@@ -1,80 +1,82 @@
 # Parte Técnico — App
 
-PWA (app web instalable) para que el técnico saque una foto del parte de
-servicio firmado, la app extraiga los datos automáticamente y los envíe
-por mail a una casilla fija.
+PWA (app web instalable) para que el técnico cargue el parte de servicio
+directamente en el celular, el cliente firme en pantalla, y se envíen
+copias por mail a la oficina y al cliente.
 
 ## Cómo funciona
 
-1. El técnico toca el botón y saca la foto.
-2. La foto se envía a `/api/extract`, una función que corre en Vercel y
-   usa la API de Claude (con visión) para leer los datos del parte.
-3. Los datos extraídos aparecen en un formulario editable — el técnico
-   revisa y corrige lo que haga falta.
-4. Al tocar "Enviar por mail", los datos (no la foto) se mandan por mail
-   usando EmailJS, a la casilla que vos configures.
+1. El técnico completa el formulario con los datos del servicio.
+2. El cliente firma con el dedo en la pantalla, confirmando conformidad.
+3. Al confirmar, la app genera un **ID único** para el parte (ej.
+   `SAT-20260723-143205-482`) y envía por mail, usando EmailJS:
+   - Una copia a la **casilla fija de la oficina**.
+   - Si el técnico cargó el mail del cliente, otra copia a **esa
+     dirección**. Si no lo cargó, sigue igual y solo manda la de oficina.
 
-## Antes de publicarla: 3 cosas para configurar
+No usa cámara ni lectura automática de fotos — todo se carga a mano.
 
-### 1. API Key de Anthropic (para la lectura automática de la foto)
-- Consola de Anthropic → crear una API key.
-- En Vercel: Project Settings → Environment Variables → agregar
-  `ANTHROPIC_API_KEY` con esa key. **No va en el código ni en el
-  frontend.**
+## Antes de publicarla: configurar EmailJS (2 plantillas)
 
-### 2. EmailJS (para el envío del mail, sin backend propio)
-- Creá una cuenta gratis en https://www.emailjs.com
-- Agregá un "Email Service" (podés conectar un Gmail, por ejemplo).
-- Creá una "Template" con estos campos disponibles (van a llegar como
-  variables desde la app): `cliente`, `direccion`, `localidad`, `tarea`,
-  `materiales`, `importe`, `tecnico`, `fecha`, `hora_entrada`,
-  `hora_salida`.
-- **Importante**: en la plantilla, poné como "To email" la casilla fija
-  a la que siempre querés que lleguen los partes.
-- Copiá tu Public Key, Service ID y Template ID y pegalos en
-  `app.js`, arriba de todo, en estas líneas:
+Se necesitan **dos plantillas** en tu cuenta de EmailJS, porque una manda
+siempre al mismo lugar (oficina) y la otra manda a un mail que cambia en
+cada parte (cliente).
+
+### 1. Plantilla de OFICINA (ya la tenés armada)
+- "To email" = tu casilla fija.
+- Variables disponibles: `id_parte`, `cliente`, `direccion`, `localidad`,
+  `tarea`, `materiales`, `importe`, `tecnico`, `fecha`, `hora_entrada`,
+  `hora_salida`, `firma_img` (esta última es un `<img>` con la firma
+  incrustada — la plantilla tiene que estar en modo **HTML** para que se
+  vea como imagen y no como texto).
+
+### 2. Plantilla de CLIENTE (nueva, falta crear)
+- En EmailJS: **Email Templates → Create New Template**.
+- En el campo **"To email"**, en vez de escribir una dirección fija,
+  escribí la variable **`{{cliente_email}}`** — así cada mail va a la
+  dirección que cargue el técnico en el formulario.
+- Mismas variables disponibles que arriba, más `cliente_email`.
+- Modo HTML también, para que se vea la firma.
+- Copiá el **Template ID** que te da y pegalo en `app.js`:
   ```js
-  const EMAILJS_PUBLIC_KEY = "TU_PUBLIC_KEY";
-  const EMAILJS_SERVICE_ID = "TU_SERVICE_ID";
-  const EMAILJS_TEMPLATE_ID = "TU_TEMPLATE_ID";
+  const EMAILJS_TEMPLATE_CLIENTE = "TU_TEMPLATE_ID_CLIENTE";
   ```
 
-### 3. Publicar en Vercel
-- Subí esta carpeta a un repo de GitHub.
-- En https://vercel.com → "New Project" → importá el repo → Deploy.
-- Vercel detecta sola la carpeta `api/` como función serverless; no hace
-  falta ningún framework ni build.
+## Publicar en Vercel
+
+- Ya no hace falta ninguna variable de entorno (se sacó la dependencia de
+  la API de Anthropic — no hay más lectura de fotos).
+- Subí los cambios al repo de GitHub y Vercel redespliega solo.
 
 ## Instalar la app en el celular Android
 
 1. Abrí la URL de Vercel en Chrome del celular.
-2. Chrome va a mostrar (o el menú ⋮ va a tener) la opción
-   "Agregar a pantalla de inicio" / "Instalar app".
-3. Queda como un ícono más, se abre en pantalla completa, sin barra de
-   navegador.
+2. Menú ⋮ → "Agregar a pantalla de inicio" / "Instalar app".
+3. Queda como un ícono más, en pantalla completa.
 
 ## Estructura del proyecto
 
 ```
-index.html      → pantallas (cámara / procesando / formulario / listo)
+index.html      → pantallas (formulario / firma / enviando / listo)
 styles.css      → diseño visual
-app.js          → lógica: cámara, llamada a la API, envío por mail
+app.js          → lógica: formulario, firma en canvas, ID único, envío doble por mail
 manifest.json   → metadata de instalación como PWA
 sw.js           → cachea la app para que abra rápido / offline
-api/extract.js  → función serverless: llama a Claude Vision
 icons/          → ícono de la app
 ```
 
-## Notas y límites de esta primera versión
+## Notas y límites de esta versión
 
-- La foto **no se guarda en ningún lado** — se lee, se procesa y se
-  descarta. Si más adelante querés guardar un historial de partes
-  (por ejemplo para buscar por cliente o fecha), se puede sumar una
-  base de datos.
-- La extracción automática puede fallar con fotos borrosas o letra muy
-  poco clara — por eso el paso 3 siempre deja los campos editables
-  antes de enviar.
-- El envío es solo de los **datos** por mail, no un PDF ni la foto
-  adjunta. Si necesitás que llegue la foto o un PDF armado del parte,
-  avisame y lo sumamos (EmailJS con plan pago permite adjuntos, o se
-  puede armar un PDF en el propio servidor de Vercel).
+- El **ID de parte** se genera por fecha/hora + un número al azar — no es
+  correlativo (parte 1, 2, 3...). Si más adelante necesitás numeración
+  correlativa real, hace falta guardar un contador en algún lado
+  persistente (por ejemplo, una base de datos), porque hoy la app no
+  guarda nada entre usos.
+- La **firma** se manda incrustada como imagen dentro del cuerpo del
+  mail (no como archivo adjunto) — funciona bien en la mayoría de los
+  clientes de mail, pero algunos podrían no mostrarla si bloquean
+  imágenes incrustadas.
+- No queda ningún registro histórico de los partes enviados dentro de la
+  app — quedan solo en las casillas de mail que los reciben. Si más
+  adelante querés un historial buscable (por cliente, fecha, etc.),
+  se puede sumar una base de datos.

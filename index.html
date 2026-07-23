@@ -28,43 +28,10 @@
     <span class="topbar-status" id="statusPill">LISTO</span>
   </header>
 
-  <!-- STEP 1: CAPTURE -->
-  <section class="screen" id="screen-capture" data-active="true">
-    <div class="viewfinder">
-      <div class="viewfinder-frame">
-        <span class="corner tl"></span>
-        <span class="corner tr"></span>
-        <span class="corner bl"></span>
-        <span class="corner br"></span>
-        <div class="viewfinder-hint">
-          <p class="hint-eyebrow">PASO 01</p>
-          <p class="hint-text">Encuadrá el parte firmado dentro del marco</p>
-        </div>
-      </div>
-    </div>
-    <label class="capture-btn" for="fileInput">
-      <span class="capture-btn-ring"></span>
-    </label>
-    <input type="file" id="fileInput" accept="image/*" capture="environment" hidden>
-    <p class="capture-caption">Tocá para fotografiar el parte técnico</p>
-  </section>
-
-  <!-- STEP 2: PROCESSING -->
-  <section class="screen" id="screen-processing">
-    <div class="scan-preview">
-      <img id="previewImg" alt="Parte técnico capturado">
-      <div class="scan-line"></div>
-    </div>
-    <div class="processing-readout">
-      <p class="hint-eyebrow">PASO 02</p>
-      <p class="hint-text" id="processingLabel">Leyendo datos del parte…</p>
-    </div>
-  </section>
-
-  <!-- STEP 3: REVIEW / EDIT -->
-  <section class="screen" id="screen-review">
+  <!-- STEP 1: FORM -->
+  <section class="screen" id="screen-form" data-active="true">
     <div class="review-scroll">
-      <p class="hint-eyebrow review-eyebrow">PASO 03 · VERIFICÁ Y CORREGÍ</p>
+      <p class="hint-eyebrow review-eyebrow">PASO 01 · DATOS DEL SERVICIO</p>
 
       <div class="field-group">
         <label class="field-label" for="f_cliente">Cliente</label>
@@ -80,6 +47,11 @@
           <label class="field-label" for="f_localidad">Localidad</label>
           <input class="field-input" id="f_localidad" type="text" placeholder="Localidad">
         </div>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="f_cliente_email">Mail del cliente <span class="field-optional">(opcional)</span></label>
+        <input class="field-input" id="f_cliente_email" type="email" placeholder="cliente@mail.com">
       </div>
 
       <div class="field-group">
@@ -117,23 +89,49 @@
           <input class="field-input field-mono" id="f_salida" type="time">
         </div>
       </div>
-
-      <div class="review-thumb-row">
-        <img id="reviewThumb" alt="Foto del parte">
-        <button class="link-btn" id="retakeBtn" type="button">Volver a sacar foto</button>
-      </div>
     </div>
 
     <div class="action-bar">
-      <button class="btn btn-primary" id="sendBtn" type="button">Enviar por mail</button>
+      <button class="btn btn-primary" id="toSignBtn" type="button">Continuar a la firma</button>
     </div>
   </section>
 
-  <!-- STEP 4: SENT -->
+  <!-- STEP 2: SIGNATURE -->
+  <section class="screen" id="screen-sign">
+    <div class="sign-header">
+      <p class="hint-eyebrow">PASO 02 · CONFORMIDAD DEL CLIENTE</p>
+      <p class="hint-text">El cliente firma para confirmar el servicio realizado</p>
+    </div>
+    <div class="sign-pad-wrap">
+      <canvas id="signCanvas"></canvas>
+      <span class="sign-line-hint">Firma</span>
+    </div>
+    <div class="sign-actions">
+      <button class="link-btn" id="clearSignBtn" type="button">Limpiar firma</button>
+      <button class="link-btn" id="backToFormBtn" type="button">← Volver a los datos</button>
+    </div>
+    <div class="action-bar">
+      <button class="btn btn-primary" id="confirmSignBtn" type="button">Confirmar y enviar</button>
+    </div>
+  </section>
+
+  <!-- STEP 3: SENDING -->
+  <section class="screen" id="screen-sending">
+    <div class="scan-preview solo">
+      <div class="scan-line"></div>
+    </div>
+    <div class="processing-readout">
+      <p class="hint-eyebrow">ENVIANDO</p>
+      <p class="hint-text" id="sendingLabel">Enviando copias por mail…</p>
+    </div>
+  </section>
+
+  <!-- STEP 4: DONE -->
   <section class="screen" id="screen-done">
     <div class="done-mark">✓</div>
     <p class="hint-eyebrow">ENVIADO</p>
-    <p class="hint-text">El parte se envió correctamente</p>
+    <p class="hint-text" id="doneMessage">El parte se envió correctamente</p>
+    <p class="done-id" id="doneId"></p>
     <button class="btn btn-secondary" id="newReportBtn" type="button">Cargar otro parte</button>
   </section>
 

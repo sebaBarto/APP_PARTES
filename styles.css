@@ -148,8 +148,8 @@ html, body {
   margin: 10px 0 max(20px, env(safe-area-inset-bottom));
 }
 
-/* ---------- STEP 2: PROCESSING ---------- */
-#screen-processing { align-items: center; justify-content: center; padding: 24px; gap: 28px; }
+/* ---------- STEP: SENDING / PROCESSING ---------- */
+#screen-sending { align-items: center; justify-content: center; padding: 24px; gap: 28px; }
 .scan-preview {
   position: relative;
   width: 100%;
@@ -157,6 +157,10 @@ html, body {
   border-radius: 6px;
   overflow: hidden;
   border: 1px solid #2A3743;
+}
+.scan-preview.solo {
+  height: 90px;
+  background: #161F29;
 }
 .scan-preview img { display: block; width: 100%; height: auto; opacity: 0.85; }
 .scan-line {
@@ -194,6 +198,12 @@ html, body {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: #6B7680;
+}
+.field-optional {
+  text-transform: none;
+  font-family: 'Inter', sans-serif;
+  color: #9AA3A9;
+  letter-spacing: normal;
 }
 .field-input {
   font-family: 'Inter', sans-serif;
@@ -258,6 +268,41 @@ html, body {
 .btn-primary:disabled { background: #C7CCC3; color: #8A9089; cursor: wait; }
 .btn-secondary { background: transparent; color: #101820; border: 1.5px solid #101820; }
 
+/* ---------- STEP: SIGNATURE ---------- */
+#screen-sign { min-height: 0; padding: 20px 18px 0; }
+.sign-header { text-align: center; margin-bottom: 18px; }
+.sign-pad-wrap {
+  position: relative;
+  flex: 1;
+  background: #F4F5F0;
+  border-radius: 12px;
+  border: 1.5px dashed #3A4753;
+  min-height: 200px;
+  overflow: hidden;
+}
+#signCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+.sign-line-hint {
+  position: absolute;
+  left: 16px;
+  bottom: 14px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #B7BDB2;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+.sign-actions {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px 2px;
+}
+
 /* ---------- STEP 4: DONE ---------- */
 #screen-done {
   align-items: center;
@@ -277,6 +322,13 @@ html, body {
   align-items: center;
   justify-content: center;
   margin-bottom: 14px;
+}
+.done-id {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  color: #5C7A8A;
+  margin-top: 8px;
+  letter-spacing: 0.04em;
 }
 #screen-done .btn-secondary {
   color: #F4F5F0;

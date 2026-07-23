@@ -25,9 +25,6 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  // Nunca cachear llamadas a la API de extracción
-  if (event.request.url.includes("/api/")) return;
-
   event.respondWith(
     caches.match(event.request).then((cached) => cached || fetch(event.request))
   );
