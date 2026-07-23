@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#101820">
+<meta name="description" content="Digitalizador de partes técnicos de servicio">
+<title>Parte Técnico</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+</head>
+<body>
+
+<div class="app" id="app">
+
+  <!-- HEADER -->
+  <header class="topbar">
+    <div class="topbar-brand">
+      <span class="topbar-mark">●</span>
+      <span class="topbar-title">PARTE&nbsp;TÉCNICO</span>
+    </div>
+    <span class="topbar-status" id="statusPill">LISTO</span>
+  </header>
+
+  <!-- STEP 1: CAPTURE -->
+  <section class="screen" id="screen-capture" data-active="true">
+    <div class="viewfinder">
+      <div class="viewfinder-frame">
+        <span class="corner tl"></span>
+        <span class="corner tr"></span>
+        <span class="corner bl"></span>
+        <span class="corner br"></span>
+        <div class="viewfinder-hint">
+          <p class="hint-eyebrow">PASO 01</p>
+          <p class="hint-text">Encuadrá el parte firmado dentro del marco</p>
+        </div>
+      </div>
+    </div>
+    <label class="capture-btn" for="fileInput">
+      <span class="capture-btn-ring"></span>
+    </label>
+    <input type="file" id="fileInput" accept="image/*" capture="environment" hidden>
+    <p class="capture-caption">Tocá para fotografiar el parte técnico</p>
+  </section>
+
+  <!-- STEP 2: PROCESSING -->
+  <section class="screen" id="screen-processing">
+    <div class="scan-preview">
+      <img id="previewImg" alt="Parte técnico capturado">
+      <div class="scan-line"></div>
+    </div>
+    <div class="processing-readout">
+      <p class="hint-eyebrow">PASO 02</p>
+      <p class="hint-text" id="processingLabel">Leyendo datos del parte…</p>
+    </div>
+  </section>
+
+  <!-- STEP 3: REVIEW / EDIT -->
+  <section class="screen" id="screen-review">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">PASO 03 · VERIFICÁ Y CORREGÍ</p>
+
+      <div class="field-group">
+        <label class="field-label" for="f_cliente">Cliente</label>
+        <input class="field-input" id="f_cliente" type="text" placeholder="Nombre del cliente">
+      </div>
+
+      <div class="field-row">
+        <div class="field-group grow">
+          <label class="field-label" for="f_direccion">Dirección</label>
+          <input class="field-input" id="f_direccion" type="text" placeholder="Calle y número">
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="f_localidad">Localidad</label>
+          <input class="field-input" id="f_localidad" type="text" placeholder="Localidad">
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="f_tarea">Tarea realizada</label>
+        <textarea class="field-input field-textarea" id="f_tarea" placeholder="Descripción de la tarea"></textarea>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="f_materiales">Materiales utilizados</label>
+        <textarea class="field-input field-textarea" id="f_materiales" placeholder="Materiales usados"></textarea>
+      </div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label class="field-label" for="f_importe">Importe del servicio</label>
+          <input class="field-input field-mono" id="f_importe" type="text" placeholder="$ 0,00">
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="f_tecnico">Técnico</label>
+          <input class="field-input" id="f_tecnico" type="text" placeholder="Nombre del técnico">
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label class="field-label" for="f_fecha">Fecha del servicio</label>
+          <input class="field-input field-mono" id="f_fecha" type="date">
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="f_entrada">Hora entrada</label>
+          <input class="field-input field-mono" id="f_entrada" type="time">
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="f_salida">Hora salida</label>
+          <input class="field-input field-mono" id="f_salida" type="time">
+        </div>
+      </div>
+
+      <div class="review-thumb-row">
+        <img id="reviewThumb" alt="Foto del parte">
+        <button class="link-btn" id="retakeBtn" type="button">Volver a sacar foto</button>
+      </div>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn btn-primary" id="sendBtn" type="button">Enviar por mail</button>
+    </div>
+  </section>
+
+  <!-- STEP 4: SENT -->
+  <section class="screen" id="screen-done">
+    <div class="done-mark">✓</div>
+    <p class="hint-eyebrow">ENVIADO</p>
+    <p class="hint-text">El parte se envió correctamente</p>
+    <button class="btn btn-secondary" id="newReportBtn" type="button">Cargar otro parte</button>
+  </section>
+
+  <!-- ERROR TOAST -->
+  <div class="toast" id="toast"></div>
+
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

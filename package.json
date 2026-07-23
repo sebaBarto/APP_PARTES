@@ -1,0 +1,6 @@
+{
+  "name": "parte-tecnico-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "PWA para digitalizar y enviar partes técnicos de servicio"
+}
