@@ -1,7 +1,7 @@
 // ==== CONFIGURACIÓN — completar antes de publicar ====
-const EMAILJS_PUBLIC_KEY = "TU_PUBLIC_KEY";
-const EMAILJS_SERVICE_ID = "TU_SERVICE_ID";
-const EMAILJS_TEMPLATE_ID = "TU_TEMPLATE_ID";
+const EMAILJS_PUBLIC_KEY = "-4JfiB5vtz2jMgIpi";
+const EMAILJS_SERVICE_ID = "service_b7zraoh";
+const EMAILJS_TEMPLATE_ID = "template_bzy9t47";
 // El mail de destino fijo se configura DENTRO de la plantilla en emailjs.com
 // (campo "To email"), no acá.
 // =======================================================
