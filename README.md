@@ -16,6 +16,26 @@ copias por mail a la oficina y al cliente.
 
 No usa cámara ni lectura automática de fotos — todo se carga a mano.
 
+## Acceso con contraseña
+
+Antes de ver el formulario, la app pide una contraseña simple. Está
+definida en `app.js`:
+```js
+const APP_PASSWORD = "Marcos@2018";
+```
+Es una validación solo del lado del celular (no hay usuarios ni login
+con servidor) — sirve para que no cualquiera que tenga la URL cargue
+partes, pero no es seguridad fuerte (cualquiera que abra el código de
+la página puede verla). Si más adelante querés un login real por
+técnico, hace falta un backend con usuarios.
+
+## Técnico interviniente
+
+Es un menú desplegable con los técnicos fijos de SAT, más la opción
+"Otro..." que habilita un campo de texto libre. Para agregar o quitar
+técnicos de la lista, se edita directamente en `index.html`, buscando
+el `<select id="f_tecnico">`.
+
 ## Antes de publicarla: configurar EmailJS (2 plantillas)
 
 Se necesitan **dos plantillas** en tu cuenta de EmailJS, porque una manda

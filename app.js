@@ -1,4 +1,10 @@
 // ==== CONFIGURACIÓN — completar antes de publicar ====
+
+// Contraseña simple para entrar a la app (se valida en el propio
+// celular, no es un login con servidor — solo para que no cualquiera
+// que abra la URL pueda cargar partes).
+const APP_PASSWORD = "Marcos@2018";
+
 const EMAILJS_PUBLIC_KEY = "-4JfiB5vtz2jMgIpi";
 
 // Plantilla que manda SIEMPRE a la casilla fija de la oficina
@@ -17,6 +23,7 @@ if (window.emailjs && EMAILJS_PUBLIC_KEY !== "TU_PUBLIC_KEY") {
 }
 
 const screens = {
+  login: document.getElementById("screen-login"),
   form: document.getElementById("screen-form"),
   sign: document.getElementById("screen-sign"),
   sending: document.getElementById("screen-sending"),
@@ -24,6 +31,11 @@ const screens = {
 };
 const statusPill = document.getElementById("statusPill");
 const toastEl = document.getElementById("toast");
+const loginBtn = document.getElementById("loginBtn");
+const loginPassword = document.getElementById("loginPassword");
+const loginError = document.getElementById("loginError");
+const tecnicoSelect = document.getElementById("f_tecnico");
+const tecnicoOtro = document.getElementById("f_tecnico_otro");
 const toSignBtn = document.getElementById("toSignBtn");
 const backToFormBtn = document.getElementById("backToFormBtn");
 const clearSignBtn = document.getElementById("clearSignBtn");
@@ -56,6 +68,38 @@ function showToast(message) {
   setTimeout(() => toastEl.classList.remove("show"), 3600);
 }
 
+// ---------- Login ---------- 
+function attemptLogin() {
+  if (loginPassword.value === APP_PASSWORD) {
+    loginError.textContent = "";
+    showScreen("form");
+  } else {
+    loginError.textContent = "Contraseña incorrecta.";
+    loginPassword.value = "";
+    loginPassword.focus();
+  }
+}
+loginBtn.addEventListener("click", attemptLogin);
+loginPassword.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") attemptLogin();
+});
+
+// ---------- Técnico: mostrar campo libre si elige "Otro..." ----------
+tecnicoSelect.addEventListener("change", () => {
+  if (tecnicoSelect.value === "otro") {
+    tecnicoOtro.style.display = "block";
+    tecnicoOtro.focus();
+  } else {
+    tecnicoOtro.style.display = "none";
+    tecnicoOtro.value = "";
+  }
+});
+
+function getTecnicoValue() {
+  if (tecnicoSelect.value === "otro") return tecnicoOtro.value.trim();
+  return tecnicoSelect.value;
+}
+
 function getFormData() {
   return {
     cliente: document.getElementById("f_cliente").value.trim(),
@@ -65,7 +109,7 @@ function getFormData() {
     tarea: document.getElementById("f_tarea").value.trim(),
     materiales: document.getElementById("f_materiales").value.trim(),
     importe: document.getElementById("f_importe").value.trim(),
-    tecnico: document.getElementById("f_tecnico").value.trim(),
+    tecnico: getTecnicoValue(),
     fecha: document.getElementById("f_fecha").value,
     hora_entrada: document.getElementById("f_entrada").value,
     hora_salida: document.getElementById("f_salida").value,
@@ -74,7 +118,10 @@ function getFormData() {
 
 function resetForm() {
   ["f_cliente","f_direccion","f_localidad","f_cliente_email","f_tarea",
-   "f_materiales","f_importe","f_tecnico"].forEach(id => document.getElementById(id).value = "");
+   "f_materiales","f_importe"].forEach(id => document.getElementById(id).value = "");
+  tecnicoSelect.value = "";
+  tecnicoOtro.value = "";
+  tecnicoOtro.style.display = "none";
   document.getElementById("f_fecha").value = "";
   document.getElementById("f_entrada").value = "";
   document.getElementById("f_salida").value = "";

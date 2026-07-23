@@ -28,8 +28,22 @@
     <span class="topbar-status" id="statusPill">LISTO</span>
   </header>
 
+  <!-- LOGIN -->
+  <section class="screen" id="screen-login" data-active="true">
+    <div class="login-wrap">
+      <span class="login-mark">●</span>
+      <p class="hint-eyebrow">ACCESO</p>
+      <p class="hint-text login-title">Ingresá la contraseña</p>
+      <input class="field-input login-input" id="loginPassword" type="password" placeholder="Contraseña" autocomplete="current-password">
+      <p class="login-error" id="loginError"></p>
+    </div>
+    <div class="action-bar">
+      <button class="btn btn-primary" id="loginBtn" type="button">Ingresar</button>
+    </div>
+  </section>
+
   <!-- STEP 1: FORM -->
-  <section class="screen" id="screen-form" data-active="true">
+  <section class="screen" id="screen-form">
     <div class="review-scroll">
       <p class="hint-eyebrow review-eyebrow">PASO 01 · DATOS DEL SERVICIO</p>
 
@@ -71,7 +85,18 @@
         </div>
         <div class="field-group">
           <label class="field-label" for="f_tecnico">Técnico</label>
-          <input class="field-input" id="f_tecnico" type="text" placeholder="Nombre del técnico">
+          <select class="field-input" id="f_tecnico">
+            <option value="" disabled selected>Elegí un técnico</option>
+            <option value="Marcos Torres">Marcos Torres</option>
+            <option value="Cristian Rossetti">Cristian Rossetti</option>
+            <option value="Rodrigo Bertorello">Rodrigo Bertorello</option>
+            <option value="Guillermo Bertorello">Guillermo Bertorello</option>
+            <option value="Marcos Pellegrini">Marcos Pellegrini</option>
+            <option value="Sebastian Bartolozzi">Sebastian Bartolozzi</option>
+            <option value="Alfredo Thiesing">Alfredo Thiesing</option>
+            <option value="otro">Otro...</option>
+          </select>
+          <input class="field-input" id="f_tecnico_otro" type="text" placeholder="Nombre del técnico" style="margin-top:8px; display:none;">
         </div>
       </div>
 

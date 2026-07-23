@@ -72,6 +72,29 @@ html, body {
 }
 .screen[data-active="true"] { display: flex; }
 
+/* ---------- LOGIN ---------- */
+#screen-login { align-items: center; justify-content: center; padding: 24px; }
+.login-wrap { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; width: 100%; max-width: 280px; }
+.login-mark { color: #F5A623; font-size: 22px; margin-bottom: 6px; }
+.login-title { margin-bottom: 14px; }
+#screen-login .login-input {
+  text-align: center;
+  background: #1B2530;
+  border: 1.5px solid #2A3743;
+  color: #F4F5F0;
+  font-size: 15px;
+  border-radius: 8px;
+  padding: 12px;
+  width: 100%;
+}
+#screen-login .login-input:focus { outline: none; border-color: #F5A623; }
+.login-error {
+  color: #E08A8A;
+  font-size: 13px;
+  min-height: 18px;
+  margin-top: 10px;
+}
+
 /* ---------- STEP 1: CAPTURE / VIEWFINDER ---------- */
 .viewfinder {
   flex: 1;
