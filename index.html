@@ -78,11 +78,46 @@
         <textarea class="field-input field-textarea" id="f_materiales" placeholder="Materiales usados"></textarea>
       </div>
 
-      <div class="field-row">
-        <div class="field-group">
-          <label class="field-label" for="f_importe">Importe del servicio</label>
-          <input class="field-input field-mono" id="f_importe" type="text" placeholder="$ 0,00">
+      <div class="field-group">
+        <label class="field-label" for="f_materiales_retirados">Materiales retirados</label>
+        <textarea class="field-input field-textarea" id="f_materiales_retirados" placeholder="Materiales retirados del sitio"></textarea>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="f_importe">Importe del servicio</label>
+        <input class="field-input field-mono" id="f_importe" type="text" placeholder="$ 0,00">
+      </div>
+
+      <div class="field-group">
+        <label class="field-label">Descuento por abonado</label>
+        <div class="discount-chips">
+          <label class="discount-chip">
+            <input type="radio" name="f_descuento_tipo" value="0" checked>
+            <span>Sin descuento</span>
+          </label>
+          <label class="discount-chip">
+            <input type="radio" name="f_descuento_tipo" value="50">
+            <span>50%</span>
+          </label>
+          <label class="discount-chip">
+            <input type="radio" name="f_descuento_tipo" value="100">
+            <span>100%</span>
+          </label>
+          <label class="discount-chip">
+            <input type="radio" name="f_descuento_tipo" value="otro">
+            <span>Otro</span>
+          </label>
         </div>
+        <input class="field-input" id="f_descuento_otro_pct" type="number" min="0" max="100" step="1" placeholder="% de descuento" style="margin-top:8px; display:none;">
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="f_costo_final">Costo final al cliente</label>
+        <input class="field-input field-mono" id="f_costo_final" type="text" placeholder="$ 0,00">
+        <span class="field-optional">Se calcula solo según el descuento, pero podés editarlo si no sabés el porcentaje.</span>
+      </div>
+
+      <div class="field-row">
         <div class="field-group">
           <label class="field-label" for="f_tecnico">Técnico</label>
           <select class="field-input" id="f_tecnico">
@@ -113,6 +148,11 @@
           <label class="field-label" for="f_salida">Hora salida</label>
           <input class="field-input field-mono" id="f_salida" type="time">
         </div>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="f_observaciones">Observaciones</label>
+        <textarea class="field-input field-textarea" id="f_observaciones" placeholder="Observaciones adicionales"></textarea>
       </div>
     </div>
 

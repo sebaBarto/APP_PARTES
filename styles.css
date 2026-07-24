@@ -246,6 +246,31 @@ html, body {
 .field-mono { font-family: 'IBM Plex Mono', monospace; font-size: 14px; }
 .field-textarea { min-height: 56px; resize: vertical; }
 
+.discount-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.discount-chip {
+  position: relative;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  color: #101820;
+  background: #FFFFFF;
+  border: 1.5px solid #D8DCD4;
+  border-radius: 20px;
+  padding: 8px 14px;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.discount-chip input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.discount-chip:has(input:checked) {
+  border-color: #F5A623;
+  background: rgba(245,166,35,0.12);
+}
+
 .review-thumb-row {
   display: flex;
   align-items: center;

@@ -36,6 +36,10 @@ const loginPassword = document.getElementById("loginPassword");
 const loginError = document.getElementById("loginError");
 const tecnicoSelect = document.getElementById("f_tecnico");
 const tecnicoOtro = document.getElementById("f_tecnico_otro");
+const importeInput = document.getElementById("f_importe");
+const descuentoRadios = document.getElementsByName("f_descuento_tipo");
+const descuentoOtroPct = document.getElementById("f_descuento_otro_pct");
+const costoFinalInput = document.getElementById("f_costo_final");
 const toSignBtn = document.getElementById("toSignBtn");
 const backToFormBtn = document.getElementById("backToFormBtn");
 const clearSignBtn = document.getElementById("clearSignBtn");
@@ -100,6 +104,67 @@ function getTecnicoValue() {
   return tecnicoSelect.value;
 }
 
+// ---------- Importe / descuento / costo final ----------
+function parseMonto(str) {
+  if (!str) return NaN;
+  let s = String(str).replace(/[^\d,.-]/g, "");
+  if (s.includes(",") && s.includes(".")) {
+    s = s.replace(/\./g, "").replace(",", ".");
+  } else if (s.includes(",")) {
+    s = s.replace(",", ".");
+  }
+  return parseFloat(s);
+}
+
+function formatMonto(num) {
+  if (isNaN(num)) return "";
+  return "$ " + num.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function getDescuentoTipo() {
+  for (const r of descuentoRadios) if (r.checked) return r.value;
+  return "0";
+}
+
+function getDescuentoPct() {
+  const tipo = getDescuentoTipo();
+  if (tipo === "0") return 0;
+  if (tipo === "otro") return parseFloat(descuentoOtroPct.value) || 0;
+  return parseFloat(tipo);
+}
+
+function getDescuentoLabel() {
+  const tipo = getDescuentoTipo();
+  if (tipo === "0") return "Sin descuento";
+  if (tipo === "otro") {
+    const pct = descuentoOtroPct.value;
+    return pct ? `${pct}%` : "Otro";
+  }
+  return `${tipo}%`;
+}
+
+function recalcularCostoFinal() {
+  const importe = parseMonto(importeInput.value);
+  const pct = getDescuentoPct();
+  if (isNaN(importe)) {
+    costoFinalInput.value = "";
+    return;
+  }
+  const final = importe - (importe * pct / 100);
+  costoFinalInput.value = formatMonto(final);
+}
+
+importeInput.addEventListener("input", recalcularCostoFinal);
+descuentoOtroPct.addEventListener("input", recalcularCostoFinal);
+descuentoRadios.forEach((r) => {
+  r.addEventListener("change", () => {
+    const esOtro = getDescuentoTipo() === "otro";
+    descuentoOtroPct.style.display = esOtro ? "block" : "none";
+    if (!esOtro) descuentoOtroPct.value = "";
+    recalcularCostoFinal();
+  });
+});
+
 function getFormData() {
   return {
     cliente: document.getElementById("f_cliente").value.trim(),
@@ -108,23 +173,31 @@ function getFormData() {
     cliente_email: document.getElementById("f_cliente_email").value.trim(),
     tarea: document.getElementById("f_tarea").value.trim(),
     materiales: document.getElementById("f_materiales").value.trim(),
+    materiales_retirados: document.getElementById("f_materiales_retirados").value.trim(),
     importe: document.getElementById("f_importe").value.trim(),
+    descuento: getDescuentoLabel(),
+    costo_final: document.getElementById("f_costo_final").value.trim(),
     tecnico: getTecnicoValue(),
     fecha: document.getElementById("f_fecha").value,
     hora_entrada: document.getElementById("f_entrada").value,
     hora_salida: document.getElementById("f_salida").value,
+    observaciones: document.getElementById("f_observaciones").value.trim(),
   };
 }
 
 function resetForm() {
   ["f_cliente","f_direccion","f_localidad","f_cliente_email","f_tarea",
-   "f_materiales","f_importe"].forEach(id => document.getElementById(id).value = "");
+   "f_materiales","f_materiales_retirados","f_importe","f_costo_final",
+   "f_observaciones"].forEach(id => document.getElementById(id).value = "");
   tecnicoSelect.value = "";
   tecnicoOtro.value = "";
   tecnicoOtro.style.display = "none";
   document.getElementById("f_fecha").value = "";
   document.getElementById("f_entrada").value = "";
   document.getElementById("f_salida").value = "";
+  descuentoRadios[0].checked = true;
+  descuentoOtroPct.value = "";
+  descuentoOtroPct.style.display = "none";
   clearSignature();
 }
 
@@ -235,11 +308,15 @@ confirmSignBtn.addEventListener("click", async () => {
     localidad: data.localidad,
     tarea: data.tarea,
     materiales: data.materiales,
+    materiales_retirados: data.materiales_retirados,
     importe: data.importe,
+    descuento: data.descuento,
+    costo_final: data.costo_final,
     tecnico: data.tecnico,
     fecha: data.fecha,
     hora_entrada: data.hora_entrada,
     hora_salida: data.hora_salida,
+    observaciones: data.observaciones,
     firma_img: signatureImgTag,
   };
 
