@@ -27,7 +27,7 @@ const SERVICIOS_URL = "/api/servicios";
 // Clave secreta compartida entre esta app, admin.html y la función
 // serverless (ver variable de entorno SERVICIOS_API_TOKEN en Vercel).
 // Cambiala antes de publicar — que sea larga y difícil de adivinar.
-const SERVICIOS_API_TOKEN = "TU_CLAVE_SECRETA_COMPARTIDA";
+const SERVICIOS_API_TOKEN = "54455ad29a4eb28e48ca915e3510ff95ceb682523fa74b32";
 // =======================================================
 
 if (window.emailjs && EMAILJS_PUBLIC_KEY !== "TU_PUBLIC_KEY") {
