@@ -36,7 +36,50 @@ Es un menú desplegable con los técnicos fijos de SAT, más la opción
 técnicos de la lista, se edita directamente en `index.html`, buscando
 el `<select id="f_tecnico">`.
 
-## Antes de publicarla: configurar EmailJS (2 plantillas)
+## Listado de servicios pendientes (precarga de datos)
+
+La app tiene una pantalla de "Servicios pendientes" después del login, que
+descarga un listado desde un endpoint propio (`/api/servicios.js`, función
+serverless de Vercel) y precarga cliente/dirección/localidad/tarea en el
+formulario cuando el técnico toca un servicio.
+
+Los datos **nunca quedan en un archivo público** — se guardan en un repo
+privado de GitHub aparte, y solo se sirven si se manda la clave secreta
+correcta. La carga se hace a mano desde `admin.html`, subiendo el CSV que
+exporta el ERP (2 veces por día alcanza).
+
+### Pasos de configuración (una sola vez)
+
+1. **Crear un repo privado nuevo** en GitHub, solo para los datos (ej.
+   `sat-servicios-data`). Que quede **Private**. Puede estar vacío.
+
+2. **Crear un Personal Access Token (fine-grained)** en GitHub, distinto
+   del que se usa para el repo de la app:
+   - Repository access: solo ese repo nuevo (`sat-servicios-data`)
+   - Permissions → Contents: **Read and write**
+   - Guardalo, lo vas a necesitar en el paso 4.
+
+3. **Elegir una clave secreta larga** (por ejemplo, generada con un
+   gestor de contraseñas) y pegarla en dos lugares:
+   - `app.js` → constante `SERVICIOS_API_TOKEN`
+   - `admin.html` → constante `SERVICIOS_API_TOKEN` (¡la misma!)
+   - También poné una contraseña propia en `admin.html` → `ADMIN_PASSWORD`
+
+4. **Cargar las variables de entorno en Vercel** (Project Settings →
+   Environment Variables):
+   - `SERVICIOS_API_TOKEN` = la misma clave del paso 3
+   - `GITHUB_DATA_TOKEN` = el token del paso 2
+   - `GITHUB_DATA_REPO` = `tu-usuario/sat-servicios-data`
+   - `GITHUB_DATA_PATH` = `servicios.json`
+   - Después de cargarlas, hacer un **redeploy** del proyecto para que
+     tomen efecto.
+
+5. Entrar a `tu-app.vercel.app/admin.html`, subir el CSV del ERP, y
+   asignar qué columna corresponde a cada dato (se recuerda para la
+   próxima vez). Al confirmar, ya queda disponible en la app de los
+   técnicos.
+
+
 
 Se necesitan **dos plantillas** en tu cuenta de EmailJS, porque una manda
 siempre al mismo lugar (oficina) y la otra manda a un mail que cambia en

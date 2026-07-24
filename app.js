@@ -18,15 +18,16 @@ const EMAILJS_TEMPLATE_OFICINA = "template_bzy9t47";
 const EMAILJS_TEMPLATE_CLIENTE = "TU_TEMPLATE_ID_CLIENTE";
 
 // URL desde donde se descarga el listado de servicios pendientes.
-// Debe responder un JSON: array de objetos con al menos
-// { numero_servicio, cliente, direccion, tarea } y opcionalmente localidad.
-// El servidor tiene que habilitar CORS para el dominio de esta app
-// (header Access-Control-Allow-Origin), si no el navegador bloquea el fetch.
-const SERVICIOS_URL = "https://TU-SERVIDOR.com/servicios-pendientes.json";
+// Es un endpoint propio (función serverless de Vercel, ver /api/servicios.js)
+// que guarda los datos en un repo privado — nunca queda como archivo
+// público. No hace falta tocar esta línea si el endpoint vive en el
+// mismo dominio que la app (caso normal).
+const SERVICIOS_URL = "/api/servicios";
 
-// Si tu endpoint requiere autenticación, completá esto y se manda
-// como header "Authorization: Bearer <token>". Dejalo vacío si no aplica.
-const SERVICIOS_API_TOKEN = "";
+// Clave secreta compartida entre esta app, admin.html y la función
+// serverless (ver variable de entorno SERVICIOS_API_TOKEN en Vercel).
+// Cambiala antes de publicar — que sea larga y difícil de adivinar.
+const SERVICIOS_API_TOKEN = "TU_CLAVE_SECRETA_COMPARTIDA";
 // =======================================================
 
 if (window.emailjs && EMAILJS_PUBLIC_KEY !== "TU_PUBLIC_KEY") {
