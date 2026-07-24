@@ -315,6 +315,33 @@ html, body {
 .btn-primary:active { opacity: 0.85; }
 .btn-primary:disabled { background: #C7CCC3; color: #8A9089; cursor: wait; }
 .btn-secondary { background: transparent; color: #101820; border: 1.5px solid #101820; }
+.btn-ghost { background: transparent; color: #101820; border: 1px solid #D8DCD4; }
+.btn-small { width: auto; padding: 8px 14px; font-size: 13px; }
+.action-bar-column { display: flex; flex-direction: column; gap: 8px; }
+
+/* ---------- STEP 0: LISTADO DE SERVICIOS ---------- */
+.list-toolbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.list-sync-label { font-size: 11px; color: #8A9089; font-family: 'IBM Plex Mono', monospace; }
+.list-status { font-size: 13px; color: #6B7680; margin: 6px 0 14px; }
+.servicios-list { display: flex; flex-direction: column; gap: 10px; }
+.servicio-card {
+  background: #FFFFFF;
+  border: 1.5px solid #D8DCD4;
+  border-radius: 10px;
+  padding: 14px 16px;
+  cursor: pointer;
+  text-align: left;
+}
+.servicio-card:active { border-color: #F5A623; background: rgba(245,166,35,0.08); }
+.servicio-card-num {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: #B5772A;
+  letter-spacing: 0.5px;
+}
+.servicio-card-cliente { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 15px; color: #101820; margin: 3px 0; }
+.servicio-card-direccion { font-size: 13px; color: #6B7680; }
+.servicio-card-tarea { font-size: 13px; color: #101820; margin-top: 4px; }
 
 /* ---------- STEP: SIGNATURE ---------- */
 #screen-sign { min-height: 0; padding: 20px 18px 0; }

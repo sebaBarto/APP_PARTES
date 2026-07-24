@@ -42,6 +42,26 @@
     </div>
   </section>
 
+  <!-- STEP 0: LISTADO DE SERVICIOS PENDIENTES -->
+  <section class="screen" id="screen-list">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">SERVICIOS PENDIENTES</p>
+
+      <div class="list-toolbar">
+        <button class="btn btn-ghost btn-small" id="refreshServiciosBtn" type="button">↻ Actualizar</button>
+        <span class="list-sync-label" id="syncLabel"></span>
+      </div>
+
+      <p class="list-status" id="listStatus"></p>
+
+      <div id="serviciosList" class="servicios-list"></div>
+    </div>
+
+    <div class="action-bar action-bar-column">
+      <button class="btn btn-secondary" id="manualReportBtn" type="button">Cargar parte sin servicio</button>
+    </div>
+  </section>
+
   <!-- STEP 1: FORM -->
   <section class="screen" id="screen-form">
     <div class="review-scroll">

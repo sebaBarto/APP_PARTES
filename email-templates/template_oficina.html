@@ -1,0 +1,137 @@
+<!--
+  PLANTILLA EMAILJS — COPIA A LA OFICINA
+  ---------------------------------------
+  En emailjs.com: Email Templates → esta plantilla (EMAILJS_TEMPLATE_OFICINA)
+  - Pegá TODO este HTML en el editor de "Content".
+  - "To email": tu casilla fija de la oficina (no una variable).
+  - "Subject" sugerido: Parte técnico {{id_parte}} - {{cliente}}
+-->
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F4F5F0; padding:24px 0; font-family:Arial, Helvetica, sans-serif;">
+  <tr>
+    <td align="center">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background:#FFFFFF; border-radius:10px; overflow:hidden; border:1px solid #D8DCD4;">
+
+        <!-- Header -->
+        <tr>
+          <td style="background:#101820; padding:20px 28px;">
+            <span style="color:#F5A623; font-size:20px;">&#9679;</span>
+            <span style="color:#FFFFFF; font-size:15px; font-weight:bold; letter-spacing:1px; margin-left:8px;">PARTE TÉCNICO</span>
+            <span style="color:#9AA3A9; font-size:12px; font-family:'Courier New', monospace; margin-top:6px;">N° {{id_parte}}</span>
+            <div style="color:#9AA3A9; font-size:12px; font-family:'Courier New', monospace; margin-top:2px;">N° de servicio (sistema): {{numero_servicio}}</div>
+          </td>
+        </tr>
+
+        <!-- Datos del cliente -->
+        <tr>
+          <td style="padding:24px 28px 8px;">
+            <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:10px;">Datos del cliente</div>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="padding:4px 0; color:#6B7680; font-size:13px; width:140px;">Cliente</td>
+                <td style="padding:4px 0; color:#101820; font-size:14px;">{{cliente}}</td>
+              </tr>
+              <tr>
+                <td style="padding:4px 0; color:#6B7680; font-size:13px;">Dirección</td>
+                <td style="padding:4px 0; color:#101820; font-size:14px;">{{direccion}}</td>
+              </tr>
+              <tr>
+                <td style="padding:4px 0; color:#6B7680; font-size:13px;">Localidad</td>
+                <td style="padding:4px 0; color:#101820; font-size:14px;">{{localidad}}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Datos del servicio -->
+        <tr>
+          <td style="padding:16px 28px 8px;">
+            <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:10px;">Datos del servicio</div>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="padding:4px 0; color:#6B7680; font-size:13px; width:140px;">Técnico</td>
+                <td style="padding:4px 0; color:#101820; font-size:14px;">{{tecnico}}</td>
+              </tr>
+              <tr>
+                <td style="padding:4px 0; color:#6B7680; font-size:13px;">Fecha</td>
+                <td style="padding:4px 0; color:#101820; font-size:14px;">{{fecha}}</td>
+              </tr>
+              <tr>
+                <td style="padding:4px 0; color:#6B7680; font-size:13px;">Horario</td>
+                <td style="padding:4px 0; color:#101820; font-size:14px;">{{hora_entrada}} a {{hora_salida}}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Tarea -->
+        <tr>
+          <td style="padding:16px 28px 8px;">
+            <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:6px;">Tarea realizada</div>
+            <div style="color:#101820; font-size:14px; line-height:1.5; background:#F4F5F0; border-radius:8px; padding:12px 14px;">{{tarea}}</div>
+          </td>
+        </tr>
+
+        <!-- Materiales -->
+        <tr>
+          <td style="padding:16px 28px 8px;">
+            <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:6px;">Materiales utilizados</div>
+            <div style="color:#101820; font-size:14px; line-height:1.5; background:#F4F5F0; border-radius:8px; padding:12px 14px;">{{materiales}}</div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:16px 28px 8px;">
+            <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:6px;">Materiales retirados</div>
+            <div style="color:#101820; font-size:14px; line-height:1.5; background:#F4F5F0; border-radius:8px; padding:12px 14px;">{{materiales_retirados}}</div>
+          </td>
+        </tr>
+
+        <!-- Costos -->
+        <tr>
+          <td style="padding:16px 28px 8px;">
+            <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:10px;">Costos</div>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="padding:4px 0; color:#6B7680; font-size:13px; width:140px;">Importe del servicio</td>
+                <td style="padding:4px 0; color:#101820; font-size:14px; font-family:'Courier New', monospace;">{{importe}}</td>
+              </tr>
+              <tr>
+                <td style="padding:4px 0; color:#6B7680; font-size:13px;">Descuento aplicado</td>
+                <td style="padding:4px 0; color:#101820; font-size:14px;">{{descuento}}</td>
+              </tr>
+              <tr>
+                <td style="padding:8px 0 4px; color:#6B7680; font-size:13px; font-weight:bold;">Costo final al cliente</td>
+                <td style="padding:8px 0 4px; color:#101820; font-size:15px; font-weight:bold; font-family:'Courier New', monospace;">{{costo_final}}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Observaciones -->
+        <tr>
+          <td style="padding:16px 28px 8px;">
+            <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:6px;">Observaciones</div>
+            <div style="color:#101820; font-size:14px; line-height:1.5; background:#F4F5F0; border-radius:8px; padding:12px 14px;">{{observaciones}}</div>
+          </td>
+        </tr>
+
+        <!-- Firma -->
+        <tr>
+          <td style="padding:16px 28px 24px;">
+            <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:8px;">Firma del cliente</div>
+            <div style="background:#F4F5F0; border-radius:8px; padding:14px; border:1px solid #D8DCD4;">
+              {{{firma_img}}}
+            </div>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background:#101820; padding:14px 28px; color:#9AA3A9; font-size:11px; font-family:'Courier New', monospace; text-align:center;">
+            Generado automáticamente por la app de partes técnicos
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>

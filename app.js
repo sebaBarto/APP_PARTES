@@ -16,6 +16,17 @@ const EMAILJS_TEMPLATE_OFICINA = "template_bzy9t47";
 // Esta plantilla debe tener el campo "To email" configurado como
 // {{cliente_email}} en emailjs.com, NO una casilla fija.
 const EMAILJS_TEMPLATE_CLIENTE = "TU_TEMPLATE_ID_CLIENTE";
+
+// URL desde donde se descarga el listado de servicios pendientes.
+// Debe responder un JSON: array de objetos con al menos
+// { numero_servicio, cliente, direccion, tarea } y opcionalmente localidad.
+// El servidor tiene que habilitar CORS para el dominio de esta app
+// (header Access-Control-Allow-Origin), si no el navegador bloquea el fetch.
+const SERVICIOS_URL = "https://TU-SERVIDOR.com/servicios-pendientes.json";
+
+// Si tu endpoint requiere autenticación, completá esto y se manda
+// como header "Authorization: Bearer <token>". Dejalo vacío si no aplica.
+const SERVICIOS_API_TOKEN = "";
 // =======================================================
 
 if (window.emailjs && EMAILJS_PUBLIC_KEY !== "TU_PUBLIC_KEY") {
@@ -24,6 +35,7 @@ if (window.emailjs && EMAILJS_PUBLIC_KEY !== "TU_PUBLIC_KEY") {
 
 const screens = {
   login: document.getElementById("screen-login"),
+  list: document.getElementById("screen-list"),
   form: document.getElementById("screen-form"),
   sign: document.getElementById("screen-sign"),
   sending: document.getElementById("screen-sending"),
@@ -34,6 +46,11 @@ const toastEl = document.getElementById("toast");
 const loginBtn = document.getElementById("loginBtn");
 const loginPassword = document.getElementById("loginPassword");
 const loginError = document.getElementById("loginError");
+const refreshServiciosBtn = document.getElementById("refreshServiciosBtn");
+const manualReportBtn = document.getElementById("manualReportBtn");
+const syncLabel = document.getElementById("syncLabel");
+const listStatus = document.getElementById("listStatus");
+const serviciosListEl = document.getElementById("serviciosList");
 const tecnicoSelect = document.getElementById("f_tecnico");
 const tecnicoOtro = document.getElementById("f_tecnico_otro");
 const importeInput = document.getElementById("f_importe");
@@ -54,6 +71,8 @@ const ctx = canvas.getContext("2d");
 let hasSignature = false;
 let drawing = false;
 let lastX = 0, lastY = 0;
+let currentNumeroServicio = "";
+let serviciosCache = [];
 
 function showScreen(name) {
   Object.entries(screens).forEach(([key, el]) => {
@@ -76,7 +95,8 @@ function showToast(message) {
 function attemptLogin() {
   if (loginPassword.value === APP_PASSWORD) {
     loginError.textContent = "";
-    showScreen("form");
+    showScreen("list");
+    fetchServicios();
   } else {
     loginError.textContent = "Contraseña incorrecta.";
     loginPassword.value = "";
@@ -86,6 +106,78 @@ function attemptLogin() {
 loginBtn.addEventListener("click", attemptLogin);
 loginPassword.addEventListener("keydown", (e) => {
   if (e.key === "Enter") attemptLogin();
+});
+
+// ---------- Listado de servicios pendientes ----------
+function formatSyncTime(date) {
+  return "Actualizado " + date.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+}
+
+function renderServiciosList(items) {
+  serviciosListEl.innerHTML = "";
+  if (!items || items.length === 0) {
+    listStatus.textContent = "No hay servicios pendientes por el momento.";
+    return;
+  }
+  listStatus.textContent = "";
+  items.forEach((item) => {
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "servicio-card";
+    card.innerHTML = `
+      <div class="servicio-card-num">N° ${item.numero_servicio ?? ""}</div>
+      <div class="servicio-card-cliente">${item.cliente ?? ""}</div>
+      <div class="servicio-card-direccion">${item.direccion ?? ""}${item.localidad ? ", " + item.localidad : ""}</div>
+      <div class="servicio-card-tarea">${item.tarea ?? ""}</div>
+    `;
+    card.addEventListener("click", () => seleccionarServicio(item));
+    serviciosListEl.appendChild(card);
+  });
+}
+
+async function fetchServicios() {
+  listStatus.textContent = "Buscando servicios...";
+  try {
+    const headers = {};
+    if (SERVICIOS_API_TOKEN) headers["Authorization"] = "Bearer " + SERVICIOS_API_TOKEN;
+    const res = await fetch(SERVICIOS_URL, { headers });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    serviciosCache = Array.isArray(data) ? data : [];
+    localStorage.setItem("servicios_cache", JSON.stringify(serviciosCache));
+    localStorage.setItem("servicios_cache_time", String(Date.now()));
+    syncLabel.textContent = formatSyncTime(new Date());
+    renderServiciosList(serviciosCache);
+  } catch (err) {
+    const cachedRaw = localStorage.getItem("servicios_cache");
+    const cachedTime = localStorage.getItem("servicios_cache_time");
+    if (cachedRaw) {
+      serviciosCache = JSON.parse(cachedRaw);
+      renderServiciosList(serviciosCache);
+      const when = cachedTime ? formatSyncTime(new Date(Number(cachedTime))) : "";
+      listStatus.textContent = "Sin conexión con el servidor. Mostrando la última lista guardada.";
+      syncLabel.textContent = when;
+    } else {
+      serviciosCache = [];
+      renderServiciosList([]);
+      listStatus.textContent = "No se pudo conectar con el servidor y no hay una lista guardada.";
+    }
+  }
+}
+
+function seleccionarServicio(item) {
+  currentNumeroServicio = item.numero_servicio ?? "";
+  document.getElementById("f_cliente").value = item.cliente ?? "";
+  document.getElementById("f_direccion").value = item.direccion ?? "";
+  if (item.localidad) document.getElementById("f_localidad").value = item.localidad;
+  document.getElementById("f_tarea").value = item.tarea ?? "";
+  showScreen("form");
+}
+
+refreshServiciosBtn.addEventListener("click", fetchServicios);
+manualReportBtn.addEventListener("click", () => {
+  currentNumeroServicio = "";
+  showScreen("form");
 });
 
 // ---------- Técnico: mostrar campo libre si elige "Otro..." ----------
@@ -167,6 +259,7 @@ descuentoRadios.forEach((r) => {
 
 function getFormData() {
   return {
+    numero_servicio: currentNumeroServicio,
     cliente: document.getElementById("f_cliente").value.trim(),
     direccion: document.getElementById("f_direccion").value.trim(),
     localidad: document.getElementById("f_localidad").value.trim(),
@@ -198,6 +291,7 @@ function resetForm() {
   descuentoRadios[0].checked = true;
   descuentoOtroPct.value = "";
   descuentoOtroPct.style.display = "none";
+  currentNumeroServicio = "";
   clearSignature();
 }
 
@@ -227,9 +321,15 @@ backToFormBtn.addEventListener("click", () => {
 });
 
 newReportBtn.addEventListener("click", () => {
+  const numeroCompletado = currentNumeroServicio;
   resetForm();
   setStatus("LISTO");
-  showScreen("form");
+  // Saco el servicio recién completado de la lista en pantalla para
+  // que no lo vuelvan a elegir por error (el próximo fetch real ya
+  // no debería traerlo desde el sistema de origen).
+  serviciosCache = serviciosCache.filter((s) => s.numero_servicio !== numeroCompletado);
+  renderServiciosList(serviciosCache);
+  showScreen("list");
 });
 
 // ---------- Pad de firma (canvas) ----------
@@ -303,6 +403,7 @@ confirmSignBtn.addEventListener("click", async () => {
 
   const basePayload = {
     id_parte: idParte,
+    numero_servicio: data.numero_servicio,
     cliente: data.cliente,
     direccion: data.direccion,
     localidad: data.localidad,
