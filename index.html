@@ -137,6 +137,32 @@
         <span class="field-optional">Se calcula solo según el descuento, pero podés editarlo si no sabés el porcentaje.</span>
       </div>
 
+      <div class="field-group">
+        <label class="field-label">Forma de pago</label>
+        <div class="discount-chips">
+          <label class="discount-chip">
+            <input type="checkbox" name="f_forma_pago" value="PAGADO">
+            <span>PAGADO</span>
+          </label>
+          <label class="discount-chip">
+            <input type="checkbox" name="f_forma_pago" value="TRANSFIERE">
+            <span>TRANSFIERE</span>
+          </label>
+          <label class="discount-chip">
+            <input type="checkbox" name="f_forma_pago" value="PAGA CON ABONO">
+            <span>PAGA CON ABONO</span>
+          </label>
+          <label class="discount-chip">
+            <input type="checkbox" name="f_forma_pago" value="DEBITO">
+            <span>DEBITO</span>
+          </label>
+          <label class="discount-chip">
+            <input type="checkbox" name="f_forma_pago" value="PAGA EN OF">
+            <span>PAGA EN OF</span>
+          </label>
+        </div>
+      </div>
+
       <div class="field-row">
         <div class="field-group">
           <label class="field-label" for="f_tecnico">Técnico</label>
@@ -176,8 +202,9 @@
       </div>
     </div>
 
-    <div class="action-bar">
+    <div class="action-bar action-bar-column">
       <button class="btn btn-primary" id="toSignBtn" type="button">Continuar a la firma</button>
+      <button class="btn btn-secondary" id="backToListBtn" type="button">Volver</button>
     </div>
   </section>
 

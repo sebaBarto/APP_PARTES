@@ -58,6 +58,8 @@ const importeInput = document.getElementById("f_importe");
 const descuentoRadios = document.getElementsByName("f_descuento_tipo");
 const descuentoOtroPct = document.getElementById("f_descuento_otro_pct");
 const costoFinalInput = document.getElementById("f_costo_final");
+const formaPagoChecks = document.getElementsByName("f_forma_pago");
+const backToListBtn = document.getElementById("backToListBtn");
 const toSignBtn = document.getElementById("toSignBtn");
 const backToFormBtn = document.getElementById("backToFormBtn");
 const clearSignBtn = document.getElementById("clearSignBtn");
@@ -258,6 +260,18 @@ descuentoRadios.forEach((r) => {
   });
 });
 
+function getFormaPago() {
+  return Array.from(formaPagoChecks)
+    .filter((c) => c.checked)
+    .map((c) => c.value)
+    .join(", ");
+}
+
+backToListBtn.addEventListener("click", () => {
+  resetForm();
+  showScreen("list");
+});
+
 function getFormData() {
   return {
     numero_servicio: currentNumeroServicio,
@@ -271,6 +285,7 @@ function getFormData() {
     importe: document.getElementById("f_importe").value.trim(),
     descuento: getDescuentoLabel(),
     costo_final: document.getElementById("f_costo_final").value.trim(),
+    forma_pago: getFormaPago(),
     tecnico: getTecnicoValue(),
     fecha: document.getElementById("f_fecha").value,
     hora_entrada: document.getElementById("f_entrada").value,
@@ -292,6 +307,7 @@ function resetForm() {
   descuentoRadios[0].checked = true;
   descuentoOtroPct.value = "";
   descuentoOtroPct.style.display = "none";
+  formaPagoChecks.forEach((c) => { c.checked = false; });
   currentNumeroServicio = "";
   clearSignature();
 }
@@ -414,6 +430,7 @@ confirmSignBtn.addEventListener("click", async () => {
     importe: data.importe,
     descuento: data.descuento,
     costo_final: data.costo_final,
+    forma_pago: data.forma_pago,
     tecnico: data.tecnico,
     fecha: data.fecha,
     hora_entrada: data.hora_entrada,
