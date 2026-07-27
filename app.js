@@ -433,7 +433,11 @@ confirmSignBtn.addEventListener("click", async () => {
   }
 
   const data = getFormData();
-  const idParte = generarIdParte();
+  // El N° de parte que se muestra y se manda por mail toma el N° de
+  // servicio real (el que viene del listado precargado). Solo se genera
+  // uno automático si el técnico cargó el parte manualmente, sin elegir
+  // un servicio de la lista.
+  const idParte = data.numero_servicio ? data.numero_servicio : generarIdParte();
   const signatureDataUrl = canvas.toDataURL("image/png");
   const signatureImgTag = `<img src="${signatureDataUrl}" alt="Firma del cliente" width="260" style="display:block;" />`;
 
