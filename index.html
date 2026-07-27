@@ -202,6 +202,16 @@
       </div>
 
       <div class="field-group">
+        <label class="field-label" for="f_foto">Foto (opcional — solo se manda a la oficina)</label>
+        <input class="field-input" id="f_foto" type="file" accept="image/*" capture="environment">
+        <div id="fotoPreviewWrap" class="hidden" style="margin-top:8px;">
+          <img id="fotoPreview" style="max-width:160px; border-radius:8px; display:block; border:1px solid #D8DCD4;">
+          <button type="button" class="btn btn-ghost btn-small" id="quitarFotoBtn" style="margin-top:6px;">Quitar foto</button>
+        </div>
+        <p class="status" id="fotoStatus" style="font-size:12px; color:#6B7680; margin:6px 0 0;"></p>
+      </div>
+
+      <div class="field-group">
         <label class="field-label" for="f_observaciones">Observaciones</label>
         <textarea class="field-input field-textarea" id="f_observaciones" placeholder="Observaciones adicionales"></textarea>
       </div>

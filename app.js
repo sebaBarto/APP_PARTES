@@ -61,6 +61,11 @@ const descuentoOtroPct = document.getElementById("f_descuento_otro_pct");
 const costoFinalInput = document.getElementById("f_costo_final");
 const formaPagoChecks = document.getElementsByName("f_forma_pago");
 const backToListBtn = document.getElementById("backToListBtn");
+const fotoInput = document.getElementById("f_foto");
+const fotoPreviewWrap = document.getElementById("fotoPreviewWrap");
+const fotoPreview = document.getElementById("fotoPreview");
+const quitarFotoBtn = document.getElementById("quitarFotoBtn");
+const fotoStatus = document.getElementById("fotoStatus");
 const toSignBtn = document.getElementById("toSignBtn");
 const backToFormBtn = document.getElementById("backToFormBtn");
 const clearSignBtn = document.getElementById("clearSignBtn");
@@ -77,6 +82,8 @@ let drawing = false;
 let lastX = 0, lastY = 0;
 let currentNumeroServicio = "";
 let serviciosCache = [];
+let fotoBase64 = null;
+let fotoMimeType = null;
 
 function showScreen(name) {
   Object.entries(screens).forEach(([key, el]) => {
@@ -294,6 +301,60 @@ backToListBtn.addEventListener("click", () => {
   showScreen("list");
 });
 
+// ---------- Foto opcional (solo va a la oficina, sube a Drive) ----------
+function comprimirImagen(file, maxDim, calidad) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = (e) => { img.src = e.target.result; };
+    reader.onerror = reject;
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > height && width > maxDim) {
+        height = Math.round((height * maxDim) / width);
+        width = maxDim;
+      } else if (height > maxDim) {
+        width = Math.round((width * maxDim) / height);
+        height = maxDim;
+      }
+      const canvasFoto = document.createElement("canvas");
+      canvasFoto.width = width;
+      canvasFoto.height = height;
+      const ctx2 = canvasFoto.getContext("2d");
+      ctx2.drawImage(img, 0, 0, width, height);
+      resolve(canvasFoto.toDataURL("image/jpeg", calidad));
+    };
+    img.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+fotoInput.addEventListener("change", async () => {
+  const file = fotoInput.files[0];
+  if (!file) return;
+  fotoStatus.textContent = "Procesando foto...";
+  try {
+    const dataUrl = await comprimirImagen(file, 1600, 0.75);
+    fotoBase64 = dataUrl;
+    fotoMimeType = "image/jpeg";
+    fotoPreview.src = dataUrl;
+    fotoPreviewWrap.classList.remove("hidden");
+    const kb = Math.round((dataUrl.length * 0.75) / 1024);
+    fotoStatus.textContent = `Foto lista (~${kb} KB).`;
+  } catch (err) {
+    fotoStatus.textContent = "No se pudo procesar la foto.";
+    fotoBase64 = null;
+  }
+});
+
+quitarFotoBtn.addEventListener("click", () => {
+  fotoBase64 = null;
+  fotoMimeType = null;
+  fotoInput.value = "";
+  fotoPreviewWrap.classList.add("hidden");
+  fotoStatus.textContent = "";
+});
+
 function getFormData() {
   return {
     numero_servicio: currentNumeroServicio,
@@ -331,6 +392,11 @@ function resetForm() {
   descuentoOtroPct.style.display = "none";
   formaPagoChecks.forEach((c) => { c.checked = false; });
   currentNumeroServicio = "";
+  fotoBase64 = null;
+  fotoMimeType = null;
+  fotoInput.value = "";
+  fotoPreviewWrap.classList.add("hidden");
+  fotoStatus.textContent = "";
   clearSignature();
 }
 
@@ -444,6 +510,33 @@ confirmSignBtn.addEventListener("click", async () => {
   showScreen("sending");
   setStatus("ENVIANDO", "busy");
 
+  let fotoLink = "";
+  if (fotoBase64) {
+    try {
+      sendingLabel.textContent = "Subiendo foto...";
+      const fotoRes = await fetch("/api/upload-foto", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: "Bearer " + SERVICIOS_API_TOKEN,
+        },
+        body: JSON.stringify({
+          filename: `${idParte}.jpg`,
+          mimeType: fotoMimeType || "image/jpeg",
+          base64: fotoBase64,
+        }),
+      });
+      const fotoData = await fotoRes.json();
+      if (fotoRes.ok && fotoData.link) {
+        fotoLink = fotoData.link;
+      } else {
+        console.error("Error subiendo foto:", fotoData);
+      }
+    } catch (err) {
+      console.error("Error subiendo foto:", err);
+    }
+  }
+
   const basePayload = {
     id_parte: idParte,
     numero_servicio: data.numero_servicio,
@@ -471,7 +564,10 @@ confirmSignBtn.addEventListener("click", async () => {
 
   try {
     sendingLabel.textContent = "Enviando copia a la oficina…";
-    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_OFICINA, basePayload);
+    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_OFICINA, {
+      ...basePayload,
+      foto_link: fotoLink,
+    });
     oficinaOk = true;
   } catch (err) {
     console.error("Error enviando a oficina:", err);
