@@ -52,6 +52,7 @@ const manualReportBtn = document.getElementById("manualReportBtn");
 const syncLabel = document.getElementById("syncLabel");
 const listStatus = document.getElementById("listStatus");
 const serviciosListEl = document.getElementById("serviciosList");
+const serviciosSearch = document.getElementById("serviciosSearch");
 const tecnicoSelect = document.getElementById("f_tecnico");
 const tecnicoOtro = document.getElementById("f_tecnico_otro");
 const importeInput = document.getElementById("f_importe");
@@ -116,10 +117,27 @@ function formatSyncTime(date) {
   return "Actualizado " + date.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
 }
 
+function normalizeText(s) {
+  return (s || "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function filtrarServicios() {
+  const term = normalizeText(serviciosSearch.value);
+  if (!term) return serviciosCache;
+  return serviciosCache.filter((item) => {
+    const haystack = normalizeText(
+      [item.numero_servicio, item.cliente, item.direccion, item.localidad, item.tarea].join(" ")
+    );
+    return haystack.includes(term);
+  });
+}
+
 function renderServiciosList(items) {
   serviciosListEl.innerHTML = "";
   if (!items || items.length === 0) {
-    listStatus.textContent = "No hay servicios pendientes por el momento.";
+    listStatus.textContent = serviciosSearch.value.trim()
+      ? "No se encontraron servicios para esa búsqueda."
+      : "No hay servicios pendientes por el momento.";
     return;
   }
   listStatus.textContent = "";
@@ -138,6 +156,10 @@ function renderServiciosList(items) {
   });
 }
 
+serviciosSearch.addEventListener("input", () => {
+  renderServiciosList(filtrarServicios());
+});
+
 async function fetchServicios() {
   listStatus.textContent = "Buscando servicios...";
   try {
@@ -150,13 +172,13 @@ async function fetchServicios() {
     localStorage.setItem("servicios_cache", JSON.stringify(serviciosCache));
     localStorage.setItem("servicios_cache_time", String(Date.now()));
     syncLabel.textContent = formatSyncTime(new Date());
-    renderServiciosList(serviciosCache);
+    renderServiciosList(filtrarServicios());
   } catch (err) {
     const cachedRaw = localStorage.getItem("servicios_cache");
     const cachedTime = localStorage.getItem("servicios_cache_time");
     if (cachedRaw) {
       serviciosCache = JSON.parse(cachedRaw);
-      renderServiciosList(serviciosCache);
+      renderServiciosList(filtrarServicios());
       const when = cachedTime ? formatSyncTime(new Date(Number(cachedTime))) : "";
       listStatus.textContent = "Sin conexión con el servidor. Mostrando la última lista guardada.";
       syncLabel.textContent = when;
@@ -345,7 +367,7 @@ newReportBtn.addEventListener("click", () => {
   // que no lo vuelvan a elegir por error (el próximo fetch real ya
   // no debería traerlo desde el sistema de origen).
   serviciosCache = serviciosCache.filter((s) => s.numero_servicio !== numeroCompletado);
-  renderServiciosList(serviciosCache);
+  renderServiciosList(filtrarServicios());
   showScreen("list");
 });
 

@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   * { box-sizing: border-box; }
   body {
@@ -53,11 +54,22 @@
 
   <div id="mainCard" class="hidden">
     <h1>Cargar servicios pendientes</h1>
-    <p class="subtitle">Subí el CSV que exporta el ERP. Se reemplaza el listado completo que ve la app.</p>
+    <p class="subtitle">Subí el archivo que exporta el ERP (CSV o Excel). Se reemplaza el listado completo que ve la app.</p>
 
     <div class="card">
-      <label for="csvFile">Archivo CSV</label>
-      <input type="file" id="csvFile" accept=".csv,.txt">
+      <label for="csvFile">Archivo (CSV o Excel)</label>
+      <input type="file" id="csvFile" accept=".csv,.txt,.xlsx,.xls">
+
+      <div id="sheetRow" class="hidden">
+        <label for="sheetSelect">Hoja</label>
+        <select id="sheetSelect"></select>
+      </div>
+
+      <div id="headerRowField" class="hidden">
+        <label for="headerRowInput">Fila del encabezado (donde están los nombres de columna)</label>
+        <input type="number" id="headerRowInput" min="1" step="1" value="1">
+      </div>
+
       <p class="status" id="parseStatus"></p>
     </div>
 
@@ -114,6 +126,10 @@ const pwError = document.getElementById("pwError");
 const loginCard = document.getElementById("loginCard");
 const mainCard = document.getElementById("mainCard");
 const csvFile = document.getElementById("csvFile");
+const sheetRow = document.getElementById("sheetRow");
+const sheetSelect = document.getElementById("sheetSelect");
+const headerRowField = document.getElementById("headerRowField");
+const headerRowInput = document.getElementById("headerRowInput");
 const parseStatus = document.getElementById("parseStatus");
 const mappingCard = document.getElementById("mappingCard");
 const uploadBtn = document.getElementById("uploadBtn");
@@ -138,32 +154,119 @@ pwBtn.addEventListener("click", () => {
 });
 pw.addEventListener("keydown", (e) => { if (e.key === "Enter") pwBtn.click(); });
 
+let workbook = null;   // libro Excel actual (si el archivo es Excel)
+let rawAllRows = [];   // filas crudas (array de arrays) de la hoja/csv actual
+
 csvFile.addEventListener("change", () => {
   const file = csvFile.files[0];
   if (!file) return;
+  const nombre = file.name.toLowerCase();
+  delete headerRowInput.dataset.touched;
+  sheetRow.classList.add("hidden");
+  headerRowField.classList.add("hidden");
+  mappingCard.classList.add("hidden");
+  uploadBtn.classList.add("hidden");
   parseStatus.textContent = "Leyendo archivo...";
-  Papa.parse(file, {
-    header: true,
-    skipEmptyLines: true,
-    complete: (results) => {
-      parsedRows = results.data;
-      headers = results.meta.fields || [];
-      if (headers.length === 0 || parsedRows.length === 0) {
-        parseStatus.textContent = "No se encontraron filas o columnas en el archivo.";
-        mappingCard.classList.add("hidden");
-        uploadBtn.classList.add("hidden");
-        return;
+
+  if (nombre.endsWith(".xlsx") || nombre.endsWith(".xls")) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        workbook = XLSX.read(new Uint8Array(e.target.result), { type: "array" });
+        const sheetNames = workbook.SheetNames.filter((name) => {
+          const rows = XLSX.utils.sheet_to_json(workbook.Sheets[name], { header: 1 });
+          return rows.length > 0;
+        });
+        sheetSelect.innerHTML = "";
+        (sheetNames.length ? sheetNames : workbook.SheetNames).forEach((name) => {
+          const opt = document.createElement("option");
+          opt.value = name;
+          opt.textContent = name;
+          sheetSelect.appendChild(opt);
+        });
+        sheetRow.classList.remove("hidden");
+        cargarHojaSeleccionada();
+      } catch (err) {
+        parseStatus.textContent = "No se pudo leer el archivo Excel.";
       }
-      parseStatus.textContent = `Se leyeron ${parsedRows.length} filas.`;
-      setupMapping();
-      mappingCard.classList.remove("hidden");
-      uploadBtn.classList.remove("hidden");
-    },
-    error: () => {
-      parseStatus.textContent = "No se pudo leer el archivo. ¿Es un CSV válido?";
-    },
-  });
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    workbook = null;
+    Papa.parse(file, {
+      header: false,
+      skipEmptyLines: true,
+      complete: (results) => {
+        rawAllRows = results.data;
+        procesarFilasCrudas();
+      },
+      error: () => {
+        parseStatus.textContent = "No se pudo leer el archivo. ¿Es un CSV válido?";
+      },
+    });
+  }
 });
+
+sheetSelect.addEventListener("change", cargarHojaSeleccionada);
+headerRowInput.addEventListener("change", procesarFilasCrudas);
+
+function cargarHojaSeleccionada() {
+  if (!workbook) return;
+  delete headerRowInput.dataset.touched;
+  const sheet = workbook.Sheets[sheetSelect.value];
+  rawAllRows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: "" });
+  procesarFilasCrudas();
+}
+
+// Adivina en qué fila está el encabezado real: la primera con varias
+// celdas no vacías (los reportes de ERP suelen traer título/filtros
+// arriba, con solo 1 o 2 celdas usadas, antes del encabezado real).
+function adivinarFilaEncabezado(rows) {
+  for (let i = 0; i < rows.length; i++) {
+    const noVacias = (rows[i] || []).filter((c) => (c ?? "").toString().trim() !== "").length;
+    if (noVacias >= 3) return i + 1; // 1-based
+  }
+  return 1;
+}
+
+function procesarFilasCrudas() {
+  if (!rawAllRows || rawAllRows.length === 0) {
+    parseStatus.textContent = "No se encontraron filas en el archivo.";
+    mappingCard.classList.add("hidden");
+    uploadBtn.classList.add("hidden");
+    return;
+  }
+
+  if (!headerRowInput.dataset.touched) {
+    headerRowInput.value = adivinarFilaEncabezado(rawAllRows);
+  }
+  headerRowField.classList.remove("hidden");
+
+  const headerIdx = Math.max(1, parseInt(headerRowInput.value, 10) || 1) - 1;
+  headers = (rawAllRows[headerIdx] || []).map((h) => (h ?? "").toString().trim()).filter((h) => h !== "");
+  const dataRaw = rawAllRows.slice(headerIdx + 1);
+  parsedRows = dataRaw
+    .filter((r) => (r || []).some((c) => (c ?? "").toString().trim() !== ""))
+    .map((r) => {
+      const obj = {};
+      headers.forEach((h, i) => { obj[h] = (r[i] ?? "").toString().trim(); });
+      return obj;
+    });
+
+  if (headers.length === 0 || parsedRows.length === 0) {
+    parseStatus.textContent = "No se encontraron columnas o filas con esa fila de encabezado. Probá cambiando el número.";
+    mappingCard.classList.add("hidden");
+    uploadBtn.classList.add("hidden");
+    return;
+  }
+
+  parseStatus.textContent = `Se leyeron ${parsedRows.length} filas.`;
+  setupMapping();
+  mappingCard.classList.remove("hidden");
+  uploadBtn.classList.remove("hidden");
+}
+
+headerRowInput.addEventListener("input", () => { headerRowInput.dataset.touched = "1"; });
 
 function setupMapping() {
   const savedMap = JSON.parse(localStorage.getItem(MAP_KEY) || "{}");

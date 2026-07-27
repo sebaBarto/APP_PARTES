@@ -45,8 +45,14 @@ formulario cuando el técnico toca un servicio.
 
 Los datos **nunca quedan en un archivo público** — se guardan en un repo
 privado de GitHub aparte, y solo se sirven si se manda la clave secreta
-correcta. La carga se hace a mano desde `admin.html`, subiendo el CSV que
-exporta el ERP (2 veces por día alcanza).
+correcta. La carga se hace a mano desde `admin.html`, subiendo el CSV o
+Excel que exporta el ERP (2 veces por día alcanza). Si el archivo tiene
+título o filtros arriba del encabezado real (común en reportes de ERP),
+`admin.html` intenta adivinar en qué fila está el encabezado, pero se
+puede corregir a mano.
+
+En la app, la pantalla de servicios pendientes tiene un buscador arriba
+para filtrar por cliente, dirección, N° de servicio o tarea.
 
 ### Pasos de configuración (una sola vez)
 
