@@ -1081,6 +1081,7 @@ let historialCache = [];
 let dashPeriodoActivo = "mes";
 let chartTecnico = null;
 let chartDias = null;
+let chartDistancia = null;
 
 function obtenerRangoPeriodo(periodo) {
   const hoy = new Date();
@@ -1203,6 +1204,7 @@ async function renderDashboard() {
     porTecnico[nombre].distanciaKm = distanciaTotal / 1000;
   }
   dashStatus.textContent = "";
+  renderChartDistancia(porTecnico);
 
   // Ranking del período elegido arriba (Día / Semana / Mes) para las
   // medallas — el técnico con más resueltos en ese período.
@@ -1328,6 +1330,33 @@ function renderChartDias(rango, enPeriodo) {
       maintainAspectRatio: false,
       plugins: { legend: { display: false }, title: { display: true, text: "Resueltos por día" } },
       scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+    },
+  });
+}
+
+const PALETA_TECNICOS = ["#F5A623", "#101820", "#2E86DE", "#2E7D32", "#B5772A", "#8A9089", "#C0392B", "#6B7680"];
+
+function renderChartDistancia(porTecnico) {
+  const canvas = document.getElementById("dashChartDistancia");
+  if (chartDistancia) chartDistancia.destroy();
+  const nombres = Object.keys(porTecnico).filter((n) => porTecnico[n].distanciaKm > 0);
+  if (nombres.length === 0) return;
+  chartDistancia = new Chart(canvas, {
+    type: "pie",
+    data: {
+      labels: nombres.map((n) => `${n} (${porTecnico[n].distanciaKm.toFixed(1)} km)`),
+      datasets: [{
+        data: nombres.map((n) => porTecnico[n].distanciaKm),
+        backgroundColor: nombres.map((_, i) => PALETA_TECNICOS[i % PALETA_TECNICOS.length]),
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 10 } } },
+        title: { display: true, text: "Distancia aproximada recorrida" },
+      },
     },
   });
 }
