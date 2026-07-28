@@ -389,6 +389,26 @@ libre en un solo campo. Si la lista de materiales frecuentes no
 representa bien lo que usan, se puede editar fácil en `index.html`
 (son checkboxes simples).
 
+## Aviso "estoy en camino" por WhatsApp
+
+Al lado del botón de llamar (📞) hay un botón verde de WhatsApp (📲),
+que también aparece solo si el servicio tiene teléfono cargado. Al
+tocarlo, abre WhatsApp con un mensaje ya escrito ("Hola! Soy \<técnico\>,
+técnico de SAT... estoy en camino...") — el técnico solo tiene que
+tocar "Enviar".
+
+No es un envío 100% automático (usamos un link `wa.me`, no la API de
+WhatsApp Business, que tiene costo por mensaje y requiere verificación
+de Meta) — pero no tiene ningún costo ni trámite, y solo requiere ese
+toque extra.
+
+**Importante sobre el formato del teléfono**: el link arma el número
+asumiendo Argentina (agrega `549` adelante si el teléfono no viene ya
+con código de país). Si los teléfonos que carga el ERP tienen otro
+formato, puede que el link no abra el chat correcto la primera vez —
+conviene probarlo con un número real y, si hace falta, ajustar la
+función `limpiarTelefonoWhatsapp` en `app.js`.
+
 ## Notas y límites de esta versión
 
 - El **ID de parte** se genera por fecha/hora + un número al azar — no es

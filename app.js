@@ -324,6 +324,44 @@ function actualizarBotonLlamar(telefono) {
   }
 }
 
+// ---------- Aviso "estoy en camino" por WhatsApp (link wa.me) ----------
+const whatsappClienteBtn = document.getElementById("whatsappClienteBtn");
+
+function limpiarTelefonoWhatsapp(numero) {
+  let limpio = (numero || "").toString().replace(/\D/g, "");
+  if (!limpio) return "";
+  // Si no viene con código de país, se asume Argentina (54) + el 9 que
+  // llevan los celulares en WhatsApp. Puede necesitar ajuste según el
+  // formato real de los teléfonos que carga el ERP — probar con un
+  // número real y corregir acá si hace falta.
+  if (!limpio.startsWith("54")) {
+    limpio = "549" + limpio.replace(/^0/, "");
+  }
+  return limpio;
+}
+
+function actualizarBotonWhatsapp(telefono) {
+  const numero = (telefono || "").toString().trim();
+  if (numero) {
+    whatsappClienteBtn.dataset.telefono = numero;
+    whatsappClienteBtn.classList.remove("hidden");
+  } else {
+    whatsappClienteBtn.dataset.telefono = "";
+    whatsappClienteBtn.classList.add("hidden");
+  }
+}
+
+whatsappClienteBtn.addEventListener("click", (e) => {
+  const numero = limpiarTelefonoWhatsapp(whatsappClienteBtn.dataset.telefono);
+  if (!numero) {
+    e.preventDefault();
+    return;
+  }
+  const tecnico = getTecnicoValue() || "un técnico";
+  const mensaje = `Hola! Soy ${tecnico}, técnico de SAT (seguridad electrónica). Le escribo para avisarle que estoy en camino a su domicilio para el servicio técnico. ¡Nos vemos pronto!`;
+  whatsappClienteBtn.href = `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
+});
+
 function seleccionarServicio(item) {
   currentNumeroServicio = item.numero_servicio ?? "";
   document.getElementById("f_cliente").value = item.cliente ?? "";
@@ -331,6 +369,7 @@ function seleccionarServicio(item) {
   if (item.localidad) document.getElementById("f_localidad").value = item.localidad;
   document.getElementById("f_tarea").value = item.tarea ?? "";
   actualizarBotonLlamar(item.telefono);
+  actualizarBotonWhatsapp(item.telefono);
   autocompletarTecnico();
   autocompletarFecha();
   mostrarVisitaAnterior();
@@ -341,6 +380,7 @@ refreshServiciosBtn.addEventListener("click", fetchServicios);
 manualReportBtn.addEventListener("click", () => {
   currentNumeroServicio = "";
   actualizarBotonLlamar(null);
+  actualizarBotonWhatsapp(null);
   autocompletarTecnico();
   autocompletarFecha();
   mostrarVisitaAnterior();
@@ -503,6 +543,7 @@ function seleccionarTareaCronograma(t) {
   if (parsed.localidad) document.getElementById("f_localidad").value = parsed.localidad;
   document.getElementById("f_tarea").value = (t.tarea || "").replace(/\n/g, " ");
   actualizarBotonLlamar(null);
+  actualizarBotonWhatsapp(null);
   autocompletarTecnico();
   autocompletarFecha();
   mostrarVisitaAnterior();
@@ -999,6 +1040,7 @@ function resetForm() {
   fotoPreviewWrap.classList.add("hidden");
   fotoStatus.textContent = "";
   actualizarBotonLlamar(null);
+  actualizarBotonWhatsapp(null);
   autocompletarTecnico();
   autocompletarFecha();
   mostrarVisitaAnterior();

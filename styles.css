@@ -230,6 +230,7 @@ html, body {
   text-decoration: none;
 }
 .btn-llamar:active { opacity: 0.85; }
+.btn-whatsapp { background: #25D366; color: #FFFFFF; }
 .field-label {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 11px;
