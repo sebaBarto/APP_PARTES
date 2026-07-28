@@ -110,6 +110,8 @@ const dashInstalacionesNum = document.getElementById("dashInstalacionesNum");
 const dashServiciosNum = document.getElementById("dashServiciosNum");
 const dashTecnicosList = document.getElementById("dashTecnicosList");
 const dashRepetidosList = document.getElementById("dashRepetidosList");
+const refreshDashboardBtn = document.getElementById("refreshDashboardBtn");
+const dashSyncLabel = document.getElementById("dashSyncLabel");
 const verDashboardFinancieroBtn = document.getElementById("verDashboardFinancieroBtn");
 const volverDeDashboardFinancieroBtn = document.getElementById("volverDeDashboardFinancieroBtn");
 const dashFinStatus = document.getElementById("dashFinStatus");
@@ -117,6 +119,8 @@ const dashFinPagosNum = document.getElementById("dashFinPagosNum");
 const dashFinBonificadosNum = document.getElementById("dashFinBonificadosNum");
 const dashFinTotalNum = document.getElementById("dashFinTotalNum");
 const dashFinPromedioNum = document.getElementById("dashFinPromedioNum");
+const refreshDashboardFinancieroBtn = document.getElementById("refreshDashboardFinancieroBtn");
+const dashFinSyncLabel = document.getElementById("dashFinSyncLabel");
 const mapaStatus = document.getElementById("mapaStatus");
 const mapaCercanosList = document.getElementById("mapaCercanosList");
 const toSignBtn = document.getElementById("toSignBtn");
@@ -1173,11 +1177,13 @@ async function fetchDashboard() {
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     historialCache = Array.isArray(data) ? data : [];
+    dashSyncLabel.textContent = formatSyncTime(new Date());
     await renderDashboard();
   } catch (err) {
     dashStatus.textContent = "No se pudo cargar el historial para el dashboard.";
   }
 }
+refreshDashboardBtn.addEventListener("click", fetchDashboard);
 
 async function renderDashboard() {
   const rango = obtenerRangoPeriodo(dashPeriodoActivo);
@@ -1463,12 +1469,14 @@ async function fetchDashboardFinanciero() {
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     historialCache = Array.isArray(data) ? data : [];
+    dashFinSyncLabel.textContent = formatSyncTime(new Date());
     dashFinStatus.textContent = "";
     renderDashboardFinanciero();
   } catch (err) {
     dashFinStatus.textContent = "No se pudo cargar el historial para el dashboard financiero.";
   }
 }
+refreshDashboardFinancieroBtn.addEventListener("click", fetchDashboardFinanciero);
 
 function renderDashboardFinanciero() {
   const rango = obtenerRangoPeriodo(dashFinPeriodoActivo);
