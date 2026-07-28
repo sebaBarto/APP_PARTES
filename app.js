@@ -6,13 +6,13 @@
 // campo "Técnico"). Los nombres tienen que coincidir EXACTO con las
 // opciones del selector de técnico en index.html.
 const TECNICOS_PASSWORDS = {
-  "Marcos Torres": "CAMBIAR_CLAVE_MARCOS_TORRES",
-  "Cristian Rossetti": "CAMBIAR_CLAVE_CRISTIAN_ROSSETTI",
+  "Marcos Torres": "MarcosT@253",
+  "Cristian Rossetti": "CristianR@5890",
   "Rodrigo Bertorello": "CAMBIAR_CLAVE_RODRIGO_BERTORELLO",
-  "Guillermo Bertorello": "CAMBIAR_CLAVE_GUILLERMO_BERTORELLO",
-  "Marcos Pellegrini": "CAMBIAR_CLAVE_MARCOS_PELLEGRINI",
-  "Sebastian Bartolozzi": "CAMBIAR_CLAVE_SEBASTIAN_BARTOLOZZI",
-  "Alfredo Thiesing": "CAMBIAR_CLAVE_ALFREDO_THIESING",
+  "Guillermo Bertorello": "GuillermoB@849",
+  "Marcos Pellegrini": "MarcosP@2907",
+  "Sebastian Bartolozzi": "Sebab031",
+  "Alfredo Thiesing": "AlfredoT@3972",
 };
 
 // Contraseña general de respaldo (para oficina/pruebas) — entra sin
