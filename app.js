@@ -80,6 +80,10 @@ const cronoStatus = document.getElementById("cronoStatus");
 const cronoTareasList = document.getElementById("cronoTareasList");
 const tecnicoSelect = document.getElementById("f_tecnico");
 const tecnicoOtro = document.getElementById("f_tecnico_otro");
+const dosTecnicosCheck = document.getElementById("f_dos_tecnicos");
+const segundoTecnicoWrap = document.getElementById("segundoTecnicoWrap");
+const tecnicoSelect2 = document.getElementById("f_tecnico2");
+const tecnicoOtro2 = document.getElementById("f_tecnico2_otro");
 const importeInput = document.getElementById("f_importe");
 const descuentoRadios = document.getElementsByName("f_descuento_tipo");
 const descuentoOtroPct = document.getElementById("f_descuento_otro_pct");
@@ -460,9 +464,37 @@ tecnicoSelect.addEventListener("change", () => {
   }
 });
 
+// ---------- Segundo técnico (opcional, si fueron dos al servicio) ----------
+dosTecnicosCheck.addEventListener("change", () => {
+  if (dosTecnicosCheck.checked) {
+    segundoTecnicoWrap.classList.remove("hidden");
+  } else {
+    segundoTecnicoWrap.classList.add("hidden");
+    tecnicoSelect2.value = "";
+    tecnicoOtro2.value = "";
+    tecnicoOtro2.style.display = "none";
+  }
+});
+
+tecnicoSelect2.addEventListener("change", () => {
+  if (tecnicoSelect2.value === "otro") {
+    tecnicoOtro2.style.display = "block";
+    tecnicoOtro2.focus();
+  } else {
+    tecnicoOtro2.style.display = "none";
+    tecnicoOtro2.value = "";
+  }
+});
+
 function getTecnicoValue() {
   if (tecnicoSelect.value === "otro") return tecnicoOtro.value.trim();
   return tecnicoSelect.value;
+}
+
+function getTecnico2Value() {
+  if (!dosTecnicosCheck.checked) return "";
+  if (tecnicoSelect2.value === "otro") return tecnicoOtro2.value.trim();
+  return tecnicoSelect2.value || "";
 }
 
 // Si el técnico que inició sesión coincide con una opción del selector,
@@ -741,6 +773,7 @@ function getFormData() {
     costo_final: document.getElementById("f_costo_final").value.trim(),
     forma_pago: getFormaPago(),
     tecnico: getTecnicoValue(),
+    tecnico2: getTecnico2Value(),
     fecha: document.getElementById("f_fecha").value,
     hora_entrada: document.getElementById("f_entrada").value,
     hora_salida: document.getElementById("f_salida").value,
@@ -755,6 +788,11 @@ function resetForm() {
   tecnicoSelect.value = "";
   tecnicoOtro.value = "";
   tecnicoOtro.style.display = "none";
+  dosTecnicosCheck.checked = false;
+  segundoTecnicoWrap.classList.add("hidden");
+  tecnicoSelect2.value = "";
+  tecnicoOtro2.value = "";
+  tecnicoOtro2.style.display = "none";
   document.getElementById("f_fecha").value = "";
   document.getElementById("f_entrada").value = "";
   document.getElementById("f_salida").value = "";
@@ -925,6 +963,7 @@ confirmSignBtn.addEventListener("click", async () => {
     costo_final: data.costo_final,
     forma_pago: data.forma_pago,
     tecnico: data.tecnico,
+    tecnico2: data.tecnico2,
     fecha: data.fecha,
     hora_entrada: data.hora_entrada,
     hora_salida: data.hora_salida,

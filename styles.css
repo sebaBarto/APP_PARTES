@@ -261,6 +261,15 @@ html, body {
 .field-mono { font-family: 'IBM Plex Mono', monospace; font-size: 14px; }
 .field-textarea { min-height: 56px; resize: vertical; }
 .hidden { display: none !important; }
+.check-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #101820;
+  cursor: pointer;
+}
+.check-inline input[type="checkbox"] { width: 18px; height: 18px; accent-color: #F5A623; }
 
 .discount-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .discount-chip {
