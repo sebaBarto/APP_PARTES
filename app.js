@@ -118,6 +118,8 @@ const dashInstalacionesNum = document.getElementById("dashInstalacionesNum");
 const dashServiciosNum = document.getElementById("dashServiciosNum");
 const dashTecnicosList = document.getElementById("dashTecnicosList");
 const dashRepetidosList = document.getElementById("dashRepetidosList");
+const sugerenciasWrap = document.getElementById("sugerenciasWrap");
+const sugerenciasList = document.getElementById("sugerenciasList");
 const refreshDashboardBtn = document.getElementById("refreshDashboardBtn");
 const dashSyncLabel = document.getElementById("dashSyncLabel");
 const verDashboardFinancieroBtn = document.getElementById("verDashboardFinancieroBtn");
@@ -227,6 +229,7 @@ function attemptLogin() {
     showScreen("list");
     fetchServicios();
     precargarHistorialParaVisitas();
+    precargarCronogramaParaSugerencias();
     actualizarBadgeColaEnvios();
     procesarColaEnvios();
   } else if (intento === APP_PASSWORD_GENERAL) {
@@ -237,6 +240,7 @@ function attemptLogin() {
     showScreen("list");
     fetchServicios();
     precargarHistorialParaVisitas();
+    precargarCronogramaParaSugerencias();
     actualizarBadgeColaEnvios();
     procesarColaEnvios();
   } else {
@@ -259,6 +263,22 @@ async function precargarHistorialParaVisitas() {
     historialCache = Array.isArray(data) ? data : [];
   } catch (err) {
     // silencioso — la info de visita anterior simplemente no aparece
+  }
+}
+
+// Precarga el cronograma en segundo plano al loguearse, para poder
+// detectar si el técnico ya terminó toda su agenda del día y sugerirle
+// servicios pendientes cercanos al finalizar un parte.
+async function precargarCronogramaParaSugerencias() {
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/cronograma", { headers, cache: "no-store" });
+    if (!res.ok) return;
+    const data = await res.json();
+    cronogramaCache = Array.isArray(data.tareas) ? data.tareas : [];
+    cronogramaTecnicosCache = Array.isArray(data.tecnicos) ? data.tecnicos : [];
+  } catch (err) {
+    // silencioso — la sugerencia de servicios cercanos simplemente no aparece
   }
 }
 
@@ -1082,6 +1102,76 @@ function renderizarMapa(actual, porId) {
 }
 
 verMapaBtn.addEventListener("click", abrirMapa);
+
+// ---------- Sugerencia de servicios cercanos al terminar la agenda ----------
+// Si el técnico ya completó todas las tareas de HOY que tenía en el
+// cronograma, sugiere los servicios pendientes más cercanos al último
+// que completó — para que no tenga que volver a la oficina de una.
+async function verificarYSugerirCercanos(data) {
+  try {
+    const tecnico = data.tecnico;
+    const fechaHoy = data.fecha;
+    if (!tecnico || !fechaHoy || !data.direccion) return;
+
+    const tareasDeHoy = cronogramaCache.filter((t) => t.tecnico === tecnico && t.fecha === fechaHoy);
+    if (tareasDeHoy.length === 0) return; // no hay agenda cargada para hoy, no aplica
+
+    const quedanPendientes = tareasDeHoy.some((t) => {
+      const match = encontrarServicioPorTarea(t.tarea);
+      return match && !(match.numero_servicio && serviciosResueltos.has(match.numero_servicio));
+    });
+    if (quedanPendientes) return; // todavía le queda algo agendado hoy
+
+    const pendientesReales = serviciosCache.filter(
+      (s) => !(s.numero_servicio && serviciosResueltos.has(s.numero_servicio))
+    );
+    if (pendientesReales.length === 0) return;
+
+    const items = [{ id: "actual", direccion: data.direccion, localidad: data.localidad || "" }];
+    pendientesReales.forEach((s, idx) => {
+      if (s.direccion) items.push({ id: `s${idx}`, direccion: s.direccion, localidad: s.localidad || "" });
+    });
+    if (items.length <= 1) return;
+
+    const res = await fetch("/api/geocode", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({ items }),
+    });
+    const geoData = await res.json();
+    const porId = {};
+    (geoData.results || []).forEach((r) => { porId[r.id] = r; });
+    const actual = porId["actual"];
+    if (!actual || actual.error || actual.pendiente) return;
+
+    const cercanos = [];
+    pendientesReales.forEach((s, idx) => {
+      const r = porId[`s${idx}`];
+      if (!r || r.error || r.pendiente) return;
+      const dist = distanciaMetros(actual.lat, actual.lon, r.lat, r.lon);
+      if (dist > 3) cercanos.push({ servicio: s, dist });
+    });
+    if (cercanos.length === 0) return;
+
+    cercanos.sort((a, b) => a.dist - b.dist);
+    sugerenciasList.innerHTML = "";
+    cercanos.slice(0, 5).forEach(({ servicio, dist }) => {
+      const card = document.createElement("button");
+      card.type = "button";
+      card.className = "sugerencia-card";
+      card.innerHTML = `
+        <div class="sugerencia-card-cliente">${servicio.cliente || ""}</div>
+        <div class="sugerencia-card-dist">${(dist / 1000).toFixed(1)} km — ${servicio.direccion || ""}</div>
+      `;
+      card.addEventListener("click", () => seleccionarServicio(servicio));
+      sugerenciasList.appendChild(card);
+    });
+    sugerenciasWrap.classList.remove("hidden");
+  } catch (err) {
+    // si falla algo (geocodificación, conexión), simplemente no se
+    // muestra ninguna sugerencia — no interrumpe el flujo del parte.
+  }
+}
 volverDeMapaBtn.addEventListener("click", () => {
   showScreen("form");
 });
@@ -1484,6 +1574,11 @@ confirmSignBtn.addEventListener("click", async () => {
 
   setStatus(oficinaOk ? "LISTO" : "");
   doneId.textContent = `N° de parte: ${idParte}`;
+  sugerenciasWrap.classList.add("hidden");
+  sugerenciasList.innerHTML = "";
+  if (oficinaOk) {
+    verificarYSugerirCercanos(data);
+  }
 
   let mensajeFoto = "";
   if (fotoBase64 && fotoError) {

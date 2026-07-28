@@ -251,6 +251,31 @@ archivo fijo puntual en vez de una carpeta, sigue existiendo la
 variable `CRONOGRAMA_DRIVE_FILE_ID` como respaldo — pero no es lo
 recomendado dado que el ID cambia con cada actualización.)
 
+## Sugerencia de servicios cercanos al terminar la agenda
+
+Cuando un técnico envía un parte con éxito, la app revisa si ya
+completó **todas** las tareas que tenía agendadas para **hoy** en el
+cronograma (comparando cada tarea contra el listado de servicios
+pendientes, igual que al tocar una tarea del cronograma). Si no le
+queda nada agendado para hoy, en la pantalla de "enviado" aparece una
+lista con los servicios pendientes más cercanos al que acaba de
+terminar — tocando uno, abre el formulario directo con esos datos.
+
+Límites a tener en cuenta:
+
+- Depende de la misma comparación por nombre de cliente que ya usa el
+  cronograma — si no encuentra coincidencia para alguna tarea agendada,
+  la cuenta puede no cerrar bien (por las dudas, en ese caso prefiere
+  no mostrar nada antes que sugerir de más).
+- Si el técnico nunca abrió la pantalla del cronograma en la sesión,
+  igual funciona — el cronograma se precarga solo al loguearse, en
+  segundo plano.
+- Usa el mismo geocodificador y caché que el mapa (`/api/geocode.js`),
+  así que la primera vez que se prueba con direcciones nuevas puede
+  tardar unos segundos.
+- Si algo falla (sin conexión, geocodificación, etc.) simplemente no
+  aparece ninguna sugerencia — nunca interrumpe el envío del parte.
+
 ## Mapa del servicio y servicios cercanos
 
 Desde el formulario hay un botón "📍 Ver en mapa" que muestra la
