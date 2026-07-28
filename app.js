@@ -1,9 +1,24 @@
 // ==== CONFIGURACIÓN — completar antes de publicar ====
 
-// Contraseña simple para entrar a la app (se valida en el propio
-// celular, no es un login con servidor — solo para que no cualquiera
-// que abra la URL pueda cargar partes).
-const APP_PASSWORD = "Marcos@2018";
+// Contraseña propia por técnico (se valida en el propio celular, no es
+// un login con servidor — solo para que no cualquiera que abra la URL
+// pueda cargar partes, y para saber quién entró y autocompletar el
+// campo "Técnico"). Los nombres tienen que coincidir EXACTO con las
+// opciones del selector de técnico en index.html.
+const TECNICOS_PASSWORDS = {
+  "Marcos Torres": "CAMBIAR_CLAVE_MARCOS_TORRES",
+  "Cristian Rossetti": "CAMBIAR_CLAVE_CRISTIAN_ROSSETTI",
+  "Rodrigo Bertorello": "CAMBIAR_CLAVE_RODRIGO_BERTORELLO",
+  "Guillermo Bertorello": "CAMBIAR_CLAVE_GUILLERMO_BERTORELLO",
+  "Marcos Pellegrini": "CAMBIAR_CLAVE_MARCOS_PELLEGRINI",
+  "Sebastian Bartolozzi": "CAMBIAR_CLAVE_SEBASTIAN_BARTOLOZZI",
+  "Alfredo Thiesing": "CAMBIAR_CLAVE_ALFREDO_THIESING",
+};
+
+// Contraseña general de respaldo (para oficina/pruebas) — entra sin
+// asociarse a ningún técnico en particular, y el campo Técnico queda
+// para elegir a mano como antes.
+const APP_PASSWORD_GENERAL = "Marcos@2018";
 
 const EMAILJS_PUBLIC_KEY = "-4JfiB5vtz2jMgIpi";
 
@@ -118,9 +133,24 @@ function showToast(message) {
   setTimeout(() => toastEl.classList.remove("show"), 3600);
 }
 
-// ---------- Login ---------- 
+// ---------- Login ----------
+let tecnicoLogueado = "";
+
 function attemptLogin() {
-  if (loginPassword.value === APP_PASSWORD) {
+  const intento = loginPassword.value;
+  const nombreCoincidente = Object.keys(TECNICOS_PASSWORDS).find(
+    (nombre) => TECNICOS_PASSWORDS[nombre] === intento
+  );
+
+  if (nombreCoincidente) {
+    tecnicoLogueado = nombreCoincidente;
+    localStorage.setItem("tecnico_logueado", tecnicoLogueado);
+    loginError.textContent = "";
+    showScreen("list");
+    fetchServicios();
+  } else if (intento === APP_PASSWORD_GENERAL) {
+    tecnicoLogueado = "";
+    localStorage.removeItem("tecnico_logueado");
     loginError.textContent = "";
     showScreen("list");
     fetchServicios();
@@ -238,6 +268,7 @@ function seleccionarServicio(item) {
   if (item.localidad) document.getElementById("f_localidad").value = item.localidad;
   document.getElementById("f_tarea").value = item.tarea ?? "";
   actualizarBotonLlamar(item.telefono);
+  autocompletarTecnico();
   showScreen("form");
 }
 
@@ -245,6 +276,7 @@ refreshServiciosBtn.addEventListener("click", fetchServicios);
 manualReportBtn.addEventListener("click", () => {
   currentNumeroServicio = "";
   actualizarBotonLlamar(null);
+  autocompletarTecnico();
   showScreen("form");
 });
 
@@ -404,6 +436,7 @@ function seleccionarTareaCronograma(t) {
   if (parsed.localidad) document.getElementById("f_localidad").value = parsed.localidad;
   document.getElementById("f_tarea").value = (t.tarea || "").replace(/\n/g, " ");
   actualizarBotonLlamar(null);
+  autocompletarTecnico();
   showScreen("form");
 }
 
@@ -430,6 +463,17 @@ tecnicoSelect.addEventListener("change", () => {
 function getTecnicoValue() {
   if (tecnicoSelect.value === "otro") return tecnicoOtro.value.trim();
   return tecnicoSelect.value;
+}
+
+// Si el técnico que inició sesión coincide con una opción del selector,
+// se autocompleta (pero se puede cambiar a mano si hiciera falta).
+function autocompletarTecnico() {
+  if (!tecnicoLogueado) return;
+  const opcionExiste = Array.from(tecnicoSelect.options).some((o) => o.value === tecnicoLogueado);
+  if (opcionExiste) {
+    tecnicoSelect.value = tecnicoLogueado;
+    tecnicoOtro.style.display = "none";
+  }
 }
 
 // ---------- Importe / descuento / costo final ----------
@@ -725,6 +769,7 @@ function resetForm() {
   fotoPreviewWrap.classList.add("hidden");
   fotoStatus.textContent = "";
   actualizarBotonLlamar(null);
+  autocompletarTecnico();
   clearSignature();
 }
 

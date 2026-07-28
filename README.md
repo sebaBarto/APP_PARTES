@@ -16,18 +16,40 @@ copias por mail a la oficina y al cliente.
 
 No usa cámara ni lectura automática de fotos — todo se carga a mano.
 
-## Acceso con contraseña
+## Acceso con contraseña (una por técnico)
 
-Antes de ver el formulario, la app pide una contraseña simple. Está
-definida en `app.js`:
+Cada técnico tiene su propia contraseña, definida en `app.js`:
 ```js
-const APP_PASSWORD = "Marcos@2018";
+const TECNICOS_PASSWORDS = {
+  "Marcos Torres": "CAMBIAR_CLAVE_MARCOS_TORRES",
+  "Cristian Rossetti": "CAMBIAR_CLAVE_CRISTIAN_ROSSETTI",
+  "Rodrigo Bertorello": "CAMBIAR_CLAVE_RODRIGO_BERTORELLO",
+  "Guillermo Bertorello": "CAMBIAR_CLAVE_GUILLERMO_BERTORELLO",
+  "Marcos Pellegrini": "CAMBIAR_CLAVE_MARCOS_PELLEGRINI",
+  "Sebastian Bartolozzi": "CAMBIAR_CLAVE_SEBASTIAN_BARTOLOZZI",
+  "Alfredo Thiesing": "CAMBIAR_CLAVE_ALFREDO_THIESING",
+};
 ```
+Hay que reemplazar cada `CAMBIAR_CLAVE_...` por una contraseña real antes
+de publicar. Los nombres tienen que coincidir exacto con las opciones
+del selector "Técnico" en `index.html` — si cambiás un nombre en un
+lado, cambialo también en el otro.
+
+Cuando un técnico entra con su contraseña, la app **autocompleta el
+campo "Técnico"** del formulario con su nombre (se puede corregir a
+mano si hiciera falta, por ejemplo si alguien usa el celular de otro
+técnico).
+
+También existe una contraseña general de respaldo (`APP_PASSWORD_GENERAL`,
+para oficina o pruebas) que entra sin asociarse a ningún técnico — en
+ese caso el campo "Técnico" queda para elegir a mano, como antes.
+
 Es una validación solo del lado del celular (no hay usuarios ni login
 con servidor) — sirve para que no cualquiera que tenga la URL cargue
-partes, pero no es seguridad fuerte (cualquiera que abra el código de
-la página puede verla). Si más adelante querés un login real por
-técnico, hace falta un backend con usuarios.
+partes y para saber quién entró, pero no es seguridad fuerte (cualquiera
+que abra el código de la página puede ver las contraseñas). Si más
+adelante se necesita un login real y protegido, hace falta un backend
+con usuarios.
 
 ## Técnico interviniente
 
