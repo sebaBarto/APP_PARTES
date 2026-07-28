@@ -1,107 +1,13 @@
-// Función serverless de Vercel — sube una foto a una carpeta de Google
-// Drive usando una cuenta de servicio (service account), y devuelve el
-// link para verla. Las credenciales viven SOLO en variables de entorno
+// Función serverless de Vercel — sube una foto al MISMO repo privado de
+// GitHub que ya se usa para los servicios pendientes (no requiere Google
+// Cloud ni Drive). Las credenciales viven solo en variables de entorno
 // del servidor, nunca llegan al navegador.
 //
-// Variables de entorno a configurar en Vercel:
-//   SERVICIOS_API_TOKEN            -> misma clave que ya usan admin.html y app.js
-//   GOOGLE_SERVICE_ACCOUNT_EMAIL    -> "client_email" del JSON de la cuenta de servicio
-//   GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY -> "private_key" del mismo JSON (con los \n tal cual)
-//   GOOGLE_DRIVE_FOLDER_ID          -> ID de la carpeta de Drive donde se guardan las fotos
-
-function base64url(input) {
-  return Buffer.from(input)
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-}
-
-async function getAccessToken() {
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const privateKey = (process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY || "").replace(/\\n/g, "\n");
-  if (!email || !privateKey) {
-    throw new Error("Faltan las credenciales de Google en las variables de entorno");
-  }
-
-  const now = Math.floor(Date.now() / 1000);
-  const header = { alg: "RS256", typ: "JWT" };
-  const claim = {
-    iss: email,
-    scope: "https://www.googleapis.com/auth/drive.file",
-    aud: "https://oauth2.googleapis.com/token",
-    exp: now + 3600,
-    iat: now,
-  };
-
-  const unsigned = `${base64url(JSON.stringify(header))}.${base64url(JSON.stringify(claim))}`;
-  const crypto = require("crypto");
-  const signer = crypto.createSign("RSA-SHA256");
-  signer.update(unsigned);
-  signer.end();
-  const signature = signer.sign(privateKey).toString("base64")
-    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  const jwt = `${unsigned}.${signature}`;
-
-  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
-      assertion: jwt,
-    }),
-  });
-  const tokenData = await tokenRes.json();
-  if (!tokenRes.ok) {
-    throw new Error("No se pudo autenticar con Google: " + JSON.stringify(tokenData));
-  }
-  return tokenData.access_token;
-}
-
-async function subirArchivo(accessToken, { filename, mimeType, buffer }) {
-  const folderId = process.env.GOOGLE_DRIVE_FOLDER_ID;
-  const boundary = "sat_foto_boundary_" + Date.now();
-  const metadata = { name: filename, parents: folderId ? [folderId] : undefined };
-
-  const bodyParts = [
-    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n`,
-    `--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n`,
-  ];
-  const multipartBody = Buffer.concat([
-    Buffer.from(bodyParts[0], "utf-8"),
-    Buffer.from(bodyParts[1], "utf-8"),
-    buffer,
-    Buffer.from(`\r\n--${boundary}--`, "utf-8"),
-  ]);
-
-  const uploadRes = await fetch(
-    "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": `multipart/related; boundary=${boundary}`,
-      },
-      body: multipartBody,
-    }
-  );
-  const uploadData = await uploadRes.json();
-  if (!uploadRes.ok) {
-    throw new Error("No se pudo subir el archivo a Drive: " + JSON.stringify(uploadData));
-  }
-  return uploadData;
-}
-
-async function hacerPublico(accessToken, fileId) {
-  await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ role: "reader", type: "anyone" }),
-  });
-}
+// Reutiliza las variables de entorno que ya existen para /api/servicios.js:
+//   SERVICIOS_API_TOKEN   -> misma clave que ya usan admin.html y app.js
+//   GITHUB_DATA_TOKEN     -> mismo token con permiso de escritura sobre el repo de datos
+//   GITHUB_DATA_REPO      -> ej: "sebaBarto/sat-servicios-data"
+// Las fotos se guardan bajo la carpeta "fotos/" de ese mismo repo.
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") {
@@ -117,23 +23,47 @@ module.exports = async (req, res) => {
     return;
   }
 
+  const { GITHUB_DATA_TOKEN, GITHUB_DATA_REPO } = process.env;
+  if (!GITHUB_DATA_TOKEN || !GITHUB_DATA_REPO) {
+    res.status(500).json({ error: "Faltan variables de entorno por configurar en Vercel" });
+    return;
+  }
+
   try {
     let body = req.body;
     if (typeof body === "string") body = JSON.parse(body);
-    const { filename, mimeType, base64 } = body || {};
-    if (!base64 || !mimeType) {
-      res.status(400).json({ error: "Falta la imagen o el tipo de archivo" });
+    const { filename, base64 } = body || {};
+    if (!base64) {
+      res.status(400).json({ error: "Falta la imagen" });
       return;
     }
 
-    const buffer = Buffer.from(base64.replace(/^data:[^;]+;base64,/, ""), "base64");
-    const nombreFinal = filename || `foto-${Date.now()}.jpg`;
+    const contentB64 = base64.replace(/^data:[^;]+;base64,/, "");
+    const nombreFinal = (filename || `foto-${Date.now()}.jpg`).replace(/[^a-zA-Z0-9._-]/g, "_");
+    const path = `fotos/${Date.now()}-${nombreFinal}`;
 
-    const accessToken = await getAccessToken();
-    const uploaded = await subirArchivo(accessToken, { filename: nombreFinal, mimeType, buffer });
-    await hacerPublico(accessToken, uploaded.id);
+    const apiUrl = `https://api.github.com/repos/${GITHUB_DATA_REPO}/contents/${path}`;
+    const ghHeaders = {
+      Authorization: `Bearer ${GITHUB_DATA_TOKEN}`,
+      Accept: "application/vnd.github+json",
+    };
 
-    res.status(200).json({ ok: true, link: uploaded.webViewLink });
+    const putRes = await fetch(apiUrl, {
+      method: "PUT",
+      headers: { ...ghHeaders, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: `Sube foto de servicio (${new Date().toISOString()})`,
+        content: contentB64,
+      }),
+    });
+
+    if (!putRes.ok) {
+      const errText = await putRes.text();
+      res.status(502).json({ error: "No se pudo guardar la foto en GitHub", detail: errText });
+      return;
+    }
+
+    res.status(200).json({ ok: true, path });
   } catch (err) {
     res.status(500).json({ error: "Error interno al subir la foto", detail: String(err.message || err) });
   }

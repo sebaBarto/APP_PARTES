@@ -116,47 +116,41 @@ cada parte (cliente).
 El técnico puede sacar o elegir una foto al completar el parte. Es
 opcional — si no carga nada, no pasa nada. La foto **no se manda como
 adjunto de mail** (EmailJS free tiene un límite de 50 KB por mail, muy
-poco para una foto), sino que se sube a una carpeta de Google Drive y el
-mail de la oficina recibe solo el link. El mail al cliente nunca incluye
-la foto ni el link.
+poco para una foto), sino que se sube al mismo repo privado de GitHub
+que ya se usa para el listado de servicios (carpeta `fotos/`), y el mail
+de la oficina recibe un link que la muestra. El mail al cliente nunca
+incluye la foto ni el link.
 
-Importante: el archivo queda compartido en Drive como "cualquiera con el
-link puede ver" — no hace falta iniciar sesión para abrirlo. El link en
-sí no es adivinable, pero tenerlo en cuenta si las fotos pueden ser
-sensibles.
+(Antes probamos con Google Drive usando una cuenta de servicio, pero
+Google no permite que las cuentas de servicio suban archivos a carpetas
+de Drive personales — piden Google Workspace con Shared Drives. Por eso
+se pasó a guardar las fotos en GitHub, reutilizando la infraestructura
+que ya estaba armada para los servicios pendientes.)
+
+El link no es un link directo al repo (que es privado) — pasa por un
+endpoint propio (`/api/foto.js`) protegido con una clave de **solo
+lectura**, distinta de la que usa la app para escribir datos. Si ese
+link llega a circular, como mucho permite ver esa foto puntual, nunca
+tocar el resto de los datos.
 
 ### Pasos de configuración (una sola vez)
 
-1. Entrar a [Google Cloud Console](https://console.cloud.google.com/),
-   crear un proyecto nuevo (o usar uno existente).
-2. Habilitar la **Google Drive API** para ese proyecto (buscarla en
-   "APIs & Services" → "Enable APIs and Services").
-3. Crear una **cuenta de servicio** (Service Account) en "APIs & Services"
-   → "Credentials" → "Create Credentials" → "Service account". No hace
-   falta darle ningún rol especial a nivel del proyecto.
-4. Dentro de esa cuenta de servicio, generar una **clave JSON** ("Keys"
-   → "Add key" → "JSON") y descargarla. Ese archivo tiene dos datos que
-   vamos a necesitar: `client_email` y `private_key`.
-5. Crear (o elegir) una carpeta en tu Google Drive normal para guardar
-   las fotos, y **compartirla** con el email de la cuenta de servicio
-   (el `client_email` del paso anterior) con permiso de **Editor**.
-6. Copiar el **ID de esa carpeta** (es la parte de la URL después de
-   `/folders/` cuando la tenés abierta en Drive).
-7. Cargar 4 variables de entorno en Vercel (Project Settings →
-   Environment Variables), además de las que ya existen para el
-   listado de servicios:
-   - `GOOGLE_SERVICE_ACCOUNT_EMAIL` = el `client_email` del JSON
-   - `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` = el `private_key` del JSON
-     (pegarlo tal cual viene, con los `\n` incluidos)
-   - `GOOGLE_DRIVE_FOLDER_ID` = el ID de la carpeta del paso 6
-   - `SERVICIOS_API_TOKEN` ya debería existir de la configuración
-     anterior — se reutiliza la misma clave para autorizar esta subida
-8. Redeploy del proyecto para que tomen efecto las nuevas variables.
+No hace falta nada de Google Cloud para esto — reutiliza las variables
+`GITHUB_DATA_TOKEN` y `GITHUB_DATA_REPO` que ya configuraste para el
+listado de servicios. Solo falta agregar una variable nueva en Vercel
+(Project Settings → Environment Variables):
+
+- `FOTOS_LINK_TOKEN` = una clave larga y aleatoria (distinta de
+  `SERVICIOS_API_TOKEN`) — se genera una sola vez y se pega también en
+  `app.js`, constante `FOTOS_LINK_TOKEN`.
+
+Después de cargarla, hacer un redeploy del proyecto.
 
 ## Publicar en Vercel
 
-- Ya no hace falta ninguna variable de entorno (se sacó la dependencia de
-  la API de Anthropic — no hay más lectura de fotos).
+- Confirmá que estén cargadas todas las variables de entorno mencionadas
+  arriba: `SERVICIOS_API_TOKEN`, `GITHUB_DATA_TOKEN`, `GITHUB_DATA_REPO`,
+  `GITHUB_DATA_PATH` y `FOTOS_LINK_TOKEN`.
 - Subí los cambios al repo de GitHub y Vercel redespliega solo.
 
 ## Instalar la app en el celular Android

@@ -28,6 +28,11 @@ const SERVICIOS_URL = "/api/servicios";
 // serverless (ver variable de entorno SERVICIOS_API_TOKEN en Vercel).
 // Cambiala antes de publicar — que sea larga y difícil de adivinar.
 const SERVICIOS_API_TOKEN = "54455ad29a4eb28e48ca915e3510ff95ceb682523fa74b32";
+
+// Clave de solo-lectura para los links de fotos que van por mail.
+// Distinta de SERVICIOS_API_TOKEN a propósito: si este link circula,
+// solo permite ver fotos, no tocar los datos de servicios.
+const FOTOS_LINK_TOKEN = "37d2ba26aa4d0e890527390a68614dbbc25735c051949a53";
 // =======================================================
 
 if (window.emailjs && EMAILJS_PUBLIC_KEY !== "TU_PUBLIC_KEY") {
@@ -528,8 +533,8 @@ confirmSignBtn.addEventListener("click", async () => {
         }),
       });
       const fotoData = await fotoRes.json();
-      if (fotoRes.ok && fotoData.link) {
-        fotoLink = fotoData.link;
+      if (fotoRes.ok && fotoData.path) {
+        fotoLink = `${window.location.origin}/api/foto?path=${encodeURIComponent(fotoData.path)}&token=${FOTOS_LINK_TOKEN}`;
       } else {
         fotoError = fotoData.detail || fotoData.error || `Error HTTP ${fotoRes.status}`;
         console.error("Error subiendo foto:", fotoData);
