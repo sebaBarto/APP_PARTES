@@ -181,7 +181,7 @@ async function fetchServicios() {
   try {
     const headers = {};
     if (SERVICIOS_API_TOKEN) headers["Authorization"] = "Bearer " + SERVICIOS_API_TOKEN;
-    const res = await fetch(SERVICIOS_URL, { headers });
+    const res = await fetch(SERVICIOS_URL, { headers, cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     serviciosCache = Array.isArray(data) ? data : [];
@@ -229,7 +229,7 @@ async function fetchCronograma() {
   cronoStatus.textContent = "Buscando cronograma...";
   try {
     const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
-    const res = await fetch("/api/cronograma", { headers });
+    const res = await fetch("/api/cronograma", { headers, cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     cronogramaCache = Array.isArray(data.tareas) ? data.tareas : [];

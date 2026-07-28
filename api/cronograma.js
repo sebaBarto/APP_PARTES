@@ -35,14 +35,15 @@ async function leerDesdeDrive() {
   const meta = await metaRes.json();
 
   let fileRes;
+  const cacheBust = `_cb=${Date.now()}`;
   if (meta.mimeType === "application/vnd.google-apps.spreadsheet") {
     fileRes = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,
+      `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet&${cacheBust}`,
       { headers: authHeaders }
     );
   } else {
     fileRes = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&${cacheBust}`,
       { headers: authHeaders }
     );
   }
@@ -101,6 +102,7 @@ module.exports = async (req, res) => {
   };
 
   if (req.method === "GET") {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     try {
       const tareas = await leerDesdeDrive();
       guardarRespaldoGitHub(ghHeaders, apiUrl, tareas).catch(() => {});

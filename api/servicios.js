@@ -32,6 +32,7 @@ module.exports = async (req, res) => {
   };
 
   if (req.method === "GET") {
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     try {
       const r = await fetch(apiUrl, { headers: ghHeaders });
       if (r.status === 404) {
