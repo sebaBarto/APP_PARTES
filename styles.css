@@ -492,6 +492,16 @@ html, body {
   font-size: 13px;
 }
 .dash-repetido-card b { color: #101820; }
+.dash-repetido-fechas { font-size: 11px; color: #6B7680; margin-top: 3px; font-family: 'IBM Plex Mono', monospace; }
+.dash-medalla { font-size: 15px; }
+.dash-chart-wrap {
+  background: #FFFFFF;
+  border: 1.5px solid #D8DCD4;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 14px;
+  height: 200px;
+}
 
 /* ---------- STEP: SIGNATURE ---------- */
 #screen-sign { min-height: 0; padding: 20px 18px 0; }

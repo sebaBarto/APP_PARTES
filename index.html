@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -93,6 +94,13 @@
           <div class="dash-card-num" id="dashResueltosNum">–</div>
           <div class="dash-card-label">Resueltos en el período</div>
         </div>
+      </div>
+
+      <div class="dash-chart-wrap">
+        <canvas id="dashChartTecnico"></canvas>
+      </div>
+      <div class="dash-chart-wrap">
+        <canvas id="dashChartDias"></canvas>
       </div>
 
       <p class="dash-subtitulo">Por técnico</p>

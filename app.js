@@ -1079,6 +1079,8 @@ confirmSignBtn.addEventListener("click", async () => {
 // ---------- Dashboard ----------
 let historialCache = [];
 let dashPeriodoActivo = "mes";
+let chartTecnico = null;
+let chartDias = null;
 
 function obtenerRangoPeriodo(periodo) {
   const hoy = new Date();
@@ -1163,6 +1165,9 @@ async function renderDashboard() {
 
   dashStatus.textContent = Object.keys(porTecnico).length > 0 ? "Calculando distancias..." : "";
 
+  renderChartTecnico(porTecnico);
+  renderChartDias(rango, enPeriodo);
+
   // Distancia aproximada: geocodifica las direcciones de cada día y
   // suma la distancia entre paradas consecutivas (ordenadas por hora
   // de entrada). Es una aproximación en línea recta, no una ruta real.
@@ -1199,6 +1204,20 @@ async function renderDashboard() {
   }
   dashStatus.textContent = "";
 
+  // Ranking del día (siempre HOY, sin importar el período elegido
+  // arriba) para las medallas — el técnico con más resueltos hoy.
+  const rangoHoy = obtenerRangoPeriodo("dia");
+  const deHoy = historialCache.filter((h) => fechaEnRango(h.fecha, rangoHoy));
+  const cantidadHoyPorTecnico = {};
+  deHoy.forEach((h) => {
+    const nombre = h.tecnico || "(sin técnico)";
+    cantidadHoyPorTecnico[nombre] = (cantidadHoyPorTecnico[nombre] || 0) + 1;
+  });
+  const rankingHoy = Object.entries(cantidadHoyPorTecnico)
+    .sort((a, b) => b[1] - a[1])
+    .map(([nombre]) => nombre);
+  const medallas = { [rankingHoy[0]]: "🥇", [rankingHoy[1]]: "🥈", [rankingHoy[2]]: "🥉" };
+
   dashTecnicosList.innerHTML = "";
   const nombresTecnicos = Object.keys(porTecnico);
   if (nombresTecnicos.length === 0) {
@@ -1211,10 +1230,11 @@ async function renderDashboard() {
         const promedioMin = stats.conTiempo > 0 ? Math.round(stats.minutosTotal / stats.conTiempo) : null;
         const promedioTexto = promedioMin == null ? "—" :
           (promedioMin >= 60 ? `${Math.floor(promedioMin / 60)}h ${promedioMin % 60}m` : `${promedioMin} min`);
+        const medalla = medallas[nombre] || "";
         const card = document.createElement("div");
         card.className = "dash-tecnico-card";
         card.innerHTML = `
-          <div class="dash-tecnico-nombre">${nombre}</div>
+          <div class="dash-tecnico-nombre">${nombre}${medalla ? ` <span class="dash-medalla" title="Ranking de hoy">${medalla}</span>` : ""}</div>
           <div class="dash-tecnico-stats">
             <span class="dash-tecnico-stat"><b>${stats.cantidad}</b> resueltos</span>
             <span class="dash-tecnico-stat">Promedio: <b>${promedioTexto}</b></span>
@@ -1233,13 +1253,15 @@ async function renderDashboard() {
   delMes.forEach((h) => {
     if (!h.cliente) return;
     const clave = `${h.tecnico || ""}|${h.cliente}`;
-    porTecnicoCliente[clave] = (porTecnicoCliente[clave] || 0) + 1;
+    if (!porTecnicoCliente[clave]) porTecnicoCliente[clave] = { n: 0, fechas: [] };
+    porTecnicoCliente[clave].n++;
+    if (h.fecha) porTecnicoCliente[clave].fechas.push(h.fecha);
   });
   const repetidos = Object.entries(porTecnicoCliente)
-    .filter(([, n]) => n > 1)
-    .map(([clave, n]) => {
+    .filter(([, info]) => info.n > 1)
+    .map(([clave, info]) => {
       const [tecnico, cliente] = clave.split("|");
-      return { tecnico, cliente, n };
+      return { tecnico, cliente, n: info.n, fechas: info.fechas.sort() };
     })
     .sort((a, b) => b.n - a.n);
 
@@ -1247,13 +1269,76 @@ async function renderDashboard() {
   if (repetidos.length === 0) {
     dashRepetidosList.innerHTML = '<p class="list-status">Ningún técnico repitió cliente este mes.</p>';
   } else {
-    repetidos.forEach(({ tecnico, cliente, n }) => {
+    repetidos.forEach(({ tecnico, cliente, n, fechas }) => {
       const card = document.createElement("div");
       card.className = "dash-repetido-card";
-      card.innerHTML = `<b>${tecnico || "(sin técnico)"}</b> volvió a <b>${cliente}</b> ${n} veces este mes`;
+      card.innerHTML = `
+        <div><b>${tecnico || "(sin técnico)"}</b> volvió a <b>${cliente}</b> ${n} veces este mes</div>
+        <div class="dash-repetido-fechas">Fechas: ${fechas.join(", ")}</div>
+      `;
       dashRepetidosList.appendChild(card);
     });
   }
+}
+
+function renderChartTecnico(porTecnico) {
+  const canvas = document.getElementById("dashChartTecnico");
+  if (chartTecnico) chartTecnico.destroy();
+  const nombres = Object.keys(porTecnico).sort((a, b) => porTecnico[b].cantidad - porTecnico[a].cantidad);
+  if (nombres.length === 0) return;
+  chartTecnico = new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels: nombres,
+      datasets: [{ label: "Resueltos", data: nombres.map((n) => porTecnico[n].cantidad), backgroundColor: "#F5A623" }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, title: { display: true, text: "Resueltos por técnico" } },
+      scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+    },
+  });
+}
+
+function renderChartDias(rango, enPeriodo) {
+  const canvas = document.getElementById("dashChartDias");
+  if (chartDias) chartDias.destroy();
+
+  const porDia = {};
+  const cursor = new Date(rango.desde);
+  while (cursor <= rango.hasta) {
+    const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(cursor.getDate()).padStart(2, "0")}`;
+    porDia[key] = 0;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  enPeriodo.forEach((h) => { if (h.fecha && Object.prototype.hasOwnProperty.call(porDia, h.fecha)) porDia[h.fecha]++; });
+
+  const claves = Object.keys(porDia).sort();
+  const labels = claves.map((k) => { const [, m, d] = k.split("-"); return `${d}/${m}`; });
+  const datos = claves.map((k) => porDia[k]);
+
+  chartDias = new Chart(canvas, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [{
+        label: "Resueltos",
+        data: datos,
+        borderColor: "#101820",
+        backgroundColor: "rgba(16,24,32,0.1)",
+        fill: true,
+        tension: 0.3,
+        pointRadius: labels.length > 15 ? 0 : 3,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, title: { display: true, text: "Resueltos por día" } },
+      scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+    },
+  });
 }
 
 document.querySelectorAll(".dash-periodo-chip").forEach((chip) => {

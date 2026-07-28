@@ -282,12 +282,18 @@ Desde el listado de servicios hay un botón **"📊 Ver dashboard"** con:
   parte completado asociado (según el historial).
 - **Resueltos en el período**: cantidad de partes completados, con
   pestañas para ver por Día / Semana / Mes.
+- **Dos gráficos** (Chart.js): resueltos por técnico, y resueltos por
+  día a lo largo del período elegido — para una lectura rápida sin
+  tener que leer los números uno por uno.
 - **Por técnico**: cantidad resuelta, tiempo promedio por servicio, y
-  distancia aproximada recorrida en el período.
+  distancia aproximada recorrida en el período. El técnico con más
+  servicios resueltos **hoy** (siempre hoy, sin importar la pestaña de
+  período elegida) aparece con 🥇, el segundo con 🥈, el tercero con 🥉.
 - **Clientes con más de una visita en el mes**: técnicos que volvieron
-  al mismo cliente más de una vez en el mes actual (esto siempre se
-  calcula sobre el mes en curso, sin importar qué pestaña de período
-  esté elegida arriba).
+  al mismo cliente más de una vez en el mes actual, con las fechas
+  exactas de cada visita para poder revisar el caso puntual (esto
+  siempre se calcula sobre el mes en curso, sin importar qué pestaña de
+  período esté elegida arriba).
 
 ### Cómo funciona (y sus límites)
 
