@@ -617,23 +617,28 @@ function renderizarMapa(actual, porId) {
     const r = porId[`s${idx}`];
     if (!r || r.error || r.pendiente) return;
     const dist = distanciaMetros(actual.lat, actual.lon, r.lat, r.lon);
-    if (dist > 3 && dist <= 500) {
-      cercanos.push({ servicio: s, dist });
-      L.circleMarker([r.lat, r.lon], {
-        radius: 8, color: "#F5A623", fillColor: "#F5A623", fillOpacity: 0.9, weight: 2,
-      }).addTo(map).bindPopup(`${s.cliente || ""} (${Math.round(dist)} m)`);
-    }
+    if (dist <= 3 || dist > 1000) return;
+
+    const esMuyCercano = dist <= 500;
+    const color = esMuyCercano ? "#F5A623" : "#2E86DE";
+    cercanos.push({ servicio: s, dist, esMuyCercano });
+    L.circleMarker([r.lat, r.lon], {
+      radius: 8, color, fillColor: color, fillOpacity: 0.9, weight: 2,
+    }).addTo(map).bindPopup(`${s.cliente || ""} (${Math.round(dist)} m)`);
   });
 
   mapaCercanosList.innerHTML = "";
   if (cercanos.length > 0) {
+    const muyCercanos = cercanos.filter((c) => c.esMuyCercano).length;
+    const soloCercanos = cercanos.length - muyCercanos;
     const titulo = document.createElement("p");
     titulo.className = "list-status";
-    titulo.textContent = `${cercanos.length} servicio(s) pendiente(s) a menos de 500 m:`;
+    titulo.textContent = `${muyCercanos} a menos de 500 m` +
+      (soloCercanos > 0 ? `, ${soloCercanos} entre 500 m y 1 km` : "") + ":";
     mapaCercanosList.appendChild(titulo);
-    cercanos.sort((a, b) => a.dist - b.dist).forEach(({ servicio, dist }) => {
+    cercanos.sort((a, b) => a.dist - b.dist).forEach(({ servicio, dist, esMuyCercano }) => {
       const card = document.createElement("div");
-      card.className = "mapa-cercano-card";
+      card.className = "mapa-cercano-card" + (esMuyCercano ? "" : " lejano");
       card.innerHTML = `
         <div class="mapa-cercano-num">N° ${servicio.numero_servicio || ""}</div>
         <div class="mapa-cercano-cliente">${servicio.cliente || ""}</div>
