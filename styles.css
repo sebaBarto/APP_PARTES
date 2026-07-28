@@ -73,7 +73,7 @@ html, body {
 .screen[data-active="true"] { display: flex; }
 
 /* ---------- LOGIN ---------- */
-#screen-login { align-items: center; justify-content: center; padding: 24px; }
+#screen-login { align-items: center; justify-content: center; padding: 24px; position: relative; }
 .login-wrap { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; width: 100%; max-width: 280px; }
 .login-logo { width: 180px; max-width: 70%; height: auto; margin-bottom: 14px; }
 .login-title { margin-bottom: 14px; }
@@ -90,6 +90,16 @@ html, body {
 #screen-login .login-input:focus { outline: none; border-color: #F5A623; }
 #screen-login .btn-ghost { color: #C7CCC3; border-color: #3A4652; background: transparent; }
 #screen-login .status-info { color: #9AA3A9; background: rgba(255,255,255,0.06); }
+#screen-login .action-bar { background: transparent; }
+.app-footer-credit {
+  position: absolute;
+  bottom: max(10px, env(safe-area-inset-bottom));
+  right: 14px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: #3A4652;
+  letter-spacing: 0.3px;
+}
 .app-version {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 10px;
