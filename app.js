@@ -511,6 +511,7 @@ confirmSignBtn.addEventListener("click", async () => {
   setStatus("ENVIANDO", "busy");
 
   let fotoLink = "";
+  let fotoError = "";
   if (fotoBase64) {
     try {
       sendingLabel.textContent = "Subiendo foto...";
@@ -530,9 +531,11 @@ confirmSignBtn.addEventListener("click", async () => {
       if (fotoRes.ok && fotoData.link) {
         fotoLink = fotoData.link;
       } else {
+        fotoError = fotoData.error || fotoData.detail || `Error HTTP ${fotoRes.status}`;
         console.error("Error subiendo foto:", fotoData);
       }
     } catch (err) {
+      fotoError = err.message || String(err);
       console.error("Error subiendo foto:", err);
     }
   }
@@ -589,13 +592,18 @@ confirmSignBtn.addEventListener("click", async () => {
   setStatus(oficinaOk ? "LISTO" : "");
   doneId.textContent = `N° de parte: ${idParte}`;
 
+  let mensajeFoto = "";
+  if (fotoBase64 && fotoError) {
+    mensajeFoto = ` (⚠ la foto no se pudo subir: ${fotoError})`;
+  }
+
   if (oficinaOk && (clienteOk || !clienteIntentado)) {
-    doneMessage.textContent = clienteIntentado
+    doneMessage.textContent = (clienteIntentado
       ? "Copia enviada a la oficina y al cliente"
-      : "Copia enviada a la oficina (sin mail de cliente)";
+      : "Copia enviada a la oficina (sin mail de cliente)") + mensajeFoto;
     showScreen("done");
   } else if (oficinaOk && clienteIntentado && !clienteOk) {
-    doneMessage.textContent = "Enviado a la oficina, pero falló el envío al cliente";
+    doneMessage.textContent = "Enviado a la oficina, pero falló el envío al cliente" + mensajeFoto;
     showScreen("done");
   } else {
     showScreen("sign");
