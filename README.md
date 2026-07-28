@@ -274,6 +274,43 @@ sw.js           → cachea la app para que abra rápido / offline
 icons/          → ícono de la app
 ```
 
+## Dashboard (para todos los técnicos)
+
+Desde el listado de servicios hay un botón **"📊 Ver dashboard"** con:
+
+- **Pendientes ahora**: servicios cargados que todavía no tienen un
+  parte completado asociado (según el historial).
+- **Resueltos en el período**: cantidad de partes completados, con
+  pestañas para ver por Día / Semana / Mes.
+- **Por técnico**: cantidad resuelta, tiempo promedio por servicio, y
+  distancia aproximada recorrida en el período.
+- **Clientes con más de una visita en el mes**: técnicos que volvieron
+  al mismo cliente más de una vez en el mes actual (esto siempre se
+  calcula sobre el mes en curso, sin importar qué pestaña de período
+  esté elegida arriba).
+
+### Cómo funciona (y sus límites)
+
+- Cada vez que se completa un parte y el mail a la oficina se manda con
+  éxito, queda un registro en `/api/historial.js` (guardado en el mismo
+  repo privado de datos, archivo `historial.json`). **El historial
+  arranca a contar desde que se activó esta función** — no hay datos de
+  partes anteriores a esto.
+- La **distancia recorrida es una aproximación**: se geocodifican las
+  direcciones de los servicios de cada técnico por día, ordenados por
+  hora de entrada, y se suma la distancia en línea recta entre paradas
+  consecutivas (usando el mismo geocodificador de `/api/geocode.js`,
+  con su misma caché). No es una ruta real calculada por calles, así
+  que va a ser menor a la distancia que efectivamente se recorre
+  manejando.
+- El tiempo promedio se calcula a partir de los campos "Hora entrada" y
+  "Hora salida" que carga el técnico en cada parte — si algún parte
+  quedó con esos campos vacíos o mal cargados, no se cuenta en el
+  promedio de ese técnico.
+- Cuando un servicio se completa entre dos técnicos (el check de
+  "Fueron dos técnicos"), el conteo y las estadísticas quedan asociadas
+  solo al técnico principal del parte, no al segundo.
+
 ## Notas y límites de esta versión
 
 - El **ID de parte** se genera por fecha/hora + un número al azar — no es
@@ -285,7 +322,7 @@ icons/          → ícono de la app
   mail (no como archivo adjunto) — funciona bien en la mayoría de los
   clientes de mail, pero algunos podrían no mostrarla si bloquean
   imágenes incrustadas.
-- No queda ningún registro histórico de los partes enviados dentro de la
-  app — quedan solo en las casillas de mail que los reciben. Si más
-  adelante querés un historial buscable (por cliente, fecha, etc.),
-  se puede sumar una base de datos.
+- El **historial** para el dashboard (`historial.json`) va a ir
+  creciendo con el tiempo — para un uso de varios años podría convenir
+  archivarlo o rotarlo periódicamente, aunque para el volumen actual de
+  la empresa no debería ser un problema en el corto/mediano plazo.

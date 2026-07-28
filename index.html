@@ -67,6 +67,43 @@
     <div class="action-bar action-bar-column">
       <button class="btn btn-secondary" id="manualReportBtn" type="button">Cargar parte sin servicio</button>
       <button class="btn btn-ghost" id="verCronogramaBtn" type="button">Ver cronograma semanal</button>
+      <button class="btn btn-ghost" id="verDashboardBtn" type="button">📊 Ver dashboard</button>
+    </div>
+  </section>
+
+  <!-- DASHBOARD -->
+  <section class="screen" id="screen-dashboard">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">DASHBOARD</p>
+
+      <div class="dash-periodo-tabs">
+        <button type="button" class="dash-periodo-chip" data-periodo="dia">Día</button>
+        <button type="button" class="dash-periodo-chip" data-periodo="semana">Semana</button>
+        <button type="button" class="dash-periodo-chip active" data-periodo="mes">Mes</button>
+      </div>
+
+      <p class="list-status" id="dashStatus"></p>
+
+      <div class="dash-cards-row">
+        <div class="dash-card">
+          <div class="dash-card-num" id="dashPendientesNum">–</div>
+          <div class="dash-card-label">Pendientes ahora</div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-num" id="dashResueltosNum">–</div>
+          <div class="dash-card-label">Resueltos en el período</div>
+        </div>
+      </div>
+
+      <p class="dash-subtitulo">Por técnico</p>
+      <div id="dashTecnicosList" class="dash-tecnicos-list"></div>
+
+      <p class="dash-subtitulo">Clientes con más de una visita en el mes</p>
+      <div id="dashRepetidosList" class="dash-repetidos-list"></div>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDeDashboardBtn" type="button">Volver</button>
     </div>
   </section>
 

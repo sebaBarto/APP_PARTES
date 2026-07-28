@@ -54,6 +54,7 @@ const screens = {
   list: document.getElementById("screen-list"),
   cronograma: document.getElementById("screen-cronograma"),
   mapa: document.getElementById("screen-mapa"),
+  dashboard: document.getElementById("screen-dashboard"),
   form: document.getElementById("screen-form"),
   sign: document.getElementById("screen-sign"),
   sending: document.getElementById("screen-sending"),
@@ -98,6 +99,13 @@ const fotoStatus = document.getElementById("fotoStatus");
 const verMapaBtn = document.getElementById("verMapaBtn");
 const volverDeMapaBtn = document.getElementById("volverDeMapaBtn");
 const llamarClienteBtn = document.getElementById("llamarClienteBtn");
+const verDashboardBtn = document.getElementById("verDashboardBtn");
+const volverDeDashboardBtn = document.getElementById("volverDeDashboardBtn");
+const dashStatus = document.getElementById("dashStatus");
+const dashPendientesNum = document.getElementById("dashPendientesNum");
+const dashResueltosNum = document.getElementById("dashResueltosNum");
+const dashTecnicosList = document.getElementById("dashTecnicosList");
+const dashRepetidosList = document.getElementById("dashRepetidosList");
 const mapaStatus = document.getElementById("mapaStatus");
 const mapaCercanosList = document.getElementById("mapaCercanosList");
 const toSignBtn = document.getElementById("toSignBtn");
@@ -1011,6 +1019,24 @@ confirmSignBtn.addEventListener("click", async () => {
       serviciosResueltos.add(data.numero_servicio);
       localStorage.setItem("servicios_resueltos", JSON.stringify([...serviciosResueltos]));
     }
+    // Registro en el historial para el dashboard — si falla, no se
+    // interrumpe el flujo (el mail ya se mandó bien, lo importante).
+    fetch("/api/historial", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({
+        numero_servicio: data.numero_servicio || "",
+        id_parte: idParte,
+        cliente: data.cliente,
+        direccion: data.direccion,
+        localidad: data.localidad,
+        tecnico: data.tecnico,
+        tecnico2: data.tecnico2,
+        fecha: data.fecha,
+        hora_entrada: data.hora_entrada,
+        hora_salida: data.hora_salida,
+      }),
+    }).catch((err) => console.error("Error registrando historial:", err));
   } catch (err) {
     console.error("Error enviando a oficina:", err);
   }
@@ -1048,6 +1074,203 @@ confirmSignBtn.addEventListener("click", async () => {
     showScreen("sign");
     showToast("No se pudo enviar el mail. Revisá la conexión e intentá de nuevo.");
   }
+});
+
+// ---------- Dashboard ----------
+let historialCache = [];
+let dashPeriodoActivo = "mes";
+
+function obtenerRangoPeriodo(periodo) {
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  if (periodo === "dia") {
+    return { desde: hoy, hasta: hoy };
+  }
+  if (periodo === "semana") {
+    const diaSemana = (hoy.getDay() + 6) % 7; // 0 = lunes
+    const lunes = new Date(hoy);
+    lunes.setDate(hoy.getDate() - diaSemana);
+    const domingo = new Date(lunes);
+    domingo.setDate(lunes.getDate() + 6);
+    return { desde: lunes, hasta: domingo };
+  }
+  const primero = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+  const ultimo = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0);
+  return { desde: primero, hasta: ultimo };
+}
+
+function fechaEnRango(fechaStr, rango) {
+  if (!fechaStr) return false;
+  const [y, m, d] = fechaStr.split("-").map(Number);
+  if (!y || !m || !d) return false;
+  const f = new Date(y, m - 1, d);
+  return f >= rango.desde && f <= rango.hasta;
+}
+
+function minutosEntre(entrada, salida) {
+  if (!entrada || !salida) return null;
+  const [hE, mE] = entrada.split(":").map(Number);
+  const [hS, mS] = salida.split(":").map(Number);
+  if ([hE, mE, hS, mS].some((n) => Number.isNaN(n))) return null;
+  let total = (hS * 60 + mS) - (hE * 60 + mE);
+  if (total < 0) total += 24 * 60;
+  return total;
+}
+
+async function fetchDashboard() {
+  dashStatus.textContent = "Cargando datos...";
+  dashTecnicosList.innerHTML = "";
+  dashRepetidosList.innerHTML = "";
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/historial", { headers, cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    historialCache = Array.isArray(data) ? data : [];
+    await renderDashboard();
+  } catch (err) {
+    dashStatus.textContent = "No se pudo cargar el historial para el dashboard.";
+  }
+}
+
+async function renderDashboard() {
+  const rango = obtenerRangoPeriodo(dashPeriodoActivo);
+  const enPeriodo = historialCache.filter((h) => fechaEnRango(h.fecha, rango));
+
+  // Pendientes actuales: servicios cargados que todavía no aparecen en
+  // el historial (nunca se completaron).
+  const numerosCompletados = new Set(historialCache.map((h) => h.numero_servicio).filter(Boolean));
+  const pendientesActuales = serviciosCache.filter((s) => !numerosCompletados.has(s.numero_servicio)).length;
+  dashPendientesNum.textContent = pendientesActuales;
+  dashResueltosNum.textContent = enPeriodo.length;
+
+  // Agrupar por técnico: cantidad, tiempo promedio, y días (para calcular
+  // distancia entre paradas consecutivas del mismo día).
+  const porTecnico = {};
+  enPeriodo.forEach((h) => {
+    const nombre = h.tecnico || "(sin técnico)";
+    if (!porTecnico[nombre]) porTecnico[nombre] = { cantidad: 0, minutosTotal: 0, conTiempo: 0, dias: {} };
+    porTecnico[nombre].cantidad++;
+    const minutos = minutosEntre(h.hora_entrada, h.hora_salida);
+    if (minutos != null) {
+      porTecnico[nombre].minutosTotal += minutos;
+      porTecnico[nombre].conTiempo++;
+    }
+    const dia = h.fecha || "sin-fecha";
+    if (!porTecnico[nombre].dias[dia]) porTecnico[nombre].dias[dia] = [];
+    porTecnico[nombre].dias[dia].push(h);
+  });
+
+  dashStatus.textContent = Object.keys(porTecnico).length > 0 ? "Calculando distancias..." : "";
+
+  // Distancia aproximada: geocodifica las direcciones de cada día y
+  // suma la distancia entre paradas consecutivas (ordenadas por hora
+  // de entrada). Es una aproximación en línea recta, no una ruta real.
+  for (const nombre of Object.keys(porTecnico)) {
+    const dias = porTecnico[nombre].dias;
+    let distanciaTotal = 0;
+    for (const dia of Object.keys(dias)) {
+      const paradas = dias[dia]
+        .filter((h) => h.direccion)
+        .sort((a, b) => (a.hora_entrada || "").localeCompare(b.hora_entrada || ""));
+      if (paradas.length < 2) continue;
+      const items = paradas.map((h, i) => ({ id: `p${i}`, direccion: h.direccion, localidad: h.localidad || "" }));
+      try {
+        const geoRes = await fetch("/api/geocode", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+          body: JSON.stringify({ items }),
+        });
+        const geoData = await geoRes.json();
+        const porId = {};
+        (geoData.results || []).forEach((r) => { porId[r.id] = r; });
+        for (let i = 1; i < paradas.length; i++) {
+          const a = porId[`p${i - 1}`];
+          const b = porId[`p${i}`];
+          if (a && b && !a.error && !b.error && !a.pendiente && !b.pendiente) {
+            distanciaTotal += distanciaMetros(a.lat, a.lon, b.lat, b.lon);
+          }
+        }
+      } catch (err) {
+        // si falla la geocodificación de ese día, se sigue sin sumarlo
+      }
+    }
+    porTecnico[nombre].distanciaKm = distanciaTotal / 1000;
+  }
+  dashStatus.textContent = "";
+
+  dashTecnicosList.innerHTML = "";
+  const nombresTecnicos = Object.keys(porTecnico);
+  if (nombresTecnicos.length === 0) {
+    dashTecnicosList.innerHTML = '<p class="list-status">No hay servicios resueltos en este período.</p>';
+  } else {
+    nombresTecnicos
+      .sort((a, b) => porTecnico[b].cantidad - porTecnico[a].cantidad)
+      .forEach((nombre) => {
+        const stats = porTecnico[nombre];
+        const promedioMin = stats.conTiempo > 0 ? Math.round(stats.minutosTotal / stats.conTiempo) : null;
+        const promedioTexto = promedioMin == null ? "—" :
+          (promedioMin >= 60 ? `${Math.floor(promedioMin / 60)}h ${promedioMin % 60}m` : `${promedioMin} min`);
+        const card = document.createElement("div");
+        card.className = "dash-tecnico-card";
+        card.innerHTML = `
+          <div class="dash-tecnico-nombre">${nombre}</div>
+          <div class="dash-tecnico-stats">
+            <span class="dash-tecnico-stat"><b>${stats.cantidad}</b> resueltos</span>
+            <span class="dash-tecnico-stat">Promedio: <b>${promedioTexto}</b></span>
+            <span class="dash-tecnico-stat">Distancia aprox.: <b>${stats.distanciaKm.toFixed(1)} km</b></span>
+          </div>
+        `;
+        dashTecnicosList.appendChild(card);
+      });
+  }
+
+  // Clientes repetidos: siempre en base al mes actual, sin importar el
+  // período elegido arriba (así lo pediste).
+  const rangoMes = obtenerRangoPeriodo("mes");
+  const delMes = historialCache.filter((h) => fechaEnRango(h.fecha, rangoMes));
+  const porTecnicoCliente = {};
+  delMes.forEach((h) => {
+    if (!h.cliente) return;
+    const clave = `${h.tecnico || ""}|${h.cliente}`;
+    porTecnicoCliente[clave] = (porTecnicoCliente[clave] || 0) + 1;
+  });
+  const repetidos = Object.entries(porTecnicoCliente)
+    .filter(([, n]) => n > 1)
+    .map(([clave, n]) => {
+      const [tecnico, cliente] = clave.split("|");
+      return { tecnico, cliente, n };
+    })
+    .sort((a, b) => b.n - a.n);
+
+  dashRepetidosList.innerHTML = "";
+  if (repetidos.length === 0) {
+    dashRepetidosList.innerHTML = '<p class="list-status">Ningún técnico repitió cliente este mes.</p>';
+  } else {
+    repetidos.forEach(({ tecnico, cliente, n }) => {
+      const card = document.createElement("div");
+      card.className = "dash-repetido-card";
+      card.innerHTML = `<b>${tecnico || "(sin técnico)"}</b> volvió a <b>${cliente}</b> ${n} veces este mes`;
+      dashRepetidosList.appendChild(card);
+    });
+  }
+}
+
+document.querySelectorAll(".dash-periodo-chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    document.querySelectorAll(".dash-periodo-chip").forEach((c) => c.classList.remove("active"));
+    chip.classList.add("active");
+    dashPeriodoActivo = chip.dataset.periodo;
+    renderDashboard();
+  });
+});
+
+verDashboardBtn.addEventListener("click", () => {
+  showScreen("dashboard");
+  fetchDashboard();
+});
+volverDeDashboardBtn.addEventListener("click", () => {
+  showScreen("list");
 });
 
 // Registrar service worker para instalación como PWA

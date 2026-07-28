@@ -439,6 +439,60 @@ html, body {
 .mapa-cercano-cliente { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px; color: #101820; }
 .mapa-cercano-dist { font-size: 12px; color: #6B7680; }
 
+/* ---------- DASHBOARD ---------- */
+.dash-periodo-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+.dash-periodo-chip {
+  flex: 1;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  background: #FFFFFF;
+  border: 1.5px solid #D8DCD4;
+  border-radius: 20px;
+  padding: 9px;
+  cursor: pointer;
+  color: #6B7680;
+}
+.dash-periodo-chip.active { background: #101820; color: #F5A623; border-color: #101820; }
+.dash-cards-row { display: flex; gap: 10px; margin-bottom: 20px; }
+.dash-card {
+  flex: 1;
+  background: #FFFFFF;
+  border: 1.5px solid #D8DCD4;
+  border-radius: 10px;
+  padding: 14px;
+  text-align: center;
+}
+.dash-card-num { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 28px; color: #101820; }
+.dash-card-label { font-size: 12px; color: #6B7680; margin-top: 2px; }
+.dash-subtitulo {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #B5772A;
+  margin: 18px 0 8px;
+}
+.dash-tecnicos-list, .dash-repetidos-list { display: flex; flex-direction: column; gap: 8px; }
+.dash-tecnico-card {
+  background: #FFFFFF;
+  border: 1.5px solid #D8DCD4;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.dash-tecnico-nombre { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px; color: #101820; }
+.dash-tecnico-stats { display: flex; gap: 14px; margin-top: 4px; flex-wrap: wrap; }
+.dash-tecnico-stat { font-size: 12px; color: #6B7680; }
+.dash-tecnico-stat b { color: #101820; font-weight: 600; }
+.dash-repetido-card {
+  background: #FFFFFF;
+  border: 1.5px solid #F5A623;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+}
+.dash-repetido-card b { color: #101820; }
+
 /* ---------- STEP: SIGNATURE ---------- */
 #screen-sign { min-height: 0; padding: 20px 18px 0; }
 .sign-header { text-align: center; margin-bottom: 18px; }
