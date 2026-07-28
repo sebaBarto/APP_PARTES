@@ -295,9 +295,33 @@ function filtrarServicios() {
   });
 }
 
-// Umbrales para marcar un servicio como "estancado" — se puede ajustar.
-const DIAS_ATENCION = 3;
-const DIAS_URGENTE = 7;
+// Umbrales para marcar un servicio como "estancado" — se administran
+// desde admin.html (pestaña "Servicios pendientes"), estos valores acá
+// son solo el respaldo de arranque hasta que se cargue la config real.
+let DIAS_ATENCION = 3;
+let DIAS_URGENTE = 7;
+
+async function cargarConfig() {
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/config", { headers, cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if (data.dias_atencion) DIAS_ATENCION = data.dias_atencion;
+    if (data.dias_urgente) DIAS_URGENTE = data.dias_urgente;
+    localStorage.setItem("config_cache", JSON.stringify({ dias_atencion: DIAS_ATENCION, dias_urgente: DIAS_URGENTE }));
+  } catch (err) {
+    const cacheado = localStorage.getItem("config_cache");
+    if (cacheado) {
+      try {
+        const c = JSON.parse(cacheado);
+        if (c.dias_atencion) DIAS_ATENCION = c.dias_atencion;
+        if (c.dias_urgente) DIAS_URGENTE = c.dias_urgente;
+      } catch (e) { /* usa el respaldo de arranque */ }
+    }
+  }
+}
+cargarConfig();
 
 // Interpreta la fecha de ingreso del servicio en varios formatos
 // comunes (dd/mm/aaaa, dd-mm-aaaa, aaaa-mm-dd). Si no se puede

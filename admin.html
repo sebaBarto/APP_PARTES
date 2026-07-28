@@ -78,6 +78,22 @@
     <p class="subtitle">Subí el archivo que exporta el ERP (CSV o Excel). Se reemplaza el listado completo que ve la app.</p>
 
     <div class="card">
+      <label>Umbrales de "servicio estancado" (necesita la columna "Fecha de ingreso" mapeada)</label>
+      <div class="field-row">
+        <div>
+          <label>Días para alerta naranja</label>
+          <input type="number" id="diasAtencionInput" min="1" step="1">
+        </div>
+        <div>
+          <label>Días para alerta roja</label>
+          <input type="number" id="diasUrgenteInput" min="1" step="1">
+        </div>
+      </div>
+      <button id="guardarConfigBtn" type="button" class="btn-secondary-admin">Guardar umbrales</button>
+      <p class="status" id="configStatus"></p>
+    </div>
+
+    <div class="card">
       <label for="csvFile">Archivo (CSV o Excel)</label>
       <input type="file" id="csvFile" accept=".csv,.txt,.xlsx,.xls">
 
@@ -349,11 +365,68 @@ pwBtn.addEventListener("click", () => {
   if (pw.value === ADMIN_PASSWORD) {
     loginCard.classList.add("hidden");
     mainCard.classList.remove("hidden");
+    cargarConfigAdmin();
   } else {
     pwError.textContent = "Contraseña incorrecta.";
   }
 });
 pw.addEventListener("keydown", (e) => { if (e.key === "Enter") pwBtn.click(); });
+
+// ---------- Configuración general (umbrales de servicio estancado) ----------
+const diasAtencionInput = document.getElementById("diasAtencionInput");
+const diasUrgenteInput = document.getElementById("diasUrgenteInput");
+const guardarConfigBtn = document.getElementById("guardarConfigBtn");
+const configStatus = document.getElementById("configStatus");
+
+async function cargarConfigAdmin() {
+  try {
+    const res = await fetch("/api/config", {
+      headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    diasAtencionInput.value = data.dias_atencion ?? 3;
+    diasUrgenteInput.value = data.dias_urgente ?? 7;
+  } catch (err) {
+    diasAtencionInput.value = 3;
+    diasUrgenteInput.value = 7;
+    configStatus.className = "status err";
+    configStatus.textContent = "No se pudo cargar la configuración guardada — se muestran los valores por defecto.";
+  }
+}
+
+guardarConfigBtn.addEventListener("click", async () => {
+  const diasAtencion = parseInt(diasAtencionInput.value, 10);
+  const diasUrgente = parseInt(diasUrgenteInput.value, 10);
+  if (!diasAtencion || !diasUrgente || diasUrgente < diasAtencion) {
+    configStatus.className = "status err";
+    configStatus.textContent = "Revisá los valores — el umbral rojo tiene que ser mayor o igual al naranja.";
+    return;
+  }
+  guardarConfigBtn.disabled = true;
+  configStatus.className = "status";
+  configStatus.textContent = "Guardando...";
+  try {
+    const res = await fetch("/api/config", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + SERVICIOS_API_TOKEN,
+      },
+      body: JSON.stringify({ dias_atencion: diasAtencion, dias_urgente: diasUrgente }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    configStatus.className = "status ok";
+    configStatus.textContent = "Listo — los nuevos umbrales ya están disponibles en la app.";
+  } catch (err) {
+    configStatus.className = "status err";
+    configStatus.textContent = "No se pudo guardar: " + err.message;
+  } finally {
+    guardarConfigBtn.disabled = false;
+  }
+});
 
 let workbook = null;   // libro Excel actual (si el archivo es Excel)
 let rawAllRows = [];   // filas crudas (array de arrays) de la hoja/csv actual

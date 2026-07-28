@@ -73,10 +73,13 @@ lleva varios días sin resolverse se marca solo:
 - 🔴 **7 días o más**: borde rojo, etiqueta en rojo — para no perderlo
   de vista.
 
-Los umbrales (3 y 7 días) están como constantes `DIAS_ATENCION` y
-`DIAS_URGENTE` al principio de la sección de servicios en `app.js`, se
-pueden ajustar fácil. Si no se carga la fecha de ingreso, simplemente
-no aparece ninguna alerta (no es obligatorio).
+Los umbrales (3 y 7 días por defecto) se editan desde `admin.html` →
+pestaña "Servicios pendientes" → arriba de todo ("Umbrales de servicio
+estancado") — no hace falta tocar código. Se guardan en el mismo repo
+privado de datos (`config.json`), reutilizando las variables de
+entorno que ya existen. Si no se carga la fecha de ingreso de un
+servicio, simplemente no aparece ninguna alerta para ese caso (no es
+obligatorio).
 
 ## Listado de servicios pendientes (precarga de datos)
 
