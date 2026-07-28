@@ -232,11 +232,14 @@ async function fetchCronograma() {
     const res = await fetch("/api/cronograma", { headers });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
-    cronogramaCache = Array.isArray(data) ? data : [];
+    cronogramaCache = Array.isArray(data.tareas) ? data.tareas : [];
     localStorage.setItem("cronograma_cache", JSON.stringify(cronogramaCache));
     localStorage.setItem("cronograma_cache_time", String(Date.now()));
     cronoSyncLabel.textContent = formatSyncTime(new Date());
     renderCronogramaDias();
+    if (data.fuente === "respaldo") {
+      cronoStatus.textContent = `⚠ No se pudo leer Drive en este momento (${data.error_drive || "sin detalle"}). Mostrando la última copia guardada.`;
+    }
   } catch (err) {
     const cachedRaw = localStorage.getItem("cronograma_cache");
     const cachedTime = localStorage.getItem("cronograma_cache_time");

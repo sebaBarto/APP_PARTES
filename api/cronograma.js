@@ -104,11 +104,15 @@ module.exports = async (req, res) => {
     try {
       const tareas = await leerDesdeDrive();
       guardarRespaldoGitHub(ghHeaders, apiUrl, tareas).catch(() => {});
-      res.status(200).json(tareas);
+      res.status(200).json({ tareas, fuente: "drive" });
     } catch (err) {
       try {
         const respaldo = await leerRespaldoGitHub(ghHeaders, apiUrl);
-        res.status(200).json(respaldo);
+        res.status(200).json({
+          tareas: respaldo,
+          fuente: "respaldo",
+          error_drive: String(err.message || err),
+        });
       } catch (err2) {
         res.status(502).json({ error: "No se pudo leer el cronograma", detail: String(err.message || err) });
       }
