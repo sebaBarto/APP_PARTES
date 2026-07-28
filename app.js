@@ -497,6 +497,26 @@ function getTecnico2Value() {
   return tecnicoSelect2.value || "";
 }
 
+// Calcula el tiempo transcurrido entre entrada y salida, redondeando
+// siempre hacia arriba al múltiplo de 5 minutos más cercano, y lo
+// muestra como "horas.minutos" (no como fracción decimal real).
+// Ej: 43 min -> "0.45" · 1h12min -> "1.15"
+function calcularTiempoTranscurrido(entrada, salida) {
+  if (!entrada || !salida) return "";
+  const [hE, mE] = entrada.split(":").map(Number);
+  const [hS, mS] = salida.split(":").map(Number);
+  if ([hE, mE, hS, mS].some((n) => Number.isNaN(n))) return "";
+
+  let totalMin = (hS * 60 + mS) - (hE * 60 + mE);
+  if (totalMin < 0) totalMin += 24 * 60; // por si cruza medianoche
+  if (totalMin === 0) return "0.00";
+
+  const redondeado = Math.ceil(totalMin / 5) * 5;
+  const horas = Math.floor(redondeado / 60);
+  const minutos = redondeado % 60;
+  return `${horas}.${String(minutos).padStart(2, "0")}`;
+}
+
 // Si el técnico que inició sesión coincide con una opción del selector,
 // se autocompleta (pero se puede cambiar a mano si hiciera falta).
 function autocompletarTecnico() {
@@ -777,6 +797,10 @@ function getFormData() {
     fecha: document.getElementById("f_fecha").value,
     hora_entrada: document.getElementById("f_entrada").value,
     hora_salida: document.getElementById("f_salida").value,
+    tiempo_transcurrido: calcularTiempoTranscurrido(
+      document.getElementById("f_entrada").value,
+      document.getElementById("f_salida").value
+    ),
     observaciones: document.getElementById("f_observaciones").value.trim(),
   };
 }
@@ -980,6 +1004,7 @@ confirmSignBtn.addEventListener("click", async () => {
     await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_OFICINA, {
       ...basePayload,
       foto_link: fotoLink,
+      tiempo_transcurrido: data.tiempo_transcurrido,
     });
     oficinaOk = true;
     if (data.numero_servicio) {
