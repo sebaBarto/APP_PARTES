@@ -323,11 +323,12 @@ function renderCronogramaTareas() {
   }
   cronoStatus.textContent = "";
   tareas.forEach((t) => {
+    const vinculado = !!encontrarServicioPorTarea(t.tarea);
     const card = document.createElement("button");
     card.type = "button";
-    card.className = "crono-tarea-card";
+    card.className = "crono-tarea-card" + (vinculado ? "" : " sin-vincular");
     card.innerHTML = `
-      <div class="crono-tarea-hora">${t.hora_inicio || ""} - ${t.hora_fin || ""}</div>
+      <div class="crono-tarea-hora">${t.hora_inicio || ""} - ${t.hora_fin || ""}${vinculado ? "" : '<span class="crono-tarea-badge">SIN VINCULAR</span>'}</div>
       <div class="crono-tarea-tecnico">${t.tecnico || ""}</div>
       <div class="crono-tarea-texto">${t.tarea || ""}</div>
     `;
