@@ -337,6 +337,18 @@ html, body {
   text-align: left;
 }
 .servicio-card:active { border-color: #F5A623; background: rgba(245,166,35,0.08); }
+.servicio-card.resuelto { border-color: #2E7D32; background: rgba(46,125,50,0.08); }
+.servicio-card-resuelto-badge {
+  display: inline-block;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: #FFFFFF;
+  background: #2E7D32;
+  border-radius: 4px;
+  padding: 2px 6px;
+  margin-left: 6px;
+  letter-spacing: 0.5px;
+}
 .servicio-card-num {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 11px;
@@ -367,7 +379,12 @@ html, body {
   border: 1.5px solid #D8DCD4;
   border-radius: 10px;
   padding: 12px 14px;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
 }
+.crono-tarea-card:active { border-color: #F5A623; }
 .crono-tarea-hora { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #B5772A; }
 .crono-tarea-tecnico { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px; color: #101820; margin: 2px 0; }
 .crono-tarea-texto { font-size: 13px; color: #101820; white-space: pre-line; }

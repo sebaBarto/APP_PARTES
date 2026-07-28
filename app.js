@@ -96,6 +96,7 @@ let drawing = false;
 let lastX = 0, lastY = 0;
 let currentNumeroServicio = "";
 let serviciosCache = [];
+let serviciosResueltos = new Set(JSON.parse(localStorage.getItem("servicios_resueltos") || "[]"));
 let fotoBase64 = null;
 let fotoMimeType = null;
 
@@ -163,11 +164,12 @@ function renderServiciosList(items) {
   }
   listStatus.textContent = "";
   items.forEach((item) => {
+    const resuelto = item.numero_servicio && serviciosResueltos.has(item.numero_servicio);
     const card = document.createElement("button");
     card.type = "button";
-    card.className = "servicio-card";
+    card.className = "servicio-card" + (resuelto ? " resuelto" : "");
     card.innerHTML = `
-      <div class="servicio-card-num">N° ${item.numero_servicio ?? ""}</div>
+      <div class="servicio-card-num">N° ${item.numero_servicio ?? ""}${resuelto ? '<span class="servicio-card-resuelto-badge">RESUELTO</span>' : ""}</div>
       <div class="servicio-card-cliente">${item.cliente ?? ""}</div>
       <div class="servicio-card-direccion">${item.direccion ?? ""}${item.localidad ? ", " + item.localidad : ""}</div>
       <div class="servicio-card-tarea">${item.tarea ?? ""}</div>
@@ -192,6 +194,11 @@ async function fetchServicios() {
     serviciosCache = Array.isArray(data) ? data : [];
     localStorage.setItem("servicios_cache", JSON.stringify(serviciosCache));
     localStorage.setItem("servicios_cache_time", String(Date.now()));
+    // Un listado nuevo desde el servidor "reinicia" las marcas de
+    // resuelto — según lo pedido, deben durar solo hasta que se
+    // cargue el próximo listado.
+    serviciosResueltos = new Set();
+    localStorage.removeItem("servicios_resueltos");
     syncLabel.textContent = formatSyncTime(new Date());
     renderServiciosList(filtrarServicios());
   } catch (err) {
@@ -316,18 +323,64 @@ function renderCronogramaTareas() {
   }
   cronoStatus.textContent = "";
   tareas.forEach((t) => {
-    const card = document.createElement("div");
+    const card = document.createElement("button");
+    card.type = "button";
     card.className = "crono-tarea-card";
     card.innerHTML = `
       <div class="crono-tarea-hora">${t.hora_inicio || ""} - ${t.hora_fin || ""}</div>
       <div class="crono-tarea-tecnico">${t.tecnico || ""}</div>
       <div class="crono-tarea-texto">${t.tarea || ""}</div>
     `;
+    card.addEventListener("click", () => seleccionarTareaCronograma(t));
     cronoTareasList.appendChild(card);
   });
 }
 
 cronoTecnicoFiltro.addEventListener("change", renderCronogramaTareas);
+
+// ---------- Relación cronograma → servicio pendiente ----------
+function encontrarServicioPorTarea(textoTarea) {
+  const norm = normalizeText(textoTarea);
+  const candidatos = serviciosCache.filter((s) => s.cliente && norm.includes(normalizeText(s.cliente)));
+  return candidatos[0] || null;
+}
+
+// Si no se encuentra un servicio pendiente correspondiente, se intenta
+// extraer cliente/dirección/localidad directo del texto de la tarea
+// (formato típico: "Servicio: Nombre\nDirección  -  Localidad").
+function parsearTareaCronograma(texto) {
+  const lineas = (texto || "").split("\n").map((l) => l.trim()).filter(Boolean);
+  let cliente = "", direccion = "", localidad = "";
+  if (lineas[0]) {
+    const m = lineas[0].match(/^Servicio:\s*(.+)$/i);
+    cliente = m ? m[1].trim() : lineas[0];
+  }
+  if (lineas[1]) {
+    const partes = lineas[1].split(/\s+-\s+/).map((p) => p.trim()).filter(Boolean);
+    if (partes.length >= 2) {
+      localidad = partes[partes.length - 1];
+      direccion = partes.slice(0, -1).join(" - ");
+    } else {
+      direccion = lineas[1];
+    }
+  }
+  return { cliente, direccion, localidad };
+}
+
+function seleccionarTareaCronograma(t) {
+  const match = encontrarServicioPorTarea(t.tarea);
+  if (match) {
+    seleccionarServicio(match);
+    return;
+  }
+  const parsed = parsearTareaCronograma(t.tarea);
+  currentNumeroServicio = "";
+  document.getElementById("f_cliente").value = parsed.cliente;
+  document.getElementById("f_direccion").value = parsed.direccion;
+  if (parsed.localidad) document.getElementById("f_localidad").value = parsed.localidad;
+  document.getElementById("f_tarea").value = (t.tarea || "").replace(/\n/g, " ");
+  showScreen("form");
+}
 
 verCronogramaBtn.addEventListener("click", () => {
   showScreen("cronograma");
@@ -670,13 +723,11 @@ backToFormBtn.addEventListener("click", () => {
 });
 
 newReportBtn.addEventListener("click", () => {
-  const numeroCompletado = currentNumeroServicio;
   resetForm();
   setStatus("LISTO");
-  // Saco el servicio recién completado de la lista en pantalla para
-  // que no lo vuelvan a elegir por error (el próximo fetch real ya
-  // no debería traerlo desde el sistema de origen).
-  serviciosCache = serviciosCache.filter((s) => s.numero_servicio !== numeroCompletado);
+  // El servicio recién completado se queda en la lista, marcado como
+  // "resuelto" (por serviciosResueltos), en vez de desaparecer — así
+  // se puede verificar de un vistazo que ya se hizo.
   renderServiciosList(filtrarServicios());
   showScreen("list");
 });
@@ -816,6 +867,10 @@ confirmSignBtn.addEventListener("click", async () => {
       foto_link: fotoLink,
     });
     oficinaOk = true;
+    if (data.numero_servicio) {
+      serviciosResueltos.add(data.numero_servicio);
+      localStorage.setItem("servicios_resueltos", JSON.stringify([...serviciosResueltos]));
+    }
   } catch (err) {
     console.error("Error enviando a oficina:", err);
   }

@@ -146,6 +146,21 @@ cronograma semanal" con el cronograma completo del equipo — todos ven
 las tareas de todos, con un filtro opcional por técnico y pestañas por
 día.
 
+Al tocar una tarea del cronograma, la app intenta encontrar el servicio
+pendiente correspondiente (comparando el nombre de cliente mencionado en
+la tarea contra el listado de servicios) y abre el formulario ya
+precargado con esos datos, igual que si se hubiera elegido directamente
+del listado. Si no encuentra una coincidencia, igual abre el formulario
+extrayendo cliente/dirección/localidad del texto de la tarea como mejor
+esfuerzo (formato esperado: "Servicio: Nombre" en la primera línea,
+"Dirección  -  Localidad" en la segunda).
+
+Cuando un parte vinculado a un servicio pendiente se completa y el mail
+a la oficina se envía con éxito, ese servicio queda marcado en verde en
+el listado (sin desaparecer) hasta que se cargue un listado nuevo desde
+`admin.html` o se sincronice de nuevo — así se puede verificar de un
+vistazo cuáles ya se resolvieron en el día.
+
 **Se sincroniza solo desde un archivo de Google Drive** cada vez que un
 técnico abre esa pantalla — no hace falta subir nada a mano. El formato
 esperado es el de siempre: una hoja por día, técnicos en columnas (fila
