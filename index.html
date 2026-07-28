@@ -50,6 +50,11 @@
     <div class="review-scroll">
       <p class="hint-eyebrow review-eyebrow">SERVICIOS PENDIENTES</p>
 
+      <div class="cola-envios-banner hidden" id="colaEnviosBanner">
+        <span id="colaEnviosTexto"></span>
+        <button type="button" class="btn btn-ghost btn-small" id="reintentarColaBtn">Reintentar ahora</button>
+      </div>
+
       <div class="search-box">
         <span class="search-icon">🔍</span>
         <input class="field-input search-input" id="serviciosSearch" type="search" placeholder="Buscar por cliente, dirección, N°...">
@@ -274,7 +279,49 @@
 
       <div class="field-group">
         <label class="field-label" for="f_materiales">Materiales utilizados</label>
-        <textarea class="field-input field-textarea" id="f_materiales" placeholder="Materiales usados"></textarea>
+        <div class="discount-chips">
+          <label class="discount-chip">
+            <input type="checkbox" name="f_material_frecuente" value="Batería">
+            <span>Batería</span>
+          </label>
+          <label class="discount-chip">
+            <input type="checkbox" name="f_material_frecuente" value="Sensor de movimiento (PIR)">
+            <span>Sensor PIR</span>
+          </label>
+          <label class="discount-chip">
+            <input type="checkbox" name="f_material_frecuente" value="Sirena">
+            <span>Sirena</span>
+          </label>
+          <label class="discount-chip">
+            <input type="checkbox" name="f_material_frecuente" value="Teclado">
+            <span>Teclado</span>
+          </label>
+          <label class="discount-chip">
+            <input type="checkbox" name="f_material_frecuente" value="Central de alarma">
+            <span>Central de alarma</span>
+          </label>
+          <label class="discount-chip">
+            <input type="checkbox" name="f_material_frecuente" value="Cable">
+            <span>Cable</span>
+          </label>
+          <label class="discount-chip">
+            <input type="checkbox" name="f_material_frecuente" value="Cámara IP">
+            <span>Cámara IP</span>
+          </label>
+          <label class="discount-chip">
+            <input type="checkbox" name="f_material_frecuente" value="Detector de humo">
+            <span>Detector de humo</span>
+          </label>
+          <label class="discount-chip">
+            <input type="checkbox" name="f_material_frecuente" value="Control remoto/llavero">
+            <span>Control remoto</span>
+          </label>
+          <label class="discount-chip">
+            <input type="checkbox" name="f_material_frecuente" value="Fuente de alimentación">
+            <span>Fuente</span>
+          </label>
+        </div>
+        <textarea class="field-input field-textarea" id="f_materiales" placeholder="Otros materiales / detalles adicionales (cantidades, modelos, etc.)" style="margin-top:8px;"></textarea>
       </div>
 
       <div class="field-group">

@@ -360,6 +360,35 @@ tilda:
   ("Instalaciones" / "Servicios técnicos") y un gráfico de torta con la
   proporción entre ambos, para el período elegido (Día/Semana/Mes).
 
+## Envío offline con reintento automático
+
+Si al enviar un parte no hay conexión (o el envío falla), la app **no
+lo pierde**: lo guarda en el celular y avisa "el parte quedó guardado
+y se va a reintentar solo cuando vuelva la conexión". El reintento pasa
+solo, sin que el técnico tenga que hacer nada, en estos momentos:
+
+- Apenas el celular recupera la conexión a internet.
+- Cada vez que se inicia sesión en la app.
+- Con el botón "Reintentar ahora" que aparece en el listado de
+  servicios pendientes mientras haya partes en espera.
+
+Los partes pendientes se guardan en el propio celular (`localStorage`)
+— si se desinstala la app o se borra el caché del navegador antes de
+que se puedan enviar, se pierden. Por eso, si un técnico ve el aviso de
+"pendiente de enviar" durante mucho tiempo, conviene asegurarse de que
+tenga conexión antes de cerrar la app.
+
+## Checklist de materiales frecuentes
+
+En "Materiales utilizados" ahora hay una lista de materiales comunes
+para tildar rápido (Batería, Sensor PIR, Sirena, Teclado, Central de
+alarma, Cable, Cámara IP, Detector de humo, Control remoto, Fuente),
+más un campo de texto libre para cualquier otro material, cantidad o
+detalle adicional. Al enviar, se combinan los tildados más el texto
+libre en un solo campo. Si la lista de materiales frecuentes no
+representa bien lo que usan, se puede editar fácil en `index.html`
+(son checkboxes simples).
+
 ## Notas y límites de esta versión
 
 - El **ID de parte** se genera por fecha/hora + un número al azar — no es

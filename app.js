@@ -72,6 +72,9 @@ const syncLabel = document.getElementById("syncLabel");
 const listStatus = document.getElementById("listStatus");
 const serviciosListEl = document.getElementById("serviciosList");
 const serviciosSearch = document.getElementById("serviciosSearch");
+const colaEnviosBanner = document.getElementById("colaEnviosBanner");
+const colaEnviosTexto = document.getElementById("colaEnviosTexto");
+const reintentarColaBtn = document.getElementById("reintentarColaBtn");
 const verCronogramaBtn = document.getElementById("verCronogramaBtn");
 const volverDeCronogramaBtn = document.getElementById("volverDeCronogramaBtn");
 const refreshCronogramaBtn = document.getElementById("refreshCronogramaBtn");
@@ -177,6 +180,8 @@ function attemptLogin() {
     showScreen("list");
     fetchServicios();
     precargarHistorialParaVisitas();
+    actualizarBadgeColaEnvios();
+    procesarColaEnvios();
   } else if (intento === APP_PASSWORD_GENERAL) {
     tecnicoLogueado = "";
     localStorage.removeItem("tecnico_logueado");
@@ -185,6 +190,8 @@ function attemptLogin() {
     showScreen("list");
     fetchServicios();
     precargarHistorialParaVisitas();
+    actualizarBadgeColaEnvios();
+    procesarColaEnvios();
   } else {
     loginError.textContent = "Contraseña incorrecta.";
     loginPassword.value = "";
@@ -738,6 +745,15 @@ function getFormaPago() {
     .join(", ");
 }
 
+const materialesFrecuentesChecks = document.getElementsByName("f_material_frecuente");
+function getMaterialesUtilizados() {
+  const frecuentes = Array.from(materialesFrecuentesChecks)
+    .filter((c) => c.checked)
+    .map((c) => c.value);
+  const otros = document.getElementById("f_materiales").value.trim();
+  return [...frecuentes, otros].filter(Boolean).join(", ");
+}
+
 backToListBtn.addEventListener("click", () => {
   resetForm();
   showScreen("list");
@@ -930,7 +946,7 @@ function getFormData() {
     localidad: document.getElementById("f_localidad").value.trim(),
     cliente_email: document.getElementById("f_cliente_email").value.trim(),
     tarea: document.getElementById("f_tarea").value.trim(),
-    materiales: document.getElementById("f_materiales").value.trim(),
+    materiales: getMaterialesUtilizados(),
     materiales_retirados: document.getElementById("f_materiales_retirados").value.trim(),
     importe: document.getElementById("f_importe").value.trim(),
     descuento: getDescuentoLabel(),
@@ -975,6 +991,7 @@ function resetForm() {
   descuentoOtroPct.value = "";
   descuentoOtroPct.style.display = "none";
   formaPagoChecks.forEach((c) => { c.checked = false; });
+  materialesFrecuentesChecks.forEach((c) => { c.checked = false; });
   currentNumeroServicio = "";
   fotoBase64 = null;
   fotoMimeType = null;
@@ -1082,29 +1099,18 @@ function clearSignature() {
 clearSignBtn.addEventListener("click", clearSignature);
 
 // ---------- Confirmar firma y enviar ----------
-confirmSignBtn.addEventListener("click", async () => {
-  if (!hasSignature) {
-    showToast("Falta la firma del cliente.");
-    return;
-  }
-
-  const data = getFormData();
-  // El N° de parte que se muestra y se manda por mail toma el N° de
-  // servicio real (el que viene del listado precargado). Solo se genera
-  // uno automático si el técnico cargó el parte manualmente, sin elegir
-  // un servicio de la lista.
-  const idParte = data.numero_servicio ? data.numero_servicio : generarIdParte();
-  const signatureDataUrl = canvas.toDataURL("image/png");
-  const signatureImgTag = `<img src="${signatureDataUrl}" alt="Firma del cliente" width="260" style="display:block;" />`;
-
-  showScreen("sending");
-  setStatus("ENVIANDO", "busy");
+// Intenta enviar un parte completo (foto, mail de oficina, historial,
+// mail de cliente). No toca la navegación de pantallas — el que llama
+// decide qué mostrar según el resultado. Se usa tanto para el envío
+// en el momento como para los reintentos automáticos en segundo plano.
+async function intentarEnviarParte(payload, interactivo) {
+  const { idParte, data, signatureImgTag, fotoBase64: fb64, fotoMimeType: fmt } = payload;
 
   let fotoLink = "";
   let fotoError = "";
-  if (fotoBase64) {
+  if (fb64) {
     try {
-      sendingLabel.textContent = "Subiendo foto...";
+      if (interactivo) sendingLabel.textContent = "Subiendo foto...";
       const fotoRes = await fetch("/api/upload-foto", {
         method: "POST",
         headers: {
@@ -1113,8 +1119,8 @@ confirmSignBtn.addEventListener("click", async () => {
         },
         body: JSON.stringify({
           filename: `${idParte}.jpg`,
-          mimeType: fotoMimeType || "image/jpeg",
-          base64: fotoBase64,
+          mimeType: fmt || "image/jpeg",
+          base64: fb64,
         }),
       });
       const fotoData = await fotoRes.json();
@@ -1155,10 +1161,10 @@ confirmSignBtn.addEventListener("click", async () => {
 
   let oficinaOk = false;
   let clienteOk = false;
-  let clienteIntentado = !!data.cliente_email;
+  const clienteIntentado = !!data.cliente_email;
 
   try {
-    sendingLabel.textContent = "Enviando copia a la oficina…";
+    if (interactivo) sendingLabel.textContent = "Enviando copia a la oficina…";
     await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_OFICINA, {
       ...basePayload,
       foto_link: fotoLink,
@@ -1170,9 +1176,6 @@ confirmSignBtn.addEventListener("click", async () => {
       serviciosResueltos.add(data.numero_servicio);
       localStorage.setItem("servicios_resueltos", JSON.stringify([...serviciosResueltos]));
     }
-    // Registro en el historial para el dashboard — si falla, no se
-    // interrumpe el flujo (el mail ya se mandó bien, lo importante),
-    // pero se avisa para poder detectarlo.
     try {
       const histRes = await fetch("/api/historial", {
         method: "POST",
@@ -1199,19 +1202,19 @@ confirmSignBtn.addEventListener("click", async () => {
       if (!histRes.ok) {
         const histData = await histRes.json().catch(() => ({}));
         console.error("Error registrando historial:", histData);
-        showToast("⚠ El mail se envió, pero no se pudo registrar en el dashboard.");
+        if (interactivo) showToast("⚠ El mail se envió, pero no se pudo registrar en el dashboard.");
       }
     } catch (err) {
       console.error("Error registrando historial:", err);
-      showToast("⚠ El mail se envió, pero no se pudo registrar en el dashboard.");
+      if (interactivo) showToast("⚠ El mail se envió, pero no se pudo registrar en el dashboard.");
     }
   } catch (err) {
     console.error("Error enviando a oficina:", err);
   }
 
-  if (clienteIntentado) {
+  if (oficinaOk && clienteIntentado) {
     try {
-      sendingLabel.textContent = "Enviando copia al cliente…";
+      if (interactivo) sendingLabel.textContent = "Enviando copia al cliente…";
       await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_CLIENTE, {
         ...basePayload,
         cliente_email: data.cliente_email,
@@ -1221,6 +1224,112 @@ confirmSignBtn.addEventListener("click", async () => {
       console.error("Error enviando al cliente:", err);
     }
   }
+
+  return { idParte, oficinaOk, clienteOk, clienteIntentado, fotoError };
+}
+
+// ---------- Cola de envíos pendientes (sin conexión) ----------
+const COLA_ENVIOS_KEY = "cola_envios_pendientes";
+
+function obtenerColaEnvios() {
+  try {
+    return JSON.parse(localStorage.getItem(COLA_ENVIOS_KEY) || "[]");
+  } catch (err) {
+    return [];
+  }
+}
+function guardarColaEnvios(cola) {
+  localStorage.setItem(COLA_ENVIOS_KEY, JSON.stringify(cola));
+  actualizarBadgeColaEnvios();
+}
+function agregarAColaEnvios(payload) {
+  const cola = obtenerColaEnvios();
+  cola.push(payload);
+  guardarColaEnvios(cola);
+}
+
+function actualizarBadgeColaEnvios() {
+  const cantidad = obtenerColaEnvios().length;
+  if (!colaEnviosBanner) return;
+  if (cantidad > 0) {
+    colaEnviosTexto.textContent = `${cantidad} parte(s) pendiente(s) de enviar (sin conexión).`;
+    colaEnviosBanner.classList.remove("hidden");
+  } else {
+    colaEnviosBanner.classList.add("hidden");
+  }
+}
+
+let procesandoColaEnvios = false;
+async function procesarColaEnvios() {
+  if (procesandoColaEnvios) return;
+  procesandoColaEnvios = true;
+  const cola = obtenerColaEnvios();
+  if (cola.length === 0) {
+    procesandoColaEnvios = false;
+    return;
+  }
+
+  const restantes = [];
+  let enviadosOk = 0;
+  for (const item of cola) {
+    try {
+      const resultado = await intentarEnviarParte(item, false);
+      if (resultado.oficinaOk) {
+        enviadosOk++;
+      } else {
+        restantes.push(item);
+      }
+    } catch (err) {
+      restantes.push(item);
+    }
+  }
+  guardarColaEnvios(restantes);
+  procesandoColaEnvios = false;
+
+  if (enviadosOk > 0) {
+    showToast(`Se enviaron ${enviadosOk} parte(s) que estaban pendientes por falta de conexión.`);
+    if (screens.list.dataset.active === "true") {
+      renderServiciosList(filtrarServicios());
+    }
+  }
+}
+
+window.addEventListener("online", procesarColaEnvios);
+reintentarColaBtn.addEventListener("click", procesarColaEnvios);
+
+confirmSignBtn.addEventListener("click", async () => {
+  if (!hasSignature) {
+    showToast("Falta la firma del cliente.");
+    return;
+  }
+
+  const data = getFormData();
+  // El N° de parte que se muestra y se manda por mail toma el N° de
+  // servicio real (el que viene del listado precargado). Solo se genera
+  // uno automático si el técnico cargó el parte manualmente, sin elegir
+  // un servicio de la lista.
+  const idParte = data.numero_servicio ? data.numero_servicio : generarIdParte();
+  const signatureDataUrl = canvas.toDataURL("image/png");
+  const signatureImgTag = `<img src="${signatureDataUrl}" alt="Firma del cliente" width="260" style="display:block;" />`;
+
+  const payload = { idParte, data, signatureImgTag, fotoBase64, fotoMimeType };
+
+  showScreen("sending");
+  setStatus("ENVIANDO", "busy");
+
+  if (navigator.onLine === false) {
+    // Directo a la cola, sin ni siquiera intentar (ahorra la espera
+    // del timeout de red cuando ya se sabe que no hay conexión).
+    agregarAColaEnvios(payload);
+    setStatus("");
+    doneId.textContent = `N° de parte: ${idParte}`;
+    doneMessage.textContent = "Sin conexión — el parte se guardó en el celular y se va a enviar solo apenas vuelva la señal.";
+    showScreen("done");
+    return;
+  }
+
+  const resultado = await intentarEnviarParte(payload, true);
+  const { oficinaOk, clienteOk, clienteIntentado, fotoError } = resultado;
 
   setStatus(oficinaOk ? "LISTO" : "");
   doneId.textContent = `N° de parte: ${idParte}`;
@@ -1239,8 +1348,11 @@ confirmSignBtn.addEventListener("click", async () => {
     doneMessage.textContent = "Enviado a la oficina, pero falló el envío al cliente" + mensajeFoto;
     showScreen("done");
   } else {
-    showScreen("sign");
-    showToast("No se pudo enviar el mail. Revisá la conexión e intentá de nuevo.");
+    // Falló el envío principal (a oficina) — se guarda para reintentar
+    // solo automáticamente en vez de perder el parte.
+    agregarAColaEnvios(payload);
+    doneMessage.textContent = "No se pudo enviar en este momento — el parte quedó guardado y se va a reintentar solo cuando vuelva la conexión.";
+    showScreen("done");
   }
 });
 
