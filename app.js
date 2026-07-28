@@ -531,7 +531,7 @@ confirmSignBtn.addEventListener("click", async () => {
       if (fotoRes.ok && fotoData.link) {
         fotoLink = fotoData.link;
       } else {
-        fotoError = fotoData.error || fotoData.detail || `Error HTTP ${fotoRes.status}`;
+        fotoError = fotoData.detail || fotoData.error || `Error HTTP ${fotoRes.status}`;
         console.error("Error subiendo foto:", fotoData);
       }
     } catch (err) {
