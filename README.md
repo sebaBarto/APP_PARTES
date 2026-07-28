@@ -189,6 +189,28 @@ archivo fijo puntual en vez de una carpeta, sigue existiendo la
 variable `CRONOGRAMA_DRIVE_FILE_ID` como respaldo — pero no es lo
 recomendado dado que el ID cambia con cada actualización.)
 
+## Mapa del servicio y servicios cercanos
+
+Desde el formulario hay un botón "📍 Ver en mapa" que muestra la
+ubicación de la dirección cargada (Leaflet + OpenStreetMap, sin costo ni
+API key), y marca en naranja cualquier otro servicio pendiente a menos
+de 500 metros — útil para agrupar visitas cercanas.
+
+Las direcciones se convierten a coordenadas con Nominatim (el
+geocodificador gratuito de OpenStreetMap) a través de `/api/geocode.js`,
+que guarda cada dirección ya buscada en el repo privado de datos
+(`geocode-cache.json`) para no tener que volver a buscarla — así se
+respeta el límite de uso gratuito (1 pedido por segundo) y las
+consultas repetidas son instantáneas. No hace falta ninguna variable de
+entorno nueva: reutiliza `SERVICIOS_API_TOKEN`, `GITHUB_DATA_TOKEN` y
+`GITHUB_DATA_REPO` que ya existen.
+
+Si hay muchas direcciones nuevas sin geocodificar todavía (la primera
+vez que se cargan muchos servicios de golpe), puede tardar unos segundos
+o requerir tocar "Ver en mapa" más de una vez, ya que cada pedido
+procesa como máximo 6 direcciones nuevas por vez (para no exceder el
+tiempo máximo de ejecución de la función serverless).
+
 ## Publicar en Vercel
 
 - Confirmá que estén cargadas todas las variables de entorno mencionadas

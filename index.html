@@ -13,7 +13,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body>
 
@@ -96,6 +98,20 @@
     </div>
   </section>
 
+  <!-- MAPA DEL SERVICIO -->
+  <section class="screen" id="screen-mapa">
+    <div class="review-scroll" style="padding:0;">
+      <p class="hint-eyebrow review-eyebrow" style="padding:16px 18px 0;">UBICACIÓN DEL SERVICIO</p>
+      <div id="mapaLeaflet" class="mapa-leaflet"></div>
+      <p class="list-status" id="mapaStatus" style="padding:0 18px;"></p>
+      <div id="mapaCercanosList" class="mapa-cercanos-list"></div>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDeMapaBtn" type="button">Volver al formulario</button>
+    </div>
+  </section>
+
   <!-- STEP 1: FORM -->
   <section class="screen" id="screen-form">
     <div class="review-scroll">
@@ -116,6 +132,8 @@
           <input class="field-input" id="f_localidad" type="text" placeholder="Localidad">
         </div>
       </div>
+
+      <button type="button" class="btn btn-ghost btn-small" id="verMapaBtn">📍 Ver en mapa</button>
 
       <div class="field-group">
         <label class="field-label" for="f_cliente_email">Mail del cliente <span class="field-optional">(opcional)</span></label>

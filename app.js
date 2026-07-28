@@ -38,6 +38,7 @@ const screens = {
   login: document.getElementById("screen-login"),
   list: document.getElementById("screen-list"),
   cronograma: document.getElementById("screen-cronograma"),
+  mapa: document.getElementById("screen-mapa"),
   form: document.getElementById("screen-form"),
   sign: document.getElementById("screen-sign"),
   sending: document.getElementById("screen-sending"),
@@ -75,6 +76,10 @@ const fotoPreviewWrap = document.getElementById("fotoPreviewWrap");
 const fotoPreview = document.getElementById("fotoPreview");
 const quitarFotoBtn = document.getElementById("quitarFotoBtn");
 const fotoStatus = document.getElementById("fotoStatus");
+const verMapaBtn = document.getElementById("verMapaBtn");
+const volverDeMapaBtn = document.getElementById("volverDeMapaBtn");
+const mapaStatus = document.getElementById("mapaStatus");
+const mapaCercanosList = document.getElementById("mapaCercanosList");
 const toSignBtn = document.getElementById("toSignBtn");
 const backToFormBtn = document.getElementById("backToFormBtn");
 const clearSignBtn = document.getElementById("clearSignBtn");
@@ -474,6 +479,124 @@ quitarFotoBtn.addEventListener("click", () => {
   fotoInput.value = "";
   fotoPreviewWrap.classList.add("hidden");
   fotoStatus.textContent = "";
+});
+
+// ---------- Mapa del servicio ----------
+let mapaLeafletInstance = null;
+
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
+
+function distanciaMetros(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+async function abrirMapa() {
+  const direccion = document.getElementById("f_direccion").value.trim();
+  const localidad = document.getElementById("f_localidad").value.trim();
+  if (!direccion) {
+    showToast("Completá la dirección antes de ver el mapa.");
+    return;
+  }
+
+  showScreen("mapa");
+  mapaStatus.textContent = "Buscando ubicación...";
+  mapaCercanosList.innerHTML = "";
+
+  const items = [{ id: "actual", direccion, localidad }];
+  serviciosCache.forEach((s, idx) => {
+    if (s.direccion) items.push({ id: `s${idx}`, direccion: s.direccion, localidad: s.localidad || "" });
+  });
+
+  try {
+    const res = await fetch("/api/geocode", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({ items }),
+    });
+    const data = await res.json();
+    const porId = {};
+    (data.results || []).forEach((r) => { porId[r.id] = r; });
+
+    const actual = porId["actual"];
+    if (!actual || actual.error) {
+      mapaStatus.textContent = "No se pudo ubicar esa dirección en el mapa.";
+      return;
+    }
+    if (actual.pendiente) {
+      mapaStatus.textContent = "Ubicando la dirección, probá de nuevo en unos segundos...";
+      return;
+    }
+
+    mapaStatus.textContent = "";
+    renderizarMapa(actual, porId);
+  } catch (err) {
+    mapaStatus.textContent = "No se pudo conectar para buscar la ubicación.";
+  }
+}
+
+function renderizarMapa(actual, porId) {
+  if (mapaLeafletInstance) {
+    mapaLeafletInstance.remove();
+    mapaLeafletInstance = null;
+  }
+
+  const map = L.map("mapaLeaflet").setView([actual.lat, actual.lon], 15);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "&copy; colaboradores de OpenStreetMap",
+  }).addTo(map);
+
+  L.circleMarker([actual.lat, actual.lon], {
+    radius: 10, color: "#101820", fillColor: "#101820", fillOpacity: 1, weight: 2,
+  }).addTo(map).bindPopup("Servicio actual").openPopup();
+
+  const cercanos = [];
+  serviciosCache.forEach((s, idx) => {
+    const r = porId[`s${idx}`];
+    if (!r || r.error || r.pendiente) return;
+    const dist = distanciaMetros(actual.lat, actual.lon, r.lat, r.lon);
+    if (dist > 3 && dist <= 500) {
+      cercanos.push({ servicio: s, dist });
+      L.circleMarker([r.lat, r.lon], {
+        radius: 8, color: "#F5A623", fillColor: "#F5A623", fillOpacity: 0.9, weight: 2,
+      }).addTo(map).bindPopup(`${s.cliente || ""} (${Math.round(dist)} m)`);
+    }
+  });
+
+  mapaCercanosList.innerHTML = "";
+  if (cercanos.length > 0) {
+    const titulo = document.createElement("p");
+    titulo.className = "list-status";
+    titulo.textContent = `${cercanos.length} servicio(s) pendiente(s) a menos de 500 m:`;
+    mapaCercanosList.appendChild(titulo);
+    cercanos.sort((a, b) => a.dist - b.dist).forEach(({ servicio, dist }) => {
+      const card = document.createElement("div");
+      card.className = "mapa-cercano-card";
+      card.innerHTML = `
+        <div class="mapa-cercano-num">N° ${servicio.numero_servicio || ""}</div>
+        <div class="mapa-cercano-cliente">${servicio.cliente || ""}</div>
+        <div class="mapa-cercano-dist">${Math.round(dist)} m — ${servicio.direccion || ""}</div>
+      `;
+      mapaCercanosList.appendChild(card);
+    });
+  }
+
+  mapaLeafletInstance = map;
+  setTimeout(() => map.invalidateSize(), 0);
+}
+
+verMapaBtn.addEventListener("click", abrirMapa);
+volverDeMapaBtn.addEventListener("click", () => {
+  showScreen("form");
 });
 
 function getFormData() {
