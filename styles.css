@@ -289,6 +289,19 @@ html, body {
   font-weight: 600;
 }
 .check-instalacion:has(input:checked) { border-color: #F5A623; background: rgba(245,166,35,0.1); }
+.materiales-agregados-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.material-agregado-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #F4F5F0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+.material-agregado-item .quitar {
+  background: none; border: none; color: #C0392B; font-size: 15px; cursor: pointer; padding: 0 0 0 10px; width: auto;
+}
 
 .discount-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .discount-chip {

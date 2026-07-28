@@ -426,16 +426,29 @@ que se puedan enviar, se pierden. Por eso, si un técnico ve el aviso de
 "pendiente de enviar" durante mucho tiempo, conviene asegurarse de que
 tenga conexión antes de cerrar la app.
 
-## Checklist de materiales frecuentes
+## Catálogo de materiales por categoría (administrable)
 
-En "Materiales utilizados" ahora hay una lista de materiales comunes
-para tildar rápido (Batería, Sensor PIR, Sirena, Teclado, Central de
-alarma, Cable, Cámara IP, Detector de humo, Control remoto, Fuente),
-más un campo de texto libre para cualquier otro material, cantidad o
-detalle adicional. Al enviar, se combinan los tildados más el texto
-libre en un solo campo. Si la lista de materiales frecuentes no
-representa bien lo que usan, se puede editar fácil en `index.html`
-(son checkboxes simples).
+En "Materiales utilizados" el técnico elige una **categoría** (ej.
+"Sensores infrarrojos"), después un **modelo** dentro de esa categoría,
+carga la **cantidad**, y toca "+ Agregar" — se puede agregar varios
+materiales distintos a un mismo parte. Debajo sigue habiendo un campo
+de texto libre para cualquier otro material que no esté en el
+catálogo. Al enviar, se combina todo en un solo campo de texto.
+
+Las categorías y modelos se administran desde `admin.html` → pestaña
+"Materiales":
+
+1. La primera vez que entrás ahí (si nunca se guardó nada) aparece
+   precargada con categorías de ejemplo — revisala, ajustala a lo que
+   realmente usan, y guardá para publicarla.
+2. Cada categoría tiene un nombre y una lista de modelos (uno por
+   línea en el mismo cuadro de texto).
+3. "+ Agregar categoría" para sumar una nueva, la ✕ de cada tarjeta
+   para sacar una entera.
+
+Se guarda en el mismo repo privado de datos (`materiales-catalogo.json`),
+reutilizando las variables de entorno que ya existen — no hace falta
+configurar nada nuevo.
 
 ## Aviso "estoy en camino" por WhatsApp
 

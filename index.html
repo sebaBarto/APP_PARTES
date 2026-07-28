@@ -280,49 +280,29 @@
 
       <div class="field-group">
         <label class="field-label" for="f_materiales">Materiales utilizados</label>
-        <div class="discount-chips">
-          <label class="discount-chip">
-            <input type="checkbox" name="f_material_frecuente" value="Batería">
-            <span>Batería</span>
-          </label>
-          <label class="discount-chip">
-            <input type="checkbox" name="f_material_frecuente" value="Sensor de movimiento (PIR)">
-            <span>Sensor PIR</span>
-          </label>
-          <label class="discount-chip">
-            <input type="checkbox" name="f_material_frecuente" value="Sirena">
-            <span>Sirena</span>
-          </label>
-          <label class="discount-chip">
-            <input type="checkbox" name="f_material_frecuente" value="Teclado">
-            <span>Teclado</span>
-          </label>
-          <label class="discount-chip">
-            <input type="checkbox" name="f_material_frecuente" value="Central de alarma">
-            <span>Central de alarma</span>
-          </label>
-          <label class="discount-chip">
-            <input type="checkbox" name="f_material_frecuente" value="Cable">
-            <span>Cable</span>
-          </label>
-          <label class="discount-chip">
-            <input type="checkbox" name="f_material_frecuente" value="Cámara IP">
-            <span>Cámara IP</span>
-          </label>
-          <label class="discount-chip">
-            <input type="checkbox" name="f_material_frecuente" value="Detector de humo">
-            <span>Detector de humo</span>
-          </label>
-          <label class="discount-chip">
-            <input type="checkbox" name="f_material_frecuente" value="Control remoto/llavero">
-            <span>Control remoto</span>
-          </label>
-          <label class="discount-chip">
-            <input type="checkbox" name="f_material_frecuente" value="Fuente de alimentación">
-            <span>Fuente</span>
-          </label>
+
+        <div class="field-row">
+          <div class="field-group grow">
+            <select class="field-input" id="matCategoriaSelect">
+              <option value="" disabled selected>Categoría</option>
+            </select>
+          </div>
         </div>
-        <textarea class="field-input field-textarea" id="f_materiales" placeholder="Otros materiales / detalles adicionales (cantidades, modelos, etc.)" style="margin-top:8px;"></textarea>
+        <div class="field-row">
+          <div class="field-group grow">
+            <select class="field-input" id="matModeloSelect" disabled>
+              <option value="" disabled selected>Elegí primero una categoría</option>
+            </select>
+          </div>
+          <div class="field-group" style="max-width:90px;">
+            <input class="field-input field-mono" id="matCantidadInput" type="number" min="1" step="1" placeholder="Cant.">
+          </div>
+        </div>
+        <button type="button" class="btn btn-ghost btn-small" id="agregarMaterialBtn" style="margin-bottom:10px;">+ Agregar</button>
+
+        <div id="materialesAgregadosList" class="materiales-agregados-list"></div>
+
+        <textarea class="field-input field-textarea" id="f_materiales" placeholder="Otros materiales / detalles adicionales que no estén en las categorías" style="margin-top:8px;"></textarea>
       </div>
 
       <div class="field-group">

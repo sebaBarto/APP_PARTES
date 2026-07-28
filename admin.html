@@ -71,6 +71,7 @@
       <button type="button" class="tab-btn active" id="tabServiciosBtn">Servicios pendientes</button>
       <button type="button" class="tab-btn" id="tabCronogramaBtn">Cronograma semanal</button>
       <button type="button" class="tab-btn" id="tabTecnicosBtn">Técnicos</button>
+      <button type="button" class="tab-btn" id="tabMaterialesBtn">Materiales</button>
     </div>
 
     <div id="panelServicios">
@@ -184,6 +185,19 @@
       <button id="guardarTecnicosBtn" type="button">Guardar cambios</button>
       <p class="status" id="guardarTecnicosStatus"></p>
     </div>
+
+    <div id="panelMateriales" class="hidden">
+      <h1>Catálogo de materiales</h1>
+      <p class="subtitle">Categorías y modelos que van a poder elegir los técnicos al cargar materiales (un modelo por línea dentro de cada categoría).</p>
+
+      <p class="status" id="materialesStatus"></p>
+
+      <div id="categoriasFilas"></div>
+
+      <button id="agregarCategoriaBtn" type="button" class="btn-secondary-admin" style="margin-bottom:14px;">+ Agregar categoría</button>
+      <button id="guardarMaterialesBtn" type="button">Guardar cambios</button>
+      <p class="status" id="guardarMaterialesStatus"></p>
+    </div>
   </div>
 
 </div>
@@ -221,34 +235,25 @@ const tabServiciosBtn = document.getElementById("tabServiciosBtn");
 const tabCronogramaBtn = document.getElementById("tabCronogramaBtn");
 const panelServicios = document.getElementById("panelServicios");
 const panelCronograma = document.getElementById("panelCronograma");
+const tabMaterialesBtn = document.getElementById("tabMaterialesBtn");
+const panelMateriales = document.getElementById("panelMateriales");
+let materialesCargadosUnaVez = false;
 
-tabServiciosBtn.addEventListener("click", () => {
-  tabServiciosBtn.classList.add("active");
-  tabCronogramaBtn.classList.remove("active");
-  tabTecnicosBtn.classList.remove("active");
-  panelServicios.classList.remove("hidden");
-  panelCronograma.classList.add("hidden");
-  panelTecnicos.classList.add("hidden");
-});
-tabCronogramaBtn.addEventListener("click", () => {
-  tabCronogramaBtn.classList.add("active");
-  tabServiciosBtn.classList.remove("active");
-  tabTecnicosBtn.classList.remove("active");
-  panelCronograma.classList.remove("hidden");
-  panelServicios.classList.add("hidden");
-  panelTecnicos.classList.add("hidden");
-});
-tabTecnicosBtn.addEventListener("click", () => {
-  tabTecnicosBtn.classList.add("active");
-  tabServiciosBtn.classList.remove("active");
-  tabCronogramaBtn.classList.remove("active");
-  panelTecnicos.classList.remove("hidden");
-  panelServicios.classList.add("hidden");
-  panelCronograma.classList.add("hidden");
-  if (!tecnicosCargadosUnaVez) {
-    tecnicosCargadosUnaVez = true;
-    cargarTecnicosAdmin();
-  }
+const TABS = [
+  { btn: tabServiciosBtn, panel: panelServicios },
+  { btn: tabCronogramaBtn, panel: panelCronograma },
+  { btn: tabTecnicosBtn, panel: panelTecnicos, onShow: () => { if (!tecnicosCargadosUnaVez) { tecnicosCargadosUnaVez = true; cargarTecnicosAdmin(); } } },
+  { btn: tabMaterialesBtn, panel: panelMateriales, onShow: () => { if (!materialesCargadosUnaVez) { materialesCargadosUnaVez = true; cargarMaterialesAdmin(); } } },
+];
+
+TABS.forEach(({ btn, panel, onShow }) => {
+  btn.addEventListener("click", () => {
+    TABS.forEach(({ btn: otroBtn, panel: otroPanel }) => {
+      otroBtn.classList.toggle("active", otroBtn === btn);
+      otroPanel.classList.toggle("hidden", otroPanel !== panel);
+    });
+    if (onShow) onShow();
+  });
 });
 
 function renderFilaTecnico(nombre, password) {
@@ -425,6 +430,103 @@ guardarConfigBtn.addEventListener("click", async () => {
     configStatus.textContent = "No se pudo guardar: " + err.message;
   } finally {
     guardarConfigBtn.disabled = false;
+  }
+});
+
+// ---------- Catálogo de materiales ----------
+const MATERIALES_RESPALDO = [
+  { categoria: "Sensores infrarrojos", modelos: ["PIR genérico"] },
+  { categoria: "Sensores magnéticos", modelos: ["Contacto magnético embutir", "Contacto magnético superficie"] },
+  { categoria: "Baterías", modelos: ["Batería 12V 7Ah", "Batería 12V 4Ah"] },
+  { categoria: "Sirenas", modelos: ["Sirena interior", "Sirena exterior"] },
+];
+
+const materialesStatus = document.getElementById("materialesStatus");
+const categoriasFilas = document.getElementById("categoriasFilas");
+const agregarCategoriaBtn = document.getElementById("agregarCategoriaBtn");
+const guardarMaterialesBtn = document.getElementById("guardarMaterialesBtn");
+const guardarMaterialesStatus = document.getElementById("guardarMaterialesStatus");
+
+function renderFilaCategoria(categoria, modelos) {
+  const fila = document.createElement("div");
+  fila.className = "card categoria-fila";
+  fila.innerHTML = `
+    <div class="field-row" style="align-items:flex-end;">
+      <div style="flex:1;">
+        <label>Categoría</label>
+        <input type="text" class="categoria-nombre" value="${categoria || ""}" placeholder="Ej: Sensores infrarrojos">
+      </div>
+      <button type="button" class="btn-quitar-tecnico quitar-categoria" title="Quitar categoría">✕</button>
+    </div>
+    <label>Modelos (uno por línea)</label>
+    <textarea class="categoria-modelos" rows="4" placeholder="Un modelo por línea">${(modelos || []).join("\n")}</textarea>
+  `;
+  fila.querySelector(".quitar-categoria").addEventListener("click", () => fila.remove());
+  categoriasFilas.appendChild(fila);
+}
+
+async function cargarMaterialesAdmin() {
+  materialesStatus.textContent = "Cargando catálogo...";
+  categoriasFilas.innerHTML = "";
+  try {
+    const res = await fetch("/api/materiales-catalogo", {
+      headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+
+    const lista = Array.isArray(data) && data.length > 0 ? data : MATERIALES_RESPALDO;
+    lista.forEach((c) => renderFilaCategoria(c.categoria, c.modelos));
+    materialesStatus.textContent = Array.isArray(data) && data.length > 0
+      ? ""
+      : "Todavía no se guardó ningún catálogo — se precargó con categorías de ejemplo. Editalas y guardá para publicarlo.";
+  } catch (err) {
+    categoriasFilas.innerHTML = "";
+    MATERIALES_RESPALDO.forEach((c) => renderFilaCategoria(c.categoria, c.modelos));
+    materialesStatus.textContent = "No se pudo conectar — se muestra un catálogo de respaldo. Revisalo antes de guardar.";
+  }
+}
+
+agregarCategoriaBtn.addEventListener("click", () => renderFilaCategoria("", []));
+
+guardarMaterialesBtn.addEventListener("click", async () => {
+  const filas = Array.from(categoriasFilas.querySelectorAll(".categoria-fila"));
+  const catalogo = filas.map((fila) => ({
+    categoria: fila.querySelector(".categoria-nombre").value.trim(),
+    modelos: fila.querySelector(".categoria-modelos").value
+      .split("\n")
+      .map((m) => m.trim())
+      .filter(Boolean),
+  })).filter((c) => c.categoria && c.modelos.length > 0);
+
+  if (catalogo.length === 0) {
+    guardarMaterialesStatus.className = "status err";
+    guardarMaterialesStatus.textContent = "Agregá al menos una categoría con nombre y algún modelo.";
+    return;
+  }
+
+  guardarMaterialesBtn.disabled = true;
+  guardarMaterialesStatus.className = "status";
+  guardarMaterialesStatus.textContent = "Guardando...";
+  try {
+    const res = await fetch("/api/materiales-catalogo", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + SERVICIOS_API_TOKEN,
+      },
+      body: JSON.stringify(catalogo),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    guardarMaterialesStatus.className = "status ok";
+    guardarMaterialesStatus.textContent = `Listo — se guardaron ${data.count} categorías. Ya están disponibles en la app.`;
+  } catch (err) {
+    guardarMaterialesStatus.className = "status err";
+    guardarMaterialesStatus.textContent = "No se pudo guardar: " + err.message;
+  } finally {
+    guardarMaterialesBtn.disabled = false;
   }
 });
 

@@ -915,13 +915,94 @@ function getFormaPago() {
     .join(", ");
 }
 
-const materialesFrecuentesChecks = document.getElementsByName("f_material_frecuente");
+// ---------- Catálogo de materiales por categoría ----------
+const MATERIALES_CATALOGO_RESPALDO = [
+  { categoria: "Sensores infrarrojos", modelos: ["PIR genérico"] },
+  { categoria: "Sensores magnéticos", modelos: ["Contacto magnético embutir", "Contacto magnético superficie"] },
+  { categoria: "Baterías", modelos: ["Batería 12V 7Ah", "Batería 12V 4Ah"] },
+  { categoria: "Sirenas", modelos: ["Sirena interior", "Sirena exterior"] },
+];
+
+const matCategoriaSelect = document.getElementById("matCategoriaSelect");
+const matModeloSelect = document.getElementById("matModeloSelect");
+const matCantidadInput = document.getElementById("matCantidadInput");
+const agregarMaterialBtn = document.getElementById("agregarMaterialBtn");
+const materialesAgregadosList = document.getElementById("materialesAgregadosList");
+
+let materialesCatalogo = MATERIALES_CATALOGO_RESPALDO;
+let materialesAgregados = [];
+
+async function cargarMaterialesCatalogo() {
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/materiales-catalogo", { headers, cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if (Array.isArray(data) && data.length > 0) {
+      materialesCatalogo = data;
+      localStorage.setItem("materiales_catalogo_cache", JSON.stringify(data));
+    }
+  } catch (err) {
+    const cacheado = localStorage.getItem("materiales_catalogo_cache");
+    if (cacheado) {
+      try { materialesCatalogo = JSON.parse(cacheado); } catch (e) { /* usa el respaldo de arranque */ }
+    }
+  }
+  poblarCategoriasMateriales();
+}
+cargarMaterialesCatalogo();
+
+function poblarCategoriasMateriales() {
+  const opciones = materialesCatalogo.map((c) => `<option value="${c.categoria}">${c.categoria}</option>`).join("");
+  matCategoriaSelect.innerHTML = `<option value="" disabled selected>Categoría</option>${opciones}`;
+}
+
+matCategoriaSelect.addEventListener("change", () => {
+  const cat = materialesCatalogo.find((c) => c.categoria === matCategoriaSelect.value);
+  if (!cat) {
+    matModeloSelect.innerHTML = '<option value="" disabled selected>Elegí primero una categoría</option>';
+    matModeloSelect.disabled = true;
+    return;
+  }
+  const opciones = cat.modelos.map((m) => `<option value="${m}">${m}</option>`).join("");
+  matModeloSelect.innerHTML = `<option value="" disabled selected>Modelo</option>${opciones}`;
+  matModeloSelect.disabled = false;
+});
+
+function renderMaterialesAgregados() {
+  materialesAgregadosList.innerHTML = "";
+  materialesAgregados.forEach((item, idx) => {
+    const fila = document.createElement("div");
+    fila.className = "material-agregado-item";
+    fila.innerHTML = `
+      <span>${item.modelo} — x${item.cantidad}</span>
+      <button type="button" class="quitar" title="Quitar">✕</button>
+    `;
+    fila.querySelector(".quitar").addEventListener("click", () => {
+      materialesAgregados.splice(idx, 1);
+      renderMaterialesAgregados();
+    });
+    materialesAgregadosList.appendChild(fila);
+  });
+}
+
+agregarMaterialBtn.addEventListener("click", () => {
+  const modelo = matModeloSelect.value;
+  const cantidad = parseInt(matCantidadInput.value, 10) || 1;
+  if (!modelo) {
+    showToast("Elegí una categoría y un modelo antes de agregar.");
+    return;
+  }
+  materialesAgregados.push({ modelo, cantidad });
+  renderMaterialesAgregados();
+  matModeloSelect.value = "";
+  matCantidadInput.value = "";
+});
+
 function getMaterialesUtilizados() {
-  const frecuentes = Array.from(materialesFrecuentesChecks)
-    .filter((c) => c.checked)
-    .map((c) => c.value);
+  const agregados = materialesAgregados.map((item) => `${item.modelo} x${item.cantidad}`);
   const otros = document.getElementById("f_materiales").value.trim();
-  return [...frecuentes, otros].filter(Boolean).join(", ");
+  return [...agregados, otros].filter(Boolean).join(", ");
 }
 
 backToListBtn.addEventListener("click", () => {
@@ -1231,7 +1312,12 @@ function resetForm() {
   descuentoOtroPct.value = "";
   descuentoOtroPct.style.display = "none";
   formaPagoChecks.forEach((c) => { c.checked = false; });
-  materialesFrecuentesChecks.forEach((c) => { c.checked = false; });
+  materialesAgregados = [];
+  renderMaterialesAgregados();
+  matCategoriaSelect.value = "";
+  matModeloSelect.innerHTML = '<option value="" disabled selected>Elegí primero una categoría</option>';
+  matModeloSelect.disabled = true;
+  matCantidadInput.value = "";
   currentNumeroServicio = "";
   fotoBase64 = null;
   fotoMimeType = null;
