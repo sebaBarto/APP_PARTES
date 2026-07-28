@@ -554,6 +554,25 @@ function calcularTiempoTranscurrido(entrada, salida) {
   return `${horas}.${String(minutos).padStart(2, "0")}`;
 }
 
+// Avisa si la hora de salida quedó antes que la de entrada — eso
+// significa que el servicio se va a contar como terminado al día
+// siguiente (o puede ser un error de carga).
+const horarioCruzaDiaAviso = document.getElementById("horarioCruzaDiaAviso");
+function verificarHorarioCruzaDia() {
+  const entrada = document.getElementById("f_entrada").value;
+  const salida = document.getElementById("f_salida").value;
+  if (!entrada || !salida) {
+    horarioCruzaDiaAviso.classList.add("hidden");
+    return;
+  }
+  const [hE, mE] = entrada.split(":").map(Number);
+  const [hS, mS] = salida.split(":").map(Number);
+  const cruzaDia = (hS * 60 + mS) < (hE * 60 + mE);
+  horarioCruzaDiaAviso.classList.toggle("hidden", !cruzaDia);
+}
+document.getElementById("f_entrada").addEventListener("change", verificarHorarioCruzaDia);
+document.getElementById("f_salida").addEventListener("change", verificarHorarioCruzaDia);
+
 // Si el técnico que inició sesión coincide con una opción del selector,
 // se autocompleta (pero se puede cambiar a mano si hiciera falta).
 function autocompletarTecnico() {
@@ -874,6 +893,7 @@ function resetForm() {
   document.getElementById("f_fecha").value = "";
   document.getElementById("f_entrada").value = "";
   document.getElementById("f_salida").value = "";
+  horarioCruzaDiaAviso.classList.add("hidden");
   descuentoRadios[0].checked = true;
   descuentoOtroPct.value = "";
   descuentoOtroPct.style.display = "none";
