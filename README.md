@@ -480,6 +480,18 @@ acceso directo del celular. Después de usarlo, puede tardar un
 instante en volver a aparecer la pantalla de login (está bajando todo
 de nuevo).
 
+**Aviso de versión nueva disponible**: la app compara su propia versión
+(`APP_VERSION` en `app.js`) contra `app_version_actual` en
+`/api/config.js` cada vez que se abre el login. Si el servidor tiene un
+número mayor, aparece un cartel arriba recomendando actualizar. Esto
+funciona incluso si el celular tiene una versión vieja cacheada,
+porque la comprobación en sí es un pedido de red que no se cachea.
+
+Para que esto funcione bien, **cada vez que se sube una versión nueva
+hay que actualizar los dos lugares**: `APP_VERSION` en `app.js` y
+`app_version_actual` (dentro de `CONFIG_DEFAULT`) en `api/config.js` —
+tienen que quedar iguales entre sí en cada publicación.
+
 ## Acceso directo al panel de administración (solo Sebastian Bartolozzi)
 
 Al loguearse con la contraseña de Sebastian Bartolozzi, en el listado

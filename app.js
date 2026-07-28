@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.0.2";
+const APP_VERSION = "3.0.3";
 
 // Contraseña propia por técnico (se valida en el propio celular, no es
 // un login con servidor — solo para que no cualquiera que abra la URL
@@ -76,6 +76,7 @@ const toastEl = document.getElementById("toast");
 const loginBtn = document.getElementById("loginBtn");
 const actualizarAppBtn = document.getElementById("actualizarAppBtn");
 const actualizarAppStatus = document.getElementById("actualizarAppStatus");
+const nuevaVersionAviso = document.getElementById("nuevaVersionAviso");
 const loginTecnicoSelect = document.getElementById("loginTecnicoSelect");
 const loginPassword = document.getElementById("loginPassword");
 const loginError = document.getElementById("loginError");
@@ -348,6 +349,7 @@ async function cargarConfig() {
     if (data.dias_atencion) DIAS_ATENCION = data.dias_atencion;
     if (data.dias_urgente) DIAS_URGENTE = data.dias_urgente;
     localStorage.setItem("config_cache", JSON.stringify({ dias_atencion: DIAS_ATENCION, dias_urgente: DIAS_URGENTE }));
+    if (data.app_version_actual) verificarVersionDisponible(data.app_version_actual);
   } catch (err) {
     const cacheado = localStorage.getItem("config_cache");
     if (cacheado) {
@@ -360,6 +362,26 @@ async function cargarConfig() {
   }
 }
 cargarConfig();
+
+// Compara dos versiones tipo "3.0.2" numéricamente (no como texto),
+// para que "3.0.10" sea mayor que "3.0.9", etc.
+function compararVersiones(a, b) {
+  const pa = a.split(".").map(Number);
+  const pb = b.split(".").map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const na = pa[i] || 0;
+    const nb = pb[i] || 0;
+    if (na !== nb) return na - nb;
+  }
+  return 0;
+}
+
+function verificarVersionDisponible(versionServidor) {
+  if (compararVersiones(versionServidor, APP_VERSION) > 0) {
+    nuevaVersionAviso.textContent = `Hay una nueva versión disponible (v${versionServidor}) — tocá "Actualizar app" para bajarla.`;
+    nuevaVersionAviso.classList.remove("hidden");
+  }
+}
 
 // Interpreta la fecha de ingreso del servicio en varios formatos
 // comunes (dd/mm/aaaa, dd-mm-aaaa, aaaa-mm-dd). Si no se puede

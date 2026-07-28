@@ -35,6 +35,7 @@
   <section class="screen" id="screen-login" data-active="true">
     <div class="login-wrap">
       <p class="app-version" id="appVersion"></p>
+      <p class="status-aviso status-info hidden" id="nuevaVersionAviso" style="margin:0 0 10px;"></p>
       <img src="icons/logo.png" alt="SAT" class="login-logo">
       <p class="hint-eyebrow">ACCESO</p>
       <p class="hint-text login-title">Elegí tu usuario e ingresá la contraseña</p>
@@ -356,23 +357,23 @@
         <label class="field-label">Forma de pago</label>
         <div class="discount-chips">
           <label class="discount-chip">
-            <input type="checkbox" name="f_forma_pago" value="PAGADO">
+            <input type="radio" name="f_forma_pago" value="PAGADO">
             <span>PAGADO</span>
           </label>
           <label class="discount-chip">
-            <input type="checkbox" name="f_forma_pago" value="TRANSFIERE">
+            <input type="radio" name="f_forma_pago" value="TRANSFIERE">
             <span>TRANSFIERE</span>
           </label>
           <label class="discount-chip">
-            <input type="checkbox" name="f_forma_pago" value="PAGA CON ABONO">
+            <input type="radio" name="f_forma_pago" value="PAGA CON ABONO">
             <span>PAGA CON ABONO</span>
           </label>
           <label class="discount-chip">
-            <input type="checkbox" name="f_forma_pago" value="DEBITO">
+            <input type="radio" name="f_forma_pago" value="DEBITO">
             <span>DEBITO</span>
           </label>
           <label class="discount-chip">
-            <input type="checkbox" name="f_forma_pago" value="PAGA EN OF">
+            <input type="radio" name="f_forma_pago" value="PAGA EN OF">
             <span>PAGA EN OF</span>
           </label>
         </div>
