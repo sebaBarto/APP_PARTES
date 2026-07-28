@@ -75,7 +75,7 @@ html, body {
 /* ---------- LOGIN ---------- */
 #screen-login { align-items: center; justify-content: center; padding: 24px; }
 .login-wrap { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; width: 100%; max-width: 280px; }
-.login-mark { color: #F5A623; font-size: 22px; margin-bottom: 6px; }
+.login-logo { width: 180px; max-width: 70%; height: auto; margin-bottom: 14px; }
 .login-title { margin-bottom: 14px; }
 #screen-login .login-input {
   text-align: center;
