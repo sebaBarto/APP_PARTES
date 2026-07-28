@@ -251,6 +251,7 @@ html, body {
   padding: 8px 10px;
   margin: -8px 0 14px;
 }
+.status-aviso.status-info { color: #6B7680; background: #F4F5F0; margin: 6px 0 0; }
 .field-input {
   font-family: 'Inter', sans-serif;
   font-size: 15px;

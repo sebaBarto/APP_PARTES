@@ -246,6 +246,7 @@
           <input class="field-input" id="f_cliente" type="text" placeholder="Nombre del cliente">
           <a href="#" id="llamarClienteBtn" class="btn-llamar hidden" title="Llamar al cliente">📞</a>
         </div>
+        <p class="status-aviso status-info hidden" id="visitaAnteriorInfo"></p>
       </div>
 
       <div class="field-row">
@@ -394,6 +395,24 @@
         </div>
       </div>
       <p class="status-aviso hidden" id="horarioCruzaDiaAviso">⚠ La hora de salida es anterior a la de entrada — se va a contar como que el servicio terminó al día siguiente. Si fue un error de carga, revisá los horarios.</p>
+
+      <label class="check-inline check-instalacion">
+        <input type="checkbox" id="f_imprevisto">
+        <span>Hubo un imprevisto (ej: esperó al cliente)</span>
+      </label>
+
+      <div id="imprevistoWrap" class="hidden" style="margin-top:-8px; margin-bottom:16px;">
+        <div class="field-row">
+          <div class="field-group grow">
+            <label class="field-label" for="f_imprevisto_detalle">¿Qué pasó?</label>
+            <input class="field-input" id="f_imprevisto_detalle" type="text" placeholder="Ej: esperó al cliente">
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="f_imprevisto_minutos">Demora (min)</label>
+            <input class="field-input field-mono" id="f_imprevisto_minutos" type="number" min="0" step="5" placeholder="0">
+          </div>
+        </div>
+      </div>
 
       <div class="field-group">
         <label class="field-label" for="f_foto">Foto (opcional — solo se manda a la oficina)</label>

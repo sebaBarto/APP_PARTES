@@ -125,6 +125,16 @@
           </td>
         </tr>
 
+        <!-- Imprevisto (opcional, solo si el técnico lo marcó) -->
+        {{#imprevisto}}
+        <tr>
+          <td style="padding:0 28px 8px;">
+            <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:6px;">Imprevisto</div>
+            <div style="color:#101820; font-size:14px; background:rgba(245,166,35,0.12); border-radius:8px; padding:12px 14px;">⚠ {{imprevisto}}</div>
+          </td>
+        </tr>
+        {{/imprevisto}}
+
         <!-- Foto (opcional, solo si el técnico subió una) -->
         {{#foto_link}}
         <tr>

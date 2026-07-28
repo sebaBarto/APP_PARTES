@@ -176,6 +176,7 @@ function attemptLogin() {
     actualizarAccesoDashboardFinanciero();
     showScreen("list");
     fetchServicios();
+    precargarHistorialParaVisitas();
   } else if (intento === APP_PASSWORD_GENERAL) {
     tecnicoLogueado = "";
     localStorage.removeItem("tecnico_logueado");
@@ -183,10 +184,27 @@ function attemptLogin() {
     actualizarAccesoDashboardFinanciero();
     showScreen("list");
     fetchServicios();
+    precargarHistorialParaVisitas();
   } else {
     loginError.textContent = "Contraseña incorrecta.";
     loginPassword.value = "";
     loginPassword.focus();
+  }
+}
+
+// Carga el historial en segundo plano al loguearse, para poder mostrar
+// la info de "última visita" del cliente sin esperar a entrar al
+// dashboard. Si falla, no interrumpe nada — esa info simplemente no
+// se muestra.
+async function precargarHistorialParaVisitas() {
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/historial", { headers, cache: "no-store" });
+    if (!res.ok) return;
+    const data = await res.json();
+    historialCache = Array.isArray(data) ? data : [];
+  } catch (err) {
+    // silencioso — la info de visita anterior simplemente no aparece
   }
 }
 
@@ -308,6 +326,7 @@ function seleccionarServicio(item) {
   actualizarBotonLlamar(item.telefono);
   autocompletarTecnico();
   autocompletarFecha();
+  mostrarVisitaAnterior();
   showScreen("form");
 }
 
@@ -317,6 +336,7 @@ manualReportBtn.addEventListener("click", () => {
   actualizarBotonLlamar(null);
   autocompletarTecnico();
   autocompletarFecha();
+  mostrarVisitaAnterior();
   showScreen("form");
 });
 
@@ -478,6 +498,7 @@ function seleccionarTareaCronograma(t) {
   actualizarBotonLlamar(null);
   autocompletarTecnico();
   autocompletarFecha();
+  mostrarVisitaAnterior();
   showScreen("form");
 }
 
@@ -573,6 +594,27 @@ function verificarHorarioCruzaDia() {
 document.getElementById("f_entrada").addEventListener("change", verificarHorarioCruzaDia);
 document.getElementById("f_salida").addEventListener("change", verificarHorarioCruzaDia);
 
+// ---------- Imprevisto (demora) ----------
+const imprevistoCheck = document.getElementById("f_imprevisto");
+const imprevistoWrap = document.getElementById("imprevistoWrap");
+imprevistoCheck.addEventListener("change", () => {
+  if (imprevistoCheck.checked) {
+    imprevistoWrap.classList.remove("hidden");
+  } else {
+    imprevistoWrap.classList.add("hidden");
+    document.getElementById("f_imprevisto_detalle").value = "";
+    document.getElementById("f_imprevisto_minutos").value = "";
+  }
+});
+
+function getImprevistoTexto() {
+  if (!imprevistoCheck.checked) return "";
+  const detalle = document.getElementById("f_imprevisto_detalle").value.trim();
+  const minutos = document.getElementById("f_imprevisto_minutos").value.trim();
+  if (!detalle && !minutos) return "Sí";
+  return `${detalle || "Sí"}${minutos ? ` (${minutos} min de demora)` : ""}`;
+}
+
 // Si el técnico que inició sesión coincide con una opción del selector,
 // se autocompleta (pero se puede cambiar a mano si hiciera falta).
 function autocompletarTecnico() {
@@ -597,6 +639,36 @@ function autocompletarFecha() {
     campoFecha.value = `${yyyy}-${mm}-${dd}`;
   }
 }
+
+// Muestra un resumen de la última visita a este cliente (según el
+// historial), si hay alguna registrada. Se busca por nombre de
+// cliente (sin distinguir mayúsculas/acentos), tomando la más
+// reciente por fecha.
+const visitaAnteriorInfo = document.getElementById("visitaAnteriorInfo");
+function mostrarVisitaAnterior() {
+  const nombreCliente = document.getElementById("f_cliente").value.trim();
+  if (!nombreCliente || !Array.isArray(historialCache) || historialCache.length === 0) {
+    visitaAnteriorInfo.classList.add("hidden");
+    return;
+  }
+  const clave = normalizeText(nombreCliente);
+  const anteriores = historialCache
+    .filter((h) => h.cliente && normalizeText(h.cliente) === clave && h.fecha)
+    .sort((a, b) => b.fecha.localeCompare(a.fecha));
+
+  if (anteriores.length === 0) {
+    visitaAnteriorInfo.classList.add("hidden");
+    return;
+  }
+  const ultima = anteriores[0];
+  const [y, m, d] = ultima.fecha.split("-");
+  const tareaCorta = (ultima.tarea || "").slice(0, 80);
+  visitaAnteriorInfo.textContent = `Última visita: ${d}/${m}/${y}` +
+    (ultima.tecnico ? ` (técnico: ${ultima.tecnico})` : "") +
+    (tareaCorta ? ` — ${tareaCorta}` : "");
+  visitaAnteriorInfo.classList.remove("hidden");
+}
+document.getElementById("f_cliente").addEventListener("change", mostrarVisitaAnterior);
 
 // ---------- Importe / descuento / costo final ----------
 function parseMonto(str) {
@@ -874,6 +946,7 @@ function getFormData() {
       document.getElementById("f_salida").value
     ),
     observaciones: document.getElementById("f_observaciones").value.trim(),
+    imprevisto: getImprevistoTexto(),
   };
 }
 
@@ -894,6 +967,10 @@ function resetForm() {
   document.getElementById("f_entrada").value = "";
   document.getElementById("f_salida").value = "";
   horarioCruzaDiaAviso.classList.add("hidden");
+  imprevistoCheck.checked = false;
+  imprevistoWrap.classList.add("hidden");
+  document.getElementById("f_imprevisto_detalle").value = "";
+  document.getElementById("f_imprevisto_minutos").value = "";
   descuentoRadios[0].checked = true;
   descuentoOtroPct.value = "";
   descuentoOtroPct.style.display = "none";
@@ -907,6 +984,7 @@ function resetForm() {
   actualizarBotonLlamar(null);
   autocompletarTecnico();
   autocompletarFecha();
+  mostrarVisitaAnterior();
   clearSignature();
 }
 
@@ -1085,6 +1163,7 @@ confirmSignBtn.addEventListener("click", async () => {
       ...basePayload,
       foto_link: fotoLink,
       tiempo_transcurrido: data.tiempo_transcurrido,
+      imprevisto: data.imprevisto,
     });
     oficinaOk = true;
     if (data.numero_servicio) {
@@ -1114,6 +1193,7 @@ confirmSignBtn.addEventListener("click", async () => {
           descuento: data.descuento,
           costo_final: data.costo_final,
           forma_pago: data.forma_pago,
+          imprevisto: data.imprevisto,
         }),
       });
       if (!histRes.ok) {
