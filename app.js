@@ -15,7 +15,7 @@ const EMAILJS_TEMPLATE_OFICINA = "template_bzy9t47";
 // Plantilla que manda al mail del cliente (variable, cargado en el form).
 // Esta plantilla debe tener el campo "To email" configurado como
 // {{cliente_email}} en emailjs.com, NO una casilla fija.
-const EMAILJS_TEMPLATE_CLIENTE = "TU_TEMPLATE_ID_CLIENTE";
+const EMAILJS_TEMPLATE_CLIENTE = "template_jtmn27i";
 
 // URL desde donde se descarga el listado de servicios pendientes.
 // Es un endpoint propio (función serverless de Vercel, ver /api/servicios.js)
