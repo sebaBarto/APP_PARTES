@@ -1,26 +1,22 @@
 // Función serverless de Vercel — sirve una foto guardada en el repo
 // privado de datos, para que el link del mail funcione con un simple
-// clic (sin pedir login de GitHub). Se protege con un token de SOLO
-// LECTURA distinto al que usa la app para escribir datos, así si este
-// link circula por mail no compromete nada más que la vista de fotos.
+// clic (sin pedir login de GitHub). No hace falta ningún token en la
+// URL: cada foto tiene un identificador aleatorio (16 caracteres) que
+// funciona como clave única — sin ese id exacto, no hay forma de
+// adivinar ni listar las fotos.
 //
-// Variable de entorno nueva a configurar en Vercel:
-//   FOTOS_LINK_TOKEN   -> clave larga y aleatoria, distinta de SERVICIOS_API_TOKEN
-// Reutiliza además GITHUB_DATA_TOKEN y GITHUB_DATA_REPO ya existentes.
+// Reutiliza las variables de entorno ya existentes:
+//   GITHUB_DATA_TOKEN, GITHUB_DATA_REPO
 
 module.exports = async (req, res) => {
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
-    res.status(405).json({ error: "Método no permitido" });
+    res.status(405).send("Método no permitido");
     return;
   }
 
-  const { token, path } = req.query;
-  if (!process.env.FOTOS_LINK_TOKEN || token !== process.env.FOTOS_LINK_TOKEN) {
-    res.status(401).send("No autorizado");
-    return;
-  }
-  if (!path || !path.startsWith("fotos/")) {
+  const { id } = req.query;
+  if (!id || !/^[a-f0-9]{16}$/.test(id)) {
     res.status(400).send("Falta indicar qué foto mostrar");
     return;
   }
@@ -32,6 +28,7 @@ module.exports = async (req, res) => {
   }
 
   try {
+    const path = `fotos/${id}.jpg`;
     const apiUrl = `https://api.github.com/repos/${GITHUB_DATA_REPO}/contents/${path}`;
     const r = await fetch(apiUrl, {
       headers: {

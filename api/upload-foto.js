@@ -39,8 +39,8 @@ module.exports = async (req, res) => {
     }
 
     const contentB64 = base64.replace(/^data:[^;]+;base64,/, "");
-    const nombreFinal = (filename || `foto-${Date.now()}.jpg`).replace(/[^a-zA-Z0-9._-]/g, "_");
-    const path = `fotos/${Date.now()}-${nombreFinal}`;
+    const fileId = require("crypto").randomBytes(8).toString("hex");
+    const path = `fotos/${fileId}.jpg`;
 
     const apiUrl = `https://api.github.com/repos/${GITHUB_DATA_REPO}/contents/${path}`;
     const ghHeaders = {
@@ -63,7 +63,7 @@ module.exports = async (req, res) => {
       return;
     }
 
-    res.status(200).json({ ok: true, path });
+    res.status(200).json({ ok: true, id: fileId });
   } catch (err) {
     res.status(500).json({ error: "Error interno al subir la foto", detail: String(err.message || err) });
   }

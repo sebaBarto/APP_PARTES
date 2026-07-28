@@ -128,29 +128,22 @@ se pasó a guardar las fotos en GitHub, reutilizando la infraestructura
 que ya estaba armada para los servicios pendientes.)
 
 El link no es un link directo al repo (que es privado) — pasa por un
-endpoint propio (`/api/foto.js`) protegido con una clave de **solo
-lectura**, distinta de la que usa la app para escribir datos. Si ese
-link llega a circular, como mucho permite ver esa foto puntual, nunca
-tocar el resto de los datos.
+endpoint propio (`/api/foto.js`). No lleva ningún token ni clave
+visible: cada foto recibe un identificador aleatorio de 16 caracteres al
+subirse, y ese identificador funciona como la clave — sin conocerlo
+exacto no hay forma de ver ni listar las fotos. El link queda corto y
+simple, por ejemplo `tu-app.vercel.app/api/foto?id=9f3ac21b7e4d5210`.
 
 ### Pasos de configuración (una sola vez)
 
-No hace falta nada de Google Cloud para esto — reutiliza las variables
-`GITHUB_DATA_TOKEN` y `GITHUB_DATA_REPO` que ya configuraste para el
-listado de servicios. Solo falta agregar una variable nueva en Vercel
-(Project Settings → Environment Variables):
-
-- `FOTOS_LINK_TOKEN` = una clave larga y aleatoria (distinta de
-  `SERVICIOS_API_TOKEN`) — se genera una sola vez y se pega también en
-  `app.js`, constante `FOTOS_LINK_TOKEN`.
-
-Después de cargarla, hacer un redeploy del proyecto.
+No hace falta nada nuevo — reutiliza las variables `GITHUB_DATA_TOKEN`
+y `GITHUB_DATA_REPO` que ya configuraste para el listado de servicios.
 
 ## Publicar en Vercel
 
 - Confirmá que estén cargadas todas las variables de entorno mencionadas
   arriba: `SERVICIOS_API_TOKEN`, `GITHUB_DATA_TOKEN`, `GITHUB_DATA_REPO`,
-  `GITHUB_DATA_PATH` y `FOTOS_LINK_TOKEN`.
+  `GITHUB_DATA_PATH`.
 - Subí los cambios al repo de GitHub y Vercel redespliega solo.
 
 ## Instalar la app en el celular Android
