@@ -97,6 +97,17 @@
         </div>
       </div>
 
+      <div class="dash-cards-row">
+        <div class="dash-card">
+          <div class="dash-card-num" id="dashInstalacionesNum">–</div>
+          <div class="dash-card-label">Instalaciones</div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-num" id="dashServiciosNum">–</div>
+          <div class="dash-card-label">Servicios técnicos</div>
+        </div>
+      </div>
+
       <div class="dash-chart-wrap">
         <canvas id="dashChartTecnico"></canvas>
       </div>
@@ -105,6 +116,9 @@
       </div>
       <div class="dash-chart-wrap">
         <canvas id="dashChartDistancia"></canvas>
+      </div>
+      <div class="dash-chart-wrap">
+        <canvas id="dashChartTipo"></canvas>
       </div>
 
       <p class="dash-subtitulo">Por técnico</p>
@@ -210,6 +224,11 @@
   <section class="screen" id="screen-form">
     <div class="review-scroll">
       <p class="hint-eyebrow review-eyebrow">PASO 01 · DATOS DEL SERVICIO</p>
+
+      <label class="check-inline check-instalacion">
+        <input type="checkbox" id="f_instalacion">
+        <span>Es una INSTALACIÓN (no un servicio técnico común)</span>
+      </label>
 
       <div class="field-group">
         <label class="field-label" for="f_cliente">Cliente</label>

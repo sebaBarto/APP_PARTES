@@ -92,6 +92,7 @@ const descuentoOtroPct = document.getElementById("f_descuento_otro_pct");
 const costoFinalInput = document.getElementById("f_costo_final");
 const formaPagoChecks = document.getElementsByName("f_forma_pago");
 const backToListBtn = document.getElementById("backToListBtn");
+const instalacionCheck = document.getElementById("f_instalacion");
 const fotoInput = document.getElementById("f_foto");
 const fotoPreviewWrap = document.getElementById("fotoPreviewWrap");
 const fotoPreview = document.getElementById("fotoPreview");
@@ -105,6 +106,8 @@ const volverDeDashboardBtn = document.getElementById("volverDeDashboardBtn");
 const dashStatus = document.getElementById("dashStatus");
 const dashPendientesNum = document.getElementById("dashPendientesNum");
 const dashResueltosNum = document.getElementById("dashResueltosNum");
+const dashInstalacionesNum = document.getElementById("dashInstalacionesNum");
+const dashServiciosNum = document.getElementById("dashServiciosNum");
 const dashTecnicosList = document.getElementById("dashTecnicosList");
 const dashRepetidosList = document.getElementById("dashRepetidosList");
 const verDashboardFinancieroBtn = document.getElementById("verDashboardFinancieroBtn");
@@ -808,6 +811,8 @@ volverDeMapaBtn.addEventListener("click", () => {
 function getFormData() {
   return {
     numero_servicio: currentNumeroServicio,
+    es_instalacion: instalacionCheck.checked,
+    tipo_servicio: instalacionCheck.checked ? "Instalación" : "Servicio técnico",
     cliente: document.getElementById("f_cliente").value.trim(),
     direccion: document.getElementById("f_direccion").value.trim(),
     localidad: document.getElementById("f_localidad").value.trim(),
@@ -833,6 +838,7 @@ function getFormData() {
 }
 
 function resetForm() {
+  instalacionCheck.checked = false;
   ["f_cliente","f_direccion","f_localidad","f_cliente_email","f_tarea",
    "f_materiales","f_materiales_retirados","f_importe","f_costo_final",
    "f_observaciones"].forEach(id => document.getElementById(id).value = "");
@@ -1003,6 +1009,7 @@ confirmSignBtn.addEventListener("click", async () => {
   const basePayload = {
     id_parte: idParte,
     numero_servicio: data.numero_servicio,
+    tipo_servicio: data.tipo_servicio,
     cliente: data.cliente,
     direccion: data.direccion,
     localidad: data.localidad,
@@ -1047,6 +1054,7 @@ confirmSignBtn.addEventListener("click", async () => {
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
         body: JSON.stringify({
           numero_servicio: data.numero_servicio || "",
+          es_instalacion: data.es_instalacion,
           id_parte: idParte,
           cliente: data.cliente,
           direccion: data.direccion,
@@ -1116,6 +1124,7 @@ let dashPeriodoActivo = "mes";
 let chartTecnico = null;
 let chartDias = null;
 let chartDistancia = null;
+let chartTipo = null;
 
 function obtenerRangoPeriodo(periodo) {
   const hoy = new Date();
@@ -1180,6 +1189,31 @@ async function renderDashboard() {
   const pendientesActuales = serviciosCache.filter((s) => !numerosCompletados.has(s.numero_servicio)).length;
   dashPendientesNum.textContent = pendientesActuales;
   dashResueltosNum.textContent = enPeriodo.length;
+
+  const instalaciones = enPeriodo.filter((h) => h.es_instalacion).length;
+  const serviciosComunes = enPeriodo.length - instalaciones;
+  dashInstalacionesNum.textContent = instalaciones;
+  dashServiciosNum.textContent = serviciosComunes;
+
+  const canvasTipo = document.getElementById("dashChartTipo");
+  if (chartTipo) chartTipo.destroy();
+  if (enPeriodo.length > 0) {
+    chartTipo = new Chart(canvasTipo, {
+      type: "doughnut",
+      data: {
+        labels: ["Instalaciones", "Servicios técnicos"],
+        datasets: [{ data: [instalaciones, serviciosComunes], backgroundColor: ["#F5A623", "#101820"] }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 10 } } },
+          title: { display: true, text: "Instalación vs. servicio técnico" },
+        },
+      },
+    });
+  }
 
   // Agrupar por técnico: cantidad, tiempo promedio, y días (para calcular
   // distancia entre paradas consecutivas del mismo día).

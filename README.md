@@ -347,6 +347,17 @@ pago de cada parte completado — por eso, igual que con el otro
 dashboard, **solo va a tener datos a partir de que se activó esta
 función**, no de partes anteriores.
 
+## Instalación vs. servicio técnico común
+
+Arriba del formulario hay un check **"Es una INSTALACIÓN"**. Si se
+tilda:
+
+- Aparece un cartelito "Instalación" (en vez de "Servicio técnico") en
+  el encabezado de los dos mails (oficina y cliente).
+- En el dashboard general se cuenta por separado: dos tarjetas nuevas
+  ("Instalaciones" / "Servicios técnicos") y un gráfico de torta con la
+  proporción entre ambos, para el período elegido (Día/Semana/Mes).
+
 ## Notas y límites de esta versión
 
 - El **ID de parte** se genera por fecha/hora + un número al azar — no es
