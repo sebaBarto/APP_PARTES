@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.0.1";
+const APP_VERSION = "3.0.2";
 
 // Contraseña propia por técnico (se valida en el propio celular, no es
 // un login con servidor — solo para que no cualquiera que abra la URL
@@ -76,6 +76,7 @@ const toastEl = document.getElementById("toast");
 const loginBtn = document.getElementById("loginBtn");
 const actualizarAppBtn = document.getElementById("actualizarAppBtn");
 const actualizarAppStatus = document.getElementById("actualizarAppStatus");
+const loginTecnicoSelect = document.getElementById("loginTecnicoSelect");
 const loginPassword = document.getElementById("loginPassword");
 const loginError = document.getElementById("loginError");
 document.getElementById("appVersion").textContent = "v" + APP_VERSION;
@@ -222,28 +223,34 @@ function poblarSelectsTecnico() {
   const actual2 = tecnicoSelect2.value;
   tecnicoSelect2.innerHTML = `<option value="" disabled ${actual2 ? "" : "selected"}>Elegí el segundo técnico</option>${opciones}<option value="otro">Otro...</option>`;
   if (nombres.includes(actual2)) tecnicoSelect2.value = actual2;
+
+  const actualLogin = loginTecnicoSelect.value;
+  loginTecnicoSelect.innerHTML = `<option value="" disabled ${actualLogin ? "" : "selected"}>Elegí tu usuario</option>${opciones}<option value="__general__">Oficina / Administración</option>`;
+  if (actualLogin && (nombres.includes(actualLogin) || actualLogin === "__general__")) {
+    loginTecnicoSelect.value = actualLogin;
+  }
 }
 
 function attemptLogin() {
+  const usuarioElegido = loginTecnicoSelect.value;
   const intento = loginPassword.value;
-  const nombreCoincidente = Object.keys(tecnicosPasswords).find(
-    (nombre) => tecnicosPasswords[nombre] === intento
-  );
 
-  if (nombreCoincidente) {
-    tecnicoLogueado = nombreCoincidente;
-    localStorage.setItem("tecnico_logueado", tecnicoLogueado);
-    loginError.textContent = "";
-    actualizarAccesoDashboardFinanciero();
-    showScreen("list");
-    fetchServicios();
-    precargarHistorialParaVisitas();
-    precargarCronogramaParaSugerencias();
-    actualizarBadgeColaEnvios();
-    procesarColaEnvios();
-  } else if (intento === APP_PASSWORD_GENERAL) {
-    tecnicoLogueado = "";
-    localStorage.removeItem("tecnico_logueado");
+  if (!usuarioElegido) {
+    loginError.textContent = "Elegí tu usuario antes de ingresar.";
+    return;
+  }
+
+  const esValido = usuarioElegido === "__general__"
+    ? intento === APP_PASSWORD_GENERAL
+    : tecnicosPasswords[usuarioElegido] === intento;
+
+  if (esValido) {
+    tecnicoLogueado = usuarioElegido === "__general__" ? "" : usuarioElegido;
+    if (tecnicoLogueado) {
+      localStorage.setItem("tecnico_logueado", tecnicoLogueado);
+    } else {
+      localStorage.removeItem("tecnico_logueado");
+    }
     loginError.textContent = "";
     actualizarAccesoDashboardFinanciero();
     showScreen("list");
