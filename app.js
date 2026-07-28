@@ -1204,27 +1204,18 @@ async function renderDashboard() {
   }
   dashStatus.textContent = "";
 
-  // Ranking del día (siempre HOY, sin importar el período elegido
-  // arriba) para las medallas — el técnico con más resueltos hoy.
-  const rangoHoy = obtenerRangoPeriodo("dia");
-  const deHoy = historialCache.filter((h) => fechaEnRango(h.fecha, rangoHoy));
-  const cantidadHoyPorTecnico = {};
-  deHoy.forEach((h) => {
-    const nombre = h.tecnico || "(sin técnico)";
-    cantidadHoyPorTecnico[nombre] = (cantidadHoyPorTecnico[nombre] || 0) + 1;
-  });
-  const rankingHoy = Object.entries(cantidadHoyPorTecnico)
-    .sort((a, b) => b[1] - a[1])
-    .map(([nombre]) => nombre);
-  const medallas = { [rankingHoy[0]]: "🥇", [rankingHoy[1]]: "🥈", [rankingHoy[2]]: "🥉" };
+  // Ranking del período elegido arriba (Día / Semana / Mes) para las
+  // medallas — el técnico con más resueltos en ese período.
+  const nombresOrdenados = Object.keys(porTecnico).sort((a, b) => porTecnico[b].cantidad - porTecnico[a].cantidad);
+  const medallas = { [nombresOrdenados[0]]: "🥇", [nombresOrdenados[1]]: "🥈", [nombresOrdenados[2]]: "🥉" };
+  const etiquetaPeriodo = { dia: "hoy", semana: "esta semana", mes: "este mes" }[dashPeriodoActivo];
 
   dashTecnicosList.innerHTML = "";
   const nombresTecnicos = Object.keys(porTecnico);
   if (nombresTecnicos.length === 0) {
     dashTecnicosList.innerHTML = '<p class="list-status">No hay servicios resueltos en este período.</p>';
   } else {
-    nombresTecnicos
-      .sort((a, b) => porTecnico[b].cantidad - porTecnico[a].cantidad)
+    nombresOrdenados
       .forEach((nombre) => {
         const stats = porTecnico[nombre];
         const promedioMin = stats.conTiempo > 0 ? Math.round(stats.minutosTotal / stats.conTiempo) : null;
@@ -1234,7 +1225,7 @@ async function renderDashboard() {
         const card = document.createElement("div");
         card.className = "dash-tecnico-card";
         card.innerHTML = `
-          <div class="dash-tecnico-nombre">${nombre}${medalla ? ` <span class="dash-medalla" title="Ranking de hoy">${medalla}</span>` : ""}</div>
+          <div class="dash-tecnico-nombre">${nombre}${medalla ? ` <span class="dash-medalla" title="Ranking de ${etiquetaPeriodo}">${medalla}</span>` : ""}</div>
           <div class="dash-tecnico-stats">
             <span class="dash-tecnico-stat"><b>${stats.cantidad}</b> resueltos</span>
             <span class="dash-tecnico-stat">Promedio: <b>${promedioTexto}</b></span>
