@@ -430,6 +430,7 @@ const cronoUploadBtn = document.getElementById("cronoUploadBtn");
 const cronoUploadStatus = document.getElementById("cronoUploadStatus");
 
 let cronogramaTareas = [];
+let cronogramaTecnicos = [];
 
 const MESES = {
   enero: "01", febrero: "02", marzo: "03", abril: "04", mayo: "05", junio: "06",
@@ -457,7 +458,7 @@ function extraerFechaISO(tituloCelda) {
 
 function parsearHojaCronograma(ws, nombreHoja) {
   const filas = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: "" });
-  if (!filas || filas.length < 4) return [];
+  if (!filas || filas.length < 4) return { tareas: [], tecnicos: [] };
 
   const fechaISO = extraerFechaISO(filas[0] && filas[0][1]);
   // Encabezado con nombres de técnicos: fila índice 2, desde columna 1.
@@ -467,7 +468,7 @@ function parsearHojaCronograma(ws, nombreHoja) {
     const nombre = limpiarTexto(encabezado[c]);
     if (nombre) columnasTecnico.push({ col: c, tecnico: nombre });
   }
-  if (columnasTecnico.length === 0) return [];
+  if (columnasTecnico.length === 0) return { tareas: [], tecnicos: [] };
 
   // Franjas horarias: columna 0, desde fila índice 3 en adelante.
   const franjas = [];
@@ -517,7 +518,7 @@ function parsearHojaCronograma(ws, nombreHoja) {
     }
   });
 
-  return tareas;
+  return { tareas, tecnicos: columnasTecnico.map((c) => c.tecnico) };
 }
 
 cronoFile.addEventListener("change", () => {
@@ -532,17 +533,20 @@ cronoFile.addEventListener("change", () => {
     try {
       const wb = XLSX.read(new Uint8Array(e.target.result), { type: "array" });
       let todas = [];
+      const tecnicosSet = new Set();
       wb.SheetNames.forEach((nombre) => {
-        const tareasHoja = parsearHojaCronograma(wb.Sheets[nombre], nombre);
-        todas = todas.concat(tareasHoja);
+        const { tareas, tecnicos } = parsearHojaCronograma(wb.Sheets[nombre], nombre);
+        todas = todas.concat(tareas);
+        tecnicos.forEach((t) => tecnicosSet.add(t));
       });
 
-      if (todas.length === 0) {
+      if (todas.length === 0 && tecnicosSet.size === 0) {
         cronoParseStatus.textContent = "No se detectaron tareas — revisá que el formato sea el esperado (una hoja por día, técnicos en la fila 3).";
         return;
       }
 
       cronogramaTareas = todas;
+      cronogramaTecnicos = [...tecnicosSet];
 
       // Resumen por día
       const porDia = {};
@@ -554,7 +558,7 @@ cronoFile.addEventListener("change", () => {
         Object.entries(porDia).map(([dia, n]) => `<tr><td>${dia}</td><td>${n}</td></tr>`).join("") +
         "</tbody>";
 
-      cronoParseStatus.textContent = `Se detectaron ${Object.keys(porDia).length} días, ${todas.length} tareas en total.`;
+      cronoParseStatus.textContent = `Se detectaron ${Object.keys(porDia).length} días, ${todas.length} tareas, ${cronogramaTecnicos.length} técnicos en total.`;
       cronoPreviewCard.classList.remove("hidden");
       cronoUploadBtn.classList.remove("hidden");
     } catch (err) {
@@ -575,7 +579,7 @@ cronoUploadBtn.addEventListener("click", async () => {
         "Content-Type": "application/json",
         "Authorization": "Bearer " + SERVICIOS_API_TOKEN,
       },
-      body: JSON.stringify(cronogramaTareas),
+      body: JSON.stringify({ tareas: cronogramaTareas, tecnicos: cronogramaTecnicos }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error desconocido");

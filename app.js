@@ -250,6 +250,7 @@ manualReportBtn.addEventListener("click", () => {
 
 // ---------- Cronograma semanal ----------
 let cronogramaCache = [];
+let cronogramaTecnicosCache = [];
 let cronoDiaActivo = "";
 
 async function fetchCronograma() {
@@ -260,7 +261,9 @@ async function fetchCronograma() {
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     cronogramaCache = Array.isArray(data.tareas) ? data.tareas : [];
+    cronogramaTecnicosCache = Array.isArray(data.tecnicos) ? data.tecnicos : [];
     localStorage.setItem("cronograma_cache", JSON.stringify(cronogramaCache));
+    localStorage.setItem("cronograma_tecnicos_cache", JSON.stringify(cronogramaTecnicosCache));
     localStorage.setItem("cronograma_cache_time", String(Date.now()));
     cronoSyncLabel.textContent = formatSyncTime(new Date());
     renderCronogramaDias();
@@ -269,9 +272,11 @@ async function fetchCronograma() {
     }
   } catch (err) {
     const cachedRaw = localStorage.getItem("cronograma_cache");
+    const cachedTecnicosRaw = localStorage.getItem("cronograma_tecnicos_cache");
     const cachedTime = localStorage.getItem("cronograma_cache_time");
     if (cachedRaw) {
       cronogramaCache = JSON.parse(cachedRaw);
+      cronogramaTecnicosCache = cachedTecnicosRaw ? JSON.parse(cachedTecnicosRaw) : [];
       renderCronogramaDias();
       const when = cachedTime ? formatSyncTime(new Date(Number(cachedTime))) : "";
       cronoStatus.textContent = "Sin conexión. Mostrando el último cronograma guardado.";
@@ -314,9 +319,12 @@ function renderCronogramaDias() {
     cronoDiasTabs.appendChild(chip);
   });
 
-  // Filtro de técnicos, con las opciones detectadas
+  // Filtro de técnicos: se arma con la lista completa detectada en el
+  // Excel (todas las columnas), no solo los que ya tienen alguna tarea
+  // cargada — así aparecen también los que por ahora no tienen nada.
   const tecnicoActual = cronoTecnicoFiltro.value;
-  const tecnicos = [...new Set(cronogramaCache.map((t) => t.tecnico))].filter(Boolean).sort();
+  const tecnicosConTareas = cronogramaCache.map((t) => t.tecnico);
+  const tecnicos = [...new Set([...cronogramaTecnicosCache, ...tecnicosConTareas])].filter(Boolean).sort();
   cronoTecnicoFiltro.innerHTML = '<option value="">Todos los técnicos</option>' +
     tecnicos.map((t) => `<option value="${t}">${t}</option>`).join("");
   cronoTecnicoFiltro.value = tecnicos.includes(tecnicoActual) ? tecnicoActual : "";

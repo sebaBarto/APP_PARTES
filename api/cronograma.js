@@ -78,21 +78,24 @@ async function leerDesdeDrive() {
 
 async function leerRespaldoGitHub(ghHeaders, apiUrl) {
   const r = await fetch(apiUrl, { headers: ghHeaders });
-  if (r.status === 404) return [];
+  if (r.status === 404) return { tareas: [], tecnicos: [] };
   if (!r.ok) throw new Error("No se pudo leer el respaldo del cronograma");
   const data = await r.json();
   const content = Buffer.from(data.content, "base64").toString("utf-8");
-  return JSON.parse(content);
+  const parsed = JSON.parse(content);
+  // Compatibilidad con el formato viejo (un array plano de tareas, sin
+  // lista de técnicos separada).
+  return Array.isArray(parsed) ? { tareas: parsed, tecnicos: [] } : parsed;
 }
 
-async function guardarRespaldoGitHub(ghHeaders, apiUrl, tareas) {
+async function guardarRespaldoGitHub(ghHeaders, apiUrl, datos) {
   let sha;
   const existing = await fetch(apiUrl, { headers: ghHeaders });
   if (existing.ok) {
     const existingData = await existing.json();
     sha = existingData.sha;
   }
-  const contentB64 = Buffer.from(JSON.stringify(tareas, null, 2)).toString("base64");
+  const contentB64 = Buffer.from(JSON.stringify(datos, null, 2)).toString("base64");
   await fetch(apiUrl, {
     method: "PUT",
     headers: { ...ghHeaders, "Content-Type": "application/json" },
@@ -126,14 +129,15 @@ module.exports = async (req, res) => {
   if (req.method === "GET") {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     try {
-      const tareas = await leerDesdeDrive();
-      guardarRespaldoGitHub(ghHeaders, apiUrl, tareas).catch(() => {});
-      res.status(200).json({ tareas, fuente: "drive" });
+      const datos = await leerDesdeDrive();
+      guardarRespaldoGitHub(ghHeaders, apiUrl, datos).catch(() => {});
+      res.status(200).json({ tareas: datos.tareas, tecnicos: datos.tecnicos, fuente: "drive" });
     } catch (err) {
       try {
         const respaldo = await leerRespaldoGitHub(ghHeaders, apiUrl);
         res.status(200).json({
-          tareas: respaldo,
+          tareas: respaldo.tareas,
+          tecnicos: respaldo.tecnicos,
           fuente: "respaldo",
           error_drive: String(err.message || err),
         });
@@ -148,12 +152,16 @@ module.exports = async (req, res) => {
     try {
       let body = req.body;
       if (typeof body === "string") body = JSON.parse(body);
-      if (!Array.isArray(body)) {
-        res.status(400).json({ error: "El cuerpo debe ser un array de tareas" });
+      // Acepta tanto el formato nuevo {tareas, tecnicos} como un array
+      // plano de tareas (compatibilidad con cargas anteriores).
+      const datos = Array.isArray(body) ? { tareas: body, tecnicos: [] } : body;
+      if (!datos || !Array.isArray(datos.tareas)) {
+        res.status(400).json({ error: "El cuerpo debe incluir un array de tareas" });
         return;
       }
-      await guardarRespaldoGitHub(ghHeaders, apiUrl, body);
-      res.status(200).json({ ok: true, count: body.length });
+      if (!Array.isArray(datos.tecnicos)) datos.tecnicos = [];
+      await guardarRespaldoGitHub(ghHeaders, apiUrl, datos);
+      res.status(200).json({ ok: true, count: datos.tareas.length });
     } catch (err) {
       res.status(500).json({ error: "Error interno al guardar el cronograma" });
     }
