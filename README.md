@@ -167,15 +167,27 @@ Reutiliza las que ya existen de la función de fotos
 de servicios pendientes (`SERVICIOS_API_TOKEN`, `GITHUB_DATA_TOKEN`,
 `GITHUB_DATA_REPO`). Solo hace falta agregar una nueva:
 
-- `CRONOGRAMA_DRIVE_FILE_ID` = el ID del archivo en Drive (la parte de
-  la URL entre `/d/` y el siguiente `/`, por ejemplo en
-  `https://docs.google.com/spreadsheets/d/ABC123.../edit` el ID es
-  `ABC123...`).
+- `CRONOGRAMA_DRIVE_FOLDER_ID` = el ID de la **carpeta** de Drive donde
+  se sube el archivo (la parte de la URL después de `/folders/`, por
+  ejemplo en `https://drive.google.com/drive/folders/XYZ456...` el ID
+  es `XYZ456...`).
 
-El archivo (o la carpeta que lo contiene) tiene que estar compartido con
-el email de la cuenta de servicio
+Se usa la carpeta y no un archivo puntual porque el archivo cambia de ID
+cada vez que se actualiza (se sube uno nuevo en vez de editarse el
+mismo) — la función siempre busca el archivo modificado más reciente
+dentro de esa carpeta, así no importa que el ID cambie.
+
+La carpeta (no un archivo individual) tiene que estar compartida con el
+email de la cuenta de servicio
 (`sat-fotos-uploader@partes-503719.iam.gserviceaccount.com`) con permiso
-de **Lector** — no hace falta Editor, solo lectura.
+de **Lector** — no hace falta Editor, solo lectura. Compartiendo la
+carpeta entera, cualquier archivo nuevo que se suba ahí queda accesible
+automáticamente, sin tener que compartir cada uno.
+
+(Como alternativa, si en algún momento se necesitara apuntar a un
+archivo fijo puntual en vez de una carpeta, sigue existiendo la
+variable `CRONOGRAMA_DRIVE_FILE_ID` como respaldo — pero no es lo
+recomendado dado que el ID cambia con cada actualización.)
 
 ## Publicar en Vercel
 

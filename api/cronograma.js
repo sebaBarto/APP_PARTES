@@ -18,25 +18,47 @@ const { parsearLibroCronograma } = require("../lib/cronograma-parser");
 const CRONOGRAMA_PATH = "cronograma.json";
 
 async function leerDesdeDrive() {
-  const fileId = process.env.CRONOGRAMA_DRIVE_FILE_ID;
-  if (!fileId) throw new Error("Falta configurar CRONOGRAMA_DRIVE_FILE_ID");
-
   const accessToken = await getAccessToken("https://www.googleapis.com/auth/drive.readonly");
   const authHeaders = { Authorization: `Bearer ${accessToken}` };
 
-  // Primero consultamos el tipo de archivo: puede ser un Excel subido
-  // tal cual (se descarga directo) o una Hoja de cálculo de Google
-  // (hay que exportarla a formato xlsx).
-  const metaRes = await fetch(
-    `https://www.googleapis.com/drive/v3/files/${fileId}?fields=mimeType,name`,
-    { headers: authHeaders }
-  );
-  if (!metaRes.ok) throw new Error("No se pudo leer metadata del archivo en Drive");
-  const meta = await metaRes.json();
+  // El archivo cambia de ID cada vez que se actualiza (se sube uno
+  // nuevo en vez de editarse el mismo) — por eso buscamos SIEMPRE el
+  // archivo más reciente dentro de la carpeta, en vez de guardar un ID
+  // fijo.
+  const folderId = process.env.CRONOGRAMA_DRIVE_FOLDER_ID;
+  const fileIdFijo = process.env.CRONOGRAMA_DRIVE_FILE_ID;
+
+  let fileId, mimeType, nombreArchivo;
+
+  if (folderId) {
+    const listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
+      `'${folderId}' in parents and trashed = false`
+    )}&orderBy=modifiedTime desc&pageSize=1&fields=files(id,mimeType,name,modifiedTime)`;
+    const listRes = await fetch(listUrl, { headers: authHeaders });
+    if (!listRes.ok) throw new Error("No se pudo listar la carpeta de Drive");
+    const listData = await listRes.json();
+    const archivo = (listData.files || [])[0];
+    if (!archivo) throw new Error("No se encontró ningún archivo en la carpeta de Drive");
+    fileId = archivo.id;
+    mimeType = archivo.mimeType;
+    nombreArchivo = archivo.name;
+  } else if (fileIdFijo) {
+    fileId = fileIdFijo;
+    const metaRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?fields=mimeType,name`,
+      { headers: authHeaders }
+    );
+    if (!metaRes.ok) throw new Error("No se pudo leer metadata del archivo en Drive");
+    const meta = await metaRes.json();
+    mimeType = meta.mimeType;
+    nombreArchivo = meta.name;
+  } else {
+    throw new Error("Falta configurar CRONOGRAMA_DRIVE_FOLDER_ID (o CRONOGRAMA_DRIVE_FILE_ID)");
+  }
 
   let fileRes;
   const cacheBust = `_cb=${Date.now()}`;
-  if (meta.mimeType === "application/vnd.google-apps.spreadsheet") {
+  if (mimeType === "application/vnd.google-apps.spreadsheet") {
     fileRes = await fetch(
       `https://www.googleapis.com/drive/v3/files/${fileId}/export?mimeType=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet&${cacheBust}`,
       { headers: authHeaders }
@@ -47,7 +69,7 @@ async function leerDesdeDrive() {
       { headers: authHeaders }
     );
   }
-  if (!fileRes.ok) throw new Error("No se pudo descargar el archivo desde Drive");
+  if (!fileRes.ok) throw new Error(`No se pudo descargar el archivo desde Drive (${nombreArchivo || fileId})`);
 
   const arrayBuffer = await fileRes.arrayBuffer();
   const workbook = XLSX.read(Buffer.from(arrayBuffer), { type: "buffer" });
