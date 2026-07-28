@@ -307,6 +307,7 @@ function seleccionarServicio(item) {
   document.getElementById("f_tarea").value = item.tarea ?? "";
   actualizarBotonLlamar(item.telefono);
   autocompletarTecnico();
+  autocompletarFecha();
   showScreen("form");
 }
 
@@ -315,6 +316,7 @@ manualReportBtn.addEventListener("click", () => {
   currentNumeroServicio = "";
   actualizarBotonLlamar(null);
   autocompletarTecnico();
+  autocompletarFecha();
   showScreen("form");
 });
 
@@ -475,6 +477,7 @@ function seleccionarTareaCronograma(t) {
   document.getElementById("f_tarea").value = (t.tarea || "").replace(/\n/g, " ");
   actualizarBotonLlamar(null);
   autocompletarTecnico();
+  autocompletarFecha();
   showScreen("form");
 }
 
@@ -559,6 +562,20 @@ function autocompletarTecnico() {
   if (opcionExiste) {
     tecnicoSelect.value = tecnicoLogueado;
     tecnicoOtro.style.display = "none";
+  }
+}
+
+// Autocompleta la fecha de hoy si el campo está vacío (se puede
+// cambiar a mano). Evita partes que queden sin fecha y por lo tanto
+// no aparezcan en ningún período del dashboard.
+function autocompletarFecha() {
+  const campoFecha = document.getElementById("f_fecha");
+  if (!campoFecha.value) {
+    const hoy = new Date();
+    const yyyy = hoy.getFullYear();
+    const mm = String(hoy.getMonth() + 1).padStart(2, "0");
+    const dd = String(hoy.getDate()).padStart(2, "0");
+    campoFecha.value = `${yyyy}-${mm}-${dd}`;
   }
 }
 
@@ -869,6 +886,7 @@ function resetForm() {
   fotoStatus.textContent = "";
   actualizarBotonLlamar(null);
   autocompletarTecnico();
+  autocompletarFecha();
   clearSignature();
 }
 
@@ -887,6 +905,10 @@ toSignBtn.addEventListener("click", () => {
   const data = getFormData();
   if (!data.cliente || !data.tecnico) {
     showToast("Completá al menos Cliente y Técnico antes de continuar.");
+    return;
+  }
+  if (!data.fecha) {
+    showToast("Falta completar la Fecha del servicio.");
     return;
   }
   showScreen("sign");
