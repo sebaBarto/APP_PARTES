@@ -69,6 +69,8 @@ const screens = {
 const statusPill = document.getElementById("statusPill");
 const toastEl = document.getElementById("toast");
 const loginBtn = document.getElementById("loginBtn");
+const actualizarAppBtn = document.getElementById("actualizarAppBtn");
+const actualizarAppStatus = document.getElementById("actualizarAppStatus");
 const loginPassword = document.getElementById("loginPassword");
 const loginError = document.getElementById("loginError");
 const refreshServiciosBtn = document.getElementById("refreshServiciosBtn");
@@ -123,6 +125,7 @@ const sugerenciasList = document.getElementById("sugerenciasList");
 const refreshDashboardBtn = document.getElementById("refreshDashboardBtn");
 const dashSyncLabel = document.getElementById("dashSyncLabel");
 const verDashboardFinancieroBtn = document.getElementById("verDashboardFinancieroBtn");
+const abrirAdminBtn = document.getElementById("abrirAdminBtn");
 const volverDeDashboardFinancieroBtn = document.getElementById("volverDeDashboardFinancieroBtn");
 const dashFinStatus = document.getElementById("dashFinStatus");
 const dashFinPagosNum = document.getElementById("dashFinPagosNum");
@@ -286,8 +289,10 @@ async function precargarCronogramaParaSugerencias() {
 function actualizarAccesoDashboardFinanciero() {
   if (tecnicoLogueado === "Sebastian Bartolozzi") {
     verDashboardFinancieroBtn.classList.remove("hidden");
+    abrirAdminBtn.classList.remove("hidden");
   } else {
     verDashboardFinancieroBtn.classList.add("hidden");
+    abrirAdminBtn.classList.add("hidden");
   }
 }
 loginBtn.addEventListener("click", attemptLogin);
@@ -2131,3 +2136,25 @@ if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch(() => {});
   });
 }
+
+// ---------- Actualizar app a la última versión (sin desinstalar) ----------
+actualizarAppBtn.addEventListener("click", async () => {
+  actualizarAppBtn.disabled = true;
+  actualizarAppStatus.classList.remove("hidden");
+  actualizarAppStatus.textContent = "Actualizando...";
+  try {
+    if ("caches" in window) {
+      const nombres = await caches.keys();
+      await Promise.all(nombres.map((n) => caches.delete(n)));
+    }
+    if ("serviceWorker" in navigator) {
+      const registros = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(registros.map((r) => r.unregister()));
+    }
+  } catch (err) {
+    console.error("Error actualizando la app:", err);
+  } finally {
+    // Se recarga sin usar ninguna copia guardada, para bajar todo de nuevo.
+    location.reload();
+  }
+});

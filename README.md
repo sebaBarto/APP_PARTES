@@ -470,6 +470,25 @@ formato, puede que el link no abra el chat correcto la primera vez —
 conviene probarlo con un número real y, si hace falta, ajustar la
 función `limpiarTelefonoWhatsapp` en `app.js`.
 
+## Actualizar la app sin desinstalar
+
+En la pantalla de login hay un botón "↻ Actualizar app a la última
+versión". Borra toda la caché del navegador y el service worker de la
+app, y recarga la página — así siempre se puede forzar a traer la
+última versión publicada sin tener que desinstalar y reinstalar el
+acceso directo del celular. Después de usarlo, puede tardar un
+instante en volver a aparecer la pantalla de login (está bajando todo
+de nuevo).
+
+## Acceso directo al panel de administración (solo Sebastian Bartolozzi)
+
+Al loguearse con la contraseña de Sebastian Bartolozzi, en el listado
+de servicios aparece un botón "🛠 Panel de administración" que abre
+`admin.html` directo (en una pestaña nueva) — sin tener que escribir la
+URL a mano. Ese panel sigue teniendo su propia contraseña (la de
+`ADMIN_PASSWORD` en `admin.html`), este botón es solo un atajo, no la
+reemplaza.
+
 ## Notas y límites de esta versión
 
 - El **ID de parte** se genera por fecha/hora + un número al azar — no es
