@@ -58,35 +58,55 @@ module.exports = async (req, res) => {
         return;
       }
 
-      let historial = [];
-      let sha;
-      const existing = await fetch(apiUrl, { headers: ghHeaders });
-      if (existing.ok) {
-        const existingData = await existing.json();
-        sha = existingData.sha;
-        historial = JSON.parse(Buffer.from(existingData.content, "base64").toString("utf-8"));
-      }
+      const registro = { ...body, registrado_en: new Date().toISOString() };
+      const MAX_INTENTOS = 5;
+      let ultimoError = null;
 
-      historial.push({ ...body, registrado_en: new Date().toISOString() });
+      for (let intento = 1; intento <= MAX_INTENTOS; intento++) {
+        let historial = [];
+        let sha;
+        const existing = await fetch(apiUrl, { headers: ghHeaders });
+        if (existing.ok) {
+          const existingData = await existing.json();
+          sha = existingData.sha;
+          historial = JSON.parse(Buffer.from(existingData.content, "base64").toString("utf-8"));
+        } else if (existing.status !== 404) {
+          ultimoError = "No se pudo leer el historial antes de guardar";
+          continue;
+        }
 
-      const contentB64 = Buffer.from(JSON.stringify(historial, null, 2)).toString("base64");
-      const putRes = await fetch(apiUrl, {
-        method: "PUT",
-        headers: { ...ghHeaders, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: `Registra parte completado (${new Date().toISOString()})`,
-          content: contentB64,
-          sha,
-        }),
-      });
+        historial.push(registro);
+        const contentB64 = Buffer.from(JSON.stringify(historial, null, 2)).toString("base64");
+        const putRes = await fetch(apiUrl, {
+          method: "PUT",
+          headers: { ...ghHeaders, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: `Registra parte completado (${new Date().toISOString()})`,
+            content: contentB64,
+            sha,
+          }),
+        });
 
-      if (!putRes.ok) {
+        if (putRes.ok) {
+          res.status(200).json({ ok: true, total: historial.length });
+          return;
+        }
+
+        // 409/422 = otro pedido guardó justo antes (el archivo cambió
+        // entre la lectura y la escritura) — se reintenta leyendo de
+        // nuevo la versión más reciente, en vez de perder el registro.
+        if (putRes.status === 409 || putRes.status === 422) {
+          ultimoError = `Conflicto al guardar (intento ${intento})`;
+          await new Promise((r) => setTimeout(r, 300 + Math.random() * 400));
+          continue;
+        }
+
         const errText = await putRes.text();
         res.status(502).json({ error: "No se pudo guardar en el historial", detail: errText });
         return;
       }
 
-      res.status(200).json({ ok: true, total: historial.length });
+      res.status(502).json({ error: "No se pudo guardar en el historial tras varios intentos", detail: ultimoError });
     } catch (err) {
       res.status(500).json({ error: "Error interno al guardar el historial" });
     }
