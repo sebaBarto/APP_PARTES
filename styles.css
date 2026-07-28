@@ -90,6 +90,13 @@ html, body {
 #screen-login .login-input:focus { outline: none; border-color: #F5A623; }
 #screen-login .btn-ghost { color: #C7CCC3; border-color: #3A4652; background: transparent; }
 #screen-login .status-info { color: #9AA3A9; background: rgba(255,255,255,0.06); }
+.app-version {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  color: #3A4652;
+  margin: 0 0 6px;
+  letter-spacing: 0.5px;
+}
 .login-error {
   color: #E08A8A;
   font-size: 13px;

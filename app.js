@@ -1,5 +1,10 @@
 // ==== CONFIGURACIÓN — completar antes de publicar ====
 
+// Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
+// ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
+// que un celular tiene la última versión.
+const APP_VERSION = "3.0.0";
+
 // Contraseña propia por técnico (se valida en el propio celular, no es
 // un login con servidor — solo para que no cualquiera que abra la URL
 // pueda cargar partes, y para saber quién entró y autocompletar el
@@ -73,6 +78,7 @@ const actualizarAppBtn = document.getElementById("actualizarAppBtn");
 const actualizarAppStatus = document.getElementById("actualizarAppStatus");
 const loginPassword = document.getElementById("loginPassword");
 const loginError = document.getElementById("loginError");
+document.getElementById("appVersion").textContent = "v" + APP_VERSION;
 const refreshServiciosBtn = document.getElementById("refreshServiciosBtn");
 const manualReportBtn = document.getElementById("manualReportBtn");
 const syncLabel = document.getElementById("syncLabel");
