@@ -215,6 +215,21 @@ html, body {
 .field-group { margin-bottom: 14px; display: flex; flex-direction: column; gap: 5px; }
 .field-group.grow { flex: 1.4; }
 .field-row { display: flex; gap: 10px; }
+.field-row-inline { display: flex; gap: 8px; align-items: stretch; }
+.field-row-inline .field-input { flex: 1; }
+.btn-llamar {
+  flex-shrink: 0;
+  width: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #101820;
+  color: #F5A623;
+  border-radius: 8px;
+  font-size: 18px;
+  text-decoration: none;
+}
+.btn-llamar:active { opacity: 0.85; }
 .field-label {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 11px;

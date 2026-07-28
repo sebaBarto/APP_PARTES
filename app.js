@@ -78,6 +78,7 @@ const quitarFotoBtn = document.getElementById("quitarFotoBtn");
 const fotoStatus = document.getElementById("fotoStatus");
 const verMapaBtn = document.getElementById("verMapaBtn");
 const volverDeMapaBtn = document.getElementById("volverDeMapaBtn");
+const llamarClienteBtn = document.getElementById("llamarClienteBtn");
 const mapaStatus = document.getElementById("mapaStatus");
 const mapaCercanosList = document.getElementById("mapaCercanosList");
 const toSignBtn = document.getElementById("toSignBtn");
@@ -218,18 +219,32 @@ async function fetchServicios() {
   }
 }
 
+function actualizarBotonLlamar(telefono) {
+  const numero = (telefono || "").toString().trim();
+  if (numero) {
+    // Se limpian espacios/guiones para armar un link tel: válido.
+    llamarClienteBtn.href = "tel:" + numero.replace(/[^\d+]/g, "");
+    llamarClienteBtn.classList.remove("hidden");
+  } else {
+    llamarClienteBtn.href = "#";
+    llamarClienteBtn.classList.add("hidden");
+  }
+}
+
 function seleccionarServicio(item) {
   currentNumeroServicio = item.numero_servicio ?? "";
   document.getElementById("f_cliente").value = item.cliente ?? "";
   document.getElementById("f_direccion").value = item.direccion ?? "";
   if (item.localidad) document.getElementById("f_localidad").value = item.localidad;
   document.getElementById("f_tarea").value = item.tarea ?? "";
+  actualizarBotonLlamar(item.telefono);
   showScreen("form");
 }
 
 refreshServiciosBtn.addEventListener("click", fetchServicios);
 manualReportBtn.addEventListener("click", () => {
   currentNumeroServicio = "";
+  actualizarBotonLlamar(null);
   showScreen("form");
 });
 
@@ -380,6 +395,7 @@ function seleccionarTareaCronograma(t) {
   document.getElementById("f_direccion").value = parsed.direccion;
   if (parsed.localidad) document.getElementById("f_localidad").value = parsed.localidad;
   document.getElementById("f_tarea").value = (t.tarea || "").replace(/\n/g, " ");
+  actualizarBotonLlamar(null);
   showScreen("form");
 }
 
@@ -700,6 +716,7 @@ function resetForm() {
   fotoInput.value = "";
   fotoPreviewWrap.classList.add("hidden");
   fotoStatus.textContent = "";
+  actualizarBotonLlamar(null);
   clearSignature();
 }
 

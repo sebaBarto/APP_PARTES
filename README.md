@@ -40,8 +40,10 @@ el `<select id="f_tecnico">`.
 
 La app tiene una pantalla de "Servicios pendientes" después del login, que
 descarga un listado desde un endpoint propio (`/api/servicios.js`, función
-serverless de Vercel) y precarga cliente/dirección/localidad/tarea en el
-formulario cuando el técnico toca un servicio.
+serverless de Vercel) y precarga cliente/dirección/localidad/teléfono/tarea
+en el formulario cuando el técnico toca un servicio. Si el servicio tiene
+teléfono cargado, aparece un botón de llamada (📞) al lado del campo
+Cliente en el formulario.
 
 Los datos **nunca quedan en un archivo público** — se guardan en un repo
 privado de GitHub aparte, y solo se sirven si se manda la clave secreta

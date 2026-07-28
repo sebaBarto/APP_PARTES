@@ -108,6 +108,12 @@
           <select id="mapLocalidad"></select>
         </div>
       </div>
+      <div class="field-row">
+        <div>
+          <label>Teléfono (opcional)</label>
+          <select id="mapTelefono"></select>
+        </div>
+      </div>
       <label>Tarea a realizar</label>
       <select id="mapTarea"></select>
 
@@ -192,6 +198,7 @@ const mapSelects = {
   cliente: document.getElementById("mapCliente"),
   direccion: document.getElementById("mapDireccion"),
   localidad: document.getElementById("mapLocalidad"),
+  telefono: document.getElementById("mapTelefono"),
   tarea: document.getElementById("mapTarea"),
 };
 
@@ -323,7 +330,7 @@ function setupMapping() {
   const savedMap = JSON.parse(localStorage.getItem(MAP_KEY) || "{}");
   Object.entries(mapSelects).forEach(([field, select]) => {
     select.innerHTML = "";
-    if (field === "localidad") {
+    if (field === "localidad" || field === "telefono") {
       const emptyOpt = document.createElement("option");
       emptyOpt.value = "";
       emptyOpt.textContent = "(sin usar)";
@@ -338,8 +345,9 @@ function setupMapping() {
     if (savedMap[field] && headers.includes(savedMap[field])) {
       select.value = savedMap[field];
     } else {
-      // intento de auto-detección por nombre parecido
-      const guess = headers.find((h) => h.toLowerCase().includes(field.split("_")[0]));
+      // intento de auto-detección por nombre parecido (sin distinguir acentos)
+      const sinAcentos = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      const guess = headers.find((h) => sinAcentos(h).includes(sinAcentos(field.split("_")[0])));
       if (guess) select.value = guess;
     }
     select.addEventListener("change", renderPreview);
@@ -357,7 +365,7 @@ function renderPreview() {
   const map = currentMapping();
   localStorage.setItem(MAP_KEY, JSON.stringify(map));
 
-  const cols = ["numero_servicio", "cliente", "direccion", "localidad", "tarea"];
+  const cols = ["numero_servicio", "cliente", "direccion", "localidad", "telefono", "tarea"];
   previewTable.querySelector("thead").innerHTML =
     "<tr>" + cols.map((c) => `<th>${c}</th>`).join("") + "</tr>";
 
@@ -384,6 +392,7 @@ uploadBtn.addEventListener("click", async () => {
       tarea: String(row[map.tarea] ?? "").trim(),
     };
     if (map.localidad) item.localidad = String(row[map.localidad] ?? "").trim();
+    if (map.telefono) item.telefono = String(row[map.telefono] ?? "").trim();
     return item;
   }).filter((item) => item.numero_servicio || item.cliente);
 
