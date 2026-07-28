@@ -1020,23 +1020,34 @@ confirmSignBtn.addEventListener("click", async () => {
       localStorage.setItem("servicios_resueltos", JSON.stringify([...serviciosResueltos]));
     }
     // Registro en el historial para el dashboard — si falla, no se
-    // interrumpe el flujo (el mail ya se mandó bien, lo importante).
-    fetch("/api/historial", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-      body: JSON.stringify({
-        numero_servicio: data.numero_servicio || "",
-        id_parte: idParte,
-        cliente: data.cliente,
-        direccion: data.direccion,
-        localidad: data.localidad,
-        tecnico: data.tecnico,
-        tecnico2: data.tecnico2,
-        fecha: data.fecha,
-        hora_entrada: data.hora_entrada,
-        hora_salida: data.hora_salida,
-      }),
-    }).catch((err) => console.error("Error registrando historial:", err));
+    // interrumpe el flujo (el mail ya se mandó bien, lo importante),
+    // pero se avisa para poder detectarlo.
+    try {
+      const histRes = await fetch("/api/historial", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+        body: JSON.stringify({
+          numero_servicio: data.numero_servicio || "",
+          id_parte: idParte,
+          cliente: data.cliente,
+          direccion: data.direccion,
+          localidad: data.localidad,
+          tecnico: data.tecnico,
+          tecnico2: data.tecnico2,
+          fecha: data.fecha,
+          hora_entrada: data.hora_entrada,
+          hora_salida: data.hora_salida,
+        }),
+      });
+      if (!histRes.ok) {
+        const histData = await histRes.json().catch(() => ({}));
+        console.error("Error registrando historial:", histData);
+        showToast("⚠ El mail se envió, pero no se pudo registrar en el dashboard.");
+      }
+    } catch (err) {
+      console.error("Error registrando historial:", err);
+      showToast("⚠ El mail se envió, pero no se pudo registrar en el dashboard.");
+    }
   } catch (err) {
     console.error("Error enviando a oficina:", err);
   }
