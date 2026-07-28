@@ -56,6 +56,8 @@ const serviciosListEl = document.getElementById("serviciosList");
 const serviciosSearch = document.getElementById("serviciosSearch");
 const verCronogramaBtn = document.getElementById("verCronogramaBtn");
 const volverDeCronogramaBtn = document.getElementById("volverDeCronogramaBtn");
+const refreshCronogramaBtn = document.getElementById("refreshCronogramaBtn");
+const cronoSyncLabel = document.getElementById("cronoSyncLabel");
 const cronoDiasTabs = document.getElementById("cronoDiasTabs");
 const cronoTecnicoFiltro = document.getElementById("cronoTecnicoFiltro");
 const cronoStatus = document.getElementById("cronoStatus");
@@ -232,13 +234,18 @@ async function fetchCronograma() {
     const data = await res.json();
     cronogramaCache = Array.isArray(data) ? data : [];
     localStorage.setItem("cronograma_cache", JSON.stringify(cronogramaCache));
+    localStorage.setItem("cronograma_cache_time", String(Date.now()));
+    cronoSyncLabel.textContent = formatSyncTime(new Date());
     renderCronogramaDias();
   } catch (err) {
     const cachedRaw = localStorage.getItem("cronograma_cache");
+    const cachedTime = localStorage.getItem("cronograma_cache_time");
     if (cachedRaw) {
       cronogramaCache = JSON.parse(cachedRaw);
       renderCronogramaDias();
+      const when = cachedTime ? formatSyncTime(new Date(Number(cachedTime))) : "";
       cronoStatus.textContent = "Sin conexión. Mostrando el último cronograma guardado.";
+      cronoSyncLabel.textContent = when;
     } else {
       cronogramaCache = [];
       cronoStatus.textContent = "No se pudo conectar y no hay un cronograma guardado.";
@@ -318,6 +325,7 @@ verCronogramaBtn.addEventListener("click", () => {
   showScreen("cronograma");
   fetchCronograma();
 });
+refreshCronogramaBtn.addEventListener("click", fetchCronograma);
 volverDeCronogramaBtn.addEventListener("click", () => {
   showScreen("list");
 });
