@@ -37,6 +37,7 @@ if (window.emailjs && EMAILJS_PUBLIC_KEY !== "TU_PUBLIC_KEY") {
 const screens = {
   login: document.getElementById("screen-login"),
   list: document.getElementById("screen-list"),
+  cronograma: document.getElementById("screen-cronograma"),
   form: document.getElementById("screen-form"),
   sign: document.getElementById("screen-sign"),
   sending: document.getElementById("screen-sending"),
@@ -53,6 +54,12 @@ const syncLabel = document.getElementById("syncLabel");
 const listStatus = document.getElementById("listStatus");
 const serviciosListEl = document.getElementById("serviciosList");
 const serviciosSearch = document.getElementById("serviciosSearch");
+const verCronogramaBtn = document.getElementById("verCronogramaBtn");
+const volverDeCronogramaBtn = document.getElementById("volverDeCronogramaBtn");
+const cronoDiasTabs = document.getElementById("cronoDiasTabs");
+const cronoTecnicoFiltro = document.getElementById("cronoTecnicoFiltro");
+const cronoStatus = document.getElementById("cronoStatus");
+const cronoTareasList = document.getElementById("cronoTareasList");
 const tecnicoSelect = document.getElementById("f_tecnico");
 const tecnicoOtro = document.getElementById("f_tecnico_otro");
 const importeInput = document.getElementById("f_importe");
@@ -210,6 +217,109 @@ refreshServiciosBtn.addEventListener("click", fetchServicios);
 manualReportBtn.addEventListener("click", () => {
   currentNumeroServicio = "";
   showScreen("form");
+});
+
+// ---------- Cronograma semanal ----------
+let cronogramaCache = [];
+let cronoDiaActivo = "";
+
+async function fetchCronograma() {
+  cronoStatus.textContent = "Buscando cronograma...";
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/cronograma", { headers });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    cronogramaCache = Array.isArray(data) ? data : [];
+    localStorage.setItem("cronograma_cache", JSON.stringify(cronogramaCache));
+    renderCronogramaDias();
+  } catch (err) {
+    const cachedRaw = localStorage.getItem("cronograma_cache");
+    if (cachedRaw) {
+      cronogramaCache = JSON.parse(cachedRaw);
+      renderCronogramaDias();
+      cronoStatus.textContent = "Sin conexión. Mostrando el último cronograma guardado.";
+    } else {
+      cronogramaCache = [];
+      cronoStatus.textContent = "No se pudo conectar y no hay un cronograma guardado.";
+    }
+  }
+}
+
+function renderCronogramaDias() {
+  const dias = [...new Set(cronogramaCache.map((t) => t.dia_label))]
+    .filter(Boolean)
+    .sort((a, b) => {
+      const fa = (cronogramaCache.find((t) => t.dia_label === a) || {}).fecha || "";
+      const fb = (cronogramaCache.find((t) => t.dia_label === b) || {}).fecha || "";
+      return fa.localeCompare(fb);
+    });
+
+  if (dias.length === 0) {
+    cronoDiasTabs.innerHTML = "";
+    cronoStatus.textContent = "No hay ningún cronograma cargado todavía.";
+    cronoTareasList.innerHTML = "";
+    return;
+  }
+
+  if (!dias.includes(cronoDiaActivo)) cronoDiaActivo = dias[0];
+
+  cronoDiasTabs.innerHTML = "";
+  dias.forEach((dia) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "crono-dia-chip" + (dia === cronoDiaActivo ? " active" : "");
+    chip.textContent = dia;
+    chip.addEventListener("click", () => {
+      cronoDiaActivo = dia;
+      renderCronogramaDias();
+    });
+    cronoDiasTabs.appendChild(chip);
+  });
+
+  // Filtro de técnicos, con las opciones detectadas
+  const tecnicoActual = cronoTecnicoFiltro.value;
+  const tecnicos = [...new Set(cronogramaCache.map((t) => t.tecnico))].filter(Boolean).sort();
+  cronoTecnicoFiltro.innerHTML = '<option value="">Todos los técnicos</option>' +
+    tecnicos.map((t) => `<option value="${t}">${t}</option>`).join("");
+  cronoTecnicoFiltro.value = tecnicos.includes(tecnicoActual) ? tecnicoActual : "";
+
+  renderCronogramaTareas();
+}
+
+function renderCronogramaTareas() {
+  const tecnicoFiltro = cronoTecnicoFiltro.value;
+  const tareas = cronogramaCache
+    .filter((t) => t.dia_label === cronoDiaActivo)
+    .filter((t) => !tecnicoFiltro || t.tecnico === tecnicoFiltro)
+    .sort((a, b) => (a.hora_inicio || "").localeCompare(b.hora_inicio || ""));
+
+  cronoTareasList.innerHTML = "";
+  if (tareas.length === 0) {
+    cronoStatus.textContent = "No hay tareas cargadas para ese día/técnico.";
+    return;
+  }
+  cronoStatus.textContent = "";
+  tareas.forEach((t) => {
+    const card = document.createElement("div");
+    card.className = "crono-tarea-card";
+    card.innerHTML = `
+      <div class="crono-tarea-hora">${t.hora_inicio || ""} - ${t.hora_fin || ""}</div>
+      <div class="crono-tarea-tecnico">${t.tecnico || ""}</div>
+      <div class="crono-tarea-texto">${t.tarea || ""}</div>
+    `;
+    cronoTareasList.appendChild(card);
+  });
+}
+
+cronoTecnicoFiltro.addEventListener("change", renderCronogramaTareas);
+
+verCronogramaBtn.addEventListener("click", () => {
+  showScreen("cronograma");
+  fetchCronograma();
+});
+volverDeCronogramaBtn.addEventListener("click", () => {
+  showScreen("list");
 });
 
 // ---------- Técnico: mostrar campo libre si elige "Otro..." ----------

@@ -38,6 +38,12 @@
   .hidden { display: none; }
   .field-row { display: flex; gap: 10px; }
   .field-row > div { flex: 1; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 18px; }
+  .tab-btn {
+    width: auto; flex: 1; background: #FFFFFF; color: #6B7680; border: 1.5px solid #D8DCD4;
+    padding: 10px; font-size: 13px;
+  }
+  .tab-btn.active { background: #101820; color: #F5A623; border-color: #101820; }
 </style>
 </head>
 <body>
@@ -53,6 +59,12 @@
   </div>
 
   <div id="mainCard" class="hidden">
+    <div class="tabs">
+      <button type="button" class="tab-btn active" id="tabServiciosBtn">Servicios pendientes</button>
+      <button type="button" class="tab-btn" id="tabCronogramaBtn">Cronograma semanal</button>
+    </div>
+
+    <div id="panelServicios">
     <h1>Cargar servicios pendientes</h1>
     <p class="subtitle">Subí el archivo que exporta el ERP (CSV o Excel). Se reemplaza el listado completo que ve la app.</p>
 
@@ -104,6 +116,26 @@
 
     <button id="uploadBtn" type="button" class="hidden">Subir servicios a la app</button>
     <p class="status" id="uploadStatus"></p>
+    </div>
+
+    <div id="panelCronograma" class="hidden">
+      <h1>Cargar cronograma semanal</h1>
+      <p class="subtitle">Subí el Excel del cronograma (una hoja por día, columnas por técnico). Se reemplaza el cronograma completo que ven los técnicos.</p>
+
+      <div class="card">
+        <label for="cronoFile">Archivo Excel</label>
+        <input type="file" id="cronoFile" accept=".xlsx,.xls">
+        <p class="status" id="cronoParseStatus"></p>
+      </div>
+
+      <div class="card hidden" id="cronoPreviewCard">
+        <p class="subtitle" style="margin:0 0 10px;">Resumen detectado:</p>
+        <table id="cronoPreviewTable"><thead></thead><tbody></tbody></table>
+      </div>
+
+      <button id="cronoUploadBtn" type="button" class="hidden">Subir cronograma a la app</button>
+      <p class="status" id="cronoUploadStatus"></p>
+    </div>
   </div>
 
 </div>
@@ -115,6 +147,24 @@ const ADMIN_PASSWORD = "Marcos@2018";
 // Misma clave secreta que SERVICIOS_API_TOKEN en app.js y en Vercel.
 const SERVICIOS_API_TOKEN = "54455ad29a4eb28e48ca915e3510ff95ceb682523fa74b32";
 // =======================================================
+
+const tabServiciosBtn = document.getElementById("tabServiciosBtn");
+const tabCronogramaBtn = document.getElementById("tabCronogramaBtn");
+const panelServicios = document.getElementById("panelServicios");
+const panelCronograma = document.getElementById("panelCronograma");
+
+tabServiciosBtn.addEventListener("click", () => {
+  tabServiciosBtn.classList.add("active");
+  tabCronogramaBtn.classList.remove("active");
+  panelServicios.classList.remove("hidden");
+  panelCronograma.classList.add("hidden");
+});
+tabCronogramaBtn.addEventListener("click", () => {
+  tabCronogramaBtn.classList.add("active");
+  tabServiciosBtn.classList.remove("active");
+  panelCronograma.classList.remove("hidden");
+  panelServicios.classList.add("hidden");
+});
 
 const MAP_KEY = "servicios_admin_column_map";
 let parsedRows = [];
@@ -358,6 +408,174 @@ uploadBtn.addEventListener("click", async () => {
     uploadStatus.textContent = "No se pudo subir: " + err.message;
   } finally {
     uploadBtn.disabled = false;
+  }
+});
+
+// ==================== CRONOGRAMA SEMANAL ====================
+const cronoFile = document.getElementById("cronoFile");
+const cronoParseStatus = document.getElementById("cronoParseStatus");
+const cronoPreviewCard = document.getElementById("cronoPreviewCard");
+const cronoPreviewTable = document.getElementById("cronoPreviewTable");
+const cronoUploadBtn = document.getElementById("cronoUploadBtn");
+const cronoUploadStatus = document.getElementById("cronoUploadStatus");
+
+let cronogramaTareas = [];
+
+const MESES = {
+  enero: "01", febrero: "02", marzo: "03", abril: "04", mayo: "05", junio: "06",
+  julio: "07", agosto: "08", septiembre: "09", setiembre: "09", octubre: "10",
+  noviembre: "11", diciembre: "12",
+};
+
+function limpiarTexto(v) {
+  return (v ?? "").toString().replace(/_x000D_/g, " ").replace(/\r/g, " ").trim();
+}
+
+// Busca en la celda de título ("Calendario:    lunes 27 julio 2026") la
+// fecha completa y la devuelve en formato ISO (YYYY-MM-DD).
+function extraerFechaISO(tituloCelda) {
+  const texto = limpiarTexto(tituloCelda).toLowerCase();
+  const match = texto.match(/(\d{1,2})\s+de\s+([a-záéíóú]+)\s+(\d{4})|(\d{1,2})\s+([a-záéíóú]+)\s+(\d{4})/);
+  if (!match) return null;
+  const dia = match[1] || match[4];
+  const mesTexto = (match[2] || match[5] || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const anio = match[3] || match[6];
+  const mes = MESES[mesTexto];
+  if (!mes) return null;
+  return `${anio}-${mes}-${dia.padStart(2, "0")}`;
+}
+
+function parsearHojaCronograma(ws, nombreHoja) {
+  const filas = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: "" });
+  if (!filas || filas.length < 4) return [];
+
+  const fechaISO = extraerFechaISO(filas[0] && filas[0][1]);
+  // Encabezado con nombres de técnicos: fila índice 2, desde columna 1.
+  const encabezado = filas[2] || [];
+  const columnasTecnico = [];
+  for (let c = 1; c < encabezado.length; c++) {
+    const nombre = limpiarTexto(encabezado[c]);
+    if (nombre) columnasTecnico.push({ col: c, tecnico: nombre });
+  }
+  if (columnasTecnico.length === 0) return [];
+
+  // Franjas horarias: columna 0, desde fila índice 3 en adelante.
+  const franjas = [];
+  for (let r = 3; r < filas.length; r++) {
+    const label = limpiarTexto(filas[r] && filas[r][0]);
+    const partes = label.split("-").map((p) => p.trim());
+    franjas[r] = { inicio: partes[0] || "", fin: partes[1] || "" };
+  }
+
+  const merges = ws["!merges"] || [];
+  const cubiertas = new Set();
+  const tareas = [];
+
+  merges.forEach((m) => {
+    const { s, e } = m;
+    if (s.c < 1 || s.r < 3) return; // fuera del área de datos
+    for (let r = s.r; r <= e.r; r++) {
+      for (let c = s.c; c <= e.c; c++) cubiertas.add(`${r},${c}`);
+    }
+    const valor = limpiarTexto(filas[s.r] && filas[s.r][s.c]);
+    if (!valor) return;
+    const tecnicoCol = columnasTecnico.find((t) => t.col === s.c);
+    if (!tecnicoCol) return;
+    tareas.push({
+      fecha: fechaISO,
+      dia_label: nombreHoja,
+      tecnico: tecnicoCol.tecnico,
+      hora_inicio: (franjas[s.r] || {}).inicio || "",
+      hora_fin: (franjas[e.r] || {}).fin || "",
+      tarea: valor,
+    });
+  });
+
+  columnasTecnico.forEach(({ col, tecnico }) => {
+    for (let r = 3; r < filas.length; r++) {
+      if (cubiertas.has(`${r},${col}`)) continue;
+      const valor = limpiarTexto(filas[r] && filas[r][col]);
+      if (!valor) continue;
+      tareas.push({
+        fecha: fechaISO,
+        dia_label: nombreHoja,
+        tecnico,
+        hora_inicio: (franjas[r] || {}).inicio || "",
+        hora_fin: (franjas[r] || {}).fin || "",
+        tarea: valor,
+      });
+    }
+  });
+
+  return tareas;
+}
+
+cronoFile.addEventListener("change", () => {
+  const file = cronoFile.files[0];
+  if (!file) return;
+  cronoParseStatus.textContent = "Leyendo archivo...";
+  cronoPreviewCard.classList.add("hidden");
+  cronoUploadBtn.classList.add("hidden");
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const wb = XLSX.read(new Uint8Array(e.target.result), { type: "array" });
+      let todas = [];
+      wb.SheetNames.forEach((nombre) => {
+        const tareasHoja = parsearHojaCronograma(wb.Sheets[nombre], nombre);
+        todas = todas.concat(tareasHoja);
+      });
+
+      if (todas.length === 0) {
+        cronoParseStatus.textContent = "No se detectaron tareas — revisá que el formato sea el esperado (una hoja por día, técnicos en la fila 3).";
+        return;
+      }
+
+      cronogramaTareas = todas;
+
+      // Resumen por día
+      const porDia = {};
+      todas.forEach((t) => {
+        porDia[t.dia_label] = (porDia[t.dia_label] || 0) + 1;
+      });
+
+      cronoPreviewTable.innerHTML = "<thead><tr><th>Día</th><th>Tareas</th></tr></thead><tbody>" +
+        Object.entries(porDia).map(([dia, n]) => `<tr><td>${dia}</td><td>${n}</td></tr>`).join("") +
+        "</tbody>";
+
+      cronoParseStatus.textContent = `Se detectaron ${Object.keys(porDia).length} días, ${todas.length} tareas en total.`;
+      cronoPreviewCard.classList.remove("hidden");
+      cronoUploadBtn.classList.remove("hidden");
+    } catch (err) {
+      cronoParseStatus.textContent = "No se pudo leer el archivo Excel.";
+    }
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+cronoUploadBtn.addEventListener("click", async () => {
+  cronoUploadBtn.disabled = true;
+  cronoUploadStatus.className = "status";
+  cronoUploadStatus.textContent = "Subiendo...";
+  try {
+    const res = await fetch("/api/cronograma", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + SERVICIOS_API_TOKEN,
+      },
+      body: JSON.stringify(cronogramaTareas),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    cronoUploadStatus.className = "status ok";
+    cronoUploadStatus.textContent = `Listo — se subieron ${data.count} tareas. Ya están disponibles en la app.`;
+  } catch (err) {
+    cronoUploadStatus.className = "status err";
+    cronoUploadStatus.textContent = "No se pudo subir: " + err.message;
+  } finally {
+    cronoUploadBtn.disabled = false;
   }
 });
 </script>

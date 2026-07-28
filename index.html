@@ -64,6 +64,30 @@
 
     <div class="action-bar action-bar-column">
       <button class="btn btn-secondary" id="manualReportBtn" type="button">Cargar parte sin servicio</button>
+      <button class="btn btn-ghost" id="verCronogramaBtn" type="button">Ver cronograma semanal</button>
+    </div>
+  </section>
+
+  <!-- CRONOGRAMA SEMANAL -->
+  <section class="screen" id="screen-cronograma">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">CRONOGRAMA SEMANAL</p>
+
+      <div id="cronoDiasTabs" class="crono-dias-tabs"></div>
+
+      <div class="field-group" style="margin-top:10px;">
+        <select class="field-input" id="cronoTecnicoFiltro">
+          <option value="">Todos los técnicos</option>
+        </select>
+      </div>
+
+      <p class="list-status" id="cronoStatus"></p>
+
+      <div id="cronoTareasList" class="crono-tareas-list"></div>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDeCronogramaBtn" type="button">Volver</button>
     </div>
   </section>
 
