@@ -16,24 +16,24 @@ copias por mail a la oficina y al cliente.
 
 No usa cámara ni lectura automática de fotos — todo se carga a mano.
 
-## Acceso con contraseña (una por técnico)
+## Acceso con contraseña (una por técnico) — administrable
 
-Cada técnico tiene su propia contraseña, definida en `app.js`:
-```js
-const TECNICOS_PASSWORDS = {
-  "Marcos Torres": "CAMBIAR_CLAVE_MARCOS_TORRES",
-  "Cristian Rossetti": "CAMBIAR_CLAVE_CRISTIAN_ROSSETTI",
-  "Rodrigo Bertorello": "CAMBIAR_CLAVE_RODRIGO_BERTORELLO",
-  "Guillermo Bertorello": "CAMBIAR_CLAVE_GUILLERMO_BERTORELLO",
-  "Marcos Pellegrini": "CAMBIAR_CLAVE_MARCOS_PELLEGRINI",
-  "Sebastian Bartolozzi": "CAMBIAR_CLAVE_SEBASTIAN_BARTOLOZZI",
-  "Alfredo Thiesing": "CAMBIAR_CLAVE_ALFREDO_THIESING",
-};
-```
-Hay que reemplazar cada `CAMBIAR_CLAVE_...` por una contraseña real antes
-de publicar. Los nombres tienen que coincidir exacto con las opciones
-del selector "Técnico" en `index.html` — si cambiás un nombre en un
-lado, cambialo también en el otro.
+Cada técnico tiene su propia contraseña, pero ahora **se administra
+desde `admin.html`** (pestaña "Técnicos"), no hace falta tocar código
+para agregar, sacar o cambiar la clave de alguien:
+
+1. Entrá a `admin.html`, pestaña "Técnicos".
+2. La primera vez que entrás (si nunca se guardó nada) va a aparecer
+   precargada con los técnicos actuales — revisala y tocá "Guardar
+   cambios" para publicarla.
+3. Para agregar uno nuevo: "+ Agregar técnico", completá nombre y
+   contraseña, "Guardar cambios".
+4. Para sacar uno: tocá la ✕ de su fila, "Guardar cambios".
+5. Para cambiar una contraseña: editá el campo, "Guardar cambios".
+
+Los nombres que cargues ahí son los que van a aparecer automáticamente
+en el selector "Técnico" del formulario (ya no hace falta editar el
+HTML para eso tampoco).
 
 Cuando un técnico entra con su contraseña, la app **autocompleta el
 campo "Técnico"** del formulario con su nombre (se puede corregir a
@@ -41,8 +41,12 @@ mano si hiciera falta, por ejemplo si alguien usa el celular de otro
 técnico).
 
 También existe una contraseña general de respaldo (`APP_PASSWORD_GENERAL`,
-para oficina o pruebas) que entra sin asociarse a ningún técnico — en
-ese caso el campo "Técnico" queda para elegir a mano, como antes.
+en `app.js`, para oficina o pruebas) que entra sin asociarse a ningún
+técnico — en ese caso el campo "Técnico" queda para elegir a mano.
+
+Esta lista se guarda en el mismo repo privado de datos
+(`tecnicos.json`), reutilizando las variables de entorno que ya
+existen — no hace falta configurar nada nuevo.
 
 Es una validación solo del lado del celular (no hay usuarios ni login
 con servidor) — sirve para que no cualquiera que tenga la URL cargue
@@ -57,6 +61,22 @@ Es un menú desplegable con los técnicos fijos de SAT, más la opción
 "Otro..." que habilita un campo de texto libre. Para agregar o quitar
 técnicos de la lista, se edita directamente en `index.html`, buscando
 el `<select id="f_tecnico">`.
+
+## Alertas de servicios estancados
+
+En `admin.html` hay un campo opcional más al cargar el listado:
+**"Fecha de ingreso"** (cuándo se dio de alta el servicio en el ERP).
+Si se mapea esa columna, en el listado de la app cada servicio que
+lleva varios días sin resolverse se marca solo:
+
+- 🕒 **3 días o más**: borde naranja, con la etiqueta "Hace X días".
+- 🔴 **7 días o más**: borde rojo, etiqueta en rojo — para no perderlo
+  de vista.
+
+Los umbrales (3 y 7 días) están como constantes `DIAS_ATENCION` y
+`DIAS_URGENTE` al principio de la sección de servicios en `app.js`, se
+pueden ajustar fácil. Si no se carga la fecha de ingreso, simplemente
+no aparece ninguna alerta (no es obligatorio).
 
 ## Listado de servicios pendientes (precarga de datos)
 

@@ -5,7 +5,12 @@
 // pueda cargar partes, y para saber quién entró y autocompletar el
 // campo "Técnico"). Los nombres tienen que coincidir EXACTO con las
 // opciones del selector de técnico en index.html.
-const TECNICOS_PASSWORDS = {
+// Lista de técnicos y contraseñas — se administra desde admin.html
+// (pestaña "Técnicos"), no hace falta editar este archivo para agregar,
+// sacar o cambiar la clave de un técnico. Esto de acá abajo es solo un
+// respaldo de arranque: se usa si todavía nunca se guardó nada desde
+// admin.html, o si no hay conexión la primera vez que se abre la app.
+const TECNICOS_PASSWORDS_RESPALDO = {
   "Marcos Torres": "MarcosT@253",
   "Cristian Rossetti": "CristianR@5890",
   "Rodrigo Bertorello": "CAMBIAR_CLAVE_RODRIGO_BERTORELLO",
@@ -165,11 +170,53 @@ function showToast(message) {
 
 // ---------- Login ----------
 let tecnicoLogueado = "";
+let tecnicosPasswords = { ...TECNICOS_PASSWORDS_RESPALDO };
+
+// Carga la lista de técnicos desde el servidor (administrada en
+// admin.html). Si no hay conexión, usa la última copia guardada en el
+// celular; si nunca se guardó ninguna, usa el respaldo de arranque.
+async function cargarTecnicos() {
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/tecnicos", { headers, cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if (Array.isArray(data) && data.length > 0) {
+      const mapa = {};
+      data.forEach((t) => { if (t.nombre) mapa[t.nombre] = t.password || ""; });
+      tecnicosPasswords = mapa;
+      localStorage.setItem("tecnicos_cache", JSON.stringify(mapa));
+    }
+  } catch (err) {
+    const cacheado = localStorage.getItem("tecnicos_cache");
+    if (cacheado) {
+      try { tecnicosPasswords = JSON.parse(cacheado); } catch (e) { /* usa el respaldo de arranque */ }
+    }
+  }
+  poblarSelectsTecnico();
+}
+const tecnicosListos = cargarTecnicos();
+
+// Arma las opciones de los selectores de técnico (principal y
+// segundo) a partir de la lista cargada, manteniendo el placeholder y
+// la opción "Otro...".
+function poblarSelectsTecnico() {
+  const nombres = Object.keys(tecnicosPasswords).sort();
+  const opciones = nombres.map((n) => `<option value="${n}">${n}</option>`).join("");
+
+  const actual1 = tecnicoSelect.value;
+  tecnicoSelect.innerHTML = `<option value="" disabled ${actual1 ? "" : "selected"}>Elegí un técnico</option>${opciones}<option value="otro">Otro...</option>`;
+  if (nombres.includes(actual1)) tecnicoSelect.value = actual1;
+
+  const actual2 = tecnicoSelect2.value;
+  tecnicoSelect2.innerHTML = `<option value="" disabled ${actual2 ? "" : "selected"}>Elegí el segundo técnico</option>${opciones}<option value="otro">Otro...</option>`;
+  if (nombres.includes(actual2)) tecnicoSelect2.value = actual2;
+}
 
 function attemptLogin() {
   const intento = loginPassword.value;
-  const nombreCoincidente = Object.keys(TECNICOS_PASSWORDS).find(
-    (nombre) => TECNICOS_PASSWORDS[nombre] === intento
+  const nombreCoincidente = Object.keys(tecnicosPasswords).find(
+    (nombre) => tecnicosPasswords[nombre] === intento
   );
 
   if (nombreCoincidente) {
@@ -248,6 +295,34 @@ function filtrarServicios() {
   });
 }
 
+// Umbrales para marcar un servicio como "estancado" — se puede ajustar.
+const DIAS_ATENCION = 3;
+const DIAS_URGENTE = 7;
+
+// Interpreta la fecha de ingreso del servicio en varios formatos
+// comunes (dd/mm/aaaa, dd-mm-aaaa, aaaa-mm-dd). Si no se puede
+// interpretar, devuelve null (ese servicio simplemente no muestra
+// alerta de estancado).
+function parsearFechaIngreso(str) {
+  if (!str) return null;
+  const texto = str.toString().trim();
+  let m = texto.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  m = texto.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
+  if (m) return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]));
+  return null;
+}
+
+function diasEstancado(item) {
+  const fecha = parsearFechaIngreso(item.fecha_ingreso);
+  if (!fecha) return null;
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  fecha.setHours(0, 0, 0, 0);
+  const dias = Math.floor((hoy - fecha) / 86400000);
+  return dias >= 0 ? dias : null;
+}
+
 function renderServiciosList(items) {
   serviciosListEl.innerHTML = "";
   if (!items || items.length === 0) {
@@ -259,11 +334,21 @@ function renderServiciosList(items) {
   listStatus.textContent = "";
   items.forEach((item) => {
     const resuelto = item.numero_servicio && serviciosResueltos.has(item.numero_servicio);
+    const dias = resuelto ? null : diasEstancado(item);
+    let claseEstancado = "";
+    let badgeEstancado = "";
+    if (dias != null && dias >= DIAS_URGENTE) {
+      claseEstancado = " estancado-urgente";
+      badgeEstancado = `<span class="servicio-card-estancado-badge urgente">🔴 Hace ${dias} días</span>`;
+    } else if (dias != null && dias >= DIAS_ATENCION) {
+      claseEstancado = " estancado-atencion";
+      badgeEstancado = `<span class="servicio-card-estancado-badge">🕒 Hace ${dias} días</span>`;
+    }
     const card = document.createElement("button");
     card.type = "button";
-    card.className = "servicio-card" + (resuelto ? " resuelto" : "");
+    card.className = "servicio-card" + (resuelto ? " resuelto" : "") + claseEstancado;
     card.innerHTML = `
-      <div class="servicio-card-num">N° ${item.numero_servicio ?? ""}${resuelto ? '<span class="servicio-card-resuelto-badge">RESUELTO</span>' : ""}</div>
+      <div class="servicio-card-num">N° ${item.numero_servicio ?? ""}${resuelto ? '<span class="servicio-card-resuelto-badge">RESUELTO</span>' : badgeEstancado}</div>
       <div class="servicio-card-cliente">${item.cliente ?? ""}</div>
       <div class="servicio-card-direccion">${item.direccion ?? ""}${item.localidad ? ", " + item.localidad : ""}</div>
       <div class="servicio-card-tarea">${item.tarea ?? ""}</div>

@@ -44,6 +44,13 @@
     padding: 10px; font-size: 13px;
   }
   .tab-btn.active { background: #101820; color: #F5A623; border-color: #101820; }
+  .tecnicos-filas { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+  .tecnico-fila { align-items: flex-end; }
+  .btn-quitar-tecnico {
+    width: auto; flex-shrink: 0; padding: 10px 14px; background: #FFFFFF;
+    color: #C0392B; border: 1.5px solid #D8DCD4;
+  }
+  .btn-secondary-admin { background: transparent; color: #101820; border: 1.5px solid #101820; }
 </style>
 </head>
 <body>
@@ -63,6 +70,7 @@
     <div class="tabs">
       <button type="button" class="tab-btn active" id="tabServiciosBtn">Servicios pendientes</button>
       <button type="button" class="tab-btn" id="tabCronogramaBtn">Cronograma semanal</button>
+      <button type="button" class="tab-btn" id="tabTecnicosBtn">Técnicos</button>
     </div>
 
     <div id="panelServicios">
@@ -113,6 +121,10 @@
           <label>Teléfono (opcional)</label>
           <select id="mapTelefono"></select>
         </div>
+        <div>
+          <label>Fecha de ingreso (opcional)</label>
+          <select id="mapFechaIngreso"></select>
+        </div>
       </div>
       <label>Tarea a realizar</label>
       <select id="mapTarea"></select>
@@ -143,6 +155,19 @@
       <button id="cronoUploadBtn" type="button" class="hidden">Subir cronograma a la app</button>
       <p class="status" id="cronoUploadStatus"></p>
     </div>
+
+    <div id="panelTecnicos" class="hidden">
+      <h1>Administrar técnicos</h1>
+      <p class="subtitle">Agregá, sacá o cambiá la contraseña de cada técnico. Estos nombres son los que van a aparecer en el selector "Técnico" del formulario de la app.</p>
+
+      <p class="status" id="tecnicosStatus"></p>
+
+      <div id="tecnicosFilas" class="tecnicos-filas"></div>
+
+      <button id="agregarTecnicoBtn" type="button" class="btn-secondary-admin" style="margin-bottom:14px;">+ Agregar técnico</button>
+      <button id="guardarTecnicosBtn" type="button">Guardar cambios</button>
+      <p class="status" id="guardarTecnicosStatus"></p>
+    </div>
   </div>
 
 </div>
@@ -155,6 +180,27 @@ const ADMIN_PASSWORD = "Marcos@2018";
 const SERVICIOS_API_TOKEN = "54455ad29a4eb28e48ca915e3510ff95ceb682523fa74b32";
 // =======================================================
 
+// Respaldo — solo se usa para prellenar el formulario la PRIMERA vez
+// (si todavía no se guardó ninguna lista de técnicos desde acá).
+const TECNICOS_RESPALDO = [
+  { nombre: "Marcos Torres", password: "MarcosT@253" },
+  { nombre: "Cristian Rossetti", password: "CristianR@5890" },
+  { nombre: "Rodrigo Bertorello", password: "CAMBIAR_CLAVE_RODRIGO_BERTORELLO" },
+  { nombre: "Guillermo Bertorello", password: "GuillermoB@849" },
+  { nombre: "Marcos Pellegrini", password: "MarcosP@2907" },
+  { nombre: "Sebastian Bartolozzi", password: "Sebab031" },
+  { nombre: "Alfredo Thiesing", password: "AlfredoT@3972" },
+];
+
+const tabTecnicosBtn = document.getElementById("tabTecnicosBtn");
+const panelTecnicos = document.getElementById("panelTecnicos");
+const tecnicosStatus = document.getElementById("tecnicosStatus");
+const tecnicosFilas = document.getElementById("tecnicosFilas");
+const agregarTecnicoBtn = document.getElementById("agregarTecnicoBtn");
+const guardarTecnicosBtn = document.getElementById("guardarTecnicosBtn");
+const guardarTecnicosStatus = document.getElementById("guardarTecnicosStatus");
+let tecnicosCargadosUnaVez = false;
+
 const tabServiciosBtn = document.getElementById("tabServiciosBtn");
 const tabCronogramaBtn = document.getElementById("tabCronogramaBtn");
 const panelServicios = document.getElementById("panelServicios");
@@ -163,14 +209,110 @@ const panelCronograma = document.getElementById("panelCronograma");
 tabServiciosBtn.addEventListener("click", () => {
   tabServiciosBtn.classList.add("active");
   tabCronogramaBtn.classList.remove("active");
+  tabTecnicosBtn.classList.remove("active");
   panelServicios.classList.remove("hidden");
   panelCronograma.classList.add("hidden");
+  panelTecnicos.classList.add("hidden");
 });
 tabCronogramaBtn.addEventListener("click", () => {
   tabCronogramaBtn.classList.add("active");
   tabServiciosBtn.classList.remove("active");
+  tabTecnicosBtn.classList.remove("active");
   panelCronograma.classList.remove("hidden");
   panelServicios.classList.add("hidden");
+  panelTecnicos.classList.add("hidden");
+});
+tabTecnicosBtn.addEventListener("click", () => {
+  tabTecnicosBtn.classList.add("active");
+  tabServiciosBtn.classList.remove("active");
+  tabCronogramaBtn.classList.remove("active");
+  panelTecnicos.classList.remove("hidden");
+  panelServicios.classList.add("hidden");
+  panelCronograma.classList.add("hidden");
+  if (!tecnicosCargadosUnaVez) {
+    tecnicosCargadosUnaVez = true;
+    cargarTecnicosAdmin();
+  }
+});
+
+function renderFilaTecnico(nombre, password) {
+  const fila = document.createElement("div");
+  fila.className = "field-row tecnico-fila";
+  fila.innerHTML = `
+    <div>
+      <label>Nombre</label>
+      <input type="text" class="tecnico-nombre" value="${nombre || ""}" placeholder="Nombre y apellido">
+    </div>
+    <div>
+      <label>Contraseña</label>
+      <input type="text" class="tecnico-password" value="${password || ""}" placeholder="Contraseña">
+    </div>
+    <button type="button" class="btn-quitar-tecnico" title="Quitar">✕</button>
+  `;
+  fila.querySelector(".btn-quitar-tecnico").addEventListener("click", () => fila.remove());
+  tecnicosFilas.appendChild(fila);
+}
+
+async function cargarTecnicosAdmin() {
+  tecnicosStatus.textContent = "Cargando técnicos...";
+  tecnicosFilas.innerHTML = "";
+  try {
+    const res = await fetch("/api/tecnicos", {
+      headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+
+    const lista = Array.isArray(data) && data.length > 0 ? data : TECNICOS_RESPALDO;
+    lista.forEach((t) => renderFilaTecnico(t.nombre, t.password));
+    tecnicosStatus.textContent = Array.isArray(data) && data.length > 0
+      ? ""
+      : "Todavía no se guardó ninguna lista — se precargó con los técnicos actuales. Revisala y guardá para publicarla.";
+  } catch (err) {
+    tecnicosFilas.innerHTML = "";
+    TECNICOS_RESPALDO.forEach((t) => renderFilaTecnico(t.nombre, t.password));
+    tecnicosStatus.textContent = "No se pudo conectar — se muestra la lista de respaldo. Revisala antes de guardar.";
+  }
+}
+
+agregarTecnicoBtn.addEventListener("click", () => renderFilaTecnico("", ""));
+
+guardarTecnicosBtn.addEventListener("click", async () => {
+  const filas = Array.from(tecnicosFilas.querySelectorAll(".tecnico-fila"));
+  const lista = filas.map((fila) => ({
+    nombre: fila.querySelector(".tecnico-nombre").value.trim(),
+    password: fila.querySelector(".tecnico-password").value.trim(),
+  })).filter((t) => t.nombre && t.password);
+
+  if (lista.length === 0) {
+    guardarTecnicosStatus.className = "status err";
+    guardarTecnicosStatus.textContent = "Agregá al menos un técnico con nombre y contraseña.";
+    return;
+  }
+
+  guardarTecnicosBtn.disabled = true;
+  guardarTecnicosStatus.className = "status";
+  guardarTecnicosStatus.textContent = "Guardando...";
+  try {
+    const res = await fetch("/api/tecnicos", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + SERVICIOS_API_TOKEN,
+      },
+      body: JSON.stringify(lista),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    guardarTecnicosStatus.className = "status ok";
+    guardarTecnicosStatus.textContent = `Listo — se guardaron ${data.count} técnicos. Ya están disponibles en la app.`;
+  } catch (err) {
+    guardarTecnicosStatus.className = "status err";
+    guardarTecnicosStatus.textContent = "No se pudo guardar: " + err.message;
+  } finally {
+    guardarTecnicosBtn.disabled = false;
+  }
 });
 
 const MAP_KEY = "servicios_admin_column_map";
@@ -199,6 +341,7 @@ const mapSelects = {
   direccion: document.getElementById("mapDireccion"),
   localidad: document.getElementById("mapLocalidad"),
   telefono: document.getElementById("mapTelefono"),
+  fecha_ingreso: document.getElementById("mapFechaIngreso"),
   tarea: document.getElementById("mapTarea"),
 };
 
@@ -330,7 +473,7 @@ function setupMapping() {
   const savedMap = JSON.parse(localStorage.getItem(MAP_KEY) || "{}");
   Object.entries(mapSelects).forEach(([field, select]) => {
     select.innerHTML = "";
-    if (field === "localidad" || field === "telefono") {
+    if (field === "localidad" || field === "telefono" || field === "fecha_ingreso") {
       const emptyOpt = document.createElement("option");
       emptyOpt.value = "";
       emptyOpt.textContent = "(sin usar)";
@@ -365,7 +508,7 @@ function renderPreview() {
   const map = currentMapping();
   localStorage.setItem(MAP_KEY, JSON.stringify(map));
 
-  const cols = ["numero_servicio", "cliente", "direccion", "localidad", "telefono", "tarea"];
+  const cols = ["numero_servicio", "cliente", "direccion", "localidad", "telefono", "fecha_ingreso", "tarea"];
   previewTable.querySelector("thead").innerHTML =
     "<tr>" + cols.map((c) => `<th>${c}</th>`).join("") + "</tr>";
 
@@ -393,6 +536,7 @@ uploadBtn.addEventListener("click", async () => {
     };
     if (map.localidad) item.localidad = String(row[map.localidad] ?? "").trim();
     if (map.telefono) item.telefono = String(row[map.telefono] ?? "").trim();
+    if (map.fecha_ingreso) item.fecha_ingreso = String(row[map.fecha_ingreso] ?? "").trim();
     return item;
   }).filter((item) => item.numero_servicio || item.cliente);
 
