@@ -2,5 +2,8 @@
   "name": "parte-tecnico-app",
   "version": "1.0.0",
   "private": true,
-  "description": "PWA para digitalizar y enviar partes técnicos de servicio"
+  "description": "PWA para digitalizar y enviar partes técnicos de servicio",
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  }
 }

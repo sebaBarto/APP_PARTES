@@ -146,18 +146,36 @@ cronograma semanal" con el cronograma completo del equipo — todos ven
 las tareas de todos, con un filtro opcional por técnico y pestañas por
 día.
 
-Se carga desde `admin.html` (pestaña "Cronograma semanal"), subiendo el
-Excel con el formato de siempre: una hoja por día, técnicos en columnas
-(fila 3), franjas horarias de 30 minutos en filas, y celdas combinadas
-cuando una tarea dura más de una franja — `admin.html` respeta esas
-celdas combinadas para calcular la duración real de cada tarea. No hace
-falta mapear columnas a mano como con los servicios: el formato ya se
-reconoce automáticamente.
+**Se sincroniza solo desde un archivo de Google Drive** cada vez que un
+técnico abre esa pantalla — no hace falta subir nada a mano. El formato
+esperado es el de siempre: una hoja por día, técnicos en columnas (fila
+3), franjas horarias de 30 minutos en filas, y celdas combinadas cuando
+una tarea dura más de una franja (se respetan para calcular la duración
+real). Funciona tanto si el archivo en Drive es un Excel subido tal cual
+como si es una Hoja de cálculo de Google nativa.
 
-Los datos se guardan en el mismo repo privado de datos, en el archivo
-`cronograma.json`, reutilizando las mismas variables de entorno que ya
-existen (`SERVICIOS_API_TOKEN`, `GITHUB_DATA_TOKEN`, `GITHUB_DATA_REPO`)
-— no hace falta configurar nada nuevo.
+Como respaldo por si falla la conexión con Drive en el momento, cada
+sincronización exitosa guarda una copia en el repo privado de datos
+(`cronograma.json`). También queda disponible la carga manual desde
+`admin.html` (pestaña "Cronograma semanal") como alternativa si hiciera
+falta.
+
+### Variables de entorno
+
+Reutiliza las que ya existen de la función de fotos
+(`GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`) y
+de servicios pendientes (`SERVICIOS_API_TOKEN`, `GITHUB_DATA_TOKEN`,
+`GITHUB_DATA_REPO`). Solo hace falta agregar una nueva:
+
+- `CRONOGRAMA_DRIVE_FILE_ID` = el ID del archivo en Drive (la parte de
+  la URL entre `/d/` y el siguiente `/`, por ejemplo en
+  `https://docs.google.com/spreadsheets/d/ABC123.../edit` el ID es
+  `ABC123...`).
+
+El archivo (o la carpeta que lo contiene) tiene que estar compartido con
+el email de la cuenta de servicio
+(`sat-fotos-uploader@partes-503719.iam.gserviceaccount.com`) con permiso
+de **Lector** — no hace falta Editor, solo lectura.
 
 ## Publicar en Vercel
 
