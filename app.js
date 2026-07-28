@@ -1222,20 +1222,24 @@ async function renderDashboard() {
   }
 
   // Agrupar por técnico: cantidad, tiempo promedio, y días (para calcular
-  // distancia entre paradas consecutivas del mismo día).
+  // distancia entre paradas consecutivas del mismo día). Si el parte
+  // tiene un segundo técnico, el servicio cuenta completo para los dos.
   const porTecnico = {};
   enPeriodo.forEach((h) => {
-    const nombre = h.tecnico || "(sin técnico)";
-    if (!porTecnico[nombre]) porTecnico[nombre] = { cantidad: 0, minutosTotal: 0, conTiempo: 0, dias: {} };
-    porTecnico[nombre].cantidad++;
-    const minutos = minutosEntre(h.hora_entrada, h.hora_salida);
-    if (minutos != null) {
-      porTecnico[nombre].minutosTotal += minutos;
-      porTecnico[nombre].conTiempo++;
-    }
-    const dia = h.fecha || "sin-fecha";
-    if (!porTecnico[nombre].dias[dia]) porTecnico[nombre].dias[dia] = [];
-    porTecnico[nombre].dias[dia].push(h);
+    const nombres = [h.tecnico, h.tecnico2].filter(Boolean);
+    if (nombres.length === 0) nombres.push("(sin técnico)");
+    nombres.forEach((nombre) => {
+      if (!porTecnico[nombre]) porTecnico[nombre] = { cantidad: 0, minutosTotal: 0, conTiempo: 0, dias: {} };
+      porTecnico[nombre].cantidad++;
+      const minutos = minutosEntre(h.hora_entrada, h.hora_salida);
+      if (minutos != null) {
+        porTecnico[nombre].minutosTotal += minutos;
+        porTecnico[nombre].conTiempo++;
+      }
+      const dia = h.fecha || "sin-fecha";
+      if (!porTecnico[nombre].dias[dia]) porTecnico[nombre].dias[dia] = [];
+      porTecnico[nombre].dias[dia].push(h);
+    });
   });
 
   dashStatus.textContent = Object.keys(porTecnico).length > 0 ? "Calculando distancias..." : "";
@@ -1319,10 +1323,14 @@ async function renderDashboard() {
   const porTecnicoCliente = {};
   delMes.forEach((h) => {
     if (!h.cliente) return;
-    const clave = `${h.tecnico || ""}|${h.cliente}`;
-    if (!porTecnicoCliente[clave]) porTecnicoCliente[clave] = { n: 0, fechas: [] };
-    porTecnicoCliente[clave].n++;
-    if (h.fecha) porTecnicoCliente[clave].fechas.push(h.fecha);
+    const nombres = [h.tecnico, h.tecnico2].filter(Boolean);
+    if (nombres.length === 0) nombres.push("");
+    nombres.forEach((nombreTecnico) => {
+      const clave = `${nombreTecnico}|${h.cliente}`;
+      if (!porTecnicoCliente[clave]) porTecnicoCliente[clave] = { n: 0, fechas: [] };
+      porTecnicoCliente[clave].n++;
+      if (h.fecha) porTecnicoCliente[clave].fechas.push(h.fecha);
+    });
   });
   const repetidos = Object.entries(porTecnicoCliente)
     .filter(([, info]) => info.n > 1)

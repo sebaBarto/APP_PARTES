@@ -314,8 +314,10 @@ Desde el listado de servicios hay un botón **"📊 Ver dashboard"** con:
   quedó con esos campos vacíos o mal cargados, no se cuenta en el
   promedio de ese técnico.
 - Cuando un servicio se completa entre dos técnicos (el check de
-  "Fueron dos técnicos"), el conteo y las estadísticas quedan asociadas
-  solo al técnico principal del parte, no al segundo.
+  "Fueron dos técnicos"), el servicio cuenta completo para **ambos** en
+  el dashboard — cada uno suma +1 a su cantidad resuelta, con el mismo
+  tiempo y la misma parada para el cálculo de distancia (no se reparte
+  a la mitad).
 
 ## Dashboard financiero (solo para Sebastian Bartolozzi)
 
