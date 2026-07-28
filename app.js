@@ -55,6 +55,7 @@ const screens = {
   cronograma: document.getElementById("screen-cronograma"),
   mapa: document.getElementById("screen-mapa"),
   dashboard: document.getElementById("screen-dashboard"),
+  dashboardFinanciero: document.getElementById("screen-dashboard-financiero"),
   form: document.getElementById("screen-form"),
   sign: document.getElementById("screen-sign"),
   sending: document.getElementById("screen-sending"),
@@ -106,6 +107,13 @@ const dashPendientesNum = document.getElementById("dashPendientesNum");
 const dashResueltosNum = document.getElementById("dashResueltosNum");
 const dashTecnicosList = document.getElementById("dashTecnicosList");
 const dashRepetidosList = document.getElementById("dashRepetidosList");
+const verDashboardFinancieroBtn = document.getElementById("verDashboardFinancieroBtn");
+const volverDeDashboardFinancieroBtn = document.getElementById("volverDeDashboardFinancieroBtn");
+const dashFinStatus = document.getElementById("dashFinStatus");
+const dashFinPagosNum = document.getElementById("dashFinPagosNum");
+const dashFinBonificadosNum = document.getElementById("dashFinBonificadosNum");
+const dashFinTotalNum = document.getElementById("dashFinTotalNum");
+const dashFinPromedioNum = document.getElementById("dashFinPromedioNum");
 const mapaStatus = document.getElementById("mapaStatus");
 const mapaCercanosList = document.getElementById("mapaCercanosList");
 const toSignBtn = document.getElementById("toSignBtn");
@@ -158,18 +166,29 @@ function attemptLogin() {
     tecnicoLogueado = nombreCoincidente;
     localStorage.setItem("tecnico_logueado", tecnicoLogueado);
     loginError.textContent = "";
+    actualizarAccesoDashboardFinanciero();
     showScreen("list");
     fetchServicios();
   } else if (intento === APP_PASSWORD_GENERAL) {
     tecnicoLogueado = "";
     localStorage.removeItem("tecnico_logueado");
     loginError.textContent = "";
+    actualizarAccesoDashboardFinanciero();
     showScreen("list");
     fetchServicios();
   } else {
     loginError.textContent = "Contraseña incorrecta.";
     loginPassword.value = "";
     loginPassword.focus();
+  }
+}
+
+// Solo Sebastian Bartolozzi ve el botón del dashboard financiero.
+function actualizarAccesoDashboardFinanciero() {
+  if (tecnicoLogueado === "Sebastian Bartolozzi") {
+    verDashboardFinancieroBtn.classList.remove("hidden");
+  } else {
+    verDashboardFinancieroBtn.classList.add("hidden");
   }
 }
 loginBtn.addEventListener("click", attemptLogin);
@@ -1037,6 +1056,10 @@ confirmSignBtn.addEventListener("click", async () => {
           fecha: data.fecha,
           hora_entrada: data.hora_entrada,
           hora_salida: data.hora_salida,
+          importe: data.importe,
+          descuento: data.descuento,
+          costo_final: data.costo_final,
+          forma_pago: data.forma_pago,
         }),
       });
       if (!histRes.ok) {
@@ -1386,6 +1409,103 @@ verDashboardBtn.addEventListener("click", () => {
   fetchDashboard();
 });
 volverDeDashboardBtn.addEventListener("click", () => {
+  showScreen("list");
+});
+
+// ---------- Dashboard financiero (solo Sebastian Bartolozzi) ----------
+let dashFinPeriodoActivo = "mes";
+let chartFinDias = null;
+
+function esBonificado(costoFinalTexto) {
+  const valor = parseMonto(costoFinalTexto);
+  return !valor || valor <= 0;
+}
+
+async function fetchDashboardFinanciero() {
+  dashFinStatus.textContent = "Cargando datos...";
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/historial", { headers, cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    historialCache = Array.isArray(data) ? data : [];
+    dashFinStatus.textContent = "";
+    renderDashboardFinanciero();
+  } catch (err) {
+    dashFinStatus.textContent = "No se pudo cargar el historial para el dashboard financiero.";
+  }
+}
+
+function renderDashboardFinanciero() {
+  const rango = obtenerRangoPeriodo(dashFinPeriodoActivo);
+  const enPeriodo = historialCache.filter((h) => fechaEnRango(h.fecha, rango));
+
+  let pagos = 0;
+  let bonificados = 0;
+  let montoTotal = 0;
+
+  enPeriodo.forEach((h) => {
+    if (esBonificado(h.costo_final)) {
+      bonificados++;
+    } else {
+      pagos++;
+      montoTotal += parseMonto(h.costo_final) || 0;
+    }
+  });
+
+  dashFinPagosNum.textContent = pagos;
+  dashFinBonificadosNum.textContent = bonificados;
+  dashFinTotalNum.textContent = formatMonto(montoTotal);
+  dashFinPromedioNum.textContent = pagos > 0 ? formatMonto(montoTotal / pagos) : "—";
+
+  // Gráfico: monto generado por día a lo largo del período.
+  const porDia = {};
+  const cursor = new Date(rango.desde);
+  while (cursor <= rango.hasta) {
+    const key = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(cursor.getDate()).padStart(2, "0")}`;
+    porDia[key] = 0;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  enPeriodo.forEach((h) => {
+    if (h.fecha && Object.prototype.hasOwnProperty.call(porDia, h.fecha) && !esBonificado(h.costo_final)) {
+      porDia[h.fecha] += parseMonto(h.costo_final) || 0;
+    }
+  });
+  const claves = Object.keys(porDia).sort();
+  const labels = claves.map((k) => { const [, m, d] = k.split("-"); return `${d}/${m}`; });
+  const datos = claves.map((k) => porDia[k]);
+
+  const canvas = document.getElementById("dashChartFinDias");
+  if (chartFinDias) chartFinDias.destroy();
+  chartFinDias = new Chart(canvas, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [{ label: "Monto generado", data: datos, backgroundColor: "#2E7D32" }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, title: { display: true, text: "Monto generado por día" } },
+      scales: { y: { beginAtZero: true } },
+    },
+  });
+}
+
+document.querySelectorAll(".dash-fin-periodo-chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    document.querySelectorAll(".dash-fin-periodo-chip").forEach((c) => c.classList.remove("active"));
+    chip.classList.add("active");
+    dashFinPeriodoActivo = chip.dataset.periodo;
+    renderDashboardFinanciero();
+  });
+});
+
+verDashboardFinancieroBtn.addEventListener("click", () => {
+  showScreen("dashboardFinanciero");
+  fetchDashboardFinanciero();
+});
+volverDeDashboardFinancieroBtn.addEventListener("click", () => {
   showScreen("list");
 });
 

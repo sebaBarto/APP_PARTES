@@ -317,6 +317,36 @@ Desde el listado de servicios hay un botón **"📊 Ver dashboard"** con:
   "Fueron dos técnicos"), el conteo y las estadísticas quedan asociadas
   solo al técnico principal del parte, no al segundo.
 
+## Dashboard financiero (solo para Sebastian Bartolozzi)
+
+Hay un segundo dashboard, con acceso restringido: el botón "💰 Ver
+dashboard financiero" solo aparece si el técnico logueado es
+**Sebastian Bartolozzi** (según la contraseña usada para entrar). Como
+con el resto de la app, esto es una restricción del lado del celular —
+no un permiso real de servidor — pero alcanza para que no lo vea
+cualquiera que use la app.
+
+Muestra, con las mismas pestañas Día / Semana / Mes que el otro
+dashboard:
+
+- **Servicios pagos** vs. **servicios bonificados** en el período. Un
+  servicio se considera "bonificado" cuando su costo final quedó en
+  $0 (por el 100% de descuento, o porque el técnico cargó $0 a mano) —
+  cualquier costo final mayor a $0 cuenta como pago.
+- **Monto total generado** en el período (suma de los costos finales
+  de los servicios pagos).
+- **Promedio de dinero por servicio pago** (monto total dividido por
+  la cantidad de servicios pagos — los bonificados no entran en esta
+  cuenta).
+- Un gráfico de barras con el monto generado día por día dentro del
+  período elegido.
+
+Usa el mismo historial que el otro dashboard (`historial.json`), al que
+ahora también se le suman el importe, descuento, costo final y forma de
+pago de cada parte completado — por eso, igual que con el otro
+dashboard, **solo va a tener datos a partir de que se activó esta
+función**, no de partes anteriores.
+
 ## Notas y límites de esta versión
 
 - El **ID de parte** se genera por fecha/hora + un número al azar — no es

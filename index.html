@@ -69,6 +69,7 @@
       <button class="btn btn-secondary" id="manualReportBtn" type="button">Cargar parte sin servicio</button>
       <button class="btn btn-ghost" id="verCronogramaBtn" type="button">Ver cronograma semanal</button>
       <button class="btn btn-ghost" id="verDashboardBtn" type="button">📊 Ver dashboard</button>
+      <button class="btn btn-ghost hidden" id="verDashboardFinancieroBtn" type="button">💰 Ver dashboard financiero</button>
     </div>
   </section>
 
@@ -115,6 +116,51 @@
 
     <div class="action-bar">
       <button class="btn btn-secondary" id="volverDeDashboardBtn" type="button">Volver</button>
+    </div>
+  </section>
+
+  <!-- DASHBOARD FINANCIERO (acceso restringido) -->
+  <section class="screen" id="screen-dashboard-financiero">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">DASHBOARD FINANCIERO</p>
+
+      <div class="dash-periodo-tabs">
+        <button type="button" class="dash-fin-periodo-chip" data-periodo="dia">Día</button>
+        <button type="button" class="dash-fin-periodo-chip" data-periodo="semana">Semana</button>
+        <button type="button" class="dash-fin-periodo-chip active" data-periodo="mes">Mes</button>
+      </div>
+
+      <p class="list-status" id="dashFinStatus"></p>
+
+      <div class="dash-cards-row">
+        <div class="dash-card">
+          <div class="dash-card-num" id="dashFinPagosNum">–</div>
+          <div class="dash-card-label">Servicios pagos</div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-num" id="dashFinBonificadosNum">–</div>
+          <div class="dash-card-label">Servicios bonificados</div>
+        </div>
+      </div>
+
+      <div class="dash-cards-row">
+        <div class="dash-card">
+          <div class="dash-card-num dash-card-num-chico" id="dashFinTotalNum">–</div>
+          <div class="dash-card-label">Monto total generado</div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-num dash-card-num-chico" id="dashFinPromedioNum">–</div>
+          <div class="dash-card-label">Promedio por servicio pago</div>
+        </div>
+      </div>
+
+      <div class="dash-chart-wrap">
+        <canvas id="dashChartFinDias"></canvas>
+      </div>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDeDashboardFinancieroBtn" type="button">Volver</button>
     </div>
   </section>
 
