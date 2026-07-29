@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.2.1";
+const APP_VERSION = "3.2.2";
 
 // Contraseña propia por técnico (se valida en el propio celular, no es
 // un login con servidor — solo para que no cualquiera que abra la URL
@@ -133,7 +133,10 @@ const costoFinalInput = document.getElementById("f_costo_final");
 const formaPagoChecks = document.getElementsByName("f_forma_pago");
 const backToListBtn = document.getElementById("backToListBtn");
 const instalacionCheck = document.getElementById("f_instalacion");
-const fotoInput = document.getElementById("f_foto");
+const fotoInputCamara = document.getElementById("f_foto_camara");
+const fotoInputGaleria = document.getElementById("f_foto_galeria");
+const fotoCamaraBtn = document.getElementById("fotoCamaraBtn");
+const fotoGaleriaBtn = document.getElementById("fotoGaleriaBtn");
 const fotoPreviewWrap = document.getElementById("fotoPreviewWrap");
 const fotoPreview = document.getElementById("fotoPreview");
 const quitarFotoBtn = document.getElementById("quitarFotoBtn");
@@ -1176,8 +1179,7 @@ function comprimirImagen(file, maxDim, calidad) {
   });
 }
 
-fotoInput.addEventListener("change", async () => {
-  const file = fotoInput.files[0];
+async function procesarArchivoFoto(file) {
   if (!file) return;
   fotoStatus.textContent = "Procesando foto...";
   try {
@@ -1192,12 +1194,18 @@ fotoInput.addEventListener("change", async () => {
     fotoStatus.textContent = "No se pudo procesar la foto.";
     fotoBase64 = null;
   }
-});
+}
+
+fotoCamaraBtn.addEventListener("click", () => fotoInputCamara.click());
+fotoGaleriaBtn.addEventListener("click", () => fotoInputGaleria.click());
+fotoInputCamara.addEventListener("change", () => procesarArchivoFoto(fotoInputCamara.files[0]));
+fotoInputGaleria.addEventListener("change", () => procesarArchivoFoto(fotoInputGaleria.files[0]));
 
 quitarFotoBtn.addEventListener("click", () => {
   fotoBase64 = null;
   fotoMimeType = null;
-  fotoInput.value = "";
+  fotoInputCamara.value = "";
+  fotoInputGaleria.value = "";
   fotoPreviewWrap.classList.add("hidden");
   fotoStatus.textContent = "";
 });
@@ -1459,7 +1467,8 @@ function resetForm() {
   currentNumeroServicio = "";
   fotoBase64 = null;
   fotoMimeType = null;
-  fotoInput.value = "";
+  fotoInputCamara.value = "";
+  fotoInputGaleria.value = "";
   fotoPreviewWrap.classList.add("hidden");
   fotoStatus.textContent = "";
   actualizarBotonLlamar(null);

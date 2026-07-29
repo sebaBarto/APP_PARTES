@@ -746,7 +746,12 @@
 
       <div class="field-group">
         <label class="field-label" for="f_foto">Foto (opcional — solo se manda a la oficina)</label>
-        <input class="field-input" id="f_foto" type="file" accept="image/*">
+        <div class="field-row">
+          <button type="button" class="btn btn-secondary" id="fotoCamaraBtn">📷 Tomar foto</button>
+          <button type="button" class="btn btn-secondary" id="fotoGaleriaBtn">🖼 Elegir de galería</button>
+        </div>
+        <input class="hidden" id="f_foto_camara" type="file" accept="image/*" capture="environment">
+        <input class="hidden" id="f_foto_galeria" type="file" accept="image/*">
         <div id="fotoPreviewWrap" class="hidden" style="margin-top:8px;">
           <img id="fotoPreview" style="max-width:160px; border-radius:8px; display:block; border:1px solid #D8DCD4;">
           <button type="button" class="btn btn-ghost btn-small" id="quitarFotoBtn" style="margin-top:6px;">Quitar foto</button>

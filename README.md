@@ -681,9 +681,11 @@ mismo repo privado de datos (`guardias-config.json`).
 
 ## Foto: cámara o galería, y contraseñas con "ojito"
 
-- El campo de foto del formulario ahora deja elegir entre sacar una
-  foto nueva con la cámara o subir una ya existente de la galería —
-  antes iba directo a la cámara sin dar la opción.
+- El campo de foto del formulario tiene **dos botones separados**:
+  "📷 Tomar foto" (abre la cámara directo) y "🖼 Elegir de galería"
+  (abre el selector de archivos existentes) — así queda explícito y no
+  depende de que el navegador/celular decida mostrar ambas opciones en
+  un único selector (que no siempre pasa según el dispositivo).
 - Todos los campos de contraseña (login de la app y de `admin.html`)
   tienen un botón de "ojito" (👁) al lado — al tocarlo, muestra la
   contraseña en texto plano para revisar que esté bien escrita; vuelve
