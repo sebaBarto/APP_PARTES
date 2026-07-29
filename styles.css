@@ -729,6 +729,15 @@ html, body {
 .credencial-card.pantalla-completa .credencial-card-cargo { font-size: 15px; }
 .credencial-card.pantalla-completa .credencial-card-dato { font-size: 17px; }
 .credencial-card.pantalla-completa .credencial-card-footer { font-size: 13px; }
+.vehiculo-alertas-wrap { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.vehiculo-alerta-card {
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+.vehiculo-alerta-card.atencion { background: rgba(245,166,35,0.12); color: #B5772A; border: 1px solid #F5A623; }
+.vehiculo-alerta-card.urgente { background: rgba(192,57,43,0.1); color: #C0392B; border: 1px solid #C0392B; }
+.vehiculo-panel-status { font-size: 11px; margin-top: 2px; }
 .dash-repetido-fechas { font-size: 11px; color: #6B7680; margin-top: 3px; font-family: 'IBM Plex Mono', monospace; }
 .dash-medalla { font-size: 15px; }
 .dash-chart-wrap {

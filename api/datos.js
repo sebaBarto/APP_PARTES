@@ -12,7 +12,7 @@
 const COLECCIONES = {
   config: {
     path: "config.json",
-    default: { dias_atencion: 3, dias_urgente: 7, app_version_actual: "3.1.8" },
+    default: { dias_atencion: 3, dias_urgente: 7, app_version_actual: "3.1.9" },
     mergeConDefault: true,
   },
   tecnicos: { path: "tecnicos.json", default: [] },
@@ -20,6 +20,14 @@ const COLECCIONES = {
   "consultas-categorias": { path: "consultas-categorias.json", default: [] },
   guardias: { path: "guardias-config.json", default: { fecha_inicio_referencia: "", secuencia: [] } },
   credenciales: { path: "credenciales-config.json", default: [] },
+  vehiculos: {
+    path: "vehiculos-config.json",
+    default: [
+      { nombre: "Renault Kangoo Blanca", km_actual: 0, umbrales: [] },
+      { nombre: "Renault Kangoo Gris", km_actual: 0, umbrales: [] },
+      { nombre: "Moto", km_actual: 0, umbrales: [] },
+    ],
+  },
 };
 
 module.exports = async (req, res) => {

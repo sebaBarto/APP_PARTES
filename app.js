@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.1.8";
+const APP_VERSION = "3.1.9";
 
 // Contraseña propia por técnico (se valida en el propio celular, no es
 // un login con servidor — solo para que no cualquiera que abra la URL
@@ -73,6 +73,8 @@ const screens = {
   guardias: document.getElementById("screen-guardias"),
   historial: document.getElementById("screen-historial"),
   credencial: document.getElementById("screen-credencial"),
+  vehiculos: document.getElementById("screen-vehiculos"),
+  vehiculoDetalle: document.getElementById("screen-vehiculo-detalle"),
   form: document.getElementById("screen-form"),
   sign: document.getElementById("screen-sign"),
   sending: document.getElementById("screen-sending"),
@@ -158,6 +160,25 @@ const tileDashboardsBtn = document.getElementById("tileDashboardsBtn");
 const tileGuardiasBtn = document.getElementById("tileGuardiasBtn");
 const tileHistorialBtn = document.getElementById("tileHistorialBtn");
 const tileCredencialBtn = document.getElementById("tileCredencialBtn");
+const tileVehiculosBtn = document.getElementById("tileVehiculosBtn");
+const volverDeVehiculosBtn = document.getElementById("volverDeVehiculosBtn");
+const vehiculosListaStatus = document.getElementById("vehiculosListaStatus");
+const vehiculosPanelTiles = document.getElementById("vehiculosPanelTiles");
+const volverDeVehiculoDetalleBtn = document.getElementById("volverDeVehiculoDetalleBtn");
+const vehiculoDetalleNombre = document.getElementById("vehiculoDetalleNombre");
+const vehiculoDetalleStatus = document.getElementById("vehiculoDetalleStatus");
+const vehiculoAlertasWrap = document.getElementById("vehiculoAlertasWrap");
+const vehiculoTomarWrap = document.getElementById("vehiculoTomarWrap");
+const vehiculoHoraToma = document.getElementById("vehiculoHoraToma");
+const vehiculoTomarBtn = document.getElementById("vehiculoTomarBtn");
+const vehiculoDevolverWrap = document.getElementById("vehiculoDevolverWrap");
+const vehiculoEnUsoInfo = document.getElementById("vehiculoEnUsoInfo");
+const vehiculoHoraDevolucion = document.getElementById("vehiculoHoraDevolucion");
+const vehiculoKmDevolucion = document.getElementById("vehiculoKmDevolucion");
+const vehiculoEvento = document.getElementById("vehiculoEvento");
+const vehiculoEventoDetalleWrap = document.getElementById("vehiculoEventoDetalleWrap");
+const vehiculoEventoDetalle = document.getElementById("vehiculoEventoDetalle");
+const vehiculoDevolverBtn = document.getElementById("vehiculoDevolverBtn");
 const volverDeCredencialBtn = document.getElementById("volverDeCredencialBtn");
 const credencialStatus = document.getElementById("credencialStatus");
 const credencialCardWrap = document.getElementById("credencialCardWrap");
@@ -2550,6 +2571,221 @@ async function fetchYRenderCredencial() {
     credencialStatus.textContent = "No se pudo cargar la credencial.";
   }
 }
+
+// ---------- Vehículos de la empresa ----------
+let vehiculoSeleccionado = "";
+
+function horaActualHHMM() {
+  const ahora = new Date();
+  return `${String(ahora.getHours()).padStart(2, "0")}:${String(ahora.getMinutes()).padStart(2, "0")}`;
+}
+function fechaActualISOVehiculo() {
+  const ahora = new Date();
+  return `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, "0")}-${String(ahora.getDate()).padStart(2, "0")}`;
+}
+
+async function fetchVehiculosConfig() {
+  const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+  const res = await fetch("/api/datos?coleccion=vehiculos", { headers, cache: "no-store" });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  const data = await res.json();
+  return Array.isArray(data) ? data : [];
+}
+async function fetchVehiculosHistorial() {
+  const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+  const res = await fetch("/api/vehiculo-uso", { headers, cache: "no-store" });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  const data = await res.json();
+  return Array.isArray(data) ? data : [];
+}
+function encontrarRegistroAbierto(historial, vehiculo) {
+  return [...historial].reverse().find((h) => h.vehiculo === vehiculo && !h.hora_devolucion) || null;
+}
+
+function calcularAlertasVehiculo(vehiculoConfig) {
+  const alertas = [];
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  (vehiculoConfig.umbrales || []).forEach((u) => {
+    if (!u.nombre || !u.valor) return;
+    if (u.tipo === "fecha") {
+      const [y, m, d] = u.valor.split("-").map(Number);
+      const fechaLimite = new Date(y, m - 1, d);
+      const diasRestantes = Math.round((fechaLimite - hoy) / 86400000);
+      const avisoAntes = Number(u.aviso_antes) || 0;
+      if (diasRestantes <= 0) {
+        alertas.push({ nivel: "urgente", mensaje: `⚠ ${u.nombre}: venció (${diasRestantes === 0 ? "hoy" : Math.abs(diasRestantes) + " día(s) atrás"})` });
+      } else if (diasRestantes <= avisoAntes) {
+        alertas.push({ nivel: "atencion", mensaje: `${u.nombre}: faltan ${diasRestantes} día(s)` });
+      }
+    } else {
+      const kmActual = Number(vehiculoConfig.km_actual) || 0;
+      const valor = Number(u.valor) || 0;
+      const restante = valor - kmActual;
+      const avisoAntes = Number(u.aviso_antes) || 0;
+      if (restante <= 0) {
+        alertas.push({ nivel: "urgente", mensaje: `⚠ ${u.nombre}: ya se pasó por ${Math.abs(restante)} km` });
+      } else if (restante <= avisoAntes) {
+        alertas.push({ nivel: "atencion", mensaje: `${u.nombre}: faltan ${restante} km` });
+      }
+    }
+  });
+  return alertas;
+}
+
+tileVehiculosBtn.addEventListener("click", () => {
+  showScreen("vehiculos");
+  renderVehiculosPicker();
+});
+volverDeVehiculosBtn.addEventListener("click", () => showScreen("home"));
+volverDeVehiculoDetalleBtn.addEventListener("click", () => showScreen("vehiculos"));
+
+async function renderVehiculosPicker() {
+  vehiculosListaStatus.textContent = "Cargando...";
+  vehiculosPanelTiles.innerHTML = "";
+  try {
+    const [config, historial] = await Promise.all([fetchVehiculosConfig(), fetchVehiculosHistorial()]);
+    vehiculosListaStatus.textContent = "";
+    config.forEach((v) => {
+      const abierto = encontrarRegistroAbierto(historial, v.nombre);
+      const estado = abierto ? `En uso por ${abierto.tecnico} desde las ${abierto.hora_toma}` : "Libre";
+      const tile = document.createElement("button");
+      tile.type = "button";
+      tile.className = "panel-tile";
+      tile.innerHTML = `
+        <span class="panel-tile-icon">${v.nombre === "Moto" ? "🏍️" : "🚐"}</span>
+        <span>
+          <span class="panel-tile-label" style="display:block;">${v.nombre}</span>
+          <span class="vehiculo-panel-status" style="color:${abierto ? "#B5772A" : "#3FAE6E"};">${estado}</span>
+        </span>
+      `;
+      tile.addEventListener("click", () => {
+        vehiculoSeleccionado = v.nombre;
+        showScreen("vehiculoDetalle");
+        renderVehiculoDetalle();
+      });
+      vehiculosPanelTiles.appendChild(tile);
+    });
+  } catch (err) {
+    vehiculosListaStatus.textContent = "No se pudo cargar la información de vehículos.";
+  }
+}
+
+async function renderVehiculoDetalle() {
+  vehiculoDetalleNombre.textContent = vehiculoSeleccionado.toUpperCase();
+  vehiculoDetalleStatus.textContent = "Cargando...";
+  vehiculoAlertasWrap.classList.add("hidden");
+  vehiculoTomarWrap.classList.add("hidden");
+  vehiculoDevolverWrap.classList.add("hidden");
+  try {
+    const [config, historial] = await Promise.all([fetchVehiculosConfig(), fetchVehiculosHistorial()]);
+    const vConfig = config.find((v) => v.nombre === vehiculoSeleccionado) || { nombre: vehiculoSeleccionado, km_actual: 0, umbrales: [] };
+    const abierto = encontrarRegistroAbierto(historial, vehiculoSeleccionado);
+
+    vehiculoDetalleStatus.textContent = `Kilometraje actual: ${vConfig.km_actual || 0} km`;
+
+    const alertas = calcularAlertasVehiculo(vConfig);
+    if (alertas.length > 0) {
+      vehiculoAlertasWrap.innerHTML = alertas
+        .map((a) => `<div class="vehiculo-alerta-card ${a.nivel}">${a.mensaje}</div>`)
+        .join("");
+      vehiculoAlertasWrap.classList.remove("hidden");
+    }
+
+    const tecnicoActual = tecnicoLogueado || "Oficina";
+
+    if (!abierto) {
+      vehiculoHoraToma.value = horaActualHHMM();
+      vehiculoTomarWrap.classList.remove("hidden");
+    } else if (abierto.tecnico === tecnicoActual) {
+      vehiculoEnUsoInfo.textContent = `Lo tomaste vos hoy a las ${abierto.hora_toma}.`;
+      vehiculoHoraDevolucion.parentElement.classList.remove("hidden");
+      vehiculoKmDevolucion.parentElement.classList.remove("hidden");
+      vehiculoEvento.parentElement.classList.remove("hidden");
+      vehiculoDevolverBtn.classList.remove("hidden");
+      vehiculoHoraDevolucion.value = horaActualHHMM();
+      vehiculoKmDevolucion.value = "";
+      vehiculoEvento.value = "";
+      vehiculoEventoDetalle.value = "";
+      vehiculoEventoDetalleWrap.classList.remove("hidden");
+      vehiculoEventoDetalleWrap.style.display = "none";
+      vehiculoDevolverWrap.classList.remove("hidden");
+    } else {
+      vehiculoEnUsoInfo.textContent = `Este vehículo lo tiene ${abierto.tecnico} desde las ${abierto.hora_toma}. No se puede tomar hasta que lo devuelva.`;
+      vehiculoDevolverWrap.classList.remove("hidden");
+      vehiculoHoraDevolucion.parentElement.classList.add("hidden");
+      vehiculoKmDevolucion.parentElement.classList.add("hidden");
+      vehiculoEvento.parentElement.classList.add("hidden");
+      vehiculoEventoDetalleWrap.classList.add("hidden");
+      vehiculoDevolverBtn.classList.add("hidden");
+    }
+  } catch (err) {
+    vehiculoDetalleStatus.textContent = "No se pudo cargar la información de este vehículo.";
+  }
+}
+
+vehiculoEvento.addEventListener("change", () => {
+  vehiculoEventoDetalleWrap.style.display = vehiculoEvento.value ? "block" : "none";
+});
+
+vehiculoTomarBtn.addEventListener("click", async () => {
+  vehiculoTomarBtn.disabled = true;
+  try {
+    const res = await fetch("/api/vehiculo-uso", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({
+        accion: "tomar",
+        vehiculo: vehiculoSeleccionado,
+        tecnico: tecnicoLogueado || "Oficina",
+        fecha: fechaActualISOVehiculo(),
+        hora_toma: vehiculoHoraToma.value || horaActualHHMM(),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    showToast(`Tomaste ${vehiculoSeleccionado}.`);
+    renderVehiculoDetalle();
+  } catch (err) {
+    showToast("No se pudo registrar: " + err.message);
+  } finally {
+    vehiculoTomarBtn.disabled = false;
+  }
+});
+
+vehiculoDevolverBtn.addEventListener("click", async () => {
+  if (!vehiculoKmDevolucion.value) {
+    showToast("Completá los kilómetros de devolución.");
+    return;
+  }
+  const eventoCompleto = vehiculoEvento.value
+    ? `${vehiculoEvento.value}${vehiculoEventoDetalle.value ? ": " + vehiculoEventoDetalle.value : ""}`
+    : "";
+  vehiculoDevolverBtn.disabled = true;
+  try {
+    const res = await fetch("/api/vehiculo-uso", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({
+        accion: "devolver",
+        vehiculo: vehiculoSeleccionado,
+        tecnico: tecnicoLogueado || "Oficina",
+        hora_devolucion: vehiculoHoraDevolucion.value || horaActualHHMM(),
+        km_devolucion: vehiculoKmDevolucion.value,
+        evento: eventoCompleto,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    showToast(`Devolviste ${vehiculoSeleccionado}. ¡Gracias!`);
+    showScreen("vehiculos");
+    renderVehiculosPicker();
+  } catch (err) {
+    showToast("No se pudo registrar: " + err.message);
+  } finally {
+    vehiculoDevolverBtn.disabled = false;
+  }
+});
 
 // Registrar service worker para instalación como PWA
 if ("serviceWorker" in navigator) {

@@ -90,6 +90,7 @@
       <button type="button" class="tab-btn" id="tabConsultasBtn">Consultas (IA)</button>
       <button type="button" class="tab-btn" id="tabGuardiasBtn">Guardias</button>
       <button type="button" class="tab-btn" id="tabCredencialesBtn">Credenciales</button>
+      <button type="button" class="tab-btn" id="tabVehiculosBtn">Vehículos</button>
     </div>
 
     <div id="panelServicios">
@@ -260,6 +261,18 @@
       <button id="guardarCredencialesBtn" type="button">Guardar cambios</button>
       <p class="status" id="guardarCredencialesStatus"></p>
     </div>
+
+    <div id="panelVehiculos" class="hidden">
+      <h1>Vehículos de la empresa</h1>
+      <p class="subtitle">Kilometraje actual y umbrales de mantenimiento por vehículo. Los umbrales son configurables: agregá los que necesites (cambio de aceite, mecánico, cubiertas, VTV, o cualquier otro).</p>
+
+      <p class="status" id="vehiculosStatus"></p>
+
+      <div id="vehiculosFilas"></div>
+
+      <button id="guardarVehiculosBtn" type="button">Guardar cambios</button>
+      <p class="status" id="guardarVehiculosStatus"></p>
+    </div>
   </div>
 
 </div>
@@ -309,6 +322,9 @@ let guardiasCargadasUnaVez = false;
 const tabCredencialesBtn = document.getElementById("tabCredencialesBtn");
 const panelCredenciales = document.getElementById("panelCredenciales");
 let credencialesCargadasUnaVez = false;
+const tabVehiculosBtn = document.getElementById("tabVehiculosBtn");
+const panelVehiculos = document.getElementById("panelVehiculos");
+let vehiculosCargadosUnaVez = false;
 
 const TABS = [
   { btn: tabServiciosBtn, panel: panelServicios },
@@ -318,6 +334,7 @@ const TABS = [
   { btn: tabConsultasBtn, panel: panelConsultas, onShow: () => { if (!consultasCatCargadasUnaVez) { consultasCatCargadasUnaVez = true; cargarConsultasCatAdmin(); } } },
   { btn: tabGuardiasBtn, panel: panelGuardias, onShow: () => { if (!guardiasCargadasUnaVez) { guardiasCargadasUnaVez = true; cargarGuardiasAdmin(); } } },
   { btn: tabCredencialesBtn, panel: panelCredenciales, onShow: () => { if (!credencialesCargadasUnaVez) { credencialesCargadasUnaVez = true; cargarCredencialesAdmin(); } } },
+  { btn: tabVehiculosBtn, panel: panelVehiculos, onShow: () => { if (!vehiculosCargadosUnaVez) { vehiculosCargadosUnaVez = true; cargarVehiculosAdmin(); } } },
 ];
 
 TABS.forEach(({ btn, panel, onShow }) => {
@@ -948,6 +965,148 @@ guardarCredencialesBtn.addEventListener("click", async () => {
     guardarCredencialesStatus.textContent = "No se pudo guardar: " + err.message;
   } finally {
     guardarCredencialesBtn.disabled = false;
+  }
+});
+
+// ---------- Vehículos de la empresa ----------
+const VEHICULOS_FIJOS = ["Renault Kangoo Blanca", "Renault Kangoo Gris", "Moto"];
+const vehiculosStatus = document.getElementById("vehiculosStatus");
+const vehiculosFilas = document.getElementById("vehiculosFilas");
+const guardarVehiculosBtn = document.getElementById("guardarVehiculosBtn");
+const guardarVehiculosStatus = document.getElementById("guardarVehiculosStatus");
+
+function renderFilaUmbral(umbralesContainer, umbral) {
+  const u = umbral || { nombre: "", tipo: "km", valor: "", aviso_antes: "" };
+  const fila = document.createElement("div");
+  fila.className = "field-row umbral-fila";
+  fila.style.alignItems = "flex-end";
+  fila.innerHTML = `
+    <div style="flex:2;">
+      <label>Nombre del umbral</label>
+      <input type="text" class="umbral-nombre" value="${u.nombre || ""}" placeholder="Ej: Cambio de aceite">
+    </div>
+    <div style="flex:1;">
+      <label>Tipo</label>
+      <select class="umbral-tipo">
+        <option value="km" ${u.tipo === "km" ? "selected" : ""}>Kilómetros</option>
+        <option value="fecha" ${u.tipo === "fecha" ? "selected" : ""}>Fecha</option>
+      </select>
+    </div>
+  `;
+  const filaValores = document.createElement("div");
+  filaValores.className = "field-row umbral-fila-valores";
+  filaValores.style.alignItems = "flex-end";
+  filaValores.innerHTML = `
+    <div style="flex:1;">
+      <label class="umbral-valor-label">${u.tipo === "fecha" ? "Fecha límite" : "Kilometraje límite"}</label>
+      <input type="${u.tipo === "fecha" ? "date" : "number"}" class="umbral-valor" value="${u.valor || ""}">
+    </div>
+    <div style="flex:1;">
+      <label class="umbral-aviso-label">${u.tipo === "fecha" ? "Avisar con (días antes)" : "Avisar con (km antes)"}</label>
+      <input type="number" class="umbral-aviso" min="0" value="${u.aviso_antes || ""}">
+    </div>
+    <button type="button" class="btn-quitar-tecnico quitar-umbral" title="Quitar">✕</button>
+  `;
+  const tipoSelect = fila.querySelector(".umbral-tipo");
+  const valorInput = filaValores.querySelector(".umbral-valor");
+  const valorLabel = filaValores.querySelector(".umbral-valor-label");
+  const avisoLabel = filaValores.querySelector(".umbral-aviso-label");
+  tipoSelect.addEventListener("change", () => {
+    const esFecha = tipoSelect.value === "fecha";
+    valorInput.type = esFecha ? "date" : "number";
+    valorInput.value = "";
+    valorLabel.textContent = esFecha ? "Fecha límite" : "Kilometraje límite";
+    avisoLabel.textContent = esFecha ? "Avisar con (días antes)" : "Avisar con (km antes)";
+  });
+  filaValores.querySelector(".quitar-umbral").addEventListener("click", () => {
+    fila.remove();
+    filaValores.remove();
+  });
+  umbralesContainer.appendChild(fila);
+  umbralesContainer.appendChild(filaValores);
+}
+
+function renderFilaVehiculo(vehiculo) {
+  const fila = document.createElement("div");
+  fila.className = "card vehiculo-fila";
+  fila.dataset.nombre = vehiculo.nombre;
+  fila.innerHTML = `
+    <h1 style="font-size:16px; margin:0 0 10px;">${vehiculo.nombre}</h1>
+    <label>Kilometraje actual</label>
+    <input type="number" class="vehiculo-km-actual" value="${vehiculo.km_actual || 0}">
+    <label style="margin-top:10px;">Umbrales de mantenimiento</label>
+    <div class="umbrales-container"></div>
+    <button type="button" class="btn-secondary-admin agregar-umbral-btn" style="margin-top:8px;">+ Agregar umbral</button>
+  `;
+  const contenedor = fila.querySelector(".umbrales-container");
+  (vehiculo.umbrales || []).forEach((u) => renderFilaUmbral(contenedor, u));
+  fila.querySelector(".agregar-umbral-btn").addEventListener("click", () => renderFilaUmbral(contenedor, null));
+  vehiculosFilas.appendChild(fila);
+}
+
+async function cargarVehiculosAdmin() {
+  vehiculosStatus.textContent = "Cargando vehículos...";
+  vehiculosFilas.innerHTML = "";
+  try {
+    const res = await fetch("/api/datos?coleccion=vehiculos", {
+      headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    const lista = VEHICULOS_FIJOS.map((nombre) => {
+      const existente = (data || []).find((v) => v.nombre === nombre);
+      return existente || { nombre, km_actual: 0, umbrales: [] };
+    });
+    lista.forEach((v) => renderFilaVehiculo(v));
+    vehiculosStatus.textContent = "";
+  } catch (err) {
+    vehiculosStatus.textContent = "No se pudo cargar la configuración de vehículos.";
+  }
+}
+
+guardarVehiculosBtn.addEventListener("click", async () => {
+  const filasVehiculo = Array.from(vehiculosFilas.querySelectorAll(":scope > .vehiculo-fila"));
+  const lista = filasVehiculo.map((fila) => {
+    const umbralesFilas = Array.from(fila.querySelectorAll(".umbral-fila"));
+    const umbralesValores = Array.from(fila.querySelectorAll(".umbral-fila-valores"));
+    const umbrales = umbralesFilas.map((uf, idx) => {
+      const vf = umbralesValores[idx];
+      return {
+        nombre: uf.querySelector(".umbral-nombre").value.trim(),
+        tipo: uf.querySelector(".umbral-tipo").value,
+        valor: vf.querySelector(".umbral-valor").value,
+        aviso_antes: vf.querySelector(".umbral-aviso").value,
+      };
+    }).filter((u) => u.nombre && u.valor);
+    return {
+      nombre: fila.dataset.nombre,
+      km_actual: Number(fila.querySelector(".vehiculo-km-actual").value) || 0,
+      umbrales,
+    };
+  });
+
+  guardarVehiculosBtn.disabled = true;
+  guardarVehiculosStatus.className = "status";
+  guardarVehiculosStatus.textContent = "Guardando...";
+  try {
+    const res = await fetch("/api/datos?coleccion=vehiculos", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + SERVICIOS_API_TOKEN,
+      },
+      body: JSON.stringify(lista),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    guardarVehiculosStatus.className = "status ok";
+    guardarVehiculosStatus.textContent = "Listo — la configuración de vehículos ya está disponible en la app.";
+  } catch (err) {
+    guardarVehiculosStatus.className = "status err";
+    guardarVehiculosStatus.textContent = "No se pudo guardar: " + err.message;
+  } finally {
+    guardarVehiculosBtn.disabled = false;
   }
 });
 

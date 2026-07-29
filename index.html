@@ -91,6 +91,10 @@
           <span class="panel-tile-icon">🪪</span>
           <span class="panel-tile-label">Credencial</span>
         </button>
+        <button type="button" class="panel-tile" id="tileVehiculosBtn">
+          <span class="panel-tile-icon">🚗</span>
+          <span class="panel-tile-label">Vehículos</span>
+        </button>
         <a href="admin.html" target="_blank" rel="noopener" class="panel-tile hidden" id="abrirAdminBtn">
           <span class="panel-tile-icon">🛠</span>
           <span class="panel-tile-label">Administración</span>
@@ -277,6 +281,67 @@
 
     <div class="action-bar">
       <button class="btn btn-secondary" id="volverDeDashboardFinancieroBtn" type="button">Volver</button>
+    </div>
+  </section>
+
+  <!-- VEHÍCULOS: SELECCIÓN -->
+  <section class="screen" id="screen-vehiculos">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">VEHÍCULOS</p>
+      <p class="list-status" id="vehiculosListaStatus"></p>
+      <div id="vehiculosPanelTiles" class="panel-tiles"></div>
+    </div>
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDeVehiculosBtn" type="button">Volver</button>
+    </div>
+  </section>
+
+  <!-- VEHÍCULOS: DETALLE -->
+  <section class="screen" id="screen-vehiculo-detalle">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow" id="vehiculoDetalleNombre">VEHÍCULO</p>
+
+      <p class="list-status" id="vehiculoDetalleStatus"></p>
+
+      <div id="vehiculoAlertasWrap" class="vehiculo-alertas-wrap hidden"></div>
+
+      <div id="vehiculoTomarWrap" class="hidden">
+        <div class="field-group">
+          <label class="field-label" for="vehiculoHoraToma">Hora en que lo tomás</label>
+          <input class="field-input field-mono" id="vehiculoHoraToma" type="time">
+        </div>
+        <button type="button" class="btn btn-primary" id="vehiculoTomarBtn">Tomar vehículo</button>
+      </div>
+
+      <div id="vehiculoDevolverWrap" class="hidden">
+        <p class="status-aviso status-info" id="vehiculoEnUsoInfo"></p>
+        <div class="field-group">
+          <label class="field-label" for="vehiculoHoraDevolucion">Hora de devolución</label>
+          <input class="field-input field-mono" id="vehiculoHoraDevolucion" type="time">
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="vehiculoKmDevolucion">Kilómetros con los que lo devolvés</label>
+          <input class="field-input field-mono" id="vehiculoKmDevolucion" type="number" min="0">
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="vehiculoEvento">¿Hubo algún evento particular?</label>
+          <select class="field-input" id="vehiculoEvento">
+            <option value="">Ninguno</option>
+            <option value="Accidente">Accidente</option>
+            <option value="Falla mecánica">Falla mecánica</option>
+            <option value="Anomalía detectada">Anomalía detectada</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+        <div class="field-group" id="vehiculoEventoDetalleWrap" style="display:none;">
+          <label class="field-label" for="vehiculoEventoDetalle">Detalle del evento</label>
+          <textarea class="field-input field-textarea" id="vehiculoEventoDetalle" placeholder="Contá qué pasó"></textarea>
+        </div>
+        <button type="button" class="btn btn-primary" id="vehiculoDevolverBtn">Devolver vehículo</button>
+      </div>
+    </div>
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDeVehiculoDetalleBtn" type="button">Volver</button>
     </div>
   </section>
 
