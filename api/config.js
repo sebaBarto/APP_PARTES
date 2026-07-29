@@ -6,7 +6,7 @@
 //   SERVICIOS_API_TOKEN, GITHUB_DATA_TOKEN, GITHUB_DATA_REPO
 
 const CONFIG_PATH = "config.json";
-const CONFIG_DEFAULT = { dias_atencion: 3, dias_urgente: 7, app_version_actual: "3.1.3" };
+const CONFIG_DEFAULT = { dias_atencion: 3, dias_urgente: 7, app_version_actual: "3.1.4" };
 
 module.exports = async (req, res) => {
   const authHeader = req.headers["authorization"] || "";
