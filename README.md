@@ -591,12 +591,15 @@ y el agrandado funcionan igual. Se vuelve a tocar (la credencial o
 afuera, en el fondo oscuro) para salir de ese modo.
 
 **Diseño con más elementos de seguridad visual** (para que no sea tan
-fácil de imitar con una captura editada):
-- Franja superior con efecto "holograma" (degradé animado dorado).
+fácil de imitar con una captura editada), con una paleta más sobria y
+elegante (negro/azul profundo, gris, y un dorado apagado en vez de
+naranja vivo):
+- Franja superior con efecto "holograma" (degradé animado que combina
+  azul profundo, gris y dorado apagado).
 - Marca de agua diagonal "SAT" de fondo, apenas visible, detrás de
   todo el contenido.
-- Un sello ovalado sobre la foto, y un doble borde (fino + grueso) en
-  toda la tarjeta.
+- Un sello ovalado dorado sobre la foto, y un doble borde (fino dorado
+  + grueso negro-azulado) en toda la tarjeta.
 - Un "número de serie" arriba a la derecha (tipo `SAT-XXXXXX`), que se
   genera solo a partir del nombre y el DNI — no hace falta cargar
   ningún dato extra en `admin.html`, siempre da el mismo código para la

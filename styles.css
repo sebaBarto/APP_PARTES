@@ -672,16 +672,16 @@ html, body {
   background: #FFFFFF;
   border-radius: 16px;
   overflow: hidden;
-  border: 1px solid #D8DCD4;
-  outline: 3px solid #101820;
+  border: 1px solid #C7CCC3;
+  outline: 3px solid #0A0E13;
   outline-offset: -6px;
-  box-shadow: 0 6px 20px rgba(16,24,32,0.18);
+  box-shadow: 0 6px 20px rgba(10,14,19,0.22), inset 0 0 0 1px rgba(184,145,47,0.35);
   cursor: pointer;
   transition: transform 0.35s ease, width 0.35s ease, height 0.35s ease;
 }
 .credencial-card-holo {
   height: 5px;
-  background: linear-gradient(90deg, #F5A623, #FFD98E, #F5A623, #B5772A, #F5A623, #FFD98E, #F5A623);
+  background: linear-gradient(90deg, #16324F, #8A93A0, #B8912F, #16324F, #8A93A0, #B8912F, #16324F);
   background-size: 200% 100%;
   animation: credencialHoloShift 6s linear infinite;
 }
@@ -692,7 +692,7 @@ html, body {
 .credencial-card-header {
   position: relative;
   z-index: 2;
-  background: #101820;
+  background: linear-gradient(135deg, #0A0E13, #16283B);
   padding: 12px 18px;
   display: flex;
   align-items: center;
@@ -701,11 +701,11 @@ html, body {
 .credencial-card-logo { height: 26px; }
 .credencial-card-empresa { color: #9AA3A9; font-size: 11px; font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.5px; flex: 1; }
 .credencial-card-serial {
-  color: #F5A623;
+  color: #D2B25C;
   font-size: 10px;
   font-family: 'IBM Plex Mono', monospace;
   letter-spacing: 1px;
-  border: 1px solid rgba(245,166,35,0.5);
+  border: 1px solid rgba(210,178,92,0.45);
   border-radius: 4px;
   padding: 2px 6px;
 }
@@ -719,7 +719,7 @@ html, body {
   font-family: 'Space Grotesk', sans-serif;
   font-weight: 800;
   font-size: 90px;
-  color: rgba(16,24,32,0.035);
+  color: rgba(22,50,79,0.045);
   letter-spacing: 6px;
   transform: rotate(-18deg) scale(1.4);
   pointer-events: none;
@@ -733,7 +733,7 @@ html, body {
   height: 90px;
   object-fit: cover;
   border-radius: 10px;
-  border: 1.5px solid #D8DCD4;
+  border: 1.5px solid #C7CCC3;
   background: #F4F5F0;
   display: block;
 }
@@ -741,8 +741,8 @@ html, body {
   position: absolute;
   bottom: -6px;
   right: -10px;
-  background: rgba(245,166,35,0.92);
-  color: #101820;
+  background: linear-gradient(135deg, #D2B25C, #8B6E22);
+  color: #0A0E13;
   font-family: 'Space Grotesk', sans-serif;
   font-weight: 800;
   font-size: 10px;
@@ -750,11 +750,11 @@ html, body {
   padding: 2px 6px;
   border-radius: 4px;
   transform: rotate(-8deg);
-  box-shadow: 0 2px 4px rgba(16,24,32,0.25);
+  box-shadow: 0 2px 4px rgba(10,14,19,0.3);
 }
 .credencial-card-datos { flex: 1; min-width: 0; }
-.credencial-card-nombre { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 17px; color: #101820; }
-.credencial-card-cargo { font-size: 12px; color: #B5772A; font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.3px; margin-bottom: 8px; }
+.credencial-card-nombre { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 17px; color: #0A0E13; }
+.credencial-card-cargo { font-size: 12px; color: #8E6E24; font-family: 'IBM Plex Mono', monospace; letter-spacing: 0.3px; margin-bottom: 8px; }
 .credencial-card-dato { font-size: 13px; color: #101820; margin-top: 3px; }
 .credencial-card-dato b { color: #6B7680; font-weight: 500; }
 .credencial-card-seguridad {
@@ -764,15 +764,15 @@ html, body {
   align-items: center;
   gap: 12px;
   padding: 12px 18px;
-  border-top: 1px dashed #D8DCD4;
-  background: repeating-linear-gradient(135deg, #FFFFFF, #FFFFFF 6px, #F8F8F5 6px, #F8F8F5 12px);
+  border-top: 1px dashed #C7CCC3;
+  background: repeating-linear-gradient(135deg, #FFFFFF, #FFFFFF 6px, #F1F2F4 6px, #F1F2F4 12px);
 }
 .credencial-card-qr {
   flex-shrink: 0;
   width: 62px;
   height: 62px;
   background: #FFFFFF;
-  border: 1px solid #D8DCD4;
+  border: 1px solid #C7CCC3;
   border-radius: 6px;
   padding: 3px;
   display: flex;
@@ -781,21 +781,21 @@ html, body {
 }
 .credencial-card-qr img, .credencial-card-qr canvas { width: 100%; height: 100%; }
 .credencial-card-verificar { display: flex; flex-direction: column; font-size: 11px; color: #6B7680; }
-.credencial-card-web { font-family: 'IBM Plex Mono', monospace; color: #101820; font-weight: 600; font-size: 12px; margin-top: 2px; }
+.credencial-card-web { font-family: 'IBM Plex Mono', monospace; color: #16283B; font-weight: 600; font-size: 12px; margin-top: 2px; }
 .credencial-card-footer {
   position: relative;
   z-index: 1;
-  background: #F4F5F0;
+  background: #EEF0F2;
   color: #6B7680;
   font-size: 11px;
   text-align: center;
   padding: 10px;
-  border-top: 1px solid #D8DCD4;
+  border-top: 1px solid #C7CCC3;
 }
 .credencial-fullscreen-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(16,24,32,0.92);
+  background: rgba(10,14,19,0.94);
   z-index: 1000;
 }
 .credencial-card.pantalla-completa {
