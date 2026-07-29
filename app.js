@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.2.5";
+const APP_VERSION = "3.2.6";
 
 // Contraseña propia por técnico (se valida en el propio celular, no es
 // un login con servidor — solo para que no cualquiera que abra la URL
@@ -158,6 +158,8 @@ const sugerenciasList = document.getElementById("sugerenciasList");
 const refreshDashboardBtn = document.getElementById("refreshDashboardBtn");
 const dashSyncLabel = document.getElementById("dashSyncLabel");
 const verDashboardFinancieroBtn = document.getElementById("verDashboardFinancieroBtn");
+const descargarExcelDashboardBtn = document.getElementById("descargarExcelDashboardBtn");
+const descargarExcelDashboardFinBtn = document.getElementById("descargarExcelDashboardFinBtn");
 const abrirAdminBtn = document.getElementById("abrirAdminBtn");
 const tileServiciosBtn = document.getElementById("tileServiciosBtn");
 const tileDashboardsBtn = document.getElementById("tileDashboardsBtn");
@@ -361,6 +363,7 @@ function attemptLogin() {
     precargarHistorialParaVisitas();
     precargarCronogramaParaSugerencias();
     actualizarAccesoCredencial();
+    actualizarAccesoExcelDashboards();
     actualizarBadgeColaEnvios();
     procesarColaEnvios();
   } else {
@@ -1848,6 +1851,9 @@ let chartTipo = null;
 function obtenerRangoPeriodo(periodo) {
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
+  if (periodo === "todo") {
+    return { desde: new Date(2000, 0, 1), hasta: new Date(2100, 0, 1) };
+  }
   if (periodo === "dia") {
     return { desde: hoy, hasta: hoy };
   }
@@ -1900,9 +1906,12 @@ async function fetchDashboard() {
 }
 refreshDashboardBtn.addEventListener("click", fetchDashboard);
 
+let ultimoEnPeriodoGeneral = [];
+
 async function renderDashboard() {
   const rango = obtenerRangoPeriodo(dashPeriodoActivo);
   const enPeriodo = historialCache.filter((h) => fechaEnRango(h.fecha, rango));
+  ultimoEnPeriodoGeneral = enPeriodo;
 
   // Pendientes actuales: servicios cargados que todavía no aparecen en
   // el historial (nunca se completaron).
@@ -2201,9 +2210,12 @@ async function fetchDashboardFinanciero() {
 }
 refreshDashboardFinancieroBtn.addEventListener("click", fetchDashboardFinanciero);
 
+let ultimoEnPeriodoFinanciero = [];
+
 function renderDashboardFinanciero() {
   const rango = obtenerRangoPeriodo(dashFinPeriodoActivo);
   const enPeriodo = historialCache.filter((h) => fechaEnRango(h.fecha, rango));
+  ultimoEnPeriodoFinanciero = enPeriodo;
 
   let pagos = 0;
   let bonificados = 0;
@@ -2832,6 +2844,7 @@ vehiculoDevolverBtn.addEventListener("click", async () => {
 
 // ---------- Dashboard de vehículos ----------
 let dashVehiculosCache = [];
+let dashVehPeriodoActivo = "mes";
 
 verDashboardVehiculosBtn.addEventListener("click", () => {
   showScreen("dashboardVehiculos");
@@ -2840,11 +2853,32 @@ verDashboardVehiculosBtn.addEventListener("click", () => {
 volverDeDashboardVehiculosBtn.addEventListener("click", () => showScreen("dashboardsMenu"));
 refreshDashVehiculosBtn.addEventListener("click", fetchDashVehiculos);
 dashVehiculosFiltro.addEventListener("change", renderDashVehiculos);
+document.querySelectorAll(".dash-veh-periodo-chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    document.querySelectorAll(".dash-veh-periodo-chip").forEach((c) => c.classList.remove("active"));
+    chip.classList.add("active");
+    dashVehPeriodoActivo = chip.dataset.periodo;
+    renderDashVehiculos();
+  });
+});
+
+async function poblarFiltroVehiculosDashboard() {
+  const actual = dashVehiculosFiltro.value;
+  try {
+    const vehiculos = await fetchVehiculosConfig();
+    const opciones = vehiculos.map((v) => `<option value="${v.nombre}">${v.nombre}</option>`).join("");
+    dashVehiculosFiltro.innerHTML = `<option value="">Todos los vehículos</option>${opciones}`;
+    dashVehiculosFiltro.value = actual;
+  } catch (err) {
+    // si falla, se queda con lo que ya estaba cargado (o vacío)
+  }
+}
 
 async function fetchDashVehiculos() {
   dashVehiculosStatus.textContent = "Cargando...";
   dashVehiculosList.innerHTML = "";
   try {
+    await poblarFiltroVehiculosDashboard();
     const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
     const res = await fetch("/api/vehiculo-uso", { headers, cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
@@ -2859,8 +2893,9 @@ async function fetchDashVehiculos() {
 
 function filtrarDashVehiculos() {
   const filtro = dashVehiculosFiltro.value;
+  const rango = obtenerRangoPeriodo(dashVehPeriodoActivo);
   return dashVehiculosCache
-    .filter((h) => !filtro || h.vehiculo === filtro)
+    .filter((h) => (!filtro || h.vehiculo === filtro) && fechaEnRango(h.fecha, rango))
     .sort((a, b) => {
       const claveA = `${a.fecha || ""} ${a.hora_toma || ""}`;
       const claveB = `${b.fecha || ""} ${b.hora_toma || ""}`;
@@ -2872,7 +2907,7 @@ function renderDashVehiculos() {
   const filtrados = filtrarDashVehiculos();
   dashVehiculosList.innerHTML = "";
   if (filtrados.length === 0) {
-    dashVehiculosStatus.textContent = "No hay registros para mostrar.";
+    dashVehiculosStatus.textContent = "No hay registros para mostrar en ese período.";
     return;
   }
   dashVehiculosStatus.textContent = "";
@@ -2897,7 +2932,7 @@ function renderDashVehiculos() {
 descargarExcelVehiculosBtn.addEventListener("click", () => {
   const filtrados = filtrarDashVehiculos();
   if (filtrados.length === 0) {
-    showToast("No hay datos para descargar.");
+    showToast("No hay datos para descargar en ese período.");
     return;
   }
   const filas = filtrados.map((h) => ({
@@ -2913,7 +2948,62 @@ descargarExcelVehiculosBtn.addEventListener("click", () => {
   const libro = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(libro, hoja, "Vehículos");
   const hoy = fechaActualISOVehiculo();
-  XLSX.writeFile(libro, `vehiculos_${hoy}.xlsx`);
+  XLSX.writeFile(libro, `vehiculos_${dashVehPeriodoActivo}_${hoy}.xlsx`);
+});
+
+// ---------- Descarga a Excel de los dashboards general y financiero ----------
+// Solo Sebastian Bartolozzi (o el login general de oficina) ven estos
+// botones — el resto de los técnicos puede ver los dashboards pero no
+// descargarlos.
+function actualizarAccesoExcelDashboards() {
+  const puede = !tecnicoLogueado || tecnicoLogueado === "Sebastian Bartolozzi";
+  descargarExcelDashboardBtn.classList.toggle("hidden", !puede);
+  descargarExcelDashboardFinBtn.classList.toggle("hidden", !puede);
+  descargarExcelVehiculosBtn.classList.toggle("hidden", !puede);
+}
+
+descargarExcelDashboardBtn.addEventListener("click", () => {
+  if (ultimoEnPeriodoGeneral.length === 0) {
+    showToast("No hay datos para descargar en ese período.");
+    return;
+  }
+  const filas = ultimoEnPeriodoGeneral.map((h) => ({
+    "N° servicio": h.numero_servicio || h.id_parte || "",
+    Tipo: h.es_instalacion ? "Instalación" : "Servicio técnico",
+    Cliente: h.cliente || "",
+    Dirección: h.direccion || "",
+    Localidad: h.localidad || "",
+    Técnico: h.tecnico || "",
+    "Segundo técnico": h.tecnico2 || "",
+    Fecha: h.fecha || "",
+    "Hora entrada": h.hora_entrada || "",
+    "Hora salida": h.hora_salida || "",
+  }));
+  const hoja = XLSX.utils.json_to_sheet(filas);
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, "Dashboard");
+  XLSX.writeFile(libro, `dashboard_${dashPeriodoActivo}_${fechaActualISOVehiculo()}.xlsx`);
+});
+
+descargarExcelDashboardFinBtn.addEventListener("click", () => {
+  if (ultimoEnPeriodoFinanciero.length === 0) {
+    showToast("No hay datos para descargar en ese período.");
+    return;
+  }
+  const filas = ultimoEnPeriodoFinanciero.map((h) => ({
+    "N° servicio": h.numero_servicio || h.id_parte || "",
+    Cliente: h.cliente || "",
+    Técnico: h.tecnico || "",
+    Fecha: h.fecha || "",
+    Importe: h.importe || "",
+    Descuento: h.descuento || "",
+    "Costo final": h.costo_final || "",
+    "Forma de pago": h.forma_pago || "",
+  }));
+  const hoja = XLSX.utils.json_to_sheet(filas);
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, "Financiero");
+  XLSX.writeFile(libro, `dashboard_financiero_${dashFinPeriodoActivo}_${fechaActualISOVehiculo()}.xlsx`);
 });
 
 // Registrar service worker para instalación como PWA

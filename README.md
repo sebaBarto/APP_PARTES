@@ -656,16 +656,29 @@ existen. Se guarda en `vehiculos-config.json` (configuración y km
 actual) y `vehiculos-historial.json` (registro de cada toma/devolución),
 en el mismo repo privado de datos.
 
-## Dashboard de vehículos (con descarga a Excel)
+## Descarga a Excel de los dashboards (restringida)
 
-Dentro de "📊 Dashboards" → "Dashboard de vehículos": lista completa del
-historial de uso de los 3 vehículos (quién lo usó, qué día, horario de
-toma/devolución, kilometraje de devolución, y el evento particular si
-lo hubo), con un filtro para ver solo uno de los vehículos. Botón
-"⬇ Descargar Excel" que arma un `.xlsx` al vuelo (respeta el filtro
-elegido) usando SheetJS del lado del navegador — no hace falta ningún
-servidor ni variable de entorno nueva para esto. Usa el mismo
-`/api/vehiculo-uso.js` que ya alimenta la pantalla de Vehículos.
+Los **tres dashboards** (general, financiero y de vehículos) tienen un
+botón "⬇ Descargar Excel del período" que arma un `.xlsx` al vuelo del
+lado del navegador (con SheetJS) — no hace falta ningún servidor ni
+variable de entorno nueva.
+
+- **Respeta el período elegido**: cada dashboard ya tenía (o ahora
+  tiene) pestañas de Día/Semana/Mes — el de vehículos sumó esas mismas
+  pestañas, más una opción "Todo". El Excel siempre exporta lo mismo
+  que se está viendo en pantalla en ese momento, así que para elegir el
+  período alcanza con tocar la pestaña correspondiente antes de
+  descargar.
+- **Acceso restringido**: el botón de descarga **solo lo ven Sebastian
+  Bartolozzi y el login general de oficina** — el resto de los
+  técnicos puede seguir viendo los dashboards con normalidad, pero no
+  descargarlos. (El dashboard financiero entero ya era exclusivo de
+  esos dos usuarios; ahora la descarga del general y del de vehículos
+  quedó con el mismo criterio.)
+- El filtro de vehículo en el dashboard de vehículos ahora se arma
+  solo con la lista real cargada en `admin.html` (antes tenía los 3
+  nombres fijos de memoria, lo cual se desactualizaba si se
+  agregaba/renombraba un vehículo).
 
 ## Historial (últimos 4 días)
 

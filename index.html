@@ -191,6 +191,8 @@
         <button type="button" class="dash-periodo-chip active" data-periodo="mes">Mes</button>
       </div>
 
+      <button type="button" class="btn btn-secondary hidden" id="descargarExcelDashboardBtn" style="margin-bottom:14px;">⬇ Descargar Excel del período</button>
+
       <p class="list-status" id="dashStatus"></p>
 
       <div class="dash-cards-row">
@@ -256,6 +258,8 @@
         <button type="button" class="dash-fin-periodo-chip active" data-periodo="mes">Mes</button>
       </div>
 
+      <button type="button" class="btn btn-secondary hidden" id="descargarExcelDashboardFinBtn" style="margin-bottom:14px;">⬇ Descargar Excel del período</button>
+
       <p class="list-status" id="dashFinStatus"></p>
 
       <div class="dash-cards-row">
@@ -300,16 +304,20 @@
         <span class="list-sync-label" id="dashVehiculosSyncLabel"></span>
       </div>
 
+      <div class="dash-periodo-tabs">
+        <button type="button" class="dash-veh-periodo-chip" data-periodo="dia">Día</button>
+        <button type="button" class="dash-veh-periodo-chip" data-periodo="semana">Semana</button>
+        <button type="button" class="dash-veh-periodo-chip active" data-periodo="mes">Mes</button>
+        <button type="button" class="dash-veh-periodo-chip" data-periodo="todo">Todo</button>
+      </div>
+
       <div class="field-group">
         <select class="field-input" id="dashVehiculosFiltro">
           <option value="">Todos los vehículos</option>
-          <option value="Renault Kangoo Blanca">Renault Kangoo Blanca</option>
-          <option value="Renault Kangoo Gris">Renault Kangoo Gris</option>
-          <option value="Moto">Moto</option>
         </select>
       </div>
 
-      <button type="button" class="btn btn-secondary" id="descargarExcelVehiculosBtn" style="margin-bottom:14px;">⬇ Descargar Excel</button>
+      <button type="button" class="btn btn-secondary hidden" id="descargarExcelVehiculosBtn" style="margin-bottom:14px;">⬇ Descargar Excel del período</button>
 
       <p class="list-status" id="dashVehiculosStatus"></p>
 

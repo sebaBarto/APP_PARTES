@@ -585,6 +585,19 @@ html, body {
   color: #6B7680;
 }
 .dash-fin-periodo-chip.active { background: #101820; color: #F5A623; border-color: #101820; }
+.dash-veh-periodo-chip {
+  flex: 1;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  background: #FFFFFF;
+  border: 1.5px solid #D8DCD4;
+  border-radius: 20px;
+  padding: 9px;
+  cursor: pointer;
+  color: #6B7680;
+}
+.dash-veh-periodo-chip.active { background: #101820; color: #F5A623; border-color: #101820; }
 .dash-card-num-chico { font-size: 18px; }
 .dash-cards-row { display: flex; gap: 10px; margin-bottom: 20px; }
 .dash-card {
