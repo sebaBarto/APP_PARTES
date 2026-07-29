@@ -83,6 +83,10 @@
           <span class="panel-tile-icon">🚨</span>
           <span class="panel-tile-label">Guardias</span>
         </button>
+        <button type="button" class="panel-tile" id="tileHistorialBtn">
+          <span class="panel-tile-icon">📜</span>
+          <span class="panel-tile-label">Historial</span>
+        </button>
         <a href="admin.html" target="_blank" rel="noopener" class="panel-tile hidden" id="abrirAdminBtn">
           <span class="panel-tile-icon">🛠</span>
           <span class="panel-tile-label">Administración</span>
@@ -269,6 +273,26 @@
 
     <div class="action-bar">
       <button class="btn btn-secondary" id="volverDeDashboardFinancieroBtn" type="button">Volver</button>
+    </div>
+  </section>
+
+  <!-- HISTORIAL (últimos 4 días) -->
+  <section class="screen" id="screen-historial">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">HISTORIAL (últimos 4 días)</p>
+
+      <div class="list-toolbar">
+        <button class="btn btn-ghost btn-small" id="refreshHistorialBtn" type="button">↻ Actualizar</button>
+        <span class="list-sync-label" id="historialSyncLabel"></span>
+      </div>
+
+      <p class="list-status" id="historialStatus"></p>
+
+      <div id="historialList" class="historial-list"></div>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDeHistorialBtn" type="button">Volver</button>
     </div>
   </section>
 

@@ -656,6 +656,17 @@ html, body {
   justify-content: space-between;
 }
 .guardia-proximo-fecha { color: #6B7680; font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+.historial-list { display: flex; flex-direction: column; gap: 10px; }
+.historial-card {
+  background: #FFFFFF;
+  border: 1.5px solid #D8DCD4;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.historial-card-num { font-family: 'IBM Plex Mono', monospace; font-size: 11px; color: #B5772A; letter-spacing: 0.5px; }
+.historial-card-cliente { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 15px; color: #101820; margin: 3px 0; }
+.historial-card-direccion { font-size: 13px; color: #6B7680; }
+.historial-card-horario { font-size: 12px; color: #6B7680; margin-top: 4px; font-family: 'IBM Plex Mono', monospace; }
 .dash-repetido-fechas { font-size: 11px; color: #6B7680; margin-top: 3px; font-family: 'IBM Plex Mono', monospace; }
 .dash-medalla { font-size: 15px; }
 .dash-chart-wrap {

@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.0.9";
+const APP_VERSION = "3.1.0";
 
 // Contraseña propia por técnico (se valida en el propio celular, no es
 // un login con servidor — solo para que no cualquiera que abra la URL
@@ -71,6 +71,7 @@ const screens = {
   dashboardFinanciero: document.getElementById("screen-dashboard-financiero"),
   consultas: document.getElementById("screen-consultas"),
   guardias: document.getElementById("screen-guardias"),
+  historial: document.getElementById("screen-historial"),
   form: document.getElementById("screen-form"),
   sign: document.getElementById("screen-sign"),
   sending: document.getElementById("screen-sending"),
@@ -154,6 +155,12 @@ const abrirAdminBtn = document.getElementById("abrirAdminBtn");
 const tileServiciosBtn = document.getElementById("tileServiciosBtn");
 const tileDashboardsBtn = document.getElementById("tileDashboardsBtn");
 const tileGuardiasBtn = document.getElementById("tileGuardiasBtn");
+const tileHistorialBtn = document.getElementById("tileHistorialBtn");
+const volverDeHistorialBtn = document.getElementById("volverDeHistorialBtn");
+const refreshHistorialBtn = document.getElementById("refreshHistorialBtn");
+const historialSyncLabel = document.getElementById("historialSyncLabel");
+const historialStatus = document.getElementById("historialStatus");
+const historialList = document.getElementById("historialList");
 const volverDeGuardiasBtn = document.getElementById("volverDeGuardiasBtn");
 const guardiaStatus = document.getElementById("guardiaStatus");
 const guardiaActualWrap = document.getElementById("guardiaActualWrap");
@@ -2356,6 +2363,75 @@ async function cargarYRenderGuardias() {
   } catch (err) {
     guardiaStatus.textContent = "No se pudo cargar la información de guardias.";
   }
+}
+
+// ---------- Historial (últimos 4 días) ----------
+tileHistorialBtn.addEventListener("click", () => {
+  showScreen("historial");
+  fetchHistorialReciente();
+});
+volverDeHistorialBtn.addEventListener("click", () => {
+  showScreen("home");
+});
+refreshHistorialBtn.addEventListener("click", fetchHistorialReciente);
+
+async function fetchHistorialReciente() {
+  historialStatus.textContent = "Cargando...";
+  historialList.innerHTML = "";
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/historial", { headers, cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    historialCache = Array.isArray(data) ? data : [];
+    historialSyncLabel.textContent = formatSyncTime(new Date());
+    renderHistorialReciente();
+  } catch (err) {
+    historialStatus.textContent = "No se pudo cargar el historial.";
+  }
+}
+
+function renderHistorialReciente() {
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const limite = new Date(hoy);
+  limite.setDate(limite.getDate() - 3); // hoy + 3 días atrás = últimos 4 días
+
+  const recientes = historialCache
+    .filter((h) => {
+      if (!h.fecha) return false;
+      const [y, m, d] = h.fecha.split("-").map(Number);
+      const f = new Date(y, m - 1, d);
+      return f >= limite && f <= hoy;
+    })
+    .sort((a, b) => {
+      const claveA = `${a.fecha} ${a.hora_entrada || ""}`;
+      const claveB = `${b.fecha} ${b.hora_entrada || ""}`;
+      return claveB.localeCompare(claveA);
+    });
+
+  historialList.innerHTML = "";
+  if (recientes.length === 0) {
+    historialStatus.textContent = "No hay servicios completados en los últimos 4 días.";
+    return;
+  }
+  historialStatus.textContent = "";
+  recientes.forEach((h) => {
+    let fechaTexto = h.fecha || "";
+    if (h.fecha) {
+      const [y, m, d] = h.fecha.split("-");
+      fechaTexto = `${d}/${m}/${y}`;
+    }
+    const card = document.createElement("div");
+    card.className = "historial-card";
+    card.innerHTML = `
+      <div class="historial-card-num">N° ${h.numero_servicio || h.id_parte || ""}</div>
+      <div class="historial-card-cliente">${h.cliente || ""}</div>
+      <div class="historial-card-direccion">${h.direccion || ""}${h.localidad ? ", " + h.localidad : ""}</div>
+      <div class="historial-card-horario">${fechaTexto} — ${h.hora_entrada || "?"} a ${h.hora_salida || "?"}</div>
+    `;
+    historialList.appendChild(card);
+  });
 }
 
 // Registrar service worker para instalación como PWA
