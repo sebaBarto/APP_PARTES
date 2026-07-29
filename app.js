@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.3.5";
+const APP_VERSION = "3.3.6";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -160,6 +160,9 @@ const dashServiciosNum = document.getElementById("dashServiciosNum");
 const dashTecnicosList = document.getElementById("dashTecnicosList");
 const dashRepetidosList = document.getElementById("dashRepetidosList");
 const sugerenciasWrap = document.getElementById("sugerenciasWrap");
+const vehiculoRecordatorioWrap = document.getElementById("vehiculoRecordatorioWrap");
+const vehiculoRecordatorioOkBtn = document.getElementById("vehiculoRecordatorioOkBtn");
+const vehiculoRecordatorioIrBtn = document.getElementById("vehiculoRecordatorioIrBtn");
 const sugerenciasList = document.getElementById("sugerenciasList");
 const refreshDashboardBtn = document.getElementById("refreshDashboardBtn");
 const dashSyncLabel = document.getElementById("dashSyncLabel");
@@ -1486,6 +1489,41 @@ async function verificarYSugerirCercanos(data) {
     // muestra ninguna sugerencia — no interrumpe el flujo del parte.
   }
 }
+
+// Si este es el primer parte que el técnico cierra hoy, y no figura
+// que haya tomado ningún vehículo de la empresa, se lo recuerda —
+// puede confirmar que no usa vehículo (por ejemplo, camina o usa el
+// propio) o ir directo a tomar uno.
+async function verificarPrimerServicioSinVehiculo(data) {
+  try {
+    if (!data.tecnico || !data.fecha) return;
+
+    const yaTeniaOtroHoy = historialCache.some((h) => h.tecnico === data.tecnico && h.fecha === data.fecha);
+    if (yaTeniaOtroHoy) return; // no es el primer parte de hoy
+
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/vehiculo-uso", { headers, cache: "no-store" });
+    if (!res.ok) return;
+    const historialVehiculos = await res.json();
+    const tieneVehiculoTomado = Array.isArray(historialVehiculos) &&
+      historialVehiculos.some((h) => h.tecnico === data.tecnico && !h.hora_devolucion);
+    if (tieneVehiculoTomado) return;
+
+    vehiculoRecordatorioWrap.classList.remove("hidden");
+  } catch (err) {
+    // si falla la verificación, no se muestra nada — no bloquea el envío
+  }
+}
+
+vehiculoRecordatorioOkBtn.addEventListener("click", () => {
+  vehiculoRecordatorioWrap.classList.add("hidden");
+});
+vehiculoRecordatorioIrBtn.addEventListener("click", () => {
+  vehiculoRecordatorioWrap.classList.add("hidden");
+  showScreen("vehiculos");
+  renderVehiculosPicker();
+});
+
 volverDeMapaBtn.addEventListener("click", () => {
   showScreen("form");
 });
@@ -1896,8 +1934,10 @@ confirmSignBtn.addEventListener("click", async () => {
   doneId.textContent = `N° de parte: ${idParte}`;
   sugerenciasWrap.classList.add("hidden");
   sugerenciasList.innerHTML = "";
+  vehiculoRecordatorioWrap.classList.add("hidden");
   if (oficinaOk) {
     verificarYSugerirCercanos(data);
+    verificarPrimerServicioSinVehiculo(data);
   }
 
   let mensajeFoto = "";

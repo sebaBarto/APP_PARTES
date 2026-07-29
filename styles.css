@@ -978,6 +978,8 @@ html, body {
   margin-top: 22px;
 }
 .sugerencias-wrap { width: 100%; max-width: 320px; max-height: 40vh; overflow-y: auto; }
+.vehiculo-recordatorio-wrap { width: 100%; max-width: 320px; margin-bottom: 8px; }
+.vehiculo-recordatorio-wrap .btn { width: 100%; }
 .sugerencia-card {
   background: rgba(255,255,255,0.06);
   border: 1.5px solid #2A3743;

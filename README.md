@@ -749,6 +749,25 @@ técnico la tiene), sin importar de qué técnico sea. Si el campo de
 búsqueda está vacío, vuelve a la vista agrupada por técnico de
 siempre.
 
+## Recordatorio de vehículo en el primer parte del día
+
+Cuando un técnico envía con éxito el **primer** parte del día (no
+tenía ningún otro registrado hoy en el historial), la app revisa si
+tiene algún vehículo de la empresa tomado en ese momento. Si no
+figura ninguno, en la pantalla de "enviado" aparece un aviso:
+"¿No tomaste un vehículo hoy?", con dos opciones:
+
+- **"Sí, es correcto — no uso vehículo"**: lo cierra y sigue normal
+  (por ejemplo, porque ese día no le tocó salir con un vehículo de la
+  empresa).
+- **"Tomar un vehículo ahora"**: lleva directo a la pantalla de
+  Vehículos para elegir uno y marcarlo como tomado.
+
+No deja seguir sin elegir una de las dos opciones. Se basa en el
+técnico que quedó cargado en el parte (no en quién inició sesión), y
+en el registro de "tomar/devolver" vehículos que ya existía — no hace
+falta ninguna variable de entorno nueva.
+
 ## Vehículos de la empresa
 
 Botón "🚗 Vehículos" en el panel principal, con la flota que se cargue
