@@ -16,6 +16,23 @@ copias por mail a la oficina y al cliente.
 
 No usa cámara ni lectura automática de fotos — todo se carga a mano.
 
+## Navegación: panel principal y submenús
+
+Después de loguearse, el técnico ve un **panel principal** con botones
+grandes:
+
+- **🔧 Servicios Técnicos** → abre un submenú con "Servicios pendientes"
+  y "Cronograma semanal".
+- **📖 Manuales** → va directo a "Consultas (manuales)" con IA.
+- **📊 Dashboards** → abre un submenú con "Dashboard general" y (solo
+  para Sebastian Bartolozzi) "Dashboard financiero".
+- **🛠 Administración** (solo para Sebastian Bartolozzi) → abre
+  `admin.html` directo.
+
+Si en el futuro se agregan más secciones grandes, van como botones
+nuevos en este mismo panel principal (`.panel-tile` en `styles.css`,
+agregando el botón en `screen-home` de `index.html`).
+
 ## Acceso con contraseña (una por técnico) — administrable
 
 Cada técnico tiene su propia contraseña, pero ahora **se administra

@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.0.6";
+const APP_VERSION = "3.0.7";
 
 // Contraseña propia por técnico (se valida en el propio celular, no es
 // un login con servidor — solo para que no cualquiera que abra la URL
@@ -61,6 +61,9 @@ if (window.emailjs && EMAILJS_PUBLIC_KEY !== "TU_PUBLIC_KEY") {
 
 const screens = {
   login: document.getElementById("screen-login"),
+  home: document.getElementById("screen-home"),
+  serviciosMenu: document.getElementById("screen-servicios-menu"),
+  dashboardsMenu: document.getElementById("screen-dashboards-menu"),
   list: document.getElementById("screen-list"),
   cronograma: document.getElementById("screen-cronograma"),
   mapa: document.getElementById("screen-mapa"),
@@ -135,6 +138,19 @@ const refreshDashboardBtn = document.getElementById("refreshDashboardBtn");
 const dashSyncLabel = document.getElementById("dashSyncLabel");
 const verDashboardFinancieroBtn = document.getElementById("verDashboardFinancieroBtn");
 const abrirAdminBtn = document.getElementById("abrirAdminBtn");
+const tileServiciosBtn = document.getElementById("tileServiciosBtn");
+const tileDashboardsBtn = document.getElementById("tileDashboardsBtn");
+const tileServiciosPendientesBtn = document.getElementById("tileServiciosPendientesBtn");
+const volverDeServiciosMenuBtn = document.getElementById("volverDeServiciosMenuBtn");
+const volverDeDashboardsMenuBtn = document.getElementById("volverDeDashboardsMenuBtn");
+const volverDeServiciosBtn = document.getElementById("volverDeServiciosBtn");
+
+tileServiciosBtn.addEventListener("click", () => showScreen("serviciosMenu"));
+tileDashboardsBtn.addEventListener("click", () => showScreen("dashboardsMenu"));
+tileServiciosPendientesBtn.addEventListener("click", () => showScreen("list"));
+volverDeServiciosMenuBtn.addEventListener("click", () => showScreen("home"));
+volverDeDashboardsMenuBtn.addEventListener("click", () => showScreen("home"));
+volverDeServiciosBtn.addEventListener("click", () => showScreen("serviciosMenu"));
 const verConsultasBtn = document.getElementById("verConsultasBtn");
 const volverDeConsultasBtn = document.getElementById("volverDeConsultasBtn");
 const consultaCategoriaSelect = document.getElementById("consultaCategoriaSelect");
@@ -264,7 +280,7 @@ function attemptLogin() {
     }
     loginError.textContent = "";
     actualizarAccesoDashboardFinanciero();
-    showScreen("list");
+    showScreen("home");
     fetchServicios();
     precargarHistorialParaVisitas();
     precargarCronogramaParaSugerencias();
@@ -735,7 +751,7 @@ verCronogramaBtn.addEventListener("click", () => {
 });
 refreshCronogramaBtn.addEventListener("click", fetchCronograma);
 volverDeCronogramaBtn.addEventListener("click", () => {
-  showScreen("list");
+  showScreen("serviciosMenu");
 });
 
 // ---------- Técnico: mostrar campo libre si elige "Otro..." ----------
@@ -2073,7 +2089,7 @@ verDashboardBtn.addEventListener("click", () => {
   fetchDashboard();
 });
 volverDeDashboardBtn.addEventListener("click", () => {
-  showScreen("list");
+  showScreen("dashboardsMenu");
 });
 
 // ---------- Dashboard financiero (solo Sebastian Bartolozzi) ----------
@@ -2172,7 +2188,7 @@ verDashboardFinancieroBtn.addEventListener("click", () => {
   fetchDashboardFinanciero();
 });
 volverDeDashboardFinancieroBtn.addEventListener("click", () => {
-  showScreen("list");
+  showScreen("dashboardsMenu");
 });
 
 // ---------- Consultas a manuales con IA ----------
@@ -2203,7 +2219,7 @@ verConsultasBtn.addEventListener("click", () => {
   if (!consultasCategoriasCargadas) cargarConsultasCategorias();
 });
 volverDeConsultasBtn.addEventListener("click", () => {
-  showScreen("list");
+  showScreen("home");
 });
 
 preguntarBtn.addEventListener("click", async () => {

@@ -53,15 +53,81 @@
     <p class="app-footer-credit">APP SAT by S.B 2026</p>
   </section>
 
-  <!-- STEP 0: LISTADO DE SERVICIOS PENDIENTES -->
-  <section class="screen" id="screen-list">
+  <!-- PANEL PRINCIPAL -->
+  <section class="screen" id="screen-home">
     <div class="review-scroll">
-      <p class="hint-eyebrow review-eyebrow">SERVICIOS PENDIENTES</p>
+      <p class="hint-eyebrow review-eyebrow">PANEL PRINCIPAL</p>
 
       <div class="cola-envios-banner hidden" id="colaEnviosBanner">
         <span id="colaEnviosTexto"></span>
         <button type="button" class="btn btn-ghost btn-small" id="reintentarColaBtn">Reintentar ahora</button>
       </div>
+
+      <div class="panel-tiles">
+        <button type="button" class="panel-tile" id="tileServiciosBtn">
+          <span class="panel-tile-icon">🔧</span>
+          <span class="panel-tile-label">Servicios Técnicos</span>
+        </button>
+        <button type="button" class="panel-tile" id="verConsultasBtn">
+          <span class="panel-tile-icon">📖</span>
+          <span class="panel-tile-label">Manuales</span>
+        </button>
+        <button type="button" class="panel-tile" id="tileDashboardsBtn">
+          <span class="panel-tile-icon">📊</span>
+          <span class="panel-tile-label">Dashboards</span>
+        </button>
+        <a href="admin.html" target="_blank" rel="noopener" class="panel-tile hidden" id="abrirAdminBtn">
+          <span class="panel-tile-icon">🛠</span>
+          <span class="panel-tile-label">Administración</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- SUBMENÚ: SERVICIOS TÉCNICOS -->
+  <section class="screen" id="screen-servicios-menu">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">SERVICIOS TÉCNICOS</p>
+      <div class="panel-tiles">
+        <button type="button" class="panel-tile" id="tileServiciosPendientesBtn">
+          <span class="panel-tile-icon">📋</span>
+          <span class="panel-tile-label">Servicios pendientes</span>
+        </button>
+        <button type="button" class="panel-tile" id="verCronogramaBtn">
+          <span class="panel-tile-icon">🗓️</span>
+          <span class="panel-tile-label">Cronograma semanal</span>
+        </button>
+      </div>
+    </div>
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDeServiciosMenuBtn" type="button">Volver</button>
+    </div>
+  </section>
+
+  <!-- SUBMENÚ: DASHBOARDS -->
+  <section class="screen" id="screen-dashboards-menu">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">DASHBOARDS</p>
+      <div class="panel-tiles">
+        <button type="button" class="panel-tile" id="verDashboardBtn">
+          <span class="panel-tile-icon">📊</span>
+          <span class="panel-tile-label">Dashboard general</span>
+        </button>
+        <button type="button" class="panel-tile hidden" id="verDashboardFinancieroBtn">
+          <span class="panel-tile-icon">💰</span>
+          <span class="panel-tile-label">Dashboard financiero</span>
+        </button>
+      </div>
+    </div>
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDeDashboardsMenuBtn" type="button">Volver</button>
+    </div>
+  </section>
+
+  <!-- STEP 0: LISTADO DE SERVICIOS PENDIENTES -->
+  <section class="screen" id="screen-list">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">SERVICIOS PENDIENTES</p>
 
       <div class="search-box">
         <span class="search-icon">🔍</span>
@@ -80,11 +146,7 @@
 
     <div class="action-bar action-bar-column">
       <button class="btn btn-secondary" id="manualReportBtn" type="button">Cargar parte sin servicio</button>
-      <button class="btn btn-ghost" id="verCronogramaBtn" type="button">Ver cronograma semanal</button>
-      <button class="btn btn-ghost" id="verConsultasBtn" type="button">🤖 Consultas (manuales)</button>
-      <button class="btn btn-ghost" id="verDashboardBtn" type="button">📊 Ver dashboard</button>
-      <button class="btn btn-ghost hidden" id="verDashboardFinancieroBtn" type="button">💰 Ver dashboard financiero</button>
-      <a href="admin.html" target="_blank" rel="noopener" class="btn btn-ghost hidden" id="abrirAdminBtn" style="text-align:center; text-decoration:none;">🛠 Panel de administración</a>
+      <button class="btn btn-ghost" id="volverDeServiciosBtn" type="button">Volver</button>
     </div>
   </section>
 
