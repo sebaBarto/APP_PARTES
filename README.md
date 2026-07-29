@@ -782,6 +782,15 @@ cuentan como "uso" las SIMs que se instalaron en un cliente (usar y
 reemplazar) — transferir y devolver son movimientos de stock, no se
 grafican como uso.
 
+**Blanquear el historial**: botón "🗑 Blanquear historial de
+movimientos" — borra **todo** el historial de movimientos (usar,
+devolver, transferir, reemplazar) de forma permanente, pidiendo
+confirmación antes. No toca qué SIM tiene cada técnico ahora mismo,
+solo el historial que alimenta este dashboard. Solo lo ven **Sebastian
+Bartolozzi, Brenda Thiesing, y el login general de oficina** — para
+que funcione, Brenda tiene que estar cargada en `admin.html` → pestaña
+"Técnicos" con el nombre exacto "Brenda Thiesing".
+
 ## Recordatorio de vehículo en el primer parte del día
 
 Cuando un técnico envía con éxito el **primer** parte del día (no

@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.4.0";
+const APP_VERSION = "3.4.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -286,6 +286,7 @@ const volverDeDashboardSimsBtn = document.getElementById("volverDeDashboardSimsB
 const refreshDashSimsBtn = document.getElementById("refreshDashSimsBtn");
 const dashSimsSyncLabel = document.getElementById("dashSimsSyncLabel");
 const descargarExcelSimsDashBtn = document.getElementById("descargarExcelSimsDashBtn");
+const blanquearHistorialSimsBtn = document.getElementById("blanquearHistorialSimsBtn");
 const dashSimsStatus = document.getElementById("dashSimsStatus");
 const dashSimsList = document.getElementById("dashSimsList");
 const dashSimsChartsPorTecnico = document.getElementById("dashSimsChartsPorTecnico");
@@ -3345,7 +3346,38 @@ function actualizarAccesoExcelDashboards() {
   descargarExcelDashboardFinBtn.classList.toggle("hidden", !puede);
   descargarExcelVehiculosBtn.classList.toggle("hidden", !puede);
   descargarExcelSimsDashBtn.classList.toggle("hidden", !puede);
+
+  // El blanqueo del historial de SIMs lo pueden hacer, además, Brenda
+  // Thiesing (no solo Sebastian y oficina).
+  const puedeBlanquear = !tecnicoLogueado || tecnicoLogueado === "Sebastian Bartolozzi" || tecnicoLogueado === "Brenda Thiesing";
+  blanquearHistorialSimsBtn.classList.toggle("hidden", !puedeBlanquear);
 }
+
+blanquearHistorialSimsBtn.addEventListener("click", async () => {
+  const confirmar = window.confirm(
+    "Esto borra TODO el historial de movimientos de SIMs (usar/devolver/transferir/reemplazar) de forma permanente.\n\n" +
+    "No afecta qué SIM tiene cada técnico ahora mismo, solo el historial de este dashboard.\n\n" +
+    "¿Confirmás que querés blanquearlo?"
+  );
+  if (!confirmar) return;
+
+  blanquearHistorialSimsBtn.disabled = true;
+  try {
+    const res = await fetch("/api/sim-uso", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({ accion: "blanquear_historial", tecnico: tecnicoLogueado || "" }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    showToast("Historial de SIMs blanqueado.");
+    fetchDashSims();
+  } catch (err) {
+    showToast("No se pudo blanquear: " + err.message);
+  } finally {
+    blanquearHistorialSimsBtn.disabled = false;
+  }
+});
 
 descargarExcelDashboardBtn.addEventListener("click", () => {
   if (ultimoEnPeriodoGeneral.length === 0) {

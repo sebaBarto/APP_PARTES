@@ -72,6 +72,23 @@ module.exports = async (req, res) => {
       let body = req.body;
       if (typeof body === "string") body = JSON.parse(body);
       const { accion, numero, tecnico } = body || {};
+
+      // "Blanquear" es distinto al resto: no se refiere a una SIM en
+      // particular, borra el historial de movimientos completo (no
+      // toca quién tiene cada SIM ahora). Solo pueden hacerlo Sebastian
+      // Bartolozzi, Brenda Thiesing, o el login general de oficina.
+      if (accion === "blanquear_historial") {
+        const PUEDEN_BLANQUEAR = ["Sebastian Bartolozzi", "Brenda Thiesing", ""];
+        if (!PUEDEN_BLANQUEAR.includes(tecnico || "")) {
+          res.status(403).json({ error: "No tenés permiso para blanquear el historial de SIMs" });
+          return;
+        }
+        const { sha: shaHistorialActual } = await leerJSON(ghHeaders, HISTORIAL_PATH, []);
+        await guardarJSON(ghHeaders, HISTORIAL_PATH, [], shaHistorialActual);
+        res.status(200).json({ ok: true });
+        return;
+      }
+
       if (!accion || !numero || !tecnico) {
         res.status(400).json({ error: "Faltan datos (acción, número de SIM o técnico)" });
         return;
