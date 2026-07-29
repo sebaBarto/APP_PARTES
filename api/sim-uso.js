@@ -118,8 +118,38 @@ module.exports = async (req, res) => {
         sim.tecnico_actual = body.tecnico_nuevo;
         sim.estado = "stock";
         sim.cliente = "";
+      } else if (accion === "reemplazar") {
+        if (sim.estado !== "stock") {
+          res.status(409).json({ error: "Esa SIM no está en stock" });
+          return;
+        }
+        if (!body.cliente || !body.numero_sim_a_retirar) {
+          res.status(400).json({ error: "Falta el cliente o la SIM que se retira" });
+          return;
+        }
+        const simVieja = sims.find((s) => s.numero === body.numero_sim_a_retirar);
+        if (!simVieja) {
+          res.status(404).json({ error: "No se encontró la SIM que se retira" });
+          return;
+        }
+        // La que se retira vuelve al stock del técnico que hace el
+        // cambio (la tiene físicamente en la mano en ese momento).
+        simVieja.estado = "stock";
+        simVieja.cliente = "";
+        simVieja.tecnico_actual = tecnico;
+        // La nueva queda instalada en el cliente.
+        sim.estado = "uso";
+        sim.cliente = body.cliente;
+        historial.push({
+          ...registroBase,
+          accion: "reemplazar",
+          cliente: body.cliente,
+          numero_servicio: body.numero_servicio || "",
+          sim_retirada: body.numero_sim_a_retirar,
+          empresa_retirada: simVieja.empresa,
+        });
       } else {
-        res.status(400).json({ error: "Acción desconocida (usar 'usar', 'devolver' o 'transferir')" });
+        res.status(400).json({ error: "Acción desconocida (usar 'usar', 'devolver', 'transferir' o 'reemplazar')" });
         return;
       }
 

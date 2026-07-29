@@ -714,6 +714,11 @@ Tocando una SIM que es tuya:
 - Si está en stock, podés **marcarla como usada**: elegís el cliente
   de la lista de servicios pendientes, o escribís uno a mano con
   "Otro (escribir)".
+  - **Si ese cliente ya tiene otra línea asociada**, la app avisa
+    ("Este cliente ya tiene la línea N° XXXX de [compañía]...") y deja
+    elegir: **reemplazarla** (la línea vieja vuelve sola a tu stock, y
+    la nueva queda instalada en el cliente) o **agregarla como segunda
+    línea** (queda usada junto con la otra, sin tocarla).
 - Si está en uso, podés **devolverla a stock**.
 - En cualquier estado, podés **transferírsela a otro técnico** — pasa
   a formar parte de su stock (queda en stock, no en uso, hasta que él

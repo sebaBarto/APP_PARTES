@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.3.3";
+const APP_VERSION = "3.3.4";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -189,6 +189,11 @@ const simClienteSelect = document.getElementById("simClienteSelect");
 const simClienteOtroWrap = document.getElementById("simClienteOtroWrap");
 const simClienteOtro = document.getElementById("simClienteOtro");
 const simUsarBtn = document.getElementById("simUsarBtn");
+const simReemplazoWrap = document.getElementById("simReemplazoWrap");
+const simReemplazoMensaje = document.getElementById("simReemplazoMensaje");
+const simReemplazarBtn = document.getElementById("simReemplazarBtn");
+const simAgregarSegundaBtn = document.getElementById("simAgregarSegundaBtn");
+const simCancelarReemplazoBtn = document.getElementById("simCancelarReemplazoBtn");
 const simDevolverWrap = document.getElementById("simDevolverWrap");
 const simDevolverBtn = document.getElementById("simDevolverBtn");
 const simTransferirWrap = document.getElementById("simTransferirWrap");
@@ -3262,6 +3267,7 @@ async function renderSimDetalle() {
   simDetalleStatus.textContent = "Cargando...";
   simSoloLecturaInfo.classList.add("hidden");
   simUsarWrap.classList.add("hidden");
+  simReemplazoWrap.classList.add("hidden");
   simDevolverWrap.classList.add("hidden");
   simTransferirWrap.classList.add("hidden");
   try {
@@ -3302,13 +3308,10 @@ async function renderSimDetalle() {
   }
 }
 
-simUsarBtn.addEventListener("click", async () => {
-  const cliente = simClienteSelect.value === "__otro__" ? simClienteOtro.value.trim() : simClienteSelect.value;
-  if (!cliente) {
-    showToast("Elegí o escribí el cliente.");
-    return;
-  }
-  simUsarBtn.disabled = true;
+let simClienteParaReemplazo = "";
+let simExistenteParaReemplazo = "";
+
+async function marcarSimComoUsada(cliente) {
   try {
     const res = await fetch("/api/sim-uso", {
       method: "POST",
@@ -3321,8 +3324,72 @@ simUsarBtn.addEventListener("click", async () => {
     renderSimDetalle();
   } catch (err) {
     showToast("No se pudo registrar: " + err.message);
+  }
+}
+
+simUsarBtn.addEventListener("click", async () => {
+  const cliente = simClienteSelect.value === "__otro__" ? simClienteOtro.value.trim() : simClienteSelect.value;
+  if (!cliente) {
+    showToast("Elegí o escribí el cliente.");
+    return;
+  }
+  simUsarBtn.disabled = true;
+  try {
+    const sims = await fetchSimsConfig();
+    const existente = sims.find((s) => s.estado === "uso" && s.cliente === cliente && s.numero !== simSeleccionada);
+    if (existente) {
+      simClienteParaReemplazo = cliente;
+      simExistenteParaReemplazo = existente.numero;
+      simReemplazoMensaje.textContent =
+        `Este cliente ya tiene la línea N° ${existente.numero} de ${existente.empresa}` +
+        `${existente.tipo ? " " + existente.tipo : ""}. ¿Querés reemplazarla o agregar esta como segunda línea?`;
+      simUsarWrap.classList.add("hidden");
+      simReemplazoWrap.classList.remove("hidden");
+    } else {
+      await marcarSimComoUsada(cliente);
+    }
+  } catch (err) {
+    showToast("No se pudo verificar el cliente: " + err.message);
   } finally {
     simUsarBtn.disabled = false;
+  }
+});
+
+simCancelarReemplazoBtn.addEventListener("click", () => {
+  simReemplazoWrap.classList.add("hidden");
+  simUsarWrap.classList.remove("hidden");
+});
+
+simAgregarSegundaBtn.addEventListener("click", async () => {
+  simAgregarSegundaBtn.disabled = true;
+  simReemplazoWrap.classList.add("hidden");
+  await marcarSimComoUsada(simClienteParaReemplazo);
+  simAgregarSegundaBtn.disabled = false;
+});
+
+simReemplazarBtn.addEventListener("click", async () => {
+  simReemplazarBtn.disabled = true;
+  try {
+    const res = await fetch("/api/sim-uso", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({
+        accion: "reemplazar",
+        numero: simSeleccionada,
+        tecnico: tecnicoLogueado || "",
+        cliente: simClienteParaReemplazo,
+        numero_sim_a_retirar: simExistenteParaReemplazo,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    showToast("Listo — la línea anterior volvió a tu stock.");
+    simReemplazoWrap.classList.add("hidden");
+    renderSimDetalle();
+  } catch (err) {
+    showToast("No se pudo registrar: " + err.message);
+  } finally {
+    simReemplazarBtn.disabled = false;
   }
 });
 
