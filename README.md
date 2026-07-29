@@ -610,6 +610,19 @@ naranja vivo):
   (`qrcodejs`, cargada por CDN en `index.html`), sin ningún servicio
   externo ni costo.
 
+## Nombre de la app, ícono más grande, y saludo personalizado
+
+- La app pasó a llamarse **"Servicio Técnico SAT"** (antes "Parte
+  Técnico") — cambiado en el título de la pestaña y en `manifest.json`
+  (nombre que se muestra al instalarla en el celular).
+- El **ícono de la app** (el que se ve en la pantalla de inicio del
+  celular) ahora tiene el logo de SAT bastante más grande — antes
+  ocupaba una franja chica en el medio, ahora ocupa la mayor parte del
+  ícono, manteniendo el fondo oscuro de siempre.
+- En el panel principal, arriba a la derecha, aparece un saludo con el
+  nombre de pila del técnico logueado (ej. "Hola, Cristian") — si se
+  entró con la clave general de oficina, dice "Hola, Oficina".
+
 ## Panel principal con el mismo estilo que el login
 
 Toda la app (no solo el panel principal) usa ahora el mismo fondo azul

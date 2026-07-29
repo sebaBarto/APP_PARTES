@@ -1,6 +1,6 @@
 {
-  "name": "Parte Técnico",
-  "short_name": "Parte Técnico",
+  "name": "Servicio Técnico SAT",
+  "short_name": "Servicio Técnico SAT",
   "description": "Digitaliza y envía partes técnicos de servicio",
   "start_url": ".",
   "scope": ".",

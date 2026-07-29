@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.2.8";
+const APP_VERSION = "3.2.9";
 
 // Contraseña propia por técnico (se valida en el propio celular, no es
 // un login con servidor — solo para que no cualquiera que abra la URL
@@ -160,6 +160,7 @@ const dashSyncLabel = document.getElementById("dashSyncLabel");
 const verDashboardFinancieroBtn = document.getElementById("verDashboardFinancieroBtn");
 const descargarExcelDashboardBtn = document.getElementById("descargarExcelDashboardBtn");
 const descargarExcelDashboardFinBtn = document.getElementById("descargarExcelDashboardFinBtn");
+const panelSaludo = document.getElementById("panelSaludo");
 const abrirAdminBtn = document.getElementById("abrirAdminBtn");
 const tileServiciosBtn = document.getElementById("tileServiciosBtn");
 const tileDashboardsBtn = document.getElementById("tileDashboardsBtn");
@@ -364,6 +365,7 @@ function attemptLogin() {
     precargarCronogramaParaSugerencias();
     actualizarAccesoCredencial();
     actualizarAccesoExcelDashboards();
+    actualizarSaludoPanel();
     actualizarBadgeColaEnvios();
     procesarColaEnvios();
   } else {
@@ -406,6 +408,14 @@ async function precargarCronogramaParaSugerencias() {
 }
 
 // Solo Sebastian Bartolozzi ve el botón del dashboard financiero.
+// Saluda por el nombre de pila del técnico logueado, arriba a la
+// derecha del panel principal (o "Oficina" si entró con la clave
+// general, que no está asociada a ningún técnico en particular).
+function actualizarSaludoPanel() {
+  const nombre = tecnicoLogueado ? tecnicoLogueado.split(" ")[0] : "Oficina";
+  panelSaludo.textContent = `Hola, ${nombre}`;
+}
+
 function actualizarAccesoDashboardFinanciero() {
   if (tecnicoLogueado === "Sebastian Bartolozzi") {
     verDashboardFinancieroBtn.classList.remove("hidden");

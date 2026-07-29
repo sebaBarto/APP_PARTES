@@ -272,6 +272,14 @@ html, body {
 #screen-home .review-scroll { background: #101820; color: #F4F5F0; border-radius: 0; }
 #screen-home .review-eyebrow { color: #F5A623; text-align: center; }
 .panel-home-logo { display: block; width: 140px; max-width: 60%; height: auto; margin: 14px auto 4px; }
+.panel-saludo {
+  text-align: right;
+  margin: 4px 0 0;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  color: #F5A623;
+}
 #screen-home .panel-tile {
   background: #F4F5F0;
   color: #101820;
