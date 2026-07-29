@@ -3,7 +3,11 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.2.9";
+const APP_VERSION = "3.3.0";
+
+// Clave pública de notificaciones push (VAPID) — es pública a
+// propósito, no es un secreto (la privada vive solo en Vercel).
+const VAPID_PUBLIC_KEY = "BHqngzDxmtV7PiUQO0zMKMaysybsccUB1ibD6UK7Kj2G0EICqt6ET-4RFV9mBU4PSxD10I6krHzrIFB2Ndxq_60";
 
 // Contraseña propia por técnico (se valida en el propio celular, no es
 // un login con servidor — solo para que no cualquiera que abra la URL
@@ -161,6 +165,7 @@ const verDashboardFinancieroBtn = document.getElementById("verDashboardFinancier
 const descargarExcelDashboardBtn = document.getElementById("descargarExcelDashboardBtn");
 const descargarExcelDashboardFinBtn = document.getElementById("descargarExcelDashboardFinBtn");
 const panelSaludo = document.getElementById("panelSaludo");
+const activarNotificacionesBtn = document.getElementById("activarNotificacionesBtn");
 const abrirAdminBtn = document.getElementById("abrirAdminBtn");
 const tileServiciosBtn = document.getElementById("tileServiciosBtn");
 const tileDashboardsBtn = document.getElementById("tileDashboardsBtn");
@@ -366,6 +371,7 @@ function attemptLogin() {
     actualizarAccesoCredencial();
     actualizarAccesoExcelDashboards();
     actualizarSaludoPanel();
+    verificarEstadoNotificaciones();
     actualizarBadgeColaEnvios();
     procesarColaEnvios();
   } else {
@@ -3014,6 +3020,67 @@ descargarExcelDashboardFinBtn.addEventListener("click", () => {
   const libro = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(libro, hoja, "Financiero");
   XLSX.writeFile(libro, `dashboard_financiero_${dashFinPeriodoActivo}_${fechaActualISOVehiculo()}.xlsx`);
+});
+
+// ---------- Notificaciones push ----------
+// Convierte la clave pública VAPID (base64 url-safe) al formato de
+// bytes que pide pushManager.subscribe.
+function convertirClaveVapid(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; i++) outputArray[i] = rawData.charCodeAt(i);
+  return outputArray;
+}
+
+async function verificarEstadoNotificaciones() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    activarNotificacionesBtn.classList.add("hidden");
+    return;
+  }
+  try {
+    const registro = await navigator.serviceWorker.ready;
+    const suscripcion = await registro.pushManager.getSubscription();
+    activarNotificacionesBtn.textContent = suscripcion ? "🔔 Notificaciones activadas" : "🔔 Activar notificaciones";
+  } catch (err) {
+    // si falla la verificación, se deja el botón con su texto por defecto
+  }
+}
+
+activarNotificacionesBtn.addEventListener("click", async () => {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    showToast("Este celular/navegador no admite notificaciones push.");
+    return;
+  }
+  activarNotificacionesBtn.disabled = true;
+  try {
+    const permiso = await Notification.requestPermission();
+    if (permiso !== "granted") {
+      showToast("No se activaron las notificaciones — hace falta el permiso.");
+      return;
+    }
+    const registro = await navigator.serviceWorker.ready;
+    let suscripcion = await registro.pushManager.getSubscription();
+    if (!suscripcion) {
+      suscripcion = await registro.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: convertirClaveVapid(VAPID_PUBLIC_KEY),
+      });
+    }
+    const res = await fetch("/api/datos?coleccion=push-subscripciones", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify(suscripcion.toJSON()),
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    activarNotificacionesBtn.textContent = "🔔 Notificaciones activadas";
+    showToast("Notificaciones activadas.");
+  } catch (err) {
+    showToast("No se pudo activar las notificaciones: " + err.message);
+  } finally {
+    activarNotificacionesBtn.disabled = false;
+  }
 });
 
 // Registrar service worker para instalación como PWA

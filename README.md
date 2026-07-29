@@ -633,6 +633,62 @@ historial, credencial, guardias, etc.) se dejaron igual — se ven como
 tarjetas claras flotando sobre el fondo oscuro. El panel principal
 además tiene el logo de SAT arriba de todo.
 
+## Notificaciones push (avisos aunque la app esté cerrada)
+
+Hay tres avisos que le llegan a **todo el equipo**, incluso con la app
+cerrada (como cualquier notificación de celular):
+
+1. **Cambio de guardia**: todos los lunes, avisa quién toma la guardia
+   esa semana.
+2. **Evento en un vehículo**: apenas un técnico marca un evento
+   (accidente, falla mecánica, anomalía) al devolver un vehículo.
+3. **Mantenimiento de vehículos**: cuando alguno se acerca o pasa un
+   umbral configurado (cambio de aceite, VTV, etc.) — solo avisa la
+   primera vez que entra en ese estado, no todos los días.
+
+### Activarlas (cada técnico, una vez)
+
+En el panel principal hay un botón "🔔 Activar notificaciones" — al
+tocarlo, el celular va a pedir permiso una sola vez. Cada uno lo activa
+en su propio teléfono.
+
+### Configuración (una sola vez, de tu lado)
+
+Hace falta cargar **tres variables de entorno nuevas en Vercel**:
+
+| Variable | Valor |
+|---|---|
+| `VAPID_PUBLIC_KEY` | `BHqngzDxmtV7PiUQO0zMKMaysybsccUB1ibD6UK7Kj2G0EICqt6ET-4RFV9mBU4PSxD10I6krHzrIFB2Ndxq_60` |
+| `VAPID_PRIVATE_KEY` | `yflpkyfuCwhh_N9nW-GDuehhw4gTZzjX1l-L1mV6srI` |
+| `CRON_SECRET` | `8051bd14886db539252c20216e0f9200f6489ce411b20c99` |
+
+(`VAPID_SUBJECT` es opcional — si no se carga, usa
+`mailto:soporte@sat365.com.ar` por defecto.)
+
+Después de cargarlas, hacé un **redeploy**. Vercel va a registrar solo
+el cron diario (`vercel.json`) que corre una vez por día (plan
+gratuito) y agrega automáticamente el header de autorización con
+`CRON_SECRET` — no hay que hacer nada más para que ande.
+
+### Cómo funciona por dentro
+
+- Usa el estándar **Web Push** (gratis, sin servicios de terceros) con
+  una librería llamada `web-push` del lado del servidor.
+- Cada celular que activa las notificaciones queda guardado en
+  `push-subscripciones.json` (en el repo privado de datos) — se agrega
+  sin borrar las de los demás.
+- El aviso de evento de vehículo se manda al toque, apenas se guarda el
+  registro de devolución.
+- El cron diario (`/api/cron-diario.js`) corre una vez por día, revisa
+  si es lunes (avisa la guardia) y si algún vehículo cruzó un umbral
+  nuevo (guarda el último estado avisado en
+  `notificaciones-estado.json`, para no repetir el mismo aviso todos
+  los días).
+- **Límite del plan gratuito de Vercel**: el cron corre una vez por
+  día, en algún momento dentro de la hora programada (no exacto al
+  minuto) — para esto no hace falta precisión exacta, así que no es un
+  problema.
+
 ## Vehículos de la empresa
 
 Botón "🚗 Vehículos" en el panel principal, con la flota que se cargue

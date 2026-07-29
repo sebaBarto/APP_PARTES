@@ -125,6 +125,22 @@ module.exports = async (req, res) => {
             await guardarJSON(ghHeaders, CONFIG_PATH, vehiculosConfig, shaConfig);
           }
         }
+
+        // Avisa a todo el equipo si se reportó un evento particular
+        // (accidente, falla mecánica, anomalía, etc.) — no interrumpe
+        // la respuesta si el envío del push fallara por algún motivo.
+        if (body.evento) {
+          try {
+            const { enviarATodos } = require("../lib/push-sender");
+            await enviarATodos({
+              titulo: `⚠ Evento en ${vehiculo}`,
+              cuerpo: `${tecnico} reportó: ${body.evento}`,
+              url: "/",
+            });
+          } catch (err) {
+            console.error("Error enviando push de evento de vehículo:", err);
+          }
+        }
         res.status(200).json({ ok: true });
         return;
       }

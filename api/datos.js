@@ -12,7 +12,7 @@
 const COLECCIONES = {
   config: {
     path: "config.json",
-    default: { dias_atencion: 3, dias_urgente: 7, app_version_actual: "3.2.9" },
+    default: { dias_atencion: 3, dias_urgente: 7, app_version_actual: "3.3.0" },
     mergeConDefault: true,
   },
   tecnicos: { path: "tecnicos.json", default: [] },
@@ -28,6 +28,7 @@ const COLECCIONES = {
       { nombre: "Moto", km_actual: 0, umbrales: [] },
     ],
   },
+  "push-subscripciones": { path: "push-subscripciones.json", default: [] },
 };
 
 module.exports = async (req, res) => {
@@ -89,12 +90,24 @@ module.exports = async (req, res) => {
 
       let sha;
       const existing = await fetch(apiUrl, { headers: ghHeaders });
+      let contenidoExistente = coleccion.default;
       if (existing.ok) {
         const existingData = await existing.json();
         sha = existingData.sha;
+        contenidoExistente = JSON.parse(Buffer.from(existingData.content, "base64").toString("utf-8"));
       }
 
-      const contentB64 = Buffer.from(JSON.stringify(body, null, 2)).toString("base64");
+      // Las suscripciones push se agregan (sin duplicar por endpoint),
+      // nunca se reemplaza la lista entera — así un celular nuevo no
+      // borra las suscripciones de los demás.
+      let contenidoAGuardar = body;
+      if (nombreColeccion === "push-subscripciones") {
+        const lista = Array.isArray(contenidoExistente) ? contenidoExistente : [];
+        const yaExiste = lista.some((s) => s.endpoint === body.endpoint);
+        contenidoAGuardar = yaExiste ? lista : [...lista, body];
+      }
+
+      const contentB64 = Buffer.from(JSON.stringify(contenidoAGuardar, null, 2)).toString("base64");
       const putRes = await fetch(apiUrl, {
         method: "PUT",
         headers: { ...ghHeaders, "Content-Type": "application/json" },
