@@ -774,6 +774,14 @@ pestañas de Día/Semana/Mes/Todo igual que los demás dashboards, y su
 propio botón de descarga a Excel (mismo criterio de acceso restringido
 a Sebastian Bartolozzi y oficina).
 
+**Gráficos de torta por compañía**: arriba de la lista de movimientos
+hay un gráfico general (Movistar/Personal/Claro, todo el equipo) y uno
+más por cada técnico que tuvo movimientos en el período elegido —
+todos se recalculan solos al cambiar de pestaña de período. Solo
+cuentan como "uso" las SIMs que se instalaron en un cliente (usar y
+reemplazar) — transferir y devolver son movimientos de stock, no se
+grafican como uso.
+
 ## Recordatorio de vehículo en el primer parte del día
 
 Cuando un técnico envía con éxito el **primer** parte del día (no

@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.3.9";
+const APP_VERSION = "3.4.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -288,6 +288,7 @@ const dashSimsSyncLabel = document.getElementById("dashSimsSyncLabel");
 const descargarExcelSimsDashBtn = document.getElementById("descargarExcelSimsDashBtn");
 const dashSimsStatus = document.getElementById("dashSimsStatus");
 const dashSimsList = document.getElementById("dashSimsList");
+const dashSimsChartsPorTecnico = document.getElementById("dashSimsChartsPorTecnico");
 const dashFinStatus = document.getElementById("dashFinStatus");
 const dashFinPagosNum = document.getElementById("dashFinPagosNum");
 const dashFinBonificadosNum = document.getElementById("dashFinBonificadosNum");
@@ -3155,6 +3156,9 @@ descargarExcelVehiculosBtn.addEventListener("click", () => {
 
 // ---------- Dashboard de SIMs ----------
 let dashSimsCache = [];
+let chartSimsGeneral = null;
+let chartsSimsPorTecnico = {};
+const COLORES_COMPANIA_SIM = { Movistar: "#2E86DE", Personal: "#3FAE6E", Claro: "#C0392B" };
 let dashSimsPeriodoActivo = "mes";
 
 verDashboardSimsBtn.addEventListener("click", () => {
@@ -3204,6 +3208,7 @@ function filtrarDashSims() {
 function renderDashSims() {
   const filtrados = filtrarDashSims();
   dashSimsList.innerHTML = "";
+  renderChartsSims(filtrados);
   if (filtrados.length === 0) {
     dashSimsStatus.textContent = "No hay movimientos para mostrar en ese período.";
     return;
@@ -3228,6 +3233,83 @@ function renderDashSims() {
       <div class="historial-card-horario">${detalle}</div>
     `;
     dashSimsList.appendChild(card);
+  });
+}
+
+// Cuenta como "uso" las acciones que reflejan una SIM instalada en un
+// cliente (usar y reemplazar) — transferir/devolver son movimientos de
+// stock, no reflejan tendencia de uso por compañía.
+function renderChartsSims(movimientos) {
+  const eventosUso = movimientos.filter((h) => h.accion === "usar" || h.accion === "reemplazar");
+
+  const generalCanvas = document.getElementById("dashSimsChartGeneral");
+  if (chartSimsGeneral) chartSimsGeneral.destroy();
+  Object.values(chartsSimsPorTecnico).forEach((c) => c.destroy());
+  chartsSimsPorTecnico = {};
+  dashSimsChartsPorTecnico.innerHTML = "";
+
+  if (eventosUso.length === 0) {
+    generalCanvas.getContext("2d").clearRect(0, 0, generalCanvas.width, generalCanvas.height);
+    dashSimsChartsPorTecnico.innerHTML = '<p class="list-status">No hay uso de SIMs para graficar en este período.</p>';
+    return;
+  }
+
+  const empresas = ["Movistar", "Personal", "Claro"];
+  const colores = empresas.map((e) => COLORES_COMPANIA_SIM[e]);
+
+  function contarPorEmpresa(lista) {
+    const conteo = { Movistar: 0, Personal: 0, Claro: 0 };
+    lista.forEach((h) => { if (conteo[h.empresa] !== undefined) conteo[h.empresa]++; else conteo[h.empresa] = (conteo[h.empresa] || 0) + 1; });
+    return conteo;
+  }
+
+  const conteoGeneral = contarPorEmpresa(eventosUso);
+  chartSimsGeneral = new Chart(generalCanvas, {
+    type: "pie",
+    data: {
+      labels: empresas,
+      datasets: [{ data: empresas.map((e) => conteoGeneral[e] || 0), backgroundColor: colores }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { position: "bottom" }, title: { display: false } },
+    },
+  });
+
+  const porTecnico = {};
+  eventosUso.forEach((h) => {
+    const nombre = h.tecnico || "Sin técnico";
+    if (!porTecnico[nombre]) porTecnico[nombre] = [];
+    porTecnico[nombre].push(h);
+  });
+
+  Object.keys(porTecnico).sort().forEach((nombre) => {
+    const wrap = document.createElement("div");
+    wrap.className = "dash-chart-wrap";
+    const titulo = document.createElement("p");
+    titulo.className = "list-status";
+    titulo.style.margin = "0 0 4px";
+    titulo.textContent = nombre;
+    const canvas = document.createElement("canvas");
+    canvas.style.maxHeight = "160px";
+    wrap.appendChild(titulo);
+    wrap.appendChild(canvas);
+    dashSimsChartsPorTecnico.appendChild(wrap);
+
+    const conteo = contarPorEmpresa(porTecnico[nombre]);
+    chartsSimsPorTecnico[nombre] = new Chart(canvas, {
+      type: "pie",
+      data: {
+        labels: empresas,
+        datasets: [{ data: empresas.map((e) => conteo[e] || 0), backgroundColor: colores }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 10 } } } },
+      },
+    });
   });
 }
 
