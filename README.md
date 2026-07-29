@@ -881,6 +881,8 @@ kilometraje del vehículo, igual que al devolverlo), el monto del
 ticket (opcional), y un detalle opcional. Queda registrado en el mismo
 historial que las tomas/devoluciones (`vehiculos-historial.json`), y
 se ve tanto en el Dashboard de vehículos como en su descarga a Excel.
+Al registrarlo, aparece un aviso confirmando ("Evento registrado:
+[tipo].") y vuelve solo a la pantalla de selección de vehículos.
 
 **Administrar la flota**: en `admin.html` → pestaña "Vehículos":
 - "+ Agregar vehículo" para sumar uno nuevo (nombre y kilometraje
