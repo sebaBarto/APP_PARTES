@@ -873,6 +873,31 @@ html, body {
 .vehiculo-alerta-card.atencion { background: rgba(245,166,35,0.15); color: #FFD98E; border: 1px solid #F5A623; }
 .vehiculo-alerta-card.urgente { background: rgba(192,57,43,0.18); color: #FF8A80; border: 1px solid #C0392B; }
 .vehiculo-panel-status { font-size: 11px; margin-top: 2px; }
+.sim-grupo-titulo {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #F5A623;
+  margin: 18px 0 8px;
+}
+.sim-card {
+  background: #FFFFFF;
+  color: #101820;
+  border: 1.5px solid #D8DCD4;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.sim-card-empresa { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px; }
+.sim-card-numero { font-size: 12px; color: #6B7680; font-family: 'IBM Plex Mono', monospace; }
+.sim-card-estado { font-size: 11px; font-family: 'IBM Plex Mono', monospace; padding: 3px 8px; border-radius: 10px; }
+.sim-card-estado.stock { background: rgba(63,174,110,0.15); color: #2E7D32; }
+.sim-card-estado.uso { background: rgba(245,166,35,0.15); color: #B5772A; }
 .dash-repetido-fechas { font-size: 11px; color: #6B7680; margin-top: 3px; font-family: 'IBM Plex Mono', monospace; }
 .dash-medalla { font-size: 15px; }
 .dash-chart-wrap {

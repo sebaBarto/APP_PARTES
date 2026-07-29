@@ -700,6 +700,34 @@ gratuito) y agrega automáticamente el header de autorización con
   minuto) — para esto no hace falta precisión exacta, así que no es un
   problema.
 
+## SIMs de los técnicos
+
+Botón "📶 SIMs" en el panel principal. Cada técnico tiene un stock de
+chips (Movistar Estándar/Mini, Personal, Claro), identificados por
+número de teléfono. La pantalla muestra **todas** las SIMs del equipo,
+agrupadas por técnico dueño (las propias aparecen primero, con el
+título "Tus SIMs"), con su estado: en stock, o en uso (y en qué
+cliente).
+
+Tocando una SIM que es tuya:
+
+- Si está en stock, podés **marcarla como usada**: elegís el cliente
+  de la lista de servicios pendientes, o escribís uno a mano con
+  "Otro (escribir)".
+- Si está en uso, podés **devolverla a stock**.
+- En cualquier estado, podés **transferírsela a otro técnico** — pasa
+  a formar parte de su stock (queda en stock, no en uso, hasta que él
+  la use).
+
+Las SIMs de otros técnicos se ven (para saber quién tiene qué), pero
+no se pueden tocar — solo actúa quien la tiene en ese momento.
+
+**Administración**: en `admin.html` → pestaña "SIMs" se carga la lista
+completa (empresa, tipo, número, técnico dueño inicial, estado). Cada
+movimiento (usar, devolver, transferir) queda en un historial aparte
+(`sims-historial.json`), igual que con los vehículos. No hace falta
+ninguna variable de entorno nueva.
+
 ## Vehículos de la empresa
 
 Botón "🚗 Vehículos" en el panel principal, con la flota que se cargue
@@ -826,15 +854,16 @@ configuración) se unificaron en uno solo:
 `tecnicos.js`, `materiales-catalogo.js`, `consultas-categorias.js`,
 `guardias-config.js` y `credenciales.js`. Se usa con un parámetro
 `?coleccion=<nombre>` (`config`, `tecnicos`, `materiales`,
-`consultas-categorias`, `guardias`, `credenciales`).
+`consultas-categorias`, `guardias`, `credenciales`, `vehiculos`,
+`push-subscripciones`, `sims`).
 
-Quedan **8 funciones en total** (`servicios`, `cronograma`, `geocode`,
-`historial`, `upload-foto`, `foto`, `consultas`, `datos`) — hay margen
-para agregar hasta 4 más antes de volver a toparnos con el límite. Si
-hiciera falta una función completamente nueva que no encaje como una
-colección más dentro de `datos.js`, revisar primero si conviene sumarla
-ahí (agregando una entrada a `COLECCIONES`) en vez de crear un archivo
-nuevo en `/api`.
+Quedan **11 funciones en total** (`servicios`, `cronograma`, `geocode`,
+`historial`, `upload-foto`, `foto`, `consultas`, `datos`,
+`vehiculo-uso`, `cron-diario`, `sim-uso`) — con margen para **una sola
+función más** antes de llegar al límite. La próxima vez que haga falta
+un endpoint nuevo, hay que sumarlo como colección dentro de
+`datos.js` si es posible (no como archivo nuevo en `/api`), salvo que
+necesite lógica propia como `vehiculo-uso.js` o `sim-uso.js`.
 
 ## Notas y límites de esta versión
 

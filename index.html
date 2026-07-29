@@ -101,6 +101,10 @@
           <span class="panel-tile-icon">🚗</span>
           <span class="panel-tile-label">Vehículos</span>
         </button>
+        <button type="button" class="panel-tile" id="tileSimsBtn">
+          <span class="panel-tile-icon">📶</span>
+          <span class="panel-tile-label">SIMs</span>
+        </button>
         <a href="admin.html" target="_blank" rel="noopener" class="panel-tile hidden" id="abrirAdminBtn">
           <span class="panel-tile-icon">🛠</span>
           <span class="panel-tile-label">Administración</span>
@@ -393,6 +397,61 @@
     </div>
     <div class="action-bar">
       <button class="btn btn-secondary" id="volverDeVehiculoDetalleBtn" type="button">Volver</button>
+    </div>
+  </section>
+
+  <!-- SIMs: LISTADO -->
+  <section class="screen" id="screen-sims">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">SIMS DE LOS TÉCNICOS</p>
+      <p class="list-status" id="simsListaStatus"></p>
+      <div id="simsGrupos"></div>
+    </div>
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDeSimsBtn" type="button">Volver</button>
+    </div>
+  </section>
+
+  <!-- SIMs: DETALLE -->
+  <section class="screen" id="screen-sim-detalle">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow" id="simDetalleNombre">SIM</p>
+
+      <p class="list-status" id="simDetalleStatus"></p>
+
+      <div id="simSoloLecturaInfo" class="status-aviso status-info hidden"></div>
+
+      <div id="simUsarWrap" class="hidden">
+        <div class="field-group">
+          <label class="field-label" for="simClienteSelect">Cliente</label>
+          <select class="field-input" id="simClienteSelect">
+            <option value="" disabled selected>Elegí un cliente</option>
+            <option value="__otro__">Otro (escribir)</option>
+          </select>
+        </div>
+        <div class="field-group" id="simClienteOtroWrap" style="display:none;">
+          <label class="field-label" for="simClienteOtro">Nombre del cliente</label>
+          <input class="field-input" id="simClienteOtro" type="text" placeholder="Nombre del cliente">
+        </div>
+        <button type="button" class="btn btn-primary" id="simUsarBtn">Marcar como usada</button>
+      </div>
+
+      <div id="simDevolverWrap" class="hidden">
+        <button type="button" class="btn btn-primary" id="simDevolverBtn">Devolver a stock</button>
+      </div>
+
+      <div id="simTransferirWrap" class="hidden" style="margin-top:16px;">
+        <div class="field-group">
+          <label class="field-label" for="simTecnicoNuevoSelect">Transferir a otro técnico</label>
+          <select class="field-input" id="simTecnicoNuevoSelect">
+            <option value="" disabled selected>Elegí un técnico</option>
+          </select>
+        </div>
+        <button type="button" class="btn btn-secondary" id="simTransferirBtn">Transferir</button>
+      </div>
+    </div>
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDeSimDetalleBtn" type="button">Volver</button>
     </div>
   </section>
 

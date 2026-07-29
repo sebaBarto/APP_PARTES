@@ -91,6 +91,7 @@
       <button type="button" class="tab-btn" id="tabGuardiasBtn">Guardias</button>
       <button type="button" class="tab-btn" id="tabCredencialesBtn">Credenciales</button>
       <button type="button" class="tab-btn" id="tabVehiculosBtn">Vehículos</button>
+      <button type="button" class="tab-btn" id="tabSimsBtn">SIMs</button>
     </div>
 
     <div id="panelServicios">
@@ -274,6 +275,19 @@
       <button id="guardarVehiculosBtn" type="button">Guardar cambios</button>
       <p class="status" id="guardarVehiculosStatus"></p>
     </div>
+
+    <div id="panelSims" class="hidden">
+      <h1>SIMs de los técnicos</h1>
+      <p class="subtitle">Cada técnico tiene un stock de chips (Movistar Estándar/Mini, Personal, Claro). Cargá acá el número y a qué técnico pertenece su stock inicial — desde la app, los técnicos las usan en clientes, las devuelven a stock, o se las transfieren entre ellos.</p>
+
+      <p class="status" id="simsStatus"></p>
+
+      <div id="simsFilas"></div>
+
+      <button id="agregarSimBtn" type="button" class="btn-secondary-admin" style="margin-bottom:14px;">+ Agregar SIM</button>
+      <button id="guardarSimsBtn" type="button">Guardar cambios</button>
+      <p class="status" id="guardarSimsStatus"></p>
+    </div>
   </div>
 
 </div>
@@ -326,6 +340,9 @@ let credencialesCargadasUnaVez = false;
 const tabVehiculosBtn = document.getElementById("tabVehiculosBtn");
 const panelVehiculos = document.getElementById("panelVehiculos");
 let vehiculosCargadosUnaVez = false;
+const tabSimsBtn = document.getElementById("tabSimsBtn");
+const panelSims = document.getElementById("panelSims");
+let simsCargadasUnaVez = false;
 
 const TABS = [
   { btn: tabServiciosBtn, panel: panelServicios },
@@ -336,6 +353,7 @@ const TABS = [
   { btn: tabGuardiasBtn, panel: panelGuardias, onShow: () => { if (!guardiasCargadasUnaVez) { guardiasCargadasUnaVez = true; cargarGuardiasAdmin(); } } },
   { btn: tabCredencialesBtn, panel: panelCredenciales, onShow: () => { if (!credencialesCargadasUnaVez) { credencialesCargadasUnaVez = true; cargarCredencialesAdmin(); } } },
   { btn: tabVehiculosBtn, panel: panelVehiculos, onShow: () => { if (!vehiculosCargadosUnaVez) { vehiculosCargadosUnaVez = true; cargarVehiculosAdmin(); } } },
+  { btn: tabSimsBtn, panel: panelSims, onShow: () => { if (!simsCargadasUnaVez) { simsCargadasUnaVez = true; cargarSimsAdmin(); } } },
 ];
 
 TABS.forEach(({ btn, panel, onShow }) => {
@@ -1119,6 +1137,136 @@ guardarVehiculosBtn.addEventListener("click", async () => {
     guardarVehiculosStatus.textContent = "No se pudo guardar: " + err.message;
   } finally {
     guardarVehiculosBtn.disabled = false;
+  }
+});
+
+// ---------- SIMs de los técnicos ----------
+const simsStatus = document.getElementById("simsStatus");
+const simsFilas = document.getElementById("simsFilas");
+const agregarSimBtn = document.getElementById("agregarSimBtn");
+const guardarSimsBtn = document.getElementById("guardarSimsBtn");
+const guardarSimsStatus = document.getElementById("guardarSimsStatus");
+let nombresTecnicosParaSims = [];
+
+function renderFilaSim(sim) {
+  const s = sim || { empresa: "Movistar", tipo: "Estándar", numero: "", tecnico_actual: "", estado: "stock", cliente: "" };
+  const opcionesTecnicos = nombresTecnicosParaSims.map((n) =>
+    `<option value="${n}" ${n === s.tecnico_actual ? "selected" : ""}>${n}</option>`
+  ).join("");
+  const fila = document.createElement("div");
+  fila.className = "card sim-fila";
+  fila.innerHTML = `
+    <div class="field-row" style="align-items:flex-end;">
+      <div style="flex:1;">
+        <label>Empresa</label>
+        <select class="sim-empresa">
+          <option ${s.empresa === "Movistar" ? "selected" : ""}>Movistar</option>
+          <option ${s.empresa === "Personal" ? "selected" : ""}>Personal</option>
+          <option ${s.empresa === "Claro" ? "selected" : ""}>Claro</option>
+        </select>
+      </div>
+      <div style="flex:1;">
+        <label>Tipo (Movistar)</label>
+        <select class="sim-tipo">
+          <option value="" ${!s.tipo ? "selected" : ""}>—</option>
+          <option ${s.tipo === "Estándar" ? "selected" : ""}>Estándar</option>
+          <option ${s.tipo === "Mini" ? "selected" : ""}>Mini</option>
+        </select>
+      </div>
+      <button type="button" class="btn-quitar-tecnico quitar-sim" title="Quitar">✕</button>
+    </div>
+    <div class="field-row">
+      <div style="flex:1;">
+        <label>Número de teléfono</label>
+        <input type="text" class="sim-numero" value="${s.numero || ""}" placeholder="341...">
+      </div>
+      <div style="flex:1;">
+        <label>Técnico dueño actual</label>
+        <select class="sim-tecnico">
+          <option value="" ${!s.tecnico_actual ? "selected" : ""}>— elegir —</option>
+          ${opcionesTecnicos}
+        </select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div style="flex:1;">
+        <label>Estado</label>
+        <select class="sim-estado">
+          <option value="stock" ${s.estado === "stock" ? "selected" : ""}>En stock</option>
+          <option value="uso" ${s.estado === "uso" ? "selected" : ""}>En uso</option>
+        </select>
+      </div>
+      <div style="flex:1;">
+        <label>Cliente (si está en uso)</label>
+        <input type="text" class="sim-cliente" value="${s.cliente || ""}" placeholder="Nombre del cliente">
+      </div>
+    </div>
+  `;
+  fila.querySelector(".quitar-sim").addEventListener("click", () => fila.remove());
+  simsFilas.appendChild(fila);
+}
+
+async function cargarSimsAdmin() {
+  simsStatus.textContent = "Cargando SIMs...";
+  simsFilas.innerHTML = "";
+  try {
+    const [resSims, resTecnicos] = await Promise.all([
+      fetch("/api/datos?coleccion=sims", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" }),
+      fetch("/api/datos?coleccion=tecnicos", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" }),
+    ]);
+    const sims = await resSims.json();
+    const tecnicos = await resTecnicos.json();
+    nombresTecnicosParaSims = (Array.isArray(tecnicos) ? tecnicos : []).map((t) => t.nombre);
+
+    (sims || []).forEach((s) => renderFilaSim(s));
+    simsStatus.textContent = Array.isArray(sims) && sims.length > 0
+      ? ""
+      : "Todavía no hay ninguna SIM cargada — agregá la primera.";
+  } catch (err) {
+    simsStatus.textContent = "No se pudo cargar la lista de SIMs.";
+  }
+}
+
+agregarSimBtn.addEventListener("click", () => renderFilaSim(null));
+
+guardarSimsBtn.addEventListener("click", async () => {
+  const filas = Array.from(simsFilas.querySelectorAll(":scope > .sim-fila"));
+  const lista = filas.map((fila) => ({
+    empresa: fila.querySelector(".sim-empresa").value,
+    tipo: fila.querySelector(".sim-tipo").value,
+    numero: fila.querySelector(".sim-numero").value.trim(),
+    tecnico_actual: fila.querySelector(".sim-tecnico").value,
+    estado: fila.querySelector(".sim-estado").value,
+    cliente: fila.querySelector(".sim-cliente").value.trim(),
+  })).filter((s) => s.numero && s.tecnico_actual);
+
+  if (lista.length === 0) {
+    guardarSimsStatus.className = "status err";
+    guardarSimsStatus.textContent = "Agregá al menos una SIM con número y técnico dueño.";
+    return;
+  }
+
+  guardarSimsBtn.disabled = true;
+  guardarSimsStatus.className = "status";
+  guardarSimsStatus.textContent = "Guardando...";
+  try {
+    const res = await fetch("/api/datos?coleccion=sims", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + SERVICIOS_API_TOKEN,
+      },
+      body: JSON.stringify(lista),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    guardarSimsStatus.className = "status ok";
+    guardarSimsStatus.textContent = "Listo — la lista de SIMs ya está disponible en la app.";
+  } catch (err) {
+    guardarSimsStatus.className = "status err";
+    guardarSimsStatus.textContent = "No se pudo guardar: " + err.message;
+  } finally {
+    guardarSimsBtn.disabled = false;
   }
 });
 

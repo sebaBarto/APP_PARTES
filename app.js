@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.3.2";
+const APP_VERSION = "3.3.3";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -80,6 +80,8 @@ const screens = {
   credencial: document.getElementById("screen-credencial"),
   vehiculos: document.getElementById("screen-vehiculos"),
   vehiculoDetalle: document.getElementById("screen-vehiculo-detalle"),
+  sims: document.getElementById("screen-sims"),
+  simDetalle: document.getElementById("screen-sim-detalle"),
   form: document.getElementById("screen-form"),
   sign: document.getElementById("screen-sign"),
   sending: document.getElementById("screen-sending"),
@@ -174,6 +176,24 @@ const tileGuardiasBtn = document.getElementById("tileGuardiasBtn");
 const tileHistorialBtn = document.getElementById("tileHistorialBtn");
 const tileCredencialBtn = document.getElementById("tileCredencialBtn");
 const tileVehiculosBtn = document.getElementById("tileVehiculosBtn");
+const tileSimsBtn = document.getElementById("tileSimsBtn");
+const volverDeSimsBtn = document.getElementById("volverDeSimsBtn");
+const simsListaStatus = document.getElementById("simsListaStatus");
+const simsGrupos = document.getElementById("simsGrupos");
+const volverDeSimDetalleBtn = document.getElementById("volverDeSimDetalleBtn");
+const simDetalleNombre = document.getElementById("simDetalleNombre");
+const simDetalleStatus = document.getElementById("simDetalleStatus");
+const simSoloLecturaInfo = document.getElementById("simSoloLecturaInfo");
+const simUsarWrap = document.getElementById("simUsarWrap");
+const simClienteSelect = document.getElementById("simClienteSelect");
+const simClienteOtroWrap = document.getElementById("simClienteOtroWrap");
+const simClienteOtro = document.getElementById("simClienteOtro");
+const simUsarBtn = document.getElementById("simUsarBtn");
+const simDevolverWrap = document.getElementById("simDevolverWrap");
+const simDevolverBtn = document.getElementById("simDevolverBtn");
+const simTransferirWrap = document.getElementById("simTransferirWrap");
+const simTecnicoNuevoSelect = document.getElementById("simTecnicoNuevoSelect");
+const simTransferirBtn = document.getElementById("simTransferirBtn");
 const volverDeVehiculosBtn = document.getElementById("volverDeVehiculosBtn");
 const vehiculosListaStatus = document.getElementById("vehiculosListaStatus");
 const vehiculosPanelTiles = document.getElementById("vehiculosPanelTiles");
@@ -3149,6 +3169,204 @@ actualizarAppBtn.addEventListener("click", async () => {
   } finally {
     // Se recarga sin usar ninguna copia guardada, para bajar todo de nuevo.
     location.reload();
+  }
+});
+
+// ---------- SIMs de los técnicos ----------
+let simSeleccionada = "";
+
+async function fetchSimsConfig() {
+  const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+  const res = await fetch("/api/datos?coleccion=sims", { headers, cache: "no-store" });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  const data = await res.json();
+  return Array.isArray(data) ? data : [];
+}
+
+tileSimsBtn.addEventListener("click", () => {
+  showScreen("sims");
+  renderSimsLista();
+});
+volverDeSimsBtn.addEventListener("click", () => showScreen("home"));
+volverDeSimDetalleBtn.addEventListener("click", () => showScreen("sims"));
+
+async function renderSimsLista() {
+  simsListaStatus.textContent = "Cargando...";
+  simsGrupos.innerHTML = "";
+  try {
+    const sims = await fetchSimsConfig();
+    if (sims.length === 0) {
+      simsListaStatus.textContent = "Todavía no hay SIMs cargadas.";
+      return;
+    }
+    simsListaStatus.textContent = "";
+
+    const porTecnico = {};
+    sims.forEach((s) => {
+      const nombre = s.tecnico_actual || "Sin asignar";
+      if (!porTecnico[nombre]) porTecnico[nombre] = [];
+      porTecnico[nombre].push(s);
+    });
+
+    // Las propias primero, para no tener que buscarlas entre las de todos.
+    const propio = tecnicoLogueado || "";
+    const nombres = Object.keys(porTecnico).sort((a, b) => {
+      if (a === propio) return -1;
+      if (b === propio) return 1;
+      return a.localeCompare(b);
+    });
+
+    nombres.forEach((nombre) => {
+      const titulo = document.createElement("p");
+      titulo.className = "sim-grupo-titulo";
+      titulo.textContent = nombre === propio ? "Tus SIMs" : nombre;
+      simsGrupos.appendChild(titulo);
+
+      porTecnico[nombre].forEach((s) => {
+        const card = document.createElement("div");
+        card.className = "sim-card";
+        card.innerHTML = `
+          <div>
+            <div class="sim-card-empresa">${s.empresa}${s.tipo ? " · " + s.tipo : ""}</div>
+            <div class="sim-card-numero">${s.numero}</div>
+          </div>
+          <span class="sim-card-estado ${s.estado}">${s.estado === "uso" ? "En uso: " + (s.cliente || "?") : "En stock"}</span>
+        `;
+        card.addEventListener("click", () => {
+          simSeleccionada = s.numero;
+          showScreen("simDetalle");
+          renderSimDetalle();
+        });
+        simsGrupos.appendChild(card);
+      });
+    });
+  } catch (err) {
+    simsListaStatus.textContent = "No se pudo cargar la lista de SIMs.";
+  }
+}
+
+function poblarClientesParaSim() {
+  const opciones = serviciosCache
+    .filter((s) => s.cliente)
+    .map((s) => `<option value="${s.cliente}">${s.cliente}</option>`)
+    .join("");
+  simClienteSelect.innerHTML = `<option value="" disabled selected>Elegí un cliente</option>${opciones}<option value="__otro__">Otro (escribir)</option>`;
+}
+
+simClienteSelect.addEventListener("change", () => {
+  const esOtro = simClienteSelect.value === "__otro__";
+  simClienteOtroWrap.style.display = esOtro ? "block" : "none";
+});
+
+async function renderSimDetalle() {
+  simDetalleStatus.textContent = "Cargando...";
+  simSoloLecturaInfo.classList.add("hidden");
+  simUsarWrap.classList.add("hidden");
+  simDevolverWrap.classList.add("hidden");
+  simTransferirWrap.classList.add("hidden");
+  try {
+    const sims = await fetchSimsConfig();
+    const sim = sims.find((s) => s.numero === simSeleccionada);
+    if (!sim) {
+      simDetalleStatus.textContent = "No se encontró esa SIM.";
+      return;
+    }
+    simDetalleNombre.textContent = `${sim.empresa}${sim.tipo ? " · " + sim.tipo : ""} — ${sim.numero}`;
+    simDetalleStatus.textContent = "";
+
+    const esPropia = sim.tecnico_actual === (tecnicoLogueado || "");
+    if (!esPropia) {
+      simSoloLecturaInfo.textContent = sim.estado === "uso"
+        ? `Esta SIM la tiene ${sim.tecnico_actual}, en uso en ${sim.cliente || "un cliente"}.`
+        : `Esta SIM la tiene ${sim.tecnico_actual}, en stock.`;
+      simSoloLecturaInfo.classList.remove("hidden");
+      return;
+    }
+
+    if (sim.estado === "stock") {
+      poblarClientesParaSim();
+      simClienteSelect.value = "";
+      simClienteOtro.value = "";
+      simClienteOtroWrap.style.display = "none";
+      simUsarWrap.classList.remove("hidden");
+    } else {
+      simDevolverWrap.classList.remove("hidden");
+    }
+
+    const otrosTecnicos = Object.keys(tecnicosPasswords).filter((n) => n !== tecnicoLogueado).sort();
+    const opciones = otrosTecnicos.map((n) => `<option value="${n}">${n}</option>`).join("");
+    simTecnicoNuevoSelect.innerHTML = `<option value="" disabled selected>Elegí un técnico</option>${opciones}`;
+    simTransferirWrap.classList.remove("hidden");
+  } catch (err) {
+    simDetalleStatus.textContent = "No se pudo cargar la información de esta SIM.";
+  }
+}
+
+simUsarBtn.addEventListener("click", async () => {
+  const cliente = simClienteSelect.value === "__otro__" ? simClienteOtro.value.trim() : simClienteSelect.value;
+  if (!cliente) {
+    showToast("Elegí o escribí el cliente.");
+    return;
+  }
+  simUsarBtn.disabled = true;
+  try {
+    const res = await fetch("/api/sim-uso", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({ accion: "usar", numero: simSeleccionada, tecnico: tecnicoLogueado || "", cliente }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    showToast("SIM marcada como usada.");
+    renderSimDetalle();
+  } catch (err) {
+    showToast("No se pudo registrar: " + err.message);
+  } finally {
+    simUsarBtn.disabled = false;
+  }
+});
+
+simDevolverBtn.addEventListener("click", async () => {
+  simDevolverBtn.disabled = true;
+  try {
+    const res = await fetch("/api/sim-uso", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({ accion: "devolver", numero: simSeleccionada, tecnico: tecnicoLogueado || "" }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    showToast("SIM devuelta a stock.");
+    renderSimDetalle();
+  } catch (err) {
+    showToast("No se pudo registrar: " + err.message);
+  } finally {
+    simDevolverBtn.disabled = false;
+  }
+});
+
+simTransferirBtn.addEventListener("click", async () => {
+  const tecnicoNuevo = simTecnicoNuevoSelect.value;
+  if (!tecnicoNuevo) {
+    showToast("Elegí a qué técnico transferírsela.");
+    return;
+  }
+  simTransferirBtn.disabled = true;
+  try {
+    const res = await fetch("/api/sim-uso", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({ accion: "transferir", numero: simSeleccionada, tecnico: tecnicoLogueado || "", tecnico_nuevo: tecnicoNuevo }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    showToast(`SIM transferida a ${tecnicoNuevo}.`);
+    showScreen("sims");
+    renderSimsLista();
+  } catch (err) {
+    showToast("No se pudo registrar: " + err.message);
+  } finally {
+    simTransferirBtn.disabled = false;
   }
 });
 
