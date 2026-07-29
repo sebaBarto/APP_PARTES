@@ -706,6 +706,29 @@ html, body {
   padding: 10px;
   border-top: 1px solid #D8DCD4;
 }
+.credencial-card { cursor: pointer; transition: transform 0.35s ease, width 0.35s ease, height 0.35s ease; }
+.credencial-fullscreen-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(16,24,32,0.92);
+  z-index: 1000;
+}
+.credencial-card.pantalla-completa {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 88vh;
+  max-width: 88vh;
+  height: auto;
+  transform: translate(-50%, -50%) rotate(90deg);
+  z-index: 1001;
+  cursor: pointer;
+}
+.credencial-card.pantalla-completa .credencial-card-foto { width: 130px; height: 130px; }
+.credencial-card.pantalla-completa .credencial-card-nombre { font-size: 24px; }
+.credencial-card.pantalla-completa .credencial-card-cargo { font-size: 15px; }
+.credencial-card.pantalla-completa .credencial-card-dato { font-size: 17px; }
+.credencial-card.pantalla-completa .credencial-card-footer { font-size: 13px; }
 .dash-repetido-fechas { font-size: 11px; color: #6B7680; margin-top: 3px; font-family: 'IBM Plex Mono', monospace; }
 .dash-medalla { font-size: 15px; }
 .dash-chart-wrap {

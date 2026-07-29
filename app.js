@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.1.7";
+const APP_VERSION = "3.1.8";
 
 // Contraseña propia por técnico (se valida en el propio celular, no es
 // un login con servidor — solo para que no cualquiera que abra la URL
@@ -167,6 +167,7 @@ const credencialCargo = document.getElementById("credencialCargo");
 const credencialDni = document.getElementById("credencialDni");
 const credencialTelefono = document.getElementById("credencialTelefono");
 const credencialVigencia = document.getElementById("credencialVigencia");
+const credencialFullscreenBackdrop = document.getElementById("credencialFullscreenBackdrop");
 const volverDeHistorialBtn = document.getElementById("volverDeHistorialBtn");
 const refreshHistorialBtn = document.getElementById("refreshHistorialBtn");
 const historialSyncLabel = document.getElementById("historialSyncLabel");
@@ -2461,7 +2462,40 @@ tileCredencialBtn.addEventListener("click", () => {
   showScreen("credencial");
   fetchYRenderCredencial();
 });
+
+function salirDeCredencialPantallaCompleta() {
+  credencialCardWrap.classList.remove("pantalla-completa");
+  credencialFullscreenBackdrop.classList.add("hidden");
+  if (document.fullscreenElement && document.exitFullscreen) {
+    document.exitFullscreen().catch(() => {});
+  }
+}
+
+function alternarCredencialPantallaCompleta() {
+  const activo = credencialCardWrap.classList.toggle("pantalla-completa");
+  credencialFullscreenBackdrop.classList.toggle("hidden", !activo);
+  if (activo) {
+    if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+  } else {
+    salirDeCredencialPantallaCompleta();
+  }
+}
+credencialCardWrap.addEventListener("click", alternarCredencialPantallaCompleta);
+credencialFullscreenBackdrop.addEventListener("click", alternarCredencialPantallaCompleta);
+// Si el técnico sale de pantalla completa con el botón atrás del
+// sistema (en vez de tocar la credencial de nuevo), se mantiene todo
+// sincronizado igual.
+document.addEventListener("fullscreenchange", () => {
+  if (!document.fullscreenElement) {
+    credencialCardWrap.classList.remove("pantalla-completa");
+    credencialFullscreenBackdrop.classList.add("hidden");
+  }
+});
+
 volverDeCredencialBtn.addEventListener("click", () => {
+  salirDeCredencialPantallaCompleta();
   showScreen("home");
 });
 
@@ -2486,6 +2520,7 @@ async function actualizarAccesoCredencial() {
 }
 
 async function fetchYRenderCredencial() {
+  salirDeCredencialPantallaCompleta();
   credencialStatus.textContent = "Cargando...";
   credencialCardWrap.classList.add("hidden");
   try {

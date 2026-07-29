@@ -581,6 +581,15 @@ filtra según con qué usuario entró a la app. No hace falta ninguna
 variable de entorno nueva, se guarda en el mismo repo privado de datos
 (`credenciales-config.json`).
 
+**Pantalla completa al tocarla**: tocando la credencial, se agranda,
+gira 90° (queda apaisada, como un carnet real) y ocupa toda la
+pantalla, con los datos en letra más grande — ideal para mostrársela al
+cliente. Se intenta también activar el modo pantalla completa real del
+navegador (oculta la barra de direcciones) donde el dispositivo lo
+permita; en iOS puede que no oculte la barra por completo, pero el giro
+y el agrandado funcionan igual. Se vuelve a tocar (la credencial o
+afuera, en el fondo oscuro) para salir de ese modo.
+
 ## Historial (últimos 4 días)
 
 Botón "📜 Historial" en el panel principal. Muestra, en una lista, los
