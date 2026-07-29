@@ -86,6 +86,7 @@
       <button type="button" class="tab-btn" id="tabMaterialesBtn">Materiales</button>
       <button type="button" class="tab-btn" id="tabConsultasBtn">Consultas (IA)</button>
       <button type="button" class="tab-btn" id="tabGuardiasBtn">Guardias</button>
+      <button type="button" class="tab-btn" id="tabCredencialesBtn">Credenciales</button>
     </div>
 
     <div id="panelServicios">
@@ -243,6 +244,19 @@
       <button id="guardarGuardiasBtn" type="button">Guardar cambios</button>
       <p class="status" id="guardarGuardiasStatus"></p>
     </div>
+
+    <div id="panelCredenciales" class="hidden">
+      <h1>Credenciales digitales de técnicos</h1>
+      <p class="subtitle">Cada técnico ve solo la suya al tocar "🪪 Credencial" en la app, según con qué usuario entró.</p>
+
+      <p class="status" id="credencialesStatus"></p>
+
+      <div id="credencialesFilas"></div>
+
+      <button id="agregarCredencialBtn" type="button" class="btn-secondary-admin" style="margin-bottom:14px;">+ Agregar técnico</button>
+      <button id="guardarCredencialesBtn" type="button">Guardar cambios</button>
+      <p class="status" id="guardarCredencialesStatus"></p>
+    </div>
   </div>
 
 </div>
@@ -289,6 +303,9 @@ let consultasCatCargadasUnaVez = false;
 const tabGuardiasBtn = document.getElementById("tabGuardiasBtn");
 const panelGuardias = document.getElementById("panelGuardias");
 let guardiasCargadasUnaVez = false;
+const tabCredencialesBtn = document.getElementById("tabCredencialesBtn");
+const panelCredenciales = document.getElementById("panelCredenciales");
+let credencialesCargadasUnaVez = false;
 
 const TABS = [
   { btn: tabServiciosBtn, panel: panelServicios },
@@ -297,6 +314,7 @@ const TABS = [
   { btn: tabMaterialesBtn, panel: panelMateriales, onShow: () => { if (!materialesCargadosUnaVez) { materialesCargadosUnaVez = true; cargarMaterialesAdmin(); } } },
   { btn: tabConsultasBtn, panel: panelConsultas, onShow: () => { if (!consultasCatCargadasUnaVez) { consultasCatCargadasUnaVez = true; cargarConsultasCatAdmin(); } } },
   { btn: tabGuardiasBtn, panel: panelGuardias, onShow: () => { if (!guardiasCargadasUnaVez) { guardiasCargadasUnaVez = true; cargarGuardiasAdmin(); } } },
+  { btn: tabCredencialesBtn, panel: panelCredenciales, onShow: () => { if (!credencialesCargadasUnaVez) { credencialesCargadasUnaVez = true; cargarCredencialesAdmin(); } } },
 ];
 
 TABS.forEach(({ btn, panel, onShow }) => {
@@ -781,6 +799,152 @@ guardarGuardiasBtn.addEventListener("click", async () => {
     guardarGuardiasStatus.textContent = "No se pudo guardar: " + err.message;
   } finally {
     guardarGuardiasBtn.disabled = false;
+  }
+});
+
+// ---------- Credenciales digitales de técnicos ----------
+const credencialesStatus = document.getElementById("credencialesStatus");
+const credencialesFilas = document.getElementById("credencialesFilas");
+const agregarCredencialBtn = document.getElementById("agregarCredencialBtn");
+const guardarCredencialesBtn = document.getElementById("guardarCredencialesBtn");
+const guardarCredencialesStatus = document.getElementById("guardarCredencialesStatus");
+
+// Comprime la foto a un tamaño chico (ideal para una credencial), para
+// que el archivo de datos no crezca mucho con varias fotos.
+function comprimirFotoCredencial(file, maxDim, calidad) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = (e) => { img.src = e.target.result; };
+    reader.onerror = reject;
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > height && width > maxDim) {
+        height = Math.round((height * maxDim) / width);
+        width = maxDim;
+      } else if (height > maxDim) {
+        width = Math.round((width * maxDim) / height);
+        height = maxDim;
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", calidad));
+    };
+    img.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderFilaCredencial(cred) {
+  const fila = document.createElement("div");
+  fila.className = "card credencial-fila";
+  fila.innerHTML = `
+    <div class="field-row" style="align-items:flex-end;">
+      <div style="flex:1;">
+        <label>Nombre (tiene que coincidir con el usuario de la pestaña Técnicos)</label>
+        <input type="text" class="cred-nombre" value="${cred.nombre || ""}" placeholder="Nombre y apellido">
+      </div>
+      <button type="button" class="btn-quitar-tecnico quitar-credencial" title="Quitar">✕</button>
+    </div>
+    <div class="field-row">
+      <div style="flex:1;">
+        <label>DNI</label>
+        <input type="text" class="cred-dni" value="${cred.dni || ""}" placeholder="30.123.456">
+      </div>
+      <div style="flex:1;">
+        <label>Cargo</label>
+        <input type="text" class="cred-cargo" value="${cred.cargo || ""}" placeholder="Técnico instalador">
+      </div>
+    </div>
+    <div class="field-row">
+      <div style="flex:1;">
+        <label>Teléfono de contacto</label>
+        <input type="text" class="cred-telefono" value="${cred.telefono_contacto || ""}" placeholder="341...">
+      </div>
+      <div style="flex:1;">
+        <label>Vigencia (válida hasta)</label>
+        <input type="date" class="cred-vigencia" value="${cred.vigencia || ""}">
+      </div>
+    </div>
+    <label>Foto (se comprime sola a un tamaño chico)</label>
+    <input type="file" class="cred-foto-input" accept="image/*">
+    <img class="cred-foto-preview" src="${cred.foto_base64 || ""}" style="max-width:100px; border-radius:8px; display:${cred.foto_base64 ? "block" : "none"}; margin-top:8px;">
+  `;
+  fila.dataset.foto = cred.foto_base64 || "";
+  fila.querySelector(".quitar-credencial").addEventListener("click", () => fila.remove());
+  fila.querySelector(".cred-foto-input").addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const dataUrl = await comprimirFotoCredencial(file, 500, 0.8);
+    fila.dataset.foto = dataUrl;
+    const preview = fila.querySelector(".cred-foto-preview");
+    preview.src = dataUrl;
+    preview.style.display = "block";
+  });
+  credencialesFilas.appendChild(fila);
+}
+
+async function cargarCredencialesAdmin() {
+  credencialesStatus.textContent = "Cargando credenciales...";
+  credencialesFilas.innerHTML = "";
+  try {
+    const res = await fetch("/api/credenciales", {
+      headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    (data || []).forEach((c) => renderFilaCredencial(c));
+    credencialesStatus.textContent = Array.isArray(data) && data.length > 0
+      ? ""
+      : "Todavía no hay ninguna credencial cargada — agregá la primera.";
+  } catch (err) {
+    credencialesStatus.textContent = "No se pudo cargar la lista de credenciales.";
+  }
+}
+
+agregarCredencialBtn.addEventListener("click", () => renderFilaCredencial({}));
+
+guardarCredencialesBtn.addEventListener("click", async () => {
+  const filas = Array.from(credencialesFilas.querySelectorAll(":scope > .credencial-fila"));
+  const lista = filas.map((fila) => ({
+    nombre: fila.querySelector(".cred-nombre").value.trim(),
+    dni: fila.querySelector(".cred-dni").value.trim(),
+    cargo: fila.querySelector(".cred-cargo").value.trim(),
+    telefono_contacto: fila.querySelector(".cred-telefono").value.trim(),
+    vigencia: fila.querySelector(".cred-vigencia").value,
+    foto_base64: fila.dataset.foto || "",
+  })).filter((c) => c.nombre);
+
+  if (lista.length === 0) {
+    guardarCredencialesStatus.className = "status err";
+    guardarCredencialesStatus.textContent = "Agregá al menos un técnico con su nombre.";
+    return;
+  }
+
+  guardarCredencialesBtn.disabled = true;
+  guardarCredencialesStatus.className = "status";
+  guardarCredencialesStatus.textContent = "Guardando...";
+  try {
+    const res = await fetch("/api/credenciales", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + SERVICIOS_API_TOKEN,
+      },
+      body: JSON.stringify(lista),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    guardarCredencialesStatus.className = "status ok";
+    guardarCredencialesStatus.textContent = `Listo — se guardaron ${data.count} credenciales. Ya están disponibles en la app.`;
+  } catch (err) {
+    guardarCredencialesStatus.className = "status err";
+    guardarCredencialesStatus.textContent = "No se pudo guardar: " + err.message;
+  } finally {
+    guardarCredencialesBtn.disabled = false;
   }
 });
 

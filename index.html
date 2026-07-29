@@ -87,6 +87,10 @@
           <span class="panel-tile-icon">📜</span>
           <span class="panel-tile-label">Historial</span>
         </button>
+        <button type="button" class="panel-tile hidden" id="tileCredencialBtn">
+          <span class="panel-tile-icon">🪪</span>
+          <span class="panel-tile-label">Credencial</span>
+        </button>
         <a href="admin.html" target="_blank" rel="noopener" class="panel-tile hidden" id="abrirAdminBtn">
           <span class="panel-tile-icon">🛠</span>
           <span class="panel-tile-label">Administración</span>
@@ -273,6 +277,37 @@
 
     <div class="action-bar">
       <button class="btn btn-secondary" id="volverDeDashboardFinancieroBtn" type="button">Volver</button>
+    </div>
+  </section>
+
+  <!-- CREDENCIAL DIGITAL -->
+  <section class="screen" id="screen-credencial">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">CREDENCIAL DIGITAL</p>
+
+      <p class="list-status" id="credencialStatus"></p>
+
+      <div id="credencialCardWrap" class="credencial-card hidden">
+        <div class="credencial-card-header">
+          <img src="icons/logo.png" alt="SAT" class="credencial-card-logo">
+          <span class="credencial-card-empresa">Seguridad Electrónica</span>
+        </div>
+        <div class="credencial-card-body">
+          <img id="credencialFoto" class="credencial-card-foto" src="" alt="Foto">
+          <div class="credencial-card-datos">
+            <div class="credencial-card-nombre" id="credencialNombre"></div>
+            <div class="credencial-card-cargo" id="credencialCargo"></div>
+            <div class="credencial-card-dato"><b>DNI:</b> <span id="credencialDni"></span></div>
+            <div class="credencial-card-dato"><b>Contacto:</b> <span id="credencialTelefono"></span></div>
+            <div class="credencial-card-dato"><b>Válida hasta:</b> <span id="credencialVigencia"></span></div>
+          </div>
+        </div>
+        <div class="credencial-card-footer">Presentar esta credencial ante el cliente para identificarse.</div>
+      </div>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDeCredencialBtn" type="button">Volver</button>
     </div>
   </section>
 

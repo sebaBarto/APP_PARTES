@@ -559,6 +559,28 @@ basándose **solo** en el contenido de esos manuales.
   aclara en la pantalla que conviene verificar lo importante antes de
   actuar según la respuesta.
 
+## Credencial digital del técnico
+
+Botón "🪪 Credencial" en el panel principal — **solo aparece si el
+técnico logueado tiene una credencial cargada** (los que no tienen
+todavía, o el login general de oficina, no lo ven). Muestra un carnet
+con foto, nombre, cargo, DNI, teléfono de contacto y fecha de vigencia,
+para que el técnico lo presente ante el cliente como método extra de
+identificación al ingresar a su domicilio.
+
+Se administra desde `admin.html` → pestaña "Credenciales":
+
+1. Por cada técnico: nombre (tiene que coincidir exacto con el usuario
+   de la pestaña "Técnicos"), DNI, cargo, teléfono de contacto, fecha
+   de vigencia, y una foto — se sube el archivo directo y se comprime
+   sola a un tamaño chico (no hace falta subirla ya editada).
+2. Guardar cambios.
+
+Cada técnico ve **solo la suya**, nunca las de sus compañeros — se
+filtra según con qué usuario entró a la app. No hace falta ninguna
+variable de entorno nueva, se guarda en el mismo repo privado de datos
+(`credenciales-config.json`).
+
 ## Historial (últimos 4 días)
 
 Botón "📜 Historial" en el panel principal. Muestra, en una lista, los

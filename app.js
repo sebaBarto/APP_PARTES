@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.1.1";
+const APP_VERSION = "3.1.2";
 
 // Contraseña propia por técnico (se valida en el propio celular, no es
 // un login con servidor — solo para que no cualquiera que abra la URL
@@ -72,6 +72,7 @@ const screens = {
   consultas: document.getElementById("screen-consultas"),
   guardias: document.getElementById("screen-guardias"),
   historial: document.getElementById("screen-historial"),
+  credencial: document.getElementById("screen-credencial"),
   form: document.getElementById("screen-form"),
   sign: document.getElementById("screen-sign"),
   sending: document.getElementById("screen-sending"),
@@ -156,6 +157,16 @@ const tileServiciosBtn = document.getElementById("tileServiciosBtn");
 const tileDashboardsBtn = document.getElementById("tileDashboardsBtn");
 const tileGuardiasBtn = document.getElementById("tileGuardiasBtn");
 const tileHistorialBtn = document.getElementById("tileHistorialBtn");
+const tileCredencialBtn = document.getElementById("tileCredencialBtn");
+const volverDeCredencialBtn = document.getElementById("volverDeCredencialBtn");
+const credencialStatus = document.getElementById("credencialStatus");
+const credencialCardWrap = document.getElementById("credencialCardWrap");
+const credencialFoto = document.getElementById("credencialFoto");
+const credencialNombre = document.getElementById("credencialNombre");
+const credencialCargo = document.getElementById("credencialCargo");
+const credencialDni = document.getElementById("credencialDni");
+const credencialTelefono = document.getElementById("credencialTelefono");
+const credencialVigencia = document.getElementById("credencialVigencia");
 const volverDeHistorialBtn = document.getElementById("volverDeHistorialBtn");
 const refreshHistorialBtn = document.getElementById("refreshHistorialBtn");
 const historialSyncLabel = document.getElementById("historialSyncLabel");
@@ -313,6 +324,7 @@ function attemptLogin() {
     fetchServicios();
     precargarHistorialParaVisitas();
     precargarCronogramaParaSugerencias();
+    actualizarAccesoCredencial();
     actualizarBadgeColaEnvios();
     procesarColaEnvios();
   } else {
@@ -2442,6 +2454,66 @@ function renderHistorialReciente() {
     `;
     historialList.appendChild(card);
   });
+}
+
+// ---------- Credencial digital del técnico ----------
+tileCredencialBtn.addEventListener("click", () => {
+  showScreen("credencial");
+  fetchYRenderCredencial();
+});
+volverDeCredencialBtn.addEventListener("click", () => {
+  showScreen("home");
+});
+
+// Se fija si el técnico logueado tiene una credencial cargada, para
+// mostrar u ocultar el botón en el panel principal (los que todavía no
+// tienen una cargada, o el login general de oficina, no lo ven).
+async function actualizarAccesoCredencial() {
+  if (!tecnicoLogueado) {
+    tileCredencialBtn.classList.add("hidden");
+    return;
+  }
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/credenciales", { headers, cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    const tieneCredencial = (Array.isArray(data) ? data : []).some((c) => c.nombre === tecnicoLogueado);
+    tileCredencialBtn.classList.toggle("hidden", !tieneCredencial);
+  } catch (err) {
+    tileCredencialBtn.classList.add("hidden");
+  }
+}
+
+async function fetchYRenderCredencial() {
+  credencialStatus.textContent = "Cargando...";
+  credencialCardWrap.classList.add("hidden");
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/credenciales", { headers, cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    const propia = (Array.isArray(data) ? data : []).find((c) => c.nombre === tecnicoLogueado);
+    if (!propia) {
+      credencialStatus.textContent = "No hay una credencial cargada para tu usuario todavía.";
+      return;
+    }
+    credencialStatus.textContent = "";
+    credencialFoto.src = propia.foto_base64 || "";
+    credencialNombre.textContent = propia.nombre || "";
+    credencialCargo.textContent = propia.cargo || "";
+    credencialDni.textContent = propia.dni || "-";
+    credencialTelefono.textContent = propia.telefono_contacto || "-";
+    if (propia.vigencia) {
+      const [y, m, d] = propia.vigencia.split("-");
+      credencialVigencia.textContent = `${d}/${m}/${y}`;
+    } else {
+      credencialVigencia.textContent = "-";
+    }
+    credencialCardWrap.classList.remove("hidden");
+  } catch (err) {
+    credencialStatus.textContent = "No se pudo cargar la credencial.";
+  }
 }
 
 // Registrar service worker para instalación como PWA
