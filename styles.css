@@ -671,6 +671,22 @@ html, body {
 }
 .consulta-respuesta-texto { font-size: 14px; color: #101820; line-height: 1.5; white-space: pre-line; }
 .consulta-manuales-usados { font-size: 11px; color: #8A9089; margin-top: 10px; font-family: 'IBM Plex Mono', monospace; }
+.consulta-manuales-list { display: flex; flex-direction: column; gap: 8px; }
+.consulta-manual-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #FFFFFF;
+  color: #101820;
+  border: 1.5px solid #D8DCD4;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+.consulta-manual-item:active { border-color: #F5A623; }
 .guardia-actual-wrap {
   background: #FFFFFF;
   border: 1.5px solid #F5A623;

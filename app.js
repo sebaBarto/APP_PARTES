@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.3.6";
+const APP_VERSION = "3.3.7";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -260,6 +260,9 @@ volverDeServiciosBtn.addEventListener("click", () => showScreen("serviciosMenu")
 const verConsultasBtn = document.getElementById("verConsultasBtn");
 const volverDeConsultasBtn = document.getElementById("volverDeConsultasBtn");
 const consultaCategoriaSelect = document.getElementById("consultaCategoriaSelect");
+const consultaManualesWrap = document.getElementById("consultaManualesWrap");
+const consultaManualesStatus = document.getElementById("consultaManualesStatus");
+const consultaManualesList = document.getElementById("consultaManualesList");
 const consultaPreguntaInput = document.getElementById("consultaPreguntaInput");
 const preguntarBtn = document.getElementById("preguntarBtn");
 const consultaStatus = document.getElementById("consultaStatus");
@@ -2432,9 +2435,76 @@ async function cargarConsultasCategorias() {
 verConsultasBtn.addEventListener("click", () => {
   showScreen("consultas");
   consultaRespuestaWrap.classList.add("hidden");
+  consultaManualesWrap.classList.add("hidden");
   consultaStatus.textContent = "";
   if (!consultasCategoriasCargadas) cargarConsultasCategorias();
 });
+
+consultaCategoriaSelect.addEventListener("change", () => {
+  cargarManualesDeCategoria(consultaCategoriaSelect.value);
+});
+
+async function cargarManualesDeCategoria(categoria) {
+  if (!categoria) {
+    consultaManualesWrap.classList.add("hidden");
+    return;
+  }
+  consultaManualesWrap.classList.remove("hidden");
+  consultaManualesStatus.textContent = "Buscando manuales...";
+  consultaManualesList.innerHTML = "";
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch(`/api/consultas?categoria=${encodeURIComponent(categoria)}`, { headers, cache: "no-store" });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    if (!Array.isArray(data) || data.length === 0) {
+      consultaManualesStatus.textContent = "No hay manuales cargados en esta categoría todavía.";
+      return;
+    }
+    consultaManualesStatus.textContent = "";
+    data.forEach((manual) => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "consulta-manual-item";
+      item.textContent = `📄 ${manual.nombre}`;
+      item.addEventListener("click", () => abrirManual(categoria, manual.id, manual.nombre, item));
+      consultaManualesList.appendChild(item);
+    });
+  } catch (err) {
+    consultaManualesStatus.textContent = "No se pudieron cargar los manuales de esta categoría.";
+  }
+}
+
+async function abrirManual(categoria, archivoId, nombre, botonElemento) {
+  // Se abre la pestaña ya mismo (todavía vacía), antes de esperar la
+  // descarga — así los navegadores que bloquean popups fuera de un
+  // gesto directo del usuario (como Safari) no la bloquean.
+  const nuevaVentana = window.open("", "_blank");
+  const textoOriginal = botonElemento.textContent;
+  botonElemento.textContent = "Abriendo...";
+  botonElemento.disabled = true;
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch(
+      `/api/consultas?categoria=${encodeURIComponent(categoria)}&archivo=${encodeURIComponent(archivoId)}`,
+      { headers }
+    );
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    if (nuevaVentana) {
+      nuevaVentana.location.href = url;
+    } else {
+      window.open(url, "_blank");
+    }
+  } catch (err) {
+    if (nuevaVentana) nuevaVentana.close();
+    showToast("No se pudo abrir el manual: " + err.message);
+  } finally {
+    botonElemento.textContent = textoOriginal;
+    botonElemento.disabled = false;
+  }
+}
 volverDeConsultasBtn.addEventListener("click", () => {
   showScreen("home");
 });

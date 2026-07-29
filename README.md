@@ -537,6 +537,13 @@ natural, y la app busca los manuales en PDF de esa categoría (en
 Drive) y le pide a una IA (Google Gemini, plan gratuito) que responda
 basándose **solo** en el contenido de esos manuales.
 
+**Ver el manual directo**: apenas se elige una categoría, aparece
+debajo la lista de manuales en PDF de esa categoría — tocando uno, se
+abre en una pestaña nueva del navegador para leerlo completo, sin
+pasar por la IA. Reutiliza la misma conexión a Drive (no hace falta
+nada nuevo), y el PDF viaja protegido por el mismo token de la app —
+no se comparten los archivos públicamente en Drive.
+
 ### Configuración (una sola vez)
 
 1. **Categorías y carpetas**: en `admin.html` → pestaña "Consultas

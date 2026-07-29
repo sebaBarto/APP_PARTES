@@ -48,12 +48,6 @@ async function descargarArchivo(accessToken, fileId) {
 }
 
 module.exports = async (req, res) => {
-  if (req.method !== "POST") {
-    res.setHeader("Allow", "POST");
-    res.status(405).json({ error: "Método no permitido" });
-    return;
-  }
-
   const authHeader = req.headers["authorization"] || "";
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();
   if (!process.env.SERVICIOS_API_TOKEN || token !== process.env.SERVICIOS_API_TOKEN) {
@@ -61,11 +55,60 @@ module.exports = async (req, res) => {
     return;
   }
 
-  const { GITHUB_DATA_TOKEN, GITHUB_DATA_REPO, GEMINI_API_KEY } = process.env;
+  const { GITHUB_DATA_TOKEN, GITHUB_DATA_REPO } = process.env;
   if (!GITHUB_DATA_TOKEN || !GITHUB_DATA_REPO) {
     res.status(500).json({ error: "Faltan variables de entorno por configurar en Vercel" });
     return;
   }
+
+  // ---------- GET: listar los manuales de una categoría, o ver uno ----------
+  if (req.method === "GET") {
+    try {
+      const { categoria, archivo } = req.query || {};
+      if (!categoria) {
+        res.status(400).json({ error: "Falta la categoría" });
+        return;
+      }
+      const ghHeaders = {
+        Authorization: `Bearer ${GITHUB_DATA_TOKEN}`,
+        Accept: "application/vnd.github+json",
+      };
+      const apiUrl = `https://api.github.com/repos/${GITHUB_DATA_REPO}/contents/${CATEGORIAS_PATH}`;
+      const categorias = await leerCategorias(ghHeaders, apiUrl);
+      const cat = categorias.find((c) => c.categoria === categoria);
+      if (!cat || !cat.carpeta_drive_id) {
+        res.status(404).json({ error: "No se encontró esa categoría o no tiene carpeta de Drive configurada" });
+        return;
+      }
+
+      const accessToken = await getAccessToken("https://www.googleapis.com/auth/drive.readonly");
+
+      if (archivo) {
+        // Ver/descargar un manual puntual — se manda el PDF tal cual.
+        const buffer = await descargarArchivo(accessToken, archivo);
+        res.setHeader("Content-Type", "application/pdf");
+        res.setHeader("Cache-Control", "private, max-age=3600");
+        res.status(200).send(buffer);
+        return;
+      }
+
+      // Sin archivo puntual: lista los manuales de esa categoría.
+      const archivos = await listarArchivosCarpeta(accessToken, cat.carpeta_drive_id);
+      res.status(200).json(archivos.map((a) => ({ id: a.id, nombre: a.name })));
+    } catch (err) {
+      res.status(500).json({ error: "Error interno al leer los manuales", detail: String(err.message || err) });
+    }
+    return;
+  }
+
+  // ---------- POST: preguntar a la IA (como ya existía) ----------
+  if (req.method !== "POST") {
+    res.setHeader("Allow", "GET, POST");
+    res.status(405).json({ error: "Método no permitido" });
+    return;
+  }
+
+  const { GEMINI_API_KEY } = process.env;
   if (!GEMINI_API_KEY) {
     res.status(500).json({ error: "Falta configurar GEMINI_API_KEY en Vercel" });
     return;
