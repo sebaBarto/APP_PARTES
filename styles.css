@@ -615,6 +615,29 @@ html, body {
 }
 .consulta-respuesta-texto { font-size: 14px; color: #101820; line-height: 1.5; white-space: pre-line; }
 .consulta-manuales-usados { font-size: 11px; color: #8A9089; margin-top: 10px; font-family: 'IBM Plex Mono', monospace; }
+.guardia-actual-wrap {
+  background: #FFFFFF;
+  border: 1.5px solid #F5A623;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 18px;
+  text-align: center;
+}
+.guardia-actual-nombre { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 20px; color: #101820; margin-bottom: 12px; }
+.guardia-actual-botones { display: flex; gap: 10px; }
+.guardia-actual-botones .btn { width: auto; flex: 1; }
+.btn-whatsapp-full { background: #25D366; color: #FFFFFF; }
+.guardia-proximos-list { display: flex; flex-direction: column; gap: 8px; }
+.guardia-proximo-card {
+  background: #FFFFFF;
+  border: 1.5px solid #D8DCD4;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  display: flex;
+  justify-content: space-between;
+}
+.guardia-proximo-fecha { color: #6B7680; font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
 .dash-repetido-fechas { font-size: 11px; color: #6B7680; margin-top: 3px; font-family: 'IBM Plex Mono', monospace; }
 .dash-medalla { font-size: 15px; }
 .dash-chart-wrap {

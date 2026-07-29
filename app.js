@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.0.7";
+const APP_VERSION = "3.0.8";
 
 // Contraseña propia por técnico (se valida en el propio celular, no es
 // un login con servidor — solo para que no cualquiera que abra la URL
@@ -70,6 +70,7 @@ const screens = {
   dashboard: document.getElementById("screen-dashboard"),
   dashboardFinanciero: document.getElementById("screen-dashboard-financiero"),
   consultas: document.getElementById("screen-consultas"),
+  guardias: document.getElementById("screen-guardias"),
   form: document.getElementById("screen-form"),
   sign: document.getElementById("screen-sign"),
   sending: document.getElementById("screen-sending"),
@@ -140,6 +141,14 @@ const verDashboardFinancieroBtn = document.getElementById("verDashboardFinancier
 const abrirAdminBtn = document.getElementById("abrirAdminBtn");
 const tileServiciosBtn = document.getElementById("tileServiciosBtn");
 const tileDashboardsBtn = document.getElementById("tileDashboardsBtn");
+const tileGuardiasBtn = document.getElementById("tileGuardiasBtn");
+const volverDeGuardiasBtn = document.getElementById("volverDeGuardiasBtn");
+const guardiaStatus = document.getElementById("guardiaStatus");
+const guardiaActualWrap = document.getElementById("guardiaActualWrap");
+const guardiaActualNombre = document.getElementById("guardiaActualNombre");
+const guardiaLlamarBtn = document.getElementById("guardiaLlamarBtn");
+const guardiaWhatsappBtn = document.getElementById("guardiaWhatsappBtn");
+const guardiaProximosList = document.getElementById("guardiaProximosList");
 const tileServiciosPendientesBtn = document.getElementById("tileServiciosPendientesBtn");
 const volverDeServiciosMenuBtn = document.getElementById("volverDeServiciosMenuBtn");
 const volverDeDashboardsMenuBtn = document.getElementById("volverDeDashboardsMenuBtn");
@@ -2261,6 +2270,81 @@ preguntarBtn.addEventListener("click", async () => {
     preguntarBtn.disabled = false;
   }
 });
+
+// ---------- Guardia técnica rotativa ----------
+tileGuardiasBtn.addEventListener("click", () => {
+  showScreen("guardias");
+  cargarYRenderGuardias();
+});
+volverDeGuardiasBtn.addEventListener("click", () => {
+  showScreen("home");
+});
+
+// Devuelve, para una fecha dada, el índice de la secuencia que está de
+// guardia esa semana (rotación semanal desde el lunes de referencia).
+function indiceGuardiaEnFecha(fechaInicioRef, cantidad, fecha) {
+  const diffMs = fecha.getTime() - fechaInicioRef.getTime();
+  const semanas = Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000));
+  return ((semanas % cantidad) + cantidad) % cantidad;
+}
+
+async function cargarYRenderGuardias() {
+  guardiaStatus.textContent = "Cargando...";
+  guardiaActualWrap.classList.add("hidden");
+  guardiaProximosList.innerHTML = "";
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/guardias-config", { headers, cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    const secuencia = data.secuencia || [];
+    if (!data.fecha_inicio_referencia || secuencia.length === 0) {
+      guardiaStatus.textContent = "Todavía no se cargó la secuencia de guardias.";
+      return;
+    }
+
+    const [y, m, d] = data.fecha_inicio_referencia.split("-").map(Number);
+    const inicioRef = new Date(y, m - 1, d, 9, 0, 0, 0);
+    const ahora = new Date();
+
+    if (ahora < inicioRef) {
+      guardiaStatus.textContent = `La secuencia todavía no arrancó (empieza el ${d}/${m}/${y} a las 9:00).`;
+    } else {
+      guardiaStatus.textContent = "";
+      const indiceActual = indiceGuardiaEnFecha(inicioRef, secuencia.length, ahora);
+      const actual = secuencia[indiceActual];
+      guardiaActualNombre.textContent = actual.nombre;
+      guardiaLlamarBtn.href = "tel:" + (actual.telefono || "").replace(/[^\d+]/g, "");
+      const numeroWa = limpiarTelefonoWhatsapp(actual.telefono);
+      const mensaje = `Hola ${actual.nombre}, te contacto por un tema de guardia técnica.`;
+      guardiaWhatsappBtn.href = numeroWa ? `https://wa.me/${numeroWa}?text=${encodeURIComponent(mensaje)}` : "#";
+      guardiaActualWrap.classList.remove("hidden");
+    }
+
+    // Próximos turnos: los siguientes lunes, con quién arranca cada uno.
+    const proximos = [];
+    let cursor = new Date(inicioRef);
+    while (cursor <= ahora) cursor = new Date(cursor.getTime() + 7 * 24 * 60 * 60 * 1000);
+    // Retrocedemos una semana para incluir el turno vigente en la lista.
+    cursor = new Date(cursor.getTime() - 7 * 24 * 60 * 60 * 1000);
+    for (let i = 0; i < 5; i++) {
+      const indice = indiceGuardiaEnFecha(inicioRef, secuencia.length, cursor);
+      proximos.push({ fecha: new Date(cursor), tecnico: secuencia[indice] });
+      cursor = new Date(cursor.getTime() + 7 * 24 * 60 * 60 * 1000);
+    }
+    guardiaProximosList.innerHTML = "";
+    proximos.forEach(({ fecha, tecnico }) => {
+      const dd = String(fecha.getDate()).padStart(2, "0");
+      const mm = String(fecha.getMonth() + 1).padStart(2, "0");
+      const card = document.createElement("div");
+      card.className = "guardia-proximo-card";
+      card.innerHTML = `<span>${tecnico.nombre}</span><span class="guardia-proximo-fecha">desde ${dd}/${mm}</span>`;
+      guardiaProximosList.appendChild(card);
+    });
+  } catch (err) {
+    guardiaStatus.textContent = "No se pudo cargar la información de guardias.";
+  }
+}
 
 // Registrar service worker para instalación como PWA
 if ("serviceWorker" in navigator) {

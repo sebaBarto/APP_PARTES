@@ -73,6 +73,7 @@
       <button type="button" class="tab-btn" id="tabTecnicosBtn">Técnicos</button>
       <button type="button" class="tab-btn" id="tabMaterialesBtn">Materiales</button>
       <button type="button" class="tab-btn" id="tabConsultasBtn">Consultas (IA)</button>
+      <button type="button" class="tab-btn" id="tabGuardiasBtn">Guardias</button>
     </div>
 
     <div id="panelServicios">
@@ -212,6 +213,24 @@
       <button id="guardarConsultasCatBtn" type="button">Guardar cambios</button>
       <p class="status" id="guardarConsultasCatStatus"></p>
     </div>
+
+    <div id="panelGuardias" class="hidden">
+      <h1>Guardia técnica rotativa</h1>
+      <p class="subtitle">La guardia rota semanalmente, de lunes 9:00 a lunes 9:00. El orden de la lista de abajo define quién sigue a quién.</p>
+
+      <div class="card">
+        <label for="guardiasFechaInicio">Lunes de arranque de la secuencia (a las 9:00 lo toma el primero de la lista)</label>
+        <input type="date" id="guardiasFechaInicio">
+      </div>
+
+      <p class="status" id="guardiasStatus"></p>
+
+      <div id="guardiasFilas"></div>
+
+      <button id="agregarGuardiaBtn" type="button" class="btn-secondary-admin" style="margin-bottom:14px;">+ Agregar técnico a la secuencia</button>
+      <button id="guardarGuardiasBtn" type="button">Guardar cambios</button>
+      <p class="status" id="guardarGuardiasStatus"></p>
+    </div>
   </div>
 
 </div>
@@ -255,6 +274,9 @@ let materialesCargadosUnaVez = false;
 const tabConsultasBtn = document.getElementById("tabConsultasBtn");
 const panelConsultas = document.getElementById("panelConsultas");
 let consultasCatCargadasUnaVez = false;
+const tabGuardiasBtn = document.getElementById("tabGuardiasBtn");
+const panelGuardias = document.getElementById("panelGuardias");
+let guardiasCargadasUnaVez = false;
 
 const TABS = [
   { btn: tabServiciosBtn, panel: panelServicios },
@@ -262,6 +284,7 @@ const TABS = [
   { btn: tabTecnicosBtn, panel: panelTecnicos, onShow: () => { if (!tecnicosCargadosUnaVez) { tecnicosCargadosUnaVez = true; cargarTecnicosAdmin(); } } },
   { btn: tabMaterialesBtn, panel: panelMateriales, onShow: () => { if (!materialesCargadosUnaVez) { materialesCargadosUnaVez = true; cargarMaterialesAdmin(); } } },
   { btn: tabConsultasBtn, panel: panelConsultas, onShow: () => { if (!consultasCatCargadasUnaVez) { consultasCatCargadasUnaVez = true; cargarConsultasCatAdmin(); } } },
+  { btn: tabGuardiasBtn, panel: panelGuardias, onShow: () => { if (!guardiasCargadasUnaVez) { guardiasCargadasUnaVez = true; cargarGuardiasAdmin(); } } },
 ];
 
 TABS.forEach(({ btn, panel, onShow }) => {
@@ -634,6 +657,111 @@ guardarConsultasCatBtn.addEventListener("click", async () => {
     guardarConsultasCatStatus.textContent = "No se pudo guardar: " + err.message;
   } finally {
     guardarConsultasCatBtn.disabled = false;
+  }
+});
+
+// ---------- Guardia técnica rotativa ----------
+const guardiasFechaInicio = document.getElementById("guardiasFechaInicio");
+const guardiasStatus = document.getElementById("guardiasStatus");
+const guardiasFilas = document.getElementById("guardiasFilas");
+const agregarGuardiaBtn = document.getElementById("agregarGuardiaBtn");
+const guardarGuardiasBtn = document.getElementById("guardarGuardiasBtn");
+const guardarGuardiasStatus = document.getElementById("guardarGuardiasStatus");
+
+function renderFilaGuardia(nombre, telefono) {
+  const fila = document.createElement("div");
+  fila.className = "card guardia-fila";
+  fila.innerHTML = `
+    <div class="field-row" style="align-items:flex-end;">
+      <div style="flex:1;">
+        <label>Nombre</label>
+        <input type="text" class="guardia-nombre" value="${nombre || ""}" placeholder="Nombre y apellido">
+      </div>
+      <div style="flex:1;">
+        <label>Teléfono (WhatsApp/llamada)</label>
+        <input type="text" class="guardia-telefono" value="${telefono || ""}" placeholder="341...">
+      </div>
+    </div>
+    <div class="field-row">
+      <button type="button" class="btn-secondary-admin subir-guardia">↑ Subir</button>
+      <button type="button" class="btn-secondary-admin bajar-guardia">↓ Bajar</button>
+      <button type="button" class="btn-quitar-tecnico quitar-guardia" title="Quitar">✕</button>
+    </div>
+  `;
+  fila.querySelector(".subir-guardia").addEventListener("click", () => {
+    const anterior = fila.previousElementSibling;
+    if (anterior) guardiasFilas.insertBefore(fila, anterior);
+  });
+  fila.querySelector(".bajar-guardia").addEventListener("click", () => {
+    const siguiente = fila.nextElementSibling;
+    if (siguiente) guardiasFilas.insertBefore(siguiente, fila);
+  });
+  fila.querySelector(".quitar-guardia").addEventListener("click", () => fila.remove());
+  guardiasFilas.appendChild(fila);
+}
+
+async function cargarGuardiasAdmin() {
+  guardiasStatus.textContent = "Cargando configuración de guardias...";
+  guardiasFilas.innerHTML = "";
+  try {
+    const res = await fetch("/api/guardias-config", {
+      headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    guardiasFechaInicio.value = data.fecha_inicio_referencia || "";
+    (data.secuencia || []).forEach((t) => renderFilaGuardia(t.nombre, t.telefono));
+    guardiasStatus.textContent = (data.secuencia || []).length > 0
+      ? ""
+      : "Todavía no hay ninguna secuencia cargada — agregá los 3 técnicos en el orden que rotan.";
+  } catch (err) {
+    guardiasStatus.textContent = "No se pudo cargar la configuración de guardias.";
+  }
+}
+
+agregarGuardiaBtn.addEventListener("click", () => renderFilaGuardia("", ""));
+
+guardarGuardiasBtn.addEventListener("click", async () => {
+  const fecha = guardiasFechaInicio.value;
+  const filas = Array.from(guardiasFilas.querySelectorAll(":scope > .guardia-fila"));
+  const secuencia = filas.map((fila) => ({
+    nombre: fila.querySelector(".guardia-nombre").value.trim(),
+    telefono: fila.querySelector(".guardia-telefono").value.trim(),
+  })).filter((t) => t.nombre && t.telefono);
+
+  if (!fecha) {
+    guardarGuardiasStatus.className = "status err";
+    guardarGuardiasStatus.textContent = "Elegí la fecha del lunes de arranque de la secuencia.";
+    return;
+  }
+  if (secuencia.length === 0) {
+    guardarGuardiasStatus.className = "status err";
+    guardarGuardiasStatus.textContent = "Agregá al menos un técnico a la secuencia, con nombre y teléfono.";
+    return;
+  }
+
+  guardarGuardiasBtn.disabled = true;
+  guardarGuardiasStatus.className = "status";
+  guardarGuardiasStatus.textContent = "Guardando...";
+  try {
+    const res = await fetch("/api/guardias-config", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + SERVICIOS_API_TOKEN,
+      },
+      body: JSON.stringify({ fecha_inicio_referencia: fecha, secuencia }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    guardarGuardiasStatus.className = "status ok";
+    guardarGuardiasStatus.textContent = "Listo — la secuencia de guardias ya está disponible en la app.";
+  } catch (err) {
+    guardarGuardiasStatus.className = "status err";
+    guardarGuardiasStatus.textContent = "No se pudo guardar: " + err.message;
+  } finally {
+    guardarGuardiasBtn.disabled = false;
   }
 });
 

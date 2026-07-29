@@ -559,6 +559,25 @@ basándose **solo** en el contenido de esos manuales.
   aclara en la pantalla que conviene verificar lo importante antes de
   actuar según la respuesta.
 
+## Guardia técnica rotativa
+
+Botón "🚨 Guardias" en el panel principal. Muestra quién está de
+guardia en ese momento (con botón de llamada y de WhatsApp para
+contactarlo directo), y los próximos turnos.
+
+La guardia rota **semanalmente, de lunes 9:00 a lunes 9:00**. Se
+administra desde `admin.html` → pestaña "Guardias":
+
+1. Cargá el **lunes de arranque de la secuencia** (una fecha real,
+   pasada o futura — la app calcula la rotación hacia adelante y hacia
+   atrás desde ahí).
+2. Agregá los técnicos que hacen guardia, **en el orden en que rotan**
+   (con botones ↑/↓ para reordenar), cada uno con su teléfono.
+3. Guardá los cambios.
+
+No hace falta ninguna variable de entorno nueva — se guarda en el
+mismo repo privado de datos (`guardias-config.json`).
+
 ## Notas y límites de esta versión
 
 - El **ID de parte** se genera por fecha/hora + un número al azar — no es

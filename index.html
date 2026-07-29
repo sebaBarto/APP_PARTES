@@ -76,6 +76,10 @@
           <span class="panel-tile-icon">📊</span>
           <span class="panel-tile-label">Dashboards</span>
         </button>
+        <button type="button" class="panel-tile" id="tileGuardiasBtn">
+          <span class="panel-tile-icon">🚨</span>
+          <span class="panel-tile-label">Guardias</span>
+        </button>
         <a href="admin.html" target="_blank" rel="noopener" class="panel-tile hidden" id="abrirAdminBtn">
           <span class="panel-tile-icon">🛠</span>
           <span class="panel-tile-label">Administración</span>
@@ -262,6 +266,32 @@
 
     <div class="action-bar">
       <button class="btn btn-secondary" id="volverDeDashboardFinancieroBtn" type="button">Volver</button>
+    </div>
+  </section>
+
+  <!-- GUARDIA TÉCNICA -->
+  <section class="screen" id="screen-guardias">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">GUARDIA TÉCNICA</p>
+      <p class="subtitle-consultas">Rota de lunes 9:00 a lunes 9:00.</p>
+
+      <p class="list-status" id="guardiaStatus"></p>
+
+      <div id="guardiaActualWrap" class="guardia-actual-wrap hidden">
+        <p class="dash-subtitulo" style="margin-top:0;">Está de guardia ahora</p>
+        <div class="guardia-actual-nombre" id="guardiaActualNombre"></div>
+        <div class="guardia-actual-botones">
+          <a href="#" id="guardiaLlamarBtn" class="btn btn-primary" style="text-align:center; text-decoration:none;">📞 Llamar</a>
+          <a href="#" id="guardiaWhatsappBtn" target="_blank" rel="noopener" class="btn btn-whatsapp-full" style="text-align:center; text-decoration:none;">📲 WhatsApp</a>
+        </div>
+      </div>
+
+      <p class="dash-subtitulo">Próximos turnos</p>
+      <div id="guardiaProximosList" class="guardia-proximos-list"></div>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDeGuardiasBtn" type="button">Volver</button>
     </div>
   </section>
 
