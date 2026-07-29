@@ -278,11 +278,18 @@
 
     <div id="panelSims" class="hidden">
       <h1>SIMs de los técnicos</h1>
-      <p class="subtitle">Cada técnico tiene un stock de chips (Movistar Estándar/Mini, Personal, Claro). Cargá acá el número y a qué técnico pertenece su stock inicial — desde la app, los técnicos las usan en clientes, las devuelven a stock, o se las transfieren entre ellos.</p>
+      <p class="subtitle">Cada técnico tiene un stock de chips (Movistar Estándar/Mini, Personal, Claro). Elegí un técnico para ver y editar solo las SIMs que tiene — para pasarle una a otro técnico, cambiá el selector "Técnico dueño" de esa fila.</p>
+
+      <div class="card">
+        <label for="simsTecnicoFiltro">Ver SIMs de</label>
+        <select id="simsTecnicoFiltro">
+          <option value="" disabled selected>Elegí un técnico</option>
+        </select>
+      </div>
 
       <div class="card">
         <label>Excel de SIMs</label>
-        <p class="subtitle" style="margin-top:0;">Descargá el estado actual, editalo en Excel si querés, y volvé a subirlo — reemplaza la lista completa de acá abajo (no se guarda solo, después hay que tocar "Guardar cambios").</p>
+        <p class="subtitle" style="margin-top:0;">Descargá el estado actual (de todos los técnicos), editalo en Excel si querés, y volvé a subirlo — reemplaza toda la lista, no solo la del técnico que estás viendo (después hay que tocar "Guardar cambios").</p>
         <div class="field-row">
           <button type="button" class="btn-secondary-admin" id="descargarExcelSimsBtn">⬇ Descargar Excel</button>
           <button type="button" class="btn-secondary-admin" id="elegirExcelSimsBtn">⬆ Subir Excel</button>
@@ -295,7 +302,7 @@
 
       <div id="simsFilas"></div>
 
-      <button id="agregarSimBtn" type="button" class="btn-secondary-admin" style="margin-bottom:14px;">+ Agregar SIM</button>
+      <button id="agregarSimBtn" type="button" class="btn-secondary-admin hidden" style="margin-bottom:14px;">+ Agregar SIM para este técnico</button>
       <button id="guardarSimsBtn" type="button">Guardar cambios</button>
       <p class="status" id="guardarSimsStatus"></p>
     </div>
@@ -1154,6 +1161,7 @@ guardarVehiculosBtn.addEventListener("click", async () => {
 // ---------- SIMs de los técnicos ----------
 const simsStatus = document.getElementById("simsStatus");
 const simsFilas = document.getElementById("simsFilas");
+const simsTecnicoFiltro = document.getElementById("simsTecnicoFiltro");
 const agregarSimBtn = document.getElementById("agregarSimBtn");
 const descargarExcelSimsBtn = document.getElementById("descargarExcelSimsBtn");
 const elegirExcelSimsBtn = document.getElementById("elegirExcelSimsBtn");
@@ -1162,9 +1170,10 @@ const simsExcelStatus = document.getElementById("simsExcelStatus");
 const guardarSimsBtn = document.getElementById("guardarSimsBtn");
 const guardarSimsStatus = document.getElementById("guardarSimsStatus");
 let nombresTecnicosParaSims = [];
+let simsCompletos = []; // todas las SIMs de todos los técnicos, tal como están guardadas/recién subidas
 
 function renderFilaSim(sim) {
-  const s = sim || { empresa: "Movistar", tipo: "Estándar", numero: "", tecnico_actual: "", estado: "stock", cliente: "" };
+  const s = sim || { empresa: "Movistar", tipo: "Estándar", numero: "", tecnico_actual: simsTecnicoFiltro.value || "", estado: "stock", cliente: "" };
   const opcionesTecnicos = nombresTecnicosParaSims.map((n) =>
     `<option value="${n}" ${n === s.tecnico_actual ? "selected" : ""}>${n}</option>`
   ).join("");
@@ -1196,7 +1205,7 @@ function renderFilaSim(sim) {
         <input type="text" class="sim-numero" value="${s.numero || ""}" placeholder="341...">
       </div>
       <div style="flex:1;">
-        <label>Técnico dueño actual</label>
+        <label>Técnico dueño (cambiar acá para pasársela a otro)</label>
         <select class="sim-tecnico">
           <option value="" ${!s.tecnico_actual ? "selected" : ""}>— elegir —</option>
           ${opcionesTecnicos}
@@ -1221,9 +1230,24 @@ function renderFilaSim(sim) {
   simsFilas.appendChild(fila);
 }
 
+function mostrarSimsDeTecnico(nombre) {
+  simsFilas.innerHTML = "";
+  if (!nombre) {
+    agregarSimBtn.classList.add("hidden");
+    return;
+  }
+  const delTecnico = simsCompletos.filter((s) => s.tecnico_actual === nombre);
+  delTecnico.forEach((s) => renderFilaSim(s));
+  simsStatus.textContent = delTecnico.length === 0 ? `${nombre} todavía no tiene ninguna SIM asignada.` : "";
+  agregarSimBtn.classList.remove("hidden");
+}
+
+simsTecnicoFiltro.addEventListener("change", () => mostrarSimsDeTecnico(simsTecnicoFiltro.value));
+
 async function cargarSimsAdmin() {
   simsStatus.textContent = "Cargando SIMs...";
   simsFilas.innerHTML = "";
+  agregarSimBtn.classList.add("hidden");
   try {
     const [resSims, resTecnicos] = await Promise.all([
       fetch("/api/datos?coleccion=sims", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" }),
@@ -1231,12 +1255,18 @@ async function cargarSimsAdmin() {
     ]);
     const sims = await resSims.json();
     const tecnicos = await resTecnicos.json();
+    simsCompletos = Array.isArray(sims) ? sims : [];
     nombresTecnicosParaSims = (Array.isArray(tecnicos) ? tecnicos : []).map((t) => t.nombre);
 
-    (sims || []).forEach((s) => renderFilaSim(s));
-    simsStatus.textContent = Array.isArray(sims) && sims.length > 0
-      ? ""
-      : "Todavía no hay ninguna SIM cargada — agregá la primera.";
+    const actual = simsTecnicoFiltro.value;
+    const opciones = nombresTecnicosParaSims.map((n) => `<option value="${n}">${n}</option>`).join("");
+    simsTecnicoFiltro.innerHTML = `<option value="" disabled ${actual ? "" : "selected"}>Elegí un técnico</option>${opciones}`;
+    if (nombresTecnicosParaSims.includes(actual)) {
+      simsTecnicoFiltro.value = actual;
+      mostrarSimsDeTecnico(actual);
+    } else {
+      simsStatus.textContent = "Elegí un técnico arriba para ver y editar sus SIMs.";
+    }
   } catch (err) {
     simsStatus.textContent = "No se pudo cargar la lista de SIMs.";
   }
@@ -1257,13 +1287,12 @@ function leerFilasSimsDelFormulario() {
 }
 
 descargarExcelSimsBtn.addEventListener("click", () => {
-  const lista = leerFilasSimsDelFormulario().filter((s) => s.numero);
-  if (lista.length === 0) {
+  if (simsCompletos.length === 0) {
     simsExcelStatus.className = "status err";
     simsExcelStatus.textContent = "No hay SIMs cargadas todavía para descargar.";
     return;
   }
-  const filas = lista.map((s) => ({
+  const filas = simsCompletos.map((s) => ({
     Empresa: s.empresa,
     Tipo: s.tipo,
     "Número": s.numero,
@@ -1276,7 +1305,7 @@ descargarExcelSimsBtn.addEventListener("click", () => {
   XLSX.utils.book_append_sheet(libro, hoja, "SIMs");
   XLSX.writeFile(libro, `sims_${new Date().toISOString().slice(0, 10)}.xlsx`);
   simsExcelStatus.className = "status ok";
-  simsExcelStatus.textContent = "Descargado.";
+  simsExcelStatus.textContent = "Descargado (de todos los técnicos).";
 });
 
 elegirExcelSimsBtn.addEventListener("click", () => simsExcelFile.click());
@@ -1311,10 +1340,11 @@ simsExcelFile.addEventListener("change", () => {
         return;
       }
 
-      simsFilas.innerHTML = "";
-      nuevaLista.forEach((s) => renderFilaSim(s));
+      simsCompletos = nuevaLista;
+      const tecnicoActual = simsTecnicoFiltro.value;
+      mostrarSimsDeTecnico(tecnicoActual);
       simsExcelStatus.className = "status ok";
-      simsExcelStatus.textContent = `Se cargaron ${nuevaLista.length} SIMs del archivo — revisá y tocá "Guardar cambios" para publicarlas.`;
+      simsExcelStatus.textContent = `Se cargaron ${nuevaLista.length} SIMs del archivo (de todos los técnicos) — elegí cada técnico arriba para revisar sus filas, y tocá "Guardar cambios" para publicarlas.`;
     } catch (err) {
       simsExcelStatus.className = "status err";
       simsExcelStatus.textContent = "No se pudo leer el archivo: " + err.message;
@@ -1326,21 +1356,20 @@ simsExcelFile.addEventListener("change", () => {
 });
 
 guardarSimsBtn.addEventListener("click", async () => {
-  const filas = Array.from(simsFilas.querySelectorAll(":scope > .sim-fila"));
-  const lista = filas.map((fila) => ({
-    empresa: fila.querySelector(".sim-empresa").value,
-    tipo: fila.querySelector(".sim-tipo").value,
-    numero: fila.querySelector(".sim-numero").value.trim(),
-    tecnico_actual: fila.querySelector(".sim-tecnico").value,
-    estado: fila.querySelector(".sim-estado").value,
-    cliente: fila.querySelector(".sim-cliente").value.trim(),
-  })).filter((s) => s.numero && s.tecnico_actual);
-
-  if (lista.length === 0) {
+  const tecnicoActual = simsTecnicoFiltro.value;
+  if (!tecnicoActual) {
     guardarSimsStatus.className = "status err";
-    guardarSimsStatus.textContent = "Agregá al menos una SIM con número y técnico dueño.";
+    guardarSimsStatus.textContent = "Elegí un técnico arriba antes de guardar.";
     return;
   }
+
+  const filas = leerFilasSimsDelFormulario().filter((s) => s.numero && s.tecnico_actual);
+
+  // Se reemplazan solo las filas de este técnico (tal como estaban
+  // antes de abrir esta pantalla) — las de los demás técnicos quedan
+  // intactas, aunque no se estén viendo ahora.
+  const restoDeTecnicos = simsCompletos.filter((s) => s.tecnico_actual !== tecnicoActual);
+  const listaCompleta = [...restoDeTecnicos, ...filas];
 
   guardarSimsBtn.disabled = true;
   guardarSimsStatus.className = "status";
@@ -1352,10 +1381,12 @@ guardarSimsBtn.addEventListener("click", async () => {
         "Content-Type": "application/json",
         Authorization: "Bearer " + SERVICIOS_API_TOKEN,
       },
-      body: JSON.stringify(lista),
+      body: JSON.stringify(listaCompleta),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error desconocido");
+    simsCompletos = listaCompleta;
+    mostrarSimsDeTecnico(tecnicoActual);
     guardarSimsStatus.className = "status ok";
     guardarSimsStatus.textContent = "Listo — la lista de SIMs ya está disponible en la app.";
   } catch (err) {

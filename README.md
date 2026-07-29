@@ -734,11 +734,16 @@ Tocando una SIM que es tuya:
 Las SIMs de otros técnicos se ven (para saber quién tiene qué), pero
 no se pueden tocar — solo actúa quien la tiene en ese momento.
 
-**Administración**: en `admin.html` → pestaña "SIMs" se carga la lista
-completa (empresa, tipo, número, técnico dueño inicial, estado). Cada
-movimiento (usar, devolver, transferir) queda en un historial aparte
-(`sims-historial.json`), igual que con los vehículos. No hace falta
-ninguna variable de entorno nueva.
+**Administración**: en `admin.html` → pestaña "SIMs" primero se elige
+un técnico en "Ver SIMs de" — recién ahí aparecen sus SIMs para
+agregar, editar o quitar. Para pasarle una SIM a otro técnico, se
+cambia el selector "Técnico dueño" de esa fila (no hace falta cambiar
+el filtro de arriba ni tocar nada más). Guardar cambios solo actualiza
+las SIMs del técnico que se está viendo en ese momento — las de los
+demás quedan intactas aunque no se estén mostrando. Cada movimiento
+hecho desde la app (usar, devolver, transferir) queda en un historial
+aparte (`sims-historial.json`), igual que con los vehículos. No hace
+falta ninguna variable de entorno nueva.
 
 **Excel de SIMs**: en `admin.html` → pestaña "SIMs" hay botones para
 **descargar** el estado actual a un `.xlsx` (Empresa, Tipo, Número,
