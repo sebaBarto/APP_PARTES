@@ -152,6 +152,10 @@
           <span class="panel-tile-icon">🚗</span>
           <span class="panel-tile-label">Dashboard de vehículos</span>
         </button>
+        <button type="button" class="panel-tile" id="verDashboardSimsBtn">
+          <span class="panel-tile-icon">📶</span>
+          <span class="panel-tile-label">Dashboard de SIMs</span>
+        </button>
       </div>
     </div>
     <div class="action-bar">
@@ -339,6 +343,35 @@
     </div>
   </section>
 
+  <!-- DASHBOARD DE SIMS -->
+  <section class="screen" id="screen-dashboard-sims">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">DASHBOARD DE SIMS</p>
+
+      <div class="list-toolbar">
+        <button class="btn btn-ghost btn-small" id="refreshDashSimsBtn" type="button">↻ Actualizar</button>
+        <span class="list-sync-label" id="dashSimsSyncLabel"></span>
+      </div>
+
+      <div class="dash-periodo-tabs">
+        <button type="button" class="dash-sims-periodo-chip" data-periodo="dia">Día</button>
+        <button type="button" class="dash-sims-periodo-chip" data-periodo="semana">Semana</button>
+        <button type="button" class="dash-sims-periodo-chip active" data-periodo="mes">Mes</button>
+        <button type="button" class="dash-sims-periodo-chip" data-periodo="todo">Todo</button>
+      </div>
+
+      <button type="button" class="btn btn-secondary hidden" id="descargarExcelSimsDashBtn" style="margin-bottom:14px;">⬇ Descargar Excel del período</button>
+
+      <p class="list-status" id="dashSimsStatus"></p>
+
+      <div id="dashSimsList" class="historial-list"></div>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDeDashboardSimsBtn" type="button">Volver</button>
+    </div>
+  </section>
+
   <!-- VEHÍCULOS: SELECCIÓN -->
   <section class="screen" id="screen-vehiculos">
     <div class="review-scroll">
@@ -449,6 +482,10 @@
 
       <div id="simDevolverWrap" class="hidden">
         <button type="button" class="btn btn-primary" id="simDevolverBtn">Devolver a stock</button>
+      </div>
+
+      <div id="simRevertirWrap" class="hidden" style="margin-top:16px;">
+        <button type="button" class="btn btn-secondary" id="simRevertirBtn">↩ Revertir</button>
       </div>
 
       <div id="simTransferirWrap" class="hidden" style="margin-top:16px;">

@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.3.7";
+const APP_VERSION = "3.3.8";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -74,6 +74,7 @@ const screens = {
   dashboard: document.getElementById("screen-dashboard"),
   dashboardFinanciero: document.getElementById("screen-dashboard-financiero"),
   dashboardVehiculos: document.getElementById("screen-dashboard-vehiculos"),
+  dashboardSims: document.getElementById("screen-dashboard-sims"),
   consultas: document.getElementById("screen-consultas"),
   guardias: document.getElementById("screen-guardias"),
   historial: document.getElementById("screen-historial"),
@@ -201,6 +202,8 @@ const simCancelarReemplazoBtn = document.getElementById("simCancelarReemplazoBtn
 const simDevolverWrap = document.getElementById("simDevolverWrap");
 const simDevolverBtn = document.getElementById("simDevolverBtn");
 const simTransferirWrap = document.getElementById("simTransferirWrap");
+const simRevertirWrap = document.getElementById("simRevertirWrap");
+const simRevertirBtn = document.getElementById("simRevertirBtn");
 const simTecnicoNuevoSelect = document.getElementById("simTecnicoNuevoSelect");
 const simTransferirBtn = document.getElementById("simTransferirBtn");
 const volverDeVehiculosBtn = document.getElementById("volverDeVehiculosBtn");
@@ -278,6 +281,13 @@ const dashVehiculosFiltro = document.getElementById("dashVehiculosFiltro");
 const descargarExcelVehiculosBtn = document.getElementById("descargarExcelVehiculosBtn");
 const dashVehiculosStatus = document.getElementById("dashVehiculosStatus");
 const dashVehiculosList = document.getElementById("dashVehiculosList");
+const verDashboardSimsBtn = document.getElementById("verDashboardSimsBtn");
+const volverDeDashboardSimsBtn = document.getElementById("volverDeDashboardSimsBtn");
+const refreshDashSimsBtn = document.getElementById("refreshDashSimsBtn");
+const dashSimsSyncLabel = document.getElementById("dashSimsSyncLabel");
+const descargarExcelSimsDashBtn = document.getElementById("descargarExcelSimsDashBtn");
+const dashSimsStatus = document.getElementById("dashSimsStatus");
+const dashSimsList = document.getElementById("dashSimsList");
 const dashFinStatus = document.getElementById("dashFinStatus");
 const dashFinPagosNum = document.getElementById("dashFinPagosNum");
 const dashFinBonificadosNum = document.getElementById("dashFinBonificadosNum");
@@ -3143,6 +3153,106 @@ descargarExcelVehiculosBtn.addEventListener("click", () => {
   XLSX.writeFile(libro, `vehiculos_${dashVehPeriodoActivo}_${hoy}.xlsx`);
 });
 
+// ---------- Dashboard de SIMs ----------
+let dashSimsCache = [];
+let dashSimsPeriodoActivo = "mes";
+
+verDashboardSimsBtn.addEventListener("click", () => {
+  showScreen("dashboardSims");
+  fetchDashSims();
+});
+volverDeDashboardSimsBtn.addEventListener("click", () => showScreen("dashboardsMenu"));
+refreshDashSimsBtn.addEventListener("click", fetchDashSims);
+document.querySelectorAll(".dash-sims-periodo-chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    document.querySelectorAll(".dash-sims-periodo-chip").forEach((c) => c.classList.remove("active"));
+    chip.classList.add("active");
+    dashSimsPeriodoActivo = chip.dataset.periodo;
+    renderDashSims();
+  });
+});
+
+async function fetchDashSims() {
+  dashSimsStatus.textContent = "Cargando...";
+  dashSimsList.innerHTML = "";
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/sim-uso", { headers, cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    dashSimsCache = Array.isArray(data) ? data : [];
+    dashSimsSyncLabel.textContent = formatSyncTime(new Date());
+    renderDashSims();
+  } catch (err) {
+    dashSimsStatus.textContent = "No se pudo cargar el historial de SIMs.";
+  }
+}
+
+const ETIQUETA_ACCION_SIM = { usar: "Usada en cliente", devolver: "Devuelta a stock", transferir: "Transferida", reemplazar: "Reemplazo en cliente" };
+
+function filtrarDashSims() {
+  const rango = obtenerRangoPeriodo(dashSimsPeriodoActivo);
+  return dashSimsCache
+    .filter((h) => fechaEnRango(h.fecha, rango))
+    .sort((a, b) => {
+      const claveA = `${a.fecha || ""} ${a.hora || ""}`;
+      const claveB = `${b.fecha || ""} ${b.hora || ""}`;
+      return claveB.localeCompare(claveA);
+    });
+}
+
+function renderDashSims() {
+  const filtrados = filtrarDashSims();
+  dashSimsList.innerHTML = "";
+  if (filtrados.length === 0) {
+    dashSimsStatus.textContent = "No hay movimientos para mostrar en ese período.";
+    return;
+  }
+  dashSimsStatus.textContent = "";
+  filtrados.forEach((h) => {
+    let fechaTexto = h.fecha || "";
+    if (h.fecha) {
+      const [y, m, d] = h.fecha.split("-");
+      fechaTexto = `${d}/${m}/${y}`;
+    }
+    let detalle = "";
+    if (h.accion === "usar") detalle = `Cliente: ${h.cliente || "?"}`;
+    else if (h.accion === "transferir") detalle = `A: ${h.tecnico_nuevo || "?"}`;
+    else if (h.accion === "reemplazar") detalle = `Cliente: ${h.cliente || "?"} · reemplazó a la SIM ${h.sim_retirada || "?"} (${h.empresa_retirada || "?"})`;
+    const card = document.createElement("div");
+    card.className = "historial-card";
+    card.innerHTML = `
+      <div class="historial-card-num">${h.empresa || ""} · ${h.numero || ""}</div>
+      <div class="historial-card-cliente">${h.tecnico || ""} — ${ETIQUETA_ACCION_SIM[h.accion] || h.accion}</div>
+      <div class="historial-card-direccion">${fechaTexto}${h.hora ? " " + h.hora : ""}</div>
+      <div class="historial-card-horario">${detalle}</div>
+    `;
+    dashSimsList.appendChild(card);
+  });
+}
+
+descargarExcelSimsDashBtn.addEventListener("click", () => {
+  const filtrados = filtrarDashSims();
+  if (filtrados.length === 0) {
+    showToast("No hay datos para descargar en ese período.");
+    return;
+  }
+  const filas = filtrados.map((h) => ({
+    Empresa: h.empresa || "",
+    Número: h.numero || "",
+    Técnico: h.tecnico || "",
+    Acción: ETIQUETA_ACCION_SIM[h.accion] || h.accion || "",
+    Fecha: h.fecha || "",
+    Cliente: h.cliente || "",
+    "Transferida a": h.tecnico_nuevo || "",
+    "SIM retirada (reemplazo)": h.sim_retirada || "",
+  }));
+  const hoja = XLSX.utils.json_to_sheet(filas);
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, "SIMs");
+  XLSX.writeFile(libro, `sims_${dashSimsPeriodoActivo}_${fechaActualISOVehiculo()}.xlsx`);
+});
+
 // ---------- Descarga a Excel de los dashboards general y financiero ----------
 // Solo Sebastian Bartolozzi (o el login general de oficina) ven estos
 // botones — el resto de los técnicos puede ver los dashboards pero no
@@ -3152,6 +3262,7 @@ function actualizarAccesoExcelDashboards() {
   descargarExcelDashboardBtn.classList.toggle("hidden", !puede);
   descargarExcelDashboardFinBtn.classList.toggle("hidden", !puede);
   descargarExcelVehiculosBtn.classList.toggle("hidden", !puede);
+  descargarExcelSimsDashBtn.classList.toggle("hidden", !puede);
 }
 
 descargarExcelDashboardBtn.addEventListener("click", () => {
@@ -3413,6 +3524,7 @@ async function renderSimDetalle() {
   simUsarWrap.classList.add("hidden");
   simReemplazoWrap.classList.add("hidden");
   simDevolverWrap.classList.add("hidden");
+  simRevertirWrap.classList.add("hidden");
   simTransferirWrap.classList.add("hidden");
   try {
     const sims = await fetchSimsConfig();
@@ -3441,6 +3553,11 @@ async function renderSimDetalle() {
       simUsarWrap.classList.remove("hidden");
     } else {
       simDevolverWrap.classList.remove("hidden");
+    }
+
+    if (sim.tecnico_anterior && sim.tecnico_anterior !== tecnicoLogueado) {
+      simRevertirBtn.textContent = `↩ Revertir a ${sim.tecnico_anterior} (por si fue un error)`;
+      simRevertirWrap.classList.remove("hidden");
     }
 
     const otrosTecnicos = Object.keys(tecnicosPasswords).filter((n) => n !== tecnicoLogueado).sort();
@@ -3556,13 +3673,7 @@ simDevolverBtn.addEventListener("click", async () => {
   }
 });
 
-simTransferirBtn.addEventListener("click", async () => {
-  const tecnicoNuevo = simTecnicoNuevoSelect.value;
-  if (!tecnicoNuevo) {
-    showToast("Elegí a qué técnico transferírsela.");
-    return;
-  }
-  simTransferirBtn.disabled = true;
+async function transferirSim(tecnicoNuevo) {
   try {
     const res = await fetch("/api/sim-uso", {
       method: "POST",
@@ -3576,9 +3687,33 @@ simTransferirBtn.addEventListener("click", async () => {
     renderSimsLista();
   } catch (err) {
     showToast("No se pudo registrar: " + err.message);
-  } finally {
-    simTransferirBtn.disabled = false;
   }
+}
+
+simTransferirBtn.addEventListener("click", async () => {
+  const tecnicoNuevo = simTecnicoNuevoSelect.value;
+  if (!tecnicoNuevo) {
+    showToast("Elegí a qué técnico transferírsela.");
+    return;
+  }
+  simTransferirBtn.disabled = true;
+  await transferirSim(tecnicoNuevo);
+  simTransferirBtn.disabled = false;
+});
+
+simRevertirBtn.addEventListener("click", async () => {
+  const textoOriginal = simRevertirBtn.textContent;
+  simRevertirBtn.disabled = true;
+  simRevertirBtn.textContent = "Revirtiendo...";
+  const sims = await fetchSimsConfig().catch(() => []);
+  const sim = sims.find((s) => s.numero === simSeleccionada);
+  if (!sim || !sim.tecnico_anterior) {
+    showToast("No se pudo determinar a quién revertirla.");
+    simRevertirBtn.disabled = false;
+    simRevertirBtn.textContent = textoOriginal;
+    return;
+  }
+  await transferirSim(sim.tecnico_anterior);
 });
 
 // Al abrir la app, si hay una sesión guardada y vigente, entra directo

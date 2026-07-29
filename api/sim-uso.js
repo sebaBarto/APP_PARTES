@@ -115,6 +115,8 @@ module.exports = async (req, res) => {
           return;
         }
         historial.push({ ...registroBase, accion: "transferir", tecnico_nuevo: body.tecnico_nuevo });
+        // Guarda quién se la dio, para poder revertir si fue por error.
+        sim.tecnico_anterior = tecnico;
         sim.tecnico_actual = body.tecnico_nuevo;
         sim.estado = "stock";
         sim.cliente = "";

@@ -756,6 +756,19 @@ técnico la tiene), sin importar de qué técnico sea. Si el campo de
 búsqueda está vacío, vuelve a la vista agrupada por técnico de
 siempre.
 
+**Revertir una transferencia por error**: si transferís una SIM y te
+equivocaste (o el que la recibe se dio cuenta de que no correspondía),
+en el detalle de esa SIM aparece un botón "↩ Revertir a [nombre]" que
+la manda directo de vuelta a quien te la dio — la app recuerda quién
+fue el último en transferírtela.
+
+**Dashboard de SIMs**: dentro de "📊 Dashboards" hay una cuarta opción,
+"Dashboard de SIMs", con todos los movimientos (usar, devolver,
+transferir, reemplazar) — arranca mostrando el último mes, con
+pestañas de Día/Semana/Mes/Todo igual que los demás dashboards, y su
+propio botón de descarga a Excel (mismo criterio de acceso restringido
+a Sebastian Bartolozzi y oficina).
+
 ## Recordatorio de vehículo en el primer parte del día
 
 Cuando un técnico envía con éxito el **primer** parte del día (no
