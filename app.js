@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.0.3";
+const APP_VERSION = "3.0.4";
 
 // Contraseña propia por técnico (se valida en el propio celular, no es
 // un login con servidor — solo para que no cualquiera que abra la URL
@@ -66,6 +66,7 @@ const screens = {
   mapa: document.getElementById("screen-mapa"),
   dashboard: document.getElementById("screen-dashboard"),
   dashboardFinanciero: document.getElementById("screen-dashboard-financiero"),
+  consultas: document.getElementById("screen-consultas"),
   form: document.getElementById("screen-form"),
   sign: document.getElementById("screen-sign"),
   sending: document.getElementById("screen-sending"),
@@ -134,6 +135,15 @@ const refreshDashboardBtn = document.getElementById("refreshDashboardBtn");
 const dashSyncLabel = document.getElementById("dashSyncLabel");
 const verDashboardFinancieroBtn = document.getElementById("verDashboardFinancieroBtn");
 const abrirAdminBtn = document.getElementById("abrirAdminBtn");
+const verConsultasBtn = document.getElementById("verConsultasBtn");
+const volverDeConsultasBtn = document.getElementById("volverDeConsultasBtn");
+const consultaCategoriaSelect = document.getElementById("consultaCategoriaSelect");
+const consultaPreguntaInput = document.getElementById("consultaPreguntaInput");
+const preguntarBtn = document.getElementById("preguntarBtn");
+const consultaStatus = document.getElementById("consultaStatus");
+const consultaRespuestaWrap = document.getElementById("consultaRespuestaWrap");
+const consultaRespuestaTexto = document.getElementById("consultaRespuestaTexto");
+const consultaManualesUsados = document.getElementById("consultaManualesUsados");
 const volverDeDashboardFinancieroBtn = document.getElementById("volverDeDashboardFinancieroBtn");
 const dashFinStatus = document.getElementById("dashFinStatus");
 const dashFinPagosNum = document.getElementById("dashFinPagosNum");
@@ -2163,6 +2173,74 @@ verDashboardFinancieroBtn.addEventListener("click", () => {
 });
 volverDeDashboardFinancieroBtn.addEventListener("click", () => {
   showScreen("list");
+});
+
+// ---------- Consultas a manuales con IA ----------
+let consultasCategoriasCache = [];
+let consultasCategoriasCargadas = false;
+
+async function cargarConsultasCategorias() {
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/consultas-categorias", { headers, cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    consultasCategoriasCache = Array.isArray(data) ? data : [];
+  } catch (err) {
+    consultasCategoriasCache = [];
+  }
+  const opciones = consultasCategoriasCache
+    .map((c) => `<option value="${c.categoria}">${c.categoria}</option>`)
+    .join("");
+  consultaCategoriaSelect.innerHTML = `<option value="" disabled selected>Elegí una categoría</option>${opciones}`;
+  consultasCategoriasCargadas = true;
+}
+
+verConsultasBtn.addEventListener("click", () => {
+  showScreen("consultas");
+  consultaRespuestaWrap.classList.add("hidden");
+  consultaStatus.textContent = "";
+  if (!consultasCategoriasCargadas) cargarConsultasCategorias();
+});
+volverDeConsultasBtn.addEventListener("click", () => {
+  showScreen("list");
+});
+
+preguntarBtn.addEventListener("click", async () => {
+  const categoria = consultaCategoriaSelect.value;
+  const pregunta = consultaPreguntaInput.value.trim();
+  if (!categoria) {
+    showToast("Elegí una categoría antes de preguntar.");
+    return;
+  }
+  if (!pregunta) {
+    showToast("Escribí tu pregunta antes de enviarla.");
+    return;
+  }
+
+  preguntarBtn.disabled = true;
+  consultaRespuestaWrap.classList.add("hidden");
+  consultaStatus.textContent = "Buscando en los manuales y consultando a la IA... puede tardar unos segundos.";
+
+  try {
+    const res = await fetch("/api/consultas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({ categoria, pregunta }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+
+    consultaStatus.textContent = "";
+    consultaRespuestaTexto.textContent = data.respuesta;
+    const usados = data.manuales_usados || [];
+    consultaManualesUsados.textContent = usados.length > 0 ? `Basado en: ${usados.join(", ")}` : "";
+    consultaRespuestaWrap.classList.remove("hidden");
+  } catch (err) {
+    consultaStatus.textContent = "No se pudo obtener una respuesta: " + err.message;
+  } finally {
+    preguntarBtn.disabled = false;
+  }
 });
 
 // Registrar service worker para instalación como PWA

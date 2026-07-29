@@ -72,6 +72,7 @@
       <button type="button" class="tab-btn" id="tabCronogramaBtn">Cronograma semanal</button>
       <button type="button" class="tab-btn" id="tabTecnicosBtn">Técnicos</button>
       <button type="button" class="tab-btn" id="tabMaterialesBtn">Materiales</button>
+      <button type="button" class="tab-btn" id="tabConsultasBtn">Consultas (IA)</button>
     </div>
 
     <div id="panelServicios">
@@ -198,6 +199,19 @@
       <button id="guardarMaterialesBtn" type="button">Guardar cambios</button>
       <p class="status" id="guardarMaterialesStatus"></p>
     </div>
+
+    <div id="panelConsultas" class="hidden">
+      <h1>Consultas con IA (manuales)</h1>
+      <p class="subtitle">Cada categoría apunta a una carpeta de Drive con los manuales en PDF de esa categoría. Compartí cada carpeta con <code>sat-fotos-uploader@partes-503719.iam.gserviceaccount.com</code> (permiso Lector).</p>
+
+      <p class="status" id="consultasCatStatus"></p>
+
+      <div id="consultasCatFilas"></div>
+
+      <button id="agregarCategoriaConsultaBtn" type="button" class="btn-secondary-admin" style="margin-bottom:14px;">+ Agregar categoría</button>
+      <button id="guardarConsultasCatBtn" type="button">Guardar cambios</button>
+      <p class="status" id="guardarConsultasCatStatus"></p>
+    </div>
   </div>
 
 </div>
@@ -238,12 +252,16 @@ const panelCronograma = document.getElementById("panelCronograma");
 const tabMaterialesBtn = document.getElementById("tabMaterialesBtn");
 const panelMateriales = document.getElementById("panelMateriales");
 let materialesCargadosUnaVez = false;
+const tabConsultasBtn = document.getElementById("tabConsultasBtn");
+const panelConsultas = document.getElementById("panelConsultas");
+let consultasCatCargadasUnaVez = false;
 
 const TABS = [
   { btn: tabServiciosBtn, panel: panelServicios },
   { btn: tabCronogramaBtn, panel: panelCronograma },
   { btn: tabTecnicosBtn, panel: panelTecnicos, onShow: () => { if (!tecnicosCargadosUnaVez) { tecnicosCargadosUnaVez = true; cargarTecnicosAdmin(); } } },
   { btn: tabMaterialesBtn, panel: panelMateriales, onShow: () => { if (!materialesCargadosUnaVez) { materialesCargadosUnaVez = true; cargarMaterialesAdmin(); } } },
+  { btn: tabConsultasBtn, panel: panelConsultas, onShow: () => { if (!consultasCatCargadasUnaVez) { consultasCatCargadasUnaVez = true; cargarConsultasCatAdmin(); } } },
 ];
 
 TABS.forEach(({ btn, panel, onShow }) => {
@@ -527,6 +545,95 @@ guardarMaterialesBtn.addEventListener("click", async () => {
     guardarMaterialesStatus.textContent = "No se pudo guardar: " + err.message;
   } finally {
     guardarMaterialesBtn.disabled = false;
+  }
+});
+
+// ---------- Categorías de consultas con IA ----------
+const consultasCatStatus = document.getElementById("consultasCatStatus");
+const consultasCatFilas = document.getElementById("consultasCatFilas");
+const agregarCategoriaConsultaBtn = document.getElementById("agregarCategoriaConsultaBtn");
+const guardarConsultasCatBtn = document.getElementById("guardarConsultasCatBtn");
+const guardarConsultasCatStatus = document.getElementById("guardarConsultasCatStatus");
+
+// Acepta tanto un link completo de Drive como el ID pelado.
+function extraerCarpetaId(texto) {
+  const m = (texto || "").match(/\/folders\/([a-zA-Z0-9_-]+)/);
+  return m ? m[1] : (texto || "").trim();
+}
+
+function renderFilaConsultaCategoria(categoria, carpetaIdOUrl) {
+  const fila = document.createElement("div");
+  fila.className = "card";
+  fila.innerHTML = `
+    <div class="field-row" style="align-items:flex-end;">
+      <div style="flex:1;">
+        <label>Categoría</label>
+        <input type="text" class="consulta-cat-nombre" value="${categoria || ""}" placeholder="Ej: Alarmas">
+      </div>
+      <button type="button" class="btn-quitar-tecnico quitar-consulta-cat" title="Quitar categoría">✕</button>
+    </div>
+    <label>Carpeta de Drive (link o ID)</label>
+    <input type="text" class="consulta-cat-carpeta" value="${carpetaIdOUrl || ""}" placeholder="https://drive.google.com/drive/folders/...">
+  `;
+  fila.querySelector(".quitar-consulta-cat").addEventListener("click", () => fila.remove());
+  consultasCatFilas.appendChild(fila);
+}
+
+async function cargarConsultasCatAdmin() {
+  consultasCatStatus.textContent = "Cargando categorías...";
+  consultasCatFilas.innerHTML = "";
+  try {
+    const res = await fetch("/api/consultas-categorias", {
+      headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    (data || []).forEach((c) => renderFilaConsultaCategoria(c.categoria, c.carpeta_drive_id));
+    consultasCatStatus.textContent = Array.isArray(data) && data.length > 0
+      ? ""
+      : "Todavía no hay categorías cargadas — agregá la primera.";
+  } catch (err) {
+    consultasCatStatus.textContent = "No se pudo cargar la lista de categorías.";
+  }
+}
+
+agregarCategoriaConsultaBtn.addEventListener("click", () => renderFilaConsultaCategoria("", ""));
+
+guardarConsultasCatBtn.addEventListener("click", async () => {
+  const filas = Array.from(consultasCatFilas.querySelectorAll(":scope > .card"));
+  const lista = filas.map((fila) => ({
+    categoria: fila.querySelector(".consulta-cat-nombre").value.trim(),
+    carpeta_drive_id: extraerCarpetaId(fila.querySelector(".consulta-cat-carpeta").value),
+  })).filter((c) => c.categoria && c.carpeta_drive_id);
+
+  if (lista.length === 0) {
+    guardarConsultasCatStatus.className = "status err";
+    guardarConsultasCatStatus.textContent = "Agregá al menos una categoría con su carpeta de Drive.";
+    return;
+  }
+
+  guardarConsultasCatBtn.disabled = true;
+  guardarConsultasCatStatus.className = "status";
+  guardarConsultasCatStatus.textContent = "Guardando...";
+  try {
+    const res = await fetch("/api/consultas-categorias", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + SERVICIOS_API_TOKEN,
+      },
+      body: JSON.stringify(lista),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    guardarConsultasCatStatus.className = "status ok";
+    guardarConsultasCatStatus.textContent = `Listo — se guardaron ${data.count} categorías. Ya están disponibles en la app.`;
+  } catch (err) {
+    guardarConsultasCatStatus.className = "status err";
+    guardarConsultasCatStatus.textContent = "No se pudo guardar: " + err.message;
+  } finally {
+    guardarConsultasCatBtn.disabled = false;
   }
 });
 

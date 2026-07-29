@@ -81,6 +81,7 @@
     <div class="action-bar action-bar-column">
       <button class="btn btn-secondary" id="manualReportBtn" type="button">Cargar parte sin servicio</button>
       <button class="btn btn-ghost" id="verCronogramaBtn" type="button">Ver cronograma semanal</button>
+      <button class="btn btn-ghost" id="verConsultasBtn" type="button">🤖 Consultas (manuales)</button>
       <button class="btn btn-ghost" id="verDashboardBtn" type="button">📊 Ver dashboard</button>
       <button class="btn btn-ghost hidden" id="verDashboardFinancieroBtn" type="button">💰 Ver dashboard financiero</button>
       <a href="admin.html" target="_blank" rel="noopener" class="btn btn-ghost hidden" id="abrirAdminBtn" style="text-align:center; text-decoration:none;">🛠 Panel de administración</a>
@@ -199,6 +200,40 @@
 
     <div class="action-bar">
       <button class="btn btn-secondary" id="volverDeDashboardFinancieroBtn" type="button">Volver</button>
+    </div>
+  </section>
+
+  <!-- CONSULTAS CON IA -->
+  <section class="screen" id="screen-consultas">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">CONSULTAS A MANUALES (IA)</p>
+      <p class="subtitle-consultas">La respuesta se genera con IA en base a los manuales cargados — puede equivocarse, verificá lo importante.</p>
+
+      <div class="field-group">
+        <label class="field-label" for="consultaCategoriaSelect">Categoría</label>
+        <select class="field-input" id="consultaCategoriaSelect">
+          <option value="" disabled selected>Elegí una categoría</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="consultaPreguntaInput">Tu pregunta</label>
+        <textarea class="field-input field-textarea" id="consultaPreguntaInput" placeholder="Ej: ¿Cómo se resetea la central a valores de fábrica?"></textarea>
+      </div>
+
+      <button type="button" class="btn btn-primary" id="preguntarBtn" style="margin-bottom:14px;">Preguntar</button>
+
+      <p class="list-status" id="consultaStatus"></p>
+
+      <div id="consultaRespuestaWrap" class="consulta-respuesta-wrap hidden">
+        <p class="dash-subtitulo" style="margin-top:0;">Respuesta</p>
+        <div id="consultaRespuestaTexto" class="consulta-respuesta-texto"></div>
+        <p class="consulta-manuales-usados" id="consultaManualesUsados"></p>
+      </div>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDeConsultasBtn" type="button">Volver</button>
     </div>
   </section>
 

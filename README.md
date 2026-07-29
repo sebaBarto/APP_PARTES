@@ -501,6 +501,47 @@ URL a mano. Ese panel sigue teniendo su propia contraseña (la de
 `ADMIN_PASSWORD` en `admin.html`), este botón es solo un atajo, no la
 reemplaza.
 
+## Consultas a manuales con IA (gratis, con Gemini)
+
+Desde el listado hay un botón "🤖 Consultas (manuales)": el técnico
+elige una categoría (ej. "Alarmas"), escribe una pregunta en lenguaje
+natural, y la app busca los manuales en PDF de esa categoría (en
+Drive) y le pide a una IA (Google Gemini, plan gratuito) que responda
+basándose **solo** en el contenido de esos manuales.
+
+### Configuración (una sola vez)
+
+1. **Categorías y carpetas**: en `admin.html` → pestaña "Consultas
+   (IA)", cargá cada categoría con el link (o ID) de la carpeta de
+   Drive donde están los manuales PDF de esa categoría. Compartí cada
+   carpeta con `sat-fotos-uploader@partes-503719.iam.gserviceaccount.com`
+   (permiso **Lector**) — la misma cuenta de servicio que ya se usa
+   para el cronograma.
+2. **Clave de Gemini** (gratis, sin tarjeta): entrá a
+   [aistudio.google.com/apikey](https://aistudio.google.com/apikey),
+   generá una clave, y cargala en Vercel como variable de entorno
+   `GEMINI_API_KEY`.
+3. Redeploy del proyecto.
+
+### Cómo funciona y sus límites
+
+- Reutiliza la cuenta de servicio de Google ya configurada — no hace
+  falta nada nuevo de ese lado.
+- El plan gratis de Gemini permite ~1.500 consultas por día, de sobra
+  para un equipo chico de técnicos.
+- **Letra chica del plan gratuito de Google**: las consultas pueden
+  usarse para entrenar sus modelos (a diferencia de los planes pagos).
+  Para manuales técnicos de fabricantes esto normalmente no es un
+  problema, pero tenelo en cuenta si algún manual tuviera información
+  confidencial.
+- Por cada consulta se manda el/los manual(es) PDF completos de esa
+  categoría a la IA (hasta un tope de ~12 MB en total por consulta) —
+  si una categoría tiene manuales muy pesados o muchos a la vez, puede
+  hacer falta separarlos en categorías más específicas.
+- La respuesta la genera una IA — **puede equivocarse**, así que se
+  aclara en la pantalla que conviene verificar lo importante antes de
+  actuar según la respuesta.
+
 ## Notas y límites de esta versión
 
 - El **ID de parte** se genera por fecha/hora + un número al azar — no es

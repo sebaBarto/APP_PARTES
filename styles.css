@@ -587,6 +587,15 @@ html, body {
   font-size: 13px;
 }
 .dash-repetido-card b { color: #101820; }
+.subtitle-consultas { font-size: 12px; color: #6B7680; margin: 0 0 14px; }
+.consulta-respuesta-wrap {
+  background: #FFFFFF;
+  border: 1.5px solid #D8DCD4;
+  border-radius: 10px;
+  padding: 14px;
+}
+.consulta-respuesta-texto { font-size: 14px; color: #101820; line-height: 1.5; white-space: pre-line; }
+.consulta-manuales-usados { font-size: 11px; color: #8A9089; margin-top: 10px; font-family: 'IBM Plex Mono', monospace; }
 .dash-repetido-fechas { font-size: 11px; color: #6B7680; margin-top: 3px; font-family: 'IBM Plex Mono', monospace; }
 .dash-medalla { font-size: 15px; }
 .dash-chart-wrap {
