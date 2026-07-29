@@ -780,8 +780,15 @@ html, body {
   justify-content: center;
 }
 .credencial-card-qr img, .credencial-card-qr canvas { width: 100%; height: 100%; }
-.credencial-card-verificar { display: flex; flex-direction: column; font-size: 11px; color: #6B7680; }
-.credencial-card-web { font-family: 'IBM Plex Mono', monospace; color: #16283B; font-weight: 600; font-size: 12px; margin-top: 2px; }
+.credencial-card-verificar { display: flex; flex-direction: column; justify-content: center; }
+.credencial-card-autorizado {
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 1.5px;
+  color: #16283B;
+  line-height: 1.4;
+}
 .credencial-card-footer {
   position: relative;
   z-index: 1;
@@ -816,7 +823,7 @@ html, body {
 .credencial-card.pantalla-completa .credencial-card-footer { font-size: 13px; }
 .credencial-card.pantalla-completa .credencial-card-qr { width: 90px; height: 90px; }
 .credencial-card.pantalla-completa .credencial-card-verificar { font-size: 14px; }
-.credencial-card.pantalla-completa .credencial-card-web { font-size: 16px; }
+.credencial-card.pantalla-completa .credencial-card-autorizado { font-size: 18px; }
 .credencial-card.pantalla-completa .credencial-card-watermark { font-size: 130px; }
 .vehiculo-alertas-wrap { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
 .vehiculo-alerta-card {
