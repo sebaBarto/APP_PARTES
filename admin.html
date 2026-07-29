@@ -270,6 +270,7 @@
 
       <div id="vehiculosFilas"></div>
 
+      <button id="agregarVehiculoBtn" type="button" class="btn-secondary-admin" style="margin-bottom:14px;">+ Agregar vehículo</button>
       <button id="guardarVehiculosBtn" type="button">Guardar cambios</button>
       <p class="status" id="guardarVehiculosStatus"></p>
     </div>
@@ -969,8 +970,9 @@ guardarCredencialesBtn.addEventListener("click", async () => {
 });
 
 // ---------- Vehículos de la empresa ----------
-const VEHICULOS_FIJOS = ["Renault Kangoo Blanca", "Renault Kangoo Gris", "Moto"];
 const vehiculosStatus = document.getElementById("vehiculosStatus");
+const agregarVehiculoBtn = document.getElementById("agregarVehiculoBtn");
+agregarVehiculoBtn.addEventListener("click", () => renderFilaVehiculo({ nombre: "", km_actual: 0, umbrales: [] }));
 const vehiculosFilas = document.getElementById("vehiculosFilas");
 const guardarVehiculosBtn = document.getElementById("guardarVehiculosBtn");
 const guardarVehiculosStatus = document.getElementById("guardarVehiculosStatus");
@@ -1029,9 +1031,14 @@ function renderFilaUmbral(umbralesContainer, umbral) {
 function renderFilaVehiculo(vehiculo) {
   const fila = document.createElement("div");
   fila.className = "card vehiculo-fila";
-  fila.dataset.nombre = vehiculo.nombre;
   fila.innerHTML = `
-    <h1 style="font-size:16px; margin:0 0 10px;">${vehiculo.nombre}</h1>
+    <div class="field-row" style="align-items:flex-end;">
+      <div style="flex:1;">
+        <label>Nombre del vehículo</label>
+        <input type="text" class="vehiculo-nombre" value="${vehiculo.nombre || ""}" placeholder="Ej: Renault Kangoo Blanca">
+      </div>
+      <button type="button" class="btn-quitar-tecnico quitar-vehiculo" title="Quitar vehículo">✕</button>
+    </div>
     <label>Kilometraje actual</label>
     <input type="number" class="vehiculo-km-actual" value="${vehiculo.km_actual || 0}">
     <label style="margin-top:10px;">Umbrales de mantenimiento</label>
@@ -1041,6 +1048,7 @@ function renderFilaVehiculo(vehiculo) {
   const contenedor = fila.querySelector(".umbrales-container");
   (vehiculo.umbrales || []).forEach((u) => renderFilaUmbral(contenedor, u));
   fila.querySelector(".agregar-umbral-btn").addEventListener("click", () => renderFilaUmbral(contenedor, null));
+  fila.querySelector(".quitar-vehiculo").addEventListener("click", () => fila.remove());
   vehiculosFilas.appendChild(fila);
 }
 
@@ -1054,12 +1062,10 @@ async function cargarVehiculosAdmin() {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error desconocido");
-    const lista = VEHICULOS_FIJOS.map((nombre) => {
-      const existente = (data || []).find((v) => v.nombre === nombre);
-      return existente || { nombre, km_actual: 0, umbrales: [] };
-    });
-    lista.forEach((v) => renderFilaVehiculo(v));
-    vehiculosStatus.textContent = "";
+    (data || []).forEach((v) => renderFilaVehiculo(v));
+    vehiculosStatus.textContent = Array.isArray(data) && data.length > 0
+      ? ""
+      : "Todavía no hay ningún vehículo cargado — agregá el primero.";
   } catch (err) {
     vehiculosStatus.textContent = "No se pudo cargar la configuración de vehículos.";
   }
@@ -1080,11 +1086,17 @@ guardarVehiculosBtn.addEventListener("click", async () => {
       };
     }).filter((u) => u.nombre && u.valor);
     return {
-      nombre: fila.dataset.nombre,
+      nombre: fila.querySelector(".vehiculo-nombre").value.trim(),
       km_actual: Number(fila.querySelector(".vehiculo-km-actual").value) || 0,
       umbrales,
     };
-  });
+  }).filter((v) => v.nombre);
+
+  if (lista.length === 0) {
+    guardarVehiculosStatus.className = "status err";
+    guardarVehiculosStatus.textContent = "Agregá al menos un vehículo con nombre.";
+    return;
+  }
 
   guardarVehiculosBtn.disabled = true;
   guardarVehiculosStatus.className = "status";

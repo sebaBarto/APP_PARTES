@@ -592,9 +592,11 @@ afuera, en el fondo oscuro) para salir de ese modo.
 
 ## Vehículos de la empresa
 
-Botón "🚗 Vehículos" en el panel principal, con los 3 vehículos fijos
-(Renault Kangoo Blanca, Renault Kangoo Gris, Moto). Cada uno muestra si
-está libre o en uso (por quién y desde qué hora). Al entrar a uno:
+Botón "🚗 Vehículos" en el panel principal, con la flota que se cargue
+en `admin.html` (arranca con 3: Renault Kangoo Blanca, Renault Kangoo
+Gris, Moto — pero **se pueden agregar, editar o borrar** libremente
+desde ahí, no están fijos en el código). Cada uno muestra si está libre
+o en uso (por quién y desde qué hora). Al entrar a uno:
 
 - Si está libre, el técnico puede **tomarlo** (carga la hora, se
   autocompleta con la hora actual pero se puede cambiar).
@@ -606,15 +608,28 @@ está libre o en uso (por quién y desde qué hora). Al entrar a uno:
 - Si lo tiene otro técnico, se avisa quién y desde cuándo, sin dejar
   tomarlo hasta que lo devuelva (para no pisarse).
 
-**Alertas de mantenimiento**: en `admin.html` → pestaña "Vehículos", se
-carga el kilometraje actual de cada uno y se pueden agregar **umbrales
-configurables** (cualquier cantidad, no solo los ejemplos de arranque)
-— cada uno con nombre, tipo (kilómetros o fecha), el valor límite, y
-con cuánta anticipación avisar (km o días antes). Ejemplos: "Cambio de
-aceite" a los 50.000 km avisando 1.000 km antes, "VTV" con fecha límite
-avisando 30 días antes, etc. Cuando se entra al detalle de un vehículo
-en la app, si algún umbral está cerca o vencido, aparece un aviso
-destacado (naranja si se acerca, rojo si ya se pasó).
+**Administrar la flota**: en `admin.html` → pestaña "Vehículos":
+- "+ Agregar vehículo" para sumar uno nuevo (nombre y kilometraje
+  inicial).
+- El nombre de cada vehículo es un campo editable — se puede renombrar
+  ahí mismo.
+- La ✕ de cada tarjeta borra ese vehículo entero.
+- "Guardar cambios" para publicar.
+
+⚠️ Ojo con renombrar un vehículo que en ese momento esté "tomado" por
+un técnico — el historial de uso queda ligado al nombre que tenía en
+el momento de tomarlo, así que renombrarlo a mitad de un uso activo
+puede generar confusión (mejor esperar a que esté libre).
+
+**Alertas de mantenimiento**: se carga el kilometraje actual de cada
+vehículo y se pueden agregar **umbrales configurables** (cualquier
+cantidad, no solo los ejemplos de arranque) — cada uno con nombre, tipo
+(kilómetros o fecha), el valor límite, y con cuánta anticipación avisar
+(km o días antes). Ejemplos: "Cambio de aceite" a los 50.000 km
+avisando 1.000 km antes, "VTV" con fecha límite avisando 30 días antes,
+etc. Cuando se entra al detalle de un vehículo en la app, si algún
+umbral está cerca o vencido, aparece un aviso destacado (naranja si se
+acerca, rojo si ya se pasó).
 
 No hace falta ninguna variable de entorno nueva — reutiliza las que ya
 existen. Se guarda en `vehiculos-config.json` (configuración y km
