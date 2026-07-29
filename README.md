@@ -454,6 +454,13 @@ que se puedan enviar, se pierden. Por eso, si un técnico ve el aviso de
 "pendiente de enviar" durante mucho tiempo, conviene asegurarse de que
 tenga conexión antes de cerrar la app.
 
+**Importante**: esta cola es **por celular**, no centralizada — el
+aviso solo lo ve la persona en cuyo celular quedó atascado el envío
+(no hay forma de verlo desde otro dispositivo). El texto del aviso
+muestra de qué técnico y cliente es cada parte pendiente (ej. "1
+parte(s) pendiente(s) de enviar — de: Cristian Rossetti (Comercial
+Norte SRL)"), para identificarlo de un vistazo si hace falta.
+
 ## Catálogo de materiales por categoría (administrable)
 
 En "Materiales utilizados" el técnico elige una **categoría** (ej.

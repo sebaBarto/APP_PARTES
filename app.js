@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.4.2";
+const APP_VERSION = "3.4.3";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -1869,10 +1869,17 @@ function agregarAColaEnvios(payload) {
 }
 
 function actualizarBadgeColaEnvios() {
-  const cantidad = obtenerColaEnvios().length;
+  const cola = obtenerColaEnvios();
   if (!colaEnviosBanner) return;
-  if (cantidad > 0) {
-    colaEnviosTexto.textContent = `${cantidad} parte(s) pendiente(s) de enviar (sin conexión).`;
+  if (cola.length > 0) {
+    const detalle = cola
+      .map((item) => {
+        const tecnico = (item.data && item.data.tecnico) || "técnico sin especificar";
+        const cliente = (item.data && item.data.cliente) || "";
+        return cliente ? `${tecnico} (${cliente})` : tecnico;
+      })
+      .join(", ");
+    colaEnviosTexto.textContent = `${cola.length} parte(s) pendiente(s) de enviar (sin conexión) — de: ${detalle}.`;
     colaEnviosBanner.classList.remove("hidden");
   } else {
     colaEnviosBanner.classList.add("hidden");
