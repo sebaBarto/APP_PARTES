@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.1.0";
+const APP_VERSION = "3.1.1";
 
 // Contraseña propia por técnico (se valida en el propio celular, no es
 // un login con servidor — solo para que no cualquiera que abra la URL
@@ -161,6 +161,7 @@ const refreshHistorialBtn = document.getElementById("refreshHistorialBtn");
 const historialSyncLabel = document.getElementById("historialSyncLabel");
 const historialStatus = document.getElementById("historialStatus");
 const historialList = document.getElementById("historialList");
+const historialModoLabel = document.getElementById("historialModoLabel");
 const volverDeGuardiasBtn = document.getElementById("volverDeGuardiasBtn");
 const guardiaStatus = document.getElementById("guardiaStatus");
 const guardiaActualWrap = document.getElementById("guardiaActualWrap");
@@ -2397,12 +2398,21 @@ function renderHistorialReciente() {
   const limite = new Date(hoy);
   limite.setDate(limite.getDate() - 3); // hoy + 3 días atrás = últimos 4 días
 
+  // Cada técnico ve solo lo suyo — salvo Sebastian Bartolozzi (y el
+  // login general de oficina), que ven el listado completo del equipo.
+  const veTodo = !tecnicoLogueado || tecnicoLogueado === "Sebastian Bartolozzi";
+  historialModoLabel.textContent = veTodo
+    ? "Viendo los servicios de todo el equipo."
+    : "Viendo solo tus servicios.";
+
   const recientes = historialCache
     .filter((h) => {
       if (!h.fecha) return false;
       const [y, m, d] = h.fecha.split("-").map(Number);
       const f = new Date(y, m - 1, d);
-      return f >= limite && f <= hoy;
+      if (!(f >= limite && f <= hoy)) return false;
+      if (veTodo) return true;
+      return h.tecnico === tecnicoLogueado || h.tecnico2 === tecnicoLogueado;
     })
     .sort((a, b) => {
       const claveA = `${a.fecha} ${a.hora_entrada || ""}`;

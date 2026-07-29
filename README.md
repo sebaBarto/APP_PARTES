@@ -562,13 +562,15 @@ basándose **solo** en el contenido de esos manuales.
 ## Historial (últimos 4 días)
 
 Botón "📜 Historial" en el panel principal. Muestra, en una lista, los
-servicios completados por **todo el equipo** en los últimos 4 días
-(hoy + los 3 días anteriores) — no solo los del técnico logueado, para
-mantener la misma filosofía de "todos ven todo" que ya usa el resto de
-la app. Cada tarjeta muestra N° de servicio, cliente, dirección,
-localidad, fecha y horario de entrada/salida. Usa el mismo historial
-que ya alimenta los dashboards (`/api/historial.js`), así que no hace
-falta ninguna variable de entorno nueva.
+servicios completados en los últimos 4 días (hoy + los 3 días
+anteriores). **Cada técnico ve solo los suyos** (o los que hizo junto a
+otro, si participó como segundo técnico) — solo **Sebastian Bartolozzi**
+(y el login general de oficina) ven el listado completo de todo el
+equipo. Un texto arriba de la lista aclara qué vista está activa. Cada
+tarjeta muestra N° de servicio, cliente, dirección, localidad, fecha y
+horario de entrada/salida. Usa el mismo historial que ya alimenta los
+dashboards (`/api/historial.js`), así que no hace falta ninguna
+variable de entorno nueva.
 
 ## Guardia técnica rotativa
 
