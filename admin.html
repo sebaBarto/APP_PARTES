@@ -280,6 +280,17 @@
       <h1>SIMs de los técnicos</h1>
       <p class="subtitle">Cada técnico tiene un stock de chips (Movistar Estándar/Mini, Personal, Claro). Cargá acá el número y a qué técnico pertenece su stock inicial — desde la app, los técnicos las usan en clientes, las devuelven a stock, o se las transfieren entre ellos.</p>
 
+      <div class="card">
+        <label>Excel de SIMs</label>
+        <p class="subtitle" style="margin-top:0;">Descargá el estado actual, editalo en Excel si querés, y volvé a subirlo — reemplaza la lista completa de acá abajo (no se guarda solo, después hay que tocar "Guardar cambios").</p>
+        <div class="field-row">
+          <button type="button" class="btn-secondary-admin" id="descargarExcelSimsBtn">⬇ Descargar Excel</button>
+          <button type="button" class="btn-secondary-admin" id="elegirExcelSimsBtn">⬆ Subir Excel</button>
+        </div>
+        <input type="file" id="simsExcelFile" accept=".xlsx,.xls" class="hidden">
+        <p class="status" id="simsExcelStatus"></p>
+      </div>
+
       <p class="status" id="simsStatus"></p>
 
       <div id="simsFilas"></div>
@@ -1144,6 +1155,10 @@ guardarVehiculosBtn.addEventListener("click", async () => {
 const simsStatus = document.getElementById("simsStatus");
 const simsFilas = document.getElementById("simsFilas");
 const agregarSimBtn = document.getElementById("agregarSimBtn");
+const descargarExcelSimsBtn = document.getElementById("descargarExcelSimsBtn");
+const elegirExcelSimsBtn = document.getElementById("elegirExcelSimsBtn");
+const simsExcelFile = document.getElementById("simsExcelFile");
+const simsExcelStatus = document.getElementById("simsExcelStatus");
 const guardarSimsBtn = document.getElementById("guardarSimsBtn");
 const guardarSimsStatus = document.getElementById("guardarSimsStatus");
 let nombresTecnicosParaSims = [];
@@ -1228,6 +1243,87 @@ async function cargarSimsAdmin() {
 }
 
 agregarSimBtn.addEventListener("click", () => renderFilaSim(null));
+
+function leerFilasSimsDelFormulario() {
+  const filas = Array.from(simsFilas.querySelectorAll(":scope > .sim-fila"));
+  return filas.map((fila) => ({
+    empresa: fila.querySelector(".sim-empresa").value,
+    tipo: fila.querySelector(".sim-tipo").value,
+    numero: fila.querySelector(".sim-numero").value.trim(),
+    tecnico_actual: fila.querySelector(".sim-tecnico").value,
+    estado: fila.querySelector(".sim-estado").value,
+    cliente: fila.querySelector(".sim-cliente").value.trim(),
+  }));
+}
+
+descargarExcelSimsBtn.addEventListener("click", () => {
+  const lista = leerFilasSimsDelFormulario().filter((s) => s.numero);
+  if (lista.length === 0) {
+    simsExcelStatus.className = "status err";
+    simsExcelStatus.textContent = "No hay SIMs cargadas todavía para descargar.";
+    return;
+  }
+  const filas = lista.map((s) => ({
+    Empresa: s.empresa,
+    Tipo: s.tipo,
+    "Número": s.numero,
+    "Técnico dueño": s.tecnico_actual,
+    Estado: s.estado === "uso" ? "En uso" : "En stock",
+    Cliente: s.cliente,
+  }));
+  const hoja = XLSX.utils.json_to_sheet(filas);
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, "SIMs");
+  XLSX.writeFile(libro, `sims_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  simsExcelStatus.className = "status ok";
+  simsExcelStatus.textContent = "Descargado.";
+});
+
+elegirExcelSimsBtn.addEventListener("click", () => simsExcelFile.click());
+
+simsExcelFile.addEventListener("change", () => {
+  const file = simsExcelFile.files[0];
+  if (!file) return;
+  simsExcelStatus.className = "status";
+  simsExcelStatus.textContent = "Leyendo archivo...";
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: "array" });
+      const hoja = wb.Sheets[wb.SheetNames[0]];
+      const filas = XLSX.utils.sheet_to_json(hoja, { defval: "" });
+
+      const nuevaLista = filas.map((row) => {
+        const estadoTexto = String(row["Estado"] || "").trim().toLowerCase();
+        return {
+          empresa: String(row["Empresa"] || "").trim(),
+          tipo: String(row["Tipo"] || "").trim(),
+          numero: String(row["Número"] ?? row["Numero"] ?? "").trim(),
+          tecnico_actual: String(row["Técnico dueño"] ?? row["Tecnico dueño"] ?? row["Tecnico dueno"] ?? "").trim(),
+          estado: estadoTexto.startsWith("en uso") || estadoTexto === "uso" ? "uso" : "stock",
+          cliente: String(row["Cliente"] || "").trim(),
+        };
+      }).filter((s) => s.numero);
+
+      if (nuevaLista.length === 0) {
+        simsExcelStatus.className = "status err";
+        simsExcelStatus.textContent = "No se encontraron filas con número de SIM — revisá los encabezados de las columnas (Empresa, Tipo, Número, Técnico dueño, Estado, Cliente).";
+        return;
+      }
+
+      simsFilas.innerHTML = "";
+      nuevaLista.forEach((s) => renderFilaSim(s));
+      simsExcelStatus.className = "status ok";
+      simsExcelStatus.textContent = `Se cargaron ${nuevaLista.length} SIMs del archivo — revisá y tocá "Guardar cambios" para publicarlas.`;
+    } catch (err) {
+      simsExcelStatus.className = "status err";
+      simsExcelStatus.textContent = "No se pudo leer el archivo: " + err.message;
+    } finally {
+      simsExcelFile.value = "";
+    }
+  };
+  reader.readAsArrayBuffer(file);
+});
 
 guardarSimsBtn.addEventListener("click", async () => {
   const filas = Array.from(simsFilas.querySelectorAll(":scope > .sim-fila"));

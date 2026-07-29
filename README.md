@@ -733,6 +733,22 @@ movimiento (usar, devolver, transferir) queda en un historial aparte
 (`sims-historial.json`), igual que con los vehículos. No hace falta
 ninguna variable de entorno nueva.
 
+**Excel de SIMs**: en `admin.html` → pestaña "SIMs" hay botones para
+**descargar** el estado actual a un `.xlsx` (Empresa, Tipo, Número,
+Técnico dueño, Estado, Cliente), editarlo tranquilo en Excel si hace
+falta, y **subirlo** de nuevo — reemplaza las filas del formulario de
+esa pestaña (después hay que tocar "Guardar cambios" para publicarlo,
+no se guarda solo al subirlo). Todo pasa en el navegador, con SheetJS
+— no hace falta ningún servidor ni variable de entorno nueva para
+esto.
+
+**Buscar qué línea tiene un cliente**: en la pantalla "SIMs" de la
+app, arriba de la lista hay un buscador — escribiendo el nombre de un
+cliente, muestra qué SIM(s) tiene asociadas (número, compañía, y qué
+técnico la tiene), sin importar de qué técnico sea. Si el campo de
+búsqueda está vacío, vuelve a la vista agrupada por técnico de
+siempre.
+
 ## Vehículos de la empresa
 
 Botón "🚗 Vehículos" en el panel principal, con la flota que se cargue

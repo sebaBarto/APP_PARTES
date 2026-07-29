@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.3.4";
+const APP_VERSION = "3.3.5";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -180,6 +180,7 @@ const tileSimsBtn = document.getElementById("tileSimsBtn");
 const volverDeSimsBtn = document.getElementById("volverDeSimsBtn");
 const simsListaStatus = document.getElementById("simsListaStatus");
 const simsGrupos = document.getElementById("simsGrupos");
+const simsBuscarCliente = document.getElementById("simsBuscarCliente");
 const volverDeSimDetalleBtn = document.getElementById("volverDeSimDetalleBtn");
 const simDetalleNombre = document.getElementById("simDetalleNombre");
 const simDetalleStatus = document.getElementById("simDetalleStatus");
@@ -3190,65 +3191,98 @@ async function fetchSimsConfig() {
 
 tileSimsBtn.addEventListener("click", () => {
   showScreen("sims");
+  simsBuscarCliente.value = "";
   renderSimsLista();
 });
 volverDeSimsBtn.addEventListener("click", () => showScreen("home"));
 volverDeSimDetalleBtn.addEventListener("click", () => showScreen("sims"));
 
+let simsListaCache = [];
+
 async function renderSimsLista() {
   simsListaStatus.textContent = "Cargando...";
   simsGrupos.innerHTML = "";
   try {
-    const sims = await fetchSimsConfig();
-    if (sims.length === 0) {
-      simsListaStatus.textContent = "Todavía no hay SIMs cargadas.";
-      return;
-    }
-    simsListaStatus.textContent = "";
-
-    const porTecnico = {};
-    sims.forEach((s) => {
-      const nombre = s.tecnico_actual || "Sin asignar";
-      if (!porTecnico[nombre]) porTecnico[nombre] = [];
-      porTecnico[nombre].push(s);
-    });
-
-    // Las propias primero, para no tener que buscarlas entre las de todos.
-    const propio = tecnicoLogueado || "";
-    const nombres = Object.keys(porTecnico).sort((a, b) => {
-      if (a === propio) return -1;
-      if (b === propio) return 1;
-      return a.localeCompare(b);
-    });
-
-    nombres.forEach((nombre) => {
-      const titulo = document.createElement("p");
-      titulo.className = "sim-grupo-titulo";
-      titulo.textContent = nombre === propio ? "Tus SIMs" : nombre;
-      simsGrupos.appendChild(titulo);
-
-      porTecnico[nombre].forEach((s) => {
-        const card = document.createElement("div");
-        card.className = "sim-card";
-        card.innerHTML = `
-          <div>
-            <div class="sim-card-empresa">${s.empresa}${s.tipo ? " · " + s.tipo : ""}</div>
-            <div class="sim-card-numero">${s.numero}</div>
-          </div>
-          <span class="sim-card-estado ${s.estado}">${s.estado === "uso" ? "En uso: " + (s.cliente || "?") : "En stock"}</span>
-        `;
-        card.addEventListener("click", () => {
-          simSeleccionada = s.numero;
-          showScreen("simDetalle");
-          renderSimDetalle();
-        });
-        simsGrupos.appendChild(card);
-      });
-    });
+    simsListaCache = await fetchSimsConfig();
+    dibujarSimsLista();
   } catch (err) {
     simsListaStatus.textContent = "No se pudo cargar la lista de SIMs.";
   }
 }
+
+function dibujarSimsLista() {
+  const busqueda = normalizeText(simsBuscarCliente.value.trim());
+  simsGrupos.innerHTML = "";
+
+  if (simsListaCache.length === 0) {
+    simsListaStatus.textContent = "Todavía no hay SIMs cargadas.";
+    return;
+  }
+
+  function crearCard(s, mostrarTecnico) {
+    const card = document.createElement("div");
+    card.className = "sim-card";
+    card.innerHTML = `
+      <div>
+        <div class="sim-card-empresa">${s.empresa}${s.tipo ? " · " + s.tipo : ""}</div>
+        <div class="sim-card-numero">${s.numero}${mostrarTecnico ? " · " + s.tecnico_actual : ""}</div>
+      </div>
+      <span class="sim-card-estado ${s.estado}">${s.estado === "uso" ? "En uso: " + (s.cliente || "?") : "En stock"}</span>
+    `;
+    card.addEventListener("click", () => {
+      simSeleccionada = s.numero;
+      showScreen("simDetalle");
+      renderSimDetalle();
+    });
+    return card;
+  }
+
+  // Modo búsqueda por cliente: lista plana de las líneas que
+  // coinciden, sin agrupar por técnico, mostrando quién la tiene.
+  if (busqueda) {
+    const encontradas = simsListaCache.filter(
+      (s) => s.estado === "uso" && s.cliente && normalizeText(s.cliente).includes(busqueda)
+    );
+    if (encontradas.length === 0) {
+      simsListaStatus.textContent = "Ningún cliente coincide con esa búsqueda.";
+      return;
+    }
+    simsListaStatus.textContent = "";
+    const titulo = document.createElement("p");
+    titulo.className = "sim-grupo-titulo";
+    titulo.textContent = "Resultados de la búsqueda";
+    simsGrupos.appendChild(titulo);
+    encontradas.forEach((s) => simsGrupos.appendChild(crearCard(s, true)));
+    return;
+  }
+
+  simsListaStatus.textContent = "";
+
+  const porTecnico = {};
+  simsListaCache.forEach((s) => {
+    const nombre = s.tecnico_actual || "Sin asignar";
+    if (!porTecnico[nombre]) porTecnico[nombre] = [];
+    porTecnico[nombre].push(s);
+  });
+
+  // Las propias primero, para no tener que buscarlas entre las de todos.
+  const propio = tecnicoLogueado || "";
+  const nombres = Object.keys(porTecnico).sort((a, b) => {
+    if (a === propio) return -1;
+    if (b === propio) return 1;
+    return a.localeCompare(b);
+  });
+
+  nombres.forEach((nombre) => {
+    const titulo = document.createElement("p");
+    titulo.className = "sim-grupo-titulo";
+    titulo.textContent = nombre === propio ? "Tus SIMs" : nombre;
+    simsGrupos.appendChild(titulo);
+    porTecnico[nombre].forEach((s) => simsGrupos.appendChild(crearCard(s, false)));
+  });
+}
+
+simsBuscarCliente.addEventListener("input", dibujarSimsLista);
 
 function poblarClientesParaSim() {
   const opciones = serviciosCache
