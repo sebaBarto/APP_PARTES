@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.4.4";
+const APP_VERSION = "3.4.5";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -754,6 +754,7 @@ function seleccionarServicio(item) {
   autocompletarTecnico();
   autocompletarFecha();
   mostrarVisitaAnterior();
+  cargarOpcionesSimInstalar();
   showScreen("form");
 }
 
@@ -765,6 +766,7 @@ manualReportBtn.addEventListener("click", () => {
   autocompletarTecnico();
   autocompletarFecha();
   mostrarVisitaAnterior();
+  cargarOpcionesSimInstalar();
   showScreen("form");
 });
 
@@ -928,6 +930,7 @@ function seleccionarTareaCronograma(t) {
   autocompletarTecnico();
   autocompletarFecha();
   mostrarVisitaAnterior();
+  cargarOpcionesSimInstalar();
   showScreen("form");
 }
 
@@ -1180,6 +1183,10 @@ const matModeloSelect = document.getElementById("matModeloSelect");
 const matCantidadInput = document.getElementById("matCantidadInput");
 const agregarMaterialBtn = document.getElementById("agregarMaterialBtn");
 const materialesAgregadosList = document.getElementById("materialesAgregadosList");
+const simInstalarWrap = document.getElementById("simInstalarWrap");
+const fInstalarSim = document.getElementById("f_instalar_sim");
+const simInstalarSelectWrap = document.getElementById("simInstalarSelectWrap");
+const simInstalarSelect = document.getElementById("simInstalarSelect");
 
 let materialesCatalogo = MATERIALES_CATALOGO_RESPALDO;
 let materialesAgregados = [];
@@ -1254,7 +1261,71 @@ agregarMaterialBtn.addEventListener("click", () => {
 function getMaterialesUtilizados() {
   const agregados = materialesAgregados.map((item) => `${item.modelo} x${item.cantidad}`);
   const otros = document.getElementById("f_materiales").value.trim();
-  return [...agregados, otros].filter(Boolean).join(", ");
+  const sim = getSimAInstalarSeleccionada();
+  const simTexto = sim ? `SIM ${sim.empresa}${sim.tipo ? " " + sim.tipo : ""} ${sim.numero}` : "";
+  return [...agregados, simTexto, otros].filter(Boolean).join(", ");
+}
+
+// ---------- Instalar una SIM del propio stock en este servicio ----------
+let simsEnStockPropio = [];
+
+function getSimAInstalarSeleccionada() {
+  if (!fInstalarSim.checked || !simInstalarSelect.value) return null;
+  return simsEnStockPropio.find((s) => s.numero === simInstalarSelect.value) || null;
+}
+
+async function cargarOpcionesSimInstalar() {
+  fInstalarSim.checked = false;
+  simInstalarSelectWrap.style.display = "none";
+  simInstalarSelect.innerHTML = '<option value="" disabled selected>Elegí la SIM que instalaste</option>';
+  simInstalarWrap.classList.add("hidden");
+  simsEnStockPropio = [];
+  if (!tecnicoLogueado) return; // el login general no tiene stock propio
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/datos?coleccion=sims", { headers, cache: "no-store" });
+    if (!res.ok) return;
+    const sims = await res.json();
+    simsEnStockPropio = (Array.isArray(sims) ? sims : []).filter(
+      (s) => s.tecnico_actual === tecnicoLogueado && s.estado === "stock"
+    );
+    if (simsEnStockPropio.length === 0) return;
+    const opciones = simsEnStockPropio
+      .map((s) => `<option value="${s.numero}">${s.empresa}${s.tipo ? " " + s.tipo : ""} — ${s.numero}</option>`)
+      .join("");
+    simInstalarSelect.innerHTML = `<option value="" disabled selected>Elegí la SIM que instalaste</option>${opciones}`;
+    simInstalarWrap.classList.remove("hidden");
+  } catch (err) {
+    // si falla, simplemente no aparece la opción de instalar SIM
+  }
+}
+
+fInstalarSim.addEventListener("change", () => {
+  simInstalarSelectWrap.style.display = fInstalarSim.checked ? "block" : "none";
+});
+
+// Después de enviar el parte con éxito, si se eligió una SIM, la marca
+// como usada en el cliente del servicio (sale del stock del técnico).
+async function asignarSimInstaladaAlCliente(data) {
+  const sim = getSimAInstalarSeleccionada();
+  if (!sim || !data.cliente) return;
+  try {
+    const res = await fetch("/api/sim-uso", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({
+        accion: "usar",
+        numero: sim.numero,
+        tecnico: data.tecnico || tecnicoLogueado || "",
+        cliente: data.cliente,
+        numero_servicio: data.numero_servicio || "",
+      }),
+    });
+    const respuesta = await res.json();
+    if (!res.ok) throw new Error(respuesta.error || "Error desconocido");
+  } catch (err) {
+    showToast("⚠ El parte se envió, pero no se pudo registrar la SIM instalada: " + err.message);
+  }
 }
 
 backToListBtn.addEventListener("click", () => {
@@ -1622,6 +1693,7 @@ function resetForm() {
   autocompletarTecnico();
   autocompletarFecha();
   mostrarVisitaAnterior();
+  cargarOpcionesSimInstalar();
   clearSignature();
 }
 
@@ -1966,6 +2038,7 @@ confirmSignBtn.addEventListener("click", async () => {
   if (oficinaOk) {
     verificarYSugerirCercanos(data);
     verificarPrimerServicioSinVehiculo(data);
+    asignarSimInstaladaAlCliente(data);
   }
 
   let mensajeFoto = "";

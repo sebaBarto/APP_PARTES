@@ -757,6 +757,18 @@
         <textarea class="field-input field-textarea" id="f_materiales" placeholder="Otros materiales / detalles adicionales que no estén en las categorías" style="margin-top:8px;"></textarea>
       </div>
 
+      <div id="simInstalarWrap" class="field-group hidden">
+        <label class="check-inline">
+          <input type="checkbox" id="f_instalar_sim">
+          <span>Instalé una SIM de mi stock en este servicio</span>
+        </label>
+        <div id="simInstalarSelectWrap" style="display:none; margin-top:8px;">
+          <select class="field-input" id="simInstalarSelect">
+            <option value="" disabled selected>Elegí la SIM que instalaste</option>
+          </select>
+        </div>
+      </div>
+
       <div class="field-group">
         <label class="field-label" for="f_materiales_retirados">Materiales retirados</label>
         <textarea class="field-input field-textarea" id="f_materiales_retirados" placeholder="Materiales retirados del sitio"></textarea>

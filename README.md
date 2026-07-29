@@ -718,6 +718,21 @@ gratuito) y agrega automáticamente el header de autorización con
 
 ## SIMs de los técnicos
 
+**Instalar una SIM desde el propio formulario del parte**: en la
+sección de materiales del formulario, si el técnico logueado tiene
+alguna SIM en stock, aparece un check "Instalé una SIM de mi stock en
+este servicio" — al tildarlo, elige cuál (de las que tiene en stock)
+en un desplegable. Al enviarse el parte con éxito, esa SIM sale sola
+del stock del técnico y queda asignada al cliente del servicio (igual
+que si la hubiera marcado como "usada" desde la pantalla de SIMs) —
+queda registrado en `sims-historial.json`, y también se agrega un
+renglón en el campo de materiales del parte ("SIM Movistar Estándar
+341...").
+
+Si el login de oficina/general carga el parte (sin stock propio), o el
+técnico no tiene ninguna SIM en stock, esta opción directamente no
+aparece.
+
 Botón "📶 SIMs" en el panel principal. Cada técnico tiene un stock de
 chips (Movistar Estándar/Mini, Personal, Claro), identificados por
 número de teléfono.
