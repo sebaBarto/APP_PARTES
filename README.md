@@ -610,6 +610,17 @@ naranja vivo):
   (`qrcodejs`, cargada por CDN en `index.html`), sin ningún servicio
   externo ni costo.
 
+## Panel principal con el mismo estilo que el login
+
+El panel principal (donde están los botones grandes de Servicios
+Técnicos, Manuales, Dashboards, etc.) tiene el mismo fondo azul oscuro
+que la pantalla de login, con el logo de SAT arriba de todo, y los
+botones en tarjetas claras de alto contraste sobre ese fondo oscuro
+(en vez del fondo blanco que tenían antes) — para que sean fáciles de
+ver de un vistazo. El resto de las pantallas (listado de servicios,
+formulario, dashboards, etc.) siguen con el fondo claro de siempre, no
+se tocaron.
+
 ## Vehículos de la empresa
 
 Botón "🚗 Vehículos" en el panel principal, con la flota que se cargue
