@@ -520,14 +520,16 @@ hay que actualizar los dos lugares**: `APP_VERSION` en `app.js` y
 `app_version_actual` (dentro de `CONFIG_DEFAULT`) en `api/config.js` —
 tienen que quedar iguales entre sí en cada publicación.
 
-## Acceso directo al panel de administración (solo Sebastian Bartolozzi)
+## Acceso directo al panel de administración (Sebastian Bartolozzi y Brenda Thiesing)
 
-Al loguearse con la contraseña de Sebastian Bartolozzi, en el listado
-de servicios aparece un botón "🛠 Panel de administración" que abre
-`admin.html` directo (en una pestaña nueva) — sin tener que escribir la
-URL a mano. Ese panel sigue teniendo su propia contraseña (la de
-`ADMIN_PASSWORD` en `admin.html`), este botón es solo un atajo, no la
-reemplaza.
+Al loguearse con la contraseña de Sebastian Bartolozzi o de Brenda
+Thiesing, en el panel principal aparece un botón "🛠 Panel de
+administración" que abre `admin.html` directo (en una pestaña nueva) —
+sin tener que escribir la URL a mano. Ese panel sigue teniendo su
+propia contraseña (la de `ADMIN_PASSWORD` en `admin.html`), este botón
+es solo un atajo, no la reemplaza. (El dashboard financiero sigue
+siendo exclusivo de Sebastian Bartolozzi — este acceso directo al
+panel de administración es lo único que también ve Brenda.)
 
 ## Consultas a manuales con IA (gratis, con Gemini)
 
