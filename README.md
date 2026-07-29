@@ -612,14 +612,13 @@ naranja vivo):
 
 ## Panel principal con el mismo estilo que el login
 
-El panel principal (donde están los botones grandes de Servicios
-Técnicos, Manuales, Dashboards, etc.) tiene el mismo fondo azul oscuro
-que la pantalla de login, con el logo de SAT arriba de todo, y los
-botones en tarjetas claras de alto contraste sobre ese fondo oscuro
-(en vez del fondo blanco que tenían antes) — para que sean fáciles de
-ver de un vistazo. El resto de las pantallas (listado de servicios,
-formulario, dashboards, etc.) siguen con el fondo claro de siempre, no
-se tocaron.
+Toda la app (no solo el panel principal) usa ahora el mismo fondo azul
+oscuro que la pantalla de login, con los botones "Volver"/"Actualizar"
+en texto claro para verse bien sobre ese fondo. Las tarjetas que ya
+tenían fondo blanco propio (servicios, cronograma, dashboards,
+historial, credencial, guardias, etc.) se dejaron igual — se ven como
+tarjetas claras flotando sobre el fondo oscuro. El panel principal
+además tiene el logo de SAT arriba de todo.
 
 ## Vehículos de la empresa
 
