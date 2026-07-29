@@ -437,6 +437,34 @@
         </div>
         <button type="button" class="btn btn-primary" id="vehiculoDevolverBtn">Devolver vehículo</button>
       </div>
+
+      <div id="vehiculoEventoSinDevolverWrap" class="hidden" style="margin-top:18px;">
+        <p class="dash-subtitulo" style="margin-top:0;">Registrar un evento sin devolver el vehículo</p>
+        <div class="field-group">
+          <label class="field-label" for="vehiculoTipoEventoSelect">Tipo de evento</label>
+          <select class="field-input" id="vehiculoTipoEventoSelect">
+            <option value="" disabled selected>Elegí un tipo</option>
+            <option value="Carga de combustible">Carga de combustible</option>
+            <option value="Gomería">Gomería</option>
+            <option value="Mecánico">Mecánico</option>
+            <option value="Lavadero">Lavadero</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="vehiculoEventoKm">Kilometraje actual del vehículo</label>
+          <input class="field-input field-mono" id="vehiculoEventoKm" type="number" min="0">
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="vehiculoEventoMonto">Monto del ticket (opcional)</label>
+          <input class="field-input field-mono" id="vehiculoEventoMonto" type="number" min="0" placeholder="$">
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="vehiculoEventoDetalleTexto">Detalle (opcional)</label>
+          <input class="field-input" id="vehiculoEventoDetalleTexto" type="text" placeholder="Alguna aclaración">
+        </div>
+        <button type="button" class="btn btn-secondary" id="vehiculoRegistrarEventoBtn">Registrar evento</button>
+      </div>
     </div>
     <div class="action-bar">
       <button class="btn btn-secondary" id="volverDeVehiculoDetalleBtn" type="button">Volver</button>

@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.4.5";
+const APP_VERSION = "3.4.6";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -217,6 +217,12 @@ const vehiculoTomarWrap = document.getElementById("vehiculoTomarWrap");
 const vehiculoHoraToma = document.getElementById("vehiculoHoraToma");
 const vehiculoTomarBtn = document.getElementById("vehiculoTomarBtn");
 const vehiculoDevolverWrap = document.getElementById("vehiculoDevolverWrap");
+const vehiculoEventoSinDevolverWrap = document.getElementById("vehiculoEventoSinDevolverWrap");
+const vehiculoTipoEventoSelect = document.getElementById("vehiculoTipoEventoSelect");
+const vehiculoEventoKm = document.getElementById("vehiculoEventoKm");
+const vehiculoEventoMonto = document.getElementById("vehiculoEventoMonto");
+const vehiculoEventoDetalleTexto = document.getElementById("vehiculoEventoDetalleTexto");
+const vehiculoRegistrarEventoBtn = document.getElementById("vehiculoRegistrarEventoBtn");
 const vehiculoEnUsoInfo = document.getElementById("vehiculoEnUsoInfo");
 const vehiculoHoraDevolucion = document.getElementById("vehiculoHoraDevolucion");
 const vehiculoKmDevolucion = document.getElementById("vehiculoKmDevolucion");
@@ -3022,6 +3028,7 @@ async function renderVehiculoDetalle() {
   vehiculoAlertasWrap.classList.add("hidden");
   vehiculoTomarWrap.classList.add("hidden");
   vehiculoDevolverWrap.classList.add("hidden");
+  vehiculoEventoSinDevolverWrap.classList.add("hidden");
   try {
     const [config, historial] = await Promise.all([fetchVehiculosConfig(), fetchVehiculosHistorial()]);
     const vConfig = config.find((v) => v.nombre === vehiculoSeleccionado) || { nombre: vehiculoSeleccionado, km_actual: 0, umbrales: [] };
@@ -3055,6 +3062,14 @@ async function renderVehiculoDetalle() {
       vehiculoEventoDetalleWrap.classList.remove("hidden");
       vehiculoEventoDetalleWrap.style.display = "none";
       vehiculoDevolverWrap.classList.remove("hidden");
+
+      // Mientras tenga el vehículo tomado, también puede registrar un
+      // evento (combustible, gomería, mecánico, lavadero) sin devolverlo.
+      vehiculoTipoEventoSelect.value = "";
+      vehiculoEventoKm.value = "";
+      vehiculoEventoMonto.value = "";
+      vehiculoEventoDetalleTexto.value = "";
+      vehiculoEventoSinDevolverWrap.classList.remove("hidden");
     } else {
       vehiculoEnUsoInfo.textContent = `Este vehículo lo tiene ${abierto.tecnico} desde las ${abierto.hora_toma}. No se puede tomar hasta que lo devuelva.`;
       vehiculoDevolverWrap.classList.remove("hidden");
@@ -3071,6 +3086,44 @@ async function renderVehiculoDetalle() {
 
 vehiculoEvento.addEventListener("change", () => {
   vehiculoEventoDetalleWrap.style.display = vehiculoEvento.value ? "block" : "none";
+});
+
+vehiculoRegistrarEventoBtn.addEventListener("click", async () => {
+  const tipoEvento = vehiculoTipoEventoSelect.value;
+  const km = vehiculoEventoKm.value;
+  if (!tipoEvento) {
+    showToast("Elegí el tipo de evento.");
+    return;
+  }
+  if (!km) {
+    showToast("Cargá el kilometraje actual del vehículo.");
+    return;
+  }
+  vehiculoRegistrarEventoBtn.disabled = true;
+  try {
+    const res = await fetch("/api/vehiculo-uso", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({
+        accion: "evento",
+        vehiculo: vehiculoSeleccionado,
+        tecnico: tecnicoLogueado || "Oficina",
+        hora: horaActualHHMM(),
+        tipo_evento: tipoEvento,
+        km,
+        monto: vehiculoEventoMonto.value || "",
+        detalle: vehiculoEventoDetalleTexto.value.trim(),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    showToast(`Evento registrado: ${tipoEvento}.`);
+    renderVehiculoDetalle();
+  } catch (err) {
+    showToast("No se pudo registrar: " + err.message);
+  } finally {
+    vehiculoRegistrarEventoBtn.disabled = false;
+  }
 });
 
 vehiculoTomarBtn.addEventListener("click", async () => {
@@ -3209,12 +3262,21 @@ function renderDashVehiculos() {
     }
     const card = document.createElement("div");
     card.className = "historial-card";
-    card.innerHTML = `
-      <div class="historial-card-num">${h.vehiculo || ""}</div>
-      <div class="historial-card-cliente">${h.tecnico || ""}</div>
-      <div class="historial-card-direccion">${fechaTexto} — ${h.hora_toma || "?"} a ${h.hora_devolucion || "(en uso)"}</div>
-      <div class="historial-card-horario">Km devolución: ${h.km_devolucion || "—"}${h.evento ? " · ⚠ " + h.evento : ""}</div>
-    `;
+    if (h.accion === "evento") {
+      card.innerHTML = `
+        <div class="historial-card-num">${h.vehiculo || ""}</div>
+        <div class="historial-card-cliente">${h.tecnico || ""} — ${h.tipo_evento || "Evento"}</div>
+        <div class="historial-card-direccion">${fechaTexto}${h.hora ? " " + h.hora : ""} — Km: ${h.km || "?"}</div>
+        <div class="historial-card-horario">${h.monto ? "Monto: $" + h.monto : ""}${h.detalle ? (h.monto ? " · " : "") + h.detalle : ""}</div>
+      `;
+    } else {
+      card.innerHTML = `
+        <div class="historial-card-num">${h.vehiculo || ""}</div>
+        <div class="historial-card-cliente">${h.tecnico || ""}</div>
+        <div class="historial-card-direccion">${fechaTexto} — ${h.hora_toma || "?"} a ${h.hora_devolucion || "(en uso)"}</div>
+        <div class="historial-card-horario">Km devolución: ${h.km_devolucion || "—"}${h.evento ? " · ⚠ " + h.evento : ""}</div>
+      `;
+    }
     dashVehiculosList.appendChild(card);
   });
 }
@@ -3229,10 +3291,16 @@ descargarExcelVehiculosBtn.addEventListener("click", () => {
     Vehículo: h.vehiculo || "",
     Técnico: h.tecnico || "",
     Fecha: h.fecha || "",
+    "Tipo de registro": h.accion === "evento" ? "Evento" : "Toma/devolución",
     "Hora toma": h.hora_toma || "",
     "Hora devolución": h.hora_devolucion || "",
     "Km devolución": h.km_devolucion || "",
     Evento: h.evento || "",
+    "Tipo de evento": h.tipo_evento || "",
+    "Hora del evento": h.hora || "",
+    "Km del evento": h.km || "",
+    "Monto del evento": h.monto || "",
+    "Detalle del evento": h.detalle || "",
   }));
   const hoja = XLSX.utils.json_to_sheet(filas);
   const libro = XLSX.utils.book_new();

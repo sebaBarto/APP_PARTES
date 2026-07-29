@@ -145,7 +145,46 @@ module.exports = async (req, res) => {
         return;
       }
 
-      res.status(400).json({ error: "Acción desconocida (usar 'tomar' o 'devolver')" });
+      // Registra un evento del vehículo (carga de combustible, gomería,
+      // mecánico, lavadero, etc.) SIN devolverlo — el técnico lo sigue
+      // teniendo tomado. Actualiza el kilometraje actual igual que una
+      // devolución, ya que es una buena oportunidad para tenerlo al día.
+      if (accion === "evento") {
+        const abierto = [...historial].reverse().find((h) => h.vehiculo === vehiculo && h.tecnico === tecnico && !h.hora_devolucion);
+        if (!abierto) {
+          res.status(404).json({ error: "No tenés ese vehículo tomado en este momento" });
+          return;
+        }
+        if (!body.tipo_evento || !body.km) {
+          res.status(400).json({ error: "Falta el tipo de evento o el kilometraje" });
+          return;
+        }
+
+        historial.push({
+          vehiculo,
+          tecnico,
+          fecha: new Date().toISOString().slice(0, 10),
+          hora: body.hora || "",
+          accion: "evento",
+          tipo_evento: body.tipo_evento,
+          km: body.km,
+          monto: body.monto || "",
+          detalle: body.detalle || "",
+        });
+        await guardarJSON(ghHeaders, HISTORIAL_PATH, historial, shaHistorial);
+
+        const { data: vehiculosConfig, sha: shaConfig } = await leerJSON(ghHeaders, CONFIG_PATH, CONFIG_DEFAULT);
+        const v = vehiculosConfig.find((x) => x.nombre === vehiculo);
+        if (v) {
+          v.km_actual = Number(body.km) || v.km_actual;
+          await guardarJSON(ghHeaders, CONFIG_PATH, vehiculosConfig, shaConfig);
+        }
+
+        res.status(200).json({ ok: true });
+        return;
+      }
+
+      res.status(400).json({ error: "Acción desconocida (usar 'tomar', 'devolver' o 'evento')" });
     } catch (err) {
       res.status(500).json({ error: "Error interno al registrar el uso del vehículo", detail: String(err.message || err) });
     }

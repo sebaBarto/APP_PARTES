@@ -871,6 +871,17 @@ o en uso (por quién y desde qué hora). Al entrar a uno:
 - Si lo tiene otro técnico, se avisa quién y desde cuándo, sin dejar
   tomarlo hasta que lo devuelva (para no pisarse).
 
+**Registrar un evento sin devolver el vehículo**: mientras lo tengas
+tomado, además de poder devolverlo, aparece una sección aparte
+"Registrar un evento sin devolver el vehículo" — sirve para anotar una
+carga de combustible, una parada en la gomería, en el mecánico, o en
+el lavadero, sin cortar el uso del vehículo. Se carga el tipo de
+evento, el kilometraje actual (obligatorio — también actualiza el
+kilometraje del vehículo, igual que al devolverlo), el monto del
+ticket (opcional), y un detalle opcional. Queda registrado en el mismo
+historial que las tomas/devoluciones (`vehiculos-historial.json`), y
+se ve tanto en el Dashboard de vehículos como en su descarga a Excel.
+
 **Administrar la flota**: en `admin.html` → pestaña "Vehículos":
 - "+ Agregar vehículo" para sumar uno nuevo (nombre y kilometraje
   inicial).
