@@ -50,10 +50,10 @@
   .hidden { display: none; }
   .field-row { display: flex; gap: 10px; }
   .field-row > div { flex: 1; }
-  .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+  .tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 18px; }
   .tab-btn {
-    width: auto; flex: 1 1 auto; min-width: 90px; background: #FFFFFF; color: #6B7680; border: 1.5px solid #D8DCD4;
-    padding: 10px; font-size: 13px;
+    width: auto; background: #FFFFFF; color: #6B7680; border: 1.5px solid #D8DCD4;
+    padding: 10px 6px; font-size: 12px;
   }
   .tab-btn.active { background: #101820; color: #F5A623; border-color: #101820; }
   .tecnicos-filas { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
