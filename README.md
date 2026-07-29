@@ -35,6 +35,17 @@ agregando el botón en `screen-home` de `index.html`).
 
 ## Acceso con contraseña (una por técnico) — administrable
 
+**La sesión queda guardada en el celular por 12 horas**, y se renueva
+sola cada vez que se abre la app dentro de ese plazo — así no hace
+falta escribir la contraseña cada vez que se cierra la app. Si pasan
+12 horas seguidas sin abrirla, vuelve a pedir usuario y contraseña. En
+el panel principal hay un botón "Cerrar sesión" para salir a mano
+(por ejemplo, si varios comparten un mismo celular). El tiempo de la
+sesión es la constante `SESION_DURACION_MS` al principio de la sección
+de login en `app.js` — se puede ajustar fácil si 12 horas queda corto
+o largo.
+
+
 Cada técnico tiene su propia contraseña, pero ahora **se administra
 desde `admin.html`** (pestaña "Técnicos"), no hace falta tocar código
 para agregar, sacar o cambiar la clave de alguien:

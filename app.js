@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.3.0";
+const APP_VERSION = "3.3.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -166,6 +166,7 @@ const descargarExcelDashboardBtn = document.getElementById("descargarExcelDashbo
 const descargarExcelDashboardFinBtn = document.getElementById("descargarExcelDashboardFinBtn");
 const panelSaludo = document.getElementById("panelSaludo");
 const activarNotificacionesBtn = document.getElementById("activarNotificacionesBtn");
+const cerrarSesionBtn = document.getElementById("cerrarSesionBtn");
 const abrirAdminBtn = document.getElementById("abrirAdminBtn");
 const tileServiciosBtn = document.getElementById("tileServiciosBtn");
 const tileDashboardsBtn = document.getElementById("tileDashboardsBtn");
@@ -342,6 +343,54 @@ function poblarSelectsTecnico() {
   }
 }
 
+// La sesión se guarda en el celular y se renueva cada vez que se usa
+// la app — si pasan 12 horas seguidas sin abrirla, pide loguearse de
+// nuevo. Así no hace falta escribir la contraseña cada vez que se
+// cierra la app, pero tampoco queda una sesión abierta para siempre.
+const SESION_DURACION_MS = 12 * 60 * 60 * 1000; // 12 horas
+
+function guardarSesion(tecnico) {
+  localStorage.setItem("sesion_sat", JSON.stringify({ tecnico: tecnico || "", expira: Date.now() + SESION_DURACION_MS }));
+}
+
+function borrarSesion() {
+  localStorage.removeItem("sesion_sat");
+  localStorage.removeItem("tecnico_logueado"); // clave vieja, ya no se usa
+}
+
+function entrarComoTecnico(nombreTecnico) {
+  tecnicoLogueado = nombreTecnico || "";
+  guardarSesion(tecnicoLogueado);
+  loginError.textContent = "";
+  actualizarAccesoDashboardFinanciero();
+  showScreen("home");
+  fetchServicios();
+  precargarHistorialParaVisitas();
+  precargarCronogramaParaSugerencias();
+  actualizarAccesoCredencial();
+  actualizarAccesoExcelDashboards();
+  actualizarSaludoPanel();
+  verificarEstadoNotificaciones();
+  actualizarBadgeColaEnvios();
+  procesarColaEnvios();
+}
+
+// Si hay una sesión guardada y todavía no venció, entra directo sin
+// pedir usuario/contraseña de nuevo.
+function intentarRestaurarSesion() {
+  try {
+    const guardada = JSON.parse(localStorage.getItem("sesion_sat") || "null");
+    if (guardada && typeof guardada.expira === "number" && guardada.expira > Date.now()) {
+      entrarComoTecnico(guardada.tecnico || "");
+      return true;
+    }
+  } catch (err) {
+    // sesión guardada corrupta — se ignora y se borra abajo
+  }
+  borrarSesion();
+  return false;
+}
+
 function attemptLogin() {
   const usuarioElegido = loginTecnicoSelect.value;
   const intento = loginPassword.value;
@@ -356,24 +405,7 @@ function attemptLogin() {
     : tecnicosPasswords[usuarioElegido] === intento;
 
   if (esValido) {
-    tecnicoLogueado = usuarioElegido === "__general__" ? "" : usuarioElegido;
-    if (tecnicoLogueado) {
-      localStorage.setItem("tecnico_logueado", tecnicoLogueado);
-    } else {
-      localStorage.removeItem("tecnico_logueado");
-    }
-    loginError.textContent = "";
-    actualizarAccesoDashboardFinanciero();
-    showScreen("home");
-    fetchServicios();
-    precargarHistorialParaVisitas();
-    precargarCronogramaParaSugerencias();
-    actualizarAccesoCredencial();
-    actualizarAccesoExcelDashboards();
-    actualizarSaludoPanel();
-    verificarEstadoNotificaciones();
-    actualizarBadgeColaEnvios();
-    procesarColaEnvios();
+    entrarComoTecnico(usuarioElegido === "__general__" ? "" : usuarioElegido);
   } else {
     loginError.textContent = "Contraseña incorrecta.";
     loginPassword.value = "";
@@ -434,6 +466,14 @@ function actualizarAccesoDashboardFinanciero() {
 loginBtn.addEventListener("click", attemptLogin);
 loginPassword.addEventListener("keydown", (e) => {
   if (e.key === "Enter") attemptLogin();
+});
+
+cerrarSesionBtn.addEventListener("click", () => {
+  borrarSesion();
+  tecnicoLogueado = "";
+  loginTecnicoSelect.value = "";
+  loginPassword.value = "";
+  showScreen("login");
 });
 
 // ---------- Listado de servicios pendientes ----------
@@ -3111,3 +3151,7 @@ actualizarAppBtn.addEventListener("click", async () => {
     location.reload();
   }
 });
+
+// Al abrir la app, si hay una sesión guardada y vigente, entra directo
+// sin pasar por el login (ver SESION_DURACION_MS más arriba).
+intentarRestaurarSesion();
