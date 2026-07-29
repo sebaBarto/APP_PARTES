@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.3.1";
+const APP_VERSION = "3.3.2";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -344,10 +344,10 @@ function poblarSelectsTecnico() {
 }
 
 // La sesión se guarda en el celular y se renueva cada vez que se usa
-// la app — si pasan 12 horas seguidas sin abrirla, pide loguearse de
+// la app — si pasan 6 horas seguidas sin abrirla, pide loguearse de
 // nuevo. Así no hace falta escribir la contraseña cada vez que se
 // cierra la app, pero tampoco queda una sesión abierta para siempre.
-const SESION_DURACION_MS = 12 * 60 * 60 * 1000; // 12 horas
+const SESION_DURACION_MS = 6 * 60 * 60 * 1000; // 6 horas
 
 function guardarSesion(tecnico) {
   localStorage.setItem("sesion_sat", JSON.stringify({ tecnico: tecnico || "", expira: Date.now() + SESION_DURACION_MS }));
