@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.1.6";
+const APP_VERSION = "3.1.7";
 
 // Contraseña propia por técnico (se valida en el propio celular, no es
 // un login con servidor — solo para que no cualquiera que abra la URL
@@ -257,7 +257,7 @@ let tecnicosPasswords = { ...TECNICOS_PASSWORDS_RESPALDO };
 async function cargarTecnicos() {
   try {
     const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
-    const res = await fetch("/api/tecnicos", { headers, cache: "no-store" });
+    const res = await fetch("/api/datos?coleccion=tecnicos", { headers, cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     if (Array.isArray(data) && data.length > 0) {
@@ -410,7 +410,7 @@ let DIAS_URGENTE = 7;
 async function cargarConfig() {
   try {
     const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
-    const res = await fetch("/api/config", { headers, cache: "no-store" });
+    const res = await fetch("/api/datos?coleccion=config", { headers, cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     if (data.dias_atencion) DIAS_ATENCION = data.dias_atencion;
@@ -1042,7 +1042,7 @@ let materialesAgregados = [];
 async function cargarMaterialesCatalogo() {
   try {
     const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
-    const res = await fetch("/api/materiales-catalogo", { headers, cache: "no-store" });
+    const res = await fetch("/api/datos?coleccion=materiales", { headers, cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     if (Array.isArray(data) && data.length > 0) {
@@ -2239,7 +2239,7 @@ let consultasCategoriasCargadas = false;
 async function cargarConsultasCategorias() {
   try {
     const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
-    const res = await fetch("/api/consultas-categorias", { headers, cache: "no-store" });
+    const res = await fetch("/api/datos?coleccion=consultas-categorias", { headers, cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     consultasCategoriasCache = Array.isArray(data) ? data : [];
@@ -2326,7 +2326,7 @@ async function cargarYRenderGuardias() {
   guardiaProximosList.innerHTML = "";
   try {
     const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
-    const res = await fetch("/api/guardias-config", { headers, cache: "no-store" });
+    const res = await fetch("/api/datos?coleccion=guardias", { headers, cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     const secuencia = data.secuencia || [];
@@ -2475,7 +2475,7 @@ async function actualizarAccesoCredencial() {
   }
   try {
     const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
-    const res = await fetch("/api/credenciales", { headers, cache: "no-store" });
+    const res = await fetch("/api/datos?coleccion=credenciales", { headers, cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     const tieneCredencial = (Array.isArray(data) ? data : []).some((c) => c.nombre === tecnicoLogueado);
@@ -2490,7 +2490,7 @@ async function fetchYRenderCredencial() {
   credencialCardWrap.classList.add("hidden");
   try {
     const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
-    const res = await fetch("/api/credenciales", { headers, cache: "no-store" });
+    const res = await fetch("/api/datos?coleccion=credenciales", { headers, cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     const propia = (Array.isArray(data) ? data : []).find((c) => c.nombre === tecnicoLogueado);

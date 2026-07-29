@@ -352,7 +352,7 @@ async function cargarTecnicosAdmin() {
   tecnicosStatus.textContent = "Cargando técnicos...";
   tecnicosFilas.innerHTML = "";
   try {
-    const res = await fetch("/api/tecnicos", {
+    const res = await fetch("/api/datos?coleccion=tecnicos", {
       headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
       cache: "no-store",
     });
@@ -390,7 +390,7 @@ guardarTecnicosBtn.addEventListener("click", async () => {
   guardarTecnicosStatus.className = "status";
   guardarTecnicosStatus.textContent = "Guardando...";
   try {
-    const res = await fetch("/api/tecnicos", {
+    const res = await fetch("/api/datos?coleccion=tecnicos", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -466,7 +466,7 @@ const configStatus = document.getElementById("configStatus");
 
 async function cargarConfigAdmin() {
   try {
-    const res = await fetch("/api/config", {
+    const res = await fetch("/api/datos?coleccion=config", {
       headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
       cache: "no-store",
     });
@@ -494,7 +494,7 @@ guardarConfigBtn.addEventListener("click", async () => {
   configStatus.className = "status";
   configStatus.textContent = "Guardando...";
   try {
-    const res = await fetch("/api/config", {
+    const res = await fetch("/api/datos?coleccion=config", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -550,7 +550,7 @@ async function cargarMaterialesAdmin() {
   materialesStatus.textContent = "Cargando catálogo...";
   categoriasFilas.innerHTML = "";
   try {
-    const res = await fetch("/api/materiales-catalogo", {
+    const res = await fetch("/api/datos?coleccion=materiales", {
       headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
       cache: "no-store",
     });
@@ -591,7 +591,7 @@ guardarMaterialesBtn.addEventListener("click", async () => {
   guardarMaterialesStatus.className = "status";
   guardarMaterialesStatus.textContent = "Guardando...";
   try {
-    const res = await fetch("/api/materiales-catalogo", {
+    const res = await fetch("/api/datos?coleccion=materiales", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -646,7 +646,7 @@ async function cargarConsultasCatAdmin() {
   consultasCatStatus.textContent = "Cargando categorías...";
   consultasCatFilas.innerHTML = "";
   try {
-    const res = await fetch("/api/consultas-categorias", {
+    const res = await fetch("/api/datos?coleccion=consultas-categorias", {
       headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
       cache: "no-store",
     });
@@ -680,7 +680,7 @@ guardarConsultasCatBtn.addEventListener("click", async () => {
   guardarConsultasCatStatus.className = "status";
   guardarConsultasCatStatus.textContent = "Guardando...";
   try {
-    const res = await fetch("/api/consultas-categorias", {
+    const res = await fetch("/api/datos?coleccion=consultas-categorias", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -744,7 +744,7 @@ async function cargarGuardiasAdmin() {
   guardiasStatus.textContent = "Cargando configuración de guardias...";
   guardiasFilas.innerHTML = "";
   try {
-    const res = await fetch("/api/guardias-config", {
+    const res = await fetch("/api/datos?coleccion=guardias", {
       headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
       cache: "no-store",
     });
@@ -785,7 +785,7 @@ guardarGuardiasBtn.addEventListener("click", async () => {
   guardarGuardiasStatus.className = "status";
   guardarGuardiasStatus.textContent = "Guardando...";
   try {
-    const res = await fetch("/api/guardias-config", {
+    const res = await fetch("/api/datos?coleccion=guardias", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -893,7 +893,7 @@ async function cargarCredencialesAdmin() {
   credencialesStatus.textContent = "Cargando credenciales...";
   credencialesFilas.innerHTML = "";
   try {
-    const res = await fetch("/api/credenciales", {
+    const res = await fetch("/api/datos?coleccion=credenciales", {
       headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
       cache: "no-store",
     });
@@ -931,7 +931,7 @@ guardarCredencialesBtn.addEventListener("click", async () => {
   guardarCredencialesStatus.className = "status";
   guardarCredencialesStatus.textContent = "Guardando...";
   try {
-    const res = await fetch("/api/credenciales", {
+    const res = await fetch("/api/datos?coleccion=credenciales", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

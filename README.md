@@ -623,6 +623,28 @@ mismo repo privado de datos (`guardias-config.json`).
   contraseña en texto plano para revisar que esté bien escrita; vuelve
   a ocultarse tocándolo de nuevo. Por defecto siempre arranca oculta.
 
+## Límite de funciones serverless (plan Hobby de Vercel)
+
+El plan gratuito de Vercel permite **como máximo 12 funciones
+serverless** por proyecto (cada archivo dentro de `/api` cuenta como
+una). Ya llegamos a ese límite una vez — por eso varios endpoints
+chicos que hacían básicamente lo mismo (leer/guardar un archivo de
+configuración) se unificaron en uno solo:
+
+**`/api/datos.js`** — reemplaza a los antiguos `config.js`,
+`tecnicos.js`, `materiales-catalogo.js`, `consultas-categorias.js`,
+`guardias-config.js` y `credenciales.js`. Se usa con un parámetro
+`?coleccion=<nombre>` (`config`, `tecnicos`, `materiales`,
+`consultas-categorias`, `guardias`, `credenciales`).
+
+Quedan **8 funciones en total** (`servicios`, `cronograma`, `geocode`,
+`historial`, `upload-foto`, `foto`, `consultas`, `datos`) — hay margen
+para agregar hasta 4 más antes de volver a toparnos con el límite. Si
+hiciera falta una función completamente nueva que no encaje como una
+colección más dentro de `datos.js`, revisar primero si conviene sumarla
+ahí (agregando una entrada a `COLECCIONES`) en vez de crear un archivo
+nuevo en `/api`.
+
 ## Notas y límites de esta versión
 
 - El **ID de parte** se genera por fecha/hora + un número al azar — no es
