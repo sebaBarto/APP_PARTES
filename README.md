@@ -578,6 +578,16 @@ administra desde `admin.html` → pestaña "Guardias":
 No hace falta ninguna variable de entorno nueva — se guarda en el
 mismo repo privado de datos (`guardias-config.json`).
 
+## Foto: cámara o galería, y contraseñas con "ojito"
+
+- El campo de foto del formulario ahora deja elegir entre sacar una
+  foto nueva con la cámara o subir una ya existente de la galería —
+  antes iba directo a la cámara sin dar la opción.
+- Todos los campos de contraseña (login de la app y de `admin.html`)
+  tienen un botón de "ojito" (👁) al lado — al tocarlo, muestra la
+  contraseña en texto plano para revisar que esté bien escrita; vuelve
+  a ocultarse tocándolo de nuevo. Por defecto siempre arranca oculta.
+
 ## Notas y límites de esta versión
 
 - El **ID de parte** se genera por fecha/hora + un número al azar — no es

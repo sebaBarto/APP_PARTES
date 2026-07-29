@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.0.8";
+const APP_VERSION = "3.0.9";
 
 // Contraseña propia por técnico (se valida en el propio celular, no es
 // un login con servidor — solo para que no cualquiera que abra la URL
@@ -84,6 +84,18 @@ const actualizarAppStatus = document.getElementById("actualizarAppStatus");
 const nuevaVersionAviso = document.getElementById("nuevaVersionAviso");
 const loginTecnicoSelect = document.getElementById("loginTecnicoSelect");
 const loginPassword = document.getElementById("loginPassword");
+
+// Botón de "ojito" para mostrar/ocultar contraseña — reutilizable en
+// cualquier campo de este tipo. Arranca siempre oculta por defecto.
+function habilitarOjitoContrasena(inputEl, btnEl) {
+  btnEl.addEventListener("click", () => {
+    const oculta = inputEl.type === "password";
+    inputEl.type = oculta ? "text" : "password";
+    btnEl.textContent = oculta ? "🙈" : "👁";
+    btnEl.classList.toggle("activo", oculta);
+  });
+}
+habilitarOjitoContrasena(loginPassword, document.getElementById("loginPasswordToggle"));
 const loginError = document.getElementById("loginError");
 document.getElementById("appVersion").textContent = "v" + APP_VERSION;
 const refreshServiciosBtn = document.getElementById("refreshServiciosBtn");

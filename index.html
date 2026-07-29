@@ -42,7 +42,10 @@
       <select class="field-input login-input" id="loginTecnicoSelect">
         <option value="" disabled selected>Elegí tu usuario</option>
       </select>
-      <input class="field-input login-input" id="loginPassword" type="password" placeholder="Contraseña" autocomplete="current-password">
+      <div class="password-field-wrap">
+        <input class="field-input login-input" id="loginPassword" type="password" placeholder="Contraseña" autocomplete="current-password">
+        <button type="button" class="password-toggle-btn" id="loginPasswordToggle" title="Mostrar/ocultar contraseña">👁</button>
+      </div>
       <p class="login-error" id="loginError"></p>
     </div>
     <div class="action-bar action-bar-column">
@@ -580,7 +583,7 @@
 
       <div class="field-group">
         <label class="field-label" for="f_foto">Foto (opcional — solo se manda a la oficina)</label>
-        <input class="field-input" id="f_foto" type="file" accept="image/*" capture="environment">
+        <input class="field-input" id="f_foto" type="file" accept="image/*">
         <div id="fotoPreviewWrap" class="hidden" style="margin-top:8px;">
           <img id="fotoPreview" style="max-width:160px; border-radius:8px; display:block; border:1px solid #D8DCD4;">
           <button type="button" class="btn btn-ghost btn-small" id="quitarFotoBtn" style="margin-top:6px;">Quitar foto</button>

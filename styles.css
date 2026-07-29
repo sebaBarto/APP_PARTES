@@ -107,6 +107,24 @@ html, body {
   width: 100%;
 }
 #screen-login .login-input:focus { outline: none; border-color: #F5A623; }
+.password-field-wrap { position: relative; width: 100%; }
+.password-field-wrap .login-input,
+.password-field-wrap .field-input { padding-right: 44px; }
+.password-toggle-btn {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  opacity: 0.6;
+  cursor: pointer;
+  padding: 0;
+}
+.password-toggle-btn.activo { opacity: 1; }
 #screen-login .btn-ghost { color: #C7CCC3; border-color: #3A4652; background: transparent; }
 #screen-login .status-info { color: #9AA3A9; background: rgba(255,255,255,0.06); }
 #screen-login .action-bar { background: transparent; }

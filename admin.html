@@ -29,6 +29,15 @@
     cursor: pointer;
   }
   button:disabled { background: #C7CCC3; color: #8A9089; cursor: wait; }
+  .password-field-wrap { position: relative; width: 100%; }
+  .password-field-wrap input[type="password"], .password-field-wrap input[type="text"] { padding-right: 42px; margin-bottom: 14px; }
+  .password-toggle-btn {
+    position: absolute; right: 4px; top: 0; bottom: 14px; margin: auto 0;
+    width: 34px; height: 34px; background: transparent; border: none;
+    font-size: 15px; opacity: 0.55; cursor: pointer; padding: 0; display: flex;
+    align-items: center; justify-content: center;
+  }
+  .password-toggle-btn.activo { opacity: 1; }
   .status { font-size: 13px; margin-top: 10px; min-height: 18px; }
   .status.ok { color: #2E7D32; }
   .status.err { color: #C0392B; }
@@ -61,7 +70,10 @@
     <h1>Cargar servicios pendientes</h1>
     <p class="subtitle">Acceso restringido — solo personal de oficina.</p>
     <label for="pw">Contraseña</label>
-    <input type="password" id="pw" placeholder="Contraseña">
+    <div class="password-field-wrap">
+      <input type="password" id="pw" placeholder="Contraseña">
+      <button type="button" class="password-toggle-btn" id="pwToggle" title="Mostrar/ocultar contraseña">👁</button>
+    </div>
     <button id="pwBtn" type="button">Ingresar</button>
     <p class="status err" id="pwError"></p>
   </div>
@@ -382,6 +394,13 @@ let parsedRows = [];
 let headers = [];
 
 const pw = document.getElementById("pw");
+document.getElementById("pwToggle").addEventListener("click", () => {
+  const btn = document.getElementById("pwToggle");
+  const oculta = pw.type === "password";
+  pw.type = oculta ? "text" : "password";
+  btn.textContent = oculta ? "🙈" : "👁";
+  btn.classList.toggle("activo", oculta);
+});
 const pwBtn = document.getElementById("pwBtn");
 const pwError = document.getElementById("pwError");
 const loginCard = document.getElementById("loginCard");
