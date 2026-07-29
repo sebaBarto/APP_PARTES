@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.1.9";
+const APP_VERSION = "3.2.0";
 
 // Contraseña propia por técnico (se valida en el propio celular, no es
 // un login con servidor — solo para que no cualquiera que abra la URL
@@ -69,6 +69,7 @@ const screens = {
   mapa: document.getElementById("screen-mapa"),
   dashboard: document.getElementById("screen-dashboard"),
   dashboardFinanciero: document.getElementById("screen-dashboard-financiero"),
+  dashboardVehiculos: document.getElementById("screen-dashboard-vehiculos"),
   consultas: document.getElementById("screen-consultas"),
   guardias: document.getElementById("screen-guardias"),
   historial: document.getElementById("screen-historial"),
@@ -223,6 +224,14 @@ const consultaRespuestaWrap = document.getElementById("consultaRespuestaWrap");
 const consultaRespuestaTexto = document.getElementById("consultaRespuestaTexto");
 const consultaManualesUsados = document.getElementById("consultaManualesUsados");
 const volverDeDashboardFinancieroBtn = document.getElementById("volverDeDashboardFinancieroBtn");
+const verDashboardVehiculosBtn = document.getElementById("verDashboardVehiculosBtn");
+const volverDeDashboardVehiculosBtn = document.getElementById("volverDeDashboardVehiculosBtn");
+const refreshDashVehiculosBtn = document.getElementById("refreshDashVehiculosBtn");
+const dashVehiculosSyncLabel = document.getElementById("dashVehiculosSyncLabel");
+const dashVehiculosFiltro = document.getElementById("dashVehiculosFiltro");
+const descargarExcelVehiculosBtn = document.getElementById("descargarExcelVehiculosBtn");
+const dashVehiculosStatus = document.getElementById("dashVehiculosStatus");
+const dashVehiculosList = document.getElementById("dashVehiculosList");
 const dashFinStatus = document.getElementById("dashFinStatus");
 const dashFinPagosNum = document.getElementById("dashFinPagosNum");
 const dashFinBonificadosNum = document.getElementById("dashFinBonificadosNum");
@@ -2785,6 +2794,92 @@ vehiculoDevolverBtn.addEventListener("click", async () => {
   } finally {
     vehiculoDevolverBtn.disabled = false;
   }
+});
+
+// ---------- Dashboard de vehículos ----------
+let dashVehiculosCache = [];
+
+verDashboardVehiculosBtn.addEventListener("click", () => {
+  showScreen("dashboardVehiculos");
+  fetchDashVehiculos();
+});
+volverDeDashboardVehiculosBtn.addEventListener("click", () => showScreen("dashboardsMenu"));
+refreshDashVehiculosBtn.addEventListener("click", fetchDashVehiculos);
+dashVehiculosFiltro.addEventListener("change", renderDashVehiculos);
+
+async function fetchDashVehiculos() {
+  dashVehiculosStatus.textContent = "Cargando...";
+  dashVehiculosList.innerHTML = "";
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/vehiculo-uso", { headers, cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    dashVehiculosCache = Array.isArray(data) ? data : [];
+    dashVehiculosSyncLabel.textContent = formatSyncTime(new Date());
+    renderDashVehiculos();
+  } catch (err) {
+    dashVehiculosStatus.textContent = "No se pudo cargar el historial de vehículos.";
+  }
+}
+
+function filtrarDashVehiculos() {
+  const filtro = dashVehiculosFiltro.value;
+  return dashVehiculosCache
+    .filter((h) => !filtro || h.vehiculo === filtro)
+    .sort((a, b) => {
+      const claveA = `${a.fecha || ""} ${a.hora_toma || ""}`;
+      const claveB = `${b.fecha || ""} ${b.hora_toma || ""}`;
+      return claveB.localeCompare(claveA);
+    });
+}
+
+function renderDashVehiculos() {
+  const filtrados = filtrarDashVehiculos();
+  dashVehiculosList.innerHTML = "";
+  if (filtrados.length === 0) {
+    dashVehiculosStatus.textContent = "No hay registros para mostrar.";
+    return;
+  }
+  dashVehiculosStatus.textContent = "";
+  filtrados.forEach((h) => {
+    let fechaTexto = h.fecha || "";
+    if (h.fecha) {
+      const [y, m, d] = h.fecha.split("-");
+      fechaTexto = `${d}/${m}/${y}`;
+    }
+    const card = document.createElement("div");
+    card.className = "historial-card";
+    card.innerHTML = `
+      <div class="historial-card-num">${h.vehiculo || ""}</div>
+      <div class="historial-card-cliente">${h.tecnico || ""}</div>
+      <div class="historial-card-direccion">${fechaTexto} — ${h.hora_toma || "?"} a ${h.hora_devolucion || "(en uso)"}</div>
+      <div class="historial-card-horario">Km devolución: ${h.km_devolucion || "—"}${h.evento ? " · ⚠ " + h.evento : ""}</div>
+    `;
+    dashVehiculosList.appendChild(card);
+  });
+}
+
+descargarExcelVehiculosBtn.addEventListener("click", () => {
+  const filtrados = filtrarDashVehiculos();
+  if (filtrados.length === 0) {
+    showToast("No hay datos para descargar.");
+    return;
+  }
+  const filas = filtrados.map((h) => ({
+    Vehículo: h.vehiculo || "",
+    Técnico: h.tecnico || "",
+    Fecha: h.fecha || "",
+    "Hora toma": h.hora_toma || "",
+    "Hora devolución": h.hora_devolucion || "",
+    "Km devolución": h.km_devolucion || "",
+    Evento: h.evento || "",
+  }));
+  const hoja = XLSX.utils.json_to_sheet(filas);
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, "Vehículos");
+  const hoy = fechaActualISOVehiculo();
+  XLSX.writeFile(libro, `vehiculos_${hoy}.xlsx`);
 });
 
 // Registrar service worker para instalación como PWA

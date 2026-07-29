@@ -12,7 +12,7 @@
 const COLECCIONES = {
   config: {
     path: "config.json",
-    default: { dias_atencion: 3, dias_urgente: 7, app_version_actual: "3.1.9" },
+    default: { dias_atencion: 3, dias_urgente: 7, app_version_actual: "3.2.0" },
     mergeConDefault: true,
   },
   tecnicos: { path: "tecnicos.json", default: [] },

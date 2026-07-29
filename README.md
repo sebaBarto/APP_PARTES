@@ -621,6 +621,17 @@ existen. Se guarda en `vehiculos-config.json` (configuración y km
 actual) y `vehiculos-historial.json` (registro de cada toma/devolución),
 en el mismo repo privado de datos.
 
+## Dashboard de vehículos (con descarga a Excel)
+
+Dentro de "📊 Dashboards" → "Dashboard de vehículos": lista completa del
+historial de uso de los 3 vehículos (quién lo usó, qué día, horario de
+toma/devolución, kilometraje de devolución, y el evento particular si
+lo hubo), con un filtro para ver solo uno de los vehículos. Botón
+"⬇ Descargar Excel" que arma un `.xlsx` al vuelo (respeta el filtro
+elegido) usando SheetJS del lado del navegador — no hace falta ningún
+servidor ni variable de entorno nueva para esto. Usa el mismo
+`/api/vehiculo-uso.js` que ya alimenta la pantalla de Vehículos.
+
 ## Historial (últimos 4 días)
 
 Botón "📜 Historial" en el panel principal. Muestra, en una lista, los

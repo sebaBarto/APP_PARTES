@@ -16,6 +16,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -135,6 +136,10 @@
         <button type="button" class="panel-tile hidden" id="verDashboardFinancieroBtn">
           <span class="panel-tile-icon">💰</span>
           <span class="panel-tile-label">Dashboard financiero</span>
+        </button>
+        <button type="button" class="panel-tile" id="verDashboardVehiculosBtn">
+          <span class="panel-tile-icon">🚗</span>
+          <span class="panel-tile-label">Dashboard de vehículos</span>
         </button>
       </div>
     </div>
@@ -281,6 +286,37 @@
 
     <div class="action-bar">
       <button class="btn btn-secondary" id="volverDeDashboardFinancieroBtn" type="button">Volver</button>
+    </div>
+  </section>
+
+  <!-- DASHBOARD DE VEHÍCULOS -->
+  <section class="screen" id="screen-dashboard-vehiculos">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">DASHBOARD DE VEHÍCULOS</p>
+
+      <div class="list-toolbar">
+        <button class="btn btn-ghost btn-small" id="refreshDashVehiculosBtn" type="button">↻ Actualizar</button>
+        <span class="list-sync-label" id="dashVehiculosSyncLabel"></span>
+      </div>
+
+      <div class="field-group">
+        <select class="field-input" id="dashVehiculosFiltro">
+          <option value="">Todos los vehículos</option>
+          <option value="Renault Kangoo Blanca">Renault Kangoo Blanca</option>
+          <option value="Renault Kangoo Gris">Renault Kangoo Gris</option>
+          <option value="Moto">Moto</option>
+        </select>
+      </div>
+
+      <button type="button" class="btn btn-secondary" id="descargarExcelVehiculosBtn" style="margin-bottom:14px;">⬇ Descargar Excel</button>
+
+      <p class="list-status" id="dashVehiculosStatus"></p>
+
+      <div id="dashVehiculosList" class="historial-list"></div>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDeDashboardVehiculosBtn" type="button">Volver</button>
     </div>
   </section>
 
