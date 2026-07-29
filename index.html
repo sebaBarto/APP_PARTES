@@ -17,6 +17,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -389,18 +390,31 @@
       <p class="list-status" id="credencialStatus"></p>
 
       <div id="credencialCardWrap" class="credencial-card hidden">
+        <div class="credencial-card-holo"></div>
         <div class="credencial-card-header">
           <img src="icons/logo.png" alt="SAT" class="credencial-card-logo">
           <span class="credencial-card-empresa">Seguridad Electrónica</span>
+          <span class="credencial-card-serial" id="credencialSerial"></span>
         </div>
+        <div class="credencial-card-watermark">SAT</div>
         <div class="credencial-card-body">
-          <img id="credencialFoto" class="credencial-card-foto" src="" alt="Foto">
+          <div class="credencial-card-foto-wrap">
+            <img id="credencialFoto" class="credencial-card-foto" src="" alt="Foto">
+            <span class="credencial-card-sello">SAT</span>
+          </div>
           <div class="credencial-card-datos">
             <div class="credencial-card-nombre" id="credencialNombre"></div>
             <div class="credencial-card-cargo" id="credencialCargo"></div>
             <div class="credencial-card-dato"><b>DNI:</b> <span id="credencialDni"></span></div>
             <div class="credencial-card-dato"><b>Contacto:</b> <span id="credencialTelefono"></span></div>
             <div class="credencial-card-dato"><b>Válida hasta:</b> <span id="credencialVigencia"></span></div>
+          </div>
+        </div>
+        <div class="credencial-card-seguridad">
+          <div id="credencialQr" class="credencial-card-qr"></div>
+          <div class="credencial-card-verificar">
+            <span>Escaneá para verificar</span>
+            <span class="credencial-card-web">www.sat365.com.ar</span>
           </div>
         </div>
         <div class="credencial-card-footer">Tocá la credencial para mostrarla en pantalla completa.</div>

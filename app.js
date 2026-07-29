@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.2.2";
+const APP_VERSION = "3.2.3";
 
 // Contraseña propia por técnico (se valida en el propio celular, no es
 // un login con servidor — solo para que no cualquiera que abra la URL
@@ -192,6 +192,8 @@ const credencialCargo = document.getElementById("credencialCargo");
 const credencialDni = document.getElementById("credencialDni");
 const credencialTelefono = document.getElementById("credencialTelefono");
 const credencialVigencia = document.getElementById("credencialVigencia");
+const credencialSerial = document.getElementById("credencialSerial");
+const credencialQr = document.getElementById("credencialQr");
 const credencialFullscreenBackdrop = document.getElementById("credencialFullscreenBackdrop");
 const volverDeHistorialBtn = document.getElementById("volverDeHistorialBtn");
 const refreshHistorialBtn = document.getElementById("refreshHistorialBtn");
@@ -2584,10 +2586,33 @@ async function fetchYRenderCredencial() {
     } else {
       credencialVigencia.textContent = "-";
     }
+    credencialSerial.textContent = generarSerialCredencial(propia.nombre, propia.dni);
+    credencialQr.innerHTML = "";
+    new QRCode(credencialQr, {
+      text: "https://www.sat365.com.ar",
+      width: 120,
+      height: 120,
+      colorDark: "#101820",
+      colorLight: "#FFFFFF",
+      correctLevel: QRCode.CorrectLevel.M,
+    });
     credencialCardWrap.classList.remove("hidden");
   } catch (err) {
     credencialStatus.textContent = "No se pudo cargar la credencial.";
   }
+}
+
+// Genera un "número de serie" con aspecto de credencial oficial, a
+// partir del nombre y el DNI — no hace falta que la oficina cargue
+// ningún dato extra, sale solo y siempre es igual para la misma persona.
+function generarSerialCredencial(nombre, dni) {
+  const texto = `${nombre || ""}|${dni || ""}`;
+  let hash = 0;
+  for (let i = 0; i < texto.length; i++) {
+    hash = (hash * 31 + texto.charCodeAt(i)) >>> 0;
+  }
+  const codigo = hash.toString(36).toUpperCase().padStart(6, "0").slice(0, 6);
+  return `SAT-${codigo}`;
 }
 
 // ---------- Vehículos de la empresa ----------

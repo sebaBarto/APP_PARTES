@@ -590,6 +590,23 @@ permita; en iOS puede que no oculte la barra por completo, pero el giro
 y el agrandado funcionan igual. Se vuelve a tocar (la credencial o
 afuera, en el fondo oscuro) para salir de ese modo.
 
+**Diseño con más elementos de seguridad visual** (para que no sea tan
+fácil de imitar con una captura editada):
+- Franja superior con efecto "holograma" (degradé animado dorado).
+- Marca de agua diagonal "SAT" de fondo, apenas visible, detrás de
+  todo el contenido.
+- Un sello ovalado sobre la foto, y un doble borde (fino + grueso) en
+  toda la tarjeta.
+- Un "número de serie" arriba a la derecha (tipo `SAT-XXXXXX`), que se
+  genera solo a partir del nombre y el DNI — no hace falta cargar
+  ningún dato extra en `admin.html`, siempre da el mismo código para la
+  misma persona.
+- Un **código QR** que al escanearlo lleva a `www.sat365.com.ar`, para
+  que el cliente pueda verificar por su cuenta que la empresa existe y
+  es la que dice ser. Se genera en el momento con una librería gratuita
+  (`qrcodejs`, cargada por CDN en `index.html`), sin ningún servicio
+  externo ni costo.
+
 ## Vehículos de la empresa
 
 Botón "🚗 Vehículos" en el panel principal, con la flota que se cargue
