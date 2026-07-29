@@ -2229,7 +2229,10 @@ preguntarBtn.addEventListener("click", async () => {
       body: JSON.stringify({ categoria, pregunta }),
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    if (!res.ok) {
+      const detalle = typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail || "");
+      throw new Error((data.error || "Error desconocido") + (detalle ? ` — ${detalle}` : ""));
+    }
 
     consultaStatus.textContent = "";
     consultaRespuestaTexto.textContent = data.respuesta;
