@@ -720,10 +720,16 @@ gratuito) y agrega automáticamente el header de autorización con
 
 Botón "📶 SIMs" en el panel principal. Cada técnico tiene un stock de
 chips (Movistar Estándar/Mini, Personal, Claro), identificados por
-número de teléfono. La pantalla muestra **todas** las SIMs del equipo,
-agrupadas por técnico dueño (las propias aparecen primero, con el
-título "Tus SIMs"), con su estado: en stock, o en uso (y en qué
-cliente).
+número de teléfono.
+
+**Visibilidad en la app**: cada técnico ve **solo las suyas** en el
+listado principal. Sebastian Bartolozzi, Brenda Thiesing, y el login
+general de oficina siguen viendo las de **todo el equipo**, agrupadas
+por técnico dueño (las propias primero). El buscador de arriba de la
+lista ("qué línea tiene un cliente") es la única excepción — busca
+siempre entre las de **todo el equipo**, sin importar quién esté
+logueado, para poder coordinar aunque el listado principal esté
+restringido.
 
 Tocando una SIM que es tuya:
 
@@ -736,39 +742,52 @@ Tocando una SIM que es tuya:
     la nueva queda instalada en el cliente) o **agregarla como segunda
     línea** (queda usada junto con la otra, sin tocarla).
 - Si está en uso, podés **devolverla a stock**.
-- En cualquier estado, podés **transferírsela a otro técnico** — pasa
-  a formar parte de su stock (queda en stock, no en uso, hasta que él
-  la use).
+- En cualquier estado, podés **transferírsela a otro técnico, o
+  devolverla al stock general de oficina** ("Oficina" aparece como una
+  opción más en el selector de transferencia) — pasa a quedar en stock,
+  sin dueño técnico, hasta que alguien la tome desde `admin.html`.
 
-Las SIMs de otros técnicos se ven (para saber quién tiene qué), pero
-no se pueden tocar — solo actúa quien la tiene en ese momento.
+Las SIMs de otros técnicos (cuando se ven, según lo de arriba) no se
+pueden tocar — solo actúa quien la tiene en ese momento.
 
-**Administración**: en `admin.html` → pestaña "SIMs" primero se elige
-un técnico en "Ver SIMs de" — recién ahí aparecen sus SIMs para
-agregar, editar o quitar. Para pasarle una SIM a otro técnico, se
-cambia el selector "Técnico dueño" de esa fila (no hace falta cambiar
-el filtro de arriba ni tocar nada más). Guardar cambios solo actualiza
-las SIMs del técnico que se está viendo en ese momento — las de los
-demás quedan intactas aunque no se estén mostrando. Cada movimiento
-hecho desde la app (usar, devolver, transferir) queda en un historial
-aparte (`sims-historial.json`), igual que con los vehículos. No hace
-falta ninguna variable de entorno nueva.
+**Administración — tabla completa**: en `admin.html` → pestaña "SIMs"
+hay una sola tabla con **todas** las líneas (de todos los técnicos y
+las que están en "Oficina"), con un buscador arriba (número, cliente,
+empresa o técnico). Cada fila tiene:
 
-**Excel de SIMs**: en `admin.html` → pestaña "SIMs" hay botones para
-**descargar** el estado actual a un `.xlsx` (Empresa, Tipo, Número,
-Técnico dueño, Estado, Cliente), editarlo tranquilo en Excel si hace
-falta, y **subirlo** de nuevo — reemplaza las filas del formulario de
-esa pestaña (después hay que tocar "Guardar cambios" para publicarlo,
-no se guarda solo al subirlo). Todo pasa en el navegador, con SheetJS
-— no hace falta ningún servidor ni variable de entorno nueva para
-esto.
+- Los campos editables de siempre (número, empresa, tipo, estado,
+  cliente) — los cambios ahí se guardan recién al tocar "Guardar
+  cambios", como antes.
+- Una columna **"Transferir a"** con un selector (cualquier técnico, o
+  "Oficina") y un botón "Transferir" — este botón actúa **al toque**,
+  sin esperar a "Guardar cambios", igual que cuando lo hace un técnico
+  desde la app. Sirve para pasarle una línea a alguien, o traerla de
+  vuelta al stock de oficina, directamente desde la planilla.
+  - Si la fila es una que recién se agregó o vino de un Excel sin
+    guardar todavía, el botón "Transferir" solo actualiza la fila en
+    pantalla (no hay nada que mover en el servidor hasta que se
+    guarde) — queda avisado en el mensaje de estado.
+
+Cada movimiento hecho desde la app o desde esta tabla (usar, devolver,
+transferir) queda en un historial aparte (`sims-historial.json`),
+igual que con los vehículos. No hace falta ninguna variable de entorno
+nueva.
+
+**Excel de SIMs**: mismos botones de siempre, con las columnas que
+pediste — **"NUMERO DE LINEA"**, **"EMPRESA PROVEEDORA"**, **"ASIGNADO
+A"** (nombre de un técnico, o "Oficina" para stock general), más Tipo,
+Estado y Cliente si hace falta. Al subir un archivo, reemplaza toda la
+tabla (después hay que tocar "Guardar cambios" para publicarlo). Todo
+pasa en el navegador, con SheetJS — no hace falta ningún servidor ni
+variable de entorno nueva.
 
 **Buscar qué línea tiene un cliente**: en la pantalla "SIMs" de la
 app, arriba de la lista hay un buscador — escribiendo el nombre de un
 cliente, muestra qué SIM(s) tiene asociadas (número, compañía, y qué
-técnico la tiene), sin importar de qué técnico sea. Si el campo de
-búsqueda está vacío, vuelve a la vista agrupada por técnico de
-siempre.
+técnico la tiene), sin importar de qué técnico sea ni de las
+restricciones de visibilidad de arriba. Si el campo de búsqueda está
+vacío, vuelve a la vista normal (agrupada por técnico, o solo la
+propia según quién esté logueado).
 
 **Revertir una transferencia por error**: si transferís una SIM y te
 equivocaste (o el que la recibe se dio cuenta de que no correspondía),

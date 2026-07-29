@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.4.3";
+const APP_VERSION = "3.4.4";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -3606,8 +3606,23 @@ function dibujarSimsLista() {
 
   simsListaStatus.textContent = "";
 
+  // Los técnicos comunes ven solo las suyas en este listado agrupado
+  // (la búsqueda de arriba sigue abarcando a todo el equipo, aparte).
+  // Sebastian, Brenda y el login de oficina siguen viendo a todos.
+  const veTodasLasSims = !tecnicoLogueado || tecnicoLogueado === "Sebastian Bartolozzi" || tecnicoLogueado === "Brenda Thiesing";
+  const listaVisible = veTodasLasSims
+    ? simsListaCache
+    : simsListaCache.filter((s) => s.tecnico_actual === tecnicoLogueado);
+
+  if (listaVisible.length === 0) {
+    simsListaStatus.textContent = veTodasLasSims
+      ? "Todavía no hay SIMs cargadas."
+      : "Todavía no tenés ninguna SIM asignada.";
+    return;
+  }
+
   const porTecnico = {};
-  simsListaCache.forEach((s) => {
+  listaVisible.forEach((s) => {
     const nombre = s.tecnico_actual || "Sin asignar";
     if (!porTecnico[nombre]) porTecnico[nombre] = [];
     porTecnico[nombre].push(s);
@@ -3689,7 +3704,8 @@ async function renderSimDetalle() {
 
     const otrosTecnicos = Object.keys(tecnicosPasswords).filter((n) => n !== tecnicoLogueado).sort();
     const opciones = otrosTecnicos.map((n) => `<option value="${n}">${n}</option>`).join("");
-    simTecnicoNuevoSelect.innerHTML = `<option value="" disabled selected>Elegí un técnico</option>${opciones}`;
+    const opcionOficina = tecnicoLogueado !== "" ? `<option value="Oficina">Oficina (stock general, sin técnico)</option>` : "";
+    simTecnicoNuevoSelect.innerHTML = `<option value="" disabled selected>Elegí un técnico</option>${opcionOficina}${opciones}`;
     simTransferirWrap.classList.remove("hidden");
   } catch (err) {
     simDetalleStatus.textContent = "No se pudo cargar la información de esta SIM.";

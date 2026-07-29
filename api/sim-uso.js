@@ -127,11 +127,11 @@ module.exports = async (req, res) => {
         sim.cliente = "";
         historial.push({ ...registroBase, accion: "devolver" });
       } else if (accion === "transferir") {
-        if (!body.tecnico_nuevo) {
-          res.status(400).json({ error: "Falta el técnico al que se transfiere" });
+        if (body.tecnico_nuevo === undefined || body.tecnico_nuevo === null) {
+          res.status(400).json({ error: "Falta el técnico (o 'Oficina') al que se transfiere" });
           return;
         }
-        historial.push({ ...registroBase, accion: "transferir", tecnico_nuevo: body.tecnico_nuevo });
+        historial.push({ ...registroBase, accion: "transferir", tecnico_nuevo: body.tecnico_nuevo || "Oficina" });
         // Guarda quién se la dio, para poder revertir si fue por error.
         sim.tecnico_anterior = tecnico;
         sim.tecnico_actual = body.tecnico_nuevo;
