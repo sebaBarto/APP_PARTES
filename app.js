@@ -3,11 +3,58 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.4.8";
+const APP_VERSION = "3.4.9";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
 const VAPID_PUBLIC_KEY = "BHqngzDxmtV7PiUQO0zMKMaysybsccUB1ibD6UK7Kj2G0EICqt6ET-4RFV9mBU4PSxD10I6krHzrIFB2Ndxq_60";
+
+// ---------- Estilo global de los gráficos (Chart.js) ----------
+// Un solo lugar para que todos los gráficos de la app compartan la
+// misma tipografía y paleta, en vez de que cada uno defina la suya.
+if (typeof Chart !== "undefined") {
+  if (typeof ChartDataLabels !== "undefined") Chart.register(ChartDataLabels);
+  Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+  Chart.defaults.font.size = 12;
+  Chart.defaults.color = "#6B7680";
+  Chart.defaults.plugins.tooltip.backgroundColor = "#101820";
+  Chart.defaults.plugins.tooltip.titleFont = { family: "'Space Grotesk', sans-serif", weight: "600" };
+  Chart.defaults.plugins.tooltip.bodyFont = { family: "'IBM Plex Mono', monospace" };
+  Chart.defaults.plugins.tooltip.padding = 10;
+  Chart.defaults.plugins.tooltip.cornerRadius = 8;
+  Chart.defaults.plugins.tooltip.displayColors = true;
+  Chart.defaults.plugins.legend.labels.font = { family: "'Inter', system-ui, sans-serif", size: 11 };
+  Chart.defaults.plugins.legend.labels.usePointStyle = true;
+  Chart.defaults.plugins.legend.labels.padding = 12;
+  Chart.defaults.plugins.title.font = { family: "'Space Grotesk', sans-serif", size: 13, weight: "600" };
+  Chart.defaults.plugins.title.color = "#101820";
+  Chart.defaults.plugins.title.padding = { bottom: 12 };
+  // Por defecto apagado — se prende explícitamente solo en los
+  // gráficos de torta/dona, donde sí aporta (ver DATALABELS_PORCENTAJE).
+  if (typeof ChartDataLabels !== "undefined") Chart.defaults.set("plugins.datalabels", { display: false });
+}
+
+// Config de porcentaje reutilizable para los gráficos de torta — la
+// guía de UX de gráficos recomienda siempre mostrar el % en la propia
+// torta, no solo al pasar el mouse/dedo (accesibilidad).
+const DATALABELS_PORCENTAJE = {
+  color: (ctx) => {
+    const bg = ctx.dataset.backgroundColor;
+    const color = Array.isArray(bg) ? bg[ctx.dataIndex] : bg;
+    // Texto oscuro sobre colores claros (ámbar, verdes claros), texto
+    // blanco sobre colores oscuros (navy, rojos) — así siempre se lee bien.
+    const clarosConocidos = ["#F5A623", "#FFD98E", "#3FAE6E", "#2E7D32"];
+    return clarosConocidos.includes((color || "").toUpperCase()) ? "#101820" : "#FFFFFF";
+  },
+  font: { family: "'Space Grotesk', sans-serif", weight: "700", size: 12 },
+  formatter: (valor, ctx) => {
+    const total = ctx.chart.data.datasets[0].data.reduce((a, b) => a + (Number(b) || 0), 0);
+    if (!total || !valor) return "";
+    const pct = (valor / total) * 100;
+    return pct < 6 ? "" : Math.round(pct) + "%";
+  },
+};
+
 
 // Contraseña propia por técnico (se valida en el propio celular, no es
 // un login con servidor — solo para que no cualquiera que abra la URL
@@ -158,6 +205,8 @@ const dashPendientesNum = document.getElementById("dashPendientesNum");
 const dashResueltosNum = document.getElementById("dashResueltosNum");
 const dashInstalacionesNum = document.getElementById("dashInstalacionesNum");
 const dashServiciosNum = document.getElementById("dashServiciosNum");
+const dashEstancadosNum = document.getElementById("dashEstancadosNum");
+const dashTiempoPromedioNum = document.getElementById("dashTiempoPromedioNum");
 const dashTecnicosList = document.getElementById("dashTecnicosList");
 const dashRepetidosList = document.getElementById("dashRepetidosList");
 const sugerenciasWrap = document.getElementById("sugerenciasWrap");
@@ -284,6 +333,8 @@ const volverDeDashboardVehiculosBtn = document.getElementById("volverDeDashboard
 const refreshDashVehiculosBtn = document.getElementById("refreshDashVehiculosBtn");
 const dashVehiculosSyncLabel = document.getElementById("dashVehiculosSyncLabel");
 const dashVehiculosFiltro = document.getElementById("dashVehiculosFiltro");
+const dashVehGastoCombustibleNum = document.getElementById("dashVehGastoCombustibleNum");
+const dashVehGastoMantenimientoNum = document.getElementById("dashVehGastoMantenimientoNum");
 const descargarExcelVehiculosBtn = document.getElementById("descargarExcelVehiculosBtn");
 const dashVehiculosStatus = document.getElementById("dashVehiculosStatus");
 const dashVehiculosList = document.getElementById("dashVehiculosList");
@@ -296,6 +347,8 @@ const blanquearHistorialSimsBtn = document.getElementById("blanquearHistorialSim
 const dashSimsStatus = document.getElementById("dashSimsStatus");
 const dashSimsList = document.getElementById("dashSimsList");
 const dashSimsChartsPorTecnico = document.getElementById("dashSimsChartsPorTecnico");
+const dashSimsEnStockNum = document.getElementById("dashSimsEnStockNum");
+const dashSimsEnUsoNum = document.getElementById("dashSimsEnUsoNum");
 const dashFinStatus = document.getElementById("dashFinStatus");
 const dashFinPagosNum = document.getElementById("dashFinPagosNum");
 const dashFinBonificadosNum = document.getElementById("dashFinBonificadosNum");
@@ -2161,6 +2214,27 @@ async function renderDashboard() {
   dashInstalacionesNum.textContent = instalaciones;
   dashServiciosNum.textContent = serviciosComunes;
 
+  // Pendientes hace 3+ días (mismo umbral "atención" que ya se usa en
+  // el listado de servicios) y tiempo promedio por servicio resuelto
+  // en el período — dan una foto rápida de cómo viene la carga de
+  // trabajo, más allá de solo contar cuántos se resolvieron.
+  const estancados = serviciosCache.filter((s) => {
+    if (numerosCompletados.has(s.numero_servicio)) return false;
+    const dias = diasEstancado(s);
+    return dias != null && dias >= DIAS_ATENCION;
+  }).length;
+  dashEstancadosNum.textContent = estancados;
+
+  const duraciones = enPeriodo.map((h) => minutosEntre(h.hora_entrada, h.hora_salida)).filter((m) => m != null && m >= 0);
+  if (duraciones.length > 0) {
+    const promedioMin = Math.round(duraciones.reduce((a, b) => a + b, 0) / duraciones.length);
+    const horas = Math.floor(promedioMin / 60);
+    const minutos = promedioMin % 60;
+    dashTiempoPromedioNum.textContent = horas > 0 ? `${horas}h ${minutos}m` : `${minutos}m`;
+  } else {
+    dashTiempoPromedioNum.textContent = "—";
+  }
+
   const canvasTipo = document.getElementById("dashChartTipo");
   if (chartTipo) chartTipo.destroy();
   if (enPeriodo.length > 0) {
@@ -2173,9 +2247,11 @@ async function renderDashboard() {
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        cutout: "62%",
         plugins: {
           legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 10 } } },
           title: { display: true, text: "Instalación vs. servicio técnico" },
+          datalabels: DATALABELS_PORCENTAJE,
         },
       },
     });
@@ -2398,6 +2474,7 @@ function renderChartDistancia(porTecnico) {
       plugins: {
         legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 10 } } },
         title: { display: true, text: "Distancia aproximada recorrida" },
+        datalabels: DATALABELS_PORCENTAJE,
       },
     },
   });
@@ -3256,6 +3333,22 @@ function filtrarDashVehiculos() {
 
 function renderDashVehiculos() {
   const filtrados = filtrarDashVehiculos();
+
+  // Gasto en combustible vs. gomería/mecánico/lavadero/otro — suma de
+  // los montos cargados en "Registrar un evento sin devolver el
+  // vehículo", para tener a la vista cuánto se está gastando, no solo
+  // el detalle uno por uno en la lista de abajo.
+  const formatoPesos = (n) => "$" + Math.round(n).toLocaleString("es-AR");
+  const eventosConMonto = filtrados.filter((h) => h.accion === "evento" && h.monto);
+  const gastoCombustible = eventosConMonto
+    .filter((h) => h.tipo_evento === "Carga de combustible")
+    .reduce((acc, h) => acc + (Number(h.monto) || 0), 0);
+  const gastoMantenimiento = eventosConMonto
+    .filter((h) => h.tipo_evento !== "Carga de combustible")
+    .reduce((acc, h) => acc + (Number(h.monto) || 0), 0);
+  dashVehGastoCombustibleNum.textContent = gastoCombustible > 0 ? formatoPesos(gastoCombustible) : "—";
+  dashVehGastoMantenimientoNum.textContent = gastoMantenimiento > 0 ? formatoPesos(gastoMantenimiento) : "—";
+
   dashVehiculosList.innerHTML = "";
   if (filtrados.length === 0) {
     dashVehiculosStatus.textContent = "No hay registros para mostrar en ese período.";
@@ -3344,11 +3437,20 @@ async function fetchDashSims() {
   dashSimsList.innerHTML = "";
   try {
     const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
-    const res = await fetch("/api/sim-uso", { headers, cache: "no-store" });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const data = await res.json();
+    const [resHistorial, sims] = await Promise.all([
+      fetch("/api/sim-uso", { headers, cache: "no-store" }),
+      fetchSimsConfig().catch(() => []),
+    ]);
+    if (!resHistorial.ok) throw new Error("HTTP " + resHistorial.status);
+    const data = await resHistorial.json();
     dashSimsCache = Array.isArray(data) ? data : [];
     dashSimsSyncLabel.textContent = formatSyncTime(new Date());
+
+    // Foto actual (no depende del período elegido): cuántas SIMs
+    // están en stock vs. instaladas en un cliente en este momento.
+    dashSimsEnStockNum.textContent = sims.filter((s) => s.estado === "stock").length;
+    dashSimsEnUsoNum.textContent = sims.filter((s) => s.estado === "uso").length;
+
     renderDashSims();
   } catch (err) {
     dashSimsStatus.textContent = "No se pudo cargar el historial de SIMs.";
@@ -3436,7 +3538,7 @@ function renderChartsSims(movimientos) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { position: "bottom" }, title: { display: false } },
+      plugins: { legend: { position: "bottom" }, title: { display: false }, datalabels: DATALABELS_PORCENTAJE },
     },
   });
 
@@ -3470,7 +3572,7 @@ function renderChartsSims(movimientos) {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 10 } } } },
+        plugins: { legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 10 } } }, datalabels: DATALABELS_PORCENTAJE },
       },
     });
   });

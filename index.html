@@ -19,6 +19,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2/dist/chartjs-plugin-datalabels.min.js"></script>
 </head>
 <body>
 
@@ -231,6 +232,17 @@
         </div>
       </div>
 
+      <div class="dash-cards-row">
+        <div class="dash-card">
+          <div class="dash-card-num" id="dashEstancadosNum">–</div>
+          <div class="dash-card-label">Pendientes hace 3+ días</div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-num dash-card-num-chico" id="dashTiempoPromedioNum">–</div>
+          <div class="dash-card-label">Tiempo promedio por servicio</div>
+        </div>
+      </div>
+
       <div class="dash-chart-wrap">
         <canvas id="dashChartTecnico"></canvas>
       </div>
@@ -331,6 +343,17 @@
         </select>
       </div>
 
+      <div class="dash-cards-row">
+        <div class="dash-card">
+          <div class="dash-card-num dash-card-num-chico" id="dashVehGastoCombustibleNum">–</div>
+          <div class="dash-card-label">Gasto en combustible</div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-num dash-card-num-chico" id="dashVehGastoMantenimientoNum">–</div>
+          <div class="dash-card-label">Gasto en gomería/mecánico/lavadero</div>
+        </div>
+      </div>
+
       <button type="button" class="btn btn-secondary hidden" id="descargarExcelVehiculosBtn" style="margin-bottom:14px;">⬇ Descargar Excel del período</button>
 
       <p class="list-status" id="dashVehiculosStatus"></p>
@@ -351,6 +374,17 @@
       <div class="list-toolbar">
         <button class="btn btn-ghost btn-small" id="refreshDashSimsBtn" type="button">↻ Actualizar</button>
         <span class="list-sync-label" id="dashSimsSyncLabel"></span>
+      </div>
+
+      <div class="dash-cards-row" id="dashSimsResumenActual">
+        <div class="dash-card">
+          <div class="dash-card-num" id="dashSimsEnStockNum">–</div>
+          <div class="dash-card-label">En stock ahora</div>
+        </div>
+        <div class="dash-card">
+          <div class="dash-card-num" id="dashSimsEnUsoNum">–</div>
+          <div class="dash-card-label">En uso ahora</div>
+        </div>
       </div>
 
       <div class="dash-periodo-tabs">

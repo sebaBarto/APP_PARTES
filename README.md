@@ -868,6 +868,52 @@ técnico que quedó cargado en el parte (no en quién inició sesión), y
 en el registro de "tomar/devolver" vehículos que ya existía — no hace
 falta ninguna variable de entorno nueva.
 
+## Identidad visual renovada y dashboards con más información (v3.4.9)
+
+Se elevó la identidad visual de toda la app manteniendo la marca de
+SAT (navy + ámbar) — no se reemplazó por colores genéricos, se
+refinó la ejecución:
+
+- **Sistema de tokens real** en `styles.css` (`:root`): colores,
+  radios, sombras y tiempos de transición como variables, en vez de
+  valores sueltos repetidos por todo el archivo.
+- **Tarjetas con sombra y elevación** (antes solo tenían borde plano):
+  paneles, servicios, historial, SIMs, credencial, dashboards — con
+  radios más grandes (16px) y una sombra con tinte cálido en vez de
+  gris genérico.
+- **Botones**: forma de píldora, brillo ámbar sutil en el primario, y
+  feedback táctil (se "achican" un poco al tocarlos) en todos los
+  botones y tarjetas tocables — antes los cambios de estado eran
+  instantáneos sin ninguna transición.
+- **Encabezados de pantalla**: un tick ámbar antes del título, para
+  anclar visualmente cada sección.
+- **Gráficos (Chart.js)**: se agregó el plugin `chartjs-plugin-datalabels`
+  para mostrar el **% directo en las tortas y donas** (antes solo se
+  veía al tocar) — el color del texto se adapta solo al fondo de cada
+  porción para que siempre se lea bien. Tipografía y colores de
+  tooltips/leyendas unificados en un solo lugar (antes cada gráfico
+  definía los suyos).
+- **Pestañas de período**: las 4 versiones duplicadas (general,
+  financiero, vehículos, SIMs) se unificaron en una sola regla, con
+  una sombra ámbar sutil en la pestaña activa.
+
+**Dashboards — más información, no solo más lindo:**
+
+- **Dashboard general**: dos tarjetas nuevas — "Pendientes hace 3+
+  días" (cuántos servicios ya están en zona de alerta, ahora mismo) y
+  "Tiempo promedio por servicio" (duración media entrada→salida en el
+  período elegido) — antes solo se veía la cantidad resuelta, sin
+  ninguna noción de carga de trabajo pendiente ni de cuánto tarda cada
+  visita en promedio.
+- **Dashboard de vehículos**: dos tarjetas nuevas — gasto total en
+  combustible y gasto total en gomería/mecánico/lavadero, sumando los
+  montos cargados en "Registrar un evento sin devolver el vehículo" —
+  antes esa plata solo se podía ver revisando cada registro uno por
+  uno en la lista.
+- **Dashboard de SIMs**: dos tarjetas nuevas —"En stock ahora" y "En
+  uso ahora" (una foto del estado actual de la flota de SIMs, sin
+  depender del período de movimientos elegido).
+
 ## Vehículos de la empresa
 
 Botón "🚗 Vehículos" en el panel principal, con la flota que se cargue
