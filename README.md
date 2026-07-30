@@ -92,6 +92,21 @@ el `<select id="f_tecnico">`.
 
 ## Alertas de servicios estancados
 
+## Servicios resueltos: desaparecen de pendientes y se marcan en el cronograma
+
+Apenas un técnico envía con éxito el parte de un servicio, ese
+servicio **desaparece del listado de "Servicios pendientes"** en su
+celular — no hace falta esperar a que se actualice el listado del ERP.
+Si esa misma tarea está en el **cronograma semanal**, también queda
+marcada ahí con un cartel verde "RESUELTO", para que se note de un
+vistazo que ya se hizo.
+
+Es una marca **local, por celular** (no se sincroniza entre técnicos)
+y dura hasta que se cargue un listado de servicios nuevo desde el
+servidor (tocando "↻ Actualizar", o automáticamente al iniciar
+sesión) — en ese momento se recalcula todo según los datos reales del
+ERP.
+
 En `admin.html` hay un campo opcional más al cargar el listado:
 **"Fecha de ingreso"** (cuándo se dio de alta el servicio en el ERP).
 Si se mapea esa columna, en el listado de la app cada servicio que

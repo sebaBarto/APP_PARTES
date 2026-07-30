@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.4.7";
+const APP_VERSION = "3.4.8";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -543,8 +543,11 @@ function normalizeText(s) {
 
 function filtrarServicios() {
   const term = normalizeText(serviciosSearch.value);
-  if (!term) return serviciosCache;
-  return serviciosCache.filter((item) => {
+  const sinResueltos = serviciosCache.filter(
+    (item) => !(item.numero_servicio && serviciosResueltos.has(item.numero_servicio))
+  );
+  if (!term) return sinResueltos;
+  return sinResueltos.filter((item) => {
     const haystack = normalizeText(
       [item.numero_servicio, item.cliente, item.direccion, item.localidad, item.tarea].join(" ")
     );
@@ -635,8 +638,7 @@ function renderServiciosList(items) {
   }
   listStatus.textContent = "";
   items.forEach((item) => {
-    const resuelto = item.numero_servicio && serviciosResueltos.has(item.numero_servicio);
-    const dias = resuelto ? null : diasEstancado(item);
+    const dias = diasEstancado(item);
     let claseEstancado = "";
     let badgeEstancado = "";
     if (dias != null && dias >= DIAS_URGENTE) {
@@ -648,9 +650,9 @@ function renderServiciosList(items) {
     }
     const card = document.createElement("button");
     card.type = "button";
-    card.className = "servicio-card" + (resuelto ? " resuelto" : "") + claseEstancado;
+    card.className = "servicio-card" + claseEstancado;
     card.innerHTML = `
-      <div class="servicio-card-num">N° ${item.numero_servicio ?? ""}${resuelto ? '<span class="servicio-card-resuelto-badge">RESUELTO</span>' : badgeEstancado}</div>
+      <div class="servicio-card-num">N° ${item.numero_servicio ?? ""}${badgeEstancado}</div>
       <div class="servicio-card-cliente">${item.cliente ?? ""}</div>
       <div class="servicio-card-direccion">${item.direccion ?? ""}${item.localidad ? ", " + item.localidad : ""}</div>
       <div class="servicio-card-tarea">${item.tarea ?? ""}</div>
@@ -874,12 +876,16 @@ function renderCronogramaTareas() {
   }
   cronoStatus.textContent = "";
   tareas.forEach((t) => {
-    const vinculado = !!encontrarServicioPorTarea(t.tarea);
+    const servicioVinculado = encontrarServicioPorTarea(t.tarea);
+    const vinculado = !!servicioVinculado;
+    const resuelto = vinculado && servicioVinculado.numero_servicio && serviciosResueltos.has(servicioVinculado.numero_servicio);
     const card = document.createElement("button");
     card.type = "button";
-    card.className = "crono-tarea-card" + (vinculado ? "" : " sin-vincular");
+    card.className = "crono-tarea-card" + (vinculado ? "" : " sin-vincular") + (resuelto ? " resuelto" : "");
     card.innerHTML = `
-      <div class="crono-tarea-hora">${t.hora_inicio || ""} - ${t.hora_fin || ""}${vinculado ? "" : '<span class="crono-tarea-badge">SIN VINCULAR</span>'}</div>
+      <div class="crono-tarea-hora">${t.hora_inicio || ""} - ${t.hora_fin || ""}${
+        resuelto ? '<span class="crono-tarea-badge resuelto">RESUELTO</span>' : vinculado ? "" : '<span class="crono-tarea-badge">SIN VINCULAR</span>'
+      }</div>
       <div class="crono-tarea-tecnico">${t.tecnico || ""}</div>
       <div class="crono-tarea-texto">${t.tarea || ""}</div>
     `;
@@ -1735,9 +1741,10 @@ backToFormBtn.addEventListener("click", () => {
 newReportBtn.addEventListener("click", () => {
   resetForm();
   setStatus("LISTO");
-  // El servicio recién completado se queda en la lista, marcado como
-  // "resuelto" (por serviciosResueltos), en vez de desaparecer — así
-  // se puede verificar de un vistazo que ya se hizo.
+  // El servicio recién completado desaparece del listado de
+  // pendientes (serviciosResueltos lo filtra en filtrarServicios) y
+  // queda marcado como resuelto en el cronograma de esta sesión, hasta
+  // que se cargue un listado nuevo desde el servidor.
   renderServiciosList(filtrarServicios());
   showScreen("list");
 });
