@@ -12,77 +12,158 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
+  :root {
+    --ink: #101820;
+    --paper: #F4F5F0;
+    --amber: #F5A623;
+    --steel: #6B7680;
+    --ok: #2E7D32;
+    --danger: #C0392B;
+    --border: #D8DCD4;
+    --r-sm: 8px;
+    --r-md: 12px;
+    --r-lg: 16px;
+    --r-pill: 999px;
+    --shadow-card: 0 1px 2px rgba(16,24,32,0.06), 0 8px 20px -10px rgba(16,24,32,0.18);
+    --shadow-card-hover: 0 2px 4px rgba(16,24,32,0.08), 0 14px 28px -12px rgba(16,24,32,0.24);
+    --shadow-amber: 0 6px 16px -6px rgba(245,166,35,0.45);
+    --ease: cubic-bezier(0.16,1,0.3,1);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  }
   * { box-sizing: border-box; }
   body {
-    margin: 0; font-family: 'Inter', sans-serif; background: #F4F5F0; color: #101820;
-    padding: 24px 16px 60px; min-height: 100vh;
+    margin: 0; font-family: 'Inter', sans-serif; color: var(--ink);
+    background: linear-gradient(180deg, #EAEDE6 0%, #F4F5F0 220px, #F4F5F0 100%);
+    padding: 20px 16px 60px; min-height: 100vh;
   }
-  .wrap { max-width: 560px; margin: 0 auto; }
-  h1 { font-family: 'Space Grotesk', sans-serif; font-size: 20px; margin: 0 0 4px; }
-  .subtitle { color: #6B7680; font-size: 13px; margin: 0 0 24px; }
-  .card { background: #FFFFFF; border: 1px solid #D8DCD4; border-radius: 10px; padding: 18px; margin-bottom: 16px; }
-  label { display: block; font-size: 12px; color: #6B7680; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; font-family: 'IBM Plex Mono', monospace; }
-  input[type="password"], input[type="file"], select {
-    width: 100%; padding: 10px 12px; border-radius: 8px; border: 1.5px solid #D8DCD4;
-    font-size: 14px; font-family: inherit; background: #FFFFFF; margin-bottom: 14px;
+  .wrap { max-width: 640px; margin: 0 auto; }
+
+  /* ---------- Encabezado ---------- */
+  .admin-header {
+    display: flex; align-items: center; gap: 14px;
+    margin-bottom: 22px; padding: 4px 2px;
   }
+  .admin-header-logo { height: 40px; width: auto; flex-shrink: 0; }
+  .admin-header-eyebrow {
+    font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--amber); margin: 0 0 2px;
+    background: var(--ink); display: inline-block; padding: 2px 8px; border-radius: var(--r-pill);
+  }
+  .admin-header-title {
+    font-family: 'Space Grotesk', sans-serif; font-size: 21px; font-weight: 700;
+    margin: 0; color: var(--ink); letter-spacing: -0.01em;
+  }
+
+  h1 { font-family: 'Space Grotesk', sans-serif; font-size: 19px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .subtitle { color: var(--steel); font-size: 13px; margin: 0 0 22px; line-height: 1.5; }
+
+  .card {
+    background: #FFFFFF; border: 1px solid var(--border); border-radius: var(--r-lg);
+    padding: 20px; margin-bottom: 16px; box-shadow: var(--shadow-card);
+    transition: box-shadow 220ms var(--ease);
+  }
+  .login-card { border-top: 4px solid var(--amber); max-width: 380px; margin: 40px auto 0; }
+
+  label {
+    display: block; font-size: 11px; color: var(--steel); margin-bottom: 6px;
+    text-transform: uppercase; letter-spacing: 0.06em; font-family: 'IBM Plex Mono', monospace; font-weight: 600;
+  }
+  input[type="password"], input[type="file"], input[type="text"], input[type="number"], input[type="date"], select, textarea {
+    width: 100%; padding: 11px 12px; border-radius: var(--r-sm); border: 1.5px solid var(--border);
+    font-size: 14px; font-family: inherit; background: #FFFFFF; margin-bottom: 14px; color: var(--ink);
+    transition: border-color 140ms var(--ease), box-shadow 140ms var(--ease);
+  }
+  input:focus, select:focus, textarea:focus {
+    outline: none; border-color: var(--amber); box-shadow: 0 0 0 3px rgba(245,166,35,0.15);
+  }
+
   button {
-    width: 100%; padding: 13px; border: none; border-radius: 8px; background: #101820;
-    color: #F5A623; font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px;
-    cursor: pointer;
+    width: 100%; padding: 13px; border: none; border-radius: var(--r-pill); background: var(--ink);
+    color: var(--amber); font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px;
+    cursor: pointer; box-shadow: var(--shadow-amber);
+    transition: transform 140ms var(--ease), box-shadow 220ms var(--ease), opacity 140ms var(--ease);
   }
-  button:disabled { background: #C7CCC3; color: #8A9089; cursor: wait; }
+  button:active { transform: scale(0.97); opacity: 0.92; box-shadow: none; }
+  button:disabled { background: #C7CCC3; color: #8A9089; cursor: wait; box-shadow: none; }
+
   .password-field-wrap { position: relative; width: 100%; }
   .password-field-wrap input[type="password"], .password-field-wrap input[type="text"] { padding-right: 42px; margin-bottom: 14px; }
   .password-toggle-btn {
     position: absolute; right: 4px; top: 0; bottom: 14px; margin: auto 0;
-    width: 34px; height: 34px; background: transparent; border: none;
+    width: 34px; height: 34px; background: transparent; border: none; box-shadow: none;
     font-size: 15px; opacity: 0.55; cursor: pointer; padding: 0; display: flex;
     align-items: center; justify-content: center;
   }
+  .password-toggle-btn:active { transform: none; }
   .password-toggle-btn.activo { opacity: 1; }
-  .status { font-size: 13px; margin-top: 10px; min-height: 18px; }
-  .status.ok { color: #2E7D32; }
-  .status.err { color: #C0392B; }
+
+  .status { font-size: 13px; margin-top: 10px; min-height: 18px; font-weight: 500; }
+  .status.ok { color: var(--ok); }
+  .status.ok:not(:empty)::before { content: "✓ "; }
+  .status.err { color: var(--danger); }
+  .status.err:not(:empty)::before { content: "⚠ "; }
+
   table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
-  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #EEE; }
-  th { color: #6B7680; font-weight: 500; }
+  th, td { text-align: left; padding: 8px 8px; border-bottom: 1px solid #EEE; }
+  th { color: var(--steel); font-weight: 600; font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.04em; }
+  tbody tr { transition: background 140ms var(--ease); }
+  tbody tr:hover { background: rgba(245,166,35,0.05); }
+
   .hidden { display: none; }
   .field-row { display: flex; gap: 10px; }
   .field-row > div { flex: 1; }
-  .tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 18px; }
+
+  .tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px; }
   .tab-btn {
-    width: auto; background: #FFFFFF; color: #6B7680; border: 1.5px solid #D8DCD4;
-    padding: 10px 6px; font-size: 12px;
+    width: auto; background: #FFFFFF; color: var(--steel); border: 1.5px solid var(--border);
+    padding: 12px 6px; font-size: 11.5px; box-shadow: none; border-radius: var(--r-md);
+    display: flex; flex-direction: column; align-items: center; gap: 4px; line-height: 1.25;
+    transition: transform 140ms var(--ease), box-shadow 220ms var(--ease), background 140ms var(--ease), color 140ms var(--ease), border-color 140ms var(--ease);
   }
-  .tab-btn.active { background: #101820; color: #F5A623; border-color: #101820; }
+  .tab-icon { font-size: 18px; }
+  .tab-btn:active { transform: scale(0.96); }
+  .tab-btn.active { background: var(--ink); color: var(--amber); border-color: var(--ink); box-shadow: var(--shadow-amber); }
+
   .tecnicos-filas { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
   .tecnico-fila { align-items: flex-end; }
-  .sims-tabla-wrap { overflow-x: auto; margin-bottom: 8px; border: 1px solid #D8DCD4; border-radius: 8px; }
+
+  .sims-tabla-wrap { overflow-x: auto; margin-bottom: 8px; border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: var(--shadow-card); }
   .sims-tabla { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 13px; }
-  .sims-tabla th, .sims-tabla td { padding: 6px 8px; border-bottom: 1px solid #EFF1EC; text-align: left; white-space: nowrap; }
-  .sims-tabla th { background: #F4F5F0; font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-transform: uppercase; color: #6B7680; }
-  .sims-tabla input, .sims-tabla select { width: 100%; min-width: 90px; padding: 6px; font-size: 13px; }
+  .sims-tabla th, .sims-tabla td { padding: 8px 8px; border-bottom: 1px solid #EFF1EC; text-align: left; white-space: nowrap; }
+  .sims-tabla th { background: var(--paper); font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-transform: uppercase; color: var(--steel); }
+  .sims-tabla input, .sims-tabla select { width: 100%; min-width: 90px; padding: 6px; font-size: 13px; margin-bottom: 0; }
   .sims-tabla .sim-transferir-celda { display: flex; gap: 4px; align-items: center; }
   .sims-tabla .sim-transferir-celda select { min-width: 130px; }
-  .sims-tabla .btn-transferir-fila { width: auto; padding: 6px 10px; font-size: 12px; background: #101820; color: #F5A623; }
-  .sims-tabla .btn-quitar-fila { width: auto; padding: 6px 8px; background: #FFFFFF; color: #C0392B; border: 1.5px solid #D8DCD4; }
+  .sims-tabla .btn-transferir-fila { width: auto; padding: 7px 12px; font-size: 12px; background: var(--ink); color: var(--amber); border-radius: var(--r-pill); }
+  .sims-tabla .btn-quitar-fila { width: auto; padding: 7px 10px; background: #FFFFFF; color: var(--danger); border: 1.5px solid var(--border); box-shadow: none; border-radius: var(--r-sm); }
   .sim-asignado-a { font-weight: 600; }
   .sim-asignado-a.oficina { color: #B5772A; }
   .sim-empresa-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+
   .btn-quitar-tecnico {
     width: auto; flex-shrink: 0; padding: 10px 14px; background: #FFFFFF;
-    color: #C0392B; border: 1.5px solid #D8DCD4;
+    color: var(--danger); border: 1.5px solid var(--border); box-shadow: none; border-radius: var(--r-sm);
   }
-  .btn-secondary-admin { background: transparent; color: #101820; border: 1.5px solid #101820; }
+  .btn-secondary-admin {
+    background: transparent; color: var(--ink); border: 1.5px solid var(--ink); box-shadow: none;
+  }
+  .btn-secondary-admin:active { background: rgba(16,24,32,0.06); }
 </style>
 </head>
 <body>
 <div class="wrap">
 
-  <div id="loginCard" class="card">
-    <img src="icons/logo.png" alt="SAT" style="height:32px; display:block; margin-bottom:14px;">
-    <h1>Cargar servicios pendientes</h1>
+  <div class="admin-header">
+    <img src="icons/logo.png" alt="SAT" class="admin-header-logo">
+    <div class="admin-header-text">
+      <p class="admin-header-eyebrow">Servicio Técnico SAT</p>
+      <h1 class="admin-header-title">Panel de administración</h1>
+    </div>
+  </div>
+
+  <div id="loginCard" class="card login-card">
     <p class="subtitle">Acceso restringido — solo personal de oficina.</p>
     <label for="pw">Contraseña</label>
     <div class="password-field-wrap">
@@ -95,15 +176,15 @@
 
   <div id="mainCard" class="hidden">
     <div class="tabs">
-      <button type="button" class="tab-btn active" id="tabServiciosBtn">Servicios pendientes</button>
-      <button type="button" class="tab-btn" id="tabCronogramaBtn">Cronograma semanal</button>
-      <button type="button" class="tab-btn" id="tabTecnicosBtn">Técnicos</button>
-      <button type="button" class="tab-btn" id="tabMaterialesBtn">Materiales</button>
-      <button type="button" class="tab-btn" id="tabConsultasBtn">Consultas (IA)</button>
-      <button type="button" class="tab-btn" id="tabGuardiasBtn">Guardias</button>
-      <button type="button" class="tab-btn" id="tabCredencialesBtn">Credenciales</button>
-      <button type="button" class="tab-btn" id="tabVehiculosBtn">Vehículos</button>
-      <button type="button" class="tab-btn" id="tabSimsBtn">SIMs</button>
+      <button type="button" class="tab-btn active" id="tabServiciosBtn"><span class="tab-icon">📋</span>Servicios pendientes</button>
+      <button type="button" class="tab-btn" id="tabCronogramaBtn"><span class="tab-icon">🗓️</span>Cronograma semanal</button>
+      <button type="button" class="tab-btn" id="tabTecnicosBtn"><span class="tab-icon">👤</span>Técnicos</button>
+      <button type="button" class="tab-btn" id="tabMaterialesBtn"><span class="tab-icon">📦</span>Materiales</button>
+      <button type="button" class="tab-btn" id="tabConsultasBtn"><span class="tab-icon">🤖</span>Consultas (IA)</button>
+      <button type="button" class="tab-btn" id="tabGuardiasBtn"><span class="tab-icon">🚨</span>Guardias</button>
+      <button type="button" class="tab-btn" id="tabCredencialesBtn"><span class="tab-icon">🪪</span>Credenciales</button>
+      <button type="button" class="tab-btn" id="tabVehiculosBtn"><span class="tab-icon">🚗</span>Vehículos</button>
+      <button type="button" class="tab-btn" id="tabSimsBtn"><span class="tab-icon">📶</span>SIMs</button>
     </div>
 
     <div id="panelServicios">

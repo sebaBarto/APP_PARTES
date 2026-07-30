@@ -914,6 +914,33 @@ refinó la ejecución:
   uso ahora" (una foto del estado actual de la flota de SIMs, sin
   depender del período de movimientos elegido).
 
+## Panel de administración rediseñado (v3.5.1)
+
+`admin.html` tenía un estilo bastante plano (tarjetas blancas sin
+sombra, botones cuadrados, pestañas de solo texto) que había quedado
+afuera de la vuelta de diseño anterior. Ahora tiene:
+
+- **Encabezado propio** con el logo de SAT y "Panel de administración"
+  arriba de todo, para que se sienta como una sección real de la app
+  y no una página suelta.
+- **Ícono en cada una de las 9 pestañas** (📋 Servicios pendientes, 🗓️
+  Cronograma, 👤 Técnicos, 📦 Materiales, 🤖 Consultas IA, 🚨
+  Guardias, 🪪 Credenciales, 🚗 Vehículos, 📶 SIMs) — los mismos que ya
+  usa la app en sus botones equivalentes, para que sea consistente.
+- **Tarjetas con sombra y borde superior ámbar** en la de acceso, en
+  vez de solo un borde plano.
+- **Botones tipo píldora** con el mismo brillo ámbar y feedback táctil
+  que ya tiene la app.
+- **Tabla de SIMs** con fila resaltada al pasar el mouse y bordes más
+  prolijos.
+- Mensajes de estado (ok/error) con un ✓ o ⚠ delante, en vez de solo
+  texto de color.
+
+Sigue con fondo claro a propósito (a diferencia de la app, que es
+oscura) — es una herramienta de oficina, no algo que se use todo el
+día como la app del técnico, así que no hacía falta convertirla a
+tema oscuro para lograr el efecto "más profesional" pedido.
+
 ## Colores por compañía en SIMs, y comparación vs. período anterior (v3.5.0)
 
 **Colores por compañía**: cada SIM (en la app y en la tabla de
