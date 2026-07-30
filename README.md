@@ -205,6 +205,15 @@ plantillas de oficina y de cliente incorporadas (mismo diseño que
 tenían en EmailJS), y `app.js` ya llama a este endpoint en vez de
 EmailJS.
 
+### Aclaración y cargo de quien firma (v3.5.7)
+
+Al firmar, además del dibujo de la firma, el cliente (o quien firme)
+completa **aclaración** (nombre y apellido, tipeado — obligatorio, no
+deja avanzar sin cargarlo) y **cargo** (opcional, ej. "Encargado",
+"Propietario"). Los dos se agregan justo debajo de la firma en los dos
+mails, con una línea separadora, como una firma en papel de toda la
+vida. Si no se carga cargo, esa línea directamente no aparece.
+
 ### Plantillas mejoradas (v3.5.6): más información, más prolijas, firma corregida
 
 - **La firma llegaba grande o estirada** en algunos clientes de mail

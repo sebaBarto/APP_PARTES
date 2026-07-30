@@ -109,7 +109,12 @@ const PLANTILLA_OFICINA = `
         </td></tr>{{/foto_link}}
         <tr><td style="padding:16px 28px 24px;">
           <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:8px;">✍️ Firma del cliente</div>
-          <div style="background:#F4F5F0; border-radius:8px; padding:14px; border:1px solid #D8DCD4;">{{{firma_img}}}</div>
+          <div style="background:#F4F5F0; border-radius:8px; padding:14px; border:1px solid #D8DCD4;">
+            {{{firma_img}}}
+            <div style="border-top:1px solid #C7CCC3; width:220px; margin:6px auto 8px;"></div>
+            <div style="text-align:center; color:#101820; font-size:13px; font-weight:bold; font-family:Arial, Helvetica, sans-serif;">{{firma_aclaracion}}</div>
+            {{#firma_cargo}}<div style="text-align:center; color:#6B7680; font-size:12px; font-family:Arial, Helvetica, sans-serif; margin-top:2px;">{{firma_cargo}}</div>{{/firma_cargo}}
+          </div>
         </td></tr>
         <tr><td style="background:#101820; padding:14px 28px; color:#9AA3A9; font-size:11px; font-family:'Courier New', monospace; text-align:center;">
           Generado automáticamente por la app de partes técnicos
@@ -176,7 +181,12 @@ const PLANTILLA_CLIENTE = `
         </td></tr>
         <tr><td style="padding:16px 28px 24px;">
           <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:8px;">✍️ Tu firma de conformidad</div>
-          <div style="background:#F4F5F0; border-radius:8px; padding:14px; border:1px solid #D8DCD4;">{{{firma_img}}}</div>
+          <div style="background:#F4F5F0; border-radius:8px; padding:14px; border:1px solid #D8DCD4;">
+            {{{firma_img}}}
+            <div style="border-top:1px solid #C7CCC3; width:220px; margin:6px auto 8px;"></div>
+            <div style="text-align:center; color:#101820; font-size:13px; font-weight:bold; font-family:Arial, Helvetica, sans-serif;">{{firma_aclaracion}}</div>
+            {{#firma_cargo}}<div style="text-align:center; color:#6B7680; font-size:12px; font-family:Arial, Helvetica, sans-serif; margin-top:2px;">{{firma_cargo}}</div>{{/firma_cargo}}
+          </div>
         </td></tr>
         <tr><td style="background:#101820; padding:18px 28px; color:#9AA3A9; font-size:11px; font-family:'Courier New', monospace; text-align:center; line-height:1.8;">
           Gracias por confiar en nosotros<br>

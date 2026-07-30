@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.5.6";
+const APP_VERSION = "3.5.7";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -368,6 +368,8 @@ const toSignBtn = document.getElementById("toSignBtn");
 const backToFormBtn = document.getElementById("backToFormBtn");
 const clearSignBtn = document.getElementById("clearSignBtn");
 const confirmSignBtn = document.getElementById("confirmSignBtn");
+const signAclaracion = document.getElementById("signAclaracion");
+const signCargo = document.getElementById("signCargo");
 const newReportBtn = document.getElementById("newReportBtn");
 const sendingLabel = document.getElementById("sendingLabel");
 const doneMessage = document.getElementById("doneMessage");
@@ -1730,6 +1732,8 @@ function getFormData() {
 
 function resetForm() {
   instalacionCheck.checked = false;
+  signAclaracion.value = "";
+  signCargo.value = "";
   ["f_cliente","f_direccion","f_localidad","f_cliente_email","f_tarea",
    "f_materiales","f_materiales_retirados","f_importe","f_costo_final",
    "f_observaciones"].forEach(id => document.getElementById(id).value = "");
@@ -1956,6 +1960,8 @@ async function intentarEnviarParte(payload, interactivo) {
     hora_salida: data.hora_salida,
     observaciones: data.observaciones,
     firma_img: signatureImgTag,
+    firma_aclaracion: data.firma_aclaracion,
+    firma_cargo: data.firma_cargo,
   };
 
   let oficinaOk = false;
@@ -2108,8 +2114,16 @@ confirmSignBtn.addEventListener("click", async () => {
     showToast("Falta la firma del cliente.");
     return;
   }
+  const aclaracion = signAclaracion.value.trim();
+  if (!aclaracion) {
+    showToast("Falta la aclaración de quien firma.");
+    signAclaracion.focus();
+    return;
+  }
 
   const data = getFormData();
+  data.firma_aclaracion = aclaracion;
+  data.firma_cargo = signCargo.value.trim();
   // El N° de parte que se muestra y se manda por mail toma el N° de
   // servicio real (el que viene del listado precargado). Solo se genera
   // uno automático si el técnico cargó el parte manualmente, sin elegir
