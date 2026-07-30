@@ -5,6 +5,7 @@
   "description": "PWA para digitalizar y enviar partes técnicos de servicio",
   "dependencies": {
     "xlsx": "^0.18.5",
-    "web-push": "^3.6.7"
+    "web-push": "^3.6.7",
+    "nodemailer": "^6.9.14"
   }
 }

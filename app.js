@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.5.3";
+const APP_VERSION = "3.5.4";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -81,18 +81,6 @@ const TECNICOS_PASSWORDS_RESPALDO = {
 // para elegir a mano como antes.
 const APP_PASSWORD_GENERAL = "Marcos@2018";
 
-const EMAILJS_PUBLIC_KEY = "-4JfiB5vtz2jMgIpi";
-
-// Plantilla que manda SIEMPRE a la casilla fija de la oficina
-// (el "To email" de esta plantilla está configurado en emailjs.com)
-const EMAILJS_SERVICE_ID = "service_b7zraoh";
-const EMAILJS_TEMPLATE_OFICINA = "template_bzy9t47";
-
-// Plantilla que manda al mail del cliente (variable, cargado en el form).
-// Esta plantilla debe tener el campo "To email" configurado como
-// {{cliente_email}} en emailjs.com, NO una casilla fija.
-const EMAILJS_TEMPLATE_CLIENTE = "template_jtmn27i";
-
 // URL desde donde se descarga el listado de servicios pendientes.
 // Es un endpoint propio (función serverless de Vercel, ver /api/servicios.js)
 // que guarda los datos en un repo privado — nunca queda como archivo
@@ -106,8 +94,19 @@ const SERVICIOS_URL = "/api/servicios";
 const SERVICIOS_API_TOKEN = "54455ad29a4eb28e48ca915e3510ff95ceb682523fa74b32";
 // =======================================================
 
-if (window.emailjs && EMAILJS_PUBLIC_KEY !== "TU_PUBLIC_KEY") {
-  emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY });
+// Manda un mail (copia a oficina o al cliente) por nuestro propio
+// endpoint (/api/enviar-mail.js), que sale por SMTP directo desde la
+// casilla propia de la empresa — reemplaza a EmailJS, que tenía un
+// límite mensual de envíos.
+async function enviarMail(tipo, datos) {
+  const res = await fetch("/api/enviar-mail", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+    body: JSON.stringify({ tipo, datos }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Error HTTP ${res.status}`);
+  return data;
 }
 
 const screens = {
@@ -1934,7 +1933,7 @@ async function intentarEnviarParte(payload, interactivo) {
 
   try {
     if (interactivo) sendingLabel.textContent = "Enviando copia a la oficina…";
-    await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_OFICINA, {
+    await enviarMail("oficina", {
       ...basePayload,
       foto_link: fotoLink,
       tiempo_transcurrido: data.tiempo_transcurrido,
@@ -1984,7 +1983,7 @@ async function intentarEnviarParte(payload, interactivo) {
   if (oficinaOk && clienteIntentado) {
     try {
       if (interactivo) sendingLabel.textContent = "Enviando copia al cliente…";
-      await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_CLIENTE, {
+      await enviarMail("cliente", {
         ...basePayload,
         cliente_email: data.cliente_email,
       });

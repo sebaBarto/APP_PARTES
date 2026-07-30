@@ -9,7 +9,8 @@ copias por mail a la oficina y al cliente.
 1. El técnico completa el formulario con los datos del servicio.
 2. El cliente firma con el dedo en la pantalla, confirmando conformidad.
 3. Al confirmar, la app genera un **ID único** para el parte (ej.
-   `SAT-20260723-143205-482`) y envía por mail, usando EmailJS:
+   `SAT-20260723-143205-482`) y envía por mail, por SMTP directo desde
+   la casilla propia de la empresa:
    - Una copia a la **casilla fija de la oficina**.
    - Si el técnico cargó el mail del cliente, otra copia a **esa
      dirección**. Si no lo cargó, sigue igual y solo manda la de oficina.
@@ -177,39 +178,60 @@ para filtrar por cliente, dirección, N° de servicio o tarea.
 
 
 
-Se necesitan **dos plantillas** en tu cuenta de EmailJS, porque una manda
-siempre al mismo lugar (oficina) y la otra manda a un mail que cambia en
-cada parte (cliente).
+## Envío de mails por SMTP propio (reemplaza a EmailJS)
 
-### 1. Plantilla de OFICINA (ya la tenés armada)
-- "To email" = tu casilla fija.
-- Variables disponibles: `id_parte`, `cliente`, `direccion`, `localidad`,
-  `tarea`, `materiales`, `importe`, `tecnico`, `fecha`, `hora_entrada`,
-  `hora_salida`, `firma_img` (esta última es un `<img>` con la firma
-  incrustada — la plantilla tiene que estar en modo **HTML** para que se
-  vea como imagen y no como texto).
+Hasta la v3.5.3 los mails los mandaba EmailJS — se dejó de usar porque
+el plan tiene un límite mensual de envíos, y al mandar **2 mails por
+cada parte** (oficina + cliente) se llenaba rápido. Ahora los manda
+directo la app, por SMTP, usando una casilla propia de la empresa
+(`serviciotecnico@sat365.com.ar`, alojada en DonWeb) — sin límite de
+un tercero.
 
-### 2. Plantilla de CLIENTE (nueva, falta crear)
-- En EmailJS: **Email Templates → Create New Template**.
-- En el campo **"To email"**, en vez de escribir una dirección fija,
-  escribí la variable **`{{cliente_email}}`** — así cada mail va a la
-  dirección que cargue el técnico en el formulario.
-- Mismas variables disponibles que arriba, más `cliente_email`.
-- Modo HTML también, para que se vea la firma.
-- Copiá el **Template ID** que te da y pegalo en `app.js`:
-  ```js
-  const EMAILJS_TEMPLATE_CLIENTE = "TU_TEMPLATE_ID_CLIENTE";
-  ```
+### Configuración (una sola vez)
+
+Cargar estas variables de entorno en Vercel (Project Settings →
+Environment Variables), y hacer un **redeploy** después:
+
+| Variable | Valor |
+|---|---|
+| `SMTP_HOST` | El servidor de correo saliente de tu cuenta (lo ves en DonWeb → tu casilla → "Correo Saliente" → Servidor; para SAT es `ai000077.ferozo.com`) |
+| `SMTP_PORT` | `465` |
+| `SMTP_USER` | La casilla que manda los mails (`serviciotecnico@sat365.com.ar`) |
+| `SMTP_PASS` | La contraseña de esa casilla |
+| `OFICINA_EMAIL` | A qué mail fija llega SIEMPRE la copia de "oficina" de cada parte |
+
+No hace falta tocar nada más — `/api/enviar-mail.js` ya tiene las
+plantillas de oficina y de cliente incorporadas (mismo diseño que
+tenían en EmailJS), y `app.js` ya llama a este endpoint en vez de
+EmailJS.
+
+### Cómo funciona por dentro
+
+- Usa la librería `nodemailer` (gratis, sin límites propios — el único
+  límite real es el que tenga tu plan de hosting de correo en DonWeb,
+  normalmente mucho más generoso que un plan gratuito de EmailJS).
+- Las plantillas HTML están **incrustadas directamente en el código**
+  de `/api/enviar-mail.js` (no se leen de archivo aparte), con el
+  mismo formato `{{variable}}` que ya usaban en EmailJS — incluye los
+  bloques opcionales (`{{#tecnico2}}...{{/tecnico2}}`, etc.) para
+  "2° técnico", "imprevisto" y "foto", que solo se muestran si esos
+  datos vinieron cargados.
+- Los archivos `email-templates/template_oficina.html` y
+  `template_cliente.html` quedan como referencia de diseño, ya no se
+  usan para nada — si en algún momento hay que cambiarles el diseño,
+  hay que editar las plantillas incrustadas en `enviar-mail.js`
+  directamente (y opcionalmente, actualizar esos dos archivos también
+  para que seas conserva la referencia al día).
 
 ## Foto opcional en el parte (solo para la oficina)
 
 El técnico puede sacar o elegir una foto al completar el parte. Es
 opcional — si no carga nada, no pasa nada. La foto **no se manda como
-adjunto de mail** (EmailJS free tiene un límite de 50 KB por mail, muy
-poco para una foto), sino que se sube al mismo repo privado de GitHub
-que ya se usa para el listado de servicios (carpeta `fotos/`), y el mail
-de la oficina recibe un link que la muestra. El mail al cliente nunca
-incluye la foto ni el link.
+adjunto de mail** (los adjuntos pesados complican el envío y no todos
+los clientes de correo los muestran bien), sino que se sube al mismo
+repo privado de GitHub que ya se usa para el listado de servicios
+(carpeta `fotos/`), y el mail de la oficina recibe un link que la
+muestra. El mail al cliente nunca incluye la foto ni el link.
 
 (Antes probamos con Google Drive usando una cuenta de servicio, pero
 Google no permite que las cuentas de servicio suban archivos a carpetas
@@ -1160,13 +1182,14 @@ configuración) se unificaron en uno solo:
 `consultas-categorias`, `guardias`, `credenciales`, `vehiculos`,
 `push-subscripciones`, `sims`).
 
-Quedan **11 funciones en total** (`servicios`, `cronograma`, `geocode`,
+Quedan **12 funciones en total** (`servicios`, `cronograma`, `geocode`,
 `historial`, `upload-foto`, `foto`, `consultas`, `datos`,
-`vehiculo-uso`, `cron-diario`, `sim-uso`) — con margen para **una sola
-función más** antes de llegar al límite. La próxima vez que haga falta
-un endpoint nuevo, hay que sumarlo como colección dentro de
-`datos.js` si es posible (no como archivo nuevo en `/api`), salvo que
-necesite lógica propia como `vehiculo-uso.js` o `sim-uso.js`.
+`vehiculo-uso`, `cron-diario`, `sim-uso`, `enviar-mail`) — **al límite
+del plan gratuito de Vercel, no queda margen**. Cualquier endpoint
+nuevo que haga falta de acá en adelante tiene que sumarse
+obligatoriamente como colección dentro de `datos.js` (no como archivo
+nuevo en `/api`), salvo que se libere una función existente primero
+(por ejemplo, fusionando alguna con otra).
 
 ## Notas y límites de esta versión
 
