@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.5.8";
+const APP_VERSION = "3.5.9";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -1334,9 +1334,12 @@ agregarMaterialBtn.addEventListener("click", () => {
 function getMaterialesUtilizados() {
   const agregados = materialesAgregados.map((item) => `${item.modelo} x${item.cantidad}`);
   const otros = document.getElementById("f_materiales").value.trim();
+  return [...agregados, otros].filter(Boolean).join(", ");
+}
+
+function getSimInstaladaTexto() {
   const sim = getSimAInstalarSeleccionada();
-  const simTexto = sim ? `SIM ${sim.empresa}${sim.tipo ? " " + sim.tipo : ""} ${sim.numero}` : "";
-  return [...agregados, simTexto, otros].filter(Boolean).join(", ");
+  return sim ? `${sim.empresa}${sim.tipo ? " " + sim.tipo : ""} — ${sim.numero}` : "";
 }
 
 // ---------- Instalar una SIM del propio stock en este servicio ----------
@@ -1711,6 +1714,7 @@ function getFormData() {
     cliente_email: document.getElementById("f_cliente_email").value.trim(),
     tarea: document.getElementById("f_tarea").value.trim(),
     materiales: getMaterialesUtilizados(),
+    sim_instalada_texto: getSimInstaladaTexto(),
     materiales_retirados: document.getElementById("f_materiales_retirados").value.trim(),
     importe: document.getElementById("f_importe").value.trim(),
     descuento: getDescuentoLabel(),
@@ -1798,6 +1802,13 @@ toSignBtn.addEventListener("click", () => {
   }
   if (!data.fecha) {
     showToast("Falta completar la Fecha del servicio.");
+    return;
+  }
+  // Si eligió categoría y modelo pero nunca tocó "+ Agregar", esa
+  // selección se pierde en silencio — se avisa antes de dejar
+  // continuar, para no perder el material cargado.
+  if (matModeloSelect.value && !matModeloSelect.disabled) {
+    showToast('Tenés un material elegido sin agregar — tocá "+ Agregar" o borralo antes de continuar.');
     return;
   }
   showScreen("sign");
@@ -1949,6 +1960,8 @@ async function intentarEnviarParte(payload, interactivo) {
     tarea: data.tarea,
     materiales: data.materiales,
     materiales_retirados: data.materiales_retirados,
+    sim_instalada_texto: data.sim_instalada_texto,
+    cliente_email_usado: data.cliente_email,
     importe: data.importe,
     descuento: data.descuento,
     costo_final: data.costo_final,

@@ -205,6 +205,23 @@ plantillas de oficina y de cliente incorporadas (mismo diseño que
 tenían en EmailJS), y `app.js` ya llama a este endpoint en vez de
 EmailJS.
 
+### Copia al cliente, SIM instalada, y aviso de material sin agregar (v3.5.9)
+
+- **Se descubrió la causa de que a veces no llegaban los materiales**:
+  hay que elegir categoría, modelo y cantidad, y después tocar
+  **"+ Agregar"** para que quede sumado a la lista — si un técnico se
+  olvidaba de tocar ese botón, la selección se perdía en silencio, sin
+  ningún aviso. Ahora, si intenta continuar a la firma con una
+  categoría/modelo elegidos pero sin agregar, la app le avisa y no lo
+  deja avanzar hasta que agregue el material o lo borre.
+- **El mail de oficina ahora muestra si se le mandó copia al cliente**
+  y a qué dirección — o "No se cargó mail del cliente" si no
+  corresponde.
+- **La SIM instalada (si se cargó) ahora tiene su propia sección** en
+  el mail de oficina ("📶 SIM instalada"), separada de los materiales
+  generales, en vez de ir mezclada dentro del mismo texto — así se ve
+  de un vistazo sin tener que leer entre los demás materiales.
+
 ### Aclaración y cargo de quien firma (v3.5.7)
 
 Al firmar, además del dibujo de la firma, el cliente (o quien firme)

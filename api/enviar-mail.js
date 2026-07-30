@@ -56,6 +56,7 @@ const PLANTILLA_OFICINA = `
               <tr><td style="padding:4px 0; color:#6B7680; font-size:13px; width:140px;">Cliente</td><td style="padding:4px 0; color:#101820; font-size:14px;">{{cliente}}</td></tr>
               <tr><td style="padding:4px 0; color:#6B7680; font-size:13px;">Dirección</td><td style="padding:4px 0; color:#101820; font-size:14px;"><a href="{{direccion_maps_link}}" style="color:#101820; text-decoration:underline;">{{direccion}}</a> 📍</td></tr>
               <tr><td style="padding:4px 0; color:#6B7680; font-size:13px;">Localidad</td><td style="padding:4px 0; color:#101820; font-size:14px;">{{localidad}}</td></tr>
+              <tr><td style="padding:4px 0; color:#6B7680; font-size:13px;">Copia al cliente</td><td style="padding:4px 0; color:#101820; font-size:14px;">{{cliente_email_status}}</td></tr>
             </table>
           </td>
         </tr>
@@ -82,6 +83,10 @@ const PLANTILLA_OFICINA = `
           <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:6px;">📤 Materiales retirados</div>
           <div style="color:#101820; font-size:14px; line-height:1.5; background:#F4F5F0; border-radius:8px; padding:12px 14px;">{{materiales_retirados}}</div>
         </td></tr>
+        {{#sim_instalada_texto}}<tr><td style="padding:0 28px 8px;">
+          <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:6px;">📶 SIM instalada</div>
+          <div style="color:#101820; font-size:14px; line-height:1.5; background:#F4F5F0; border-radius:8px; padding:12px 14px;">{{sim_instalada_texto}}</div>
+        </td></tr>{{/sim_instalada_texto}}
         <tr>
           <td style="padding:16px 28px 8px;">
             <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:10px;">💰 Costos</div>
@@ -230,6 +235,9 @@ function enriquecerDatos(datos) {
     ...datos,
     forma_pago_chip: armarEtiquetaFormaPago(datos.forma_pago),
     direccion_maps_link: armarLinkMapa(datos.direccion, datos.localidad),
+    cliente_email_status: datos.cliente_email_usado
+      ? `Sí, a ${datos.cliente_email_usado}`
+      : "No se cargó mail del cliente — no se le mandó copia",
   };
 }
 
