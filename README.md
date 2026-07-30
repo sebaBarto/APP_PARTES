@@ -205,6 +205,26 @@ plantillas de oficina y de cliente incorporadas (mismo diseño que
 tenían en EmailJS), y `app.js` ya llama a este endpoint en vez de
 EmailJS.
 
+### Borrador del parte en curso (v3.6.0)
+
+Si un técnico abre un servicio, carga algunos datos, y toca **"Volver"**
+(o cierra la app / cambia de pantalla) antes de firmar y enviar, lo que
+ya había cargado **no se pierde** — queda guardado en el celular
+(`localStorage`) y se restaura solo la próxima vez que abra **ese
+mismo servicio**, con un aviso de "Se restauró lo que ya tenías
+cargado en este servicio."
+
+- Se guarda automáticamente al tocar "Volver", y también si la app
+  pasa a segundo plano (por si cierran sin tocar ese botón).
+- El borrador se borra solo una vez que el parte se envía con éxito —
+  no queda dando vueltas después de terminado.
+- Solo aplica a servicios reales de la lista (con número de servicio)
+  — los partes cargados con "Cargar parte sin servicio" no tienen una
+  clave estable para guardar un borrador, así que esos no se guardan.
+- Es **por celular** — si el técnico cambia de teléfono a mitad de un
+  servicio, no se lleva el borrador con él (queda en el celular
+  original).
+
 ### Copia al cliente, SIM instalada, y aviso de material sin agregar (v3.5.9)
 
 - **Se descubrió la causa de que a veces no llegaban los materiales**:

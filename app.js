@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.5.9";
+const APP_VERSION = "3.6.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -381,6 +381,128 @@ let hasSignature = false;
 let drawing = false;
 let lastX = 0, lastY = 0;
 let currentNumeroServicio = "";
+
+// ---------- Borrador del parte en curso ----------
+// Si el técnico abre un servicio, carga datos, y toca "Volver" (o
+// cierra la app) antes de terminar y firmar, lo que ya había cargado
+// no se pierde — queda guardado en el celular y se restaura solo la
+// próxima vez que abra ESE MISMO servicio. Solo aplica a servicios
+// reales de la lista (con número de servicio) — los partes cargados
+// con "Cargar parte sin servicio" no tienen una clave estable para
+// guardar un borrador, así que no se guardan.
+function claveBorrador(numeroServicio) {
+  return `borrador_parte_${numeroServicio}`;
+}
+
+function armarBorrador() {
+  return {
+    cliente: document.getElementById("f_cliente").value,
+    direccion: document.getElementById("f_direccion").value,
+    localidad: document.getElementById("f_localidad").value,
+    cliente_email: document.getElementById("f_cliente_email").value,
+    tarea: document.getElementById("f_tarea").value,
+    materiales_otros: document.getElementById("f_materiales").value,
+    materiales_agregados: materialesAgregados,
+    materiales_retirados: document.getElementById("f_materiales_retirados").value,
+    importe: document.getElementById("f_importe").value,
+    costo_final: document.getElementById("f_costo_final").value,
+    descuento_tipo: (Array.from(descuentoRadios).find((r) => r.checked) || {}).value || "0",
+    descuento_otro_pct: descuentoOtroPct.value,
+    forma_pago: (Array.from(formaPagoChecks).find((r) => r.checked) || {}).value || "",
+    instalacion: instalacionCheck.checked,
+    tecnico: tecnicoSelect.value,
+    tecnico_otro: tecnicoOtro.value,
+    dos_tecnicos: dosTecnicosCheck.checked,
+    tecnico2: tecnicoSelect2.value,
+    tecnico2_otro: tecnicoOtro2.value,
+    fecha: document.getElementById("f_fecha").value,
+    hora_entrada: document.getElementById("f_entrada").value,
+    hora_salida: document.getElementById("f_salida").value,
+    imprevisto: imprevistoCheck.checked,
+    imprevisto_detalle: document.getElementById("f_imprevisto_detalle").value,
+    imprevisto_minutos: document.getElementById("f_imprevisto_minutos").value,
+    observaciones: document.getElementById("f_observaciones").value,
+    guardado_en: Date.now(),
+  };
+}
+
+function hayAlgoCargadoEnElForm() {
+  const b = armarBorrador();
+  return !!(
+    b.cliente || b.direccion || b.tarea || b.materiales_agregados.length > 0 ||
+    b.materiales_otros || b.importe || b.observaciones
+  );
+}
+
+function guardarBorradorActual() {
+  if (!currentNumeroServicio) return; // sin servicio real, no hay clave estable
+  if (!hayAlgoCargadoEnElForm()) return; // no guardar un borrador vacío
+  try {
+    localStorage.setItem(claveBorrador(currentNumeroServicio), JSON.stringify(armarBorrador()));
+  } catch (err) {
+    // si falla (almacenamiento lleno, modo privado, etc.), no se
+    // interrumpe el flujo — simplemente no queda guardado el borrador
+  }
+}
+
+function borrarBorrador(numeroServicio) {
+  if (!numeroServicio) return;
+  localStorage.removeItem(claveBorrador(numeroServicio));
+}
+
+function restaurarBorradorSiExiste(numeroServicio) {
+  if (!numeroServicio) return false;
+  const guardado = localStorage.getItem(claveBorrador(numeroServicio));
+  if (!guardado) return false;
+  let b;
+  try {
+    b = JSON.parse(guardado);
+  } catch (err) {
+    return false;
+  }
+
+  document.getElementById("f_cliente").value = b.cliente || "";
+  document.getElementById("f_direccion").value = b.direccion || "";
+  document.getElementById("f_localidad").value = b.localidad || "";
+  document.getElementById("f_cliente_email").value = b.cliente_email || "";
+  document.getElementById("f_tarea").value = b.tarea || "";
+  document.getElementById("f_materiales").value = b.materiales_otros || "";
+  materialesAgregados = Array.isArray(b.materiales_agregados) ? b.materiales_agregados : [];
+  renderMaterialesAgregados();
+  document.getElementById("f_materiales_retirados").value = b.materiales_retirados || "";
+  document.getElementById("f_importe").value = b.importe || "";
+  document.getElementById("f_costo_final").value = b.costo_final || "";
+  const radioDescuento = Array.from(descuentoRadios).find((r) => r.value === (b.descuento_tipo || "0"));
+  if (radioDescuento) {
+    radioDescuento.checked = true;
+    radioDescuento.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  descuentoOtroPct.value = b.descuento_otro_pct || "";
+  if (b.forma_pago) {
+    const radioPago = Array.from(formaPagoChecks).find((r) => r.value === b.forma_pago);
+    if (radioPago) radioPago.checked = true;
+  }
+  instalacionCheck.checked = !!b.instalacion;
+  tecnicoSelect.value = b.tecnico || "";
+  tecnicoSelect.dispatchEvent(new Event("change", { bubbles: true }));
+  tecnicoOtro.value = b.tecnico_otro || "";
+  dosTecnicosCheck.checked = !!b.dos_tecnicos;
+  dosTecnicosCheck.dispatchEvent(new Event("change", { bubbles: true }));
+  tecnicoSelect2.value = b.tecnico2 || "";
+  tecnicoSelect2.dispatchEvent(new Event("change", { bubbles: true }));
+  tecnicoOtro2.value = b.tecnico2_otro || "";
+  document.getElementById("f_fecha").value = b.fecha || "";
+  document.getElementById("f_entrada").value = b.hora_entrada || "";
+  document.getElementById("f_salida").value = b.hora_salida || "";
+  imprevistoCheck.checked = !!b.imprevisto;
+  imprevistoCheck.dispatchEvent(new Event("change", { bubbles: true }));
+  document.getElementById("f_imprevisto_detalle").value = b.imprevisto_detalle || "";
+  document.getElementById("f_imprevisto_minutos").value = b.imprevisto_minutos || "";
+  document.getElementById("f_observaciones").value = b.observaciones || "";
+
+  return true;
+}
+
 let serviciosCache = [];
 let serviciosResueltos = new Set(JSON.parse(localStorage.getItem("servicios_resueltos") || "[]"));
 let fotoBase64 = null;
@@ -824,6 +946,10 @@ function seleccionarServicio(item) {
   autocompletarFecha();
   mostrarVisitaAnterior();
   cargarOpcionesSimInstalar();
+  const restaurado = restaurarBorradorSiExiste(currentNumeroServicio);
+  if (restaurado) {
+    showToast("Se restauró lo que ya tenías cargado en este servicio.");
+  }
   showScreen("form");
 }
 
@@ -1405,8 +1531,20 @@ async function asignarSimInstaladaAlCliente(data) {
 }
 
 backToListBtn.addEventListener("click", () => {
+  guardarBorradorActual();
   resetForm();
   showScreen("list");
+});
+
+// Por si cierran la app o cambian de pestaña sin tocar "Volver" —
+// guarda el borrador igual, mientras se esté en la pantalla del
+// formulario.
+document.addEventListener("visibilitychange", () => {
+  const enFormOFirma = (screens.form && screens.form.dataset.active === "true") ||
+    (screens.sign && screens.sign.dataset.active === "true");
+  if (document.visibilityState === "hidden" && enFormOFirma) {
+    guardarBorradorActual();
+  }
 });
 
 // ---------- Foto opcional (solo va a la oficina, sube a Drive) ----------
@@ -1993,6 +2131,7 @@ async function intentarEnviarParte(payload, interactivo) {
     if (data.numero_servicio) {
       serviciosResueltos.add(data.numero_servicio);
       localStorage.setItem("servicios_resueltos", JSON.stringify([...serviciosResueltos]));
+      borrarBorrador(data.numero_servicio);
     }
     try {
       const histRes = await fetch("/api/historial", {
