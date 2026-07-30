@@ -914,6 +914,31 @@ refinó la ejecución:
   uso ahora" (una foto del estado actual de la flota de SIMs, sin
   depender del período de movimientos elegido).
 
+## Mismo rediseño llevado al resto de pantallas, y bug reparado (v3.5.3)
+
+- **Submenú de Servicios Técnicos** y **submenú de Dashboards**: misma
+  grilla de 2 columnas e íconos SVG con insignia de color que el panel
+  principal (antes solo lo tenía la pantalla de inicio).
+- **Listado de vehículos**: mismo tratamiento, pero con una variante
+  con sentido — en vez de un color fijo por sección, la insignia de
+  cada vehículo refleja su **estado real**: verde si está libre,
+  coral si está en uso en ese momento.
+- La grilla y los íconos ahora son una clase reutilizable
+  (`.panel-tiles-grid` / `.panel-tile-grid`) en vez de estar atados
+  solo a la pantalla principal — para poder aplicarla a futuras
+  pantallas sin repetir código.
+
+**Bug reparado**: si el CDN de Leaflet (la librería del mapa) no
+llegaba a cargar por cualquier motivo — sin conexión, bloqueado por
+algún firewall corporativo, caída puntual del CDN — una línea de
+configuración del mapa que corría directo al abrir la app explotaba y
+cortaba en seco la ejecución de **todo el resto del script**, dejando
+funciones sin relación alguna con el mapa (como el reintento de envíos
+sin conexión) rotas silenciosamente. Ahora esa configuración está
+protegida: si Leaflet no cargó, el resto de la app sigue funcionando
+normal — sólo el mapa en sí queda no disponible hasta que haya
+conexión, con un aviso claro en vez de romperse.
+
 ## Panel principal rediseñado a fondo (v3.5.2)
 
 Rediseño completo, con más foco que la vuelta anterior — específicamente

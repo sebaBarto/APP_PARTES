@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.5.2";
+const APP_VERSION = "3.5.3";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -1464,11 +1464,18 @@ quitarFotoBtn.addEventListener("click", () => {
 // ---------- Mapa del servicio ----------
 let mapaLeafletInstance = null;
 
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-});
+// Si por lo que sea el CDN de Leaflet no llegó a cargar (sin
+// conexión, bloqueado, caído), esto no debe frenar el resto de la
+// app — antes, un error acá cortaba en seco toda la ejecución del
+// script que venía después (media app dejaba de funcionar por un
+// mapa que ni se estaba usando en ese momento).
+if (typeof L !== "undefined") {
+  L.Icon.Default.mergeOptions({
+    iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+    iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+    shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+  });
+}
 
 function distanciaMetros(lat1, lon1, lat2, lon2) {
   const R = 6371000;
@@ -1519,7 +1526,7 @@ async function abrirMapa() {
     mapaStatus.textContent = "";
     renderizarMapa(actual, porId);
   } catch (err) {
-    mapaStatus.textContent = "No se pudo conectar para buscar la ubicación.";
+    mapaStatus.textContent = "No se pudo mostrar el mapa (revisá la conexión e intentá de nuevo).";
   }
 }
 
@@ -3172,13 +3179,16 @@ async function renderVehiculosPicker() {
       const estado = abierto ? `En uso por ${abierto.tecnico} desde las ${abierto.hora_toma}` : "Libre";
       const tile = document.createElement("button");
       tile.type = "button";
-      tile.className = "panel-tile";
+      tile.className = `panel-tile panel-tile-grid ${abierto ? "tile-vehiculo-en-uso" : "tile-vehiculo-libre"}`;
+      const iconoSvg = v.nombre === "Moto"
+        ? '<circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="M9 17h4l3-7h3"/><path d="M13 17l-2-5-3-1"/>'
+        : '<path d="M3 13l2-6a2 2 0 0 1 2-1h10a2 2 0 0 1 2 1l2 6"/><rect x="2" y="13" width="20" height="5" rx="1.5"/><circle cx="7" cy="18.5" r="1.5"/><circle cx="17" cy="18.5" r="1.5"/>';
       tile.innerHTML = `
-        <span class="panel-tile-icon">${v.nombre === "Moto" ? "🏍️" : "🚐"}</span>
-        <span>
-          <span class="panel-tile-label" style="display:block;">${v.nombre}</span>
-          <span class="vehiculo-panel-status" style="color:${abierto ? "#B5772A" : "#3FAE6E"};">${estado}</span>
+        <span class="panel-tile-icon-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${iconoSvg}</svg>
         </span>
+        <span class="panel-tile-label">${v.nombre}</span>
+        <span class="vehiculo-panel-status" style="color:${abierto ? "#B5772A" : "#2E7D32"};">${estado}</span>
       `;
       tile.addEventListener("click", () => {
         vehiculoSeleccionado = v.nombre;

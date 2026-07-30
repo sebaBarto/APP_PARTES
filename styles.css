@@ -150,10 +150,11 @@ html, body {
 .panel-tile-label { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 16px; color: #101820; text-align: left; }
 
 /* ---------- Panel principal: grilla tipo "bento" con insignias de ícono ----------
-   Solo se aplica en #screen-home — las demás pantallas (submenús,
-   listado de vehículos) siguen usando la lista vertical de siempre. */
-#screen-home .panel-tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
-#screen-home .panel-tile {
+   Se usa en el panel principal, en los submenús con pocas opciones
+   (Servicios Técnicos, Dashboards), y en el listado de vehículos —
+   con la clase .panel-tiles-grid / .panel-tile-grid. */
+.panel-tiles.panel-tiles-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.panel-tile.panel-tile-grid {
   flex-direction: column;
   justify-content: center;
   gap: 12px;
@@ -161,7 +162,7 @@ html, body {
   background: #FFFFFF;
   border-color: #D8DCD4;
 }
-#screen-home .panel-tile:active { border-color: #F5A623; background: #FFFFFF; transform: scale(0.96); }
+.panel-tile.panel-tile-grid:active { border-color: #F5A623; background: #FFFFFF; transform: scale(0.96); }
 .panel-tile-icon-badge {
   width: 52px;
   height: 52px;
@@ -172,12 +173,13 @@ html, body {
   flex-shrink: 0;
 }
 .panel-tile-icon-badge svg { width: 26px; height: 26px; stroke: #FFFFFF; }
-#screen-home .panel-tile-label {
+.panel-tile-grid .panel-tile-label {
   font-size: 13.5px;
   letter-spacing: -0.005em;
   text-align: center;
   line-height: 1.2;
 }
+.panel-tile-grid .vehiculo-panel-status { text-align: center; display: block; margin-top: 2px; }
 
 /* Acentos curados por sección — variedad con intención, no al azar. */
 .tile-servicios .panel-tile-icon-badge { background: var(--acc-amber); }
@@ -190,6 +192,14 @@ html, body {
 .tile-sims .panel-tile-icon-badge { background: var(--acc-blue); }
 .tile-admin .panel-tile-icon-badge { background: var(--ink); }
 .tile-admin .panel-tile-icon-badge svg { stroke: var(--amber); }
+.tile-servicios-pendientes .panel-tile-icon-badge { background: var(--acc-amber); }
+.tile-cronograma .panel-tile-icon-badge { background: var(--acc-indigo); }
+.tile-dash-general .panel-tile-icon-badge { background: var(--acc-teal); }
+.tile-dash-financiero .panel-tile-icon-badge { background: var(--acc-gold); }
+.tile-dash-vehiculos .panel-tile-icon-badge { background: var(--acc-green); }
+.tile-dash-sims .panel-tile-icon-badge { background: var(--acc-blue); }
+.tile-vehiculo-libre .panel-tile-icon-badge { background: var(--ok, #3FAE6E); }
+.tile-vehiculo-en-uso .panel-tile-icon-badge { background: var(--acc-coral); }
 .login-logo { width: 180px; max-width: 70%; height: auto; margin-bottom: 14px; }
 .login-title { margin-bottom: 14px; }
 #screen-login .login-input {
