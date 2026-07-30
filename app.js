@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.6.0";
+const APP_VERSION = "3.6.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -132,6 +132,8 @@ const screens = {
   vehiculoDetalle: document.getElementById("screen-vehiculo-detalle"),
   sims: document.getElementById("screen-sims"),
   simDetalle: document.getElementById("screen-sim-detalle"),
+  herramientas: document.getElementById("screen-herramientas"),
+  herramientaDetalle: document.getElementById("screen-herramienta-detalle"),
   form: document.getElementById("screen-form"),
   sign: document.getElementById("screen-sign"),
   sending: document.getElementById("screen-sending"),
@@ -235,6 +237,24 @@ const tileHistorialBtn = document.getElementById("tileHistorialBtn");
 const tileCredencialBtn = document.getElementById("tileCredencialBtn");
 const tileVehiculosBtn = document.getElementById("tileVehiculosBtn");
 const tileSimsBtn = document.getElementById("tileSimsBtn");
+const tileHerramientasBtn = document.getElementById("tileHerramientasBtn");
+const herramientasListaStatus = document.getElementById("herramientasListaStatus");
+const herramientasPanelTiles = document.getElementById("herramientasPanelTiles");
+const volverDeHerramientasBtn = document.getElementById("volverDeHerramientasBtn");
+const herramientaDetalleNombre = document.getElementById("herramientaDetalleNombre");
+const herramientaDetalleStatus = document.getElementById("herramientaDetalleStatus");
+const herramientaSoloLecturaInfo = document.getElementById("herramientaSoloLecturaInfo");
+const herramientaTomarWrap = document.getElementById("herramientaTomarWrap");
+const herramientaTomarBtn = document.getElementById("herramientaTomarBtn");
+const herramientaEnUsoWrap = document.getElementById("herramientaEnUsoWrap");
+const herramientaDevolverBtn = document.getElementById("herramientaDevolverBtn");
+const herramientaClienteInput = document.getElementById("herramientaClienteInput");
+const herramientaDejarEnClienteBtn = document.getElementById("herramientaDejarEnClienteBtn");
+const herramientaTecnicoNuevoSelect = document.getElementById("herramientaTecnicoNuevoSelect");
+const herramientaTransferirBtn = document.getElementById("herramientaTransferirBtn");
+const herramientaEnClienteWrap = document.getElementById("herramientaEnClienteWrap");
+const herramientaRetirarBtn = document.getElementById("herramientaRetirarBtn");
+const volverDeHerramientaDetalleBtn = document.getElementById("volverDeHerramientaDetalleBtn");
 const volverDeSimsBtn = document.getElementById("volverDeSimsBtn");
 const simsListaStatus = document.getElementById("simsListaStatus");
 const simsGrupos = document.getElementById("simsGrupos");
@@ -1512,10 +1532,11 @@ async function asignarSimInstaladaAlCliente(data) {
   const sim = getSimAInstalarSeleccionada();
   if (!sim || !data.cliente) return;
   try {
-    const res = await fetch("/api/sim-uso", {
+    const res = await fetch("/api/recurso-uso", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
       body: JSON.stringify({
+        recurso: "sim",
         accion: "usar",
         numero: sim.numero,
         tecnico: data.tecnico || tecnicoLogueado || "",
@@ -1815,7 +1836,7 @@ async function verificarPrimerServicioSinVehiculo(data) {
     if (yaTeniaOtroHoy) return; // no es el primer parte de hoy
 
     const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
-    const res = await fetch("/api/vehiculo-uso", { headers, cache: "no-store" });
+    const res = await fetch("/api/recurso-uso?recurso=vehiculo", { headers, cache: "no-store" });
     if (!res.ok) return;
     const historialVehiculos = await res.json();
     const tieneVehiculoTomado = Array.isArray(historialVehiculos) &&
@@ -3317,7 +3338,7 @@ async function fetchVehiculosConfig() {
 }
 async function fetchVehiculosHistorial() {
   const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
-  const res = await fetch("/api/vehiculo-uso", { headers, cache: "no-store" });
+  const res = await fetch("/api/recurso-uso?recurso=vehiculo", { headers, cache: "no-store" });
   if (!res.ok) throw new Error("HTTP " + res.status);
   const data = await res.json();
   return Array.isArray(data) ? data : [];
@@ -3477,10 +3498,11 @@ vehiculoRegistrarEventoBtn.addEventListener("click", async () => {
   }
   vehiculoRegistrarEventoBtn.disabled = true;
   try {
-    const res = await fetch("/api/vehiculo-uso", {
+    const res = await fetch("/api/recurso-uso", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
       body: JSON.stringify({
+        recurso: "vehiculo",
         accion: "evento",
         vehiculo: vehiculoSeleccionado,
         tecnico: tecnicoLogueado || "Oficina",
@@ -3506,10 +3528,11 @@ vehiculoRegistrarEventoBtn.addEventListener("click", async () => {
 vehiculoTomarBtn.addEventListener("click", async () => {
   vehiculoTomarBtn.disabled = true;
   try {
-    const res = await fetch("/api/vehiculo-uso", {
+    const res = await fetch("/api/recurso-uso", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
       body: JSON.stringify({
+        recurso: "vehiculo",
         accion: "tomar",
         vehiculo: vehiculoSeleccionado,
         tecnico: tecnicoLogueado || "Oficina",
@@ -3538,10 +3561,11 @@ vehiculoDevolverBtn.addEventListener("click", async () => {
     : "";
   vehiculoDevolverBtn.disabled = true;
   try {
-    const res = await fetch("/api/vehiculo-uso", {
+    const res = await fetch("/api/recurso-uso", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
       body: JSON.stringify({
+        recurso: "vehiculo",
         accion: "devolver",
         vehiculo: vehiculoSeleccionado,
         tecnico: tecnicoLogueado || "Oficina",
@@ -3600,7 +3624,7 @@ async function fetchDashVehiculos() {
   try {
     await poblarFiltroVehiculosDashboard();
     const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
-    const res = await fetch("/api/vehiculo-uso", { headers, cache: "no-store" });
+    const res = await fetch("/api/recurso-uso?recurso=vehiculo", { headers, cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     dashVehiculosCache = Array.isArray(data) ? data : [];
@@ -3730,7 +3754,7 @@ async function fetchDashSims() {
   try {
     const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
     const [resHistorial, sims] = await Promise.all([
-      fetch("/api/sim-uso", { headers, cache: "no-store" }),
+      fetch("/api/recurso-uso?recurso=sim", { headers, cache: "no-store" }),
       fetchSimsConfig().catch(() => []),
     ]);
     if (!resHistorial.ok) throw new Error("HTTP " + resHistorial.status);
@@ -3919,10 +3943,11 @@ blanquearHistorialSimsBtn.addEventListener("click", async () => {
 
   blanquearHistorialSimsBtn.disabled = true;
   try {
-    const res = await fetch("/api/sim-uso", {
+    const res = await fetch("/api/recurso-uso", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-      body: JSON.stringify({ accion: "blanquear_historial", tecnico: tecnicoLogueado || "" }),
+      body: JSON.stringify({ recurso: "sim",
+        accion: "blanquear_historial", tecnico: tecnicoLogueado || "" }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error desconocido");
@@ -4066,6 +4091,212 @@ actualizarAppBtn.addEventListener("click", async () => {
   } finally {
     // Se recarga sin usar ninguna copia guardada, para bajar todo de nuevo.
     location.reload();
+  }
+});
+
+// ---------- Herramientas especiales (escaleras, computadora, taladros, etc.) ----------
+let herramientaSeleccionada = "";
+
+async function fetchHerramientasConfig() {
+  const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+  const res = await fetch("/api/datos?coleccion=herramientas", { headers, cache: "no-store" });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  const data = await res.json();
+  return Array.isArray(data) ? data : [];
+}
+
+tileHerramientasBtn.addEventListener("click", () => {
+  showScreen("herramientas");
+  renderHerramientasPicker();
+});
+volverDeHerramientasBtn.addEventListener("click", () => showScreen("home"));
+volverDeHerramientaDetalleBtn.addEventListener("click", () => showScreen("herramientas"));
+
+function claseYTextoEstadoHerramienta(h) {
+  if (h.estado === "cliente") return { clase: "tile-herr-cliente", texto: `En ${h.cliente || "un cliente"} (${h.tecnico_actual || "?"})` };
+  if (h.estado === "uso") return { clase: "tile-herr-uso", texto: `En uso: ${h.tecnico_actual || "?"}` };
+  return { clase: "tile-herr-libre", texto: "Libre" };
+}
+
+async function renderHerramientasPicker() {
+  herramientasListaStatus.textContent = "Cargando...";
+  herramientasPanelTiles.innerHTML = "";
+  try {
+    const herramientas = await fetchHerramientasConfig();
+    if (herramientas.length === 0) {
+      herramientasListaStatus.textContent = "Todavía no hay herramientas cargadas.";
+      return;
+    }
+    herramientasListaStatus.textContent = "";
+    herramientas.forEach((h) => {
+      const { clase, texto } = claseYTextoEstadoHerramienta(h);
+      const tile = document.createElement("button");
+      tile.type = "button";
+      tile.className = `panel-tile panel-tile-grid ${clase}`;
+      tile.innerHTML = `
+        <span class="panel-tile-icon-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h16v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M8 8V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="4" y1="12" x2="20" y2="12"/></svg>
+        </span>
+        <span class="panel-tile-label">${h.nombre}</span>
+        <span class="vehiculo-panel-status" style="color:#101820;">${texto}</span>
+      `;
+      tile.addEventListener("click", () => {
+        herramientaSeleccionada = h.nombre;
+        showScreen("herramientaDetalle");
+        renderHerramientaDetalle();
+      });
+      herramientasPanelTiles.appendChild(tile);
+    });
+  } catch (err) {
+    herramientasListaStatus.textContent = "No se pudo cargar la lista de herramientas.";
+  }
+}
+
+async function renderHerramientaDetalle() {
+  herramientaDetalleStatus.textContent = "Cargando...";
+  herramientaSoloLecturaInfo.classList.add("hidden");
+  herramientaTomarWrap.classList.add("hidden");
+  herramientaEnUsoWrap.classList.add("hidden");
+  herramientaEnClienteWrap.classList.add("hidden");
+  try {
+    const herramientas = await fetchHerramientasConfig();
+    const h = herramientas.find((x) => x.nombre === herramientaSeleccionada);
+    if (!h) {
+      herramientaDetalleStatus.textContent = "No se encontró esa herramienta.";
+      return;
+    }
+    herramientaDetalleNombre.textContent = h.nombre;
+    herramientaDetalleStatus.textContent = "";
+
+    const esMia = h.tecnico_actual === (tecnicoLogueado || "");
+
+    if (h.estado === "libre") {
+      herramientaTomarWrap.classList.remove("hidden");
+      return;
+    }
+
+    if (h.estado === "uso" && esMia) {
+      herramientaClienteInput.value = "";
+      const otrosTecnicos = Object.keys(tecnicosPasswords).filter((n) => n !== tecnicoLogueado).sort();
+      herramientaTecnicoNuevoSelect.innerHTML =
+        '<option value="" disabled selected>Elegí un técnico</option>' +
+        otrosTecnicos.map((n) => `<option value="${n}">${n}</option>`).join("");
+      herramientaEnUsoWrap.classList.remove("hidden");
+      return;
+    }
+
+    if (h.estado === "cliente") {
+      // Cualquier técnico puede retirarla de donde quedó, no solo
+      // quien la dejó — en la práctica, puede pasar a buscarla otro.
+      herramientaEnClienteWrap.classList.remove("hidden");
+      herramientaSoloLecturaInfo.textContent = `${h.tecnico_actual || "Alguien"} la dejó en ${h.cliente || "un cliente"}.`;
+      herramientaSoloLecturaInfo.classList.remove("hidden");
+      return;
+    }
+
+    // En uso, pero por otro técnico — solo informativo.
+    herramientaSoloLecturaInfo.textContent = `La tiene ${h.tecnico_actual || "alguien"} en este momento.`;
+    herramientaSoloLecturaInfo.classList.remove("hidden");
+  } catch (err) {
+    herramientaDetalleStatus.textContent = "No se pudo cargar la información de esta herramienta.";
+  }
+}
+
+async function llamarHerramientaUso(accion, extra) {
+  const res = await fetch("/api/recurso-uso", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+    body: JSON.stringify({
+      recurso: "herramienta",
+      accion,
+      nombre: herramientaSeleccionada,
+      tecnico: tecnicoLogueado || "",
+      hora: horaActualHHMM(),
+      ...extra,
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Error desconocido");
+  return data;
+}
+
+herramientaTomarBtn.addEventListener("click", async () => {
+  herramientaTomarBtn.disabled = true;
+  try {
+    await llamarHerramientaUso("tomar");
+    showToast(`Tomaste "${herramientaSeleccionada}".`);
+    showScreen("herramientas");
+    renderHerramientasPicker();
+  } catch (err) {
+    showToast("No se pudo registrar: " + err.message);
+  } finally {
+    herramientaTomarBtn.disabled = false;
+  }
+});
+
+herramientaDevolverBtn.addEventListener("click", async () => {
+  herramientaDevolverBtn.disabled = true;
+  try {
+    await llamarHerramientaUso("devolver");
+    showToast(`Devolviste "${herramientaSeleccionada}".`);
+    showScreen("herramientas");
+    renderHerramientasPicker();
+  } catch (err) {
+    showToast("No se pudo registrar: " + err.message);
+  } finally {
+    herramientaDevolverBtn.disabled = false;
+  }
+});
+
+herramientaDejarEnClienteBtn.addEventListener("click", async () => {
+  const cliente = herramientaClienteInput.value.trim();
+  if (!cliente) {
+    showToast("Escribí el nombre del cliente.");
+    return;
+  }
+  herramientaDejarEnClienteBtn.disabled = true;
+  try {
+    await llamarHerramientaUso("dejar_en_cliente", { cliente });
+    showToast(`Quedó registrado que dejaste "${herramientaSeleccionada}" en ${cliente}.`);
+    showScreen("herramientas");
+    renderHerramientasPicker();
+  } catch (err) {
+    showToast("No se pudo registrar: " + err.message);
+  } finally {
+    herramientaDejarEnClienteBtn.disabled = false;
+  }
+});
+
+herramientaTransferirBtn.addEventListener("click", async () => {
+  const tecnicoNuevo = herramientaTecnicoNuevoSelect.value;
+  if (!tecnicoNuevo) {
+    showToast("Elegí a qué técnico transferírsela.");
+    return;
+  }
+  herramientaTransferirBtn.disabled = true;
+  try {
+    await llamarHerramientaUso("transferir", { tecnico_nuevo: tecnicoNuevo });
+    showToast(`Transferiste "${herramientaSeleccionada}" a ${tecnicoNuevo}.`);
+    showScreen("herramientas");
+    renderHerramientasPicker();
+  } catch (err) {
+    showToast("No se pudo registrar: " + err.message);
+  } finally {
+    herramientaTransferirBtn.disabled = false;
+  }
+});
+
+herramientaRetirarBtn.addEventListener("click", async () => {
+  herramientaRetirarBtn.disabled = true;
+  try {
+    await llamarHerramientaUso("retirar_de_cliente");
+    showToast(`Retiraste "${herramientaSeleccionada}" — vuelve a tu stock.`);
+    showScreen("herramientas");
+    renderHerramientasPicker();
+  } catch (err) {
+    showToast("No se pudo registrar: " + err.message);
+  } finally {
+    herramientaRetirarBtn.disabled = false;
   }
 });
 
@@ -4263,10 +4494,11 @@ let simExistenteParaReemplazo = "";
 
 async function marcarSimComoUsada(cliente) {
   try {
-    const res = await fetch("/api/sim-uso", {
+    const res = await fetch("/api/recurso-uso", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-      body: JSON.stringify({ accion: "usar", numero: simSeleccionada, tecnico: tecnicoLogueado || "", cliente }),
+      body: JSON.stringify({ recurso: "sim",
+        accion: "usar", numero: simSeleccionada, tecnico: tecnicoLogueado || "", cliente }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error desconocido");
@@ -4320,10 +4552,11 @@ simAgregarSegundaBtn.addEventListener("click", async () => {
 simReemplazarBtn.addEventListener("click", async () => {
   simReemplazarBtn.disabled = true;
   try {
-    const res = await fetch("/api/sim-uso", {
+    const res = await fetch("/api/recurso-uso", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
       body: JSON.stringify({
+        recurso: "sim",
         accion: "reemplazar",
         numero: simSeleccionada,
         tecnico: tecnicoLogueado || "",
@@ -4346,10 +4579,11 @@ simReemplazarBtn.addEventListener("click", async () => {
 simDevolverBtn.addEventListener("click", async () => {
   simDevolverBtn.disabled = true;
   try {
-    const res = await fetch("/api/sim-uso", {
+    const res = await fetch("/api/recurso-uso", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-      body: JSON.stringify({ accion: "devolver", numero: simSeleccionada, tecnico: tecnicoLogueado || "" }),
+      body: JSON.stringify({ recurso: "sim",
+        accion: "devolver", numero: simSeleccionada, tecnico: tecnicoLogueado || "" }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error desconocido");
@@ -4364,10 +4598,11 @@ simDevolverBtn.addEventListener("click", async () => {
 
 async function transferirSim(tecnicoNuevo) {
   try {
-    const res = await fetch("/api/sim-uso", {
+    const res = await fetch("/api/recurso-uso", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-      body: JSON.stringify({ accion: "transferir", numero: simSeleccionada, tecnico: tecnicoLogueado || "", tecnico_nuevo: tecnicoNuevo }),
+      body: JSON.stringify({ recurso: "sim",
+        accion: "transferir", numero: simSeleccionada, tecnico: tecnicoLogueado || "", tecnico_nuevo: tecnicoNuevo }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error desconocido");

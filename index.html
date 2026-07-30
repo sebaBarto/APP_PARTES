@@ -121,6 +121,12 @@
           </span>
           <span class="panel-tile-label">SIMs</span>
         </button>
+        <button type="button" class="panel-tile panel-tile-grid tile-herramientas" id="tileHerramientasBtn">
+          <span class="panel-tile-icon-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h16v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M8 8V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="4" y1="12" x2="20" y2="12"/></svg>
+          </span>
+          <span class="panel-tile-label">Herramientas</span>
+        </button>
         <a href="admin.html" target="_blank" rel="noopener" class="panel-tile panel-tile-grid tile-admin hidden" id="abrirAdminBtn">
           <span class="panel-tile-icon-badge">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>
@@ -605,6 +611,61 @@
     </div>
     <div class="action-bar">
       <button class="btn btn-secondary" id="volverDeSimDetalleBtn" type="button">Volver</button>
+    </div>
+  </section>
+
+  <!-- HERRAMIENTAS: LISTADO -->
+  <section class="screen" id="screen-herramientas">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">HERRAMIENTAS</p>
+      <p class="list-status" id="herramientasListaStatus"></p>
+      <div id="herramientasPanelTiles" class="panel-tiles panel-tiles-grid"></div>
+    </div>
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDeHerramientasBtn" type="button">Volver</button>
+    </div>
+  </section>
+
+  <!-- HERRAMIENTAS: DETALLE -->
+  <section class="screen" id="screen-herramienta-detalle">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow" id="herramientaDetalleNombre">HERRAMIENTA</p>
+      <p class="list-status" id="herramientaDetalleStatus"></p>
+
+      <div id="herramientaSoloLecturaInfo" class="status-aviso status-info hidden"></div>
+
+      <div id="herramientaTomarWrap" class="hidden">
+        <button type="button" class="btn btn-primary" id="herramientaTomarBtn">Tomar esta herramienta</button>
+      </div>
+
+      <div id="herramientaEnUsoWrap" class="hidden">
+        <button type="button" class="btn btn-primary" id="herramientaDevolverBtn">Devolver</button>
+
+        <div style="margin-top:16px;">
+          <div class="field-group">
+            <label class="field-label" for="herramientaClienteInput">Dejar en un cliente</label>
+            <input class="field-input" id="herramientaClienteInput" type="text" placeholder="Nombre del cliente">
+          </div>
+          <button type="button" class="btn btn-secondary" id="herramientaDejarEnClienteBtn">Dejar en ese cliente</button>
+        </div>
+
+        <div style="margin-top:16px;">
+          <div class="field-group">
+            <label class="field-label" for="herramientaTecnicoNuevoSelect">Transferir a otro técnico</label>
+            <select class="field-input" id="herramientaTecnicoNuevoSelect">
+              <option value="" disabled selected>Elegí un técnico</option>
+            </select>
+          </div>
+          <button type="button" class="btn btn-secondary" id="herramientaTransferirBtn">Transferir</button>
+        </div>
+      </div>
+
+      <div id="herramientaEnClienteWrap" class="hidden">
+        <button type="button" class="btn btn-primary" id="herramientaRetirarBtn">Ya la retiré — vuelve a mi stock</button>
+      </div>
+    </div>
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDeHerramientaDetalleBtn" type="button">Volver</button>
     </div>
   </section>
 

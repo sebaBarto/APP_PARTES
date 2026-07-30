@@ -29,6 +29,7 @@
   --acc-slate: #5C7A8A;
   --acc-green: #2E9E4F;
   --acc-blue: #2E86DE;
+  --acc-brown: #8B5E3C;
   --amber-soft: rgba(245, 166, 35, 0.14);
   --amber-ring: rgba(245, 166, 35, 0.28);
   --steel: #5C7A8A;
@@ -200,6 +201,10 @@ html, body {
 .tile-dash-sims .panel-tile-icon-badge { background: var(--acc-blue); }
 .tile-vehiculo-libre .panel-tile-icon-badge { background: var(--ok, #3FAE6E); }
 .tile-vehiculo-en-uso .panel-tile-icon-badge { background: var(--acc-coral); }
+.tile-herramientas .panel-tile-icon-badge { background: var(--acc-brown); }
+.tile-herr-libre .panel-tile-icon-badge { background: var(--ok, #3FAE6E); }
+.tile-herr-uso .panel-tile-icon-badge { background: var(--acc-coral); }
+.tile-herr-cliente .panel-tile-icon-badge { background: var(--acc-gold); }
 .login-logo { width: 180px; max-width: 70%; height: auto; margin-bottom: 14px; }
 .login-title { margin-bottom: 14px; }
 #screen-login .login-input {

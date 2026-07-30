@@ -205,6 +205,39 @@ plantillas de oficina y de cliente incorporadas (mismo diseño que
 tenían en EmailJS), y `app.js` ya llama a este endpoint en vez de
 EmailJS.
 
+## Herramientas especiales, y fusión de vehículos/SIMs/herramientas en un solo endpoint (v3.6.1)
+
+**Nueva sección "🧰 Herramientas"** en el panel principal, para llevar
+registro de elementos puntuales que se llevan un técnico a la vez —
+escaleras especiales, la computadora de diagnóstico, un taladro en
+particular, etc. (a diferencia de los vehículos, no se usan todos los
+días). Funciona igual que vehículos y SIMs:
+
+- Un técnico la **toma** cuando la necesita, y la **devuelve** cuando
+  termina.
+- Se la puede **transferir** directo a otro técnico.
+- Si la **deja en lo de un cliente** (en vez de devolverla), queda
+  registrado con qué cliente, y sale un **aviso por notificación
+  push** a todo el equipo — para que quede claro dónde está. Cualquier
+  técnico (no necesariamente quien la dejó) puede marcar después que
+  la retiró, y vuelve a estar en uso normal.
+- **Todos los técnicos ven** quién tiene cada herramienta en este
+  momento, igual que con las SIMs.
+- Se administra desde `admin.html` → pestaña "Herramientas" — se
+  carga el nombre de cada una (el estado y quién la tiene lo va
+  actualizando la app sola).
+
+**De regalo, se liberó otra función**: en vez de crear un tercer
+endpoint para herramientas (que nos hubiera dejado otra vez al
+límite), se aprovechó para fusionar `vehiculo-uso.js` + `sim-uso.js` +
+la lógica nueva de herramientas en **un solo archivo**
+(`recurso-uso.js`) — las tres comparten el mismo patrón de "tomar /
+devolver / transferir + historial", así que tenía sentido unificarlas.
+Resultado: **10 funciones en total**, con **2 de margen** (antes
+había 1). Se probó a fondo con pruebas automatizadas que vehículos y
+SIMs siguen funcionando exactamente igual que antes a través del
+endpoint nuevo, sin ningún cambio de comportamiento para el usuario.
+
 ### Borrador del parte en curso (v3.6.0)
 
 Si un técnico abre un servicio, carga algunos datos, y toca **"Volver"**
@@ -1255,17 +1288,19 @@ configuración) se unificaron en uno solo:
 `consultas-categorias`, `guardias`, `credenciales`, `vehiculos`,
 `push-subscripciones`, `sims`).
 
-Quedan **11 funciones en total** (`servicios`, `cronograma`, `geocode`,
-`historial`, `foto`, `consultas`, `datos`, `vehiculo-uso`,
-`cron-diario`, `sim-uso`, `enviar-mail`) — con **1 función libre**
-antes de volver a tocar el límite del plan gratuito de Vercel. Se
-liberó una fusionando `foto.js` (mostrar una foto) y `upload-foto.js`
-(subir una foto) en un solo archivo — ambas trabajaban sobre el mismo
-recurso (la carpeta `fotos/` del repo de datos), así que alcanzaba con
-que el método HTTP (GET/POST) decida qué hacer, en vez de tener dos
-funciones separadas. La próxima vez que haga falta un endpoint nuevo,
-sumarlo como colección dentro de `datos.js` si es posible, para no
-volver a gastar la última función libre.
+Quedan **10 funciones en total** (`servicios`, `cronograma`, `geocode`,
+`historial`, `foto`, `consultas`, `datos`, `recurso-uso`,
+`cron-diario`, `enviar-mail`) — con **2 funciones libres** antes de
+volver a tocar el límite del plan gratuito de Vercel.
+`recurso-uso.js` reemplaza a los antiguos `vehiculo-uso.js` y
+`sim-uso.js` (fusionados), y además maneja la lógica de herramientas
+— las tres comparten el mismo patrón de "tomar / devolver /
+transferir + historial" (ver `?recurso=vehiculo|sim|herramienta`).
+Antes de eso, ya se había liberado una función fusionando `foto.js`
+(mostrar una foto) y `upload-foto.js` (subir una foto) en un solo
+archivo. La próxima vez que haga falta un endpoint nuevo, sumarlo como
+colección dentro de `datos.js` si es posible, para no gastar de las
+que quedan libres.
 
 ## Revisión y depuración (v3.5.8)
 

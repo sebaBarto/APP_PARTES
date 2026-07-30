@@ -185,6 +185,7 @@
       <button type="button" class="tab-btn" id="tabCredencialesBtn"><span class="tab-icon">🪪</span>Credenciales</button>
       <button type="button" class="tab-btn" id="tabVehiculosBtn"><span class="tab-icon">🚗</span>Vehículos</button>
       <button type="button" class="tab-btn" id="tabSimsBtn"><span class="tab-icon">📶</span>SIMs</button>
+      <button type="button" class="tab-btn" id="tabHerramientasBtn"><span class="tab-icon">🧰</span>Herramientas</button>
     </div>
 
     <div id="panelServicios">
@@ -413,6 +414,19 @@
       <button id="guardarSimsBtn" type="button">Guardar cambios</button>
       <p class="status" id="guardarSimsStatus"></p>
     </div>
+
+    <div id="panelHerramientas" class="hidden">
+      <h1>Herramientas especiales</h1>
+      <p class="subtitle">Escaleras especiales, la computadora, taladros puntuales, etc. — cargá el nombre de cada una; el estado y quién la tiene lo va actualizando la app sola a medida que los técnicos la usan.</p>
+
+      <p class="status" id="herramientasStatus"></p>
+
+      <div id="herramientasFilas"></div>
+
+      <button id="agregarHerramientaBtn" type="button" class="btn-secondary-admin" style="margin-bottom:14px;">+ Agregar herramienta</button>
+      <button id="guardarHerramientasBtn" type="button">Guardar cambios</button>
+      <p class="status" id="guardarHerramientasStatus"></p>
+    </div>
   </div>
 
 </div>
@@ -468,6 +482,9 @@ let vehiculosCargadosUnaVez = false;
 const tabSimsBtn = document.getElementById("tabSimsBtn");
 const panelSims = document.getElementById("panelSims");
 let simsCargadasUnaVez = false;
+const tabHerramientasBtn = document.getElementById("tabHerramientasBtn");
+const panelHerramientas = document.getElementById("panelHerramientas");
+let herramientasCargadasUnaVez = false;
 
 const TABS = [
   { btn: tabServiciosBtn, panel: panelServicios },
@@ -479,6 +496,7 @@ const TABS = [
   { btn: tabCredencialesBtn, panel: panelCredenciales, onShow: () => { if (!credencialesCargadasUnaVez) { credencialesCargadasUnaVez = true; cargarCredencialesAdmin(); } } },
   { btn: tabVehiculosBtn, panel: panelVehiculos, onShow: () => { if (!vehiculosCargadosUnaVez) { vehiculosCargadosUnaVez = true; cargarVehiculosAdmin(); } } },
   { btn: tabSimsBtn, panel: panelSims, onShow: () => { if (!simsCargadasUnaVez) { simsCargadasUnaVez = true; cargarSimsAdmin(); } } },
+  { btn: tabHerramientasBtn, panel: panelHerramientas, onShow: () => { if (!herramientasCargadasUnaVez) { herramientasCargadasUnaVez = true; cargarHerramientasAdmin(); } } },
 ];
 
 TABS.forEach(({ btn, panel, onShow }) => {
@@ -1566,6 +1584,112 @@ guardarSimsBtn.addEventListener("click", async () => {
     guardarSimsStatus.textContent = "No se pudo guardar: " + err.message;
   } finally {
     guardarSimsBtn.disabled = false;
+  }
+});
+
+// ---------- Herramientas especiales ----------
+const herramientasStatus = document.getElementById("herramientasStatus");
+const herramientasFilas = document.getElementById("herramientasFilas");
+const agregarHerramientaBtn = document.getElementById("agregarHerramientaBtn");
+const guardarHerramientasBtn = document.getElementById("guardarHerramientasBtn");
+const guardarHerramientasStatus = document.getElementById("guardarHerramientasStatus");
+let nombresTecnicosParaHerramientas = [];
+
+function renderFilaHerramienta(h) {
+  const item = h || { nombre: "", estado: "libre", tecnico_actual: "", cliente: "" };
+  const opcionesTecnicos = nombresTecnicosParaHerramientas.map((n) =>
+    `<option value="${n}" ${n === item.tecnico_actual ? "selected" : ""}>${n}</option>`
+  ).join("");
+  const fila = document.createElement("div");
+  fila.className = "card herramienta-fila";
+  fila.innerHTML = `
+    <div class="field-row" style="align-items:flex-end;">
+      <div style="flex:1;">
+        <label>Nombre de la herramienta</label>
+        <input type="text" class="herramienta-nombre" value="${item.nombre || ""}" placeholder="Ej: Escalera 6m, Notebook de diagnóstico...">
+      </div>
+      <button type="button" class="btn-quitar-tecnico quitar-herramienta" title="Quitar">✕</button>
+    </div>
+    <div class="field-row">
+      <div style="flex:1;">
+        <label>Estado</label>
+        <select class="herramienta-estado">
+          <option value="libre" ${item.estado === "libre" ? "selected" : ""}>Libre</option>
+          <option value="uso" ${item.estado === "uso" ? "selected" : ""}>En uso</option>
+          <option value="cliente" ${item.estado === "cliente" ? "selected" : ""}>En un cliente</option>
+        </select>
+      </div>
+      <div style="flex:1;">
+        <label>Técnico (si está en uso o en cliente)</label>
+        <select class="herramienta-tecnico">
+          <option value="">— ninguno —</option>
+          ${opcionesTecnicos}
+        </select>
+      </div>
+    </div>
+    <label>Cliente (si está en un cliente)</label>
+    <input type="text" class="herramienta-cliente" value="${item.cliente || ""}" placeholder="Nombre del cliente">
+  `;
+  fila.querySelector(".quitar-herramienta").addEventListener("click", () => fila.remove());
+  herramientasFilas.appendChild(fila);
+}
+
+async function cargarHerramientasAdmin() {
+  herramientasStatus.textContent = "Cargando herramientas...";
+  herramientasFilas.innerHTML = "";
+  try {
+    const [resHerr, resTecnicos] = await Promise.all([
+      fetch("/api/datos?coleccion=herramientas", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" }),
+      fetch("/api/datos?coleccion=tecnicos", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" }),
+    ]);
+    const herramientas = await resHerr.json();
+    const tecnicos = await resTecnicos.json();
+    nombresTecnicosParaHerramientas = (Array.isArray(tecnicos) ? tecnicos : []).map((t) => t.nombre);
+
+    (herramientas || []).forEach((h) => renderFilaHerramienta(h));
+    herramientasStatus.textContent = Array.isArray(herramientas) && herramientas.length > 0
+      ? ""
+      : "Todavía no hay ninguna herramienta cargada — agregá la primera.";
+  } catch (err) {
+    herramientasStatus.textContent = "No se pudo cargar la lista de herramientas.";
+  }
+}
+
+agregarHerramientaBtn.addEventListener("click", () => renderFilaHerramienta(null));
+
+guardarHerramientasBtn.addEventListener("click", async () => {
+  const filas = Array.from(herramientasFilas.querySelectorAll(":scope > .herramienta-fila"));
+  const lista = filas.map((fila) => ({
+    nombre: fila.querySelector(".herramienta-nombre").value.trim(),
+    estado: fila.querySelector(".herramienta-estado").value,
+    tecnico_actual: fila.querySelector(".herramienta-tecnico").value,
+    cliente: fila.querySelector(".herramienta-cliente").value.trim(),
+  })).filter((h) => h.nombre);
+
+  if (lista.length === 0) {
+    guardarHerramientasStatus.className = "status err";
+    guardarHerramientasStatus.textContent = "Agregá al menos una herramienta con nombre.";
+    return;
+  }
+
+  guardarHerramientasBtn.disabled = true;
+  guardarHerramientasStatus.className = "status";
+  guardarHerramientasStatus.textContent = "Guardando...";
+  try {
+    const res = await fetch("/api/datos?coleccion=herramientas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify(lista),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    guardarHerramientasStatus.className = "status ok";
+    guardarHerramientasStatus.textContent = "Listo — la lista de herramientas ya está disponible en la app.";
+  } catch (err) {
+    guardarHerramientasStatus.className = "status err";
+    guardarHerramientasStatus.textContent = "No se pudo guardar: " + err.message;
+  } finally {
+    guardarHerramientasBtn.disabled = false;
   }
 });
 
