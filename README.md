@@ -914,6 +914,33 @@ refinó la ejecución:
   uso ahora" (una foto del estado actual de la flota de SIMs, sin
   depender del período de movimientos elegido).
 
+## Panel principal rediseñado a fondo (v3.5.2)
+
+Rediseño completo, con más foco que la vuelta anterior — específicamente
+lo que pediste: tamaño de botones, tipografía, colores e íconos.
+
+- **Íconos propios en SVG**, no más emoji: cada botón del panel
+  principal (Servicios Técnicos, Manuales, Dashboards, Guardias,
+  Historial, Credencial, Vehículos, SIMs, Administración) tiene un
+  ícono de línea dibujado a medida, consistente en trazo y estilo —
+  el emoji quedaba genérico y dependía de cómo lo dibuje cada celular;
+  un ícono propio se ve igual en todos lados y da un aire mucho más
+  profesional.
+- **Insignia de color por sección**: cada ícono va dentro de un
+  cuadrado redondeado de color — ámbar (Servicios), índigo (Manuales),
+  turquesa (Dashboards), coral (Guardias), gris azulado (Historial),
+  dorado (Credencial), verde (Vehículos), azul (SIMs), y navy con
+  ícono ámbar para Administración (para que se note que es distinto,
+  al ser una sección restringida). Los colores no son al azar — cada
+  uno tiene una asociación pensada con la sección.
+- **Grilla de 2 columnas** ("bento grid") en vez de la lista vertical
+  de antes — se ven más botones de un vistazo, con una forma más
+  cuadrada y moderna, en vez de filas largas y angostas.
+- Este cambio de grilla e íconos **es solo del panel principal** — los
+  submenús (Servicios Técnicos, Dashboards) y la lista de vehículos
+  siguen con la lista vertical de siempre, ya que no fue lo que
+  pediste tocar y cambiar todo de golpe hubiese sido más riesgoso.
+
 ## Panel de administración rediseñado (v3.5.1)
 
 `admin.html` tenía un estilo bastante plano (tarjetas blancas sin

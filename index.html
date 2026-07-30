@@ -74,40 +74,58 @@
       <button type="button" class="btn btn-ghost btn-small" id="activarNotificacionesBtn" style="margin-bottom:14px;">🔔 Activar notificaciones</button>
 
       <div class="panel-tiles">
-        <button type="button" class="panel-tile" id="tileServiciosBtn">
-          <span class="panel-tile-icon">🔧</span>
+        <button type="button" class="panel-tile tile-servicios" id="tileServiciosBtn">
+          <span class="panel-tile-icon-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7.5a5.5 5.5 0 0 1-7.6 5.1L6 20l-2-2 7.4-7.4A5.5 5.5 0 0 1 16.5 3a5.4 5.4 0 0 1 2.1.4L15 7l2 2 3.6-3.6c.3.6.4 1.3.4 2.1z"/></svg>
+          </span>
           <span class="panel-tile-label">Servicios Técnicos</span>
         </button>
-        <button type="button" class="panel-tile" id="verConsultasBtn">
-          <span class="panel-tile-icon">📖</span>
+        <button type="button" class="panel-tile tile-manuales" id="verConsultasBtn">
+          <span class="panel-tile-icon-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5c0-1.1.9-2 2-2h5c1.1 0 2 .9 2 2v14.5c0-1.1-.9-2-2-2H6c-1.1 0-2 .9-2 2z"/><path d="M20 5.5c0-1.1-.9-2-2-2h-5c-1.1 0-2 .9-2 2v14.5c0-1.1.9-2 2-2h5c1.1 0 2 .9 2 2z"/></svg>
+          </span>
           <span class="panel-tile-label">Manuales</span>
         </button>
-        <button type="button" class="panel-tile" id="tileDashboardsBtn">
-          <span class="panel-tile-icon">📊</span>
+        <button type="button" class="panel-tile tile-dashboards" id="tileDashboardsBtn">
+          <span class="panel-tile-icon-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="4" y2="13"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="20" y1="20" x2="20" y2="10"/><line x1="2" y1="20" x2="22" y2="20"/></svg>
+          </span>
           <span class="panel-tile-label">Dashboards</span>
         </button>
-        <button type="button" class="panel-tile" id="tileGuardiasBtn">
-          <span class="panel-tile-icon">🚨</span>
+        <button type="button" class="panel-tile tile-guardias" id="tileGuardiasBtn">
+          <span class="panel-tile-icon-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a5 5 0 0 0-5 5c0 6-3 8-3 8h16s-3-2-3-8a5 5 0 0 0-5-5z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>
+          </span>
           <span class="panel-tile-label">Guardias</span>
         </button>
-        <button type="button" class="panel-tile" id="tileHistorialBtn">
-          <span class="panel-tile-icon">📜</span>
+        <button type="button" class="panel-tile tile-historial" id="tileHistorialBtn">
+          <span class="panel-tile-icon-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M9 3h6"/></svg>
+          </span>
           <span class="panel-tile-label">Historial</span>
         </button>
-        <button type="button" class="panel-tile hidden" id="tileCredencialBtn">
-          <span class="panel-tile-icon">🪪</span>
+        <button type="button" class="panel-tile tile-credencial hidden" id="tileCredencialBtn">
+          <span class="panel-tile-icon-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10.5" r="2"/><path d="M6 16c0-1.7 1.3-3 3-3s3 1.3 3 3"/><path d="M14 9h4"/><path d="M14 13h4"/></svg>
+          </span>
           <span class="panel-tile-label">Credencial</span>
         </button>
-        <button type="button" class="panel-tile" id="tileVehiculosBtn">
-          <span class="panel-tile-icon">🚗</span>
+        <button type="button" class="panel-tile tile-vehiculos" id="tileVehiculosBtn">
+          <span class="panel-tile-icon-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13l2-6a2 2 0 0 1 2-1h10a2 2 0 0 1 2 1l2 6"/><rect x="2" y="13" width="20" height="5" rx="1.5"/><circle cx="7" cy="18.5" r="1.5"/><circle cx="17" cy="18.5" r="1.5"/></svg>
+          </span>
           <span class="panel-tile-label">Vehículos</span>
         </button>
-        <button type="button" class="panel-tile" id="tileSimsBtn">
-          <span class="panel-tile-icon">📶</span>
+        <button type="button" class="panel-tile tile-sims" id="tileSimsBtn">
+          <span class="panel-tile-icon-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h6l4 4v12a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><rect x="9.5" y="10" width="5" height="5.5" rx="1"/></svg>
+          </span>
           <span class="panel-tile-label">SIMs</span>
         </button>
-        <a href="admin.html" target="_blank" rel="noopener" class="panel-tile hidden" id="abrirAdminBtn">
-          <span class="panel-tile-icon">🛠</span>
+        <a href="admin.html" target="_blank" rel="noopener" class="panel-tile tile-admin hidden" id="abrirAdminBtn">
+          <span class="panel-tile-icon-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>
+          </span>
           <span class="panel-tile-label">Administración</span>
         </a>
       </div>

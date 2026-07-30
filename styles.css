@@ -17,6 +17,18 @@
   --panel: #1B2530;
   --paper: #F4F5F0;
   --amber: #F5A623;
+
+  /* Acentos para las insignias de ícono del panel principal — una
+     variación curada, no al azar, para que cada sección se reconozca
+     de un vistazo sin salirse de la paleta general de la marca. */
+  --acc-amber: #F5A623;
+  --acc-gold: #C9932E;
+  --acc-indigo: #6C63C4;
+  --acc-teal: #17A2A0;
+  --acc-coral: #E4402C;
+  --acc-slate: #5C7A8A;
+  --acc-green: #2E9E4F;
+  --acc-blue: #2E86DE;
   --amber-soft: rgba(245, 166, 35, 0.14);
   --amber-ring: rgba(245, 166, 35, 0.28);
   --steel: #5C7A8A;
@@ -136,6 +148,48 @@ html, body {
 .panel-tile:active { border-color: #F5A623; background: rgba(245,166,35,0.08); transform: scale(0.98); box-shadow: var(--shadow-card-hover); }
 .panel-tile-icon { font-size: 28px; flex-shrink: 0; }
 .panel-tile-label { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 16px; color: #101820; text-align: left; }
+
+/* ---------- Panel principal: grilla tipo "bento" con insignias de ícono ----------
+   Solo se aplica en #screen-home — las demás pantallas (submenús,
+   listado de vehículos) siguen usando la lista vertical de siempre. */
+#screen-home .panel-tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+#screen-home .panel-tile {
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  padding: 22px 12px 18px;
+  background: #FFFFFF;
+  border-color: #D8DCD4;
+}
+#screen-home .panel-tile:active { border-color: #F5A623; background: #FFFFFF; transform: scale(0.96); }
+.panel-tile-icon-badge {
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.panel-tile-icon-badge svg { width: 26px; height: 26px; stroke: #FFFFFF; }
+#screen-home .panel-tile-label {
+  font-size: 13.5px;
+  letter-spacing: -0.005em;
+  text-align: center;
+  line-height: 1.2;
+}
+
+/* Acentos curados por sección — variedad con intención, no al azar. */
+.tile-servicios .panel-tile-icon-badge { background: var(--acc-amber); }
+.tile-manuales .panel-tile-icon-badge { background: var(--acc-indigo); }
+.tile-dashboards .panel-tile-icon-badge { background: var(--acc-teal); }
+.tile-guardias .panel-tile-icon-badge { background: var(--acc-coral); }
+.tile-historial .panel-tile-icon-badge { background: var(--acc-slate); }
+.tile-credencial .panel-tile-icon-badge { background: var(--acc-gold); }
+.tile-vehiculos .panel-tile-icon-badge { background: var(--acc-green); }
+.tile-sims .panel-tile-icon-badge { background: var(--acc-blue); }
+.tile-admin .panel-tile-icon-badge { background: var(--ink); }
+.tile-admin .panel-tile-icon-badge svg { stroke: var(--amber); }
 .login-logo { width: 180px; max-width: 70%; height: auto; margin-bottom: 14px; }
 .login-title { margin-bottom: 14px; }
 #screen-login .login-input {
@@ -337,13 +391,6 @@ html, body {
   font-size: 14px;
   color: #F5A623;
 }
-#screen-home .panel-tile {
-  background: #F4F5F0;
-  color: #101820;
-  border: 1.5px solid transparent;
-}
-#screen-home .panel-tile:active { background: #F5A623; border-color: #F5A623; transform: scale(0.98); }
-#screen-home .panel-tile-label { color: #101820; }
 #screen-home .cola-envios-banner { background: rgba(245,166,35,0.15); border-color: #F5A623; color: #F4F5F0; }
 #screen-home .cola-envios-banner .btn-ghost { color: #F5A623; border-color: #F5A623; }
 
