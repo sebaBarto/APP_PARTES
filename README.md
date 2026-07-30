@@ -205,6 +205,33 @@ plantillas de oficina y de cliente incorporadas (mismo diseño que
 tenían en EmailJS), y `app.js` ya llama a este endpoint en vez de
 EmailJS.
 
+### Plantillas mejoradas (v3.5.6): más información, más prolijas, firma corregida
+
+- **La firma llegaba grande o estirada** en algunos clientes de mail
+  — la causa era que el tamaño real (en píxeles) del dibujo cambiaba
+  según el celular desde el que se firmaba, así que la proporción
+  nunca era la misma dos veces. Ahora se redibuja siempre sobre un
+  lienzo de tamaño fijo (320×110), centrada y con fondo blanco, antes
+  de mandarla — así se ve igual de bien sin importar desde qué celular
+  se firmó.
+- **Forma de pago con color**: en vez de texto plano, aparece como una
+  etiqueta de color (verde si pagó, celeste si transfirió, ámbar si
+  quedó a cuenta o a pagar en oficina) — se entiende de un vistazo.
+- **Dirección como link a Google Maps**: tocás la dirección y abre la
+  ubicación directo — útil sobre todo para quien recibe la copia de
+  oficina.
+- **Miniatura de la foto** (mail de oficina): si el técnico cargó una
+  foto, ahora se ve como imagen chica directo en el mail (tocándola
+  se abre en tamaño completo), en vez de solo un link de texto.
+- **Ícono por sección** (👤 🔧 📝 📦 💰 ⚠️ ✍️) para ubicarse más rápido
+  al leer.
+- **Mejor en celular**: el ancho ya no es fijo a 600px — se adapta a
+  pantallas chicas, y el mail incluye la meta etiqueta de viewport
+  para que los clientes de correo en el celular lo escalen bien.
+- **Pie de contacto** en el mail al cliente, con el sitio de la
+  empresa (`www.sat365.com.ar`) — si querés que también aparezca un
+  teléfono o WhatsApp, decime el número y lo agrego.
+
 ### Cómo funciona por dentro
 
 - Usa la librería `nodemailer` (gratis, sin límites propios — el único

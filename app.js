@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.5.5";
+const APP_VERSION = "3.5.6";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -1816,6 +1816,34 @@ newReportBtn.addEventListener("click", () => {
 });
 
 // ---------- Pad de firma (canvas) ----------
+// La firma se dibuja en un canvas cuyo tamaño real en píxeles cambia
+// según el celular (ancho de pantalla, densidad de píxeles) — si se
+// manda tal cual al mail, la proporción nunca es la misma dos veces y
+// termina viéndose grande o estirada según el cliente de correo. Acá
+// se la redibuja centrada, con fondo blanco, sobre un lienzo de
+// tamaño y proporción SIEMPRE iguales (320×110), para que en el mail
+// se vea del mismo tamaño consistente sin importar desde qué celular
+// se firmó.
+function normalizarFirmaParaMail(canvasOriginal) {
+  const ANCHO_FINAL = 320;
+  const ALTO_FINAL = 110;
+  const destino = document.createElement("canvas");
+  destino.width = ANCHO_FINAL;
+  destino.height = ALTO_FINAL;
+  const destCtx = destino.getContext("2d");
+  destCtx.fillStyle = "#FFFFFF";
+  destCtx.fillRect(0, 0, ANCHO_FINAL, ALTO_FINAL);
+
+  const escala = Math.min(ANCHO_FINAL / canvasOriginal.width, ALTO_FINAL / canvasOriginal.height);
+  const anchoEscalado = canvasOriginal.width * escala;
+  const altoEscalado = canvasOriginal.height * escala;
+  const offsetX = (ANCHO_FINAL - anchoEscalado) / 2;
+  const offsetY = (ALTO_FINAL - altoEscalado) / 2;
+  destCtx.drawImage(canvasOriginal, offsetX, offsetY, anchoEscalado, altoEscalado);
+
+  return destino.toDataURL("image/png");
+}
+
 function setupCanvas() {
   const rect = canvas.parentElement.getBoundingClientRect();
   const dpr = window.devicePixelRatio || 1;
@@ -2087,8 +2115,8 @@ confirmSignBtn.addEventListener("click", async () => {
   // uno automático si el técnico cargó el parte manualmente, sin elegir
   // un servicio de la lista.
   const idParte = data.numero_servicio ? data.numero_servicio : generarIdParte();
-  const signatureDataUrl = canvas.toDataURL("image/png");
-  const signatureImgTag = `<img src="${signatureDataUrl}" alt="Firma del cliente" width="260" style="display:block;" />`;
+  const signatureDataUrl = normalizarFirmaParaMail(canvas);
+  const signatureImgTag = `<img src="${signatureDataUrl}" alt="Firma del cliente" width="320" height="110" style="display:block; width:320px; height:110px; border:0;" />`;
 
   const payload = { idParte, data, signatureImgTag, fotoBase64, fotoMimeType };
 
