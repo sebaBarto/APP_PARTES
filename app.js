@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.4.9";
+const APP_VERSION = "3.5.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -206,6 +206,9 @@ const dashResueltosNum = document.getElementById("dashResueltosNum");
 const dashInstalacionesNum = document.getElementById("dashInstalacionesNum");
 const dashServiciosNum = document.getElementById("dashServiciosNum");
 const dashEstancadosNum = document.getElementById("dashEstancadosNum");
+const dashResueltosDelta = document.getElementById("dashResueltosDelta");
+const dashInstalacionesDelta = document.getElementById("dashInstalacionesDelta");
+const dashServiciosDelta = document.getElementById("dashServiciosDelta");
 const dashTiempoPromedioNum = document.getElementById("dashTiempoPromedioNum");
 const dashTecnicosList = document.getElementById("dashTecnicosList");
 const dashRepetidosList = document.getElementById("dashRepetidosList");
@@ -353,6 +356,7 @@ const dashFinStatus = document.getElementById("dashFinStatus");
 const dashFinPagosNum = document.getElementById("dashFinPagosNum");
 const dashFinBonificadosNum = document.getElementById("dashFinBonificadosNum");
 const dashFinTotalNum = document.getElementById("dashFinTotalNum");
+const dashFinTotalDelta = document.getElementById("dashFinTotalDelta");
 const dashFinPromedioNum = document.getElementById("dashFinPromedioNum");
 const refreshDashboardFinancieroBtn = document.getElementById("refreshDashboardFinancieroBtn");
 const dashFinSyncLabel = document.getElementById("dashFinSyncLabel");
@@ -2159,6 +2163,48 @@ function obtenerRangoPeriodo(periodo) {
   return { desde: primero, hasta: ultimo };
 }
 
+// El mismo tipo de período, pero el tramo inmediato anterior — para
+// mostrar "▲ 12% vs. período anterior" en las tarjetas KPI. "Todo" no
+// tiene un "anterior" con sentido, así que no se compara.
+function obtenerRangoPeriodoAnterior(periodo) {
+  if (periodo === "todo") return null;
+  if (periodo === "dia") {
+    const ayer = new Date();
+    ayer.setHours(0, 0, 0, 0);
+    ayer.setDate(ayer.getDate() - 1);
+    return { desde: ayer, hasta: ayer };
+  }
+  if (periodo === "semana") {
+    const actual = obtenerRangoPeriodo("semana");
+    const desde = new Date(actual.desde);
+    desde.setDate(desde.getDate() - 7);
+    const hasta = new Date(actual.hasta);
+    hasta.setDate(hasta.getDate() - 7);
+    return { desde, hasta };
+  }
+  const hoy = new Date();
+  const primero = new Date(hoy.getFullYear(), hoy.getMonth() - 1, 1);
+  const ultimo = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
+  return { desde: primero, hasta: ultimo };
+}
+
+// Arma el HTML de "▲ 12% vs. período anterior" para meter debajo de un
+// número de tarjeta KPI. actual/anterior son cantidades; null si ese
+// período no tiene comparación (p. ej. "Todo").
+function armarDeltaPeriodo(actual, anterior) {
+  if (anterior == null) return "";
+  if (anterior === 0) {
+    return actual > 0
+      ? `<div class="dash-card-delta up">▲ nuevo</div>`
+      : `<div class="dash-card-delta neutral">= sin cambios</div>`;
+  }
+  const cambio = ((actual - anterior) / anterior) * 100;
+  if (Math.abs(cambio) < 1) return `<div class="dash-card-delta neutral">= vs. anterior</div>`;
+  const signo = cambio > 0 ? "▲" : "▼";
+  const clase = cambio > 0 ? "up" : "down";
+  return `<div class="dash-card-delta ${clase}">${signo} ${Math.abs(Math.round(cambio))}% vs. anterior</div>`;
+}
+
 function fechaEnRango(fechaStr, rango) {
   if (!fechaStr) return false;
   const [y, m, d] = fechaStr.split("-").map(Number);
@@ -2213,6 +2259,22 @@ async function renderDashboard() {
   const serviciosComunes = enPeriodo.length - instalaciones;
   dashInstalacionesNum.textContent = instalaciones;
   dashServiciosNum.textContent = serviciosComunes;
+
+  // Comparación contra el mismo período anterior (semana pasada, mes
+  // pasado, etc.) — para saber de un vistazo si veníamos mejor o peor,
+  // no solo el número suelto de este período. "Todo" no se compara.
+  const rangoAnterior = obtenerRangoPeriodoAnterior(dashPeriodoActivo);
+  if (rangoAnterior) {
+    const enPeriodoAnterior = historialCache.filter((h) => fechaEnRango(h.fecha, rangoAnterior));
+    const instalacionesAnterior = enPeriodoAnterior.filter((h) => h.es_instalacion).length;
+    dashResueltosDelta.innerHTML = armarDeltaPeriodo(enPeriodo.length, enPeriodoAnterior.length);
+    dashInstalacionesDelta.innerHTML = armarDeltaPeriodo(instalaciones, instalacionesAnterior);
+    dashServiciosDelta.innerHTML = armarDeltaPeriodo(serviciosComunes, enPeriodoAnterior.length - instalacionesAnterior);
+  } else {
+    dashResueltosDelta.innerHTML = "";
+    dashInstalacionesDelta.innerHTML = "";
+    dashServiciosDelta.innerHTML = "";
+  }
 
   // Pendientes hace 3+ días (mismo umbral "atención" que ya se usa en
   // el listado de servicios) y tiempo promedio por servicio resuelto
@@ -2406,8 +2468,20 @@ function renderChartTecnico(porTecnico) {
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: { legend: { display: false }, title: { display: true, text: "Resueltos por técnico" } },
+      plugins: {
+        legend: { display: false },
+        title: { display: true, text: "Resueltos por técnico" },
+        datalabels: {
+          display: true,
+          anchor: "end",
+          align: "top",
+          color: "#101820",
+          font: { family: "'Space Grotesk', sans-serif", weight: "700", size: 12 },
+          formatter: (v) => (v > 0 ? v : ""),
+        },
+      },
       scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+      layout: { padding: { top: 16 } },
     },
   });
 }
@@ -2547,6 +2621,18 @@ function renderDashboardFinanciero() {
   dashFinBonificadosNum.textContent = bonificados;
   dashFinTotalNum.textContent = formatMonto(montoTotal);
   dashFinPromedioNum.textContent = pagos > 0 ? formatMonto(montoTotal / pagos) : "—";
+
+  // Comparación contra el mismo período anterior, igual que en el
+  // dashboard general.
+  const rangoAnteriorFin = obtenerRangoPeriodoAnterior(dashFinPeriodoActivo);
+  if (rangoAnteriorFin) {
+    const montoAnterior = historialCache
+      .filter((h) => fechaEnRango(h.fecha, rangoAnteriorFin) && !esBonificado(h.costo_final))
+      .reduce((acc, h) => acc + (parseMonto(h.costo_final) || 0), 0);
+    dashFinTotalDelta.innerHTML = armarDeltaPeriodo(montoTotal, montoAnterior);
+  } else {
+    dashFinTotalDelta.innerHTML = "";
+  }
 
   // Gráfico: monto generado por día a lo largo del período.
   const porDia = {};
@@ -3414,7 +3500,7 @@ descargarExcelVehiculosBtn.addEventListener("click", () => {
 let dashSimsCache = [];
 let chartSimsGeneral = null;
 let chartsSimsPorTecnico = {};
-const COLORES_COMPANIA_SIM = { Movistar: "#2E86DE", Personal: "#3FAE6E", Claro: "#C0392B" };
+const COLORES_COMPANIA_SIM = { Movistar: "#2E9E4F", Personal: "#29ABE2", Claro: "#E4402C" };
 let dashSimsPeriodoActivo = "mes";
 
 verDashboardSimsBtn.addEventListener("click", () => {
@@ -3821,9 +3907,11 @@ function dibujarSimsLista() {
   function crearCard(s, mostrarTecnico) {
     const card = document.createElement("div");
     card.className = "sim-card";
+    const colorEmpresa = COLORES_COMPANIA_SIM[s.empresa] || "#8A9089";
+    card.style.borderLeft = `4px solid ${colorEmpresa}`;
     card.innerHTML = `
       <div>
-        <div class="sim-card-empresa">${s.empresa}${s.tipo ? " · " + s.tipo : ""}</div>
+        <div class="sim-card-empresa"><span class="sim-card-dot" style="background:${colorEmpresa};"></span>${s.empresa}${s.tipo ? " · " + s.tipo : ""}</div>
         <div class="sim-card-numero">${s.numero}${mostrarTecnico ? " · " + s.tecnico_actual : ""}</div>
       </div>
       <span class="sim-card-estado ${s.estado}">${s.estado === "uso" ? "En uso: " + (s.cliente || "?") : "En stock"}</span>
@@ -3926,7 +4014,8 @@ async function renderSimDetalle() {
       simDetalleStatus.textContent = "No se encontró esa SIM.";
       return;
     }
-    simDetalleNombre.textContent = `${sim.empresa}${sim.tipo ? " · " + sim.tipo : ""} — ${sim.numero}`;
+    const colorEmpresaDetalle = COLORES_COMPANIA_SIM[sim.empresa] || "#8A9089";
+    simDetalleNombre.innerHTML = `<span class="sim-card-dot" style="background:${colorEmpresaDetalle};"></span>${sim.empresa}${sim.tipo ? " · " + sim.tipo : ""} — ${sim.numero}`;
     simDetalleStatus.textContent = "";
 
     const esPropia = sim.tecnico_actual === (tecnicoLogueado || "");

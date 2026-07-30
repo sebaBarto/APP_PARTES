@@ -698,6 +698,10 @@ html, body {
 }
 .dash-card-num { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 30px; letter-spacing: -0.02em; color: #101820; line-height: 1.1; }
 .dash-card-label { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: #6B7680; margin-top: 4px; }
+.dash-card-delta { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; margin-top: 6px; font-weight: 600; }
+.dash-card-delta.up { color: #2E7D32; }
+.dash-card-delta.down { color: #C0392B; }
+.dash-card-delta.neutral { color: #8A9089; }
 .dash-subtitulo {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 11px;
@@ -990,7 +994,8 @@ html, body {
   transition: box-shadow var(--dur-med) var(--ease-press), transform var(--dur-fast) var(--ease-press), border-color var(--dur-fast) var(--ease-press);
 }
 .sim-card:active { border-color: #F5A623; transform: scale(0.98); }
-.sim-card-empresa { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px; }
+.sim-card-empresa { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 7px; }
+.sim-card-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 0 3px rgba(0,0,0,0.04); }
 .sim-card-numero { font-size: 12px; color: #6B7680; font-family: 'IBM Plex Mono', monospace; }
 .sim-card-estado { font-size: 11px; font-family: 'IBM Plex Mono', monospace; padding: 3px 8px; border-radius: 10px; }
 .sim-card-estado.stock { background: rgba(63,174,110,0.15); color: #2E7D32; }

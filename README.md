@@ -914,6 +914,31 @@ refinó la ejecución:
   uso ahora" (una foto del estado actual de la flota de SIMs, sin
   depender del período de movimientos elegido).
 
+## Colores por compañía en SIMs, y comparación vs. período anterior (v3.5.0)
+
+**Colores por compañía**: cada SIM (en la app y en la tabla de
+`admin.html`) muestra una franja de color a la izquierda y un
+puntito junto al nombre de la compañía — Movistar verde, Personal
+celeste, Claro rojo (colores reales de cada marca, sin usar sus
+logos, para no reproducir marcas registradas de terceros dentro de la
+app). Se ve de un vistazo qué proveedor es cada línea sin tener que
+leer el texto. Los mismos colores se usan en los gráficos de torta del
+Dashboard de SIMs, para que todo sea consistente.
+
+**Comparación contra el período anterior**: en el Dashboard general
+("Resueltos", "Instalaciones", "Servicios técnicos") y en el
+financiero ("Monto total generado"), debajo del número aparece un
+indicador tipo "▲ 12% vs. anterior" o "▼ 8% vs. anterior" —
+compara el período elegido (día/semana/mes) contra el tramo
+equivalente inmediatamente anterior. La opción "Todo" no tiene
+comparación posible, así que ahí no aparece nada.
+
+**Valores directo en las barras**: el gráfico "Resueltos por técnico"
+ahora muestra el número arriba de cada barra, sin tener que tocarla.
+El gráfico de monto por día (financiero) se dejó sin esto a propósito
+— tiene muchos puntos (uno por día del período) y saturaría la
+lectura; ahí conviene seguir usando el tooltip al tocar.
+
 ## Vehículos de la empresa
 
 Botón "🚗 Vehículos" en el panel principal, con la flota que se cargue

@@ -69,6 +69,7 @@
   .sims-tabla .btn-quitar-fila { width: auto; padding: 6px 8px; background: #FFFFFF; color: #C0392B; border: 1.5px solid #D8DCD4; }
   .sim-asignado-a { font-weight: 600; }
   .sim-asignado-a.oficina { color: #B5772A; }
+  .sim-empresa-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
   .btn-quitar-tecnico {
     width: auto; flex-shrink: 0; padding: 10px 14px; background: #FFFFFF;
     color: #C0392B; border: 1.5px solid #D8DCD4;
@@ -1198,17 +1199,21 @@ let nombresTecnicosParaSims = [];
 let simsCompletos = []; // todas las SIMs, tal como están guardadas/recién subidas/recién transferidas
 let numerosExistentesEnServidor = new Set(); // para saber si una fila ya existe del lado del servidor
 
+const COLORES_COMPANIA_SIM_ADMIN = { Movistar: "#2E9E4F", Personal: "#29ABE2", Claro: "#E4402C" };
+
 function renderFilaSimTabla(sim) {
   const s = sim || { empresa: "Movistar", tipo: "Estándar", numero: "", tecnico_actual: "Oficina", estado: "stock", cliente: "" };
   const destinos = [...nombresTecnicosParaSims, "Oficina"].filter((n) => n !== s.tecnico_actual);
   const opcionesDestino = destinos.map((n) => `<option value="${n}">${n}</option>`).join("");
+  const colorEmpresa = COLORES_COMPANIA_SIM_ADMIN[s.empresa] || "#8A9089";
 
   const fila = document.createElement("tr");
   fila.className = "sim-fila-tabla";
   fila.dataset.tecnicoActual = s.tecnico_actual || "Oficina";
   fila.innerHTML = `
-    <td><input type="text" class="sim-numero" value="${s.numero || ""}" placeholder="341..."></td>
+    <td style="border-left:4px solid ${colorEmpresa};"><input type="text" class="sim-numero" value="${s.numero || ""}" placeholder="341..."></td>
     <td>
+      <span class="sim-empresa-dot" style="background:${colorEmpresa};"></span>
       <select class="sim-empresa">
         <option ${s.empresa === "Movistar" ? "selected" : ""}>Movistar</option>
         <option ${s.empresa === "Personal" ? "selected" : ""}>Personal</option>
@@ -1241,6 +1246,12 @@ function renderFilaSimTabla(sim) {
     </td>
     <td><button type="button" class="btn-quitar-fila" title="Quitar">✕</button></td>
   `;
+
+  fila.querySelector(".sim-empresa").addEventListener("change", (e) => {
+    const nuevoColor = COLORES_COMPANIA_SIM_ADMIN[e.target.value] || "#8A9089";
+    fila.querySelector("td").style.borderLeft = `4px solid ${nuevoColor}`;
+    fila.querySelector(".sim-empresa-dot").style.background = nuevoColor;
+  });
 
   fila.querySelector(".btn-quitar-fila").addEventListener("click", () => fila.remove());
 
