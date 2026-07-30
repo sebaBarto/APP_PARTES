@@ -1218,14 +1218,31 @@ configuración) se unificaron en uno solo:
 `consultas-categorias`, `guardias`, `credenciales`, `vehiculos`,
 `push-subscripciones`, `sims`).
 
-Quedan **12 funciones en total** (`servicios`, `cronograma`, `geocode`,
-`historial`, `upload-foto`, `foto`, `consultas`, `datos`,
-`vehiculo-uso`, `cron-diario`, `sim-uso`, `enviar-mail`) — **al límite
-del plan gratuito de Vercel, no queda margen**. Cualquier endpoint
-nuevo que haga falta de acá en adelante tiene que sumarse
-obligatoriamente como colección dentro de `datos.js` (no como archivo
-nuevo en `/api`), salvo que se libere una función existente primero
-(por ejemplo, fusionando alguna con otra).
+Quedan **11 funciones en total** (`servicios`, `cronograma`, `geocode`,
+`historial`, `foto`, `consultas`, `datos`, `vehiculo-uso`,
+`cron-diario`, `sim-uso`, `enviar-mail`) — con **1 función libre**
+antes de volver a tocar el límite del plan gratuito de Vercel. Se
+liberó una fusionando `foto.js` (mostrar una foto) y `upload-foto.js`
+(subir una foto) en un solo archivo — ambas trabajaban sobre el mismo
+recurso (la carpeta `fotos/` del repo de datos), así que alcanzaba con
+que el método HTTP (GET/POST) decida qué hacer, en vez de tener dos
+funciones separadas. La próxima vez que haga falta un endpoint nuevo,
+sumarlo como colección dentro de `datos.js` si es posible, para no
+volver a gastar la última función libre.
+
+## Revisión y depuración (v3.5.8)
+
+Se hizo una pasada de revisión general de toda la app: sintaxis de
+los 12 archivos de `/api`, de `app.js`, `index.html`, `admin.html` y
+`styles.css`; búsqueda de variables/funciones declaradas más de una
+vez; cruce de todos los `getElementById` contra los `id` reales del
+HTML (274 referencias, ninguna rota); y una recorrida automatizada
+por las pantallas principales (login, servicios, cronograma,
+manuales, dashboards, guardias, historial, vehículos, SIMs) y por el
+flujo completo de cargar un parte y firmarlo (incluida la validación
+nueva de aclaración obligatoria) — **sin encontrar errores nuevos**.
+De paso, se aprovechó para fusionar `foto.js` + `upload-foto.js` y
+liberar una función (ver más abajo).
 
 ## Notas y límites de esta versión
 

@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.5.7";
+const APP_VERSION = "3.5.8";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -1914,7 +1914,7 @@ async function intentarEnviarParte(payload, interactivo) {
   if (fb64) {
     try {
       if (interactivo) sendingLabel.textContent = "Subiendo foto...";
-      const fotoRes = await fetch("/api/upload-foto", {
+      const fotoRes = await fetch("/api/foto", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
