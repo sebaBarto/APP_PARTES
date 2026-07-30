@@ -197,6 +197,9 @@ function getTransporter() {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
     },
+    connectionTimeout: 8000,
+    greetingTimeout: 8000,
+    socketTimeout: 8000,
   });
   return transporterCache;
 }
@@ -259,6 +262,7 @@ module.exports = async (req, res) => {
 
     res.status(200).json({ ok: true });
   } catch (err) {
-    res.status(500).json({ error: "No se pudo enviar el mail", detail: String(err.message || err) });
+    const detalle = err.code ? `[${err.code}] ${err.message || err}` : String(err.message || err);
+    res.status(500).json({ error: "No se pudo enviar el mail", detail: detalle });
   }
 };
