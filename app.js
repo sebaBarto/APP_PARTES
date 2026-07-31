@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.6.2";
+const APP_VERSION = "3.7.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -134,6 +134,8 @@ const screens = {
   simDetalle: document.getElementById("screen-sim-detalle"),
   herramientas: document.getElementById("screen-herramientas"),
   herramientaDetalle: document.getElementById("screen-herramienta-detalle"),
+  comodatoForm: document.getElementById("screen-comodato-form"),
+  comodatoFirma: document.getElementById("screen-comodato-firma"),
   form: document.getElementById("screen-form"),
   sign: document.getElementById("screen-sign"),
   sending: document.getElementById("screen-sending"),
@@ -238,6 +240,29 @@ const tileCredencialBtn = document.getElementById("tileCredencialBtn");
 const tileVehiculosBtn = document.getElementById("tileVehiculosBtn");
 const tileSimsBtn = document.getElementById("tileSimsBtn");
 const tileHerramientasBtn = document.getElementById("tileHerramientasBtn");
+const tileComodatoBtn = document.getElementById("tileComodatoBtn");
+const comFDNombre = document.getElementById("comFDNombre");
+const comFDDireccion = document.getElementById("comFDDireccion");
+const comFDCiudad = document.getElementById("comFDCiudad");
+const comFDRepresentado = document.getElementById("comFDRepresentado");
+const comFDClienteEmail = document.getElementById("comFDClienteEmail");
+const comBienCategoriaSelect = document.getElementById("comBienCategoriaSelect");
+const comBienModeloSelect = document.getElementById("comBienModeloSelect");
+const comBienCantidadInput = document.getElementById("comBienCantidadInput");
+const comBienAgregarBtn = document.getElementById("comBienAgregarBtn");
+const comBienesAgregadosList = document.getElementById("comBienesAgregadosList");
+const comFDOtroArticulo = document.getElementById("comFDOtroArticulo");
+const comFDAbono = document.getElementById("comFDAbono");
+const comVolverListaBtn = document.getElementById("comVolverListaBtn");
+const comContinuarFirmaBtn = document.getElementById("comContinuarFirmaBtn");
+const comodatoSignCanvas = document.getElementById("comodatoSignCanvas");
+const comClearSignBtn = document.getElementById("comClearSignBtn");
+const comFDAclaracion = document.getElementById("comFDAclaracion");
+const comFDCargo = document.getElementById("comFDCargo");
+const comFDDni = document.getElementById("comFDDni");
+const comodatoEnviandoAviso = document.getElementById("comodatoEnviandoAviso");
+const comVolverFormBtn = document.getElementById("comVolverFormBtn");
+const comConfirmarFirmaBtn = document.getElementById("comConfirmarFirmaBtn");
 const herramientasListaStatus = document.getElementById("herramientasListaStatus");
 const herramientasPanelTiles = document.getElementById("herramientasPanelTiles");
 const volverDeHerramientasBtn = document.getElementById("volverDeHerramientasBtn");
@@ -2232,12 +2257,15 @@ function actualizarBadgeColaEnvios() {
   if (cola.length > 0) {
     const detalle = cola
       .map((item) => {
+        if ((item.tipo || "parte") === "comodato") {
+          return `Comodato: ${(item.datos && item.datos.comodatario) || "sin nombre"}`;
+        }
         const tecnico = (item.data && item.data.tecnico) || "técnico sin especificar";
         const cliente = (item.data && item.data.cliente) || "";
         return cliente ? `${tecnico} (${cliente})` : tecnico;
       })
       .join(", ");
-    colaEnviosTexto.textContent = `${cola.length} parte(s) pendiente(s) de enviar (sin conexión) — de: ${detalle}.`;
+    colaEnviosTexto.textContent = `${cola.length} envío(s) pendiente(s) de enviar (sin conexión) — de: ${detalle}.`;
     colaEnviosBanner.classList.remove("hidden");
   } else {
     colaEnviosBanner.classList.add("hidden");
@@ -2258,7 +2286,10 @@ async function procesarColaEnvios() {
   let enviadosOk = 0;
   for (const item of cola) {
     try {
-      const resultado = await intentarEnviarParte(item, false);
+      const tipo = item.tipo || "parte"; // los ya guardados antes de este cambio no tienen tipo -> son partes
+      const resultado = tipo === "comodato"
+        ? await intentarEnviarComodato(item, false)
+        : await intentarEnviarParte(item, false);
       if (resultado.oficinaOk) {
         enviadosOk++;
       } else {
@@ -2272,7 +2303,7 @@ async function procesarColaEnvios() {
   procesandoColaEnvios = false;
 
   if (enviadosOk > 0) {
-    showToast(`Se enviaron ${enviadosOk} parte(s) que estaban pendientes por falta de conexión.`);
+    showToast(`Se enviaron ${enviadosOk} envío(s) que estaban pendientes por falta de conexión.`);
     if (screens.list.dataset.active === "true") {
       renderServiciosList(filtrarServicios());
     }
@@ -2305,7 +2336,7 @@ confirmSignBtn.addEventListener("click", async () => {
   const signatureDataUrl = normalizarFirmaParaMail(canvas);
   const signatureImgTag = `<img src="${signatureDataUrl}" alt="Firma del cliente" width="320" height="110" style="display:block; width:320px; height:110px; border:0;" />`;
 
-  const payload = { idParte, data, signatureImgTag, fotoBase64, fotoMimeType };
+  const payload = { tipo: "parte", idParte, data, signatureImgTag, fotoBase64, fotoMimeType };
 
   showScreen("sending");
   setStatus("ENVIANDO", "busy");
@@ -4311,6 +4342,253 @@ herramientaRetirarBtn.addEventListener("click", async () => {
     showToast("No se pudo registrar: " + err.message);
   } finally {
     herramientaRetirarBtn.disabled = false;
+  }
+});
+
+// ---------- Contrato de comodato ----------
+let comodatoBienesAgregados = [];
+let comodatoHasSignature = false;
+let comodatoDrawing = false;
+let comodatoLastX = 0;
+let comodatoLastY = 0;
+const comodatoCtx = comodatoSignCanvas.getContext("2d");
+
+function MESES_ES() {
+  return ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+}
+
+function poblarCategoriasComodato() {
+  const opciones = materialesCatalogo.map((c) => `<option value="${c.categoria}">${c.categoria}</option>`).join("");
+  comBienCategoriaSelect.innerHTML = `<option value="" disabled selected>Elegí una categoría</option>${opciones}`;
+}
+
+comBienCategoriaSelect.addEventListener("change", () => {
+  const cat = materialesCatalogo.find((c) => c.categoria === comBienCategoriaSelect.value);
+  if (!cat) {
+    comBienModeloSelect.innerHTML = '<option value="" disabled selected>Elegí primero una categoría</option>';
+    comBienModeloSelect.disabled = true;
+    return;
+  }
+  const opciones = cat.modelos.map((m) => `<option value="${m}">${m}</option>`).join("");
+  comBienModeloSelect.innerHTML = `<option value="" disabled selected>Modelo</option>${opciones}`;
+  comBienModeloSelect.disabled = false;
+});
+
+comBienAgregarBtn.addEventListener("click", () => {
+  const modelo = comBienModeloSelect.value;
+  const cantidad = parseInt(comBienCantidadInput.value, 10) || 1;
+  if (!modelo) {
+    showToast("Elegí una categoría y un modelo antes de agregar.");
+    return;
+  }
+  comodatoBienesAgregados.push({ modelo, cantidad });
+  renderComodatoBienesAgregados();
+  comBienModeloSelect.value = "";
+  comBienCantidadInput.value = "1";
+});
+
+function renderComodatoBienesAgregados() {
+  comBienesAgregadosList.innerHTML = "";
+  comodatoBienesAgregados.forEach((item, idx) => {
+    const fila = document.createElement("div");
+    fila.className = "material-agregado-item";
+    fila.innerHTML = `<span>${item.modelo} x${item.cantidad}</span>`;
+    const quitarBtn = document.createElement("button");
+    quitarBtn.type = "button";
+    quitarBtn.textContent = "✕";
+    quitarBtn.addEventListener("click", () => {
+      comodatoBienesAgregados.splice(idx, 1);
+      renderComodatoBienesAgregados();
+    });
+    fila.appendChild(quitarBtn);
+    comBienesAgregadosList.appendChild(fila);
+  });
+}
+
+function getBienesComodatoTexto() {
+  const agregados = comodatoBienesAgregados.map((item) => `${item.modelo} x${item.cantidad}`);
+  const otro = comFDOtroArticulo.value.trim();
+  return [...agregados, otro].filter(Boolean).join(", ");
+}
+
+function resetFormularioComodato() {
+  comFDNombre.value = "";
+  comFDDireccion.value = "";
+  comFDCiudad.value = "Rosario";
+  comFDRepresentado.value = "";
+  comFDClienteEmail.value = "";
+  comFDOtroArticulo.value = "";
+  comFDAbono.value = "";
+  comodatoBienesAgregados = [];
+  renderComodatoBienesAgregados();
+  comBienModeloSelect.value = "";
+  comFDAclaracion.value = "";
+  comFDCargo.value = "";
+  comFDDni.value = "";
+}
+
+tileComodatoBtn.addEventListener("click", () => {
+  if (materialesCatalogo.length > 0) poblarCategoriasComodato();
+  resetFormularioComodato();
+  showScreen("comodatoForm");
+});
+
+comVolverListaBtn.addEventListener("click", () => showScreen("home"));
+
+comContinuarFirmaBtn.addEventListener("click", () => {
+  if (!comFDNombre.value.trim() || !comFDDireccion.value.trim() || !comFDCiudad.value.trim() || !comFDRepresentado.value.trim()) {
+    showToast("Completá los datos del comodatario antes de continuar.");
+    return;
+  }
+  if (!comFDAbono.value) {
+    showToast("Falta el monto del abono mensual.");
+    return;
+  }
+  if (comodatoBienesAgregados.length === 0 && !comFDOtroArticulo.value.trim()) {
+    showToast("Agregá al menos un artículo que se deja en comodato.");
+    return;
+  }
+  if (comBienModeloSelect.value && !comBienModeloSelect.disabled) {
+    showToast('Tenés un artículo elegido sin agregar — tocá "+ Agregar" o borralo antes de continuar.');
+    return;
+  }
+  showScreen("comodatoFirma");
+  setupComodatoCanvas();
+});
+
+comVolverFormBtn.addEventListener("click", () => showScreen("comodatoForm"));
+
+function setupComodatoCanvas() {
+  const rect = comodatoSignCanvas.parentElement.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  comodatoSignCanvas.width = rect.width * dpr;
+  comodatoSignCanvas.height = rect.height * dpr;
+  comodatoCtx.scale(dpr, dpr);
+  comodatoCtx.lineWidth = 2.4;
+  comodatoCtx.lineCap = "round";
+  comodatoCtx.lineJoin = "round";
+  comodatoCtx.strokeStyle = "#101820";
+  clearComodatoSignature();
+}
+function comodatoPointerPos(e) {
+  const rect = comodatoSignCanvas.getBoundingClientRect();
+  const point = e.touches ? e.touches[0] : e;
+  return { x: point.clientX - rect.left, y: point.clientY - rect.top };
+}
+function comodatoStartDraw(e) {
+  e.preventDefault();
+  comodatoDrawing = true;
+  const p = comodatoPointerPos(e);
+  comodatoLastX = p.x; comodatoLastY = p.y;
+}
+function comodatoMoveDraw(e) {
+  if (!comodatoDrawing) return;
+  e.preventDefault();
+  const p = comodatoPointerPos(e);
+  comodatoCtx.beginPath();
+  comodatoCtx.moveTo(comodatoLastX, comodatoLastY);
+  comodatoCtx.lineTo(p.x, p.y);
+  comodatoCtx.stroke();
+  comodatoLastX = p.x; comodatoLastY = p.y;
+  comodatoHasSignature = true;
+}
+function comodatoEndDraw() { comodatoDrawing = false; }
+comodatoSignCanvas.addEventListener("mousedown", comodatoStartDraw);
+comodatoSignCanvas.addEventListener("mousemove", comodatoMoveDraw);
+window.addEventListener("mouseup", comodatoEndDraw);
+comodatoSignCanvas.addEventListener("touchstart", comodatoStartDraw, { passive: false });
+comodatoSignCanvas.addEventListener("touchmove", comodatoMoveDraw, { passive: false });
+comodatoSignCanvas.addEventListener("touchend", comodatoEndDraw);
+
+function clearComodatoSignature() {
+  comodatoCtx.clearRect(0, 0, comodatoSignCanvas.width, comodatoSignCanvas.height);
+  comodatoHasSignature = false;
+}
+comClearSignBtn.addEventListener("click", clearComodatoSignature);
+
+async function intentarEnviarComodato(item, interactivo) {
+  const res = await fetch("/api/comodato", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+    body: JSON.stringify({
+      datos: item.datos,
+      firma_comodatario_base64: item.firma_comodatario_base64,
+      cliente_email: item.cliente_email,
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    return { oficinaOk: false, clienteOk: false };
+  }
+  return { oficinaOk: !!data.oficinaOk, clienteOk: !!data.clienteOk };
+}
+
+comConfirmarFirmaBtn.addEventListener("click", async () => {
+  if (!comodatoHasSignature) {
+    showToast("Falta la firma del comodatario.");
+    return;
+  }
+  const aclaracion = comFDAclaracion.value.trim();
+  const cargo = comFDCargo.value.trim();
+  const dni = comFDDni.value.trim();
+  if (!aclaracion || !cargo || !dni) {
+    showToast("Completá aclaración, cargo y DNI de quien firma.");
+    return;
+  }
+
+  const hoy = new Date();
+  const datos = {
+    comodatario: comFDNombre.value.trim(),
+    direccion_comodatario: comFDDireccion.value.trim(),
+    ciudad_comodatario: comFDCiudad.value.trim(),
+    representado_por: comFDRepresentado.value.trim(),
+    bienes: getBienesComodatoTexto(),
+    abono_mensual: comFDAbono.value,
+    dia: String(hoy.getDate()),
+    mes: MESES_ES()[hoy.getMonth()],
+    anio: String(hoy.getFullYear()),
+    aclaracion_comodatario: aclaracion,
+    cargo_comodatario: cargo,
+    dni_comodatario: dni,
+  };
+  const firmaBase64 = normalizarFirmaParaMail(comodatoSignCanvas).replace(/^data:image\/png;base64,/, "");
+  const clienteEmail = comFDClienteEmail.value.trim();
+  const item = { tipo: "comodato", datos, firma_comodatario_base64: firmaBase64, cliente_email: clienteEmail };
+
+  comConfirmarFirmaBtn.disabled = true;
+  comodatoEnviandoAviso.style.display = "block";
+
+  if (navigator.onLine === false) {
+    agregarAColaEnvios(item);
+    comodatoEnviandoAviso.style.display = "none";
+    comConfirmarFirmaBtn.disabled = false;
+    showToast("Sin conexión — el comodato se guardó en el celular y se va a enviar solo apenas vuelva la señal.");
+    showScreen("home");
+    return;
+  }
+
+  try {
+    const resultado = await intentarEnviarComodato(item, true);
+    if (resultado.oficinaOk) {
+      showToast(resultado.clienteOk
+        ? "Comodato enviado a la oficina y al cliente."
+        : "Comodato enviado a la oficina (sin copia al cliente).");
+      showScreen("home");
+    } else {
+      // No se pudo confirmar que llegó a oficina — se guarda para
+      // reintentar solo, en vez de darlo por enviado y borrar la
+      // firma del celular sin estar seguros de que llegó.
+      agregarAColaEnvios(item);
+      showToast("No se pudo confirmar el envío a la oficina — se guardó y se va a reintentar solo.");
+      showScreen("home");
+    }
+  } catch (err) {
+    agregarAColaEnvios(item);
+    showToast("No se pudo confirmar el envío a la oficina — se guardó y se va a reintentar solo.");
+    showScreen("home");
+  } finally {
+    comConfirmarFirmaBtn.disabled = false;
+    comodatoEnviandoAviso.style.display = "none";
   }
 });
 

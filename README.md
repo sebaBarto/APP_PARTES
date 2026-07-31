@@ -205,6 +205,60 @@ plantillas de oficina y de cliente incorporadas (mismo diseño que
 tenían en EmailJS), y `app.js` ya llama a este endpoint en vez de
 EmailJS.
 
+## Contrato de comodato (v3.7.0)
+
+Nueva sección **"📄 Comodato"** en el panel principal, para cuando se
+le deja a un cliente equipos en préstamo (centrales, GPS, sensores,
+etc.). El técnico completa un formulario (cliente, dirección,
+representante, artículos — de un catálogo + opción "otro" —, abono
+mensual), firma con el mismo sistema de firma digital que ya usa la
+app (más aclaración, cargo y DNI, obligatorios para este contrato), y
+al confirmar se genera el PDF del contrato ya completo y firmado, que
+se manda por mail a la oficina y al cliente.
+
+### Cómo se genera el PDF (sin depender de Word ni de LibreOffice)
+
+Vercel no puede convertir un Word a PDF (no tiene LibreOffice
+disponible), así que en vez de rellenar el `.docx` original y
+convertirlo, el PDF se **genera directamente en código** con la
+librería `pdf-lib` (liviana, JS puro, sin dependencias externas) — el
+texto legal es el mismo exacto que el contrato original en Word
+(se migró cláusula por cláusula), con salto de línea y paginado
+automáticos según el largo de cada campo. Esto es más confiable que
+depender de un servicio externo de conversión.
+
+- `lib/pdf-comodato.js`: arma el PDF completo, con el encabezado real
+  de SAT (logo extraído del Word original, convertido de CMYK a RGB
+  porque si no se ve mal en el PDF) y la firma real de Alfredo
+  Thiesing (comodante) ya incrustada — la del cliente (comodatario) se
+  agrega dinámicamente en cada comodato.
+- Los dos archivos de imagen (`assets/comodato-encabezado.png` y
+  `assets/comodato-firma-thiesing.png`) están sacados directamente del
+  Word original — si en algún momento cambia el logo o la firma de
+  Alfredo, hay que reemplazar esos dos archivos.
+- El diseño del PDF es prolijo pero **no un clon pixel a pixel** del
+  Word original (tipografía y espaciado propios) — lo que sí es
+  idéntico es el texto legal completo.
+
+### `/api/comodato.js`
+
+Nueva función (van **11 de 12** — queda 1 libre). Recibe los datos del
+formulario + la firma, arma el PDF, y manda dos mails (oficina y
+cliente, si se cargó su mail). El envío a oficina es el que importa:
+si por algún motivo no se puede confirmar que llegó, el comodato
+**no se da por enviado** — queda guardado en el celular y se reintenta
+solo (ver más abajo), igual que ya pasa con los partes de servicio.
+
+### No se pierde el comodato hasta confirmar que llegó a oficina
+
+La cola de reintento sin conexión que ya existía para los partes de
+servicio (por si el técnico se queda sin señal) ahora también guarda
+comodatos — cada elemento de la cola tiene un campo `tipo`
+(`"parte"` o `"comodato"`) para saber cómo reintentarlo. Si el mail a
+oficina falla o no se puede confirmar, el comodato queda guardado en
+el celular del técnico y se reintenta solo apenas vuelva la conexión
+— nunca se descarta sin que oficina lo haya recibido.
+
 ### Ícono según el tipo de herramienta (v3.6.2)
 
 Al cargar una herramienta en `admin.html`, ahora se elige también un
@@ -1297,10 +1351,10 @@ configuración) se unificaron en uno solo:
 `consultas-categorias`, `guardias`, `credenciales`, `vehiculos`,
 `push-subscripciones`, `sims`).
 
-Quedan **10 funciones en total** (`servicios`, `cronograma`, `geocode`,
+Quedan **11 funciones en total** (`servicios`, `cronograma`, `geocode`,
 `historial`, `foto`, `consultas`, `datos`, `recurso-uso`,
-`cron-diario`, `enviar-mail`) — con **2 funciones libres** antes de
-volver a tocar el límite del plan gratuito de Vercel.
+`cron-diario`, `enviar-mail`, `comodato`) — con **1 función libre**
+antes de volver a tocar el límite del plan gratuito de Vercel.
 `recurso-uso.js` reemplaza a los antiguos `vehiculo-uso.js` y
 `sim-uso.js` (fusionados), y además maneja la lógica de herramientas
 — las tres comparten el mismo patrón de "tomar / devolver /
@@ -1308,8 +1362,10 @@ transferir + historial" (ver `?recurso=vehiculo|sim|herramienta`).
 Antes de eso, ya se había liberado una función fusionando `foto.js`
 (mostrar una foto) y `upload-foto.js` (subir una foto) en un solo
 archivo. La próxima vez que haga falta un endpoint nuevo, sumarlo como
-colección dentro de `datos.js` si es posible, para no gastar de las
-que quedan libres.
+colección dentro de `datos.js` si es posible — o si hace falta liberar
+otra función, `vehiculo-uso`/`sim-uso` ya viven fusionados así que el
+próximo candidato natural sería revisar si `historial.js` puede
+sumarse a `datos.js` como una colección con lógica especial.
 
 ## Revisión y depuración (v3.5.8)
 

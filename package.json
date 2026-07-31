@@ -6,6 +6,7 @@
   "dependencies": {
     "xlsx": "^0.18.5",
     "web-push": "^3.6.7",
-    "nodemailer": "^6.9.14"
+    "nodemailer": "^6.9.14",
+    "pdf-lib": "^1.17.1"
   }
 }

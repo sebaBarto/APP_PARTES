@@ -127,6 +127,12 @@
           </span>
           <span class="panel-tile-label">Herramientas</span>
         </button>
+        <button type="button" class="panel-tile panel-tile-grid tile-comodato" id="tileComodatoBtn">
+          <span class="panel-tile-icon-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="14" y2="16"/><path d="M9 19.5l1.5 1.5 3-3.5"/></svg>
+          </span>
+          <span class="panel-tile-label">Comodato</span>
+        </button>
         <a href="admin.html" target="_blank" rel="noopener" class="panel-tile panel-tile-grid tile-admin hidden" id="abrirAdminBtn">
           <span class="panel-tile-icon-badge">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>
@@ -666,6 +672,103 @@
     </div>
     <div class="action-bar">
       <button class="btn btn-secondary" id="volverDeHerramientaDetalleBtn" type="button">Volver</button>
+    </div>
+  </section>
+
+  <!-- COMODATO: FORMULARIO -->
+  <section class="screen" id="screen-comodato-form">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">CONTRATO DE COMODATO</p>
+
+      <div class="field-group">
+        <label class="field-label" for="comFDNombre">Nombre del comodatario (cliente / negocio)</label>
+        <input class="field-input" id="comFDNombre" type="text" placeholder="Nombre completo o razón social">
+      </div>
+      <div class="field-group">
+        <label class="field-label" for="comFDDireccion">Dirección</label>
+        <input class="field-input" id="comFDDireccion" type="text" placeholder="Calle y número">
+      </div>
+      <div class="field-group">
+        <label class="field-label" for="comFDCiudad">Ciudad</label>
+        <input class="field-input" id="comFDCiudad" type="text" placeholder="Ej: Rosario" value="Rosario">
+      </div>
+      <div class="field-group">
+        <label class="field-label" for="comFDRepresentado">Representado en este acto por</label>
+        <input class="field-input" id="comFDRepresentado" type="text" placeholder="Nombre de quien firma en representación">
+      </div>
+      <div class="field-group">
+        <label class="field-label" for="comFDClienteEmail">Mail del cliente (opcional, le mandamos una copia)</label>
+        <input class="field-input" id="comFDClienteEmail" type="email" placeholder="cliente@mail.com">
+      </div>
+
+      <p class="hint-eyebrow" style="margin-top:20px;">ARTÍCULOS QUE SE DEJAN EN COMODATO</p>
+      <div class="field-row">
+        <div class="field-group grow">
+          <label class="field-label" for="comBienCategoriaSelect">Categoría</label>
+          <select class="field-input" id="comBienCategoriaSelect"></select>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field-group grow">
+          <label class="field-label" for="comBienModeloSelect">Modelo</label>
+          <select class="field-input" id="comBienModeloSelect" disabled><option value="" disabled selected>Elegí primero una categoría</option></select>
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="comBienCantidadInput">Cant.</label>
+          <input class="field-input" id="comBienCantidadInput" type="number" min="1" value="1">
+        </div>
+      </div>
+      <button type="button" class="btn btn-secondary" id="comBienAgregarBtn" style="margin-bottom:10px;">+ Agregar</button>
+      <div id="comBienesAgregadosList"></div>
+
+      <div class="field-group" style="margin-top:14px;">
+        <label class="field-label" for="comFDOtroArticulo">Otro artículo (si no está en la lista)</label>
+        <input class="field-input" id="comFDOtroArticulo" type="text" placeholder="Descripción libre, opcional">
+      </div>
+
+      <div class="field-group" style="margin-top:14px;">
+        <label class="field-label" for="comFDAbono">Abono mensual ($)</label>
+        <input class="field-input" id="comFDAbono" type="number" min="0" placeholder="Ej: 15000">
+      </div>
+    </div>
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="comVolverListaBtn" type="button">Cancelar</button>
+      <button class="btn btn-primary" id="comContinuarFirmaBtn" type="button">Continuar a la firma</button>
+    </div>
+  </section>
+
+  <!-- COMODATO: FIRMA -->
+  <section class="screen" id="screen-comodato-firma">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">FIRMA DEL COMODATARIO</p>
+      <p class="hint-text">Que firme el cliente o quien lo represente, con el dedo en la pantalla.</p>
+
+      <div class="sign-pad-wrap">
+        <canvas id="comodatoSignCanvas"></canvas>
+        <span class="sign-line-hint">Firma</span>
+      </div>
+      <div class="sign-actions">
+        <button class="link-btn" id="comClearSignBtn" type="button">Limpiar firma</button>
+      </div>
+
+      <div class="field-group" style="margin-top:10px;">
+        <label class="field-label" for="comFDAclaracion">Aclaración (obligatorio)</label>
+        <input class="field-input" id="comFDAclaracion" type="text" placeholder="Nombre y apellido de quien firma">
+      </div>
+      <div class="field-group">
+        <label class="field-label" for="comFDCargo">Cargo (obligatorio)</label>
+        <input class="field-input" id="comFDCargo" type="text" placeholder="Ej: Propietario, Encargado...">
+      </div>
+      <div class="field-group">
+        <label class="field-label" for="comFDDni">DNI (obligatorio)</label>
+        <input class="field-input" id="comFDDni" type="text" inputmode="numeric" placeholder="Sin puntos">
+      </div>
+
+      <p class="status-aviso status-info" id="comodatoEnviandoAviso" style="display:none;">Generando el PDF y enviando... esto puede tardar unos segundos.</p>
+    </div>
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="comVolverFormBtn" type="button">← Volver a los datos</button>
+      <button class="btn btn-primary" id="comConfirmarFirmaBtn" type="button">Confirmar y enviar</button>
     </div>
   </section>
 
