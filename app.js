@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.12.2";
+const APP_VERSION = "3.12.3";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -5126,6 +5126,7 @@ function renderResultadosSimRegistro() {
         <div class="sim-card-empresa"><span class="sim-card-dot" style="background:${colorEmpresa};"></span>${s.empresa || "?"}</div>
         <div class="sim-card-numero">${s.numero} · ${s.cliente || "sin nombre"}</div>
         <div style="font-size:12px; color:#6B7680; margin-top:2px;">${s.direccion || ""}</div>
+        <div style="font-size:12px; color:#2E7D32; margin-top:2px; font-weight:600;">${s.estado_linea || "Activo"}</div>
       </div>
       <button type="button" class="btn-small btn-secondary" style="width:auto;">Retirar</button>
     `;

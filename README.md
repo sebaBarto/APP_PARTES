@@ -218,6 +218,15 @@ nuevo, se agrega — nunca borra nada. También se sumó la columna
 encabezados, y se normaliza a Mayúscula inicial (Movistar/Personal/
 Claro) para que quede igual que el resto de la app.
 
+### Se suma "Estado de línea" a la búsqueda (v3.12.3)
+
+En "📇 Buscar SIM instalada / Retirar" (app del técnico), cada
+resultado de búsqueda ya mostraba compañía, número y cliente, pero no
+mostraba el **Estado de línea** (Activo/Inactiva) aunque el dato ya
+estaba guardado desde la importación. Ahora se muestra también —
+la búsqueda deja ver los cuatro datos: compañía, número de línea,
+cliente y estado de línea, tal como estaba en la planilla original.
+
 ### Privacidad entre técnicos en SIMs (v3.12.2)
 
 Un técnico ahora **solo ve sus propias SIMs** en la app — nunca las
