@@ -692,9 +692,13 @@
         <label class="field-label" for="comFDCiudad">Ciudad</label>
         <input class="field-input" id="comFDCiudad" type="text" placeholder="Ej: Rosario" value="Rosario">
       </div>
+      <label class="check-inline check-instalacion">
+        <input type="checkbox" id="comFDOtroRepresentanteCheck">
+        <span>Lo representa otra persona (no el titular)</span>
+      </label>
       <div class="field-group">
         <label class="field-label" for="comFDRepresentado">Representado en este acto por</label>
-        <input class="field-input" id="comFDRepresentado" type="text" placeholder="Nombre de quien firma en representación">
+        <input class="field-input" id="comFDRepresentado" type="text" placeholder="Nombre de quien firma en representación" readonly>
       </div>
       <div class="field-group">
         <label class="field-label" for="comFDClienteEmail">Mail del cliente (opcional, le mandamos una copia)</label>
@@ -715,7 +719,18 @@
         </div>
         <div class="field-group">
           <label class="field-label" for="comBienCantidadInput">Cant.</label>
-          <input class="field-input" id="comBienCantidadInput" type="number" min="1" value="1">
+          <select class="field-input" id="comBienCantidadInput">
+            <option value="1" selected>1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+            <option value="9">9</option>
+            <option value="10">10</option>
+          </select>
         </div>
       </div>
       <button type="button" class="btn btn-secondary" id="comBienAgregarBtn" style="margin-bottom:10px;">+ Agregar</button>
@@ -727,8 +742,11 @@
       </div>
 
       <div class="field-group" style="margin-top:14px;">
-        <label class="field-label" for="comFDAbono">Abono mensual ($)</label>
-        <input class="field-input" id="comFDAbono" type="number" min="0" placeholder="Ej: 15000">
+        <label class="field-label" for="comFDAbono">Abono mensual</label>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <input class="field-input" id="comFDAbono" type="text" inputmode="decimal" placeholder="$ 0,00" style="flex:1;">
+          <span style="color:#F4F5F0; font-weight:600; font-size:13px; white-space:nowrap;">+ IVA</span>
+        </div>
       </div>
     </div>
     <div class="action-bar">

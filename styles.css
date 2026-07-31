@@ -462,6 +462,7 @@ html, body {
   padding: 11px 12px;
   width: 100%;
 }
+.field-input:read-only { background: #EFF1EC; color: #6B7680; }
 .field-input:focus {
   outline: none;
   border-color: #F5A623;
@@ -1094,6 +1095,20 @@ html, body {
   height: 100%;
   display: block;
   touch-action: none;
+}
+#comodatoSignCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+/* Dentro de .review-scroll (que no es flex), el "flex:1" del wrap no
+   hace nada — le damos una altura fija razonable para que siempre
+   queden a la vista los campos de abajo (aclaración, cargo, DNI). */
+#screen-comodato-firma .sign-pad-wrap {
+  flex: none;
+  height: 160px;
+  min-height: 160px;
 }
 .sign-line-hint {
   position: absolute;

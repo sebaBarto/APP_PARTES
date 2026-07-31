@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.7.0";
+const APP_VERSION = "3.7.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -245,6 +245,7 @@ const comFDNombre = document.getElementById("comFDNombre");
 const comFDDireccion = document.getElementById("comFDDireccion");
 const comFDCiudad = document.getElementById("comFDCiudad");
 const comFDRepresentado = document.getElementById("comFDRepresentado");
+const comFDOtroRepresentanteCheck = document.getElementById("comFDOtroRepresentanteCheck");
 const comFDClienteEmail = document.getElementById("comFDClienteEmail");
 const comBienCategoriaSelect = document.getElementById("comBienCategoriaSelect");
 const comBienModeloSelect = document.getElementById("comBienModeloSelect");
@@ -4415,7 +4416,9 @@ function resetFormularioComodato() {
   comFDNombre.value = "";
   comFDDireccion.value = "";
   comFDCiudad.value = "Rosario";
+  comFDOtroRepresentanteCheck.checked = false;
   comFDRepresentado.value = "";
+  comFDRepresentado.readOnly = true;
   comFDClienteEmail.value = "";
   comFDOtroArticulo.value = "";
   comFDAbono.value = "";
@@ -4426,6 +4429,38 @@ function resetFormularioComodato() {
   comFDCargo.value = "";
   comFDDni.value = "";
 }
+
+// Si nadie tildó "lo representa otra persona", el campo "representado
+// en este acto por" se completa solo con el nombre del titular
+// (evita que quede vacío por olvido, para el caso más común).
+comFDNombre.addEventListener("input", () => {
+  if (!comFDOtroRepresentanteCheck.checked) {
+    comFDRepresentado.value = comFDNombre.value;
+  }
+});
+comFDOtroRepresentanteCheck.addEventListener("change", () => {
+  if (comFDOtroRepresentanteCheck.checked) {
+    comFDRepresentado.value = "";
+    comFDRepresentado.readOnly = false;
+    comFDRepresentado.focus();
+  } else {
+    comFDRepresentado.readOnly = true;
+    comFDRepresentado.value = comFDNombre.value;
+  }
+});
+
+// Formatea el abono como moneda ($ 15.000,00) al salir del campo —
+// para que quede prolijo y consistente sin que el técnico tenga que
+// tipear los puntos/comas él mismo.
+function formatearAbono(valorCrudo) {
+  const soloDigitos = valorCrudo.replace(/[^\d]/g, "");
+  if (!soloDigitos) return "";
+  const numero = parseInt(soloDigitos, 10);
+  return numero.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+comFDAbono.addEventListener("blur", () => {
+  comFDAbono.value = formatearAbono(comFDAbono.value);
+});
 
 tileComodatoBtn.addEventListener("click", () => {
   if (materialesCatalogo.length > 0) poblarCategoriasComodato();

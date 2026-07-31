@@ -205,6 +205,26 @@ plantillas de oficina y de cliente incorporadas (mismo diseño que
 tenían en EmailJS), y `app.js` ya llama a este endpoint en vez de
 EmailJS.
 
+### Ajustes de uso real (v3.7.1)
+
+- **Bug de la pantalla de firma**: al crear la firma del comodato me
+  olvidé de darle estilo propio al canvas nuevo, así que se mostraba a
+  su tamaño real en píxeles (enorme) en vez de ajustarse al recuadro —
+  tapaba los campos de aclaración y DNI. Ya está corregido, con una
+  altura fija prolija para el recuadro de firma en esta pantalla.
+- **"¿Lo representa otra persona?"**: nuevo check arriba del campo
+  "representado en este acto por". Si no está tildado (el caso más
+  común: el titular firma por sí mismo), ese campo se completa solo
+  con el nombre que ya escribiste arriba. Si lo tildás, se habilita
+  para escribir el nombre de quien realmente representa al titular.
+- **Abono mensual con formato de moneda**: ahora se escribe el número
+  y al salir del campo se formatea solo como "15.000,00"; al lado
+  siempre dice "+ IVA" fijo, y ese aumento también se refleja en el
+  texto del contrato.
+- **Cantidad de artículos como selector**: en vez de tipear la
+  cantidad de cada artículo en comodato, ahora se elige de una lista
+  (1 a 10) — evita errores de tipeo del técnico.
+
 ## Contrato de comodato (v3.7.0)
 
 Nueva sección **"📄 Comodato"** en el panel principal, para cuando se
