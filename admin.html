@@ -1596,7 +1596,7 @@ const guardarHerramientasStatus = document.getElementById("guardarHerramientasSt
 let nombresTecnicosParaHerramientas = [];
 
 function renderFilaHerramienta(h) {
-  const item = h || { nombre: "", estado: "libre", tecnico_actual: "", cliente: "" };
+  const item = h || { nombre: "", tipo: "otro", estado: "libre", tecnico_actual: "", cliente: "" };
   const opcionesTecnicos = nombresTecnicosParaHerramientas.map((n) =>
     `<option value="${n}" ${n === item.tecnico_actual ? "selected" : ""}>${n}</option>`
   ).join("");
@@ -1610,6 +1610,13 @@ function renderFilaHerramienta(h) {
       </div>
       <button type="button" class="btn-quitar-tecnico quitar-herramienta" title="Quitar">✕</button>
     </div>
+    <label>Tipo (define el ícono en la app)</label>
+    <select class="herramienta-tipo">
+      <option value="escalera" ${item.tipo === "escalera" ? "selected" : ""}>Escalera</option>
+      <option value="computadora" ${item.tipo === "computadora" ? "selected" : ""}>Computadora / Notebook</option>
+      <option value="electrica" ${item.tipo === "electrica" ? "selected" : ""}>Herramienta eléctrica (taladro, amoladora...)</option>
+      <option value="otro" ${!item.tipo || item.tipo === "otro" ? "selected" : ""}>Otro</option>
+    </select>
     <div class="field-row">
       <div style="flex:1;">
         <label>Estado</label>
@@ -1661,6 +1668,7 @@ guardarHerramientasBtn.addEventListener("click", async () => {
   const filas = Array.from(herramientasFilas.querySelectorAll(":scope > .herramienta-fila"));
   const lista = filas.map((fila) => ({
     nombre: fila.querySelector(".herramienta-nombre").value.trim(),
+    tipo: fila.querySelector(".herramienta-tipo").value,
     estado: fila.querySelector(".herramienta-estado").value,
     tecnico_actual: fila.querySelector(".herramienta-tecnico").value,
     cliente: fila.querySelector(".herramienta-cliente").value.trim(),

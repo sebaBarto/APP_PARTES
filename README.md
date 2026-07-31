@@ -205,6 +205,15 @@ plantillas de oficina y de cliente incorporadas (mismo diseño que
 tenían en EmailJS), y `app.js` ya llama a este endpoint en vez de
 EmailJS.
 
+### Ícono según el tipo de herramienta (v3.6.2)
+
+Al cargar una herramienta en `admin.html`, ahora se elige también un
+**tipo** (Escalera, Computadora/Notebook, Herramienta eléctrica, u
+Otro) — solo define qué ícono se le muestra en la app, para
+reconocerla más rápido de un vistazo en la lista. El color de la
+insignia sigue reflejando el estado (libre/en uso/en un cliente) como
+antes; lo único que cambia con el tipo es el dibujo del ícono.
+
 ## Herramientas especiales, y fusión de vehículos/SIMs/herramientas en un solo endpoint (v3.6.1)
 
 **Nueva sección "🧰 Herramientas"** en el panel principal, para llevar

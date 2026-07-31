@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.6.1";
+const APP_VERSION = "3.6.2";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -4118,6 +4118,20 @@ function claseYTextoEstadoHerramienta(h) {
   return { clase: "tile-herr-libre", texto: "Libre" };
 }
 
+function iconoSvgHerramienta(tipo) {
+  if (tipo === "escalera") {
+    return '<line x1="7" y1="3" x2="7" y2="21"/><line x1="17" y1="3" x2="17" y2="21"/><line x1="7" y1="7" x2="17" y2="7"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="7" y1="17" x2="17" y2="17"/>';
+  }
+  if (tipo === "computadora") {
+    return '<rect x="5" y="4" width="14" height="9" rx="1"/><path d="M3 18h18l-1.5-3h-15z"/>';
+  }
+  if (tipo === "electrica") {
+    return '<rect x="4" y="10" width="9" height="5" rx="1"/><path d="M13 11l6-2v7l-6-2z"/><line x1="7" y1="15" x2="7" y2="19"/>';
+  }
+  // "otro" / sin tipo cargado -> caja de herramientas genérica
+  return '<path d="M4 8h16v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M8 8V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="4" y1="12" x2="20" y2="12"/>';
+}
+
 async function renderHerramientasPicker() {
   herramientasListaStatus.textContent = "Cargando...";
   herramientasPanelTiles.innerHTML = "";
@@ -4135,7 +4149,7 @@ async function renderHerramientasPicker() {
       tile.className = `panel-tile panel-tile-grid ${clase}`;
       tile.innerHTML = `
         <span class="panel-tile-icon-badge">
-          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h16v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M8 8V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="4" y1="12" x2="20" y2="12"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${iconoSvgHerramienta(h.tipo)}</svg>
         </span>
         <span class="panel-tile-label">${h.nombre}</span>
         <span class="vehiculo-panel-status" style="color:#101820;">${texto}</span>
