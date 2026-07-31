@@ -209,10 +209,9 @@ async function chequearFelicitacionSemanal(ghHeaders, estado, ahora) {
 async function chequearRecordatorioDevolverVehiculo(ghHeaders, estado, ahora) {
   const diaSemana = ahora.getDay();
   if (diaSemana === 0 || diaSemana === 6) return null; // solo lunes a viernes
-  // Esta franja comparte cron con la de la mañana (todos los días) y,
-  // los viernes, con la de la felicitación semanal (17hs) — sin este
-  // chequeo de hora, se dispararía con cualquiera de esas.
-  if (ahora.getHours() < 18) return null;
+  // Esta franja comparte cron con la de la mañana (todos los días) —
+  // sin este chequeo de hora, se dispararía también ahí.
+  if (ahora.getHours() < 15) return null;
 
   const hoyStr = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, "0")}-${String(ahora.getDate()).padStart(2, "0")}`;
   if (estado.ultimo_dia_recordatorio_devolver === hoyStr) return null;

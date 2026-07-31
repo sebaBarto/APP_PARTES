@@ -205,6 +205,17 @@ plantillas de oficina y de cliente incorporadas (mismo diseño que
 tenían en EmailJS), y `app.js` ya llama a este endpoint en vez de
 EmailJS.
 
+### Recordatorio de vehículo movido a las 17-18hs (v3.11.1)
+
+Se corrió el horario del recordatorio de devolver el vehículo, de
+18-19hs a **17-18hs**, tal como se pidió. Como ahora coincide con la
+franja de la felicitación semanal de los viernes, se aprovechó para
+unificar en un solo horario de cron de tarde (de lunes a viernes) en
+vez de tener dos por separado — los viernes a esa hora pueden salir
+los dos avisos (recordatorio de vehículo + felicitación, si
+corresponde), cualquier otro día de la semana sale solo el
+recordatorio de vehículo si aplica.
+
 ## Recordatorio de devolver el vehículo al final del día, y bug de la felicitación (v3.11.0)
 
 ### Bug corregido: la felicitación llegaba a la mañana
