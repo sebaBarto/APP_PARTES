@@ -629,7 +629,12 @@ html, body {
   letter-spacing: 0.5px;
 }
 .servicio-card.estancado-atencion { border-color: #F5A623; }
-.servicio-card.estancado-urgente { border-color: #C0392B; background: rgba(192,57,43,0.06); }
+.servicio-card.estancado-urgente {
+  border-color: #A9332A;
+  background: #C0392B;
+  box-shadow: 0 1px 2px rgba(16,24,32,0.35), 0 8px 20px -8px rgba(192,57,43,0.55);
+}
+.servicio-card.estancado-urgente:active { border-color: #A9332A; background: #A9332A; }
 .servicio-card-estancado-badge {
   display: inline-block;
   font-family: 'IBM Plex Mono', monospace;
@@ -641,7 +646,7 @@ html, body {
   margin-left: 6px;
   letter-spacing: 0.5px;
 }
-.servicio-card-estancado-badge.urgente { color: #FFFFFF; background: #C0392B; }
+.servicio-card-estancado-badge.urgente { color: #C0392B; background: #FFFFFF; }
 .servicio-card-num {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 11px;
@@ -651,6 +656,13 @@ html, body {
 .servicio-card-cliente { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 15px; color: #101820; margin: 3px 0; }
 .servicio-card-direccion { font-size: 13px; color: #6B7680; }
 .servicio-card-tarea { font-size: 13px; color: #101820; margin-top: 4px; }
+
+/* Fondo rojo sólido en "urgente" -> el texto oscuro normal no se lee;
+   se pasa a blanco/claro para que haya buen contraste. */
+.estancado-urgente .servicio-card-num { color: #FFE8E5; }
+.estancado-urgente .servicio-card-cliente { color: #FFFFFF; }
+.estancado-urgente .servicio-card-direccion { color: #FFE8E5; }
+.estancado-urgente .servicio-card-tarea { color: #FFFFFF; }
 
 /* ---------- CRONOGRAMA SEMANAL ---------- */
 .crono-dias-tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }

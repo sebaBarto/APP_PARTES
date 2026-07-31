@@ -205,6 +205,19 @@ plantillas de oficina y de cliente incorporadas (mismo diseño que
 tenían en EmailJS), y `app.js` ya llama a este endpoint en vez de
 EmailJS.
 
+## Contraste en servicios muy atrasados (v3.9.1)
+
+En la lista de "Servicios pendientes", cuando un servicio pasa el
+umbral de "urgente" (por defecto, 10+ días sin resolver), la tarjeta
+se marcaba en rojo pero con un fondo muy tenue (6% de opacidad) — el
+nombre del cliente, en texto oscuro, quedaba con muy poco contraste
+contra ese fondo casi blanco. Ahora esa tarjeta tiene un **fondo rojo
+sólido**, con el nombre del cliente y el resto del texto en **blanco**
+— contraste verificado en 5.44:1, por encima del mínimo de
+accesibilidad (4.5:1). De paso, la etiqueta "🔴 Hace X días" se invirtió
+(fondo blanco, texto rojo) para que siga destacando como una etiqueta
+propia sobre el nuevo fondo rojo, en vez de mezclarse con él.
+
 ## Recordatorio para técnicos "en la calle" (v3.9.0)
 
 Desde `admin.html` → Técnicos, cada técnico tiene un check **"🚐 Está
