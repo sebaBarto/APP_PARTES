@@ -1449,9 +1449,13 @@ function renderFilaSimTabla(sim) {
           <select class="sim-instalar-servicio-select">
             <option value="" selected>Elegir un servicio pendiente...</option>
             ${opcionesServicios}
-            <option value="__otro__">Otro (escribir cliente)</option>
+            <option value="__otro__">Otro (escribir todo a mano)</option>
           </select>
-          <input type="text" class="sim-instalar-cliente-input hidden" placeholder="Nombre del cliente" style="margin-top:6px;">
+          <div class="sim-instalar-manual-wrap hidden" style="margin-top:6px;">
+            <input type="text" class="sim-instalar-cliente-input" placeholder="Nombre del cliente" style="margin-bottom:4px;">
+            <input type="text" class="sim-instalar-abonado-input" placeholder="N° de abonado (opcional)" style="margin-bottom:4px;">
+            <input type="text" class="sim-instalar-direccion-input" placeholder="Dirección (opcional)">
+          </div>
         </div>
         <button type="button" class="btn-transferir-fila">Transferir</button>
       </div>
@@ -1469,7 +1473,10 @@ function renderFilaSimTabla(sim) {
 
   const panelInstalarCliente = fila.querySelector(".sim-instalar-cliente-panel");
   const selectServicio = fila.querySelector(".sim-instalar-servicio-select");
+  const manualWrap = fila.querySelector(".sim-instalar-manual-wrap");
   const inputClienteManual = fila.querySelector(".sim-instalar-cliente-input");
+  const inputAbonadoManual = fila.querySelector(".sim-instalar-abonado-input");
+  const inputDireccionManual = fila.querySelector(".sim-instalar-direccion-input");
 
   fila.querySelector(".sim-transferir-select").addEventListener("change", (e) => {
     panelInstalarCliente.classList.toggle("hidden", e.target.value !== "__cliente__");
@@ -1477,17 +1484,19 @@ function renderFilaSimTabla(sim) {
 
   selectServicio.addEventListener("change", () => {
     if (selectServicio.value === "__otro__") {
-      inputClienteManual.classList.remove("hidden");
+      manualWrap.classList.remove("hidden");
       inputClienteManual.value = "";
-      inputClienteManual.readOnly = false;
+      inputAbonadoManual.value = "";
+      inputDireccionManual.value = "";
       inputClienteManual.focus();
     } else if (selectServicio.value !== "") {
       const servicio = serviciosPendientesParaSims.filter((sv) => sv.cliente)[Number(selectServicio.value)];
-      inputClienteManual.classList.remove("hidden");
-      inputClienteManual.readOnly = true;
+      manualWrap.classList.remove("hidden");
       inputClienteManual.value = servicio ? servicio.cliente : "";
+      inputAbonadoManual.value = "";
+      inputDireccionManual.value = servicio ? servicio.direccion || "" : "";
     } else {
-      inputClienteManual.classList.add("hidden");
+      manualWrap.classList.add("hidden");
     }
   });
 
@@ -1504,7 +1513,7 @@ function renderFilaSimTabla(sim) {
     }
 
     if (destino === "__cliente__") {
-      await instalarSimEnCliente(fila, numeroActual, selectServicio, inputClienteManual);
+      await instalarSimEnCliente(fila, numeroActual, inputClienteManual, inputAbonadoManual, inputDireccionManual);
       return;
     }
 
@@ -1571,17 +1580,14 @@ function renderFilaSimTabla(sim) {
 // la misma acción real ("usar") que usa la app del técnico, así se
 // migra bien al registro de instaladas y no queda a mitad de camino
 // en el stock.
-async function instalarSimEnCliente(fila, numeroActual, selectServicio, inputClienteManual) {
+async function instalarSimEnCliente(fila, numeroActual, inputClienteManual, inputAbonadoManual, inputDireccionManual) {
   const cliente = inputClienteManual.value.trim();
   if (!cliente) {
     alert("Elegí un servicio pendiente o escribí el nombre del cliente.");
     return;
   }
-  let direccion = "";
-  if (selectServicio.value !== "__otro__" && selectServicio.value !== "") {
-    const servicio = serviciosPendientesParaSims.filter((sv) => sv.cliente)[Number(selectServicio.value)];
-    direccion = servicio ? servicio.direccion || "" : "";
-  }
+  const numeroAbonado = inputAbonadoManual.value.trim();
+  const direccion = inputDireccionManual.value.trim();
 
   if (!numerosExistentesEnServidor.has(numeroActual)) {
     alert('Esta fila todavía no está guardada — tocá "Guardar cambios" primero, y después instalala en el cliente.');
@@ -1602,6 +1608,7 @@ async function instalarSimEnCliente(fila, numeroActual, selectServicio, inputCli
         tecnico: fila.dataset.tecnicoActual,
         cliente,
         direccion,
+        numero_abonado: numeroAbonado,
       }),
     });
     const data = await res.json();
@@ -1610,7 +1617,7 @@ async function instalarSimEnCliente(fila, numeroActual, selectServicio, inputCli
     simsCompletos = simsCompletos.filter((x) => x.numero !== numeroActual);
     fila.remove();
     simsStatus.className = "status ok";
-    simsStatus.textContent = `Instalada en ${cliente} — ya figura en el registro de SIMs instaladas.`;
+    simsStatus.textContent = `Instalada en ${cliente} — ya figura completa en el registro de SIMs instaladas.`;
   } catch (err) {
     alert("No se pudo instalar: " + err.message);
     boton.disabled = false;

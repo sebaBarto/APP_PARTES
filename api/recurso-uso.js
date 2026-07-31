@@ -310,7 +310,7 @@ async function postSim(ghHeaders, body, res) {
     sims.splice(idx, 1);
     const { data: registro, sha: shaRegistro } = await leerJSON(ghHeaders, SIM_REGISTRO_PATH, []);
     registro.push({
-      numero_abonado: "", // las que se instalan desde la app no tienen un N° de abonado legado
+      numero_abonado: body.numero_abonado || "", // si se cargó a mano desde admin.html, se usa ese
       estado_linea: "Activo",
       cliente: body.cliente,
       direccion: body.direccion || "",

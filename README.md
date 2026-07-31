@@ -218,6 +218,17 @@ nuevo, se agrega — nunca borra nada. También se sumó la columna
 encabezados, y se normaliza a Mayúscula inicial (Movistar/Personal/
 Claro) para que quede igual que el resto de la app.
 
+### Ficha completa al escribir a mano (v3.13.1)
+
+En "📋 Instalar en cliente" → "Otro (escribir todo a mano)", ahora se
+puede cargar, además del nombre del cliente, el **N° de abonado** y
+la **dirección** — así la línea queda con la ficha completa en el
+registro de instaladas desde el momento en que se carga, igual que
+las que vinieron de la planilla original. Elegir un servicio
+pendiente de la lista sigue autocompletando cliente y dirección (el
+N° de abonado no, porque los servicios no tienen ese dato) — y todo
+queda editable por si hace falta ajustar algo antes de confirmar.
+
 ## "Instalar en cliente" desde admin.html, y bug del botón "Transferir" (v3.13.0)
 
 ### Bug encontrado: "Transferir" en la tabla de stock estaba roto
