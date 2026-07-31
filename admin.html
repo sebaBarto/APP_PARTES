@@ -218,6 +218,10 @@
           <input type="number" id="diasUrgenteInput" min="1" step="1">
         </div>
       </div>
+      <label class="permiso-check" style="margin:14px 0;">
+        <input type="checkbox" id="felicitacionSemanalCheck" checked>
+        <span>🏆 Mandar cada viernes (17-18hs) una notificación felicitando al técnico con mejor desempeño de la semana</span>
+      </label>
       <button id="guardarConfigBtn" type="button" class="btn-secondary-admin">Guardar umbrales</button>
       <p class="status" id="configStatus"></p>
     </div>
@@ -689,6 +693,7 @@ const diasAtencionInput = document.getElementById("diasAtencionInput");
 const diasUrgenteInput = document.getElementById("diasUrgenteInput");
 const guardarConfigBtn = document.getElementById("guardarConfigBtn");
 const configStatus = document.getElementById("configStatus");
+const felicitacionSemanalCheck = document.getElementById("felicitacionSemanalCheck");
 
 async function cargarConfigAdmin() {
   try {
@@ -700,6 +705,7 @@ async function cargarConfigAdmin() {
     if (!res.ok) throw new Error(data.error || "Error desconocido");
     diasAtencionInput.value = data.dias_atencion ?? 3;
     diasUrgenteInput.value = data.dias_urgente ?? 7;
+    felicitacionSemanalCheck.checked = data.felicitacion_semanal_activa !== false;
   } catch (err) {
     diasAtencionInput.value = 3;
     diasUrgenteInput.value = 7;
@@ -726,7 +732,11 @@ guardarConfigBtn.addEventListener("click", async () => {
         "Content-Type": "application/json",
         Authorization: "Bearer " + SERVICIOS_API_TOKEN,
       },
-      body: JSON.stringify({ dias_atencion: diasAtencion, dias_urgente: diasUrgente }),
+      body: JSON.stringify({
+        dias_atencion: diasAtencion,
+        dias_urgente: diasUrgente,
+        felicitacion_semanal_activa: felicitacionSemanalCheck.checked,
+      }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error desconocido");

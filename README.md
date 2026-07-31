@@ -205,6 +205,36 @@ plantillas de oficina y de cliente incorporadas (mismo diseño que
 tenían en EmailJS), y `app.js` ya llama a este endpoint en vez de
 EmailJS.
 
+## Sonido garantizado en avisos importantes, y felicitación semanal (v3.10.0)
+
+### Sonido en las notificaciones
+
+Las notificaciones push del celular ya sonaban con el sonido del
+sistema por defecto (nunca se mandaban en silencio) — se dejó
+explícito en el código para que quede garantizado. Además, el
+recordatorio a técnicos "en la calle" (ver v3.9.0) ahora se manda
+marcado como **"importante"**: queda fijo en la pantalla hasta que lo
+toquen (no desaparece solo a los pocos segundos) y vibra más fuerte —
+para que sea difícil pasarlo por alto. Una aclaración honesta: el
+sonido en sí depende del sistema operativo del celular (si el
+técnico tiene el teléfono en silencio o modo "No molestar", ninguna
+app puede saltarse eso).
+
+### Felicitación al mejor desempeño de la semana
+
+Los viernes, en algún momento entre las 17:00 y las 18:00hs (la app
+usa el mismo cron de un solo disparo diario que ya usábamos, pero con
+un segundo horario agregado solo para los viernes — Vercel gratis no
+garantiza el minuto exacto, pero sí que caiga dentro de esa hora),
+se manda un aviso a **todo el equipo** felicitando al técnico que más
+servicios resolvió esa semana (lunes a viernes). Si hay empate, se
+felicita a todos los que empataron. Si nadie resolvió nada esa
+semana, no se manda nada.
+
+**Se puede desactivar** desde `admin.html` → pestaña Servicios
+pendientes → hay un check "🏆 Mandar cada viernes..." — viene
+**activado por defecto**, tal como pediste.
+
 ## Contraste en servicios muy atrasados (v3.9.1)
 
 En la lista de "Servicios pendientes", cuando un servicio pasa el

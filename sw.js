@@ -64,6 +64,14 @@ self.addEventListener("push", (event) => {
       icon: "./icons/icon-192.png",
       badge: "./icons/icon-192.png",
       data: { url: datos.url || "./" },
+      // "silent: false" asegura que suene con el sonido del sistema
+      // (nunca se manda en silencio) — para el recordatorio a
+      // técnicos "en la calle", además queda fija en pantalla hasta
+      // que la toquen, y vibra más fuerte, para que no pase
+      // desapercibida.
+      silent: false,
+      requireInteraction: !!datos.importante,
+      vibrate: datos.importante ? [300, 100, 300, 100, 300] : [200, 100, 200],
     })
   );
 });

@@ -20,6 +20,8 @@ const { enviarATodos, enviarASeleccionados } = require("../lib/push-sender");
 const GUARDIAS_PATH = "guardias-config.json";
 const VEHICULOS_PATH = "vehiculos-config.json";
 const TECNICOS_PATH = "tecnicos.json";
+const HISTORIAL_PATH = "historial.json";
+const CONFIG_PATH = "config.json";
 const ESTADO_PATH = "notificaciones-estado.json";
 
 async function leerJSON(ghHeaders, path, valorDefault) {
@@ -147,6 +149,53 @@ async function esFeriadoArgentina(fecha) {
 // mañana, solo a los técnicos marcados "En la calle" en admin.html,
 // salvo feriado. Solo se manda una vez por día (se guarda la fecha en
 // el estado para no repetirlo si el cron se invoca más de una vez).
+// Felicitación semanal — los viernes entre las 17 y las 18hs (según
+// cuándo dispare el cron en esa franja), se le manda a TODO el equipo
+// un aviso público felicitando al técnico que más servicios resolvió
+// esa semana (lunes a hoy). Se puede apagar desde admin.html.
+async function chequearFelicitacionSemanal(ghHeaders, estado, ahora) {
+  if (ahora.getDay() !== 5) return null; // solo viernes
+
+  const semanaActual = numeroSemanaIso(ahora);
+  if (estado.ultima_semana_felicitacion === semanaActual) return null; // ya se mandó esta semana
+
+  const { data: config } = await leerJSON(ghHeaders, CONFIG_PATH, {});
+  if (config && config.felicitacion_semanal_activa === false) return null;
+
+  // Lunes de esta semana, a las 00:00
+  const lunes = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+  const diaSemana = lunes.getDay() || 7; // 1=lunes...7=domingo
+  lunes.setDate(lunes.getDate() - (diaSemana - 1));
+  const lunesStr = `${lunes.getFullYear()}-${String(lunes.getMonth() + 1).padStart(2, "0")}-${String(lunes.getDate()).padStart(2, "0")}`;
+  const hoyStr = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, "0")}-${String(ahora.getDate()).padStart(2, "0")}`;
+
+  const { data: historial } = await leerJSON(ghHeaders, HISTORIAL_PATH, []);
+  const conteos = {};
+  (historial || []).forEach((h) => {
+    if (!h.fecha || !h.tecnico) return;
+    if (h.fecha < lunesStr || h.fecha > hoyStr) return;
+    conteos[h.tecnico] = (conteos[h.tecnico] || 0) + 1;
+  });
+
+  const nombres = Object.keys(conteos);
+  if (nombres.length === 0) {
+    estado.ultima_semana_felicitacion = semanaActual;
+    return null; // nadie resolvió nada esta semana, no hay a quién felicitar
+  }
+
+  const maxCantidad = Math.max(...nombres.map((n) => conteos[n]));
+  const ganadores = nombres.filter((n) => conteos[n] === maxCantidad);
+
+  const cuerpo = ganadores.length === 1
+    ? `${ganadores[0]} resolvió más servicios esta semana (${maxCantidad}). ¡Felicitaciones! 🎉`
+    : `¡Empate esta semana entre ${ganadores.join(" y ")}, con ${maxCantidad} servicios cada uno! 🎉`;
+
+  await enviarATodos({ titulo: "🏆 Mejor desempeño de la semana", cuerpo, url: "/" });
+
+  estado.ultima_semana_felicitacion = semanaActual;
+  return ganadores;
+}
+
 async function chequearRecordatorioTecnicosEnCalle(ghHeaders, estado, ahora) {
   const diaSemana = ahora.getDay(); // 0 = domingo ... 6 = sábado
   if (diaSemana === 0 || diaSemana === 6) return null;
@@ -164,6 +213,7 @@ async function chequearRecordatorioTecnicosEnCalle(ghHeaders, estado, ahora) {
     titulo: "🚐 Recordatorio",
     cuerpo: "No te olvides de tomar el vehículo y las herramientas que necesites para hoy.",
     url: "/",
+    importante: true,
   });
 
   estado.ultimo_dia_recordatorio_tecnicos = hoyStr;
@@ -212,10 +262,11 @@ module.exports = async (req, res) => {
     const tecnicoDeGuardia = await chequearGuardia(ghHeaders, estado, ahora);
     await chequearVehiculos(ghHeaders, estado, ahora);
     const tecnicosRecordados = await chequearRecordatorioTecnicosEnCalle(ghHeaders, estado, ahora);
+    const ganadoresSemana = await chequearFelicitacionSemanal(ghHeaders, estado, ahora);
 
     await guardarJSON(ghHeaders, ESTADO_PATH, estado, shaEstado);
 
-    res.status(200).json({ ok: true, guardia_notificada: tecnicoDeGuardia || null, recordatorio_en_calle: tecnicosRecordados || null });
+    res.status(200).json({ ok: true, guardia_notificada: tecnicoDeGuardia || null, recordatorio_en_calle: tecnicosRecordados || null, felicitacion_semanal: ganadoresSemana || null });
   } catch (err) {
     res.status(500).json({ error: "Error interno en el cron diario", detail: String(err.message || err) });
   }
