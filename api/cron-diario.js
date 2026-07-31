@@ -15,10 +15,11 @@
 //   CRON_SECRET, GITHUB_DATA_TOKEN, GITHUB_DATA_REPO,
 //   VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT
 
-const { enviarATodos } = require("../lib/push-sender");
+const { enviarATodos, enviarASeleccionados } = require("../lib/push-sender");
 
 const GUARDIAS_PATH = "guardias-config.json";
 const VEHICULOS_PATH = "vehiculos-config.json";
+const TECNICOS_PATH = "tecnicos.json";
 const ESTADO_PATH = "notificaciones-estado.json";
 
 async function leerJSON(ghHeaders, path, valorDefault) {
@@ -123,6 +124,52 @@ function calcularAlertasVehiculo(vehiculoConfig, hoy) {
   return alertas;
 }
 
+// Consulta si una fecha es feriado nacional en Argentina, usando una
+// API pública gratuita (Nager.Date) — así no hay que mantener a mano
+// una lista de feriados móviles/puentes que cambian cada año. Si la
+// consulta falla por lo que sea, se prefiere NO bloquear el aviso
+// (mejor un recordatorio de más un feriado raro, que quedarse sin
+// avisar meses por un problema de red).
+async function esFeriadoArgentina(fecha) {
+  const anio = fecha.getFullYear();
+  const yyyyMMdd = `${anio}-${String(fecha.getMonth() + 1).padStart(2, "0")}-${String(fecha.getDate()).padStart(2, "0")}`;
+  try {
+    const r = await fetch(`https://date.nager.at/api/v3/publicholidays/${anio}/AR`);
+    if (!r.ok) return false;
+    const feriados = await r.json();
+    return Array.isArray(feriados) && feriados.some((f) => f.date === yyyyMMdd);
+  } catch (err) {
+    return false;
+  }
+}
+
+// Recordatorio de tomar vehículo/herramientas — lunes a viernes, a la
+// mañana, solo a los técnicos marcados "En la calle" en admin.html,
+// salvo feriado. Solo se manda una vez por día (se guarda la fecha en
+// el estado para no repetirlo si el cron se invoca más de una vez).
+async function chequearRecordatorioTecnicosEnCalle(ghHeaders, estado, ahora) {
+  const diaSemana = ahora.getDay(); // 0 = domingo ... 6 = sábado
+  if (diaSemana === 0 || diaSemana === 6) return null;
+
+  const hoyStr = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, "0")}-${String(ahora.getDate()).padStart(2, "0")}`;
+  if (estado.ultimo_dia_recordatorio_tecnicos === hoyStr) return null;
+
+  if (await esFeriadoArgentina(ahora)) return null;
+
+  const { data: tecnicos } = await leerJSON(ghHeaders, TECNICOS_PATH, []);
+  const enCalle = (tecnicos || []).filter((t) => t.en_calle).map((t) => t.nombre);
+  if (enCalle.length === 0) return null;
+
+  await enviarASeleccionados(enCalle, {
+    titulo: "🚐 Recordatorio",
+    cuerpo: "No te olvides de tomar el vehículo y las herramientas que necesites para hoy.",
+    url: "/",
+  });
+
+  estado.ultimo_dia_recordatorio_tecnicos = hoyStr;
+  return enCalle;
+}
+
 async function chequearVehiculos(ghHeaders, estado, hoy) {
   const { data: vehiculos } = await leerJSON(ghHeaders, VEHICULOS_PATH, []);
   if (!estado.vehiculos) estado.vehiculos = {};
@@ -164,10 +211,11 @@ module.exports = async (req, res) => {
 
     const tecnicoDeGuardia = await chequearGuardia(ghHeaders, estado, ahora);
     await chequearVehiculos(ghHeaders, estado, ahora);
+    const tecnicosRecordados = await chequearRecordatorioTecnicosEnCalle(ghHeaders, estado, ahora);
 
     await guardarJSON(ghHeaders, ESTADO_PATH, estado, shaEstado);
 
-    res.status(200).json({ ok: true, guardia_notificada: tecnicoDeGuardia || null });
+    res.status(200).json({ ok: true, guardia_notificada: tecnicoDeGuardia || null, recordatorio_en_calle: tecnicosRecordados || null });
   } catch (err) {
     res.status(500).json({ error: "Error interno en el cron diario", detail: String(err.message || err) });
   }

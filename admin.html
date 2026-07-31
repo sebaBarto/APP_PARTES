@@ -138,6 +138,10 @@
     color: var(--steel); cursor: pointer; font-weight: 500;
   }
   .permiso-check input { width: auto; margin: 0; }
+  .tecnico-en-calle-check {
+    width: 100%; margin-top: 10px; padding: 8px 10px; background: var(--paper);
+    border-radius: var(--r-sm); font-size: 13px; font-weight: 600; color: var(--ink);
+  }
 
   .sims-tabla-wrap { overflow-x: auto; margin-bottom: 8px; border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: var(--shadow-card); }
   .sims-tabla { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 13px; }
@@ -532,7 +536,7 @@ const PERMISOS_TECNICO = [
   { clave: "admin", etiqueta: "Panel de Administración" },
 ];
 
-function renderFilaTecnico(nombre, password, permisos) {
+function renderFilaTecnico(nombre, password, permisos, enCalle) {
   const p = permisos || {};
   const fila = document.createElement("div");
   fila.className = "field-row tecnico-fila";
@@ -552,6 +556,10 @@ function renderFilaTecnico(nombre, password, permisos) {
       <input type="text" class="tecnico-password" value="${password || ""}" placeholder="Contraseña">
     </div>
     <button type="button" class="btn-quitar-tecnico" title="Quitar">✕</button>
+    <label class="permiso-check tecnico-en-calle-check">
+      <input type="checkbox" class="tecnico-en-calle" ${enCalle ? "checked" : ""}>
+      <span>🚐 Está en la calle (recibe el recordatorio de las 9:30)</span>
+    </label>
     <div class="permisos-tecnico-grid">${checksHtml}</div>
   `;
   fila.querySelector(".btn-quitar-tecnico").addEventListener("click", () => fila.remove());
@@ -570,18 +578,18 @@ async function cargarTecnicosAdmin() {
     if (!res.ok) throw new Error(data.error || "Error desconocido");
 
     const lista = Array.isArray(data) && data.length > 0 ? data : TECNICOS_RESPALDO;
-    lista.forEach((t) => renderFilaTecnico(t.nombre, t.password, t.permisos));
+    lista.forEach((t) => renderFilaTecnico(t.nombre, t.password, t.permisos, t.en_calle));
     tecnicosStatus.textContent = Array.isArray(data) && data.length > 0
       ? ""
       : "Todavía no se guardó ninguna lista — se precargó con los técnicos actuales. Revisala y guardá para publicarla.";
   } catch (err) {
     tecnicosFilas.innerHTML = "";
-    TECNICOS_RESPALDO.forEach((t) => renderFilaTecnico(t.nombre, t.password, t.permisos));
+    TECNICOS_RESPALDO.forEach((t) => renderFilaTecnico(t.nombre, t.password, t.permisos, t.en_calle));
     tecnicosStatus.textContent = "No se pudo conectar — se muestra la lista de respaldo. Revisala antes de guardar.";
   }
 }
 
-agregarTecnicoBtn.addEventListener("click", () => renderFilaTecnico("", "", null));
+agregarTecnicoBtn.addEventListener("click", () => renderFilaTecnico("", "", null, false));
 
 guardarTecnicosBtn.addEventListener("click", async () => {
   const filas = Array.from(tecnicosFilas.querySelectorAll(".tecnico-fila"));
@@ -594,6 +602,7 @@ guardarTecnicosBtn.addEventListener("click", async () => {
       nombre: fila.querySelector(".tecnico-nombre").value.trim(),
       password: fila.querySelector(".tecnico-password").value.trim(),
       permisos,
+      en_calle: fila.querySelector(".tecnico-en-calle").checked,
     };
   }).filter((t) => t.nombre && t.password);
 

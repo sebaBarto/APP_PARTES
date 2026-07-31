@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.8.1";
+const APP_VERSION = "3.9.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -4146,7 +4146,7 @@ activarNotificacionesBtn.addEventListener("click", async () => {
     const res = await fetch("/api/datos?coleccion=push-subscripciones", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-      body: JSON.stringify(suscripcion.toJSON()),
+      body: JSON.stringify({ ...suscripcion.toJSON(), tecnico: tecnicoLogueado || "" }),
     });
     if (!res.ok) throw new Error("HTTP " + res.status);
     activarNotificacionesBtn.textContent = "🔔 Notificaciones activadas";

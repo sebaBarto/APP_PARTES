@@ -12,7 +12,7 @@
 const COLECCIONES = {
   config: {
     path: "config.json",
-    default: { dias_atencion: 3, dias_urgente: 7, app_version_actual: "3.8.1" },
+    default: { dias_atencion: 3, dias_urgente: 7, app_version_actual: "3.9.0" },
     mergeConDefault: true,
   },
   tecnicos: { path: "tecnicos.json", default: [] },
@@ -101,12 +101,21 @@ module.exports = async (req, res) => {
 
       // Las suscripciones push se agregan (sin duplicar por endpoint),
       // nunca se reemplaza la lista entera — así un celular nuevo no
-      // borra las suscripciones de los demás.
+      // borra las suscripciones de los demás. Si el mismo celular ya
+      // estaba suscripto pero ahora lo usa otro técnico (cambió de
+      // mano), se actualiza a quién pertenece en vez de dejarlo
+      // desactualizado.
       let contenidoAGuardar = body;
       if (nombreColeccion === "push-subscripciones") {
         const lista = Array.isArray(contenidoExistente) ? contenidoExistente : [];
-        const yaExiste = lista.some((s) => s.endpoint === body.endpoint);
-        contenidoAGuardar = yaExiste ? lista : [...lista, body];
+        const idx = lista.findIndex((s) => s.endpoint === body.endpoint);
+        if (idx === -1) {
+          contenidoAGuardar = [...lista, body];
+        } else {
+          const copia = [...lista];
+          copia[idx] = { ...copia[idx], tecnico: body.tecnico };
+          contenidoAGuardar = copia;
+        }
       }
 
       const contentB64 = Buffer.from(JSON.stringify(contenidoAGuardar, null, 2)).toString("base64");

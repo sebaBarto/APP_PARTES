@@ -205,6 +205,46 @@ plantillas de oficina y de cliente incorporadas (mismo diseño que
 tenían en EmailJS), y `app.js` ya llama a este endpoint en vez de
 EmailJS.
 
+## Recordatorio para técnicos "en la calle" (v3.9.0)
+
+Desde `admin.html` → Técnicos, cada técnico tiene un check **"🚐 Está
+en la calle"**. Los que lo tengan tildado reciben una notificación
+push de lunes a viernes (no fines de semana ni feriados nacionales)
+recordándoles tomar el vehículo y las herramientas que necesiten.
+
+### Aclaración importante sobre el horario
+
+Pediste que sea a las 9:30 en punto — en el plan gratuito de Vercel,
+el horario de un cron job **no se garantiza al minuto exacto**, solo
+"en algún momento dentro de la hora indicada". Como ya usábamos el
+cron de las 9 en punto (hora Argentina) para el aviso de cambio de
+guardia, el recordatorio de vehículo/herramientas se agregó a ESE
+MISMO disparador (en vez de un cron nuevo) — así que en la práctica
+va a llegar **en algún momento entre las 9:00 y las 10:00 AM**, no
+exactamente a las 9:30. Si más adelante hace falta más precisión, hay
+que pasar a un plan pago de Vercel (o un programador externo), pero
+para un recordatorio matutino esta ventana debería alcanzar.
+
+### Cómo se determinan los feriados
+
+En vez de mantener a mano una lista de feriados argentinos (que
+cambian todos los años, con puentes y feriados trasladables por
+decreto), se consulta una API pública y gratuita
+([Nager.Date](https://date.nager.at)) que ya tiene el calendario
+completo de Argentina. Si por algún motivo esa consulta falla, se
+prefiere mandar el recordatorio igual antes que arriesgarse a no
+avisar por semanas por un problema de red pasajero.
+
+### Un cambio de fondo: las suscripciones push ahora saben de quién son
+
+Hasta ahora, cuando un técnico tocaba "Activar notificaciones", se
+guardaba el dato de su celular pero **no a qué técnico pertenecía**
+— por eso no había forma de mandarle un aviso a "solo estos
+técnicos". Ahora cada suscripción guarda también el nombre del
+técnico, y si el mismo celular pasa a otro técnico (cambia de mano),
+se actualiza solo. Esto habilita, a futuro, más avisos dirigidos a
+técnicos puntuales (no solo a todo el equipo).
+
 ## Borrador del comodato en curso (v3.8.1)
 
 Mismo mecanismo que ya existía para los partes de servicio: si el
