@@ -218,6 +218,32 @@ nuevo, se agrega — nunca borra nada. También se sumó la columna
 encabezados, y se normaliza a Mayúscula inicial (Movistar/Personal/
 Claro) para que quede igual que el resto de la app.
 
+## "Instalar en cliente" desde admin.html, y bug del botón "Transferir" (v3.13.0)
+
+### Bug encontrado: "Transferir" en la tabla de stock estaba roto
+
+El botón "Transferir" de cada fila apuntaba a `/api/sim-uso` — un
+endpoint que ya no existe desde que se fusionó en `/api/recurso-uso`
+(hace varias versiones). Es decir, **transferir una SIM a otro
+técnico u Oficina desde `admin.html` venía fallando en silencio**
+desde esa fusión. Ya está corregido.
+
+### Nueva opción: "📋 Instalar en cliente"
+
+En el selector "Transferir a" de cada fila de SIM, ahora hay una
+opción extra además de los técnicos y "Oficina": **"📋 Instalar en
+cliente"**. Al elegirla, aparece:
+
+- Un desplegable con los **servicios pendientes** actuales — al
+  elegir uno, completa solo el nombre del cliente y la dirección.
+- O la opción "Otro (escribir cliente)", para cargar el nombre a mano
+  si no está entre los servicios pendientes.
+
+Al confirmar, pasa por la misma acción real que usa la app del
+técnico ("usar") — así la SIM se migra correctamente al registro de
+instaladas y desaparece del stock al toque, en vez de quedar a mitad
+de camino como pasaba editando los campos "En uso" + "Cliente" a mano.
+
 ### La migración a instaladas ahora corre al guardar, no solo al abrir la pestaña (v3.12.6)
 
 Si en `admin.html` se editaba una SIM directo en la tabla de stock

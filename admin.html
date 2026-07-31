@@ -1394,6 +1394,7 @@ const simsExcelStatus = document.getElementById("simsExcelStatus");
 const guardarSimsBtn = document.getElementById("guardarSimsBtn");
 const guardarSimsStatus = document.getElementById("guardarSimsStatus");
 let nombresTecnicosParaSims = [];
+let serviciosPendientesParaSims = []; // para autocompletar cliente/dirección al instalar una SIM
 let simsCompletos = []; // todas las SIMs, tal como están guardadas/recién subidas/recién transferidas
 let numerosExistentesEnServidor = new Set(); // para saber si una fila ya existe del lado del servidor
 
@@ -1403,6 +1404,10 @@ function renderFilaSimTabla(sim) {
   const s = sim || { empresa: "Movistar", tipo: "Estándar", numero: "", tecnico_actual: "Oficina", estado: "stock", cliente: "" };
   const destinos = [...nombresTecnicosParaSims, "Oficina"].filter((n) => n !== s.tecnico_actual);
   const opcionesDestino = destinos.map((n) => `<option value="${n}">${n}</option>`).join("");
+  const opcionesServicios = serviciosPendientesParaSims
+    .filter((sv) => sv.cliente)
+    .map((sv, idx) => `<option value="${idx}">${sv.cliente}${sv.direccion ? " — " + sv.direccion : ""}</option>`)
+    .join("");
   const colorEmpresa = COLORES_COMPANIA_SIM_ADMIN[s.empresa] || "#8A9089";
 
   const fila = document.createElement("tr");
@@ -1438,7 +1443,16 @@ function renderFilaSimTabla(sim) {
         <select class="sim-transferir-select">
           <option value="" disabled selected>Elegir...</option>
           ${opcionesDestino}
+          <option value="__cliente__">📋 Instalar en cliente</option>
         </select>
+        <div class="sim-instalar-cliente-panel hidden" style="margin-top:6px;">
+          <select class="sim-instalar-servicio-select">
+            <option value="" selected>Elegir un servicio pendiente...</option>
+            ${opcionesServicios}
+            <option value="__otro__">Otro (escribir cliente)</option>
+          </select>
+          <input type="text" class="sim-instalar-cliente-input hidden" placeholder="Nombre del cliente" style="margin-top:6px;">
+        </div>
         <button type="button" class="btn-transferir-fila">Transferir</button>
       </div>
     </td>
@@ -1453,6 +1467,30 @@ function renderFilaSimTabla(sim) {
 
   fila.querySelector(".btn-quitar-fila").addEventListener("click", () => fila.remove());
 
+  const panelInstalarCliente = fila.querySelector(".sim-instalar-cliente-panel");
+  const selectServicio = fila.querySelector(".sim-instalar-servicio-select");
+  const inputClienteManual = fila.querySelector(".sim-instalar-cliente-input");
+
+  fila.querySelector(".sim-transferir-select").addEventListener("change", (e) => {
+    panelInstalarCliente.classList.toggle("hidden", e.target.value !== "__cliente__");
+  });
+
+  selectServicio.addEventListener("change", () => {
+    if (selectServicio.value === "__otro__") {
+      inputClienteManual.classList.remove("hidden");
+      inputClienteManual.value = "";
+      inputClienteManual.readOnly = false;
+      inputClienteManual.focus();
+    } else if (selectServicio.value !== "") {
+      const servicio = serviciosPendientesParaSims.filter((sv) => sv.cliente)[Number(selectServicio.value)];
+      inputClienteManual.classList.remove("hidden");
+      inputClienteManual.readOnly = true;
+      inputClienteManual.value = servicio ? servicio.cliente : "";
+    } else {
+      inputClienteManual.classList.add("hidden");
+    }
+  });
+
   fila.querySelector(".btn-transferir-fila").addEventListener("click", async () => {
     const destino = fila.querySelector(".sim-transferir-select").value;
     const numeroActual = fila.querySelector(".sim-numero").value.trim();
@@ -1465,13 +1503,18 @@ function renderFilaSimTabla(sim) {
       return;
     }
 
+    if (destino === "__cliente__") {
+      await instalarSimEnCliente(fila, numeroActual, selectServicio, inputClienteManual);
+      return;
+    }
+
     function reflejarCambioEnFila() {
       fila.dataset.tecnicoActual = destino;
       fila.querySelector(".sim-asignado-a").textContent = destino;
       fila.querySelector(".sim-asignado-a").classList.toggle("oficina", destino === "Oficina");
       const nuevosDestinos = [...nombresTecnicosParaSims, "Oficina"].filter((n) => n !== destino);
       fila.querySelector(".sim-transferir-select").innerHTML =
-        `<option value="" disabled selected>Elegir...</option>${nuevosDestinos.map((n) => `<option value="${n}">${n}</option>`).join("")}`;
+        `<option value="" disabled selected>Elegir...</option>${nuevosDestinos.map((n) => `<option value="${n}">${n}</option>`).join("")}<option value="__cliente__">📋 Instalar en cliente</option>`;
     }
 
     // Si la fila es nueva (todavía no se guardó nada), no hay nada que
@@ -1488,10 +1531,11 @@ function renderFilaSimTabla(sim) {
     boton.disabled = true;
     boton.textContent = "...";
     try {
-      const res = await fetch("/api/sim-uso", {
+      const res = await fetch("/api/recurso-uso", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
         body: JSON.stringify({
+          recurso: "sim",
           accion: "transferir",
           numero: numeroActual,
           tecnico: fila.dataset.tecnicoActual,
@@ -1521,6 +1565,57 @@ function renderFilaSimTabla(sim) {
   });
 
   return fila;
+}
+
+// Instala una SIM directo en un cliente desde admin.html — pasa por
+// la misma acción real ("usar") que usa la app del técnico, así se
+// migra bien al registro de instaladas y no queda a mitad de camino
+// en el stock.
+async function instalarSimEnCliente(fila, numeroActual, selectServicio, inputClienteManual) {
+  const cliente = inputClienteManual.value.trim();
+  if (!cliente) {
+    alert("Elegí un servicio pendiente o escribí el nombre del cliente.");
+    return;
+  }
+  let direccion = "";
+  if (selectServicio.value !== "__otro__" && selectServicio.value !== "") {
+    const servicio = serviciosPendientesParaSims.filter((sv) => sv.cliente)[Number(selectServicio.value)];
+    direccion = servicio ? servicio.direccion || "" : "";
+  }
+
+  if (!numerosExistentesEnServidor.has(numeroActual)) {
+    alert('Esta fila todavía no está guardada — tocá "Guardar cambios" primero, y después instalala en el cliente.');
+    return;
+  }
+
+  const boton = fila.querySelector(".btn-transferir-fila");
+  boton.disabled = true;
+  boton.textContent = "...";
+  try {
+    const res = await fetch("/api/recurso-uso", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({
+        recurso: "sim",
+        accion: "usar",
+        numero: numeroActual,
+        tecnico: fila.dataset.tecnicoActual,
+        cliente,
+        direccion,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    // Se instaló y ya se migró al registro — sale del stock acá mismo.
+    simsCompletos = simsCompletos.filter((x) => x.numero !== numeroActual);
+    fila.remove();
+    simsStatus.className = "status ok";
+    simsStatus.textContent = `Instalada en ${cliente} — ya figura en el registro de SIMs instaladas.`;
+  } catch (err) {
+    alert("No se pudo instalar: " + err.message);
+    boton.disabled = false;
+    boton.textContent = "Transferir";
+  }
 }
 
 function dibujarTablaSims() {
@@ -1566,15 +1661,22 @@ async function cargarSimsAdmin() {
       // si falla la migración, no se interrumpe la carga normal de la tabla
     }
 
-    const [resSims, resTecnicos] = await Promise.all([
+    const [resSims, resTecnicos, resServicios] = await Promise.all([
       fetch("/api/datos?coleccion=sims", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" }),
       fetch("/api/datos?coleccion=tecnicos", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" }),
+      fetch("/api/servicios", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" }).catch(() => null),
     ]);
     const sims = await resSims.json();
     const tecnicos = await resTecnicos.json();
     simsCompletos = Array.isArray(sims) ? sims : [];
     numerosExistentesEnServidor = new Set(simsCompletos.map((s) => s.numero));
     nombresTecnicosParaSims = (Array.isArray(tecnicos) ? tecnicos : []).map((t) => t.nombre);
+    try {
+      const servicios = resServicios ? await resServicios.json() : [];
+      serviciosPendientesParaSims = Array.isArray(servicios) ? servicios : [];
+    } catch (errServicios) {
+      serviciosPendientesParaSims = []; // si falla, igual se puede escribir el cliente a mano
+    }
     dibujarTablaSims();
   } catch (err) {
     simsStatus.textContent = "No se pudo cargar la lista de SIMs.";
