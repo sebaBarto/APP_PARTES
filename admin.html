@@ -1548,6 +1548,24 @@ async function cargarSimsAdmin() {
   simsStatus.textContent = "Cargando SIMs...";
   simsTablaBody.innerHTML = "";
   try {
+    // Migración automática: cualquier SIM que haya quedado marcada "en
+    // uso" con un cliente (de antes de que existiera el registro de
+    // instaladas separado) se pasa sola al registro y desaparece de
+    // acá — no hace falta hacer nada manual para esto.
+    try {
+      const resMigracion = await fetch("/api/recurso-uso", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+        body: JSON.stringify({ recurso: "sim", accion: "migrar_legacy_a_registro" }),
+      });
+      const dataMigracion = await resMigracion.json();
+      if (dataMigracion && dataMigracion.migradas > 0) {
+        alert(`Se migraron ${dataMigracion.migradas} SIM(s) que estaban "en uso" al registro de instaladas — ya no aparecen acá.`);
+      }
+    } catch (errMigracion) {
+      // si falla la migración, no se interrumpe la carga normal de la tabla
+    }
+
     const [resSims, resTecnicos] = await Promise.all([
       fetch("/api/datos?coleccion=sims", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" }),
       fetch("/api/datos?coleccion=tecnicos", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" }),

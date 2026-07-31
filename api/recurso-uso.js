@@ -179,6 +179,39 @@ async function postSim(ghHeaders, body, res) {
     return;
   }
 
+  // Migración automática de casos "viejos": SIMs que quedaron
+  // marcadas "en uso" con un cliente dentro del archivo de stock, de
+  // antes de que existiera el registro de instaladas separado. Se
+  // dispara sola al abrir la pestaña de SIMs en admin.html — no hace
+  // falta ningún dato puntual, migra todas las que encuentre.
+  if (accion === "migrar_legacy_a_registro") {
+    const { data: sims, sha: shaSims } = await leerJSON(ghHeaders, SIM_CONFIG_PATH, []);
+    const legacy = sims.filter((s) => s.estado === "uso" && s.cliente);
+    if (legacy.length === 0) {
+      res.status(200).json({ ok: true, migradas: 0 });
+      return;
+    }
+    const restante = sims.filter((s) => !(s.estado === "uso" && s.cliente));
+    const { data: registro, sha: shaRegistro } = await leerJSON(ghHeaders, SIM_REGISTRO_PATH, []);
+    const hoy = new Date().toISOString().slice(0, 10);
+    legacy.forEach((s) => {
+      registro.push({
+        numero_abonado: "",
+        estado_linea: "Activo",
+        cliente: s.cliente,
+        direccion: "",
+        fecha_activacion: hoy, // no se sabe la fecha real de instalación de estos casos viejos
+        numero: s.numero,
+        empresa: s.empresa,
+        tecnico_instalador: s.tecnico_actual || "",
+      });
+    });
+    await guardarJSON(ghHeaders, SIM_CONFIG_PATH, restante, shaSims);
+    await guardarJSON(ghHeaders, SIM_REGISTRO_PATH, registro, shaRegistro);
+    res.status(200).json({ ok: true, migradas: legacy.length });
+    return;
+  }
+
   // "Retirar" es distinto al resto: la SIM no está en el stock sino
   // en el registro de instaladas (~900 líneas), así que se maneja
   // aparte — busca por número de línea en el registro, no en el stock.

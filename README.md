@@ -218,6 +218,19 @@ nuevo, se agrega — nunca borra nada. También se sumó la columna
 encabezados, y se normaliza a Mayúscula inicial (Movistar/Personal/
 Claro) para que quede igual que el resto de la app.
 
+### Migración automática de SIMs "viejas" en uso (v3.12.4)
+
+Cualquier SIM que haya quedado marcada **"en uso" con un cliente**
+dentro del stock (de antes de que existiera el registro de instaladas
+separado) ahora se migra sola al registro apenas se abre la pestaña
+**"SIMs"** en `admin.html` — no hace falta tocar nada a mano. Esas
+líneas desaparecen del stock y pasan a figurar en "SIMs instaladas",
+con el cliente y el técnico que las tenía asignadas (la fecha de
+instalación real no se conserva para estos casos viejos, porque no
+estaba guardada en ningún lado — queda con la fecha del día en que se
+migran). Es seguro que corra cada vez que se entra a esa pestaña: si
+no encuentra nada para migrar, no hace nada.
+
 ### Se suma "Estado de línea" a la búsqueda (v3.12.3)
 
 En "📇 Buscar SIM instalada / Retirar" (app del técnico), cada
