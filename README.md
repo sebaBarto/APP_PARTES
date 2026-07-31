@@ -218,6 +218,18 @@ nuevo, se agrega — nunca borra nada. También se sumó la columna
 encabezados, y se normaliza a Mayúscula inicial (Movistar/Personal/
 Claro) para que quede igual que el resto de la app.
 
+### Bug crítico corregido: guardar con un filtro activo borraba SIMs (v3.12.5)
+
+En la pestaña "SIMs" de `admin.html`, "Guardar cambios" leía
+literalmente las filas que estaban **dibujadas en pantalla** — si
+había un filtro/búsqueda activo mostrando solo una parte de la
+tabla, guardar en ese estado mandaba al servidor **solo esas filas
+visibles**, reemplazando toda la lista y borrando todo lo que no
+coincidía con el filtro. Ahora, si el buscador tiene algo escrito,
+"Guardar cambios" se bloquea con un aviso explícito pidiendo borrar
+la búsqueda antes de guardar — así nunca se puede guardar una versión
+parcial sin querer.
+
 ### Migración automática de SIMs "viejas" en uso (v3.12.4)
 
 Cualquier SIM que haya quedado marcada **"en uso" con un cliente**

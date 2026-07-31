@@ -1677,6 +1677,16 @@ simsExcelFile.addEventListener("change", () => {
 });
 
 guardarSimsBtn.addEventListener("click", async () => {
+  // Si hay un filtro activo, la tabla en pantalla NO tiene todas las
+  // SIMs — solo las que coinciden con la búsqueda. Guardar en ese
+  // estado borraría del servidor todo lo que no se esté viendo en
+  // ese momento. Se bloquea el guardado hasta que se borre el filtro.
+  if (simsBuscarAdmin.value.trim()) {
+    guardarSimsStatus.className = "status err";
+    guardarSimsStatus.textContent = 'Borrá lo que escribiste en el buscador antes de guardar — así se guardan todas las SIMs, no solo las que ves filtradas.';
+    return;
+  }
+
   const lista = leerFilasSimsDeLaTabla().filter((s) => s.numero);
 
   if (lista.length === 0) {
