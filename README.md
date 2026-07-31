@@ -205,6 +205,37 @@ plantillas de oficina y de cliente incorporadas (mismo diseño que
 tenían en EmailJS), y `app.js` ya llama a este endpoint en vez de
 EmailJS.
 
+## Recordatorio de devolver el vehículo al final del día, y bug de la felicitación (v3.11.0)
+
+### Bug corregido: la felicitación llegaba a la mañana
+
+La felicitación semanal solo chequeaba "¿hoy es viernes?" — pero el
+cron de la mañana (que corre TODOS los días) también es viernes los
+viernes, así que se disparaba ahí en vez de esperar a la tarde. Ahora
+también chequea la hora (además del día), para que solo se dispare
+con la invocación de la tarde.
+
+### Recordatorio de devolver el vehículo al final del día
+
+De lunes a viernes (no fines de semana ni feriados), entre las 18 y
+las 19hs aproximadamente, a los técnicos "en la calle" que **todavía
+tienen un vehículo tomado** a esa altura del día les llega un aviso
+para que se acuerden de devolverlo. Se agregó un tercer horario de
+cron para esto (ya usábamos dos: el de la mañana y el de los
+viernes).
+
+**Sobre la idea de usar geolocalización en vez de un horario fijo**:
+lo evalué, pero no es viable de forma confiable con esta app tal como
+está armada hoy. Una PWA (como esta) no puede rastrear la ubicación
+del celular en segundo plano cuando la app está cerrada — eso
+requiere permisos y capacidades que solo tienen las apps nativas
+instaladas desde una tienda de aplicaciones, especialmente en iPhone,
+donde Safari es todavía más restrictivo con esto. Si en algún momento
+se quisiera geolocalización real (detectar "llegó a la oficina"), hay
+que evaluar convertir la app a una app nativa — es un cambio de fondo,
+no un ajuste. Por ahora, el aviso por horario fijo es la opción
+confiable.
+
 ### El recordatorio se salta si ya tiene todo tomado (v3.10.1)
 
 Si un técnico "en la calle" ya tomó el vehículo **y** ya tiene al

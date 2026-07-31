@@ -157,6 +157,11 @@ async function esFeriadoArgentina(fecha) {
 // esa semana (lunes a hoy). Se puede apagar desde admin.html.
 async function chequearFelicitacionSemanal(ghHeaders, estado, ahora) {
   if (ahora.getDay() !== 5) return null; // solo viernes
+  // Los viernes disparan DOS invocaciones del mismo cron (la de la
+  // mañana de todos los días, y la de la tarde solo de los viernes) —
+  // sin este chequeo de hora, la felicitación salía con la de la
+  // mañana en vez de esperar a la tarde.
+  if (ahora.getHours() < 15) return null;
 
   const semanaActual = numeroSemanaIso(ahora);
   if (estado.ultima_semana_felicitacion === semanaActual) return null; // ya se mandó esta semana
@@ -196,6 +201,48 @@ async function chequearFelicitacionSemanal(ghHeaders, estado, ahora) {
 
   estado.ultima_semana_felicitacion = semanaActual;
   return ganadores;
+}
+
+// Recordatorio de devolver el vehículo al final del día — lunes a
+// viernes (no fin de semana ni feriado), a los técnicos "en la
+// calle" que todavía tienen un vehículo tomado a esa altura del día.
+async function chequearRecordatorioDevolverVehiculo(ghHeaders, estado, ahora) {
+  const diaSemana = ahora.getDay();
+  if (diaSemana === 0 || diaSemana === 6) return null; // solo lunes a viernes
+  // Esta franja comparte cron con la de la mañana (todos los días) y,
+  // los viernes, con la de la felicitación semanal (17hs) — sin este
+  // chequeo de hora, se dispararía con cualquiera de esas.
+  if (ahora.getHours() < 18) return null;
+
+  const hoyStr = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, "0")}-${String(ahora.getDate()).padStart(2, "0")}`;
+  if (estado.ultimo_dia_recordatorio_devolver === hoyStr) return null;
+
+  if (await esFeriadoArgentina(ahora)) return null;
+
+  const { data: tecnicos } = await leerJSON(ghHeaders, TECNICOS_PATH, []);
+  const enCalle = new Set((tecnicos || []).filter((t) => t.en_calle).map((t) => t.nombre));
+  if (enCalle.size === 0) return null;
+
+  const { data: historialVehiculos } = await leerJSON(ghHeaders, VEHICULOS_HISTORIAL_PATH, []);
+  const destinatarios = [...new Set(
+    (historialVehiculos || [])
+      .filter((h) => h.tecnico && enCalle.has(h.tecnico) && !h.hora_devolucion && !h.accion)
+      .map((h) => h.tecnico)
+  )];
+  if (destinatarios.length === 0) {
+    estado.ultimo_dia_recordatorio_devolver = hoyStr;
+    return null; // nadie en la calle tiene un vehículo tomado a esta altura
+  }
+
+  await enviarASeleccionados(destinatarios, {
+    titulo: "🚐 No te olvides",
+    cuerpo: "Antes de terminar el día, acordate de devolver el vehículo.",
+    url: "/",
+    importante: true,
+  });
+
+  estado.ultimo_dia_recordatorio_devolver = hoyStr;
+  return destinatarios;
 }
 
 async function chequearRecordatorioTecnicosEnCalle(ghHeaders, estado, ahora) {
@@ -287,10 +334,11 @@ module.exports = async (req, res) => {
     await chequearVehiculos(ghHeaders, estado, ahora);
     const tecnicosRecordados = await chequearRecordatorioTecnicosEnCalle(ghHeaders, estado, ahora);
     const ganadoresSemana = await chequearFelicitacionSemanal(ghHeaders, estado, ahora);
+    const recordadosDevolver = await chequearRecordatorioDevolverVehiculo(ghHeaders, estado, ahora);
 
     await guardarJSON(ghHeaders, ESTADO_PATH, estado, shaEstado);
 
-    res.status(200).json({ ok: true, guardia_notificada: tecnicoDeGuardia || null, recordatorio_en_calle: tecnicosRecordados || null, felicitacion_semanal: ganadoresSemana || null });
+    res.status(200).json({ ok: true, guardia_notificada: tecnicoDeGuardia || null, recordatorio_en_calle: tecnicosRecordados || null, felicitacion_semanal: ganadoresSemana || null, recordatorio_devolver: recordadosDevolver || null });
   } catch (err) {
     res.status(500).json({ error: "Error interno en el cron diario", detail: String(err.message || err) });
   }
