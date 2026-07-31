@@ -205,7 +205,46 @@ plantillas de oficina y de cliente incorporadas (mismo diseño que
 tenían en EmailJS), y `app.js` ya llama a este endpoint en vez de
 EmailJS.
 
-### Recordatorio de vehículo movido a las 17-18hs (v3.11.1)
+## Registro de SIMs instaladas, para manejar la escala real (v3.12.0)
+
+Con ~900 SIMs ya instaladas en clientes (y solo 30-60 en stock activo
+entre todos los técnicos), el sistema de SIMs de antes — pensado para
+manejar todo junto en un solo archivo, con una tabla editable
+mostrando todo de una — dejaba de ser práctico. Se separó en **dos
+categorías con lógica distinta**:
+
+- **Stock activo** (`sims-config.json`, sin cambios): las 3-4 SIMs por
+  técnico que se mueven todo el tiempo — tomar, transferir, usar.
+  Sigue funcionando exactamente igual que antes.
+- **Registro de instaladas** (`sims-instaladas.json`, nuevo): las
+  ~900 líneas ya funcionando en un cliente, que casi no se mueven.
+  Es un registro de **consulta**, no una tabla editable — se busca,
+  no se lista todo de una.
+
+### El movimiento entre las dos categorías
+
+- **Instalar una SIM del stock en un cliente** ("usar"/"reemplazar"):
+  automáticamente sale del stock del técnico y pasa a figurar en el
+  registro definitivo, con cliente, dirección, fecha de instalación y
+  quién la instaló.
+- **Retirar una SIM de un cliente** (por ejemplo, se dio de baja del
+  servicio): nueva opción **"📇 Buscar SIM instalada / Retirar"** en la
+  pantalla de SIMs de la app — el técnico busca por cliente, número o
+  dirección, y la retira con un toque. Sale del registro y vuelve a
+  su stock personal, lista para reinstalar en otro cliente.
+
+### Importar desde Excel (`admin.html` → pestaña "SIMs instaladas")
+
+Se puede cargar (o actualizar) el registro completo subiendo una
+planilla con las columnas N° DE ABONADO, ESTADO DE LINEA, NOMBRE
+ABONADO, DIRECCION, FECHA DE ACTIVACION, NUMERO DE LINEA, EMPRESA. La
+importación es **inteligente**: si un N° de abonado ya existe en el
+registro, se actualiza con los datos nuevos; si es nuevo, se agrega
+— nunca duplica ni borra lo que ya estaba cargado (ya sea a mano o
+por una SIM instalada desde la app). Se probó la lectura y el mapeo
+de columnas contra un archivo real de 908 líneas, sin errores.
+
+## Recordatorio de vehículo movido a las 17-18hs (v3.11.1)
 
 Se corrió el horario del recordatorio de devolver el vehículo, de
 18-19hs a **17-18hs**, tal como se pidió. Como ahora coincide con la

@@ -562,7 +562,25 @@
       <div id="simsGrupos"></div>
     </div>
     <div class="action-bar">
+      <button class="btn btn-secondary" id="irARegistroSimsBtn" type="button">📇 Buscar SIM instalada / Retirar</button>
       <button class="btn btn-secondary" id="volverDeSimsBtn" type="button">Volver</button>
+    </div>
+  </section>
+
+  <!-- REGISTRO DE SIMs INSTALADAS: BUSCAR / RETIRAR -->
+  <section class="screen" id="screen-sim-registro">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">SIM INSTALADAS EN CLIENTES</p>
+      <p class="hint-text">Buscá para ver si un cliente ya tiene una línea instalada, o para retirarla (por ejemplo, si se dio de baja del servicio) y que vuelva a tu stock.</p>
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input class="field-input search-input" id="simRegistroBuscarInput" type="search" placeholder="Cliente, número o dirección...">
+      </div>
+      <p class="list-status" id="simRegistroStatus"></p>
+      <div id="simRegistroResultados"></div>
+    </div>
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDeSimRegistroBtn" type="button">Volver</button>
     </div>
   </section>
 

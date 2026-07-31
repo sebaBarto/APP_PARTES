@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.11.1";
+const APP_VERSION = "3.12.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -132,6 +132,7 @@ const screens = {
   vehiculoDetalle: document.getElementById("screen-vehiculo-detalle"),
   sims: document.getElementById("screen-sims"),
   simDetalle: document.getElementById("screen-sim-detalle"),
+  simRegistro: document.getElementById("screen-sim-registro"),
   herramientas: document.getElementById("screen-herramientas"),
   herramientaDetalle: document.getElementById("screen-herramienta-detalle"),
   comodatoForm: document.getElementById("screen-comodato-form"),
@@ -282,6 +283,11 @@ const herramientaEnClienteWrap = document.getElementById("herramientaEnClienteWr
 const herramientaRetirarBtn = document.getElementById("herramientaRetirarBtn");
 const volverDeHerramientaDetalleBtn = document.getElementById("volverDeHerramientaDetalleBtn");
 const volverDeSimsBtn = document.getElementById("volverDeSimsBtn");
+const irARegistroSimsBtn = document.getElementById("irARegistroSimsBtn");
+const volverDeSimRegistroBtn = document.getElementById("volverDeSimRegistroBtn");
+const simRegistroBuscarInput = document.getElementById("simRegistroBuscarInput");
+const simRegistroStatus = document.getElementById("simRegistroStatus");
+const simRegistroResultados = document.getElementById("simRegistroResultados");
 const simsListaStatus = document.getElementById("simsListaStatus");
 const simsGrupos = document.getElementById("simsGrupos");
 const simsBuscarCliente = document.getElementById("simsBuscarCliente");
@@ -1626,6 +1632,7 @@ async function asignarSimInstaladaAlCliente(data) {
         numero: sim.numero,
         tecnico: data.tecnico || tecnicoLogueado || "",
         cliente: data.cliente,
+        direccion: data.direccion || "",
         numero_servicio: data.numero_servicio || "",
       }),
     });
@@ -5101,6 +5108,105 @@ simRevertirBtn.addEventListener("click", async () => {
   }
   await transferirSim(sim.tecnico_anterior);
 });
+
+// ---------- Registro de SIMs instaladas (buscar / retirar) ----------
+let simsRegistroCache = null; // se trae una sola vez y se cachea (es un archivo grande, ~900 líneas)
+const LIMITE_RESULTADOS_REGISTRO = 30;
+
+irARegistroSimsBtn.addEventListener("click", () => {
+  showScreen("simRegistro");
+  simRegistroBuscarInput.value = "";
+  simRegistroResultados.innerHTML = "";
+  simRegistroStatus.textContent = "Escribí para buscar entre las líneas instaladas.";
+  cargarSimsRegistro();
+});
+volverDeSimRegistroBtn.addEventListener("click", () => showScreen("sims"));
+
+async function cargarSimsRegistro() {
+  if (simsRegistroCache) return; // ya está en memoria, no hace falta volver a pedirlo
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/datos?coleccion=sims_instaladas", { headers, cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    simsRegistroCache = await res.json();
+    if (!Array.isArray(simsRegistroCache)) simsRegistroCache = [];
+  } catch (err) {
+    simRegistroStatus.textContent = "No se pudo cargar el registro de instaladas.";
+    simsRegistroCache = [];
+  }
+}
+
+function renderResultadosSimRegistro() {
+  const busqueda = simRegistroBuscarInput.value.trim().toLowerCase();
+  simRegistroResultados.innerHTML = "";
+  if (!busqueda) {
+    simRegistroStatus.textContent = "Escribí para buscar entre las líneas instaladas.";
+    return;
+  }
+  if (!simsRegistroCache) {
+    simRegistroStatus.textContent = "Cargando...";
+    return;
+  }
+  const coincidencias = simsRegistroCache.filter((s) =>
+    (s.cliente || "").toLowerCase().includes(busqueda) ||
+    (s.numero || "").toLowerCase().includes(busqueda) ||
+    (s.direccion || "").toLowerCase().includes(busqueda)
+  );
+  if (coincidencias.length === 0) {
+    simRegistroStatus.textContent = "Ninguna coincidencia.";
+    return;
+  }
+  simRegistroStatus.textContent = coincidencias.length > LIMITE_RESULTADOS_REGISTRO
+    ? `${coincidencias.length} coincidencias — mostrando las primeras ${LIMITE_RESULTADOS_REGISTRO}.`
+    : `${coincidencias.length} coincidencia(s).`;
+
+  coincidencias.slice(0, LIMITE_RESULTADOS_REGISTRO).forEach((s) => {
+    const colorEmpresa = COLORES_COMPANIA_SIM[s.empresa] || "#8A9089";
+    const card = document.createElement("div");
+    card.className = "sim-card";
+    card.style.borderLeft = `4px solid ${colorEmpresa}`;
+    card.innerHTML = `
+      <div>
+        <div class="sim-card-empresa"><span class="sim-card-dot" style="background:${colorEmpresa};"></span>${s.empresa || "?"}</div>
+        <div class="sim-card-numero">${s.numero} · ${s.cliente || "sin nombre"}</div>
+        <div style="font-size:12px; color:#6B7680; margin-top:2px;">${s.direccion || ""}</div>
+      </div>
+      <button type="button" class="btn-small btn-secondary" style="width:auto;">Retirar</button>
+    `;
+    card.querySelector("button").addEventListener("click", (e) => {
+      e.stopPropagation();
+      confirmarRetirarSim(s);
+    });
+    simRegistroResultados.appendChild(card);
+  });
+}
+simRegistroBuscarInput.addEventListener("input", renderResultadosSimRegistro);
+
+async function confirmarRetirarSim(sim) {
+  const ok = confirm(`¿Retirar la línea ${sim.numero} (${sim.cliente || "sin nombre"})? Vuelve a tu stock personal.`);
+  if (!ok) return;
+  try {
+    const res = await fetch("/api/recurso-uso", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({
+        recurso: "sim",
+        accion: "retirar_de_registro",
+        numero: sim.numero,
+        tecnico: tecnicoLogueado || "",
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    // Sale del registro cacheado localmente, para que la búsqueda ya
+    // no la muestre sin tener que volver a pedir todo el archivo.
+    simsRegistroCache = simsRegistroCache.filter((s) => s.numero !== sim.numero);
+    renderResultadosSimRegistro();
+    showToast(`Retiraste la línea ${sim.numero} — ya está en tu stock.`);
+  } catch (err) {
+    showToast("No se pudo retirar: " + err.message);
+  }
+}
 
 // Al abrir la app, si hay una sesión guardada y vigente, entra directo
 // sin pasar por el login (ver SESION_DURACION_MS más arriba).

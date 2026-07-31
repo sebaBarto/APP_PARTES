@@ -200,6 +200,7 @@
       <button type="button" class="tab-btn" id="tabVehiculosBtn"><span class="tab-icon">🚗</span>Vehículos</button>
       <button type="button" class="tab-btn" id="tabSimsBtn"><span class="tab-icon">📶</span>SIMs</button>
       <button type="button" class="tab-btn" id="tabHerramientasBtn"><span class="tab-icon">🧰</span>Herramientas</button>
+      <button type="button" class="tab-btn" id="tabSimsInstaladasBtn"><span class="tab-icon">📇</span>SIMs instaladas</button>
     </div>
 
     <div id="panelServicios">
@@ -445,6 +446,43 @@
       <button id="guardarHerramientasBtn" type="button">Guardar cambios</button>
       <p class="status" id="guardarHerramientasStatus"></p>
     </div>
+
+    <div id="panelSimsInstaladas" class="hidden">
+      <h1>SIMs instaladas en clientes</h1>
+      <p class="subtitle">
+        Registro de consulta de las líneas ya instaladas y funcionando en un cliente (a diferencia
+        del stock, esto no se edita línea por línea acá — se actualiza solo cuando un técnico
+        instala o retira una SIM desde la app, o importando una planilla nueva).
+      </p>
+
+      <div class="card" style="margin-bottom:16px;">
+        <label>Importar / actualizar desde Excel</label>
+        <p class="subtitle" style="margin:0 0 10px;">
+          Columnas esperadas: N° DE ABONADO, ESTADO DE LINEA, NOMBRE ABONADO, DIRECCION,
+          FECHA DE ACTIVACION, NUMERO DE LINEA, EMPRESA. Si un N° de abonado ya existe en el
+          registro, se actualiza; si es nuevo, se agrega — no borra nada que ya esté cargado.
+        </p>
+        <input type="file" id="simsInstaladasExcelFile" accept=".xlsx,.xls,.csv">
+        <p class="status" id="simsInstaladasImportStatus"></p>
+      </div>
+
+      <div class="card">
+        <label for="simsInstaladasBuscar">Buscar por cliente, número, dirección o N° de abonado</label>
+        <input type="text" id="simsInstaladasBuscar" placeholder="Escribí para buscar...">
+        <p class="status" id="simsInstaladasStatus"></p>
+        <div class="sims-tabla-wrap" id="simsInstaladasResultadosWrap" style="display:none;">
+          <table class="sims-tabla">
+            <thead>
+              <tr>
+                <th>N° Abonado</th><th>Cliente</th><th>Dirección</th><th>Empresa</th>
+                <th>Número</th><th>Activación</th><th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="simsInstaladasTablaBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   </div>
 
 </div>
@@ -503,6 +541,9 @@ let simsCargadasUnaVez = false;
 const tabHerramientasBtn = document.getElementById("tabHerramientasBtn");
 const panelHerramientas = document.getElementById("panelHerramientas");
 let herramientasCargadasUnaVez = false;
+const tabSimsInstaladasBtn = document.getElementById("tabSimsInstaladasBtn");
+const panelSimsInstaladas = document.getElementById("panelSimsInstaladas");
+let simsInstaladasCargadasUnaVez = false;
 
 const TABS = [
   { btn: tabServiciosBtn, panel: panelServicios },
@@ -515,6 +556,7 @@ const TABS = [
   { btn: tabVehiculosBtn, panel: panelVehiculos, onShow: () => { if (!vehiculosCargadosUnaVez) { vehiculosCargadosUnaVez = true; cargarVehiculosAdmin(); } } },
   { btn: tabSimsBtn, panel: panelSims, onShow: () => { if (!simsCargadasUnaVez) { simsCargadasUnaVez = true; cargarSimsAdmin(); } } },
   { btn: tabHerramientasBtn, panel: panelHerramientas, onShow: () => { if (!herramientasCargadasUnaVez) { herramientasCargadasUnaVez = true; cargarHerramientasAdmin(); } } },
+  { btn: tabSimsInstaladasBtn, panel: panelSimsInstaladas, onShow: () => { if (!simsInstaladasCargadasUnaVez) { simsInstaladasCargadasUnaVez = true; cargarSimsInstaladasAdmin(); } } },
 ];
 
 TABS.forEach(({ btn, panel, onShow }) => {
@@ -1756,6 +1798,163 @@ guardarHerramientasBtn.addEventListener("click", async () => {
   } finally {
     guardarHerramientasBtn.disabled = false;
   }
+});
+
+// ---------- Registro de SIMs instaladas (solo consulta) ----------
+const simsInstaladasExcelFile = document.getElementById("simsInstaladasExcelFile");
+const simsInstaladasImportStatus = document.getElementById("simsInstaladasImportStatus");
+const simsInstaladasBuscar = document.getElementById("simsInstaladasBuscar");
+const simsInstaladasStatus = document.getElementById("simsInstaladasStatus");
+const simsInstaladasResultadosWrap = document.getElementById("simsInstaladasResultadosWrap");
+const simsInstaladasTablaBody = document.getElementById("simsInstaladasTablaBody");
+let simsInstaladasCache = [];
+const LIMITE_RESULTADOS_INSTALADAS = 50;
+
+async function cargarSimsInstaladasAdmin() {
+  simsInstaladasStatus.textContent = "Cargando el registro...";
+  try {
+    const res = await fetch("/api/datos?coleccion=sims_instaladas", {
+      headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    simsInstaladasCache = Array.isArray(data) ? data : [];
+    simsInstaladasStatus.textContent = `${simsInstaladasCache.length} SIMs instaladas en el registro. Escribí arriba para buscar.`;
+  } catch (err) {
+    simsInstaladasStatus.className = "status err";
+    simsInstaladasStatus.textContent = "No se pudo cargar el registro: " + err.message;
+  }
+}
+
+function dibujarResultadosSimsInstaladas() {
+  const busqueda = simsInstaladasBuscar.value.trim().toLowerCase();
+  if (!busqueda) {
+    simsInstaladasResultadosWrap.style.display = "none";
+    simsInstaladasStatus.className = "status";
+    simsInstaladasStatus.textContent = `${simsInstaladasCache.length} SIMs instaladas en el registro. Escribí arriba para buscar.`;
+    return;
+  }
+  const coincidencias = simsInstaladasCache.filter((s) =>
+    (s.cliente || "").toLowerCase().includes(busqueda) ||
+    (s.numero || "").toLowerCase().includes(busqueda) ||
+    (s.direccion || "").toLowerCase().includes(busqueda) ||
+    (s.numero_abonado || "").toLowerCase().includes(busqueda)
+  );
+
+  if (coincidencias.length === 0) {
+    simsInstaladasResultadosWrap.style.display = "none";
+    simsInstaladasStatus.className = "status";
+    simsInstaladasStatus.textContent = "Ninguna coincidencia.";
+    return;
+  }
+
+  simsInstaladasStatus.className = "status";
+  simsInstaladasStatus.textContent = coincidencias.length > LIMITE_RESULTADOS_INSTALADAS
+    ? `${coincidencias.length} coincidencias — mostrando las primeras ${LIMITE_RESULTADOS_INSTALADAS}. Afiná la búsqueda para acotar.`
+    : `${coincidencias.length} coincidencia(s).`;
+
+  simsInstaladasTablaBody.innerHTML = "";
+  coincidencias.slice(0, LIMITE_RESULTADOS_INSTALADAS).forEach((s) => {
+    const fila = document.createElement("tr");
+    fila.innerHTML = `
+      <td>${s.numero_abonado || ""}</td>
+      <td>${s.cliente || ""}</td>
+      <td>${s.direccion || ""}</td>
+      <td>${s.empresa || ""}</td>
+      <td>${s.numero || ""}</td>
+      <td>${s.fecha_activacion || ""}</td>
+      <td>${s.estado_linea || ""}</td>
+    `;
+    simsInstaladasTablaBody.appendChild(fila);
+  });
+  simsInstaladasResultadosWrap.style.display = "block";
+}
+simsInstaladasBuscar.addEventListener("input", dibujarResultadosSimsInstaladas);
+
+// Normaliza "MOVISTAR"/"movistar " -> "Movistar", para que coincida
+// con cómo ya se guarda el nombre de la empresa en el resto de la app.
+function normalizarEmpresa(texto) {
+  const limpio = String(texto || "").trim();
+  const mapa = { movistar: "Movistar", personal: "Personal", claro: "Claro" };
+  return mapa[limpio.toLowerCase()] || limpio;
+}
+
+function formatearFechaExcel(valor) {
+  if (!valor) return "";
+  if (valor instanceof Date) return valor.toISOString().slice(0, 10);
+  // A veces llega como número de serie de Excel en vez de fecha real
+  if (typeof valor === "number") {
+    const fecha = new Date(Math.round((valor - 25569) * 86400 * 1000));
+    return isNaN(fecha) ? "" : fecha.toISOString().slice(0, 10);
+  }
+  return String(valor).trim();
+}
+
+simsInstaladasExcelFile.addEventListener("change", () => {
+  const file = simsInstaladasExcelFile.files[0];
+  if (!file) return;
+  simsInstaladasImportStatus.className = "status";
+  simsInstaladasImportStatus.textContent = "Leyendo archivo...";
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: "array" });
+      const hoja = wb.Sheets[wb.SheetNames[0]];
+      const filas = XLSX.utils.sheet_to_json(hoja, { defval: "" });
+
+      const nuevos = filas
+        .map((row) => ({
+          numero_abonado: String(row["N° DE ABONADO"] ?? row["N de abonado"] ?? "").trim(),
+          estado_linea: String(row["ESTADO DE LINEA"] ?? "Activo").trim(),
+          cliente: String(row["NOMBRE ABONADO"] ?? "").trim(),
+          direccion: String(row["DIRECCION"] ?? "").trim(),
+          fecha_activacion: formatearFechaExcel(row["FECHA DE ACTIVACION"]),
+          numero: String(row["NUMERO DE LINEA"] ?? "").trim(),
+          empresa: normalizarEmpresa(row["EMPRESA"]),
+        }))
+        .filter((s) => s.numero_abonado && s.numero);
+
+      if (nuevos.length === 0) {
+        simsInstaladasImportStatus.className = "status err";
+        simsInstaladasImportStatus.textContent = "No se encontraron filas válidas — revisá los encabezados de la planilla.";
+        return;
+      }
+
+      // Mezcla: si el N° de abonado ya está en el registro, se
+      // actualiza con los datos nuevos; si no existe, se agrega. Así
+      // se puede reimportar una planilla actualizada sin perder los
+      // datos ya cargados a mano ni duplicar filas.
+      const resExistente = await fetch("/api/datos?coleccion=sims_instaladas", {
+        headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+        cache: "no-store",
+      });
+      const existentes = await resExistente.json();
+      const registro = new Map((Array.isArray(existentes) ? existentes : []).map((s) => [s.numero_abonado, s]));
+      nuevos.forEach((s) => registro.set(s.numero_abonado, s));
+      const listaFinal = [...registro.values()];
+
+      simsInstaladasImportStatus.textContent = `Guardando ${listaFinal.length} registros...`;
+      const res = await fetch("/api/datos?coleccion=sims_instaladas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+        body: JSON.stringify(listaFinal),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error desconocido");
+
+      simsInstaladasCache = listaFinal;
+      simsInstaladasImportStatus.className = "status ok";
+      simsInstaladasImportStatus.textContent = `Listo — ${nuevos.length} filas leídas de la planilla, ${listaFinal.length} en total en el registro.`;
+      dibujarResultadosSimsInstaladas();
+    } catch (err) {
+      simsInstaladasImportStatus.className = "status err";
+      simsInstaladasImportStatus.textContent = "No se pudo importar: " + err.message;
+    } finally {
+      simsInstaladasExcelFile.value = "";
+    }
+  };
+  reader.readAsArrayBuffer(file);
 });
 
 

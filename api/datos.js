@@ -12,7 +12,7 @@
 const COLECCIONES = {
   config: {
     path: "config.json",
-    default: { dias_atencion: 3, dias_urgente: 7, app_version_actual: "3.11.1", felicitacion_semanal_activa: true },
+    default: { dias_atencion: 3, dias_urgente: 7, app_version_actual: "3.12.0", felicitacion_semanal_activa: true },
     mergeConDefault: true,
   },
   tecnicos: { path: "tecnicos.json", default: [] },
@@ -31,6 +31,7 @@ const COLECCIONES = {
   "push-subscripciones": { path: "push-subscripciones.json", default: [] },
   sims: { path: "sims-config.json", default: [] },
   herramientas: { path: "herramientas-config.json", default: [] },
+  sims_instaladas: { path: "sims-instaladas.json", default: [] },
 };
 
 module.exports = async (req, res) => {

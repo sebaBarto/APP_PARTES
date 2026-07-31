@@ -152,6 +152,7 @@ async function postVehiculo(ghHeaders, body, res) {
 // ============================================================
 const SIM_HISTORIAL_PATH = "sims-historial.json";
 const SIM_CONFIG_PATH = "sims-config.json";
+const SIM_REGISTRO_PATH = "sims-instaladas.json";
 
 async function getSim(ghHeaders, res) {
   res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
@@ -178,6 +179,47 @@ async function postSim(ghHeaders, body, res) {
     return;
   }
 
+  // "Retirar" es distinto al resto: la SIM no está en el stock sino
+  // en el registro de instaladas (~900 líneas), así que se maneja
+  // aparte — busca por número de línea en el registro, no en el stock.
+  if (accion === "retirar_de_registro") {
+    if (!numero || !tecnico) {
+      res.status(400).json({ error: "Faltan datos (número de línea o técnico)" });
+      return;
+    }
+    const { data: registro, sha: shaRegistro } = await leerJSON(ghHeaders, SIM_REGISTRO_PATH, []);
+    const idxRegistro = registro.findIndex((s) => s.numero === numero);
+    if (idxRegistro === -1) {
+      res.status(404).json({ error: "No se encontró esa línea en el registro de instaladas" });
+      return;
+    }
+    const instalada = registro[idxRegistro];
+    registro.splice(idxRegistro, 1);
+
+    const { data: sims, sha: shaSims } = await leerJSON(ghHeaders, SIM_CONFIG_PATH, []);
+    sims.push({
+      empresa: instalada.empresa || "",
+      tipo: instalada.tipo || "",
+      numero: instalada.numero,
+      tecnico_actual: tecnico,
+      estado: "stock",
+      cliente: "",
+    });
+
+    const { data: historial, sha: shaHistorial } = await leerJSON(ghHeaders, SIM_HISTORIAL_PATH, []);
+    historial.push({
+      fecha: new Date().toISOString().slice(0, 10), hora: body.hora || "",
+      numero, empresa: instalada.empresa || "", tecnico,
+      accion: "retirar_de_registro", cliente_anterior: instalada.cliente || "",
+    });
+
+    await guardarJSON(ghHeaders, SIM_REGISTRO_PATH, registro, shaRegistro);
+    await guardarJSON(ghHeaders, SIM_CONFIG_PATH, sims, shaSims);
+    await guardarJSON(ghHeaders, SIM_HISTORIAL_PATH, historial, shaHistorial);
+    res.status(200).json({ ok: true });
+    return;
+  }
+
   if (!accion || !numero || !tecnico) {
     res.status(400).json({ error: "Faltan datos (acción, número de SIM o técnico)" });
     return;
@@ -197,16 +239,17 @@ async function postSim(ghHeaders, body, res) {
   const { data: historial, sha: shaHistorial } = await leerJSON(ghHeaders, SIM_HISTORIAL_PATH, []);
   const registroBase = { fecha: new Date().toISOString().slice(0, 10), hora: body.hora || "", numero, empresa: sim.empresa, tecnico };
 
-  if (accion === "usar") {
-    if (!body.cliente) { res.status(400).json({ error: "Falta el cliente" }); return; }
-    sim.estado = "uso";
-    sim.cliente = body.cliente;
-    historial.push({ ...registroBase, accion: "usar", cliente: body.cliente, numero_servicio: body.numero_servicio || "" });
-  } else if (accion === "devolver") {
+  if (accion === "devolver") {
     sim.estado = "stock";
     sim.cliente = "";
     historial.push({ ...registroBase, accion: "devolver" });
-  } else if (accion === "transferir") {
+    await guardarJSON(ghHeaders, SIM_CONFIG_PATH, sims, shaSims);
+    await guardarJSON(ghHeaders, SIM_HISTORIAL_PATH, historial, shaHistorial);
+    res.status(200).json({ ok: true, sim });
+    return;
+  }
+
+  if (accion === "transferir") {
     if (body.tecnico_nuevo === undefined || body.tecnico_nuevo === null) {
       res.status(400).json({ error: "Falta el técnico (o 'Oficina') al que se transfiere" });
       return;
@@ -216,28 +259,89 @@ async function postSim(ghHeaders, body, res) {
     sim.tecnico_actual = body.tecnico_nuevo;
     sim.estado = "stock";
     sim.cliente = "";
-  } else if (accion === "reemplazar") {
+    await guardarJSON(ghHeaders, SIM_CONFIG_PATH, sims, shaSims);
+    await guardarJSON(ghHeaders, SIM_HISTORIAL_PATH, historial, shaHistorial);
+    res.status(200).json({ ok: true, sim });
+    return;
+  }
+
+  // "usar" y "reemplazar" instalan una SIM en un cliente — a partir de
+  // acá esa línea deja de ser "stock que se mueve" y pasa a ser una
+  // línea instalada y funcionando, así que sale del archivo de stock
+  // y entra al registro grande de instaladas.
+  if (accion === "usar") {
+    if (!body.cliente) { res.status(400).json({ error: "Falta el cliente" }); return; }
+    historial.push({ ...registroBase, accion: "usar", cliente: body.cliente, numero_servicio: body.numero_servicio || "" });
+
+    const idx = sims.findIndex((s) => s.numero === numero);
+    sims.splice(idx, 1);
+    const { data: registro, sha: shaRegistro } = await leerJSON(ghHeaders, SIM_REGISTRO_PATH, []);
+    registro.push({
+      numero_abonado: "", // las que se instalan desde la app no tienen un N° de abonado legado
+      estado_linea: "Activo",
+      cliente: body.cliente,
+      direccion: body.direccion || "",
+      fecha_activacion: registroBase.fecha,
+      numero: sim.numero,
+      empresa: sim.empresa,
+      tecnico_instalador: tecnico,
+    });
+
+    await guardarJSON(ghHeaders, SIM_CONFIG_PATH, sims, shaSims);
+    await guardarJSON(ghHeaders, SIM_REGISTRO_PATH, registro, shaRegistro);
+    await guardarJSON(ghHeaders, SIM_HISTORIAL_PATH, historial, shaHistorial);
+    res.status(200).json({ ok: true, sim });
+    return;
+  }
+
+  if (accion === "reemplazar") {
     if (sim.estado !== "stock") { res.status(409).json({ error: "Esa SIM no está en stock" }); return; }
     if (!body.cliente || !body.numero_sim_a_retirar) { res.status(400).json({ error: "Falta el cliente o la SIM que se retira" }); return; }
-    const simVieja = sims.find((s) => s.numero === body.numero_sim_a_retirar);
-    if (!simVieja) { res.status(404).json({ error: "No se encontró la SIM que se retira" }); return; }
-    simVieja.estado = "stock";
-    simVieja.cliente = "";
-    simVieja.tecnico_actual = tecnico;
-    sim.estado = "uso";
-    sim.cliente = body.cliente;
+
+    // La SIM vieja que se retira estaba instalada (en el registro
+    // grande, no en el stock) — sale de ahí y vuelve al stock del
+    // técnico. La SIM nueva hace el camino inverso: sale del stock y
+    // entra al registro, a nombre del mismo cliente.
+    const { data: registro, sha: shaRegistro } = await leerJSON(ghHeaders, SIM_REGISTRO_PATH, []);
+    const idxVieja = registro.findIndex((s) => s.numero === body.numero_sim_a_retirar);
+    if (idxVieja === -1) { res.status(404).json({ error: "No se encontró en el registro la SIM que se retira" }); return; }
+    const simVieja = registro[idxVieja];
+    registro.splice(idxVieja, 1);
+
+    const idxNueva = sims.findIndex((s) => s.numero === numero);
+    sims.splice(idxNueva, 1);
+    sims.push({
+      empresa: simVieja.empresa || "",
+      tipo: "",
+      numero: simVieja.numero,
+      tecnico_actual: tecnico,
+      estado: "stock",
+      cliente: "",
+    });
+    registro.push({
+      numero_abonado: simVieja.numero_abonado || "",
+      estado_linea: "Activo",
+      cliente: body.cliente,
+      direccion: body.direccion || simVieja.direccion || "",
+      fecha_activacion: registroBase.fecha,
+      numero: sim.numero,
+      empresa: sim.empresa,
+      tecnico_instalador: tecnico,
+    });
+
     historial.push({
       ...registroBase, accion: "reemplazar", cliente: body.cliente,
       numero_servicio: body.numero_servicio || "", sim_retirada: body.numero_sim_a_retirar, empresa_retirada: simVieja.empresa,
     });
-  } else {
-    res.status(400).json({ error: "Acción desconocida (usar 'usar', 'devolver', 'transferir' o 'reemplazar')" });
+
+    await guardarJSON(ghHeaders, SIM_CONFIG_PATH, sims, shaSims);
+    await guardarJSON(ghHeaders, SIM_REGISTRO_PATH, registro, shaRegistro);
+    await guardarJSON(ghHeaders, SIM_HISTORIAL_PATH, historial, shaHistorial);
+    res.status(200).json({ ok: true, sim });
     return;
   }
 
-  await guardarJSON(ghHeaders, SIM_CONFIG_PATH, sims, shaSims);
-  await guardarJSON(ghHeaders, SIM_HISTORIAL_PATH, historial, shaHistorial);
-  res.status(200).json({ ok: true, sim });
+  res.status(400).json({ error: "Acción desconocida (usar 'usar', 'devolver', 'transferir', 'reemplazar' o 'retirar_de_registro')" });
 }
 
 // ============================================================
