@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.8.0";
+const APP_VERSION = "3.8.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -1648,8 +1648,11 @@ backToListBtn.addEventListener("click", () => {
 document.addEventListener("visibilitychange", () => {
   const enFormOFirma = (screens.form && screens.form.dataset.active === "true") ||
     (screens.sign && screens.sign.dataset.active === "true");
-  if (document.visibilityState === "hidden" && enFormOFirma) {
-    guardarBorradorActual();
+  const enComodato = (screens.comodatoForm && screens.comodatoForm.dataset.active === "true") ||
+    (screens.comodatoFirma && screens.comodatoFirma.dataset.active === "true");
+  if (document.visibilityState === "hidden") {
+    if (enFormOFirma) guardarBorradorActual();
+    if (enComodato) guardarBorradorComodatoActual();
   }
 });
 
@@ -4470,6 +4473,72 @@ function getBienesComodatoTexto() {
   return [...agregados, otro].filter(Boolean).join(", ");
 }
 
+// ---------- Borrador del comodato en curso ----------
+// Mismo mecanismo que el borrador de partes: si el técnico carga
+// datos en el formulario de comodato y toca "Cancelar" (o cierra la
+// app) antes de firmar y enviar, lo que ya había cargado no se
+// pierde. A diferencia de los partes, acá no hay un número de
+// servicio para usar como clave — como en la práctica hay como mucho
+// un comodato en curso a la vez, alcanza con una sola clave fija.
+const CLAVE_BORRADOR_COMODATO = "borrador_comodato";
+
+function armarBorradorComodato() {
+  return {
+    comodatario: comFDNombre.value,
+    direccion_comodatario: comFDDireccion.value,
+    ciudad_comodatario: comFDCiudad.value,
+    otro_representante: comFDOtroRepresentanteCheck.checked,
+    representado_por: comFDRepresentado.value,
+    cliente_email: comFDClienteEmail.value,
+    bienes_agregados: comodatoBienesAgregados,
+    otro_articulo: comFDOtroArticulo.value,
+    abono_mensual: comFDAbono.value,
+  };
+}
+
+function hayAlgoCargadoEnComodato() {
+  const b = armarBorradorComodato();
+  return !!(b.comodatario || b.direccion_comodatario || b.bienes_agregados.length > 0 || b.otro_articulo || b.abono_mensual);
+}
+
+function guardarBorradorComodatoActual() {
+  if (!hayAlgoCargadoEnComodato()) return;
+  try {
+    localStorage.setItem(CLAVE_BORRADOR_COMODATO, JSON.stringify(armarBorradorComodato()));
+  } catch (err) {
+    // si falla (almacenamiento lleno, modo privado, etc.), no se
+    // interrumpe el flujo — simplemente no queda guardado el borrador
+  }
+}
+
+function borrarBorradorComodato() {
+  localStorage.removeItem(CLAVE_BORRADOR_COMODATO);
+}
+
+function restaurarBorradorComodatoSiExiste() {
+  const guardado = localStorage.getItem(CLAVE_BORRADOR_COMODATO);
+  if (!guardado) return false;
+  let b;
+  try {
+    b = JSON.parse(guardado);
+  } catch (err) {
+    return false;
+  }
+
+  comFDNombre.value = b.comodatario || "";
+  comFDDireccion.value = b.direccion_comodatario || "";
+  comFDCiudad.value = b.ciudad_comodatario || "Rosario";
+  comFDOtroRepresentanteCheck.checked = !!b.otro_representante;
+  comFDRepresentado.readOnly = !b.otro_representante;
+  comFDRepresentado.value = b.representado_por || "";
+  comFDClienteEmail.value = b.cliente_email || "";
+  comodatoBienesAgregados = Array.isArray(b.bienes_agregados) ? b.bienes_agregados : [];
+  renderComodatoBienesAgregados();
+  comFDOtroArticulo.value = b.otro_articulo || "";
+  comFDAbono.value = b.abono_mensual || "";
+  return true;
+}
+
 function resetFormularioComodato() {
   comFDNombre.value = "";
   comFDDireccion.value = "";
@@ -4523,10 +4592,17 @@ comFDAbono.addEventListener("blur", () => {
 tileComodatoBtn.addEventListener("click", () => {
   if (materialesCatalogo.length > 0) poblarCategoriasComodato();
   resetFormularioComodato();
+  const restaurado = restaurarBorradorComodatoSiExiste();
+  if (restaurado) {
+    showToast("Se restauró un comodato que tenías sin terminar.");
+  }
   showScreen("comodatoForm");
 });
 
-comVolverListaBtn.addEventListener("click", () => showScreen("home"));
+comVolverListaBtn.addEventListener("click", () => {
+  guardarBorradorComodatoActual();
+  showScreen("home");
+});
 
 comContinuarFirmaBtn.addEventListener("click", () => {
   if (!comFDNombre.value.trim() || !comFDDireccion.value.trim() || !comFDCiudad.value.trim() || !comFDRepresentado.value.trim()) {
@@ -4663,6 +4739,7 @@ comConfirmarFirmaBtn.addEventListener("click", async () => {
   try {
     const resultado = await intentarEnviarComodato(item, true);
     if (resultado.oficinaOk) {
+      borrarBorradorComodato();
       showToast(resultado.clienteOk
         ? "Comodato enviado a la oficina y al cliente."
         : "Comodato enviado a la oficina (sin copia al cliente).");

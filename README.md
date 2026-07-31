@@ -205,6 +205,29 @@ plantillas de oficina y de cliente incorporadas (mismo diseño que
 tenían en EmailJS), y `app.js` ya llama a este endpoint en vez de
 EmailJS.
 
+## Borrador del comodato en curso (v3.8.1)
+
+Mismo mecanismo que ya existía para los partes de servicio: si el
+técnico carga datos en el formulario de Comodato y toca "Cancelar" (o
+cierra la app) antes de firmar y enviar, lo que ya había cargado
+**no se pierde** — queda guardado en el celular y se restaura solo la
+próxima vez que abra Comodato, con un aviso de "Se restauró un
+comodato que tenías sin terminar." A diferencia de los partes (que se
+guardan por número de servicio), acá alcanza con **una sola clave
+fija**, porque en la práctica hay como mucho un comodato en curso a
+la vez.
+
+- Se guarda al tocar "Cancelar", y también si la app pasa a segundo
+  plano mientras está en el formulario o en la pantalla de firma.
+- Se vacía recién cuando el envío a oficina se confirma con éxito —
+  igual que en partes, si falla o no hay conexión, el comodato ya
+  quedó capturado en la cola de reintento (ver más arriba), así que
+  no hace falta borrar el borrador todavía en ese caso.
+- El alcance es el mismo que en partes: guarda los datos del
+  formulario (cliente, dirección, artículos, abono, etc.), no lo que
+  se carga en la pantalla de firma (aclaración/cargo/DNI) — eso
+  siempre hay que volver a cargarlo si se interrumpe justo ahí.
+
 ## Permisos por técnico, configurables desde el panel de administración (v3.8.0)
 
 Antes, varias secciones estaban restringidas a nombres fijos en el
