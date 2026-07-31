@@ -218,6 +218,31 @@ nuevo, se agrega — nunca borra nada. También se sumó la columna
 encabezados, y se normaliza a Mayúscula inicial (Movistar/Personal/
 Claro) para que quede igual que el resto de la app.
 
+### Privacidad entre técnicos en SIMs (v3.12.2)
+
+Un técnico ahora **solo ve sus propias SIMs** en la app — nunca las
+de otro técnico, ni las que están sin asignar en "Oficina". Antes
+había dos formas en las que esto se filtraba:
+
+- El **buscador de arriba** de la lista de SIMs buscaba entre las de
+  todo el equipo (para ver qué línea tenía un cliente) — se sacó
+  directamente, porque ya no hace falta: para eso está la búsqueda en
+  el registro de instaladas (ver más arriba).
+- El permiso de **Administración** (el que da acceso al panel
+  `admin.html`) de paso también mostraba todas las SIMs de todos
+  dentro de la app — se separó: ese permiso ahora solo controla el
+  acceso al panel, la visibilidad de SIMs adentro de la app queda
+  siempre acotada a lo propio, para cualquier técnico.
+
+**Tomar una SIM de "Oficina" (sin asignar) sigue siendo una acción
+exclusiva de quien tenga el panel de administración** — un técnico no
+la puede ver ni tomar por sí mismo desde la app; se la asigna un
+admin desde `admin.html` (columna "Transferir a" en la tabla de
+stock). Desde su propio menú, un técnico puede: transferir una SIM
+suya a otro técnico, instalarla en un cliente (lo que la mueve al
+registro definitivo), y retirar una ya instalada si el cliente se dio
+de baja.
+
 ## Registro de SIMs instaladas, para manejar la escala real (v3.12.0)
 
 Con ~900 SIMs ya instaladas en clientes (y solo 30-60 en stock activo
