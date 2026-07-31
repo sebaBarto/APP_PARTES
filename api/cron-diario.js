@@ -19,6 +19,8 @@ const { enviarATodos, enviarASeleccionados } = require("../lib/push-sender");
 
 const GUARDIAS_PATH = "guardias-config.json";
 const VEHICULOS_PATH = "vehiculos-config.json";
+const VEHICULOS_HISTORIAL_PATH = "vehiculos-historial.json";
+const HERRAMIENTAS_PATH = "herramientas-config.json";
 const TECNICOS_PATH = "tecnicos.json";
 const HISTORIAL_PATH = "historial.json";
 const CONFIG_PATH = "config.json";
@@ -209,7 +211,29 @@ async function chequearRecordatorioTecnicosEnCalle(ghHeaders, estado, ahora) {
   const enCalle = (tecnicos || []).filter((t) => t.en_calle).map((t) => t.nombre);
   if (enCalle.length === 0) return null;
 
-  await enviarASeleccionados(enCalle, {
+  // Si un técnico ya tomó vehículo Y ya tomó alguna herramienta, no
+  // hace falta recordárselo — se salta del envío.
+  const { data: historialVehiculos } = await leerJSON(ghHeaders, VEHICULOS_HISTORIAL_PATH, []);
+  const tienenVehiculoTomado = new Set(
+    (historialVehiculos || [])
+      .filter((h) => h.tecnico && !h.hora_devolucion && !h.accion) // registro "tomar" todavía abierto
+      .map((h) => h.tecnico)
+  );
+  const { data: herramientas } = await leerJSON(ghHeaders, HERRAMIENTAS_PATH, []);
+  const tienenHerramientaTomada = new Set(
+    (herramientas || [])
+      .filter((h) => h.tecnico_actual && (h.estado === "uso" || h.estado === "cliente"))
+      .map((h) => h.tecnico_actual)
+  );
+  const destinatarios = enCalle.filter(
+    (nombre) => !(tienenVehiculoTomado.has(nombre) && tienenHerramientaTomada.has(nombre))
+  );
+  if (destinatarios.length === 0) {
+    estado.ultimo_dia_recordatorio_tecnicos = hoyStr;
+    return []; // todos ya tenían vehículo y herramienta — no hacía falta avisarle a nadie
+  }
+
+  await enviarASeleccionados(destinatarios, {
     titulo: "🚐 Recordatorio",
     cuerpo: "No te olvides de tomar el vehículo y las herramientas que necesites para hoy.",
     url: "/",
@@ -217,7 +241,7 @@ async function chequearRecordatorioTecnicosEnCalle(ghHeaders, estado, ahora) {
   });
 
   estado.ultimo_dia_recordatorio_tecnicos = hoyStr;
-  return enCalle;
+  return destinatarios;
 }
 
 async function chequearVehiculos(ghHeaders, estado, hoy) {

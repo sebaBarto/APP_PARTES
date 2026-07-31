@@ -205,6 +205,15 @@ plantillas de oficina y de cliente incorporadas (mismo diseño que
 tenían en EmailJS), y `app.js` ya llama a este endpoint en vez de
 EmailJS.
 
+### El recordatorio se salta si ya tiene todo tomado (v3.10.1)
+
+Si un técnico "en la calle" ya tomó el vehículo **y** ya tiene al
+menos una herramienta en uso antes de que dispare el recordatorio de
+la mañana, no le llega el aviso — ya no hace falta. Si le falta
+cualquiera de las dos cosas (por ejemplo, tomó el vehículo pero
+todavía no tomó ninguna herramienta), el recordatorio le sigue
+llegando igual.
+
 ## Sonido garantizado en avisos importantes, y felicitación semanal (v3.10.0)
 
 ### Sonido en las notificaciones
