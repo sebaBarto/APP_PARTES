@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.7.1";
+const APP_VERSION = "3.8.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -574,6 +574,7 @@ function showToast(message) {
 // ---------- Login ----------
 let tecnicoLogueado = "";
 let tecnicosPasswords = { ...TECNICOS_PASSWORDS_RESPALDO };
+let tecnicosPermisos = {}; // { nombre: {permisos...} } — se completa al cargar la lista
 
 // Carga la lista de técnicos desde el servidor (administrada en
 // admin.html). Si no hay conexión, usa la última copia guardada en el
@@ -586,17 +587,67 @@ async function cargarTecnicos() {
     const data = await res.json();
     if (Array.isArray(data) && data.length > 0) {
       const mapa = {};
-      data.forEach((t) => { if (t.nombre) mapa[t.nombre] = t.password || ""; });
+      const mapaPermisos = {};
+      data.forEach((t) => {
+        if (!t.nombre) return;
+        mapa[t.nombre] = t.password || "";
+        if (t.permisos) mapaPermisos[t.nombre] = t.permisos;
+      });
       tecnicosPasswords = mapa;
+      tecnicosPermisos = mapaPermisos;
       localStorage.setItem("tecnicos_cache", JSON.stringify(mapa));
+      localStorage.setItem("tecnicos_permisos_cache", JSON.stringify(mapaPermisos));
     }
   } catch (err) {
     const cacheado = localStorage.getItem("tecnicos_cache");
     if (cacheado) {
       try { tecnicosPasswords = JSON.parse(cacheado); } catch (e) { /* usa el respaldo de arranque */ }
     }
+    const cacheadoPermisos = localStorage.getItem("tecnicos_permisos_cache");
+    if (cacheadoPermisos) {
+      try { tecnicosPermisos = JSON.parse(cacheadoPermisos); } catch (e) { /* sin permisos guardados */ }
+    }
   }
   poblarSelectsTecnico();
+}
+
+// ---------- Permisos por técnico (configurables desde admin.html) ----------
+// Antes, varias secciones estaban restringidas a nombres fijos en el
+// código (Sebastian Bartolozzi para el dashboard financiero, Sebastian
+// + Brenda para Administración, etc.). Ahora se administran como
+// casillas por técnico desde admin.html → Técnicos. Un técnico nuevo
+// arranca con todo apagado — el administrador prende lo que
+// corresponda.
+function permisosDelTecnico(nombre) {
+  if (!nombre) {
+    // Login general de oficina (sin técnico en particular): acceso
+    // total, como ya era antes de este sistema.
+    return {
+      dash_general: true, dash_financiero: true, dash_vehiculos: true, dash_sims: true,
+      historial_todos: true, vehiculos: true, sims: true, herramientas: true,
+      comodato: true, admin: true,
+    };
+  }
+  if (tecnicosPermisos[nombre]) {
+    // Ya tiene permisos guardados explícitamente desde admin.html —
+    // cualquier casilla que no esté ahí cuenta como apagada.
+    return tecnicosPermisos[nombre];
+  }
+  // Técnico que existía desde antes de este sistema y todavía nadie
+  // guardó sus permisos explícitamente — mantiene el acceso que ya
+  // tenía, para no cortarle nada de golpe con esta actualización.
+  return {
+    dash_general: true,
+    dash_financiero: nombre === "Sebastian Bartolozzi",
+    dash_vehiculos: true,
+    dash_sims: true,
+    historial_todos: nombre === "Sebastian Bartolozzi",
+    vehiculos: true,
+    sims: true,
+    herramientas: true,
+    comodato: true,
+    admin: nombre === "Sebastian Bartolozzi" || nombre === "Brenda Thiesing",
+  };
 }
 const tecnicosListos = cargarTecnicos();
 
@@ -648,6 +699,7 @@ function entrarComoTecnico(nombreTecnico) {
   precargarCronogramaParaSugerencias();
   actualizarAccesoCredencial();
   actualizarAccesoExcelDashboards();
+  actualizarAccesoSeccionesPanel();
   actualizarSaludoPanel();
   verificarEstadoNotificaciones();
   actualizarBadgeColaEnvios();
@@ -733,20 +785,27 @@ function actualizarSaludoPanel() {
   panelSaludo.textContent = `Hola, ${nombre}`;
 }
 
-function actualizarAccesoDashboardFinanciero() {
-  if (tecnicoLogueado === "Sebastian Bartolozzi") {
-    verDashboardFinancieroBtn.classList.remove("hidden");
-  } else {
-    verDashboardFinancieroBtn.classList.add("hidden");
-  }
+// Muestra u oculta las tiles del panel principal según los permisos
+// del técnico logueado (configurados en admin.html → Técnicos). El
+// tile de "Dashboards" en sí se oculta solo si no tiene acceso a
+// NINGUNO de los 4 dashboards — si tiene al menos uno, entra al
+// submenú y ahí ve solo los que le corresponden.
+function actualizarAccesoSeccionesPanel() {
+  const permisos = permisosDelTecnico(tecnicoLogueado);
+  tileDashboardsBtn.classList.toggle("hidden", !(permisos.dash_general || permisos.dash_financiero || permisos.dash_vehiculos || permisos.dash_sims));
+  verDashboardBtn.classList.toggle("hidden", !permisos.dash_general);
+  verDashboardVehiculosBtn.classList.toggle("hidden", !permisos.dash_vehiculos);
+  verDashboardSimsBtn.classList.toggle("hidden", !permisos.dash_sims);
+  tileVehiculosBtn.classList.toggle("hidden", !permisos.vehiculos);
+  tileSimsBtn.classList.toggle("hidden", !permisos.sims);
+  tileHerramientasBtn.classList.toggle("hidden", !permisos.herramientas);
+  tileComodatoBtn.classList.toggle("hidden", !permisos.comodato);
+}
 
-  // El panel de administración lo pueden abrir directo Sebastian
-  // Bartolozzi y Brenda Thiesing.
-  if (tecnicoLogueado === "Sebastian Bartolozzi" || tecnicoLogueado === "Brenda Thiesing") {
-    abrirAdminBtn.classList.remove("hidden");
-  } else {
-    abrirAdminBtn.classList.add("hidden");
-  }
+function actualizarAccesoDashboardFinanciero() {
+  const permisos = permisosDelTecnico(tecnicoLogueado);
+  verDashboardFinancieroBtn.classList.toggle("hidden", !permisos.dash_financiero);
+  abrirAdminBtn.classList.toggle("hidden", !permisos.admin);
 }
 loginBtn.addEventListener("click", attemptLogin);
 loginPassword.addEventListener("keydown", (e) => {
@@ -3188,7 +3247,7 @@ function renderHistorialReciente() {
 
   // Cada técnico ve solo lo suyo — salvo Sebastian Bartolozzi (y el
   // login general de oficina), que ven el listado completo del equipo.
-  const veTodo = !tecnicoLogueado || tecnicoLogueado === "Sebastian Bartolozzi";
+  const veTodo = permisosDelTecnico(tecnicoLogueado).historial_todos;
   historialModoLabel.textContent = veTodo
     ? "Viendo los servicios de todo el equipo."
     : "Viendo solo tus servicios.";
@@ -3953,16 +4012,15 @@ descargarExcelSimsDashBtn.addEventListener("click", () => {
 // botones — el resto de los técnicos puede ver los dashboards pero no
 // descargarlos.
 function actualizarAccesoExcelDashboards() {
-  const puede = !tecnicoLogueado || tecnicoLogueado === "Sebastian Bartolozzi";
-  descargarExcelDashboardBtn.classList.toggle("hidden", !puede);
-  descargarExcelDashboardFinBtn.classList.toggle("hidden", !puede);
-  descargarExcelVehiculosBtn.classList.toggle("hidden", !puede);
-  descargarExcelSimsDashBtn.classList.toggle("hidden", !puede);
+  const permisos = permisosDelTecnico(tecnicoLogueado);
+  descargarExcelDashboardBtn.classList.toggle("hidden", !permisos.dash_general);
+  descargarExcelDashboardFinBtn.classList.toggle("hidden", !permisos.dash_financiero);
+  descargarExcelVehiculosBtn.classList.toggle("hidden", !permisos.dash_vehiculos);
+  descargarExcelSimsDashBtn.classList.toggle("hidden", !permisos.dash_sims);
 
-  // El blanqueo del historial de SIMs lo pueden hacer, además, Brenda
-  // Thiesing (no solo Sebastian y oficina).
-  const puedeBlanquear = !tecnicoLogueado || tecnicoLogueado === "Sebastian Bartolozzi" || tecnicoLogueado === "Brenda Thiesing";
-  blanquearHistorialSimsBtn.classList.toggle("hidden", !puedeBlanquear);
+  // El blanqueo del historial de SIMs es una acción destructiva —
+  // queda atada al permiso de Administración.
+  blanquearHistorialSimsBtn.classList.toggle("hidden", !permisos.admin);
 }
 
 blanquearHistorialSimsBtn.addEventListener("click", async () => {
@@ -4712,7 +4770,7 @@ function dibujarSimsLista() {
   // Los técnicos comunes ven solo las suyas en este listado agrupado
   // (la búsqueda de arriba sigue abarcando a todo el equipo, aparte).
   // Sebastian, Brenda y el login de oficina siguen viendo a todos.
-  const veTodasLasSims = !tecnicoLogueado || tecnicoLogueado === "Sebastian Bartolozzi" || tecnicoLogueado === "Brenda Thiesing";
+  const veTodasLasSims = permisosDelTecnico(tecnicoLogueado).admin;
   const listaVisible = veTodasLasSims
     ? simsListaCache
     : simsListaCache.filter((s) => s.tecnico_actual === tecnicoLogueado);

@@ -127,7 +127,17 @@
   .tab-btn.active { background: var(--ink); color: var(--amber); border-color: var(--ink); box-shadow: var(--shadow-amber); }
 
   .tecnicos-filas { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
-  .tecnico-fila { align-items: flex-end; }
+  .tecnico-fila { align-items: flex-end; flex-wrap: wrap; }
+  .permisos-tecnico-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 6px 14px; width: 100%; margin-top: 12px; padding-top: 12px;
+    border-top: 1px dashed var(--border);
+  }
+  .permiso-check {
+    display: flex; align-items: center; gap: 7px; font-size: 12.5px;
+    color: var(--steel); cursor: pointer; font-weight: 500;
+  }
+  .permiso-check input { width: auto; margin: 0; }
 
   .sims-tabla-wrap { overflow-x: auto; margin-bottom: 8px; border: 1px solid var(--border); border-radius: var(--r-md); box-shadow: var(--shadow-card); }
   .sims-tabla { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 13px; }
@@ -509,9 +519,29 @@ TABS.forEach(({ btn, panel, onShow }) => {
   });
 });
 
-function renderFilaTecnico(nombre, password) {
+const PERMISOS_TECNICO = [
+  { clave: "dash_general", etiqueta: "Dashboard general" },
+  { clave: "dash_financiero", etiqueta: "Dashboard financiero" },
+  { clave: "dash_vehiculos", etiqueta: "Dashboard de vehículos" },
+  { clave: "dash_sims", etiqueta: "Dashboard de SIMs" },
+  { clave: "historial_todos", etiqueta: "Ver historial de todo el equipo" },
+  { clave: "vehiculos", etiqueta: "Sección Vehículos" },
+  { clave: "sims", etiqueta: "Sección SIMs" },
+  { clave: "herramientas", etiqueta: "Sección Herramientas" },
+  { clave: "comodato", etiqueta: "Sección Comodato" },
+  { clave: "admin", etiqueta: "Panel de Administración" },
+];
+
+function renderFilaTecnico(nombre, password, permisos) {
+  const p = permisos || {};
   const fila = document.createElement("div");
   fila.className = "field-row tecnico-fila";
+  const checksHtml = PERMISOS_TECNICO.map((perm) => `
+    <label class="permiso-check">
+      <input type="checkbox" class="tecnico-permiso" data-clave="${perm.clave}" ${p[perm.clave] ? "checked" : ""}>
+      <span>${perm.etiqueta}</span>
+    </label>
+  `).join("");
   fila.innerHTML = `
     <div>
       <label>Nombre</label>
@@ -522,6 +552,7 @@ function renderFilaTecnico(nombre, password) {
       <input type="text" class="tecnico-password" value="${password || ""}" placeholder="Contraseña">
     </div>
     <button type="button" class="btn-quitar-tecnico" title="Quitar">✕</button>
+    <div class="permisos-tecnico-grid">${checksHtml}</div>
   `;
   fila.querySelector(".btn-quitar-tecnico").addEventListener("click", () => fila.remove());
   tecnicosFilas.appendChild(fila);
@@ -539,25 +570,32 @@ async function cargarTecnicosAdmin() {
     if (!res.ok) throw new Error(data.error || "Error desconocido");
 
     const lista = Array.isArray(data) && data.length > 0 ? data : TECNICOS_RESPALDO;
-    lista.forEach((t) => renderFilaTecnico(t.nombre, t.password));
+    lista.forEach((t) => renderFilaTecnico(t.nombre, t.password, t.permisos));
     tecnicosStatus.textContent = Array.isArray(data) && data.length > 0
       ? ""
       : "Todavía no se guardó ninguna lista — se precargó con los técnicos actuales. Revisala y guardá para publicarla.";
   } catch (err) {
     tecnicosFilas.innerHTML = "";
-    TECNICOS_RESPALDO.forEach((t) => renderFilaTecnico(t.nombre, t.password));
+    TECNICOS_RESPALDO.forEach((t) => renderFilaTecnico(t.nombre, t.password, t.permisos));
     tecnicosStatus.textContent = "No se pudo conectar — se muestra la lista de respaldo. Revisala antes de guardar.";
   }
 }
 
-agregarTecnicoBtn.addEventListener("click", () => renderFilaTecnico("", ""));
+agregarTecnicoBtn.addEventListener("click", () => renderFilaTecnico("", "", null));
 
 guardarTecnicosBtn.addEventListener("click", async () => {
   const filas = Array.from(tecnicosFilas.querySelectorAll(".tecnico-fila"));
-  const lista = filas.map((fila) => ({
-    nombre: fila.querySelector(".tecnico-nombre").value.trim(),
-    password: fila.querySelector(".tecnico-password").value.trim(),
-  })).filter((t) => t.nombre && t.password);
+  const lista = filas.map((fila) => {
+    const permisos = {};
+    fila.querySelectorAll(".tecnico-permiso").forEach((chk) => {
+      permisos[chk.dataset.clave] = chk.checked;
+    });
+    return {
+      nombre: fila.querySelector(".tecnico-nombre").value.trim(),
+      password: fila.querySelector(".tecnico-password").value.trim(),
+      permisos,
+    };
+  }).filter((t) => t.nombre && t.password);
 
   if (lista.length === 0) {
     guardarTecnicosStatus.className = "status err";

@@ -205,6 +205,42 @@ plantillas de oficina y de cliente incorporadas (mismo diseño que
 tenían en EmailJS), y `app.js` ya llama a este endpoint en vez de
 EmailJS.
 
+## Permisos por técnico, configurables desde el panel de administración (v3.8.0)
+
+Antes, varias secciones estaban restringidas a nombres fijos en el
+código (Dashboard financiero solo para Sebastián; Administración solo
+para Sebastián y Brenda; ver el historial/las SIMs de todo el equipo,
+también). Ahora todo eso se administra con **casillas por técnico**
+desde `admin.html` → pestaña **Técnicos** — cada técnico tiene, debajo
+de su nombre y contraseña, una grilla de 10 casillas:
+
+- Dashboard general
+- Dashboard financiero
+- Dashboard de vehículos
+- Dashboard de SIMs
+- Ver historial de todo el equipo (si no, cada uno ve solo lo propio)
+- Sección Vehículos
+- Sección SIMs
+- Sección Herramientas
+- Sección Comodato
+- Panel de Administración
+
+Si un técnico no tiene ninguna tildada, no ve ese botón en el panel
+principal — un **técnico nuevo arranca con todo apagado**, y vos
+tildás lo que le corresponda antes de guardar.
+
+**Importante para la primera vez que uses esto**: los técnicos que ya
+existían antes de esta actualización (Sebastián, Brenda, y el resto)
+todavía **no tienen casillas guardadas explícitamente** — mientras
+eso sea así, la app les mantiene el acceso que ya tenían (por nombre,
+como antes) para que nadie se quede afuera de golpe. Pero en cuanto
+entres a la pestaña Técnicos y guardes los cambios (aunque sea para
+agregar o editar a un solo técnico), **se guardan casillas explícitas
+para todos los que aparezcan en esa lista** — así que la primera vez,
+antes de guardar, repasá que Sebastián tenga todo tildado y que Brenda
+tenga al menos "Panel de Administración", para no sacarles acceso sin
+querer.
+
 ### Ajustes de uso real (v3.7.1)
 
 - **Bug de la pantalla de firma**: al crear la firma del comodato me
