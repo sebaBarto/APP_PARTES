@@ -1709,10 +1709,36 @@ guardarSimsBtn.addEventListener("click", async () => {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error desconocido");
-    simsCompletos = lista;
+
+    // Si al editar se dejó alguna SIM marcada "en uso" con un cliente
+    // (en vez de usar el traspaso automático desde la app), se migra
+    // sola al registro de instaladas ahora mismo, sin esperar a que
+    // se vuelva a abrir esta pestaña.
+    let migradas = 0;
+    try {
+      const resMigracion = await fetch("/api/recurso-uso", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+        body: JSON.stringify({ recurso: "sim", accion: "migrar_legacy_a_registro" }),
+      });
+      const dataMigracion = await resMigracion.json();
+      migradas = (dataMigracion && dataMigracion.migradas) || 0;
+    } catch (errMigracion) {
+      // si falla la migración, el guardado en sí ya se hizo bien;
+      // se va a migrar sola la próxima vez que se abra esta pestaña
+    }
+
+    if (migradas > 0) {
+      const resSims = await fetch("/api/datos?coleccion=sims", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+      simsCompletos = await resSims.json();
+    } else {
+      simsCompletos = lista;
+    }
     dibujarTablaSims();
     guardarSimsStatus.className = "status ok";
-    guardarSimsStatus.textContent = "Listo — la lista de SIMs ya está disponible en la app.";
+    guardarSimsStatus.textContent = migradas > 0
+      ? `Listo — además, ${migradas} SIM(s) que quedaron "en uso" se movieron solas al registro de instaladas.`
+      : "Listo — la lista de SIMs ya está disponible en la app.";
   } catch (err) {
     guardarSimsStatus.className = "status err";
     guardarSimsStatus.textContent = "No se pudo guardar: " + err.message;

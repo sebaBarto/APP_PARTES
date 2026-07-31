@@ -218,6 +218,16 @@ nuevo, se agrega — nunca borra nada. También se sumó la columna
 encabezados, y se normaliza a Mayúscula inicial (Movistar/Personal/
 Claro) para que quede igual que el resto de la app.
 
+### La migración a instaladas ahora corre al guardar, no solo al abrir la pestaña (v3.12.6)
+
+Si en `admin.html` se editaba una SIM directo en la tabla de stock
+(poniéndola "en uso" + un cliente a mano, en vez de hacer el traspaso
+desde la app) y se guardaba, quedaba "a mitad de camino": guardada,
+pero sin pasar todavía al registro de instaladas — recién se migraba
+la próxima vez que se abría esa pestaña. Ahora "Guardar cambios"
+dispara la migración automática al toque, así el resultado se ve
+correcto enseguida, sin tener que recargar nada.
+
 ### Bug crítico corregido: guardar con un filtro activo borraba SIMs (v3.12.5)
 
 En la pestaña "SIMs" de `admin.html`, "Guardar cambios" leía
