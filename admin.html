@@ -1622,7 +1622,7 @@ simsExcelFile.addEventListener("change", () => {
           row["ASIGNADO A"] ?? row["Asignado a"] ?? row["Técnico dueño"] ?? row["Tecnico dueño"] ?? ""
         ).trim();
         return {
-          empresa: String(row["EMPRESA PROVEEDORA"] ?? row["Empresa"] ?? "").trim(),
+          empresa: normalizarEmpresa(row["EMPRESA PROVEEDORA"] ?? row["EMPRESA"] ?? row["Empresa"] ?? ""),
           tipo: String(row["Tipo"] || "").trim(),
           numero: String(row["NUMERO DE LINEA"] ?? row["Número"] ?? row["Numero"] ?? "").trim(),
           tecnico_actual: asignado || "Oficina",
@@ -1637,10 +1637,17 @@ simsExcelFile.addEventListener("change", () => {
         return;
       }
 
-      simsCompletos = nuevaLista;
+      // Se MEZCLA con lo que ya estaba cargado (por número de línea)
+      // en vez de reemplazar toda la lista — así no se pierden las
+      // SIMs que los técnicos ya tienen asignadas en su stock. Si un
+      // número ya existía, se actualiza con los datos del archivo; si
+      // es nuevo, se agrega.
+      const mapaSims = new Map(simsCompletos.map((s) => [s.numero, s]));
+      nuevaLista.forEach((s) => mapaSims.set(s.numero, s));
+      simsCompletos = [...mapaSims.values()];
       dibujarTablaSims();
       simsExcelStatus.className = "status ok";
-      simsExcelStatus.textContent = `Se cargaron ${nuevaLista.length} SIMs del archivo — revisá la tabla y tocá "Guardar cambios" para publicarlas.`;
+      simsExcelStatus.textContent = `Se sumaron/actualizaron ${nuevaLista.length} SIMs del archivo (total ahora: ${simsCompletos.length}) — revisá la tabla y tocá "Guardar cambios" para publicarlas.`;
     } catch (err) {
       simsExcelStatus.className = "status err";
       simsExcelStatus.textContent = "No se pudo leer el archivo: " + err.message;

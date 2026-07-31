@@ -205,6 +205,19 @@ plantillas de oficina y de cliente incorporadas (mismo diseño que
 tenían en EmailJS), y `app.js` ya llama a este endpoint en vez de
 EmailJS.
 
+### Bug importante corregido: importar stock ya no borra lo existente (v3.12.1)
+
+La importación de Excel del **stock** (pestaña "SIMs", no la de
+"SIMs instaladas") tenía un bug serio: subir una planilla
+**reemplazaba toda la tabla**, incluidas las SIMs que los técnicos ya
+tenían asignadas — si se guardaba así, se perdían esas asignaciones.
+Ahora la importación se **mezcla** con lo que ya está cargado (por
+número de línea): si el número ya existía, se actualiza; si es
+nuevo, se agrega — nunca borra nada. También se sumó la columna
+`EMPRESA` (además de `EMPRESA PROVEEDORA`) al reconocimiento de
+encabezados, y se normaliza a Mayúscula inicial (Movistar/Personal/
+Claro) para que quede igual que el resto de la app.
+
 ## Registro de SIMs instaladas, para manejar la escala real (v3.12.0)
 
 Con ~900 SIMs ya instaladas en clientes (y solo 30-60 en stock activo
