@@ -87,6 +87,14 @@ const PLANTILLA_OFICINA = `
           <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:6px;">📶 SIM instalada</div>
           <div style="color:#101820; font-size:14px; line-height:1.5; background:#F4F5F0; border-radius:8px; padding:12px 14px;">{{sim_instalada_texto}}</div>
         </td></tr>{{/sim_instalada_texto}}
+        {{#tiene_claves}}<tr><td style="padding:0 28px 8px;">
+          <div style="color:#C0392B; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:6px;">🔑 Claves y códigos (uso interno — no se le envía al cliente)</div>
+          <div style="color:#101820; font-size:14px; line-height:1.7; background:#FCEEEC; border:1px solid #E4B8B2; border-radius:8px; padding:12px 14px;">
+            {{#claves_usuario}}<div><b>Usuario:</b> {{claves_usuario}}</div>{{/claves_usuario}}
+            {{#claves_clave}}<div><b>Clave:</b> {{claves_clave}}</div>{{/claves_clave}}
+            {{#claves_codigo}}<div><b>Código de verificación:</b> {{claves_codigo}}</div>{{/claves_codigo}}
+          </div>
+        </td></tr>{{/tiene_claves}}
         <tr>
           <td style="padding:16px 28px 8px;">
             <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:10px;">💰 Costos</div>
@@ -238,6 +246,7 @@ function enriquecerDatos(datos) {
     cliente_email_status: datos.cliente_email_usado
       ? `Sí, a ${datos.cliente_email_usado}`
       : "No se cargó mail del cliente — no se le mandó copia",
+    tiene_claves: !!(datos.claves_usuario || datos.claves_clave || datos.claves_codigo),
   };
 }
 

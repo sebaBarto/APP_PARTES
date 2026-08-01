@@ -30,7 +30,7 @@
       <span class="topbar-mark">●</span>
       <span class="topbar-title">PARTE&nbsp;TÉCNICO</span>
     </div>
-    <span class="topbar-status" id="statusPill">LISTO</span>
+    <button type="button" class="topbar-status" id="statusPill">LISTO</button>
   </header>
 
   <!-- LOGIN -->
@@ -1216,11 +1216,37 @@
         <label class="field-label" for="f_observaciones">Observaciones</label>
         <textarea class="field-input field-textarea" id="f_observaciones" placeholder="Observaciones adicionales"></textarea>
       </div>
+
+      <button type="button" class="btn btn-secondary" id="abrirClavesBtn" style="margin-top:6px;">🔑 Claves</button>
     </div>
 
     <div class="action-bar action-bar-column">
       <button class="btn btn-primary" id="toSignBtn" type="button">Continuar a la firma</button>
       <button class="btn btn-secondary" id="backToListBtn" type="button">Volver</button>
+    </div>
+  </section>
+
+  <!-- CLAVES Y CÓDIGOS (solo van a la oficina, nunca al cliente) -->
+  <section class="screen" id="screen-claves">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">CLAVES Y CÓDIGOS</p>
+      <p class="hint-text">Usuario, clave, o código de verificación del producto instalado — por ejemplo, el de la central de alarma o el router. Esto queda guardado en el parte, pero <b>solo le llega a la oficina por mail — nunca al cliente</b>.</p>
+
+      <div class="field-group">
+        <label class="field-label" for="f_claves_usuario">Usuario</label>
+        <input class="field-input" id="f_claves_usuario" type="text" placeholder="Usuario de acceso">
+      </div>
+      <div class="field-group">
+        <label class="field-label" for="f_claves_clave">Clave</label>
+        <input class="field-input" id="f_claves_clave" type="text" placeholder="Contraseña / clave">
+      </div>
+      <div class="field-group">
+        <label class="field-label" for="f_claves_codigo">Código de verificación de producto</label>
+        <input class="field-input" id="f_claves_codigo" type="text" placeholder="Código de verificación">
+      </div>
+    </div>
+    <div class="action-bar">
+      <button class="btn btn-primary" id="guardarClavesBtn" type="button">Guardar y volver al parte</button>
     </div>
   </section>
 

@@ -114,10 +114,15 @@ html, body {
   font-size: 11px;
   letter-spacing: 0.08em;
   color: #7593A3;
+  background: none;
   border: 1px solid #2A3743;
   border-radius: 999px;
   padding: 4px 10px;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-press), color var(--dur-fast) var(--ease-press);
 }
+.topbar-status:hover { border-color: var(--amber); color: var(--amber); }
+.topbar-status:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.45); }
 .topbar-status.busy { color: #F5A623; border-color: #F5A623; }
 .topbar-status.ok { color: #3FAE6E; border-color: #3FAE6E; }
 

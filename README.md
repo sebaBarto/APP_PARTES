@@ -229,6 +229,28 @@ pendiente de la lista sigue autocompletando cliente y dirección (el
 N° de abonado no, porque los servicios no tienen ese dato) — y todo
 queda editable por si hace falta ajustar algo antes de confirmar.
 
+## Botón "LISTO" ahora hace algo, y sección de Claves solo para oficina (v3.15.0)
+
+### El "LISTO" de arriba ahora es útil
+
+Era un `<span>` sin ningún manejador de clic — de ahí que "no hacía nada". Ahora es un botón
+real: al tocarlo, muestra el estado de sincronización (conectado o no, y si hay envíos
+pendientes por una falta de conexión anterior) — reutilizando la información que la app ya
+llevaba internamente, sin agregar nada nuevo que rastrear.
+
+### Nueva sección "🔑 Claves" al final del parte
+
+Al final del formulario (antes de pasar a la firma), nuevo botón **"🔑 Claves"** que abre una
+mini-pantalla para cargar usuario, clave, y código de verificación de producto (por ejemplo, de
+la central de alarma o el router instalado). El botón muestra un ✓ una vez que se cargó algo,
+para saber de un vistazo si ya se completó.
+
+**Esta información solo le llega a la oficina por mail — nunca al cliente.** Se probó
+explícitamente: con los mismos datos, la plantilla de oficina muestra la sección completa
+(usuario, clave, código), y la plantilla de cliente no la incluye en absoluto — ni siquiera
+como sección vacía. Si no se carga nada en "Claves", la sección ni aparece en el mail de
+oficina.
+
 ### Foco de teclado, hover, y verificación responsive en dashboards (v3.14.1)
 
 Siguiendo pidiendo específicamente por los dashboards: se encontró que **ni los botones ni los

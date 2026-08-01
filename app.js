@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.14.1";
+const APP_VERSION = "3.15.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -138,6 +138,7 @@ const screens = {
   comodatoForm: document.getElementById("screen-comodato-form"),
   comodatoFirma: document.getElementById("screen-comodato-firma"),
   form: document.getElementById("screen-form"),
+  claves: document.getElementById("screen-claves"),
   sign: document.getElementById("screen-sign"),
   sending: document.getElementById("screen-sending"),
   done: document.getElementById("screen-done"),
@@ -416,6 +417,11 @@ const dashFinSyncLabel = document.getElementById("dashFinSyncLabel");
 const mapaStatus = document.getElementById("mapaStatus");
 const mapaCercanosList = document.getElementById("mapaCercanosList");
 const toSignBtn = document.getElementById("toSignBtn");
+const abrirClavesBtn = document.getElementById("abrirClavesBtn");
+const guardarClavesBtn = document.getElementById("guardarClavesBtn");
+const f_claves_usuario = document.getElementById("f_claves_usuario");
+const f_claves_clave = document.getElementById("f_claves_clave");
+const f_claves_codigo = document.getElementById("f_claves_codigo");
 const backToFormBtn = document.getElementById("backToFormBtn");
 const clearSignBtn = document.getElementById("clearSignBtn");
 const confirmSignBtn = document.getElementById("confirmSignBtn");
@@ -569,6 +575,21 @@ function setStatus(text, mode) {
   statusPill.textContent = text;
   statusPill.className = "topbar-status" + (mode ? " " + mode : "");
 }
+
+// El "LISTO" de arriba no era clickeable — ahora sirve para consultar
+// el estado real de sincronización (conexión + envíos pendientes) al
+// tocarlo, en vez de ser solo una etiqueta decorativa.
+statusPill.addEventListener("click", () => {
+  const cola = typeof obtenerColaEnvios === "function" ? obtenerColaEnvios() : [];
+  const conectado = navigator.onLine !== false;
+  if (!conectado) {
+    showToast("Sin conexión ahora mismo — lo que cargues se guarda y se manda solo apenas vuelva la señal.");
+  } else if (cola.length > 0) {
+    showToast(`Conectado — hay ${cola.length} envío(s) todavía pendiente(s) por una falta de conexión anterior. Se están reintentando solos.`);
+  } else {
+    showToast("Conectado — todo al día, sin envíos pendientes.");
+  }
+});
 
 function showToast(message) {
   toastEl.textContent = message;
@@ -1984,6 +2005,9 @@ function getFormData() {
     ),
     observaciones: document.getElementById("f_observaciones").value.trim(),
     imprevisto: getImprevistoTexto(),
+    claves_usuario: f_claves_usuario.value.trim(),
+    claves_clave: f_claves_clave.value.trim(),
+    claves_codigo: f_claves_codigo.value.trim(),
   };
 }
 
@@ -1991,6 +2015,10 @@ function resetForm() {
   instalacionCheck.checked = false;
   signAclaracion.value = "";
   signCargo.value = "";
+  f_claves_usuario.value = "";
+  f_claves_clave.value = "";
+  f_claves_codigo.value = "";
+  actualizarBotonClaves();
   ["f_cliente","f_direccion","f_localidad","f_cliente_email","f_tarea",
    "f_materiales","f_materiales_retirados","f_importe","f_costo_final",
    "f_observaciones"].forEach(id => document.getElementById(id).value = "");
@@ -2047,6 +2075,19 @@ function generarIdParte() {
 }
 
 // ---------- Navegación entre pasos ----------
+// Claves y códigos (usuario/clave/código de verificación) — quedan
+// guardados en el parte, pero solo se mandan al mail de oficina,
+// nunca al cliente (ver enviar-mail.js).
+function actualizarBotonClaves() {
+  const hayAlgoCargado = f_claves_usuario.value.trim() || f_claves_clave.value.trim() || f_claves_codigo.value.trim();
+  abrirClavesBtn.textContent = hayAlgoCargado ? "🔑 Claves ✓" : "🔑 Claves";
+}
+abrirClavesBtn.addEventListener("click", () => showScreen("claves"));
+guardarClavesBtn.addEventListener("click", () => {
+  actualizarBotonClaves();
+  showScreen("form");
+});
+
 toSignBtn.addEventListener("click", () => {
   const data = getFormData();
   if (!data.cliente || !data.tecnico) {
@@ -2228,6 +2269,9 @@ async function intentarEnviarParte(payload, interactivo) {
     firma_img: signatureImgTag,
     firma_aclaracion: data.firma_aclaracion,
     firma_cargo: data.firma_cargo,
+    claves_usuario: data.claves_usuario,
+    claves_clave: data.claves_clave,
+    claves_codigo: data.claves_codigo,
   };
 
   let oficinaOk = false;
