@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.15.0";
+const APP_VERSION = "3.15.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -191,6 +191,7 @@ const tecnicoOtro2 = document.getElementById("f_tecnico2_otro");
 const importeInput = document.getElementById("f_importe");
 const descuentoRadios = document.getElementsByName("f_descuento_tipo");
 const descuentoOtroPct = document.getElementById("f_descuento_otro_pct");
+const numeroPresupuestoInput = document.getElementById("f_numero_presupuesto");
 const costoFinalInput = document.getElementById("f_costo_final");
 const formaPagoChecks = document.getElementsByName("f_forma_pago");
 const backToListBtn = document.getElementById("backToListBtn");
@@ -419,9 +420,12 @@ const mapaCercanosList = document.getElementById("mapaCercanosList");
 const toSignBtn = document.getElementById("toSignBtn");
 const abrirClavesBtn = document.getElementById("abrirClavesBtn");
 const guardarClavesBtn = document.getElementById("guardarClavesBtn");
-const f_claves_usuario = document.getElementById("f_claves_usuario");
-const f_claves_clave = document.getElementById("f_claves_clave");
-const f_claves_codigo = document.getElementById("f_claves_codigo");
+const agregarClaveBtn = document.getElementById("agregarClaveBtn");
+const clavesTituloInput = document.getElementById("clavesTituloInput");
+const clavesUsuarioInput = document.getElementById("clavesUsuarioInput");
+const clavesClaveInput = document.getElementById("clavesClaveInput");
+const clavesCodigoInput = document.getElementById("clavesCodigoInput");
+const clavesAgregadasList = document.getElementById("clavesAgregadasList");
 const backToFormBtn = document.getElementById("backToFormBtn");
 const clearSignBtn = document.getElementById("clearSignBtn");
 const confirmSignBtn = document.getElementById("confirmSignBtn");
@@ -1456,7 +1460,7 @@ function getDescuentoTipo() {
 
 function getDescuentoPct() {
   const tipo = getDescuentoTipo();
-  if (tipo === "0") return 0;
+  if (tipo === "0" || tipo === "presupuesto") return 0;
   if (tipo === "otro") return parseFloat(descuentoOtroPct.value) || 0;
   return parseFloat(tipo);
 }
@@ -1467,6 +1471,10 @@ function getDescuentoLabel() {
   if (tipo === "otro") {
     const pct = descuentoOtroPct.value;
     return pct ? `${pct}%` : "Otro";
+  }
+  if (tipo === "presupuesto") {
+    const numero = numeroPresupuestoInput.value.trim();
+    return numero ? `Por presupuesto N° ${numero}` : "Por presupuesto";
   }
   return `${tipo}%`;
 }
@@ -1486,9 +1494,11 @@ importeInput.addEventListener("input", recalcularCostoFinal);
 descuentoOtroPct.addEventListener("input", recalcularCostoFinal);
 descuentoRadios.forEach((r) => {
   r.addEventListener("change", () => {
-    const esOtro = getDescuentoTipo() === "otro";
-    descuentoOtroPct.style.display = esOtro ? "block" : "none";
-    if (!esOtro) descuentoOtroPct.value = "";
+    const tipo = getDescuentoTipo();
+    descuentoOtroPct.style.display = tipo === "otro" ? "block" : "none";
+    if (tipo !== "otro") descuentoOtroPct.value = "";
+    numeroPresupuestoInput.style.display = tipo === "presupuesto" ? "block" : "none";
+    if (tipo !== "presupuesto") numeroPresupuestoInput.value = "";
     recalcularCostoFinal();
   });
 });
@@ -2005,9 +2015,7 @@ function getFormData() {
     ),
     observaciones: document.getElementById("f_observaciones").value.trim(),
     imprevisto: getImprevistoTexto(),
-    claves_usuario: f_claves_usuario.value.trim(),
-    claves_clave: f_claves_clave.value.trim(),
-    claves_codigo: f_claves_codigo.value.trim(),
+    claves: clavesAgregadas,
   };
 }
 
@@ -2015,9 +2023,8 @@ function resetForm() {
   instalacionCheck.checked = false;
   signAclaracion.value = "";
   signCargo.value = "";
-  f_claves_usuario.value = "";
-  f_claves_clave.value = "";
-  f_claves_codigo.value = "";
+  clavesAgregadas = [];
+  renderClavesAgregadas();
   actualizarBotonClaves();
   ["f_cliente","f_direccion","f_localidad","f_cliente_email","f_tarea",
    "f_materiales","f_materiales_retirados","f_importe","f_costo_final",
@@ -2041,6 +2048,8 @@ function resetForm() {
   descuentoRadios[0].checked = true;
   descuentoOtroPct.value = "";
   descuentoOtroPct.style.display = "none";
+  numeroPresupuestoInput.value = "";
+  numeroPresupuestoInput.style.display = "none";
   formaPagoChecks.forEach((c) => { c.checked = false; });
   materialesAgregados = [];
   renderMaterialesAgregados();
@@ -2075,18 +2084,59 @@ function generarIdParte() {
 }
 
 // ---------- Navegación entre pasos ----------
-// Claves y códigos (usuario/clave/código de verificación) — quedan
-// guardados en el parte, pero solo se mandan al mail de oficina,
-// nunca al cliente (ver enviar-mail.js).
+// Claves y códigos (título + usuario/clave/código) — se pueden
+// cargar varias. Quedan guardadas en el parte, pero solo se mandan
+// al mail de oficina, nunca al cliente (ver enviar-mail.js).
+let clavesAgregadas = [];
+
 function actualizarBotonClaves() {
-  const hayAlgoCargado = f_claves_usuario.value.trim() || f_claves_clave.value.trim() || f_claves_codigo.value.trim();
-  abrirClavesBtn.textContent = hayAlgoCargado ? "🔑 Claves ✓" : "🔑 Claves";
+  abrirClavesBtn.textContent = clavesAgregadas.length > 0 ? `🔑 Claves ✓ (${clavesAgregadas.length})` : "🔑 Claves";
 }
-abrirClavesBtn.addEventListener("click", () => showScreen("claves"));
-guardarClavesBtn.addEventListener("click", () => {
+
+function renderClavesAgregadas() {
+  clavesAgregadasList.innerHTML = "";
+  clavesAgregadas.forEach((c, idx) => {
+    const detalle = [c.usuario && `Usuario: ${c.usuario}`, c.clave && `Clave: ${c.clave}`, c.codigo && `Código: ${c.codigo}`]
+      .filter(Boolean).join(" · ");
+    const fila = document.createElement("div");
+    fila.className = "material-agregado-item";
+    fila.innerHTML = `<span><b>${c.titulo}</b>${detalle ? " — " + detalle : ""}</span>`;
+    const quitarBtn = document.createElement("button");
+    quitarBtn.type = "button";
+    quitarBtn.textContent = "✕";
+    quitarBtn.addEventListener("click", () => {
+      clavesAgregadas.splice(idx, 1);
+      renderClavesAgregadas();
+      actualizarBotonClaves();
+    });
+    fila.appendChild(quitarBtn);
+    clavesAgregadasList.appendChild(fila);
+  });
+}
+
+agregarClaveBtn.addEventListener("click", () => {
+  const titulo = clavesTituloInput.value.trim();
+  if (!titulo) {
+    showToast("Escribí un título para saber de qué es esta clave (ej: WiFi del cliente).");
+    return;
+  }
+  clavesAgregadas.push({
+    titulo,
+    usuario: clavesUsuarioInput.value.trim(),
+    clave: clavesClaveInput.value.trim(),
+    codigo: clavesCodigoInput.value.trim(),
+  });
+  renderClavesAgregadas();
   actualizarBotonClaves();
-  showScreen("form");
+  clavesTituloInput.value = "";
+  clavesUsuarioInput.value = "";
+  clavesClaveInput.value = "";
+  clavesCodigoInput.value = "";
+  clavesTituloInput.focus();
 });
+
+abrirClavesBtn.addEventListener("click", () => showScreen("claves"));
+guardarClavesBtn.addEventListener("click", () => showScreen("form"));
 
 toSignBtn.addEventListener("click", () => {
   const data = getFormData();
@@ -2269,9 +2319,7 @@ async function intentarEnviarParte(payload, interactivo) {
     firma_img: signatureImgTag,
     firma_aclaracion: data.firma_aclaracion,
     firma_cargo: data.firma_cargo,
-    claves_usuario: data.claves_usuario,
-    claves_clave: data.claves_clave,
-    claves_codigo: data.claves_codigo,
+    claves: data.claves,
   };
 
   let oficinaOk = false;

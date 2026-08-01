@@ -229,6 +229,19 @@ pendiente de la lista sigue autocompletando cliente y dirección (el
 N° de abonado no, porque los servicios no tienen ese dato) — y todo
 queda editable por si hace falta ajustar algo antes de confirmar.
 
+### Varias claves con título, y descuento "Por presupuesto" (v3.15.1)
+
+**Claves y códigos** ahora admite cargar varias, cada una con su propio **título** (para saber
+de qué es — ej: "WiFi del cliente", "Panel de alarma") — ya no son 3 campos fijos, sino una
+lista: se completa título (obligatorio) + usuario/clave/código (todos opcionales) y se agrega;
+el botón muestra cuántas hay cargadas. Sigue yendo solo al mail de oficina — se probó de nuevo
+con varias claves juntas y el cliente sigue sin recibir nada de esto.
+
+**Descuento**: nueva opción **"Por presupuesto"** junto a Sin descuento/50%/100%/Otro. Al
+elegirla, aparece un campo opcional para el número de presupuesto — si se completa, queda
+como "Por presupuesto N° [número]"; si no, simplemente "Por presupuesto". No aplica ningún
+descuento automático al costo final (el precio ya viene definido por el presupuesto en sí).
+
 ## Botón "LISTO" ahora hace algo, y sección de Claves solo para oficina (v3.15.0)
 
 ### El "LISTO" de arriba ahora es útil

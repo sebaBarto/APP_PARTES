@@ -1089,8 +1089,13 @@
             <input type="radio" name="f_descuento_tipo" value="otro">
             <span>Otro</span>
           </label>
+          <label class="discount-chip">
+            <input type="radio" name="f_descuento_tipo" value="presupuesto">
+            <span>Por presupuesto</span>
+          </label>
         </div>
         <input class="field-input" id="f_descuento_otro_pct" type="number" min="0" max="100" step="1" placeholder="% de descuento" style="margin-top:8px; display:none;">
+        <input class="field-input" id="f_numero_presupuesto" type="text" placeholder="N° de presupuesto (opcional)" style="margin-top:8px; display:none;">
       </div>
 
       <div class="field-group">
@@ -1230,20 +1235,27 @@
   <section class="screen" id="screen-claves">
     <div class="review-scroll">
       <p class="hint-eyebrow review-eyebrow">CLAVES Y CÓDIGOS</p>
-      <p class="hint-text">Usuario, clave, o código de verificación del producto instalado — por ejemplo, el de la central de alarma o el router. Esto queda guardado en el parte, pero <b>solo le llega a la oficina por mail — nunca al cliente</b>.</p>
+      <p class="hint-text">Usuario, clave, o código de verificación del producto instalado — por ejemplo, el de la central de alarma o el router. Podés cargar más de una. Esto queda guardado en el parte, pero <b>solo le llega a la oficina por mail — nunca al cliente</b>.</p>
 
       <div class="field-group">
-        <label class="field-label" for="f_claves_usuario">Usuario</label>
-        <input class="field-input" id="f_claves_usuario" type="text" placeholder="Usuario de acceso">
+        <label class="field-label" for="clavesTituloInput">Título (de qué es)</label>
+        <input class="field-input" id="clavesTituloInput" type="text" placeholder="Ej: WiFi del cliente, Panel de alarma...">
       </div>
       <div class="field-group">
-        <label class="field-label" for="f_claves_clave">Clave</label>
-        <input class="field-input" id="f_claves_clave" type="text" placeholder="Contraseña / clave">
+        <label class="field-label" for="clavesUsuarioInput">Usuario</label>
+        <input class="field-input" id="clavesUsuarioInput" type="text" placeholder="Usuario de acceso (opcional)">
       </div>
       <div class="field-group">
-        <label class="field-label" for="f_claves_codigo">Código de verificación de producto</label>
-        <input class="field-input" id="f_claves_codigo" type="text" placeholder="Código de verificación">
+        <label class="field-label" for="clavesClaveInput">Clave</label>
+        <input class="field-input" id="clavesClaveInput" type="text" placeholder="Contraseña / clave (opcional)">
       </div>
+      <div class="field-group">
+        <label class="field-label" for="clavesCodigoInput">Código de verificación de producto</label>
+        <input class="field-input" id="clavesCodigoInput" type="text" placeholder="Código de verificación (opcional)">
+      </div>
+      <button type="button" class="btn btn-secondary" id="agregarClaveBtn" style="margin-bottom:10px;">+ Agregar</button>
+
+      <div id="clavesAgregadasList"></div>
     </div>
     <div class="action-bar">
       <button class="btn btn-primary" id="guardarClavesBtn" type="button">Guardar y volver al parte</button>
