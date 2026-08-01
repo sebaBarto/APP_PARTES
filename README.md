@@ -229,6 +229,17 @@ pendiente de la lista sigue autocompletando cliente y dirección (el
 N° de abonado no, porque los servicios no tienen ese dato) — y todo
 queda editable por si hace falta ajustar algo antes de confirmar.
 
+### Las claves ahora quedan guardadas aunque se salga de la pantalla (v3.15.2)
+
+Las claves cargadas vivían solo en la memoria de la página — si el técnico las cargaba, salía
+de la pantalla, y la app se cerraba o el celular la mataba en segundo plano (algo común en
+Android), se perdían. Ahora se guardan en el mismo borrador que ya usa el resto del parte: se
+puede abrir "Claves" en cualquier momento del servicio, cargar algo, salir, y va a seguir ahí
+hasta que se envíe el parte — se probó cargando **solo** una clave (sin tocar ningún otro campo
+del formulario) y confirmando que igual se guarda y se restaura completa al reabrir el mismo
+servicio. De paso se corrigió el mismo hueco para el número de presupuesto (opción "Por
+presupuesto"), que tenía el mismo problema.
+
 ### Varias claves con título, y descuento "Por presupuesto" (v3.15.1)
 
 **Claves y códigos** ahora admite cargar varias, cada una con su propio **título** (para saber

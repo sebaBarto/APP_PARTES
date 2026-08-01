@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.15.1";
+const APP_VERSION = "3.15.2";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -469,6 +469,7 @@ function armarBorrador() {
     costo_final: document.getElementById("f_costo_final").value,
     descuento_tipo: (Array.from(descuentoRadios).find((r) => r.checked) || {}).value || "0",
     descuento_otro_pct: descuentoOtroPct.value,
+    descuento_numero_presupuesto: numeroPresupuestoInput.value,
     forma_pago: (Array.from(formaPagoChecks).find((r) => r.checked) || {}).value || "",
     instalacion: instalacionCheck.checked,
     tecnico: tecnicoSelect.value,
@@ -483,6 +484,7 @@ function armarBorrador() {
     imprevisto_detalle: document.getElementById("f_imprevisto_detalle").value,
     imprevisto_minutos: document.getElementById("f_imprevisto_minutos").value,
     observaciones: document.getElementById("f_observaciones").value,
+    claves: clavesAgregadas,
     guardado_en: Date.now(),
   };
 }
@@ -491,7 +493,7 @@ function hayAlgoCargadoEnElForm() {
   const b = armarBorrador();
   return !!(
     b.cliente || b.direccion || b.tarea || b.materiales_agregados.length > 0 ||
-    b.materiales_otros || b.importe || b.observaciones
+    b.materiales_otros || b.importe || b.observaciones || b.claves.length > 0
   );
 }
 
@@ -539,6 +541,7 @@ function restaurarBorradorSiExiste(numeroServicio) {
     radioDescuento.dispatchEvent(new Event("change", { bubbles: true }));
   }
   descuentoOtroPct.value = b.descuento_otro_pct || "";
+  numeroPresupuestoInput.value = b.descuento_numero_presupuesto || "";
   if (b.forma_pago) {
     const radioPago = Array.from(formaPagoChecks).find((r) => r.value === b.forma_pago);
     if (radioPago) radioPago.checked = true;
@@ -560,6 +563,9 @@ function restaurarBorradorSiExiste(numeroServicio) {
   document.getElementById("f_imprevisto_detalle").value = b.imprevisto_detalle || "";
   document.getElementById("f_imprevisto_minutos").value = b.imprevisto_minutos || "";
   document.getElementById("f_observaciones").value = b.observaciones || "";
+  clavesAgregadas = Array.isArray(b.claves) ? b.claves : [];
+  renderClavesAgregadas();
+  actualizarBotonClaves();
 
   return true;
 }
