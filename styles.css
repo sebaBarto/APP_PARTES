@@ -223,7 +223,7 @@ html, body {
   padding: 12px;
   width: 100%;
 }
-#screen-login .login-input:focus { outline: none; border-color: #F5A623; }
+#screen-login .login-input:focus { outline: none; border-color: #F5A623; box-shadow: 0 0 0 3px rgba(245,166,35,0.28); }
 .password-field-wrap { position: relative; width: 100%; }
 .password-field-wrap .login-input,
 .password-field-wrap .field-input { padding-right: 44px; }
@@ -757,6 +757,21 @@ html, body {
   color: #F5A623;
   border-color: #101820;
   box-shadow: var(--shadow-amber);
+}
+.dash-periodo-chip:hover,
+.dash-fin-periodo-chip:hover,
+.dash-veh-periodo-chip:hover,
+.dash-sims-periodo-chip:hover {
+  border-color: var(--amber);
+}
+.dash-periodo-chip:focus-visible,
+.dash-fin-periodo-chip:focus-visible,
+.dash-veh-periodo-chip:focus-visible,
+.dash-sims-periodo-chip:focus-visible,
+.btn:focus-visible,
+.panel-tile:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.45);
 }
 .dash-periodo-chip:active,
 .dash-fin-periodo-chip:active,

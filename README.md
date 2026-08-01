@@ -229,6 +229,20 @@ pendiente de la lista sigue autocompletando cliente y dirección (el
 N° de abonado no, porque los servicios no tienen ese dato) — y todo
 queda editable por si hace falta ajustar algo antes de confirmar.
 
+### Foco de teclado, hover, y verificación responsive en dashboards (v3.14.1)
+
+Siguiendo pidiendo específicamente por los dashboards: se encontró que **ni los botones ni los
+selectores de período (Día/Semana/Mes) tenían ningún estilo de foco propio** — dependían del
+outline por defecto del navegador, inconsistente con la marca. Se agregó un anillo ámbar de
+foco (visible solo al navegar con teclado, no con mouse/touch, usando `:focus-visible`) a
+botones, tiles, y selectores de período en todos los dashboards — verificado que realmente se
+renderiza tabulando con el teclado de verdad (no solo enfocando por código), esperando a que
+termine la transición antes de medir.
+
+También se agregó estado `:hover` a los selectores de período (no lo tenían), y se verificó que
+los dashboards no generen scroll horizontal en ningún ancho de pantalla probado, desde 320px
+(el más angosto habitual) hasta 768px.
+
 ## Auditoría de diseño: contraste, tamaño táctil, y paleta de gráficos (v3.14.0)
 
 Se hizo una revisión rigurosa del diseño, basada en **medición objetiva** (no en apreciación
