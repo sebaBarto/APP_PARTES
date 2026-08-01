@@ -12,7 +12,7 @@
 const COLECCIONES = {
   config: {
     path: "config.json",
-    default: { dias_atencion: 3, dias_urgente: 7, app_version_actual: "3.15.2", felicitacion_semanal_activa: true },
+    default: { dias_atencion: 3, dias_urgente: 7, app_version_actual: "3.16.0", felicitacion_semanal_activa: true },
     mergeConDefault: true,
   },
   tecnicos: { path: "tecnicos.json", default: [] },
@@ -40,6 +40,48 @@ module.exports = async (req, res) => {
   if (!process.env.SERVICIOS_API_TOKEN || token !== process.env.SERVICIOS_API_TOKEN) {
     res.status(401).json({ error: "No autorizado" });
     return;
+  }
+
+  // Verificación de contraseñas — se hace acá adentro, del lado del
+  // servidor, y nunca se le devuelve ninguna contraseña al que
+  // pregunta (ni siquiera la propia): solo si coincide o no. Antes,
+  // el celular bajaba la lista completa de técnicos CON sus
+  // contraseñas y comparaba él mismo — cualquiera con el token de la
+  // app (visible en el código) podía leer la lista completa.
+  if (req.method === "POST") {
+    let bodyAccion = req.body;
+    if (typeof bodyAccion === "string") {
+      try { bodyAccion = JSON.parse(bodyAccion); } catch (err) { bodyAccion = null; }
+    }
+    if (bodyAccion && bodyAccion.accion === "verificar_admin") {
+      const ok = !!process.env.ADMIN_PASSWORD && bodyAccion.password === process.env.ADMIN_PASSWORD;
+      res.status(200).json({ ok });
+      return;
+    }
+    if (bodyAccion && bodyAccion.accion === "verificar_login") {
+      const { GITHUB_DATA_TOKEN, GITHUB_DATA_REPO } = process.env;
+      if (!GITHUB_DATA_TOKEN || !GITHUB_DATA_REPO) {
+        res.status(500).json({ error: "Faltan variables de entorno por configurar en Vercel" });
+        return;
+      }
+      try {
+        const url = `https://api.github.com/repos/${GITHUB_DATA_REPO}/contents/${COLECCIONES.tecnicos.path}`;
+        const r = await fetch(url, {
+          headers: { Authorization: `Bearer ${GITHUB_DATA_TOKEN}`, Accept: "application/vnd.github+json" },
+        });
+        let tecnicos = [];
+        if (r.ok) {
+          const data = await r.json();
+          tecnicos = JSON.parse(Buffer.from(data.content, "base64").toString("utf-8"));
+        }
+        const encontrado = (Array.isArray(tecnicos) ? tecnicos : []).find((t) => t.nombre === bodyAccion.nombre);
+        const ok = !!encontrado && encontrado.password === bodyAccion.password;
+        res.status(200).json({ ok });
+      } catch (err) {
+        res.status(500).json({ error: "Error interno al verificar" });
+      }
+      return;
+    }
   }
 
   const nombreColeccion = req.query.coleccion;
@@ -75,7 +117,14 @@ module.exports = async (req, res) => {
       }
       const data = await r.json();
       const content = JSON.parse(Buffer.from(data.content, "base64").toString("utf-8"));
-      res.status(200).json(coleccion.mergeConDefault ? { ...coleccion.default, ...content } : content);
+      let resultado = coleccion.mergeConDefault ? { ...coleccion.default, ...content } : content;
+      if (nombreColeccion === "tecnicos" && Array.isArray(resultado)) {
+        resultado = resultado.map((t) => {
+          const { password, ...resto } = t;
+          return resto;
+        });
+      }
+      res.status(200).json(resultado);
     } catch (err) {
       res.status(500).json({ error: `Error interno al leer ${nombreColeccion}` });
     }
@@ -107,6 +156,14 @@ module.exports = async (req, res) => {
       // mano), se actualiza a quién pertenece en vez de dejarlo
       // desactualizado.
       let contenidoAGuardar = body;
+      if (nombreColeccion === "tecnicos" && Array.isArray(body)) {
+        const existentes = Array.isArray(contenidoExistente) ? contenidoExistente : [];
+        contenidoAGuardar = body.map((t) => {
+          if (t.password) return t; // se escribió una clave nueva -> se usa esa
+          const previo = existentes.find((x) => x.nombre === t.nombre);
+          return { ...t, password: previo ? previo.password : "" };
+        });
+      }
       if (nombreColeccion === "push-subscripciones") {
         const lista = Array.isArray(contenidoExistente) ? contenidoExistente : [];
         const idx = lista.findIndex((s) => s.endpoint === body.endpoint);

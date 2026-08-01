@@ -488,23 +488,26 @@
 </div>
 
 <script>
-// ==== CONFIGURACIÓN — completar antes de publicar ====
-// Contraseña para entrar a esta página (distinta de la de los técnicos).
-const ADMIN_PASSWORD = "Marcos@2018";
+// ==== CONFIGURACIÓN ====
 // Misma clave secreta que SERVICIOS_API_TOKEN en app.js y en Vercel.
 const SERVICIOS_API_TOKEN = "54455ad29a4eb28e48ca915e3510ff95ceb682523fa74b32";
+// La contraseña del panel ya NO vive acá — se verifica contra el
+// servidor (variable de entorno ADMIN_PASSWORD en Vercel), nunca
+// comparando en el código del navegador.
 // =======================================================
 
 // Respaldo — solo se usa para prellenar el formulario la PRIMERA vez
-// (si todavía no se guardó ninguna lista de técnicos desde acá).
+// (si todavía no se guardó ninguna lista de técnicos desde acá). Ya
+// no incluye contraseñas reales — hay que cargarlas de nuevo la
+// primera vez que se use esta pantalla.
 const TECNICOS_RESPALDO = [
-  { nombre: "Marcos Torres", password: "MarcosT@253" },
-  { nombre: "Cristian Rossetti", password: "CristianR@5890" },
-  { nombre: "Rodrigo Bertorello", password: "CAMBIAR_CLAVE_RODRIGO_BERTORELLO" },
-  { nombre: "Guillermo Bertorello", password: "GuillermoB@849" },
-  { nombre: "Marcos Pellegrini", password: "MarcosP@2907" },
-  { nombre: "Sebastian Bartolozzi", password: "Sebab031" },
-  { nombre: "Alfredo Thiesing", password: "AlfredoT@3972" },
+  { nombre: "Marcos Torres", password: "" },
+  { nombre: "Cristian Rossetti", password: "" },
+  { nombre: "Rodrigo Bertorello", password: "" },
+  { nombre: "Guillermo Bertorello", password: "" },
+  { nombre: "Marcos Pellegrini", password: "" },
+  { nombre: "Sebastian Bartolozzi", password: "" },
+  { nombre: "Alfredo Thiesing", password: "" },
 ];
 
 const tabTecnicosBtn = document.getElementById("tabTecnicosBtn");
@@ -599,7 +602,7 @@ function renderFilaTecnico(nombre, password, permisos, enCalle) {
     </div>
     <div>
       <label>Contraseña</label>
-      <input type="text" class="tecnico-password" value="${password || ""}" placeholder="Contraseña">
+      <input type="text" class="tecnico-password" value="" placeholder="Dejar en blanco para no cambiarla">
     </div>
     <button type="button" class="btn-quitar-tecnico" title="Quitar">✕</button>
     <label class="permiso-check tecnico-en-calle-check">
@@ -611,6 +614,8 @@ function renderFilaTecnico(nombre, password, permisos, enCalle) {
   fila.querySelector(".btn-quitar-tecnico").addEventListener("click", () => fila.remove());
   tecnicosFilas.appendChild(fila);
 }
+
+let nombresTecnicosExistentesEnServidor = new Set();
 
 async function cargarTecnicosAdmin() {
   tecnicosStatus.textContent = "Cargando técnicos...";
@@ -625,12 +630,14 @@ async function cargarTecnicosAdmin() {
 
     const lista = Array.isArray(data) && data.length > 0 ? data : TECNICOS_RESPALDO;
     lista.forEach((t) => renderFilaTecnico(t.nombre, t.password, t.permisos, t.en_calle));
+    nombresTecnicosExistentesEnServidor = new Set(lista.map((t) => t.nombre));
     tecnicosStatus.textContent = Array.isArray(data) && data.length > 0
       ? ""
       : "Todavía no se guardó ninguna lista — se precargó con los técnicos actuales. Revisala y guardá para publicarla.";
   } catch (err) {
     tecnicosFilas.innerHTML = "";
     TECNICOS_RESPALDO.forEach((t) => renderFilaTecnico(t.nombre, t.password, t.permisos, t.en_calle));
+    nombresTecnicosExistentesEnServidor = new Set();
     tecnicosStatus.textContent = "No se pudo conectar — se muestra la lista de respaldo. Revisala antes de guardar.";
   }
 }
@@ -639,7 +646,7 @@ agregarTecnicoBtn.addEventListener("click", () => renderFilaTecnico("", "", null
 
 guardarTecnicosBtn.addEventListener("click", async () => {
   const filas = Array.from(tecnicosFilas.querySelectorAll(".tecnico-fila"));
-  const lista = filas.map((fila) => {
+  const conNombre = filas.map((fila) => {
     const permisos = {};
     fila.querySelectorAll(".tecnico-permiso").forEach((chk) => {
       permisos[chk.dataset.clave] = chk.checked;
@@ -650,7 +657,19 @@ guardarTecnicosBtn.addEventListener("click", async () => {
       permisos,
       en_calle: fila.querySelector(".tecnico-en-calle").checked,
     };
-  }).filter((t) => t.nombre && t.password);
+  }).filter((t) => t.nombre);
+
+  // Un técnico nuevo (que todavía no existía en el servidor) tiene que
+  // traer una contraseña sí o sí — dejarla en blanco solo está
+  // permitido para no cambiarle la clave a alguien que ya existía.
+  const nuevoSinClave = conNombre.find((t) => !t.password && !nombresTecnicosExistentesEnServidor.has(t.nombre));
+  if (nuevoSinClave) {
+    guardarTecnicosStatus.className = "status err";
+    guardarTecnicosStatus.textContent = `"${nuevoSinClave.nombre}" es un técnico nuevo — hay que cargarle una contraseña antes de guardar.`;
+    return;
+  }
+
+  const lista = conNombre;
 
   if (lista.length === 0) {
     guardarTecnicosStatus.className = "status err";
@@ -719,13 +738,27 @@ const mapSelects = {
   tarea: document.getElementById("mapTarea"),
 };
 
-pwBtn.addEventListener("click", () => {
-  if (pw.value === ADMIN_PASSWORD) {
-    loginCard.classList.add("hidden");
-    mainCard.classList.remove("hidden");
-    cargarConfigAdmin();
-  } else {
-    pwError.textContent = "Contraseña incorrecta.";
+pwBtn.addEventListener("click", async () => {
+  pwBtn.disabled = true;
+  pwError.textContent = "";
+  try {
+    const res = await fetch("/api/datos?coleccion=tecnicos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({ accion: "verificar_admin", password: pw.value }),
+    });
+    const data = await res.json();
+    if (res.ok && data.ok) {
+      loginCard.classList.add("hidden");
+      mainCard.classList.remove("hidden");
+      cargarConfigAdmin();
+    } else {
+      pwError.textContent = "Contraseña incorrecta.";
+    }
+  } catch (err) {
+    pwError.textContent = "No se pudo verificar — revisá tu conexión e intentá de nuevo.";
+  } finally {
+    pwBtn.disabled = false;
   }
 });
 pw.addEventListener("keydown", (e) => { if (e.key === "Enter") pwBtn.click(); });

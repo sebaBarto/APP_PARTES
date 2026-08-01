@@ -94,7 +94,8 @@ module.exports = async (req, res) => {
       return;
     }
 
-    if (cliente_email) {
+    const emailValido = typeof cliente_email === "string" && /^[^\s@<>\r\n]+@[^\s@<>\r\n]+\.[^\s@<>\r\n]+$/.test(cliente_email.trim());
+    if (cliente_email && emailValido) {
       try {
         await transporter.sendMail({
           from: `"Servicio Técnico SAT" <${process.env.SMTP_USER}>`,

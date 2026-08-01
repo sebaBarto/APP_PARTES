@@ -240,6 +240,55 @@ del formulario) y confirmando que igual se guarda y se restaura completa al reab
 servicio. De paso se corrigió el mismo hueco para el número de presupuesto (opción "Por
 presupuesto"), que tenía el mismo problema.
 
+## Auditoría de seguridad integral (v3.16.0)
+
+Revisión de seguridad de toda la app: manejo de datos, accesos y permisos, comunicación con
+servicios externos, y almacenamiento de información sensible.
+
+### Lo más grave, encontrado y corregido: contraseñas reales en el código público
+
+Las contraseñas de **todos los técnicos**, y la contraseña de oficina/administración, estaban
+escritas en texto plano directo en el código — visibles para cualquiera que abriera el
+repositorio (que es público), sin necesidad de hackear nada. Esto venía desde hace mucho:
+**toda esa historia queda en el registro de cambios de Git para siempre**, así que aunque ya se
+sacaron del código actual, las contraseñas viejas deben tratarse como conocidas por cualquiera
+y cambiarse todas.
+
+**Se corrigió de raíz**: ahora ninguna contraseña vive en el código ni se le entrega nunca a
+quien pregunta — se verifican del lado del servidor (usuario/clave del técnico, y la del
+panel), comparando contra lo guardado en el repositorio privado de datos o una variable de
+entorno en Vercel. El técnico y quien entra al panel siguen usando la app exactamente igual que
+antes (mismo formulario, mismos pasos) — el cambio es invisible para ellos, pero cierra el
+agujero. Se probó a fondo: login correcto/incorrecto de técnico, login correcto/incorrecto de
+administración, que la lista de técnicos ya no incluya contraseñas al consultarla, que dejar la
+contraseña en blanco al editar un técnico existente no se la borre, y que no se pueda crear un
+técnico nuevo sin ponerle contraseña.
+
+### Otros problemas encontrados y corregidos
+
+- **Texto libre mostrado sin filtrar en pantalla (en ~14 lugares)**: el nombre de un cliente, una
+  dirección, una nota escrita por un técnico, etc. se insertaban directo en la pantalla — si
+  alguien escribía código malicioso en un campo de texto, se podía llegar a ejecutar en la
+  pantalla de otro técnico que viera esa información después. Se corrigió neutralizando
+  cualquier código antes de mostrar texto que alguien haya escrito.
+- **Mails sin validar el formato del destinatario**: el mail del cliente se usaba para enviar sin
+  chequear que tuviera forma de mail real, lo que en teoría permitía intentar desviar copias o
+  inyectar destinatarios extra. Ahora se valida el formato antes de mandar cualquier cosa.
+- Se confirmó que todos los endpoints del servidor controlan el acceso correctamente, y que no
+  hay dependencias con vulnerabilidades conocidas.
+
+### Recomendaciones para el futuro
+
+- **Cambiar ya todas las contraseñas** (las de los técnicos y la de oficina/admin) — las que
+  estaban en el código deben considerarse conocidas por cualquiera, para siempre.
+- El token compartido que usa toda la app para hablar con el servidor (`SERVICIOS_API_TOKEN`)
+  sigue siendo un único valor fijo, visible en el código — cualquiera que lo tenga puede usar la
+  API directamente. Esto es aceptable para un equipo chico e interno, pero si la empresa crece
+  o el riesgo percibido aumenta, lo correcto a futuro es una sesión por persona (en vez de una
+  clave compartida por todos), algo que requiere una revisión más de fondo del inicio de sesión.
+- Revisar cada tanto que no se vuelvan a colar datos sensibles hardcodeados en el código (es fácil
+  que pase sin querer al ir agregando funciones con el tiempo).
+
 ### Varias claves con título, y descuento "Por presupuesto" (v3.15.1)
 
 **Claves y códigos** ahora admite cargar varias, cada una con su propio **título** (para saber

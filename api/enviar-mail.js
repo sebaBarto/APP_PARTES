@@ -25,6 +25,14 @@ function escapeHtml(s) {
     .replace(/"/g, "&quot;");
 }
 
+// Valida que el mail del cliente tenga forma de mail de verdad, sin
+// espacios ni saltos de línea — esto evita que alguien pueda inyectar
+// destinatarios extra o cabeceras falsas escribiendo algo raro en el
+// campo de mail del cliente (ej: "x@x.com\nBcc: otro@mail.com").
+function esEmailValido(email) {
+  return typeof email === "string" && /^[^\s@<>\r\n]+@[^\s@<>\r\n]+\.[^\s@<>\r\n]+$/.test(email.trim());
+}
+
 function renderTemplate(html, datos) {
   html = html.replace(/\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_, clave, contenido) =>
     datos[clave] ? contenido : ""
@@ -344,6 +352,10 @@ module.exports = async (req, res) => {
       destinatario = datos.cliente_email;
       if (!destinatario) {
         res.status(400).json({ error: "Falta el mail del cliente" });
+        return;
+      }
+      if (!esEmailValido(destinatario)) {
+        res.status(400).json({ error: "El mail del cliente no tiene un formato válido" });
         return;
       }
       asunto = `Parte de servicio ${datos.id_parte || ""} - ${datos.cliente || ""}`;

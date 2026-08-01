@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.15.2";
+const APP_VERSION = "3.16.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -66,20 +66,21 @@ const DATALABELS_PORCENTAJE = {
 // sacar o cambiar la clave de un técnico. Esto de acá abajo es solo un
 // respaldo de arranque: se usa si todavía nunca se guardó nada desde
 // admin.html, o si no hay conexión la primera vez que se abre la app.
+// Lista de técnicos de respaldo — solo para poder mostrar el
+// desplegable de "elegí tu usuario" si todavía no se pudo conectar al
+// servidor. Ya NO guarda contraseñas acá (antes las tenía, en texto
+// plano, visibles para cualquiera que abriera el código — la
+// verificación de contraseña ahora es siempre contra el servidor,
+// nunca comparando localmente).
 const TECNICOS_PASSWORDS_RESPALDO = {
-  "Marcos Torres": "MarcosT@253",
-  "Cristian Rossetti": "CristianR@5890",
-  "Rodrigo Bertorello": "CAMBIAR_CLAVE_RODRIGO_BERTORELLO",
-  "Guillermo Bertorello": "GuillermoB@849",
-  "Marcos Pellegrini": "MarcosP@2907",
-  "Sebastian Bartolozzi": "Sebab031",
-  "Alfredo Thiesing": "AlfredoT@3972",
+  "Marcos Torres": "",
+  "Cristian Rossetti": "",
+  "Rodrigo Bertorello": "",
+  "Guillermo Bertorello": "",
+  "Marcos Pellegrini": "",
+  "Sebastian Bartolozzi": "",
+  "Alfredo Thiesing": "",
 };
-
-// Contraseña general de respaldo (para oficina/pruebas) — entra sin
-// asociarse a ningún técnico en particular, y el campo Técnico queda
-// para elegir a mano como antes.
-const APP_PASSWORD_GENERAL = "Marcos@2018";
 
 // URL desde donde se descarga el listado de servicios pendientes.
 // Es un endpoint propio (función serverless de Vercel, ver /api/servicios.js)
@@ -609,6 +610,10 @@ function showToast(message) {
 
 // ---------- Login ----------
 let tecnicoLogueado = "";
+// Ya no guarda contraseñas de verdad (el valor siempre queda vacío) —
+// se mantiene solo para tener la lista de NOMBRES a mano al armar el
+// desplegable de login. La contraseña siempre se verifica contra el
+// servidor, nunca comparando acá.
 let tecnicosPasswords = { ...TECNICOS_PASSWORDS_RESPALDO };
 let tecnicosPermisos = {}; // { nombre: {permisos...} } — se completa al cargar la lista
 
@@ -758,7 +763,7 @@ function intentarRestaurarSesion() {
   return false;
 }
 
-function attemptLogin() {
+async function attemptLogin() {
   const usuarioElegido = loginTecnicoSelect.value;
   const intento = loginPassword.value;
 
@@ -767,16 +772,30 @@ function attemptLogin() {
     return;
   }
 
-  const esValido = usuarioElegido === "__general__"
-    ? intento === APP_PASSWORD_GENERAL
-    : tecnicosPasswords[usuarioElegido] === intento;
-
-  if (esValido) {
-    entrarComoTecnico(usuarioElegido === "__general__" ? "" : usuarioElegido);
-  } else {
-    loginError.textContent = "Contraseña incorrecta.";
-    loginPassword.value = "";
-    loginPassword.focus();
+  loginBtn.disabled = true;
+  loginError.textContent = "";
+  try {
+    const headers = { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const body = usuarioElegido === "__general__"
+      ? { accion: "verificar_admin", password: intento }
+      : { accion: "verificar_login", nombre: usuarioElegido, password: intento };
+    const res = await fetch("/api/datos?coleccion=tecnicos", {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (res.ok && data.ok) {
+      entrarComoTecnico(usuarioElegido === "__general__" ? "" : usuarioElegido);
+    } else {
+      loginError.textContent = "Contraseña incorrecta.";
+      loginPassword.value = "";
+      loginPassword.focus();
+    }
+  } catch (err) {
+    loginError.textContent = "No se pudo verificar — revisá tu conexión e intentá de nuevo.";
+  } finally {
+    loginBtn.disabled = false;
   }
 }
 
@@ -863,6 +882,19 @@ function formatSyncTime(date) {
 
 function normalizeText(s) {
   return (s || "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+// Neutraliza HTML/JS antes de insertar texto (cliente, dirección,
+// tarea, claves, etc.) con innerHTML — sin esto, alguien podría
+// escribir algo como <script> o <img onerror=...> en un campo de
+// texto libre y que se ejecute en la pantalla de otro técnico.
+function escapeHtml(s) {
+  return (s ?? "").toString()
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 function filtrarServicios() {
@@ -976,10 +1008,10 @@ function renderServiciosList(items) {
     card.type = "button";
     card.className = "servicio-card" + claseEstancado;
     card.innerHTML = `
-      <div class="servicio-card-num">N° ${item.numero_servicio ?? ""}${badgeEstancado}</div>
-      <div class="servicio-card-cliente">${item.cliente ?? ""}</div>
-      <div class="servicio-card-direccion">${item.direccion ?? ""}${item.localidad ? ", " + item.localidad : ""}</div>
-      <div class="servicio-card-tarea">${item.tarea ?? ""}</div>
+      <div class="servicio-card-num">N° ${escapeHtml(item.numero_servicio)}${badgeEstancado}</div>
+      <div class="servicio-card-cliente">${escapeHtml(item.cliente)}</div>
+      <div class="servicio-card-direccion">${escapeHtml(item.direccion)}${item.localidad ? ", " + escapeHtml(item.localidad) : ""}</div>
+      <div class="servicio-card-tarea">${escapeHtml(item.tarea)}</div>
     `;
     card.addEventListener("click", () => seleccionarServicio(item));
     serviciosListEl.appendChild(card);
@@ -1214,8 +1246,8 @@ function renderCronogramaTareas() {
       <div class="crono-tarea-hora">${t.hora_inicio || ""} - ${t.hora_fin || ""}${
         resuelto ? '<span class="crono-tarea-badge resuelto">RESUELTO</span>' : vinculado ? "" : '<span class="crono-tarea-badge">SIN VINCULAR</span>'
       }</div>
-      <div class="crono-tarea-tecnico">${t.tecnico || ""}</div>
-      <div class="crono-tarea-texto">${t.tarea || ""}</div>
+      <div class="crono-tarea-tecnico">${escapeHtml(t.tecnico)}</div>
+      <div class="crono-tarea-texto">${escapeHtml(t.tarea)}</div>
     `;
     card.addEventListener("click", () => seleccionarTareaCronograma(t));
     cronoTareasList.appendChild(card);
@@ -1871,9 +1903,9 @@ function renderizarMapa(actual, porId) {
       const card = document.createElement("div");
       card.className = "mapa-cercano-card" + (esMuyCercano ? "" : " lejano");
       card.innerHTML = `
-        <div class="mapa-cercano-num">N° ${servicio.numero_servicio || ""}</div>
-        <div class="mapa-cercano-cliente">${servicio.cliente || ""}</div>
-        <div class="mapa-cercano-dist">${Math.round(dist)} m — ${servicio.direccion || ""}</div>
+        <div class="mapa-cercano-num">N° ${escapeHtml(servicio.numero_servicio)}</div>
+        <div class="mapa-cercano-cliente">${escapeHtml(servicio.cliente)}</div>
+        <div class="mapa-cercano-dist">${Math.round(dist)} m — ${escapeHtml(servicio.direccion)}</div>
       `;
       mapaCercanosList.appendChild(card);
     });
@@ -1942,8 +1974,8 @@ async function verificarYSugerirCercanos(data) {
       card.type = "button";
       card.className = "sugerencia-card";
       card.innerHTML = `
-        <div class="sugerencia-card-cliente">${servicio.cliente || ""}</div>
-        <div class="sugerencia-card-dist">${(dist / 1000).toFixed(1)} km — ${servicio.direccion || ""}</div>
+        <div class="sugerencia-card-cliente">${escapeHtml(servicio.cliente)}</div>
+        <div class="sugerencia-card-dist">${(dist / 1000).toFixed(1)} km — ${escapeHtml(servicio.direccion)}</div>
       `;
       card.addEventListener("click", () => seleccionarServicio(servicio));
       sugerenciasList.appendChild(card);
@@ -2102,11 +2134,11 @@ function actualizarBotonClaves() {
 function renderClavesAgregadas() {
   clavesAgregadasList.innerHTML = "";
   clavesAgregadas.forEach((c, idx) => {
-    const detalle = [c.usuario && `Usuario: ${c.usuario}`, c.clave && `Clave: ${c.clave}`, c.codigo && `Código: ${c.codigo}`]
+    const detalle = [c.usuario && `Usuario: ${escapeHtml(c.usuario)}`, c.clave && `Clave: ${escapeHtml(c.clave)}`, c.codigo && `Código: ${escapeHtml(c.codigo)}`]
       .filter(Boolean).join(" · ");
     const fila = document.createElement("div");
     fila.className = "material-agregado-item";
-    fila.innerHTML = `<span><b>${c.titulo}</b>${detalle ? " — " + detalle : ""}</span>`;
+    fila.innerHTML = `<span><b>${escapeHtml(c.titulo)}</b>${detalle ? " — " + detalle : ""}</span>`;
     const quitarBtn = document.createElement("button");
     quitarBtn.type = "button";
     quitarBtn.textContent = "✕";
@@ -2825,7 +2857,7 @@ async function renderDashboard() {
         const card = document.createElement("div");
         card.className = "dash-tecnico-card";
         card.innerHTML = `
-          <div class="dash-tecnico-nombre">${nombre}${medalla ? ` <span class="dash-medalla" title="Ranking de ${etiquetaPeriodo}">${medalla}</span>` : ""}</div>
+          <div class="dash-tecnico-nombre">${escapeHtml(nombre)}${medalla ? ` <span class="dash-medalla" title="Ranking de ${etiquetaPeriodo}">${medalla}</span>` : ""}</div>
           <div class="dash-tecnico-stats">
             <span class="dash-tecnico-stat"><b>${stats.cantidad}</b> resueltos</span>
             <span class="dash-tecnico-stat">Promedio: <b>${promedioTexto}</b></span>
@@ -2868,7 +2900,7 @@ async function renderDashboard() {
       const card = document.createElement("div");
       card.className = "dash-repetido-card";
       card.innerHTML = `
-        <div><b>${tecnico || "(sin técnico)"}</b> volvió a <b>${cliente}</b> ${n} veces este mes</div>
+        <div><b>${escapeHtml(tecnico) || "(sin técnico)"}</b> volvió a <b>${escapeHtml(cliente)}</b> ${n} veces este mes</div>
         <div class="dash-repetido-fechas">Fechas: ${fechas.join(", ")}</div>
       `;
       dashRepetidosList.appendChild(card);
@@ -3312,7 +3344,7 @@ async function cargarYRenderGuardias() {
       const mm = String(fecha.getMonth() + 1).padStart(2, "0");
       const card = document.createElement("div");
       card.className = "guardia-proximo-card";
-      card.innerHTML = `<span>${tecnico.nombre}</span><span class="guardia-proximo-fecha">desde ${dd}/${mm}</span>`;
+      card.innerHTML = `<span>${escapeHtml(tecnico.nombre)}</span><span class="guardia-proximo-fecha">desde ${dd}/${mm}</span>`;
       guardiaProximosList.appendChild(card);
     });
   } catch (err) {
@@ -3389,9 +3421,9 @@ function renderHistorialReciente() {
     const card = document.createElement("div");
     card.className = "historial-card";
     card.innerHTML = `
-      <div class="historial-card-num">N° ${h.numero_servicio || h.id_parte || ""}</div>
-      <div class="historial-card-cliente">${h.cliente || ""}</div>
-      <div class="historial-card-direccion">${h.direccion || ""}${h.localidad ? ", " + h.localidad : ""}</div>
+      <div class="historial-card-num">N° ${escapeHtml(h.numero_servicio || h.id_parte)}</div>
+      <div class="historial-card-cliente">${escapeHtml(h.cliente)}</div>
+      <div class="historial-card-direccion">${escapeHtml(h.direccion)}${h.localidad ? ", " + escapeHtml(h.localidad) : ""}</div>
       <div class="historial-card-horario">${fechaTexto} — ${h.hora_entrada || "?"} a ${h.hora_salida || "?"}</div>
     `;
     historialList.appendChild(card);
@@ -3879,17 +3911,17 @@ function renderDashVehiculos() {
     card.className = "historial-card";
     if (h.accion === "evento") {
       card.innerHTML = `
-        <div class="historial-card-num">${h.vehiculo || ""}</div>
-        <div class="historial-card-cliente">${h.tecnico || ""} — ${h.tipo_evento || "Evento"}</div>
+        <div class="historial-card-num">${escapeHtml(h.vehiculo)}</div>
+        <div class="historial-card-cliente">${escapeHtml(h.tecnico)} — ${escapeHtml(h.tipo_evento) || "Evento"}</div>
         <div class="historial-card-direccion">${fechaTexto}${h.hora ? " " + h.hora : ""} — Km: ${h.km || "?"}</div>
-        <div class="historial-card-horario">${h.monto ? "Monto: $" + h.monto : ""}${h.detalle ? (h.monto ? " · " : "") + h.detalle : ""}</div>
+        <div class="historial-card-horario">${h.monto ? "Monto: $" + h.monto : ""}${h.detalle ? (h.monto ? " · " : "") + escapeHtml(h.detalle) : ""}</div>
       `;
     } else {
       card.innerHTML = `
-        <div class="historial-card-num">${h.vehiculo || ""}</div>
-        <div class="historial-card-cliente">${h.tecnico || ""}</div>
+        <div class="historial-card-num">${escapeHtml(h.vehiculo)}</div>
+        <div class="historial-card-cliente">${escapeHtml(h.tecnico)}</div>
         <div class="historial-card-direccion">${fechaTexto} — ${h.hora_toma || "?"} a ${h.hora_devolucion || "(en uso)"}</div>
-        <div class="historial-card-horario">Km devolución: ${h.km_devolucion || "—"}${h.evento ? " · ⚠ " + h.evento : ""}</div>
+        <div class="historial-card-horario">Km devolución: ${h.km_devolucion || "—"}${h.evento ? " · ⚠ " + escapeHtml(h.evento) : ""}</div>
       `;
     }
     dashVehiculosList.appendChild(card);
@@ -4000,14 +4032,14 @@ function renderDashSims() {
       fechaTexto = `${d}/${m}/${y}`;
     }
     let detalle = "";
-    if (h.accion === "usar") detalle = `Cliente: ${h.cliente || "?"}`;
-    else if (h.accion === "transferir") detalle = `A: ${h.tecnico_nuevo || "?"}`;
-    else if (h.accion === "reemplazar") detalle = `Cliente: ${h.cliente || "?"} · reemplazó a la SIM ${h.sim_retirada || "?"} (${h.empresa_retirada || "?"})`;
+    if (h.accion === "usar") detalle = `Cliente: ${escapeHtml(h.cliente) || "?"}`;
+    else if (h.accion === "transferir") detalle = `A: ${escapeHtml(h.tecnico_nuevo) || "?"}`;
+    else if (h.accion === "reemplazar") detalle = `Cliente: ${escapeHtml(h.cliente) || "?"} · reemplazó a la SIM ${escapeHtml(h.sim_retirada) || "?"} (${escapeHtml(h.empresa_retirada) || "?"})`;
     const card = document.createElement("div");
     card.className = "historial-card";
     card.innerHTML = `
-      <div class="historial-card-num">${h.empresa || ""} · ${h.numero || ""}</div>
-      <div class="historial-card-cliente">${h.tecnico || ""} — ${ETIQUETA_ACCION_SIM[h.accion] || h.accion}</div>
+      <div class="historial-card-num">${h.empresa || ""} · ${escapeHtml(h.numero)}</div>
+      <div class="historial-card-cliente">${escapeHtml(h.tecnico)} — ${ETIQUETA_ACCION_SIM[h.accion] || h.accion}</div>
       <div class="historial-card-direccion">${fechaTexto}${h.hora ? " " + h.hora : ""}</div>
       <div class="historial-card-horario">${detalle}</div>
     `;
@@ -4912,10 +4944,10 @@ function dibujarSimsLista() {
     card.style.borderLeft = `4px solid ${colorEmpresa}`;
     card.innerHTML = `
       <div>
-        <div class="sim-card-empresa"><span class="sim-card-dot" style="background:${colorEmpresa};"></span>${s.empresa}${s.tipo ? " · " + s.tipo : ""}</div>
-        <div class="sim-card-numero">${s.numero}${mostrarTecnico ? " · " + s.tecnico_actual : ""}</div>
+        <div class="sim-card-empresa"><span class="sim-card-dot" style="background:${colorEmpresa};"></span>${s.empresa}${s.tipo ? " · " + escapeHtml(s.tipo) : ""}</div>
+        <div class="sim-card-numero">${escapeHtml(s.numero)}${mostrarTecnico ? " · " + escapeHtml(s.tecnico_actual) : ""}</div>
       </div>
-      <span class="sim-card-estado ${s.estado}">${s.estado === "uso" ? "En uso: " + (s.cliente || "?") : "En stock"}</span>
+      <span class="sim-card-estado ${s.estado}">${s.estado === "uso" ? "En uso: " + escapeHtml(s.cliente || "?") : "En stock"}</span>
     `;
     card.addEventListener("click", () => {
       simSeleccionada = s.numero;
@@ -5222,9 +5254,9 @@ function renderResultadosSimRegistro() {
     card.innerHTML = `
       <div>
         <div class="sim-card-empresa"><span class="sim-card-dot" style="background:${colorEmpresa};"></span>${s.empresa || "?"}</div>
-        <div class="sim-card-numero">${s.numero} · ${s.cliente || "sin nombre"}</div>
-        <div style="font-size:12px; color:#6B7680; margin-top:2px;">${s.direccion || ""}</div>
-        <div style="font-size:12px; color:#2E7D32; margin-top:2px; font-weight:600;">${s.estado_linea || "Activo"}</div>
+        <div class="sim-card-numero">${escapeHtml(s.numero)} · ${escapeHtml(s.cliente) || "sin nombre"}</div>
+        <div style="font-size:12px; color:#6B7680; margin-top:2px;">${escapeHtml(s.direccion)}</div>
+        <div style="font-size:12px; color:#2E7D32; margin-top:2px; font-weight:600;">${escapeHtml(s.estado_linea) || "Activo"}</div>
       </div>
       <button type="button" class="btn-small btn-secondary" style="width:auto;">Retirar</button>
     `;
