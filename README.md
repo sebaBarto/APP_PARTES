@@ -229,6 +229,36 @@ pendiente de la lista sigue autocompletando cliente y dirección (el
 N° de abonado no, porque los servicios no tienen ese dato) — y todo
 queda editable por si hace falta ajustar algo antes de confirmar.
 
+## Auditoría de diseño: contraste, tamaño táctil, y paleta de gráficos (v3.14.0)
+
+Se hizo una revisión rigurosa del diseño, basada en **medición objetiva** (no en apreciación
+visual, ya que este entorno no permite juzgar estética a simple vista) — contraste real
+calculado según la fórmula de WCAG, tamaños de elementos, y distancia perceptual entre colores.
+Se investigaron también tendencias actuales de diseño de dashboards y apps de campo para
+técnicos antes de decidir qué tocar.
+
+**Encontrado y corregido:**
+- El texto "LISTO" de la barra superior tenía 3.92:1 de contraste (necesita 4.5:1) — corregido a 5.50:1.
+- El texto "= sin cambios" en las tarjetas de dashboard tenía 3.27:1 — corregido a 5.21:1.
+- Los encabezados de la tabla de SIMs en `admin.html` tenían 4.23:1 — corregido a 5.33:1.
+- Dos botones secundarios (Activar notificaciones, Cerrar sesión) medían 33px de alto — se
+  llevaron a 44px, el mínimo recomendado para uso táctil de un solo dedo (importante para
+  técnicos que muchas veces usan el celular con una sola mano en la calle).
+- La paleta de colores para distinguir técnicos en los gráficos tenía pares casi
+  indistinguibles entre sí (dos grises muy parecidos, un ámbar y un marrón casi iguales) — se
+  reemplazó por una con mejor separación (la distancia mínima entre cualquier par de colores
+  pasó de 41 a 67, verificado numéricamente) y sin rojo y verde uno al lado del otro (para
+  daltonismo rojo-verde).
+- Se formalizó la escala de espaciado para que coincida con los valores que ya se venían usando
+  en la práctica, en vez de una escala que nunca se aplicaba realmente.
+
+**Se revisó pero NO se tocó** (para no arriesgar romper algo sin poder verlo): un caso que
+parecía tener mal contraste (el estado "En stock" de las SIMs) resultó ser un falso positivo al
+medir con una muestra de píxel real en vez de la fórmula ingenua — el contraste real es 5.13:1,
+está bien. Tampoco se hizo un reemplazo masivo de los ~140 valores de espaciado que no seguían
+la escala original, porque sin poder verificar visualmente el resultado, el riesgo de romper
+alineaciones sutiles no compensaba el beneficio.
+
 ## "Instalar en cliente" desde admin.html, y bug del botón "Transferir" (v3.13.0)
 
 ### Bug encontrado: "Transferir" en la tabla de stock estaba roto

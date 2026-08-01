@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.13.1";
+const APP_VERSION = "3.14.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -2850,7 +2850,7 @@ function renderChartDias(rango, enPeriodo) {
   });
 }
 
-const PALETA_TECNICOS = ["#F5A623", "#101820", "#2E86DE", "#2E7D32", "#B5772A", "#8A9089", "#C0392B", "#6B7680"];
+const PALETA_TECNICOS = ["#F5A623", "#2E86DE", "#7B4B94", "#2E9E4F", "#C0392B", "#17A2A0", "#101820", "#8B5E3C"];
 
 function renderChartDistancia(porTecnico) {
   const canvas = document.getElementById("dashChartDistancia");

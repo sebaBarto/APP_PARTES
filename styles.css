@@ -43,10 +43,14 @@
   --r-pill: 999px;
 
   --sp-1: 4px;
-  --sp-2: 8px;
-  --sp-3: 12px;
-  --sp-4: 16px;
-  --sp-5: 24px;
+  --sp-2: 6px;
+  --sp-3: 8px;
+  --sp-4: 10px;
+  --sp-5: 12px;
+  --sp-6: 14px;
+  --sp-7: 16px;
+  --sp-8: 20px;
+  --sp-9: 24px;
 
   /* Sombras con tinte cálido (ámbar) en vez de gris plano — le da
      al panel claro sobre fondo oscuro una sensación de "elevación"
@@ -109,7 +113,7 @@ html, body {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 11px;
   letter-spacing: 0.08em;
-  color: #5C7A8A;
+  color: #7593A3;
   border: 1px solid #2A3743;
   border-radius: 999px;
   padding: 4px 10px;
@@ -580,7 +584,7 @@ html, body {
 .btn-secondary:active { transform: scale(0.97); background: rgba(244,245,240,0.08); }
 .btn-ghost { background: transparent; color: #C7CCC3; border: 1px solid #3A4652; }
 .btn-ghost:active { transform: scale(0.97); background: rgba(199,204,195,0.08); }
-.btn-small { width: auto; padding: 8px 14px; font-size: 13px; }
+.btn-small { width: auto; padding: 13px 16px; font-size: 13px; min-height: 44px; }
 .action-bar-column { display: flex; flex-direction: column; gap: 8px; }
 
 /* ---------- STEP 0: LISTADO DE SERVICIOS ---------- */
@@ -778,7 +782,7 @@ html, body {
 .dash-card-delta { font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; margin-top: 6px; font-weight: 600; }
 .dash-card-delta.up { color: #2E7D32; }
 .dash-card-delta.down { color: #C0392B; }
-.dash-card-delta.neutral { color: #8A9089; }
+.dash-card-delta.neutral { color: #696E68; }
 .dash-subtitulo {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 11px;
