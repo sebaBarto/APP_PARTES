@@ -133,6 +133,12 @@
           </span>
           <span class="panel-tile-label">Comodato</span>
         </button>
+        <button type="button" class="panel-tile panel-tile-grid tile-planos" id="tilePlanosBtn">
+          <span class="panel-tile-icon-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 9h18M9 9v12M14 3v6M9 15h5"/></svg>
+          </span>
+          <span class="panel-tile-label">Planos</span>
+        </button>
         <a href="admin.html" target="_blank" rel="noopener" class="panel-tile panel-tile-grid tile-admin hidden" id="abrirAdminBtn">
           <span class="panel-tile-icon-badge">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>
@@ -577,6 +583,23 @@
     </div>
     <div class="action-bar">
       <button class="btn btn-secondary" id="volverDeSimRegistroBtn" type="button">Volver</button>
+    </div>
+  </section>
+
+  <!-- PLANOS DE CABLEADO -->
+  <section class="screen" id="screen-planos">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">PLANOS DE CABLEADO</p>
+      <p class="hint-text">Buscá por nombre de cliente para ver su plano en PDF.</p>
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input class="field-input search-input" id="planosBuscarInput" type="search" placeholder="Nombre del cliente...">
+      </div>
+      <p class="list-status" id="planosStatus"></p>
+      <div id="planosResultados"></div>
+    </div>
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDePlanosBtn" type="button">Volver</button>
     </div>
   </section>
 

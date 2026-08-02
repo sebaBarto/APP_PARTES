@@ -1,0 +1,13 @@
+{
+  "name": "sync-local-planos",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Vigila una carpeta en tu PC y sube los planos nuevos o modificados (PDF y Visio) a la app de SAT.",
+  "main": "sync.js",
+  "scripts": {
+    "start": "node sync.js"
+  },
+  "dependencies": {
+    "chokidar": "^5.0.0"
+  }
+}

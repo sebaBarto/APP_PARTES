@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.16.0";
+const APP_VERSION = "3.17.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -134,6 +134,7 @@ const screens = {
   sims: document.getElementById("screen-sims"),
   simDetalle: document.getElementById("screen-sim-detalle"),
   simRegistro: document.getElementById("screen-sim-registro"),
+  planos: document.getElementById("screen-planos"),
   herramientas: document.getElementById("screen-herramientas"),
   herramientaDetalle: document.getElementById("screen-herramienta-detalle"),
   comodatoForm: document.getElementById("screen-comodato-form"),
@@ -245,6 +246,11 @@ const tileVehiculosBtn = document.getElementById("tileVehiculosBtn");
 const tileSimsBtn = document.getElementById("tileSimsBtn");
 const tileHerramientasBtn = document.getElementById("tileHerramientasBtn");
 const tileComodatoBtn = document.getElementById("tileComodatoBtn");
+const tilePlanosBtn = document.getElementById("tilePlanosBtn");
+const volverDePlanosBtn = document.getElementById("volverDePlanosBtn");
+const planosBuscarInput = document.getElementById("planosBuscarInput");
+const planosStatus = document.getElementById("planosStatus");
+const planosResultados = document.getElementById("planosResultados");
 const comFDNombre = document.getElementById("comFDNombre");
 const comFDDireccion = document.getElementById("comFDDireccion");
 const comFDCiudad = document.getElementById("comFDCiudad");
@@ -5292,6 +5298,91 @@ async function confirmarRetirarSim(sim) {
     showToast(`Retiraste la línea ${sim.numero} — ya está en tu stock.`);
   } catch (err) {
     showToast("No se pudo retirar: " + err.message);
+  }
+}
+
+// ---------- Planos de cableado ----------
+let planosCache = null; // se trae una sola vez y se cachea (nombres, es liviano)
+const LIMITE_RESULTADOS_PLANOS = 30;
+
+tilePlanosBtn.addEventListener("click", () => {
+  showScreen("planos");
+  planosBuscarInput.value = "";
+  planosResultados.innerHTML = "";
+  planosStatus.textContent = "Escribí para buscar el plano de un cliente.";
+  cargarPlanos();
+});
+volverDePlanosBtn.addEventListener("click", () => showScreen("home"));
+
+async function cargarPlanos() {
+  if (planosCache) return; // ya está en memoria
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/planos", { headers, cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    planosCache = await res.json();
+    if (!Array.isArray(planosCache)) planosCache = [];
+  } catch (err) {
+    planosStatus.textContent = "No se pudo cargar la lista de planos.";
+    planosCache = [];
+  }
+}
+
+function renderResultadosPlanos() {
+  const busqueda = normalizeText(planosBuscarInput.value.trim());
+  planosResultados.innerHTML = "";
+  if (!busqueda) {
+    planosStatus.textContent = "Escribí para buscar el plano de un cliente.";
+    return;
+  }
+  if (!planosCache) {
+    planosStatus.textContent = "Cargando...";
+    return;
+  }
+  const coincidencias = planosCache.filter((p) => normalizeText(p.nombre).includes(busqueda));
+  if (coincidencias.length === 0) {
+    planosStatus.textContent = "Ningún plano coincide con esa búsqueda.";
+    return;
+  }
+  planosStatus.textContent = coincidencias.length > LIMITE_RESULTADOS_PLANOS
+    ? `${coincidencias.length} coincidencias — mostrando las primeras ${LIMITE_RESULTADOS_PLANOS}.`
+    : `${coincidencias.length} coincidencia(s).`;
+
+  coincidencias.slice(0, LIMITE_RESULTADOS_PLANOS).forEach((p) => {
+    const card = document.createElement("div");
+    card.className = "sim-card";
+    card.innerHTML = `
+      <div>
+        <div class="sim-card-numero">${escapeHtml(p.nombre)}</div>
+        <div style="font-size:12px; color:#6B7680; margin-top:2px;">PDF${p.tamano_kb ? " · " + p.tamano_kb + " KB" : ""}</div>
+      </div>
+      <button type="button" class="btn-small btn-secondary" style="width:auto;">Ver</button>
+    `;
+    card.querySelector("button").addEventListener("click", (e) => {
+      e.stopPropagation();
+      abrirPlano(p.nombre, card.querySelector("button"));
+    });
+    planosResultados.appendChild(card);
+  });
+}
+planosBuscarInput.addEventListener("input", renderResultadosPlanos);
+
+async function abrirPlano(nombre, boton) {
+  const textoOriginal = boton.textContent;
+  boton.textContent = "...";
+  boton.disabled = true;
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch(`/api/planos?nombre=${encodeURIComponent(nombre)}`, { headers });
+    if (!res.ok) throw new Error("No se pudo abrir el plano");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank");
+  } catch (err) {
+    showToast("No se pudo abrir el plano: " + err.message);
+  } finally {
+    boton.textContent = textoOriginal;
+    boton.disabled = false;
   }
 }
 

@@ -201,6 +201,7 @@
       <button type="button" class="tab-btn" id="tabSimsBtn"><span class="tab-icon">📶</span>SIMs</button>
       <button type="button" class="tab-btn" id="tabHerramientasBtn"><span class="tab-icon">🧰</span>Herramientas</button>
       <button type="button" class="tab-btn" id="tabSimsInstaladasBtn"><span class="tab-icon">📇</span>SIMs instaladas</button>
+      <button type="button" class="tab-btn" id="tabPlanosBtn"><span class="tab-icon">📐</span>Planos</button>
     </div>
 
     <div id="panelServicios">
@@ -483,7 +484,39 @@
         </div>
       </div>
     </div>
-  </div>
+
+    <div id="panelPlanos" class="hidden">
+      <h1>Planos de cableado</h1>
+      <p class="subtitle">
+        PDF con el plano/croquis de cableado de cada cliente — un cliente puede tener más de
+        uno (por ejemplo, distintas plantas o sectores). Se buscan por nombre desde la app de
+        los técnicos.
+      </p>
+
+      <div class="card" style="margin-bottom:16px;">
+        <label>Subir planos (podés elegir varios a la vez)</label>
+        <p class="subtitle" style="margin:0 0 10px;">
+          Nombrá cada archivo con el nombre del cliente antes de subirlo (por ejemplo,
+          "Distribuidora Norte SA - Planta baja.pdf") — así lo van a poder encontrar buscando
+          ese nombre desde la app. Si ya existe un plano con el mismo nombre, se reemplaza.
+        </p>
+        <input type="file" id="planosArchivosInput" accept="application/pdf" multiple>
+        <div style="margin-top:10px;">
+          <div id="planosProgresoBarraFondo" style="background:#EFF1EC; border-radius:8px; height:10px; overflow:hidden; display:none;">
+            <div id="planosProgresoBarra" style="background:var(--amber, #F5A623); height:100%; width:0%; transition:width 0.2s;"></div>
+          </div>
+          <p class="status" id="planosSubirStatus"></p>
+        </div>
+      </div>
+
+      <div class="card">
+        <label for="planosBuscarAdmin">Buscar planos ya cargados</label>
+        <input type="text" id="planosBuscarAdmin" placeholder="Escribí para buscar...">
+        <p class="status" id="planosAdminStatus"></p>
+        <div id="planosAdminResultados"></div>
+      </div>
+    </div>
+    </div>
 
 </div>
 
@@ -547,6 +580,9 @@ let herramientasCargadasUnaVez = false;
 const tabSimsInstaladasBtn = document.getElementById("tabSimsInstaladasBtn");
 const panelSimsInstaladas = document.getElementById("panelSimsInstaladas");
 let simsInstaladasCargadasUnaVez = false;
+const tabPlanosBtn = document.getElementById("tabPlanosBtn");
+const panelPlanos = document.getElementById("panelPlanos");
+let planosCargadosUnaVezAdmin = false;
 
 const TABS = [
   { btn: tabServiciosBtn, panel: panelServicios },
@@ -560,6 +596,7 @@ const TABS = [
   { btn: tabSimsBtn, panel: panelSims, onShow: () => { if (!simsCargadasUnaVez) { simsCargadasUnaVez = true; cargarSimsAdmin(); } } },
   { btn: tabHerramientasBtn, panel: panelHerramientas, onShow: () => { if (!herramientasCargadasUnaVez) { herramientasCargadasUnaVez = true; cargarHerramientasAdmin(); } } },
   { btn: tabSimsInstaladasBtn, panel: panelSimsInstaladas, onShow: () => { if (!simsInstaladasCargadasUnaVez) { simsInstaladasCargadasUnaVez = true; cargarSimsInstaladasAdmin(); } } },
+  { btn: tabPlanosBtn, panel: panelPlanos, onShow: () => { if (!planosCargadosUnaVezAdmin) { planosCargadosUnaVezAdmin = true; cargarPlanosAdmin(); } } },
 ];
 
 TABS.forEach(({ btn, panel, onShow }) => {
@@ -2159,6 +2196,104 @@ simsInstaladasExcelFile.addEventListener("change", () => {
   };
   reader.readAsArrayBuffer(file);
 });
+
+// ---------- Planos de cableado ----------
+const planosArchivosInput = document.getElementById("planosArchivosInput");
+const planosProgresoBarraFondo = document.getElementById("planosProgresoBarraFondo");
+const planosProgresoBarra = document.getElementById("planosProgresoBarra");
+const planosSubirStatus = document.getElementById("planosSubirStatus");
+const planosBuscarAdmin = document.getElementById("planosBuscarAdmin");
+const planosAdminStatus = document.getElementById("planosAdminStatus");
+const planosAdminResultados = document.getElementById("planosAdminResultados");
+let planosCacheAdmin = [];
+
+function leerArchivoComoBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+planosArchivosInput.addEventListener("change", async () => {
+  const archivos = Array.from(planosArchivosInput.files || []);
+  if (archivos.length === 0) return;
+
+  planosProgresoBarraFondo.style.display = "block";
+  planosProgresoBarra.style.width = "0%";
+  let subidos = 0;
+  let fallidos = [];
+
+  // Se suben de a uno — así ningún archivo pesado hace que el pedido
+  // entero sea demasiado grande, y si alguno falla, no arruina a los
+  // demás que ya se subieron bien.
+  for (let i = 0; i < archivos.length; i++) {
+    const archivo = archivos[i];
+    const nombreSinExtension = archivo.name.replace(/\.pdf$/i, "");
+    planosSubirStatus.textContent = `Subiendo ${i + 1} de ${archivos.length}: ${nombreSinExtension}...`;
+    try {
+      const base64 = await leerArchivoComoBase64(archivo);
+      const res = await fetch("/api/planos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+        body: JSON.stringify({ nombre_archivo: nombreSinExtension, base64 }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error desconocido");
+      subidos++;
+    } catch (err) {
+      fallidos.push(`${nombreSinExtension} (${err.message})`);
+    }
+    planosProgresoBarra.style.width = `${Math.round(((i + 1) / archivos.length) * 100)}%`;
+  }
+
+  planosSubirStatus.className = fallidos.length > 0 ? "status err" : "status ok";
+  planosSubirStatus.textContent = fallidos.length > 0
+    ? `Se subieron ${subidos} de ${archivos.length}. Fallaron: ${fallidos.join(", ")}`
+    : `Listo — se subieron los ${subidos} planos.`;
+  planosArchivosInput.value = "";
+  planosCargadosUnaVezAdmin = false; // para que la proxima busqueda traiga la lista actualizada
+});
+
+async function cargarPlanosAdmin() {
+  planosAdminStatus.textContent = "Cargando lista de planos...";
+  try {
+    const res = await fetch("/api/planos", {
+      headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    planosCacheAdmin = Array.isArray(data) ? data : [];
+    planosAdminStatus.textContent = `${planosCacheAdmin.length} planos cargados. Escribí arriba para buscar.`;
+  } catch (err) {
+    planosAdminStatus.className = "status err";
+    planosAdminStatus.textContent = "No se pudo cargar la lista: " + err.message;
+  }
+}
+
+function dibujarResultadosPlanosAdmin() {
+  const busqueda = planosBuscarAdmin.value.trim().toLowerCase();
+  planosAdminResultados.innerHTML = "";
+  if (!busqueda) {
+    planosAdminStatus.className = "status";
+    planosAdminStatus.textContent = `${planosCacheAdmin.length} planos cargados. Escribí arriba para buscar.`;
+    return;
+  }
+  const coincidencias = planosCacheAdmin.filter((p) => p.nombre.toLowerCase().includes(busqueda));
+  planosAdminStatus.textContent = coincidencias.length === 0
+    ? "Ninguna coincidencia."
+    : `${coincidencias.length} coincidencia(s).`;
+  coincidencias.slice(0, 50).forEach((p) => {
+    const fila = document.createElement("div");
+    fila.className = "card";
+    fila.style.marginBottom = "8px";
+    fila.textContent = `${p.nombre} — ${p.tamano_kb || 0} KB`;
+    planosAdminResultados.appendChild(fila);
+  });
+}
+planosBuscarAdmin.addEventListener("input", dibujarResultadosPlanosAdmin);
 
 
 let workbook = null;   // libro Excel actual (si el archivo es Excel)

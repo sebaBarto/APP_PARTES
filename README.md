@@ -240,6 +240,48 @@ del formulario) y confirmando que igual se guarda y se restaura completa al reab
 servicio. De paso se corrigió el mismo hueco para el número de presupuesto (opción "Por
 presupuesto"), que tenía el mismo problema.
 
+## Planos de cableado, con almacenamiento en Cloudflare R2 (v3.17.0)
+
+Nueva sección **"📐 Planos"** en la app del técnico: buscá por nombre de cliente y abrí el PDF
+del plano/croquis de cableado directo desde el celular (se abre en una pestaña nueva, para
+poder hacer zoom con los gestos normales).
+
+### Dónde se guardan, y por qué
+
+Con ~1000 archivos livianos (~450 MB en total) y creciendo, un repositorio de Git **no** es un
+buen lugar para guardarlos — cada vez que se reemplaza un plano, Git guarda la versión vieja
+Y la nueva para siempre, así que el repositorio solo crecería sin parar. En cambio, se
+guardan en **Cloudflare R2** (almacenamiento de objetos, gratis hasta 10 GB, sin cobrar nunca
+por las descargas — de sobra para esto y para crecer bastante más).
+
+A diferencia de las fotos de servicios (que no piden contraseña porque van embebidas en
+mails), los planos **siempre exigen el token de acceso de la app** — son datos más sensibles
+(muestran cómo está armada la seguridad de un cliente) y nunca se necesitan fuera de la app.
+
+**Variables de entorno nuevas a cargar en Vercel**: `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`,
+`R2_SECRET_ACCESS_KEY`, `R2_BUCKET_NAME`.
+
+### Carga masiva desde `admin.html`
+
+Nueva pestaña "📐 Planos" — se pueden subir varios PDF a la vez (se suben de a uno por detrás
+de escena, con una barra de progreso, para no toparse con los límites de tamaño de Vercel al
+mandar cientos de archivos juntos). Cada archivo se nombra con el nombre del cliente antes de
+subirlo — ese nombre es lo que después se busca desde la app. Si ya existe un plano con el
+mismo nombre, se reemplaza.
+
+### Sincronizador automático para la PC (`sync-local-planos/`)
+
+Como carga inicial de ~1000 archivos sería muy lento uno por uno, se armó un programa aparte
+que corre en la PC de oficina: vigila una carpeta y sube solo lo nuevo o modificado, sin
+intervención manual. Como los archivos originales son una mezcla de PDF y Visio (`.vsd`/
+`.vsdx`), el programa convierte los Visio a PDF automáticamente antes de subirlos (con
+LibreOffice, gratis) — un celular no puede abrir un Visio directo. Instrucciones completas de
+instalación en `sync-local-planos/README.md`.
+
+Se probó a fondo: sube PDF y Visio correctamente, no vuelve a subir un archivo si no cambió de
+verdad, sube de nuevo solo lo que se modificó, y si falla la conversión de un archivo puntual,
+el resto sigue procesándose sin problema.
+
 ## Auditoría de seguridad integral (v3.16.0)
 
 Revisión de seguridad de toda la app: manejo de datos, accesos y permisos, comunicación con
