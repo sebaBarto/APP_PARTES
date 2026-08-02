@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.17.0";
+const APP_VERSION = "3.18.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -135,6 +135,7 @@ const screens = {
   simDetalle: document.getElementById("screen-sim-detalle"),
   simRegistro: document.getElementById("screen-sim-registro"),
   planos: document.getElementById("screen-planos"),
+  emergencia: document.getElementById("screen-emergencia"),
   herramientas: document.getElementById("screen-herramientas"),
   herramientaDetalle: document.getElementById("screen-herramienta-detalle"),
   comodatoForm: document.getElementById("screen-comodato-form"),
@@ -247,6 +248,13 @@ const tileSimsBtn = document.getElementById("tileSimsBtn");
 const tileHerramientasBtn = document.getElementById("tileHerramientasBtn");
 const tileComodatoBtn = document.getElementById("tileComodatoBtn");
 const tilePlanosBtn = document.getElementById("tilePlanosBtn");
+const tileEmergenciaBtn = document.getElementById("tileEmergenciaBtn");
+const volverDeEmergenciaBtn = document.getElementById("volverDeEmergenciaBtn");
+const cargarEmergenciaBtn = document.getElementById("cargarEmergenciaBtn");
+const emergenciaLista = document.getElementById("emergenciaLista");
+const emergenciaListaStatus = document.getElementById("emergenciaListaStatus");
+const cronoEmergenciasWrap = document.getElementById("cronoEmergenciasWrap");
+const cronoEmergenciasLista = document.getElementById("cronoEmergenciasLista");
 const volverDePlanosBtn = document.getElementById("volverDePlanosBtn");
 const planosBuscarInput = document.getElementById("planosBuscarInput");
 const planosStatus = document.getElementById("planosStatus");
@@ -672,7 +680,7 @@ function permisosDelTecnico(nombre) {
     return {
       dash_general: true, dash_financiero: true, dash_vehiculos: true, dash_sims: true,
       historial_todos: true, vehiculos: true, sims: true, herramientas: true,
-      comodato: true, admin: true,
+      comodato: true, admin: true, agendar_emergencia: true,
     };
   }
   if (tecnicosPermisos[nombre]) {
@@ -694,6 +702,7 @@ function permisosDelTecnico(nombre) {
     herramientas: true,
     comodato: true,
     admin: nombre === "Sebastian Bartolozzi" || nombre === "Brenda Thiesing",
+    agendar_emergencia: false,
   };
 }
 const tecnicosListos = cargarTecnicos();
@@ -861,6 +870,7 @@ function actualizarAccesoSeccionesPanel() {
   tileSimsBtn.classList.toggle("hidden", !permisos.sims);
   tileHerramientasBtn.classList.toggle("hidden", !permisos.herramientas);
   tileComodatoBtn.classList.toggle("hidden", !permisos.comodato);
+  tileEmergenciaBtn.classList.toggle("hidden", !permisos.agendar_emergencia);
 }
 
 function actualizarAccesoDashboardFinanciero() {
@@ -1315,6 +1325,7 @@ function seleccionarTareaCronograma(t) {
 verCronogramaBtn.addEventListener("click", () => {
   showScreen("cronograma");
   fetchCronograma();
+  cargarResumenEmergenciasEnCronograma();
 });
 refreshCronogramaBtn.addEventListener("click", fetchCronograma);
 volverDeCronogramaBtn.addEventListener("click", () => {
@@ -5298,6 +5309,134 @@ async function confirmarRetirarSim(sim) {
     showToast(`Retiraste la línea ${sim.numero} — ya está en tu stock.`);
   } catch (err) {
     showToast("No se pudo retirar: " + err.message);
+  }
+}
+
+// ---------- Agenda de emergencia ----------
+tileEmergenciaBtn.addEventListener("click", () => {
+  showScreen("emergencia");
+  cargarListaEmergencias();
+});
+volverDeEmergenciaBtn.addEventListener("click", () => showScreen("home"));
+
+async function cargarListaEmergencias() {
+  emergenciaListaStatus.textContent = "Cargando...";
+  emergenciaLista.innerHTML = "";
+  try {
+    const res = await fetch("/api/datos?coleccion=servicios_emergencia", {
+      headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      cache: "no-store",
+    });
+    const data = await res.json();
+    const lista = Array.isArray(data) ? data : [];
+    if (lista.length === 0) {
+      emergenciaListaStatus.textContent = "Todavía no se cargó ningún servicio de emergencia.";
+      return;
+    }
+    emergenciaListaStatus.textContent = "";
+    lista
+      .slice()
+      .sort((a, b) => (b.fecha_carga || "").localeCompare(a.fecha_carga || ""))
+      .slice(0, 20)
+      .forEach((e) => {
+        const card = document.createElement("div");
+        card.className = "sim-card";
+        card.innerHTML = `
+          <div>
+            <div class="sim-card-numero">${escapeHtml(e.cliente) || "(sin cliente)"} ${e.revisado ? "· <span style=\"color:#2E7D32;\">ya pasado</span>" : ""}</div>
+            <div style="font-size:12px; color:#6B7680; margin-top:2px;">${escapeHtml(e.direccion)}</div>
+            <div style="font-size:12px; color:#6B7680; margin-top:2px;">${escapeHtml(e.tarea)}</div>
+            <div style="font-size:12px; color:#8A9089; margin-top:4px;">Para: ${e.fecha_deseada || "?"}${e.hora_deseada ? " " + e.hora_deseada : ""} — cargado por ${escapeHtml(e.cargado_por) || "?"}</div>
+          </div>
+        `;
+        emergenciaLista.appendChild(card);
+      });
+  } catch (err) {
+    emergenciaListaStatus.textContent = "No se pudo cargar la lista.";
+  }
+}
+
+cargarEmergenciaBtn.addEventListener("click", async () => {
+  const cliente = document.getElementById("emerg_cliente").value.trim();
+  const direccion = document.getElementById("emerg_direccion").value.trim();
+  const telefono = document.getElementById("emerg_telefono").value.trim();
+  const tarea = document.getElementById("emerg_tarea").value.trim();
+  const fecha_deseada = document.getElementById("emerg_fecha").value;
+  const hora_deseada = document.getElementById("emerg_hora").value;
+
+  if (!cliente || !direccion || !tarea || !fecha_deseada) {
+    showToast("Completá al menos cliente, dirección, motivo y fecha deseada.");
+    return;
+  }
+
+  cargarEmergenciaBtn.disabled = true;
+  cargarEmergenciaBtn.textContent = "Cargando...";
+  try {
+    const resActual = await fetch("/api/datos?coleccion=servicios_emergencia", {
+      headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      cache: "no-store",
+    });
+    const listaActual = await resActual.json();
+    const lista = Array.isArray(listaActual) ? listaActual : [];
+
+    const nuevaEntrada = {
+      id: "emerg_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8),
+      cliente, direccion, telefono, tarea, fecha_deseada, hora_deseada,
+      cargado_por: tecnicoLogueado || "Oficina",
+      fecha_carga: new Date().toISOString(),
+      revisado: false,
+    };
+
+    const res = await fetch("/api/datos?coleccion=servicios_emergencia", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify([...lista, nuevaEntrada]),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+
+    showToast("Servicio de emergencia cargado — se le avisó a todo el equipo.");
+    document.getElementById("emerg_cliente").value = "";
+    document.getElementById("emerg_direccion").value = "";
+    document.getElementById("emerg_telefono").value = "";
+    document.getElementById("emerg_tarea").value = "";
+    document.getElementById("emerg_fecha").value = "";
+    document.getElementById("emerg_hora").value = "";
+    cargarListaEmergencias();
+  } catch (err) {
+    showToast("No se pudo cargar: " + err.message);
+  } finally {
+    cargarEmergenciaBtn.disabled = false;
+    cargarEmergenciaBtn.textContent = "🚨 Cargar servicio de emergencia";
+  }
+});
+
+
+// ---------- Resumen de emergencias pendientes, mostrado en Cronograma ----------
+async function cargarResumenEmergenciasEnCronograma() {
+  try {
+    const res = await fetch("/api/datos?coleccion=servicios_emergencia", {
+      headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      cache: "no-store",
+    });
+    const data = await res.json();
+    const pendientes = (Array.isArray(data) ? data : []).filter((e) => !e.revisado);
+    if (pendientes.length === 0) {
+      cronoEmergenciasWrap.classList.add("hidden");
+      return;
+    }
+    cronoEmergenciasWrap.classList.remove("hidden");
+    cronoEmergenciasLista.innerHTML = pendientes
+      .map((e) => `
+        <div style="font-size:13px; margin-top:4px;">
+          <b>${escapeHtml(e.cliente)}</b> — ${escapeHtml(e.tarea)} · para ${e.fecha_deseada || "?"}${e.hora_deseada ? " " + e.hora_deseada : ""}
+          <span style="color:#8A9089;">(cargó ${escapeHtml(e.cargado_por)})</span>
+        </div>
+      `)
+      .join("");
+  } catch (err) {
+    // si falla, simplemente no se muestra el resumen — no es crítico para ver el resto del cronograma
+    cronoEmergenciasWrap.classList.add("hidden");
   }
 }
 

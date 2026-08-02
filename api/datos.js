@@ -12,7 +12,7 @@
 const COLECCIONES = {
   config: {
     path: "config.json",
-    default: { dias_atencion: 3, dias_urgente: 7, app_version_actual: "3.17.0", felicitacion_semanal_activa: true },
+    default: { dias_atencion: 3, dias_urgente: 7, app_version_actual: "3.18.0", felicitacion_semanal_activa: true },
     mergeConDefault: true,
   },
   tecnicos: { path: "tecnicos.json", default: [] },
@@ -20,6 +20,7 @@ const COLECCIONES = {
   "consultas-categorias": { path: "consultas-categorias.json", default: [] },
   guardias: { path: "guardias-config.json", default: { fecha_inicio_referencia: "", secuencia: [] } },
   credenciales: { path: "credenciales-config.json", default: [] },
+  servicios_emergencia: { path: "servicios-emergencia.json", default: [] },
   vehiculos: {
     path: "vehiculos-config.json",
     default: [
@@ -156,6 +157,12 @@ module.exports = async (req, res) => {
       // mano), se actualiza a quién pertenece en vez de dejarlo
       // desactualizado.
       let contenidoAGuardar = body;
+      let entradasEmergenciaNuevas = [];
+      if (nombreColeccion === "servicios_emergencia" && Array.isArray(body)) {
+        const existentes = Array.isArray(contenidoExistente) ? contenidoExistente : [];
+        const idsExistentes = new Set(existentes.map((e) => e.id));
+        entradasEmergenciaNuevas = body.filter((e) => !idsExistentes.has(e.id));
+      }
       if (nombreColeccion === "tecnicos" && Array.isArray(body)) {
         const existentes = Array.isArray(contenidoExistente) ? contenidoExistente : [];
         contenidoAGuardar = body.map((t) => {
@@ -191,6 +198,24 @@ module.exports = async (req, res) => {
         const errText = await putRes.text();
         res.status(502).json({ error: `No se pudo guardar ${nombreColeccion}`, detail: errText });
         return;
+      }
+
+      // Si se acaba de cargar un servicio de emergencia nuevo, se
+      // avisa a todo el equipo — puede ser relevante para cualquiera
+      // que esté revisando la agenda, no solo para quien lo cargó.
+      if (entradasEmergenciaNuevas.length > 0) {
+        try {
+          const { enviarATodos } = require("../lib/push-sender");
+          for (const entrada of entradasEmergenciaNuevas) {
+            await enviarATodos({
+              titulo: "🚨 Servicio de emergencia agendado",
+              cuerpo: `${entrada.cargado_por || "Alguien"} cargó un servicio para ${entrada.cliente || "un cliente"}${entrada.fecha_deseada ? " el " + entrada.fecha_deseada : ""} — revisalo en Cronograma.`,
+              url: "/",
+            });
+          }
+        } catch (errPush) {
+          // si falla el envío del aviso, no se rompe el guardado en sí
+        }
       }
 
       res.status(200).json({ ok: true, count: Array.isArray(body) ? body.length : undefined });

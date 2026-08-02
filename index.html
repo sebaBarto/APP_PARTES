@@ -139,6 +139,12 @@
           </span>
           <span class="panel-tile-label">Planos</span>
         </button>
+        <button type="button" class="panel-tile panel-tile-grid tile-emergencia hidden" id="tileEmergenciaBtn">
+          <span class="panel-tile-icon-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.29 3.86l-8.18 14.18A2 2 0 0 0 3.82 21h16.36a2 2 0 0 0 1.71-3l-8.18-14.14a2 2 0 0 0-3.42 0z"/></svg>
+          </span>
+          <span class="panel-tile-label">Emergencia</span>
+        </button>
         <a href="admin.html" target="_blank" rel="noopener" class="panel-tile panel-tile-grid tile-admin hidden" id="abrirAdminBtn">
           <span class="panel-tile-icon-badge">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>
@@ -603,6 +609,49 @@
     </div>
   </section>
 
+  <!-- AGENDA DE EMERGENCIA -->
+  <section class="screen" id="screen-emergencia">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">AGENDA DE EMERGENCIA</p>
+      <p class="hint-text">Para cargar un servicio fuera de horario (fin de semana, urgencia) cuando no se puede acceder al sistema de oficina. Se le avisa a todo el equipo, y queda pendiente de pasar al sistema real.</p>
+
+      <div id="emergenciaFormWrap">
+        <div class="field-group">
+          <label class="field-label" for="emerg_cliente">Cliente</label>
+          <input class="field-input" id="emerg_cliente" type="text" placeholder="Nombre del cliente">
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="emerg_telefono">Teléfono</label>
+          <input class="field-input" id="emerg_telefono" type="tel" placeholder="Teléfono de contacto">
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="emerg_direccion">Dirección</label>
+          <input class="field-input" id="emerg_direccion" type="text" placeholder="Dirección">
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="emerg_tarea">Motivo</label>
+          <textarea class="field-input field-textarea" id="emerg_tarea" placeholder="Qué pasó / qué hay que hacer"></textarea>
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="emerg_fecha">Fecha deseada</label>
+          <input class="field-input" id="emerg_fecha" type="date">
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="emerg_hora">Hora deseada (opcional)</label>
+          <input class="field-input" id="emerg_hora" type="time">
+        </div>
+        <button type="button" class="btn btn-primary" id="cargarEmergenciaBtn">🚨 Cargar servicio de emergencia</button>
+      </div>
+
+      <p class="hint-eyebrow review-eyebrow" style="margin-top:24px;">CARGADOS RECIENTEMENTE</p>
+      <p class="list-status" id="emergenciaListaStatus"></p>
+      <div id="emergenciaLista"></div>
+    </div>
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDeEmergenciaBtn" type="button">Volver</button>
+    </div>
+  </section>
+
   <!-- SIMs: DETALLE -->
   <section class="screen" id="screen-sim-detalle">
     <div class="review-scroll">
@@ -963,6 +1012,11 @@
   <section class="screen" id="screen-cronograma">
     <div class="review-scroll">
       <p class="hint-eyebrow review-eyebrow">CRONOGRAMA SEMANAL</p>
+
+      <div id="cronoEmergenciasWrap" class="hidden" style="background:#FCEEEC; border:1px solid #E4B8B2; border-radius:10px; padding:12px 14px; margin-bottom:14px;">
+        <div style="font-weight:700; color:#C0392B; font-size:13px; margin-bottom:6px;">🚨 Servicios de emergencia sin pasar al sistema</div>
+        <div id="cronoEmergenciasLista"></div>
+      </div>
 
       <div class="list-toolbar">
         <button class="btn btn-ghost btn-small" id="refreshCronogramaBtn" type="button">↻ Actualizar</button>

@@ -32,6 +32,7 @@
   --acc-brown: #8B5E3C;
   --acc-purple: #7B4B94;
   --acc-navy: #34495E;
+  --acc-alert: #C0392B;
   --amber-soft: rgba(245, 166, 35, 0.14);
   --amber-ring: rgba(245, 166, 35, 0.28);
   --steel: #5C7A8A;
@@ -215,6 +216,7 @@ html, body {
 .tile-herramientas .panel-tile-icon-badge { background: var(--acc-brown); }
 .tile-comodato .panel-tile-icon-badge { background: var(--acc-purple); }
 .tile-planos .panel-tile-icon-badge { background: var(--acc-navy); }
+.tile-emergencia .panel-tile-icon-badge { background: var(--acc-alert); }
 .tile-herr-libre .panel-tile-icon-badge { background: var(--ok, #3FAE6E); }
 .tile-herr-uso .panel-tile-icon-badge { background: var(--acc-coral); }
 .tile-herr-cliente .panel-tile-icon-badge { background: var(--acc-gold); }

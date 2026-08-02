@@ -240,6 +240,30 @@ del formulario) y confirmando que igual se guarda y se restaura completa al reab
 servicio. De paso se corrigió el mismo hueco para el número de presupuesto (opción "Por
 presupuesto"), que tenía el mismo problema.
 
+## Agenda de servicios de emergencia, fuera de horario (v3.18.0)
+
+Nuevo permiso configurable por técnico: **"Agendar servicios de emergencia"** (arranca apagado
+para todos — hay que activarlo puntualmente desde `admin.html` → Técnicos para quien
+corresponda). Con ese permiso activo, aparece un nuevo tile **"🚨 Emergencia"** en el panel
+principal, pensado para cargar un servicio cuando no se puede acceder al sistema real de
+oficina (fin de semana, fuera de horario): cliente, dirección, teléfono, motivo, fecha y hora
+deseada.
+
+Al cargar uno, **se le avisa por notificación push a todo el equipo** — se probó que esto pase
+solo cuando es una entrada genuinamente nueva (no se reenvía el aviso al simplemente marcar una
+como resuelta).
+
+**Dónde se revisan después** (para pasarlos al sistema real):
+- Dentro de la pantalla de Cronograma de la app, para que cualquiera que consulte la semana
+  también vea lo que se cargó así.
+- En `admin.html`, nueva pestaña "🚨 Emergencias" — lista completa, con botón para marcar cada
+  uno como "ya pasado" (o volver a marcarlo como pendiente si hizo falta), y para borrarlo si
+  ya no corresponde.
+
+Se probó a fondo: el permiso oculta/muestra el tile correctamente, el formulario rechaza
+guardar si falta algún dato clave, marcar como revisado no vuelve a disparar el aviso push, y
+las acciones de marcar/reabrir/borrar desde `admin.html` actualizan bien la lista.
+
 ## Planos de cableado, con almacenamiento en Cloudflare R2 (v3.17.0)
 
 Nueva sección **"📐 Planos"** en la app del técnico: buscá por nombre de cliente y abrí el PDF

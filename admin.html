@@ -202,6 +202,7 @@
       <button type="button" class="tab-btn" id="tabHerramientasBtn"><span class="tab-icon">🧰</span>Herramientas</button>
       <button type="button" class="tab-btn" id="tabSimsInstaladasBtn"><span class="tab-icon">📇</span>SIMs instaladas</button>
       <button type="button" class="tab-btn" id="tabPlanosBtn"><span class="tab-icon">📐</span>Planos</button>
+      <button type="button" class="tab-btn" id="tabEmergenciaBtn"><span class="tab-icon">🚨</span>Emergencias</button>
     </div>
 
     <div id="panelServicios">
@@ -516,6 +517,19 @@
         <div id="planosAdminResultados"></div>
       </div>
     </div>
+
+    <div id="panelEmergencia" class="hidden">
+      <h1>Servicios de emergencia</h1>
+      <p class="subtitle">
+        Servicios cargados desde la app fuera de horario (fines de semana, urgencias). Revisalos
+        y pasalos a tu sistema de oficina — después marcalos como "ya pasado" para no tener que
+        volver a mirarlos.
+      </p>
+      <div class="card">
+        <p class="status" id="emergenciaAdminStatus"></p>
+        <div id="emergenciaAdminLista"></div>
+      </div>
+    </div>
     </div>
 
 </div>
@@ -582,6 +596,10 @@ const panelSimsInstaladas = document.getElementById("panelSimsInstaladas");
 let simsInstaladasCargadasUnaVez = false;
 const tabPlanosBtn = document.getElementById("tabPlanosBtn");
 const panelPlanos = document.getElementById("panelPlanos");
+const tabEmergenciaBtn = document.getElementById("tabEmergenciaBtn");
+const panelEmergencia = document.getElementById("panelEmergencia");
+let emergenciaCargadaUnaVezAdmin = false;
+let emergenciasCargadasUnaVezAdmin = false;
 let planosCargadosUnaVezAdmin = false;
 
 const TABS = [
@@ -597,6 +615,8 @@ const TABS = [
   { btn: tabHerramientasBtn, panel: panelHerramientas, onShow: () => { if (!herramientasCargadasUnaVez) { herramientasCargadasUnaVez = true; cargarHerramientasAdmin(); } } },
   { btn: tabSimsInstaladasBtn, panel: panelSimsInstaladas, onShow: () => { if (!simsInstaladasCargadasUnaVez) { simsInstaladasCargadasUnaVez = true; cargarSimsInstaladasAdmin(); } } },
   { btn: tabPlanosBtn, panel: panelPlanos, onShow: () => { if (!planosCargadosUnaVezAdmin) { planosCargadosUnaVezAdmin = true; cargarPlanosAdmin(); } } },
+  { btn: tabEmergenciaBtn, panel: panelEmergencia, onShow: () => { if (!emergenciaCargadaUnaVezAdmin) { emergenciaCargadaUnaVezAdmin = true; cargarEmergenciasAdmin(); } } },
+  { btn: tabEmergenciaBtn, panel: panelEmergencia, onShow: () => { if (!emergenciasCargadasUnaVezAdmin) { emergenciasCargadasUnaVezAdmin = true; cargarEmergenciasAdmin(); } } },
 ];
 
 TABS.forEach(({ btn, panel, onShow }) => {
@@ -619,6 +639,7 @@ const PERMISOS_TECNICO = [
   { clave: "sims", etiqueta: "Sección SIMs" },
   { clave: "herramientas", etiqueta: "Sección Herramientas" },
   { clave: "comodato", etiqueta: "Sección Comodato" },
+  { clave: "agendar_emergencia", etiqueta: "Agendar servicios de emergencia (fuera de horario)" },
   { clave: "admin", etiqueta: "Panel de Administración" },
 ];
 
@@ -2294,6 +2315,102 @@ function dibujarResultadosPlanosAdmin() {
   });
 }
 planosBuscarAdmin.addEventListener("input", dibujarResultadosPlanosAdmin);
+
+// ---------- Servicios de emergencia ----------
+const emergenciaAdminStatus = document.getElementById("emergenciaAdminStatus");
+const emergenciaAdminLista = document.getElementById("emergenciaAdminLista");
+let emergenciasCacheAdmin = [];
+
+async function cargarEmergenciasAdmin() {
+  emergenciaAdminStatus.textContent = "Cargando...";
+  try {
+    const res = await fetch("/api/datos?coleccion=servicios_emergencia", {
+      headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    emergenciasCacheAdmin = Array.isArray(data) ? data : [];
+    dibujarEmergenciasAdmin();
+  } catch (err) {
+    emergenciaAdminStatus.className = "status err";
+    emergenciaAdminStatus.textContent = "No se pudo cargar: " + err.message;
+  }
+}
+
+function dibujarEmergenciasAdmin() {
+  emergenciaAdminLista.innerHTML = "";
+  if (emergenciasCacheAdmin.length === 0) {
+    emergenciaAdminStatus.textContent = "Todavía no se cargó ningún servicio de emergencia.";
+    return;
+  }
+  const pendientes = emergenciasCacheAdmin.filter((e) => !e.revisado).length;
+  emergenciaAdminStatus.textContent = `${emergenciasCacheAdmin.length} en total — ${pendientes} sin pasar todavía.`;
+
+  const ordenados = emergenciasCacheAdmin
+    .slice()
+    .sort((a, b) => (b.fecha_carga || "").localeCompare(a.fecha_carga || ""));
+
+  ordenados.forEach((entrada) => {
+    const fila = document.createElement("div");
+    fila.className = "card";
+    fila.style.marginBottom = "10px";
+    fila.style.opacity = entrada.revisado ? "0.55" : "1";
+    fila.innerHTML = `
+      <div style="display:flex; justify-content:space-between; gap:10px; align-items:flex-start;">
+        <div>
+          <div style="font-weight:700;">${entrada.cliente || "(sin cliente)"} ${entrada.revisado ? "✓ ya pasado" : ""}</div>
+          <div style="font-size:13px; color:#6B7680;">${entrada.direccion || ""}${entrada.telefono ? " · " + entrada.telefono : ""}</div>
+          <div style="font-size:13px; margin-top:4px;">${entrada.tarea || ""}</div>
+          <div style="font-size:12px; color:#8A9089; margin-top:4px;">
+            Para: ${entrada.fecha_deseada || "?"}${entrada.hora_deseada ? " " + entrada.hora_deseada : ""} —
+            cargado por ${entrada.cargado_por || "?"} el ${entrada.fecha_carga ? new Date(entrada.fecha_carga).toLocaleString("es-AR") : "?"}
+          </div>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <button type="button" class="btn-small btn-secondary marcar-revisado-btn" style="width:auto;">${entrada.revisado ? "Marcar pendiente" : "Marcar ya pasado"}</button>
+          <button type="button" class="btn-small btn-secondary borrar-emergencia-btn" style="width:auto;">Borrar</button>
+        </div>
+      </div>
+    `;
+    fila.querySelector(".marcar-revisado-btn").addEventListener("click", () => cambiarRevisadoEmergencia(entrada.id, !entrada.revisado));
+    fila.querySelector(".borrar-emergencia-btn").addEventListener("click", () => borrarEmergencia(entrada.id));
+    emergenciaAdminLista.appendChild(fila);
+  });
+}
+
+async function guardarListaEmergencias(listaNueva) {
+  const res = await fetch("/api/datos?coleccion=servicios_emergencia", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+    body: JSON.stringify(listaNueva),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "Error desconocido");
+}
+
+async function cambiarRevisadoEmergencia(id, nuevoValor) {
+  try {
+    const listaNueva = emergenciasCacheAdmin.map((e) => (e.id === id ? { ...e, revisado: nuevoValor } : e));
+    await guardarListaEmergencias(listaNueva);
+    emergenciasCacheAdmin = listaNueva;
+    dibujarEmergenciasAdmin();
+  } catch (err) {
+    alert("No se pudo actualizar: " + err.message);
+  }
+}
+
+async function borrarEmergencia(id) {
+  if (!confirm("¿Borrar este servicio de emergencia de la lista?")) return;
+  try {
+    const listaNueva = emergenciasCacheAdmin.filter((e) => e.id !== id);
+    await guardarListaEmergencias(listaNueva);
+    emergenciasCacheAdmin = listaNueva;
+    dibujarEmergenciasAdmin();
+  } catch (err) {
+    alert("No se pudo borrar: " + err.message);
+  }
+}
 
 
 let workbook = null;   // libro Excel actual (si el archivo es Excel)
