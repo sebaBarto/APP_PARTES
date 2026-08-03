@@ -240,6 +240,24 @@ del formulario) y confirmando que igual se guarda y se restaura completa al reab
 servicio. De paso se corrigió el mismo hueco para el número de presupuesto (opción "Por
 presupuesto"), que tenía el mismo problema.
 
+### Tres regresiones corregidas tras el cambio a SVG (v3.19.1)
+
+Encontradas revisando la app con más cuidado (dos eran mías, del cambio anterior; una ya
+estaba desde antes):
+
+- **El "golpe de vista" del listado de servicios se había perdido**: el punto rojo/reloj
+  que reemplazó al emoji quedó demasiado chico y sutil para escanear la lista rápido. Se
+  agrandaron los íconos, y el caso urgente ahora tiene **fondo rojo sólido** en vez de
+  blanco con texto rojo — mucho más notorio, como el emoji original.
+- **Las medallas del ranking semanal perdieron su distinción de color** — la numeración
+  1°/2°/3° que las reemplazó usaba el mismo color ámbar para las tres. Ahora cada una
+  tiene su propio color (oro/plata/bronce).
+- **Botones como "Retirar" (SIMs instaladas) y "Ver" (Planos) casi no se veían** — esto no
+  era del cambio de emojis, sino un bug de fondo: usaban un estilo de botón pensado para
+  fondo oscuro (texto casi blanco) dentro de una tarjeta blanca, quedando el texto casi
+  invisible. Se armó una variante para ese caso y se aplicó en los 4 botones que tenían el
+  mismo problema.
+
 ## Emojis reemplazados por íconos SVG (v3.19.0)
 
 Revisión completa de los tres archivos principales (`index.html`, `app.js`, `admin.html`)

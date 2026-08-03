@@ -592,6 +592,11 @@ html, body {
 .btn-primary:disabled { background: #C7CCC3; color: #8A9089; cursor: wait; box-shadow: none; }
 .btn-secondary { background: transparent; color: #F4F5F0; border: 1.5px solid #F4F5F0; }
 .btn-secondary:active { transform: scale(0.97); background: rgba(244,245,240,0.08); }
+/* Variante para cuando este botón vive dentro de una tarjeta blanca
+   (el original está pensado para fondo oscuro — texto casi blanco
+   sobre blanco quedaba prácticamente invisible). */
+.btn-secondary-en-card { color: #101820; border-color: #C7CCC3; }
+.btn-secondary-en-card:active { background: rgba(16,24,32,0.06); }
 .btn-ghost { background: transparent; color: #C7CCC3; border: 1px solid #3A4652; }
 .btn-ghost:active { transform: scale(0.97); background: rgba(199,204,195,0.08); }
 .btn-small { width: auto; padding: 13px 16px; font-size: 13px; min-height: 44px; }
@@ -661,7 +666,7 @@ html, body {
   margin-left: 6px;
   letter-spacing: 0.5px;
 }
-.servicio-card-estancado-badge.urgente { color: #C0392B; background: #FFFFFF; }
+.servicio-card-estancado-badge.urgente { color: #FFFFFF; background: #C0392B; font-weight: 700; }
 .servicio-card-num {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 11px;
@@ -1113,12 +1118,14 @@ html, body {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 11px;
   font-weight: 700;
-  background: var(--amber);
   color: #101820;
   border-radius: 999px;
   padding: 2px 7px;
   vertical-align: 2px;
 }
+.dash-medalla.medalla-oro { background: #E8B723; }
+.dash-medalla.medalla-plata { background: #C4CCD4; }
+.dash-medalla.medalla-bronce { background: #C58B4E; }
 .dash-chart-wrap {
   background: #FFFFFF;
   border: 1.5px solid #D8DCD4;

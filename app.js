@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.19.0";
+const APP_VERSION = "3.19.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -1017,10 +1017,10 @@ function renderServiciosList(items) {
     let badgeEstancado = "";
     if (dias != null && dias >= DIAS_URGENTE) {
       claseEstancado = " estancado-urgente";
-      badgeEstancado = `<span class="servicio-card-estancado-badge urgente"><svg viewBox="0 0 24 24" fill="currentColor" width="10" height="10" style="vertical-align:1px; margin-right:3px;"><circle cx="12" cy="12" r="8"/></svg>Hace ${dias} días</span>`;
+      badgeEstancado = `<span class="servicio-card-estancado-badge urgente"><svg viewBox="0 0 24 24" fill="currentColor" width="9" height="9" style="vertical-align:0px; margin-right:4px;"><circle cx="12" cy="12" r="10"/></svg>Hace ${dias} días</span>`;
     } else if (dias != null && dias >= DIAS_ATENCION) {
       claseEstancado = " estancado-atencion";
-      badgeEstancado = `<span class="servicio-card-estancado-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11" style="vertical-align:-1px; margin-right:3px;"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Hace ${dias} días</span>`;
+      badgeEstancado = `<span class="servicio-card-estancado-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="vertical-align:-2px; margin-right:3px;"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Hace ${dias} días</span>`;
     }
     const card = document.createElement("button");
     card.type = "button";
@@ -2860,7 +2860,11 @@ async function renderDashboard() {
   // Ranking del período elegido arriba (Día / Semana / Mes) para las
   // medallas — el técnico con más resueltos en ese período.
   const nombresOrdenados = Object.keys(porTecnico).sort((a, b) => porTecnico[b].cantidad - porTecnico[a].cantidad);
-  const medallas = { [nombresOrdenados[0]]: "1°", [nombresOrdenados[1]]: "2°", [nombresOrdenados[2]]: "3°" };
+  const medallas = {
+    [nombresOrdenados[0]]: { texto: "1°", clase: "medalla-oro" },
+    [nombresOrdenados[1]]: { texto: "2°", clase: "medalla-plata" },
+    [nombresOrdenados[2]]: { texto: "3°", clase: "medalla-bronce" },
+  };
   const etiquetaPeriodo = { dia: "hoy", semana: "esta semana", mes: "este mes" }[dashPeriodoActivo];
 
   dashTecnicosList.innerHTML = "";
@@ -2878,7 +2882,7 @@ async function renderDashboard() {
         const card = document.createElement("div");
         card.className = "dash-tecnico-card";
         card.innerHTML = `
-          <div class="dash-tecnico-nombre">${escapeHtml(nombre)}${medalla ? ` <span class="dash-medalla" title="Ranking de ${etiquetaPeriodo}">${medalla}</span>` : ""}</div>
+          <div class="dash-tecnico-nombre">${escapeHtml(nombre)}${medalla ? ` <span class="dash-medalla ${medalla.clase}" title="Ranking de ${etiquetaPeriodo}">${medalla.texto}</span>` : ""}</div>
           <div class="dash-tecnico-stats">
             <span class="dash-tecnico-stat"><b>${stats.cantidad}</b> resueltos</span>
             <span class="dash-tecnico-stat">Promedio: <b>${promedioTexto}</b></span>
@@ -5279,7 +5283,7 @@ function renderResultadosSimRegistro() {
         <div style="font-size:12px; color:#6B7680; margin-top:2px;">${escapeHtml(s.direccion)}</div>
         <div style="font-size:12px; color:#2E7D32; margin-top:2px; font-weight:600;">${escapeHtml(s.estado_linea) || "Activo"}</div>
       </div>
-      <button type="button" class="btn-small btn-secondary" style="width:auto;">Retirar</button>
+      <button type="button" class="btn-small btn-secondary btn-secondary-en-card" style="width:auto;">Retirar</button>
     `;
     card.querySelector("button").addEventListener("click", (e) => {
       e.stopPropagation();
@@ -5499,7 +5503,7 @@ function renderResultadosPlanos() {
         <div class="sim-card-numero">${escapeHtml(p.nombre)}</div>
         <div style="font-size:12px; color:#6B7680; margin-top:2px;">PDF${p.tamano_kb ? " · " + p.tamano_kb + " KB" : ""}</div>
       </div>
-      <button type="button" class="btn-small btn-secondary" style="width:auto;">Ver</button>
+      <button type="button" class="btn-small btn-secondary btn-secondary-en-card" style="width:auto;">Ver</button>
     `;
     card.querySelector("button").addEventListener("click", (e) => {
       e.stopPropagation();
