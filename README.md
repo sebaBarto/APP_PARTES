@@ -240,6 +240,31 @@ del formulario) y confirmando que igual se guarda y se restaura completa al reab
 servicio. De paso se corrigió el mismo hueco para el número de presupuesto (opción "Por
 presupuesto"), que tenía el mismo problema.
 
+## Emojis reemplazados por íconos SVG (v3.19.0)
+
+Revisión completa de los tres archivos principales (`index.html`, `app.js`, `admin.html`)
+para reemplazar los emojis usados como íconos por SVG propios — más consistentes entre
+celulares (los emojis se ven distinto en cada marca/sistema operativo).
+
+- **`admin.html`** no había recibido esta pasada todavía — los 12 íconos de pestañas ahora
+  son SVG (reusando, donde coincidían, los mismos íconos que ya tenía la app del técnico,
+  para que ambas pantallas se vean coherentes entre sí), más el botón de mostrar/ocultar
+  contraseña.
+- **`index.html`**: búsqueda, notificaciones, llamar/WhatsApp, ver en mapa, foto,
+  galería, y varios botones más.
+- **Botones que cambian de texto dinámicamente** (Claves, Notificaciones, Emergencia) —
+  estos necesitaron un cambio más de fondo (de `textContent` a `innerHTML`) para poder
+  mostrar un ícono real en vez de un emoji.
+- Las medallas 🥇🥈🥉 del ranking semanal se reemplazaron por una numeración (1°/2°/3°) en
+  una etiqueta, más consistente con el estilo monocromático del resto de los íconos que
+  forzar un emoji de medalla que no pega con ese estilo.
+- Los emojis que vivían **adentro de mensajes de texto plano** (avisos tipo toast) se
+  sacaron directamente — técnicamente no pueden mostrar un ícono real ahí (esos mensajes
+  son texto, no HTML), así que la única opción real era dejar el texto solo.
+- Quedan afuera de este cambio símbolos simples como ✕ (quitar) y ✓ (confirmado), que ya
+  se ven igual en cualquier lado — no son el tipo de emoji colorido que generaba
+  inconsistencia entre celulares.
+
 ## Agenda de servicios de emergencia, fuera de horario (v3.18.0)
 
 Nuevo permiso configurable por técnico: **"Agendar servicios de emergencia"** (arranca apagado

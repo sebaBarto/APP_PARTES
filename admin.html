@@ -122,7 +122,8 @@
     display: flex; flex-direction: column; align-items: center; gap: 4px; line-height: 1.25;
     transition: transform 140ms var(--ease), box-shadow 220ms var(--ease), background 140ms var(--ease), color 140ms var(--ease), border-color 140ms var(--ease);
   }
-  .tab-icon { font-size: 18px; }
+  .tab-icon { display: flex; }
+  .tab-icon svg { width: 20px; height: 20px; stroke: currentColor; }
   .tab-btn:active { transform: scale(0.96); }
   .tab-btn.active { background: var(--ink); color: var(--amber); border-color: var(--ink); box-shadow: var(--shadow-amber); }
 
@@ -182,7 +183,7 @@
     <label for="pw">Contraseña</label>
     <div class="password-field-wrap">
       <input type="password" id="pw" placeholder="Contraseña">
-      <button type="button" class="password-toggle-btn" id="pwToggle" title="Mostrar/ocultar contraseña">👁</button>
+      <button type="button" class="password-toggle-btn" id="pwToggle" title="Mostrar/ocultar contraseña"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
     </div>
     <button id="pwBtn" type="button">Ingresar</button>
     <p class="status err" id="pwError"></p>
@@ -190,19 +191,19 @@
 
   <div id="mainCard" class="hidden">
     <div class="tabs">
-      <button type="button" class="tab-btn active" id="tabServiciosBtn"><span class="tab-icon">📋</span>Servicios pendientes</button>
-      <button type="button" class="tab-btn" id="tabCronogramaBtn"><span class="tab-icon">🗓️</span>Cronograma semanal</button>
-      <button type="button" class="tab-btn" id="tabTecnicosBtn"><span class="tab-icon">👤</span>Técnicos</button>
-      <button type="button" class="tab-btn" id="tabMaterialesBtn"><span class="tab-icon">📦</span>Materiales</button>
-      <button type="button" class="tab-btn" id="tabConsultasBtn"><span class="tab-icon">🤖</span>Consultas (IA)</button>
-      <button type="button" class="tab-btn" id="tabGuardiasBtn"><span class="tab-icon">🚨</span>Guardias</button>
-      <button type="button" class="tab-btn" id="tabCredencialesBtn"><span class="tab-icon">🪪</span>Credenciales</button>
-      <button type="button" class="tab-btn" id="tabVehiculosBtn"><span class="tab-icon">🚗</span>Vehículos</button>
-      <button type="button" class="tab-btn" id="tabSimsBtn"><span class="tab-icon">📶</span>SIMs</button>
-      <button type="button" class="tab-btn" id="tabHerramientasBtn"><span class="tab-icon">🧰</span>Herramientas</button>
-      <button type="button" class="tab-btn" id="tabSimsInstaladasBtn"><span class="tab-icon">📇</span>SIMs instaladas</button>
-      <button type="button" class="tab-btn" id="tabPlanosBtn"><span class="tab-icon">📐</span>Planos</button>
-      <button type="button" class="tab-btn" id="tabEmergenciaBtn"><span class="tab-icon">🚨</span>Emergencias</button>
+      <button type="button" class="tab-btn active" id="tabServiciosBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6a1 1 0 0 1 1 1v1H8V4a1 1 0 0 1 1-1z"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="13" y2="18"/></svg></span>Servicios pendientes</button>
+      <button type="button" class="tab-btn" id="tabCronogramaBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/><line x1="7" y1="14" x2="9" y2="14"/><line x1="15" y1="14" x2="17" y2="14"/></svg></span>Cronograma semanal</button>
+      <button type="button" class="tab-btn" id="tabTecnicosBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg></span>Técnicos</button>
+      <button type="button" class="tab-btn" id="tabMaterialesBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l9-5 9 5-9 5-9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg></span>Materiales</button>
+      <button type="button" class="tab-btn" id="tabConsultasBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5c0-1.1.9-2 2-2h5c1.1 0 2 .9 2 2v14.5c0-1.1-.9-2-2-2H6c-1.1 0-2 .9-2 2z"/><path d="M20 5.5c0-1.1-.9-2-2-2h-5c-1.1 0-2 .9-2 2v14.5c0-1.1.9-2 2-2h5c1.1 0 2 .9 2 2z"/></svg></span>Consultas (IA)</button>
+      <button type="button" class="tab-btn" id="tabGuardiasBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a5 5 0 0 0-5 5c0 6-3 8-3 8h16s-3-2-3-8a5 5 0 0 0-5-5z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg></span>Guardias</button>
+      <button type="button" class="tab-btn" id="tabCredencialesBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10.5" r="2"/><path d="M6 16c0-1.7 1.3-3 3-3s3 1.3 3 3"/><path d="M14 9h4"/><path d="M14 13h4"/></svg></span>Credenciales</button>
+      <button type="button" class="tab-btn" id="tabVehiculosBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13l2-6a2 2 0 0 1 2-1h10a2 2 0 0 1 2 1l2 6"/><rect x="2" y="13" width="20" height="5" rx="1.5"/><circle cx="7" cy="18.5" r="1.5"/><circle cx="17" cy="18.5" r="1.5"/></svg></span>Vehículos</button>
+      <button type="button" class="tab-btn" id="tabSimsBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h6l4 4v12a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><rect x="9.5" y="10" width="5" height="5.5" rx="1"/></svg></span>SIMs</button>
+      <button type="button" class="tab-btn" id="tabHerramientasBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h16v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M8 8V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="4" y1="12" x2="20" y2="12"/></svg></span>Herramientas</button>
+      <button type="button" class="tab-btn" id="tabSimsInstaladasBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg></span>SIMs instaladas</button>
+      <button type="button" class="tab-btn" id="tabPlanosBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 9h18M9 9v12M14 3v6M9 15h5"/></svg></span>Planos</button>
+      <button type="button" class="tab-btn" id="tabEmergenciaBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.29 3.86l-8.18 14.18A2 2 0 0 0 3.82 21h16.36a2 2 0 0 0 1.71-3l-8.18-14.14a2 2 0 0 0-3.42 0z"/></svg></span>Emergencias</button>
     </div>
 
     <div id="panelServicios">
@@ -223,7 +224,7 @@
       </div>
       <label class="permiso-check" style="margin:14px 0;">
         <input type="checkbox" id="felicitacionSemanalCheck" checked>
-        <span>🏆 Mandar cada viernes (17-18hs) una notificación felicitando al técnico con mejor desempeño de la semana</span>
+        <span>Mandar cada viernes (17-18hs) una notificación felicitando al técnico con mejor desempeño de la semana</span>
       </label>
       <button id="guardarConfigBtn" type="button" class="btn-secondary-admin">Guardar umbrales</button>
       <p class="status" id="configStatus"></p>
@@ -367,7 +368,7 @@
 
     <div id="panelCredenciales" class="hidden">
       <h1>Credenciales digitales de técnicos</h1>
-      <p class="subtitle">Cada técnico ve solo la suya al tocar "🪪 Credencial" en la app, según con qué usuario entró.</p>
+      <p class="subtitle">Cada técnico ve solo la suya al tocar "Credencial" en la app, según con qué usuario entró.</p>
 
       <p class="status" id="credencialesStatus"></p>
 
@@ -399,8 +400,8 @@
         <label>Excel de SIMs</label>
         <p class="subtitle" style="margin-top:0;">Columnas: NUMERO DE LINEA, EMPRESA PROVEEDORA, ASIGNADO A (nombre de un técnico, o "Oficina"). Al subir, reemplaza toda la tabla de abajo (después hay que tocar "Guardar cambios" para publicarlo).</p>
         <div class="field-row">
-          <button type="button" class="btn-secondary-admin" id="descargarExcelSimsBtn">⬇ Descargar Excel</button>
-          <button type="button" class="btn-secondary-admin" id="elegirExcelSimsBtn">⬆ Subir Excel</button>
+          <button type="button" class="btn-secondary-admin" id="descargarExcelSimsBtn"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15" style="vertical-align:-2px; margin-right:4px;"><path d="M12 3v13M7 12l5 5 5-5"/><path d="M4 19h16"/></svg>Descargar Excel</button>
+          <button type="button" class="btn-secondary-admin" id="elegirExcelSimsBtn"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15" style="vertical-align:-2px; margin-right:4px;"><path d="M12 20V7M7 12l5-5 5 5"/><path d="M4 19h16"/></svg>Subir Excel</button>
         </div>
         <input type="file" id="simsExcelFile" accept=".xlsx,.xls" class="hidden">
         <p class="status" id="simsExcelStatus"></p>
@@ -665,7 +666,7 @@ function renderFilaTecnico(nombre, password, permisos, enCalle) {
     <button type="button" class="btn-quitar-tecnico" title="Quitar">✕</button>
     <label class="permiso-check tecnico-en-calle-check">
       <input type="checkbox" class="tecnico-en-calle" ${enCalle ? "checked" : ""}>
-      <span>🚐 Está en la calle (recibe el recordatorio de las 9:30)</span>
+      <span>Está en la calle (recibe el recordatorio de las 9:30)</span>
     </label>
     <div class="permisos-tecnico-grid">${checksHtml}</div>
   `;
@@ -763,12 +764,15 @@ const MAP_KEY = "servicios_admin_column_map";
 let parsedRows = [];
 let headers = [];
 
+const OJO_ABIERTO = '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>';
+const OJO_CERRADO = '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M3 3l18 18"/><path d="M10.6 5.2A10.6 10.6 0 0 1 12 5c6.5 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.1M6.6 6.6C3.7 8.5 2 12 2 12s3.5 7 10 7c1.5 0 2.8-.3 4-.8"/><path d="M9.5 9.5a3 3 0 0 0 4.2 4.2"/></svg>';
+
 const pw = document.getElementById("pw");
 document.getElementById("pwToggle").addEventListener("click", () => {
   const btn = document.getElementById("pwToggle");
   const oculta = pw.type === "password";
   pw.type = oculta ? "text" : "password";
-  btn.textContent = oculta ? "🙈" : "👁";
+  btn.innerHTML = oculta ? OJO_CERRADO : OJO_ABIERTO;
   btn.classList.toggle("activo", oculta);
 });
 const pwBtn = document.getElementById("pwBtn");
@@ -1534,7 +1538,7 @@ function renderFilaSimTabla(sim) {
         <select class="sim-transferir-select">
           <option value="" disabled selected>Elegir...</option>
           ${opcionesDestino}
-          <option value="__cliente__">📋 Instalar en cliente</option>
+          <option value="__cliente__">Instalar en cliente</option>
         </select>
         <div class="sim-instalar-cliente-panel hidden" style="margin-top:6px;">
           <select class="sim-instalar-servicio-select">
@@ -1614,7 +1618,7 @@ function renderFilaSimTabla(sim) {
       fila.querySelector(".sim-asignado-a").classList.toggle("oficina", destino === "Oficina");
       const nuevosDestinos = [...nombresTecnicosParaSims, "Oficina"].filter((n) => n !== destino);
       fila.querySelector(".sim-transferir-select").innerHTML =
-        `<option value="" disabled selected>Elegir...</option>${nuevosDestinos.map((n) => `<option value="${n}">${n}</option>`).join("")}<option value="__cliente__">📋 Instalar en cliente</option>`;
+        `<option value="" disabled selected>Elegir...</option>${nuevosDestinos.map((n) => `<option value="${n}">${n}</option>`).join("")}<option value="__cliente__">Instalar en cliente</option>`;
     }
 
     // Si la fila es nueva (todavía no se guardó nada), no hay nada que

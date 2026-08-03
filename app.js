@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.18.0";
+const APP_VERSION = "3.19.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -157,11 +157,13 @@ const loginPassword = document.getElementById("loginPassword");
 
 // Botón de "ojito" para mostrar/ocultar contraseña — reutilizable en
 // cualquier campo de este tipo. Arranca siempre oculta por defecto.
+const OJO_ABIERTO_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>';
+const OJO_CERRADO_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M3 3l18 18"/><path d="M10.6 5.2A10.6 10.6 0 0 1 12 5c6.5 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.1M6.6 6.6C3.7 8.5 2 12 2 12s3.5 7 10 7c1.5 0 2.8-.3 4-.8"/><path d="M9.5 9.5a3 3 0 0 0 4.2 4.2"/></svg>';
 function habilitarOjitoContrasena(inputEl, btnEl) {
   btnEl.addEventListener("click", () => {
     const oculta = inputEl.type === "password";
     inputEl.type = oculta ? "text" : "password";
-    btnEl.textContent = oculta ? "🙈" : "👁";
+    btnEl.innerHTML = oculta ? OJO_CERRADO_SVG : OJO_ABIERTO_SVG;
     btnEl.classList.toggle("activo", oculta);
   });
 }
@@ -1015,10 +1017,10 @@ function renderServiciosList(items) {
     let badgeEstancado = "";
     if (dias != null && dias >= DIAS_URGENTE) {
       claseEstancado = " estancado-urgente";
-      badgeEstancado = `<span class="servicio-card-estancado-badge urgente">🔴 Hace ${dias} días</span>`;
+      badgeEstancado = `<span class="servicio-card-estancado-badge urgente"><svg viewBox="0 0 24 24" fill="currentColor" width="10" height="10" style="vertical-align:1px; margin-right:3px;"><circle cx="12" cy="12" r="8"/></svg>Hace ${dias} días</span>`;
     } else if (dias != null && dias >= DIAS_ATENCION) {
       claseEstancado = " estancado-atencion";
-      badgeEstancado = `<span class="servicio-card-estancado-badge">🕒 Hace ${dias} días</span>`;
+      badgeEstancado = `<span class="servicio-card-estancado-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11" style="vertical-align:-1px; margin-right:3px;"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Hace ${dias} días</span>`;
     }
     const card = document.createElement("button");
     card.type = "button";
@@ -1174,7 +1176,7 @@ async function fetchCronograma() {
     cronoSyncLabel.textContent = formatSyncTime(new Date());
     renderCronogramaDias();
     if (data.fuente === "respaldo") {
-      cronoStatus.textContent = `⚠ No se pudo leer Drive en este momento (${data.error_drive || "sin detalle"}). Mostrando la última copia guardada.`;
+      cronoStatus.textContent = `No se pudo leer Drive en este momento (${data.error_drive || "sin detalle"}). Mostrando la última copia guardada.`;
     }
   } catch (err) {
     const cachedRaw = localStorage.getItem("cronograma_cache");
@@ -1724,7 +1726,7 @@ async function asignarSimInstaladaAlCliente(data) {
     const respuesta = await res.json();
     if (!res.ok) throw new Error(respuesta.error || "Error desconocido");
   } catch (err) {
-    showToast("⚠ El parte se envió, pero no se pudo registrar la SIM instalada: " + err.message);
+    showToast("El parte se envió, pero no se pudo registrar la SIM instalada: " + err.message);
   }
 }
 
@@ -2145,7 +2147,9 @@ function generarIdParte() {
 let clavesAgregadas = [];
 
 function actualizarBotonClaves() {
-  abrirClavesBtn.textContent = clavesAgregadas.length > 0 ? `🔑 Claves ✓ (${clavesAgregadas.length})` : "🔑 Claves";
+  abrirClavesBtn.innerHTML = clavesAgregadas.length > 0
+    ? `<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15" style="vertical-align:-2px; margin-right:4px;"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2.5-2.5M19 10l2-2"/></svg>Claves ✓ (${clavesAgregadas.length})`
+    : `<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15" style="vertical-align:-2px; margin-right:4px;"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2.5-2.5M19 10l2-2"/></svg>Claves`;
 }
 
 function renderClavesAgregadas() {
@@ -2421,11 +2425,11 @@ async function intentarEnviarParte(payload, interactivo) {
       if (!histRes.ok) {
         const histData = await histRes.json().catch(() => ({}));
         console.error("Error registrando historial:", histData);
-        if (interactivo) showToast("⚠ El mail se envió, pero no se pudo registrar en el dashboard.");
+        if (interactivo) showToast("El mail se envió, pero no se pudo registrar en el dashboard.");
       }
     } catch (err) {
       console.error("Error registrando historial:", err);
-      if (interactivo) showToast("⚠ El mail se envió, pero no se pudo registrar en el dashboard.");
+      if (interactivo) showToast("El mail se envió, pero no se pudo registrar en el dashboard.");
     }
   } catch (err) {
     console.error("Error enviando a oficina:", err);
@@ -2584,7 +2588,7 @@ confirmSignBtn.addEventListener("click", async () => {
 
   let mensajeFoto = "";
   if (fotoBase64 && fotoError) {
-    mensajeFoto = ` (⚠ la foto no se pudo subir: ${fotoError})`;
+    mensajeFoto = ` (la foto no se pudo subir: ${fotoError})`;
   }
 
   if (oficinaOk && (clienteOk || !clienteIntentado)) {
@@ -2856,7 +2860,7 @@ async function renderDashboard() {
   // Ranking del período elegido arriba (Día / Semana / Mes) para las
   // medallas — el técnico con más resueltos en ese período.
   const nombresOrdenados = Object.keys(porTecnico).sort((a, b) => porTecnico[b].cantidad - porTecnico[a].cantidad);
-  const medallas = { [nombresOrdenados[0]]: "🥇", [nombresOrdenados[1]]: "🥈", [nombresOrdenados[2]]: "🥉" };
+  const medallas = { [nombresOrdenados[0]]: "1°", [nombresOrdenados[1]]: "2°", [nombresOrdenados[2]]: "3°" };
   const etiquetaPeriodo = { dia: "hoy", semana: "esta semana", mes: "este mes" }[dashPeriodoActivo];
 
   dashTecnicosList.innerHTML = "";
@@ -3211,7 +3215,7 @@ async function cargarManualesDeCategoria(categoria) {
       const item = document.createElement("button");
       item.type = "button";
       item.className = "consulta-manual-item";
-      item.textContent = `📄 ${manual.nombre}`;
+      item.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="vertical-align:-2px; margin-right:4px; flex-shrink:0;"><path d="M8 3h6l4 4v12a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v4h4"/></svg>${escapeHtml(manual.nombre)}`;
       item.addEventListener("click", () => abrirManual(categoria, manual.id, manual.nombre, item));
       consultaManualesList.appendChild(item);
     });
@@ -3606,7 +3610,7 @@ function calcularAlertasVehiculo(vehiculoConfig) {
       const diasRestantes = Math.round((fechaLimite - hoy) / 86400000);
       const avisoAntes = Number(u.aviso_antes) || 0;
       if (diasRestantes <= 0) {
-        alertas.push({ nivel: "urgente", mensaje: `⚠ ${u.nombre}: venció (${diasRestantes === 0 ? "hoy" : Math.abs(diasRestantes) + " día(s) atrás"})` });
+        alertas.push({ nivel: "urgente", mensaje: `${u.nombre}: venció (${diasRestantes === 0 ? "hoy" : Math.abs(diasRestantes) + " día(s) atrás"})` });
       } else if (diasRestantes <= avisoAntes) {
         alertas.push({ nivel: "atencion", mensaje: `${u.nombre}: faltan ${diasRestantes} día(s)` });
       }
@@ -3616,7 +3620,7 @@ function calcularAlertasVehiculo(vehiculoConfig) {
       const restante = valor - kmActual;
       const avisoAntes = Number(u.aviso_antes) || 0;
       if (restante <= 0) {
-        alertas.push({ nivel: "urgente", mensaje: `⚠ ${u.nombre}: ya se pasó por ${Math.abs(restante)} km` });
+        alertas.push({ nivel: "urgente", mensaje: `${u.nombre}: ya se pasó por ${Math.abs(restante)} km` });
       } else if (restante <= avisoAntes) {
         alertas.push({ nivel: "atencion", mensaje: `${u.nombre}: faltan ${restante} km` });
       }
@@ -3938,7 +3942,7 @@ function renderDashVehiculos() {
         <div class="historial-card-num">${escapeHtml(h.vehiculo)}</div>
         <div class="historial-card-cliente">${escapeHtml(h.tecnico)}</div>
         <div class="historial-card-direccion">${fechaTexto} — ${h.hora_toma || "?"} a ${h.hora_devolucion || "(en uso)"}</div>
-        <div class="historial-card-horario">Km devolución: ${h.km_devolucion || "—"}${h.evento ? " · ⚠ " + escapeHtml(h.evento) : ""}</div>
+        <div class="historial-card-horario">Km devolución: ${h.km_devolucion || "—"}${h.evento ? " · " + escapeHtml(h.evento) : ""}</div>
       `;
     }
     dashVehiculosList.appendChild(card);
@@ -4270,7 +4274,7 @@ async function verificarEstadoNotificaciones() {
   try {
     const registro = await navigator.serviceWorker.ready;
     const suscripcion = await registro.pushManager.getSubscription();
-    activarNotificacionesBtn.textContent = suscripcion ? "🔔 Notificaciones activadas" : "🔔 Activar notificaciones";
+    activarNotificacionesBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15" style="vertical-align:-2px; margin-right:4px;"><path d="M12 3a5 5 0 0 0-5 5c0 6-3 8-3 8h16s-3-2-3-8a5 5 0 0 0-5-5z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>${suscripcion ? "Notificaciones activadas" : "Activar notificaciones"}`;
   } catch (err) {
     // si falla la verificación, se deja el botón con su texto por defecto
   }
@@ -4302,7 +4306,7 @@ activarNotificacionesBtn.addEventListener("click", async () => {
       body: JSON.stringify({ ...suscripcion.toJSON(), tecnico: tecnicoLogueado || "" }),
     });
     if (!res.ok) throw new Error("HTTP " + res.status);
-    activarNotificacionesBtn.textContent = "🔔 Notificaciones activadas";
+    activarNotificacionesBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15" style="vertical-align:-2px; margin-right:4px;"><path d="M12 3a5 5 0 0 0-5 5c0 6-3 8-3 8h16s-3-2-3-8a5 5 0 0 0-5-5z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>Notificaciones activadas';
     showToast("Notificaciones activadas.");
   } catch (err) {
     showToast("No se pudo activar las notificaciones: " + err.message);
@@ -5407,7 +5411,7 @@ cargarEmergenciaBtn.addEventListener("click", async () => {
     showToast("No se pudo cargar: " + err.message);
   } finally {
     cargarEmergenciaBtn.disabled = false;
-    cargarEmergenciaBtn.textContent = "🚨 Cargar servicio de emergencia";
+    cargarEmergenciaBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="vertical-align:-3px; margin-right:5px;"><path d="M12 9v4M12 17h.01M10.29 3.86l-8.18 14.18A2 2 0 0 0 3.82 21h16.36a2 2 0 0 0 1.71-3l-8.18-14.14a2 2 0 0 0-3.42 0z"/></svg>Cargar servicio de emergencia';
   }
 });
 
