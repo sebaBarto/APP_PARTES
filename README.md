@@ -258,6 +258,16 @@ estaba desde antes):
   invisible. Se armó una variante para ese caso y se aplicó en los 4 botones que tenían el
   mismo problema.
 
+## Botón para borrar toda la base de Clientes (v3.32.0)
+
+Nueva "zona de riesgo" en la pestaña Clientes de `admin.html`, con un botón para borrar
+todos los clientes cargados de una — útil, por ejemplo, si un import salió mal y se
+prefiere arrancar de cero en vez de ir corrigiendo fila por fila. Pide **dos
+confirmaciones seguidas** (no una sola), justo por ser una acción permanente y sin
+vuelta atrás. No toca los planos en Drive ni las SIMs, solo esta base de referencia.
+Probados los tres casos: cancelar la primera confirmación, confirmar la primera pero
+cancelar la segunda, y confirmar las dos — solo en el último caso se borra de verdad.
+
 ## Import de Clientes: encabezados de Excel más flexibles (v3.31.0)
 
 Encontrado en el uso real: el import de la pestaña Clientes buscaba la columna "NOMBRE"

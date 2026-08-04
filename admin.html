@@ -426,6 +426,17 @@
         <p class="status" id="clientesAdminStatus"></p>
         <div id="clientesAdminResultados"></div>
       </div>
+
+      <div class="card" style="margin-top:16px; border-color:#C0392B;">
+        <label style="color:#C0392B;">Zona de riesgo</label>
+        <p class="subtitle" style="margin:0 0 10px;">
+          Borra TODOS los clientes cargados (número, nombre, dirección, etc.) de forma
+          permanente — no se puede deshacer. No afecta los planos ni las SIMs en sí,
+          solo esta base de referencia.
+        </p>
+        <button type="button" id="borrarTodosClientesBtn" class="btn-secondary-admin" style="color:#C0392B; border-color:#C0392B;">Borrar toda la base de Clientes</button>
+        <p class="status" id="borrarClientesStatus"></p>
+      </div>
     </div>
 
     <div id="panelConsultas" class="hidden">
@@ -1133,6 +1144,49 @@ function dibujarResultadosClientesAdmin() {
   });
 }
 clientesBuscarAdmin.addEventListener("input", dibujarResultadosClientesAdmin);
+
+const borrarTodosClientesBtn = document.getElementById("borrarTodosClientesBtn");
+const borrarClientesStatus = document.getElementById("borrarClientesStatus");
+borrarTodosClientesBtn.addEventListener("click", async () => {
+  const cantidad = clientesCacheAdmin.length;
+  if (cantidad === 0) {
+    borrarClientesStatus.className = "status";
+    borrarClientesStatus.textContent = "No hay ningún cliente cargado todavía.";
+    return;
+  }
+  const confirmar1 = window.confirm(
+    `Esto borra los ${cantidad} clientes cargados (número, nombre, dirección, teléfono, etc.) de forma PERMANENTE — no se puede deshacer.\n\n` +
+    "No afecta los planos en Drive ni las SIMs en sí, solo esta base de referencia.\n\n" +
+    "¿Confirmás que querés borrar toda la base de Clientes?"
+  );
+  if (!confirmar1) return;
+  const confirmar2 = window.confirm("Última confirmación: se van a borrar TODOS los clientes ahora mismo. ¿Seguro?");
+  if (!confirmar2) return;
+
+  borrarTodosClientesBtn.disabled = true;
+  borrarClientesStatus.className = "status";
+  borrarClientesStatus.textContent = "Borrando...";
+  try {
+    const res = await fetch("/api/datos?coleccion=clientes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify([]),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    clientesCacheAdmin = [];
+    clientesAdminResultados.innerHTML = "";
+    clientesAdminStatus.className = "status";
+    clientesAdminStatus.textContent = "0 clientes cargados. Escribí arriba para buscar.";
+    borrarClientesStatus.className = "status ok";
+    borrarClientesStatus.textContent = "Listo — se borraron todos los clientes.";
+  } catch (err) {
+    borrarClientesStatus.className = "status err";
+    borrarClientesStatus.textContent = "No se pudo borrar: " + err.message;
+  } finally {
+    borrarTodosClientesBtn.disabled = false;
+  }
+});
 
 clientesExcelFile.addEventListener("change", () => {
   const file = clientesExcelFile.files[0];
