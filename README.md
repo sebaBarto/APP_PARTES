@@ -258,6 +258,19 @@ estaba desde antes):
   invisible. Se armó una variante para ese caso y se aplicó en los 4 botones que tenían el
   mismo problema.
 
+## Varios planos por cliente, agrupados en una sola tarjeta (v3.30.0)
+
+Ajuste para el caso real: un cliente puede tener más de un plano (`CLI_XXXXXX.pdf`,
+`CLI_XXXXXX_2.pdf`, `CLI_XXXXXX_3.pdf`...). Antes cada uno aparecía como un resultado de
+búsqueda separado — ahora se agrupan en una sola tarjeta por cliente, con un botón "Plano
+1", "Plano 2", etc. cuando hay más de uno (o simplemente "Ver" cuando hay uno solo, sin
+cambiar la experiencia para el caso más común).
+
+Este cambio acompaña al programa nuevo `sync-local-planos-drive/` (aparte del proyecto,
+para correr en la PC) — convierte los planos en Visio, organizados en subcarpetas de
+Drive `CLI_XXXXXX`, a PDF con LibreOffice, y los sube a una carpeta plana lista para que
+la app los lea. Instrucciones completas en su propio README.
+
 ## Planos desde Google Drive (solución de paso) + búsqueda por número de cliente (v3.29.0)
 
 Mientras se termina la migración a Cloudflare, los planos ahora se leen en vivo desde una

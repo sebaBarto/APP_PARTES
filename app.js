@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.29.0";
+const APP_VERSION = "3.30.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -5558,15 +5558,18 @@ async function cargarPlanos() {
     const res = await fetch("/api/planos", { headers, cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const lista = await res.json();
-    // A cada plano, si su nombre sigue el patrón "CLI_XXXXXX", se le
-    // suma el nombre real del cliente (buscado en la base de
-    // Clientes) — así se puede mostrar y buscar por cualquiera de
-    // los dos.
+    // A cada plano, si su nombre sigue el patrón "CLI_XXXXXX" (o
+    // "CLI_XXXXXX_2", "CLI_XXXXXX_3"... cuando un cliente tiene más
+    // de un plano), se le suma el nombre real del cliente (buscado
+    // en la base de Clientes) — así se puede mostrar y buscar por
+    // cualquiera de los dos, y agrupar los planos de un mismo
+    // cliente juntos.
     planosCache = (Array.isArray(lista) ? lista : []).map((p) => {
-      const match = /^CLI_(.+)$/i.exec(p.nombre);
+      const match = /^CLI_(\d+)(?:_(\d+))?$/i.exec(p.nombre);
       const numeroCliente = match ? match[1] : null;
+      const indicePlano = match && match[2] ? Number(match[2]) : 1;
       const nombreCliente = numeroCliente ? clientesParaPlanosCache[numeroCliente] : null;
-      return { ...p, numero_cliente: numeroCliente, nombre_cliente: nombreCliente || null };
+      return { ...p, numero_cliente: numeroCliente, indice_plano: indicePlano, nombre_cliente: nombreCliente || null };
     });
   } catch (err) {
     planosStatus.textContent = "No se pudo cargar la lista de planos.";
@@ -5594,27 +5597,43 @@ function renderResultadosPlanos() {
     planosStatus.textContent = "Ningún plano coincide con esa búsqueda.";
     return;
   }
-  planosStatus.textContent = coincidencias.length > LIMITE_RESULTADOS_PLANOS
-    ? `${coincidencias.length} coincidencias — mostrando las primeras ${LIMITE_RESULTADOS_PLANOS}.`
-    : `${coincidencias.length} coincidencia(s).`;
 
-  coincidencias.slice(0, LIMITE_RESULTADOS_PLANOS).forEach((p) => {
+  // Agrupar por cliente (o por nombre de archivo crudo, si no tiene
+  // número de cliente reconocido) — así un cliente con varios planos
+  // aparece en UNA sola tarjeta, con un botón por cada uno.
+  const grupos = new Map();
+  coincidencias.forEach((p) => {
+    const clave = p.numero_cliente || p.nombre;
+    if (!grupos.has(clave)) grupos.set(clave, []);
+    grupos.get(clave).push(p);
+  });
+
+  planosStatus.textContent = grupos.size > LIMITE_RESULTADOS_PLANOS
+    ? `${grupos.size} coincidencias — mostrando las primeras ${LIMITE_RESULTADOS_PLANOS}.`
+    : `${grupos.size} coincidencia(s).`;
+
+  Array.from(grupos.values()).slice(0, LIMITE_RESULTADOS_PLANOS).forEach((planosDelCliente) => {
+    planosDelCliente.sort((a, b) => a.indice_plano - b.indice_plano);
+    const primero = planosDelCliente[0];
     const card = document.createElement("div");
     card.className = "sim-card";
-    const tituloPrincipal = p.nombre_cliente || p.nombre;
-    const subtitulo = p.nombre_cliente
-      ? `N° de cliente ${escapeHtml(p.numero_cliente)}${p.tamano_kb ? " · " + p.tamano_kb + " KB" : ""}`
-      : `PDF${p.tamano_kb ? " · " + p.tamano_kb + " KB" : ""}`;
+    const tituloPrincipal = primero.nombre_cliente || primero.nombre;
+    const subtitulo = primero.nombre_cliente ? `N° de cliente ${escapeHtml(primero.numero_cliente)}` : "PDF";
+    const botones = planosDelCliente.map((p, i) =>
+      `<button type="button" class="btn-small btn-secondary btn-secondary-en-card" style="width:auto;" data-nombre="${escapeHtml(p.nombre)}">${planosDelCliente.length > 1 ? `Plano ${i + 1}` : "Ver"}</button>`
+    ).join(" ");
     card.innerHTML = `
-      <div>
+      <div style="flex:1;">
         <div class="sim-card-numero">${escapeHtml(tituloPrincipal)}</div>
         <div style="font-size:12px; color:#6B7680; margin-top:2px;">${subtitulo}</div>
       </div>
-      <button type="button" class="btn-small btn-secondary btn-secondary-en-card" style="width:auto;">Ver</button>
+      <div style="display:flex; gap:6px; flex-wrap:wrap;">${botones}</div>
     `;
-    card.querySelector("button").addEventListener("click", (e) => {
-      e.stopPropagation();
-      abrirPlano(p.nombre, card.querySelector("button"));
+    card.querySelectorAll("button[data-nombre]").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        abrirPlano(btn.dataset.nombre, btn);
+      });
     });
     planosResultados.appendChild(card);
   });
