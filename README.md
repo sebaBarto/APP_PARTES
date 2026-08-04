@@ -258,6 +258,13 @@ estaba desde antes):
   invisible. Se armó una variante para ese caso y se aplicó en los 4 botones que tenían el
   mismo problema.
 
+## Corrige contraste ilegible en tarjeta "RESUELTO" del Cronograma (v3.34.1)
+
+Bug real encontrado apenas se activó la marca permanente: el fondo verde de esa tarjeta
+tenía tan poca opacidad (8%) que quedaba prácticamente transparente, dejando ver el fondo
+oscuro de la app detrás — con el texto oscuro de siempre, quedaba ilegible. Ahora usa un
+verde claro sólido, con contraste de sobra (16:1).
+
 ## Ícono de "último servicio" más visible + arreglo de fondo (v3.34.0)
 
 Dos problemas reales encontrados en el uso:
