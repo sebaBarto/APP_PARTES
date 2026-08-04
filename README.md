@@ -258,6 +258,22 @@ estaba desde antes):
   invisible. Se armó una variante para ese caso y se aplicó en los 4 botones que tenían el
   mismo problema.
 
+## Colores por sección en admin.html, coherentes con la app del técnico (v3.28.0)
+
+Las 12 pestañas de `admin.html` tenían todos los íconos del mismo gris uniforme —
+funcional, pero hacía que el panel se sintiera un producto aparte de la app del técnico
+(que sí usa un color distinto por sección desde el panel principal). Ahora cada pestaña
+usa el mismo color que su tile equivalente allá (Guardias=el mismo azul acero nuevo,
+SIMs=azul, Vehículos=verde, Planos=navy, Emergencias=rojo, etc.), más dos colores nuevos
+para las dos secciones sin equivalente directo (Técnicos, Clientes). Ayuda a ubicarse más
+rápido por color, y las dos pantallas se sienten parte del mismo producto.
+
+De paso, mientras revisaba el dashboard general, encontré un detalle de robustez (no
+visual): si el gráfico de la parte de abajo falla por cualquier motivo, el mensaje de
+error que se muestra dice "no se pudo cargar el historial" — aunque el historial sí se
+haya cargado bien y el problema sea solo del gráfico. Queda anotado para una próxima
+pasada, no es algo urgente.
+
 ## Auditoría visual puntual (v3.27.0)
 
 Pedido de revisar el frontend con criterio de diseño y mejorar lo que valiera la pena,

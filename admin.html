@@ -28,6 +28,21 @@
     --shadow-card-hover: 0 2px 4px rgba(16,24,32,0.08), 0 14px 28px -12px rgba(16,24,32,0.24);
     --shadow-amber: 0 6px 16px -6px rgba(245,166,35,0.45);
     --ease: cubic-bezier(0.16,1,0.3,1);
+
+    /* Mismos acentos que ya usa cada tile equivalente en la app del
+       técnico, para que las dos pantallas se sientan del mismo
+       producto — más los 2 nuevos para pestañas sin equivalente ahí. */
+    --acc-amber: #F5A623;
+    --acc-indigo: #6C63C4;
+    --acc-guardia: #4A6FA5;
+    --acc-gold: #C9932E;
+    --acc-green: #2E9E4F;
+    --acc-blue: #2E86DE;
+    --acc-brown: #8B5E3C;
+    --acc-navy: #34495E;
+    --acc-alert: #C0392B;
+    --acc-teal: #17A2A0;
+    --acc-rose: #B5586F;
   }
   @media (prefers-reduced-motion: reduce) {
     * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
@@ -143,6 +158,26 @@
   .tab-icon svg { width: 20px; height: 20px; stroke: currentColor; }
   .tab-btn:active { transform: scale(0.96); }
   .tab-btn.active { background: var(--ink); color: var(--amber); border-color: var(--ink); box-shadow: var(--shadow-amber); }
+
+  /* Mismo color por sección que ya tiene su tile equivalente en la
+     app del técnico — para que ambas pantallas se sientan del mismo
+     producto, y se pueda ubicar cada pestaña más rápido por color en
+     vez de tener que leer cada etiqueta. Solo el ÍCONO lleva color;
+     el texto queda neutro para no perder legibilidad. */
+  #tabServiciosBtn:not(.active) .tab-icon,
+  #tabCronogramaBtn:not(.active) .tab-icon { color: var(--acc-indigo); }
+  #tabTecnicosBtn:not(.active) .tab-icon { color: var(--acc-teal); }
+  #tabMaterialesBtn:not(.active) .tab-icon { color: var(--acc-brown); }
+  #tabClientesBtn:not(.active) .tab-icon { color: var(--acc-rose); }
+  #tabConsultasBtn:not(.active) .tab-icon { color: var(--acc-indigo); }
+  #tabGuardiasBtn:not(.active) .tab-icon { color: var(--acc-guardia); }
+  #tabCredencialesBtn:not(.active) .tab-icon { color: var(--acc-gold); }
+  #tabVehiculosBtn:not(.active) .tab-icon { color: var(--acc-green); }
+  #tabSimsBtn:not(.active) .tab-icon,
+  #tabSimsInstaladasBtn:not(.active) .tab-icon { color: var(--acc-blue); }
+  #tabHerramientasBtn:not(.active) .tab-icon { color: var(--acc-brown); }
+  #tabPlanosBtn:not(.active) .tab-icon { color: var(--acc-navy); }
+  #tabEmergenciaBtn:not(.active) .tab-icon { color: var(--acc-alert); }
 
   .tecnicos-filas { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
   .tecnico-fila { align-items: flex-end; flex-wrap: wrap; }
