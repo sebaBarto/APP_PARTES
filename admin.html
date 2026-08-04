@@ -100,6 +100,14 @@
   .password-toggle-btn.activo { opacity: 1; }
 
   .status { font-size: 13px; margin-top: 10px; min-height: 18px; font-weight: 500; }
+  .badge-estado-sim {
+    display: inline-block; border: none; border-radius: 999px; padding: 4px 12px;
+    font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit;
+    transition: transform 120ms var(--ease);
+  }
+  .badge-estado-sim:active { transform: scale(0.94); }
+  .badge-estado-sim.activa { background: rgba(46,125,50,0.15); color: #2E7D32; }
+  .badge-estado-sim.inactiva { background: rgba(192,57,43,0.15); color: #C0392B; }
   .status.ok { color: var(--ok); }
   .status.ok:not(:empty)::before { content: "✓ "; }
   .status.err { color: var(--danger); }
@@ -2278,6 +2286,7 @@ function dibujarResultadosSimsInstaladas() {
   simsInstaladasTablaBody.innerHTML = "";
   coincidencias.slice(0, LIMITE_RESULTADOS_INSTALADAS).forEach((s) => {
     const fila = document.createElement("tr");
+    const activa = (s.estado_linea || "Activo") !== "Inactivo";
     fila.innerHTML = `
       <td>${s.numero_abonado || ""}</td>
       <td>${s.cliente || ""}</td>
@@ -2285,13 +2294,45 @@ function dibujarResultadosSimsInstaladas() {
       <td>${s.empresa || ""}</td>
       <td>${s.numero || ""}</td>
       <td>${s.fecha_activacion || ""}</td>
-      <td>${s.estado_linea || ""}</td>
+      <td><button type="button" class="badge-estado-sim ${activa ? "activa" : "inactiva"}" title="Tocar para cambiar">${activa ? "Activa" : "Inactiva"}</button></td>
     `;
+    fila.querySelector(".badge-estado-sim").addEventListener("click", () => cambiarEstadoSimInstalada(s.numero, activa ? "Inactivo" : "Activo"));
     simsInstaladasTablaBody.appendChild(fila);
   });
   simsInstaladasResultadosWrap.style.display = "block";
 }
 simsInstaladasBuscar.addEventListener("input", dibujarResultadosSimsInstaladas);
+
+// Cambia el estado de una SIM instalada puntual (activa/inactiva) y
+// guarda enseguida — sin tener que ir a otra pantalla ni tocar el
+// resto de sus datos.
+async function cambiarEstadoSimInstalada(numero, nuevoEstado) {
+  simsInstaladasStatus.className = "status";
+  simsInstaladasStatus.textContent = "Guardando...";
+  try {
+    const res = await fetch("/api/datos?coleccion=sims_instaladas", {
+      headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      cache: "no-store",
+    });
+    const lista = await res.json();
+    const actualizada = (Array.isArray(lista) ? lista : []).map((s) =>
+      s.numero === numero ? { ...s, estado_linea: nuevoEstado } : s
+    );
+    const resGuardar = await fetch("/api/datos?coleccion=sims_instaladas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify(actualizada),
+    });
+    if (!resGuardar.ok) throw new Error("HTTP " + resGuardar.status);
+    simsInstaladasCache = actualizada;
+    dibujarResultadosSimsInstaladas();
+    simsInstaladasStatus.className = "status";
+    simsInstaladasStatus.textContent = `Marcada como ${nuevoEstado === "Activo" ? "activa" : "inactiva"}.`;
+  } catch (err) {
+    simsInstaladasStatus.className = "status err";
+    simsInstaladasStatus.textContent = "No se pudo guardar: " + err.message;
+  }
+}
 
 // Normaliza "MOVISTAR"/"movistar " -> "Movistar", para que coincida
 // con cómo ya se guarda el nombre de la empresa en el resto de la app.

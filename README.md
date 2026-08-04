@@ -258,6 +258,14 @@ estaba desde antes):
   invisible. Se armó una variante para ese caso y se aplicó en los 4 botones que tenían el
   mismo problema.
 
+## Estado de SIMs instaladas: activa/inactiva, editable desde el listado (v3.21.0)
+
+En el listado de "SIMs instaladas" de `admin.html`, el estado (que ya existía como dato,
+cargado desde el Excel) pasó de ser texto fijo a un botón — verde "Activa" / rojo
+"Inactiva" — que al tocarlo cambia el estado, lo guarda, y actualiza la lista al instante,
+sin salir de la pantalla ni recargar nada. No hizo falta agregar ningún campo nuevo a la
+base de datos, el dato ya estaba, solo no se podía editar.
+
 ## Número de cliente: conecta servicios, planos y SIMs (v3.20.0)
 
 Nueva forma de identificar cada dirección de servicio de manera confiable — un número de
