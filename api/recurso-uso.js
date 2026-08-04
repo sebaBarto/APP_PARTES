@@ -265,8 +265,18 @@ async function postSim(ghHeaders, body, res) {
     return;
   }
   if (sim.tecnico_actual !== tecnico) {
-    res.status(409).json({ error: `Esa SIM la tiene ${sim.tecnico_actual}, no vos` });
-    return;
+    // No es la SIM del técnico que hace el pedido — pero si tiene el
+    // permiso "ver todas las SIMs" activado, se lo deja igual. Esto
+    // se verifica acá, del lado del servidor, consultando la base de
+    // técnicos real — nunca confiando en un dato que mande el celular
+    // (alguien podría mandar cualquier cosa ahí).
+    const { data: tecnicosLista } = await leerJSON(ghHeaders, "tecnicos.json", []);
+    const tecnicoActuante = tecnicosLista.find((t) => t.nombre === tecnico);
+    const tienePermiso = !!(tecnicoActuante && tecnicoActuante.permisos && tecnicoActuante.permisos.sims_ver_todas);
+    if (!tienePermiso) {
+      res.status(409).json({ error: `Esa SIM la tiene ${sim.tecnico_actual}, no vos` });
+      return;
+    }
   }
 
   const { data: historial, sha: shaHistorial } = await leerJSON(ghHeaders, SIM_HISTORIAL_PATH, []);
@@ -288,7 +298,7 @@ async function postSim(ghHeaders, body, res) {
       return;
     }
     historial.push({ ...registroBase, accion: "transferir", tecnico_nuevo: body.tecnico_nuevo || "Oficina" });
-    sim.tecnico_anterior = tecnico;
+    sim.tecnico_anterior = sim.tecnico_actual; // el dueño real anterior, no necesariamente quien inició la transferencia
     sim.tecnico_actual = body.tecnico_nuevo;
     sim.estado = "stock";
     sim.cliente = "";

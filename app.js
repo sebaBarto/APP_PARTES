@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.25.0";
+const APP_VERSION = "3.26.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -682,7 +682,7 @@ function permisosDelTecnico(nombre) {
     return {
       dash_general: true, dash_financiero: true, dash_vehiculos: true, dash_sims: true,
       historial_todos: true, vehiculos: true, sims: true, herramientas: true,
-      comodato: true, admin: true, agendar_emergencia: true,
+      comodato: true, admin: true, agendar_emergencia: true, sims_ver_todas: true,
     };
   }
   if (tecnicosPermisos[nombre]) {
@@ -705,6 +705,7 @@ function permisosDelTecnico(nombre) {
     comodato: true,
     admin: nombre === "Sebastian Bartolozzi" || nombre === "Brenda Thiesing",
     agendar_emergencia: false,
+    sims_ver_todas: false,
   };
 }
 const tecnicosListos = cargarTecnicos();
@@ -5042,15 +5043,35 @@ function dibujarSimsLista() {
   // ni siquiera con el permiso de Administración (ese permiso da
   // acceso al panel de admin.html, que es donde sí se ve y se
   // reasigna todo; acá adentro de la app queda siempre acotado a lo
-  // propio, por privacidad entre técnicos).
+  // propio, por privacidad entre técnicos) — salvo que tenga el
+  // permiso puntual "sims_ver_todas", pensado para quien necesita
+  // supervisar/operar el listado completo sin tener que ser admin.
   const propio = tecnicoLogueado || "";
-  const listaVisible = simsListaCache.filter((s) => s.tecnico_actual === propio);
+  const veTodas = !!permisosDelTecnico(tecnicoLogueado).sims_ver_todas;
+  const listaVisible = veTodas ? simsListaCache.slice() : simsListaCache.filter((s) => s.tecnico_actual === propio);
 
   if (listaVisible.length === 0) {
     simsListaStatus.textContent = "Todavía no tenés ninguna SIM asignada.";
     return;
   }
   simsListaStatus.textContent = "";
+
+  if (veTodas) {
+    // Agrupadas por técnico, para que quede claro de quién es cada una.
+    const porTecnico = {};
+    listaVisible.forEach((s) => {
+      const clave = s.tecnico_actual || "(sin asignar)";
+      (porTecnico[clave] = porTecnico[clave] || []).push(s);
+    });
+    Object.keys(porTecnico).sort().forEach((nombreTec) => {
+      const titulo = document.createElement("p");
+      titulo.className = "sim-grupo-titulo";
+      titulo.textContent = nombreTec === propio ? "Tus SIMs" : nombreTec;
+      simsGrupos.appendChild(titulo);
+      porTecnico[nombreTec].forEach((s) => simsGrupos.appendChild(crearCard(s, false)));
+    });
+    return;
+  }
 
   const titulo = document.createElement("p");
   titulo.className = "sim-grupo-titulo";
@@ -5091,7 +5112,7 @@ async function renderSimDetalle() {
     simDetalleNombre.innerHTML = `<span class="sim-card-dot" style="background:${colorEmpresaDetalle};"></span>${sim.empresa}${sim.tipo ? " · " + sim.tipo : ""} — ${sim.numero}`;
     simDetalleStatus.textContent = "";
 
-    const esPropia = sim.tecnico_actual === (tecnicoLogueado || "");
+    const esPropia = sim.tecnico_actual === (tecnicoLogueado || "") || !!permisosDelTecnico(tecnicoLogueado).sims_ver_todas;
     if (!esPropia) {
       simSoloLecturaInfo.textContent = sim.estado === "uso"
         ? `Esta SIM la tiene ${sim.tecnico_actual}, en uso en ${sim.cliente || "un cliente"}.`

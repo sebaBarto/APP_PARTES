@@ -258,6 +258,24 @@ estaba desde antes):
   invisible. Se armó una variante para ese caso y se aplicó en los 4 botones que tenían el
   mismo problema.
 
+## Permiso "Ver y operar todas las SIMs" (v3.26.0)
+
+Nuevo permiso configurable por técnico, independiente de ser administrador: quien lo
+tenga ve, dentro de la app (no solo desde `admin.html`), el listado completo de SIMs de
+todo el equipo — agrupado por técnico dueño — y puede operar cualquiera (transferir,
+instalar, retirar) igual que si fuera propia. Sin este permiso, todo sigue exactamente
+igual que antes (cada uno ve solo lo suyo).
+
+La verificación real vive del lado del servidor (consultando la base de técnicos, nunca
+confiando en lo que mande el celular). De paso, encontré y corregí un bug real: al
+transferir una SIM ajena, el dato de "de quién era antes" (que usa el botón de revertir
+por error) se guardaba mal — quedaba el nombre de quien hacía la transferencia en vez del
+dueño real anterior.
+
+Probado a fondo en los tres niveles: listado (con y sin permiso), detalle de una SIM
+ajena (queda operable, no de solo lectura), y el servidor (rechaza sin permiso, acepta
+con permiso, y guarda bien el dueño anterior).
+
 ## Diseño adaptativo: compu vs. celular (v3.25.0)
 
 Las dos pantallas (la app del técnico y `admin.html`) estaban fijadas a un ancho angosto
