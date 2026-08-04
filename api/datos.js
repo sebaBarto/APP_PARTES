@@ -12,10 +12,11 @@
 const COLECCIONES = {
   config: {
     path: "config.json",
-    default: { dias_atencion: 3, dias_urgente: 7, app_version_actual: "3.19.1", felicitacion_semanal_activa: true },
+    default: { dias_atencion: 3, dias_urgente: 7, app_version_actual: "3.20.0", felicitacion_semanal_activa: true },
     mergeConDefault: true,
   },
   tecnicos: { path: "tecnicos.json", default: [] },
+  clientes: { path: "clientes-config.json", default: [] },
   materiales: { path: "materiales-catalogo.json", default: [] },
   "consultas-categorias": { path: "consultas-categorias.json", default: [] },
   guardias: { path: "guardias-config.json", default: { fecha_inicio_referencia: "", secuencia: [] } },

@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.19.1";
+const APP_VERSION = "3.20.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -1125,6 +1125,34 @@ whatsappClienteBtn.addEventListener("click", (e) => {
   whatsappClienteBtn.href = `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
 });
 
+// ---------- Acceso directo al plano del cliente, si el servicio trae número de cliente ----------
+const verPlanoClienteBtn = document.getElementById("verPlanoClienteBtn");
+let numeroClienteActivo = "";
+
+function actualizarBotonVerPlano(numeroCliente) {
+  numeroClienteActivo = (numeroCliente || "").toString().trim();
+  verPlanoClienteBtn.classList.toggle("hidden", !numeroClienteActivo);
+}
+
+verPlanoClienteBtn.addEventListener("click", async () => {
+  if (!numeroClienteActivo) return;
+  const iconoOriginal = verPlanoClienteBtn.innerHTML;
+  verPlanoClienteBtn.disabled = true;
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch(`/api/planos?nombre=${encodeURIComponent("CLI_" + numeroClienteActivo)}`, { headers });
+    if (!res.ok) throw new Error(res.status === 404 ? "Todavía no hay un plano subido para este cliente" : "No se pudo abrir el plano");
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank");
+  } catch (err) {
+    showToast(err.message);
+  } finally {
+    verPlanoClienteBtn.innerHTML = iconoOriginal;
+    verPlanoClienteBtn.disabled = false;
+  }
+});
+
 function seleccionarServicio(item) {
   currentNumeroServicio = item.numero_servicio ?? "";
   document.getElementById("f_cliente").value = item.cliente ?? "";
@@ -1133,6 +1161,7 @@ function seleccionarServicio(item) {
   document.getElementById("f_tarea").value = item.tarea ?? "";
   actualizarBotonLlamar(item.telefono);
   actualizarBotonWhatsapp(item.telefono);
+  actualizarBotonVerPlano(item.numero_cliente);
   autocompletarTecnico();
   autocompletarFecha();
   mostrarVisitaAnterior();
@@ -1149,6 +1178,7 @@ manualReportBtn.addEventListener("click", () => {
   currentNumeroServicio = "";
   actualizarBotonLlamar(null);
   actualizarBotonWhatsapp(null);
+  actualizarBotonVerPlano(null);
   autocompletarTecnico();
   autocompletarFecha();
   mostrarVisitaAnterior();

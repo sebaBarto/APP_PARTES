@@ -258,6 +258,26 @@ estaba desde antes):
   invisible. Se armó una variante para ese caso y se aplicó en los 4 botones que tenían el
   mismo problema.
 
+## Número de cliente: conecta servicios, planos y SIMs (v3.20.0)
+
+Nueva forma de identificar cada dirección de servicio de manera confiable — un número de
+cliente identifica un **sitio puntual** (una empresa con varias sucursales tiene un número
+distinto por cada una), en vez de depender de buscar por nombre (que puede tener errores
+de tipeo, mayúsculas distintas, etc.).
+
+- **Nueva pestaña "Clientes" en `admin.html`**: importar/actualizar por Excel (número de
+  cliente, nombre, dirección, localidad, teléfono, número de abonado), y buscador.
+- **El Excel de servicios pendientes** ahora puede traer, de forma opcional, las columnas
+  de número de cliente y número de abonado (mapeables como el resto de las columnas).
+- **En la pantalla de trabajo del técnico**: si el servicio abierto trae un número de
+  cliente, aparece un botón junto a "Llamar"/"WhatsApp" para **ver el plano de ese cliente
+  directo**, sin tener que buscarlo a mano — el número de cliente coincide exactamente con
+  el nombre del archivo (`CLI_XXXXXX.pdf`).
+
+Probado de punta a punta: la importación de clientes arma bien cada fila, la búsqueda
+filtra correcto, el botón de plano queda oculto cuando el servicio no trae número de
+cliente y aparece cuando sí, y al tocarlo pide exactamente el archivo correcto.
+
 ## Emojis reemplazados por íconos SVG (v3.19.0)
 
 Revisión completa de los tres archivos principales (`index.html`, `app.js`, `admin.html`)
