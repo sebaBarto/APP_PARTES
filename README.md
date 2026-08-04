@@ -258,6 +258,22 @@ estaba desde antes):
   invisible. Se armó una variante para ese caso y se aplicó en los 4 botones que tenían el
   mismo problema.
 
+## Mail automático a Security 24 por cambio de guardia (v3.22.0)
+
+Cuando corresponde un cambio de guardia semanal (los lunes, calculado automáticamente
+desde la secuencia configurada en `admin.html`), además del aviso push que ya existía,
+ahora también se manda un mail a `actualizaciondedatos@security24.com.ar` con el nombre
+del técnico de guardia y el rango exacto (desde/hasta, siempre lunes 9:00 a lunes 9:00).
+
+Un bug real que encontré y corregí en el camino: el cálculo de "9:00" mostraba "6:00" al
+principio — la función que calcula la hora argentina ya hace un ajuste interno de -3
+horas, y mi código lo volvía a aplicar una segunda vez sin darme cuenta. Quedó probado de
+punta a punta (forzando que el sistema piense que es lunes) que ahora muestra la hora
+correcta tanto en el "desde" como en el "hasta".
+
+Si el mail falla por algún motivo, no frena el aviso push — son dos avisos
+independientes.
+
 ## Estado de SIMs instaladas: activa/inactiva, editable desde el listado (v3.21.0)
 
 En el listado de "SIMs instaladas" de `admin.html`, el estado (que ya existía como dato,
