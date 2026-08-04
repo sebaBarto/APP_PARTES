@@ -258,6 +258,24 @@ estaba desde antes):
   invisible. Se armó una variante para ese caso y se aplicó en los 4 botones que tenían el
   mismo problema.
 
+## Autocompletar desde la base de Clientes en SIMs y Emergencias (v3.35.0)
+
+Dos pantallas ahora aprovechan la base de Clientes para no tener que escribir todo a
+mano:
+
+- **Instalar SIM en un cliente**: el desplegable de clientes ahora incluye también los
+  cargados en la base de Clientes (antes solo mostraba los que tenían un servicio
+  pendiente en ese momento). Al elegir uno, se completa sola la dirección — de paso, se
+  agregó ese campo, que antes ni siquiera existía en esta pantalla. También se guarda el
+  número de cliente junto con la SIM instalada, para relacionarlo mejor a futuro.
+- **Cargar servicio de emergencia**: el campo Cliente ahora sugiere nombres ya cargados
+  mientras escribís, y al elegir uno se completan solos el teléfono y la dirección (solo
+  si esos campos están vacíos — si el técnico ya escribió algo a mano, no se lo pisa).
+
+Probado en los dos casos: aparecen los clientes correctos en las sugerencias, se
+autocompleta bien al elegir uno, y no se sobreescribe nada que ya estuviera cargado a
+mano.
+
 ## Corrige contraste ilegible en tarjeta "RESUELTO" del Cronograma (v3.34.1)
 
 Bug real encontrado apenas se activó la marca permanente: el fondo verde de esa tarjeta

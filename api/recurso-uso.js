@@ -324,6 +324,7 @@ async function postSim(ghHeaders, body, res) {
       estado_linea: "Activo",
       cliente: body.cliente,
       direccion: body.direccion || "",
+      numero_cliente: body.numero_cliente || "",
       fecha_activacion: registroBase.fecha,
       numero: sim.numero,
       empresa: sim.empresa,

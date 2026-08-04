@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.34.1";
+const APP_VERSION = "3.35.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -5089,17 +5089,46 @@ function dibujarSimsLista() {
   listaVisible.forEach((s) => simsGrupos.appendChild(crearCard(s, false)));
 }
 
-function poblarClientesParaSim() {
-  const opciones = serviciosCache
-    .filter((s) => s.cliente)
-    .map((s) => `<option value="${s.cliente}">${s.cliente}</option>`)
-    .join("");
+async function poblarClientesParaSim() {
+  await cargarClientesGeneral();
+  const nombresDeServicios = serviciosCache.filter((s) => s.cliente).map((s) => s.cliente);
+  const nombresDeClientes = (clientesGeneralCache || []).filter((c) => c.nombre).map((c) => c.nombre);
+  const nombresUnicos = [...new Set([...nombresDeServicios, ...nombresDeClientes])].sort((a, b) => a.localeCompare(b));
+  const opciones = nombresUnicos.map((n) => `<option value="${n}">${n}</option>`).join("");
   simClienteSelect.innerHTML = `<option value="" disabled selected>Elegí un cliente</option>${opciones}<option value="__otro__">Otro (escribir)</option>`;
 }
 
+// ---------- Caché compartido de la base de Clientes ----------
+// Se usa para autocompletar dirección/teléfono en varias pantallas
+// (SIMs, servicios de emergencia) a partir de lo cargado en la
+// pestaña Clientes de admin.html — evita tener que escribir todo a
+// mano si el cliente ya está cargado ahí.
+let clientesGeneralCache = null;
+async function cargarClientesGeneral() {
+  if (clientesGeneralCache) return clientesGeneralCache;
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/datos?coleccion=clientes", { headers, cache: "no-store" });
+    const data = await res.json();
+    clientesGeneralCache = Array.isArray(data) ? data : [];
+  } catch (err) {
+    clientesGeneralCache = [];
+  }
+  return clientesGeneralCache;
+}
+function buscarClientePorNombre(nombre) {
+  const clave = normalizeText(nombre);
+  return (clientesGeneralCache || []).find((c) => c.nombre && normalizeText(c.nombre) === clave) || null;
+}
+
+const simDireccionInstalacion = document.getElementById("simDireccionInstalacion");
+let simNumeroClienteActivo = "";
 simClienteSelect.addEventListener("change", () => {
   const esOtro = simClienteSelect.value === "__otro__";
   simClienteOtroWrap.style.display = esOtro ? "block" : "none";
+  const clienteEncontrado = esOtro ? null : buscarClientePorNombre(simClienteSelect.value);
+  simDireccionInstalacion.value = clienteEncontrado ? clienteEncontrado.direccion || "" : "";
+  simNumeroClienteActivo = clienteEncontrado ? clienteEncontrado.numero_cliente || "" : "";
 });
 
 async function renderSimDetalle() {
@@ -5131,7 +5160,7 @@ async function renderSimDetalle() {
     }
 
     if (sim.estado === "stock") {
-      poblarClientesParaSim();
+      await poblarClientesParaSim();
       simClienteSelect.value = "";
       simClienteOtro.value = "";
       simClienteOtroWrap.style.display = "none";
@@ -5164,7 +5193,8 @@ async function marcarSimComoUsada(cliente) {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
       body: JSON.stringify({ recurso: "sim",
-        accion: "usar", numero: simSeleccionada, tecnico: tecnicoLogueado || "", cliente }),
+        accion: "usar", numero: simSeleccionada, tecnico: tecnicoLogueado || "", cliente,
+        direccion: simDireccionInstalacion.value.trim(), numero_cliente: simNumeroClienteActivo }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error desconocido");
@@ -5407,9 +5437,23 @@ async function confirmarRetirarSim(sim) {
 }
 
 // ---------- Agenda de emergencia ----------
-tileEmergenciaBtn.addEventListener("click", () => {
+tileEmergenciaBtn.addEventListener("click", async () => {
   showScreen("emergencia");
   cargarListaEmergencias();
+  await cargarClientesGeneral();
+  const datalist = document.getElementById("emergClientesLista");
+  datalist.innerHTML = (clientesGeneralCache || [])
+    .filter((c) => c.nombre)
+    .map((c) => `<option value="${escapeHtml(c.nombre)}"></option>`)
+    .join("");
+});
+document.getElementById("emerg_cliente").addEventListener("change", (e) => {
+  const encontrado = buscarClientePorNombre(e.target.value);
+  if (!encontrado) return;
+  const telInput = document.getElementById("emerg_telefono");
+  const dirInput = document.getElementById("emerg_direccion");
+  if (!telInput.value.trim() && encontrado.telefono) telInput.value = encontrado.telefono;
+  if (!dirInput.value.trim() && encontrado.direccion) dirInput.value = encontrado.direccion;
 });
 volverDeEmergenciaBtn.addEventListener("click", () => showScreen("home"));
 

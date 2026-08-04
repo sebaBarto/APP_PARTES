@@ -618,7 +618,8 @@
       <div id="emergenciaFormWrap">
         <div class="field-group">
           <label class="field-label" for="emerg_cliente">Cliente</label>
-          <input class="field-input" id="emerg_cliente" type="text" placeholder="Nombre del cliente">
+          <input class="field-input" id="emerg_cliente" type="text" placeholder="Nombre del cliente" list="emergClientesLista">
+          <datalist id="emergClientesLista"></datalist>
         </div>
         <div class="field-group">
           <label class="field-label" for="emerg_telefono">Teléfono</label>
@@ -672,6 +673,10 @@
         <div class="field-group" id="simClienteOtroWrap" style="display:none;">
           <label class="field-label" for="simClienteOtro">Nombre del cliente</label>
           <input class="field-input" id="simClienteOtro" type="text" placeholder="Nombre del cliente">
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="simDireccionInstalacion">Dirección</label>
+          <input class="field-input" id="simDireccionInstalacion" type="text" placeholder="Se completa sola si el cliente ya está cargado">
         </div>
         <button type="button" class="btn btn-primary" id="simUsarBtn">Marcar como usada</button>
       </div>
