@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.33.0";
+const APP_VERSION = "3.34.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -1543,7 +1543,8 @@ verVisitaAnteriorBtn.addEventListener("click", () => {
   if (!ultimaVisitaEncontrada) return;
   const [y, m, d] = ultimaVisitaEncontrada.fecha.split("-");
   visitaAnteriorModalContenido.innerHTML = `
-    <p style="margin:0 0 8px;"><b>Qué se hizo:</b> ${escapeHtml(ultimaVisitaEncontrada.tarea || "(sin detalle)")}</p>
+    <p style="margin:0 0 8px;"><b>Se pidió:</b> ${escapeHtml(ultimaVisitaEncontrada.tarea || "(sin detalle)")}</p>
+    ${ultimaVisitaEncontrada.observaciones ? `<p style="margin:0 0 8px;"><b>Se resolvió:</b> ${escapeHtml(ultimaVisitaEncontrada.observaciones)}</p>` : ""}
     <p style="margin:0 0 8px;"><b>Fecha:</b> ${d}/${m}/${y}</p>
     <p style="margin:0;"><b>Técnico:</b> ${escapeHtml(ultimaVisitaEncontrada.tecnico || "(sin dato)")}</p>
   `;
@@ -2473,6 +2474,8 @@ async function intentarEnviarParte(payload, interactivo) {
           cliente: data.cliente,
           direccion: data.direccion,
           localidad: data.localidad,
+          tarea: data.tarea,
+          observaciones: data.observaciones,
           tecnico: data.tecnico,
           tecnico2: data.tecnico2,
           fecha: data.fecha,

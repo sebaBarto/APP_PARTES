@@ -81,12 +81,13 @@ svg[fill="none"] { stroke: currentColor; }
 
 .btn-info-inline {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 22px; height: 22px; margin-left: 6px; vertical-align: -5px;
-  background: transparent; border: none; padding: 0; cursor: pointer;
-  color: var(--acc-slate); border-radius: 50%;
+  width: 24px; height: 24px; margin-left: 8px; vertical-align: -6px;
+  background: var(--amber); border: none; padding: 0; cursor: pointer;
+  color: #101820; border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(245,166,35,0.4);
 }
-.btn-info-inline:disabled { color: #C7CCC3; cursor: default; }
-.btn-info-inline:not(:disabled):active { background: rgba(92,122,138,0.15); }
+.btn-info-inline:disabled { background: #E4E6E0; color: #ABB0A6; box-shadow: none; cursor: default; }
+.btn-info-inline:not(:disabled):active { transform: scale(0.92); }
 
 .modal-overlay {
   position: fixed; inset: 0; background: rgba(16,24,32,0.55);

@@ -258,6 +258,25 @@ estaba desde antes):
   invisible. Se armó una variante para ese caso y se aplicó en los 4 botones que tenían el
   mismo problema.
 
+## Ícono de "último servicio" más visible + arreglo de fondo (v3.34.0)
+
+Dos problemas reales encontrados en el uso:
+
+1. **El ícono ⓘ se perdía visualmente** — ahora tiene fondo ámbar sólido cuando está
+   habilitado (bien notorio) y gris apagado cuando no hay historial — mucho más fácil de
+   distinguir de un vistazo.
+2. **"Qué se hizo" mostraba "(sin detalle)" incluso con historial real** — encontré,
+   revisando los datos reales, que el envío al historial nunca había incluido los campos
+   de tarea u observaciones (fue un vacío de origen, ya existía antes de esta sesión —
+   mi función de "última visita" asumía que sí, porque la probé con datos de prueba que
+   sí los tenían). Ahora se guardan los dos, y la ventanita muestra por separado "Se
+   pidió" (la tarea original) y "Se resolvió" (las observaciones del técnico, si las
+   cargó).
+
+**Importante**: esto solo completa los partes que se carguen de ahora en más — los que
+ya están guardados en el historial (de antes de este cambio) van a seguir sin ese dato,
+porque nunca se guardó y no hay forma de recuperarlo retroactivamente.
+
 ## Cronograma: "RESUELTO" ahora es permanente (v3.33.0)
 
 Encontrado en el uso real: la marca "RESUELTO" en el Cronograma se guardaba solo en el
