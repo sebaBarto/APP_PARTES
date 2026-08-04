@@ -258,6 +258,15 @@ estaba desde antes):
   invisible. Se armó una variante para ese caso y se aplicó en los 4 botones que tenían el
   mismo problema.
 
+## Número de abonado también se autocompleta al instalar una SIM (v3.36.0)
+
+Sumado a la dirección, ahora al elegir un cliente ya cargado para instalar una SIM
+nueva, también se toma solo el número de abonado de la base de Clientes (se muestra
+como texto justo antes del botón, para confirmar que se tomó el correcto) y se guarda
+junto con la SIM. De paso revisé el flujo de "reemplazar" (cambiar el chip físico de un
+cliente que ya tenía línea instalada) — ese ya heredaba bien el número de abonado de la
+SIM vieja, no necesitaba cambios.
+
 ## Autocompletar desde la base de Clientes en SIMs y Emergencias (v3.35.0)
 
 Dos pantallas ahora aprovechan la base de Clientes para no tener que escribir todo a

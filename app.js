@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.35.0";
+const APP_VERSION = "3.36.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -5122,13 +5122,17 @@ function buscarClientePorNombre(nombre) {
 }
 
 const simDireccionInstalacion = document.getElementById("simDireccionInstalacion");
+const simNumeroAbonadoInfo = document.getElementById("simNumeroAbonadoInfo");
 let simNumeroClienteActivo = "";
+let simNumeroAbonadoActivo = "";
 simClienteSelect.addEventListener("change", () => {
   const esOtro = simClienteSelect.value === "__otro__";
   simClienteOtroWrap.style.display = esOtro ? "block" : "none";
   const clienteEncontrado = esOtro ? null : buscarClientePorNombre(simClienteSelect.value);
   simDireccionInstalacion.value = clienteEncontrado ? clienteEncontrado.direccion || "" : "";
   simNumeroClienteActivo = clienteEncontrado ? clienteEncontrado.numero_cliente || "" : "";
+  simNumeroAbonadoActivo = clienteEncontrado ? clienteEncontrado.numero_abonado || "" : "";
+  simNumeroAbonadoInfo.textContent = simNumeroAbonadoActivo ? "Número de abonado: " + simNumeroAbonadoActivo : "";
 });
 
 async function renderSimDetalle() {
@@ -5194,7 +5198,8 @@ async function marcarSimComoUsada(cliente) {
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
       body: JSON.stringify({ recurso: "sim",
         accion: "usar", numero: simSeleccionada, tecnico: tecnicoLogueado || "", cliente,
-        direccion: simDireccionInstalacion.value.trim(), numero_cliente: simNumeroClienteActivo }),
+        direccion: simDireccionInstalacion.value.trim(), numero_cliente: simNumeroClienteActivo,
+        numero_abonado: simNumeroAbonadoActivo }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error desconocido");
