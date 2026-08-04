@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.30.0";
+const APP_VERSION = "3.30.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -5526,6 +5526,14 @@ async function cargarResumenEmergenciasEnCronograma() {
 }
 
 // ---------- Planos de cableado ----------
+// Saca ceros a la izquierda para que "98", "098" y "00000098" se
+// traten como el mismo número — protege contra el caso típico de
+// Excel guardando la columna como número en vez de texto.
+function normalizarNumeroCliente(numero) {
+  const limpio = String(numero || "").trim().replace(/^0+(?=\d)/, "");
+  return limpio || "0";
+}
+
 let planosCache = null; // se trae una sola vez y se cachea (nombres, es liviano)
 let clientesParaPlanosCache = null; // numero_cliente -> nombre, para poder mostrar el nombre real en vez de "CLI_XXXXXX"
 const LIMITE_RESULTADOS_PLANOS = 30;
@@ -5547,7 +5555,12 @@ async function cargarPlanos() {
       const dataClientes = await resClientes.json();
       clientesParaPlanosCache = {};
       (Array.isArray(dataClientes) ? dataClientes : []).forEach((c) => {
-        if (c.numero_cliente) clientesParaPlanosCache[String(c.numero_cliente).trim()] = c.nombre || "";
+        // Se normaliza sacando los ceros a la izquierda — si en el
+        // Excel la columna no quedó como texto, Excel convierte
+        // "00000098" en el número 98 solo, perdiendo los ceros. Sin
+        // normalizar esto, "CLI_00000098" (el archivo) nunca
+        // cruzaría con un cliente cargado como "98".
+        if (c.numero_cliente) clientesParaPlanosCache[normalizarNumeroCliente(c.numero_cliente)] = c.nombre || "";
       });
     } catch (err) {
       clientesParaPlanosCache = {}; // si falla, se sigue igual mostrando el nombre de archivo tal cual
@@ -5568,7 +5581,7 @@ async function cargarPlanos() {
       const match = /^CLI_(\d+)(?:_(\d+))?$/i.exec(p.nombre);
       const numeroCliente = match ? match[1] : null;
       const indicePlano = match && match[2] ? Number(match[2]) : 1;
-      const nombreCliente = numeroCliente ? clientesParaPlanosCache[numeroCliente] : null;
+      const nombreCliente = numeroCliente ? clientesParaPlanosCache[normalizarNumeroCliente(numeroCliente)] : null;
       return { ...p, numero_cliente: numeroCliente, indice_plano: indicePlano, nombre_cliente: nombreCliente || null };
     });
   } catch (err) {

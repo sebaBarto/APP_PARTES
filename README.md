@@ -258,6 +258,16 @@ estaba desde antes):
   invisible. Se armó una variante para ese caso y se aplicó en los 4 botones que tenían el
   mismo problema.
 
+## Corrige cruce de número de cliente con ceros a la izquierda (v3.30.1)
+
+Encontrado en el uso real: si al cargar la base de Clientes la columna de número no
+queda formateada como texto en el Excel, Excel le saca los ceros a la izquierda (guarda
+"98" en vez de "00000098") — pero el archivo del plano en Drive se llama con ceros
+(`CLI_00000098.pdf`). Antes de esto, esos dos no cruzaban (buscar por nombre no
+encontraba el plano). Ahora se normaliza sacando ceros de los dos lados antes de
+comparar, así "98", "098" y "00000098" se tratan como el mismo número, sin depender de
+cómo haya quedado formateada la planilla.
+
 ## Varios planos por cliente, agrupados en una sola tarjeta (v3.30.0)
 
 Ajuste para el caso real: un cliente puede tener más de un plano (`CLI_XXXXXX.pdf`,
