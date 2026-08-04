@@ -258,6 +258,26 @@ estaba desde antes):
   invisible. Se armó una variante para ese caso y se aplicó en los 4 botones que tenían el
   mismo problema.
 
+## Auditoría visual puntual (v3.27.0)
+
+Pedido de revisar el frontend con criterio de diseño y mejorar lo que valiera la pena,
+sin rehacer nada de raíz (la identidad de la app — navy + ámbar, etiquetas tipo
+"eyebrow" — ya es distintiva, no había que cambiarla). Encontré y corregí 4 cosas
+puntuales, mostrando capturas antes de tocar nada:
+
+1. **Guardias y Emergencia compartían el mismo rojo** en el panel principal — se podían
+   confundir a simple vista siendo funciones bien distintas. Guardias pasó a un azul
+   acero nuevo, dejando el rojo exclusivo para lo urgente.
+2. **La línea de "Cobrador" en el formulario se veía como un campo bloqueado** (misma
+   caja gris que un input deshabilitado) — ahora es una nota en cursiva, sin caja, que
+   se lee claramente como información y no como algo editable.
+3. **"Sin cobrador asignado" se repetía en cada tarjeta que no tenía uno** — ahora esa
+   línea directamente no aparece cuando no hay cobrador cargado, reduciendo el ruido.
+4. **"Continuar a la firma" y "Volver" se veían con un peso visual muy parecido** — no
+   hacía falta un relleno sólido (ningún botón de la app lo usa, hubiera roto la
+   consistencia); en cambio, se le bajó el protagonismo a los botones secundarios en
+   general (borde y texto más discretos), así el primario resalta más por comparación.
+
 ## Permiso "Ver y operar todas las SIMs" (v3.26.0)
 
 Nuevo permiso configurable por técnico, independiente de ser administrador: quien lo

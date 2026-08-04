@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.26.0";
+const APP_VERSION = "3.27.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -1031,7 +1031,7 @@ function renderServiciosList(items) {
       <div class="servicio-card-cliente">${escapeHtml(item.cliente)}</div>
       <div class="servicio-card-direccion">${escapeHtml(item.direccion)}${item.localidad ? ", " + escapeHtml(item.localidad) : ""}</div>
       <div class="servicio-card-tarea">${escapeHtml(item.tarea)}</div>
-      <div class="servicio-card-cobrador">Cobrador: ${item.cobrador ? escapeHtml(item.cobrador) : "Sin cobrador asignado"}</div>
+      ${item.cobrador ? `<div class="servicio-card-cobrador">Cobrador: ${escapeHtml(item.cobrador)}</div>` : ""}
     `;
     card.addEventListener("click", () => seleccionarServicio(item));
     serviciosListEl.appendChild(card);

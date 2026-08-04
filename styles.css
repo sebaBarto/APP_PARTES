@@ -33,6 +33,7 @@
   --acc-purple: #7B4B94;
   --acc-navy: #34495E;
   --acc-alert: #C0392B;
+  --acc-guardia: #4A6FA5;
   --amber-soft: rgba(245, 166, 35, 0.14);
   --amber-ring: rgba(245, 166, 35, 0.28);
   --steel: #5C7A8A;
@@ -239,7 +240,7 @@ html, body {
 .tile-servicios .panel-tile-icon-badge { background: var(--acc-amber); }
 .tile-manuales .panel-tile-icon-badge { background: var(--acc-indigo); }
 .tile-dashboards .panel-tile-icon-badge { background: var(--acc-teal); }
-.tile-guardias .panel-tile-icon-badge { background: var(--acc-coral); }
+.tile-guardias .panel-tile-icon-badge { background: var(--acc-guardia); }
 .tile-historial .panel-tile-icon-badge { background: var(--acc-slate); }
 .tile-credencial .panel-tile-icon-badge { background: var(--acc-gold); }
 .tile-vehiculos .panel-tile-icon-badge { background: var(--acc-green); }
@@ -507,6 +508,15 @@ html, body {
   margin: -8px 0 14px;
 }
 .status-aviso.status-info { color: #6B7680; background: #F4F5F0; margin: 6px 0 0; }
+/* Para datos informativos chicos, pegados a un campo (como el
+   cobrador) — a propósito NO se ve como una caja/campo, para no
+   confundir con algo editable. */
+.campo-caption {
+  font-size: 12px;
+  color: #8A9089;
+  margin: 6px 2px 0;
+  font-style: italic;
+}
 .field-input {
   font-family: 'Inter', sans-serif;
   font-size: 15px;
@@ -631,7 +641,7 @@ html, body {
 .btn-primary { background: #101820; color: #F5A623; box-shadow: var(--shadow-amber), var(--shadow-card); }
 .btn-primary:active { opacity: 0.9; transform: scale(0.97); box-shadow: var(--shadow-card); }
 .btn-primary:disabled { background: #C7CCC3; color: #8A9089; cursor: wait; box-shadow: none; }
-.btn-secondary { background: transparent; color: #F4F5F0; border: 1.5px solid #F4F5F0; }
+.btn-secondary { background: transparent; color: #C7CCC3; border: 1.5px solid #4A5560; font-weight: 500; }
 .btn-secondary:active { transform: scale(0.97); background: rgba(244,245,240,0.08); }
 /* Variante para cuando este botón vive dentro de una tarjeta blanca
    (el original está pensado para fondo oscuro — texto casi blanco
