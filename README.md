@@ -258,6 +258,16 @@ estaba desde antes):
   invisible. Se armó una variante para ese caso y se aplicó en los 4 botones que tenían el
   mismo problema.
 
+## Cronograma: "RESUELTO" ahora es permanente (v3.33.0)
+
+Encontrado en el uso real: la marca "RESUELTO" en el Cronograma se guardaba solo en el
+celular de cada técnico (localStorage), y a propósito se borraba sola cada vez que se
+actualizaba el listado de servicios pendientes — un diseño pensado para durar poco.
+Ahora compara directo contra el historial real (¿existe un parte cargado con ese número
+de servicio?), así queda permanente sin importar cuándo se actualizó la lista, ni si se
+borraron datos del sitio en el navegador. Probados ambos casos: con historial coincidente
+(marca RESUELTO) y sin él (no marca nada).
+
 ## Botón para borrar toda la base de Clientes (v3.32.0)
 
 Nueva "zona de riesgo" en la pestaña Clientes de `admin.html`, con un botón para borrar

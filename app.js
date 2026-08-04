@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.32.0";
+const APP_VERSION = "3.33.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -1296,7 +1296,12 @@ function renderCronogramaTareas() {
   tareas.forEach((t) => {
     const servicioVinculado = encontrarServicioPorTarea(t.tarea);
     const vinculado = !!servicioVinculado;
-    const resuelto = vinculado && servicioVinculado.numero_servicio && serviciosResueltos.has(servicioVinculado.numero_servicio);
+    // Antes esto se guardaba de forma temporal en el celular (se
+    // borraba solo al actualizar el listado de pendientes) — ahora
+    // se compara directo contra el historial real, así queda
+    // permanente sin importar cuándo se actualizó nada.
+    const resuelto = vinculado && servicioVinculado.numero_servicio &&
+      historialCache.some((h) => h.numero_servicio === servicioVinculado.numero_servicio);
     const card = document.createElement("button");
     card.type = "button";
     card.className = "crono-tarea-card" + (vinculado ? "" : " sin-vincular") + (resuelto ? " resuelto" : "");
@@ -1364,10 +1369,11 @@ function seleccionarTareaCronograma(t) {
   showScreen("form");
 }
 
-verCronogramaBtn.addEventListener("click", () => {
+verCronogramaBtn.addEventListener("click", async () => {
   showScreen("cronograma");
-  fetchCronograma();
   cargarResumenEmergenciasEnCronograma();
+  await precargarHistorialParaVisitas(); // primero esto, para que "resuelto" salga bien desde el primer render
+  fetchCronograma();
 });
 refreshCronogramaBtn.addEventListener("click", fetchCronograma);
 volverDeCronogramaBtn.addEventListener("click", () => {
