@@ -258,6 +258,31 @@ estaba desde antes):
   invisible. Se armó una variante para ese caso y se aplicó en los 4 botones que tenían el
   mismo problema.
 
+## Planos desde Google Drive (solución de paso) + búsqueda por número de cliente (v3.29.0)
+
+Mientras se termina la migración a Cloudflare, los planos ahora se leen en vivo desde una
+carpeta de Google Drive — mismo mecanismo que ya usa el Cronograma, reutilizando la misma
+cuenta de servicio. Cada archivo tiene que llamarse `CLI_XXXXXX.pdf` (mismo número de
+cliente que la pestaña Clientes de `admin.html`).
+
+**Variable de entorno nueva a cargar en Vercel**: `PLANOS_DRIVE_FOLDER_ID` (el ID de la
+carpeta de Drive — se ve en la URL al abrirla). Esa carpeta tiene que estar compartida con
+el mismo mail de la cuenta de servicio que ya usa el Cronograma
+(`GOOGLE_SERVICE_ACCOUNT_EMAIL`).
+
+**Búsqueda mejorada**: como ahora existe la base de Clientes (número de cliente ↔ nombre),
+el buscador de Planos cruza automáticamente el nombre del archivo (`CLI_XXXXXX`) con esa
+base — se puede buscar por nombre del cliente O por número, y en los resultados se
+muestra el nombre real en vez del código. Si un plano no tiene un cliente correspondiente
+cargado en la base, se sigue mostrando con su nombre de archivo tal cual (no se rompe
+nada).
+
+La carga manual de un plano puntual desde `admin.html` queda discontinuada mientras la
+fuente sea Drive — ahora se sube el PDF directo a la carpeta compartida.
+
+Probado con datos simulados: búsqueda por nombre, por número, y el caso de un plano sin
+cliente correspondiente en la base (cae bien al nombre de archivo).
+
 ## Colores por sección en admin.html, coherentes con la app del técnico (v3.28.0)
 
 Las 12 pestañas de `admin.html` tenían todos los íconos del mismo gris uniforme —

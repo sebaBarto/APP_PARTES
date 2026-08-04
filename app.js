@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.28.0";
+const APP_VERSION = "3.29.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -5527,25 +5527,47 @@ async function cargarResumenEmergenciasEnCronograma() {
 
 // ---------- Planos de cableado ----------
 let planosCache = null; // se trae una sola vez y se cachea (nombres, es liviano)
+let clientesParaPlanosCache = null; // numero_cliente -> nombre, para poder mostrar el nombre real en vez de "CLI_XXXXXX"
 const LIMITE_RESULTADOS_PLANOS = 30;
 
 tilePlanosBtn.addEventListener("click", () => {
   showScreen("planos");
   planosBuscarInput.value = "";
   planosResultados.innerHTML = "";
-  planosStatus.textContent = "Escribí para buscar el plano de un cliente.";
+  planosStatus.textContent = "Escribí para buscar por nombre o número de cliente.";
   cargarPlanos();
 });
 volverDePlanosBtn.addEventListener("click", () => showScreen("home"));
 
 async function cargarPlanos() {
+  const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+  if (!clientesParaPlanosCache) {
+    try {
+      const resClientes = await fetch("/api/datos?coleccion=clientes", { headers, cache: "no-store" });
+      const dataClientes = await resClientes.json();
+      clientesParaPlanosCache = {};
+      (Array.isArray(dataClientes) ? dataClientes : []).forEach((c) => {
+        if (c.numero_cliente) clientesParaPlanosCache[String(c.numero_cliente).trim()] = c.nombre || "";
+      });
+    } catch (err) {
+      clientesParaPlanosCache = {}; // si falla, se sigue igual mostrando el nombre de archivo tal cual
+    }
+  }
   if (planosCache) return; // ya está en memoria
   try {
-    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
     const res = await fetch("/api/planos", { headers, cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
-    planosCache = await res.json();
-    if (!Array.isArray(planosCache)) planosCache = [];
+    const lista = await res.json();
+    // A cada plano, si su nombre sigue el patrón "CLI_XXXXXX", se le
+    // suma el nombre real del cliente (buscado en la base de
+    // Clientes) — así se puede mostrar y buscar por cualquiera de
+    // los dos.
+    planosCache = (Array.isArray(lista) ? lista : []).map((p) => {
+      const match = /^CLI_(.+)$/i.exec(p.nombre);
+      const numeroCliente = match ? match[1] : null;
+      const nombreCliente = numeroCliente ? clientesParaPlanosCache[numeroCliente] : null;
+      return { ...p, numero_cliente: numeroCliente, nombre_cliente: nombreCliente || null };
+    });
   } catch (err) {
     planosStatus.textContent = "No se pudo cargar la lista de planos.";
     planosCache = [];
@@ -5556,14 +5578,18 @@ function renderResultadosPlanos() {
   const busqueda = normalizeText(planosBuscarInput.value.trim());
   planosResultados.innerHTML = "";
   if (!busqueda) {
-    planosStatus.textContent = "Escribí para buscar el plano de un cliente.";
+    planosStatus.textContent = "Escribí para buscar por nombre o número de cliente.";
     return;
   }
   if (!planosCache) {
     planosStatus.textContent = "Cargando...";
     return;
   }
-  const coincidencias = planosCache.filter((p) => normalizeText(p.nombre).includes(busqueda));
+  const coincidencias = planosCache.filter((p) =>
+    normalizeText(p.nombre).includes(busqueda) ||
+    (p.nombre_cliente && normalizeText(p.nombre_cliente).includes(busqueda)) ||
+    (p.numero_cliente && p.numero_cliente.includes(busqueda))
+  );
   if (coincidencias.length === 0) {
     planosStatus.textContent = "Ningún plano coincide con esa búsqueda.";
     return;
@@ -5575,10 +5601,14 @@ function renderResultadosPlanos() {
   coincidencias.slice(0, LIMITE_RESULTADOS_PLANOS).forEach((p) => {
     const card = document.createElement("div");
     card.className = "sim-card";
+    const tituloPrincipal = p.nombre_cliente || p.nombre;
+    const subtitulo = p.nombre_cliente
+      ? `N° de cliente ${escapeHtml(p.numero_cliente)}${p.tamano_kb ? " · " + p.tamano_kb + " KB" : ""}`
+      : `PDF${p.tamano_kb ? " · " + p.tamano_kb + " KB" : ""}`;
     card.innerHTML = `
       <div>
-        <div class="sim-card-numero">${escapeHtml(p.nombre)}</div>
-        <div style="font-size:12px; color:#6B7680; margin-top:2px;">PDF${p.tamano_kb ? " · " + p.tamano_kb + " KB" : ""}</div>
+        <div class="sim-card-numero">${escapeHtml(tituloPrincipal)}</div>
+        <div style="font-size:12px; color:#6B7680; margin-top:2px;">${subtitulo}</div>
       </div>
       <button type="button" class="btn-small btn-secondary btn-secondary-en-card" style="width:auto;">Ver</button>
     `;
