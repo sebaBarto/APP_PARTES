@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.23.0";
+const APP_VERSION = "3.24.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -1506,11 +1506,16 @@ function autocompletarFecha() {
 // historial), si hay alguna registrada. Se busca por nombre de
 // cliente (sin distinguir mayúsculas/acentos), tomando la más
 // reciente por fecha.
-const visitaAnteriorInfo = document.getElementById("visitaAnteriorInfo");
+const verVisitaAnteriorBtn = document.getElementById("verVisitaAnteriorBtn");
+const visitaAnteriorModalOverlay = document.getElementById("visitaAnteriorModalOverlay");
+const visitaAnteriorModalContenido = document.getElementById("visitaAnteriorModalContenido");
+let ultimaVisitaEncontrada = null;
+
 function mostrarVisitaAnterior() {
   const nombreCliente = document.getElementById("f_cliente").value.trim();
+  ultimaVisitaEncontrada = null;
   if (!nombreCliente || !Array.isArray(historialCache) || historialCache.length === 0) {
-    visitaAnteriorInfo.classList.add("hidden");
+    verVisitaAnteriorBtn.disabled = true;
     return;
   }
   const clave = normalizeText(nombreCliente);
@@ -1519,18 +1524,30 @@ function mostrarVisitaAnterior() {
     .sort((a, b) => b.fecha.localeCompare(a.fecha));
 
   if (anteriores.length === 0) {
-    visitaAnteriorInfo.classList.add("hidden");
+    verVisitaAnteriorBtn.disabled = true;
     return;
   }
-  const ultima = anteriores[0];
-  const [y, m, d] = ultima.fecha.split("-");
-  const tareaCorta = (ultima.tarea || "").slice(0, 80);
-  visitaAnteriorInfo.textContent = `Última visita: ${d}/${m}/${y}` +
-    (ultima.tecnico ? ` (técnico: ${ultima.tecnico})` : "") +
-    (tareaCorta ? ` — ${tareaCorta}` : "");
-  visitaAnteriorInfo.classList.remove("hidden");
+  ultimaVisitaEncontrada = anteriores[0];
+  verVisitaAnteriorBtn.disabled = false;
 }
 document.getElementById("f_cliente").addEventListener("change", mostrarVisitaAnterior);
+
+verVisitaAnteriorBtn.addEventListener("click", () => {
+  if (!ultimaVisitaEncontrada) return;
+  const [y, m, d] = ultimaVisitaEncontrada.fecha.split("-");
+  visitaAnteriorModalContenido.innerHTML = `
+    <p style="margin:0 0 8px;"><b>Qué se hizo:</b> ${escapeHtml(ultimaVisitaEncontrada.tarea || "(sin detalle)")}</p>
+    <p style="margin:0 0 8px;"><b>Fecha:</b> ${d}/${m}/${y}</p>
+    <p style="margin:0;"><b>Técnico:</b> ${escapeHtml(ultimaVisitaEncontrada.tecnico || "(sin dato)")}</p>
+  `;
+  visitaAnteriorModalOverlay.classList.remove("hidden");
+});
+document.getElementById("cerrarVisitaAnteriorBtn").addEventListener("click", () => {
+  visitaAnteriorModalOverlay.classList.add("hidden");
+});
+visitaAnteriorModalOverlay.addEventListener("click", (e) => {
+  if (e.target === visitaAnteriorModalOverlay) visitaAnteriorModalOverlay.classList.add("hidden");
+});
 
 // ---------- Importe / descuento / costo final ----------
 function parseMonto(str) {

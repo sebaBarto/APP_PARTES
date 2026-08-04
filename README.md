@@ -258,6 +258,16 @@ estaba desde antes):
   invisible. Se armó una variante para ese caso y se aplicó en los 4 botones que tenían el
   mismo problema.
 
+## Último servicio del cliente: ícono + ventana emergente (v3.24.0)
+
+Encontré que la lógica y el dato ya existían (`mostrarVisitaAnterior()`), solo se
+mostraban como un texto fijo, siempre visible en la pantalla principal. Se cambió la
+presentación nada más: ahora es un ícono ⓘ chico junto al campo "Cliente" — gris y
+deshabilitado si el cliente no tiene servicios anteriores, o habilitado si sí — que al
+tocarlo abre una ventana chica con los 3 datos pedidos: qué se hizo, fecha, y qué técnico
+lo hizo (siempre el más reciente, si hay varios). Ya no ocupa espacio permanente en la
+pantalla.
+
 ## Cobrador asignado, visible en el servicio (v3.23.0)
 
 El nombre del cobrador ahora viaja como una columna más (opcional) del Excel de servicios

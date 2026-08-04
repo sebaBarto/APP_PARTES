@@ -1066,15 +1066,24 @@
       </label>
 
       <div class="field-group">
-        <label class="field-label" for="f_cliente">Cliente</label>
+        <label class="field-label" for="f_cliente">Cliente
+          <button type="button" id="verVisitaAnteriorBtn" class="btn-info-inline" disabled title="Último servicio de este cliente"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16.5"/><circle cx="12" cy="7.8" r="0.9" fill="currentColor" stroke="none"/></svg></button>
+        </label>
         <div class="field-row-inline">
           <input class="field-input" id="f_cliente" type="text" placeholder="Nombre del cliente">
           <a href="#" id="llamarClienteBtn" class="btn-llamar hidden" title="Llamar al cliente"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3.1-8.6A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .3 2 .7 2.9a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.2-1.3a2 2 0 0 1 2.1-.5c.9.4 1.9.6 2.9.7a2 2 0 0 1 1.8 2.1z"/></svg></a>
           <a href="#" id="whatsappClienteBtn" class="btn-llamar btn-whatsapp hidden" title="Avisar por WhatsApp que estoy en camino" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.4 8.4 0 0 1-8.9 8.4 8.5 8.5 0 0 1-4-1L3 20l1.2-5a8.3 8.3 0 0 1-1.1-4.2A8.4 8.4 0 0 1 11.9 2 8.4 8.4 0 0 1 21 11.5z"/><path d="M8.5 9.3c0 3.5 2.7 6.2 6.2 6.2"/></svg></a>
           <button type="button" id="verPlanoClienteBtn" class="btn-llamar hidden" title="Ver el plano de este cliente" style="background:#34495E;"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 9h18M9 9v12M14 3v6M9 15h5"/></svg></button>
         </div>
-        <p class="status-aviso status-info hidden" id="visitaAnteriorInfo"></p>
         <p class="status-aviso status-info" id="cobradorInfo" style="margin-top:6px;"></p>
+      </div>
+
+      <div class="modal-overlay hidden" id="visitaAnteriorModalOverlay">
+        <div class="modal-caja">
+          <p class="hint-eyebrow" style="margin-bottom:4px;">ÚLTIMO SERVICIO DE ESTE CLIENTE</p>
+          <div id="visitaAnteriorModalContenido" style="font-size:14px; line-height:1.6; color:#101820;"></div>
+          <button type="button" class="btn btn-secondary" id="cerrarVisitaAnteriorBtn" style="margin-top:16px;">Cerrar</button>
+        </div>
       </div>
 
       <div class="field-row">
