@@ -258,6 +258,28 @@ estaba desde antes):
   invisible. Se armó una variante para ese caso y se aplicó en los 4 botones que tenían el
   mismo problema.
 
+## Diseño adaptativo: compu vs. celular (v3.25.0)
+
+Las dos pantallas (la app del técnico y `admin.html`) estaban fijadas a un ancho angosto
+pensado para simular un celular incluso en una computadora — por eso se veían con mucho
+espacio vacío a los costados en un monitor grande. Se agregaron reglas de CSS que solo se
+activan a partir de cierto ancho de pantalla (celular no se ve afectado en absoluto):
+
+- **App del técnico**: en compu, queda enmarcada con más ancho, esquinas redondeadas y
+  sombra — se ve como una app de verdad centrada en la pantalla, no estirada al 100%
+  (un formulario angosto estirado a un monitor de 27" se vuelve difícil de leer).
+- **`admin.html`**: en compu, se ensancha bastante más (hasta 1100px) — tiene sentido
+  dado que hay tablas con varias columnas que se benefician del espacio extra.
+
+De paso, se corrigió un detalle cosmético menor que se notó al agregar el marco: el aviso
+tipo "toast" (mensajes flotantes) se ocultaba solo moviéndolo fuera de la pantalla, y en
+ciertos casos dejaba asomar un borde — ahora también se oculta por opacidad, así queda
+invisible de verdad sin importar su tamaño exacto.
+
+Confirmado con capturas en celular (412px) y compu (1440px): el celular quedó
+pixel-por-pixel igual que antes, y la compu ahora aprovecha el espacio sin verse roto ni
+estirado de forma rara.
+
 ## Último servicio del cliente: ícono + ventana emergente (v3.24.0)
 
 Encontré que la lógica y el dato ya existían (`mostrarVisitaAnterior()`), solo se

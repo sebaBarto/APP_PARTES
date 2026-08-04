@@ -39,6 +39,12 @@
     padding: 20px 16px 60px; min-height: 100vh;
   }
   .wrap { max-width: 640px; margin: 0 auto; }
+  /* En pantallas de compu, se aprovecha bastante más el ancho —
+     acá hay tablas con varias columnas que lo necesitan. No afecta
+     en absoluto a celular (la regla no se activa por debajo de 640px). */
+  @media (min-width: 900px) {
+    .wrap { max-width: 1100px; }
+  }
 
   /* ---------- Encabezado ---------- */
   .admin-header {

@@ -119,6 +119,23 @@ html, body {
   overflow: hidden;
 }
 
+/* A partir de una pantalla de compu (no celular), se aprovecha más el
+   ancho disponible — el celular no se ve afectado por esto en
+   absoluto, esta regla ni siquiera se activa por debajo de 640px. */
+@media (min-width: 640px) {
+  .app {
+    max-width: 640px;
+    height: 94vh;
+    height: 94dvh;
+    margin: 3vh auto;
+    border-radius: 20px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.35);
+  }
+}
+@media (min-width: 1024px) {
+  .app { max-width: 760px; }
+}
+
 /* ---------- TOPBAR ---------- */
 .topbar {
   display: flex;
@@ -1276,10 +1293,11 @@ html, body {
   padding: 12px 14px;
   border-radius: 8px;
   transform: translateY(120%);
-  transition: transform 0.25s ease;
+  opacity: 0;
+  transition: transform 0.25s ease, opacity 0.25s ease;
   z-index: 20;
 }
-.toast.show { transform: translateY(0); }
+.toast.show { transform: translateY(0); opacity: 1; }
 
 @media (prefers-reduced-motion: reduce) {
   .scan-line { animation: none; top: 50%; }
