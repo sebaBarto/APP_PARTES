@@ -72,6 +72,11 @@
 }
 
 * { box-sizing: border-box; }
+/* Red de seguridad: cualquier ícono SVG con fill="none" (nuestro
+   estilo de línea, en vez de relleno) tiene que tener SIEMPRE un
+   color de trazo — si se agrega un ícono nuevo y nos olvidamos de
+   definirle un color puntual, esto evita que quede invisible. */
+svg[fill="none"] { stroke: currentColor; }
 
 html, body {
   margin: 0;

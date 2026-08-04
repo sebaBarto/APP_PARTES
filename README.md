@@ -258,6 +258,28 @@ estaba desde antes):
   invisible. Se armó una variante para ese caso y se aplicó en los 4 botones que tenían el
   mismo problema.
 
+## Caché vieja del celular + 16 íconos invisibles (v3.22.1)
+
+Dos problemas reales encontrados después de un aviso tuyo de que no veías cambios
+recientes:
+
+1. **El Service Worker (la parte de la app que la hace funcionar sin internet) tenía un
+   número de versión de caché que nunca subí** a lo largo de toda esta sesión, a pesar de
+   muchísimos cambios — tu celular seguía mostrando una copia guardada de antes. Ya está
+   subido; puede hacer falta cerrar y volver a abrir la app (o borrar los datos de sitio
+   del navegador) una vez para que se note el cambio.
+2. **16 íconos quedaban invisibles de verdad** (no era solo el caché) — al reemplazar los
+   emojis por SVG, a la mayoría les faltó definir el color del trazo, y sin eso un ícono
+   de "solo línea" no se ve. Se agregó una regla general que le pone color a cualquier
+   ícono de este estilo que no lo tenga definido puntualmente — soluciona los 16 actuales
+   y previene que vuelva a pasar con íconos futuros.
+
+**Sobre los colores de "servicio estancado"**: si después de una recarga a fondo seguís
+sin verlos, revisá que al importar el Excel de servicios pendientes se haya mapeado la
+columna de fecha de ingreso — hoy ese campo es opcional en el mapeo, así que si no se
+elige ninguna columna para él, ningún servicio va a tener colores (van a quedar todos
+iguales, que es justo lo que describiste).
+
 ## Mail automático a Security 24 por cambio de guardia (v3.22.0)
 
 Cuando corresponde un cambio de guardia semanal (los lunes, calculado automáticamente
