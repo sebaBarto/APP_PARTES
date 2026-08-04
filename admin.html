@@ -1146,14 +1146,32 @@ clientesExcelFile.addEventListener("change", () => {
       const hoja = wb.Sheets[wb.SheetNames[0]];
       const filas = XLSX.utils.sheet_to_json(hoja, { defval: "" });
 
+      // Los encabezados reales de la planilla pueden variar bastante
+      // (mayúsculas/minúsculas, tildes, espacios de más) — en vez de
+      // pedir el texto exacto para cada columna, se busca de forma
+      // flexible por variaciones conocidas de cada nombre de campo.
+      function normalizarEncabezado(s) {
+        return String(s || "").trim().toLowerCase()
+          .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // saca tildes
+          .replace(/\s+/g, " ");
+      }
+      function valorDeColumna(row, variaciones) {
+        const clavesFila = Object.keys(row);
+        for (const variacion of variaciones) {
+          const claveEncontrada = clavesFila.find((k) => normalizarEncabezado(k) === variacion);
+          if (claveEncontrada !== undefined) return String(row[claveEncontrada] ?? "").trim();
+        }
+        return "";
+      }
+
       const nuevos = filas
         .map((row) => ({
-          numero_cliente: String(row["N° DE CLIENTE"] ?? row["N de cliente"] ?? row["NUMERO DE CLIENTE"] ?? "").trim(),
-          nombre: String(row["NOMBRE"] ?? "").trim(),
-          direccion: String(row["DIRECCION"] ?? "").trim(),
-          localidad: String(row["LOCALIDAD"] ?? "").trim(),
-          telefono: String(row["TELEFONO"] ?? "").trim(),
-          numero_abonado: String(row["N° DE ABONADO"] ?? row["N de abonado"] ?? "").trim(),
+          numero_cliente: valorDeColumna(row, ["n° de cliente", "n de cliente", "numero de cliente", "nro de cliente", "nro cliente", "numero cliente"]),
+          nombre: valorDeColumna(row, ["nombre", "nombre cliente", "nombre del cliente", "razon social", "cliente"]),
+          direccion: valorDeColumna(row, ["direccion", "domicilio"]),
+          localidad: valorDeColumna(row, ["localidad", "ciudad"]),
+          telefono: valorDeColumna(row, ["telefono", "tel"]),
+          numero_abonado: valorDeColumna(row, ["n° de abonado", "n de abonado", "numero de abonado", "nro de abonado", "nro abonado", "numero abonado"]),
         }))
         .filter((c) => c.numero_cliente);
 

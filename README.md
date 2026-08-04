@@ -258,6 +258,26 @@ estaba desde antes):
   invisible. Se armó una variante para ese caso y se aplicó en los 4 botones que tenían el
   mismo problema.
 
+## Import de Clientes: encabezados de Excel más flexibles (v3.31.0)
+
+Encontrado en el uso real: el import de la pestaña Clientes buscaba la columna "NOMBRE"
+con ese texto exacto (mayúsculas, sin variaciones) — a diferencia de "N° de cliente", que
+ya tenía varias alternativas previstas. Si el Excel real tenía el encabezado escrito
+apenas distinto (minúsculas, con espacios de más, u otra variante como "Nombre Cliente"),
+esa columna no se reconocía y quedaba vacía para **todas** las filas — lo que después
+hacía que buscar por nombre no encontrara nada (aunque buscar por número sí), y que
+Planos no pudiera relacionar el número del archivo con el nombre del cliente.
+
+Ahora la lectura del Excel es mucho más permisiva en los seis campos (nombre, dirección,
+localidad, teléfono, número de abonado, además del número de cliente): no importa
+mayúsculas/minúsculas, tildes, ni espacios de más, y acepta varias formas conocidas de
+cada encabezado. Probado con tres variantes reales de planilla distintas (con espacios,
+con otra redacción, todo en minúscula) — las tres se leyeron bien.
+
+**Para vos**: volvé a subir tu Excel de Clientes desde `admin.html` — como el import
+actualiza en vez de duplicar (por número de cliente), esto va a completar los nombres que
+quedaron vacíos, sin tocar nada de lo que ya estaba bien.
+
 ## Corrige cruce de número de cliente con ceros a la izquierda (v3.30.1)
 
 Encontrado en el uso real: si al cargar la base de Clientes la columna de número no
