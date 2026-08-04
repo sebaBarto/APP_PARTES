@@ -303,6 +303,8 @@
           <select id="mapNumeroAbonado"></select>
         </div>
       </div>
+      <label>Cobrador asignado (opcional)</label>
+      <select id="mapCobrador"></select>
 
       <p class="subtitle" style="margin-top:14px;">Vista previa (primeras filas):</p>
       <table id="previewTable"><thead></thead><tbody></tbody></table>
@@ -854,6 +856,7 @@ const mapSelects = {
   tarea: document.getElementById("mapTarea"),
   numero_cliente: document.getElementById("mapNumeroCliente"),
   numero_abonado: document.getElementById("mapNumeroAbonado"),
+  cobrador: document.getElementById("mapCobrador"),
 };
 
 pwBtn.addEventListener("click", async () => {
@@ -2770,7 +2773,7 @@ function renderPreview() {
   const map = currentMapping();
   localStorage.setItem(MAP_KEY, JSON.stringify(map));
 
-  const cols = ["numero_servicio", "cliente", "direccion", "localidad", "telefono", "fecha_ingreso", "tarea", "numero_cliente", "numero_abonado"];
+  const cols = ["numero_servicio", "cliente", "direccion", "localidad", "telefono", "fecha_ingreso", "tarea", "numero_cliente", "numero_abonado", "cobrador"];
   previewTable.querySelector("thead").innerHTML =
     "<tr>" + cols.map((c) => `<th>${c}</th>`).join("") + "</tr>";
 
@@ -2801,6 +2804,7 @@ uploadBtn.addEventListener("click", async () => {
     if (map.fecha_ingreso) item.fecha_ingreso = String(row[map.fecha_ingreso] ?? "").trim();
     if (map.numero_cliente) item.numero_cliente = String(row[map.numero_cliente] ?? "").trim();
     if (map.numero_abonado) item.numero_abonado = String(row[map.numero_abonado] ?? "").trim();
+    if (map.cobrador) item.cobrador = String(row[map.cobrador] ?? "").trim();
     return item;
   }).filter((item) => item.numero_servicio || item.cliente);
 

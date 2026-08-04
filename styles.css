@@ -681,6 +681,7 @@ html, body {
 .servicio-card-cliente { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 15px; color: #101820; margin: 3px 0; }
 .servicio-card-direccion { font-size: 13px; color: #6B7680; }
 .servicio-card-tarea { font-size: 13px; color: #101820; margin-top: 4px; }
+.servicio-card-cobrador { font-size: 12px; color: #6B7680; margin-top: 4px; }
 
 /* Fondo rojo sólido en "urgente" -> el texto oscuro normal no se lee;
    se pasa a blanco/claro para que haya buen contraste. */
@@ -688,6 +689,7 @@ html, body {
 .estancado-urgente .servicio-card-cliente { color: #FFFFFF; }
 .estancado-urgente .servicio-card-direccion { color: #FFE8E5; }
 .estancado-urgente .servicio-card-tarea { color: #FFFFFF; }
+.estancado-urgente .servicio-card-cobrador { color: #FFE8E5; }
 
 /* ---------- CRONOGRAMA SEMANAL ---------- */
 .crono-dias-tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; }

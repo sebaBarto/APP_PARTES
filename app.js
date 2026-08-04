@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.22.1";
+const APP_VERSION = "3.23.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -1030,6 +1030,7 @@ function renderServiciosList(items) {
       <div class="servicio-card-cliente">${escapeHtml(item.cliente)}</div>
       <div class="servicio-card-direccion">${escapeHtml(item.direccion)}${item.localidad ? ", " + escapeHtml(item.localidad) : ""}</div>
       <div class="servicio-card-tarea">${escapeHtml(item.tarea)}</div>
+      <div class="servicio-card-cobrador">Cobrador: ${item.cobrador ? escapeHtml(item.cobrador) : "Sin cobrador asignado"}</div>
     `;
     card.addEventListener("click", () => seleccionarServicio(item));
     serviciosListEl.appendChild(card);
@@ -1134,6 +1135,12 @@ function actualizarBotonVerPlano(numeroCliente) {
   verPlanoClienteBtn.classList.toggle("hidden", !numeroClienteActivo);
 }
 
+const cobradorInfo = document.getElementById("cobradorInfo");
+function actualizarCobradorInfo(cobrador) {
+  const nombre = (cobrador || "").toString().trim();
+  cobradorInfo.textContent = "Cobrador: " + (nombre || "Sin cobrador asignado");
+}
+
 verPlanoClienteBtn.addEventListener("click", async () => {
   if (!numeroClienteActivo) return;
   const iconoOriginal = verPlanoClienteBtn.innerHTML;
@@ -1162,6 +1169,7 @@ function seleccionarServicio(item) {
   actualizarBotonLlamar(item.telefono);
   actualizarBotonWhatsapp(item.telefono);
   actualizarBotonVerPlano(item.numero_cliente);
+  actualizarCobradorInfo(item.cobrador);
   autocompletarTecnico();
   autocompletarFecha();
   mostrarVisitaAnterior();
@@ -1179,6 +1187,7 @@ manualReportBtn.addEventListener("click", () => {
   actualizarBotonLlamar(null);
   actualizarBotonWhatsapp(null);
   actualizarBotonVerPlano(null);
+  actualizarCobradorInfo(null);
   autocompletarTecnico();
   autocompletarFecha();
   mostrarVisitaAnterior();

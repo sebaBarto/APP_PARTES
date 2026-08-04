@@ -258,6 +258,18 @@ estaba desde antes):
   invisible. Se armó una variante para ese caso y se aplicó en los 4 botones que tenían el
   mismo problema.
 
+## Cobrador asignado, visible en el servicio (v3.23.0)
+
+El nombre del cobrador ahora viaja como una columna más (opcional) del Excel de servicios
+pendientes — no hace falta ninguna tabla nueva, se carga junto con el resto igual que
+número de cliente o de abonado. Se ve en dos lugares, como se pidió:
+- En la tarjeta del servicio, antes de tomarlo.
+- En la pantalla de trabajo, una vez cargado.
+
+Si no hay cobrador cargado para ese servicio, se muestra "Sin cobrador asignado" en vez de
+dejarlo vacío. Probado en los cuatro casos: con cobrador, sin cobrador, servicio cargado
+desde la lista, y reporte manual (sin servicio de por medio).
+
 ## Caché vieja del celular + 16 íconos invisibles (v3.22.1)
 
 Dos problemas reales encontrados después de un aviso tuyo de que no veías cambios
