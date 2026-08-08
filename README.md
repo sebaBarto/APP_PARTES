@@ -267,6 +267,16 @@ junto con la SIM. De paso revisé el flujo de "reemplazar" (cambiar el chip fís
 cliente que ya tenía línea instalada) — ese ya heredaba bien el número de abonado de la
 SIM vieja, no necesitaba cambios.
 
+## Corrige estado de vehículo mostrando "desde las NULL" (v3.40.1)
+
+Encontrado apenas se probó el corte de Vehículos en vivo: la función que busca "quién
+tiene el vehículo ahora" (`encontrarRegistroAbierto`) no distinguía un registro de
+"evento" (que tampoco tiene hora de devolución, por diseño) de uno real de "tomar" — si
+alguien reportaba un evento mientras tenía el vehículo tomado, la búsqueda podía terminar
+encontrando el registro del evento en vez del de la toma real, mostrando su hora vacía
+(`NULL`) en el mensaje de estado. Ya corregido para ignorar los registros de evento en
+esta búsqueda puntual.
+
 ## Corte real — Vehículos y Herramientas (v3.40.0)
 
 El más grande hasta ahora: la lógica de "tomar/devolver/evento" y "tomar/devolver/
