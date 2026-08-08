@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.45.0";
+const APP_VERSION = "3.46.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -693,7 +693,7 @@ function permisosDelTecnico(nombre) {
     // total, como ya era antes de este sistema.
     return {
       dash_general: true, dash_financiero: true, dash_vehiculos: true, dash_herramientas: true, dash_sims: true,
-      historial_todos: true, vehiculos: true, sims: true, herramientas: true,
+      historial_todos: true, vehiculos: true, sims: true, herramientas: true, marcar_pasado_sistema: true,
       comodato: true, admin: true, agendar_emergencia: true, sims_ver_todas: true,
     };
   }
@@ -708,6 +708,7 @@ function permisosDelTecnico(nombre) {
   return {
     dash_general: true,
     dash_financiero: nombre === "Sebastian Bartolozzi",
+    marcar_pasado_sistema: nombre === "Sebastian Bartolozzi",
     dash_vehiculos: true,
     dash_herramientas: true,
     dash_sims: true,
@@ -3467,7 +3468,11 @@ async function cargarYRenderGuardias() {
   }
 }
 
-// ---------- Historial (últimos 4 días) ----------
+// ---------- Historial (extendido, con filtros por período) ----------
+let histPeriodoActivo = "4dias";
+const histFechaEspecificaWrap = document.getElementById("histFechaEspecificaWrap");
+const histFechaEspecifica = document.getElementById("histFechaEspecifica");
+
 tileHistorialBtn.addEventListener("click", () => {
   showScreen("historial");
   fetchHistorialReciente();
@@ -3476,6 +3481,20 @@ volverDeHistorialBtn.addEventListener("click", () => {
   showScreen("home");
 });
 refreshHistorialBtn.addEventListener("click", fetchHistorialReciente);
+
+document.querySelectorAll(".hist-periodo-chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    document.querySelectorAll(".hist-periodo-chip").forEach((c) => c.classList.remove("active"));
+    chip.classList.add("active");
+    histPeriodoActivo = chip.dataset.periodo;
+    histFechaEspecificaWrap.classList.toggle("hidden", histPeriodoActivo !== "fecha");
+    if (histPeriodoActivo === "fecha" && !histFechaEspecifica.value) {
+      histFechaEspecifica.value = new Date().toISOString().slice(0, 10);
+    }
+    renderHistorialReciente();
+  });
+});
+histFechaEspecifica.addEventListener("change", renderHistorialReciente);
 
 async function fetchHistorialReciente() {
   historialStatus.textContent = "Cargando...";
@@ -3493,54 +3512,95 @@ async function fetchHistorialReciente() {
   }
 }
 
+async function marcarPartePasadoSistema(h, marcarComo) {
+  const verbo = marcarComo ? "marcar" : "desmarcar";
+  const ok = confirm(
+    marcarComo
+      ? `¿Confirmás que el parte N° ${h.numero_servicio || h.id_parte} (${h.cliente}) ya está pasado a tu sistema?`
+      : `¿Desmarcar el parte N° ${h.numero_servicio || h.id_parte} (${h.cliente})?`
+  );
+  if (!ok) return;
+  try {
+    const res = await fetch("/api/historial", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({ accion: "marcar_pasado_sistema", id_parte: h.id_parte, pasado: marcarComo, tecnico: tecnicoLogueado || "" }),
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    h.pasado_sistema_offline = marcarComo;
+    h.pasado_sistema_por = marcarComo ? tecnicoLogueado || "" : "";
+    renderHistorialReciente();
+  } catch (err) {
+    showToast(`No se pudo ${verbo}: ` + err.message);
+  }
+}
+
 function renderHistorialReciente() {
-  const hoy = new Date();
-  hoy.setHours(0, 0, 0, 0);
-  const limite = new Date(hoy);
-  limite.setDate(limite.getDate() - 3); // hoy + 3 días atrás = últimos 4 días
+  const permisos = permisosDelTecnico(tecnicoLogueado);
+  const veTodo = permisos.historial_todos;
+  const puedeMarcarPasado = permisos.marcar_pasado_sistema;
 
-  // Cada técnico ve solo lo suyo — salvo Sebastian Bartolozzi (y el
-  // login general de oficina), que ven el listado completo del equipo.
-  const veTodo = permisosDelTecnico(tecnicoLogueado).historial_todos;
-  historialModoLabel.textContent = veTodo
-    ? "Viendo los servicios de todo el equipo."
-    : "Viendo solo tus servicios.";
-
-  const recientes = historialCache
-    .filter((h) => {
+  let filtrados;
+  if (histPeriodoActivo === "4dias") {
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    const limite = new Date(hoy);
+    limite.setDate(limite.getDate() - 3);
+    filtrados = historialCache.filter((h) => {
       if (!h.fecha) return false;
       const [y, m, d] = h.fecha.split("-").map(Number);
       const f = new Date(y, m - 1, d);
-      if (!(f >= limite && f <= hoy)) return false;
-      if (veTodo) return true;
-      return h.tecnico === tecnicoLogueado || h.tecnico2 === tecnicoLogueado;
-    })
-    .sort((a, b) => {
-      const claveA = `${a.fecha} ${a.hora_entrada || ""}`;
-      const claveB = `${b.fecha} ${b.hora_entrada || ""}`;
-      return claveB.localeCompare(claveA);
+      return f >= limite && f <= hoy;
     });
+    historialModoLabel.textContent = (veTodo ? "Viendo los últimos 4 días de todo el equipo." : "Viendo tus últimos 4 días.");
+  } else {
+    const rango = obtenerRangoPeriodo(histPeriodoActivo, histFechaEspecifica);
+    filtrados = historialCache.filter((h) => fechaEnRango(h.fecha, rango));
+    historialModoLabel.textContent = (veTodo ? "Viendo el historial completo de todo el equipo." : "Viendo tu historial completo.");
+  }
+
+  if (!veTodo) {
+    filtrados = filtrados.filter((h) => h.tecnico === tecnicoLogueado || h.tecnico2 === tecnicoLogueado);
+  }
+  filtrados.sort((a, b) => {
+    const claveA = `${a.fecha} ${a.hora_entrada || ""}`;
+    const claveB = `${b.fecha} ${b.hora_entrada || ""}`;
+    return claveB.localeCompare(claveA);
+  });
 
   historialList.innerHTML = "";
-  if (recientes.length === 0) {
-    historialStatus.textContent = "No hay servicios completados en los últimos 4 días.";
+  if (filtrados.length === 0) {
+    historialStatus.textContent = "No hay servicios completados en ese período.";
     return;
   }
-  historialStatus.textContent = "";
-  recientes.forEach((h) => {
+  historialStatus.textContent = `${filtrados.length} servicio(s).`;
+  filtrados.forEach((h) => {
     let fechaTexto = h.fecha || "";
     if (h.fecha) {
       const [y, m, d] = h.fecha.split("-");
       fechaTexto = `${d}/${m}/${y}`;
     }
     const card = document.createElement("div");
-    card.className = "historial-card";
+    card.className = "historial-card" + (h.pasado_sistema_offline ? " historial-card-pasado" : "");
     card.innerHTML = `
       <div class="historial-card-num">N° ${escapeHtml(h.numero_servicio || h.id_parte)}</div>
       <div class="historial-card-cliente">${escapeHtml(h.cliente)}</div>
       <div class="historial-card-direccion">${escapeHtml(h.direccion)}${h.localidad ? ", " + escapeHtml(h.localidad) : ""}</div>
       <div class="historial-card-horario">${fechaTexto} — ${h.hora_entrada || "?"} a ${h.hora_salida || "?"}</div>
+      ${puedeMarcarPasado ? `
+        <label class="historial-card-check">
+          <input type="checkbox" ${h.pasado_sistema_offline ? "checked" : ""}>
+          ${h.pasado_sistema_offline ? `Pasado a sistema (${escapeHtml(h.pasado_sistema_por || "")})` : "Pasado a mi sistema"}
+        </label>
+      ` : ""}
     `;
+    if (puedeMarcarPasado) {
+      const checkbox = card.querySelector("input[type=checkbox]");
+      checkbox.addEventListener("click", (e) => {
+        e.preventDefault();
+        marcarPartePasadoSistema(h, !h.pasado_sistema_offline);
+      });
+    }
     historialList.appendChild(card);
   });
 }

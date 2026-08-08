@@ -304,6 +304,22 @@ Clientes (antes solo mostraba servicios pendientes, con "escribir a mano" como �
 alternativa); si lo que se escribe coincide con un cliente real, se usa el nombre exacto
 como está guardado en la base, en vez de lo que se haya tipeado.
 
+## Historial extendido, con tilde de "pasado a mi sistema" (v3.46.0)
+
+La pantalla de Historial ya no está limitada a los últimos 4 días — ahora tiene los
+mismos filtros que los demás dashboards (4 días / semana / mes / todo / fecha puntual).
+
+Nuevo permiso ("Marcar partes como 'pasado a mi sistema'", pensado para uso de
+oficina): quien lo tenga ve un tilde en cada parte, que al tocarlo pide confirmación
+("¿Confirmás que el parte N° X ya está pasado a tu sistema?") antes de marcarlo — así
+se evitan clics accidentales. Una vez marcado, la tarjeta pasa a fondo verde y muestra
+quién lo marcó, para poder chequear de un vistazo qué partes ya se cargaron a mano en
+el sistema offline de la oficina y cuáles faltan.
+
+Nuevo en el backend: tres columnas (`pasado_sistema_offline`, `pasado_sistema_por`,
+`pasado_sistema_en`) y un endpoint para marcar/desmarcar, con quién y cuándo, no solo
+un tilde suelto.
+
 ## Corte real — Historial de partes (v3.45.0)
 
 La pieza más sensible hasta ahora: es donde queda registrado cada trabajo completado

@@ -978,12 +978,25 @@
   <!-- HISTORIAL (últimos 4 días) -->
   <section class="screen" id="screen-historial">
     <div class="review-scroll">
-      <p class="hint-eyebrow review-eyebrow">HISTORIAL (últimos 4 días)</p>
+      <p class="hint-eyebrow review-eyebrow">HISTORIAL</p>
       <p class="subtitle-consultas" id="historialModoLabel"></p>
 
       <div class="list-toolbar">
         <button class="btn btn-ghost btn-small" id="refreshHistorialBtn" type="button">↻ Actualizar</button>
         <span class="list-sync-label" id="historialSyncLabel"></span>
+      </div>
+
+      <div class="dash-periodo-tabs">
+        <button type="button" class="hist-periodo-chip active" data-periodo="4dias">Últimos 4 días</button>
+        <button type="button" class="hist-periodo-chip" data-periodo="semana">Semana</button>
+        <button type="button" class="hist-periodo-chip" data-periodo="mes">Mes</button>
+        <button type="button" class="hist-periodo-chip" data-periodo="todo">Todo</button>
+        <button type="button" class="hist-periodo-chip" data-periodo="fecha">Fecha</button>
+      </div>
+
+      <div class="field-group hidden" id="histFechaEspecificaWrap">
+        <label class="field-label" for="histFechaEspecifica">Elegí el día</label>
+        <input class="field-input" type="date" id="histFechaEspecifica">
       </div>
 
       <p class="list-status" id="historialStatus"></p>

@@ -70,6 +70,9 @@ function mapearDesdeBackendNuevo(p) {
     forma_pago: p.forma_pago || "",
     imprevisto: p.imprevisto || "",
     registrado_en: p.creado_en || p.actualizado_en || "",
+    pasado_sistema_offline: !!p.pasado_sistema_offline,
+    pasado_sistema_por: p.pasado_sistema_por || "",
+    pasado_sistema_en: p.pasado_sistema_en || "",
   };
 }
 
@@ -110,6 +113,24 @@ module.exports = async (req, res) => {
       if (typeof body === "string") body = JSON.parse(body);
       if (!body || typeof body !== "object") {
         res.status(400).json({ error: "Falta el registro a guardar" });
+        return;
+      }
+
+      // Marcar/desmarcar "pasado a mi sistema" — un pedido chico y
+      // aparte, no un parte nuevo (se distingue por este campo, para
+      // no gastar otro de los 12 slots de funciones de Vercel).
+      if (body.accion === "marcar_pasado_sistema") {
+        if (!body.id_parte) {
+          res.status(400).json({ error: "Falta el id del parte" });
+          return;
+        }
+        const r = await fetch(`${BACKEND_NUEVO_URL}/api/partes/${encodeURIComponent(body.id_parte)}/marcar-pasado-sistema`, {
+          method: "POST",
+          headers: { ...headersBackendNuevo, "Content-Type": "application/json" },
+          body: JSON.stringify({ pasado: !!body.pasado, tecnico: body.tecnico || "" }),
+        });
+        const data = await r.json();
+        res.status(r.status).json(data);
         return;
       }
 
