@@ -267,6 +267,30 @@ junto con la SIM. De paso revisé el flujo de "reemplazar" (cambiar el chip fís
 cliente que ya tenía línea instalada) — ese ya heredaba bien el número de abonado de la
 SIM vieja, no necesitaba cambios.
 
+## Corte real — Vehículos y Herramientas (v3.40.0)
+
+El más grande hasta ahora: la lógica de "tomar/devolver/evento" y "tomar/devolver/
+transferir/dejar en cliente/retirar de cliente" vivía en `recurso-uso.js`, un archivo
+aparte con su propia lectura/escritura directa a GitHub — no pasaba por donde veníamos
+cortando hasta ahora.
+
+Reconstruí esta lógica en el backend nuevo calcada exacta de la real (encontré que mi
+primer intento, hecho de memoria, le faltaban varias cosas: el "evento" de un vehículo
+como registro de historial aparte con tipo/km/monto propios, y el estado "dejado en
+cliente" de las herramientas). Confirmé contra la estructura real de las tablas antes de
+tocar código, y probé de punta a punta: un vehículo tomado por alguien no se lo puede
+tomar otro, reportar un evento mientras está tomado no rompe el ciclo de toma/devolución,
+y las herramientas dejadas en un cliente las puede retirar cualquier técnico (no solo
+quien las dejó) — todo igual que el sistema original.
+
+**SIMs queda sin tocar por ahora** (es el más delicado, se deja para más adelante) — el
+mismo archivo `recurso-uso.js` ahora atiende vehículo/herramienta con el backend nuevo, y
+sim sigue exactamente como estaba, sin ningún cambio.
+
+Los avisos push (evento de vehículo, herramienta dejada en cliente) los sigue mandando
+este lado de Vercel como siempre — el backend nuevo solo devuelve la información
+necesaria para decidir si corresponde avisar.
+
 ## Corte real — Suscripciones push y Servicios de emergencia (v3.39.0)
 
 Estas dos tenían lógica propia (no un simple reemplazo de lista) que había que
