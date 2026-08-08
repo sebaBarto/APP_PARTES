@@ -1,12 +1,77 @@
-// Función serverless de Vercel — guarda un registro por cada parte
-// completado y enviado con éxito a la oficina. Es la base de datos
-// para el dashboard (cantidad de servicios resueltos, tiempos
-// promedio, distancia recorrida, clientes repetidos, etc).
+// Función serverless de Vercel — guarda y lee el historial de partes
+// completados. Ya corta al backend nuevo (Cloudflare + D1) en vez de
+// leer/escribir un archivo en GitHub — la lógica de reintentos por
+// conflicto de escritura que tenía antes ya no hace falta, D1 no
+// tiene ese problema (cada guardado es independiente).
+//
+// La app sigue mandando y esperando los nombres de campo de siempre
+// (id_parte, tecnico2, descuento como un solo valor) — acá se
+// traducen hacia/desde los nombres reales de la tabla nueva, que son
+// distintos en varios casos (encontrado revisando la estructura real
+// de la base, no de memoria).
 //
 // Variables de entorno reutilizadas:
-//   SERVICIOS_API_TOKEN, GITHUB_DATA_TOKEN, GITHUB_DATA_REPO
+//   SERVICIOS_API_TOKEN, BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN
 
-const HISTORIAL_PATH = "historial.json";
+// Convierte un número con formato argentino ("$ 12.345,67", "35000")
+// a un número limpio — o null si no se puede interpretar.
+function numeroLimpio(valor) {
+  if (valor === undefined || valor === null || valor === "") return null;
+  if (typeof valor === "number") return valor;
+  const limpio = String(valor).replace(/[^\d,.-]/g, "").replace(/\./g, "").replace(",", ".");
+  const n = parseFloat(limpio);
+  return isNaN(n) ? null : n;
+}
+
+// App -> backend nuevo (al guardar un parte)
+function mapearHaciaBackendNuevo(v) {
+  return {
+    id: v.id_parte || v.id || undefined, // si no viene, el backend nuevo genera uno
+    numero_servicio: v.numero_servicio || "",
+    cliente: v.cliente || "",
+    direccion: v.direccion || "",
+    localidad: v.localidad || "",
+    tarea: v.tarea || "",
+    tecnico: v.tecnico || "",
+    tecnico_segundo: v.tecnico2 || "",
+    fecha: v.fecha || "",
+    hora_entrada: v.hora_entrada || "",
+    hora_salida: v.hora_salida || "",
+    es_instalacion: !!v.es_instalacion,
+    observaciones: v.observaciones || "",
+    imprevisto: v.imprevisto || "",
+    importe: numeroLimpio(v.importe),
+    descuento_tipo: v.descuento || "",
+    descuento_pct: numeroLimpio(v.descuento),
+    costo_final: numeroLimpio(v.costo_final),
+    forma_pago: v.forma_pago || "",
+  };
+}
+
+// Backend nuevo -> app (al leer el historial completo)
+function mapearDesdeBackendNuevo(p) {
+  return {
+    id_parte: p.id,
+    numero_servicio: p.numero_servicio || "",
+    cliente: p.cliente || "",
+    direccion: p.direccion || "",
+    localidad: p.localidad || "",
+    tarea: p.tarea || "",
+    observaciones: p.observaciones || "",
+    tecnico: p.tecnico || "",
+    tecnico2: p.tecnico_segundo || "",
+    fecha: p.fecha || "",
+    hora_entrada: p.hora_entrada || "",
+    hora_salida: p.hora_salida || "",
+    es_instalacion: !!p.es_instalacion,
+    importe: p.importe,
+    descuento: p.descuento_tipo || "",
+    costo_final: p.costo_final,
+    forma_pago: p.forma_pago || "",
+    imprevisto: p.imprevisto || "",
+    registrado_en: p.creado_en || p.actualizado_en || "",
+  };
+}
 
 module.exports = async (req, res) => {
   const authHeader = req.headers["authorization"] || "";
@@ -16,33 +81,23 @@ module.exports = async (req, res) => {
     return;
   }
 
-  const { GITHUB_DATA_TOKEN, GITHUB_DATA_REPO } = process.env;
-  if (!GITHUB_DATA_TOKEN || !GITHUB_DATA_REPO) {
-    res.status(500).json({ error: "Faltan variables de entorno por configurar en Vercel" });
+  const { BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN } = process.env;
+  if (!BACKEND_NUEVO_URL || !BACKEND_NUEVO_TOKEN) {
+    res.status(500).json({ error: "Faltan variables de entorno del backend nuevo por configurar en Vercel" });
     return;
   }
-
-  const apiUrl = `https://api.github.com/repos/${GITHUB_DATA_REPO}/contents/${HISTORIAL_PATH}`;
-  const ghHeaders = {
-    Authorization: `Bearer ${GITHUB_DATA_TOKEN}`,
-    Accept: "application/vnd.github+json",
-  };
+  const headersBackendNuevo = { Authorization: `Bearer ${BACKEND_NUEVO_TOKEN}` };
 
   if (req.method === "GET") {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     try {
-      const r = await fetch(apiUrl, { headers: ghHeaders });
-      if (r.status === 404) {
-        res.status(200).json([]);
-        return;
-      }
+      const r = await fetch(`${BACKEND_NUEVO_URL}/api/partes`, { headers: headersBackendNuevo });
       if (!r.ok) {
         res.status(502).json({ error: "No se pudo leer el historial" });
         return;
       }
-      const data = await r.json();
-      const content = Buffer.from(data.content, "base64").toString("utf-8");
-      res.status(200).json(JSON.parse(content));
+      const partes = await r.json();
+      res.status(200).json((Array.isArray(partes) ? partes : []).map(mapearDesdeBackendNuevo));
     } catch (err) {
       res.status(500).json({ error: "Error interno al leer el historial" });
     }
@@ -58,55 +113,18 @@ module.exports = async (req, res) => {
         return;
       }
 
-      const registro = { ...body, registrado_en: new Date().toISOString() };
-      const MAX_INTENTOS = 5;
-      let ultimoError = null;
-
-      for (let intento = 1; intento <= MAX_INTENTOS; intento++) {
-        let historial = [];
-        let sha;
-        const existing = await fetch(apiUrl, { headers: ghHeaders });
-        if (existing.ok) {
-          const existingData = await existing.json();
-          sha = existingData.sha;
-          historial = JSON.parse(Buffer.from(existingData.content, "base64").toString("utf-8"));
-        } else if (existing.status !== 404) {
-          ultimoError = "No se pudo leer el historial antes de guardar";
-          continue;
-        }
-
-        historial.push(registro);
-        const contentB64 = Buffer.from(JSON.stringify(historial, null, 2)).toString("base64");
-        const putRes = await fetch(apiUrl, {
-          method: "PUT",
-          headers: { ...ghHeaders, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            message: `Registra parte completado (${new Date().toISOString()})`,
-            content: contentB64,
-            sha,
-          }),
-        });
-
-        if (putRes.ok) {
-          res.status(200).json({ ok: true, total: historial.length });
-          return;
-        }
-
-        // 409/422 = otro pedido guardó justo antes (el archivo cambió
-        // entre la lectura y la escritura) — se reintenta leyendo de
-        // nuevo la versión más reciente, en vez de perder el registro.
-        if (putRes.status === 409 || putRes.status === 422) {
-          ultimoError = `Conflicto al guardar (intento ${intento})`;
-          await new Promise((r) => setTimeout(r, 300 + Math.random() * 400));
-          continue;
-        }
-
-        const errText = await putRes.text();
-        res.status(502).json({ error: "No se pudo guardar en el historial", detail: errText });
+      const registro = mapearHaciaBackendNuevo(body);
+      const r = await fetch(`${BACKEND_NUEVO_URL}/api/partes`, {
+        method: "POST",
+        headers: { ...headersBackendNuevo, "Content-Type": "application/json" },
+        body: JSON.stringify(registro),
+      });
+      const data = await r.json();
+      if (!r.ok) {
+        res.status(502).json({ error: "No se pudo guardar en el historial", detail: data });
         return;
       }
-
-      res.status(502).json({ error: "No se pudo guardar en el historial tras varios intentos", detail: ultimoError });
+      res.status(200).json({ ok: true, id_parte: data.id });
     } catch (err) {
       res.status(500).json({ error: "Error interno al guardar el historial" });
     }

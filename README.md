@@ -304,6 +304,27 @@ Clientes (antes solo mostraba servicios pendientes, con "escribir a mano" como �
 alternativa); si lo que se escribe coincide con un cliente real, se usa el nombre exacto
 como está guardado en la base, en vez de lo que se haya tipeado.
 
+## Corte real — Historial de partes (v3.45.0)
+
+La pieza más sensible hasta ahora: es donde queda registrado cada trabajo completado
+(alimenta el dashboard, la "última visita" a un cliente, y el "RESUELTO" del
+Cronograma). El backend nuevo para esto ya estaba armado desde hace tiempo — solo
+faltaba que la app le hablara a él en vez de a GitHub.
+
+Como los nombres de columna de la tabla real son distintos a los que usa la app
+(`id` en vez de `id_parte`, `tecnico_segundo` en vez de `tecnico2`, `descuento_tipo` +
+`descuento_pct` en vez de un solo campo `descuento`), armé la traducción en los dos
+sentidos — la app sigue mandando y recibiendo exactamente los mismos nombres de
+siempre, sin enterarse del cambio.
+
+De yapa, esto elimina la lógica de reintentos por conflicto de escritura que tenía el
+sistema viejo (GitHub no permite dos escrituras al mismo archivo al mismo tiempo sin
+chocar) — D1 no tiene ese problema, cada parte se guarda de forma independiente.
+
+Probado de punta a punta contra una base real: guardar y volver a leer un parte
+completo conserva todos los campos exactos, y si se reintenta guardar el mismo parte
+dos veces (por ejemplo, un doble toque sin querer), no se duplica.
+
 ## Corte real — SIMs (v3.43.0)
 
 El más grande y complejo de los tres recursos de `recurso-uso.js` — 7 acciones distintas
