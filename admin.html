@@ -217,6 +217,8 @@
     background: transparent; color: var(--ink); border: 1.5px solid var(--ink); box-shadow: none;
   }
   .btn-secondary-admin:active { background: rgba(16,24,32,0.06); }
+.sim-instalar-cliente-info { color: #6B7680; }
+.sim-instalar-cliente-info.ok { color: #2E7D32; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -1853,6 +1855,7 @@ function renderFilaSimTabla(sim) {
           </select>
           <div class="sim-instalar-manual-wrap" style="margin-top:6px;">
             <input type="text" class="sim-instalar-cliente-input" placeholder="Buscar cliente por nombre..." list="simInstalarClientesLista" style="margin-bottom:4px;">
+            <div class="sim-instalar-cliente-info" style="font-size:12px; margin-bottom:4px;"></div>
             <input type="text" class="sim-instalar-abonado-input" placeholder="N° de abonado (opcional)" style="margin-bottom:4px;">
             <input type="text" class="sim-instalar-direccion-input" placeholder="Dirección (opcional)">
           </div>
@@ -1877,6 +1880,24 @@ function renderFilaSimTabla(sim) {
   const inputClienteManual = fila.querySelector(".sim-instalar-cliente-input");
   const inputAbonadoManual = fila.querySelector(".sim-instalar-abonado-input");
   const inputDireccionManual = fila.querySelector(".sim-instalar-direccion-input");
+  const clienteEncontradoInfo = fila.querySelector(".sim-instalar-cliente-info");
+
+  // Apenas lo que se escribió coincide con un cliente real (ignorando
+  // mayúsculas/tildes), se completan solos el abonado y la dirección
+  // — visible en pantalla, no recién al guardar — para que quede
+  // claro qué datos se van a usar.
+  inputClienteManual.addEventListener("input", () => {
+    const encontrado = buscarClienteSimsPorNombre(inputClienteManual.value.trim());
+    if (encontrado) {
+      inputAbonadoManual.value = encontrado.numero_abonado || "";
+      inputDireccionManual.value = encontrado.direccion || "";
+      clienteEncontradoInfo.textContent = `✓ Cliente encontrado en la base (${encontrado.numero_cliente || "sin número"})`;
+      clienteEncontradoInfo.className = "sim-instalar-cliente-info ok";
+    } else {
+      clienteEncontradoInfo.textContent = inputClienteManual.value.trim() ? "Cliente nuevo — no está en la base, se guarda tal cual se escribió." : "";
+      clienteEncontradoInfo.className = "sim-instalar-cliente-info";
+    }
+  });
 
   fila.querySelector(".sim-transferir-select").addEventListener("change", (e) => {
     panelInstalarCliente.classList.toggle("hidden", e.target.value !== "__cliente__");
@@ -1888,6 +1909,7 @@ function renderFilaSimTabla(sim) {
       inputClienteManual.value = servicio ? servicio.cliente : "";
       inputAbonadoManual.value = "";
       inputDireccionManual.value = servicio ? servicio.direccion || "" : "";
+      inputClienteManual.dispatchEvent(new Event("input"));
     }
   });
 

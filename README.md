@@ -267,6 +267,16 @@ junto con la SIM. De paso revisé el flujo de "reemplazar" (cambiar el chip fís
 cliente que ya tenía línea instalada) — ese ya heredaba bien el número de abonado de la
 SIM vieja, no necesitaba cambios.
 
+## Auto-completado visible al instalar SIM en un cliente conocido (v3.43.2)
+
+A raíz de la consulta sobre si se autocompletan los datos del cliente al instalar una
+SIM: la respuesta es sí, pero en `admin.html` pasaba en silencio (recién se aplicaba al
+guardar, sin verse en pantalla) — podía generar dudas sobre qué datos se iban a usar
+realmente. Ahora, apenas el nombre escrito coincide con un cliente real de la base
+(ignorando mayúsculas/tildes), el número de abonado y la dirección se completan solos
+en los campos, con un aviso "✓ Cliente encontrado en la base" — y si no coincide con
+ninguno, avisa que es un cliente nuevo y se va a guardar tal cual se escribió.
+
 ## Corrige SIM "perdida" al reinstalar por diferencia de tildes (v3.43.1)
 
 Investigando un reporte de una SIM que parecía haber desaparecido al reinstalarla en un
