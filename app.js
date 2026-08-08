@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.43.2";
+const APP_VERSION = "3.44.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -315,9 +315,8 @@ const simDetalleNombre = document.getElementById("simDetalleNombre");
 const simDetalleStatus = document.getElementById("simDetalleStatus");
 const simSoloLecturaInfo = document.getElementById("simSoloLecturaInfo");
 const simUsarWrap = document.getElementById("simUsarWrap");
-const simClienteSelect = document.getElementById("simClienteSelect");
-const simClienteOtroWrap = document.getElementById("simClienteOtroWrap");
-const simClienteOtro = document.getElementById("simClienteOtro");
+const simClienteInput = document.getElementById("simClienteInput");
+const simClienteEncontradoInfo = document.getElementById("simClienteEncontradoInfo");
 const simUsarBtn = document.getElementById("simUsarBtn");
 const simReemplazoWrap = document.getElementById("simReemplazoWrap");
 const simReemplazoMensaje = document.getElementById("simReemplazoMensaje");
@@ -5248,11 +5247,17 @@ function dibujarSimsLista() {
 
 async function poblarClientesParaSim() {
   await cargarClientesGeneral();
-  const nombresDeServicios = serviciosCache.filter((s) => s.cliente).map((s) => s.cliente);
-  const nombresDeClientes = (clientesGeneralCache || []).filter((c) => c.nombre).map((c) => c.nombre);
-  const nombresUnicos = [...new Set([...nombresDeServicios, ...nombresDeClientes])].sort((a, b) => a.localeCompare(b));
-  const opciones = nombresUnicos.map((n) => `<option value="${n}">${n}</option>`).join("");
-  simClienteSelect.innerHTML = `<option value="" disabled selected>Elegí un cliente</option>${opciones}<option value="__otro__">Otro (escribir)</option>`;
+  // Antes se mezclaban acá los nombres de clientes con los nombres
+  // sueltos de servicios pendientes (texto libre, sin garantía de
+  // coincidir con la base) — eso fue justo la causa de un problema
+  // real (una SIM que no completaba los datos ni se encontraba
+  // después). Ahora la lista sale solo de la base de Clientes, que
+  // es la fuente confiable.
+  const datalist = document.getElementById("simClientesLista");
+  datalist.innerHTML = (clientesGeneralCache || [])
+    .filter((c) => c.nombre)
+    .map((c) => `<option value="${c.nombre.replace(/"/g, "&quot;")}"></option>`)
+    .join("");
 }
 
 // ---------- Caché compartido de la base de Clientes ----------
@@ -5282,14 +5287,19 @@ const simDireccionInstalacion = document.getElementById("simDireccionInstalacion
 const simNumeroAbonadoInfo = document.getElementById("simNumeroAbonadoInfo");
 let simNumeroClienteActivo = "";
 let simNumeroAbonadoActivo = "";
-simClienteSelect.addEventListener("change", () => {
-  const esOtro = simClienteSelect.value === "__otro__";
-  simClienteOtroWrap.style.display = esOtro ? "block" : "none";
-  const clienteEncontrado = esOtro ? null : buscarClientePorNombre(simClienteSelect.value);
+simClienteInput.addEventListener("input", () => {
+  const clienteEncontrado = buscarClientePorNombre(simClienteInput.value.trim());
   simDireccionInstalacion.value = clienteEncontrado ? clienteEncontrado.direccion || "" : "";
   simNumeroClienteActivo = clienteEncontrado ? clienteEncontrado.numero_cliente || "" : "";
   simNumeroAbonadoActivo = clienteEncontrado ? clienteEncontrado.numero_abonado || "" : "";
   simNumeroAbonadoInfo.textContent = simNumeroAbonadoActivo ? "Número de abonado: " + simNumeroAbonadoActivo : "";
+  if (clienteEncontrado) {
+    simClienteEncontradoInfo.textContent = "✓ Cliente encontrado en la base.";
+    simClienteEncontradoInfo.className = "hint-text hint-ok";
+  } else {
+    simClienteEncontradoInfo.textContent = simClienteInput.value.trim() ? "Cliente nuevo — no está en la base, se guarda tal cual se escribió." : "";
+    simClienteEncontradoInfo.className = "hint-text";
+  }
 });
 
 async function renderSimDetalle() {
@@ -5322,9 +5332,10 @@ async function renderSimDetalle() {
 
     if (sim.estado === "stock") {
       await poblarClientesParaSim();
-      simClienteSelect.value = "";
-      simClienteOtro.value = "";
-      simClienteOtroWrap.style.display = "none";
+      simClienteInput.value = "";
+      simClienteEncontradoInfo.textContent = "";
+      simDireccionInstalacion.value = "";
+      simNumeroAbonadoInfo.textContent = "";
       simUsarWrap.classList.remove("hidden");
     } else {
       simDevolverWrap.classList.remove("hidden");
@@ -5368,11 +5379,16 @@ async function marcarSimComoUsada(cliente) {
 }
 
 simUsarBtn.addEventListener("click", async () => {
-  const cliente = simClienteSelect.value === "__otro__" ? simClienteOtro.value.trim() : simClienteSelect.value;
-  if (!cliente) {
-    showToast("Elegí o escribí el cliente.");
+  const textoEscrito = simClienteInput.value.trim();
+  if (!textoEscrito) {
+    showToast("Escribí el nombre del cliente.");
     return;
   }
+  // Si coincide con un cliente real, se usa el nombre EXACTO como
+  // está guardado en la base — evita instalar bajo un nombre
+  // levemente distinto (con o sin tilde, etc.) al que ya existe.
+  const clienteEncontrado = buscarClientePorNombre(textoEscrito);
+  const cliente = clienteEncontrado ? clienteEncontrado.nombre : textoEscrito;
   simUsarBtn.disabled = true;
   try {
     const sims = await fetchSimsConfig();

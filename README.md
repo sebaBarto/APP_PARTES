@@ -267,6 +267,19 @@ junto con la SIM. De paso revisé el flujo de "reemplazar" (cambiar el chip fís
 cliente que ya tenía línea instalada) — ese ya heredaba bien el número de abonado de la
 SIM vieja, no necesitaba cambios.
 
+## Buscador de cliente por texto en SIMs (app del técnico) (v3.44.0)
+
+Reemplacé el desplegable de cliente (incómodo con más de 1000 clientes) por un campo de
+texto con sugerencias, igual al patrón que ya usamos en Emergencias — escribís y
+completa solo (ignorando mayúsculas/tildes), mostrando "✓ Cliente encontrado en la
+base" cuando coincide.
+
+De paso, esto corrige la causa real de un problema reportado: el desplegable viejo
+mezclaba nombres de la base de Clientes con nombres sueltos escritos en servicios
+pendientes (texto libre, sin garantía de coincidir) — si se elegía la versión "suelta",
+no enganchaba con los datos reales ni completaba nada. Ahora la lista sale solo de la
+base de Clientes, la fuente confiable.
+
 ## Auto-completado visible al instalar SIM en un cliente conocido (v3.43.2)
 
 A raíz de la consulta sobre si se autocompletan los datos del cliente al instalar una

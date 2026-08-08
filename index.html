@@ -717,15 +717,10 @@
 
       <div id="simUsarWrap" class="hidden">
         <div class="field-group">
-          <label class="field-label" for="simClienteSelect">Cliente</label>
-          <select class="field-input" id="simClienteSelect">
-            <option value="" disabled selected>Elegí un cliente</option>
-            <option value="__otro__">Otro (escribir)</option>
-          </select>
-        </div>
-        <div class="field-group" id="simClienteOtroWrap" style="display:none;">
-          <label class="field-label" for="simClienteOtro">Nombre del cliente</label>
-          <input class="field-input" id="simClienteOtro" type="text" placeholder="Nombre del cliente">
+          <label class="field-label" for="simClienteInput">Cliente</label>
+          <input class="field-input" id="simClienteInput" type="text" placeholder="Escribí para buscar el cliente..." list="simClientesLista">
+          <datalist id="simClientesLista"></datalist>
+          <div id="simClienteEncontradoInfo" class="hint-text"></div>
         </div>
         <div class="field-group">
           <label class="field-label" for="simDireccionInstalacion">Dirección</label>
