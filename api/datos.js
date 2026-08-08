@@ -145,6 +145,61 @@ async function manejarColeccionCortada(nombreColeccion, metodo, body, backendUrl
     }
   }
 
+  if (nombreColeccion === "push-subscripciones") {
+    // La app manda UN objeto (no una lista) — se agrega o actualiza
+    // por endpoint, nunca se reemplaza la lista entera (así un
+    // celular nuevo no borra las suscripciones de los demás).
+    if (metodo === "GET") {
+      const r = await fetch(`${backendUrl}/api/push-subscripciones`, { headers });
+      return { status: r.status, data: await r.json() };
+    }
+    if (metodo === "POST") {
+      const r = await fetch(`${backendUrl}/api/push-subscripciones`, { method: "POST", headers, body: JSON.stringify([body]) });
+      const data = await r.json();
+      return { status: r.status, data: { ok: data.ok } };
+    }
+  }
+
+  if (nombreColeccion === "servicios_emergencia") {
+    if (metodo === "GET") {
+      const r = await fetch(`${backendUrl}/api/emergencias`, { headers });
+      return { status: r.status, data: await r.json() };
+    }
+    if (metodo === "POST") {
+      // La app manda la lista completa (viejas + nuevas) — como acá
+      // no hay una clave natural para "actualizar por id", se vacía
+      // y se vuelve a cargar todo entero, para no duplicar. Antes de
+      // vaciar, se compara con lo que ya había (por cliente + fecha
+      // de carga, ya que el id viejo no es el mismo que genera la
+      // base nueva) para avisarle a todo el equipo de las que son
+      // realmente nuevas — igual que hacía el sistema viejo.
+      const rExistentes = await fetch(`${backendUrl}/api/emergencias`, { headers });
+      const existentes = await rExistentes.json();
+      const clavesExistentes = new Set((Array.isArray(existentes) ? existentes : []).map((e) => `${e.cliente}|${e.fecha_carga}`));
+      const nuevas = (Array.isArray(body) ? body : []).filter((e) => !clavesExistentes.has(`${e.cliente}|${e.fecha_carga}`));
+
+      await fetch(`${backendUrl}/api/emergencias`, { method: "DELETE", headers });
+      const r = await fetch(`${backendUrl}/api/emergencias`, { method: "POST", headers, body: JSON.stringify(body) });
+      const data = await r.json();
+
+      if (nuevas.length > 0) {
+        try {
+          const { enviarATodos } = require("../lib/push-sender");
+          for (const entrada of nuevas) {
+            await enviarATodos({
+              titulo: "🚨 Servicio de emergencia agendado",
+              cuerpo: `${entrada.cargado_por || "Alguien"} cargó un servicio para ${entrada.cliente || "un cliente"}${entrada.fecha_deseada ? " el " + entrada.fecha_deseada : ""} — revisalo en Cronograma.`,
+              url: "/",
+            });
+          }
+        } catch (errPush) {
+          // si falla el envío del aviso, no se rompe el guardado en sí
+        }
+      }
+      return { status: r.status, data: { ok: data.ok, count: Array.isArray(body) ? body.length : undefined } };
+    }
+  }
+
   return { status: 405, data: { error: "Método no permitido" } };
 }
 
@@ -204,7 +259,7 @@ module.exports = async (req, res) => {
   // El resto sigue en GitHub por ahora; se van cortando de a una,
   // probando cada una antes de seguir con la próxima. La app en el
   // celular no cambia en nada — sigue pidiendo lo mismo de siempre.
-  const COLECCIONES_YA_CORTADAS = ["clientes", "materiales", "credenciales", "consultas-categorias", "config", "guardias"];
+  const COLECCIONES_YA_CORTADAS = ["clientes", "materiales", "credenciales", "consultas-categorias", "config", "guardias", "push-subscripciones", "servicios_emergencia"];
   if (COLECCIONES_YA_CORTADAS.includes(nombreColeccion)) {
     const { BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN } = process.env;
     if (!BACKEND_NUEVO_URL || !BACKEND_NUEVO_TOKEN) {

@@ -267,6 +267,32 @@ junto con la SIM. De paso revisé el flujo de "reemplazar" (cambiar el chip fís
 cliente que ya tenía línea instalada) — ese ya heredaba bien el número de abonado de la
 SIM vieja, no necesitaba cambios.
 
+## Corte real — Suscripciones push y Servicios de emergencia (v3.39.0)
+
+Estas dos tenían lógica propia (no un simple reemplazo de lista) que había que
+preservar con cuidado:
+
+- **Suscripciones push**: la app manda un solo objeto (no una lista) para agregar o
+  actualizar una suscripción puntual — se sigue haciendo así, solo que ahora habla con
+  el backend nuevo.
+- **Servicios de emergencia**: al cargar uno nuevo, se le avisa por push a todo el
+  equipo. Como en el backend nuevo no hay una clave natural para "actualizar por id" en
+  esta tabla, se vacía y se vuelve a cargar completa en cada guardado — para saber
+  cuáles son realmente nuevas (y avisar solo de esas), se compara por cliente + fecha de
+  carga contra lo que ya había, en vez del id viejo (que no es el mismo que genera la
+  base nueva).
+
+**Encontrado en el camino, corregido de paso**: el módulo que manda los avisos push
+(`lib/push-sender.js`) leía las suscripciones **directo de GitHub**, sin pasar por nada
+de esto — si no se corregía, cualquier técnico que se suscribiera de ahora en más nunca
+iba a recibir avisos (quedaban guardados en un lugar que nadie leía). Ya apunta al
+backend nuevo también, sin que haya hecho falta tocar nada de quien lo usa (vehículos,
+cron diario, emergencias).
+
+Probado de punta a punta: suscribirse guarda bien, el envío de avisos lee esa
+suscripción correctamente, cargar una emergencia nueva avisa una vez, y volver a mandar
+la misma lista no vuelve a avisar.
+
 ## Corrige "secuencia" de Guardias llegando como texto en vez de lista (v3.38.1)
 
 Encontrado apenas se probó el corte de Guardias en vivo: ese campo se guarda como texto
