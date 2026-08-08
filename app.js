@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.41.1";
+const APP_VERSION = "3.42.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -124,6 +124,7 @@ const screens = {
   dashboard: document.getElementById("screen-dashboard"),
   dashboardFinanciero: document.getElementById("screen-dashboard-financiero"),
   dashboardVehiculos: document.getElementById("screen-dashboard-vehiculos"),
+  dashboardHerramientas: document.getElementById("screen-dashboard-herramientas"),
   dashboardSims: document.getElementById("screen-dashboard-sims"),
   consultas: document.getElementById("screen-consultas"),
   guardias: document.getElementById("screen-guardias"),
@@ -415,6 +416,16 @@ const dashVehGastoMantenimientoNum = document.getElementById("dashVehGastoManten
 const descargarExcelVehiculosBtn = document.getElementById("descargarExcelVehiculosBtn");
 const dashVehiculosStatus = document.getElementById("dashVehiculosStatus");
 const dashVehiculosList = document.getElementById("dashVehiculosList");
+const verDashboardHerramientasBtn = document.getElementById("verDashboardHerramientasBtn");
+const volverDeDashboardHerramientasBtn = document.getElementById("volverDeDashboardHerramientasBtn");
+const refreshDashHerramientasBtn = document.getElementById("refreshDashHerramientasBtn");
+const dashHerramientasSyncLabel = document.getElementById("dashHerramientasSyncLabel");
+const dashHerramientasFiltro = document.getElementById("dashHerramientasFiltro");
+const dashHerrFechaEspecificaWrap = document.getElementById("dashHerrFechaEspecificaWrap");
+const dashHerrFechaEspecifica = document.getElementById("dashHerrFechaEspecifica");
+const descargarExcelHerramientasBtn = document.getElementById("descargarExcelHerramientasBtn");
+const dashHerramientasStatus = document.getElementById("dashHerramientasStatus");
+const dashHerramientasList = document.getElementById("dashHerramientasList");
 const verDashboardSimsBtn = document.getElementById("verDashboardSimsBtn");
 const volverDeDashboardSimsBtn = document.getElementById("volverDeDashboardSimsBtn");
 const refreshDashSimsBtn = document.getElementById("refreshDashSimsBtn");
@@ -682,7 +693,7 @@ function permisosDelTecnico(nombre) {
     // Login general de oficina (sin técnico en particular): acceso
     // total, como ya era antes de este sistema.
     return {
-      dash_general: true, dash_financiero: true, dash_vehiculos: true, dash_sims: true,
+      dash_general: true, dash_financiero: true, dash_vehiculos: true, dash_herramientas: true, dash_sims: true,
       historial_todos: true, vehiculos: true, sims: true, herramientas: true,
       comodato: true, admin: true, agendar_emergencia: true, sims_ver_todas: true,
     };
@@ -699,6 +710,7 @@ function permisosDelTecnico(nombre) {
     dash_general: true,
     dash_financiero: nombre === "Sebastian Bartolozzi",
     dash_vehiculos: true,
+    dash_herramientas: true,
     dash_sims: true,
     historial_todos: nombre === "Sebastian Bartolozzi",
     vehiculos: true,
@@ -867,9 +879,10 @@ function actualizarSaludoPanel() {
 // submenú y ahí ve solo los que le corresponden.
 function actualizarAccesoSeccionesPanel() {
   const permisos = permisosDelTecnico(tecnicoLogueado);
-  tileDashboardsBtn.classList.toggle("hidden", !(permisos.dash_general || permisos.dash_financiero || permisos.dash_vehiculos || permisos.dash_sims));
+  tileDashboardsBtn.classList.toggle("hidden", !(permisos.dash_general || permisos.dash_financiero || permisos.dash_vehiculos || permisos.dash_herramientas || permisos.dash_sims));
   verDashboardBtn.classList.toggle("hidden", !permisos.dash_general);
   verDashboardVehiculosBtn.classList.toggle("hidden", !permisos.dash_vehiculos);
+  verDashboardHerramientasBtn.classList.toggle("hidden", !permisos.dash_herramientas);
   verDashboardSimsBtn.classList.toggle("hidden", !permisos.dash_sims);
   tileVehiculosBtn.classList.toggle("hidden", !permisos.vehiculos);
   tileSimsBtn.classList.toggle("hidden", !permisos.sims);
@@ -2684,7 +2697,7 @@ let chartDias = null;
 let chartDistancia = null;
 let chartTipo = null;
 
-function obtenerRangoPeriodo(periodo) {
+function obtenerRangoPeriodo(periodo, inputFechaEspecifica) {
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
   if (periodo === "todo") {
@@ -2696,7 +2709,8 @@ function obtenerRangoPeriodo(periodo) {
   if (periodo === "fecha") {
     // Fecha puntual elegida a mano — si todavía no eligió ninguna,
     // se muestra hoy por defecto (para no dejar la lista vacía).
-    const valor = dashVehFechaEspecifica.value;
+    const elemento = inputFechaEspecifica || dashVehFechaEspecifica;
+    const valor = elemento.value;
     if (!valor) return { desde: hoy, hasta: hoy };
     const [y, m, d] = valor.split("-").map(Number);
     const elegida = new Date(y, m - 1, d);
@@ -4062,6 +4076,132 @@ descargarExcelVehiculosBtn.addEventListener("click", () => {
   XLSX.utils.book_append_sheet(libro, hoja, "Vehículos");
   const hoy = fechaActualISOVehiculo();
   XLSX.writeFile(libro, `vehiculos_${dashVehPeriodoActivo}_${hoy}.xlsx`);
+});
+
+// ---------- Dashboard de Herramientas ----------
+let dashHerramientasCache = [];
+let dashHerrPeriodoActivo = "mes";
+
+verDashboardHerramientasBtn.addEventListener("click", () => {
+  showScreen("dashboardHerramientas");
+  fetchDashHerramientas();
+});
+volverDeDashboardHerramientasBtn.addEventListener("click", () => showScreen("dashboardsMenu"));
+refreshDashHerramientasBtn.addEventListener("click", fetchDashHerramientas);
+dashHerramientasFiltro.addEventListener("change", renderDashHerramientas);
+
+document.querySelectorAll(".dash-herr-periodo-chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    document.querySelectorAll(".dash-herr-periodo-chip").forEach((c) => c.classList.remove("active"));
+    chip.classList.add("active");
+    dashHerrPeriodoActivo = chip.dataset.periodo;
+    dashHerrFechaEspecificaWrap.classList.toggle("hidden", dashHerrPeriodoActivo !== "fecha");
+    if (dashHerrPeriodoActivo === "fecha" && !dashHerrFechaEspecifica.value) {
+      dashHerrFechaEspecifica.value = new Date().toISOString().slice(0, 10);
+    }
+    renderDashHerramientas();
+  });
+});
+dashHerrFechaEspecifica.addEventListener("change", renderDashHerramientas);
+
+async function poblarFiltroHerramientasDashboard() {
+  const actual = dashHerramientasFiltro.value;
+  try {
+    const herramientas = await fetchHerramientasConfig();
+    const opciones = herramientas.map((h) => `<option value="${h.nombre}">${h.nombre}</option>`).join("");
+    dashHerramientasFiltro.innerHTML = `<option value="">Todas las herramientas</option>${opciones}`;
+    dashHerramientasFiltro.value = actual || "";
+  } catch (err) {
+    // si falla, se sigue igual con "todas"
+  }
+}
+
+async function fetchDashHerramientas() {
+  dashHerramientasStatus.textContent = "Cargando...";
+  try {
+    await poblarFiltroHerramientasDashboard();
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/recurso-uso?recurso=herramienta", { headers, cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    dashHerramientasCache = await res.json();
+    if (!Array.isArray(dashHerramientasCache)) dashHerramientasCache = [];
+    dashHerramientasSyncLabel.textContent = "Actualizado " + formatSyncTime(new Date());
+    renderDashHerramientas();
+  } catch (err) {
+    dashHerramientasStatus.textContent = "No se pudo cargar el historial de herramientas.";
+  }
+}
+
+function filtrarDashHerramientas() {
+  const filtro = dashHerramientasFiltro.value;
+  const rango = obtenerRangoPeriodo(dashHerrPeriodoActivo, dashHerrFechaEspecifica);
+  return dashHerramientasCache
+    .filter((h) => (!filtro || h.herramienta === filtro) && fechaEnRango(h.fecha, rango))
+    .sort((a, b) => {
+      const claveA = `${a.fecha || ""} ${a.hora || ""}`;
+      const claveB = `${b.fecha || ""} ${b.hora || ""}`;
+      return claveB.localeCompare(claveA);
+    });
+}
+
+// Un solo texto por acción, para que la tarjeta cuente "toda la
+// trazabilidad" de un vistazo — quién, qué hizo, y con qué cliente
+// (cuando corresponde), sin tener que adivinar según el campo.
+function descripcionAccionHerramienta(h) {
+  if (h.accion === "tomar") return `${h.tecnico} la tomó`;
+  if (h.accion === "devolver") return `${h.tecnico} la devolvió`;
+  if (h.accion === "transferir") return `${h.tecnico} se la transfirió a ${h.detalle || "otro técnico"}`;
+  if (h.accion === "dejar_en_cliente") return `${h.tecnico} la dejó en ${h.cliente || "un cliente"}`;
+  if (h.accion === "retirar_de_cliente") return `${h.tecnico} la retiró de ${h.cliente || "un cliente"}`;
+  return `${h.tecnico} — ${h.accion || "movimiento"}`;
+}
+
+function renderDashHerramientas() {
+  const filtrados = filtrarDashHerramientas();
+  dashHerramientasList.innerHTML = "";
+  if (filtrados.length === 0) {
+    dashHerramientasStatus.textContent = "No hay registros para mostrar en ese período.";
+    return;
+  }
+  dashHerramientasStatus.textContent = `${filtrados.length} registro(s).`;
+  filtrados.forEach((h) => {
+    let fechaTexto = h.fecha || "";
+    if (h.fecha) {
+      const [y, m, d] = h.fecha.split("-");
+      fechaTexto = `${d}/${m}/${y}`;
+    }
+    const card = document.createElement("div");
+    card.className = "historial-card";
+    card.innerHTML = `
+      <div class="historial-card-num">${escapeHtml(h.herramienta)}</div>
+      <div class="historial-card-cliente">${escapeHtml(descripcionAccionHerramienta(h))}</div>
+      <div class="historial-card-direccion">${fechaTexto}${h.hora ? " — " + h.hora : ""}</div>
+    `;
+    dashHerramientasList.appendChild(card);
+  });
+}
+
+descargarExcelHerramientasBtn.addEventListener("click", () => {
+  const filtrados = filtrarDashHerramientas();
+  if (filtrados.length === 0) {
+    showToast("No hay datos para descargar en ese período.");
+    return;
+  }
+  const filas = filtrados.map((h) => ({
+    Herramienta: h.herramienta || "",
+    Técnico: h.tecnico || "",
+    Acción: h.accion || "",
+    Fecha: h.fecha || "",
+    Hora: h.hora || "",
+    "Cliente (si corresponde)": h.cliente || "",
+    "Transferida a (si corresponde)": h.accion === "transferir" ? h.detalle || "" : "",
+    Descripción: descripcionAccionHerramienta(h),
+  }));
+  const hoja = XLSX.utils.json_to_sheet(filas);
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, "Herramientas");
+  const hoy = fechaActualISOVehiculo();
+  XLSX.writeFile(libro, `herramientas_${dashHerrPeriodoActivo}_${hoy}.xlsx`);
 });
 
 // ---------- Dashboard de SIMs ----------

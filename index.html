@@ -204,6 +204,12 @@
           </span>
           <span class="panel-tile-label">Dashboard de vehículos</span>
         </button>
+        <button type="button" class="panel-tile panel-tile-grid tile-dash-herramientas" id="verDashboardHerramientasBtn">
+          <span class="panel-tile-icon-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.1-3.1a4 4 0 0 1-5.5 5.5L5 21.5H2.5V19L12.5 9a4 4 0 0 1 5.5-5.5l-3.1 3.1z"/></svg>
+          </span>
+          <span class="panel-tile-label">Dashboard de herramientas</span>
+        </button>
         <button type="button" class="panel-tile panel-tile-grid tile-dash-sims" id="verDashboardSimsBtn">
           <span class="panel-tile-icon-badge">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h6l4 4v12a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><rect x="9.5" y="10" width="5" height="5.5" rx="1"/></svg>
@@ -426,6 +432,47 @@
 
     <div class="action-bar">
       <button class="btn btn-secondary" id="volverDeDashboardVehiculosBtn" type="button">Volver</button>
+    </div>
+  </section>
+
+  <!-- DASHBOARD DE HERRAMIENTAS -->
+  <section class="screen" id="screen-dashboard-herramientas">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">DASHBOARD DE HERRAMIENTAS</p>
+
+      <div class="list-toolbar">
+        <button class="btn btn-ghost btn-small" id="refreshDashHerramientasBtn" type="button">↻ Actualizar</button>
+        <span class="list-sync-label" id="dashHerramientasSyncLabel"></span>
+      </div>
+
+      <div class="dash-periodo-tabs">
+        <button type="button" class="dash-herr-periodo-chip" data-periodo="dia">Día</button>
+        <button type="button" class="dash-herr-periodo-chip" data-periodo="semana">Semana</button>
+        <button type="button" class="dash-herr-periodo-chip active" data-periodo="mes">Mes</button>
+        <button type="button" class="dash-herr-periodo-chip" data-periodo="todo">Todo</button>
+        <button type="button" class="dash-herr-periodo-chip" data-periodo="fecha">Fecha</button>
+      </div>
+
+      <div class="field-group hidden" id="dashHerrFechaEspecificaWrap">
+        <label class="field-label" for="dashHerrFechaEspecifica">Elegí el día</label>
+        <input class="field-input" type="date" id="dashHerrFechaEspecifica">
+      </div>
+
+      <div class="field-group">
+        <select class="field-input" id="dashHerramientasFiltro">
+          <option value="">Todas las herramientas</option>
+        </select>
+      </div>
+
+      <button type="button" class="btn btn-secondary hidden" id="descargarExcelHerramientasBtn" style="margin-bottom:14px;">⬇ Descargar Excel del período</button>
+
+      <p class="list-status" id="dashHerramientasStatus"></p>
+
+      <div id="dashHerramientasList" class="historial-list"></div>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDeDashboardHerramientasBtn" type="button">Volver</button>
     </div>
   </section>
 

@@ -267,6 +267,15 @@ junto con la SIM. De paso revisé el flujo de "reemplazar" (cambiar el chip fís
 cliente que ya tenía línea instalada) — ese ya heredaba bien el número de abonado de la
 SIM vieja, no necesitaba cambios.
 
+## Nuevo Dashboard de Herramientas, con trazabilidad completa (v3.42.0)
+
+Nuevo dashboard (permiso "dash_herramientas"), calcado del de vehículos: filtro por
+período (día/semana/mes/todo/fecha puntual) y por herramienta, con descarga a Excel.
+Cada tarjeta muestra, en una sola línea, quién hizo qué y con qué cliente cuando
+corresponde — tomó, devolvió, la transfirió a otro técnico, la dejó en un cliente, o la
+retiró de un cliente — dando la trazabilidad completa de una herramienta a lo largo del
+tiempo. Probado con los 5 tipos de movimiento y el filtro por fecha puntual.
+
 ## Corrige estado de Herramientas y Vehículos desactualizado (v3.41.1)
 
 Encontrado apenas se probó tomar una herramienta en vivo: corté las *acciones* de
