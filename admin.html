@@ -220,6 +220,7 @@
 </style>
 </head>
 <body>
+<datalist id="simInstalarClientesLista"></datalist>
 <div class="wrap">
 
   <div class="admin-header">
@@ -1775,6 +1776,26 @@ const guardarSimsBtn = document.getElementById("guardarSimsBtn");
 const guardarSimsStatus = document.getElementById("guardarSimsStatus");
 let nombresTecnicosParaSims = [];
 let serviciosPendientesParaSims = []; // para autocompletar cliente/dirección al instalar una SIM
+let clientesGeneralParaSims = []; // base completa de Clientes, para buscar al instalar una SIM
+
+function normalizeText(s) {
+  return (s || "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function buscarClienteSimsPorNombre(nombre) {
+  const clave = normalizeText(nombre);
+  if (!clave) return null;
+  return clientesGeneralParaSims.find((c) => c.nombre && normalizeText(c.nombre) === clave) || null;
+}
+
+function poblarDatalistClientesSims() {
+  const datalist = document.getElementById("simInstalarClientesLista");
+  if (!datalist) return;
+  datalist.innerHTML = clientesGeneralParaSims
+    .filter((c) => c.nombre)
+    .map((c) => `<option value="${c.nombre.replace(/"/g, "&quot;")}"></option>`)
+    .join("");
+}
 let simsCompletos = []; // todas las SIMs, tal como están guardadas/recién subidas/recién transferidas
 let numerosExistentesEnServidor = new Set(); // para saber si una fila ya existe del lado del servidor
 
@@ -1829,10 +1850,9 @@ function renderFilaSimTabla(sim) {
           <select class="sim-instalar-servicio-select">
             <option value="" selected>Elegir un servicio pendiente...</option>
             ${opcionesServicios}
-            <option value="__otro__">Otro (escribir todo a mano)</option>
           </select>
-          <div class="sim-instalar-manual-wrap hidden" style="margin-top:6px;">
-            <input type="text" class="sim-instalar-cliente-input" placeholder="Nombre del cliente" style="margin-bottom:4px;">
+          <div class="sim-instalar-manual-wrap" style="margin-top:6px;">
+            <input type="text" class="sim-instalar-cliente-input" placeholder="Buscar cliente por nombre..." list="simInstalarClientesLista" style="margin-bottom:4px;">
             <input type="text" class="sim-instalar-abonado-input" placeholder="N° de abonado (opcional)" style="margin-bottom:4px;">
             <input type="text" class="sim-instalar-direccion-input" placeholder="Dirección (opcional)">
           </div>
@@ -1863,20 +1883,11 @@ function renderFilaSimTabla(sim) {
   });
 
   selectServicio.addEventListener("change", () => {
-    if (selectServicio.value === "__otro__") {
-      manualWrap.classList.remove("hidden");
-      inputClienteManual.value = "";
-      inputAbonadoManual.value = "";
-      inputDireccionManual.value = "";
-      inputClienteManual.focus();
-    } else if (selectServicio.value !== "") {
+    if (selectServicio.value !== "") {
       const servicio = serviciosPendientesParaSims.filter((sv) => sv.cliente)[Number(selectServicio.value)];
-      manualWrap.classList.remove("hidden");
       inputClienteManual.value = servicio ? servicio.cliente : "";
       inputAbonadoManual.value = "";
       inputDireccionManual.value = servicio ? servicio.direccion || "" : "";
-    } else {
-      manualWrap.classList.add("hidden");
     }
   });
 
@@ -1961,13 +1972,20 @@ function renderFilaSimTabla(sim) {
 // migra bien al registro de instaladas y no queda a mitad de camino
 // en el stock.
 async function instalarSimEnCliente(fila, numeroActual, inputClienteManual, inputAbonadoManual, inputDireccionManual) {
-  const cliente = inputClienteManual.value.trim();
-  if (!cliente) {
+  const textoEscrito = inputClienteManual.value.trim();
+  if (!textoEscrito) {
     alert("Elegí un servicio pendiente o escribí el nombre del cliente.");
     return;
   }
-  const numeroAbonado = inputAbonadoManual.value.trim();
-  const direccion = inputDireccionManual.value.trim();
+  // Si lo que se escribió coincide con un cliente real de la base
+  // (ignorando mayúsculas/tildes), se usa el nombre EXACTO como está
+  // guardado ahí — así se evita instalar la SIM bajo un nombre
+  // ligeramente distinto (con o sin tilde, etc.) al que ya existe,
+  // que después no aparecería al buscarla.
+  const clienteEncontrado = buscarClienteSimsPorNombre(textoEscrito);
+  const cliente = clienteEncontrado ? clienteEncontrado.nombre : textoEscrito;
+  const numeroAbonado = inputAbonadoManual.value.trim() || (clienteEncontrado ? clienteEncontrado.numero_abonado || "" : "");
+  const direccion = inputDireccionManual.value.trim() || (clienteEncontrado ? clienteEncontrado.direccion || "" : "");
 
   if (!numerosExistentesEnServidor.has(numeroActual)) {
     alert('Esta fila todavía no está guardada — tocá "Guardar cambios" primero, y después instalala en el cliente.');
@@ -2048,10 +2066,11 @@ async function cargarSimsAdmin() {
       // si falla la migración, no se interrumpe la carga normal de la tabla
     }
 
-    const [resSims, resTecnicos, resServicios] = await Promise.all([
+    const [resSims, resTecnicos, resServicios, resClientes] = await Promise.all([
       fetch("/api/datos?coleccion=sims", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" }),
       fetch("/api/datos?coleccion=tecnicos", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" }),
       fetch("/api/servicios", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" }).catch(() => null),
+      fetch("/api/datos?coleccion=clientes", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" }).catch(() => null),
     ]);
     const sims = await resSims.json();
     const tecnicos = await resTecnicos.json();
@@ -2064,6 +2083,13 @@ async function cargarSimsAdmin() {
     } catch (errServicios) {
       serviciosPendientesParaSims = []; // si falla, igual se puede escribir el cliente a mano
     }
+    try {
+      const clientes = resClientes ? await resClientes.json() : [];
+      clientesGeneralParaSims = Array.isArray(clientes) ? clientes : [];
+    } catch (errClientes) {
+      clientesGeneralParaSims = []; // si falla, igual se puede escribir el cliente a mano
+    }
+    poblarDatalistClientesSims();
     dibujarTablaSims();
   } catch (err) {
     simsStatus.textContent = "No se pudo cargar la lista de SIMs.";

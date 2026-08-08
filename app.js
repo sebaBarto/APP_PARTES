@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.43.0";
+const APP_VERSION = "3.43.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -5526,7 +5526,7 @@ async function cargarSimsRegistro() {
 }
 
 function renderResultadosSimRegistro() {
-  const busqueda = simRegistroBuscarInput.value.trim().toLowerCase();
+  const busqueda = normalizeText(simRegistroBuscarInput.value.trim());
   simRegistroResultados.innerHTML = "";
   if (!busqueda) {
     simRegistroStatus.textContent = "Escribí para buscar entre las líneas instaladas.";
@@ -5537,9 +5537,9 @@ function renderResultadosSimRegistro() {
     return;
   }
   const coincidencias = simsRegistroCache.filter((s) =>
-    (s.cliente || "").toLowerCase().includes(busqueda) ||
-    (s.numero || "").toLowerCase().includes(busqueda) ||
-    (s.direccion || "").toLowerCase().includes(busqueda)
+    normalizeText(s.cliente).includes(busqueda) ||
+    normalizeText(s.numero).includes(busqueda) ||
+    normalizeText(s.direccion).includes(busqueda)
   );
   if (coincidencias.length === 0) {
     simRegistroStatus.textContent = "Ninguna coincidencia.";

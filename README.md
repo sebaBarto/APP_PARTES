@@ -267,6 +267,20 @@ junto con la SIM. De paso revisé el flujo de "reemplazar" (cambiar el chip fís
 cliente que ya tenía línea instalada) — ese ya heredaba bien el número de abonado de la
 SIM vieja, no necesitaba cambios.
 
+## Corrige SIM "perdida" al reinstalar por diferencia de tildes (v3.43.1)
+
+Investigando un reporte de una SIM que parecía haber desaparecido al reinstalarla en un
+cliente: los datos nunca se perdieron — quedó guardada correctamente, pero bajo el
+nombre "Bartolozzi Sebastián" (con tilde, tal como se escribió a mano), mientras la
+búsqueda posterior fue sin tilde y no la encontraba por una comparación de texto exacta.
+
+Dos correcciones: la búsqueda de líneas instaladas ahora ignora mayúsculas y tildes. Y,
+más importante para que esto no vuelva a pasar — en `admin.html`, al instalar una SIM en
+un cliente, el campo ahora es un buscador con sugerencias tomadas de la base completa de
+Clientes (antes solo mostraba servicios pendientes, con "escribir a mano" como única
+alternativa); si lo que se escribe coincide con un cliente real, se usa el nombre exacto
+como está guardado en la base, en vez de lo que se haya tipeado.
+
 ## Corte real — SIMs (v3.43.0)
 
 El más grande y complejo de los tres recursos de `recurso-uso.js` — 7 acciones distintas
