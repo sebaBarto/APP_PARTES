@@ -267,6 +267,25 @@ junto con la SIM. De paso revisé el flujo de "reemplazar" (cambiar el chip fís
 cliente que ya tenía línea instalada) — ese ya heredaba bien el número de abonado de la
 SIM vieja, no necesitaba cambios.
 
+## Corte real — SIMs (v3.43.0)
+
+El más grande y complejo de los tres recursos de `recurso-uso.js` — 7 acciones distintas
+(usar, devolver, transferir, reemplazar, retirar de registro, migración de casos viejos,
+y blanquear historial). Reconstruí todo calcado exacto de la lógica real, agregando una
+tabla que nunca se había contemplado (el historial de SIMs vivía en un archivo aparte).
+Probé las 7 acciones contra una base real, incluida la protección de "solo Sebastian o
+Brenda pueden blanquear el historial" y el intercambio correcto de SIMs entre stock y
+registro al reemplazar una línea.
+
+A diferencia de vehículos y herramientas, esta vez corté de entrada tanto las acciones
+como la lectura del estado actual (stock e instaladas) — la vez pasada me había olvidado
+de esa segunda parte y hubo que corregirlo después.
+
+De paso, limpié bastante código que había quedado sin usar en `recurso-uso.js` (las
+versiones viejas de vehículo/herramienta que ya se habían reemplazado, y las funciones
+de lectura/escritura de GitHub que ya no las necesitaba nadie) — el archivo bajó de 528 a
+166 líneas.
+
 ## Nuevo Dashboard de Herramientas, con trazabilidad completa (v3.42.0)
 
 Nuevo dashboard (permiso "dash_herramientas"), calcado del de vehículos: filtro por
