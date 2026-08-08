@@ -12,7 +12,7 @@
 const COLECCIONES = {
   config: {
     path: "config.json",
-    default: { dias_atencion: 3, dias_urgente: 7, app_version_actual: "3.36.0", felicitacion_semanal_activa: true },
+    default: { dias_atencion: 3, dias_urgente: 7, app_version_actual: "3.37.0", felicitacion_semanal_activa: true },
     mergeConDefault: true,
   },
   tecnicos: { path: "tecnicos.json", default: [] },
@@ -87,6 +87,59 @@ module.exports = async (req, res) => {
   }
 
   const nombreColeccion = req.query.coleccion;
+
+  // --- CORTE EN CURSO: Clientes ya vive en el backend nuevo (Cloudflare) ---
+  // El resto de las colecciones sigue en GitHub por ahora; se van
+  // cortando de a una, probando cada una antes de seguir con la
+  // próxima. Acá no cambia nada de la app en el celular — sigue
+  // pidiendo lo mismo de siempre, solo que del lado del servidor
+  // ahora se reenvía al lugar nuevo.
+  if (nombreColeccion === "clientes") {
+    const { BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN } = process.env;
+    if (!BACKEND_NUEVO_URL || !BACKEND_NUEVO_TOKEN) {
+      res.status(500).json({ error: "Faltan variables de entorno del backend nuevo por configurar en Vercel" });
+      return;
+    }
+    const headersBackendNuevo = { Authorization: `Bearer ${BACKEND_NUEVO_TOKEN}`, "Content-Type": "application/json" };
+    try {
+      if (req.method === "GET") {
+        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+        const r = await fetch(`${BACKEND_NUEVO_URL}/api/clientes`, { headers: headersBackendNuevo });
+        const data = await r.json();
+        res.status(r.status).json(data);
+        return;
+      }
+      if (req.method === "POST") {
+        let body = req.body;
+        if (typeof body === "string") body = JSON.parse(body);
+        // admin.html manda POST con lista vacía para "borrar todos"
+        // (así funcionaba con el sistema viejo) — el backend nuevo
+        // tiene un DELETE aparte para eso, así que se traduce acá,
+        // sin que la app tenga que cambiar nada.
+        if (Array.isArray(body) && body.length === 0) {
+          const r = await fetch(`${BACKEND_NUEVO_URL}/api/clientes`, { method: "DELETE", headers: headersBackendNuevo });
+          const data = await r.json();
+          res.status(r.status).json(data);
+          return;
+        }
+        const r = await fetch(`${BACKEND_NUEVO_URL}/api/clientes`, {
+          method: "POST",
+          headers: headersBackendNuevo,
+          body: JSON.stringify(body),
+        });
+        const data = await r.json();
+        res.status(r.status).json(data);
+        return;
+      }
+      res.setHeader("Allow", "GET, POST");
+      res.status(405).json({ error: "Método no permitido" });
+    } catch (err) {
+      res.status(500).json({ error: "Error interno al hablar con el backend nuevo", detalle: String(err.message || err) });
+    }
+    return;
+  }
+  // --- fin del corte de Clientes ---
+
   const coleccion = COLECCIONES[nombreColeccion];
   if (!coleccion) {
     res.status(400).json({ error: "Colección desconocida", validas: Object.keys(COLECCIONES) });

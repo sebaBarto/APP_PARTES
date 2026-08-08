@@ -267,6 +267,28 @@ junto con la SIM. De paso revisé el flujo de "reemplazar" (cambiar el chip fís
 cliente que ya tenía línea instalada) — ese ya heredaba bien el número de abonado de la
 SIM vieja, no necesitaba cambios.
 
+## Corte real — Clientes (v3.37.0)
+
+Primer paso del corte hacia el backend nuevo (Cloudflare + D1), empezando por Clientes
+(la colección más reciente y ya bien probada allá). La app en el celular no cambia en
+nada — sigue pidiendo `/api/datos?coleccion=clientes` como siempre; del lado del
+servidor, ese pedido ahora se reenvía al backend nuevo en vez de leer/escribir el
+archivo en GitHub. El resto de las colecciones (técnicos, SIMs, servicios, etc.) sigue
+en GitHub por ahora, sin tocar — se van a ir cortando de a una, probando cada una antes
+de seguir con la próxima.
+
+Un detalle traducido a propósito: el botón "borrar todos" de la pestaña Clientes en
+`admin.html` manda un `POST` con lista vacía (así funcionaba con el sistema viejo) — el
+backend nuevo tiene un `DELETE` aparte para eso, así que se traduce automáticamente del
+lado del servidor, sin que la app tenga que cambiar nada.
+
+**Variables de entorno nuevas a cargar en Vercel**: `BACKEND_NUEVO_URL` (la URL del
+Worker) y `BACKEND_NUEVO_TOKEN` (el mismo token que ya usa el backend nuevo).
+
+Probado con todo simulado: leer y guardar clientes van al lugar correcto, borrar todos
+se traduce bien a DELETE, y —importante— cualquier otra colección (probado con
+técnicos) sigue exactamente igual que antes, sin verse afectada por este cambio.
+
 ## Autocompletar desde la base de Clientes en SIMs y Emergencias (v3.35.0)
 
 Dos pantallas ahora aprovechan la base de Clientes para no tener que escribir todo a
