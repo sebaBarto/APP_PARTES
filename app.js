@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.46.0";
+const APP_VERSION = "3.47.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -129,6 +129,7 @@ const screens = {
   consultas: document.getElementById("screen-consultas"),
   guardias: document.getElementById("screen-guardias"),
   historial: document.getElementById("screen-historial"),
+  stock: document.getElementById("screen-stock"),
   credencial: document.getElementById("screen-credencial"),
   vehiculos: document.getElementById("screen-vehiculos"),
   vehiculoDetalle: document.getElementById("screen-vehiculo-detalle"),
@@ -372,6 +373,14 @@ const historialSyncLabel = document.getElementById("historialSyncLabel");
 const historialStatus = document.getElementById("historialStatus");
 const historialList = document.getElementById("historialList");
 const historialModoLabel = document.getElementById("historialModoLabel");
+const verStockBtn = document.getElementById("verStockBtn");
+const volverDeStockBtn = document.getElementById("volverDeStockBtn");
+const refreshStockBtn = document.getElementById("refreshStockBtn");
+const stockSyncLabel = document.getElementById("stockSyncLabel");
+const stockStatus = document.getElementById("stockStatus");
+const stockList = document.getElementById("stockList");
+const stockFechaEspecificaWrap = document.getElementById("stockFechaEspecificaWrap");
+const stockFechaEspecifica = document.getElementById("stockFechaEspecifica");
 const volverDeGuardiasBtn = document.getElementById("volverDeGuardiasBtn");
 const guardiaStatus = document.getElementById("guardiaStatus");
 const guardiaActualWrap = document.getElementById("guardiaActualWrap");
@@ -494,6 +503,7 @@ function armarBorrador() {
     materiales_otros: document.getElementById("f_materiales").value,
     materiales_agregados: materialesAgregados,
     materiales_retirados: document.getElementById("f_materiales_retirados").value,
+    materiales_retirados_agregados: materialesRetiradosAgregados,
     importe: document.getElementById("f_importe").value,
     costo_final: document.getElementById("f_costo_final").value,
     descuento_tipo: (Array.from(descuentoRadios).find((r) => r.checked) || {}).value || "0",
@@ -522,6 +532,7 @@ function hayAlgoCargadoEnElForm() {
   const b = armarBorrador();
   return !!(
     b.cliente || b.direccion || b.tarea || b.materiales_agregados.length > 0 ||
+    (b.materiales_retirados_agregados && b.materiales_retirados_agregados.length > 0) ||
     b.materiales_otros || b.importe || b.observaciones || b.claves.length > 0
   );
 }
@@ -562,6 +573,8 @@ function restaurarBorradorSiExiste(numeroServicio) {
   materialesAgregados = Array.isArray(b.materiales_agregados) ? b.materiales_agregados : [];
   renderMaterialesAgregados();
   document.getElementById("f_materiales_retirados").value = b.materiales_retirados || "";
+  materialesRetiradosAgregados = Array.isArray(b.materiales_retirados_agregados) ? b.materiales_retirados_agregados : [];
+  renderMaterialesRetiradosAgregados();
   document.getElementById("f_importe").value = b.importe || "";
   document.getElementById("f_costo_final").value = b.costo_final || "";
   const radioDescuento = Array.from(descuentoRadios).find((r) => r.value === (b.descuento_tipo || "0"));
@@ -692,7 +705,7 @@ function permisosDelTecnico(nombre) {
     // Login general de oficina (sin técnico en particular): acceso
     // total, como ya era antes de este sistema.
     return {
-      dash_general: true, dash_financiero: true, dash_vehiculos: true, dash_herramientas: true, dash_sims: true,
+      dash_general: true, dash_financiero: true, dash_vehiculos: true, dash_herramientas: true, dash_sims: true, dash_stock: true,
       historial_todos: true, vehiculos: true, sims: true, herramientas: true, marcar_pasado_sistema: true,
       comodato: true, admin: true, agendar_emergencia: true, sims_ver_todas: true,
     };
@@ -709,6 +722,7 @@ function permisosDelTecnico(nombre) {
     dash_general: true,
     dash_financiero: nombre === "Sebastian Bartolozzi",
     marcar_pasado_sistema: nombre === "Sebastian Bartolozzi",
+    dash_stock: nombre === "Sebastian Bartolozzi",
     dash_vehiculos: true,
     dash_herramientas: true,
     dash_sims: true,
@@ -879,11 +893,12 @@ function actualizarSaludoPanel() {
 // submenú y ahí ve solo los que le corresponden.
 function actualizarAccesoSeccionesPanel() {
   const permisos = permisosDelTecnico(tecnicoLogueado);
-  tileDashboardsBtn.classList.toggle("hidden", !(permisos.dash_general || permisos.dash_financiero || permisos.dash_vehiculos || permisos.dash_herramientas || permisos.dash_sims));
+  tileDashboardsBtn.classList.toggle("hidden", !(permisos.dash_general || permisos.dash_financiero || permisos.dash_vehiculos || permisos.dash_herramientas || permisos.dash_sims || permisos.dash_stock));
   verDashboardBtn.classList.toggle("hidden", !permisos.dash_general);
   verDashboardVehiculosBtn.classList.toggle("hidden", !permisos.dash_vehiculos);
   verDashboardHerramientasBtn.classList.toggle("hidden", !permisos.dash_herramientas);
   verDashboardSimsBtn.classList.toggle("hidden", !permisos.dash_sims);
+  verStockBtn.classList.toggle("hidden", !permisos.dash_stock);
   tileVehiculosBtn.classList.toggle("hidden", !permisos.vehiculos);
   tileSimsBtn.classList.toggle("hidden", !permisos.sims);
   tileHerramientasBtn.classList.toggle("hidden", !permisos.herramientas);
@@ -1684,6 +1699,7 @@ async function cargarMaterialesCatalogo() {
     }
   }
   poblarCategoriasMateriales();
+  poblarCategoriasMaterialesRetirados();
 }
 cargarMaterialesCatalogo();
 
@@ -1738,6 +1754,89 @@ function getMaterialesUtilizados() {
   const agregados = materialesAgregados.map((item) => `${item.modelo} x${item.cantidad}`);
   const otros = document.getElementById("f_materiales").value.trim();
   return [...agregados, otros].filter(Boolean).join(", ");
+}
+
+// ---------- Selector estructurado de materiales retirados (mismo patrón que "usados") ----------
+const matRetCategoriaSelect = document.getElementById("matRetCategoriaSelect");
+const matRetModeloSelect = document.getElementById("matRetModeloSelect");
+const matRetCantidadInput = document.getElementById("matRetCantidadInput");
+const agregarMaterialRetiradoBtn = document.getElementById("agregarMaterialRetiradoBtn");
+const materialesRetiradosAgregadosList = document.getElementById("materialesRetiradosAgregadosList");
+let materialesRetiradosAgregados = [];
+
+function poblarCategoriasMaterialesRetirados() {
+  const opciones = materialesCatalogo.map((c) => `<option value="${c.categoria}">${c.categoria}</option>`).join("");
+  matRetCategoriaSelect.innerHTML = `<option value="" disabled selected>Categoría</option>${opciones}`;
+}
+
+matRetCategoriaSelect.addEventListener("change", () => {
+  const cat = materialesCatalogo.find((c) => c.categoria === matRetCategoriaSelect.value);
+  if (!cat) {
+    matRetModeloSelect.innerHTML = '<option value="" disabled selected>Elegí primero una categoría</option>';
+    matRetModeloSelect.disabled = true;
+    return;
+  }
+  const opciones = cat.modelos.map((m) => `<option value="${m}">${m}</option>`).join("");
+  matRetModeloSelect.innerHTML = `<option value="" disabled selected>Modelo</option>${opciones}`;
+  matRetModeloSelect.disabled = false;
+});
+
+function renderMaterialesRetiradosAgregados() {
+  materialesRetiradosAgregadosList.innerHTML = "";
+  materialesRetiradosAgregados.forEach((item, idx) => {
+    const fila = document.createElement("div");
+    fila.className = "material-agregado-item";
+    fila.innerHTML = `
+      <span>${item.modelo} — x${item.cantidad}</span>
+      <button type="button" class="quitar" title="Quitar">✕</button>
+    `;
+    fila.querySelector(".quitar").addEventListener("click", () => {
+      materialesRetiradosAgregados.splice(idx, 1);
+      renderMaterialesRetiradosAgregados();
+    });
+    materialesRetiradosAgregadosList.appendChild(fila);
+  });
+}
+
+agregarMaterialRetiradoBtn.addEventListener("click", () => {
+  const modelo = matRetModeloSelect.value;
+  const cantidad = parseInt(matRetCantidadInput.value, 10) || 1;
+  if (!modelo) {
+    showToast("Elegí una categoría y un modelo antes de agregar.");
+    return;
+  }
+  materialesRetiradosAgregados.push({ modelo, cantidad });
+  renderMaterialesRetiradosAgregados();
+  matRetModeloSelect.value = "";
+  matRetCantidadInput.value = "";
+});
+
+function getMaterialesRetirados() {
+  const agregados = materialesRetiradosAgregados.map((item) => `${item.modelo} x${item.cantidad}`);
+  const otros = document.getElementById("f_materiales_retirados").value.trim();
+  return [...agregados, otros].filter(Boolean).join(", ");
+}
+
+// Arma la lista de movimientos de stock (uno por material, juntando
+// usados y retirados) para mandar al guardar el parte — buscando la
+// categoría de cada modelo en el catálogo, ya que el selector solo
+// guarda el nombre del modelo.
+function categoriaDeModelo(modelo) {
+  const cat = materialesCatalogo.find((c) => (c.modelos || []).includes(modelo));
+  return cat ? cat.categoria : "";
+}
+
+function armarMovimientosDeStock() {
+  const porModelo = {};
+  materialesAgregados.forEach((item) => {
+    if (!porModelo[item.modelo]) porModelo[item.modelo] = { modelo: item.modelo, categoria: categoriaDeModelo(item.modelo), cantidad_instalada: 0, cantidad_retirada: 0 };
+    porModelo[item.modelo].cantidad_instalada += item.cantidad;
+  });
+  materialesRetiradosAgregados.forEach((item) => {
+    if (!porModelo[item.modelo]) porModelo[item.modelo] = { modelo: item.modelo, categoria: categoriaDeModelo(item.modelo), cantidad_instalada: 0, cantidad_retirada: 0 };
+    porModelo[item.modelo].cantidad_retirada += item.cantidad;
+  });
+  return Object.values(porModelo);
 }
 
 function getSimInstaladaTexto() {
@@ -2135,7 +2234,7 @@ function getFormData() {
     tarea: document.getElementById("f_tarea").value.trim(),
     materiales: getMaterialesUtilizados(),
     sim_instalada_texto: getSimInstaladaTexto(),
-    materiales_retirados: document.getElementById("f_materiales_retirados").value.trim(),
+    materiales_retirados: getMaterialesRetirados(),
     importe: document.getElementById("f_importe").value.trim(),
     descuento: getDescuentoLabel(),
     costo_final: document.getElementById("f_costo_final").value.trim(),
@@ -2193,6 +2292,12 @@ function resetForm() {
   matModeloSelect.innerHTML = '<option value="" disabled selected>Elegí primero una categoría</option>';
   matModeloSelect.disabled = true;
   matCantidadInput.value = "";
+  materialesRetiradosAgregados = [];
+  renderMaterialesRetiradosAgregados();
+  matRetCategoriaSelect.value = "";
+  matRetModeloSelect.innerHTML = '<option value="" disabled selected>Elegí primero una categoría</option>';
+  matRetModeloSelect.disabled = true;
+  matRetCantidadInput.value = "";
   currentNumeroServicio = "";
   fotoBase64 = null;
   fotoMimeType = null;
@@ -2507,6 +2612,29 @@ async function intentarEnviarParte(payload, interactivo) {
         const histData = await histRes.json().catch(() => ({}));
         console.error("Error registrando historial:", histData);
         if (interactivo) showToast("El mail se envió, pero no se pudo registrar en el dashboard.");
+      } else {
+        // Movimientos de stock (materiales instalados/retirados) —
+        // no bloquea nada si falla, el parte ya quedó guardado.
+        try {
+          const movimientos = armarMovimientosDeStock().map((m) => ({
+            ...m,
+            numero_servicio: data.numero_servicio || "",
+            cliente: data.cliente,
+            direccion: data.direccion,
+            fecha: data.fecha,
+            hora: data.hora_entrada,
+            tecnico: data.tecnico,
+          }));
+          if (movimientos.length > 0) {
+            await fetch("/api/historial", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+              body: JSON.stringify({ accion: "guardar_stock", parte_id: idParte, movimientos }),
+            });
+          }
+        } catch (errStock) {
+          console.error("Error registrando movimientos de stock:", errStock);
+        }
       }
     } catch (err) {
       console.error("Error registrando historial:", err);
@@ -3602,6 +3730,121 @@ function renderHistorialReciente() {
       });
     }
     historialList.appendChild(card);
+  });
+}
+
+// ---------- Historial de Stock (materiales instalados/retirados) ----------
+let stockCache = [];
+let stockPeriodoActivo = "semana";
+
+verStockBtn.addEventListener("click", () => {
+  showScreen("stock");
+  fetchStock();
+});
+volverDeStockBtn.addEventListener("click", () => showScreen("dashboardsMenu"));
+refreshStockBtn.addEventListener("click", fetchStock);
+
+document.querySelectorAll(".stock-periodo-chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    document.querySelectorAll(".stock-periodo-chip").forEach((c) => c.classList.remove("active"));
+    chip.classList.add("active");
+    stockPeriodoActivo = chip.dataset.periodo;
+    stockFechaEspecificaWrap.classList.toggle("hidden", stockPeriodoActivo !== "fecha");
+    if (stockPeriodoActivo === "fecha" && !stockFechaEspecifica.value) {
+      stockFechaEspecifica.value = new Date().toISOString().slice(0, 10);
+    }
+    renderStock();
+  });
+});
+stockFechaEspecifica.addEventListener("change", renderStock);
+
+async function fetchStock() {
+  stockStatus.textContent = "Cargando...";
+  stockList.innerHTML = "";
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/historial?tipo=stock", { headers, cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    stockCache = Array.isArray(data) ? data : [];
+    stockSyncLabel.textContent = formatSyncTime(new Date());
+    renderStock();
+  } catch (err) {
+    stockStatus.textContent = "No se pudo cargar el historial de stock.";
+  }
+}
+
+async function marcarStockPasadoSistema(m, marcarComo) {
+  const ok = confirm(
+    marcarComo
+      ? `¿Confirmás que este movimiento (${m.modelo}, ${m.cliente}) ya está pasado a tu sistema?`
+      : `¿Desmarcar este movimiento (${m.modelo}, ${m.cliente})?`
+  );
+  if (!ok) return;
+  try {
+    const res = await fetch("/api/historial", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({ accion: "marcar_pasado_sistema_stock", id: m.id, pasado: marcarComo, tecnico: tecnicoLogueado || "" }),
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    m.pasado_sistema_offline = marcarComo ? 1 : 0;
+    m.pasado_sistema_por = marcarComo ? tecnicoLogueado || "" : "";
+    renderStock();
+  } catch (err) {
+    showToast("No se pudo actualizar: " + err.message);
+  }
+}
+
+function renderStock() {
+  const puedeMarcarPasado = permisosDelTecnico(tecnicoLogueado).marcar_pasado_sistema;
+  const rango = obtenerRangoPeriodo(stockPeriodoActivo, stockFechaEspecifica);
+  const filtrados = stockCache
+    .filter((m) => fechaEnRango(m.fecha, rango))
+    .sort((a, b) => {
+      const claveA = `${a.fecha || ""} ${a.hora || ""}`;
+      const claveB = `${b.fecha || ""} ${b.hora || ""}`;
+      return claveB.localeCompare(claveA);
+    });
+
+  stockList.innerHTML = "";
+  if (filtrados.length === 0) {
+    stockStatus.textContent = "No hay movimientos de stock en ese período.";
+    return;
+  }
+  stockStatus.textContent = `${filtrados.length} movimiento(s).`;
+  filtrados.forEach((m) => {
+    let fechaTexto = m.fecha || "";
+    if (m.fecha) {
+      const [y, mm, d] = m.fecha.split("-");
+      fechaTexto = `${d}/${mm}/${y}`;
+    }
+    const partes = [];
+    if (m.cantidad_instalada > 0) partes.push(`Instaló x${m.cantidad_instalada}`);
+    if (m.cantidad_retirada > 0) partes.push(`Retiró x${m.cantidad_retirada}`);
+
+    const card = document.createElement("div");
+    card.className = "historial-card" + (m.pasado_sistema_offline ? " historial-card-pasado" : "");
+    card.innerHTML = `
+      <div class="historial-card-num">${escapeHtml(m.modelo)}${m.categoria ? " · " + escapeHtml(m.categoria) : ""}</div>
+      <div class="historial-card-cliente">${escapeHtml(m.cliente)} — ${escapeHtml(m.tecnico)}</div>
+      <div class="historial-card-direccion">${escapeHtml(m.direccion || "")}</div>
+      <div class="historial-card-horario">${fechaTexto} — ${partes.join(" / ")}</div>
+      ${puedeMarcarPasado ? `
+        <label class="historial-card-check">
+          <input type="checkbox" ${m.pasado_sistema_offline ? "checked" : ""}>
+          ${m.pasado_sistema_offline ? `Pasado a sistema (${escapeHtml(m.pasado_sistema_por || "")})` : "Pasado a mi sistema"}
+        </label>
+      ` : ""}
+    `;
+    if (puedeMarcarPasado) {
+      const checkbox = card.querySelector("input[type=checkbox]");
+      checkbox.addEventListener("click", (e) => {
+        e.preventDefault();
+        marcarStockPasadoSistema(m, !m.pasado_sistema_offline);
+      });
+    }
+    stockList.appendChild(card);
   });
 }
 

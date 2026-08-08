@@ -94,6 +94,17 @@ module.exports = async (req, res) => {
   if (req.method === "GET") {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     try {
+      // ?tipo=stock trae el historial de stock en vez del de partes
+      // (mismo archivo, para no gastar otro de los 12 slots de Vercel).
+      if (req.query && req.query.tipo === "stock") {
+        const r = await fetch(`${BACKEND_NUEVO_URL}/api/stock`, { headers: headersBackendNuevo });
+        if (!r.ok) {
+          res.status(502).json({ error: "No se pudo leer el historial de stock" });
+          return;
+        }
+        res.status(200).json(await r.json());
+        return;
+      }
       const r = await fetch(`${BACKEND_NUEVO_URL}/api/partes`, { headers: headersBackendNuevo });
       if (!r.ok) {
         res.status(502).json({ error: "No se pudo leer el historial" });
@@ -128,6 +139,40 @@ module.exports = async (req, res) => {
           method: "POST",
           headers: { ...headersBackendNuevo, "Content-Type": "application/json" },
           body: JSON.stringify({ pasado: !!body.pasado, tecnico: body.tecnico || "" }),
+        });
+        const data = await r.json();
+        res.status(r.status).json(data);
+        return;
+      }
+
+      // Igual, pero para el historial de stock.
+      if (body.accion === "marcar_pasado_sistema_stock") {
+        if (!body.id) {
+          res.status(400).json({ error: "Falta el id del movimiento" });
+          return;
+        }
+        const r = await fetch(`${BACKEND_NUEVO_URL}/api/stock/${encodeURIComponent(body.id)}/marcar-pasado-sistema`, {
+          method: "POST",
+          headers: { ...headersBackendNuevo, "Content-Type": "application/json" },
+          body: JSON.stringify({ pasado: !!body.pasado, tecnico: body.tecnico || "" }),
+        });
+        const data = await r.json();
+        res.status(r.status).json(data);
+        return;
+      }
+
+      // Guarda los movimientos de stock de un parte (uno por
+      // material que tuvo movimiento) — se manda junto con el parte,
+      // desde la misma pantalla de completar servicio.
+      if (body.accion === "guardar_stock") {
+        if (!body.parte_id || !Array.isArray(body.movimientos)) {
+          res.status(400).json({ error: "Falta parte_id o la lista de movimientos" });
+          return;
+        }
+        const r = await fetch(`${BACKEND_NUEVO_URL}/api/stock`, {
+          method: "POST",
+          headers: { ...headersBackendNuevo, "Content-Type": "application/json" },
+          body: JSON.stringify({ parte_id: body.parte_id, movimientos: body.movimientos }),
         });
         const data = await r.json();
         res.status(r.status).json(data);

@@ -304,6 +304,27 @@ Clientes (antes solo mostraba servicios pendientes, con "escribir a mano" como �
 alternativa); si lo que se escribe coincide con un cliente real, se usa el nombre exacto
 como está guardado en la base, en vez de lo que se haya tipeado.
 
+## Historial de Stock — materiales instalados/retirados, con cantidades (v3.47.0)
+
+Nueva pantalla ("Historial de stock", con permiso propio), que se completa sola a
+partir de lo que el técnico ya carga al terminar un parte — sin pantallas nuevas para
+cargar a mano. Cada movimiento queda registrado con cliente, dirección, fecha, hora,
+técnico, material, y cuánto se instaló / cuánto se retiró (puede ser una fila con las
+dos cantidades a la vez, por ejemplo un reemplazo).
+
+Antes, "materiales retirados" era solo un campo de texto libre — le agregué el mismo
+selector estructurado (categoría/modelo/cantidad) que ya tenía "materiales utilizados",
+para que las cantidades queden confiables y no dependan de cómo cada uno lo escriba a
+mano.
+
+Mismo sistema de "pasado a mi sistema" que ya armamos para el historial de partes
+(mismo permiso, misma confirmación antes de marcar, mismo fondo verde) — así se puede
+chequear de un vistazo qué movimientos de stock ya se cargaron en el sistema offline de
+la oficina.
+
+Backend nuevo: tabla `stock_movimientos` (una fila por material que tuvo movimiento en
+un parte), con protección contra duplicados si el mismo parte se reintenta guardar.
+
 ## Historial extendido, con tilde de "pasado a mi sistema" (v3.46.0)
 
 La pantalla de Historial ya no está limitada a los últimos 4 días — ahora tiene los

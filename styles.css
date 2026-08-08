@@ -254,6 +254,7 @@ html, body {
 .tile-dash-financiero .panel-tile-icon-badge { background: var(--acc-gold); }
 .tile-dash-vehiculos .panel-tile-icon-badge { background: var(--acc-green); }
 .tile-dash-herramientas .panel-tile-icon-badge { background: var(--acc-brown); }
+.tile-dash-stock .panel-tile-icon-badge { background: var(--acc-gold); }
 .tile-dash-sims .panel-tile-icon-badge { background: var(--acc-blue); }
 .tile-vehiculo-libre .panel-tile-icon-badge { background: var(--ok, #3FAE6E); }
 .tile-vehiculo-en-uso .panel-tile-icon-badge { background: var(--acc-coral); }

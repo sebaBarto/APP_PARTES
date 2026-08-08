@@ -210,6 +210,12 @@
           </span>
           <span class="panel-tile-label">Dashboard de herramientas</span>
         </button>
+        <button type="button" class="panel-tile panel-tile-grid tile-dash-stock" id="verStockBtn">
+          <span class="panel-tile-icon-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8L12 3 3 8l9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>
+          </span>
+          <span class="panel-tile-label">Historial de stock</span>
+        </button>
         <button type="button" class="panel-tile panel-tile-grid tile-dash-sims" id="verDashboardSimsBtn">
           <span class="panel-tile-icon-badge">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h6l4 4v12a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><rect x="9.5" y="10" width="5" height="5.5" rx="1"/></svg>
@@ -473,6 +479,39 @@
 
     <div class="action-bar">
       <button class="btn btn-secondary" id="volverDeDashboardHerramientasBtn" type="button">Volver</button>
+    </div>
+  </section>
+
+  <!-- HISTORIAL DE STOCK -->
+  <section class="screen" id="screen-stock">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">HISTORIAL DE STOCK</p>
+      <p class="subtitle-consultas">Materiales instalados y retirados en cada servicio.</p>
+
+      <div class="list-toolbar">
+        <button class="btn btn-ghost btn-small" id="refreshStockBtn" type="button">↻ Actualizar</button>
+        <span class="list-sync-label" id="stockSyncLabel"></span>
+      </div>
+
+      <div class="dash-periodo-tabs">
+        <button type="button" class="stock-periodo-chip active" data-periodo="semana">Semana</button>
+        <button type="button" class="stock-periodo-chip" data-periodo="mes">Mes</button>
+        <button type="button" class="stock-periodo-chip" data-periodo="todo">Todo</button>
+        <button type="button" class="stock-periodo-chip" data-periodo="fecha">Fecha</button>
+      </div>
+
+      <div class="field-group hidden" id="stockFechaEspecificaWrap">
+        <label class="field-label" for="stockFechaEspecifica">Elegí el día</label>
+        <input class="field-input" type="date" id="stockFechaEspecifica">
+      </div>
+
+      <p class="list-status" id="stockStatus"></p>
+
+      <div id="stockList" class="historial-list"></div>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDeStockBtn" type="button">Volver</button>
     </div>
   </section>
 
@@ -1217,7 +1256,29 @@
 
       <div class="field-group">
         <label class="field-label" for="f_materiales_retirados">Materiales retirados</label>
-        <textarea class="field-input field-textarea" id="f_materiales_retirados" placeholder="Materiales retirados del sitio"></textarea>
+
+        <div class="field-row">
+          <div class="field-group grow">
+            <select class="field-input" id="matRetCategoriaSelect">
+              <option value="" disabled selected>Categoría</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field-group grow">
+            <select class="field-input" id="matRetModeloSelect" disabled>
+              <option value="" disabled selected>Elegí primero una categoría</option>
+            </select>
+          </div>
+          <div class="field-group" style="max-width:90px;">
+            <input class="field-input field-mono" id="matRetCantidadInput" type="number" min="1" step="1" placeholder="Cant.">
+          </div>
+        </div>
+        <button type="button" class="btn btn-ghost btn-small" id="agregarMaterialRetiradoBtn" style="margin-bottom:10px;">+ Agregar</button>
+
+        <div id="materialesRetiradosAgregadosList" class="materiales-agregados-list"></div>
+
+        <textarea class="field-input field-textarea" id="f_materiales_retirados" placeholder="Otros materiales retirados que no estén en las categorías" style="margin-top:8px;"></textarea>
       </div>
 
       <div class="field-group">
