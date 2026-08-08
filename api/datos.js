@@ -131,6 +131,12 @@ async function manejarColeccionCortada(nombreColeccion, metodo, body, backendUrl
       // nuevo (para no mandar el mail dos veces la misma semana) —
       // la app no lo necesita, se lo saca antes de devolverlo.
       if (data && typeof data === "object") delete data.ultima_semana_notificada;
+      // "secuencia" se guarda como texto (JSON) en la base nueva —
+      // hay que convertirlo de vuelta a lista antes de devolverlo,
+      // si no la app recibe un texto plano en vez de un array.
+      if (data && typeof data.secuencia === "string") {
+        try { data.secuencia = JSON.parse(data.secuencia); } catch (err) { data.secuencia = []; }
+      }
       return { status: r.status, data };
     }
     if (metodo === "POST") {

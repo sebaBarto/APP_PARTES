@@ -267,6 +267,14 @@ junto con la SIM. De paso revisé el flujo de "reemplazar" (cambiar el chip fís
 cliente que ya tenía línea instalada) — ese ya heredaba bien el número de abonado de la
 SIM vieja, no necesitaba cambios.
 
+## Corrige "secuencia" de Guardias llegando como texto en vez de lista (v3.38.1)
+
+Encontrado apenas se probó el corte de Guardias en vivo: ese campo se guarda como texto
+(JSON) en la base nueva, y me olvidé de convertirlo de vuelta a lista antes de
+devolvérselo a la app — por eso no se veía ni el técnico de guardia actual ni los
+siguientes, y admin.html decía que no se pudo cargar la secuencia. Ya corregido y
+probado con el mismo formato exacto que devuelve la base real.
+
 ## Corte real — Materiales, Credenciales, Categorías de consultas, Config, Guardias (v3.38.0)
 
 Segundo grupo cortado hacia el backend nuevo, mismo patrón que Clientes (la app no
