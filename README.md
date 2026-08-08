@@ -267,6 +267,16 @@ junto con la SIM. De paso revisé el flujo de "reemplazar" (cambiar el chip fís
 cliente que ya tenía línea instalada) — ese ya heredaba bien el número de abonado de la
 SIM vieja, no necesitaba cambios.
 
+## Corrige estado de Herramientas y Vehículos desactualizado (v3.41.1)
+
+Encontrado apenas se probó tomar una herramienta en vivo: corté las *acciones* de
+vehículos/herramientas (tomar/devolver/etc.) hacia el backend nuevo, pero me olvidé de
+cortar también la lectura de su "foto" actual (libre/tomada, quién la tiene) — esa
+seguía viniendo del archivo viejo de GitHub, que ya no se actualiza porque las acciones
+ahora escriben en la base nueva. Por eso una herramienta recién tomada seguía
+mostrándose en verde. Ya está corregido — probé el flujo completo (estado antes, tomar,
+estado después) y confirma que se actualiza bien.
+
 ## Buscar por fecha puntual en el Dashboard de Vehículos (v3.41.0)
 
 Nueva quinta opción de período ("Fecha"), además de Día/Semana/Mes/Todo — al elegirla,

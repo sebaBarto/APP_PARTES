@@ -200,6 +200,30 @@ async function manejarColeccionCortada(nombreColeccion, metodo, body, backendUrl
     }
   }
 
+  if (nombreColeccion === "vehiculos") {
+    if (metodo === "GET") {
+      const r = await fetch(`${backendUrl}/api/vehiculos`, { headers });
+      return { status: r.status, data: await r.json() };
+    }
+    if (metodo === "POST") {
+      const r = await fetch(`${backendUrl}/api/vehiculos`, { method: "POST", headers, body: JSON.stringify(body) });
+      const data = await r.json();
+      return { status: r.status, data: { ok: data.ok, count: data.count } };
+    }
+  }
+
+  if (nombreColeccion === "herramientas") {
+    if (metodo === "GET") {
+      const r = await fetch(`${backendUrl}/api/herramientas`, { headers });
+      return { status: r.status, data: await r.json() };
+    }
+    if (metodo === "POST") {
+      const r = await fetch(`${backendUrl}/api/herramientas`, { method: "POST", headers, body: JSON.stringify(body) });
+      const data = await r.json();
+      return { status: r.status, data: { ok: data.ok, count: data.count } };
+    }
+  }
+
   return { status: 405, data: { error: "Método no permitido" } };
 }
 
@@ -259,7 +283,7 @@ module.exports = async (req, res) => {
   // El resto sigue en GitHub por ahora; se van cortando de a una,
   // probando cada una antes de seguir con la próxima. La app en el
   // celular no cambia en nada — sigue pidiendo lo mismo de siempre.
-  const COLECCIONES_YA_CORTADAS = ["clientes", "materiales", "credenciales", "consultas-categorias", "config", "guardias", "push-subscripciones", "servicios_emergencia"];
+  const COLECCIONES_YA_CORTADAS = ["clientes", "materiales", "credenciales", "consultas-categorias", "config", "guardias", "push-subscripciones", "servicios_emergencia", "vehiculos", "herramientas"];
   if (COLECCIONES_YA_CORTADAS.includes(nombreColeccion)) {
     const { BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN } = process.env;
     if (!BACKEND_NUEVO_URL || !BACKEND_NUEVO_TOKEN) {
