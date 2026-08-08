@@ -267,6 +267,33 @@ junto con la SIM. De paso revisé el flujo de "reemplazar" (cambiar el chip fís
 cliente que ya tenía línea instalada) — ese ya heredaba bien el número de abonado de la
 SIM vieja, no necesitaba cambios.
 
+## Corte real — Materiales, Credenciales, Categorías de consultas, Config, Guardias (v3.38.0)
+
+Segundo grupo cortado hacia el backend nuevo, mismo patrón que Clientes (la app no
+cambia en nada). Dos de estas necesitaron traducir la forma de los datos, porque en el
+backend nuevo quedaron guardadas distinto:
+
+- **Materiales**: en GitHub vive agrupado por categoría (`{categoria, modelos: [...]}`),
+  en el backend nuevo es una fila por material — se arma/desarma automáticamente en cada
+  sentido, sin que `admin.html` note la diferencia.
+- **Categorías de consultas**: los nombres de campo cambian (`categoria`/`carpeta_drive_id`
+  del lado viejo, `nombre`/`manual_ref` del lado nuevo) — se traducen también en los dos
+  sentidos.
+- Credenciales, Config y Guardias tienen la misma forma en los dos lados, así que es un
+  reenvío directo. En Guardias se le saca al vuelo el campo interno
+  `ultima_semana_notificada` (para evitar mandar el aviso dos veces la misma semana) antes
+  de devolverlo — la app nunca lo necesitó.
+
+**Importante de acá en más**: como "config" ya vive en el backend nuevo, cambiar el
+número de versión en `app.js` **ya no alcanza por sí solo** — ahora hay que actualizarlo
+también ahí. Después de cada despliegue con una versión nueva, correr:
+```powershell
+Invoke-RestMethod -Uri "https://sat-backend.gsigalovsky.workers.dev/api/config" -Method Post -Headers @{Authorization="Bearer 54455ad29a4eb28e48ca915e3510ff95ceb682523fa74b32"; "Content-Type"="application/json"} -Body '{"dias_atencion":3,"dias_urgente":7,"app_version_actual":"3.38.0","felicitacion_semanal_activa":true}'
+```
+
+Probado con todo simulado: los seis casos (agrupar/desagrupar materiales, traducir
+categorías en los dos sentidos, y los tres reenvíos directos) funcionan bien.
+
 ## Corte real — Clientes (v3.37.0)
 
 Primer paso del corte hacia el backend nuevo (Cloudflare + D1), empezando por Clientes

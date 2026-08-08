@@ -12,7 +12,7 @@
 const COLECCIONES = {
   config: {
     path: "config.json",
-    default: { dias_atencion: 3, dias_urgente: 7, app_version_actual: "3.37.0", felicitacion_semanal_activa: true },
+    default: { dias_atencion: 3, dias_urgente: 7, app_version_actual: "3.38.0", felicitacion_semanal_activa: true },
     mergeConDefault: true,
   },
   tecnicos: { path: "tecnicos.json", default: [] },
@@ -35,6 +35,112 @@ const COLECCIONES = {
   herramientas: { path: "herramientas-config.json", default: [] },
   sims_instaladas: { path: "sims-instaladas.json", default: [] },
 };
+
+// Traduce cada colección que ya se cortó al backend nuevo — algunas
+// tienen exactamente la misma forma de datos en los dos lados (esas
+// son un simple reenvío), y otras dos (materiales y categorías de
+// consultas) tienen una forma distinta, así que hay que armar/
+// desarmar la estructura de un lado al otro.
+async function manejarColeccionCortada(nombreColeccion, metodo, body, backendUrl, headers) {
+  if (nombreColeccion === "clientes") {
+    if (metodo === "GET") {
+      const r = await fetch(`${backendUrl}/api/clientes`, { headers });
+      return { status: r.status, data: await r.json() };
+    }
+    if (metodo === "POST") {
+      // admin.html manda POST con lista vacía para "borrar todos"
+      // (así funcionaba con el sistema viejo) — se traduce a DELETE.
+      if (Array.isArray(body) && body.length === 0) {
+        const r = await fetch(`${backendUrl}/api/clientes`, { method: "DELETE", headers });
+        return { status: r.status, data: await r.json() };
+      }
+      const r = await fetch(`${backendUrl}/api/clientes`, { method: "POST", headers, body: JSON.stringify(body) });
+      return { status: r.status, data: await r.json() };
+    }
+  }
+
+  if (nombreColeccion === "materiales") {
+    // GitHub: [{categoria, modelos: [...]}]  <->  backend nuevo: [{id, categoria, nombre, precio}]
+    if (metodo === "GET") {
+      const r = await fetch(`${backendUrl}/api/materiales`, { headers });
+      const filas = await r.json();
+      const porCategoria = {};
+      (Array.isArray(filas) ? filas : []).forEach((f) => {
+        if (!porCategoria[f.categoria]) porCategoria[f.categoria] = [];
+        porCategoria[f.categoria].push(f.nombre);
+      });
+      const agrupado = Object.keys(porCategoria).map((categoria) => ({ categoria, modelos: porCategoria[categoria] }));
+      return { status: r.status, data: agrupado };
+    }
+    if (metodo === "POST") {
+      const filas = [];
+      (Array.isArray(body) ? body : []).forEach((cat) => {
+        (cat.modelos || []).forEach((modelo) => filas.push({ categoria: cat.categoria, nombre: modelo, precio: null }));
+      });
+      const r = await fetch(`${backendUrl}/api/materiales`, { method: "POST", headers, body: JSON.stringify(filas) });
+      const data = await r.json();
+      return { status: r.status, data: { ok: data.ok, count: data.count } };
+    }
+  }
+
+  if (nombreColeccion === "consultas-categorias") {
+    // GitHub: [{categoria, carpeta_drive_id}]  <->  backend nuevo: [{id, nombre, manual_ref}]
+    if (metodo === "GET") {
+      const r = await fetch(`${backendUrl}/api/consultas-categorias`, { headers });
+      const filas = await r.json();
+      const traducido = (Array.isArray(filas) ? filas : []).map((f) => ({ categoria: f.nombre, carpeta_drive_id: f.manual_ref }));
+      return { status: r.status, data: traducido };
+    }
+    if (metodo === "POST") {
+      const filas = (Array.isArray(body) ? body : []).map((c) => ({ nombre: c.categoria, manual_ref: c.carpeta_drive_id }));
+      const r = await fetch(`${backendUrl}/api/consultas-categorias`, { method: "POST", headers, body: JSON.stringify(filas) });
+      const data = await r.json();
+      return { status: r.status, data: { ok: data.ok, count: data.count } };
+    }
+  }
+
+  if (nombreColeccion === "credenciales") {
+    // Misma forma en los dos lados — reenvío directo.
+    if (metodo === "GET") {
+      const r = await fetch(`${backendUrl}/api/credenciales`, { headers });
+      return { status: r.status, data: await r.json() };
+    }
+    if (metodo === "POST") {
+      const r = await fetch(`${backendUrl}/api/credenciales`, { method: "POST", headers, body: JSON.stringify(body) });
+      const data = await r.json();
+      return { status: r.status, data: { ok: data.ok, count: data.count } };
+    }
+  }
+
+  if (nombreColeccion === "config") {
+    if (metodo === "GET") {
+      const r = await fetch(`${backendUrl}/api/config`, { headers });
+      return { status: r.status, data: await r.json() };
+    }
+    if (metodo === "POST") {
+      const r = await fetch(`${backendUrl}/api/config`, { method: "POST", headers, body: JSON.stringify(body) });
+      return { status: r.status, data: await r.json() };
+    }
+  }
+
+  if (nombreColeccion === "guardias") {
+    if (metodo === "GET") {
+      const r = await fetch(`${backendUrl}/api/guardias`, { headers });
+      const data = await r.json();
+      // ultima_semana_notificada es un dato interno del backend
+      // nuevo (para no mandar el mail dos veces la misma semana) —
+      // la app no lo necesita, se lo saca antes de devolverlo.
+      if (data && typeof data === "object") delete data.ultima_semana_notificada;
+      return { status: r.status, data };
+    }
+    if (metodo === "POST") {
+      const r = await fetch(`${backendUrl}/api/guardias`, { method: "POST", headers, body: JSON.stringify(body) });
+      return { status: r.status, data: await r.json() };
+    }
+  }
+
+  return { status: 405, data: { error: "Método no permitido" } };
+}
 
 module.exports = async (req, res) => {
   const authHeader = req.headers["authorization"] || "";
@@ -88,57 +194,34 @@ module.exports = async (req, res) => {
 
   const nombreColeccion = req.query.coleccion;
 
-  // --- CORTE EN CURSO: Clientes ya vive en el backend nuevo (Cloudflare) ---
-  // El resto de las colecciones sigue en GitHub por ahora; se van
-  // cortando de a una, probando cada una antes de seguir con la
-  // próxima. Acá no cambia nada de la app en el celular — sigue
-  // pidiendo lo mismo de siempre, solo que del lado del servidor
-  // ahora se reenvía al lugar nuevo.
-  if (nombreColeccion === "clientes") {
+  // --- CORTE EN CURSO: estas colecciones ya viven en el backend nuevo (Cloudflare) ---
+  // El resto sigue en GitHub por ahora; se van cortando de a una,
+  // probando cada una antes de seguir con la próxima. La app en el
+  // celular no cambia en nada — sigue pidiendo lo mismo de siempre.
+  const COLECCIONES_YA_CORTADAS = ["clientes", "materiales", "credenciales", "consultas-categorias", "config", "guardias"];
+  if (COLECCIONES_YA_CORTADAS.includes(nombreColeccion)) {
     const { BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN } = process.env;
     if (!BACKEND_NUEVO_URL || !BACKEND_NUEVO_TOKEN) {
       res.status(500).json({ error: "Faltan variables de entorno del backend nuevo por configurar en Vercel" });
       return;
     }
     const headersBackendNuevo = { Authorization: `Bearer ${BACKEND_NUEVO_TOKEN}`, "Content-Type": "application/json" };
+
     try {
-      if (req.method === "GET") {
-        res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
-        const r = await fetch(`${BACKEND_NUEVO_URL}/api/clientes`, { headers: headersBackendNuevo });
-        const data = await r.json();
-        res.status(r.status).json(data);
-        return;
-      }
+      let body = null;
       if (req.method === "POST") {
-        let body = req.body;
+        body = req.body;
         if (typeof body === "string") body = JSON.parse(body);
-        // admin.html manda POST con lista vacía para "borrar todos"
-        // (así funcionaba con el sistema viejo) — el backend nuevo
-        // tiene un DELETE aparte para eso, así que se traduce acá,
-        // sin que la app tenga que cambiar nada.
-        if (Array.isArray(body) && body.length === 0) {
-          const r = await fetch(`${BACKEND_NUEVO_URL}/api/clientes`, { method: "DELETE", headers: headersBackendNuevo });
-          const data = await r.json();
-          res.status(r.status).json(data);
-          return;
-        }
-        const r = await fetch(`${BACKEND_NUEVO_URL}/api/clientes`, {
-          method: "POST",
-          headers: headersBackendNuevo,
-          body: JSON.stringify(body),
-        });
-        const data = await r.json();
-        res.status(r.status).json(data);
-        return;
       }
-      res.setHeader("Allow", "GET, POST");
-      res.status(405).json({ error: "Método no permitido" });
+      const resultado = await manejarColeccionCortada(nombreColeccion, req.method, body, BACKEND_NUEVO_URL, headersBackendNuevo);
+      if (req.method === "GET") res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+      res.status(resultado.status).json(resultado.data);
     } catch (err) {
       res.status(500).json({ error: "Error interno al hablar con el backend nuevo", detalle: String(err.message || err) });
     }
     return;
   }
-  // --- fin del corte de Clientes ---
+  // --- fin del corte ---
 
   const coleccion = COLECCIONES[nombreColeccion];
   if (!coleccion) {
