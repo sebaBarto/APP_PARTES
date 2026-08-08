@@ -267,6 +267,12 @@ junto con la SIM. De paso revisé el flujo de "reemplazar" (cambiar el chip fís
 cliente que ya tenía línea instalada) — ese ya heredaba bien el número de abonado de la
 SIM vieja, no necesitaba cambios.
 
+## Al tomar un vehículo, vuelve a la lista general (v3.40.2)
+
+Ajuste pedido tras probar el corte de Vehículos: al tomar uno, ahora vuelve a la
+pantalla con el estado de todos los vehículos (como se esperaba), en vez de quedarse en
+el detalle de ese vehículo puntual mostrando ya las opciones de devolver/evento.
+
 ## Corrige estado de vehículo mostrando "desde las NULL" (v3.40.1)
 
 Encontrado apenas se probó el corte de Vehículos en vivo: la función que busca "quién
