@@ -267,6 +267,15 @@ junto con la SIM. De paso revisé el flujo de "reemplazar" (cambiar el chip fís
 cliente que ya tenía línea instalada) — ese ya heredaba bien el número de abonado de la
 SIM vieja, no necesitaba cambios.
 
+## Buscar por fecha puntual en el Dashboard de Vehículos (v3.41.0)
+
+Nueva quinta opción de período ("Fecha"), además de Día/Semana/Mes/Todo — al elegirla,
+aparece un selector de calendario para elegir cualquier día puntual (no solo "hoy").
+Combinado con el filtro de vehículo que ya existía, permite ver de un vistazo quién usó
+un vehículo en concreto un día específico, con qué kilometraje, y qué eventos se
+cargaron ese día. Probado con un día con actividad (muestra los registros correctos) y
+uno sin nada (muestra la lista vacía, sin romper).
+
 ## Al tomar un vehículo, vuelve a la lista general (v3.40.2)
 
 Ajuste pedido tras probar el corte de Vehículos: al tomar uno, ahora vuelve a la

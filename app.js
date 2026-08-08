@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.40.2";
+const APP_VERSION = "3.41.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -408,6 +408,8 @@ const volverDeDashboardVehiculosBtn = document.getElementById("volverDeDashboard
 const refreshDashVehiculosBtn = document.getElementById("refreshDashVehiculosBtn");
 const dashVehiculosSyncLabel = document.getElementById("dashVehiculosSyncLabel");
 const dashVehiculosFiltro = document.getElementById("dashVehiculosFiltro");
+const dashVehFechaEspecificaWrap = document.getElementById("dashVehFechaEspecificaWrap");
+const dashVehFechaEspecifica = document.getElementById("dashVehFechaEspecifica");
 const dashVehGastoCombustibleNum = document.getElementById("dashVehGastoCombustibleNum");
 const dashVehGastoMantenimientoNum = document.getElementById("dashVehGastoMantenimientoNum");
 const descargarExcelVehiculosBtn = document.getElementById("descargarExcelVehiculosBtn");
@@ -2691,6 +2693,15 @@ function obtenerRangoPeriodo(periodo) {
   if (periodo === "dia") {
     return { desde: hoy, hasta: hoy };
   }
+  if (periodo === "fecha") {
+    // Fecha puntual elegida a mano — si todavía no eligió ninguna,
+    // se muestra hoy por defecto (para no dejar la lista vacía).
+    const valor = dashVehFechaEspecifica.value;
+    if (!valor) return { desde: hoy, hasta: hoy };
+    const [y, m, d] = valor.split("-").map(Number);
+    const elegida = new Date(y, m - 1, d);
+    return { desde: elegida, hasta: elegida };
+  }
   if (periodo === "semana") {
     const diaSemana = (hoy.getDay() + 6) % 7; // 0 = lunes
     const lunes = new Date(hoy);
@@ -3924,9 +3935,14 @@ document.querySelectorAll(".dash-veh-periodo-chip").forEach((chip) => {
     document.querySelectorAll(".dash-veh-periodo-chip").forEach((c) => c.classList.remove("active"));
     chip.classList.add("active");
     dashVehPeriodoActivo = chip.dataset.periodo;
+    dashVehFechaEspecificaWrap.classList.toggle("hidden", dashVehPeriodoActivo !== "fecha");
+    if (dashVehPeriodoActivo === "fecha" && !dashVehFechaEspecifica.value) {
+      dashVehFechaEspecifica.value = new Date().toISOString().slice(0, 10);
+    }
     renderDashVehiculos();
   });
 });
+dashVehFechaEspecifica.addEventListener("change", renderDashVehiculos);
 
 async function poblarFiltroVehiculosDashboard() {
   const actual = dashVehiculosFiltro.value;
