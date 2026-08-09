@@ -341,6 +341,14 @@ Nuevo en el backend: tres columnas (`pasado_sistema_offline`, `pasado_sistema_po
 `pasado_sistema_en`) y un endpoint para marcar/desmarcar, con quién y cuándo, no solo
 un tilde suelto.
 
+## Historial de Stock: agrega número de servicio y de cliente (v3.48.1)
+
+A pedido tras probar en vivo: cada tarjeta ahora muestra el número de servicio y el
+número de cliente (buscado en la base de Clientes por el nombre, igual que ya se hace
+en SIMs y Emergencias) — para que quien pasa los movimientos al sistema offline de la
+oficina no se confunda de cliente. De paso, la base de Clientes ahora se precarga apenas
+el técnico entra a la app, para que esté lista en cualquier pantalla que la necesite.
+
 ## Corte real — Login de Técnicos, con migración perezosa (v3.48.0)
 
 El último y más delicado de toda esta migración. Encontrado en el camino: las

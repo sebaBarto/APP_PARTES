@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.48.0";
+const APP_VERSION = "3.48.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -784,6 +784,7 @@ function entrarComoTecnico(nombreTecnico) {
   fetchServicios();
   precargarHistorialParaVisitas();
   precargarCronogramaParaSugerencias();
+  cargarClientesGeneral(); // precarga, para que esté lista al completar un parte (número de cliente en Stock, etc.)
   actualizarAccesoCredencial();
   actualizarAccesoExcelDashboards();
   actualizarAccesoSeccionesPanel();
@@ -2616,9 +2617,14 @@ async function intentarEnviarParte(payload, interactivo) {
         // Movimientos de stock (materiales instalados/retirados) —
         // no bloquea nada si falla, el parte ya quedó guardado.
         try {
+          // Se busca el número de cliente por nombre (igual que ya
+          // se hace en SIMs y Emergencias) — así quien pasa esto al
+          // sistema offline no se confunde de cliente.
+          const clienteEncontradoStock = buscarClientePorNombre(data.cliente);
           const movimientos = armarMovimientosDeStock().map((m) => ({
             ...m,
             numero_servicio: data.numero_servicio || "",
+            numero_cliente: clienteEncontradoStock ? clienteEncontradoStock.numero_cliente || "" : "",
             cliente: data.cliente,
             direccion: data.direccion,
             fecha: data.fecha,
@@ -3826,10 +3832,10 @@ function renderStock() {
     const card = document.createElement("div");
     card.className = "historial-card" + (m.pasado_sistema_offline ? " historial-card-pasado" : "");
     card.innerHTML = `
-      <div class="historial-card-num">${escapeHtml(m.modelo)}${m.categoria ? " · " + escapeHtml(m.categoria) : ""}</div>
-      <div class="historial-card-cliente">${escapeHtml(m.cliente)} — ${escapeHtml(m.tecnico)}</div>
-      <div class="historial-card-direccion">${escapeHtml(m.direccion || "")}</div>
-      <div class="historial-card-horario">${fechaTexto} — ${partes.join(" / ")}</div>
+      <div class="historial-card-num">N° ${escapeHtml(m.numero_servicio || "s/n")}${m.numero_cliente ? " · Cliente " + escapeHtml(m.numero_cliente) : ""}</div>
+      <div class="historial-card-cliente">${escapeHtml(m.modelo)}${m.categoria ? " · " + escapeHtml(m.categoria) : ""}</div>
+      <div class="historial-card-direccion">${escapeHtml(m.cliente)} — ${escapeHtml(m.direccion || "")}</div>
+      <div class="historial-card-horario">${escapeHtml(m.tecnico)} — ${fechaTexto} — ${partes.join(" / ")}</div>
       ${puedeMarcarPasado ? `
         <label class="historial-card-check">
           <input type="checkbox" ${m.pasado_sistema_offline ? "checked" : ""}>
