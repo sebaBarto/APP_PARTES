@@ -276,7 +276,40 @@ module.exports = async (req, res) => {
       return;
     }
     if (bodyAccion && bodyAccion.accion === "verificar_login") {
-      const { GITHUB_DATA_TOKEN, GITHUB_DATA_REPO } = process.env;
+      const { BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN, GITHUB_DATA_TOKEN, GITHUB_DATA_REPO } = process.env;
+      const nombre = bodyAccion.nombre;
+      const password = bodyAccion.password;
+
+      // 1) Primero se intenta contra el backend nuevo (hash real,
+      // PBKDF2) — es lo que va a pasar siempre después de la primera
+      // vez que cada técnico entre tras este cambio.
+      if (BACKEND_NUEVO_URL && BACKEND_NUEVO_TOKEN) {
+        try {
+          const rNuevo = await fetch(`${BACKEND_NUEVO_URL}/api/tecnicos/verificar`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${BACKEND_NUEVO_TOKEN}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ nombre, password }),
+          });
+          if (rNuevo.status === 200) {
+            const dataNuevo = await rNuevo.json();
+            if (dataNuevo.ok) {
+              res.status(200).json({ ok: true });
+              return;
+            }
+          }
+          // rNuevo.status === 401 (no coincide, o el técnico no
+          // existe ahí todavía) -> sigue de largo al paso 2, no se
+          // corta acá.
+        } catch (errNuevo) {
+          // si el backend nuevo no responde, no se bloquea el login
+          // — se sigue con el sistema viejo como respaldo.
+        }
+      }
+
+      // 2) Si no coincidió con el backend nuevo, se prueba contra el
+      // sistema viejo (texto plano) — cubre a cualquiera que haya
+      // cambiado su contraseña después de la migración original, o
+      // que sea nuevo y todavía no tenga hash guardado allá.
       if (!GITHUB_DATA_TOKEN || !GITHUB_DATA_REPO) {
         res.status(500).json({ error: "Faltan variables de entorno por configurar en Vercel" });
         return;
@@ -291,8 +324,21 @@ module.exports = async (req, res) => {
           const data = await r.json();
           tecnicos = JSON.parse(Buffer.from(data.content, "base64").toString("utf-8"));
         }
-        const encontrado = (Array.isArray(tecnicos) ? tecnicos : []).find((t) => t.nombre === bodyAccion.nombre);
-        const ok = !!encontrado && encontrado.password === bodyAccion.password;
+        const encontrado = (Array.isArray(tecnicos) ? tecnicos : []).find((t) => t.nombre === nombre);
+        const ok = !!encontrado && encontrado.password === password;
+
+        // 3) Si coincidió acá, de paso se guarda el hash correcto en
+        // el backend nuevo — así la próxima vez ya entra directo por
+        // el paso 1, sin pasar más por acá. Si esto falla, no importa
+        // — el login ya funcionó, se reintenta la próxima vez.
+        if (ok && BACKEND_NUEVO_URL && BACKEND_NUEVO_TOKEN) {
+          fetch(`${BACKEND_NUEVO_URL}/api/tecnicos`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${BACKEND_NUEVO_TOKEN}`, "Content-Type": "application/json" },
+            body: JSON.stringify([{ nombre, password, permisos: encontrado.permisos || {} }]),
+          }).catch(() => {});
+        }
+
         res.status(200).json({ ok });
       } catch (err) {
         res.status(500).json({ error: "Error interno al verificar" });

@@ -341,6 +341,32 @@ Nuevo en el backend: tres columnas (`pasado_sistema_offline`, `pasado_sistema_po
 `pasado_sistema_en`) y un endpoint para marcar/desmarcar, con quién y cuándo, no solo
 un tilde suelto.
 
+## Corte real — Login de Técnicos, con migración perezosa (v3.48.0)
+
+El último y más delicado de toda esta migración. Encontrado en el camino: las
+contraseñas de los técnicos se guardaban y comparaban en **texto plano** en el sistema
+viejo (no como hash) — un problema de seguridad real, aunque separado de la migración
+en sí (no se mandaban al celular, pero sí quedaban legibles en el archivo de datos).
+
+El login ahora prueba primero contra el backend nuevo (hash real, PBKDF2 con sal por
+usuario). Si no coincide (porque el técnico cambió su contraseña después de la
+migración original, o es alguien nuevo), prueba contra el sistema viejo como respaldo
+— y si ahí sí entra, aprovecha ese momento para guardar el hash correcto en el backend
+nuevo, sin que el técnico haga nada distinto ni note el cambio. La próxima vez que esa
+persona entre, ya pasa directo por el backend nuevo.
+
+Si el backend nuevo no responde por algún motivo, el login sigue funcionando igual (cae
+al sistema viejo) — no hay forma de que esto deje a alguien afuera.
+
+Probado de punta a punta: contraseña que coincide por el camino viejo activa el
+relleno correctamente; un segundo login con la misma contraseña ya entra directo por
+el nuevo; contraseña incorrecta se rechaza en los dos casos; y el sistema sigue andando
+aunque el backend nuevo esté caído.
+
+**Pendiente, como mejora aparte** (no bloquea nada de lo anterior): agregar huella
+digital / Face ID como método de acceso más rápido y seguro, con la contraseña como
+respaldo — evaluado y acordado, para sumar cuando haya tiempo.
+
 ## Corte real — Historial de partes (v3.45.0)
 
 La pieza más sensible hasta ahora: es donde queda registrado cada trabajo completado
