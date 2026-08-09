@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.51.0";
+const APP_VERSION = "3.52.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -140,6 +140,7 @@ const screens = {
   emergencia: document.getElementById("screen-emergencia"),
   herramientas: document.getElementById("screen-herramientas"),
   presencia: document.getElementById("screen-presencia"),
+  instalacion: document.getElementById("screen-instalacion"),
   herramientaDetalle: document.getElementById("screen-herramienta-detalle"),
   comodatoForm: document.getElementById("screen-comodato-form"),
   comodatoFirma: document.getElementById("screen-comodato-firma"),
@@ -256,6 +257,28 @@ const tileVehiculosBtn = document.getElementById("tileVehiculosBtn");
 const tileSimsBtn = document.getElementById("tileSimsBtn");
 const tileHerramientasBtn = document.getElementById("tileHerramientasBtn");
 const tilePresenciaBtn = document.getElementById("tilePresenciaBtn");
+const tileInstalacionBtn = document.getElementById("tileInstalacionBtn");
+const volverDeInstalacionBtn = document.getElementById("volverDeInstalacionBtn");
+const instalacionClienteInput = document.getElementById("instalacionClienteInput");
+const instalacionClienteEncontradoInfo = document.getElementById("instalacionClienteEncontradoInfo");
+const instalacionDireccionInput = document.getElementById("instalacionDireccionInput");
+const instalacionIniciarBtn = document.getElementById("instalacionIniciarBtn");
+const instalacionClienteCard = document.getElementById("instalacionClienteCard");
+const instalacionDetalleWrap = document.getElementById("instalacionDetalleWrap");
+const instalacionActivaTexto = document.getElementById("instalacionActivaTexto");
+const instZonaNumeroInput = document.getElementById("instZonaNumeroInput");
+const instZonaDescripcionInput = document.getElementById("instZonaDescripcionInput");
+const agregarZonaBtn = document.getElementById("agregarZonaBtn");
+const instZonasList = document.getElementById("instZonasList");
+const guardarZonasBtn = document.getElementById("guardarZonasBtn");
+const instCanalNumeroInput = document.getElementById("instCanalNumeroInput");
+const instCanalDescripcionInput = document.getElementById("instCanalDescripcionInput");
+const agregarCanalBtn = document.getElementById("agregarCanalBtn");
+const instCanalesList = document.getElementById("instCanalesList");
+const guardarCanalesBtn = document.getElementById("guardarCanalesBtn");
+const instFotoInput = document.getElementById("instFotoInput");
+const instFotosStatus = document.getElementById("instFotosStatus");
+const instFotosGrid = document.getElementById("instFotosGrid");
 const volverDePresenciaBtn = document.getElementById("volverDePresenciaBtn");
 const presenciaEstadoTexto = document.getElementById("presenciaEstadoTexto");
 const presenciaLlegadaWrap = document.getElementById("presenciaLlegadaWrap");
@@ -4005,6 +4028,20 @@ async function actualizarEstadoPresencia() {
   }
 }
 
+// Devuelve {lat, lng, precision} o null si no hay permiso/no se
+// puede — nunca bloquea el marcado de llegada/salida por esto, es
+// un dato adicional, no un requisito.
+function obtenerUbicacionActual() {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) { resolve(null); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, precision: pos.coords.accuracy }),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+    );
+  });
+}
+
 presenciaMarcarLlegadaBtn.addEventListener("click", async () => {
   const textoEscrito = presenciaClienteInput.value.trim();
   if (!textoEscrito) {
@@ -4013,7 +4050,10 @@ presenciaMarcarLlegadaBtn.addEventListener("click", async () => {
   }
   const cliente = presenciaClienteEncontrado ? presenciaClienteEncontrado.nombre : textoEscrito;
   presenciaMarcarLlegadaBtn.disabled = true;
+  presenciaMarcarLlegadaBtn.textContent = "Ubicando...";
   try {
+    const ubicacion = await obtenerUbicacionActual();
+    presenciaMarcarLlegadaBtn.textContent = "📍 Marcar llegada";
     const ahora = new Date();
     const res = await fetch("/api/recurso-uso", {
       method: "POST",
@@ -4024,23 +4064,28 @@ presenciaMarcarLlegadaBtn.addEventListener("click", async () => {
         numero_cliente: presenciaClienteEncontrado ? presenciaClienteEncontrado.numero_cliente || "" : "",
         fecha: ahora.toISOString().slice(0, 10),
         hora: ahora.toTimeString().slice(0, 5),
+        lat: ubicacion?.lat, lng: ubicacion?.lng, precision: ubicacion?.precision,
       }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error desconocido");
-    showToast(`Llegada marcada en ${cliente}.`);
+    showToast(ubicacion ? `Llegada marcada en ${cliente}, con ubicación.` : `Llegada marcada en ${cliente} (sin ubicación — revisá el permiso de GPS).`);
     actualizarEstadoPresencia();
     fetchHistorialPresencia();
   } catch (err) {
     showToast("No se pudo marcar: " + err.message);
   } finally {
     presenciaMarcarLlegadaBtn.disabled = false;
+    presenciaMarcarLlegadaBtn.textContent = "📍 Marcar llegada";
   }
 });
 
 presenciaMarcarSalidaBtn.addEventListener("click", async () => {
   presenciaMarcarSalidaBtn.disabled = true;
+  presenciaMarcarSalidaBtn.textContent = "Ubicando...";
   try {
+    const ubicacion = await obtenerUbicacionActual();
+    presenciaMarcarSalidaBtn.textContent = "📍 Marcar salida";
     const ahora = new Date();
     const res = await fetch("/api/recurso-uso", {
       method: "POST",
@@ -4048,6 +4093,7 @@ presenciaMarcarSalidaBtn.addEventListener("click", async () => {
       body: JSON.stringify({
         recurso: "presencia", accion: "salida", tecnico: tecnicoLogueado,
         fecha: ahora.toISOString().slice(0, 10), hora: ahora.toTimeString().slice(0, 5),
+        lat: ubicacion?.lat, lng: ubicacion?.lng, precision: ubicacion?.precision,
       }),
     });
     const data = await res.json();
@@ -4059,6 +4105,7 @@ presenciaMarcarSalidaBtn.addEventListener("click", async () => {
     showToast("No se pudo marcar: " + err.message);
   } finally {
     presenciaMarcarSalidaBtn.disabled = false;
+    presenciaMarcarSalidaBtn.textContent = "📍 Marcar salida";
   }
 });
 
@@ -4125,6 +4172,231 @@ function renderHistorialPresencia() {
     presenciaHistorialList.appendChild(card);
   });
 }
+
+// ---------- Instalación (zonas, canales, fotos) ----------
+let instalacionClienteEncontrado = null;
+let instalacionActivaId = null;
+let instZonasAgregadas = [];
+let instCanalesAgregadas = [];
+
+tileInstalacionBtn.addEventListener("click", () => {
+  showScreen("instalacion");
+  resetearPantallaInstalacion();
+  poblarDatalistClientesInstalacion();
+});
+volverDeInstalacionBtn.addEventListener("click", () => showScreen("home"));
+
+function resetearPantallaInstalacion() {
+  instalacionActivaId = null;
+  instZonasAgregadas = [];
+  instCanalesAgregadas = [];
+  instalacionClienteInput.value = "";
+  instalacionDireccionInput.value = "";
+  instalacionClienteEncontradoInfo.textContent = "";
+  instalacionClienteCard.classList.remove("hidden");
+  instalacionDetalleWrap.classList.add("hidden");
+  renderInstZonas();
+  renderInstCanales();
+  instFotosGrid.innerHTML = "";
+  instFotosStatus.textContent = "";
+}
+
+function poblarDatalistClientesInstalacion() {
+  const datalist = document.getElementById("instalacionClientesLista");
+  datalist.innerHTML = (clientesGeneralCache || [])
+    .filter((c) => c.nombre)
+    .map((c) => `<option value="${c.nombre.replace(/"/g, "&quot;")}"></option>`)
+    .join("");
+}
+
+instalacionClienteInput.addEventListener("input", () => {
+  instalacionClienteEncontrado = buscarClientePorNombre(instalacionClienteInput.value.trim());
+  if (instalacionClienteEncontrado) {
+    instalacionDireccionInput.value = instalacionClienteEncontrado.direccion || "";
+    instalacionClienteEncontradoInfo.textContent = "✓ Cliente encontrado en la base.";
+    instalacionClienteEncontradoInfo.className = "hint-text hint-ok";
+  } else {
+    instalacionDireccionInput.value = "";
+    instalacionClienteEncontradoInfo.textContent = instalacionClienteInput.value.trim() ? "Cliente nuevo — no está en la base, se guarda tal cual se escribió." : "";
+    instalacionClienteEncontradoInfo.className = "hint-text";
+  }
+});
+
+instalacionIniciarBtn.addEventListener("click", async () => {
+  const textoEscrito = instalacionClienteInput.value.trim();
+  if (!textoEscrito) {
+    showToast("Escribí el cliente antes de iniciar.");
+    return;
+  }
+  const cliente = instalacionClienteEncontrado ? instalacionClienteEncontrado.nombre : textoEscrito;
+  instalacionIniciarBtn.disabled = true;
+  try {
+    const ahora = new Date();
+    const res = await fetch("/api/historial", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({
+        accion: "crear_instalacion", tecnico: tecnicoLogueado, cliente,
+        direccion: instalacionDireccionInput.value.trim(),
+        numero_cliente: instalacionClienteEncontrado ? instalacionClienteEncontrado.numero_cliente || "" : "",
+        fecha: ahora.toISOString().slice(0, 10), hora: ahora.toTimeString().slice(0, 5),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || "Error desconocido");
+    instalacionActivaId = data.id;
+    instalacionActivaTexto.textContent = `Instalación en curso: ${cliente}`;
+    instalacionClienteCard.classList.add("hidden");
+    instalacionDetalleWrap.classList.remove("hidden");
+  } catch (err) {
+    showToast("No se pudo iniciar: " + err.message);
+  } finally {
+    instalacionIniciarBtn.disabled = false;
+  }
+});
+
+function renderInstZonas() {
+  instZonasList.innerHTML = "";
+  instZonasAgregadas.forEach((z, idx) => {
+    const fila = document.createElement("div");
+    fila.className = "material-agregado-item";
+    fila.innerHTML = `<span>Zona ${escapeHtml(z.numero)} — ${escapeHtml(z.descripcion)}</span><button type="button" class="quitar" title="Quitar">✕</button>`;
+    fila.querySelector(".quitar").addEventListener("click", () => { instZonasAgregadas.splice(idx, 1); renderInstZonas(); });
+    instZonasList.appendChild(fila);
+  });
+}
+agregarZonaBtn.addEventListener("click", () => {
+  const numero = instZonaNumeroInput.value.trim();
+  const descripcion = instZonaDescripcionInput.value.trim();
+  if (!numero) { showToast("Escribí el número de zona."); return; }
+  instZonasAgregadas.push({ numero, descripcion });
+  renderInstZonas();
+  instZonaNumeroInput.value = "";
+  instZonaDescripcionInput.value = "";
+  instZonaNumeroInput.focus();
+});
+guardarZonasBtn.addEventListener("click", async () => {
+  if (!instalacionActivaId) return;
+  guardarZonasBtn.disabled = true;
+  try {
+    const res = await fetch("/api/historial", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({ accion: "guardar_items_instalacion", instalacion_id: instalacionActivaId, tipo: "zona", items: instZonasAgregadas }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || "Error desconocido");
+    showToast(`${instZonasAgregadas.length} zona(s) guardada(s).`);
+  } catch (err) {
+    showToast("No se pudo guardar: " + err.message);
+  } finally {
+    guardarZonasBtn.disabled = false;
+  }
+});
+
+function renderInstCanales() {
+  instCanalesList.innerHTML = "";
+  instCanalesAgregadas.forEach((z, idx) => {
+    const fila = document.createElement("div");
+    fila.className = "material-agregado-item";
+    fila.innerHTML = `<span>Canal ${escapeHtml(z.numero)} — ${escapeHtml(z.descripcion)}</span><button type="button" class="quitar" title="Quitar">✕</button>`;
+    fila.querySelector(".quitar").addEventListener("click", () => { instCanalesAgregadas.splice(idx, 1); renderInstCanales(); });
+    instCanalesList.appendChild(fila);
+  });
+}
+agregarCanalBtn.addEventListener("click", () => {
+  const numero = instCanalNumeroInput.value.trim();
+  const descripcion = instCanalDescripcionInput.value.trim();
+  if (!numero) { showToast("Escribí el número de canal."); return; }
+  instCanalesAgregadas.push({ numero, descripcion });
+  renderInstCanales();
+  instCanalNumeroInput.value = "";
+  instCanalDescripcionInput.value = "";
+  instCanalNumeroInput.focus();
+});
+guardarCanalesBtn.addEventListener("click", async () => {
+  if (!instalacionActivaId) return;
+  guardarCanalesBtn.disabled = true;
+  try {
+    const res = await fetch("/api/historial", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({ accion: "guardar_items_instalacion", instalacion_id: instalacionActivaId, tipo: "canal", items: instCanalesAgregadas }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || "Error desconocido");
+    showToast(`${instCanalesAgregadas.length} canal(es) guardado(s).`);
+  } catch (err) {
+    showToast("No se pudo guardar: " + err.message);
+  } finally {
+    guardarCanalesBtn.disabled = false;
+  }
+});
+
+function leerArchivoComoBase64Instalacion(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function renderInstFotos() {
+  if (!instalacionActivaId) return;
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch(`/api/historial?tipo=instalacion&id=${instalacionActivaId}`, { headers, cache: "no-store" });
+    const data = await res.json();
+    const fotos = data.fotos || [];
+    instFotosGrid.innerHTML = "";
+    fotos.forEach((nombre) => {
+      const item = document.createElement("div");
+      item.className = "instalacion-foto-item";
+      item.innerHTML = `
+        <img src="/api/historial?tipo=foto-instalacion&id=${instalacionActivaId}&nombre=${encodeURIComponent(nombre)}" loading="lazy">
+        <button type="button" class="instalacion-foto-borrar" title="Borrar">✕</button>
+      `;
+      item.querySelector("button").addEventListener("click", async () => {
+        try {
+          await fetch("/api/historial", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+            body: JSON.stringify({ accion: "borrar_foto_instalacion", instalacion_id: instalacionActivaId, nombre }),
+          });
+          renderInstFotos();
+        } catch (err) {
+          showToast("No se pudo borrar la foto.");
+        }
+      });
+      instFotosGrid.appendChild(item);
+    });
+  } catch (err) {
+    // si falla, se deja la grilla como estaba
+  }
+}
+
+instFotoInput.addEventListener("change", async () => {
+  if (!instalacionActivaId) return;
+  const archivos = Array.from(instFotoInput.files || []);
+  if (archivos.length === 0) return;
+  for (let i = 0; i < archivos.length; i++) {
+    instFotosStatus.textContent = `Subiendo foto ${i + 1} de ${archivos.length}...`;
+    try {
+      const base64 = await leerArchivoComoBase64Instalacion(archivos[i]);
+      await fetch("/api/historial", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+        body: JSON.stringify({ accion: "subir_foto_instalacion", instalacion_id: instalacionActivaId, nombre_archivo: `foto-${Date.now()}-${i}.jpg`, base64 }),
+      });
+    } catch (err) {
+      showToast(`No se pudo subir una foto: ${err.message}`);
+    }
+  }
+  instFotosStatus.textContent = "";
+  instFotoInput.value = "";
+  renderInstFotos();
+});
 
 // ---------- Credencial digital del técnico ----------
 const webauthnEstadoTexto = document.getElementById("webauthnEstadoTexto");

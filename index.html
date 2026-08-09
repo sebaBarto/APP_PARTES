@@ -142,6 +142,12 @@
           </span>
           <span class="panel-tile-label">Presencia en obra</span>
         </button>
+        <button type="button" class="panel-tile panel-tile-grid tile-instalacion" id="tileInstalacionBtn">
+          <span class="panel-tile-icon-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 18v3"/><circle cx="8" cy="9" r="1"/><circle cx="12" cy="9" r="1"/><circle cx="16" cy="9" r="1"/><circle cx="8" cy="13" r="1"/><circle cx="12" cy="13" r="1"/></svg>
+          </span>
+          <span class="panel-tile-label">Instalación</span>
+        </button>
         <button type="button" class="panel-tile panel-tile-grid tile-comodato" id="tileComodatoBtn">
           <span class="panel-tile-icon-badge">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="14" y2="16"/><path d="M9 19.5l1.5 1.5 3-3.5"/></svg>
@@ -865,6 +871,72 @@
 
     <div class="action-bar">
       <button class="btn btn-secondary" id="volverDePresenciaBtn" type="button">Volver</button>
+    </div>
+  </section>
+
+  <!-- INSTALACIÓN (zonas, canales, fotos) -->
+  <section class="screen" id="screen-instalacion">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">INSTALACIÓN</p>
+
+      <div class="card" id="instalacionClienteCard">
+        <label class="field-label" for="instalacionClienteInput">Cliente</label>
+        <input class="field-input" id="instalacionClienteInput" type="text" placeholder="Escribí para buscar el cliente..." list="instalacionClientesLista">
+        <datalist id="instalacionClientesLista"></datalist>
+        <div id="instalacionClienteEncontradoInfo" class="hint-text"></div>
+        <div class="field-group" style="margin-top:8px;">
+          <label class="field-label" for="instalacionDireccionInput">Dirección</label>
+          <input class="field-input" id="instalacionDireccionInput" type="text" placeholder="Se completa sola si el cliente ya está cargado">
+        </div>
+        <button class="btn btn-primary" id="instalacionIniciarBtn" type="button" style="margin-top:8px;">Iniciar instalación</button>
+      </div>
+
+      <div id="instalacionDetalleWrap" class="hidden">
+        <div class="card" style="margin-top:16px;">
+          <p class="status ok" id="instalacionActivaTexto"></p>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+          <label>Zonas de alarma</label>
+          <div class="field-row">
+            <div class="field-group" style="max-width:90px;">
+              <input class="field-input field-mono" id="instZonaNumeroInput" type="text" placeholder="N°">
+            </div>
+            <div class="field-group grow">
+              <input class="field-input" id="instZonaDescripcionInput" type="text" placeholder="Descripción (ej: PIR living)">
+            </div>
+          </div>
+          <button type="button" class="btn btn-ghost btn-small" id="agregarZonaBtn" style="margin:8px 0;">+ Agregar zona</button>
+          <div id="instZonasList" class="materiales-agregados-list"></div>
+          <button type="button" class="btn btn-secondary" id="guardarZonasBtn" style="margin-top:8px;">Guardar zonas</button>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+          <label>Canales de cámaras</label>
+          <div class="field-row">
+            <div class="field-group" style="max-width:90px;">
+              <input class="field-input field-mono" id="instCanalNumeroInput" type="text" placeholder="N°">
+            </div>
+            <div class="field-group grow">
+              <input class="field-input" id="instCanalDescripcionInput" type="text" placeholder="Descripción (ej: Cámara entrada)">
+            </div>
+          </div>
+          <button type="button" class="btn btn-ghost btn-small" id="agregarCanalBtn" style="margin:8px 0;">+ Agregar canal</button>
+          <div id="instCanalesList" class="materiales-agregados-list"></div>
+          <button type="button" class="btn btn-secondary" id="guardarCanalesBtn" style="margin-top:8px;">Guardar canales</button>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+          <label>Fotos</label>
+          <input type="file" id="instFotoInput" accept="image/*" capture="environment" multiple style="margin-top:6px;">
+          <p class="status" id="instFotosStatus"></p>
+          <div id="instFotosGrid" class="instalacion-fotos-grid"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDeInstalacionBtn" type="button">Volver</button>
     </div>
   </section>
 

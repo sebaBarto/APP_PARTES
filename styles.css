@@ -260,6 +260,7 @@ html, body {
 .tile-vehiculo-en-uso .panel-tile-icon-badge { background: var(--acc-coral); }
 .tile-herramientas .panel-tile-icon-badge { background: var(--acc-brown); }
 .tile-presencia .panel-tile-icon-badge { background: var(--acc-guardia, #4A6FA5); }
+.tile-instalacion .panel-tile-icon-badge { background: var(--acc-navy); }
 .tile-comodato .panel-tile-icon-badge { background: var(--acc-purple); }
 .tile-planos .panel-tile-icon-badge { background: var(--acc-navy); }
 .tile-emergencia .panel-tile-icon-badge { background: var(--acc-alert); }
@@ -1013,6 +1014,34 @@ html, body {
 }
 .badge-instalado { background: #E1F0E4; color: #1F6B34; }
 .badge-retirado { background: #FBE8DC; color: #B5541A; }
+
+.instalacion-fotos-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+.instalacion-foto-item {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: var(--r-md, 10px);
+  overflow: hidden;
+  border: 1.5px solid #D8DCD4;
+}
+.instalacion-foto-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.instalacion-foto-borrar {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  font-size: 13px;
+  cursor: pointer;
+}
 .credencial-card {
   position: relative;
   background: #FFFFFF;

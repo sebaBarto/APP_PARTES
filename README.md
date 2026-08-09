@@ -341,6 +341,26 @@ Nuevo en el backend: tres columnas (`pasado_sistema_offline`, `pasado_sistema_po
 `pasado_sistema_en`) y un endpoint para marcar/desmarcar, con quién y cuándo, no solo
 un tilde suelto.
 
+## Geolocalización en Presencia en obra + nuevo módulo Instalación (v3.52.0)
+
+**Geolocalización**: al marcar llegada o salida en Presencia en obra, ahora se captura
+la ubicación GPS del celular (latitud, longitud, y precisión en metros) — sin bloquear
+el marcado si el técnico no dio permiso de ubicación, queda igual el registro, solo sin
+esa parte del dato.
+
+**Nuevo módulo — Instalación**: pantalla aparte del parte técnico, para documentar en
+detalle una instalación de alarma/cámaras. El técnico busca el cliente (mismo buscador
+con autocompletado de siempre), inicia la instalación, y desde ahí puede:
+- Agregar tantas **zonas de alarma** como necesite (número + descripción cada una).
+- Agregar tantos **canales de cámaras** como necesite (mismo formato).
+- Subir **varias fotos** del cliente/instalación, con opción de borrar cada una.
+
+Backend nuevo: tabla `instalaciones` (los datos generales) + `instalaciones_items`
+(zonas y canales, mismo tipo de fila con un campo "tipo" para distinguir) + fotos en R2
+bajo `instalaciones/{id}/`. Probado de punta a punta con Playwright: cliente con
+autocompletado, iniciar instalación, agregar y guardar zonas y canales, y subir una
+foto real — confirmando que todo queda guardado correctamente.
+
 ## Nuevo módulo: Presencia en obra (v3.51.0)
 
 Nueva pantalla ("Presencia en obra") donde cada técnico marca su llegada y salida de

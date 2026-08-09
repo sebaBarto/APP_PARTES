@@ -94,6 +94,24 @@ module.exports = async (req, res) => {
   if (req.method === "GET") {
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     try {
+      // Foto individual de una instalación — devuelve la imagen en
+      // sí (binario), no JSON, igual que hace planos.js con los PDF.
+      if (req.query && req.query.tipo === "foto-instalacion" && req.query.id && req.query.nombre) {
+        const r = await fetch(`${BACKEND_NUEVO_URL}/api/instalaciones/${encodeURIComponent(req.query.id)}/fotos/${encodeURIComponent(req.query.nombre)}`, { headers: headersBackendNuevo });
+        if (r.status === 404) {
+          res.status(404).json({ error: "No se encontró esa foto" });
+          return;
+        }
+        if (!r.ok) {
+          res.status(502).json({ error: "No se pudo descargar la foto" });
+          return;
+        }
+        const buffer = Buffer.from(await r.arrayBuffer());
+        res.setHeader("Content-Type", "image/jpeg");
+        res.setHeader("Cache-Control", "private, max-age=3600");
+        res.status(200).send(buffer);
+        return;
+      }
       // ?tipo=stock trae el historial de stock en vez del de partes
       // (mismo archivo, para no gastar otro de los 12 slots de Vercel).
       if (req.query && req.query.tipo === "stock") {
@@ -103,6 +121,22 @@ module.exports = async (req, res) => {
           return;
         }
         res.status(200).json(await r.json());
+        return;
+      }
+      // ?tipo=instalaciones (lista) o ?tipo=instalacion&id=X (detalle completo)
+      if (req.query && req.query.tipo === "instalaciones") {
+        const r = await fetch(`${BACKEND_NUEVO_URL}/api/instalaciones`, { headers: headersBackendNuevo });
+        if (!r.ok) {
+          res.status(502).json({ error: "No se pudo leer el listado de instalaciones" });
+          return;
+        }
+        res.status(200).json(await r.json());
+        return;
+      }
+      if (req.query && req.query.tipo === "instalacion" && req.query.id) {
+        const r = await fetch(`${BACKEND_NUEVO_URL}/api/instalaciones/${encodeURIComponent(req.query.id)}`, { headers: headersBackendNuevo });
+        const data = await r.json();
+        res.status(r.status).json(data);
         return;
       }
       const r = await fetch(`${BACKEND_NUEVO_URL}/api/partes`, { headers: headersBackendNuevo });
@@ -173,6 +207,59 @@ module.exports = async (req, res) => {
           method: "POST",
           headers: { ...headersBackendNuevo, "Content-Type": "application/json" },
           body: JSON.stringify({ parte_id: body.parte_id, movimientos: body.movimientos }),
+        });
+        const data = await r.json();
+        res.status(r.status).json(data);
+        return;
+      }
+
+      // ---------- Instalación (zonas/canales/fotos) ----------
+      if (body.accion === "crear_instalacion") {
+        const r = await fetch(`${BACKEND_NUEVO_URL}/api/instalaciones`, {
+          method: "POST",
+          headers: { ...headersBackendNuevo, "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const data = await r.json();
+        res.status(r.status).json(data);
+        return;
+      }
+      if (body.accion === "guardar_items_instalacion") {
+        if (!body.instalacion_id || !body.tipo) {
+          res.status(400).json({ error: "Falta instalacion_id o tipo" });
+          return;
+        }
+        const r = await fetch(`${BACKEND_NUEVO_URL}/api/instalaciones/${encodeURIComponent(body.instalacion_id)}/items`, {
+          method: "POST",
+          headers: { ...headersBackendNuevo, "Content-Type": "application/json" },
+          body: JSON.stringify({ tipo: body.tipo, items: body.items }),
+        });
+        const data = await r.json();
+        res.status(r.status).json(data);
+        return;
+      }
+      if (body.accion === "subir_foto_instalacion") {
+        if (!body.instalacion_id || !body.base64) {
+          res.status(400).json({ error: "Falta instalacion_id o la foto" });
+          return;
+        }
+        const r = await fetch(`${BACKEND_NUEVO_URL}/api/instalaciones/${encodeURIComponent(body.instalacion_id)}/fotos`, {
+          method: "POST",
+          headers: { ...headersBackendNuevo, "Content-Type": "application/json" },
+          body: JSON.stringify({ nombre_archivo: body.nombre_archivo, base64: body.base64 }),
+        });
+        const data = await r.json();
+        res.status(r.status).json(data);
+        return;
+      }
+      if (body.accion === "borrar_foto_instalacion") {
+        if (!body.instalacion_id || !body.nombre) {
+          res.status(400).json({ error: "Falta instalacion_id o nombre" });
+          return;
+        }
+        const r = await fetch(`${BACKEND_NUEVO_URL}/api/instalaciones/${encodeURIComponent(body.instalacion_id)}/fotos/${encodeURIComponent(body.nombre)}/borrar`, {
+          method: "POST",
+          headers: headersBackendNuevo,
         });
         const data = await r.json();
         res.status(r.status).json(data);
