@@ -603,19 +603,13 @@
       </p>
 
       <div class="card" style="margin-bottom:16px;">
-        <label>Subir planos (podés elegir varios a la vez)</label>
+        <label>Sincronización automática</label>
         <p class="subtitle" style="margin:0 0 10px;">
-          Nombrá cada archivo con el nombre del cliente antes de subirlo (por ejemplo,
-          "Distribuidora Norte SA - Planta baja.pdf") — así lo van a poder encontrar buscando
-          ese nombre desde la app. Si ya existe un plano con el mismo nombre, se reemplaza.
+          Los planos ya no se suben a mano desde acá — un programa en tu PC (donde están los
+          originales en Visio) revisa la carpeta cada 1 hora, convierte a PDF lo que cambió, y
+          lo sube solo. Esto solo te muestra si sigue funcionando.
         </p>
-        <input type="file" id="planosArchivosInput" accept="application/pdf" multiple>
-        <div style="margin-top:10px;">
-          <div id="planosProgresoBarraFondo" style="background:#EFF1EC; border-radius:8px; height:10px; overflow:hidden; display:none;">
-            <div id="planosProgresoBarra" style="background:var(--amber, #F5A623); height:100%; width:0%; transition:width 0.2s;"></div>
-          </div>
-          <p class="status" id="planosSubirStatus"></p>
-        </div>
+        <p class="status" id="planosSyncStatus">Consultando...</p>
       </div>
 
       <div class="card">
@@ -726,7 +720,7 @@ const TABS = [
   { btn: tabSimsBtn, panel: panelSims, onShow: () => { if (!simsCargadasUnaVez) { simsCargadasUnaVez = true; cargarSimsAdmin(); } } },
   { btn: tabHerramientasBtn, panel: panelHerramientas, onShow: () => { if (!herramientasCargadasUnaVez) { herramientasCargadasUnaVez = true; cargarHerramientasAdmin(); } } },
   { btn: tabSimsInstaladasBtn, panel: panelSimsInstaladas, onShow: () => { if (!simsInstaladasCargadasUnaVez) { simsInstaladasCargadasUnaVez = true; cargarSimsInstaladasAdmin(); } } },
-  { btn: tabPlanosBtn, panel: panelPlanos, onShow: () => { if (!planosCargadosUnaVezAdmin) { planosCargadosUnaVezAdmin = true; cargarPlanosAdmin(); } } },
+  { btn: tabPlanosBtn, panel: panelPlanos, onShow: () => { consultarEstadoSincronizacionPlanos(); if (!planosCargadosUnaVezAdmin) { planosCargadosUnaVezAdmin = true; cargarPlanosAdmin(); } } },
   { btn: tabEmergenciaBtn, panel: panelEmergencia, onShow: () => { if (!emergenciaCargadaUnaVezAdmin) { emergenciaCargadaUnaVezAdmin = true; cargarEmergenciasAdmin(); } } },
   { btn: tabEmergenciaBtn, panel: panelEmergencia, onShow: () => { if (!emergenciasCargadasUnaVezAdmin) { emergenciasCargadasUnaVezAdmin = true; cargarEmergenciasAdmin(); } } },
 ];
@@ -2591,63 +2585,51 @@ simsInstaladasExcelFile.addEventListener("change", () => {
 });
 
 // ---------- Planos de cableado ----------
-const planosArchivosInput = document.getElementById("planosArchivosInput");
-const planosProgresoBarraFondo = document.getElementById("planosProgresoBarraFondo");
-const planosProgresoBarra = document.getElementById("planosProgresoBarra");
-const planosSubirStatus = document.getElementById("planosSubirStatus");
+const planosSyncStatus = document.getElementById("planosSyncStatus");
 const planosBuscarAdmin = document.getElementById("planosBuscarAdmin");
 const planosAdminStatus = document.getElementById("planosAdminStatus");
 const planosAdminResultados = document.getElementById("planosAdminResultados");
 let planosCacheAdmin = [];
 
-function leerArchivoComoBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
+function formatoHaceCuanto(fechaIso) {
+  const diffMs = Date.now() - new Date(fechaIso).getTime();
+  const minutos = Math.round(diffMs / 60000);
+  if (minutos < 1) return "hace un momento";
+  if (minutos < 60) return `hace ${minutos} minuto(s)`;
+  const horas = Math.round(minutos / 60);
+  if (horas < 24) return `hace ${horas} hora(s)`;
+  const dias = Math.round(horas / 24);
+  return `hace ${dias} día(s)`;
 }
 
-planosArchivosInput.addEventListener("change", async () => {
-  const archivos = Array.from(planosArchivosInput.files || []);
-  if (archivos.length === 0) return;
-
-  planosProgresoBarraFondo.style.display = "block";
-  planosProgresoBarra.style.width = "0%";
-  let subidos = 0;
-  let fallidos = [];
-
-  // Se suben de a uno — así ningún archivo pesado hace que el pedido
-  // entero sea demasiado grande, y si alguno falla, no arruina a los
-  // demás que ya se subieron bien.
-  for (let i = 0; i < archivos.length; i++) {
-    const archivo = archivos[i];
-    const nombreSinExtension = archivo.name.replace(/\.pdf$/i, "");
-    planosSubirStatus.textContent = `Subiendo ${i + 1} de ${archivos.length}: ${nombreSinExtension}...`;
-    try {
-      const base64 = await leerArchivoComoBase64(archivo);
-      const res = await fetch("/api/planos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-        body: JSON.stringify({ nombre_archivo: nombreSinExtension, base64 }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Error desconocido");
-      subidos++;
-    } catch (err) {
-      fallidos.push(`${nombreSinExtension} (${err.message})`);
+async function consultarEstadoSincronizacionPlanos() {
+  try {
+    const res = await fetch("/api/planos?estado=1", {
+      headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (!res.ok || data.nunca_corrio) {
+      planosSyncStatus.className = "status";
+      planosSyncStatus.textContent = "Todavía no corrió ninguna sincronización desde la PC.";
+      return;
     }
-    planosProgresoBarra.style.width = `${Math.round(((i + 1) / archivos.length) * 100)}%`;
+    if (data.error) {
+      planosSyncStatus.className = "status err";
+      planosSyncStatus.textContent = `Última corrida (${formatoHaceCuanto(data.ultima_corrida)}) — falló: ${data.error}`;
+      return;
+    }
+    const haceCuanto = formatoHaceCuanto(data.ultima_corrida);
+    const avisoDemora = (Date.now() - new Date(data.ultima_corrida).getTime()) > 3 * 60 * 60 * 1000;
+    planosSyncStatus.className = avisoDemora ? "status err" : "status ok";
+    planosSyncStatus.textContent = avisoDemora
+      ? `⚠ La última sincronización fue ${haceCuanto} — revisá que la PC esté prendida y conectada.`
+      : `✓ Última sincronización ${haceCuanto}. Procesados: ${data.procesados ?? 0}, sin cambios: ${data.saltados ?? 0}, fallidos: ${data.fallidos ?? 0}.`;
+  } catch (err) {
+    planosSyncStatus.className = "status err";
+    planosSyncStatus.textContent = "No se pudo consultar el estado.";
   }
-
-  planosSubirStatus.className = fallidos.length > 0 ? "status err" : "status ok";
-  planosSubirStatus.textContent = fallidos.length > 0
-    ? `Se subieron ${subidos} de ${archivos.length}. Fallaron: ${fallidos.join(", ")}`
-    : `Listo — se subieron los ${subidos} planos.`;
-  planosArchivosInput.value = "";
-  planosCargadosUnaVezAdmin = false; // para que la proxima busqueda traiga la lista actualizada
-});
+}
 
 async function cargarPlanosAdmin() {
   planosAdminStatus.textContent = "Cargando lista de planos...";

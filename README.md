@@ -341,6 +341,20 @@ Nuevo en el backend: tres columnas (`pasado_sistema_offline`, `pasado_sistema_po
 `pasado_sistema_en`) y un endpoint para marcar/desmarcar, con quién y cuándo, no solo
 un tilde suelto.
 
+## Planos: corte a R2 + sincronización automática cada 1 hora (v3.49.0)
+
+`api/planos.js` ahora habla con el backend nuevo (R2) en vez de Google Drive — ya no
+depende de un token que vencía a la hora. En `admin.html`, saqué el botón de subida
+manual (hacía rato que ya no funcionaba, tiraba error) y lo reemplacé por un panel de
+estado: "Última sincronización: hace X", con aviso en rojo si pasan más de 3 horas sin
+novedades (por si la PC de la oficina se apagó o se cortó la conexión).
+
+El sincronizador (`sync-local-planos-r2`) ahora se programa con el Programador de
+tareas de Windows para correr solo, cada 1 hora — no hace falta acordarse de correr
+nada a mano. Después de cada corrida, deja un archivo de estado en R2 que la app lee
+para mostrar ese panel, y un log local (`sync.log`) para revisar en la PC si hiciera
+falta. Instrucciones completas en `INSTALAR.md` dentro del proyecto del sincronizador.
+
 ## Historial de Stock: agrega número de servicio y de cliente (v3.48.1)
 
 A pedido tras probar en vivo: cada tarjeta ahora muestra el número de servicio y el
