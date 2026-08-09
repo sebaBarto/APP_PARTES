@@ -4,7 +4,7 @@ Este documento existe para poder diagnosticar y reparar el sistema en el futuro,
 depender de tener toda esta conversación a mano. Cubre la arquitectura completa, el
 modelo de datos real, cada pieza del código, y las trampas ya conocidas.
 
-Última actualización: v3.50.0 (agosto 2026).
+Última actualización: v3.51.0 (agosto 2026).
 
 ---
 
@@ -80,6 +80,7 @@ npx wrangler d1 execute sat-servicios-db --command="PRAGMA table_info(nombre_tab
 | `comodatos` | Contratos de comodato | `id`, `cliente`, `direccion`, `fecha`, `detalle` (JSON), `estado_envio` |
 | `tecnico_credenciales_webauthn` | Huellas/Face ID registradas (v3.50+) | `id`, `tecnico`, `credential_id` (único), `public_key`, `counter`, `device_type`, `transports`, `nombre_dispositivo`, `creado_en`, `ultimo_uso_en` |
 | `webauthn_desafios` | Challenges temporales de WebAuthn (se auto-limpian) | `tecnico` (PK), `challenge`, `tipo` (`registro`\|`login`), `creado_en` |
+| `presencias_obra` | Llegada/salida de cada técnico en obra (v3.51+) | `id`, `tecnico`, `cliente`, `direccion`, `numero_cliente`, `fecha_llegada`, `hora_llegada`, `fecha_salida`, `hora_salida` — un registro con `hora_salida` vacía = todavía en obra (mismo patrón que `vehiculos_historial`) |
 
 ### Migraciones aplicadas (en orden)
 `migracion_v2.sql` a `migracion_v10.sql`, todas en `/sat-backend-d1/`. `schema.sql` es la
@@ -110,6 +111,7 @@ Proyecto: `/sat-backend-d1/`. Cada archivo en `src/routes/` es un recurso.
 | `herramientas.js` | `/api/herramientas` | Acciones `tomar`/`devolver`/`transferir`/`dejar_en_cliente`/`retirar_de_cliente`. |
 | `partes.js` | `/api/partes` | Guardado con `ON CONFLICT(id) DO NOTHING` — evita duplicar si se reintenta el mismo parte. Incluye `/marcar-pasado-sistema`. |
 | `stock.js` | `/api/stock` | `POST /` recibe `{parte_id, movimientos: [...]}` — borra los movimientos viejos de ese parte antes de insertar los nuevos (evita duplicar en reintentos). |
+| `presencias.js` | `/api/presencias-obra` | Llegada/salida en obra (v3.51+). `GET /activa?tecnico=X` para saber si ya está en obra. Rechaza una llegada nueva si hay una sin salida marcada. |
 | `planos.js` | `/api/planos` | Lee/lista del bucket R2. `GET /estado-sincronizacion` (¡registrada ANTES de `/:nombre` en el código, si no el nombre "estado-sincronizacion" se interpretaría como un plano!). |
 | `comodatos.js` | `/api/comodatos` | Simple, sin acciones especiales. |
 
@@ -133,7 +135,7 @@ archivo por función.
 | Archivo | Qué hace | Comparte con |
 |---|---|---|
 | `datos.js` | Endpoint genérico `/api/datos?coleccion=X` — algunas colecciones ya redirigen al backend nuevo (ver `COLECCIONES_YA_CORTADAS`), el resto sigue en GitHub. También el login (`verificar_login`, con migración perezosa — sección 8) y las 5 acciones de WebAuthn. | — |
-| `recurso-uso.js` | `?recurso=vehiculo\|sim\|herramienta` — tomar/devolver/etc. de los tres. Los tres ya hablan con el backend nuevo. | — |
+| `recurso-uso.js` | `?recurso=vehiculo\|sim\|herramienta\|presencia` — tomar/devolver/etc. de los tres, y llegada/salida en obra (v3.51+, siempre avisa por push a todo el equipo). Los cuatro ya hablan con el backend nuevo. | — |
 | `historial.js` | Guarda/lee el historial de partes (traduce nombres de campo, ver sección 8). También `?tipo=stock` para el historial de stock, y las acciones de "marcar pasado a sistema" (para partes y para stock). | Stock |
 | `foto.js` | GET/POST de fotos (repo GitHub, carpeta `fotos/`) | Antes eran 2 funciones |
 | `comodato.js` | Genera el PDF de comodato y lo manda por mail | — |
