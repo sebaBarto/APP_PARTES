@@ -117,6 +117,65 @@ async function postHerramientaNuevo(headersBackendNuevo, body, res) {
 }
 
 // ============================================================
+// PRESENCIA EN OBRA (llegada/salida) — ya cortado al backend nuevo
+// ============================================================
+async function getPresenciaNuevo(headersBackendNuevo, tecnico, res) {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+  try {
+    const r = await fetch(`${process.env.BACKEND_NUEVO_URL}/api/presencias-obra/activa?tecnico=${encodeURIComponent(tecnico || "")}`, { headers: headersBackendNuevo });
+    const data = await r.json();
+    res.status(r.status).json(data);
+  } catch (err) {
+    res.status(500).json({ error: "Error interno al consultar presencia en obra" });
+  }
+}
+
+async function getPresenciaHistorialNuevo(headersBackendNuevo, res) {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+  try {
+    const r = await fetch(`${process.env.BACKEND_NUEVO_URL}/api/presencias-obra`, { headers: headersBackendNuevo });
+    const data = await r.json();
+    res.status(r.status).json(data);
+  } catch (err) {
+    res.status(500).json({ error: "Error interno al leer el historial de presencia en obra" });
+  }
+}
+
+async function postPresenciaNuevo(headersBackendNuevo, body, res) {
+  const { accion, tecnico, cliente } = body || {};
+  if (!accion || !tecnico) {
+    res.status(400).json({ error: "Faltan datos (acción o técnico)" });
+    return;
+  }
+  const ruta = accion === "llegada" ? "llegada" : accion === "salida" ? "salida" : null;
+  if (!ruta) {
+    res.status(400).json({ error: "Acción desconocida (usar 'llegada' o 'salida')" });
+    return;
+  }
+  const r = await fetch(`${process.env.BACKEND_NUEVO_URL}/api/presencias-obra/${ruta}`, {
+    method: "POST",
+    headers: { ...headersBackendNuevo, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await r.json();
+  if (!r.ok) { res.status(r.status).json(data); return; }
+
+  // Aviso a todo el equipo — a diferencia de vehículo/herramienta,
+  // este SIEMPRE avisa (no es un evento raro, es el uso normal).
+  try {
+    const { enviarATodos } = require("../lib/push-sender");
+    if (accion === "llegada") {
+      await enviarATodos({ titulo: `📍 ${tecnico} llegó a obra`, cuerpo: `Llegó a ${cliente}.`, url: "/" });
+    } else {
+      await enviarATodos({ titulo: `📍 ${tecnico} se retiró de obra`, cuerpo: `Se fue de ${data.cliente || cliente || "la obra"}.`, url: "/" });
+    }
+  } catch (err) {
+    console.error("Error enviando push de presencia en obra:", err);
+  }
+  res.status(200).json({ ok: true });
+}
+
+// ============================================================
 // Handler principal
 // ============================================================
 module.exports = async (req, res) => {
@@ -146,7 +205,11 @@ module.exports = async (req, res) => {
       if (recurso === "vehiculo") return await getVehiculoNuevo(headersBackendNuevo, res);
       if (recurso === "sim") return await getSimNuevo(headersBackendNuevo, res);
       if (recurso === "herramienta") return await getHerramientaNuevo(headersBackendNuevo, res);
-      res.status(400).json({ error: "Falta indicar el recurso (?recurso=vehiculo|sim|herramienta)" });
+      if (recurso === "presencia") {
+        if (req.query.historial) return await getPresenciaHistorialNuevo(headersBackendNuevo, res);
+        return await getPresenciaNuevo(headersBackendNuevo, req.query.tecnico, res);
+      }
+      res.status(400).json({ error: "Falta indicar el recurso (?recurso=vehiculo|sim|herramienta|presencia)" });
       return;
     }
 
@@ -154,7 +217,8 @@ module.exports = async (req, res) => {
       if (recurso === "vehiculo") return await postVehiculoNuevo(headersBackendNuevo, body, res);
       if (recurso === "sim") return await postSimNuevo(headersBackendNuevo, body, res);
       if (recurso === "herramienta") return await postHerramientaNuevo(headersBackendNuevo, body, res);
-      res.status(400).json({ error: "Falta indicar el recurso (vehiculo, sim o herramienta)" });
+      if (recurso === "presencia") return await postPresenciaNuevo(headersBackendNuevo, body, res);
+      res.status(400).json({ error: "Falta indicar el recurso (vehiculo, sim, herramienta o presencia)" });
       return;
     }
 

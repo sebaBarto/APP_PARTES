@@ -136,6 +136,12 @@
           </span>
           <span class="panel-tile-label">Herramientas</span>
         </button>
+        <button type="button" class="panel-tile panel-tile-grid tile-presencia" id="tilePresenciaBtn">
+          <span class="panel-tile-icon-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.4 22a8.4 8.4 0 0 0-16.8 0"/><circle cx="12" cy="7.5" r="4.5"/></svg>
+          </span>
+          <span class="panel-tile-label">Presencia en obra</span>
+        </button>
         <button type="button" class="panel-tile panel-tile-grid tile-comodato" id="tileComodatoBtn">
           <span class="panel-tile-icon-badge">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="8" y1="16" x2="14" y2="16"/><path d="M9 19.5l1.5 1.5 3-3.5"/></svg>
@@ -809,6 +815,59 @@
   </section>
 
   <!-- HERRAMIENTAS: LISTADO -->
+  <!-- PRESENCIA EN OBRA -->
+  <section class="screen" id="screen-presencia">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">PRESENCIA EN OBRA</p>
+
+      <div class="card" id="presenciaEstadoCard" style="margin-bottom:16px;">
+        <p class="status" id="presenciaEstadoTexto">Consultando...</p>
+
+        <div id="presenciaLlegadaWrap" class="hidden">
+          <div class="field-group">
+            <label class="field-label" for="presenciaClienteInput">Cliente / obra</label>
+            <input class="field-input" id="presenciaClienteInput" type="text" placeholder="Escribí para buscar el cliente..." list="presenciaClientesLista">
+            <datalist id="presenciaClientesLista"></datalist>
+            <div id="presenciaClienteEncontradoInfo" class="hint-text"></div>
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="presenciaDireccionInput">Dirección</label>
+            <input class="field-input" id="presenciaDireccionInput" type="text" placeholder="Se completa sola si el cliente ya está cargado">
+          </div>
+          <button class="btn btn-primary" id="presenciaMarcarLlegadaBtn" type="button">📍 Marcar llegada</button>
+        </div>
+
+        <div id="presenciaSalidaWrap" class="hidden">
+          <button class="btn btn-primary" id="presenciaMarcarSalidaBtn" type="button">📍 Marcar salida</button>
+        </div>
+      </div>
+
+      <div class="list-toolbar">
+        <button class="btn btn-ghost btn-small" id="refreshPresenciaBtn" type="button">↻ Actualizar historial</button>
+        <span class="list-sync-label" id="presenciaSyncLabel"></span>
+      </div>
+
+      <div class="dash-periodo-tabs">
+        <button type="button" class="presencia-periodo-chip active" data-periodo="semana">Semana</button>
+        <button type="button" class="presencia-periodo-chip" data-periodo="mes">Mes</button>
+        <button type="button" class="presencia-periodo-chip" data-periodo="todo">Todo</button>
+        <button type="button" class="presencia-periodo-chip" data-periodo="fecha">Fecha</button>
+      </div>
+
+      <div class="field-group hidden" id="presenciaFechaEspecificaWrap">
+        <label class="field-label" for="presenciaFechaEspecifica">Elegí el día</label>
+        <input class="field-input" type="date" id="presenciaFechaEspecifica">
+      </div>
+
+      <p class="list-status" id="presenciaHistorialStatus"></p>
+      <div id="presenciaHistorialList" class="historial-list"></div>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDePresenciaBtn" type="button">Volver</button>
+    </div>
+  </section>
+
   <section class="screen" id="screen-herramientas">
     <div class="review-scroll">
       <p class="hint-eyebrow review-eyebrow">HERRAMIENTAS</p>

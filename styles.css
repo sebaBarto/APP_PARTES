@@ -259,6 +259,7 @@ html, body {
 .tile-vehiculo-libre .panel-tile-icon-badge { background: var(--ok, #3FAE6E); }
 .tile-vehiculo-en-uso .panel-tile-icon-badge { background: var(--acc-coral); }
 .tile-herramientas .panel-tile-icon-badge { background: var(--acc-brown); }
+.tile-presencia .panel-tile-icon-badge { background: var(--acc-guardia, #4A6FA5); }
 .tile-comodato .panel-tile-icon-badge { background: var(--acc-purple); }
 .tile-planos .panel-tile-icon-badge { background: var(--acc-navy); }
 .tile-emergencia .panel-tile-icon-badge { background: var(--acc-alert); }
@@ -984,6 +985,7 @@ html, body {
   transition: box-shadow var(--dur-med) var(--ease-press), transform var(--dur-fast) var(--ease-press), border-color var(--dur-fast) var(--ease-press);
 }
 .historial-card-pasado { background: #EAF6EC; border-color: #A8D5B0; }
+.historial-card-en-obra { background: #EAF1FB; border-color: #A8C4E8; }
 .historial-card-check {
   display: flex;
   align-items: center;

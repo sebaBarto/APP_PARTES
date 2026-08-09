@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.50.1";
+const APP_VERSION = "3.51.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -139,6 +139,7 @@ const screens = {
   planos: document.getElementById("screen-planos"),
   emergencia: document.getElementById("screen-emergencia"),
   herramientas: document.getElementById("screen-herramientas"),
+  presencia: document.getElementById("screen-presencia"),
   herramientaDetalle: document.getElementById("screen-herramienta-detalle"),
   comodatoForm: document.getElementById("screen-comodato-form"),
   comodatoFirma: document.getElementById("screen-comodato-firma"),
@@ -254,6 +255,22 @@ const tileCredencialBtn = document.getElementById("tileCredencialBtn");
 const tileVehiculosBtn = document.getElementById("tileVehiculosBtn");
 const tileSimsBtn = document.getElementById("tileSimsBtn");
 const tileHerramientasBtn = document.getElementById("tileHerramientasBtn");
+const tilePresenciaBtn = document.getElementById("tilePresenciaBtn");
+const volverDePresenciaBtn = document.getElementById("volverDePresenciaBtn");
+const presenciaEstadoTexto = document.getElementById("presenciaEstadoTexto");
+const presenciaLlegadaWrap = document.getElementById("presenciaLlegadaWrap");
+const presenciaSalidaWrap = document.getElementById("presenciaSalidaWrap");
+const presenciaClienteInput = document.getElementById("presenciaClienteInput");
+const presenciaClienteEncontradoInfo = document.getElementById("presenciaClienteEncontradoInfo");
+const presenciaDireccionInput = document.getElementById("presenciaDireccionInput");
+const presenciaMarcarLlegadaBtn = document.getElementById("presenciaMarcarLlegadaBtn");
+const presenciaMarcarSalidaBtn = document.getElementById("presenciaMarcarSalidaBtn");
+const refreshPresenciaBtn = document.getElementById("refreshPresenciaBtn");
+const presenciaSyncLabel = document.getElementById("presenciaSyncLabel");
+const presenciaFechaEspecificaWrap = document.getElementById("presenciaFechaEspecificaWrap");
+const presenciaFechaEspecifica = document.getElementById("presenciaFechaEspecifica");
+const presenciaHistorialStatus = document.getElementById("presenciaHistorialStatus");
+const presenciaHistorialList = document.getElementById("presenciaHistorialList");
 const tileComodatoBtn = document.getElementById("tileComodatoBtn");
 const tilePlanosBtn = document.getElementById("tilePlanosBtn");
 const tileEmergenciaBtn = document.getElementById("tileEmergenciaBtn");
@@ -3925,6 +3942,187 @@ function renderStock() {
       });
     }
     stockList.appendChild(card);
+  });
+}
+
+// ---------- Presencia en obra (llegada/salida) ----------
+let presenciaHistorialCache = [];
+let presenciaPeriodoActivo = "semana";
+let presenciaClienteEncontrado = null;
+
+tilePresenciaBtn.addEventListener("click", () => {
+  showScreen("presencia");
+  actualizarEstadoPresencia();
+  poblarDatalistClientesPresencia();
+  fetchHistorialPresencia();
+});
+volverDePresenciaBtn.addEventListener("click", () => showScreen("home"));
+refreshPresenciaBtn.addEventListener("click", fetchHistorialPresencia);
+
+function poblarDatalistClientesPresencia() {
+  const datalist = document.getElementById("presenciaClientesLista");
+  datalist.innerHTML = (clientesGeneralCache || [])
+    .filter((c) => c.nombre)
+    .map((c) => `<option value="${c.nombre.replace(/"/g, "&quot;")}"></option>`)
+    .join("");
+}
+
+presenciaClienteInput.addEventListener("input", () => {
+  presenciaClienteEncontrado = buscarClientePorNombre(presenciaClienteInput.value.trim());
+  if (presenciaClienteEncontrado) {
+    presenciaDireccionInput.value = presenciaClienteEncontrado.direccion || "";
+    presenciaClienteEncontradoInfo.textContent = "✓ Cliente encontrado en la base.";
+    presenciaClienteEncontradoInfo.className = "hint-text hint-ok";
+  } else {
+    presenciaDireccionInput.value = "";
+    presenciaClienteEncontradoInfo.textContent = presenciaClienteInput.value.trim() ? "Cliente nuevo — no está en la base, se guarda tal cual se escribió." : "";
+    presenciaClienteEncontradoInfo.className = "hint-text";
+  }
+});
+
+async function actualizarEstadoPresencia() {
+  presenciaEstadoTexto.textContent = "Consultando...";
+  presenciaLlegadaWrap.classList.add("hidden");
+  presenciaSalidaWrap.classList.add("hidden");
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/recurso-uso?recurso=presencia&tecnico=" + encodeURIComponent(tecnicoLogueado || ""), { headers, cache: "no-store" });
+    const data = await res.json();
+    if (data.activa) {
+      presenciaEstadoTexto.className = "status ok";
+      presenciaEstadoTexto.textContent = `📍 Estás en obra en ${data.activa.cliente}, desde las ${data.activa.hora_llegada}.`;
+      presenciaSalidaWrap.classList.remove("hidden");
+    } else {
+      presenciaEstadoTexto.className = "status";
+      presenciaEstadoTexto.textContent = "No tenés ninguna llegada marcada ahora.";
+      presenciaClienteInput.value = "";
+      presenciaDireccionInput.value = "";
+      presenciaClienteEncontradoInfo.textContent = "";
+      presenciaLlegadaWrap.classList.remove("hidden");
+    }
+  } catch (err) {
+    presenciaEstadoTexto.textContent = "No se pudo consultar el estado.";
+  }
+}
+
+presenciaMarcarLlegadaBtn.addEventListener("click", async () => {
+  const textoEscrito = presenciaClienteInput.value.trim();
+  if (!textoEscrito) {
+    showToast("Escribí el cliente/obra antes de marcar la llegada.");
+    return;
+  }
+  const cliente = presenciaClienteEncontrado ? presenciaClienteEncontrado.nombre : textoEscrito;
+  presenciaMarcarLlegadaBtn.disabled = true;
+  try {
+    const ahora = new Date();
+    const res = await fetch("/api/recurso-uso", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({
+        recurso: "presencia", accion: "llegada", tecnico: tecnicoLogueado, cliente,
+        direccion: presenciaDireccionInput.value.trim(),
+        numero_cliente: presenciaClienteEncontrado ? presenciaClienteEncontrado.numero_cliente || "" : "",
+        fecha: ahora.toISOString().slice(0, 10),
+        hora: ahora.toTimeString().slice(0, 5),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    showToast(`Llegada marcada en ${cliente}.`);
+    actualizarEstadoPresencia();
+    fetchHistorialPresencia();
+  } catch (err) {
+    showToast("No se pudo marcar: " + err.message);
+  } finally {
+    presenciaMarcarLlegadaBtn.disabled = false;
+  }
+});
+
+presenciaMarcarSalidaBtn.addEventListener("click", async () => {
+  presenciaMarcarSalidaBtn.disabled = true;
+  try {
+    const ahora = new Date();
+    const res = await fetch("/api/recurso-uso", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({
+        recurso: "presencia", accion: "salida", tecnico: tecnicoLogueado,
+        fecha: ahora.toISOString().slice(0, 10), hora: ahora.toTimeString().slice(0, 5),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    showToast("Salida marcada.");
+    actualizarEstadoPresencia();
+    fetchHistorialPresencia();
+  } catch (err) {
+    showToast("No se pudo marcar: " + err.message);
+  } finally {
+    presenciaMarcarSalidaBtn.disabled = false;
+  }
+});
+
+document.querySelectorAll(".presencia-periodo-chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    document.querySelectorAll(".presencia-periodo-chip").forEach((c) => c.classList.remove("active"));
+    chip.classList.add("active");
+    presenciaPeriodoActivo = chip.dataset.periodo;
+    presenciaFechaEspecificaWrap.classList.toggle("hidden", presenciaPeriodoActivo !== "fecha");
+    if (presenciaPeriodoActivo === "fecha" && !presenciaFechaEspecifica.value) {
+      presenciaFechaEspecifica.value = new Date().toISOString().slice(0, 10);
+    }
+    renderHistorialPresencia();
+  });
+});
+presenciaFechaEspecifica.addEventListener("change", renderHistorialPresencia);
+
+async function fetchHistorialPresencia() {
+  presenciaHistorialStatus.textContent = "Cargando...";
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/recurso-uso?recurso=presencia&historial=1", { headers, cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    presenciaHistorialCache = Array.isArray(data) ? data : [];
+    presenciaSyncLabel.textContent = formatSyncTime(new Date());
+    renderHistorialPresencia();
+  } catch (err) {
+    presenciaHistorialStatus.textContent = "No se pudo cargar el historial.";
+  }
+}
+
+function renderHistorialPresencia() {
+  const veTodo = permisosDelTecnico(tecnicoLogueado).historial_todos;
+  const rango = obtenerRangoPeriodo(presenciaPeriodoActivo, presenciaFechaEspecifica);
+  let filtrados = presenciaHistorialCache.filter((p) => fechaEnRango(p.fecha_llegada, rango));
+  if (!veTodo) filtrados = filtrados.filter((p) => p.tecnico === tecnicoLogueado);
+  filtrados.sort((a, b) => {
+    const claveA = `${a.fecha_llegada} ${a.hora_llegada || ""}`;
+    const claveB = `${b.fecha_llegada} ${b.hora_llegada || ""}`;
+    return claveB.localeCompare(claveA);
+  });
+
+  presenciaHistorialList.innerHTML = "";
+  if (filtrados.length === 0) {
+    presenciaHistorialStatus.textContent = "No hay presencias registradas en ese período.";
+    return;
+  }
+  presenciaHistorialStatus.textContent = `${filtrados.length} presencia(s).`;
+  filtrados.forEach((p) => {
+    const [y, m, d] = p.fecha_llegada.split("-");
+    const fechaTexto = `${d}/${m}/${y}`;
+    const sigueEnObra = !p.hora_salida;
+    const card = document.createElement("div");
+    card.className = "historial-card" + (sigueEnObra ? " historial-card-en-obra" : "");
+    card.innerHTML = `
+      <div class="historial-card-num">${escapeHtml(p.tecnico)}${p.numero_cliente ? " · Cliente " + escapeHtml(p.numero_cliente) : ""}</div>
+      <div class="historial-card-cliente">${escapeHtml(p.cliente)}</div>
+      <div class="historial-card-direccion">${escapeHtml(p.direccion || "")}</div>
+      <div class="historial-card-horario">
+        ${fechaTexto} — Llegó ${p.hora_llegada}${sigueEnObra ? " — <b>sigue en obra</b>" : ` — Salió ${p.hora_salida}`}
+      </div>
+    `;
+    presenciaHistorialList.appendChild(card);
   });
 }
 

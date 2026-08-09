@@ -341,6 +341,24 @@ Nuevo en el backend: tres columnas (`pasado_sistema_offline`, `pasado_sistema_po
 `pasado_sistema_en`) y un endpoint para marcar/desmarcar, con quién y cuándo, no solo
 un tilde suelto.
 
+## Nuevo módulo: Presencia en obra (v3.51.0)
+
+Nueva pantalla ("Presencia en obra") donde cada técnico marca su llegada y salida de
+cada sitio de trabajo — con buscador de cliente (mismo patrón que SIMs/Emergencias,
+ignora tildes y autocompleta la dirección si el cliente ya está en la base). Al marcar
+llegada o salida, se manda un aviso push a todo el equipo. El historial queda completo,
+con día y hora de ingreso y egreso, en qué cliente, y qué técnico — con los mismos
+filtros de período que el resto de los historiales, y una marca visual (fondo celeste)
+para quien todavía sigue en obra sin haber marcado salida.
+
+No permite marcar una llegada nueva si ya hay una sin salida marcada — evita quedar con
+un registro "abierto" sin querer.
+
+Backend nuevo: tabla `presencias_obra`, con protección contra doble llegada sin salida.
+Probado de punta a punta: estado inicial, llegada con autocompletado, cambio de estado,
+historial mostrando "sigue en obra", salida, y confirmación de que ambos avisos push se
+disparan correctamente.
+
 ## Historial de Stock: etiquetas de color para instalado/retirado (v3.50.1)
 
 A pedido: cada movimiento ahora se ve con una etiqueta verde ("↑ Instaló xN") y/o una
