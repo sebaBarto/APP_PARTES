@@ -345,6 +345,39 @@ module.exports = async (req, res) => {
       }
       return;
     }
+
+    // ---------- Huella digital / Face ID (WebAuthn) — simples reenvíos al backend nuevo ----------
+    const ACCIONES_WEBAUTHN = {
+      webauthn_tiene_credencial: "GET:/api/tecnicos/webauthn/tiene-credencial?nombre=",
+      webauthn_registro_opciones: "POST:/api/tecnicos/webauthn/registro/opciones",
+      webauthn_registro_verificar: "POST:/api/tecnicos/webauthn/registro/verificar",
+      webauthn_login_opciones: "POST:/api/tecnicos/webauthn/login/opciones",
+      webauthn_login_verificar: "POST:/api/tecnicos/webauthn/login/verificar",
+    };
+    if (bodyAccion && ACCIONES_WEBAUTHN[bodyAccion.accion]) {
+      const { BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN } = process.env;
+      if (!BACKEND_NUEVO_URL || !BACKEND_NUEVO_TOKEN) {
+        res.status(500).json({ error: "Faltan variables de entorno del backend nuevo por configurar en Vercel" });
+        return;
+      }
+      const headersBackendNuevo = { Authorization: `Bearer ${BACKEND_NUEVO_TOKEN}`, "Content-Type": "application/json" };
+      const [metodo, ruta] = ACCIONES_WEBAUTHN[bodyAccion.accion].split(":");
+      try {
+        const url = metodo === "GET"
+          ? `${BACKEND_NUEVO_URL}${ruta}${encodeURIComponent(bodyAccion.nombre || "")}`
+          : `${BACKEND_NUEVO_URL}${ruta}`;
+        const r = await fetch(url, {
+          method: metodo,
+          headers: headersBackendNuevo,
+          body: metodo === "GET" ? undefined : JSON.stringify(bodyAccion),
+        });
+        const data = await r.json();
+        res.status(r.status).json(data);
+      } catch (err) {
+        res.status(500).json({ error: "Error interno al hablar con el backend nuevo" });
+      }
+      return;
+    }
   }
 
   const nombreColeccion = req.query.coleccion;

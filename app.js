@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.49.0";
+const APP_VERSION = "3.50.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -156,6 +156,10 @@ const actualizarAppStatus = document.getElementById("actualizarAppStatus");
 const nuevaVersionAviso = document.getElementById("nuevaVersionAviso");
 const loginTecnicoSelect = document.getElementById("loginTecnicoSelect");
 const loginPassword = document.getElementById("loginPassword");
+const loginHuellaWrap = document.getElementById("loginHuellaWrap");
+const loginHuellaBtn = document.getElementById("loginHuellaBtn");
+const loginPasswordWrap = document.getElementById("loginPasswordWrap");
+const loginUsarPasswordLink = document.getElementById("loginUsarPasswordLink");
 
 // Botón de "ojito" para mostrar/ocultar contraseña — reutilizable en
 // cualquier campo de este tipo. Arranca siempre oculta por defecto.
@@ -915,6 +919,75 @@ function actualizarAccesoDashboardFinanciero() {
 loginBtn.addEventListener("click", attemptLogin);
 loginPassword.addEventListener("keydown", (e) => {
   if (e.key === "Enter") attemptLogin();
+});
+
+// ---------- Huella digital / Face ID — login ----------
+loginTecnicoSelect.addEventListener("change", actualizarOpcionHuellaEnLogin);
+
+async function actualizarOpcionHuellaEnLogin() {
+  const nombre = loginTecnicoSelect.value;
+  loginHuellaWrap.classList.add("hidden");
+  loginPasswordWrap.classList.remove("hidden");
+  loginBtn.classList.remove("hidden");
+  if (!nombre || nombre === "__general__" || !window.SimpleWebAuthnBrowser || !window.SimpleWebAuthnBrowser.browserSupportsWebAuthn()) return;
+  try {
+    const headers = { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/datos?coleccion=tecnicos", {
+      method: "POST", headers,
+      body: JSON.stringify({ accion: "webauthn_tiene_credencial", nombre }),
+    });
+    const data = await res.json();
+    if (data.tiene) {
+      loginHuellaWrap.classList.remove("hidden");
+      loginPasswordWrap.classList.add("hidden");
+      loginBtn.classList.add("hidden");
+    }
+  } catch (err) {
+    // si falla la consulta, se sigue con contraseña nomás, sin romper nada
+  }
+}
+
+loginUsarPasswordLink.addEventListener("click", (e) => {
+  e.preventDefault();
+  loginHuellaWrap.classList.add("hidden");
+  loginPasswordWrap.classList.remove("hidden");
+  loginBtn.classList.remove("hidden");
+});
+
+loginHuellaBtn.addEventListener("click", async () => {
+  const nombre = loginTecnicoSelect.value;
+  if (!nombre) return;
+  loginHuellaBtn.disabled = true;
+  loginError.textContent = "";
+  try {
+    const headers = { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const resOpc = await fetch("/api/datos?coleccion=tecnicos", {
+      method: "POST", headers,
+      body: JSON.stringify({ accion: "webauthn_login_opciones", nombre }),
+    });
+    const opciones = await resOpc.json();
+    if (!resOpc.ok || opciones.error) throw new Error(opciones.error || "No se pudo iniciar");
+
+    const respuesta = await window.SimpleWebAuthnBrowser.startAuthentication({ optionsJSON: opciones });
+
+    const resVer = await fetch("/api/datos?coleccion=tecnicos", {
+      method: "POST", headers,
+      body: JSON.stringify({ accion: "webauthn_login_verificar", nombre, respuesta }),
+    });
+    const dataVer = await resVer.json();
+    if (!resVer.ok || !dataVer.ok) throw new Error(dataVer.error || "No se pudo verificar");
+
+    entrarComoTecnico(nombre);
+  } catch (err) {
+    // Si el técnico cancela el pedido de huella (por ejemplo, tocó
+    // "Cancelar" en el diálogo del celular), no se muestra como un
+    // error real — simplemente no pasó nada.
+    if (err.name !== "NotAllowedError") {
+      loginError.textContent = "No se pudo entrar con huella — probá con tu contraseña.";
+    }
+  } finally {
+    loginHuellaBtn.disabled = false;
+  }
 });
 
 cerrarSesionBtn.addEventListener("click", () => {
@@ -3855,9 +3928,77 @@ function renderStock() {
 }
 
 // ---------- Credencial digital del técnico ----------
+const webauthnEstadoTexto = document.getElementById("webauthnEstadoTexto");
+const activarHuellaBtn = document.getElementById("activarHuellaBtn");
+
 tileCredencialBtn.addEventListener("click", () => {
   showScreen("credencial");
   fetchYRenderCredencial();
+  actualizarEstadoWebauthn();
+});
+
+async function actualizarEstadoWebauthn() {
+  if (!window.SimpleWebAuthnBrowser || !window.SimpleWebAuthnBrowser.browserSupportsWebAuthn()) {
+    webauthnEstadoTexto.textContent = "Este celular/navegador no admite huella o Face ID para apps web.";
+    activarHuellaBtn.classList.add("hidden");
+    return;
+  }
+  webauthnEstadoTexto.textContent = "Consultando...";
+  try {
+    const headers = { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/datos?coleccion=tecnicos", {
+      method: "POST", headers,
+      body: JSON.stringify({ accion: "webauthn_tiene_credencial", nombre: tecnicoLogueado }),
+    });
+    const data = await res.json();
+    if (data.tiene) {
+      webauthnEstadoTexto.className = "status ok";
+      webauthnEstadoTexto.textContent = "✓ Ya está activada en este celular.";
+      activarHuellaBtn.textContent = "👆 Activar en otro celular / volver a activar acá";
+    } else {
+      webauthnEstadoTexto.className = "status";
+      webauthnEstadoTexto.textContent = "Todavía no la activaste en ningún celular.";
+      activarHuellaBtn.textContent = "👆 Activar huella / Face ID en este celular";
+    }
+  } catch (err) {
+    webauthnEstadoTexto.textContent = "";
+  }
+}
+
+activarHuellaBtn.addEventListener("click", async () => {
+  activarHuellaBtn.disabled = true;
+  webauthnEstadoTexto.className = "status";
+  webauthnEstadoTexto.textContent = "Activando...";
+  try {
+    const headers = { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const resOpc = await fetch("/api/datos?coleccion=tecnicos", {
+      method: "POST", headers,
+      body: JSON.stringify({ accion: "webauthn_registro_opciones", nombre: tecnicoLogueado }),
+    });
+    const opciones = await resOpc.json();
+    if (!resOpc.ok || opciones.error) throw new Error(opciones.error || "No se pudo iniciar");
+
+    const respuesta = await window.SimpleWebAuthnBrowser.startRegistration({ optionsJSON: opciones });
+
+    const nombreDispositivo = /iPhone|iPad/.test(navigator.userAgent) ? "iPhone/iPad"
+      : /Android/.test(navigator.userAgent) ? "Celular Android"
+      : "Este dispositivo";
+    const resVer = await fetch("/api/datos?coleccion=tecnicos", {
+      method: "POST", headers,
+      body: JSON.stringify({ accion: "webauthn_registro_verificar", nombre: tecnicoLogueado, respuesta, nombre_dispositivo: nombreDispositivo }),
+    });
+    const dataVer = await resVer.json();
+    if (!resVer.ok || !dataVer.ok) throw new Error(dataVer.error || "No se pudo activar");
+
+    showToast("¡Listo! Ya podés entrar con huella o Face ID la próxima vez.");
+    actualizarEstadoWebauthn();
+  } catch (err) {
+    if (err.name !== "NotAllowedError") {
+      showToast("No se pudo activar: " + err.message);
+    }
+  } finally {
+    activarHuellaBtn.disabled = false;
+  }
 });
 
 function salirDeCredencialPantallaCompleta() {

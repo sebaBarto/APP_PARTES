@@ -17,6 +17,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@simplewebauthn/browser@13.3.0/dist/bundle/index.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2/dist/chartjs-plugin-datalabels.min.js"></script>
 </head>
@@ -44,9 +45,17 @@
       <select class="field-input login-input" id="loginTecnicoSelect">
         <option value="" disabled selected>Elegí tu usuario</option>
       </select>
-      <div class="password-field-wrap">
-        <input class="field-input login-input" id="loginPassword" type="password" placeholder="Contraseña" autocomplete="current-password">
-        <button type="button" class="password-toggle-btn" id="loginPasswordToggle" title="Mostrar/ocultar contraseña"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
+
+      <div id="loginHuellaWrap" class="hidden" style="margin:14px 0;">
+        <button class="btn btn-primary" id="loginHuellaBtn" type="button">👆 Entrar con huella / Face ID</button>
+        <p class="login-huella-alternativa"><a href="#" id="loginUsarPasswordLink">Entrar con contraseña en su lugar</a></p>
+      </div>
+
+      <div id="loginPasswordWrap">
+        <div class="password-field-wrap">
+          <input class="field-input login-input" id="loginPassword" type="password" placeholder="Contraseña" autocomplete="current-password">
+          <button type="button" class="password-toggle-btn" id="loginPasswordToggle" title="Mostrar/ocultar contraseña"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
+        </div>
       </div>
       <p class="login-error" id="loginError"></p>
     </div>
@@ -1004,6 +1013,16 @@
           </div>
         </div>
         <div class="credencial-card-footer">Tocá la credencial para mostrarla en pantalla completa.</div>
+      </div>
+
+      <div class="card" style="margin-top:18px;">
+        <label>Seguridad de acceso</label>
+        <p class="subtitle" style="margin:0 0 10px;">
+          Activá la huella o Face ID para entrar más rápido, sin escribir la contraseña cada
+          vez. Tu contraseña sigue funcionando igual, por si algún día cambiás de celular.
+        </p>
+        <p class="status" id="webauthnEstadoTexto"></p>
+        <button class="btn btn-secondary" id="activarHuellaBtn" type="button">👆 Activar huella / Face ID en este celular</button>
       </div>
     </div>
 

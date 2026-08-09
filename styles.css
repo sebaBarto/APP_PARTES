@@ -322,6 +322,17 @@ html, body {
   margin-top: 10px;
 }
 
+.login-huella-alternativa {
+  text-align: center;
+  margin: 10px 0 0;
+}
+.login-huella-alternativa a {
+  color: #6B7680;
+  font-size: 13px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 /* ---------- STEP 1: CAPTURE / VIEWFINDER ---------- */
 .viewfinder {
   flex: 1;

@@ -341,6 +341,26 @@ Nuevo en el backend: tres columnas (`pasado_sistema_offline`, `pasado_sistema_po
 `pasado_sistema_en`) y un endpoint para marcar/desmarcar, con quién y cuándo, no solo
 un tilde suelto.
 
+## Huella digital / Face ID para entrar (v3.50.0)
+
+La mejora de seguridad que habíamos evaluado y dejado pendiente: cada técnico puede
+activar su huella o Face ID (desde Credencial digital → "Seguridad de acceso") y de ahí
+en más entra tocando el sensor, sin escribir la contraseña nunca más — que sigue
+funcionando igual, como respaldo por si cambia de celular o quiere reactivarla en uno
+nuevo.
+
+Usa el estándar WebAuthn/Passkeys (lo mismo que usan bancos y apps grandes) — la huella
+en sí nunca sale del celular, el servidor solo guarda una clave pública que sirve para
+confirmar la firma, nunca para "copiarla" a otro lado. Implementado con
+`@simplewebauthn/server`, la librería más usada para esto, para no improvisar la parte
+criptográfica.
+
+Probado de punta a punta con clics reales y un autenticador virtual (simula una huella
+real con criptografía real, no un simulacro): activar la huella, cerrar sesión, elegir
+el usuario (aparece el botón de huella, se esconden el campo de contraseña y el botón
+de "Ingresar" de siempre), y entrar tocando huella — sin escribir nada — llegando
+correctamente a la pantalla principal.
+
 ## Planos: corte a R2 + sincronización automática cada 1 hora (v3.49.0)
 
 `api/planos.js` ahora habla con el backend nuevo (R2) en vez de Google Drive — ya no
