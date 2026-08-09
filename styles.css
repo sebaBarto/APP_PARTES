@@ -999,6 +999,18 @@ html, body {
 .historial-card-cliente { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 15px; color: #101820; margin: 3px 0; }
 .historial-card-direccion { font-size: 13px; color: #6B7680; }
 .historial-card-horario { font-size: 12px; color: #6B7680; margin-top: 4px; font-family: 'IBM Plex Mono', monospace; }
+
+.historial-card-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.badge-stock {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: 'Space Grotesk', sans-serif;
+}
+.badge-instalado { background: #E1F0E4; color: #1F6B34; }
+.badge-retirado { background: #FBE8DC; color: #B5541A; }
 .credencial-card {
   position: relative;
   background: #FFFFFF;

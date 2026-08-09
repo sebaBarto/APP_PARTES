@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.50.0";
+const APP_VERSION = "3.50.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -3899,8 +3899,8 @@ function renderStock() {
       fechaTexto = `${d}/${mm}/${y}`;
     }
     const partes = [];
-    if (m.cantidad_instalada > 0) partes.push(`Instaló x${m.cantidad_instalada}`);
-    if (m.cantidad_retirada > 0) partes.push(`Retiró x${m.cantidad_retirada}`);
+    if (m.cantidad_instalada > 0) partes.push(`<span class="badge-stock badge-instalado">↑ Instaló x${m.cantidad_instalada}</span>`);
+    if (m.cantidad_retirada > 0) partes.push(`<span class="badge-stock badge-retirado">↓ Retiró x${m.cantidad_retirada}</span>`);
 
     const card = document.createElement("div");
     card.className = "historial-card" + (m.pasado_sistema_offline ? " historial-card-pasado" : "");
@@ -3908,7 +3908,8 @@ function renderStock() {
       <div class="historial-card-num">N° ${escapeHtml(m.numero_servicio || "s/n")}${m.numero_cliente ? " · Cliente " + escapeHtml(m.numero_cliente) : ""}</div>
       <div class="historial-card-cliente">${escapeHtml(m.modelo)}${m.categoria ? " · " + escapeHtml(m.categoria) : ""}</div>
       <div class="historial-card-direccion">${escapeHtml(m.cliente)} — ${escapeHtml(m.direccion || "")}</div>
-      <div class="historial-card-horario">${escapeHtml(m.tecnico)} — ${fechaTexto} — ${partes.join(" / ")}</div>
+      <div class="historial-card-horario">${escapeHtml(m.tecnico)} — ${fechaTexto}</div>
+      <div class="historial-card-badges">${partes.join("")}</div>
       ${puedeMarcarPasado ? `
         <label class="historial-card-check">
           <input type="checkbox" ${m.pasado_sistema_offline ? "checked" : ""}>

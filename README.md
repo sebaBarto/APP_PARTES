@@ -341,6 +341,13 @@ Nuevo en el backend: tres columnas (`pasado_sistema_offline`, `pasado_sistema_po
 `pasado_sistema_en`) y un endpoint para marcar/desmarcar, con quién y cuándo, no solo
 un tilde suelto.
 
+## Historial de Stock: etiquetas de color para instalado/retirado (v3.50.1)
+
+A pedido: cada movimiento ahora se ve con una etiqueta verde ("↑ Instaló xN") y/o una
+naranja ("↓ Retiró xN"), en vez de un texto plano — mucho más fácil de distinguir de un
+vistazo, sobre todo en los casos de reemplazo donde ambas aparecen juntas en la misma
+tarjeta.
+
 ## Huella digital / Face ID para entrar (v3.50.0)
 
 La mejora de seguridad que habíamos evaluado y dejado pendiente: cada técnico puede
