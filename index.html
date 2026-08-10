@@ -906,12 +906,32 @@
           <label class="field-label" for="instalacionDireccionInput">Dirección</label>
           <input class="field-input" id="instalacionDireccionInput" type="text" placeholder="Se completa sola si el cliente ya está cargado">
         </div>
-        <button class="btn btn-primary" id="instalacionIniciarBtn" type="button" style="margin-top:8px;">Iniciar instalación</button>
+        <button class="btn btn-primary" id="instalacionIniciarBtn" type="button" style="margin-top:8px;">Abrir instalación</button>
+        <p class="hint-text" style="margin-top:6px;">Una instalación puede durar varios días — se abre una sola vez, y cada día que vayas marcás tu entrada y salida acá mismo. Recién al terminar del todo, la cerrás y cargás zonas, canales y fotos.</p>
+      </div>
+
+      <div id="instalacionAbiertaWrap" class="hidden">
+        <div class="card" style="margin-top:16px;">
+          <p class="status ok" id="instalacionActivaTexto"></p>
+          <div id="instDiaLlegadaWrap">
+            <button class="btn btn-primary" id="instMarcarLlegadaBtn" type="button">📍 Marcar entrada de hoy</button>
+          </div>
+          <div id="instDiaSalidaWrap" class="hidden">
+            <button class="btn btn-primary" id="instMarcarSalidaBtn" type="button">📍 Marcar salida de hoy</button>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+          <label>Días trabajados hasta ahora</label>
+          <div id="instDiasList" class="historial-list"></div>
+        </div>
+
+        <button class="btn btn-secondary" id="instalacionCerrarBtn" type="button" style="margin-top:16px;">Cerrar instalación</button>
       </div>
 
       <div id="instalacionDetalleWrap" class="hidden">
         <div class="card" style="margin-top:16px;">
-          <p class="status ok" id="instalacionActivaTexto"></p>
+          <p class="hint-text">Última etapa — cargá lo que instalaste y guardá para cerrar definitivamente.</p>
         </div>
 
         <div class="card" style="margin-top:16px;">
@@ -950,6 +970,8 @@
           <p class="status" id="instFotosStatus"></p>
           <div id="instFotosGrid" class="instalacion-fotos-grid"></div>
         </div>
+
+        <button class="btn btn-primary" id="instalacionGuardarYCerrarBtn" type="button" style="margin-top:16px;">✔ Guardar y cerrar instalación</button>
       </div>
     </div>
 

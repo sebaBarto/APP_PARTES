@@ -2696,9 +2696,12 @@ function renderInstalacionesAdminLista() {
   instalacionesAdminLista.innerHTML = filtradas.map((inst) => {
     const [y, m, d] = (inst.fecha || "").split("-");
     const fechaTexto = y ? `${d}/${m}/${y}` : "";
+    const badge = inst.estado === "cerrada"
+      ? `<span style="background:#E1F0E4;color:#1F6B34;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;margin-left:6px;">Cerrada</span>`
+      : `<span style="background:#FBE8DC;color:#B5541A;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;margin-left:6px;">Abierta</span>`;
     return `
       <div class="fila-lista-clickeable" data-id="${inst.id}" style="padding:10px 0; border-bottom:1px solid #EEE; cursor:pointer;">
-        <b>${escapeHtmlAdmin(inst.cliente)}</b>${inst.numero_cliente ? " · Cliente " + escapeHtmlAdmin(inst.numero_cliente) : ""}<br>
+        <b>${escapeHtmlAdmin(inst.cliente)}</b>${inst.numero_cliente ? " · Cliente " + escapeHtmlAdmin(inst.numero_cliente) : ""}${badge}<br>
         <span style="color:#6B7680; font-size:13px;">${escapeHtmlAdmin(inst.tecnico)} — ${fechaTexto}</span>
       </div>
     `;
@@ -2731,11 +2734,21 @@ async function mostrarDetalleInstalacionAdmin(id) {
     const fotosHtml = (inst.fotos || []).map((nombre) =>
       `<img src="/api/historial?tipo=foto-instalacion&id=${id}&nombre=${encodeURIComponent(nombre)}" style="width:100px;height:100px;object-fit:cover;border-radius:8px;margin:4px;">`
     ).join("") || "<p style='color:#6B7680;'>Sin fotos.</p>";
+    const diasHtml = (inst.dias || []).map((d, idx) => {
+      const [y, m, dd] = (d.fecha_llegada || "").split("-");
+      const fechaTexto = y ? `${dd}/${m}/${y}` : "";
+      return `<li>Día ${idx + 1} (${fechaTexto}): entrada ${escapeHtmlAdmin(d.hora_llegada || "")}${d.hora_salida ? ", salida " + escapeHtmlAdmin(d.hora_salida) : " — sigue en obra"}</li>`;
+    }).join("") || "<li style='color:#6B7680;'>Sin días marcados.</li>";
+    const estadoBadge = inst.estado === "cerrada"
+      ? `<span style="background:#E1F0E4;color:#1F6B34;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:700;">Cerrada</span>`
+      : `<span style="background:#FBE8DC;color:#B5541A;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:700;">Abierta</span>`;
 
     instalacionesAdminDetalleContenido.innerHTML = `
-      <h2 style="margin-top:0;">${escapeHtmlAdmin(inst.cliente)}</h2>
+      <h2 style="margin-top:0;">${escapeHtmlAdmin(inst.cliente)} ${estadoBadge}</h2>
       <p style="color:#6B7680;">${escapeHtmlAdmin(inst.direccion || "")}${inst.numero_cliente ? " · Cliente " + escapeHtmlAdmin(inst.numero_cliente) : ""}</p>
-      <p style="color:#6B7680;">${escapeHtmlAdmin(inst.tecnico)} — ${escapeHtmlAdmin(inst.fecha || "")} ${escapeHtmlAdmin(inst.hora || "")}</p>
+      <p style="color:#6B7680;">${escapeHtmlAdmin(inst.tecnico)} — abierta el ${escapeHtmlAdmin(inst.fecha || "")} ${escapeHtmlAdmin(inst.hora || "")}</p>
+      <h3>Días trabajados</h3>
+      <ul>${diasHtml}</ul>
       <h3>Zonas de alarma</h3>
       <ul>${zonasHtml}</ul>
       <h3>Canales de cámaras</h3>

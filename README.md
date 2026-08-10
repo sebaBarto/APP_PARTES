@@ -341,6 +341,31 @@ Nuevo en el backend: tres columnas (`pasado_sistema_offline`, `pasado_sistema_po
 `pasado_sistema_en`) y un endpoint para marcar/desmarcar, con quién y cuándo, no solo
 un tilde suelto.
 
+## Instalación de varios días: abrir, marcar cada día, y cerrar al final (v3.54.0)
+
+Rediseño completo del flujo de Instalación, para instalaciones que llevan varios días:
+
+- Se **abre** la instalación una sola vez (elegís el cliente).
+- Cada día que el técnico va, marca su **entrada** y **salida** ahí mismo — se ve la
+  lista de días trabajados hasta el momento, en tiempo real.
+- Recién al terminar del todo, el técnico toca **"Cerrar instalación"** — ahí se
+  destraban los campos de zonas de alarma, canales de cámaras, y fotos. Con todo
+  cargado, **"Guardar y cerrar"** guarda todo y cierra la instalación de forma
+  definitiva.
+- No se puede cerrar si queda una entrada sin su salida marcada, ni se puede marcar una
+  entrada nueva en una instalación que ya está cerrada — validado del lado del servidor,
+  no solo en la pantalla.
+
+En `admin.html` → pestaña Instalaciones, cada entrada de la lista muestra si está
+**abierta** o **cerrada**, y el detalle ahora incluye también los **días trabajados**
+(entrada y salida de cada uno), además de zonas, canales y fotos.
+
+Backend nuevo: `instalaciones` tiene un campo de estado, y `presencias_obra` se puede
+vincular a una instalación puntual (`instalacion_id`). Probado de punta a punta contra
+una base real: 3 días completos, rechazo de cierre con una marca abierta, cierre
+exitoso, y bloqueo de nuevas entradas después de cerrado — y también probado con clics
+reales en la pantalla, con los mismos resultados.
+
 ## Fusión en "Instalador" + vista de Instalaciones en admin.html (v3.53.0)
 
 A pedido: "Presencia en obra" e "Instalación" ya no son dos tiles sueltos en la

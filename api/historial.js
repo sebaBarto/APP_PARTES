@@ -224,6 +224,19 @@ module.exports = async (req, res) => {
         res.status(r.status).json(data);
         return;
       }
+      if (body.accion === "cerrar_instalacion") {
+        if (!body.instalacion_id) {
+          res.status(400).json({ error: "Falta instalacion_id" });
+          return;
+        }
+        const r = await fetch(`${BACKEND_NUEVO_URL}/api/instalaciones/${encodeURIComponent(body.instalacion_id)}/cerrar`, {
+          method: "POST",
+          headers: headersBackendNuevo,
+        });
+        const data = await r.json();
+        res.status(r.status).json(data);
+        return;
+      }
       if (body.accion === "guardar_items_instalacion") {
         if (!body.instalacion_id || !body.tipo) {
           res.status(400).json({ error: "Falta instalacion_id o tipo" });

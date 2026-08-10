@@ -141,6 +141,17 @@ async function getPresenciaHistorialNuevo(headersBackendNuevo, res) {
   }
 }
 
+async function getPresenciasDeInstalacionNuevo(headersBackendNuevo, instalacionId, res) {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+  try {
+    const r = await fetch(`${process.env.BACKEND_NUEVO_URL}/api/presencias-obra/por-instalacion/${encodeURIComponent(instalacionId)}`, { headers: headersBackendNuevo });
+    const data = await r.json();
+    res.status(r.status).json(data);
+  } catch (err) {
+    res.status(500).json({ error: "Error interno al leer los días de esta instalación" });
+  }
+}
+
 async function postPresenciaNuevo(headersBackendNuevo, body, res) {
   const { accion, tecnico, cliente } = body || {};
   if (!accion || !tecnico) {
@@ -207,6 +218,7 @@ module.exports = async (req, res) => {
       if (recurso === "herramienta") return await getHerramientaNuevo(headersBackendNuevo, res);
       if (recurso === "presencia") {
         if (req.query.historial) return await getPresenciaHistorialNuevo(headersBackendNuevo, res);
+        if (req.query.presencias_de_instalacion) return await getPresenciasDeInstalacionNuevo(headersBackendNuevo, req.query.presencias_de_instalacion, res);
         return await getPresenciaNuevo(headersBackendNuevo, req.query.tecnico, res);
       }
       res.status(400).json({ error: "Falta indicar el recurso (?recurso=vehiculo|sim|herramienta|presencia)" });

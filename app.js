@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.53.0";
+const APP_VERSION = "3.54.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -4179,11 +4179,20 @@ function renderHistorialPresencia() {
   });
 }
 
-// ---------- Instalación (zonas, canales, fotos) ----------
+// ---------- Instalación (zonas, canales, fotos — de varios días) ----------
 let instalacionClienteEncontrado = null;
 let instalacionActivaId = null;
+let instalacionActivaEstado = null; // 'abierta' | 'cerrada'
 let instZonasAgregadas = [];
 let instCanalesAgregadas = [];
+const instalacionActivaBtn = document.getElementById("instMarcarLlegadaBtn");
+const instalacionSalidaBtn = document.getElementById("instMarcarSalidaBtn");
+const instDiaLlegadaWrap = document.getElementById("instDiaLlegadaWrap");
+const instDiaSalidaWrap = document.getElementById("instDiaSalidaWrap");
+const instDiasList = document.getElementById("instDiasList");
+const instalacionAbiertaWrap = document.getElementById("instalacionAbiertaWrap");
+const instalacionCerrarBtn = document.getElementById("instalacionCerrarBtn");
+const instalacionGuardarYCerrarBtn = document.getElementById("instalacionGuardarYCerrarBtn");
 
 tileInstalacionBtn.addEventListener("click", () => {
   showScreen("instalacion");
@@ -4194,12 +4203,14 @@ volverDeInstalacionBtn.addEventListener("click", () => showScreen("instaladorMen
 
 function resetearPantallaInstalacion() {
   instalacionActivaId = null;
+  instalacionActivaEstado = null;
   instZonasAgregadas = [];
   instCanalesAgregadas = [];
   instalacionClienteInput.value = "";
   instalacionDireccionInput.value = "";
   instalacionClienteEncontradoInfo.textContent = "";
   instalacionClienteCard.classList.remove("hidden");
+  instalacionAbiertaWrap.classList.add("hidden");
   instalacionDetalleWrap.classList.add("hidden");
   renderInstZonas();
   renderInstCanales();
@@ -4231,7 +4242,7 @@ instalacionClienteInput.addEventListener("input", () => {
 instalacionIniciarBtn.addEventListener("click", async () => {
   const textoEscrito = instalacionClienteInput.value.trim();
   if (!textoEscrito) {
-    showToast("Escribí el cliente antes de iniciar.");
+    showToast("Escribí el cliente antes de abrir la instalación.");
     return;
   }
   const cliente = instalacionClienteEncontrado ? instalacionClienteEncontrado.nombre : textoEscrito;
@@ -4251,14 +4262,123 @@ instalacionIniciarBtn.addEventListener("click", async () => {
     const data = await res.json();
     if (!res.ok || !data.ok) throw new Error(data.error || "Error desconocido");
     instalacionActivaId = data.id;
-    instalacionActivaTexto.textContent = `Instalación en curso: ${cliente}`;
+    instalacionActivaEstado = "abierta";
+    instalacionActivaTexto.textContent = `Instalación abierta: ${cliente}`;
     instalacionClienteCard.classList.add("hidden");
-    instalacionDetalleWrap.classList.remove("hidden");
+    instalacionAbiertaWrap.classList.remove("hidden");
+    instDiaLlegadaWrap.classList.remove("hidden");
+    instDiaSalidaWrap.classList.add("hidden");
+    renderInstDias([]);
   } catch (err) {
-    showToast("No se pudo iniciar: " + err.message);
+    showToast("No se pudo abrir: " + err.message);
   } finally {
     instalacionIniciarBtn.disabled = false;
   }
+});
+
+function renderInstDias(dias) {
+  instDiasList.innerHTML = "";
+  if (!dias || dias.length === 0) {
+    instDiasList.innerHTML = "<p style='color:#6B7680; font-size:13px;'>Todavía no marcaste ningún día.</p>";
+    return;
+  }
+  dias.forEach((d, idx) => {
+    const [y, m, dd] = d.fecha_llegada.split("-");
+    const fechaTexto = `${dd}/${m}/${y}`;
+    const card = document.createElement("div");
+    card.className = "historial-card" + (!d.hora_salida ? " historial-card-en-obra" : "");
+    card.innerHTML = `
+      <div class="historial-card-num">Día ${idx + 1} — ${fechaTexto}</div>
+      <div class="historial-card-horario">Entrada ${d.hora_llegada}${d.hora_salida ? ` — Salida ${d.hora_salida}` : " — <b>sigue en obra</b>"}</div>
+    `;
+    instDiasList.appendChild(card);
+  });
+}
+
+async function actualizarEstadoDiaInstalacion() {
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/recurso-uso?recurso=presencia&tecnico=" + encodeURIComponent(tecnicoLogueado || ""), { headers, cache: "no-store" });
+    const data = await res.json();
+    const enEstaInstalacion = data.activa && data.activa.instalacion_id === instalacionActivaId;
+    instDiaLlegadaWrap.classList.toggle("hidden", !!enEstaInstalacion);
+    instDiaSalidaWrap.classList.toggle("hidden", !enEstaInstalacion);
+  } catch (err) {
+    // si falla, se deja como estaba
+  }
+
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch(`/api/recurso-uso?recurso=presencia&presencias_de_instalacion=${instalacionActivaId}`, { headers, cache: "no-store" });
+    const dias = await res.json();
+    renderInstDias(Array.isArray(dias) ? dias : []);
+  } catch (err) {
+    // si falla, se deja la lista como estaba
+  }
+}
+
+instalacionActivaBtn.addEventListener("click", async () => {
+  const cliente = instalacionClienteEncontrado ? instalacionClienteEncontrado.nombre : instalacionClienteInput.value.trim();
+  instalacionActivaBtn.disabled = true;
+  instalacionActivaBtn.textContent = "Ubicando...";
+  try {
+    const ubicacion = await obtenerUbicacionActual();
+    instalacionActivaBtn.textContent = "📍 Marcar entrada de hoy";
+    const ahora = new Date();
+    const res = await fetch("/api/recurso-uso", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({
+        recurso: "presencia", accion: "llegada", tecnico: tecnicoLogueado, cliente,
+        direccion: instalacionDireccionInput.value.trim(),
+        fecha: ahora.toISOString().slice(0, 10), hora: ahora.toTimeString().slice(0, 5),
+        lat: ubicacion?.lat, lng: ubicacion?.lng, precision: ubicacion?.precision,
+        instalacion_id: instalacionActivaId,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    showToast("Entrada marcada.");
+    actualizarEstadoDiaInstalacion();
+  } catch (err) {
+    showToast("No se pudo marcar: " + err.message);
+  } finally {
+    instalacionActivaBtn.disabled = false;
+    instalacionActivaBtn.textContent = "📍 Marcar entrada de hoy";
+  }
+});
+
+instalacionSalidaBtn.addEventListener("click", async () => {
+  instalacionSalidaBtn.disabled = true;
+  instalacionSalidaBtn.textContent = "Ubicando...";
+  try {
+    const ubicacion = await obtenerUbicacionActual();
+    instalacionSalidaBtn.textContent = "📍 Marcar salida de hoy";
+    const ahora = new Date();
+    const res = await fetch("/api/recurso-uso", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({
+        recurso: "presencia", accion: "salida", tecnico: tecnicoLogueado,
+        fecha: ahora.toISOString().slice(0, 10), hora: ahora.toTimeString().slice(0, 5),
+        lat: ubicacion?.lat, lng: ubicacion?.lng, precision: ubicacion?.precision,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    showToast("Salida marcada.");
+    actualizarEstadoDiaInstalacion();
+  } catch (err) {
+    showToast("No se pudo marcar: " + err.message);
+  } finally {
+    instalacionSalidaBtn.disabled = false;
+    instalacionSalidaBtn.textContent = "📍 Marcar salida de hoy";
+  }
+});
+
+instalacionCerrarBtn.addEventListener("click", () => {
+  instalacionAbiertaWrap.classList.add("hidden");
+  instalacionDetalleWrap.classList.remove("hidden");
 });
 
 function renderInstZonas() {
@@ -4402,6 +4522,32 @@ instFotoInput.addEventListener("change", async () => {
   instFotosStatus.textContent = "";
   instFotoInput.value = "";
   renderInstFotos();
+});
+
+instalacionGuardarYCerrarBtn.addEventListener("click", async () => {
+  if (!instalacionActivaId) return;
+  instalacionGuardarYCerrarBtn.disabled = true;
+  instalacionGuardarYCerrarBtn.textContent = "Guardando...";
+  try {
+    const headers = { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    if (instZonasAgregadas.length > 0) {
+      await fetch("/api/historial", { method: "POST", headers, body: JSON.stringify({ accion: "guardar_items_instalacion", instalacion_id: instalacionActivaId, tipo: "zona", items: instZonasAgregadas }) });
+    }
+    if (instCanalesAgregadas.length > 0) {
+      await fetch("/api/historial", { method: "POST", headers, body: JSON.stringify({ accion: "guardar_items_instalacion", instalacion_id: instalacionActivaId, tipo: "canal", items: instCanalesAgregadas }) });
+    }
+    const res = await fetch("/api/historial", { method: "POST", headers, body: JSON.stringify({ accion: "cerrar_instalacion", instalacion_id: instalacionActivaId }) });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || "No se pudo cerrar");
+    showToast("Instalación cerrada correctamente.");
+    resetearPantallaInstalacion();
+    showScreen("instaladorMenu");
+  } catch (err) {
+    showToast("No se pudo cerrar: " + err.message);
+  } finally {
+    instalacionGuardarYCerrarBtn.disabled = false;
+    instalacionGuardarYCerrarBtn.textContent = "✔ Guardar y cerrar instalación";
+  }
 });
 
 // ---------- Credencial digital del técnico ----------
