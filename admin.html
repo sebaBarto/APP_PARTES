@@ -2761,9 +2761,34 @@ async function mostrarDetalleInstalacionAdmin(id) {
       <ul>${canalesHtml}</ul>
       <h3>Fotos</h3>
       <div style="display:flex; flex-wrap:wrap;">${fotosHtml}</div>
+      ${inst.estado === "abierta" ? `
+        <button type="button" id="instalacionBorrarBtn" style="margin-top:16px; background:#C0392B; color:#fff; border:none; padding:10px 16px; border-radius:8px; cursor:pointer; font-weight:600;">🗑 Borrar esta instalación</button>
+      ` : ""}
     `;
+
+    if (inst.estado === "abierta") {
+      document.getElementById("instalacionBorrarBtn").addEventListener("click", () => borrarInstalacionAdmin(id, inst.cliente));
+    }
   } catch (err) {
     instalacionesAdminDetalleContenido.innerHTML = `<p style="color:#C0392B;">No se pudo cargar: ${escapeHtmlAdmin(err.message)}</p>`;
+  }
+}
+
+async function borrarInstalacionAdmin(id, cliente) {
+  const confirmar = confirm(`¿Borrar la instalación "${cliente}"? Se pierde todo — días marcados, zonas, canales y fotos. Esto no se puede deshacer.`);
+  if (!confirmar) return;
+  try {
+    const res = await fetch("/api/historial", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({ accion: "borrar_instalacion", instalacion_id: id }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || "Error desconocido");
+    instalacionesAdminDetalle.classList.add("hidden");
+    cargarInstalacionesAdmin();
+  } catch (err) {
+    alert("No se pudo borrar: " + err.message);
   }
 }
 

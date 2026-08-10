@@ -341,6 +341,15 @@ Nuevo en el backend: tres columnas (`pasado_sistema_offline`, `pasado_sistema_po
 `pasado_sistema_en`) y un endpoint para marcar/desmarcar, con quién y cuándo, no solo
 un tilde suelto.
 
+## Borrar instalaciones abiertas desde admin.html (v3.57.0)
+
+Nuevo: en `admin.html` → Instalaciones → detalle de una instalación **abierta**, aparece
+un botón "🗑 Borrar esta instalación" (con confirmación antes de borrar). Borra todo lo
+relacionado — días marcados, zonas, canales, y fotos en R2. Las instalaciones **cerradas**
+quedan protegidas — no se puede borrar una una vez cerrada (representa trabajo ya
+terminado), ni desde acá ni directamente contra el backend. Probado de punta a punta:
+el botón aparece solo en abiertas, y el borrado limpia todo correctamente.
+
 ## Instalación recupera sola una que quedó abierta (v3.56.1)
 
 Corrige lo reportado: al volver a entrar a "Instalación" después de haber abierto una y
