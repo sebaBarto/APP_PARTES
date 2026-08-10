@@ -231,6 +231,12 @@ module.exports = async (req, res) => {
         res.status(r.status).json(data);
         return;
       }
+      if (req.query && req.query.tipo === "instalacion_abierta") {
+        const r = await fetch(`${BACKEND_NUEVO_URL}/api/instalaciones/abierta?tecnico=${encodeURIComponent(req.query.tecnico || "")}`, { headers: headersBackendNuevo });
+        const data = await r.json();
+        res.status(r.status).json(data);
+        return;
+      }
       const r = await fetch(`${BACKEND_NUEVO_URL}/api/partes`, { headers: headersBackendNuevo });
       if (!r.ok) {
         res.status(502).json({ error: "No se pudo leer el historial" });

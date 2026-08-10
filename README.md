@@ -341,6 +341,30 @@ Nuevo en el backend: tres columnas (`pasado_sistema_offline`, `pasado_sistema_po
 `pasado_sistema_en`) y un endpoint para marcar/desmarcar, con quién y cuándo, no solo
 un tilde suelto.
 
+## Instalación recupera sola una que quedó abierta (v3.56.1)
+
+Corrige lo reportado: al volver a entrar a "Instalación" después de haber abierto una y
+salido de la pantalla, ahora se fija primero si el técnico tiene alguna instalación sin
+cerrar — si la hay, la retoma directo (con los días ya marcados, lista para seguir
+marcando o cerrar), en vez de mostrar siempre la pantalla de "abrir una nueva" como si
+no existiera. Probado de punta a punta: abrir, marcar un día completo, salir a la
+pantalla principal, volver a entrar, y confirmar que la recupera con el día visible.
+
+## Aviso de guardia — diagnóstico manual, aviso a mano, y copias a ventas/técnica (backend)
+
+Se detectó que el aviso semanal de guardia a Security24 no se estaba mandando — el
+disparador automático de Cloudflare no estaba corriendo, sin errores visibles en el
+código. Se agregó:
+- **Copias**: el mail ahora también llega, en copia, a `ventas@sat365.com.ar` y
+  `tecnica@sat365.com.ar`.
+- **Diagnóstico** (`GET /api/guardias/diagnostico`, en el backend): muestra en cualquier
+  momento, sin mandar nada, qué pasaría si el aviso corriera ahora — a quién le tocaría,
+  si ya se avisó esta semana, etc.
+- **Aviso manual** (`POST /api/guardias/avisar-ahora`, en el backend): dispara el aviso
+  real a mano, con la misma protección contra duplicados que el automático — para
+  cuando el disparador automático no corre y hay que mandarlo sin esperar al lunes
+  siguiente.
+
 ## Ícono de Instalación arreglado + mail de resumen al cerrar (v3.56.0)
 
 Corregido: el tile "Instalación" no mostraba ícono — era un desajuste de nombres de

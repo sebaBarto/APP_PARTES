@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.56.0";
+const APP_VERSION = "3.56.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -442,7 +442,7 @@ volverDeServiciosMenuBtn.addEventListener("click", () => showScreen("home"));
 volverDeDashboardsMenuBtn.addEventListener("click", () => showScreen("home"));
 tileInstaladorBtn.addEventListener("click", () => {
   showScreen("instalacion");
-  resetearPantallaInstalacion();
+  verificarInstalacionAbierta();
 });
 volverDeServiciosBtn.addEventListener("click", () => showScreen("serviciosMenu"));
 const verConsultasBtn = document.getElementById("verConsultasBtn");
@@ -4238,6 +4238,30 @@ function resetearPantallaInstalacion() {
   renderInstCanales();
   instFotosGrid.innerHTML = "";
   instFotosStatus.textContent = "";
+}
+
+// Al entrar a la pantalla, se fija primero si ya hay una instalación
+// abierta sin cerrar para este técnico — si la hay, la retoma
+// directo (con sus días ya marcados), en vez de arrancar siempre de
+// cero como si no existiera.
+async function verificarInstalacionAbierta() {
+  resetearPantallaInstalacion();
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/historial?tipo=instalacion_abierta&tecnico=" + encodeURIComponent(tecnicoLogueado || ""), { headers, cache: "no-store" });
+    const data = await res.json();
+    if (data.abierta) {
+      instalacionActivaId = data.abierta.id;
+      instalacionActivaEstado = "abierta";
+      instalacionActivaTexto.textContent = `Instalación abierta: ${data.abierta.cliente}`;
+      instalacionClienteCard.classList.add("hidden");
+      instalacionAbiertaWrap.classList.remove("hidden");
+      actualizarEstadoDiaInstalacion();
+    }
+  } catch (err) {
+    // si falla la consulta, se deja la pantalla de "abrir nueva" —
+    // no bloquea nada, el técnico puede seguir usándola normal
+  }
 }
 
 instalacionIniciarBtn.addEventListener("click", async () => {
