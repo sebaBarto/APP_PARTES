@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.55.0";
+const APP_VERSION = "3.55.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -1188,6 +1188,30 @@ function renderServiciosList(items) {
 serviciosSearch.addEventListener("input", () => {
   renderServiciosList(filtrarServicios());
 });
+
+// Saca un servicio de la lista compartida (GitHub) apenas se
+// completa, para que desaparezca para todo el equipo — no solo en el
+// celular de quien lo completó. Trae la lista fresca del servidor
+// justo antes de guardar (en vez de confiar en la caché local) para
+// minimizar el riesgo de pisar un cambio de otro técnico/oficina que
+// haya pasado casi al mismo tiempo.
+async function eliminarServicioDeListaCompartida(numeroServicio) {
+  const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+  const res = await fetch(SERVICIOS_URL, { headers, cache: "no-store" });
+  if (!res.ok) throw new Error("No se pudo leer la lista actual (HTTP " + res.status + ")");
+  const listaActual = await res.json();
+  const listaFiltrada = (Array.isArray(listaActual) ? listaActual : []).filter(
+    (s) => s.numero_servicio !== numeroServicio
+  );
+  if (listaFiltrada.length === listaActual.length) return; // ya no estaba, nada que hacer
+
+  const resGuardar = await fetch(SERVICIOS_URL, {
+    method: "POST",
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify(listaFiltrada),
+  });
+  if (!resGuardar.ok) throw new Error("No se pudo guardar la lista actualizada (HTTP " + resGuardar.status + ")");
+}
 
 async function fetchServicios() {
   listStatus.textContent = "Buscando servicios...";
@@ -2699,6 +2723,14 @@ async function intentarEnviarParte(payload, interactivo) {
       serviciosResueltos.add(data.numero_servicio);
       localStorage.setItem("servicios_resueltos", JSON.stringify([...serviciosResueltos]));
       borrarBorrador(data.numero_servicio);
+      // Además de esconderlo en este celular (arriba), se saca de la
+      // lista compartida — así desaparece para todo el equipo, no
+      // solo acá. No se espera a que termine (no debe frenar el
+      // flujo de "listo"); si falla, el servicio simplemente queda
+      // en la lista como antes, sin romper nada.
+      eliminarServicioDeListaCompartida(data.numero_servicio).catch((err) => {
+        console.error("No se pudo quitar el servicio de la lista compartida:", err);
+      });
     }
     try {
       const histRes = await fetch("/api/historial", {

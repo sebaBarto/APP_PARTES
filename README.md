@@ -341,6 +341,16 @@ Nuevo en el backend: tres columnas (`pasado_sistema_offline`, `pasado_sistema_po
 `pasado_sistema_en`) y un endpoint para marcar/desmarcar, con quién y cuándo, no solo
 un tilde suelto.
 
+## Servicio completado ya se borra de la lista compartida para todos (v3.55.1)
+
+Corrige lo reportado: antes, al completar un parte, el servicio solo se escondía en el
+celular de quien lo completó — nunca se sacaba de la lista compartida, así que
+reaparecía apenas se actualizaba (y siempre estuvo visible para el resto del equipo).
+Ahora, al completar con éxito, además se trae la lista fresca del servidor, se saca ese
+servicio, y se guarda — así desaparece para todos, no solo localmente. No frena el
+flujo de "listo" (corre en paralelo); si por algún motivo falla, el servicio
+simplemente queda en la lista como antes, sin romper nada.
+
 ## Instalación simplificada: tile directo, nombre libre, geolocalización verificable (v3.55.0)
 
 Tres ajustes a pedido:
