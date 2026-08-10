@@ -341,6 +341,34 @@ Nuevo en el backend: tres columnas (`pasado_sistema_offline`, `pasado_sistema_po
 `pasado_sistema_en`) y un endpoint para marcar/desmarcar, con quién y cuándo, no solo
 un tilde suelto.
 
+## Instalación: ayudante en el mismo servicio, observaciones al cerrar, y no perder datos (v3.59.0)
+
+Tres mejoras a pedido, todas relacionadas con el trabajo en equipo en una instalación:
+
+- **Ayudante en la misma instalación**: cuando un técnico marca su entrada en una
+  instalación, cualquier otro técnico que entre a la pantalla ahora ve un aviso
+  ("Instalaciones abiertas ahora — ¿sos el ayudante?") con quién ya está trabajando ahí,
+  y un botón "Sumarme" — marca su propia entrada/salida, pero todo queda en el mismo
+  servicio del mismo cliente, no se crean instalaciones separadas. El cierre exige que
+  **todos** los que se sumaron hayan marcado su salida — y si a alguno le falta, el
+  mensaje dice específicamente quién.
+- **Observaciones al cerrar**: nuevo campo de texto libre en la pantalla de cierre —
+  se guarda con la instalación, y aparece tanto en el mail de resumen como en
+  `admin.html`.
+- **No se pierde nada si falta marcar salida**: si alguien intenta cerrar sin haber
+  marcado su propia salida, la app lo manda de vuelta a esa pantalla — pero las zonas,
+  canales, fotos y observaciones que ya había cargado quedan intactas, listas para
+  cuando vuelva a intentar cerrar.
+
+El mail de resumen y la vista en `admin.html` ahora muestran, para cada día trabajado,
+qué técnico específico lo marcó (no solo quién abrió la instalación en un principio).
+
+Backend nuevo: tabla `instalaciones` con columna de `observaciones`, y un endpoint para
+listar todas las instalaciones abiertas (usado para el "sumarme"). Probado de punta a
+punta con dos técnicos distintos: uno abre y marca, el otro lo encuentra y se suma,
+carga datos, intenta cerrar sin haber marcado salida (se lo frena sin perder nada),
+marca salida, y cierra con éxito con todo intacto.
+
 ## Claves: dos correcciones reales, y ahora visibles en el Historial (v3.58.0)
 
 A raíz de un caso real reportado (un parte con claves cargadas que no aparecieron en el

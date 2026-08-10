@@ -2743,7 +2743,7 @@ async function mostrarDetalleInstalacionAdmin(id) {
       const linkSalida = (d.hora_salida && d.lat_salida && d.lng_salida)
         ? ` <a href="https://www.google.com/maps?q=${d.lat_salida},${d.lng_salida}" target="_blank" rel="noopener" style="color:#4A6FA5;">📍 ver ubicación${d.precision_salida ? ` (±${Math.round(d.precision_salida)}m)` : ""}</a>`
         : (d.hora_salida ? ` <span style="color:#B5541A; font-size:12px;">(sin ubicación)</span>` : "");
-      return `<li>Día ${idx + 1} (${fechaTexto}): entrada ${escapeHtmlAdmin(d.hora_llegada || "")}${linkEntrada}${d.hora_salida ? `, salida ${escapeHtmlAdmin(d.hora_salida)}${linkSalida}` : " — sigue en obra"}</li>`;
+      return `<li>Día ${idx + 1} (${fechaTexto}) — <b>${escapeHtmlAdmin(d.tecnico)}</b>: entrada ${escapeHtmlAdmin(d.hora_llegada || "")}${linkEntrada}${d.hora_salida ? `, salida ${escapeHtmlAdmin(d.hora_salida)}${linkSalida}` : " — sigue en obra"}</li>`;
     }).join("") || "<li style='color:#6B7680;'>Sin días marcados.</li>";
     const estadoBadge = inst.estado === "cerrada"
       ? `<span style="background:#E1F0E4;color:#1F6B34;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:700;">Cerrada</span>`
@@ -2752,13 +2752,14 @@ async function mostrarDetalleInstalacionAdmin(id) {
     instalacionesAdminDetalleContenido.innerHTML = `
       <h2 style="margin-top:0;">${escapeHtmlAdmin(inst.cliente)} ${estadoBadge}</h2>
       <p style="color:#6B7680;">${escapeHtmlAdmin(inst.direccion || "")}${inst.numero_cliente ? " · Cliente " + escapeHtmlAdmin(inst.numero_cliente) : ""}</p>
-      <p style="color:#6B7680;">${escapeHtmlAdmin(inst.tecnico)} — abierta el ${escapeHtmlAdmin(inst.fecha || "")} ${escapeHtmlAdmin(inst.hora || "")}</p>
+      <p style="color:#6B7680;">Abierta por ${escapeHtmlAdmin(inst.tecnico)} el ${escapeHtmlAdmin(inst.fecha || "")} ${escapeHtmlAdmin(inst.hora || "")}</p>
       <h3>Días trabajados</h3>
       <ul>${diasHtml}</ul>
       <h3>Zonas de alarma</h3>
       <ul>${zonasHtml}</ul>
       <h3>Canales de cámaras</h3>
       <ul>${canalesHtml}</ul>
+      ${inst.observaciones ? `<h3>Observaciones</h3><p style="background:#F4F5F0; border-radius:8px; padding:12px 14px;">${escapeHtmlAdmin(inst.observaciones)}</p>` : ""}
       <h3>Fotos</h3>
       <div style="display:flex; flex-wrap:wrap;">${fotosHtml}</div>
       ${inst.estado === "abierta" ? `

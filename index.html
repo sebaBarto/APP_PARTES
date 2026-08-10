@@ -873,6 +873,11 @@
     <div class="review-scroll">
       <p class="hint-eyebrow review-eyebrow">INSTALACIÓN</p>
 
+      <div id="instalacionesAbiertasParaSumarseWrap" class="hidden" style="margin-bottom:16px;">
+        <p class="hint-eyebrow" style="margin-bottom:8px;">Instalaciones abiertas ahora — ¿sos el ayudante?</p>
+        <div id="instalacionesAbiertasParaSumarseList"></div>
+      </div>
+
       <div class="card" id="instalacionClienteCard">
         <label class="field-label" for="instalacionClienteInput">Nombre de la instalación</label>
         <input class="field-input" id="instalacionClienteInput" type="text" placeholder="Ej: Distribuidora Norte, o el nombre que prefieras">
@@ -943,6 +948,11 @@
           <input type="file" id="instFotoInput" accept="image/*" capture="environment" multiple style="margin-top:6px;">
           <p class="status" id="instFotosStatus"></p>
           <div id="instFotosGrid" class="instalacion-fotos-grid"></div>
+        </div>
+
+        <div class="card" style="margin-top:16px;">
+          <label class="field-label" for="instObservacionesInput">Observaciones (opcional)</label>
+          <textarea class="field-input field-textarea" id="instObservacionesInput" placeholder="Cualquier comentario general sobre cómo quedó la instalación..."></textarea>
         </div>
 
         <button class="btn btn-primary" id="instalacionGuardarYCerrarBtn" type="button" style="margin-top:16px;">✔ Guardar y cerrar instalación</button>

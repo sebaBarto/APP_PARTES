@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.58.0";
+const APP_VERSION = "3.59.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -277,6 +277,9 @@ const guardarCanalesBtn = document.getElementById("guardarCanalesBtn");
 const instFotoInput = document.getElementById("instFotoInput");
 const instFotosStatus = document.getElementById("instFotosStatus");
 const instFotosGrid = document.getElementById("instFotosGrid");
+const instalacionesAbiertasParaSumarseWrap = document.getElementById("instalacionesAbiertasParaSumarseWrap");
+const instalacionesAbiertasParaSumarseList = document.getElementById("instalacionesAbiertasParaSumarseList");
+const instObservacionesInput = document.getElementById("instObservacionesInput");
 const volverDePresenciaBtn = document.getElementById("volverDePresenciaBtn");
 const presenciaEstadoTexto = document.getElementById("presenciaEstadoTexto");
 const presenciaLlegadaWrap = document.getElementById("presenciaLlegadaWrap");
@@ -4247,7 +4250,9 @@ function resetearPantallaInstalacion() {
   instCanalesAgregadas = [];
   instalacionClienteInput.value = "";
   instalacionDireccionInput.value = "";
+  instObservacionesInput.value = "";
   instalacionClienteCard.classList.remove("hidden");
+  instalacionesAbiertasParaSumarseWrap.classList.add("hidden");
   instalacionAbiertaWrap.classList.add("hidden");
   instalacionDetalleWrap.classList.add("hidden");
   renderInstZonas();
@@ -4264,21 +4269,100 @@ async function verificarInstalacionAbierta() {
   resetearPantallaInstalacion();
   try {
     const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+
+    // 1) ¿Tengo una instalación que YO abrí, todavía sin cerrar?
     const res = await fetch("/api/historial?tipo=instalacion_abierta&tecnico=" + encodeURIComponent(tecnicoLogueado || ""), { headers, cache: "no-store" });
     const data = await res.json();
     if (data.abierta) {
-      instalacionActivaId = data.abierta.id;
-      instalacionActivaEstado = "abierta";
-      instalacionClienteInput.value = data.abierta.cliente; // lo necesita el botón de marcar entrada
-      instalacionDireccionInput.value = data.abierta.direccion || "";
-      instalacionActivaTexto.textContent = `Instalación abierta: ${data.abierta.cliente}`;
-      instalacionClienteCard.classList.add("hidden");
-      instalacionAbiertaWrap.classList.remove("hidden");
-      actualizarEstadoDiaInstalacion();
+      mostrarInstalacionAbierta(data.abierta);
+      return;
     }
+
+    // 2) ¿Estoy marcado presente ahora mismo en la instalación de OTRO
+    // técnico? (me sumé como ayudante)
+    const resActiva = await fetch("/api/recurso-uso?recurso=presencia&tecnico=" + encodeURIComponent(tecnicoLogueado || ""), { headers, cache: "no-store" });
+    const dataActiva = await resActiva.json();
+    if (dataActiva.activa && dataActiva.activa.instalacion_id) {
+      const resInst = await fetch("/api/historial?tipo=instalacion&id=" + dataActiva.activa.instalacion_id, { headers, cache: "no-store" });
+      const inst = await resInst.json();
+      if (inst && !inst.error) {
+        mostrarInstalacionAbierta(inst);
+        return;
+      }
+    }
+
+    // 3) No tengo ninguna propia — ver si hay instalaciones abiertas
+    // de otros técnicos, por si soy el ayudante de alguna.
+    await mostrarInstalacionesParaSumarse();
   } catch (err) {
     // si falla la consulta, se deja la pantalla de "abrir nueva" —
     // no bloquea nada, el técnico puede seguir usándola normal
+  }
+}
+
+function mostrarInstalacionAbierta(inst) {
+  instalacionActivaId = inst.id;
+  instalacionActivaEstado = "abierta";
+  instalacionClienteInput.value = inst.cliente; // lo necesita el botón de marcar entrada
+  instalacionDireccionInput.value = inst.direccion || "";
+  instalacionActivaTexto.textContent = `Instalación abierta: ${inst.cliente}`;
+  instalacionClienteCard.classList.add("hidden");
+  instalacionesAbiertasParaSumarseWrap.classList.add("hidden");
+  instalacionAbiertaWrap.classList.remove("hidden");
+  actualizarEstadoDiaInstalacion();
+}
+
+async function mostrarInstalacionesParaSumarse() {
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/historial?tipo=instalaciones_abiertas", { headers, cache: "no-store" });
+    const lista = await res.json();
+    if (!Array.isArray(lista) || lista.length === 0) {
+      instalacionesAbiertasParaSumarseWrap.classList.add("hidden");
+      return;
+    }
+    instalacionesAbiertasParaSumarseWrap.classList.remove("hidden");
+    instalacionesAbiertasParaSumarseList.innerHTML = lista.map((inst) => {
+      const tecnicos = (inst.tecnicos_involucrados || []).join(", ") || inst.tecnico;
+      return `
+        <div class="card" style="margin-bottom:10px;">
+          <b>${escapeHtml(inst.cliente)}</b><br>
+          <span style="color:#6B7680; font-size:13px;">Con: ${escapeHtml(tecnicos)}</span><br>
+          <button type="button" class="btn btn-secondary btn-small sumarme-btn" style="margin-top:8px;"
+            data-id="${inst.id}" data-cliente="${escapeHtml(inst.cliente)}" data-direccion="${escapeHtml(inst.direccion || "")}">
+            Sumarme (marcar mi entrada)
+          </button>
+        </div>
+      `;
+    }).join("");
+    instalacionesAbiertasParaSumarseList.querySelectorAll(".sumarme-btn").forEach((btn) => {
+      btn.addEventListener("click", () => sumarmeAInstalacion(btn.dataset.id, btn.dataset.cliente, btn.dataset.direccion));
+    });
+  } catch (err) {
+    instalacionesAbiertasParaSumarseWrap.classList.add("hidden");
+  }
+}
+
+async function sumarmeAInstalacion(id, cliente, direccion) {
+  try {
+    const ubicacion = await obtenerUbicacionActual();
+    const ahora = new Date();
+    const res = await fetch("/api/recurso-uso", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({
+        recurso: "presencia", accion: "llegada", tecnico: tecnicoLogueado, cliente, direccion,
+        fecha: ahora.toISOString().slice(0, 10), hora: ahora.toTimeString().slice(0, 5),
+        lat: ubicacion?.lat, lng: ubicacion?.lng, precision: ubicacion?.precision,
+        instalacion_id: Number(id),
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    showToast(`Te sumaste a la instalación en ${cliente}.`);
+    verificarInstalacionAbierta();
+  } catch (err) {
+    showToast("No se pudo sumar: " + err.message);
   }
 }
 
@@ -4306,6 +4390,7 @@ instalacionIniciarBtn.addEventListener("click", async () => {
     instalacionActivaEstado = "abierta";
     instalacionActivaTexto.textContent = `Instalación abierta: ${nombreInstalacion}`;
     instalacionClienteCard.classList.add("hidden");
+    instalacionesAbiertasParaSumarseWrap.classList.add("hidden");
     instalacionAbiertaWrap.classList.remove("hidden");
     instDiaLlegadaWrap.classList.remove("hidden");
     instDiaSalidaWrap.classList.add("hidden");
@@ -4577,9 +4662,23 @@ instalacionGuardarYCerrarBtn.addEventListener("click", async () => {
     if (instCanalesAgregadas.length > 0) {
       await fetch("/api/historial", { method: "POST", headers, body: JSON.stringify({ accion: "guardar_items_instalacion", instalacion_id: instalacionActivaId, tipo: "canal", items: instCanalesAgregadas }) });
     }
-    const res = await fetch("/api/historial", { method: "POST", headers, body: JSON.stringify({ accion: "cerrar_instalacion", instalacion_id: instalacionActivaId }) });
+    const res = await fetch("/api/historial", { method: "POST", headers, body: JSON.stringify({ accion: "cerrar_instalacion", instalacion_id: instalacionActivaId, observaciones: instObservacionesInput.value.trim() }) });
     const data = await res.json();
-    if (!res.ok || !data.ok) throw new Error(data.error || "No se pudo cerrar");
+    if (!res.ok || !data.ok) {
+      // Si el motivo es que falta marcar una salida, se manda de
+      // vuelta a esa pantalla para que la marque — sin perder nada
+      // de lo que ya cargó acá (zonas, canales, fotos y
+      // observaciones quedan tal cual, para retomar el cierre
+      // después sin tener que volver a escribir todo).
+      if (data.error && data.error.includes("sin salida")) {
+        showToast(data.error);
+        instalacionDetalleWrap.classList.add("hidden");
+        instalacionAbiertaWrap.classList.remove("hidden");
+        actualizarEstadoDiaInstalacion();
+        return;
+      }
+      throw new Error(data.error || "No se pudo cerrar");
+    }
     showToast("Instalación cerrada correctamente.");
     resetearPantallaInstalacion();
     showScreen("home");

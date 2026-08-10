@@ -123,7 +123,7 @@ async function mandarMailResumenInstalacion(instalacionId, backendUrl, headersBa
   const diasHtml = (inst.dias || []).map((d, idx) => {
     const linkEntrada = (d.lat_llegada && d.lng_llegada) ? ` (<a href="https://www.google.com/maps?q=${d.lat_llegada},${d.lng_llegada}">ver ubicación</a>)` : "";
     const linkSalida = (d.lat_salida && d.lng_salida) ? ` (<a href="https://www.google.com/maps?q=${d.lat_salida},${d.lng_salida}">ver ubicación</a>)` : "";
-    return `<li>Día ${idx + 1} (${formatearFecha(d.fecha_llegada)}): entrada ${escapeHtmlMail(d.hora_llegada)}${linkEntrada}${d.hora_salida ? `, salida ${escapeHtmlMail(d.hora_salida)}${linkSalida}` : ""}</li>`;
+    return `<li>Día ${idx + 1} (${formatearFecha(d.fecha_llegada)}) — <b>${escapeHtmlMail(d.tecnico)}</b>: entrada ${escapeHtmlMail(d.hora_llegada)}${linkEntrada}${d.hora_salida ? `, salida ${escapeHtmlMail(d.hora_salida)}${linkSalida}` : ""}</li>`;
   }).join("") || "<li>Sin días registrados.</li>";
 
   const zonasHtml = (inst.zonas || []).map((z) => `<li>Zona ${escapeHtmlMail(z.numero)} — ${escapeHtmlMail(z.descripcion)}</li>`).join("") || "<li>Sin zonas cargadas.</li>";
@@ -157,6 +157,7 @@ async function mandarMailResumenInstalacion(instalacionId, backendUrl, headersBa
       <ul>${zonasHtml}</ul>
       <h3>Canales de cámaras</h3>
       <ul>${canalesHtml}</ul>
+      ${inst.observaciones ? `<h3>Observaciones</h3><p style="background:#F4F5F0; border-radius:8px; padding:12px 14px;">${escapeHtmlMail(inst.observaciones)}</p>` : ""}
       <h3>Fotos</h3>
       <p>${(inst.fotos || []).length > 0 ? `${inst.fotos.length} foto(s) adjunta(s) a este mail.` : "Sin fotos cargadas."}</p>
     </div>
@@ -237,6 +238,12 @@ module.exports = async (req, res) => {
       }
       if (req.query && req.query.tipo === "instalacion_abierta") {
         const r = await fetch(`${BACKEND_NUEVO_URL}/api/instalaciones/abierta?tecnico=${encodeURIComponent(req.query.tecnico || "")}`, { headers: headersBackendNuevo });
+        const data = await r.json();
+        res.status(r.status).json(data);
+        return;
+      }
+      if (req.query && req.query.tipo === "instalaciones_abiertas") {
+        const r = await fetch(`${BACKEND_NUEVO_URL}/api/instalaciones/abiertas`, { headers: headersBackendNuevo });
         const data = await r.json();
         res.status(r.status).json(data);
         return;
@@ -333,7 +340,8 @@ module.exports = async (req, res) => {
         }
         const r = await fetch(`${BACKEND_NUEVO_URL}/api/instalaciones/${encodeURIComponent(body.instalacion_id)}/cerrar`, {
           method: "POST",
-          headers: headersBackendNuevo,
+          headers: { ...headersBackendNuevo, "Content-Type": "application/json" },
+          body: JSON.stringify({ observaciones: body.observaciones || "" }),
         });
         const data = await r.json();
         if (!r.ok || !data.ok) {
