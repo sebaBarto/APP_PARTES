@@ -341,6 +341,25 @@ Nuevo en el backend: tres columnas (`pasado_sistema_offline`, `pasado_sistema_po
 `pasado_sistema_en`) y un endpoint para marcar/desmarcar, con quién y cuándo, no solo
 un tilde suelto.
 
+## Claves: dos correcciones reales, y ahora visibles en el Historial (v3.58.0)
+
+A raíz de un caso real reportado (un parte con claves cargadas que no aparecieron en el
+mail), se encontraron y corrigieron dos problemas independientes:
+
+1. **Si se escribía una clave pero nunca se tocaba "+ Agregar"**, se perdía en
+   silencio, sin ningún aviso — mismo problema que ya existía (y ya estaba resuelto)
+   para materiales. Ahora avisa antes de dejar continuar a la firma, igual que con
+   materiales.
+2. **Más grave**: al guardar el parte en el historial (D1), el campo `claves` nunca se
+   mandaba — se usaba solo para el mail, pero jamás quedaba guardado. Esto significa que,
+   aunque el mail hubiera salido bien, esa información no era recuperable después. Ya
+   corregido — se guarda como corresponde, y **ahora las claves se pueden ver
+   directamente en el Historial de la app**, en cada parte que las tenga cargadas — así
+   quedan siempre accesibles, no solo en el mail del momento.
+
+Probado de punta a punta: guardar un parte con una clave y volver a leerlo trae la
+información intacta, y se ve correctamente en la tarjeta del Historial.
+
 ## Corrige error al marcar entrada del 2do día en Instalación (v3.57.1)
 
 Corrige lo reportado: al recuperar una instalación abierta (por ejemplo, al entrar de

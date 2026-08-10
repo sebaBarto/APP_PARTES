@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.57.1";
+const APP_VERSION = "3.58.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -2539,6 +2539,13 @@ toSignBtn.addEventListener("click", () => {
     showToast('Tenés un material elegido sin agregar — tocá "+ Agregar" o borralo antes de continuar.');
     return;
   }
+  // Mismo caso para una clave escrita pero nunca agregada a la lista
+  // — sin este aviso, se pierde en silencio (fue justo lo que pasó
+  // con un parte real).
+  if (clavesTituloInput.value.trim() || clavesUsuarioInput.value.trim() || clavesClaveInput.value.trim() || clavesCodigoInput.value.trim()) {
+    showToast('Tenés una clave escrita sin agregar — andá a "Claves" y tocá "+ Agregar" antes de continuar.');
+    return;
+  }
   showScreen("sign");
   setupCanvas();
 });
@@ -3864,11 +3871,20 @@ function renderHistorialReciente() {
     }
     const card = document.createElement("div");
     card.className = "historial-card" + (h.pasado_sistema_offline ? " historial-card-pasado" : "");
+    const clavesHtml = (h.claves && h.claves.length > 0) ? `
+      <div class="historial-card-claves">
+        🔑 ${h.claves.map((c) => {
+          const detalle = [c.usuario && `Usuario: ${escapeHtml(c.usuario)}`, c.clave && `Clave: ${escapeHtml(c.clave)}`, c.codigo && `Código: ${escapeHtml(c.codigo)}`].filter(Boolean).join(" · ");
+          return `<b>${escapeHtml(c.titulo)}</b>${detalle ? " — " + detalle : ""}`;
+        }).join("<br>")}
+      </div>
+    ` : "";
     card.innerHTML = `
       <div class="historial-card-num">N° ${escapeHtml(h.numero_servicio || h.id_parte)}</div>
       <div class="historial-card-cliente">${escapeHtml(h.cliente)}</div>
       <div class="historial-card-direccion">${escapeHtml(h.direccion)}${h.localidad ? ", " + escapeHtml(h.localidad) : ""}</div>
       <div class="historial-card-horario">${fechaTexto} — ${h.hora_entrada || "?"} a ${h.hora_salida || "?"}</div>
+      ${clavesHtml}
       ${puedeMarcarPasado ? `
         <label class="historial-card-check">
           <input type="checkbox" ${h.pasado_sistema_offline ? "checked" : ""}>

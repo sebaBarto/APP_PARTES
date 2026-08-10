@@ -1002,6 +1002,16 @@ html, body {
 .historial-card-cliente { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 15px; color: #101820; margin: 3px 0; }
 .historial-card-direccion { font-size: 13px; color: #6B7680; }
 .historial-card-horario { font-size: 12px; color: #6B7680; margin-top: 4px; font-family: 'IBM Plex Mono', monospace; }
+.historial-card-claves {
+  font-size: 12px;
+  color: #101820;
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: #FCEEEC;
+  border: 1px solid #E4B8B2;
+  border-radius: 8px;
+  line-height: 1.5;
+}
 
 .historial-card-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
 .badge-stock {

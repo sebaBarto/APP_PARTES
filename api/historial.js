@@ -74,11 +74,14 @@ function mapearHaciaBackendNuevo(v) {
     descuento_pct: numeroLimpio(v.descuento),
     costo_final: numeroLimpio(v.costo_final),
     forma_pago: v.forma_pago || "",
+    claves: JSON.stringify(Array.isArray(v.claves) ? v.claves : []),
   };
 }
 
 // Backend nuevo -> app (al leer el historial completo)
 function mapearDesdeBackendNuevo(p) {
+  let claves = [];
+  try { claves = JSON.parse(p.claves || "[]"); } catch (err) { claves = []; }
   return {
     id_parte: p.id,
     numero_servicio: p.numero_servicio || "",
@@ -102,6 +105,7 @@ function mapearDesdeBackendNuevo(p) {
     pasado_sistema_offline: !!p.pasado_sistema_offline,
     pasado_sistema_por: p.pasado_sistema_por || "",
     pasado_sistema_en: p.pasado_sistema_en || "",
+    claves,
   };
 }
 
