@@ -140,7 +140,7 @@
           <span class="panel-tile-icon-badge">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 18v3"/><circle cx="8" cy="9" r="1"/><circle cx="12" cy="9" r="1"/><circle cx="16" cy="9" r="1"/><circle cx="8" cy="13" r="1"/><circle cx="12" cy="13" r="1"/></svg>
           </span>
-          <span class="panel-tile-label">Instalador</span>
+          <span class="panel-tile-label">Instalación</span>
         </button>
         <button type="button" class="panel-tile panel-tile-grid tile-comodato" id="tileComodatoBtn">
           <span class="panel-tile-icon-badge">
@@ -241,30 +241,6 @@
     </div>
     <div class="action-bar">
       <button class="btn btn-secondary" id="volverDeDashboardsMenuBtn" type="button">Volver</button>
-    </div>
-  </section>
-
-  <!-- SUBMENÚ INSTALADOR (Presencia en obra + Instalación) -->
-  <section class="screen" id="screen-instalador-menu">
-    <div class="review-scroll">
-      <p class="hint-eyebrow review-eyebrow">INSTALADOR</p>
-      <div class="panel-tiles panel-tiles-grid">
-        <button type="button" class="panel-tile panel-tile-grid tile-presencia" id="tilePresenciaBtn">
-          <span class="panel-tile-icon-badge">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.4 22a8.4 8.4 0 0 0-16.8 0"/><circle cx="12" cy="7.5" r="4.5"/></svg>
-          </span>
-          <span class="panel-tile-label">Presencia en obra</span>
-        </button>
-        <button type="button" class="panel-tile panel-tile-grid tile-instalacion" id="tileInstalacionBtn">
-          <span class="panel-tile-icon-badge">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 18v3"/><circle cx="8" cy="9" r="1"/><circle cx="12" cy="9" r="1"/><circle cx="16" cy="9" r="1"/><circle cx="8" cy="13" r="1"/><circle cx="12" cy="13" r="1"/></svg>
-          </span>
-          <span class="panel-tile-label">Instalación</span>
-        </button>
-      </div>
-    </div>
-    <div class="action-bar">
-      <button class="btn btn-secondary" id="volverDeInstaladorMenuBtn" type="button">Volver</button>
     </div>
   </section>
 
@@ -898,13 +874,11 @@
       <p class="hint-eyebrow review-eyebrow">INSTALACIÓN</p>
 
       <div class="card" id="instalacionClienteCard">
-        <label class="field-label" for="instalacionClienteInput">Cliente</label>
-        <input class="field-input" id="instalacionClienteInput" type="text" placeholder="Escribí para buscar el cliente..." list="instalacionClientesLista">
-        <datalist id="instalacionClientesLista"></datalist>
-        <div id="instalacionClienteEncontradoInfo" class="hint-text"></div>
+        <label class="field-label" for="instalacionClienteInput">Nombre de la instalación</label>
+        <input class="field-input" id="instalacionClienteInput" type="text" placeholder="Ej: Distribuidora Norte, o el nombre que prefieras">
         <div class="field-group" style="margin-top:8px;">
-          <label class="field-label" for="instalacionDireccionInput">Dirección</label>
-          <input class="field-input" id="instalacionDireccionInput" type="text" placeholder="Se completa sola si el cliente ya está cargado">
+          <label class="field-label" for="instalacionDireccionInput">Dirección (opcional)</label>
+          <input class="field-input" id="instalacionDireccionInput" type="text" placeholder="Dirección del lugar">
         </div>
         <button class="btn btn-primary" id="instalacionIniciarBtn" type="button" style="margin-top:8px;">Abrir instalación</button>
         <p class="hint-text" style="margin-top:6px;">Una instalación puede durar varios días — se abre una sola vez, y cada día que vayas marcás tu entrada y salida acá mismo. Recién al terminar del todo, la cerrás y cargás zonas, canales y fotos.</p>

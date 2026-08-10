@@ -341,6 +341,25 @@ Nuevo en el backend: tres columnas (`pasado_sistema_offline`, `pasado_sistema_po
 `pasado_sistema_en`) y un endpoint para marcar/desmarcar, con quién y cuándo, no solo
 un tilde suelto.
 
+## Instalación simplificada: tile directo, nombre libre, geolocalización verificable (v3.55.0)
+
+Tres ajustes a pedido:
+
+- **Sin submenú**: se sacó "Presencia en obra" suelta de la navegación (el botón ya no
+  existe en ningún lado) y el tile "Instalador" ahora abre directo la pantalla de
+  Instalación, sin pasar por un menú intermedio con una sola opción.
+- **Nombre libre**: ya no hace falta buscar/relacionar con un cliente de la base — el
+  técnico le pone a la instalación el nombre que quiera, texto libre.
+- **Geolocalización verificable**: en `admin.html` → Instalaciones → detalle, cada día
+  marcado ahora tiene un link "📍 ver ubicación" (abre Google Maps con el punto exacto,
+  con la precisión en metros) tanto para la entrada como para la salida — o un aviso
+  claro de "(sin ubicación)" si el técnico no dio permiso de GPS ese día.
+
+Probado de punta a punta: el tile abre directo la pantalla (sin submenú), el nombre
+libre funciona sin depender de la base de clientes, la geolocalización se sigue
+capturando y mandando correctamente, y los links de mapa en `admin.html` apuntan a las
+coordenadas correctas.
+
 ## Presencia en obra evita confundir con una instalación abierta (v3.54.1)
 
 Si un técnico tiene una instalación de varios días abierta, la pantalla suelta de

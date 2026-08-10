@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.54.1";
+const APP_VERSION = "3.55.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -118,7 +118,6 @@ const screens = {
   home: document.getElementById("screen-home"),
   serviciosMenu: document.getElementById("screen-servicios-menu"),
   dashboardsMenu: document.getElementById("screen-dashboards-menu"),
-  instaladorMenu: document.getElementById("screen-instalador-menu"),
   list: document.getElementById("screen-list"),
   cronograma: document.getElementById("screen-cronograma"),
   mapa: document.getElementById("screen-mapa"),
@@ -258,12 +257,8 @@ const tileVehiculosBtn = document.getElementById("tileVehiculosBtn");
 const tileSimsBtn = document.getElementById("tileSimsBtn");
 const tileHerramientasBtn = document.getElementById("tileHerramientasBtn");
 const tileInstaladorBtn = document.getElementById("tileInstaladorBtn");
-const volverDeInstaladorMenuBtn = document.getElementById("volverDeInstaladorMenuBtn");
-const tilePresenciaBtn = document.getElementById("tilePresenciaBtn");
-const tileInstalacionBtn = document.getElementById("tileInstalacionBtn");
 const volverDeInstalacionBtn = document.getElementById("volverDeInstalacionBtn");
 const instalacionClienteInput = document.getElementById("instalacionClienteInput");
-const instalacionClienteEncontradoInfo = document.getElementById("instalacionClienteEncontradoInfo");
 const instalacionDireccionInput = document.getElementById("instalacionDireccionInput");
 const instalacionIniciarBtn = document.getElementById("instalacionIniciarBtn");
 const instalacionClienteCard = document.getElementById("instalacionClienteCard");
@@ -445,8 +440,10 @@ tileDashboardsBtn.addEventListener("click", () => showScreen("dashboardsMenu"));
 tileServiciosPendientesBtn.addEventListener("click", () => showScreen("list"));
 volverDeServiciosMenuBtn.addEventListener("click", () => showScreen("home"));
 volverDeDashboardsMenuBtn.addEventListener("click", () => showScreen("home"));
-tileInstaladorBtn.addEventListener("click", () => showScreen("instaladorMenu"));
-volverDeInstaladorMenuBtn.addEventListener("click", () => showScreen("home"));
+tileInstaladorBtn.addEventListener("click", () => {
+  showScreen("instalacion");
+  resetearPantallaInstalacion();
+});
 volverDeServiciosBtn.addEventListener("click", () => showScreen("serviciosMenu"));
 const verConsultasBtn = document.getElementById("verConsultasBtn");
 const volverDeConsultasBtn = document.getElementById("volverDeConsultasBtn");
@@ -3979,13 +3976,7 @@ let presenciaHistorialCache = [];
 let presenciaPeriodoActivo = "semana";
 let presenciaClienteEncontrado = null;
 
-tilePresenciaBtn.addEventListener("click", () => {
-  showScreen("presencia");
-  actualizarEstadoPresencia();
-  poblarDatalistClientesPresencia();
-  fetchHistorialPresencia();
-});
-volverDePresenciaBtn.addEventListener("click", () => showScreen("instaladorMenu"));
+volverDePresenciaBtn.addEventListener("click", () => showScreen("home"));
 refreshPresenciaBtn.addEventListener("click", fetchHistorialPresencia);
 
 function poblarDatalistClientesPresencia() {
@@ -4186,7 +4177,6 @@ function renderHistorialPresencia() {
 }
 
 // ---------- Instalación (zonas, canales, fotos — de varios días) ----------
-let instalacionClienteEncontrado = null;
 let instalacionActivaId = null;
 let instalacionActivaEstado = null; // 'abierta' | 'cerrada'
 let instZonasAgregadas = [];
@@ -4200,12 +4190,7 @@ const instalacionAbiertaWrap = document.getElementById("instalacionAbiertaWrap")
 const instalacionCerrarBtn = document.getElementById("instalacionCerrarBtn");
 const instalacionGuardarYCerrarBtn = document.getElementById("instalacionGuardarYCerrarBtn");
 
-tileInstalacionBtn.addEventListener("click", () => {
-  showScreen("instalacion");
-  resetearPantallaInstalacion();
-  poblarDatalistClientesInstalacion();
-});
-volverDeInstalacionBtn.addEventListener("click", () => showScreen("instaladorMenu"));
+volverDeInstalacionBtn.addEventListener("click", () => showScreen("home"));
 
 function resetearPantallaInstalacion() {
   instalacionActivaId = null;
@@ -4214,7 +4199,6 @@ function resetearPantallaInstalacion() {
   instCanalesAgregadas = [];
   instalacionClienteInput.value = "";
   instalacionDireccionInput.value = "";
-  instalacionClienteEncontradoInfo.textContent = "";
   instalacionClienteCard.classList.remove("hidden");
   instalacionAbiertaWrap.classList.add("hidden");
   instalacionDetalleWrap.classList.add("hidden");
@@ -4224,34 +4208,12 @@ function resetearPantallaInstalacion() {
   instFotosStatus.textContent = "";
 }
 
-function poblarDatalistClientesInstalacion() {
-  const datalist = document.getElementById("instalacionClientesLista");
-  datalist.innerHTML = (clientesGeneralCache || [])
-    .filter((c) => c.nombre)
-    .map((c) => `<option value="${c.nombre.replace(/"/g, "&quot;")}"></option>`)
-    .join("");
-}
-
-instalacionClienteInput.addEventListener("input", () => {
-  instalacionClienteEncontrado = buscarClientePorNombre(instalacionClienteInput.value.trim());
-  if (instalacionClienteEncontrado) {
-    instalacionDireccionInput.value = instalacionClienteEncontrado.direccion || "";
-    instalacionClienteEncontradoInfo.textContent = "✓ Cliente encontrado en la base.";
-    instalacionClienteEncontradoInfo.className = "hint-text hint-ok";
-  } else {
-    instalacionDireccionInput.value = "";
-    instalacionClienteEncontradoInfo.textContent = instalacionClienteInput.value.trim() ? "Cliente nuevo — no está en la base, se guarda tal cual se escribió." : "";
-    instalacionClienteEncontradoInfo.className = "hint-text";
-  }
-});
-
 instalacionIniciarBtn.addEventListener("click", async () => {
-  const textoEscrito = instalacionClienteInput.value.trim();
-  if (!textoEscrito) {
-    showToast("Escribí el cliente antes de abrir la instalación.");
+  const nombreInstalacion = instalacionClienteInput.value.trim();
+  if (!nombreInstalacion) {
+    showToast("Ponele un nombre a la instalación antes de abrirla.");
     return;
   }
-  const cliente = instalacionClienteEncontrado ? instalacionClienteEncontrado.nombre : textoEscrito;
   instalacionIniciarBtn.disabled = true;
   try {
     const ahora = new Date();
@@ -4259,9 +4221,8 @@ instalacionIniciarBtn.addEventListener("click", async () => {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
       body: JSON.stringify({
-        accion: "crear_instalacion", tecnico: tecnicoLogueado, cliente,
+        accion: "crear_instalacion", tecnico: tecnicoLogueado, cliente: nombreInstalacion,
         direccion: instalacionDireccionInput.value.trim(),
-        numero_cliente: instalacionClienteEncontrado ? instalacionClienteEncontrado.numero_cliente || "" : "",
         fecha: ahora.toISOString().slice(0, 10), hora: ahora.toTimeString().slice(0, 5),
       }),
     });
@@ -4269,7 +4230,7 @@ instalacionIniciarBtn.addEventListener("click", async () => {
     if (!res.ok || !data.ok) throw new Error(data.error || "Error desconocido");
     instalacionActivaId = data.id;
     instalacionActivaEstado = "abierta";
-    instalacionActivaTexto.textContent = `Instalación abierta: ${cliente}`;
+    instalacionActivaTexto.textContent = `Instalación abierta: ${nombreInstalacion}`;
     instalacionClienteCard.classList.add("hidden");
     instalacionAbiertaWrap.classList.remove("hidden");
     instDiaLlegadaWrap.classList.remove("hidden");
@@ -4324,7 +4285,7 @@ async function actualizarEstadoDiaInstalacion() {
 }
 
 instalacionActivaBtn.addEventListener("click", async () => {
-  const cliente = instalacionClienteEncontrado ? instalacionClienteEncontrado.nombre : instalacionClienteInput.value.trim();
+  const cliente = instalacionClienteInput.value.trim();
   instalacionActivaBtn.disabled = true;
   instalacionActivaBtn.textContent = "Ubicando...";
   try {
@@ -4547,7 +4508,7 @@ instalacionGuardarYCerrarBtn.addEventListener("click", async () => {
     if (!res.ok || !data.ok) throw new Error(data.error || "No se pudo cerrar");
     showToast("Instalación cerrada correctamente.");
     resetearPantallaInstalacion();
-    showScreen("instaladorMenu");
+    showScreen("home");
   } catch (err) {
     showToast("No se pudo cerrar: " + err.message);
   } finally {

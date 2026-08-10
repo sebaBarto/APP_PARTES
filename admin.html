@@ -2737,7 +2737,13 @@ async function mostrarDetalleInstalacionAdmin(id) {
     const diasHtml = (inst.dias || []).map((d, idx) => {
       const [y, m, dd] = (d.fecha_llegada || "").split("-");
       const fechaTexto = y ? `${dd}/${m}/${y}` : "";
-      return `<li>Día ${idx + 1} (${fechaTexto}): entrada ${escapeHtmlAdmin(d.hora_llegada || "")}${d.hora_salida ? ", salida " + escapeHtmlAdmin(d.hora_salida) : " — sigue en obra"}</li>`;
+      const linkEntrada = (d.lat_llegada && d.lng_llegada)
+        ? ` <a href="https://www.google.com/maps?q=${d.lat_llegada},${d.lng_llegada}" target="_blank" rel="noopener" style="color:#4A6FA5;">📍 ver ubicación${d.precision_llegada ? ` (±${Math.round(d.precision_llegada)}m)` : ""}</a>`
+        : ` <span style="color:#B5541A; font-size:12px;">(sin ubicación)</span>`;
+      const linkSalida = (d.hora_salida && d.lat_salida && d.lng_salida)
+        ? ` <a href="https://www.google.com/maps?q=${d.lat_salida},${d.lng_salida}" target="_blank" rel="noopener" style="color:#4A6FA5;">📍 ver ubicación${d.precision_salida ? ` (±${Math.round(d.precision_salida)}m)` : ""}</a>`
+        : (d.hora_salida ? ` <span style="color:#B5541A; font-size:12px;">(sin ubicación)</span>` : "");
+      return `<li>Día ${idx + 1} (${fechaTexto}): entrada ${escapeHtmlAdmin(d.hora_llegada || "")}${linkEntrada}${d.hora_salida ? `, salida ${escapeHtmlAdmin(d.hora_salida)}${linkSalida}` : " — sigue en obra"}</li>`;
     }).join("") || "<li style='color:#6B7680;'>Sin días marcados.</li>";
     const estadoBadge = inst.estado === "cerrada"
       ? `<span style="background:#E1F0E4;color:#1F6B34;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:700;">Cerrada</span>`
