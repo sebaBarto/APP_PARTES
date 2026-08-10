@@ -341,6 +341,17 @@ Nuevo en el backend: tres columnas (`pasado_sistema_offline`, `pasado_sistema_po
 `pasado_sistema_en`) y un endpoint para marcar/desmarcar, con quién y cuándo, no solo
 un tilde suelto.
 
+## Corrige error al marcar entrada del 2do día en Instalación (v3.57.1)
+
+Corrige lo reportado: al recuperar una instalación abierta (por ejemplo, al entrar de
+nuevo para marcar el segundo día), el nombre del cliente no quedaba guardado en el
+campo correspondiente — así que al tocar "Marcar entrada de hoy" se mandaba vacío, y el
+backend correctamente lo rechazaba con "Falta el técnico o el cliente". Ahora, al
+recuperar la instalación abierta, también se restaura el nombre del cliente (y la
+dirección) — probado de punta a punta: abrir, marcar el día 1 completo, salir, volver a
+entrar, y confirmar que la entrada del día 2 se manda con el cliente correcto, sin
+error.
+
 ## Borrar instalaciones abiertas desde admin.html (v3.57.0)
 
 Nuevo: en `admin.html` → Instalaciones → detalle de una instalación **abierta**, aparece
