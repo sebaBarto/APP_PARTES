@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.54.0";
+const APP_VERSION = "3.54.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -4017,7 +4017,13 @@ async function actualizarEstadoPresencia() {
     const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
     const res = await fetch("/api/recurso-uso?recurso=presencia&tecnico=" + encodeURIComponent(tecnicoLogueado || ""), { headers, cache: "no-store" });
     const data = await res.json();
-    if (data.activa) {
+    if (data.activa && data.activa.instalacion_id) {
+      // La entrada abierta pertenece a una instalación de varios días
+      // — se marca desde esa pantalla, no desde acá, para no
+      // confundir con dos lugares distintos haciendo lo mismo.
+      presenciaEstadoTexto.className = "status ok";
+      presenciaEstadoTexto.textContent = `📍 Tenés una instalación abierta en ${data.activa.cliente} — marcá tu entrada/salida desde Instalador → Instalación.`;
+    } else if (data.activa) {
       presenciaEstadoTexto.className = "status ok";
       presenciaEstadoTexto.textContent = `📍 Estás en obra en ${data.activa.cliente}, desde las ${data.activa.hora_llegada}.`;
       presenciaSalidaWrap.classList.remove("hidden");

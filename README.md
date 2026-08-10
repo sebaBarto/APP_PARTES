@@ -341,6 +341,14 @@ Nuevo en el backend: tres columnas (`pasado_sistema_offline`, `pasado_sistema_po
 `pasado_sistema_en`) y un endpoint para marcar/desmarcar, con quién y cuándo, no solo
 un tilde suelto.
 
+## Presencia en obra evita confundir con una instalación abierta (v3.54.1)
+
+Si un técnico tiene una instalación de varios días abierta, la pantalla suelta de
+"Presencia en obra" ya no le muestra el botón de "Marcar llegada" (que antes le daba
+un error confuso) — en su lugar, le avisa claramente que tiene una instalación abierta
+en ese cliente y lo redirige a marcar desde ahí, evitando dos lugares distintos
+haciendo lo mismo.
+
 ## Instalación de varios días: abrir, marcar cada día, y cerrar al final (v3.54.0)
 
 Rediseño completo del flujo de Instalación, para instalaciones que llevan varios días:
