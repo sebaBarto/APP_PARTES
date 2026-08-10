@@ -260,7 +260,7 @@ html, body {
 .tile-vehiculo-en-uso .panel-tile-icon-badge { background: var(--acc-coral); }
 .tile-herramientas .panel-tile-icon-badge { background: var(--acc-brown); }
 .tile-presencia .panel-tile-icon-badge { background: var(--acc-guardia, #4A6FA5); }
-.tile-instalacion .panel-tile-icon-badge { background: var(--acc-navy); }
+.tile-instalador .panel-tile-icon-badge { background: var(--acc-navy); }
 .tile-comodato .panel-tile-icon-badge { background: var(--acc-purple); }
 .tile-planos .panel-tile-icon-badge { background: var(--acc-navy); }
 .tile-emergencia .panel-tile-icon-badge { background: var(--acc-alert); }

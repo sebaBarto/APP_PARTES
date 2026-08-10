@@ -341,6 +341,19 @@ Nuevo en el backend: tres columnas (`pasado_sistema_offline`, `pasado_sistema_po
 `pasado_sistema_en`) y un endpoint para marcar/desmarcar, con quién y cuándo, no solo
 un tilde suelto.
 
+## Ícono de Instalación arreglado + mail de resumen al cerrar (v3.56.0)
+
+Corregido: el tile "Instalación" no mostraba ícono — era un desajuste de nombres de
+clase CSS que quedó de la fusión de tiles (`tile-instalador` en el HTML, el color solo
+estaba definido para `tile-instalacion`).
+
+Nuevo: al cerrar una instalación, se manda automáticamente un mail a
+`instalacion@sat365.com.ar` con el resumen completo — días trabajados (con links de
+ubicación de cada entrada/salida), zonas de alarma, canales de cámaras, y las fotos
+**adjuntas directamente al mail** (no solo un link, para tener todo a mano sin entrar
+al sistema). Probado de punta a punta: mail armado correctamente, con las fotos
+adjuntas, todos los datos, y los links de mapa funcionando.
+
 ## Servicio completado ya se borra de la lista compartida para todos (v3.55.1)
 
 Corrige lo reportado: antes, al completar un parte, el servicio solo se escondía en el

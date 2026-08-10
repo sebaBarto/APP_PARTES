@@ -12,6 +12,35 @@
 //
 // Variables de entorno reutilizadas:
 //   SERVICIOS_API_TOKEN, BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN
+//   Para el mail de cierre de instalación (reutiliza las mismas ya
+//   configuradas para los demás mails):
+//   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS
+
+const nodemailer = require("nodemailer");
+
+let transporterCache = null;
+function getTransporter() {
+  if (transporterCache) return transporterCache;
+  const puerto = Number(process.env.SMTP_PORT || 465);
+  transporterCache = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: puerto,
+    secure: puerto === 465,
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    connectionTimeout: 8000,
+    greetingTimeout: 8000,
+    socketTimeout: 8000,
+  });
+  return transporterCache;
+}
+
+function escapeHtmlMail(s) {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
 
 // Convierte un número con formato argentino ("$ 12.345,67", "35000")
 // a un número limpio — o null si no se puede interpretar.
@@ -74,6 +103,69 @@ function mapearDesdeBackendNuevo(p) {
     pasado_sistema_por: p.pasado_sistema_por || "",
     pasado_sistema_en: p.pasado_sistema_en || "",
   };
+}
+
+async function mandarMailResumenInstalacion(instalacionId, backendUrl, headersBackendNuevo) {
+  const r = await fetch(`${backendUrl}/api/instalaciones/${encodeURIComponent(instalacionId)}`, { headers: headersBackendNuevo });
+  if (!r.ok) throw new Error("No se pudo leer el detalle de la instalación para el mail");
+  const inst = await r.json();
+
+  const formatearFecha = (f) => {
+    if (!f) return "";
+    const [y, m, d] = f.split("-");
+    return `${d}/${m}/${y}`;
+  };
+
+  const diasHtml = (inst.dias || []).map((d, idx) => {
+    const linkEntrada = (d.lat_llegada && d.lng_llegada) ? ` (<a href="https://www.google.com/maps?q=${d.lat_llegada},${d.lng_llegada}">ver ubicación</a>)` : "";
+    const linkSalida = (d.lat_salida && d.lng_salida) ? ` (<a href="https://www.google.com/maps?q=${d.lat_salida},${d.lng_salida}">ver ubicación</a>)` : "";
+    return `<li>Día ${idx + 1} (${formatearFecha(d.fecha_llegada)}): entrada ${escapeHtmlMail(d.hora_llegada)}${linkEntrada}${d.hora_salida ? `, salida ${escapeHtmlMail(d.hora_salida)}${linkSalida}` : ""}</li>`;
+  }).join("") || "<li>Sin días registrados.</li>";
+
+  const zonasHtml = (inst.zonas || []).map((z) => `<li>Zona ${escapeHtmlMail(z.numero)} — ${escapeHtmlMail(z.descripcion)}</li>`).join("") || "<li>Sin zonas cargadas.</li>";
+  const canalesHtml = (inst.canales || []).map((c) => `<li>Canal ${escapeHtmlMail(c.numero)} — ${escapeHtmlMail(c.descripcion)}</li>`).join("") || "<li>Sin canales cargados.</li>";
+
+  // Las fotos se adjuntan directo al mail (no solo un link) — así
+  // queda todo accesible sin tener que entrar al sistema.
+  const adjuntos = [];
+  for (const nombre of inst.fotos || []) {
+    try {
+      const rFoto = await fetch(`${backendUrl}/api/instalaciones/${encodeURIComponent(instalacionId)}/fotos/${encodeURIComponent(nombre)}`, { headers: headersBackendNuevo });
+      if (rFoto.ok) {
+        const buffer = Buffer.from(await rFoto.arrayBuffer());
+        adjuntos.push({ filename: nombre, content: buffer });
+      }
+    } catch (errFoto) {
+      console.error(`No se pudo adjuntar la foto ${nombre}:`, errFoto);
+    }
+  }
+
+  const html = `
+    <div style="font-family: Arial, Helvetica, sans-serif; color:#101820;">
+      <h2 style="margin-bottom:4px;">Instalación cerrada: ${escapeHtmlMail(inst.cliente)}</h2>
+      <p style="color:#6B7680; margin-top:0;">
+        ${escapeHtmlMail(inst.direccion || "")}<br>
+        Técnico: ${escapeHtmlMail(inst.tecnico)} — Abierta el ${formatearFecha(inst.fecha)}
+      </p>
+      <h3>Días trabajados</h3>
+      <ul>${diasHtml}</ul>
+      <h3>Zonas de alarma</h3>
+      <ul>${zonasHtml}</ul>
+      <h3>Canales de cámaras</h3>
+      <ul>${canalesHtml}</ul>
+      <h3>Fotos</h3>
+      <p>${(inst.fotos || []).length > 0 ? `${inst.fotos.length} foto(s) adjunta(s) a este mail.` : "Sin fotos cargadas."}</p>
+    </div>
+  `;
+
+  const transporter = getTransporter();
+  await transporter.sendMail({
+    from: process.env.SMTP_USER,
+    to: "instalacion@sat365.com.ar",
+    subject: `Instalación cerrada — ${inst.cliente}`,
+    html,
+    attachments: adjuntos,
+  });
 }
 
 module.exports = async (req, res) => {
@@ -234,7 +326,23 @@ module.exports = async (req, res) => {
           headers: headersBackendNuevo,
         });
         const data = await r.json();
-        res.status(r.status).json(data);
+        if (!r.ok || !data.ok) {
+          res.status(r.status).json(data);
+          return;
+        }
+
+        // Se manda el mail de resumen ANTES de responder — para
+        // asegurarse de que termina de mandarse (las funciones de
+        // Vercel pueden cortarse apenas se manda la respuesta). Si el
+        // mail falla, no se le muestra error al técnico — el cierre
+        // en sí ya fue exitoso, eso es lo importante para él.
+        try {
+          await mandarMailResumenInstalacion(body.instalacion_id, BACKEND_NUEVO_URL, headersBackendNuevo);
+        } catch (errMail) {
+          console.error("No se pudo mandar el mail de resumen de instalación:", errMail);
+        }
+
+        res.status(200).json(data);
         return;
       }
       if (body.accion === "guardar_items_instalacion") {
