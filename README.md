@@ -341,6 +341,24 @@ Nuevo en el backend: tres columnas (`pasado_sistema_offline`, `pasado_sistema_po
 `pasado_sistema_en`) y un endpoint para marcar/desmarcar, con quién y cuándo, no solo
 un tilde suelto.
 
+## Fusión en "Instalador" + vista de Instalaciones en admin.html (v3.53.0)
+
+A pedido: "Presencia en obra" e "Instalación" ya no son dos tiles sueltos en la
+pantalla principal — ahora hay un único tile **"Instalador"** (con permiso propio,
+apagado por defecto) que abre un submenú con las dos pantallas adentro, mismo patrón
+que ya usa "Dashboards". Los botones "Volver" de esas dos pantallas ahora vuelven a
+ese submenú en vez de al home.
+
+Nueva pestaña **"Instalaciones"** en `admin.html`, para que la oficina revise el
+detalle de cada instalación sin tener que entrar como técnico — lista buscable por
+cliente o técnico, y al tocar una se ve el detalle completo: zonas de alarma, canales
+de cámaras, y las fotos subidas.
+
+Probado con Playwright de punta a punta: el tile no aparece sin el permiso, aparece
+con el permiso, el submenú muestra las dos opciones, y volver desde cualquiera de las
+dos lleva al submenú correctamente. También la pestaña nueva de `admin.html`: lista,
+búsqueda con filtro, detalle completo con zonas/canales/fotos, y volver a la lista.
+
 ## Geolocalización en Presencia en obra + nuevo módulo Instalación (v3.52.0)
 
 **Geolocalización**: al marcar llegada o salida en Presencia en obra, ahora se captura

@@ -259,6 +259,7 @@
       <button type="button" class="tab-btn" id="tabHerramientasBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h16v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M8 8V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="4" y1="12" x2="20" y2="12"/></svg></span>Herramientas</button>
       <button type="button" class="tab-btn" id="tabSimsInstaladasBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg></span>SIMs instaladas</button>
       <button type="button" class="tab-btn" id="tabPlanosBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 9h18M9 9v12M14 3v6M9 15h5"/></svg></span>Planos</button>
+      <button type="button" class="tab-btn" id="tabInstalacionesBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 18v3"/><circle cx="8" cy="9" r="1"/><circle cx="12" cy="9" r="1"/><circle cx="16" cy="9" r="1"/></svg></span>Instalaciones</button>
       <button type="button" class="tab-btn" id="tabEmergenciaBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.29 3.86l-8.18 14.18A2 2 0 0 0 3.82 21h16.36a2 2 0 0 0 1.71-3l-8.18-14.14a2 2 0 0 0-3.42 0z"/></svg></span>Emergencias</button>
     </div>
 
@@ -620,6 +621,25 @@
       </div>
     </div>
 
+    <div id="panelInstalaciones" class="hidden">
+      <h1>Instalaciones</h1>
+      <p class="subtitle">
+        Cada instalación cargada por los técnicos, con el detalle de zonas de alarma, canales de
+        cámaras, y las fotos que hayan subido. Tocá una para ver el detalle completo.
+      </p>
+
+      <div class="card" style="margin-bottom:16px;">
+        <input type="text" id="instalacionesBuscarAdmin" placeholder="Buscar por cliente o técnico...">
+        <p class="status" id="instalacionesAdminStatus">Cargando...</p>
+        <div id="instalacionesAdminLista"></div>
+      </div>
+
+      <div id="instalacionesAdminDetalle" class="card hidden">
+        <button type="button" style="background:none;border:none;color:#6B7680;cursor:pointer;font-size:14px;padding:0;margin-bottom:12px;" id="instalacionesVolverListaBtn">← Volver a la lista</button>
+        <div id="instalacionesAdminDetalleContenido"></div>
+      </div>
+    </div>
+
     <div id="panelEmergencia" class="hidden">
       <h1>Servicios de emergencia</h1>
       <p class="subtitle">
@@ -701,6 +721,8 @@ const panelSimsInstaladas = document.getElementById("panelSimsInstaladas");
 let simsInstaladasCargadasUnaVez = false;
 const tabPlanosBtn = document.getElementById("tabPlanosBtn");
 const panelPlanos = document.getElementById("panelPlanos");
+const tabInstalacionesBtn = document.getElementById("tabInstalacionesBtn");
+const panelInstalaciones = document.getElementById("panelInstalaciones");
 const tabEmergenciaBtn = document.getElementById("tabEmergenciaBtn");
 const panelEmergencia = document.getElementById("panelEmergencia");
 let emergenciaCargadaUnaVezAdmin = false;
@@ -721,6 +743,7 @@ const TABS = [
   { btn: tabHerramientasBtn, panel: panelHerramientas, onShow: () => { if (!herramientasCargadasUnaVez) { herramientasCargadasUnaVez = true; cargarHerramientasAdmin(); } } },
   { btn: tabSimsInstaladasBtn, panel: panelSimsInstaladas, onShow: () => { if (!simsInstaladasCargadasUnaVez) { simsInstaladasCargadasUnaVez = true; cargarSimsInstaladasAdmin(); } } },
   { btn: tabPlanosBtn, panel: panelPlanos, onShow: () => { consultarEstadoSincronizacionPlanos(); if (!planosCargadosUnaVezAdmin) { planosCargadosUnaVezAdmin = true; cargarPlanosAdmin(); } } },
+  { btn: tabInstalacionesBtn, panel: panelInstalaciones, onShow: () => cargarInstalacionesAdmin() },
   { btn: tabEmergenciaBtn, panel: panelEmergencia, onShow: () => { if (!emergenciaCargadaUnaVezAdmin) { emergenciaCargadaUnaVezAdmin = true; cargarEmergenciasAdmin(); } } },
   { btn: tabEmergenciaBtn, panel: panelEmergencia, onShow: () => { if (!emergenciasCargadasUnaVezAdmin) { emergenciasCargadasUnaVezAdmin = true; cargarEmergenciasAdmin(); } } },
 ];
@@ -744,6 +767,7 @@ const PERMISOS_TECNICO = [
   { clave: "historial_todos", etiqueta: "Ver historial de todo el equipo" },
   { clave: "dash_stock", etiqueta: "Ver historial de Stock (materiales instalados/retirados)" },
   { clave: "marcar_pasado_sistema", etiqueta: "Marcar partes y stock como \"pasado a mi sistema\" (uso de oficina)" },
+  { clave: "instalador", etiqueta: "Instalador (Presencia en obra + Instalación)" },
   { clave: "vehiculos", etiqueta: "Sección Vehículos" },
   { clave: "sims", etiqueta: "Sección SIMs" },
   { clave: "sims_ver_todas", etiqueta: "Ver y operar TODAS las SIMs (no solo las propias)" },
@@ -1776,6 +1800,12 @@ let nombresTecnicosParaSims = [];
 let serviciosPendientesParaSims = []; // para autocompletar cliente/dirección al instalar una SIM
 let clientesGeneralParaSims = []; // base completa de Clientes, para buscar al instalar una SIM
 
+function escapeHtmlAdmin(s) {
+  const div = document.createElement("div");
+  div.textContent = s ?? "";
+  return div.innerHTML;
+}
+
 function normalizeText(s) {
   return (s || "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
@@ -2589,6 +2619,11 @@ const planosSyncStatus = document.getElementById("planosSyncStatus");
 const planosBuscarAdmin = document.getElementById("planosBuscarAdmin");
 const planosAdminStatus = document.getElementById("planosAdminStatus");
 const planosAdminResultados = document.getElementById("planosAdminResultados");
+const instalacionesBuscarAdmin = document.getElementById("instalacionesBuscarAdmin");
+const instalacionesAdminStatus = document.getElementById("instalacionesAdminStatus");
+const instalacionesAdminLista = document.getElementById("instalacionesAdminLista");
+const instalacionesAdminDetalle = document.getElementById("instalacionesAdminDetalle");
+const instalacionesAdminDetalleContenido = document.getElementById("instalacionesAdminDetalleContenido");
 let planosCacheAdmin = [];
 
 function formatoHaceCuanto(fechaIso) {
@@ -2628,6 +2663,88 @@ async function consultarEstadoSincronizacionPlanos() {
   } catch (err) {
     planosSyncStatus.className = "status err";
     planosSyncStatus.textContent = "No se pudo consultar el estado.";
+  }
+}
+
+// ---------- Instalaciones (admin) ----------
+let instalacionesCacheAdmin = [];
+
+async function cargarInstalacionesAdmin() {
+  instalacionesAdminStatus.textContent = "Cargando...";
+  try {
+    const res = await fetch("/api/historial?tipo=instalaciones", {
+      headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    instalacionesCacheAdmin = Array.isArray(data) ? data : [];
+    renderInstalacionesAdminLista();
+  } catch (err) {
+    instalacionesAdminStatus.className = "status err";
+    instalacionesAdminStatus.textContent = "No se pudo cargar: " + err.message;
+  }
+}
+
+function renderInstalacionesAdminLista() {
+  const busqueda = normalizeText(instalacionesBuscarAdmin.value.trim());
+  const filtradas = instalacionesCacheAdmin.filter((inst) =>
+    !busqueda || normalizeText(inst.cliente).includes(busqueda) || normalizeText(inst.tecnico).includes(busqueda)
+  );
+  instalacionesAdminStatus.className = "status";
+  instalacionesAdminStatus.textContent = `${filtradas.length} instalación(es).`;
+  instalacionesAdminLista.innerHTML = filtradas.map((inst) => {
+    const [y, m, d] = (inst.fecha || "").split("-");
+    const fechaTexto = y ? `${d}/${m}/${y}` : "";
+    return `
+      <div class="fila-lista-clickeable" data-id="${inst.id}" style="padding:10px 0; border-bottom:1px solid #EEE; cursor:pointer;">
+        <b>${escapeHtmlAdmin(inst.cliente)}</b>${inst.numero_cliente ? " · Cliente " + escapeHtmlAdmin(inst.numero_cliente) : ""}<br>
+        <span style="color:#6B7680; font-size:13px;">${escapeHtmlAdmin(inst.tecnico)} — ${fechaTexto}</span>
+      </div>
+    `;
+  }).join("") || "<p style='color:#6B7680;'>No hay instalaciones cargadas.</p>";
+
+  instalacionesAdminLista.querySelectorAll(".fila-lista-clickeable").forEach((fila) => {
+    fila.addEventListener("click", () => mostrarDetalleInstalacionAdmin(fila.dataset.id));
+  });
+}
+
+instalacionesBuscarAdmin.addEventListener("input", renderInstalacionesAdminLista);
+
+document.getElementById("instalacionesVolverListaBtn").addEventListener("click", () => {
+  instalacionesAdminDetalle.classList.add("hidden");
+});
+
+async function mostrarDetalleInstalacionAdmin(id) {
+  instalacionesAdminDetalleContenido.innerHTML = "Cargando...";
+  instalacionesAdminDetalle.classList.remove("hidden");
+  try {
+    const res = await fetch(`/api/historial?tipo=instalacion&id=${id}`, {
+      headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      cache: "no-store",
+    });
+    const inst = await res.json();
+    if (!res.ok) throw new Error(inst.error || "Error desconocido");
+
+    const zonasHtml = (inst.zonas || []).map((z) => `<li>Zona ${escapeHtmlAdmin(z.numero)} — ${escapeHtmlAdmin(z.descripcion || "")}</li>`).join("") || "<li style='color:#6B7680;'>Sin zonas cargadas.</li>";
+    const canalesHtml = (inst.canales || []).map((c) => `<li>Canal ${escapeHtmlAdmin(c.numero)} — ${escapeHtmlAdmin(c.descripcion || "")}</li>`).join("") || "<li style='color:#6B7680;'>Sin canales cargados.</li>";
+    const fotosHtml = (inst.fotos || []).map((nombre) =>
+      `<img src="/api/historial?tipo=foto-instalacion&id=${id}&nombre=${encodeURIComponent(nombre)}" style="width:100px;height:100px;object-fit:cover;border-radius:8px;margin:4px;">`
+    ).join("") || "<p style='color:#6B7680;'>Sin fotos.</p>";
+
+    instalacionesAdminDetalleContenido.innerHTML = `
+      <h2 style="margin-top:0;">${escapeHtmlAdmin(inst.cliente)}</h2>
+      <p style="color:#6B7680;">${escapeHtmlAdmin(inst.direccion || "")}${inst.numero_cliente ? " · Cliente " + escapeHtmlAdmin(inst.numero_cliente) : ""}</p>
+      <p style="color:#6B7680;">${escapeHtmlAdmin(inst.tecnico)} — ${escapeHtmlAdmin(inst.fecha || "")} ${escapeHtmlAdmin(inst.hora || "")}</p>
+      <h3>Zonas de alarma</h3>
+      <ul>${zonasHtml}</ul>
+      <h3>Canales de cámaras</h3>
+      <ul>${canalesHtml}</ul>
+      <h3>Fotos</h3>
+      <div style="display:flex; flex-wrap:wrap;">${fotosHtml}</div>
+    `;
+  } catch (err) {
+    instalacionesAdminDetalleContenido.innerHTML = `<p style="color:#C0392B;">No se pudo cargar: ${escapeHtmlAdmin(err.message)}</p>`;
   }
 }
 

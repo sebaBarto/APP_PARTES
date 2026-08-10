@@ -136,17 +136,11 @@
           </span>
           <span class="panel-tile-label">Herramientas</span>
         </button>
-        <button type="button" class="panel-tile panel-tile-grid tile-presencia" id="tilePresenciaBtn">
-          <span class="panel-tile-icon-badge">
-            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.4 22a8.4 8.4 0 0 0-16.8 0"/><circle cx="12" cy="7.5" r="4.5"/></svg>
-          </span>
-          <span class="panel-tile-label">Presencia en obra</span>
-        </button>
-        <button type="button" class="panel-tile panel-tile-grid tile-instalacion" id="tileInstalacionBtn">
+        <button type="button" class="panel-tile panel-tile-grid tile-instalador hidden" id="tileInstaladorBtn">
           <span class="panel-tile-icon-badge">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 18v3"/><circle cx="8" cy="9" r="1"/><circle cx="12" cy="9" r="1"/><circle cx="16" cy="9" r="1"/><circle cx="8" cy="13" r="1"/><circle cx="12" cy="13" r="1"/></svg>
           </span>
-          <span class="panel-tile-label">Instalación</span>
+          <span class="panel-tile-label">Instalador</span>
         </button>
         <button type="button" class="panel-tile panel-tile-grid tile-comodato" id="tileComodatoBtn">
           <span class="panel-tile-icon-badge">
@@ -247,6 +241,30 @@
     </div>
     <div class="action-bar">
       <button class="btn btn-secondary" id="volverDeDashboardsMenuBtn" type="button">Volver</button>
+    </div>
+  </section>
+
+  <!-- SUBMENÚ INSTALADOR (Presencia en obra + Instalación) -->
+  <section class="screen" id="screen-instalador-menu">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">INSTALADOR</p>
+      <div class="panel-tiles panel-tiles-grid">
+        <button type="button" class="panel-tile panel-tile-grid tile-presencia" id="tilePresenciaBtn">
+          <span class="panel-tile-icon-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.4 22a8.4 8.4 0 0 0-16.8 0"/><circle cx="12" cy="7.5" r="4.5"/></svg>
+          </span>
+          <span class="panel-tile-label">Presencia en obra</span>
+        </button>
+        <button type="button" class="panel-tile panel-tile-grid tile-instalacion" id="tileInstalacionBtn">
+          <span class="panel-tile-icon-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 18v3"/><circle cx="8" cy="9" r="1"/><circle cx="12" cy="9" r="1"/><circle cx="16" cy="9" r="1"/><circle cx="8" cy="13" r="1"/><circle cx="12" cy="13" r="1"/></svg>
+          </span>
+          <span class="panel-tile-label">Instalación</span>
+        </button>
+      </div>
+    </div>
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDeInstaladorMenuBtn" type="button">Volver</button>
     </div>
   </section>
 

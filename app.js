@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.52.0";
+const APP_VERSION = "3.53.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -118,6 +118,7 @@ const screens = {
   home: document.getElementById("screen-home"),
   serviciosMenu: document.getElementById("screen-servicios-menu"),
   dashboardsMenu: document.getElementById("screen-dashboards-menu"),
+  instaladorMenu: document.getElementById("screen-instalador-menu"),
   list: document.getElementById("screen-list"),
   cronograma: document.getElementById("screen-cronograma"),
   mapa: document.getElementById("screen-mapa"),
@@ -256,6 +257,8 @@ const tileCredencialBtn = document.getElementById("tileCredencialBtn");
 const tileVehiculosBtn = document.getElementById("tileVehiculosBtn");
 const tileSimsBtn = document.getElementById("tileSimsBtn");
 const tileHerramientasBtn = document.getElementById("tileHerramientasBtn");
+const tileInstaladorBtn = document.getElementById("tileInstaladorBtn");
+const volverDeInstaladorMenuBtn = document.getElementById("volverDeInstaladorMenuBtn");
 const tilePresenciaBtn = document.getElementById("tilePresenciaBtn");
 const tileInstalacionBtn = document.getElementById("tileInstalacionBtn");
 const volverDeInstalacionBtn = document.getElementById("volverDeInstalacionBtn");
@@ -442,6 +445,8 @@ tileDashboardsBtn.addEventListener("click", () => showScreen("dashboardsMenu"));
 tileServiciosPendientesBtn.addEventListener("click", () => showScreen("list"));
 volverDeServiciosMenuBtn.addEventListener("click", () => showScreen("home"));
 volverDeDashboardsMenuBtn.addEventListener("click", () => showScreen("home"));
+tileInstaladorBtn.addEventListener("click", () => showScreen("instaladorMenu"));
+volverDeInstaladorMenuBtn.addEventListener("click", () => showScreen("home"));
 volverDeServiciosBtn.addEventListener("click", () => showScreen("serviciosMenu"));
 const verConsultasBtn = document.getElementById("verConsultasBtn");
 const volverDeConsultasBtn = document.getElementById("volverDeConsultasBtn");
@@ -749,7 +754,7 @@ function permisosDelTecnico(nombre) {
     // Login general de oficina (sin técnico en particular): acceso
     // total, como ya era antes de este sistema.
     return {
-      dash_general: true, dash_financiero: true, dash_vehiculos: true, dash_herramientas: true, dash_sims: true, dash_stock: true,
+      dash_general: true, dash_financiero: true, dash_vehiculos: true, dash_herramientas: true, dash_sims: true, dash_stock: true, instalador: true,
       historial_todos: true, vehiculos: true, sims: true, herramientas: true, marcar_pasado_sistema: true,
       comodato: true, admin: true, agendar_emergencia: true, sims_ver_todas: true,
     };
@@ -947,6 +952,7 @@ function actualizarAccesoSeccionesPanel() {
   tileVehiculosBtn.classList.toggle("hidden", !permisos.vehiculos);
   tileSimsBtn.classList.toggle("hidden", !permisos.sims);
   tileHerramientasBtn.classList.toggle("hidden", !permisos.herramientas);
+  tileInstaladorBtn.classList.toggle("hidden", !permisos.instalador);
   tileComodatoBtn.classList.toggle("hidden", !permisos.comodato);
   tileEmergenciaBtn.classList.toggle("hidden", !permisos.agendar_emergencia);
 }
@@ -3979,7 +3985,7 @@ tilePresenciaBtn.addEventListener("click", () => {
   poblarDatalistClientesPresencia();
   fetchHistorialPresencia();
 });
-volverDePresenciaBtn.addEventListener("click", () => showScreen("home"));
+volverDePresenciaBtn.addEventListener("click", () => showScreen("instaladorMenu"));
 refreshPresenciaBtn.addEventListener("click", fetchHistorialPresencia);
 
 function poblarDatalistClientesPresencia() {
@@ -4184,7 +4190,7 @@ tileInstalacionBtn.addEventListener("click", () => {
   resetearPantallaInstalacion();
   poblarDatalistClientesInstalacion();
 });
-volverDeInstalacionBtn.addEventListener("click", () => showScreen("home"));
+volverDeInstalacionBtn.addEventListener("click", () => showScreen("instaladorMenu"));
 
 function resetearPantallaInstalacion() {
   instalacionActivaId = null;
