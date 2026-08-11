@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.60.1";
+const APP_VERSION = "3.60.2";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -1505,7 +1505,23 @@ cronoTecnicoFiltro.addEventListener("change", renderCronogramaTareas);
 // ---------- Relación cronograma → servicio pendiente ----------
 function encontrarServicioPorTarea(textoTarea) {
   const norm = normalizeText(textoTarea);
-  const candidatos = serviciosCache.filter((s) => s.cliente && norm.includes(normalizeText(s.cliente)));
+  // Antes exigía que el nombre del cliente apareciera exactamente
+  // igual, palabra por palabra en el mismo orden — un cliente
+  // cargado como "Marta De Simone" en un lado y "De Simone Marta" en
+  // el otro nunca coincidía, y el parte se armaba "suelto" (sin
+  // vincular al servicio real, sin su número). Ahora alcanza con que
+  // TODAS las palabras del nombre aparezcan en el texto de la tarea,
+  // sin importar el orden — mucho más tolerante a cómo esté escrito
+  // cada lado.
+  const candidatos = serviciosCache.filter((s) => {
+    if (!s.cliente) return false;
+    const palabras = normalizeText(s.cliente).split(/\s+/).filter((p) => p.length > 2); // ignora "de", "la", etc.
+    if (palabras.length === 0) return false;
+    return palabras.every((palabra) => norm.includes(palabra));
+  });
+  // Si hay más de una coincidencia (nombres parecidos), se prefiere
+  // la que matchea más "de cerca" — la de nombre más largo/específico.
+  candidatos.sort((a, b) => b.cliente.length - a.cliente.length);
   return candidatos[0] || null;
 }
 

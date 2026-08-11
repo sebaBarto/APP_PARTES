@@ -341,6 +341,22 @@ Nuevo en el backend: tres columnas (`pasado_sistema_offline`, `pasado_sistema_po
 `pasado_sistema_en`) y un endpoint para marcar/desmarcar, con quién y cuándo, no solo
 un tilde suelto.
 
+## Corrige vinculación Cronograma → servicio pendiente (v3.60.2)
+
+Corrige un bug real reportado: al resolver un servicio desde el Cronograma, si el
+nombre del cliente estaba escrito en un orden distinto entre el cronograma y la lista
+de servicios pendientes (ej: "Marta De Simone" vs "De Simone Marta"), la app no lo
+reconocía como el mismo servicio — armaba el parte "suelto", sin el número real. Esto
+explicaba tres problemas juntos que se estaban viendo: el mail a oficina mostraba un
+número armado por la app en vez del número real del servicio, ese servicio seguía
+apareciendo como pendiente después de resuelto, y (probablemente relacionado) los
+materiales no quedaban registrados en el Historial de Stock.
+
+Ahora el matching no exige que el nombre esté en el mismo orden — alcanza con que todas
+las palabras del nombre del cliente aparezcan en el texto de la tarea, en cualquier
+orden. Probado con el caso real (orden invertido), con espacios de más, y confirmando
+que sigue sin generar falsos positivos con nombres parecidos pero distintos.
+
 ## Cronograma se posiciona solo en el día de hoy (v3.60.1)
 
 A pedido: al entrar al Cronograma, ahora busca el día de hoy entre los que estén
