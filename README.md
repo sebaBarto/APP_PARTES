@@ -341,6 +341,19 @@ Nuevo en el backend: tres columnas (`pasado_sistema_offline`, `pasado_sistema_po
 `pasado_sistema_en`) y un endpoint para marcar/desmarcar, con quién y cuándo, no solo
 un tilde suelto.
 
+## Cronograma se posiciona solo en el día de hoy (v3.60.1)
+
+A pedido: al entrar al Cronograma, ahora busca el día de hoy entre los que estén
+cargados y arranca ahí directo (con el chip correspondiente desplazándose a la vista si
+hace falta) — en vez de mostrar siempre el primer día disponible, más allá de que sea
+uno viejo. Si "hoy" no está cargado todavía, sigue mostrando el primero, como antes.
+
+Sobre lo otro reportado (el cronograma no mostraba días después del 5 de agosto): se
+revisó el código completo — no hay ningún límite artificial de fechas ni de cantidad de
+días, se procesan **todas** las hojas del Excel que haya en el archivo de Drive. Es
+prácticamente seguro que el archivo en Drive todavía no tenía cargadas las hojas de esa
+semana — un tema de carga de datos en la oficina, no un bug de la app.
+
 ## Encuesta de satisfacción al cliente + animaciones (v3.60.0)
 
 **Encuesta de satisfacción**: el mail que recibe el cliente al completarse un servicio

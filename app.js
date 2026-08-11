@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.60.0";
+const APP_VERSION = "3.60.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -1426,7 +1426,14 @@ function renderCronogramaDias() {
     return;
   }
 
-  if (!dias.includes(cronoDiaActivo)) cronoDiaActivo = dias[0];
+  if (!dias.includes(cronoDiaActivo)) {
+    // Se prefiere el día de hoy si está en el cronograma — así el
+    // técnico entra directo a lo que le importa, sin tener que
+    // buscar entre los días pasados.
+    const fechaHoyISO = new Date().toISOString().slice(0, 10);
+    const diaDeHoy = dias.find((d) => (cronogramaCache.find((t) => t.dia_label === d) || {}).fecha === fechaHoyISO);
+    cronoDiaActivo = diaDeHoy || dias[0];
+  }
 
   cronoDiasTabs.innerHTML = "";
   dias.forEach((dia) => {
@@ -1440,6 +1447,8 @@ function renderCronogramaDias() {
     });
     cronoDiasTabs.appendChild(chip);
   });
+  const chipActivo = cronoDiasTabs.querySelector(".crono-dia-chip.active");
+  if (chipActivo) chipActivo.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
 
   // Filtro de técnicos: se arma con la lista completa detectada en el
   // Excel (todas las columnas), no solo los que ya tienen alguna tarea
@@ -1545,6 +1554,7 @@ function seleccionarTareaCronograma(t) {
 
 verCronogramaBtn.addEventListener("click", async () => {
   showScreen("cronograma");
+  cronoDiaActivo = ""; // fuerza a buscar el día de hoy de nuevo al entrar
   cargarResumenEmergenciasEnCronograma();
   await precargarHistorialParaVisitas(); // primero esto, para que "resuelto" salga bien desde el primer render
   fetchCronograma();
