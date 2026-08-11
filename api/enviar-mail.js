@@ -341,6 +341,36 @@ module.exports = async (req, res) => {
     res.status(405).json({ error: "Método no permitido" });
     return;
   }
+
+  // Diagnóstico SMTP — verifica la conexión sin mandar ningún mail real,
+  // y devuelve el error exacto si algo falla.
+  let body = req.body;
+  if (typeof body === "string") try { body = JSON.parse(body); } catch (e) { body = {}; }
+  if ((body || {}).tipo === "diagnostico-smtp") {
+    try {
+      const transporter = getTransporter();
+      await transporter.verify();
+      res.status(200).json({
+        ok: true,
+        host: process.env.SMTP_HOST,
+        port: process.env.SMTP_PORT,
+        user: process.env.SMTP_USER,
+        mensaje: "Conexión SMTP verificada correctamente — el servidor acepta credenciales.",
+      });
+    } catch (err) {
+      res.status(200).json({
+        ok: false,
+        host: process.env.SMTP_HOST,
+        port: process.env.SMTP_PORT,
+        user: process.env.SMTP_USER,
+        error: err.message || String(err),
+        code: err.code || null,
+        responseCode: err.responseCode || null,
+      });
+    }
+    return;
+  }
+
   if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
     res.status(500).json({ error: "Faltan variables de entorno de SMTP por configurar en Vercel" });
     return;
