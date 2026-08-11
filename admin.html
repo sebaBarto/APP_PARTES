@@ -762,7 +762,7 @@ const TABS = [
   { btn: tabClientesBtn, panel: panelClientes, onShow: () => { if (!clientesCargadosUnaVez) { clientesCargadosUnaVez = true; cargarClientesAdmin(); } } },
   { btn: tabConsultasBtn, panel: panelConsultas, onShow: () => { if (!consultasCatCargadasUnaVez) { consultasCatCargadasUnaVez = true; cargarConsultasCatAdmin(); } } },
   { btn: tabGuardiasBtn, panel: panelGuardias, onShow: () => { if (!guardiasCargadasUnaVez) { guardiasCargadasUnaVez = true; cargarGuardiasAdmin(); } } },
-  { btn: tabCredencialesBtn, panel: panelCredenciales, onShow: () => { if (!credencialesCargadasUnaVez) { credencialesCargadasUnaVez = true; cargarCredencialesAdmin(); } } },
+  { btn: tabCredencialesBtn, panel: panelCredenciales, onShow: () => cargarCredencialesAdmin() },
   { btn: tabVehiculosBtn, panel: panelVehiculos, onShow: () => { if (!vehiculosCargadosUnaVez) { vehiculosCargadosUnaVez = true; cargarVehiculosAdmin(); } } },
   { btn: tabSimsBtn, panel: panelSims, onShow: () => { if (!simsCargadasUnaVez) { simsCargadasUnaVez = true; cargarSimsAdmin(); } } },
   { btn: tabHerramientasBtn, panel: panelHerramientas, onShow: () => { if (!herramientasCargadasUnaVez) { herramientasCargadasUnaVez = true; cargarHerramientasAdmin(); } } },
@@ -1650,6 +1650,7 @@ guardarCredencialesBtn.addEventListener("click", async () => {
     if (!res.ok) throw new Error(data.error || "Error desconocido");
     guardarCredencialesStatus.className = "status ok";
     guardarCredencialesStatus.textContent = `Listo — se guardaron ${data.count} credenciales. Ya están disponibles en la app.`;
+    cargarCredencialesAdmin(); // recarga para que el DOM quede igual al servidor
   } catch (err) {
     guardarCredencialesStatus.className = "status err";
     guardarCredencialesStatus.textContent = "No se pudo guardar: " + err.message;
