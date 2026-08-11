@@ -174,6 +174,57 @@ async function mandarMailResumenInstalacion(instalacionId, backendUrl, headersBa
 }
 
 module.exports = async (req, res) => {
+  // Encuesta de satisfacción — se llama desde un link dentro del
+  // mail que recibe el cliente, así que NO puede pedir el token de
+  // acceso (el cliente no lo tiene, ni debería). Por eso se maneja
+  // ANTES del control de autorización de acá abajo, como única
+  // excepción de todo este archivo.
+  if (req.method === "GET" && req.query && req.query.tipo === "encuesta") {
+    const { parte, puntaje } = req.query;
+    const paginaHtml = (titulo, mensaje) => `<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${titulo}</title>
+<style>body{font-family:system-ui,sans-serif;background:#101820;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;text-align:center;padding:24px;}
+.caja{max-width:360px;} .emoji{font-size:56px;margin-bottom:16px;} h1{font-size:20px;margin:0 0 8px;} p{color:#B5BDC4;font-size:15px;}</style>
+</head><body><div class="caja"><div class="emoji">${titulo.includes("Gracias") ? "✅" : "⚠️"}</div><h1>${titulo}</h1><p>${mensaje}</p></div></body></html>`;
+
+    try {
+      const { BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN } = process.env;
+      if (!parte || !puntaje || !BACKEND_NUEVO_URL || !BACKEND_NUEVO_TOKEN) {
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.status(400).send(paginaHtml("No se pudo registrar", "Faltan datos en el link."));
+        return;
+      }
+      // Se busca el parte para sacarle cliente/técnico/fecha (para
+      // el reporte de admin.html) — si no se encuentra, igual se
+      // registra la calificación solo con el puntaje.
+      let cliente = "", tecnico = "", fechaParte = "";
+      try {
+        const rParte = await fetch(`${BACKEND_NUEVO_URL}/api/partes`, { headers: { Authorization: `Bearer ${BACKEND_NUEVO_TOKEN}` } });
+        const partes = await rParte.json();
+        const encontrado = (Array.isArray(partes) ? partes : []).find((p) => p.id === parte);
+        if (encontrado) { cliente = encontrado.cliente || ""; tecnico = encontrado.tecnico || ""; fechaParte = encontrado.fecha || ""; }
+      } catch (err) { /* no es grave si esto falla, se guarda igual */ }
+
+      const rEncuesta = await fetch(`${BACKEND_NUEVO_URL}/api/encuestas`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${BACKEND_NUEVO_TOKEN}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ parte_id: parte, puntaje, cliente, tecnico, fecha_parte: fechaParte }),
+      });
+      const dataEncuesta = await rEncuesta.json();
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      if (dataEncuesta.ya_calificado) {
+        res.status(200).send(paginaHtml("Ya habías calificado este servicio", "Gracias igual por tu tiempo."));
+      } else {
+        res.status(200).send(paginaHtml("¡Gracias por tu calificación!", "Nos ayuda mucho a seguir mejorando el servicio."));
+      }
+    } catch (err) {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.status(500).send(paginaHtml("No se pudo registrar", "Intentá de nuevo más tarde."));
+    }
+    return;
+  }
+
   const authHeader = req.headers["authorization"] || "";
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();
   if (!process.env.SERVICIOS_API_TOKEN || token !== process.env.SERVICIOS_API_TOKEN) {
@@ -244,6 +295,12 @@ module.exports = async (req, res) => {
       }
       if (req.query && req.query.tipo === "instalaciones_abiertas") {
         const r = await fetch(`${BACKEND_NUEVO_URL}/api/instalaciones/abiertas`, { headers: headersBackendNuevo });
+        const data = await r.json();
+        res.status(r.status).json(data);
+        return;
+      }
+      if (req.query && req.query.tipo === "encuestas") {
+        const r = await fetch(`${BACKEND_NUEVO_URL}/api/encuestas`, { headers: headersBackendNuevo });
         const data = await r.json();
         res.status(r.status).json(data);
         return;

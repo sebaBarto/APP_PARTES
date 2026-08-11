@@ -341,6 +341,27 @@ Nuevo en el backend: tres columnas (`pasado_sistema_offline`, `pasado_sistema_po
 `pasado_sistema_en`) y un endpoint para marcar/desmarcar, con quién y cuándo, no solo
 un tilde suelto.
 
+## Encuesta de satisfacción al cliente + animaciones (v3.60.0)
+
+**Encuesta de satisfacción**: el mail que recibe el cliente al completarse un servicio
+ahora tiene 5 caritas (😞🙁😐🙂😄) — con un toque, califica el servicio de 1 a 5. Cada
+parte se puede calificar una sola vez (tocar el link de nuevo solo muestra "gracias,
+ya habías calificado", sin cambiar el puntaje). No hace falta ningún login ni token —
+es un link público pensado para clickearse directo desde el mail. Nueva pestaña
+**"Satisfacción"** en `admin.html`, con el promedio general y el listado completo de
+calificaciones recibidas, con cliente y técnico.
+
+**Animaciones**: los botones y tiles principales tienen un efecto más marcado al
+tocarlos (un poco más de "hundido", con un resplandor sutil en los botones
+principales). Las tarjetas de todos los dashboards (Historial, Stock, Presencia,
+Vehículos, Herramientas, SIMs) ahora aparecen con una animación de entrada suave y
+escalonada — una tras otra, en vez de aparecer todas de golpe.
+
+Backend nuevo: tabla `encuestas_satisfaccion`, con protección contra recalificar el
+mismo parte. Probado de punta a punta: calificar sin token (como llega desde el mail),
+intentar recalificar (avisa que ya calificó), los 5 links del mail bien armados con el
+número de parte correcto, y el promedio calculado bien en `admin.html`.
+
 ## Instalación: ayudante en el mismo servicio, observaciones al cerrar, y no perder datos (v3.59.0)
 
 Tres mejoras a pedido, todas relacionadas con el trabajo en equipo en una instalación:

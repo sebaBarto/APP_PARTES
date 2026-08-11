@@ -207,6 +207,16 @@ const PLANTILLA_CLIENTE = `
             {{#firma_cargo}}<div style="text-align:center; color:#6B7680; font-size:12px; font-family:Arial, Helvetica, sans-serif; margin-top:2px;">{{firma_cargo}}</div>{{/firma_cargo}}
           </div>
         </td></tr>
+        <tr><td style="padding:0 28px 24px;">
+          <div style="background:#F4F5F0; border-radius:8px; padding:16px; text-align:center;">
+            <div style="color:#101820; font-size:13px; font-weight:bold; margin-bottom:10px;">¿Cómo te resultó nuestro servicio?</div>
+            <a href="{{encuesta_link_1}}" style="text-decoration:none; font-size:26px; margin:0 4px;">😞</a>
+            <a href="{{encuesta_link_2}}" style="text-decoration:none; font-size:26px; margin:0 4px;">🙁</a>
+            <a href="{{encuesta_link_3}}" style="text-decoration:none; font-size:26px; margin:0 4px;">😐</a>
+            <a href="{{encuesta_link_4}}" style="text-decoration:none; font-size:26px; margin:0 4px;">🙂</a>
+            <a href="{{encuesta_link_5}}" style="text-decoration:none; font-size:26px; margin:0 4px;">😄</a>
+          </div>
+        </td></tr>
         <tr><td style="background:#101820; padding:18px 28px; color:#9AA3A9; font-size:11px; font-family:'Courier New', monospace; text-align:center; line-height:1.8;">
           Gracias por confiar en nosotros<br>
           <a href="https://www.sat365.com.ar" style="color:#F5A623; text-decoration:none;">www.sat365.com.ar</a>
@@ -264,6 +274,8 @@ function armarHtmlClaves(claves) {
 }
 
 function enriquecerDatos(datos) {
+  const linkEncuesta = (puntaje) =>
+    `https://app-partes-sat15.vercel.app/api/historial?tipo=encuesta&parte=${encodeURIComponent(datos.id_parte || "")}&puntaje=${puntaje}`;
   return {
     ...datos,
     forma_pago_chip: armarEtiquetaFormaPago(datos.forma_pago),
@@ -273,6 +285,11 @@ function enriquecerDatos(datos) {
       : "No se cargó mail del cliente — no se le mandó copia",
     tiene_claves: Array.isArray(datos.claves) && datos.claves.length > 0,
     claves_html: armarHtmlClaves(datos.claves),
+    encuesta_link_1: linkEncuesta(1),
+    encuesta_link_2: linkEncuesta(2),
+    encuesta_link_3: linkEncuesta(3),
+    encuesta_link_4: linkEncuesta(4),
+    encuesta_link_5: linkEncuesta(5),
   };
 }
 

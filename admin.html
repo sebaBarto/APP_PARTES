@@ -260,6 +260,7 @@
       <button type="button" class="tab-btn" id="tabSimsInstaladasBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg></span>SIMs instaladas</button>
       <button type="button" class="tab-btn" id="tabPlanosBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 9h18M9 9v12M14 3v6M9 15h5"/></svg></span>Planos</button>
       <button type="button" class="tab-btn" id="tabInstalacionesBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 18v3"/><circle cx="8" cy="9" r="1"/><circle cx="12" cy="9" r="1"/><circle cx="16" cy="9" r="1"/></svg></span>Instalaciones</button>
+      <button type="button" class="tab-btn" id="tabEncuestasBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 14s1.5 2 4 2 4-2 4-2"/><circle cx="9" cy="9" r="1"/><circle cx="15" cy="9" r="1"/><circle cx="12" cy="12" r="10"/></svg></span>Satisfacción</button>
       <button type="button" class="tab-btn" id="tabEmergenciaBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.29 3.86l-8.18 14.18A2 2 0 0 0 3.82 21h16.36a2 2 0 0 0 1.71-3l-8.18-14.14a2 2 0 0 0-3.42 0z"/></svg></span>Emergencias</button>
     </div>
 
@@ -640,6 +641,24 @@
       </div>
     </div>
 
+    <div id="panelEncuestas" class="hidden">
+      <h1>Satisfacción del cliente</h1>
+      <p class="subtitle">
+        Calificación de 1 a 5 que el cliente elige desde un link en el mail que recibe al
+        completarse su servicio — un cliente solo puede calificar una vez por parte.
+      </p>
+
+      <div class="card" style="margin-bottom:16px; text-align:center;">
+        <div style="font-size:42px; font-weight:700; color:#101820;" id="encuestasPromedio">—</div>
+        <div style="color:#6B7680; font-size:13px;" id="encuestasResumen">Sin calificaciones todavía.</div>
+      </div>
+
+      <div class="card">
+        <p class="status" id="encuestasStatus">Cargando...</p>
+        <div id="encuestasLista"></div>
+      </div>
+    </div>
+
     <div id="panelEmergencia" class="hidden">
       <h1>Servicios de emergencia</h1>
       <p class="subtitle">
@@ -723,6 +742,12 @@ const tabPlanosBtn = document.getElementById("tabPlanosBtn");
 const panelPlanos = document.getElementById("panelPlanos");
 const tabInstalacionesBtn = document.getElementById("tabInstalacionesBtn");
 const panelInstalaciones = document.getElementById("panelInstalaciones");
+const tabEncuestasBtn = document.getElementById("tabEncuestasBtn");
+const panelEncuestas = document.getElementById("panelEncuestas");
+const encuestasPromedio = document.getElementById("encuestasPromedio");
+const encuestasResumen = document.getElementById("encuestasResumen");
+const encuestasStatus = document.getElementById("encuestasStatus");
+const encuestasLista = document.getElementById("encuestasLista");
 const tabEmergenciaBtn = document.getElementById("tabEmergenciaBtn");
 const panelEmergencia = document.getElementById("panelEmergencia");
 let emergenciaCargadaUnaVezAdmin = false;
@@ -744,6 +769,7 @@ const TABS = [
   { btn: tabSimsInstaladasBtn, panel: panelSimsInstaladas, onShow: () => { if (!simsInstaladasCargadasUnaVez) { simsInstaladasCargadasUnaVez = true; cargarSimsInstaladasAdmin(); } } },
   { btn: tabPlanosBtn, panel: panelPlanos, onShow: () => { consultarEstadoSincronizacionPlanos(); if (!planosCargadosUnaVezAdmin) { planosCargadosUnaVezAdmin = true; cargarPlanosAdmin(); } } },
   { btn: tabInstalacionesBtn, panel: panelInstalaciones, onShow: () => cargarInstalacionesAdmin() },
+  { btn: tabEncuestasBtn, panel: panelEncuestas, onShow: () => cargarEncuestasAdmin() },
   { btn: tabEmergenciaBtn, panel: panelEmergencia, onShow: () => { if (!emergenciaCargadaUnaVezAdmin) { emergenciaCargadaUnaVezAdmin = true; cargarEmergenciasAdmin(); } } },
   { btn: tabEmergenciaBtn, panel: panelEmergencia, onShow: () => { if (!emergenciasCargadasUnaVezAdmin) { emergenciasCargadasUnaVezAdmin = true; cargarEmergenciasAdmin(); } } },
 ];
@@ -2668,6 +2694,50 @@ async function consultarEstadoSincronizacionPlanos() {
 
 // ---------- Instalaciones (admin) ----------
 let instalacionesCacheAdmin = [];
+
+// ---------- Satisfacción del cliente ----------
+async function cargarEncuestasAdmin() {
+  encuestasStatus.textContent = "Cargando...";
+  try {
+    const res = await fetch("/api/historial?tipo=encuestas", {
+      headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    const encuestas = Array.isArray(data) ? data : [];
+
+    if (encuestas.length === 0) {
+      encuestasPromedio.textContent = "—";
+      encuestasResumen.textContent = "Sin calificaciones todavía.";
+      encuestasStatus.textContent = "";
+      encuestasLista.innerHTML = "";
+      return;
+    }
+
+    const promedio = encuestas.reduce((suma, e) => suma + e.puntaje, 0) / encuestas.length;
+    encuestasPromedio.textContent = promedio.toFixed(1);
+    encuestasResumen.textContent = `${encuestas.length} calificación(es) recibida(s).`;
+    encuestasStatus.textContent = "";
+
+    const emojis = { 1: "😞", 2: "🙁", 3: "😐", 4: "🙂", 5: "😄" };
+    encuestasLista.innerHTML = encuestas.map((e) => {
+      const fecha = e.creado_en ? e.creado_en.slice(0, 10) : "";
+      return `
+        <div style="padding:10px 0; border-bottom:1px solid #EEE; display:flex; align-items:center; gap:10px;">
+          <span style="font-size:24px;">${emojis[e.puntaje] || "❓"}</span>
+          <div>
+            <b>${escapeHtmlAdmin(e.cliente || e.parte_id)}</b><br>
+            <span style="color:#6B7680; font-size:13px;">${escapeHtmlAdmin(e.tecnico || "")} — ${escapeHtmlAdmin(fecha)}</span>
+          </div>
+        </div>
+      `;
+    }).join("");
+  } catch (err) {
+    encuestasStatus.className = "status err";
+    encuestasStatus.textContent = "No se pudo cargar: " + err.message;
+  }
+}
 
 async function cargarInstalacionesAdmin() {
   instalacionesAdminStatus.textContent = "Cargando...";
