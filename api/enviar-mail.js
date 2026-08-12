@@ -413,6 +413,31 @@ module.exports = async (req, res) => {
     }
 
     const transporter = getTransporter();
+
+    // El mail al cliente va por Resend — el servidor SMTP de Ferozo
+    // bloquea los envíos a destinos externos calificándolos como spam
+    // cuando el origen es una IP externa (Vercel/AWS). Resend tiene
+    // buena reputación con Gmail y otros proveedores. El de oficina
+    // sigue por SMTP porque es entrega interna (no sale de Ferozo).
+    if (tipo === "cliente" && process.env.RESEND_API_KEY) {
+      const resendRes = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from: process.env.EMAIL_FROM || `Servicio Técnico SAT <no-responder@sat365.com.ar>`,
+          to: [destinatario],
+          subject: asunto,
+          html: envolverDocumento(html),
+        }),
+      });
+      if (!resendRes.ok) {
+        const errData = await resendRes.json().catch(() => ({}));
+        throw new Error(errData.message || `Resend HTTP ${resendRes.status}`);
+      }
+      res.status(200).json({ ok: true });
+      return;
+    }
+
     await transporter.sendMail({
       from: `"Servicio Técnico SAT" <${process.env.SMTP_USER}>`,
       to: destinatario,
