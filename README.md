@@ -391,6 +391,21 @@ mismo parte. Probado de punta a punta: calificar sin token (como llega desde el 
 intentar recalificar (avisa que ya calificó), los 5 links del mail bien armados con el
 número de parte correcto, y el promedio calculado bien en `admin.html`.
 
+## Corrige que la app se quede pegada en una versión vieja (caché de sw.js)
+
+A raíz de un caso real (Sebastian veía datos de antes del arreglo de SIMs, aunque el
+número de versión mostrado ya decía 3.62.1): Vercel no tenía ninguna configuración de
+caché para `sw.js` (el Service Worker), así que el navegador podía guardarse una copia
+vieja de ese archivo por su cuenta — y si nunca nota que cambió, jamás dispara el
+mecanismo de actualización interno de la app (que si estaba bien armado). Ahora
+`sw.js` se sirve siempre con `Cache-Control: no-cache`, obligando al navegador a
+consultarlo de nuevo en cada visita — así detecta apenas hay una versión nueva y se
+actualiza solo, sin depender de que alguien toque manualmente "Actualizar app".
+
+Recordatorio: ya existe un botón **"↻ Actualizar app a la última versión"** en la
+pantalla de login, que fuerza una limpieza completa de caché — sirve como solución
+inmediata para cualquier caso viejo que haya quedado pegado de antes de este arreglo.
+
 ## Corrige detección de línea existente al instalar SIM (v3.62.1)
 
 Corrige un bug real reportado (caso Siri Carlos): al instalar una SIM en un cliente que
