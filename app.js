@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.60.2";
+const APP_VERSION = "3.61.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -376,6 +376,13 @@ const simRevertirWrap = document.getElementById("simRevertirWrap");
 const simRevertirBtn = document.getElementById("simRevertirBtn");
 const simTecnicoNuevoSelect = document.getElementById("simTecnicoNuevoSelect");
 const simTransferirBtn = document.getElementById("simTransferirBtn");
+const simEstadoFisicoWrap = document.getElementById("simEstadoFisicoWrap");
+const simEstadoFisicoActual = document.getElementById("simEstadoFisicoActual");
+const simMarcarDefectuosaBtn = document.getElementById("simMarcarDefectuosaBtn");
+const simMarcarExtraviadaBtn = document.getElementById("simMarcarExtraviadaBtn");
+const simMarcarDisponibleBtn = document.getElementById("simMarcarDisponibleBtn");
+const simsTransferenciasPendientesWrap = document.getElementById("simsTransferenciasPendientesWrap");
+const simsTransferenciasPendientesList = document.getElementById("simsTransferenciasPendientesList");
 const volverDeVehiculosBtn = document.getElementById("volverDeVehiculosBtn");
 const vehiculosListaStatus = document.getElementById("vehiculosListaStatus");
 const vehiculosPanelTiles = document.getElementById("vehiculosPanelTiles");
@@ -6398,6 +6405,7 @@ async function fetchSimsConfig() {
 tileSimsBtn.addEventListener("click", () => {
   showScreen("sims");
   renderSimsLista();
+  cargarTransferenciasPendientes();
 });
 volverDeSimsBtn.addEventListener("click", () => showScreen("home"));
 volverDeSimDetalleBtn.addEventListener("click", () => showScreen("sims"));
@@ -6428,12 +6436,14 @@ function dibujarSimsLista() {
     card.className = "sim-card";
     const colorEmpresa = COLORES_COMPANIA_SIM[s.empresa] || "#8A9089";
     card.style.borderLeft = `4px solid ${colorEmpresa}`;
+    const badgeFisico = s.estado_fisico && s.estado_fisico !== "Disponible"
+      ? `<span class="sim-card-badge-fisico">${escapeHtml(s.estado_fisico)}</span>` : "";
     card.innerHTML = `
       <div>
-        <div class="sim-card-empresa"><span class="sim-card-dot" style="background:${colorEmpresa};"></span>${s.empresa}${s.tipo ? " · " + escapeHtml(s.tipo) : ""}</div>
+        <div class="sim-card-empresa"><span class="sim-card-dot" style="background:${colorEmpresa};"></span>${s.empresa}${s.tipo ? " · " + escapeHtml(s.tipo) : ""}${badgeFisico}</div>
         <div class="sim-card-numero">${escapeHtml(s.numero)}${mostrarTecnico ? " · " + escapeHtml(s.tecnico_actual) : ""}</div>
       </div>
-      <span class="sim-card-estado ${s.estado}">${s.estado === "uso" ? "En uso: " + escapeHtml(s.cliente || "?") : "En stock"}</span>
+      <span class="sim-card-estado ${s.estado}">${s.ubicacion_tipo === "cliente" ? "Instalada: " + escapeHtml(s.ubicacion_nombre || "?") : s.ubicacion_tipo === "oficina" ? "En Oficina" : "En tu stock"}</span>
     `;
     card.addEventListener("click", () => {
       simSeleccionada = s.numero;
@@ -6450,9 +6460,15 @@ function dibujarSimsLista() {
   // propio, por privacidad entre técnicos) — salvo que tenga el
   // permiso puntual "sims_ver_todas", pensado para quien necesita
   // supervisar/operar el listado completo sin tener que ser admin.
+  //
+  // "Mis SIMs" es el stock personal (lo que tiene para instalar) —
+  // no incluye las que ya instaló en algún cliente, esas se buscan
+  // aparte con "Buscar SIM instalada".
   const propio = tecnicoLogueado || "";
   const veTodas = !!permisosDelTecnico(tecnicoLogueado).sims_ver_todas;
-  const listaVisible = veTodas ? simsListaCache.slice() : simsListaCache.filter((s) => s.tecnico_actual === propio);
+  const listaVisible = veTodas
+    ? simsListaCache.filter((s) => s.ubicacion_tipo !== "cliente")
+    : simsListaCache.filter((s) => s.ubicacion_tipo === "tecnico" && s.tecnico_actual === propio);
 
   if (listaVisible.length === 0) {
     simsListaStatus.textContent = "Todavía no tenés ninguna SIM asignada.";
@@ -6549,6 +6565,7 @@ async function renderSimDetalle() {
   simDevolverWrap.classList.add("hidden");
   simRevertirWrap.classList.add("hidden");
   simTransferirWrap.classList.add("hidden");
+  simEstadoFisicoWrap.classList.add("hidden");
   try {
     const sims = await fetchSimsConfig();
     const sim = sims.find((s) => s.numero === simSeleccionada);
@@ -6562,22 +6579,25 @@ async function renderSimDetalle() {
 
     const esPropia = sim.tecnico_actual === (tecnicoLogueado || "") || !!permisosDelTecnico(tecnicoLogueado).sims_ver_todas;
     if (!esPropia) {
-      simSoloLecturaInfo.textContent = sim.estado === "uso"
-        ? `Esta SIM la tiene ${sim.tecnico_actual}, en uso en ${sim.cliente || "un cliente"}.`
+      simSoloLecturaInfo.textContent = sim.ubicacion_tipo === "cliente"
+        ? `Esta SIM está instalada en ${sim.ubicacion_nombre || "un cliente"} (la puso ${sim.tecnico_instalador || sim.tecnico_actual}).`
         : `Esta SIM la tiene ${sim.tecnico_actual}, en stock.`;
       simSoloLecturaInfo.classList.remove("hidden");
       return;
     }
 
-    if (sim.estado === "stock") {
+    if (sim.ubicacion_tipo === "cliente") {
+      simDevolverWrap.classList.remove("hidden");
+    } else if (sim.estado_fisico && sim.estado_fisico !== "Disponible") {
+      simSoloLecturaInfo.textContent = `Esta SIM está marcada como "${sim.estado_fisico}" — no se puede instalar hasta que vuelva a estar Disponible.`;
+      simSoloLecturaInfo.classList.remove("hidden");
+    } else {
       await poblarClientesParaSim();
       simClienteInput.value = "";
       simClienteEncontradoInfo.textContent = "";
       simDireccionInstalacion.value = "";
       simNumeroAbonadoInfo.textContent = "";
       simUsarWrap.classList.remove("hidden");
-    } else {
-      simDevolverWrap.classList.remove("hidden");
     }
 
     if (sim.tecnico_anterior && sim.tecnico_anterior !== tecnicoLogueado) {
@@ -6589,7 +6609,18 @@ async function renderSimDetalle() {
     const opciones = otrosTecnicos.map((n) => `<option value="${n}">${n}</option>`).join("");
     const opcionOficina = tecnicoLogueado !== "" ? `<option value="Oficina">Oficina (stock general, sin técnico)</option>` : "";
     simTecnicoNuevoSelect.innerHTML = `<option value="" disabled selected>Elegí un técnico</option>${opcionOficina}${opciones}`;
-    simTransferirWrap.classList.remove("hidden");
+    if (sim.ubicacion_tipo !== "cliente") simTransferirWrap.classList.remove("hidden");
+
+    // Estado físico — solo tiene sentido para SIMs en stock (una vez
+    // instalada, se maneja como "retirar", no como defectuosa/perdida).
+    if (sim.ubicacion_tipo !== "cliente") {
+      const estadoActual = sim.estado_fisico || "Disponible";
+      simEstadoFisicoActual.textContent = `Estado actual: ${estadoActual}`;
+      simMarcarDefectuosaBtn.classList.toggle("hidden", estadoActual === "Defectuosa");
+      simMarcarExtraviadaBtn.classList.toggle("hidden", estadoActual === "Extraviada");
+      simMarcarDisponibleBtn.classList.toggle("hidden", estadoActual === "Disponible");
+      simEstadoFisicoWrap.classList.remove("hidden");
+    }
   } catch (err) {
     simDetalleStatus.textContent = "No se pudo cargar la información de esta SIM.";
   }
@@ -6719,7 +6750,7 @@ async function transferirSim(tecnicoNuevo) {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error desconocido");
-    showToast(`SIM transferida a ${tecnicoNuevo}.`);
+    showToast(data.pendiente ? `Transferencia a ${tecnicoNuevo} enviada — queda pendiente hasta que la acepte.` : `SIM transferida a ${tecnicoNuevo}.`);
     showScreen("sims");
     renderSimsLista();
   } catch (err) {
@@ -6752,6 +6783,76 @@ simRevertirBtn.addEventListener("click", async () => {
   }
   await transferirSim(sim.tecnico_anterior);
 });
+
+// ---------- Estado físico (Disponible / Defectuosa / Extraviada) ----------
+async function marcarEstadoFisicoSim(estadoFisico) {
+  try {
+    const res = await fetch("/api/recurso-uso", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({ recurso: "sim", accion: "marcar_estado_fisico", numero: simSeleccionada, tecnico: tecnicoLogueado || "", estado_fisico: estadoFisico }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    showToast(`Marcada como ${estadoFisico}.`);
+    renderSimDetalle();
+  } catch (err) {
+    showToast("No se pudo marcar: " + err.message);
+  }
+}
+simMarcarDefectuosaBtn.addEventListener("click", () => marcarEstadoFisicoSim("Defectuosa"));
+simMarcarExtraviadaBtn.addEventListener("click", () => marcarEstadoFisicoSim("Extraviada"));
+simMarcarDisponibleBtn.addEventListener("click", () => marcarEstadoFisicoSim("Disponible"));
+
+// ---------- Transferencias pendientes de aceptación ----------
+async function cargarTransferenciasPendientes() {
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch(`/api/recurso-uso?recurso=sim&pendientes=1&tecnico=${encodeURIComponent(tecnicoLogueado || "")}`, { headers, cache: "no-store" });
+    const pendientes = await res.json();
+    if (!Array.isArray(pendientes) || pendientes.length === 0) {
+      simsTransferenciasPendientesWrap.classList.add("hidden");
+      return;
+    }
+    simsTransferenciasPendientesWrap.classList.remove("hidden");
+    simsTransferenciasPendientesList.innerHTML = pendientes.map((t) => `
+      <div class="card" style="margin-bottom:10px;">
+        <b>${escapeHtml(t.empresa || "")}${t.tipo ? " · " + escapeHtml(t.tipo) : ""}</b><br>
+        <span style="font-family:'IBM Plex Mono', monospace;">${escapeHtml(t.numero)}</span><br>
+        <span style="color:#6B7680; font-size:13px;">De: ${escapeHtml(t.tecnico_origen)}</span>
+        <div style="margin-top:8px;">
+          <button type="button" class="btn btn-primary btn-small aceptar-transf-btn" data-id="${t.id}">Aceptar</button>
+          <button type="button" class="btn btn-ghost btn-small rechazar-transf-btn" data-id="${t.id}" style="margin-left:8px;">Rechazar</button>
+        </div>
+      </div>
+    `).join("");
+    simsTransferenciasPendientesList.querySelectorAll(".aceptar-transf-btn").forEach((btn) => {
+      btn.addEventListener("click", () => resolverTransferenciaPendiente(btn.dataset.id, "aceptar_transferencia"));
+    });
+    simsTransferenciasPendientesList.querySelectorAll(".rechazar-transf-btn").forEach((btn) => {
+      btn.addEventListener("click", () => resolverTransferenciaPendiente(btn.dataset.id, "rechazar_transferencia"));
+    });
+  } catch (err) {
+    simsTransferenciasPendientesWrap.classList.add("hidden");
+  }
+}
+
+async function resolverTransferenciaPendiente(idTransferencia, accion) {
+  try {
+    const res = await fetch("/api/recurso-uso", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({ recurso: "sim", accion, tecnico: tecnicoLogueado || "", id_transferencia: Number(idTransferencia) }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    showToast(accion === "aceptar_transferencia" ? "Transferencia aceptada — ya está en tu stock." : "Transferencia rechazada.");
+    cargarTransferenciasPendientes();
+    renderSimsLista();
+  } catch (err) {
+    showToast("No se pudo resolver: " + err.message);
+  }
+}
 
 // ---------- Registro de SIMs instaladas (buscar / retirar) ----------
 let simsRegistroCache = null; // se trae una sola vez y se cachea (es un archivo grande, ~900 líneas)

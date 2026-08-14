@@ -17,9 +17,15 @@
 // ============================================================
 // SIMs — ya cortado al backend nuevo (Cloudflare)
 // ============================================================
-async function getSimNuevo(headersBackendNuevo, res) {
+async function getSimNuevo(headersBackendNuevo, res, query) {
   res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
   try {
+    if (query && query.pendientes) {
+      const r = await fetch(`${process.env.BACKEND_NUEVO_URL}/api/sims/transferencias-pendientes?tecnico=${encodeURIComponent(query.tecnico || "")}`, { headers: headersBackendNuevo });
+      const data = await r.json();
+      res.status(r.status).json(data);
+      return;
+    }
     const r = await fetch(`${process.env.BACKEND_NUEVO_URL}/api/sims/historial`, { headers: headersBackendNuevo });
     const data = await r.json();
     res.status(r.status).json(data);
@@ -214,7 +220,7 @@ module.exports = async (req, res) => {
 
     if (req.method === "GET") {
       if (recurso === "vehiculo") return await getVehiculoNuevo(headersBackendNuevo, res);
-      if (recurso === "sim") return await getSimNuevo(headersBackendNuevo, res);
+      if (recurso === "sim") return await getSimNuevo(headersBackendNuevo, res, req.query);
       if (recurso === "herramienta") return await getHerramientaNuevo(headersBackendNuevo, res);
       if (recurso === "presencia") {
         if (req.query.historial) return await getPresenciaHistorialNuevo(headersBackendNuevo, res);

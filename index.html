@@ -673,6 +673,12 @@
   <section class="screen" id="screen-sims">
     <div class="review-scroll">
       <p class="hint-eyebrow review-eyebrow">MIS SIMs</p>
+
+      <div id="simsTransferenciasPendientesWrap" class="hidden" style="margin-bottom:16px;">
+        <p class="hint-eyebrow" style="margin-bottom:8px;">Te están transfiriendo</p>
+        <div id="simsTransferenciasPendientesList"></div>
+      </div>
+
       <p class="list-status" id="simsListaStatus"></p>
       <div id="simsGrupos"></div>
     </div>
@@ -807,6 +813,15 @@
           </select>
         </div>
         <button type="button" class="btn btn-secondary" id="simTransferirBtn">Transferir</button>
+        <p class="hint-text" style="margin-top:4px;">Queda pendiente hasta que el técnico la acepte — no vas a poder usarla mientras tanto.</p>
+      </div>
+
+      <div id="simEstadoFisicoWrap" class="hidden" style="margin-top:16px;">
+        <label class="field-label">Estado físico</label>
+        <p class="hint-text" id="simEstadoFisicoActual" style="margin-top:0;"></p>
+        <button type="button" class="btn btn-ghost btn-small" id="simMarcarDefectuosaBtn">Marcar como Defectuosa</button>
+        <button type="button" class="btn btn-ghost btn-small" id="simMarcarExtraviadaBtn" style="margin-left:8px;">Marcar como Extraviada</button>
+        <button type="button" class="btn btn-ghost btn-small hidden" id="simMarcarDisponibleBtn">Volver a marcar como Disponible</button>
       </div>
     </div>
     <div class="action-bar">
