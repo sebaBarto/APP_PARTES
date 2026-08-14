@@ -391,6 +391,19 @@ mismo parte. Probado de punta a punta: calificar sin token (como llega desde el 
 intentar recalificar (avisa que ya calificó), los 5 links del mail bien armados con el
 número de parte correcto, y el promedio calculado bien en `admin.html`.
 
+## Corrige detección de línea existente al instalar SIM (v3.62.1)
+
+Corrige un bug real reportado (caso Siri Carlos): al instalar una SIM en un cliente que
+ya tenía una línea, la app no la detectaba — comparaba el nombre del cliente con el
+nombre guardado en la SIM instalada de forma **exacta** (letra por letra), así que
+cualquier diferencia mínima (mayúsculas, un espacio de más) hacía que nunca encontrara
+la coincidencia, y por lo tanto nunca ofrecía "reemplazar o agregar segunda línea".
+
+Corregido con el mismo matching tolerante que ya se usa en el Cronograma — alcanza con
+que las palabras del nombre coincidan, sin importar mayúsculas, tildes, o espacios de
+más. Probado con el caso real (nombre guardado con espacios extra y en minúsculas):
+ahora detecta correctamente la línea existente y ofrece las dos opciones.
+
 ## Materiales "a mano" ya alimentan el Historial de Stock (v3.62.0)
 
 Corrige lo reportado: el campo de texto libre "Otros materiales" (para lo que no

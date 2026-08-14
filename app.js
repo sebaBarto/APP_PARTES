@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.62.0";
+const APP_VERSION = "3.62.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -6695,7 +6695,18 @@ simUsarBtn.addEventListener("click", async () => {
   simUsarBtn.disabled = true;
   try {
     const sims = await fetchSimsConfig();
-    const existente = sims.find((s) => s.estado === "uso" && s.cliente === cliente && s.numero !== simSeleccionada);
+    // Antes exigía coincidencia exacta de texto entre el nombre del
+    // cliente y como quedó guardado en la SIM instalada — una mínima
+    // diferencia (mayúsculas, espacio de más, etc.) hacía que nunca
+    // se encontrara. Ahora usa el mismo matching tolerante que ya se
+    // usa en el Cronograma: alcanza con que las palabras del nombre
+    // coincidan, sin importar mayúsculas/tildes/orden.
+    const normCliente = normalizeText(cliente);
+    const existente = sims.find((s) => {
+      if (s.estado !== "uso" || s.numero === simSeleccionada || !s.cliente) return false;
+      const palabras = normalizeText(s.cliente).split(/\s+/).filter((p) => p.length > 2);
+      return palabras.length > 0 && palabras.every((palabra) => normCliente.includes(palabra));
+    });
     if (existente) {
       simClienteParaReemplazo = cliente;
       simExistenteParaReemplazo = existente.numero;
