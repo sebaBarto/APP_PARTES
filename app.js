@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.61.0";
+const APP_VERSION = "3.62.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -1848,6 +1848,7 @@ const MATERIALES_CATALOGO_RESPALDO = [
 
 const matCategoriaSelect = document.getElementById("matCategoriaSelect");
 const matModeloSelect = document.getElementById("matModeloSelect");
+const matModeloManualInput = document.getElementById("matModeloManualInput");
 const matCantidadInput = document.getElementById("matCantidadInput");
 const agregarMaterialBtn = document.getElementById("agregarMaterialBtn");
 const materialesAgregadosList = document.getElementById("materialesAgregadosList");
@@ -1887,14 +1888,21 @@ function poblarCategoriasMateriales() {
 
 matCategoriaSelect.addEventListener("change", () => {
   const cat = materialesCatalogo.find((c) => c.categoria === matCategoriaSelect.value);
+  matModeloManualInput.classList.add("hidden");
+  matModeloManualInput.value = "";
   if (!cat) {
     matModeloSelect.innerHTML = '<option value="" disabled selected>Elegí primero una categoría</option>';
     matModeloSelect.disabled = true;
     return;
   }
   const opciones = cat.modelos.map((m) => `<option value="${m}">${m}</option>`).join("");
-  matModeloSelect.innerHTML = `<option value="" disabled selected>Modelo</option>${opciones}`;
+  matModeloSelect.innerHTML = `<option value="" disabled selected>Modelo</option>${opciones}<option value="__manual__">Otro (escribir el material)</option>`;
   matModeloSelect.disabled = false;
+});
+
+matModeloSelect.addEventListener("change", () => {
+  matModeloManualInput.classList.toggle("hidden", matModeloSelect.value !== "__manual__");
+  if (matModeloSelect.value === "__manual__") matModeloManualInput.focus();
 });
 
 function renderMaterialesAgregados() {
@@ -1903,7 +1911,7 @@ function renderMaterialesAgregados() {
     const fila = document.createElement("div");
     fila.className = "material-agregado-item";
     fila.innerHTML = `
-      <span>${item.modelo} — x${item.cantidad}</span>
+      <span>${escapeHtml(item.modelo)} — x${item.cantidad}${item.manual ? ' <span class="badge-material-manual">Manual</span>' : ""}</span>
       <button type="button" class="quitar" title="Quitar">✕</button>
     `;
     fila.querySelector(".quitar").addEventListener("click", () => {
@@ -1915,16 +1923,19 @@ function renderMaterialesAgregados() {
 }
 
 agregarMaterialBtn.addEventListener("click", () => {
-  const modelo = matModeloSelect.value;
+  const esManual = matModeloSelect.value === "__manual__";
+  const modelo = esManual ? matModeloManualInput.value.trim() : matModeloSelect.value;
   const cantidad = parseInt(matCantidadInput.value, 10) || 1;
   if (!modelo) {
-    showToast("Elegí una categoría y un modelo antes de agregar.");
+    showToast(esManual ? "Escribí el nombre del material." : "Elegí una categoría y un modelo antes de agregar.");
     return;
   }
-  materialesAgregados.push({ modelo, cantidad });
+  materialesAgregados.push({ modelo, cantidad, manual: esManual });
   renderMaterialesAgregados();
   matModeloSelect.value = "";
   matCantidadInput.value = "";
+  matModeloManualInput.value = "";
+  matModeloManualInput.classList.add("hidden");
 });
 
 function getMaterialesUtilizados() {
@@ -1936,6 +1947,7 @@ function getMaterialesUtilizados() {
 // ---------- Selector estructurado de materiales retirados (mismo patrón que "usados") ----------
 const matRetCategoriaSelect = document.getElementById("matRetCategoriaSelect");
 const matRetModeloSelect = document.getElementById("matRetModeloSelect");
+const matRetModeloManualInput = document.getElementById("matRetModeloManualInput");
 const matRetCantidadInput = document.getElementById("matRetCantidadInput");
 const agregarMaterialRetiradoBtn = document.getElementById("agregarMaterialRetiradoBtn");
 const materialesRetiradosAgregadosList = document.getElementById("materialesRetiradosAgregadosList");
@@ -1948,14 +1960,21 @@ function poblarCategoriasMaterialesRetirados() {
 
 matRetCategoriaSelect.addEventListener("change", () => {
   const cat = materialesCatalogo.find((c) => c.categoria === matRetCategoriaSelect.value);
+  matRetModeloManualInput.classList.add("hidden");
+  matRetModeloManualInput.value = "";
   if (!cat) {
     matRetModeloSelect.innerHTML = '<option value="" disabled selected>Elegí primero una categoría</option>';
     matRetModeloSelect.disabled = true;
     return;
   }
   const opciones = cat.modelos.map((m) => `<option value="${m}">${m}</option>`).join("");
-  matRetModeloSelect.innerHTML = `<option value="" disabled selected>Modelo</option>${opciones}`;
+  matRetModeloSelect.innerHTML = `<option value="" disabled selected>Modelo</option>${opciones}<option value="__manual__">Otro (escribir el material)</option>`;
   matRetModeloSelect.disabled = false;
+});
+
+matRetModeloSelect.addEventListener("change", () => {
+  matRetModeloManualInput.classList.toggle("hidden", matRetModeloSelect.value !== "__manual__");
+  if (matRetModeloSelect.value === "__manual__") matRetModeloManualInput.focus();
 });
 
 function renderMaterialesRetiradosAgregados() {
@@ -1964,7 +1983,7 @@ function renderMaterialesRetiradosAgregados() {
     const fila = document.createElement("div");
     fila.className = "material-agregado-item";
     fila.innerHTML = `
-      <span>${item.modelo} — x${item.cantidad}</span>
+      <span>${escapeHtml(item.modelo)} — x${item.cantidad}${item.manual ? ' <span class="badge-material-manual">Manual</span>' : ""}</span>
       <button type="button" class="quitar" title="Quitar">✕</button>
     `;
     fila.querySelector(".quitar").addEventListener("click", () => {
@@ -1976,16 +1995,19 @@ function renderMaterialesRetiradosAgregados() {
 }
 
 agregarMaterialRetiradoBtn.addEventListener("click", () => {
-  const modelo = matRetModeloSelect.value;
+  const esManual = matRetModeloSelect.value === "__manual__";
+  const modelo = esManual ? matRetModeloManualInput.value.trim() : matRetModeloSelect.value;
   const cantidad = parseInt(matRetCantidadInput.value, 10) || 1;
   if (!modelo) {
-    showToast("Elegí una categoría y un modelo antes de agregar.");
+    showToast(esManual ? "Escribí el nombre del material." : "Elegí una categoría y un modelo antes de agregar.");
     return;
   }
-  materialesRetiradosAgregados.push({ modelo, cantidad });
+  materialesRetiradosAgregados.push({ modelo, cantidad, manual: esManual });
   renderMaterialesRetiradosAgregados();
   matRetModeloSelect.value = "";
   matRetCantidadInput.value = "";
+  matRetModeloManualInput.value = "";
+  matRetModeloManualInput.classList.add("hidden");
 });
 
 function getMaterialesRetirados() {
@@ -2006,12 +2028,14 @@ function categoriaDeModelo(modelo) {
 function armarMovimientosDeStock() {
   const porModelo = {};
   materialesAgregados.forEach((item) => {
-    if (!porModelo[item.modelo]) porModelo[item.modelo] = { modelo: item.modelo, categoria: categoriaDeModelo(item.modelo), cantidad_instalada: 0, cantidad_retirada: 0 };
+    if (!porModelo[item.modelo]) porModelo[item.modelo] = { modelo: item.modelo, categoria: categoriaDeModelo(item.modelo), cantidad_instalada: 0, cantidad_retirada: 0, es_manual: false };
     porModelo[item.modelo].cantidad_instalada += item.cantidad;
+    if (item.manual) porModelo[item.modelo].es_manual = true;
   });
   materialesRetiradosAgregados.forEach((item) => {
-    if (!porModelo[item.modelo]) porModelo[item.modelo] = { modelo: item.modelo, categoria: categoriaDeModelo(item.modelo), cantidad_instalada: 0, cantidad_retirada: 0 };
+    if (!porModelo[item.modelo]) porModelo[item.modelo] = { modelo: item.modelo, categoria: categoriaDeModelo(item.modelo), cantidad_instalada: 0, cantidad_retirada: 0, es_manual: false };
     porModelo[item.modelo].cantidad_retirada += item.cantidad;
+    if (item.manual) porModelo[item.modelo].es_manual = true;
   });
   return Object.values(porModelo);
 }
@@ -2469,11 +2493,15 @@ function resetForm() {
   matModeloSelect.innerHTML = '<option value="" disabled selected>Elegí primero una categoría</option>';
   matModeloSelect.disabled = true;
   matCantidadInput.value = "";
+  matModeloManualInput.value = "";
+  matModeloManualInput.classList.add("hidden");
   materialesRetiradosAgregados = [];
   renderMaterialesRetiradosAgregados();
   matRetCategoriaSelect.value = "";
   matRetModeloSelect.innerHTML = '<option value="" disabled selected>Elegí primero una categoría</option>';
   matRetModeloSelect.disabled = true;
+  matRetModeloManualInput.value = "";
+  matRetModeloManualInput.classList.add("hidden");
   matRetCantidadInput.value = "";
   currentNumeroServicio = "";
   fotoBase64 = null;
@@ -2573,6 +2601,10 @@ toSignBtn.addEventListener("click", () => {
   // continuar, para no perder el material cargado.
   if (matModeloSelect.value && !matModeloSelect.disabled) {
     showToast('Tenés un material elegido sin agregar — tocá "+ Agregar" o borralo antes de continuar.');
+    return;
+  }
+  if (matRetModeloSelect.value && !matRetModeloSelect.disabled) {
+    showToast('Tenés un material retirado elegido sin agregar — tocá "+ Agregar" o borralo antes de continuar.');
     return;
   }
   // Mismo caso para una clave escrita pero nunca agregada a la lista
@@ -4028,6 +4060,7 @@ function renderStock() {
     const partes = [];
     if (m.cantidad_instalada > 0) partes.push(`<span class="badge-stock badge-instalado">↑ Instaló x${m.cantidad_instalada}</span>`);
     if (m.cantidad_retirada > 0) partes.push(`<span class="badge-stock badge-retirado">↓ Retiró x${m.cantidad_retirada}</span>`);
+    if (m.es_manual) partes.push(`<span class="badge-material-manual">✎ Cargado a mano</span>`);
 
     const card = document.createElement("div");
     card.className = "historial-card" + (m.pasado_sistema_offline ? " historial-card-pasado" : "");

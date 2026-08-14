@@ -1041,6 +1041,17 @@ html, body {
   font-family: 'Space Grotesk', sans-serif;
 }
 .badge-instalado { background: #E1F0E4; color: #1F6B34; }
+.badge-material-manual {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #FCE8D6;
+  color: #A85A0E;
+  vertical-align: middle;
+  margin-left: 4px;
+}
 .badge-retirado { background: #FBE8DC; color: #B5541A; }
 
 .instalacion-fotos-grid {

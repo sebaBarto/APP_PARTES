@@ -391,6 +391,23 @@ mismo parte. Probado de punta a punta: calificar sin token (como llega desde el 
 intentar recalificar (avisa que ya calificó), los 5 links del mail bien armados con el
 número de parte correcto, y el promedio calculado bien en `admin.html`.
 
+## Materiales "a mano" ya alimentan el Historial de Stock (v3.62.0)
+
+Corrige lo reportado: el campo de texto libre "Otros materiales" (para lo que no
+estuviera en las categorías) salía bien en el mail, pero nunca llegaba al Historial de
+Stock — solo lo agregado con el selector de categoría/modelo llegaba ahí.
+
+Ahora el selector estructurado (tanto para instalados como para retirados) tiene una
+opción **"Otro (escribir el material)"** — al elegirla, aparece un campo para
+escribirlo a mano, y ese material sí queda registrado en Stock, marcado con una
+etiqueta **"✎ Cargado a mano"** bien visible en cada tarjeta, para poder controlarlo
+fácilmente de un vistazo. También se agregó el mismo aviso que ya existía para
+materiales/claves sin agregar, ahora también para el selector de retirados.
+
+Backend nuevo: columna `es_manual` en `stock_movimientos`. Probado de punta a punta:
+elegir "Otro", escribir un material, agregarlo, y confirmar que el movimiento final
+queda marcado correctamente.
+
 ## Rediseño completo del módulo de SIMs (v3.61.0 + admin.html)
 
 Rediseño grande a pedido, en base a un pedido detallado de reglas de negocio y a
