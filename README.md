@@ -391,6 +391,42 @@ mismo parte. Probado de punta a punta: calificar sin token (como llega desde el 
 intentar recalificar (avisa que ya calificó), los 5 links del mail bien armados con el
 número de parte correcto, y el promedio calculado bien en `admin.html`.
 
+## Rediseño completo del módulo de SIMs (v3.61.0 + admin.html)
+
+Rediseño grande a pedido, en base a un pedido detallado de reglas de negocio y a
+problemas reales encontrados en capturas del panel:
+
+**Corrección de datos**: se encontraron y limpiaron **912 SIMs** que estaban a la vez
+en el stock de un técnico/Oficina Y instaladas en un cliente (un número no puede estar
+en dos lugares) — venían de una carga masiva vieja que nunca chequeó contra las ya
+instaladas. La carga masiva ya está corregida para que esto no vuelva a pasar (salta
+automáticamente cualquier número que ya figure instalado).
+
+**Estado Físico** (Disponible / Defectuosa / Extraviada): nuevo, en la app del técnico
+— al marcar una SIM como Defectuosa o Extraviada, sale del stock disponible para
+instalar hasta que se vuelva a marcar como Disponible.
+
+**Transferencia con confirmación**: transferir una SIM a otro técnico ahora queda
+**pendiente** hasta que el destino la Acepte o Rechace — mientras tanto, ni el origen
+ni nadie más la puede usar. Transferir a "Oficina" sigue siendo inmediato (no tiene
+sentido pedirle confirmación al stock central). Nueva sección "Te están transfiriendo"
+en Mis SIMs, con los botones de Aceptar/Rechazar.
+
+**Formato dinámico por proveedor**: en el alta desde `admin.html`, elegir Claro o
+Personal fija el formato en "Estándar" automáticamente (deshabilitado) — solo Movistar
+tiene la opción Mini.
+
+**Limpieza visual en `admin.html`**: se sacó la columna "En uso/En stock" (redundante,
+generaba confusión), y la columna "Asignado a" ahora muestra el **cliente** para las
+SIMs instaladas en vez del técnico que la instaló históricamente — esa fila queda de
+solo lectura (no tiene sentido editarla ni transferirla desde esta tabla; se retira
+desde la app del técnico).
+
+Probado de punta a punta: transferencia pendiente + aceptar + rechazar, estado físico
+bloqueando instalación, limpieza masiva sin tocar SIMs sanas, y la tabla de
+`admin.html` con los tres tipos de fila (Oficina/técnico/cliente) renderizando y
+comportándose bien.
+
 ## Instalación: ayudante en el mismo servicio, observaciones al cerrar, y no perder datos (v3.59.0)
 
 Tres mejoras a pedido, todas relacionadas con el trabajo en equipo en una instalación:

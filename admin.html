@@ -207,6 +207,8 @@
   .sims-tabla .btn-quitar-fila { width: auto; padding: 7px 10px; background: #FFFFFF; color: var(--danger); border: 1.5px solid var(--border); box-shadow: none; border-radius: var(--r-sm); }
   .sim-asignado-a { font-weight: 600; }
   .sim-asignado-a.oficina { color: #B5772A; }
+  .sim-asignado-a.cliente { color: #2E6B4F; }
+  .sim-badge-fisico-admin { display: inline-block; margin-top: 3px; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; background: #FBE0DC; color: #A33A2E; }
   .sim-empresa-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
 
   .btn-quitar-tecnico {
@@ -530,7 +532,6 @@
               <th>Número de línea</th>
               <th>Empresa</th>
               <th>Tipo</th>
-              <th>Estado</th>
               <th>Cliente</th>
               <th>Asignado a</th>
               <th>Transferir a</th>
@@ -1857,7 +1858,8 @@ let numerosExistentesEnServidor = new Set(); // para saber si una fila ya existe
 const COLORES_COMPANIA_SIM_ADMIN = { Movistar: "#2E9E4F", Personal: "#29ABE2", Claro: "#E4402C" };
 
 function renderFilaSimTabla(sim) {
-  const s = sim || { empresa: "Movistar", tipo: "Estándar", numero: "", tecnico_actual: "Oficina", estado: "stock", cliente: "" };
+  const s = sim || { empresa: "Movistar", tipo: "Estándar", numero: "", tecnico_actual: "Oficina", estado: "stock", estado_fisico: "Disponible", ubicacion_tipo: "oficina", ubicacion_nombre: "Oficina", cliente: "" };
+  const esInstalada = s.ubicacion_tipo === "cliente";
   const destinos = [...nombresTecnicosParaSims, "Oficina"].filter((n) => n !== s.tecnico_actual);
   const opcionesDestino = destinos.map((n) => `<option value="${n}">${n}</option>`).join("");
   const opcionesServicios = serviciosPendientesParaSims
@@ -1865,36 +1867,38 @@ function renderFilaSimTabla(sim) {
     .map((sv, idx) => `<option value="${idx}">${sv.cliente}${sv.direccion ? " — " + sv.direccion : ""}</option>`)
     .join("");
   const colorEmpresa = COLORES_COMPANIA_SIM_ADMIN[s.empresa] || "#8A9089";
+  const formatoFijo = s.empresa === "Claro" || s.empresa === "Personal";
 
   const fila = document.createElement("tr");
   fila.className = "sim-fila-tabla";
   fila.dataset.tecnicoActual = s.tecnico_actual || "Oficina";
   fila.innerHTML = `
-    <td style="border-left:4px solid ${colorEmpresa};"><input type="text" class="sim-numero" value="${s.numero || ""}" placeholder="341..."></td>
+    <td style="border-left:4px solid ${colorEmpresa};"><input type="text" class="sim-numero" value="${s.numero || ""}" placeholder="341..." ${esInstalada ? "disabled" : ""}></td>
     <td>
       <span class="sim-empresa-dot" style="background:${colorEmpresa};"></span>
-      <select class="sim-empresa">
+      <select class="sim-empresa" ${esInstalada ? "disabled" : ""}>
         <option ${s.empresa === "Movistar" ? "selected" : ""}>Movistar</option>
         <option ${s.empresa === "Personal" ? "selected" : ""}>Personal</option>
         <option ${s.empresa === "Claro" ? "selected" : ""}>Claro</option>
       </select>
     </td>
     <td>
-      <select class="sim-tipo">
+      <select class="sim-tipo" ${(formatoFijo || esInstalada) ? "disabled" : ""}>
         <option value="" ${!s.tipo ? "selected" : ""}>—</option>
-        <option ${s.tipo === "Estándar" ? "selected" : ""}>Estándar</option>
-        <option ${s.tipo === "Mini" ? "selected" : ""}>Mini</option>
+        <option value="Estándar" ${s.tipo === "Estándar" || formatoFijo ? "selected" : ""}>Estándar</option>
+        <option value="Mini" ${s.tipo === "Mini" ? "selected" : ""}>Mini</option>
       </select>
     </td>
+    <td><input type="text" class="sim-cliente" value="${s.cliente || ""}" placeholder="Cliente" ${esInstalada ? "disabled" : ""}></td>
     <td>
-      <select class="sim-estado">
-        <option value="stock" ${s.estado === "stock" ? "selected" : ""}>En stock</option>
-        <option value="uso" ${s.estado === "uso" ? "selected" : ""}>En uso</option>
-      </select>
+      ${esInstalada
+        ? `<span class="sim-asignado-a cliente">Cliente: ${s.ubicacion_nombre || "?"}</span>`
+        : `<span class="sim-asignado-a ${s.tecnico_actual === "Oficina" ? "oficina" : ""}">${s.tecnico_actual || "Oficina"}</span>`
+      }
+      ${s.estado_fisico && s.estado_fisico !== "Disponible" ? `<br><span class="sim-badge-fisico-admin">${s.estado_fisico}</span>` : ""}
     </td>
-    <td><input type="text" class="sim-cliente" value="${s.cliente || ""}" placeholder="Cliente"></td>
-    <td><span class="sim-asignado-a ${s.tecnico_actual === "Oficina" ? "oficina" : ""}">${s.tecnico_actual || "Oficina"}</span></td>
     <td>
+      ${esInstalada ? `<span style="color:#6B7680; font-size:13px;">Instalada — se retira desde la app del técnico</span>` : `
       <div class="sim-transferir-celda">
         <select class="sim-transferir-select">
           <option value="" disabled selected>Elegir...</option>
@@ -1915,17 +1919,32 @@ function renderFilaSimTabla(sim) {
         </div>
         <button type="button" class="btn-transferir-fila">Transferir</button>
       </div>
+      `}
     </td>
-    <td><button type="button" class="btn-quitar-fila" title="Quitar">✕</button></td>
+    <td><button type="button" class="btn-quitar-fila" title="Quitar" ${esInstalada ? "disabled" : ""}>✕</button></td>
   `;
 
   fila.querySelector(".sim-empresa").addEventListener("change", (e) => {
     const nuevoColor = COLORES_COMPANIA_SIM_ADMIN[e.target.value] || "#8A9089";
     fila.querySelector("td").style.borderLeft = `4px solid ${nuevoColor}`;
     fila.querySelector(".sim-empresa-dot").style.background = nuevoColor;
+    // Claro y Personal solo vienen en formato Estándar — Movistar es
+    // el único que tiene Mini también.
+    const tipoSelect = fila.querySelector(".sim-tipo");
+    if (e.target.value === "Claro" || e.target.value === "Personal") {
+      tipoSelect.value = "Estándar";
+      tipoSelect.disabled = true;
+    } else {
+      tipoSelect.disabled = false;
+    }
   });
 
   fila.querySelector(".btn-quitar-fila").addEventListener("click", () => fila.remove());
+
+  // Una fila que representa una SIM ya instalada no tiene ninguno de
+  // los controles de transferir/instalar (se sacaron del HTML porque
+  // no aplican) — no hay nada más que conectar acá.
+  if (esInstalada) return fila;
 
   const panelInstalarCliente = fila.querySelector(".sim-instalar-cliente-panel");
   const selectServicio = fila.querySelector(".sim-instalar-servicio-select");
@@ -2021,7 +2040,6 @@ function renderFilaSimTabla(sim) {
       if (!res.ok) throw new Error(data.error || "Error desconocido");
       // Refleja el cambio en la fila sin recargar toda la tabla.
       reflejarCambioEnFila();
-      fila.querySelector(".sim-estado").value = "stock";
       fila.querySelector(".sim-cliente").value = "";
       const idx = simsCompletos.findIndex((x) => x.numero === numeroActual);
       if (idx >= 0) {
@@ -2183,7 +2201,7 @@ function leerFilasSimsDeLaTabla() {
     tipo: fila.querySelector(".sim-tipo").value,
     numero: fila.querySelector(".sim-numero").value.trim(),
     tecnico_actual: fila.dataset.tecnicoActual,
-    estado: fila.querySelector(".sim-estado").value,
+    estado: "stock",
     cliente: fila.querySelector(".sim-cliente").value.trim(),
   }));
 }
@@ -2198,8 +2216,8 @@ descargarExcelSimsBtn.addEventListener("click", () => {
     "NUMERO DE LINEA": s.numero,
     "EMPRESA PROVEEDORA": s.empresa,
     Tipo: s.tipo,
-    "ASIGNADO A": s.tecnico_actual || "Oficina",
-    Estado: s.estado === "uso" ? "En uso" : "En stock",
+    "ASIGNADO A": s.ubicacion_tipo === "cliente" ? `Cliente: ${s.ubicacion_nombre || ""}` : (s.tecnico_actual || "Oficina"),
+    "ESTADO FISICO": s.estado_fisico || "Disponible",
     Cliente: s.cliente,
   }));
   const hoja = XLSX.utils.json_to_sheet(filas);
