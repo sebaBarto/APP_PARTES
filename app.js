@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.62.1";
+const APP_VERSION = "3.62.2";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -2025,14 +2025,16 @@ function categoriaDeModelo(modelo) {
   return cat ? cat.categoria : "";
 }
 
-function armarMovimientosDeStock() {
+function armarMovimientosDeStock(instaladosParam, retiradosParam) {
+  const instalados = instaladosParam || materialesAgregados;
+  const retirados = retiradosParam || materialesRetiradosAgregados;
   const porModelo = {};
-  materialesAgregados.forEach((item) => {
+  instalados.forEach((item) => {
     if (!porModelo[item.modelo]) porModelo[item.modelo] = { modelo: item.modelo, categoria: categoriaDeModelo(item.modelo), cantidad_instalada: 0, cantidad_retirada: 0, es_manual: false };
     porModelo[item.modelo].cantidad_instalada += item.cantidad;
     if (item.manual) porModelo[item.modelo].es_manual = true;
   });
-  materialesRetiradosAgregados.forEach((item) => {
+  retirados.forEach((item) => {
     if (!porModelo[item.modelo]) porModelo[item.modelo] = { modelo: item.modelo, categoria: categoriaDeModelo(item.modelo), cantidad_instalada: 0, cantidad_retirada: 0, es_manual: false };
     porModelo[item.modelo].cantidad_retirada += item.cantidad;
     if (item.manual) porModelo[item.modelo].es_manual = true;
@@ -2844,7 +2846,7 @@ async function intentarEnviarParte(payload, interactivo) {
           // se hace en SIMs y Emergencias) — así quien pasa esto al
           // sistema offline no se confunde de cliente.
           const clienteEncontradoStock = buscarClientePorNombre(data.cliente);
-          const movimientos = armarMovimientosDeStock().map((m) => ({
+          const movimientos = armarMovimientosDeStock(data.materiales_agregados, data.materiales_retirados_agregados).map((m) => ({
             ...m,
             numero_servicio: data.numero_servicio || "",
             numero_cliente: clienteEncontradoStock ? clienteEncontradoStock.numero_cliente || "" : "",

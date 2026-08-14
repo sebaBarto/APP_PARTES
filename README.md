@@ -391,6 +391,23 @@ mismo parte. Probado de punta a punta: calificar sin token (como llega desde el 
 intentar recalificar (avisa que ya calificó), los 5 links del mail bien armados con el
 número de parte correcto, y el promedio calculado bien en `admin.html`.
 
+## Corrige pérdida de materiales en Stock para partes encolados (v3.62.2)
+
+Corrige un bug real y bastante serio (caso Orieta Dario, parte N° 37445): cuando un
+parte queda encolado por falta de señal y se reintenta más tarde, los movimientos de
+Stock se armaban con el **estado en vivo del formulario en ese momento** — no con los
+materiales que realmente tenía guardado ese parte puntual. Si el técnico ya había
+empezado a cargar otro servicio distinto para cuando el reintento se disparaba solo, el
+material que llegaba a Stock era el del parte equivocado (o ninguno, si el formulario
+ya estaba vacío) — mientras que el mail sí mostraba lo correcto, porque ese usa los
+datos guardados del parte, no el estado en vivo.
+
+Ahora los movimientos de Stock se arman siempre a partir de los materiales guardados
+en el parte que se está enviando, sin importar qué haya en pantalla en ese momento.
+Probado de punta a punta reproduciendo el escenario exacto: parte encolado con un
+material, el técnico empieza otro parte distinto antes de que se reintente el primero,
+y confirmando que Stock recibe el material correcto del parte original.
+
 ## Corrige que la app se quede pegada en una versión vieja (caché de sw.js)
 
 A raíz de un caso real (Sebastian veía datos de antes del arreglo de SIMs, aunque el
