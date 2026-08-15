@@ -391,6 +391,15 @@ mismo parte. Probado de punta a punta: calificar sin token (como llega desde el 
 intentar recalificar (avisa que ya calificó), los 5 links del mail bien armados con el
 número de parte correcto, y el promedio calculado bien en `admin.html`.
 
+## Corrige sugerencias de cliente que no aparecían (v3.65.1)
+
+Corrige un caso real: si el técnico escribía muy rápido apenas entraba al formulario,
+las sugerencias podían no aparecer aunque el cliente existiera — la lista se carga en
+segundo plano al loguearse, y el buscador solo revisaba si ya estaba lista, sin
+esperarla. Ahora espera activamente a que termine de cargar antes de decidir que no
+hay resultados (sin demora perceptible en el uso normal, donde ya está lista de
+antes). Probado simulando una red lenta.
+
 ## Buscador de cliente en el parte, por nombre o dirección (v3.65.0)
 
 A pedido: al cargar un parte "sin servicio" (o cualquier parte, en realidad), el campo

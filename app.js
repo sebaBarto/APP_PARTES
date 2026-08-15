@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.65.0";
+const APP_VERSION = "3.65.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -1777,9 +1777,22 @@ document.getElementById("f_cliente").addEventListener("change", () => {
 // cliente — así "última visita" y las claves guardadas encuentran
 // bien el historial, aunque el cliente después cambie de nombre.
 const fClienteInput = document.getElementById("f_cliente");
-fClienteInput.addEventListener("input", () => {
+fClienteInput.addEventListener("input", async () => {
   const texto = fClienteInput.value.trim();
-  if (texto.length < 2 || !Array.isArray(clientesGeneralCache)) {
+  if (texto.length < 2) {
+    clienteSugerenciasWrap.classList.add("hidden");
+    return;
+  }
+  // Espera a que termine de cargar si todavía no estaba lista (hay
+  // una precarga al loguear, pero si el técnico escribe muy rápido
+  // puede llegar antes de que termine) — cargarClientesGeneral()
+  // devuelve enseguida si ya está cargada, así que esto no demora
+  // nada en el caso normal.
+  await cargarClientesGeneral();
+  // El texto pudo haber cambiado mientras esperaba — si ya no
+  // coincide con lo que hay ahora en el campo, no seguir.
+  if (fClienteInput.value.trim() !== texto) return;
+  if (!Array.isArray(clientesGeneralCache)) {
     clienteSugerenciasWrap.classList.add("hidden");
     return;
   }
