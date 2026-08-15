@@ -373,7 +373,49 @@ module.exports = async (req, res) => {
       try { bodyAccion = JSON.parse(bodyAccion); } catch (err) { bodyAccion = null; }
     }
     if (bodyAccion && bodyAccion.accion === "verificar_admin") {
+      const ip = (req.headers["x-forwarded-for"] || req.headers["x-real-ip"] || "desconocida").toString().split(",")[0].trim();
+      const { BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN } = process.env;
+
+      // Si ya está bloqueado por intentos previos, ni se molesta en
+      // verificar la contraseña — evita que alguien siga probando
+      // mientras dura el bloqueo.
+      if (BACKEND_NUEVO_URL && BACKEND_NUEVO_TOKEN) {
+        try {
+          const rEstado = await fetch(`${BACKEND_NUEVO_URL}/api/admin-login/estado?ip=${encodeURIComponent(ip)}`, {
+            headers: { Authorization: `Bearer ${BACKEND_NUEVO_TOKEN}` },
+          });
+          const estado = await rEstado.json();
+          if (estado.bloqueado) {
+            res.status(200).json({ ok: false, bloqueado: true, minutos_restantes: estado.minutos_restantes });
+            return;
+          }
+        } catch (err) {
+          // si falla la consulta de bloqueo, se sigue igual con la
+          // verificación normal — mejor no dejar a nadie afuera por
+          // un problema de red puntual.
+        }
+      }
+
       const ok = await verificarPasswordAdmin(bodyAccion.password);
+
+      if (BACKEND_NUEVO_URL && BACKEND_NUEVO_TOKEN) {
+        try {
+          const rRegistro = await fetch(`${BACKEND_NUEVO_URL}/api/admin-login/registrar`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${BACKEND_NUEVO_TOKEN}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ ip, exito: ok }),
+          });
+          const registro = await rRegistro.json();
+          if (!ok && registro.bloqueado) {
+            res.status(200).json({ ok: false, bloqueado: true, minutos_restantes: registro.minutos_restantes });
+            return;
+          }
+        } catch (err) {
+          // igual — si falla el registro del intento, no se le niega
+          // el acceso a nadie por eso.
+        }
+      }
+
       res.status(200).json({ ok });
       return;
     }

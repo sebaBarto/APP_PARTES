@@ -1006,6 +1006,8 @@ pwBtn.addEventListener("click", async () => {
       loginCard.classList.add("hidden");
       mainCard.classList.remove("hidden");
       cargarConfigAdmin();
+    } else if (data.bloqueado) {
+      pwError.textContent = `Demasiados intentos fallidos — probá de nuevo en ${data.minutos_restantes} minuto(s).`;
     } else {
       pwError.textContent = "Contraseña incorrecta.";
     }
