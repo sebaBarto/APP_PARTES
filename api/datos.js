@@ -307,7 +307,7 @@ module.exports = async (req, res) => {
     }
     const { BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN } = process.env;
     if (!BACKEND_NUEVO_URL || !BACKEND_NUEVO_TOKEN) {
-      res.status(500).json({ error: "Falta configuración del servidor" });
+      res.status(500).json({ error: "Falta configuración del servidor", detalle: `URL presente: ${!!BACKEND_NUEVO_URL}, token presente: ${!!BACKEND_NUEVO_TOKEN}` });
       return;
     }
     try {
@@ -336,7 +336,9 @@ module.exports = async (req, res) => {
       }
       res.status(200).json({ ok: true });
     } catch (err) {
-      res.status(500).json({ error: "No se pudo registrar el pedido, intentá de nuevo" });
+      // Diagnóstico temporal — muestra el motivo real del error para
+      // encontrar la causa exacta, se saca después de resolver esto.
+      res.status(500).json({ error: "No se pudo registrar el pedido, intentá de nuevo", detalle: err.message, stack: err.stack });
     }
     return;
   }
