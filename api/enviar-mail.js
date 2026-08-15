@@ -395,6 +395,20 @@ module.exports = async (req, res) => {
       }
       asunto = `Parte técnico ${datos.id_parte || ""} - ${datos.cliente || ""}`;
       html = renderTemplate(PLANTILLA_OFICINA, datosEnriquecidos);
+    } else if (tipo === "solicitud_publica") {
+      // Aviso del formulario público de "pedir servicio" (clientes
+      // fuera de horario) — va fijo a estas dos casillas, sin
+      // depender de ninguna variable de entorno nueva.
+      destinatario = "ventas@sat365.com.ar,tecnica@sat365.com.ar";
+      asunto = `📞 Nuevo pedido de servicio — ${datos.cliente || "sin nombre"}`;
+      html = envolverDocumento(`
+        <h2 style="margin-top:0;">Nuevo pedido desde el formulario web</h2>
+        <p><b>Cliente:</b> ${escapeHtml(datos.cliente || "")}</p>
+        <p><b>Teléfono:</b> ${escapeHtml(datos.telefono || "")}</p>
+        ${datos.direccion ? `<p><b>Dirección:</b> ${escapeHtml(datos.direccion)}</p>` : ""}
+        ${datos.tarea ? `<p><b>Qué necesita:</b> ${escapeHtml(datos.tarea)}</p>` : ""}
+        <p style="color:#6B7680; font-size:13px;">Ya quedó registrado en Agenda de emergencia — este mail es solo un aviso, no hace falta cargarlo de nuevo.</p>
+      `);
     } else if (tipo === "cliente") {
       destinatario = datos.cliente_email;
       if (!destinatario) {
@@ -408,7 +422,7 @@ module.exports = async (req, res) => {
       asunto = `Parte de servicio ${datos.id_parte || ""} - ${datos.cliente || ""}`;
       html = renderTemplate(PLANTILLA_CLIENTE, datosEnriquecidos);
     } else {
-      res.status(400).json({ error: "Tipo desconocido (usar 'oficina' o 'cliente')" });
+      res.status(400).json({ error: "Tipo desconocido (usar 'oficina', 'cliente' o 'solicitud_publica')" });
       return;
     }
 

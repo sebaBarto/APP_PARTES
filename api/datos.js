@@ -307,7 +307,7 @@ module.exports = async (req, res) => {
     }
     const { BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN } = process.env;
     if (!BACKEND_NUEVO_URL || !BACKEND_NUEVO_TOKEN) {
-      res.status(500).json({ error: "Falta configuración del servidor", detalle: `URL presente: ${!!BACKEND_NUEVO_URL}, token presente: ${!!BACKEND_NUEVO_TOKEN}` });
+      res.status(500).json({ error: "Falta configuración del servidor" });
       return;
     }
     try {
@@ -334,11 +334,22 @@ module.exports = async (req, res) => {
       } catch (errPush) {
         console.error("No se pudo avisar por push del formulario público:", errPush);
       }
+      // Mismo criterio — el mail a oficina es un aviso extra, nunca
+      // debe hacer que el cliente vea un error si el pedido ya quedó
+      // guardado bien.
+      try {
+        const enviarMailHandler = require("./enviar-mail");
+        const resFalso = { status: () => resFalso, json: () => resFalso, setHeader: () => resFalso };
+        await enviarMailHandler(
+          { method: "POST", headers: { authorization: `Bearer ${process.env.SERVICIOS_API_TOKEN}` }, body: { tipo: "solicitud_publica", datos: { cliente, telefono, direccion: comoTexto(body?.direccion), tarea: comoTexto(body?.tarea) } } },
+          resFalso
+        );
+      } catch (errMail) {
+        console.error("No se pudo avisar por mail del formulario público:", errMail);
+      }
       res.status(200).json({ ok: true });
     } catch (err) {
-      // Diagnóstico temporal — muestra el motivo real del error para
-      // encontrar la causa exacta, se saca después de resolver esto.
-      res.status(500).json({ error: "No se pudo registrar el pedido, intentá de nuevo", detalle: err.message, stack: err.stack });
+      res.status(500).json({ error: "No se pudo registrar el pedido, intentá de nuevo" });
     }
     return;
   }
