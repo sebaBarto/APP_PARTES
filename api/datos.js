@@ -9,6 +9,42 @@
 // Variables de entorno reutilizadas:
 //   SERVICIOS_API_TOKEN, GITHUB_DATA_TOKEN, GITHUB_DATA_REPO
 
+const crypto = require("crypto");
+
+// Verifica la contraseña del panel de administración contra un HASH
+// guardado en la variable de entorno (ADMIN_PASSWORD_HASH), nunca
+// contra la contraseña en texto plano — así, ni siquiera alguien con
+// acceso a la configuración de Vercel puede leer la contraseña real,
+// solo confirmar si un intento coincide o no. El hash se guarda como
+// "salt:hash" (ambos en hexadecimal), generado con scrypt (incluido
+// en Node, sin depender de ningún paquete externo).
+//
+// Nota de compatibilidad: si todavía no se migró a
+// ADMIN_PASSWORD_HASH, sigue aceptando la variable vieja
+// (ADMIN_PASSWORD, texto plano) como respaldo — para no dejar el
+// panel sin acceso hasta que se genere el hash nuevo.
+async function verificarPasswordAdmin(intento) {
+  if (typeof intento !== "string" || !intento) return false;
+
+  const hashGuardado = process.env.ADMIN_PASSWORD_HASH;
+  if (hashGuardado) {
+    const [saltHex, hashHex] = hashGuardado.split(":");
+    if (!saltHex || !hashHex) return false;
+    const hashIntento = await new Promise((resolve, reject) => {
+      crypto.scrypt(intento, Buffer.from(saltHex, "hex"), 64, (err, derivedKey) => {
+        if (err) reject(err); else resolve(derivedKey);
+      });
+    });
+    const bufferGuardado = Buffer.from(hashHex, "hex");
+    // Comparación de tiempo constante — evita que alguien pueda medir
+    // cuánto tarda la respuesta para deducir la contraseña de a poco.
+    return hashIntento.length === bufferGuardado.length && crypto.timingSafeEqual(hashIntento, bufferGuardado);
+  }
+
+  // Respaldo temporal mientras no se configuró el hash todavía.
+  return !!process.env.ADMIN_PASSWORD && intento === process.env.ADMIN_PASSWORD;
+}
+
 const COLECCIONES = {
   config: {
     path: "config.json",
@@ -324,7 +360,7 @@ module.exports = async (req, res) => {
       try { bodyAccion = JSON.parse(bodyAccion); } catch (err) { bodyAccion = null; }
     }
     if (bodyAccion && bodyAccion.accion === "verificar_admin") {
-      const ok = !!process.env.ADMIN_PASSWORD && bodyAccion.password === process.env.ADMIN_PASSWORD;
+      const ok = await verificarPasswordAdmin(bodyAccion.password);
       res.status(200).json({ ok });
       return;
     }

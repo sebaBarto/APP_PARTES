@@ -558,6 +558,24 @@ Recordatorio: ya existe un botón **"↻ Actualizar app a la última versión"**
 pantalla de login, que fuerza una limpieza completa de caché — sirve como solución
 inmediata para cualquier caso viejo que haya quedado pegado de antes de este arreglo.
 
+## Contraseña de admin.html hasheada, y link corto para el formulario público
+
+**Hasheo de la contraseña**: `ADMIN_PASSWORD` guardaba la contraseña en texto plano en
+la configuración de Vercel — ahora se verifica contra un hash (scrypt, incluido en
+Node, sin depender de ningún paquete externo), guardado como `ADMIN_PASSWORD_HASH`.
+Ni con acceso a la configuración de Vercel se puede leer la contraseña real, solo
+confirmar si un intento coincide. Se agregó `generar-hash-admin.js` — un script para
+correr en la propia PC (`node generar-hash-admin.js "TuContraseñaNueva"`) que genera
+el hash sin que la contraseña real viaje a ningún lado. Mientras no se configure
+`ADMIN_PASSWORD_HASH`, sigue funcionando con la `ADMIN_PASSWORD` vieja como respaldo,
+para no dejar el panel sin acceso de un día para el otro.
+
+**Dominio propio para el formulario**: `pedido.sat365.com.ar` (a configurar) apunta
+directo a `solicitar-servicio.html` — así el link que se comparte con clientes no
+muestra el dominio de Vercel. De paso, `/admin.html` y `/index.html` quedan
+bloqueados específicamente en ese dominio (rebotan a la página del formulario) — una
+capa extra, sin ser una protección completa por sí sola.
+
 ## Corrige detección de línea existente al instalar SIM (v3.62.1)
 
 Corrige un bug real reportado (caso Siri Carlos): al instalar una SIM en un cliente que

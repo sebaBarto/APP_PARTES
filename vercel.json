@@ -19,5 +19,26 @@
         }
       ]
     }
+  ],
+  "rewrites": [
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "pedido.sat365.com.ar" }],
+      "destination": "/solicitar-servicio.html"
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/admin.html",
+      "has": [{ "type": "host", "value": "pedido.sat365.com.ar" }],
+      "destination": "https://pedido.sat365.com.ar/",
+      "permanent": false
+    },
+    {
+      "source": "/index.html",
+      "has": [{ "type": "host", "value": "pedido.sat365.com.ar" }],
+      "destination": "https://pedido.sat365.com.ar/",
+      "permanent": false
+    }
   ]
 }
