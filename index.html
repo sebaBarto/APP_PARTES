@@ -1420,8 +1420,12 @@
               <option value="" disabled selected>Elegí primero una categoría</option>
             </select>
           </div>
-          <div class="field-group" style="max-width:90px;">
-            <input class="field-input field-mono" id="matCantidadInput" type="number" min="1" step="1" placeholder="Cant.">
+          <div class="field-group" style="max-width:120px;">
+            <div class="cantidad-stepper">
+              <button type="button" class="cantidad-stepper-btn" id="matCantidadMenosBtn" aria-label="Restar">−</button>
+              <input class="field-input field-mono cantidad-stepper-input" id="matCantidadInput" type="number" min="1" step="1" value="1" readonly>
+              <button type="button" class="cantidad-stepper-btn" id="matCantidadMasBtn" aria-label="Sumar">+</button>
+            </div>
           </div>
         </div>
         <input class="field-input hidden" id="matModeloManualInput" type="text" placeholder="Escribí el nombre del material" style="margin-top:8px;">
@@ -1460,8 +1464,12 @@
               <option value="" disabled selected>Elegí primero una categoría</option>
             </select>
           </div>
-          <div class="field-group" style="max-width:90px;">
-            <input class="field-input field-mono" id="matRetCantidadInput" type="number" min="1" step="1" placeholder="Cant.">
+          <div class="field-group" style="max-width:120px;">
+            <div class="cantidad-stepper">
+              <button type="button" class="cantidad-stepper-btn" id="matRetCantidadMenosBtn" aria-label="Restar">−</button>
+              <input class="field-input field-mono cantidad-stepper-input" id="matRetCantidadInput" type="number" min="1" step="1" value="1" readonly>
+              <button type="button" class="cantidad-stepper-btn" id="matRetCantidadMasBtn" aria-label="Sumar">+</button>
+            </div>
           </div>
         </div>
         <input class="field-input hidden" id="matRetModeloManualInput" type="text" placeholder="Escribí el nombre del material" style="margin-top:8px;">

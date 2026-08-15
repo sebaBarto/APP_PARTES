@@ -58,6 +58,7 @@ function mapearHaciaBackendNuevo(v) {
     id: v.id_parte || v.id || undefined, // si no viene, el backend nuevo genera uno
     numero_servicio: v.numero_servicio || "",
     cliente: v.cliente || "",
+    numero_cliente: v.numero_cliente || "",
     direccion: v.direccion || "",
     localidad: v.localidad || "",
     tarea: v.tarea || "",
@@ -86,6 +87,7 @@ function mapearDesdeBackendNuevo(p) {
     id_parte: p.id,
     numero_servicio: p.numero_servicio || "",
     cliente: p.cliente || "",
+    numero_cliente: p.numero_cliente || "",
     direccion: p.direccion || "",
     localidad: p.localidad || "",
     tarea: p.tarea || "",

@@ -391,6 +391,31 @@ mismo parte. Probado de punta a punta: calificar sin token (como llega desde el 
 intentar recalificar (avisa que ya calificó), los 5 links del mail bien armados con el
 número de parte correcto, y el promedio calculado bien en `admin.html`.
 
+## Número de cliente estable + hora de salida automática + cantidad sin tipear (v3.63.0)
+
+Tres mejoras al parte técnico:
+
+**Botón de INFO corregido de raíz**: el campo Cliente nunca guardaba el número de
+cliente, solo el nombre — así que si un cliente cambiaba de titular (caso real:
+"Massa Maria Victoria" pasó a llamarse "Inmobiliaria massa" entre dos visitas), la app
+no podía relacionar el historial. Ahora se guarda `numero_cliente` con cada parte
+(cuando viene de un servicio pendiente), y "última visita" compara primero por ese
+número — estable aunque cambie el nombre — y solo cae al nombre como respaldo si no
+hay número disponible. Probado con el caso real.
+
+**Hora de salida automática**: al tocar "Continuar" hacia la firma, si el campo está
+vacío, se completa solo con la hora del celular en ese momento — sin pisar nada si ya
+tenía un valor cargado (por ejemplo, un borrador restaurado).
+
+**Cantidad de materiales sin tipear**: tanto en instalados como en retirados (incluido
+el material cargado a mano), el campo de cantidad ahora es un selector con botones −/+
+en vez de un teclado numérico — no se puede escribir directamente, arranca en 1 y no
+baja de ahí.
+
+Backend nuevo: columna `numero_cliente` en la tabla de partes (`migracion_v18.sql`).
+Probado de punta a punta: la vinculación por número de cliente, la hora automática, y
+el stepper de cantidad (sumar, restar, tope en 1, y que vuelve a 1 después de agregar).
+
 ## Corrige pérdida de materiales en Stock para partes encolados (v3.62.2)
 
 Corrige un bug real y bastante serio (caso Orieta Dario, parte N° 37445): cuando un

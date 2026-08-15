@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.62.2";
+const APP_VERSION = "3.63.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -536,6 +536,7 @@ let hasSignature = false;
 let drawing = false;
 let lastX = 0, lastY = 0;
 let currentNumeroServicio = "";
+let currentNumeroCliente = "";
 
 // ---------- Borrador del parte en curso ----------
 // Si el técnico abre un servicio, carga datos, y toca "Volver" (o
@@ -1344,6 +1345,7 @@ verPlanoClienteBtn.addEventListener("click", async () => {
 
 function seleccionarServicio(item) {
   currentNumeroServicio = item.numero_servicio ?? "";
+  currentNumeroCliente = item.numero_cliente ?? "";
   document.getElementById("f_cliente").value = item.cliente ?? "";
   document.getElementById("f_direccion").value = item.direccion ?? "";
   if (item.localidad) document.getElementById("f_localidad").value = item.localidad;
@@ -1366,6 +1368,7 @@ function seleccionarServicio(item) {
 refreshServiciosBtn.addEventListener("click", fetchServicios);
 manualReportBtn.addEventListener("click", () => {
   currentNumeroServicio = "";
+  currentNumeroCliente = "";
   actualizarBotonLlamar(null);
   actualizarBotonWhatsapp(null);
   actualizarBotonVerPlano(null);
@@ -1732,10 +1735,22 @@ function mostrarVisitaAnterior() {
     verVisitaAnteriorBtn.disabled = true;
     return;
   }
-  const clave = normalizeText(nombreCliente);
-  const anteriores = historialCache
-    .filter((h) => h.cliente && normalizeText(h.cliente) === clave && h.fecha)
-    .sort((a, b) => b.fecha.localeCompare(a.fecha));
+  // Preferir el número de cliente (estable, no cambia aunque cambie
+  // el titular) — si no está disponible (servicio cargado a mano,
+  // sin venir de un pendiente, o partes viejos de antes de este
+  // arreglo), se cae al nombre como respaldo.
+  let anteriores = [];
+  if (currentNumeroCliente) {
+    anteriores = historialCache
+      .filter((h) => h.numero_cliente && h.numero_cliente === currentNumeroCliente && h.fecha)
+      .sort((a, b) => b.fecha.localeCompare(a.fecha));
+  }
+  if (anteriores.length === 0) {
+    const clave = normalizeText(nombreCliente);
+    anteriores = historialCache
+      .filter((h) => h.cliente && normalizeText(h.cliente) === clave && h.fecha)
+      .sort((a, b) => b.fecha.localeCompare(a.fecha));
+  }
 
   if (anteriores.length === 0) {
     verVisitaAnteriorBtn.disabled = true;
@@ -1850,6 +1865,16 @@ const matCategoriaSelect = document.getElementById("matCategoriaSelect");
 const matModeloSelect = document.getElementById("matModeloSelect");
 const matModeloManualInput = document.getElementById("matModeloManualInput");
 const matCantidadInput = document.getElementById("matCantidadInput");
+const matCantidadMenosBtn = document.getElementById("matCantidadMenosBtn");
+const matCantidadMasBtn = document.getElementById("matCantidadMasBtn");
+matCantidadMenosBtn.addEventListener("click", () => {
+  const actual = parseInt(matCantidadInput.value, 10) || 1;
+  matCantidadInput.value = Math.max(1, actual - 1);
+});
+matCantidadMasBtn.addEventListener("click", () => {
+  const actual = parseInt(matCantidadInput.value, 10) || 1;
+  matCantidadInput.value = actual + 1;
+});
 const agregarMaterialBtn = document.getElementById("agregarMaterialBtn");
 const materialesAgregadosList = document.getElementById("materialesAgregadosList");
 const simInstalarWrap = document.getElementById("simInstalarWrap");
@@ -1933,7 +1958,7 @@ agregarMaterialBtn.addEventListener("click", () => {
   materialesAgregados.push({ modelo, cantidad, manual: esManual });
   renderMaterialesAgregados();
   matModeloSelect.value = "";
-  matCantidadInput.value = "";
+  matCantidadInput.value = "1";
   matModeloManualInput.value = "";
   matModeloManualInput.classList.add("hidden");
 });
@@ -1949,6 +1974,16 @@ const matRetCategoriaSelect = document.getElementById("matRetCategoriaSelect");
 const matRetModeloSelect = document.getElementById("matRetModeloSelect");
 const matRetModeloManualInput = document.getElementById("matRetModeloManualInput");
 const matRetCantidadInput = document.getElementById("matRetCantidadInput");
+const matRetCantidadMenosBtn = document.getElementById("matRetCantidadMenosBtn");
+const matRetCantidadMasBtn = document.getElementById("matRetCantidadMasBtn");
+matRetCantidadMenosBtn.addEventListener("click", () => {
+  const actual = parseInt(matRetCantidadInput.value, 10) || 1;
+  matRetCantidadInput.value = Math.max(1, actual - 1);
+});
+matRetCantidadMasBtn.addEventListener("click", () => {
+  const actual = parseInt(matRetCantidadInput.value, 10) || 1;
+  matRetCantidadInput.value = actual + 1;
+});
 const agregarMaterialRetiradoBtn = document.getElementById("agregarMaterialRetiradoBtn");
 const materialesRetiradosAgregadosList = document.getElementById("materialesRetiradosAgregadosList");
 let materialesRetiradosAgregados = [];
@@ -2005,7 +2040,7 @@ agregarMaterialRetiradoBtn.addEventListener("click", () => {
   materialesRetiradosAgregados.push({ modelo, cantidad, manual: esManual });
   renderMaterialesRetiradosAgregados();
   matRetModeloSelect.value = "";
-  matRetCantidadInput.value = "";
+  matRetCantidadInput.value = "1";
   matRetModeloManualInput.value = "";
   matRetModeloManualInput.classList.add("hidden");
 });
@@ -2428,6 +2463,7 @@ volverDeMapaBtn.addEventListener("click", () => {
 function getFormData() {
   return {
     numero_servicio: currentNumeroServicio,
+    numero_cliente: currentNumeroCliente,
     es_instalacion: instalacionCheck.checked,
     tipo_servicio: instalacionCheck.checked ? "Instalación" : "Servicio técnico",
     cliente: document.getElementById("f_cliente").value.trim(),
@@ -2494,7 +2530,7 @@ function resetForm() {
   matCategoriaSelect.value = "";
   matModeloSelect.innerHTML = '<option value="" disabled selected>Elegí primero una categoría</option>';
   matModeloSelect.disabled = true;
-  matCantidadInput.value = "";
+  matCantidadInput.value = "1";
   matModeloManualInput.value = "";
   matModeloManualInput.classList.add("hidden");
   materialesRetiradosAgregados = [];
@@ -2504,7 +2540,7 @@ function resetForm() {
   matRetModeloSelect.disabled = true;
   matRetModeloManualInput.value = "";
   matRetModeloManualInput.classList.add("hidden");
-  matRetCantidadInput.value = "";
+  matRetCantidadInput.value = "1";
   currentNumeroServicio = "";
   fotoBase64 = null;
   fotoMimeType = null;
@@ -2589,6 +2625,16 @@ abrirClavesBtn.addEventListener("click", () => showScreen("claves"));
 guardarClavesBtn.addEventListener("click", () => showScreen("form"));
 
 toSignBtn.addEventListener("click", () => {
+  // Se completa sola con la hora actual del celular, si todavía no
+  // se había puesto nada — así el técnico no tiene que acordarse de
+  // tocarla a mano. Si ya tenía algo cargado (por ejemplo, restauró
+  // un borrador), se respeta lo que ya había.
+  const salidaInput = document.getElementById("f_salida");
+  if (!salidaInput.value) {
+    const ahora = new Date();
+    salidaInput.value = `${String(ahora.getHours()).padStart(2, "0")}:${String(ahora.getMinutes()).padStart(2, "0")}`;
+    verificarHorarioCruzaDia();
+  }
   const data = getFormData();
   if (!data.cliente || !data.tecnico) {
     showToast("Completá al menos Cliente y Técnico antes de continuar.");
@@ -2815,6 +2861,7 @@ async function intentarEnviarParte(payload, interactivo) {
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
         body: JSON.stringify({
           numero_servicio: data.numero_servicio || "",
+          numero_cliente: data.numero_cliente || "",
           es_instalacion: data.es_instalacion,
           id_parte: idParte,
           cliente: data.cliente,

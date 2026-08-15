@@ -557,6 +557,37 @@ html, body {
   box-shadow: 0 0 0 3px rgba(245,166,35,0.18);
 }
 .field-mono { font-family: 'IBM Plex Mono', monospace; font-size: 14px; }
+.cantidad-stepper {
+  display: flex;
+  align-items: stretch;
+  border: 1.5px solid #D8DCD4;
+  border-radius: var(--r-md, 10px);
+  overflow: hidden;
+  height: 46px;
+}
+.cantidad-stepper-btn {
+  background: #F4F5F0;
+  border: none;
+  width: 38px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #101820;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background var(--dur-fast) var(--ease-press);
+}
+.cantidad-stepper-btn:active { background: #E4E6DC; }
+.cantidad-stepper-input {
+  border: none !important;
+  border-left: 1.5px solid #D8DCD4 !important;
+  border-right: 1.5px solid #D8DCD4 !important;
+  border-radius: 0 !important;
+  text-align: center;
+  width: 100%;
+  min-width: 0;
+  padding: 0 !important;
+  height: 100%;
+}
 .field-textarea { min-height: 56px; resize: vertical; }
 .hidden { display: none !important; }
 .check-inline {
