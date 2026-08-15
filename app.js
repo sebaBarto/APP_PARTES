@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.63.1";
+const APP_VERSION = "3.64.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -1761,14 +1761,36 @@ function mostrarVisitaAnterior() {
 }
 document.getElementById("f_cliente").addEventListener("change", mostrarVisitaAnterior);
 
-verVisitaAnteriorBtn.addEventListener("click", () => {
+verVisitaAnteriorBtn.addEventListener("click", async () => {
   if (!ultimaVisitaEncontrada) return;
   const [y, m, d] = ultimaVisitaEncontrada.fecha.split("-");
+  let clavesHtml = "";
+  if (currentNumeroCliente) {
+    try {
+      const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+      const res = await fetch(`/api/historial?tipo=claves_cliente&numero_cliente=${encodeURIComponent(currentNumeroCliente)}`, { headers, cache: "no-store" });
+      const datosClaves = await res.json();
+      if (datosClaves && Array.isArray(datosClaves.claves) && datosClaves.claves.length > 0) {
+        const filas = datosClaves.claves.map((c) => {
+          const detalle = [c.usuario && `Usuario: ${escapeHtml(c.usuario)}`, c.clave && `Clave: ${escapeHtml(c.clave)}`, c.codigo && `Código: ${escapeHtml(c.codigo)}`].filter(Boolean).join(" · ");
+          return `<div style="margin-bottom:4px;"><b>${escapeHtml(c.titulo)}</b>${detalle ? " — " + detalle : ""}</div>`;
+        }).join("");
+        clavesHtml = `
+          <div style="background:#FCEEEC; border:1px solid #E4B8B2; border-radius:8px; padding:10px 12px; margin-top:10px;">
+            🔑 <b>Claves guardadas de este cliente:</b><br>${filas}
+          </div>
+        `;
+      }
+    } catch (err) {
+      // si falla, simplemente no se muestra esa sección
+    }
+  }
   visitaAnteriorModalContenido.innerHTML = `
     <p style="margin:0 0 8px;"><b>Se pidió:</b> ${escapeHtml(ultimaVisitaEncontrada.tarea || "(sin detalle)")}</p>
     ${ultimaVisitaEncontrada.observaciones ? `<p style="margin:0 0 8px;"><b>Se resolvió:</b> ${escapeHtml(ultimaVisitaEncontrada.observaciones)}</p>` : ""}
     <p style="margin:0 0 8px;"><b>Fecha:</b> ${d}/${m}/${y}</p>
     <p style="margin:0;"><b>Técnico:</b> ${escapeHtml(ultimaVisitaEncontrada.tecnico || "(sin dato)")}</p>
+    ${clavesHtml}
   `;
   visitaAnteriorModalOverlay.classList.remove("hidden");
 });

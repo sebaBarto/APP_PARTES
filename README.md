@@ -391,6 +391,27 @@ mismo parte. Probado de punta a punta: calificar sin token (como llega desde el 
 intentar recalificar (avisa que ya calificó), los 5 links del mail bien armados con el
 número de parte correcto, y el promedio calculado bien en `admin.html`.
 
+## Claves guardadas por cliente, consultables (v3.64.0)
+
+A pedido: hasta ahora las claves cargadas en un parte quedaban atadas solo a ese parte
+puntual — no había forma de preguntar "¿cuál es la clave de este cliente?" sin ir a
+buscar en qué servicio se cargó. Ahora se van acumulando en un registro por cliente
+(usando el número de cliente, no el nombre — así no se pierde nada si el cliente
+cambia de titular): cada vez que se completa un parte con claves, se suman al registro
+de ese cliente, actualizando la que ya existía si el título coincide, o agregando una
+nueva si no.
+
+Se puede consultar desde dos lugares:
+- **App del técnico**: el botón de **INFO** (última visita) ahora también muestra, si
+  las hay, las claves guardadas de ese cliente.
+- **`admin.html`**: nueva pestaña **"Claves por cliente"**, con lista buscable y
+  detalle completo por cliente.
+
+Backend nuevo: tabla `clientes_claves` (`migracion_v19.sql`). Probado de punta a
+punta: guardar dos partes distintos para el mismo cliente (uno actualiza una clave
+existente, el otro agrega una nueva), consultar el resultado combinado, y verificar
+que se ve bien tanto en el botón de INFO como en la pestaña nueva de `admin.html`.
+
 ## Cantidad más clara al escribir material a mano (v3.63.1)
 
 La cantidad ya funcionaba correctamente en modo "Otro (escribir el material)", pero

@@ -263,6 +263,7 @@
       <button type="button" class="tab-btn" id="tabPlanosBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 9h18M9 9v12M14 3v6M9 15h5"/></svg></span>Planos</button>
       <button type="button" class="tab-btn" id="tabInstalacionesBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 18v3"/><circle cx="8" cy="9" r="1"/><circle cx="12" cy="9" r="1"/><circle cx="16" cy="9" r="1"/></svg></span>Instalaciones</button>
       <button type="button" class="tab-btn" id="tabEncuestasBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 14s1.5 2 4 2 4-2 4-2"/><circle cx="9" cy="9" r="1"/><circle cx="15" cy="9" r="1"/><circle cx="12" cy="12" r="10"/></svg></span>Satisfacción</button>
+      <button type="button" class="tab-btn" id="tabClavesClienteBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>Claves por cliente</button>
       <button type="button" class="tab-btn" id="tabEmergenciaBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.29 3.86l-8.18 14.18A2 2 0 0 0 3.82 21h16.36a2 2 0 0 0 1.71-3l-8.18-14.14a2 2 0 0 0-3.42 0z"/></svg></span>Emergencias</button>
     </div>
 
@@ -660,6 +661,26 @@
       </div>
     </div>
 
+    <div id="panelClavesCliente" class="hidden">
+      <h1>Claves por cliente</h1>
+      <p class="subtitle">
+        Claves y códigos que fueron cargando los técnicos en los partes, agrupadas por
+        cliente — se van sumando y actualizando solas, sin tener que buscar en qué
+        parte se cargó cada una.
+      </p>
+
+      <div class="card" style="margin-bottom:16px;">
+        <input type="text" id="clavesClienteBuscarAdmin" placeholder="Buscar por cliente...">
+        <p class="status" id="clavesClienteStatus">Cargando...</p>
+        <div id="clavesClienteLista"></div>
+      </div>
+
+      <div id="clavesClienteDetalle" class="card hidden">
+        <button type="button" style="background:none;border:none;color:#6B7680;cursor:pointer;font-size:14px;padding:0;margin-bottom:12px;" id="clavesClienteVolverListaBtn">← Volver a la lista</button>
+        <div id="clavesClienteDetalleContenido"></div>
+      </div>
+    </div>
+
     <div id="panelEmergencia" class="hidden">
       <h1>Servicios de emergencia</h1>
       <p class="subtitle">
@@ -745,6 +766,13 @@ const tabInstalacionesBtn = document.getElementById("tabInstalacionesBtn");
 const panelInstalaciones = document.getElementById("panelInstalaciones");
 const tabEncuestasBtn = document.getElementById("tabEncuestasBtn");
 const panelEncuestas = document.getElementById("panelEncuestas");
+const tabClavesClienteBtn = document.getElementById("tabClavesClienteBtn");
+const panelClavesCliente = document.getElementById("panelClavesCliente");
+const clavesClienteBuscarAdmin = document.getElementById("clavesClienteBuscarAdmin");
+const clavesClienteStatus = document.getElementById("clavesClienteStatus");
+const clavesClienteLista = document.getElementById("clavesClienteLista");
+const clavesClienteDetalle = document.getElementById("clavesClienteDetalle");
+const clavesClienteDetalleContenido = document.getElementById("clavesClienteDetalleContenido");
 const encuestasPromedio = document.getElementById("encuestasPromedio");
 const encuestasResumen = document.getElementById("encuestasResumen");
 const encuestasStatus = document.getElementById("encuestasStatus");
@@ -771,6 +799,7 @@ const TABS = [
   { btn: tabPlanosBtn, panel: panelPlanos, onShow: () => { consultarEstadoSincronizacionPlanos(); if (!planosCargadosUnaVezAdmin) { planosCargadosUnaVezAdmin = true; cargarPlanosAdmin(); } } },
   { btn: tabInstalacionesBtn, panel: panelInstalaciones, onShow: () => cargarInstalacionesAdmin() },
   { btn: tabEncuestasBtn, panel: panelEncuestas, onShow: () => cargarEncuestasAdmin() },
+  { btn: tabClavesClienteBtn, panel: panelClavesCliente, onShow: () => cargarClavesClienteAdmin() },
   { btn: tabEmergenciaBtn, panel: panelEmergencia, onShow: () => { if (!emergenciaCargadaUnaVezAdmin) { emergenciaCargadaUnaVezAdmin = true; cargarEmergenciasAdmin(); } } },
   { btn: tabEmergenciaBtn, panel: panelEmergencia, onShow: () => { if (!emergenciasCargadasUnaVezAdmin) { emergenciasCargadasUnaVezAdmin = true; cargarEmergenciasAdmin(); } } },
 ];
@@ -2715,6 +2744,63 @@ async function consultarEstadoSincronizacionPlanos() {
 let instalacionesCacheAdmin = [];
 
 // ---------- Satisfacción del cliente ----------
+// ---------- Claves por cliente ----------
+let clavesClienteCacheAdmin = [];
+
+async function cargarClavesClienteAdmin() {
+  clavesClienteStatus.textContent = "Cargando...";
+  try {
+    const res = await fetch("/api/historial?tipo=claves_cliente", {
+      headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    clavesClienteCacheAdmin = Array.isArray(data) ? data : [];
+    renderClavesClienteLista();
+  } catch (err) {
+    clavesClienteStatus.className = "status err";
+    clavesClienteStatus.textContent = "No se pudo cargar: " + err.message;
+  }
+}
+
+function renderClavesClienteLista() {
+  const busqueda = normalizeText(clavesClienteBuscarAdmin.value.trim());
+  const filtrados = clavesClienteCacheAdmin.filter((c) => !busqueda || normalizeText(c.cliente || "").includes(busqueda));
+  clavesClienteStatus.className = "status";
+  clavesClienteStatus.textContent = `${filtrados.length} cliente(s) con claves guardadas.`;
+  clavesClienteLista.innerHTML = filtrados.map((c) => `
+    <div class="fila-lista-clickeable" data-numero="${c.numero_cliente}" style="padding:10px 0; border-bottom:1px solid #EEE; cursor:pointer;">
+      <b>${escapeHtmlAdmin(c.cliente || c.numero_cliente)}</b> · Cliente ${escapeHtmlAdmin(c.numero_cliente)}<br>
+      <span style="color:#6B7680; font-size:13px;">${c.claves.length} clave(s) guardada(s)</span>
+    </div>
+  `).join("") || "<p style='color:#6B7680;'>No hay claves guardadas todavía.</p>";
+
+  clavesClienteLista.querySelectorAll(".fila-lista-clickeable").forEach((fila) => {
+    fila.addEventListener("click", () => mostrarDetalleClavesClienteAdmin(fila.dataset.numero));
+  });
+}
+clavesClienteBuscarAdmin.addEventListener("input", renderClavesClienteLista);
+
+document.getElementById("clavesClienteVolverListaBtn").addEventListener("click", () => {
+  clavesClienteDetalle.classList.add("hidden");
+});
+
+function mostrarDetalleClavesClienteAdmin(numeroCliente) {
+  const c = clavesClienteCacheAdmin.find((x) => x.numero_cliente === numeroCliente);
+  if (!c) return;
+  const filas = c.claves.map((k) => {
+    const detalle = [k.usuario && `Usuario: ${escapeHtmlAdmin(k.usuario)}`, k.clave && `Clave: ${escapeHtmlAdmin(k.clave)}`, k.codigo && `Código: ${escapeHtmlAdmin(k.codigo)}`].filter(Boolean).join(" · ");
+    return `<li><b>${escapeHtmlAdmin(k.titulo)}</b>${detalle ? " — " + detalle : ""}</li>`;
+  }).join("") || "<li style='color:#6B7680;'>Sin claves.</li>";
+  clavesClienteDetalleContenido.innerHTML = `
+    <h2 style="margin-top:0;">${escapeHtmlAdmin(c.cliente || c.numero_cliente)}</h2>
+    <p style="color:#6B7680;">Cliente N° ${escapeHtmlAdmin(c.numero_cliente)}</p>
+    <ul>${filas}</ul>
+  `;
+  clavesClienteDetalle.classList.remove("hidden");
+}
+
 async function cargarEncuestasAdmin() {
   encuestasStatus.textContent = "Cargando...";
   try {
