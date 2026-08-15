@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.65.1";
+const APP_VERSION = "3.66.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -300,6 +300,10 @@ const tilePlanosBtn = document.getElementById("tilePlanosBtn");
 const tileEmergenciaBtn = document.getElementById("tileEmergenciaBtn");
 const volverDeEmergenciaBtn = document.getElementById("volverDeEmergenciaBtn");
 const cargarEmergenciaBtn = document.getElementById("cargarEmergenciaBtn");
+const verOcupacionSemanaBtn = document.getElementById("verOcupacionSemanaBtn");
+const ocupacionSemanaWrap = document.getElementById("ocupacionSemanaWrap");
+const ocupacionSemanaStatus = document.getElementById("ocupacionSemanaStatus");
+const ocupacionSemanaList = document.getElementById("ocupacionSemanaList");
 const emergenciaLista = document.getElementById("emergenciaLista");
 const emergenciaListaStatus = document.getElementById("emergenciaListaStatus");
 const cronoEmergenciasWrap = document.getElementById("cronoEmergenciasWrap");
@@ -7191,6 +7195,62 @@ document.getElementById("emerg_cliente").addEventListener("change", (e) => {
   if (!dirInput.value.trim() && encontrado.direccion) dirInput.value = encontrado.direccion;
 });
 volverDeEmergenciaBtn.addEventListener("click", () => showScreen("home"));
+
+// ---------- Vista semanal de ocupación (para agendar emergencias sin pisarse) ----------
+let ocupacionSemanaAbierta = false;
+verOcupacionSemanaBtn.addEventListener("click", async () => {
+  ocupacionSemanaAbierta = !ocupacionSemanaAbierta;
+  ocupacionSemanaWrap.classList.toggle("hidden", !ocupacionSemanaAbierta);
+  verOcupacionSemanaBtn.textContent = ocupacionSemanaAbierta ? "📅 Ocultar ocupación de la semana" : "📅 Ver ocupación de la semana";
+  if (ocupacionSemanaAbierta) await renderOcupacionSemana();
+});
+
+async function renderOcupacionSemana() {
+  ocupacionSemanaStatus.textContent = "Cargando...";
+  ocupacionSemanaList.innerHTML = "";
+  try {
+    // Trae emergencias ya agendadas fresco (el cronograma ya viene
+    // precargado desde el login, no hace falta pedirlo de nuevo).
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/datos?coleccion=servicios_emergencia", { headers, cache: "no-store" });
+    const data = await res.json();
+    const emergenciasAgendadas = Array.isArray(data) ? data : [];
+
+    const hoy = new Date();
+    const dias = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(hoy);
+      d.setDate(hoy.getDate() + i);
+      dias.push(d);
+    }
+
+    ocupacionSemanaStatus.textContent = "";
+    ocupacionSemanaList.innerHTML = dias.map((d) => {
+      const fechaISO = d.toISOString().slice(0, 10);
+      const etiquetaDia = d.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "short" });
+
+      const delCronograma = (cronogramaCache || [])
+        .filter((t) => t.fecha === fechaISO)
+        .sort((a, b) => (a.hora_inicio || "").localeCompare(b.hora_inicio || ""))
+        .map((t) => `<div class="ocupacion-item">🔧 ${escapeHtml(t.hora_inicio || "")}${t.hora_fin ? "–" + escapeHtml(t.hora_fin) : ""} — ${escapeHtml(t.tecnico || "")}${t.tarea ? ": " + escapeHtml(t.tarea.slice(0, 60)) : ""}</div>`);
+
+      const delasEmergencias = emergenciasAgendadas
+        .filter((e) => e.fecha === fechaISO)
+        .sort((a, b) => (a.hora || "").localeCompare(b.hora || ""))
+        .map((e) => `<div class="ocupacion-item ocupacion-item-emergencia">🚨 ${escapeHtml(e.hora || "(sin hora)")} — ${escapeHtml(e.cliente || "")}</div>`);
+
+      const items = [...delCronograma, ...delasEmergencias];
+      return `
+        <div class="ocupacion-dia-card">
+          <div class="ocupacion-dia-titulo">${etiquetaDia}</div>
+          ${items.length > 0 ? items.join("") : `<div class="ocupacion-item ocupacion-item-libre">Sin nada agendado — día libre</div>`}
+        </div>
+      `;
+    }).join("");
+  } catch (err) {
+    ocupacionSemanaStatus.textContent = "No se pudo cargar la ocupación de la semana.";
+  }
+}
 
 async function cargarListaEmergencias() {
   emergenciaListaStatus.textContent = "Cargando...";

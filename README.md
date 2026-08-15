@@ -391,6 +391,17 @@ mismo parte. Probado de punta a punta: calificar sin token (como llega desde el 
 intentar recalificar (avisa que ya calificó), los 5 links del mail bien armados con el
 número de parte correcto, y el promedio calculado bien en `admin.html`.
 
+## Vista de ocupación semanal al agendar emergencias (v3.66.0)
+
+A pedido: en "Agenda de emergencia", nuevo botón **"📅 Ver ocupación de la semana"** —
+muestra los próximos 7 días, combinando el Cronograma (🔧 lo que ya está programado
+por técnico y horario) y las emergencias ya agendadas (🚨), para poder ofrecerle al
+cliente una fecha/hora que realmente esté libre, sin pisarse con nada ya comprometido.
+Los días sin nada agendado se marcan claramente como "día libre".
+
+Probado de punta a punta: combina correctamente ambas fuentes de datos, agrupa por
+día, y distingue visualmente cada tipo de ocupación.
+
 ## Corrige sugerencias de cliente que no aparecían (v3.65.1)
 
 Corrige un caso real: si el técnico escribía muy rápido apenas entraba al formulario,

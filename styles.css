@@ -1288,6 +1288,30 @@ html, body {
   color: #F5A623;
   margin: 18px 0 8px;
 }
+.ocupacion-dia-card {
+  background: #FFFFFF;
+  border: 1.5px solid #D8DCD4;
+  border-radius: var(--r-lg, 14px);
+  padding: 10px 14px;
+  margin-bottom: 10px;
+}
+.ocupacion-dia-titulo {
+  font-weight: 700;
+  color: #101820;
+  font-size: 14px;
+  margin-bottom: 6px;
+  text-transform: capitalize;
+}
+.ocupacion-item {
+  font-size: 13px;
+  color: #101820;
+  padding: 4px 0;
+  border-top: 1px solid #F0F1EC;
+}
+.ocupacion-item:first-of-type { border-top: none; }
+.ocupacion-item-emergencia { color: #A33A2E; font-weight: 600; }
+.ocupacion-item-libre { color: #2E7D32; font-style: italic; }
+
 .sim-card {
   background: #FFFFFF;
   color: #101820;

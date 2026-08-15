@@ -754,6 +754,11 @@
           <label class="field-label" for="emerg_hora">Hora deseada (opcional)</label>
           <input class="field-input" id="emerg_hora" type="time">
         </div>
+        <button type="button" class="btn btn-ghost btn-small" id="verOcupacionSemanaBtn" style="margin-bottom:10px;">📅 Ver ocupación de la semana</button>
+        <div id="ocupacionSemanaWrap" class="hidden" style="margin-bottom:14px;">
+          <p class="status" id="ocupacionSemanaStatus"></p>
+          <div id="ocupacionSemanaList"></div>
+        </div>
         <button type="button" class="btn btn-primary" id="cargarEmergenciaBtn"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" style="vertical-align:-3px; margin-right:5px;"><path d="M12 9v4M12 17h.01M10.29 3.86l-8.18 14.18A2 2 0 0 0 3.82 21h16.36a2 2 0 0 0 1.71-3l-8.18-14.14a2 2 0 0 0-3.42 0z"/></svg>Cargar servicio de emergencia</button>
       </div>
 
