@@ -391,6 +391,37 @@ mismo parte. Probado de punta a punta: calificar sin token (como llega desde el 
 intentar recalificar (avisa que ya calificó), los 5 links del mail bien armados con el
 número de parte correcto, y el promedio calculado bien en `admin.html`.
 
+## Formulario público para pedidos de servicio fuera de horario
+
+A pedido: página nueva **`solicitar-servicio.html`**, pública y sin login — para
+cuando un cliente escribe fuera de horario (WhatsApp, redes, etc.) y el mensaje se
+puede perder. El cliente completa nombre, teléfono, dirección (opcional) y qué
+necesita; al enviarlo:
+
+- Se guarda como un servicio de emergencia más (misma tabla que ya usa el equipo,
+  visible en "Agenda de emergencia" en la app y en `admin.html`) — marcado con
+  `cargado_por: "Formulario web (cliente)"` para distinguirlo de un lado
+  a simple vista.
+- Se dispara un **aviso push a todo el equipo**, igual que las demás notificaciones
+  ya existentes en la app.
+
+Backend nuevo: `POST /api/emergencias/solicitud-publica` en Cloudflare — a propósito
+una ruta separada del endpoint que ya existía (ese espera y reemplaza la lista
+completa, pensado solo para la app ya logueada; este solo agrega una fila nueva, sin
+poder tocar ni borrar las que ya había — la única forma segura de exponerlo sin
+login). En Vercel se sumó como una excepción puntual dentro de `api/datos.js` (ya se
+había llegado al límite de 12 funciones), con el mismo patrón usado para la encuesta
+de satisfacción.
+
+Probado de punta a punta: envío exitoso (guarda + dispara el push con el mensaje
+correcto), rechazo si faltan datos (sin llegar a tocar el backend), y que la
+seguridad del resto de las rutas de `api/datos.js` sigue intacta.
+
+**Pendiente de tu lado**: el link de WhatsApp al pie de la página (`wa.me/...`) tiene
+un número de ejemplo — hay que reemplazarlo por el número real de la empresa antes de
+compartir el link. También conviene configurar la respuesta automática de WhatsApp
+Business fuera de horario, apuntando a este mismo link.
+
 ## Notificaciones activadas por defecto (v3.66.1)
 
 A pedido: ya no hace falta que el técnico busque y toque "Activar notificaciones" — se

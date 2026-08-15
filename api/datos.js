@@ -252,6 +252,58 @@ async function manejarColeccionCortada(nombreColeccion, metodo, body, backendUrl
 }
 
 module.exports = async (req, res) => {
+  // Formulario público de "pedir servicio" — pensado para un cliente
+  // que escribe fuera de horario y no tiene ni necesita ningún login.
+  // Por eso va ANTES del control de token de acá abajo, como única
+  // excepción de todo este archivo (mismo patrón que la encuesta de
+  // satisfacción). Guarda el pedido, y avisa a todo el equipo por
+  // push — así no se pierde como pasaría con un WhatsApp fuera de
+  // horario.
+  if (req.method === "POST" && req.query && req.query.publico === "solicitud_emergencia") {
+    let body = req.body;
+    if (typeof body === "string") { try { body = JSON.parse(body); } catch (e) { body = {}; } }
+    const cliente = (body?.cliente || "").trim();
+    const telefono = (body?.telefono || "").trim();
+    if (!cliente || !telefono) {
+      res.status(400).json({ error: "Faltan datos (nombre o teléfono)" });
+      return;
+    }
+    const { BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN } = process.env;
+    if (!BACKEND_NUEVO_URL || !BACKEND_NUEVO_TOKEN) {
+      res.status(500).json({ error: "Falta configuración del servidor" });
+      return;
+    }
+    try {
+      const r = await fetch(`${BACKEND_NUEVO_URL}/api/emergencias/solicitud-publica`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${BACKEND_NUEVO_TOKEN}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ cliente, telefono, direccion: body?.direccion || "", tarea: body?.tarea || "" }),
+      });
+      const data = await r.json();
+      if (!r.ok) {
+        res.status(r.status).json(data);
+        return;
+      }
+      // El aviso push no debe frenar la respuesta al cliente que
+      // completó el formulario — si falla, el pedido ya quedó
+      // guardado igual, que es lo que realmente importa.
+      try {
+        const { enviarATodos } = require("../lib/push-sender");
+        await enviarATodos({
+          titulo: `📞 Nuevo pedido de servicio: ${cliente}`,
+          cuerpo: `${telefono}${body?.direccion ? " — " + body.direccion : ""}${body?.tarea ? " — " + body.tarea.slice(0, 80) : ""}`,
+          url: "/",
+        });
+      } catch (errPush) {
+        console.error("No se pudo avisar por push del formulario público:", errPush);
+      }
+      res.status(200).json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ error: "No se pudo registrar el pedido, intentá de nuevo" });
+    }
+    return;
+  }
+
   const authHeader = req.headers["authorization"] || "";
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();
   if (!process.env.SERVICIOS_API_TOKEN || token !== process.env.SERVICIOS_API_TOKEN) {

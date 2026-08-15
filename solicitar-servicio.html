@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Solicitar servicio técnico — SAT</title>
+<meta name="robots" content="noindex">
+<style>
+  :root {
+    --ink: #101820;
+    --panel: #1B2530;
+    --paper: #F4F5F0;
+    --amber: #F5A623;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--ink);
+    color: var(--paper);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 40px;
+  }
+  .logo-badge {
+    background: var(--amber);
+    color: var(--ink);
+    font-weight: 800;
+    font-size: 22px;
+    letter-spacing: 1px;
+    padding: 6px 16px;
+    border-radius: 8px;
+    margin-bottom: 6px;
+  }
+  .subtitulo-empresa {
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: #8A9089;
+    text-transform: uppercase;
+    margin-bottom: 28px;
+  }
+  .card {
+    background: var(--panel);
+    border-radius: 16px;
+    padding: 24px 20px;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  }
+  h1 {
+    font-size: 19px;
+    margin: 0 0 8px;
+    color: #FFFFFF;
+  }
+  .intro {
+    font-size: 14px;
+    color: #A8AEA6;
+    line-height: 1.5;
+    margin: 0 0 22px;
+  }
+  label {
+    display: block;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: #8A9089;
+    margin-bottom: 6px;
+    margin-top: 16px;
+  }
+  input, textarea {
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1.5px solid #35424F;
+    background: #101820;
+    color: #FFFFFF;
+    font-size: 15px;
+    font-family: inherit;
+  }
+  input:focus, textarea:focus {
+    outline: none;
+    border-color: var(--amber);
+  }
+  textarea { resize: vertical; min-height: 80px; }
+  button {
+    width: 100%;
+    margin-top: 24px;
+    padding: 14px;
+    border: none;
+    border-radius: 10px;
+    background: var(--amber);
+    color: var(--ink);
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.6; cursor: default; }
+  .status {
+    margin-top: 14px;
+    font-size: 13px;
+    text-align: center;
+  }
+  .status.err { color: #E4726A; }
+  .pantalla-gracias { display: none; text-align: center; }
+  .pantalla-gracias.visible { display: block; }
+  .pantalla-gracias .icono { font-size: 44px; margin-bottom: 12px; }
+  .pantalla-gracias h1 { margin-bottom: 10px; }
+  .pantalla-gracias p { color: #A8AEA6; font-size: 14px; line-height: 1.5; }
+  .contacto-directo {
+    margin-top: 22px;
+    font-size: 13px;
+    color: #6B7680;
+    text-align: center;
+  }
+  .contacto-directo a { color: var(--amber); text-decoration: none; }
+</style>
+</head>
+<body>
+  <div class="logo-badge">SAT</div>
+  <div class="subtitulo-empresa">Servicio Técnico SAT</div>
+
+  <div class="card">
+    <div id="formularioWrap">
+      <h1>Solicitar un servicio</h1>
+      <p class="intro">
+        Completá tus datos y nos vamos a contactar a la brevedad. Si es fuera de
+        nuestro horario de atención, tu pedido queda registrado igual — no hace
+        falta que nos escribas por otro medio.
+      </p>
+
+      <label for="cliente">Nombre y apellido</label>
+      <input id="cliente" type="text" placeholder="Tu nombre" autocomplete="name">
+
+      <label for="telefono">Teléfono de contacto</label>
+      <input id="telefono" type="tel" placeholder="Tu teléfono" autocomplete="tel">
+
+      <label for="direccion">Dirección (opcional)</label>
+      <input id="direccion" type="text" placeholder="Dirección del servicio" autocomplete="street-address">
+
+      <label for="tarea">¿Qué necesitás?</label>
+      <textarea id="tarea" placeholder="Contanos qué pasó o qué necesitás"></textarea>
+
+      <button type="button" id="enviarBtn">Enviar solicitud</button>
+      <p class="status" id="statusMsg"></p>
+    </div>
+
+    <div class="pantalla-gracias" id="pantallaGracias">
+      <div class="icono">✅</div>
+      <h1>¡Listo, recibimos tu pedido!</h1>
+      <p>Ya quedó registrado. Nos vamos a contactar a la brevedad al teléfono que nos dejaste.</p>
+    </div>
+  </div>
+
+  <div class="contacto-directo">
+    ¿Preferís hablar directo? <a href="https://wa.me/5493410000000" target="_blank">Escribinos por WhatsApp</a>
+  </div>
+
+<script>
+  const enviarBtn = document.getElementById("enviarBtn");
+  const statusMsg = document.getElementById("statusMsg");
+
+  enviarBtn.addEventListener("click", async () => {
+    const cliente = document.getElementById("cliente").value.trim();
+    const telefono = document.getElementById("telefono").value.trim();
+    const direccion = document.getElementById("direccion").value.trim();
+    const tarea = document.getElementById("tarea").value.trim();
+
+    if (!cliente || !telefono) {
+      statusMsg.className = "status err";
+      statusMsg.textContent = "Completá al menos tu nombre y tu teléfono.";
+      return;
+    }
+
+    enviarBtn.disabled = true;
+    statusMsg.className = "status";
+    statusMsg.textContent = "Enviando...";
+
+    try {
+      const res = await fetch("/api/datos?publico=solicitud_emergencia", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cliente, telefono, direccion, tarea }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "No se pudo enviar");
+
+      document.getElementById("formularioWrap").style.display = "none";
+      document.getElementById("pantallaGracias").classList.add("visible");
+    } catch (err) {
+      statusMsg.className = "status err";
+      statusMsg.textContent = "No se pudo enviar — probá de nuevo en un momento.";
+      enviarBtn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
