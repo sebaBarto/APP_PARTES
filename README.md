@@ -391,6 +391,15 @@ mismo parte. Probado de punta a punta: calificar sin token (como llega desde el 
 intentar recalificar (avisa que ya calificó), los 5 links del mail bien armados con el
 número de parte correcto, y el promedio calculado bien en `admin.html`.
 
+## Cantidad más clara al escribir material a mano (v3.63.1)
+
+La cantidad ya funcionaba correctamente en modo "Otro (escribir el material)", pero
+quedaba visualmente separada del campo de texto — el selector de −/+ parecía asociado
+al desplegable de arriba, no al material que se estaba escribiendo. Reorganizado para
+que el selector de cantidad quede siempre en la misma fila que el campo que esté
+activo en ese momento (el desplegable, o el texto manual) — y se agregó un link
+"← Volver al catálogo" para salir del modo manual sin perder la categoría elegida.
+
 ## Número de cliente estable + hora de salida automática + cantidad sin tipear (v3.63.0)
 
 Tres mejoras al parte técnico:

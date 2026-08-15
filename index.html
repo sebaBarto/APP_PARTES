@@ -1419,6 +1419,7 @@
             <select class="field-input" id="matModeloSelect" disabled>
               <option value="" disabled selected>Elegí primero una categoría</option>
             </select>
+            <input class="field-input hidden" id="matModeloManualInput" type="text" placeholder="Escribí el nombre del material">
           </div>
           <div class="field-group" style="max-width:120px;">
             <div class="cantidad-stepper">
@@ -1428,7 +1429,7 @@
             </div>
           </div>
         </div>
-        <input class="field-input hidden" id="matModeloManualInput" type="text" placeholder="Escribí el nombre del material" style="margin-top:8px;">
+        <button type="button" class="hint-text hidden" id="matVolverCatalogoBtn" style="background:none; border:none; text-decoration:underline; cursor:pointer; padding:0; margin:2px 0 8px;">← Volver al catálogo</button>
         <button type="button" class="btn btn-ghost btn-small" id="agregarMaterialBtn" style="margin-bottom:10px;">+ Agregar</button>
 
         <div id="materialesAgregadosList" class="materiales-agregados-list"></div>
@@ -1463,6 +1464,7 @@
             <select class="field-input" id="matRetModeloSelect" disabled>
               <option value="" disabled selected>Elegí primero una categoría</option>
             </select>
+            <input class="field-input hidden" id="matRetModeloManualInput" type="text" placeholder="Escribí el nombre del material">
           </div>
           <div class="field-group" style="max-width:120px;">
             <div class="cantidad-stepper">
@@ -1472,7 +1474,7 @@
             </div>
           </div>
         </div>
-        <input class="field-input hidden" id="matRetModeloManualInput" type="text" placeholder="Escribí el nombre del material" style="margin-top:8px;">
+        <button type="button" class="hint-text hidden" id="matRetVolverCatalogoBtn" style="background:none; border:none; text-decoration:underline; cursor:pointer; padding:0; margin:2px 0 8px;">← Volver al catálogo</button>
         <button type="button" class="btn btn-ghost btn-small" id="agregarMaterialRetiradoBtn" style="margin-bottom:10px;">+ Agregar</button>
 
         <div id="materialesRetiradosAgregadosList" class="materiales-agregados-list"></div>

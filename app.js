@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.63.0";
+const APP_VERSION = "3.63.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -1864,6 +1864,7 @@ const MATERIALES_CATALOGO_RESPALDO = [
 const matCategoriaSelect = document.getElementById("matCategoriaSelect");
 const matModeloSelect = document.getElementById("matModeloSelect");
 const matModeloManualInput = document.getElementById("matModeloManualInput");
+const matVolverCatalogoBtn = document.getElementById("matVolverCatalogoBtn");
 const matCantidadInput = document.getElementById("matCantidadInput");
 const matCantidadMenosBtn = document.getElementById("matCantidadMenosBtn");
 const matCantidadMasBtn = document.getElementById("matCantidadMasBtn");
@@ -1915,6 +1916,7 @@ matCategoriaSelect.addEventListener("change", () => {
   const cat = materialesCatalogo.find((c) => c.categoria === matCategoriaSelect.value);
   matModeloManualInput.classList.add("hidden");
   matModeloManualInput.value = "";
+  matModeloSelect.classList.remove("hidden");
   if (!cat) {
     matModeloSelect.innerHTML = '<option value="" disabled selected>Elegí primero una categoría</option>';
     matModeloSelect.disabled = true;
@@ -1926,8 +1928,18 @@ matCategoriaSelect.addEventListener("change", () => {
 });
 
 matModeloSelect.addEventListener("change", () => {
-  matModeloManualInput.classList.toggle("hidden", matModeloSelect.value !== "__manual__");
-  if (matModeloSelect.value === "__manual__") matModeloManualInput.focus();
+  const esManual = matModeloSelect.value === "__manual__";
+  matModeloSelect.classList.toggle("hidden", esManual);
+  matModeloManualInput.classList.toggle("hidden", !esManual);
+  matVolverCatalogoBtn.classList.toggle("hidden", !esManual);
+  if (esManual) matModeloManualInput.focus();
+});
+matVolverCatalogoBtn.addEventListener("click", () => {
+  matModeloSelect.classList.remove("hidden");
+  matModeloManualInput.classList.add("hidden");
+  matModeloManualInput.value = "";
+  matVolverCatalogoBtn.classList.add("hidden");
+  matModeloSelect.value = "";
 });
 
 function renderMaterialesAgregados() {
@@ -1958,9 +1970,11 @@ agregarMaterialBtn.addEventListener("click", () => {
   materialesAgregados.push({ modelo, cantidad, manual: esManual });
   renderMaterialesAgregados();
   matModeloSelect.value = "";
+  matModeloSelect.classList.remove("hidden");
   matCantidadInput.value = "1";
   matModeloManualInput.value = "";
   matModeloManualInput.classList.add("hidden");
+  matVolverCatalogoBtn.classList.add("hidden");
 });
 
 function getMaterialesUtilizados() {
@@ -1973,6 +1987,7 @@ function getMaterialesUtilizados() {
 const matRetCategoriaSelect = document.getElementById("matRetCategoriaSelect");
 const matRetModeloSelect = document.getElementById("matRetModeloSelect");
 const matRetModeloManualInput = document.getElementById("matRetModeloManualInput");
+const matRetVolverCatalogoBtn = document.getElementById("matRetVolverCatalogoBtn");
 const matRetCantidadInput = document.getElementById("matRetCantidadInput");
 const matRetCantidadMenosBtn = document.getElementById("matRetCantidadMenosBtn");
 const matRetCantidadMasBtn = document.getElementById("matRetCantidadMasBtn");
@@ -1997,6 +2012,7 @@ matRetCategoriaSelect.addEventListener("change", () => {
   const cat = materialesCatalogo.find((c) => c.categoria === matRetCategoriaSelect.value);
   matRetModeloManualInput.classList.add("hidden");
   matRetModeloManualInput.value = "";
+  matRetModeloSelect.classList.remove("hidden");
   if (!cat) {
     matRetModeloSelect.innerHTML = '<option value="" disabled selected>Elegí primero una categoría</option>';
     matRetModeloSelect.disabled = true;
@@ -2008,8 +2024,18 @@ matRetCategoriaSelect.addEventListener("change", () => {
 });
 
 matRetModeloSelect.addEventListener("change", () => {
-  matRetModeloManualInput.classList.toggle("hidden", matRetModeloSelect.value !== "__manual__");
-  if (matRetModeloSelect.value === "__manual__") matRetModeloManualInput.focus();
+  const esManual = matRetModeloSelect.value === "__manual__";
+  matRetModeloSelect.classList.toggle("hidden", esManual);
+  matRetModeloManualInput.classList.toggle("hidden", !esManual);
+  matRetVolverCatalogoBtn.classList.toggle("hidden", !esManual);
+  if (esManual) matRetModeloManualInput.focus();
+});
+matRetVolverCatalogoBtn.addEventListener("click", () => {
+  matRetModeloSelect.classList.remove("hidden");
+  matRetModeloManualInput.classList.add("hidden");
+  matRetModeloManualInput.value = "";
+  matRetVolverCatalogoBtn.classList.add("hidden");
+  matRetModeloSelect.value = "";
 });
 
 function renderMaterialesRetiradosAgregados() {
@@ -2040,9 +2066,11 @@ agregarMaterialRetiradoBtn.addEventListener("click", () => {
   materialesRetiradosAgregados.push({ modelo, cantidad, manual: esManual });
   renderMaterialesRetiradosAgregados();
   matRetModeloSelect.value = "";
+  matRetModeloSelect.classList.remove("hidden");
   matRetCantidadInput.value = "1";
   matRetModeloManualInput.value = "";
   matRetModeloManualInput.classList.add("hidden");
+  matRetVolverCatalogoBtn.classList.add("hidden");
 });
 
 function getMaterialesRetirados() {
@@ -2530,16 +2558,20 @@ function resetForm() {
   matCategoriaSelect.value = "";
   matModeloSelect.innerHTML = '<option value="" disabled selected>Elegí primero una categoría</option>';
   matModeloSelect.disabled = true;
+  matModeloSelect.classList.remove("hidden");
   matCantidadInput.value = "1";
   matModeloManualInput.value = "";
   matModeloManualInput.classList.add("hidden");
+  matVolverCatalogoBtn.classList.add("hidden");
   materialesRetiradosAgregados = [];
   renderMaterialesRetiradosAgregados();
   matRetCategoriaSelect.value = "";
   matRetModeloSelect.innerHTML = '<option value="" disabled selected>Elegí primero una categoría</option>';
   matRetModeloSelect.disabled = true;
+  matRetModeloSelect.classList.remove("hidden");
   matRetModeloManualInput.value = "";
   matRetModeloManualInput.classList.add("hidden");
+  matRetVolverCatalogoBtn.classList.add("hidden");
   matRetCantidadInput.value = "1";
   currentNumeroServicio = "";
   fotoBase64 = null;
