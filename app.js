@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.66.0";
+const APP_VERSION = "3.66.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -5957,21 +5957,32 @@ async function verificarEstadoNotificaciones() {
     const registro = await navigator.serviceWorker.ready;
     const suscripcion = await registro.pushManager.getSubscription();
     activarNotificacionesBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15" style="vertical-align:-2px; margin-right:4px;"><path d="M12 3a5 5 0 0 0-5 5c0 6-3 8-3 8h16s-3-2-3-8a5 5 0 0 0-5-5z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>${suscripcion ? "Notificaciones activadas" : "Activar notificaciones"}`;
+    // Notificaciones activadas por defecto: si nunca se le preguntó
+    // a este navegador (Notification.permission === "default", ni
+    // aceptó ni rechazó antes), se dispara sola la activación al
+    // entrar — no hace falta que el técnico busque el botón. Si en
+    // algún momento lo rechazó explícitamente ("denied"), no se
+    // vuelve a insistir — solo puede reactivarlo él mismo, a mano,
+    // con el botón (que sigue estando siempre disponible para
+    // desactivar/reactivar cuando quiera).
+    if (!suscripcion && Notification.permission === "default") {
+      await activarNotificacionesFlow(/* silencioso */ true);
+    }
   } catch (err) {
     // si falla la verificación, se deja el botón con su texto por defecto
   }
 }
 
-activarNotificacionesBtn.addEventListener("click", async () => {
+async function activarNotificacionesFlow(silencioso) {
   if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-    showToast("Este celular/navegador no admite notificaciones push.");
+    if (!silencioso) showToast("Este celular/navegador no admite notificaciones push.");
     return;
   }
   activarNotificacionesBtn.disabled = true;
   try {
     const permiso = await Notification.requestPermission();
     if (permiso !== "granted") {
-      showToast("No se activaron las notificaciones — hace falta el permiso.");
+      if (!silencioso) showToast("No se activaron las notificaciones — hace falta el permiso.");
       return;
     }
     const registro = await navigator.serviceWorker.ready;
@@ -5989,13 +6000,15 @@ activarNotificacionesBtn.addEventListener("click", async () => {
     });
     if (!res.ok) throw new Error("HTTP " + res.status);
     activarNotificacionesBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15" style="vertical-align:-2px; margin-right:4px;"><path d="M12 3a5 5 0 0 0-5 5c0 6-3 8-3 8h16s-3-2-3-8a5 5 0 0 0-5-5z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>Notificaciones activadas';
-    showToast("Notificaciones activadas.");
+    if (!silencioso) showToast("Notificaciones activadas.");
   } catch (err) {
-    showToast("No se pudo activar las notificaciones: " + err.message);
+    if (!silencioso) showToast("No se pudo activar las notificaciones: " + err.message);
   } finally {
     activarNotificacionesBtn.disabled = false;
   }
-});
+}
+
+activarNotificacionesBtn.addEventListener("click", () => activarNotificacionesFlow(false));
 
 // Registrar service worker para instalación como PWA
 if ("serviceWorker" in navigator) {

@@ -391,6 +391,21 @@ mismo parte. Probado de punta a punta: calificar sin token (como llega desde el 
 intentar recalificar (avisa que ya calificó), los 5 links del mail bien armados con el
 número de parte correcto, y el promedio calculado bien en `admin.html`.
 
+## Notificaciones activadas por defecto (v3.66.1)
+
+A pedido: ya no hace falta que el técnico busque y toque "Activar notificaciones" — se
+dispara solo al entrar por primera vez (mostrando el cartel nativo del navegador para
+pedir el permiso). Solo se pregunta una vez: si nunca se le preguntó antes
+(`Notification.permission === "default"`), se intenta activar solo; si ya lo había
+rechazado explícitamente, no se vuelve a insistir. El botón sigue estando disponible
+siempre para activar/reactivar a mano cuando se quiera.
+
+Nota técnica: los navegadores nunca permiten activar notificaciones push sin que el
+usuario apruebe el permiso nativo — no hay forma de saltarse ese paso, es una
+restricción de seguridad de todos los navegadores. Esto logra que, en la práctica, la
+mayoría termine con las notificaciones activadas sin buscar nada, en vez de estar "on"
+sin que nadie lo haya aprobado nunca (lo cual no es técnicamente posible).
+
 ## Vista de ocupación semanal al agendar emergencias (v3.66.0)
 
 A pedido: en "Agenda de emergencia", nuevo botón **"📅 Ver ocupación de la semana"** —
