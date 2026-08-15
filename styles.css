@@ -1428,6 +1428,32 @@ html, body {
   margin-top: 22px;
 }
 .sugerencias-wrap { width: 100%; max-width: 320px; max-height: 40vh; overflow-y: auto; }
+.cliente-sugerencias-wrap {
+  position: relative;
+  margin-top: -4px;
+}
+.cliente-sugerencias-list {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  background: #FFFFFF;
+  border: 1.5px solid #D8DCD4;
+  border-radius: var(--r-md, 10px);
+  box-shadow: var(--shadow-card-hover, 0 6px 16px rgba(0,0,0,0.15));
+  max-height: 240px;
+  overflow-y: auto;
+}
+.cliente-sugerencia-item {
+  padding: 10px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #EEE;
+}
+.cliente-sugerencia-item:last-child { border-bottom: none; }
+.cliente-sugerencia-item:active { background: #F4F5F0; }
+.cliente-sugerencia-nombre { font-weight: 600; color: #101820; font-size: 14px; }
+.cliente-sugerencia-direccion { color: #6B7680; font-size: 12px; margin-top: 2px; }
 .vehiculo-recordatorio-wrap { width: 100%; max-width: 320px; margin-bottom: 8px; }
 .vehiculo-recordatorio-wrap .btn { width: 100%; }
 .sugerencia-card {

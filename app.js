@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.64.0";
+const APP_VERSION = "3.65.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -1724,6 +1724,8 @@ function autocompletarFecha() {
 // cliente (sin distinguir mayúsculas/acentos), tomando la más
 // reciente por fecha.
 const verVisitaAnteriorBtn = document.getElementById("verVisitaAnteriorBtn");
+const clienteSugerenciasWrap = document.getElementById("clienteSugerenciasWrap");
+const clienteSugerenciasList = document.getElementById("clienteSugerenciasList");
 const visitaAnteriorModalOverlay = document.getElementById("visitaAnteriorModalOverlay");
 const visitaAnteriorModalContenido = document.getElementById("visitaAnteriorModalContenido");
 let ultimaVisitaEncontrada = null;
@@ -1759,7 +1761,62 @@ function mostrarVisitaAnterior() {
   ultimaVisitaEncontrada = anteriores[0];
   verVisitaAnteriorBtn.disabled = false;
 }
-document.getElementById("f_cliente").addEventListener("change", mostrarVisitaAnterior);
+document.getElementById("f_cliente").addEventListener("change", () => {
+  // Si escribió el nombre exacto de un cliente conocido (sin usar la
+  // sugerencia), igual se vincula el número de cliente — así "última
+  // visita" y las claves guardadas lo encuentran bien.
+  const exacto = buscarClientePorNombre(document.getElementById("f_cliente").value.trim());
+  if (exacto) currentNumeroCliente = exacto.numero_cliente || "";
+  mostrarVisitaAnterior();
+});
+
+// Sugerencias de cliente al escribir — busca por nombre O dirección a
+// la vez (por eso no se usa un <datalist> nativo, que solo filtra
+// por lo que ya se ve en el texto). Al elegir una, se completa todo
+// lo que se pueda (dirección, localidad) y se guarda el número de
+// cliente — así "última visita" y las claves guardadas encuentran
+// bien el historial, aunque el cliente después cambie de nombre.
+const fClienteInput = document.getElementById("f_cliente");
+fClienteInput.addEventListener("input", () => {
+  const texto = fClienteInput.value.trim();
+  if (texto.length < 2 || !Array.isArray(clientesGeneralCache)) {
+    clienteSugerenciasWrap.classList.add("hidden");
+    return;
+  }
+  const clave = normalizeText(texto);
+  const coincidencias = clientesGeneralCache
+    .filter((c) => (c.nombre && normalizeText(c.nombre).includes(clave)) || (c.direccion && normalizeText(c.direccion).includes(clave)))
+    .slice(0, 6);
+
+  if (coincidencias.length === 0) {
+    clienteSugerenciasWrap.classList.add("hidden");
+    return;
+  }
+  clienteSugerenciasList.innerHTML = coincidencias.map((c, idx) => `
+    <div class="cliente-sugerencia-item" data-idx="${idx}">
+      <div class="cliente-sugerencia-nombre">${escapeHtml(c.nombre)}</div>
+      ${c.direccion ? `<div class="cliente-sugerencia-direccion">${escapeHtml(c.direccion)}</div>` : ""}
+    </div>
+  `).join("");
+  clienteSugerenciasList.querySelectorAll(".cliente-sugerencia-item").forEach((item) => {
+    item.addEventListener("mousedown", (e) => {
+      e.preventDefault(); // evita que el input pierda foco antes del click
+      const c = coincidencias[Number(item.dataset.idx)];
+      fClienteInput.value = c.nombre;
+      if (c.direccion) document.getElementById("f_direccion").value = c.direccion;
+      if (c.localidad) document.getElementById("f_localidad").value = c.localidad;
+      currentNumeroCliente = c.numero_cliente || "";
+      clienteSugerenciasWrap.classList.add("hidden");
+      mostrarVisitaAnterior();
+    });
+  });
+  clienteSugerenciasWrap.classList.remove("hidden");
+});
+fClienteInput.addEventListener("blur", () => {
+  // Se retrasa un poco para que el "mousedown" de arriba llegue a
+  // disparar antes de que esto oculte la lista.
+  setTimeout(() => clienteSugerenciasWrap.classList.add("hidden"), 150);
+});
 
 verVisitaAnteriorBtn.addEventListener("click", async () => {
   if (!ultimaVisitaEncontrada) return;

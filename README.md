@@ -391,6 +391,20 @@ mismo parte. Probado de punta a punta: calificar sin token (como llega desde el 
 intentar recalificar (avisa que ya calificó), los 5 links del mail bien armados con el
 número de parte correcto, y el promedio calculado bien en `admin.html`.
 
+## Buscador de cliente en el parte, por nombre o dirección (v3.65.0)
+
+A pedido: al cargar un parte "sin servicio" (o cualquier parte, en realidad), el campo
+Cliente ahora sugiere clientes ya cargados en la base a medida que se escribe — busca
+tanto por **nombre** como por **dirección** al mismo tiempo (por eso no es un
+desplegable nativo, que solo filtra por lo que ya se ve en el texto). Al elegir una
+sugerencia, se completa sola la dirección y localidad, y queda vinculado el número de
+cliente — lo mismo que ya beneficia al botón de INFO y a las claves guardadas por
+cliente. Si el técnico escribe el nombre exacto sin usar la sugerencia, también se
+vincula solo.
+
+Probado de punta a punta: búsqueda por nombre, búsqueda por dirección (trayendo varios
+clientes de la misma calle), y el autocompletado completo al elegir una sugerencia.
+
 ## Claves guardadas por cliente, consultables (v3.64.0)
 
 A pedido: hasta ahora las claves cargadas en un parte quedaban atadas solo a ese parte
