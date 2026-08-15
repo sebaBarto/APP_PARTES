@@ -262,8 +262,9 @@ module.exports = async (req, res) => {
   if (req.method === "POST" && req.query && req.query.publico === "solicitud_emergencia") {
     let body = req.body;
     if (typeof body === "string") { try { body = JSON.parse(body); } catch (e) { body = {}; } }
-    const cliente = (body?.cliente || "").trim();
-    const telefono = (body?.telefono || "").trim();
+    const comoTexto = (v) => (typeof v === "string" ? v.trim() : "");
+    const cliente = comoTexto(body?.cliente);
+    const telefono = comoTexto(body?.telefono);
     if (!cliente || !telefono) {
       res.status(400).json({ error: "Faltan datos (nombre o teléfono)" });
       return;
@@ -277,7 +278,7 @@ module.exports = async (req, res) => {
       const r = await fetch(`${BACKEND_NUEVO_URL}/api/emergencias/solicitud-publica`, {
         method: "POST",
         headers: { Authorization: `Bearer ${BACKEND_NUEVO_TOKEN}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ cliente, telefono, direccion: body?.direccion || "", tarea: body?.tarea || "" }),
+        body: JSON.stringify({ cliente, telefono, direccion: comoTexto(body?.direccion), tarea: comoTexto(body?.tarea) }),
       });
       const data = await r.json();
       if (!r.ok) {
