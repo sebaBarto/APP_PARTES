@@ -1280,7 +1280,13 @@ clientesExcelFile.addEventListener("change", () => {
     try {
       const wb = XLSX.read(e.target.result, { type: "array" });
       const hoja = wb.Sheets[wb.SheetNames[0]];
-      const filas = XLSX.utils.sheet_to_json(hoja, { defval: "" });
+      // Se lee como matriz (no como objetos por fila) porque el
+      // archivo puede traer filas de título ("Listado:", "Filtros:",
+      // "Orden:") ANTES de la fila real de encabezados — si se usa
+      // el modo automático de la librería (que asume que la fila 1
+      // son los encabezados), esas filas de título se toman como si
+      // fueran nombres de columna y absolutamente nada se reconoce.
+      const filasMatriz = XLSX.utils.sheet_to_json(hoja, { header: 1, raw: false, defval: "" });
 
       // Los encabezados reales de la planilla pueden variar bastante
       // (mayúsculas/minúsculas, tildes, espacios de más) — en vez de
@@ -1291,29 +1297,71 @@ clientesExcelFile.addEventListener("change", () => {
           .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // saca tildes
           .replace(/\s+/g, " ");
       }
-      function valorDeColumna(row, variaciones) {
-        const clavesFila = Object.keys(row);
-        for (const variacion of variaciones) {
-          const claveEncontrada = clavesFila.find((k) => normalizarEncabezado(k) === variacion);
-          if (claveEncontrada !== undefined) return String(row[claveEncontrada] ?? "").trim();
+
+      const VARIACIONES = {
+        numero_cliente: ["n° de cliente", "n de cliente", "numero de cliente", "nro de cliente", "nro cliente", "numero cliente", "n° cliente"],
+        nombre: ["nombre", "nombre cliente", "nombre del cliente", "razon social", "cliente", "nombre fantasia"],
+        direccion: ["direccion", "domicilio"],
+        localidad: ["localidad", "ciudad"],
+        telefono: ["telefono", "tel"],
+        numero_abonado: ["n° de abonado", "n de abonado", "numero de abonado", "nro de abonado", "nro abonado", "numero abonado", "n° abon", "n abon"],
+      };
+
+      // Busca en las primeras filas (hasta 25) cuál es la que
+      // realmente tiene los encabezados — la que mejor matchea con
+      // "numero_cliente" y "nombre" (los dos campos clave).
+      function filaTieneEncabezado(fila, variaciones) {
+        const normalizada = (fila || []).map(normalizarEncabezado);
+        return normalizada.findIndex((c) => variaciones.includes(c));
+      }
+      let filaEncabezadoIdx = 0;
+      let mejorPuntaje = -1;
+      for (let i = 0; i < Math.min(filasMatriz.length, 25); i++) {
+        const fila = filasMatriz[i] || [];
+        const tieneNumero = filaTieneEncabezado(fila, VARIACIONES.numero_cliente) !== -1;
+        const tieneNombre = filaTieneEncabezado(fila, VARIACIONES.nombre) !== -1;
+        const puntaje = (tieneNumero ? 1 : 0) + (tieneNombre ? 1 : 0);
+        if (puntaje > mejorPuntaje) {
+          mejorPuntaje = puntaje;
+          filaEncabezadoIdx = i;
         }
-        return "";
+        if (puntaje === 2) break;
       }
 
-      const nuevos = filas
+      const filaEncabezado = filasMatriz[filaEncabezadoIdx] || [];
+      const indices = {};
+      for (const campo of Object.keys(VARIACIONES)) {
+        const idx = filaTieneEncabezado(filaEncabezado, VARIACIONES[campo]);
+        if (idx !== -1) indices[campo] = idx;
+      }
+
+      function valorDeColumna(fila, campo) {
+        const idx = indices[campo];
+        if (idx === undefined) return "";
+        return String(fila[idx] ?? "").trim();
+      }
+
+      const filasDatos = filasMatriz.slice(filaEncabezadoIdx + 1);
+      const nuevos = filasDatos
+        .filter((fila) => fila && fila.some((c) => c !== "" && c != null))
         .map((row) => ({
-          numero_cliente: valorDeColumna(row, ["n° de cliente", "n de cliente", "numero de cliente", "nro de cliente", "nro cliente", "numero cliente"]),
-          nombre: valorDeColumna(row, ["nombre", "nombre cliente", "nombre del cliente", "razon social", "cliente"]),
-          direccion: valorDeColumna(row, ["direccion", "domicilio"]),
-          localidad: valorDeColumna(row, ["localidad", "ciudad"]),
-          telefono: valorDeColumna(row, ["telefono", "tel"]),
-          numero_abonado: valorDeColumna(row, ["n° de abonado", "n de abonado", "numero de abonado", "nro de abonado", "nro abonado", "numero abonado"]),
+          numero_cliente: valorDeColumna(row, "numero_cliente"),
+          nombre: valorDeColumna(row, "nombre"),
+          direccion: valorDeColumna(row, "direccion"),
+          localidad: valorDeColumna(row, "localidad"),
+          telefono: valorDeColumna(row, "telefono"),
+          numero_abonado: valorDeColumna(row, "numero_abonado"),
         }))
         .filter((c) => c.numero_cliente);
 
+      const totalFilasConDatos = filasDatos.filter((fila) => fila && fila.some((c) => c !== "" && c != null)).length;
+      const descartadasSinNumero = totalFilasConDatos - nuevos.length;
+
       if (nuevos.length === 0) {
         clientesImportStatus.className = "status err";
-        clientesImportStatus.textContent = "No se encontraron filas válidas — revisá los encabezados de la planilla (hace falta al menos \"N° DE CLIENTE\").";
+        clientesImportStatus.textContent = totalFilasConDatos > 0
+          ? `Se leyeron ${totalFilasConDatos} filas, pero ninguna tenía "N° de Cliente" cargado — no se importó nada. Revisá esa columna en la planilla.`
+          : "No se encontraron filas válidas — revisá los encabezados de la planilla (hace falta al menos \"N° DE CLIENTE\").";
         return;
       }
 
@@ -1337,8 +1385,10 @@ clientesExcelFile.addEventListener("change", () => {
       if (!res.ok) throw new Error(data.error || "Error desconocido");
 
       clientesCacheAdmin = listaFinal;
-      clientesImportStatus.className = "status ok";
-      clientesImportStatus.textContent = `Listo — ${nuevos.length} filas leídas de la planilla, ${listaFinal.length} en total.`;
+      clientesImportStatus.className = descartadasSinNumero > 0 ? "status err" : "status ok";
+      clientesImportStatus.textContent = descartadasSinNumero > 0
+        ? `Listo — ${nuevos.length} filas cargadas, ${listaFinal.length} en total. Atención: ${descartadasSinNumero} fila(s) se descartaron por no tener "N° de Cliente" cargado.`
+        : `Listo — ${nuevos.length} filas leídas de la planilla, ${listaFinal.length} en total.`;
       dibujarResultadosClientesAdmin();
     } catch (err) {
       clientesImportStatus.className = "status err";
