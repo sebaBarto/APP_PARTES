@@ -1289,51 +1289,84 @@ clientesExcelFile.addEventListener("change", () => {
       const filasMatriz = XLSX.utils.sheet_to_json(hoja, { header: 1, raw: false, defval: "" });
 
       // Los encabezados reales de la planilla pueden variar bastante
-      // (mayúsculas/minúsculas, tildes, espacios de más) — en vez de
-      // pedir el texto exacto para cada columna, se busca de forma
-      // flexible por variaciones conocidas de cada nombre de campo.
+      // (mayúsculas/minúsculas, tildes, símbolos raros, palabras de
+      // más, con o sin "de") — se normaliza de forma agresiva y se
+      // busca por coincidencia "contiene" (no exacta), mismo enfoque
+      // ya probado para Servicios Pendientes.
+      const PALABRAS_CONECTORAS = new Set(["de", "del", "la", "el", "los", "las", "a"]);
       function normalizarEncabezado(s) {
-        return String(s || "").trim().toLowerCase()
-          .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // saca tildes
-          .replace(/\s+/g, " ");
+        let texto = String(s || "").trim().toLowerCase()
+          .normalize("NFD").replace(/[\u0300-\u036f]/g, ""); // saca tildes
+        // "N°" puede venir con distintos símbolos casi idénticos a
+        // simple vista (° grado, º ordinal masculino) — se
+        // convierten a la palabra completa "numero" antes de seguir.
+        texto = texto.replace(/n[°ºª]/g, "numero ");
+        // Saca cualquier otro símbolo/puntuación (puntos, comas,
+        // paréntesis, etc.) para no depender de que coincida
+        // exactamente el signo de puntuación usado.
+        texto = texto.replace(/[^a-z0-9]+/g, " ").trim();
+        return texto
+          .split(" ")
+          .filter((palabra) => palabra && !PALABRAS_CONECTORAS.has(palabra))
+          .join("");
       }
 
+      // Variantes ya normalizadas (sin espacios ni conectoras) —
+      // ordenadas de más específica a más genérica dentro de cada
+      // campo, para que la variante corta no gane por accidente
+      // sobre una más precisa.
       const VARIACIONES = {
-        numero_cliente: ["n° de cliente", "n de cliente", "numero de cliente", "nro de cliente", "nro cliente", "numero cliente", "n° cliente"],
-        nombre: ["nombre", "nombre cliente", "nombre del cliente", "razon social", "cliente", "nombre fantasia"],
+        numero_cliente: ["numerocliente", "nrocliente"],
+        nombre: ["nombrefantasia", "razonsocial", "nombrecliente", "nombre", "cliente"],
         direccion: ["direccion", "domicilio"],
         localidad: ["localidad", "ciudad"],
         telefono: ["telefono", "tel"],
-        numero_abonado: ["n° de abonado", "n de abonado", "numero de abonado", "nro de abonado", "nro abonado", "numero abonado", "n° abon", "n abon"],
+        numero_abonado: ["numeroabonado", "nroabonado", "numeroabon", "nroabon", "abonado"],
       };
+      // Los campos con "numero" más específico (abonado) se buscan
+      // ANTES que numero_cliente, para que la variante genérica no
+      // se robe una columna que en realidad es otra cosa.
+      const ORDEN_BUSQUEDA = ["numero_abonado", "numero_cliente", "nombre", "direccion", "localidad", "telefono"];
+
+      function buscarColumna(encabezadosNormalizados, campo, usadas) {
+        const variantes = [...VARIACIONES[campo]].sort((a, b) => b.length - a.length);
+        return encabezadosNormalizados.findIndex(
+          (enc, i) => !usadas.has(i) && variantes.some((v) => enc.includes(v))
+        );
+      }
+
+      function mapearFila(fila) {
+        const encabezadosNormalizados = (fila || []).map(normalizarEncabezado);
+        const mapa = {};
+        const usadas = new Set();
+        for (const campo of ORDEN_BUSQUEDA) {
+          const idx = buscarColumna(encabezadosNormalizados, campo, usadas);
+          if (idx !== -1) {
+            mapa[campo] = idx;
+            usadas.add(idx);
+          }
+        }
+        return mapa;
+      }
 
       // Busca en las primeras filas (hasta 25) cuál es la que
       // realmente tiene los encabezados — la que mejor matchea con
       // "numero_cliente" y "nombre" (los dos campos clave).
-      function filaTieneEncabezado(fila, variaciones) {
-        const normalizada = (fila || []).map(normalizarEncabezado);
-        return normalizada.findIndex((c) => variaciones.includes(c));
-      }
       let filaEncabezadoIdx = 0;
+      let mejorMapa = {};
       let mejorPuntaje = -1;
       for (let i = 0; i < Math.min(filasMatriz.length, 25); i++) {
-        const fila = filasMatriz[i] || [];
-        const tieneNumero = filaTieneEncabezado(fila, VARIACIONES.numero_cliente) !== -1;
-        const tieneNombre = filaTieneEncabezado(fila, VARIACIONES.nombre) !== -1;
-        const puntaje = (tieneNumero ? 1 : 0) + (tieneNombre ? 1 : 0);
+        const mapa = mapearFila(filasMatriz[i] || []);
+        const puntaje = (mapa.numero_cliente !== undefined ? 1 : 0) + (mapa.nombre !== undefined ? 1 : 0);
         if (puntaje > mejorPuntaje) {
           mejorPuntaje = puntaje;
+          mejorMapa = mapa;
           filaEncabezadoIdx = i;
         }
         if (puntaje === 2) break;
       }
 
-      const filaEncabezado = filasMatriz[filaEncabezadoIdx] || [];
-      const indices = {};
-      for (const campo of Object.keys(VARIACIONES)) {
-        const idx = filaTieneEncabezado(filaEncabezado, VARIACIONES[campo]);
-        if (idx !== -1) indices[campo] = idx;
-      }
+      const indices = mejorMapa;
 
       function valorDeColumna(fila, campo) {
         const idx = indices[campo];
