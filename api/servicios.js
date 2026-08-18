@@ -121,17 +121,24 @@ module.exports = async (req, res) => {
     try {
       const desdeDrive = await leerDesdeDrive();
       if (desdeDrive !== null) {
+        res.setHeader("X-Servicios-Fuente", "drive");
         guardarRespaldoGitHub(desdeDrive).catch(() => {});
         res.status(200).json(desdeDrive);
         return;
       }
       // SERVICIOS_DRIVE_FOLDER_ID no configurado — sigue el
       // comportamiento de siempre (leer del respaldo directo).
+      res.setHeader("X-Servicios-Fuente", "respaldo-sin-configurar");
       const respaldo = await leerRespaldoGitHub();
       res.status(200).json(respaldo);
     } catch (err) {
       // Si Drive falla, no se rompe la app — se usa el último
-      // respaldo bueno que haya guardado.
+      // respaldo bueno que haya guardado. Se deja registrado el
+      // motivo exacto (visible en Vercel → Logs, y en el header de
+      // la respuesta) para poder diagnosticarlo.
+      console.error("[servicios] Drive falló, usando respaldo:", err.message);
+      res.setHeader("X-Servicios-Fuente", "respaldo-por-error");
+      res.setHeader("X-Servicios-Error-Drive", String(err.message || err).slice(0, 200));
       try {
         const respaldo = await leerRespaldoGitHub();
         res.status(200).json(respaldo);
