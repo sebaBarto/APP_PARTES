@@ -383,8 +383,16 @@ module.exports = async (req, res) => {
           headers: { ...headersBackendNuevo, "Content-Type": "application/json" },
           body: JSON.stringify({ parte_id: body.parte_id, movimientos: body.movimientos }),
         });
-        const data = await r.json();
-        res.status(r.status).json(data);
+        const textoRespuestaStock = await r.text();
+        let dataStock;
+        try {
+          dataStock = JSON.parse(textoRespuestaStock);
+        } catch (errParse) {
+          console.error("[historial] El backend nuevo devolvió algo que no es JSON al guardar stock:", r.status, textoRespuestaStock.slice(0, 500));
+          res.status(502).json({ error: "El backend nuevo devolvió una respuesta inválida al guardar stock", status: r.status, cuerpo: textoRespuestaStock.slice(0, 300) });
+          return;
+        }
+        res.status(r.status).json(dataStock);
         return;
       }
 
