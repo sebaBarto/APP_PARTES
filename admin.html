@@ -476,6 +476,14 @@
       <button id="agregarGuardiaBtn" type="button" class="btn-secondary-admin" style="margin-bottom:14px;">+ Agregar técnico a la secuencia</button>
       <button id="guardarGuardiasBtn" type="button">Guardar cambios</button>
       <p class="status" id="guardarGuardiasStatus"></p>
+
+      <div class="card" style="margin-top:24px;">
+        <label>Aviso a Security24 (cambio de guardia)</label>
+        <p class="subtitle" style="margin-top:2px;">Se manda solo, automáticamente, todos los lunes a las 9:00. Si por algún motivo no llegó, lo podés disparar a mano acá.</p>
+        <p id="guardiaAvisoEstado" style="margin:10px 0; font-size:14px;">Consultando estado...</p>
+        <button id="avisarGuardiaAhoraBtn" type="button" class="btn-secondary-admin">Avisar a Security24 ahora</button>
+        <p class="status" id="avisarGuardiaAhoraStatus"></p>
+      </div>
     </div>
 
     <div id="panelCredenciales" class="hidden">
@@ -790,7 +798,7 @@ const TABS = [
   { btn: tabMaterialesBtn, panel: panelMateriales, onShow: () => { if (!materialesCargadosUnaVez) { materialesCargadosUnaVez = true; cargarMaterialesAdmin(); } } },
   { btn: tabClientesBtn, panel: panelClientes, onShow: () => { if (!clientesCargadosUnaVez) { clientesCargadosUnaVez = true; cargarClientesAdmin(); } } },
   { btn: tabConsultasBtn, panel: panelConsultas, onShow: () => { if (!consultasCatCargadasUnaVez) { consultasCatCargadasUnaVez = true; cargarConsultasCatAdmin(); } } },
-  { btn: tabGuardiasBtn, panel: panelGuardias, onShow: () => { if (!guardiasCargadasUnaVez) { guardiasCargadasUnaVez = true; cargarGuardiasAdmin(); } } },
+  { btn: tabGuardiasBtn, panel: panelGuardias, onShow: () => { if (!guardiasCargadasUnaVez) { guardiasCargadasUnaVez = true; cargarGuardiasAdmin(); } cargarEstadoAvisoGuardia(); } },
   { btn: tabCredencialesBtn, panel: panelCredenciales, onShow: () => cargarCredencialesAdmin() },
   { btn: tabVehiculosBtn, panel: panelVehiculos, onShow: () => { if (!vehiculosCargadosUnaVez) { vehiculosCargadosUnaVez = true; cargarVehiculosAdmin(); } } },
   { btn: tabSimsBtn, panel: panelSims, onShow: () => { if (!simsCargadasUnaVez) { simsCargadasUnaVez = true; cargarSimsAdmin(); } } },
@@ -1624,6 +1632,76 @@ guardarGuardiasBtn.addEventListener("click", async () => {
     guardarGuardiasStatus.textContent = "No se pudo guardar: " + err.message;
   } finally {
     guardarGuardiasBtn.disabled = false;
+  }
+});
+
+// ---------- Aviso manual a Security24 ----------
+const guardiaAvisoEstado = document.getElementById("guardiaAvisoEstado");
+const avisarGuardiaAhoraBtn = document.getElementById("avisarGuardiaAhoraBtn");
+const avisarGuardiaAhoraStatus = document.getElementById("avisarGuardiaAhoraStatus");
+
+async function cargarEstadoAvisoGuardia() {
+  guardiaAvisoEstado.textContent = "Consultando estado...";
+  guardiaAvisoEstado.className = "";
+  try {
+    const res = await fetch("/api/datos?accion=guardia_diagnostico", {
+      headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+
+    if (!data.tecnicoQueLeTocaria) {
+      guardiaAvisoEstado.textContent = "Todavía no hay ninguna secuencia de guardias cargada.";
+      avisarGuardiaAhoraBtn.disabled = true;
+      return;
+    }
+
+    avisarGuardiaAhoraBtn.disabled = false;
+    if (data.yaNotificadoEstaSemana) {
+      guardiaAvisoEstado.innerHTML = `✓ Aviso de esta semana ya realizado — <b>${data.tecnicoQueLeTocaria}</b> de guardia.`;
+      guardiaAvisoEstado.className = "status ok";
+    } else {
+      guardiaAvisoEstado.innerHTML = `Todavía no se avisó esta semana — le toca a <b>${data.tecnicoQueLeTocaria}</b>.`;
+      guardiaAvisoEstado.className = "status";
+    }
+  } catch (err) {
+    guardiaAvisoEstado.textContent = "No se pudo consultar el estado.";
+    guardiaAvisoEstado.className = "status err";
+  }
+}
+
+avisarGuardiaAhoraBtn.addEventListener("click", async () => {
+  const yaEstabaHecho = guardiaAvisoEstado.className === "status ok";
+  if (yaEstabaHecho && !confirm("El aviso de esta semana ya se había realizado — ¿mandarlo de nuevo igual?")) {
+    return;
+  }
+  avisarGuardiaAhoraBtn.disabled = true;
+  avisarGuardiaAhoraStatus.className = "status";
+  avisarGuardiaAhoraStatus.textContent = "Enviando...";
+  try {
+    const res = await fetch("/api/datos?accion=guardia_avisar_ahora", {
+      method: "POST",
+      headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+
+    if (!data.ejecutado) {
+      avisarGuardiaAhoraStatus.className = "status err";
+      avisarGuardiaAhoraStatus.textContent = "No se pudo: " + (data.motivo || "motivo desconocido");
+    } else if (data.mail && data.mail.ok === false) {
+      avisarGuardiaAhoraStatus.className = "status err";
+      avisarGuardiaAhoraStatus.textContent = `El mail falló (${data.tecnico}): ` + (data.mail.error || "error desconocido");
+    } else {
+      avisarGuardiaAhoraStatus.className = "status ok";
+      avisarGuardiaAhoraStatus.textContent = `Listo — se avisó que ${data.tecnico} queda de guardia.`;
+    }
+  } catch (err) {
+    avisarGuardiaAhoraStatus.className = "status err";
+    avisarGuardiaAhoraStatus.textContent = "No se pudo enviar: " + err.message;
+  } finally {
+    avisarGuardiaAhoraBtn.disabled = false;
+    cargarEstadoAvisoGuardia();
   }
 });
 

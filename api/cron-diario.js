@@ -16,65 +16,6 @@
 //   VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT
 
 const { enviarATodos, enviarASeleccionados } = require("../lib/push-sender");
-const nodemailer = require("nodemailer");
-
-let transporterCache = null;
-function getTransporter() {
-  if (transporterCache) return transporterCache;
-  const puerto = Number(process.env.SMTP_PORT || 465);
-  transporterCache = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: puerto,
-    secure: puerto === 465,
-    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
-    connectionTimeout: 8000,
-    greetingTimeout: 8000,
-    socketTimeout: 8000,
-  });
-  return transporterCache;
-}
-
-// Mail a Security 24 avisando quién queda de guardia y hasta cuándo
-// (la guardia siempre rota de lunes 9:00 a lunes 9:00 — ver
-// admin.html, pestaña Guardias). Nunca frena el aviso push si esto
-// falla — son dos avisos independientes.
-//
-// OJO con las fechas acá: "inicioGuardia" viene de ahoraArgentina(),
-// que ya le resta 3 horas al UTC real para representar la hora de
-// Argentina (aunque el objeto Date queda "etiquetado" como UTC por
-// dentro). Por eso achá se lee con los métodos UTC (getUTCHours, etc)
-// y SIN volver a pasarle un timeZone a toLocaleString — si se hiciera
-// eso, se restarían las 3 horas dos veces.
-function formatoFechaArgentina(fecha) {
-  const dd = String(fecha.getUTCDate()).padStart(2, "0");
-  const mm = String(fecha.getUTCMonth() + 1).padStart(2, "0");
-  const yyyy = fecha.getUTCFullYear();
-  const hh = String(fecha.getUTCHours()).padStart(2, "0");
-  const min = String(fecha.getUTCMinutes()).padStart(2, "0");
-  return `${dd}/${mm}/${yyyy} ${hh}:${min}`;
-}
-
-async function avisarGuardiaASecurity24(nombreTecnico, inicioGuardia) {
-  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
-    console.error("[cron-diario] No se mandó el aviso de guardia a Security24: faltan variables SMTP.");
-    return;
-  }
-  const finGuardia = new Date(inicioGuardia.getTime() + 7 * 24 * 60 * 60 * 1000);
-  try {
-    await getTransporter().sendMail({
-      from: `"Servicio Técnico SAT" <${process.env.SMTP_USER}>`,
-      to: "actualizaciondedatos@security24.com.ar",
-      subject: `Cambio de guardia — ${nombreTecnico} de guardia hasta ${formatoFechaArgentina(finGuardia)}`,
-      html: `<p>Cambio de guardia técnica.</p><p><b>Técnico de guardia:</b> ${nombreTecnico}</p><p><b>Desde:</b> ${formatoFechaArgentina(inicioGuardia)}</p><p><b>Hasta:</b> ${formatoFechaArgentina(finGuardia)}</p>`,
-    });
-  } catch (err) {
-    // No se corta el resto del cron si el mail falla — el aviso push
-    // ya salió, que es lo más importante para el equipo interno. Pero
-    // SÍ queda registrado, para poder diagnosticar si vuelve a pasar
-    // (antes fallaba en silencio total, sin ningún rastro).
-    console.error("[cron-diario] Falló el mail de cambio de guardia a Security24:", err.message || err);
-  }
-}
 
 const GUARDIAS_PATH = "guardias-config.json";
 const VEHICULOS_PATH = "vehiculos-config.json";
@@ -149,8 +90,12 @@ async function chequearGuardia(ghHeaders, estado, ahora) {
   if (!resultadoPush || resultadoPush.enviados === 0) {
     console.error("[cron-diario] El push de cambio de guardia se mandó a 0 suscripciones:", JSON.stringify(resultadoPush));
   }
-  const inicioGuardiaHoy = ahora; // el cron corre a las 12:00 UTC = 9:00 Argentina exacto
-  await avisarGuardiaASecurity24(tecnico.nombre, inicioGuardiaHoy);
+  // El mail a Security24 ya NO se manda desde acá — lo maneja el cron
+  // de Cloudflare (sat-backend-d1/src/cron.js), que lee la config de
+  // guardias desde la base D1 (la fuente de verdad actual, la que
+  // edita admin.html). Antes los DOS sistemas lo mandaban en
+  // paralelo, el mismo lunes a la misma hora — quedaba duplicado (o,
+  // peor, ambos podían fallar en silencio sin que el otro lo cubriera).
 
   estado.ultima_semana_guardia_notificada = semanaActual;
   return tecnico.nombre;

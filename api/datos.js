@@ -361,6 +361,46 @@ module.exports = async (req, res) => {
     return;
   }
 
+  // Estado y disparo manual del aviso de guardia a Security24 — viven
+  // en el backend nuevo (Cloudflare + D1), que es quien maneja esto
+  // ahora (ver sat-backend-d1/src/cron.js). Se proxea acá para no
+  // exponer nunca la URL/token del backend nuevo al navegador, mismo
+  // criterio que el resto de este archivo.
+  if (req.query && req.query.accion === "guardia_diagnostico" && req.method === "GET") {
+    const { BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN } = process.env;
+    if (!BACKEND_NUEVO_URL || !BACKEND_NUEVO_TOKEN) {
+      res.status(500).json({ error: "Falta configuración del servidor" });
+      return;
+    }
+    try {
+      const r = await fetch(`${BACKEND_NUEVO_URL}/api/guardias/diagnostico`, {
+        headers: { Authorization: `Bearer ${BACKEND_NUEVO_TOKEN}` },
+      });
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+      res.status(r.status).json(await r.json());
+    } catch (err) {
+      res.status(500).json({ error: "No se pudo consultar el estado de guardia" });
+    }
+    return;
+  }
+  if (req.query && req.query.accion === "guardia_avisar_ahora" && req.method === "POST") {
+    const { BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN } = process.env;
+    if (!BACKEND_NUEVO_URL || !BACKEND_NUEVO_TOKEN) {
+      res.status(500).json({ error: "Falta configuración del servidor" });
+      return;
+    }
+    try {
+      const r = await fetch(`${BACKEND_NUEVO_URL}/api/guardias/avisar-ahora`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${BACKEND_NUEVO_TOKEN}` },
+      });
+      res.status(r.status).json(await r.json());
+    } catch (err) {
+      res.status(500).json({ error: "No se pudo disparar el aviso de guardia" });
+    }
+    return;
+  }
+
   // Verificación de contraseñas — se hace acá adentro, del lado del
   // servidor, y nunca se le devuelve ninguna contraseña al que
   // pregunta (ni siquiera la propia): solo si coincide o no. Antes,
