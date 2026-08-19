@@ -783,8 +783,11 @@
       <div id="simUsarWrap" class="hidden">
         <div class="field-group">
           <label class="field-label" for="simClienteInput">Cliente</label>
-          <input class="field-input" id="simClienteInput" type="text" placeholder="Escribí para buscar el cliente..." list="simClientesLista">
-          <datalist id="simClientesLista"></datalist>
+          <input class="field-input" id="simClienteInput" type="text" placeholder="Escribí para buscar el cliente..." autocomplete="off">
+          <div id="simClienteSugerenciasWrap" class="cliente-sugerencias-wrap hidden">
+            <div id="simClienteSugerenciasList" class="cliente-sugerencias-list"></div>
+          </div>
+          <div id="simClienteAmbiguoAviso" class="aviso-clientes-duplicados hidden"></div>
           <div id="simClienteEncontradoInfo" class="hint-text"></div>
         </div>
         <div class="field-group">
@@ -1378,6 +1381,7 @@
         <div id="clienteSugerenciasWrap" class="cliente-sugerencias-wrap hidden">
           <div id="clienteSugerenciasList" class="cliente-sugerencias-list"></div>
         </div>
+        <div id="clienteAmbiguoAviso" class="aviso-clientes-duplicados hidden"></div>
         <p class="campo-caption" id="cobradorInfo"></p>
       </div>
 

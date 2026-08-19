@@ -1498,6 +1498,21 @@ html, body {
 .cliente-sugerencia-item:active { background: #F4F5F0; }
 .cliente-sugerencia-nombre { font-weight: 600; color: #101820; font-size: 14px; }
 .cliente-sugerencia-direccion { color: #6B7680; font-size: 12px; margin-top: 2px; }
+.cliente-sugerencia-abonado { color: #6B7680; font-size: 12px; margin-top: 1px; font-family: 'IBM Plex Mono', monospace; }
+.cliente-sugerencia-item.cliente-sugerencia-ambiguo {
+  border-left: 3px solid #D68910;
+  background: #FFF9EE;
+}
+.aviso-clientes-duplicados {
+  background: #FFF3D6;
+  border: 1.5px solid #E8A93A;
+  border-radius: var(--r-md, 10px);
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #7A4E00;
+  margin-top: 6px;
+  font-weight: 500;
+}
 .vehiculo-recordatorio-wrap { width: 100%; max-width: 320px; margin-bottom: 8px; }
 .vehiculo-recordatorio-wrap .btn { width: 100%; }
 .sugerencia-card {

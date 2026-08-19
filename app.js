@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.68.1";
+const APP_VERSION = "3.69.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -1771,11 +1771,25 @@ function mostrarVisitaAnterior() {
   verVisitaAnteriorBtn.disabled = false;
 }
 document.getElementById("f_cliente").addEventListener("change", () => {
-  // Si escribió el nombre exacto de un cliente conocido (sin usar la
-  // sugerencia), igual se vincula el número de cliente — así "última
-  // visita" y las claves guardadas lo encuentran bien.
-  const exacto = buscarClientePorNombre(document.getElementById("f_cliente").value.trim());
-  if (exacto) currentNumeroCliente = exacto.numero_cliente || "";
+  const nombreEscrito = document.getElementById("f_cliente").value.trim();
+  const clienteAmbiguoAviso = document.getElementById("clienteAmbiguoAviso");
+  const cantidad = contarClientesConNombreExacto(nombreEscrito);
+  if (cantidad > 1) {
+    // Hay más de un cliente con este nombre exacto — no se adivina
+    // cuál es (antes se agarraba el primero en silencio, y eso fue
+    // justo lo que causó un movimiento de SIM al cliente equivocado
+    // una vez). Se avisa y se pide elegir de la lista de sugerencias.
+    clienteAmbiguoAviso.textContent = `⚠ Hay ${cantidad} clientes llamados "${nombreEscrito}" — elegí el correcto de la lista de sugerencias (fijate la dirección) para no confundirte.`;
+    clienteAmbiguoAviso.classList.remove("hidden");
+    // No se vincula ningún número de cliente hasta que elija uno puntual.
+  } else {
+    clienteAmbiguoAviso.classList.add("hidden");
+    // Si escribió el nombre exacto de un cliente conocido (sin usar la
+    // sugerencia), igual se vincula el número de cliente — así "última
+    // visita" y las claves guardadas lo encuentran bien.
+    const exacto = buscarClientePorNombre(nombreEscrito);
+    if (exacto) currentNumeroCliente = exacto.numero_cliente || "";
+  }
   mostrarVisitaAnterior();
 });
 
@@ -1814,12 +1828,16 @@ fClienteInput.addEventListener("input", async () => {
     clienteSugerenciasWrap.classList.add("hidden");
     return;
   }
-  clienteSugerenciasList.innerHTML = coincidencias.map((c, idx) => `
-    <div class="cliente-sugerencia-item" data-idx="${idx}">
+  clienteSugerenciasList.innerHTML = coincidencias.map((c, idx) => {
+    const esAmbiguo = contarClientesConNombreExacto(c.nombre) > 1;
+    return `
+    <div class="cliente-sugerencia-item${esAmbiguo ? " cliente-sugerencia-ambiguo" : ""}" data-idx="${idx}">
       <div class="cliente-sugerencia-nombre">${escapeHtml(c.nombre)}</div>
       ${c.direccion ? `<div class="cliente-sugerencia-direccion">${escapeHtml(c.direccion)}</div>` : ""}
+      ${c.numero_abonado ? `<div class="cliente-sugerencia-abonado">Abonado: ${escapeHtml(c.numero_abonado)}</div>` : ""}
     </div>
-  `).join("");
+  `;
+  }).join("");
   clienteSugerenciasList.querySelectorAll(".cliente-sugerencia-item").forEach((item) => {
     item.addEventListener("mousedown", (e) => {
       e.preventDefault(); // evita que el input pierda foco antes del click
@@ -1829,6 +1847,7 @@ fClienteInput.addEventListener("input", async () => {
       if (c.localidad) document.getElementById("f_localidad").value = c.localidad;
       currentNumeroCliente = c.numero_cliente || "";
       clienteSugerenciasWrap.classList.add("hidden");
+      document.getElementById("clienteAmbiguoAviso").classList.add("hidden");
       mostrarVisitaAnterior();
     });
   });
@@ -6774,18 +6793,14 @@ function dibujarSimsLista() {
 }
 
 async function poblarClientesParaSim() {
-  await cargarClientesGeneral();
   // Antes se mezclaban acá los nombres de clientes con los nombres
   // sueltos de servicios pendientes (texto libre, sin garantía de
   // coincidir con la base) — eso fue justo la causa de un problema
   // real (una SIM que no completaba los datos ni se encontraba
   // después). Ahora la lista sale solo de la base de Clientes, que
-  // es la fuente confiable.
-  const datalist = document.getElementById("simClientesLista");
-  datalist.innerHTML = (clientesGeneralCache || [])
-    .filter((c) => c.nombre)
-    .map((c) => `<option value="${c.nombre.replace(/"/g, "&quot;")}"></option>`)
-    .join("");
+  // es la fuente confiable — se precarga acá, y la lista visual de
+  // sugerencias (con dirección y abonado) se arma al tipear.
+  await cargarClientesGeneral();
 }
 
 // ---------- Caché compartido de la base de Clientes ----------
@@ -6811,21 +6826,103 @@ function buscarClientePorNombre(nombre) {
   return (clientesGeneralCache || []).find((c) => c.nombre && normalizeText(c.nombre) === clave) || null;
 }
 
+// Cuántos clientes distintos hay con este nombre EXACTO — para avisar
+// cuando hay más de uno (mismo nombre, distinta dirección/abonado),
+// que es justo el caso que puede confundir a un técnico si no elige
+// explícitamente de la lista de sugerencias.
+function contarClientesConNombreExacto(nombre) {
+  const clave = normalizeText(nombre);
+  if (!clave) return 0;
+  return (clientesGeneralCache || []).filter((c) => c.nombre && normalizeText(c.nombre) === clave).length;
+}
+
 const simDireccionInstalacion = document.getElementById("simDireccionInstalacion");
 const simNumeroAbonadoInfo = document.getElementById("simNumeroAbonadoInfo");
+const simClienteSugerenciasWrap = document.getElementById("simClienteSugerenciasWrap");
+const simClienteSugerenciasList = document.getElementById("simClienteSugerenciasList");
+const simClienteAmbiguoAviso = document.getElementById("simClienteAmbiguoAviso");
 let simNumeroClienteActivo = "";
 let simNumeroAbonadoActivo = "";
-simClienteInput.addEventListener("input", () => {
-  const clienteEncontrado = buscarClientePorNombre(simClienteInput.value.trim());
-  simDireccionInstalacion.value = clienteEncontrado ? clienteEncontrado.direccion || "" : "";
-  simNumeroClienteActivo = clienteEncontrado ? clienteEncontrado.numero_cliente || "" : "";
-  simNumeroAbonadoActivo = clienteEncontrado ? clienteEncontrado.numero_abonado || "" : "";
+
+function limpiarSeleccionClienteSim() {
+  simDireccionInstalacion.value = "";
+  simNumeroClienteActivo = "";
+  simNumeroAbonadoActivo = "";
+  simNumeroAbonadoInfo.textContent = "";
+}
+
+function elegirClienteParaSim(c) {
+  simClienteInput.value = c.nombre;
+  simDireccionInstalacion.value = c.direccion || "";
+  simNumeroClienteActivo = c.numero_cliente || "";
+  simNumeroAbonadoActivo = c.numero_abonado || "";
   simNumeroAbonadoInfo.textContent = simNumeroAbonadoActivo ? "Número de abonado: " + simNumeroAbonadoActivo : "";
-  if (clienteEncontrado) {
-    simClienteEncontradoInfo.textContent = "✓ Cliente encontrado en la base.";
-    simClienteEncontradoInfo.className = "hint-text hint-ok";
+  simClienteEncontradoInfo.textContent = "✓ Cliente encontrado en la base.";
+  simClienteEncontradoInfo.className = "hint-text hint-ok";
+  simClienteSugerenciasWrap.classList.add("hidden");
+  simClienteAmbiguoAviso.classList.add("hidden");
+}
+
+// Lista visual de sugerencias al tipear (nombre o dirección), igual
+// que en el campo de Cliente del parte técnico — antes esto era un
+// <datalist> nativo que solo mostraba nombres, y apenas se tipeaba
+// un nombre que coincidía EXACTO con alguno de la base, se
+// completaba la dirección/abonado en silencio, agarrando siempre el
+// primero que encontraba. Con varios clientes con el mismo nombre
+// (mismo caso real que causó un movimiento de SIM al domicilio
+// equivocado), eso llevaba al error sin ningún aviso en pantalla.
+simClienteInput.addEventListener("input", () => {
+  const texto = simClienteInput.value.trim();
+  limpiarSeleccionClienteSim();
+  simClienteEncontradoInfo.textContent = "";
+  simClienteAmbiguoAviso.classList.add("hidden");
+
+  if (texto.length < 2 || !Array.isArray(clientesGeneralCache)) {
+    simClienteSugerenciasWrap.classList.add("hidden");
+    return;
+  }
+  const clave = normalizeText(texto);
+  const coincidencias = clientesGeneralCache
+    .filter((c) => (c.nombre && normalizeText(c.nombre).includes(clave)) || (c.direccion && normalizeText(c.direccion).includes(clave)))
+    .slice(0, 6);
+
+  if (coincidencias.length === 0) {
+    simClienteSugerenciasWrap.classList.add("hidden");
+    return;
+  }
+  simClienteSugerenciasList.innerHTML = coincidencias.map((c, idx) => {
+    const esAmbiguo = contarClientesConNombreExacto(c.nombre) > 1;
+    return `
+    <div class="cliente-sugerencia-item${esAmbiguo ? " cliente-sugerencia-ambiguo" : ""}" data-idx="${idx}">
+      <div class="cliente-sugerencia-nombre">${escapeHtml(c.nombre)}</div>
+      ${c.direccion ? `<div class="cliente-sugerencia-direccion">${escapeHtml(c.direccion)}</div>` : ""}
+      ${c.numero_abonado ? `<div class="cliente-sugerencia-abonado">Abonado: ${escapeHtml(c.numero_abonado)}</div>` : ""}
+    </div>
+  `;
+  }).join("");
+  simClienteSugerenciasList.querySelectorAll(".cliente-sugerencia-item").forEach((item) => {
+    item.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      elegirClienteParaSim(coincidencias[Number(item.dataset.idx)]);
+    });
+  });
+  simClienteSugerenciasWrap.classList.remove("hidden");
+});
+
+simClienteInput.addEventListener("change", () => {
+  // Si ya eligió de la lista, esto no hace nada nuevo (ya está
+  // resuelto). Esto es para cuando tipeó el nombre completo a mano
+  // sin tocar ninguna sugerencia.
+  if (simNumeroClienteActivo) return;
+  const texto = simClienteInput.value.trim();
+  const cantidad = contarClientesConNombreExacto(texto);
+  if (cantidad > 1) {
+    simClienteAmbiguoAviso.textContent = `⚠ Hay ${cantidad} clientes llamados "${texto}" — elegí el correcto de la lista de sugerencias (fijate la dirección) antes de continuar.`;
+    simClienteAmbiguoAviso.classList.remove("hidden");
+  } else if (cantidad === 1) {
+    elegirClienteParaSim(buscarClientePorNombre(texto));
   } else {
-    simClienteEncontradoInfo.textContent = simClienteInput.value.trim() ? "Cliente nuevo — no está en la base, se guarda tal cual se escribió." : "";
+    simClienteEncontradoInfo.textContent = texto ? "Cliente nuevo — no está en la base, se guarda tal cual se escribió." : "";
     simClienteEncontradoInfo.className = "hint-text";
   }
 });
@@ -6870,6 +6967,10 @@ async function renderSimDetalle() {
       simClienteEncontradoInfo.textContent = "";
       simDireccionInstalacion.value = "";
       simNumeroAbonadoInfo.textContent = "";
+      simNumeroClienteActivo = "";
+      simNumeroAbonadoActivo = "";
+      simClienteSugerenciasWrap.classList.add("hidden");
+      simClienteAmbiguoAviso.classList.add("hidden");
       simUsarWrap.classList.remove("hidden");
     }
 
@@ -6925,6 +7026,15 @@ simUsarBtn.addEventListener("click", async () => {
   const textoEscrito = simClienteInput.value.trim();
   if (!textoEscrito) {
     showToast("Escribí el nombre del cliente.");
+    return;
+  }
+  // Si hay varios clientes con este nombre exacto y no se resolvió
+  // cuál es (no se tocó ninguna sugerencia ni quedó vinculado un
+  // número de cliente), no se deja continuar — evita justo el caso
+  // real que pasó una vez: quedarse con el primero de la lista sin
+  // que nadie elija cuál era en realidad.
+  if (!simNumeroClienteActivo && contarClientesConNombreExacto(textoEscrito) > 1) {
+    showToast("Hay varios clientes con este nombre — elegí el correcto de la lista de sugerencias antes de continuar.");
     return;
   }
   // Si coincide con un cliente real, se usa el nombre EXACTO como
