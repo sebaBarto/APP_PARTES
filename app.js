@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.68.0";
+const APP_VERSION = "3.68.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -1333,8 +1333,13 @@ verPlanoClienteBtn.addEventListener("click", async () => {
   const iconoOriginal = verPlanoClienteBtn.innerHTML;
   verPlanoClienteBtn.disabled = true;
   try {
+    // Las carpetas de planos usan el número de cliente con 8 dígitos
+    // y ceros a la izquierda (CLI_00001374) — el número que trae el
+    // servicio pendiente puede venir sin ese relleno (ej: "1374"), así
+    // que hay que armarlo igual antes de buscar, si no nunca matchea.
+    const numeroConCeros = numeroClienteActivo.trim().replace(/\.0+$/, "").replace(/\D/g, "").padStart(8, "0");
     const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
-    const res = await fetch(`/api/planos?nombre=${encodeURIComponent("CLI_" + numeroClienteActivo)}`, { headers });
+    const res = await fetch(`/api/planos?nombre=${encodeURIComponent("CLI_" + numeroConCeros)}`, { headers });
     if (!res.ok) throw new Error(res.status === 404 ? "Todavía no hay un plano subido para este cliente" : "No se pudo abrir el plano");
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
