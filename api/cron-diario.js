@@ -55,7 +55,10 @@ function formatoFechaArgentina(fecha) {
 }
 
 async function avisarGuardiaASecurity24(nombreTecnico, inicioGuardia) {
-  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) return;
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.error("[cron-diario] No se mandó el aviso de guardia a Security24: faltan variables SMTP.");
+    return;
+  }
   const finGuardia = new Date(inicioGuardia.getTime() + 7 * 24 * 60 * 60 * 1000);
   try {
     await getTransporter().sendMail({
@@ -66,7 +69,10 @@ async function avisarGuardiaASecurity24(nombreTecnico, inicioGuardia) {
     });
   } catch (err) {
     // No se corta el resto del cron si el mail falla — el aviso push
-    // ya salió, que es lo más importante para el equipo interno.
+    // ya salió, que es lo más importante para el equipo interno. Pero
+    // SÍ queda registrado, para poder diagnosticar si vuelve a pasar
+    // (antes fallaba en silencio total, sin ningún rastro).
+    console.error("[cron-diario] Falló el mail de cambio de guardia a Security24:", err.message || err);
   }
 }
 
@@ -135,11 +141,14 @@ async function chequearGuardia(ghHeaders, estado, ahora) {
   const indice = ((semanas % secuencia.length) + secuencia.length) % secuencia.length;
   const tecnico = secuencia[indice];
 
-  await enviarATodos({
+  const resultadoPush = await enviarATodos({
     titulo: "🚨 Cambio de guardia",
     cuerpo: `Esta semana la guardia técnica la toma ${tecnico.nombre}.`,
     url: "/",
   });
+  if (!resultadoPush || resultadoPush.enviados === 0) {
+    console.error("[cron-diario] El push de cambio de guardia se mandó a 0 suscripciones:", JSON.stringify(resultadoPush));
+  }
   const inicioGuardiaHoy = ahora; // el cron corre a las 12:00 UTC = 9:00 Argentina exacto
   await avisarGuardiaASecurity24(tecnico.nombre, inicioGuardiaHoy);
 
