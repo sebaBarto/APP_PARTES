@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.67.0";
+const APP_VERSION = "3.68.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -2250,17 +2250,47 @@ async function asignarSimInstaladaAlCliente(data) {
   const sim = getSimAInstalarSeleccionada();
   if (!sim || !data.cliente) return;
   try {
+    // Mismo chequeo que ya existe en la pantalla de SIMs — si el
+    // cliente ya tiene una línea instalada, se le pregunta al técnico
+    // si quiere reemplazarla (la vieja vuelve a SU stock) o dejar las
+    // dos. Antes esto no se chequeaba acá, así que instalar una SIM
+    // nueva durante un parte podía dejar la vieja "fantasma": seguía
+    // figurando en el cliente, sin volver al stock de nadie.
+    let numeroSimARetirar = null;
+    try {
+      const sims = await fetchSimsConfig();
+      const normCliente = normalizeText(data.cliente);
+      const existente = sims.find((s) => {
+        if (s.estado !== "uso" || s.numero === sim.numero || !s.cliente) return false;
+        const palabras = normalizeText(s.cliente).split(/\s+/).filter((p) => p.length > 2);
+        return palabras.length > 0 && palabras.every((palabra) => normCliente.includes(palabra));
+      });
+      if (existente) {
+        const reemplazar = confirm(
+          `Este cliente ya tiene la línea N° ${existente.numero} de ${existente.empresa}` +
+          `${existente.tipo ? " " + existente.tipo : ""}.\n\n` +
+          `Aceptar = reemplazarla (vuelve a tu stock).\nCancelar = dejar las dos líneas instaladas.`
+        );
+        if (reemplazar) numeroSimARetirar = existente.numero;
+      }
+    } catch (errConsulta) {
+      // Si no se pudo consultar, se sigue con "usar" simple — no se
+      // bloquea el registro de la SIM nueva por esto.
+      console.error("No se pudo chequear si el cliente ya tenía una SIM:", errConsulta);
+    }
+
     const res = await fetch("/api/recurso-uso", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
       body: JSON.stringify({
         recurso: "sim",
-        accion: "usar",
+        accion: numeroSimARetirar ? "reemplazar" : "usar",
         numero: sim.numero,
         tecnico: data.tecnico || tecnicoLogueado || "",
         cliente: data.cliente,
         direccion: data.direccion || "",
         numero_servicio: data.numero_servicio || "",
+        ...(numeroSimARetirar ? { numero_sim_a_retirar: numeroSimARetirar } : {}),
       }),
     });
     const respuesta = await res.json();
