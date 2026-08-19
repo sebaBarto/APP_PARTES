@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.66.1";
+const APP_VERSION = "3.66.2";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -3031,12 +3031,21 @@ async function intentarEnviarParte(payload, interactivo) {
             hora: data.hora_entrada,
             tecnico: data.tecnico,
           }));
+          // DIAGNÓSTICO TEMPORAL — para encontrar por qué no está
+          // llegando el stock de hoy al dashboard. Sacar después.
+          if (interactivo) showToast(`[Diagnóstico] Movimientos armados: ${movimientos.length} — ${JSON.stringify(movimientos.map(m => m.modelo))}`);
           if (movimientos.length > 0) {
-            await fetch("/api/historial", {
+            const resStock = await fetch("/api/historial", {
               method: "POST",
               headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
               body: JSON.stringify({ accion: "guardar_stock", parte_id: idParte, movimientos }),
             });
+            const dataStock = await resStock.json().catch(() => ({}));
+            if (interactivo) {
+              showToast(resStock.ok
+                ? `[Diagnóstico] Stock guardado OK — count: ${dataStock.count}`
+                : `[Diagnóstico] Stock FALLÓ (${resStock.status}): ${JSON.stringify(dataStock)}`);
+            }
           }
         } catch (errStock) {
           console.error("Error registrando movimientos de stock:", errStock);
