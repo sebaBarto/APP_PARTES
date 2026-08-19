@@ -490,14 +490,28 @@ module.exports = async (req, res) => {
         headers: { ...headersBackendNuevo, "Content-Type": "application/json" },
         body: JSON.stringify(registro),
       });
-      const data = await r.json();
+      const textoRespuesta = await r.text();
+      let data;
+      try {
+        data = JSON.parse(textoRespuesta);
+      } catch (errParse) {
+        // El backend nuevo devolvió algo que no es JSON (por ejemplo,
+        // una página de error de Cloudflare) — antes esto tiraba una
+        // excepción que caía en el catch genérico, sin dejar ver el
+        // motivo real. Ahora se registra el texto crudo tal cual vino.
+        console.error("[historial] El backend nuevo devolvió algo que no es JSON:", r.status, textoRespuesta.slice(0, 500));
+        res.status(502).json({ error: "El backend nuevo devolvió una respuesta inválida", status: r.status, cuerpo: textoRespuesta.slice(0, 300) });
+        return;
+      }
       if (!r.ok) {
+        console.error("[historial] El backend nuevo rechazó el parte:", r.status, JSON.stringify(data));
         res.status(502).json({ error: "No se pudo guardar en el historial", detail: data });
         return;
       }
       res.status(200).json({ ok: true, id_parte: data.id });
     } catch (err) {
-      res.status(500).json({ error: "Error interno al guardar el historial" });
+      console.error("[historial] Error interno al guardar el historial:", err.message || err);
+      res.status(500).json({ error: "Error interno al guardar el historial", detail: String(err.message || err) });
     }
     return;
   }

@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.66.2";
+const APP_VERSION = "3.66.3";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -3012,7 +3012,8 @@ async function intentarEnviarParte(payload, interactivo) {
       if (!histRes.ok) {
         const histData = await histRes.json().catch(() => ({}));
         console.error("Error registrando historial:", histData);
-        if (interactivo) showToast("El mail se envió, pero no se pudo registrar en el dashboard.");
+        // DIAGNÓSTICO TEMPORAL — para ver el motivo real, sacar después.
+        if (interactivo) showToast(`[Diagnóstico] Falló guardar historial (${histRes.status}): ${JSON.stringify(histData).slice(0, 200)}`);
       } else {
         // Movimientos de stock (materiales instalados/retirados) —
         // no bloquea nada si falla, el parte ya quedó guardado.
