@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.66.3";
+const APP_VERSION = "3.67.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -3012,8 +3012,7 @@ async function intentarEnviarParte(payload, interactivo) {
       if (!histRes.ok) {
         const histData = await histRes.json().catch(() => ({}));
         console.error("Error registrando historial:", histData);
-        // DIAGNÓSTICO TEMPORAL — para ver el motivo real, sacar después.
-        if (interactivo) showToast(`[Diagnóstico] Falló guardar historial (${histRes.status}): ${JSON.stringify(histData).slice(0, 200)}`);
+        if (interactivo) showToast("El mail se envió, pero no se pudo registrar en el dashboard.");
       } else {
         // Movimientos de stock (materiales instalados/retirados) —
         // no bloquea nada si falla, el parte ya quedó guardado.
@@ -3032,9 +3031,6 @@ async function intentarEnviarParte(payload, interactivo) {
             hora: data.hora_entrada,
             tecnico: data.tecnico,
           }));
-          // DIAGNÓSTICO TEMPORAL — para encontrar por qué no está
-          // llegando el stock de hoy al dashboard. Sacar después.
-          if (interactivo) showToast(`[Diagnóstico] Movimientos armados: ${movimientos.length} — ${JSON.stringify(movimientos.map(m => m.modelo))}`);
           if (movimientos.length > 0) {
             const resStock = await fetch("/api/historial", {
               method: "POST",
@@ -3042,10 +3038,8 @@ async function intentarEnviarParte(payload, interactivo) {
               body: JSON.stringify({ accion: "guardar_stock", parte_id: idParte, movimientos }),
             });
             const dataStock = await resStock.json().catch(() => ({}));
-            if (interactivo) {
-              showToast(resStock.ok
-                ? `[Diagnóstico] Stock guardado OK — count: ${dataStock.count}`
-                : `[Diagnóstico] Stock FALLÓ (${resStock.status}): ${JSON.stringify(dataStock)}`);
+            if (!resStock.ok) {
+              console.error("Error guardando movimientos de stock:", dataStock);
             }
           }
         } catch (errStock) {
@@ -4134,8 +4128,19 @@ function renderHistorialReciente() {
         }).join("<br>")}
       </div>
     ` : "";
+    const costoFinalNum = parseFloat(h.costo_final);
+    const tieneCobro = !isNaN(costoFinalNum) && costoFinalNum > 0;
+    const pagoHtml = tieneCobro ? `
+      <div class="historial-card-pago">
+        ${h.forma_pago ? `<span class="historial-card-metodo-pago">${escapeHtml(h.forma_pago)}</span>` : ""}
+        <span class="historial-card-cobrar" title="Tiene un valor a cobrar">$</span>
+      </div>
+    ` : "";
     card.innerHTML = `
-      <div class="historial-card-num">N° ${escapeHtml(h.numero_servicio || h.id_parte)}</div>
+      <div class="historial-card-header">
+        <div class="historial-card-num">N° ${escapeHtml(h.numero_servicio || h.id_parte)}</div>
+        ${pagoHtml}
+      </div>
       <div class="historial-card-cliente">${escapeHtml(h.cliente)}</div>
       <div class="historial-card-direccion">${escapeHtml(h.direccion)}${h.localidad ? ", " + escapeHtml(h.localidad) : ""}</div>
       <div class="historial-card-horario">${fechaTexto} — ${h.hora_entrada || "?"} a ${h.hora_salida || "?"}</div>
