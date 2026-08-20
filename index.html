@@ -731,8 +731,11 @@
       <div id="emergenciaFormWrap">
         <div class="field-group">
           <label class="field-label" for="emerg_cliente">Cliente</label>
-          <input class="field-input" id="emerg_cliente" type="text" placeholder="Nombre del cliente" list="emergClientesLista">
-          <datalist id="emergClientesLista"></datalist>
+          <input class="field-input" id="emerg_cliente" type="text" placeholder="Nombre del cliente" autocomplete="off">
+          <div id="emergClienteSugerenciasWrap" class="cliente-sugerencias-wrap hidden">
+            <div id="emergClienteSugerenciasList" class="cliente-sugerencias-list"></div>
+          </div>
+          <div id="emergClienteAmbiguoAviso" class="aviso-clientes-duplicados hidden"></div>
         </div>
         <div class="field-group">
           <label class="field-label" for="emerg_telefono">Teléfono</label>

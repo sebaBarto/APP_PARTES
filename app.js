@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.69.0";
+const APP_VERSION = "3.69.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -7353,14 +7353,77 @@ tileEmergenciaBtn.addEventListener("click", async () => {
   showScreen("emergencia");
   cargarListaEmergencias();
   await cargarClientesGeneral();
-  const datalist = document.getElementById("emergClientesLista");
-  datalist.innerHTML = (clientesGeneralCache || [])
-    .filter((c) => c.nombre)
-    .map((c) => `<option value="${escapeHtml(c.nombre)}"></option>`)
-    .join("");
 });
+
+const emergClienteInput = document.getElementById("emerg_cliente");
+const emergClienteSugerenciasWrap = document.getElementById("emergClienteSugerenciasWrap");
+const emergClienteSugerenciasList = document.getElementById("emergClienteSugerenciasList");
+const emergClienteAmbiguoAviso = document.getElementById("emergClienteAmbiguoAviso");
+
+function elegirClienteParaEmerg(c) {
+  emergClienteInput.value = c.nombre;
+  const telInput = document.getElementById("emerg_telefono");
+  const dirInput = document.getElementById("emerg_direccion");
+  if (c.telefono) telInput.value = c.telefono;
+  if (c.direccion) dirInput.value = c.direccion;
+  emergClienteSugerenciasWrap.classList.add("hidden");
+  emergClienteAmbiguoAviso.classList.add("hidden");
+}
+
+// Misma lista visual (nombre + dirección + abonado) que ya se usa en
+// "Cliente" del parte técnico y en SIMs — antes era un <datalist>
+// nativo que solo mostraba nombres, y con clientes de nombre muy
+// parecido (ej: "Soy Lola 1", "Soy Lola 2", "Soy Lola 3") no había
+// forma de saber cuál dirección se estaba por completar.
+emergClienteInput.addEventListener("input", () => {
+  const texto = emergClienteInput.value.trim();
+  emergClienteAmbiguoAviso.classList.add("hidden");
+
+  if (texto.length < 2 || !Array.isArray(clientesGeneralCache)) {
+    emergClienteSugerenciasWrap.classList.add("hidden");
+    return;
+  }
+  const clave = normalizeText(texto);
+  const coincidencias = clientesGeneralCache
+    .filter((c) => (c.nombre && normalizeText(c.nombre).includes(clave)) || (c.direccion && normalizeText(c.direccion).includes(clave)))
+    .slice(0, 6);
+
+  if (coincidencias.length === 0) {
+    emergClienteSugerenciasWrap.classList.add("hidden");
+    return;
+  }
+  emergClienteSugerenciasList.innerHTML = coincidencias.map((c, idx) => {
+    const esAmbiguo = contarClientesConNombreExacto(c.nombre) > 1;
+    return `
+    <div class="cliente-sugerencia-item${esAmbiguo ? " cliente-sugerencia-ambiguo" : ""}" data-idx="${idx}">
+      <div class="cliente-sugerencia-nombre">${escapeHtml(c.nombre)}</div>
+      ${c.direccion ? `<div class="cliente-sugerencia-direccion">${escapeHtml(c.direccion)}</div>` : ""}
+      ${c.numero_abonado ? `<div class="cliente-sugerencia-abonado">Abonado: ${escapeHtml(c.numero_abonado)}</div>` : ""}
+    </div>
+  `;
+  }).join("");
+  emergClienteSugerenciasList.querySelectorAll(".cliente-sugerencia-item").forEach((item) => {
+    item.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      elegirClienteParaEmerg(coincidencias[Number(item.dataset.idx)]);
+    });
+  });
+  emergClienteSugerenciasWrap.classList.remove("hidden");
+});
+
 document.getElementById("emerg_cliente").addEventListener("change", (e) => {
-  const encontrado = buscarClientePorNombre(e.target.value);
+  const texto = e.target.value.trim();
+  const cantidad = contarClientesConNombreExacto(texto);
+  if (cantidad > 1) {
+    // Varios clientes con el mismo nombre — no se adivina cuál es
+    // (antes se agarraba el primero en silencio). Se avisa y se pide
+    // elegir de la lista de sugerencias, fijándose la dirección.
+    emergClienteAmbiguoAviso.textContent = `⚠ Hay ${cantidad} clientes llamados "${texto}" — elegí el correcto de la lista de sugerencias (fijate la dirección) para no confundirte.`;
+    emergClienteAmbiguoAviso.classList.remove("hidden");
+    return;
+  }
+  emergClienteAmbiguoAviso.classList.add("hidden");
+  const encontrado = buscarClientePorNombre(texto);
   if (!encontrado) return;
   const telInput = document.getElementById("emerg_telefono");
   const dirInput = document.getElementById("emerg_direccion");
