@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.70.1";
+const APP_VERSION = "3.70.2";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -2294,8 +2294,16 @@ async function asignarSimInstaladaAlCliente(data) {
       const normCliente = normalizeText(data.cliente);
       const candidatas = sims.filter((s) => s.estado === "uso" && s.numero !== sim.numero && s.cliente);
 
-      let existente = data.numero_cliente
-        ? candidatas.find((s) => s.numero_cliente && String(s.numero_cliente) === String(data.numero_cliente))
+      // Se normaliza el número de cliente antes de comparar (sin
+      // ceros a la izquierda, sin espacios/guiones) — el que trae un
+      // servicio pendiente (del Excel sincronizado) puede no tener
+      // el mismo formato exacto que el guardado al instalar la SIM,
+      // mismo tipo de desajuste que ya se encontró hoy con los
+      // planos (con o sin ceros a la izquierda).
+      const limpiarNumeroCliente = (n) => String(n || "").replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+      const numeroClienteLimpio = limpiarNumeroCliente(data.numero_cliente);
+      let existente = numeroClienteLimpio
+        ? candidatas.find((s) => s.numero_cliente && limpiarNumeroCliente(s.numero_cliente) === numeroClienteLimpio)
         : null;
 
       if (!existente) {
