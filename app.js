@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.69.1";
+const APP_VERSION = "3.70.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -6857,10 +6857,26 @@ function elegirClienteParaSim(c) {
   simNumeroClienteActivo = c.numero_cliente || "";
   simNumeroAbonadoActivo = c.numero_abonado || "";
   simNumeroAbonadoInfo.textContent = simNumeroAbonadoActivo ? "Número de abonado: " + simNumeroAbonadoActivo : "";
-  simClienteEncontradoInfo.textContent = "✓ Cliente encontrado en la base.";
-  simClienteEncontradoInfo.className = "hint-text hint-ok";
   simClienteSugerenciasWrap.classList.add("hidden");
   simClienteAmbiguoAviso.classList.add("hidden");
+
+  // Si este cliente YA tiene una SIM instalada, avisar acá mismo —
+  // es justo el caso real que pasó: un técnico instaló una línea
+  // nueva con "Usar" (que da por hecho que el cliente no tenía nada
+  // antes) cuando en realidad estaba reemplazando una existente. La
+  // vieja, al no decirle nada al sistema, nunca quedó registrada
+  // como retirada — ni instalada, ni en ningún stock.
+  const clave = normalizeText(c.nombre);
+  const yaInstalada = (simsListaCache || []).find(
+    (s) => s.ubicacion_tipo === "cliente" && s.ubicacion_nombre && normalizeText(s.ubicacion_nombre) === clave
+  );
+  if (yaInstalada) {
+    simClienteEncontradoInfo.textContent = `⚠ Este cliente ya tiene la línea ${yaInstalada.numero} (${yaInstalada.empresa}) instalada. Si estás retirando esa línea, usá "Reemplazar" en vez de "Usar" — si no, la línea vieja se pierde del sistema.`;
+    simClienteEncontradoInfo.className = "hint-text hint-warn";
+  } else {
+    simClienteEncontradoInfo.textContent = "✓ Cliente encontrado en la base.";
+    simClienteEncontradoInfo.className = "hint-text hint-ok";
+  }
 }
 
 // Lista visual de sugerencias al tipear (nombre o dirección), igual

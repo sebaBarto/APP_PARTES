@@ -392,6 +392,11 @@ html, body {
   font-weight: 600;
 }
 
+.hint-warn {
+  color: #D68910;
+  font-weight: 600;
+}
+
 .capture-btn {
   display: flex;
   align-self: center;
