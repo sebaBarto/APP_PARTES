@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.70.2";
+const APP_VERSION = "3.70.3";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -6904,7 +6904,7 @@ function elegirClienteParaSim(c) {
     (s) => s.ubicacion_tipo === "cliente" && s.ubicacion_nombre && normalizeText(s.ubicacion_nombre) === clave
   );
   if (yaInstalada) {
-    simClienteEncontradoInfo.textContent = `⚠ Este cliente ya tiene la línea ${yaInstalada.numero} (${yaInstalada.empresa}) instalada. Si estás retirando esa línea, usá "Reemplazar" en vez de "Usar" — si no, la línea vieja se pierde del sistema.`;
+    simClienteEncontradoInfo.textContent = `⚠ Este cliente ya tiene la línea ${yaInstalada.numero} (${yaInstalada.empresa}) instalada. Al tocar "Marcar como usada" te va a preguntar si querés reemplazarla.`;
     simClienteEncontradoInfo.className = "hint-text hint-warn";
   } else {
     simClienteEncontradoInfo.textContent = "✓ Cliente encontrado en la base.";
@@ -7094,18 +7094,31 @@ simUsarBtn.addEventListener("click", async () => {
   simUsarBtn.disabled = true;
   try {
     const sims = await fetchSimsConfig();
-    // Antes exigía coincidencia exacta de texto entre el nombre del
-    // cliente y como quedó guardado en la SIM instalada — una mínima
-    // diferencia (mayúsculas, espacio de más, etc.) hacía que nunca
-    // se encontrara. Ahora usa el mismo matching tolerante que ya se
-    // usa en el Cronograma: alcanza con que las palabras del nombre
-    // coincidan, sin importar mayúsculas/tildes/orden.
-    const normCliente = normalizeText(cliente);
-    const existente = sims.find((s) => {
-      if (s.estado !== "uso" || s.numero === simSeleccionada || !s.cliente) return false;
-      const palabras = normalizeText(s.cliente).split(/\s+/).filter((p) => p.length > 2);
-      return palabras.length > 0 && palabras.every((palabra) => normCliente.includes(palabra));
-    });
+    // Mismo algoritmo mejorado que se usa en el parte técnico: primero
+    // intenta por número de cliente (normalizado, sin ceros de más o
+    // de menos), y si no hay o no coincide, cae al nombre — tolerante
+    // en ambas direcciones. Antes exigía que TODAS las palabras del
+    // nombre guardado aparecieran en lo que se tipeó acá, y con un
+    // nombre guardado más largo (ej: con un segundo nombre) nunca
+    // coincidía — el aviso de arriba sí lo detectaba (con el
+    // algoritmo nuevo), pero ESTE chequeo, el que de verdad ofrece
+    // "Reemplazar", se quedaba con el viejo y nunca lo mostraba.
+    const limpiarNumeroCliente = (n) => String(n || "").replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+    const numeroClienteLimpio = limpiarNumeroCliente(simNumeroClienteActivo);
+    const candidatas = sims.filter((s) => s.estado === "uso" && s.numero !== simSeleccionada && s.cliente);
+    let existente = numeroClienteLimpio
+      ? candidatas.find((s) => s.numero_cliente && limpiarNumeroCliente(s.numero_cliente) === numeroClienteLimpio)
+      : null;
+    if (!existente) {
+      const normCliente = normalizeText(cliente);
+      existente = candidatas.find((s) => {
+        const palabrasBase = normalizeText(s.cliente).split(/\s+/).filter((p) => p.length > 2);
+        const palabrasTecnico = normCliente.split(/\s+/).filter((p) => p.length > 2);
+        if (palabrasBase.length === 0 || palabrasTecnico.length === 0) return false;
+        const coincidentes = palabrasBase.filter((p) => palabrasTecnico.includes(p)).length;
+        return coincidentes / Math.min(palabrasBase.length, palabrasTecnico.length) >= 0.5;
+      });
+    }
     if (existente) {
       simClienteParaReemplazo = cliente;
       simExistenteParaReemplazo = existente.numero;
