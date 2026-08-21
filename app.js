@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.71.0";
+const APP_VERSION = "3.72.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -1773,6 +1773,10 @@ function mostrarVisitaAnterior() {
 document.getElementById("f_cliente").addEventListener("change", () => {
   const nombreEscrito = document.getElementById("f_cliente").value.trim();
   const clienteAmbiguoAviso = document.getElementById("clienteAmbiguoAviso");
+  // Si ya se había validado la SIM a instalar con OTRO nombre de
+  // cliente, esa decisión queda vieja — se vuelve a chequear al
+  // enviar el parte (el respaldo en asignarSimInstaladaAlCliente).
+  if (decisionSimInstalar) decisionSimInstalar = null;
   const cantidad = contarClientesConNombreExacto(nombreEscrito);
   if (cantidad > 1) {
     // Hay más de un cliente con este nombre exacto — no se adivina
@@ -2232,6 +2236,11 @@ function getSimInstaladaTexto() {
 
 // ---------- Instalar una SIM del propio stock en este servicio ----------
 let simsEnStockPropio = [];
+// Se completa apenas el técnico elige la SIM (no al enviar el parte)
+// — ahí mismo se avisa si el cliente no está en la base, y si ya
+// tiene otra línea, se pregunta si reemplazarla. Al enviar el parte
+// ya está resuelto, sin volver a preguntar nada.
+let decisionSimInstalar = null;
 
 function getSimAInstalarSeleccionada() {
   if (!fInstalarSim.checked || !simInstalarSelect.value) return null;
@@ -2244,6 +2253,7 @@ async function cargarOpcionesSimInstalar() {
   simInstalarSelect.innerHTML = '<option value="" disabled selected>Elegí la SIM que instalaste</option>';
   simInstalarWrap.classList.add("hidden");
   simsEnStockPropio = [];
+  decisionSimInstalar = null;
   if (!tecnicoLogueado) return; // el login general no tiene stock propio
   try {
     const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
@@ -2266,6 +2276,66 @@ async function cargarOpcionesSimInstalar() {
 
 fInstalarSim.addEventListener("change", () => {
   simInstalarSelectWrap.style.display = fInstalarSim.checked ? "block" : "none";
+  if (!fInstalarSim.checked) decisionSimInstalar = null;
+});
+
+// Se valida acá, apenas se elige la SIM — no al enviar el parte. Así
+// el técnico ya sabe en el momento si el cliente no está en la base,
+// o si hay que reemplazar una línea existente, y puede seguir
+// completando tranquilo el resto del parte hasta la firma sin
+// sorpresas al final.
+simInstalarSelect.addEventListener("change", async () => {
+  decisionSimInstalar = null;
+  const sim = getSimAInstalarSeleccionada();
+  if (!sim) return;
+
+  const clienteEscrito = document.getElementById("f_cliente").value.trim();
+  if (!clienteEscrito) {
+    showToast("Completá el cliente antes de elegir la SIM que instalaste.");
+    fInstalarSim.checked = false;
+    simInstalarSelectWrap.style.display = "none";
+    simInstalarSelect.value = "";
+    return;
+  }
+
+  // Si el nombre no coincide con ningún cliente de la base, se avisa
+  // — antes esto no se chequeaba en ningún lado, así que una SIM
+  // podía terminar "instalada" bajo cualquier texto escrito a mano,
+  // sin ninguna relación con un cliente real.
+  const clienteReal = buscarClientePorNombre(clienteEscrito);
+  if (!clienteReal) {
+    const seguir = confirm(
+      `No encontramos "${clienteEscrito}" en la base de clientes.\n\n` +
+      `Revisá que el nombre esté bien escrito — si seguís igual, la SIM va a quedar instalada bajo este nombre tal cual.\n\n` +
+      `Aceptar = seguir igual.\nCancelar = volver a elegir.`
+    );
+    if (!seguir) {
+      fInstalarSim.checked = false;
+      simInstalarSelectWrap.style.display = "none";
+      simInstalarSelect.value = "";
+      return;
+    }
+  }
+
+  try {
+    const sims = await fetchSimsConfig();
+    const numeroClienteParaBuscar = clienteReal ? clienteReal.numero_cliente : currentNumeroCliente;
+    const existente = buscarSimExistenteEnCliente(clienteEscrito, numeroClienteParaBuscar, sims, sim.numero);
+    if (existente) {
+      const reemplazar = confirm(
+        `Este cliente ya tiene la línea N° ${existente.numero} de ${existente.empresa}` +
+        `${existente.tipo ? " " + existente.tipo : ""}.\n\n` +
+        `Aceptar = reemplazarla (vuelve a tu stock).\nCancelar = dejar las dos líneas instaladas.`
+      );
+      decisionSimInstalar = { numeroSimARetirar: reemplazar ? existente.numero : null };
+    } else {
+      decisionSimInstalar = { numeroSimARetirar: null };
+    }
+  } catch (errConsulta) {
+    console.error("No se pudo chequear si el cliente ya tenía una SIM:", errConsulta);
+    showToast("No se pudo verificar si el cliente ya tenía otra línea instalada — revisalo a mano si corresponde.");
+    decisionSimInstalar = { numeroSimARetirar: null };
+  }
 });
 
 // Después de enviar el parte con éxito, si se eligió una SIM, la marca
@@ -2274,35 +2344,29 @@ async function asignarSimInstaladaAlCliente(data) {
   const sim = getSimAInstalarSeleccionada();
   if (!sim || !data.cliente) return;
   try {
-    // Mismo chequeo que ya existe en la pantalla de SIMs — si el
-    // cliente ya tiene una línea instalada, se le pregunta al técnico
-    // si quiere reemplazarla (la vieja vuelve a SU stock) o dejar las
-    // dos. Antes esto no se chequeaba acá, así que instalar una SIM
-    // nueva durante un parte podía dejar la vieja "fantasma": seguía
-    // figurando en el cliente, sin volver al stock de nadie.
-    //
-    // Usa la MISMA función que la pantalla de SIMs (buscarSimExistenteEnCliente)
-    // — antes cada pantalla tenía su propia copia de este chequeo, y
-    // se desincronizaron sin que nadie lo notara hasta que un técnico
-    // se topó con el caso real.
-    let numeroSimARetirar = null;
-    try {
-      const sims = await fetchSimsConfig();
-      const existente = buscarSimExistenteEnCliente(data.cliente, data.numero_cliente, sims, sim.numero);
-      if (existente) {
-        const reemplazar = confirm(
-          `Este cliente ya tiene la línea N° ${existente.numero} de ${existente.empresa}` +
-          `${existente.tipo ? " " + existente.tipo : ""}.\n\n` +
-          `Aceptar = reemplazarla (vuelve a tu stock).\nCancelar = dejar las dos líneas instaladas.`
-        );
-        if (reemplazar) numeroSimARetirar = existente.numero;
+    // La decisión (reemplazar o no) ya se tomó en el momento en que
+    // el técnico eligió la SIM (ver el listener de simInstalarSelect)
+    // — acá no se vuelve a preguntar nada, solo se usa lo que ya se
+    // resolvió. Si por algún motivo no quedó nada guardado (ej: se
+    // marcó el checkbox de una forma que salteó ese chequeo), se hace
+    // como respaldo acá mismo, para no perder la protección.
+    let numeroSimARetirar = decisionSimInstalar ? decisionSimInstalar.numeroSimARetirar : null;
+    if (!decisionSimInstalar) {
+      try {
+        const sims = await fetchSimsConfig();
+        const existente = buscarSimExistenteEnCliente(data.cliente, data.numero_cliente, sims, sim.numero);
+        if (existente) {
+          const reemplazar = confirm(
+            `Este cliente ya tiene la línea N° ${existente.numero} de ${existente.empresa}` +
+            `${existente.tipo ? " " + existente.tipo : ""}.\n\n` +
+            `Aceptar = reemplazarla (vuelve a tu stock).\nCancelar = dejar las dos líneas instaladas.`
+          );
+          if (reemplazar) numeroSimARetirar = existente.numero;
+        }
+      } catch (errConsulta) {
+        console.error("No se pudo chequear si el cliente ya tenía una SIM:", errConsulta);
+        showToast("No se pudo verificar si el cliente ya tenía otra línea instalada — revisalo a mano si corresponde.");
       }
-    } catch (errConsulta) {
-      // Si no se pudo consultar, se avisa (antes esto fallaba en
-      // silencio total, sin que el técnico se enterara de que no se
-      // pudo verificar nada).
-      console.error("No se pudo chequear si el cliente ya tenía una SIM:", errConsulta);
-      showToast("No se pudo verificar si el cliente ya tenía otra línea instalada — revisalo a mano si corresponde.");
     }
 
     const res = await fetch("/api/recurso-uso", {
