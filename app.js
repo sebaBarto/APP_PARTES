@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.70.3";
+const APP_VERSION = "3.71.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -2281,45 +2281,14 @@ async function asignarSimInstaladaAlCliente(data) {
     // nueva durante un parte podía dejar la vieja "fantasma": seguía
     // figurando en el cliente, sin volver al stock de nadie.
     //
-    // Se prioriza matchear por número de cliente (mucho más
-    // confiable) — el matching por nombre se usa solo si no hay
-    // número de cliente, y es tolerante en ambas direcciones (antes
-    // exigía que CADA palabra del nombre guardado apareciera en lo
-    // que escribió el técnico — con un nombre guardado con una
-    // palabra de más, como un apellido extra, nunca coincidía, y la
-    // línea vieja se perdía en silencio sin avisar nada).
+    // Usa la MISMA función que la pantalla de SIMs (buscarSimExistenteEnCliente)
+    // — antes cada pantalla tenía su propia copia de este chequeo, y
+    // se desincronizaron sin que nadie lo notara hasta que un técnico
+    // se topó con el caso real.
     let numeroSimARetirar = null;
     try {
       const sims = await fetchSimsConfig();
-      const normCliente = normalizeText(data.cliente);
-      const candidatas = sims.filter((s) => s.estado === "uso" && s.numero !== sim.numero && s.cliente);
-
-      // Se normaliza el número de cliente antes de comparar (sin
-      // ceros a la izquierda, sin espacios/guiones) — el que trae un
-      // servicio pendiente (del Excel sincronizado) puede no tener
-      // el mismo formato exacto que el guardado al instalar la SIM,
-      // mismo tipo de desajuste que ya se encontró hoy con los
-      // planos (con o sin ceros a la izquierda).
-      const limpiarNumeroCliente = (n) => String(n || "").replace(/\D/g, "").replace(/^0+(?=\d)/, "");
-      const numeroClienteLimpio = limpiarNumeroCliente(data.numero_cliente);
-      let existente = numeroClienteLimpio
-        ? candidatas.find((s) => s.numero_cliente && limpiarNumeroCliente(s.numero_cliente) === numeroClienteLimpio)
-        : null;
-
-      if (!existente) {
-        existente = candidatas.find((s) => {
-          const palabrasBase = normalizeText(s.cliente).split(/\s+/).filter((p) => p.length > 2);
-          const palabrasTecnico = normCliente.split(/\s+/).filter((p) => p.length > 2);
-          if (palabrasBase.length === 0 || palabrasTecnico.length === 0) return false;
-          const coincidentes = palabrasBase.filter((p) => palabrasTecnico.includes(p)).length;
-          // Alcanza con que coincida la mitad de las palabras de
-          // cualquiera de los dos lados — tolera un nombre guardado
-          // más largo o más corto que lo que se tipeó, sin exigir
-          // una coincidencia palabra por palabra perfecta.
-          return coincidentes / Math.min(palabrasBase.length, palabrasTecnico.length) >= 0.5;
-        });
-      }
-
+      const existente = buscarSimExistenteEnCliente(data.cliente, data.numero_cliente, sims, sim.numero);
       if (existente) {
         const reemplazar = confirm(
           `Este cliente ya tiene la línea N° ${existente.numero} de ${existente.empresa}` +
@@ -6869,6 +6838,43 @@ function contarClientesConNombreExacto(nombre) {
   return (clientesGeneralCache || []).filter((c) => c.nombre && normalizeText(c.nombre) === clave).length;
 }
 
+// Única función para detectar si un cliente ya tiene una SIM
+// instalada — se usa TANTO al instalar una SIM desde el parte
+// técnico COMO desde la pantalla de "Tus SIMs". Antes había dos
+// copias de esta misma lógica, una arreglada y la otra no, y se
+// desincronizaron sin que nadie lo notara hasta que un técnico se
+// topó con el caso real. Con una sola función, un arreglo futuro
+// vale para los dos lugares a la vez.
+//
+// Prioriza el número de cliente (normalizado, sin ceros de más o de
+// menos) cuando está disponible — mucho más confiable que el
+// nombre. Si no hay número, cae al nombre, tolerante en ambas
+// direcciones (alcanza con que coincida la mitad de las palabras de
+// cualquiera de los dos lados).
+function limpiarNumeroClienteParaComparar(n) {
+  return String(n || "").replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+}
+
+function buscarSimExistenteEnCliente(nombreCliente, numeroCliente, simsCache, numeroSimAExcluir) {
+  const candidatas = (simsCache || []).filter((s) => s.estado === "uso" && s.numero !== numeroSimAExcluir && s.cliente);
+
+  const numeroLimpio = limpiarNumeroClienteParaComparar(numeroCliente);
+  if (numeroLimpio) {
+    const porNumero = candidatas.find((s) => s.numero_cliente && limpiarNumeroClienteParaComparar(s.numero_cliente) === numeroLimpio);
+    if (porNumero) return porNumero;
+  }
+
+  const normCliente = normalizeText(nombreCliente);
+  if (!normCliente) return null;
+  return candidatas.find((s) => {
+    const palabrasBase = normalizeText(s.cliente).split(/\s+/).filter((p) => p.length > 2);
+    const palabrasTecnico = normCliente.split(/\s+/).filter((p) => p.length > 2);
+    if (palabrasBase.length === 0 || palabrasTecnico.length === 0) return false;
+    const coincidentes = palabrasBase.filter((p) => palabrasTecnico.includes(p)).length;
+    return coincidentes / Math.min(palabrasBase.length, palabrasTecnico.length) >= 0.5;
+  }) || null;
+}
+
 const simDireccionInstalacion = document.getElementById("simDireccionInstalacion");
 const simNumeroAbonadoInfo = document.getElementById("simNumeroAbonadoInfo");
 const simClienteSugerenciasWrap = document.getElementById("simClienteSugerenciasWrap");
@@ -6899,10 +6905,11 @@ function elegirClienteParaSim(c) {
   // antes) cuando en realidad estaba reemplazando una existente. La
   // vieja, al no decirle nada al sistema, nunca quedó registrada
   // como retirada — ni instalada, ni en ningún stock.
-  const clave = normalizeText(c.nombre);
-  const yaInstalada = (simsListaCache || []).find(
-    (s) => s.ubicacion_tipo === "cliente" && s.ubicacion_nombre && normalizeText(s.ubicacion_nombre) === clave
-  );
+  //
+  // Usa la misma función compartida que las otras dos pantallas —
+  // antes comparaba solo por nombre exacto, sin la tolerancia ni el
+  // respaldo por número de cliente que ya tienen las demás.
+  const yaInstalada = buscarSimExistenteEnCliente(c.nombre, c.numero_cliente, simsListaCache, null);
   if (yaInstalada) {
     simClienteEncontradoInfo.textContent = `⚠ Este cliente ya tiene la línea ${yaInstalada.numero} (${yaInstalada.empresa}) instalada. Al tocar "Marcar como usada" te va a preguntar si querés reemplazarla.`;
     simClienteEncontradoInfo.className = "hint-text hint-warn";
@@ -7094,31 +7101,10 @@ simUsarBtn.addEventListener("click", async () => {
   simUsarBtn.disabled = true;
   try {
     const sims = await fetchSimsConfig();
-    // Mismo algoritmo mejorado que se usa en el parte técnico: primero
-    // intenta por número de cliente (normalizado, sin ceros de más o
-    // de menos), y si no hay o no coincide, cae al nombre — tolerante
-    // en ambas direcciones. Antes exigía que TODAS las palabras del
-    // nombre guardado aparecieran en lo que se tipeó acá, y con un
-    // nombre guardado más largo (ej: con un segundo nombre) nunca
-    // coincidía — el aviso de arriba sí lo detectaba (con el
-    // algoritmo nuevo), pero ESTE chequeo, el que de verdad ofrece
-    // "Reemplazar", se quedaba con el viejo y nunca lo mostraba.
-    const limpiarNumeroCliente = (n) => String(n || "").replace(/\D/g, "").replace(/^0+(?=\d)/, "");
-    const numeroClienteLimpio = limpiarNumeroCliente(simNumeroClienteActivo);
-    const candidatas = sims.filter((s) => s.estado === "uso" && s.numero !== simSeleccionada && s.cliente);
-    let existente = numeroClienteLimpio
-      ? candidatas.find((s) => s.numero_cliente && limpiarNumeroCliente(s.numero_cliente) === numeroClienteLimpio)
-      : null;
-    if (!existente) {
-      const normCliente = normalizeText(cliente);
-      existente = candidatas.find((s) => {
-        const palabrasBase = normalizeText(s.cliente).split(/\s+/).filter((p) => p.length > 2);
-        const palabrasTecnico = normCliente.split(/\s+/).filter((p) => p.length > 2);
-        if (palabrasBase.length === 0 || palabrasTecnico.length === 0) return false;
-        const coincidentes = palabrasBase.filter((p) => palabrasTecnico.includes(p)).length;
-        return coincidentes / Math.min(palabrasBase.length, palabrasTecnico.length) >= 0.5;
-      });
-    }
+    // Misma función que usa el parte técnico (buscarSimExistenteEnCliente)
+    // — antes cada pantalla tenía su propia copia de este chequeo, y
+    // se desincronizaron sin que nadie lo notara.
+    const existente = buscarSimExistenteEnCliente(cliente, simNumeroClienteActivo, sims, simSeleccionada);
     if (existente) {
       simClienteParaReemplazo = cliente;
       simExistenteParaReemplazo = existente.numero;
