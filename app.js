@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.70.0";
+const APP_VERSION = "3.70.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -2280,15 +2280,38 @@ async function asignarSimInstaladaAlCliente(data) {
     // dos. Antes esto no se chequeaba acá, así que instalar una SIM
     // nueva durante un parte podía dejar la vieja "fantasma": seguía
     // figurando en el cliente, sin volver al stock de nadie.
+    //
+    // Se prioriza matchear por número de cliente (mucho más
+    // confiable) — el matching por nombre se usa solo si no hay
+    // número de cliente, y es tolerante en ambas direcciones (antes
+    // exigía que CADA palabra del nombre guardado apareciera en lo
+    // que escribió el técnico — con un nombre guardado con una
+    // palabra de más, como un apellido extra, nunca coincidía, y la
+    // línea vieja se perdía en silencio sin avisar nada).
     let numeroSimARetirar = null;
     try {
       const sims = await fetchSimsConfig();
       const normCliente = normalizeText(data.cliente);
-      const existente = sims.find((s) => {
-        if (s.estado !== "uso" || s.numero === sim.numero || !s.cliente) return false;
-        const palabras = normalizeText(s.cliente).split(/\s+/).filter((p) => p.length > 2);
-        return palabras.length > 0 && palabras.every((palabra) => normCliente.includes(palabra));
-      });
+      const candidatas = sims.filter((s) => s.estado === "uso" && s.numero !== sim.numero && s.cliente);
+
+      let existente = data.numero_cliente
+        ? candidatas.find((s) => s.numero_cliente && String(s.numero_cliente) === String(data.numero_cliente))
+        : null;
+
+      if (!existente) {
+        existente = candidatas.find((s) => {
+          const palabrasBase = normalizeText(s.cliente).split(/\s+/).filter((p) => p.length > 2);
+          const palabrasTecnico = normCliente.split(/\s+/).filter((p) => p.length > 2);
+          if (palabrasBase.length === 0 || palabrasTecnico.length === 0) return false;
+          const coincidentes = palabrasBase.filter((p) => palabrasTecnico.includes(p)).length;
+          // Alcanza con que coincida la mitad de las palabras de
+          // cualquiera de los dos lados — tolera un nombre guardado
+          // más largo o más corto que lo que se tipeó, sin exigir
+          // una coincidencia palabra por palabra perfecta.
+          return coincidentes / Math.min(palabrasBase.length, palabrasTecnico.length) >= 0.5;
+        });
+      }
+
       if (existente) {
         const reemplazar = confirm(
           `Este cliente ya tiene la línea N° ${existente.numero} de ${existente.empresa}` +
@@ -2298,9 +2321,11 @@ async function asignarSimInstaladaAlCliente(data) {
         if (reemplazar) numeroSimARetirar = existente.numero;
       }
     } catch (errConsulta) {
-      // Si no se pudo consultar, se sigue con "usar" simple — no se
-      // bloquea el registro de la SIM nueva por esto.
+      // Si no se pudo consultar, se avisa (antes esto fallaba en
+      // silencio total, sin que el técnico se enterara de que no se
+      // pudo verificar nada).
       console.error("No se pudo chequear si el cliente ya tenía una SIM:", errConsulta);
+      showToast("No se pudo verificar si el cliente ya tenía otra línea instalada — revisalo a mano si corresponde.");
     }
 
     const res = await fetch("/api/recurso-uso", {
