@@ -705,6 +705,7 @@
 
 </div>
 
+<script src="sims-utils.js"></script>
 <script>
 // ==== CONFIGURACIÓN ====
 // Misma clave secreta que SERVICIOS_API_TOKEN en app.js y en Vercel.
@@ -2026,9 +2027,9 @@ function escapeHtmlAdmin(s) {
   return div.innerHTML;
 }
 
-function normalizeText(s) {
-  return (s || "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-}
+// normalizeText, limpiarNumeroClienteParaComparar y
+// buscarSimExistenteEnCliente viven en sims-utils.js — compartidas
+// con app.js para que un arreglo futuro valga en los dos lugares.
 
 function buscarClienteSimsPorNombre(nombre) {
   const clave = normalizeText(nombre);
@@ -2271,6 +2272,7 @@ async function instalarSimEnCliente(fila, numeroActual, inputClienteManual, inpu
   const cliente = clienteEncontrado ? clienteEncontrado.nombre : textoEscrito;
   const numeroAbonado = inputAbonadoManual.value.trim() || (clienteEncontrado ? clienteEncontrado.numero_abonado || "" : "");
   const direccion = inputDireccionManual.value.trim() || (clienteEncontrado ? clienteEncontrado.direccion || "" : "");
+  const numeroClienteEncontrado = clienteEncontrado ? clienteEncontrado.numero_cliente : "";
 
   if (!numerosExistentesEnServidor.has(numeroActual)) {
     alert('Esta fila todavía no está guardada — tocá "Guardar cambios" primero, y después instalala en el cliente.');
@@ -2281,17 +2283,51 @@ async function instalarSimEnCliente(fila, numeroActual, inputClienteManual, inpu
   boton.disabled = true;
   boton.textContent = "...";
   try {
+    // Mismo chequeo que ya hace la app del técnico (sims-utils.js) —
+    // antes el admin instalaba directo con "usar", sin verificar
+    // nunca si el cliente ya tenía otra línea, así que una línea
+    // vieja podía quedar "fantasma" sin que nadie se enterara.
+    let numeroSimARetirar = null;
+    try {
+      const resInstaladas = await fetch("/api/datos?coleccion=sims_instaladas", {
+        headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+        cache: "no-store",
+      });
+      const instaladas = await resInstaladas.json();
+      const candidatas = (Array.isArray(instaladas) ? instaladas : []).map((s) => ({ ...s, estado: "uso" }));
+      const resultado = buscarSimExistenteEnCliente(cliente, numeroClienteEncontrado, candidatas, numeroActual);
+      if (resultado.tipo === "confirmada") {
+        const existente = resultado.sim;
+        const reemplazar = confirm(
+          `Este cliente ya tiene la línea N° ${existente.numero} de ${existente.empresa}, a nombre de "${existente.cliente}".\n\n` +
+          `Aceptar = reemplazarla (vuelve al stock del técnico).\nCancelar = dejar las dos líneas instaladas.`
+        );
+        if (reemplazar) numeroSimARetirar = existente.numero;
+      } else if (resultado.tipo === "sin_certeza") {
+        const existente = resultado.sim;
+        alert(
+          `No pude confirmar con certeza si este cliente ya tiene otra línea (no tengo su número de cliente).\n\n` +
+          `Encontré algo parecido: línea N° ${existente.numero} de ${existente.empresa}, a nombre de "${existente.cliente}".\n\n` +
+          `Revisá en "SIMs instaladas" si es el mismo cliente antes de continuar.`
+        );
+      }
+    } catch (errConsulta) {
+      console.error("No se pudo chequear si el cliente ya tenía una SIM:", errConsulta);
+      alert("No se pudo verificar si el cliente ya tenía otra línea instalada — revisalo a mano en 'SIMs instaladas' si corresponde.");
+    }
+
     const res = await fetch("/api/recurso-uso", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
       body: JSON.stringify({
         recurso: "sim",
-        accion: "usar",
+        accion: numeroSimARetirar ? "reemplazar" : "usar",
         numero: numeroActual,
         tecnico: fila.dataset.tecnicoActual,
         cliente,
         direccion,
         numero_abonado: numeroAbonado,
+        ...(numeroSimARetirar ? { numero_sim_a_retirar: numeroSimARetirar } : {}),
       }),
     });
     const data = await res.json();

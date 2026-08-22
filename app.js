@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.72.2";
+const APP_VERSION = "3.73.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -1059,10 +1059,6 @@ cerrarSesionBtn.addEventListener("click", () => {
 // ---------- Listado de servicios pendientes ----------
 function formatSyncTime(date) {
   return "Actualizado " + date.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
-}
-
-function normalizeText(s) {
-  return (s || "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
 // Neutraliza HTML/JS antes de insertar texto (cliente, dirección,
@@ -2320,15 +2316,26 @@ simInstalarSelect.addEventListener("change", async () => {
   try {
     const sims = await fetchSimsConfig();
     const numeroClienteParaBuscar = clienteReal ? clienteReal.numero_cliente : currentNumeroCliente;
-    const existente = buscarSimExistenteEnCliente(clienteEscrito, numeroClienteParaBuscar, sims, sim.numero);
-    if (existente) {
+    const resultado = buscarSimExistenteEnCliente(clienteEscrito, numeroClienteParaBuscar, sims, sim.numero);
+    if (resultado.tipo === "confirmada") {
+      const existente = resultado.sim;
       const reemplazar = confirm(
         `Este cliente ya tiene la línea N° ${existente.numero} de ${existente.empresa}` +
         `${existente.tipo ? " " + existente.tipo : ""}, a nombre de "${existente.cliente}".\n\n` +
-        `Fijate que sea el mismo cliente antes de continuar.\n\n` +
         `Aceptar = reemplazarla (vuelve a tu stock).\nCancelar = dejar las dos líneas instaladas.`
       );
       decisionSimInstalar = { numeroSimARetirar: reemplazar ? existente.numero : null };
+    } else if (resultado.tipo === "sin_certeza") {
+      // No hay número de cliente para confirmar con seguridad — se
+      // avisa y se muestra el parecido, pero no se decide solo (ver
+      // el comentario en sims-utils.js sobre por qué).
+      const existente = resultado.sim;
+      alert(
+        `No pude confirmar con certeza si este cliente ya tiene otra línea (no tengo su número de cliente).\n\n` +
+        `Encontré algo parecido: línea N° ${existente.numero} de ${existente.empresa}, a nombre de "${existente.cliente}".\n\n` +
+        `Si es el mismo cliente, retirala vos mismo desde "SIM instaladas" antes de continuar. Si no es el mismo, seguí tranquilo.`
+      );
+      decisionSimInstalar = { numeroSimARetirar: null };
     } else {
       decisionSimInstalar = { numeroSimARetirar: null };
     }
@@ -2355,15 +2362,22 @@ async function asignarSimInstaladaAlCliente(data) {
     if (!decisionSimInstalar) {
       try {
         const sims = await fetchSimsConfig();
-        const existente = buscarSimExistenteEnCliente(data.cliente, data.numero_cliente, sims, sim.numero);
-        if (existente) {
+        const resultado = buscarSimExistenteEnCliente(data.cliente, data.numero_cliente, sims, sim.numero);
+        if (resultado.tipo === "confirmada") {
+          const existente = resultado.sim;
           const reemplazar = confirm(
             `Este cliente ya tiene la línea N° ${existente.numero} de ${existente.empresa}` +
             `${existente.tipo ? " " + existente.tipo : ""}, a nombre de "${existente.cliente}".\n\n` +
-            `Fijate que sea el mismo cliente antes de continuar.\n\n` +
             `Aceptar = reemplazarla (vuelve a tu stock).\nCancelar = dejar las dos líneas instaladas.`
           );
           if (reemplazar) numeroSimARetirar = existente.numero;
+        } else if (resultado.tipo === "sin_certeza") {
+          const existente = resultado.sim;
+          alert(
+            `No pude confirmar con certeza si este cliente ya tiene otra línea (no tengo su número de cliente).\n\n` +
+            `Encontré algo parecido: línea N° ${existente.numero} de ${existente.empresa}, a nombre de "${existente.cliente}".\n\n` +
+            `Si es el mismo cliente, retirala vos mismo desde "SIM instaladas" antes de continuar.`
+          );
         }
       } catch (errConsulta) {
         console.error("No se pudo chequear si el cliente ya tenía una SIM:", errConsulta);
@@ -6909,53 +6923,10 @@ function contarClientesConNombreExacto(nombre) {
   return (clientesGeneralCache || []).filter((c) => c.nombre && normalizeText(c.nombre) === clave).length;
 }
 
-// Única función para detectar si un cliente ya tiene una SIM
-// instalada — se usa TANTO al instalar una SIM desde el parte
-// técnico COMO desde la pantalla de "Tus SIMs". Antes había dos
-// copias de esta misma lógica, una arreglada y la otra no, y se
-// desincronizaron sin que nadie lo notara hasta que un técnico se
-// topó con el caso real. Con una sola función, un arreglo futuro
-// vale para los dos lugares a la vez.
-//
-// Prioriza el número de cliente (normalizado, sin ceros de más o de
-// menos) cuando está disponible — mucho más confiable que el
-// nombre. Si no hay número, cae al nombre, tolerante en ambas
-// direcciones (alcanza con que coincida la mitad de las palabras de
-// cualquiera de los dos lados).
-function limpiarNumeroClienteParaComparar(n) {
-  return String(n || "").replace(/\D/g, "").replace(/^0+(?=\d)/, "");
-}
-
-function buscarSimExistenteEnCliente(nombreCliente, numeroCliente, simsCache, numeroSimAExcluir) {
-  const candidatas = (simsCache || []).filter((s) => s.estado === "uso" && s.numero !== numeroSimAExcluir && s.cliente);
-
-  const numeroLimpio = limpiarNumeroClienteParaComparar(numeroCliente);
-  if (numeroLimpio) {
-    const porNumero = candidatas.find((s) => s.numero_cliente && limpiarNumeroClienteParaComparar(s.numero_cliente) === numeroLimpio);
-    if (porNumero) return porNumero;
-  }
-
-  const normCliente = normalizeText(nombreCliente);
-  if (!normCliente) return null;
-  return candidatas.find((s) => {
-    const palabrasBase = normalizeText(s.cliente).split(/\s+/).filter((p) => p.length > 2);
-    const palabrasTecnico = normCliente.split(/\s+/).filter((p) => p.length > 2);
-    if (palabrasBase.length === 0 || palabrasTecnico.length === 0) return false;
-    // Se exige que TODAS las palabras del lado más corto estén en el
-    // más largo (no un porcentaje) — con un porcentaje (ej: 50%),
-    // dos nombres de 2 palabras que solo comparten el primer nombre
-    // ("Juan Pérez" y "Juan Gómez") ya llegaban al 50% y se
-    // consideraban la misma persona, ofreciendo reemplazar la línea
-    // de un cliente totalmente distinto sin relación con el
-    // servicio. Exigiendo el 100% del lado más corto se sigue
-    // tolerando un nombre guardado con una palabra de más (ej:
-    // "Maskin Gabriela" adentro de "Maskin Gabriela Fernanda"), pero
-    // ya no alcanza con compartir solo un nombre de pila.
-    const masCorto = palabrasBase.length <= palabrasTecnico.length ? palabrasBase : palabrasTecnico;
-    const masLargo = palabrasBase.length <= palabrasTecnico.length ? palabrasTecnico : palabrasBase;
-    return masCorto.every((p) => masLargo.includes(p));
-  }) || null;
-}
+// buscarSimExistenteEnCliente y limpiarNumeroClienteParaComparar
+// viven en sims-utils.js — se comparten con admin.html para que un
+// arreglo futuro valga en los dos lugares a la vez, sin depender de
+// mantener dos copias sincronizadas a mano.
 
 const simDireccionInstalacion = document.getElementById("simDireccionInstalacion");
 const simNumeroAbonadoInfo = document.getElementById("simNumeroAbonadoInfo");
@@ -6991,9 +6962,14 @@ function elegirClienteParaSim(c) {
   // Usa la misma función compartida que las otras dos pantallas —
   // antes comparaba solo por nombre exacto, sin la tolerancia ni el
   // respaldo por número de cliente que ya tienen las demás.
-  const yaInstalada = buscarSimExistenteEnCliente(c.nombre, c.numero_cliente, simsListaCache, null);
-  if (yaInstalada) {
+  const resultado = buscarSimExistenteEnCliente(c.nombre, c.numero_cliente, simsListaCache, null);
+  if (resultado.tipo === "confirmada") {
+    const yaInstalada = resultado.sim;
     simClienteEncontradoInfo.textContent = `⚠ Este cliente ya tiene la línea ${yaInstalada.numero} (${yaInstalada.empresa}) instalada. Al tocar "Marcar como usada" te va a preguntar si querés reemplazarla.`;
+    simClienteEncontradoInfo.className = "hint-text hint-warn";
+  } else if (resultado.tipo === "sin_certeza") {
+    const yaInstalada = resultado.sim;
+    simClienteEncontradoInfo.textContent = `⚠ No tengo el número de este cliente para confirmarlo, pero hay una línea parecida (${yaInstalada.numero}, ${yaInstalada.empresa}) a nombre de "${yaInstalada.cliente}" — fijate si es el mismo antes de continuar.`;
     simClienteEncontradoInfo.className = "hint-text hint-warn";
   } else {
     simClienteEncontradoInfo.textContent = "✓ Cliente encontrado en la base.";
@@ -7183,16 +7159,19 @@ simUsarBtn.addEventListener("click", async () => {
   simUsarBtn.disabled = true;
   try {
     const sims = await fetchSimsConfig();
-    // Misma función que usa el parte técnico (buscarSimExistenteEnCliente)
-    // — antes cada pantalla tenía su propia copia de este chequeo, y
-    // se desincronizaron sin que nadie lo notara.
-    const existente = buscarSimExistenteEnCliente(cliente, simNumeroClienteActivo, sims, simSeleccionada);
-    if (existente) {
+    // Misma función compartida que usa el parte técnico y el admin
+    // (sims-utils.js) — antes cada pantalla tenía su propia copia de
+    // este chequeo, y se desincronizaron sin que nadie lo notara.
+    const resultado = buscarSimExistenteEnCliente(cliente, simNumeroClienteActivo, sims, simSeleccionada);
+    if (resultado.tipo === "confirmada" || resultado.tipo === "sin_certeza") {
+      const existente = resultado.sim;
       simClienteParaReemplazo = cliente;
       simExistenteParaReemplazo = existente.numero;
-      simReemplazoMensaje.textContent =
-        `Este cliente ya tiene la línea N° ${existente.numero} de ${existente.empresa}` +
-        `${existente.tipo ? " " + existente.tipo : ""}, a nombre de "${existente.cliente}". Fijate que sea el mismo cliente. ¿Querés reemplazarla o agregar esta como segunda línea?`;
+      simReemplazoMensaje.textContent = resultado.tipo === "confirmada"
+        ? `Este cliente ya tiene la línea N° ${existente.numero} de ${existente.empresa}` +
+          `${existente.tipo ? " " + existente.tipo : ""}, a nombre de "${existente.cliente}". ¿Querés reemplazarla o agregar esta como segunda línea?`
+        : `No tengo el número de este cliente para confirmarlo, pero hay una línea parecida: N° ${existente.numero} de ${existente.empresa}` +
+          `${existente.tipo ? " " + existente.tipo : ""}, a nombre de "${existente.cliente}". Fijate bien si es el mismo cliente antes de elegir.`;
       simUsarWrap.classList.add("hidden");
       simReemplazoWrap.classList.remove("hidden");
     } else {
