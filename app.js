@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.72.1";
+const APP_VERSION = "3.72.2";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -2324,7 +2324,8 @@ simInstalarSelect.addEventListener("change", async () => {
     if (existente) {
       const reemplazar = confirm(
         `Este cliente ya tiene la línea N° ${existente.numero} de ${existente.empresa}` +
-        `${existente.tipo ? " " + existente.tipo : ""}.\n\n` +
+        `${existente.tipo ? " " + existente.tipo : ""}, a nombre de "${existente.cliente}".\n\n` +
+        `Fijate que sea el mismo cliente antes de continuar.\n\n` +
         `Aceptar = reemplazarla (vuelve a tu stock).\nCancelar = dejar las dos líneas instaladas.`
       );
       decisionSimInstalar = { numeroSimARetirar: reemplazar ? existente.numero : null };
@@ -2358,7 +2359,8 @@ async function asignarSimInstaladaAlCliente(data) {
         if (existente) {
           const reemplazar = confirm(
             `Este cliente ya tiene la línea N° ${existente.numero} de ${existente.empresa}` +
-            `${existente.tipo ? " " + existente.tipo : ""}.\n\n` +
+            `${existente.tipo ? " " + existente.tipo : ""}, a nombre de "${existente.cliente}".\n\n` +
+            `Fijate que sea el mismo cliente antes de continuar.\n\n` +
             `Aceptar = reemplazarla (vuelve a tu stock).\nCancelar = dejar las dos líneas instaladas.`
           );
           if (reemplazar) numeroSimARetirar = existente.numero;
@@ -6939,8 +6941,19 @@ function buscarSimExistenteEnCliente(nombreCliente, numeroCliente, simsCache, nu
     const palabrasBase = normalizeText(s.cliente).split(/\s+/).filter((p) => p.length > 2);
     const palabrasTecnico = normCliente.split(/\s+/).filter((p) => p.length > 2);
     if (palabrasBase.length === 0 || palabrasTecnico.length === 0) return false;
-    const coincidentes = palabrasBase.filter((p) => palabrasTecnico.includes(p)).length;
-    return coincidentes / Math.min(palabrasBase.length, palabrasTecnico.length) >= 0.5;
+    // Se exige que TODAS las palabras del lado más corto estén en el
+    // más largo (no un porcentaje) — con un porcentaje (ej: 50%),
+    // dos nombres de 2 palabras que solo comparten el primer nombre
+    // ("Juan Pérez" y "Juan Gómez") ya llegaban al 50% y se
+    // consideraban la misma persona, ofreciendo reemplazar la línea
+    // de un cliente totalmente distinto sin relación con el
+    // servicio. Exigiendo el 100% del lado más corto se sigue
+    // tolerando un nombre guardado con una palabra de más (ej:
+    // "Maskin Gabriela" adentro de "Maskin Gabriela Fernanda"), pero
+    // ya no alcanza con compartir solo un nombre de pila.
+    const masCorto = palabrasBase.length <= palabrasTecnico.length ? palabrasBase : palabrasTecnico;
+    const masLargo = palabrasBase.length <= palabrasTecnico.length ? palabrasTecnico : palabrasBase;
+    return masCorto.every((p) => masLargo.includes(p));
   }) || null;
 }
 
@@ -7179,7 +7192,7 @@ simUsarBtn.addEventListener("click", async () => {
       simExistenteParaReemplazo = existente.numero;
       simReemplazoMensaje.textContent =
         `Este cliente ya tiene la línea N° ${existente.numero} de ${existente.empresa}` +
-        `${existente.tipo ? " " + existente.tipo : ""}. ¿Querés reemplazarla o agregar esta como segunda línea?`;
+        `${existente.tipo ? " " + existente.tipo : ""}, a nombre de "${existente.cliente}". Fijate que sea el mismo cliente. ¿Querés reemplazarla o agregar esta como segunda línea?`;
       simUsarWrap.classList.add("hidden");
       simReemplazoWrap.classList.remove("hidden");
     } else {
