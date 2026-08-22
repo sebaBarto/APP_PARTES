@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.72.0";
+const APP_VERSION = "3.72.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -3322,7 +3322,12 @@ confirmSignBtn.addEventListener("click", async () => {
   if (oficinaOk) {
     verificarYSugerirCercanos(data);
     verificarPrimerServicioSinVehiculo(data);
-    asignarSimInstaladaAlCliente(data);
+    // Se espera a que esto termine antes de seguir — si no, el
+    // técnico podía ver "Enviado" y entrar a "Tus SIMs" en el
+    // segundo siguiente, viendo el dato viejo porque el guardado
+    // todavía estaba en camino (confuso, aunque no era ningún error
+    // real: apenas terminaba de guardar, quedaba bien).
+    await asignarSimInstaladaAlCliente(data);
   }
 
   let mensajeFoto = "";
