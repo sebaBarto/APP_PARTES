@@ -796,7 +796,7 @@ const TABS = [
   { btn: tabServiciosBtn, panel: panelServicios },
   { btn: tabCronogramaBtn, panel: panelCronograma },
   { btn: tabTecnicosBtn, panel: panelTecnicos, onShow: () => { if (!tecnicosCargadosUnaVez) { tecnicosCargadosUnaVez = true; cargarTecnicosAdmin(); } } },
-  { btn: tabMaterialesBtn, panel: panelMateriales, onShow: () => { if (!materialesCargadosUnaVez) { materialesCargadosUnaVez = true; cargarMaterialesAdmin(); } } },
+  { btn: tabMaterialesBtn, panel: panelMateriales, onShow: () => cargarMaterialesAdmin() },
   { btn: tabClientesBtn, panel: panelClientes, onShow: () => { if (!clientesCargadosUnaVez) { clientesCargadosUnaVez = true; cargarClientesAdmin(); } } },
   { btn: tabConsultasBtn, panel: panelConsultas, onShow: () => { if (!consultasCatCargadasUnaVez) { consultasCatCargadasUnaVez = true; cargarConsultasCatAdmin(); } } },
   { btn: tabGuardiasBtn, panel: panelGuardias, onShow: () => { if (!guardiasCargadasUnaVez) { guardiasCargadasUnaVez = true; cargarGuardiasAdmin(); } cargarEstadoAvisoGuardia(); } },
