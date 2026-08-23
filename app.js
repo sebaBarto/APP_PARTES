@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.73.1";
+const APP_VERSION = "3.74.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -2270,27 +2270,42 @@ async function cargarOpcionesSimInstalar() {
   }
 }
 
+const simInstalarConfirmarBtn = document.getElementById("simInstalarConfirmarBtn");
+const simInstalarEstadoInfo = document.getElementById("simInstalarEstadoInfo");
+
 fInstalarSim.addEventListener("change", () => {
   simInstalarSelectWrap.style.display = fInstalarSim.checked ? "block" : "none";
-  if (!fInstalarSim.checked) decisionSimInstalar = null;
+  if (!fInstalarSim.checked) { decisionSimInstalar = null; simInstalarEstadoInfo.textContent = ""; }
 });
 
-// Se valida acá, apenas se elige la SIM — no al enviar el parte. Así
-// el técnico ya sabe en el momento si el cliente no está en la base,
-// o si hay que reemplazar una línea existente, y puede seguir
-// completando tranquilo el resto del parte hasta la firma sin
+// Se valida acá, apenas se confirma la SIM elegida — no al enviar el
+// parte. Así el técnico ya sabe en el momento si el cliente no está
+// en la base, o si hay que reemplazar una línea existente, y puede
+// seguir completando tranquilo el resto del parte hasta la firma sin
 // sorpresas al final.
-simInstalarSelect.addEventListener("change", async () => {
+//
+// Se dispara desde un BOTÓN explícito ("Confirmar SIM seleccionada"),
+// no solo desde el evento "change" del <select> — un técnico reportó
+// que, en su celular, elegir la SIM del desplegable no disparaba
+// ningún aviso a pesar de que el cliente sí tenía otra línea. No se
+// pudo confirmar la causa exacta (podría ser el navegador/OS no
+// disparando "change" de forma confiable en ese dispositivo puntual),
+// pero un botón que se toca a propósito es un mecanismo mucho más
+// confiable que depender de ese evento — así que ahora es el camino
+// principal. El evento "change" se deja como respaldo silencioso,
+// por si el navegador sí lo dispara solo.
+async function validarSimAInstalar() {
   decisionSimInstalar = null;
+  simInstalarEstadoInfo.textContent = "";
   const sim = getSimAInstalarSeleccionada();
-  if (!sim) return;
+  if (!sim) {
+    simInstalarEstadoInfo.textContent = "Elegí primero una SIM de la lista.";
+    return;
+  }
 
   const clienteEscrito = document.getElementById("f_cliente").value.trim();
   if (!clienteEscrito) {
-    showToast("Completá el cliente antes de elegir la SIM que instalaste.");
-    fInstalarSim.checked = false;
-    simInstalarSelectWrap.style.display = "none";
-    simInstalarSelect.value = "";
+    showToast("Completá el cliente antes de confirmar la SIM que instalaste.");
     return;
   }
 
@@ -2306,8 +2321,6 @@ simInstalarSelect.addEventListener("change", async () => {
       `Aceptar = seguir igual.\nCancelar = volver a elegir.`
     );
     if (!seguir) {
-      fInstalarSim.checked = false;
-      simInstalarSelectWrap.style.display = "none";
       simInstalarSelect.value = "";
       return;
     }
@@ -2317,6 +2330,7 @@ simInstalarSelect.addEventListener("change", async () => {
     const sims = await fetchSimsConfig();
     const numeroClienteParaBuscar = clienteReal ? clienteReal.numero_cliente : currentNumeroCliente;
     const resultado = buscarSimExistenteEnCliente(clienteEscrito, numeroClienteParaBuscar, sims, sim.numero);
+    console.log("[validarSimAInstalar]", { clienteEscrito, numeroClienteParaBuscar, resultado, candidatasEnUso: sims.filter((s) => s.estado === "uso").length });
     if (resultado.tipo === "confirmada") {
       const existente = resultado.sim;
       const reemplazar = confirm(
@@ -2325,6 +2339,9 @@ simInstalarSelect.addEventListener("change", async () => {
         `Aceptar = reemplazarla (vuelve a tu stock).\nCancelar = dejar las dos líneas instaladas.`
       );
       decisionSimInstalar = { numeroSimARetirar: reemplazar ? existente.numero : null };
+      simInstalarEstadoInfo.textContent = reemplazar
+        ? `✓ Vas a reemplazar la línea ${existente.numero}.`
+        : "✓ Vas a dejar las dos líneas instaladas.";
     } else if (resultado.tipo === "sin_certeza") {
       // No hay número de cliente para confirmar con seguridad — se
       // avisa y se muestra el parecido, pero no se decide solo (ver
@@ -2336,15 +2353,21 @@ simInstalarSelect.addEventListener("change", async () => {
         `Si es el mismo cliente, retirala vos mismo desde "SIM instaladas" antes de continuar. Si no es el mismo, seguí tranquilo.`
       );
       decisionSimInstalar = { numeroSimARetirar: null };
+      simInstalarEstadoInfo.textContent = "✓ Confirmado — revisá el aviso de arriba.";
     } else {
       decisionSimInstalar = { numeroSimARetirar: null };
+      simInstalarEstadoInfo.textContent = "✓ Listo, no encontramos otra línea en este cliente.";
     }
   } catch (errConsulta) {
     console.error("No se pudo chequear si el cliente ya tenía una SIM:", errConsulta);
     showToast("No se pudo verificar si el cliente ya tenía otra línea instalada — revisalo a mano si corresponde.");
     decisionSimInstalar = { numeroSimARetirar: null };
+    simInstalarEstadoInfo.textContent = "⚠ No se pudo verificar — revisalo a mano.";
   }
-});
+}
+
+simInstalarConfirmarBtn.addEventListener("click", validarSimAInstalar);
+simInstalarSelect.addEventListener("change", validarSimAInstalar);
 
 // Después de enviar el parte con éxito, si se eligió una SIM, la marca
 // como usada en el cliente del servicio (sale del stock del técnico).
