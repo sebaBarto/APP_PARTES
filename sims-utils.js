@@ -23,10 +23,10 @@ function limpiarNumeroClienteParaComparar(n) {
 //  - "confirmada": se encontró por número de cliente — dato único e
 //    irrepetible, así que acá sí se puede ofrecer un reemplazo
 //    automático con confianza.
-//  - "sin_certeza": no hay número de cliente disponible para
-//    verificar, pero el nombre escrito se parece al de una SIM ya
-//    instalada — se debe avisar y mostrar cuál, pero la decisión de
-//    reemplazar queda en manos de la persona, nunca automática.
+//  - "sin_certeza": no se pudo confirmar por número (falta de un
+//    lado o del otro) pero el nombre escrito se parece al de una SIM
+//    ya instalada — se debe avisar y mostrar cuál, pero la decisión
+//    de reemplazar queda en manos de la persona, nunca automática.
 //  - "ninguna": no hay ningún indicio de que el cliente ya tenga
 //    otra línea.
 //
@@ -35,6 +35,15 @@ function limpiarNumeroClienteParaComparar(n) {
 // hizo que se ofreciera reemplazar la línea de un cliente
 // completamente distinto que solo compartía el apellido con el que
 // realmente se buscaba. Ahora, sin número, nunca se decide solo.
+//
+// IMPORTANTE: si el cliente actual SÍ tiene número pero la SIM
+// instalada existente NO lo tiene guardado (registros viejos, de
+// antes de garantizar ese campo, o corregidos a mano sin ese dato),
+// buscar solo por número corta la búsqueda ahí y nunca encuentra
+// nada — un caso real así hizo que el sistema dijera "no hay otra
+// línea" cuando sí la había. Por eso, si la búsqueda por número no
+// encuentra nada, se sigue igual al respaldo por nombre, en vez de
+// cortar de una.
 function buscarSimExistenteEnCliente(nombreCliente, numeroCliente, simsCache, numeroSimAExcluir) {
   const candidatas = (simsCache || []).filter((s) => s.estado === "uso" && s.numero !== numeroSimAExcluir && s.cliente);
 
@@ -42,9 +51,6 @@ function buscarSimExistenteEnCliente(nombreCliente, numeroCliente, simsCache, nu
   if (numeroLimpio) {
     const porNumero = candidatas.find((s) => s.numero_cliente && limpiarNumeroClienteParaComparar(s.numero_cliente) === numeroLimpio);
     if (porNumero) return { tipo: "confirmada", sim: porNumero };
-    // Con número de cliente disponible y sin coincidencia, no hace
-    // falta mirar el nombre — el número ya es la fuente confiable.
-    return { tipo: "ninguna" };
   }
 
   const normCliente = normalizeText(nombreCliente);
