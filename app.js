@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.74.1";
+const APP_VERSION = "3.74.2";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -2313,6 +2313,14 @@ async function validarSimAInstalar() {
   // — antes esto no se chequeaba en ningún lado, así que una SIM
   // podía terminar "instalada" bajo cualquier texto escrito a mano,
   // sin ninguna relación con un cliente real.
+  //
+  // Se espera acá a que la lista de clientes esté cargada (no se
+  // asume que la precarga de fondo ya terminó) — un técnico con mala
+  // señal en el momento de iniciar sesión podía quedarse sin este
+  // dato para toda la sesión, y el sistema entonces nunca encontraba
+  // ningún cliente conocido, ni siquiera uno tan cargado como
+  // Bartolozzi.
+  await cargarClientesGeneral();
   const clienteReal = buscarClientePorNombre(clienteEscrito);
   if (!clienteReal) {
     const seguir = confirm(
@@ -6919,15 +6927,27 @@ async function poblarClientesParaSim() {
 // pestaña Clientes de admin.html — evita tener que escribir todo a
 // mano si el cliente ya está cargado ahí.
 let clientesGeneralCache = null;
+let clientesGeneralCargadoOk = false;
+// Antes, si la precarga fallaba por una mala señal (muy común en el
+// campo), el catch dejaba clientesGeneralCache en un array vacío —
+// y como [] es "verdadero" en JS, la próxima llamada lo tomaba como
+// "ya está cargado" y nunca reintentaba. Un técnico con esa mala
+// suerte se quedaba SIN caché de clientes por el resto de la sesión,
+// sin ningún aviso — buscarClientePorNombre siempre devolvía null,
+// aunque el cliente sí existiera en la base. Ahora se distingue
+// "nunca se intentó" de "se intentó y falló", y en el segundo caso
+// se reintenta la próxima vez que haga falta.
 async function cargarClientesGeneral() {
-  if (clientesGeneralCache) return clientesGeneralCache;
+  if (clientesGeneralCargadoOk) return clientesGeneralCache;
   try {
     const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
     const res = await fetch("/api/datos?coleccion=clientes", { headers, cache: "no-store" });
     const data = await res.json();
     clientesGeneralCache = Array.isArray(data) ? data : [];
+    clientesGeneralCargadoOk = true;
   } catch (err) {
-    clientesGeneralCache = [];
+    console.error("No se pudo cargar la lista de clientes (se reintentará la próxima vez que haga falta):", err);
+    clientesGeneralCache = clientesGeneralCache || [];
   }
   return clientesGeneralCache;
 }
