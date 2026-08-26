@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.74.2";
+const APP_VERSION = "3.75.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -2383,55 +2383,30 @@ async function asignarSimInstaladaAlCliente(data) {
   const sim = getSimAInstalarSeleccionada();
   if (!sim || !data.cliente) return;
   try {
-    // La decisión (reemplazar o no) ya se tomó en el momento en que
-    // el técnico eligió la SIM (ver el listener de simInstalarSelect)
-    // — acá no se vuelve a preguntar nada, solo se usa lo que ya se
-    // resolvió. Si por algún motivo no quedó nada guardado (ej: se
-    // marcó el checkbox de una forma que salteó ese chequeo), se hace
-    // como respaldo acá mismo, para no perder la protección.
-    let numeroSimARetirar = decisionSimInstalar ? decisionSimInstalar.numeroSimARetirar : null;
-    if (!decisionSimInstalar) {
-      try {
-        const sims = await fetchSimsConfig();
-        const resultado = buscarSimExistenteEnCliente(data.cliente, data.numero_cliente, sims, sim.numero);
-        if (resultado.tipo === "confirmada") {
-          const existente = resultado.sim;
-          const reemplazar = confirm(
-            `Este cliente ya tiene la línea N° ${existente.numero} de ${existente.empresa}` +
-            `${existente.tipo ? " " + existente.tipo : ""}, a nombre de "${existente.cliente}".\n\n` +
-            `Aceptar = reemplazarla (vuelve a tu stock).\nCancelar = dejar las dos líneas instaladas.`
-          );
-          if (reemplazar) numeroSimARetirar = existente.numero;
-        } else if (resultado.tipo === "sin_certeza") {
-          const existente = resultado.sim;
-          alert(
-            `No pude confirmar con certeza si este cliente ya tiene otra línea (no tengo su número de cliente).\n\n` +
-            `Encontré algo parecido: línea N° ${existente.numero} de ${existente.empresa}, a nombre de "${existente.cliente}".\n\n` +
-            `Si es el mismo cliente, retirala vos mismo desde "SIM instaladas" antes de continuar.`
-          );
-        }
-      } catch (errConsulta) {
-        console.error("No se pudo chequear si el cliente ya tenía una SIM:", errConsulta);
-        showToast("No se pudo verificar si el cliente ya tenía otra línea instalada — revisalo a mano si corresponde.");
-      }
-    }
-
-    const res = await fetch("/api/recurso-uso", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-      body: JSON.stringify({
-        recurso: "sim",
-        accion: numeroSimARetirar ? "reemplazar" : "usar",
-        numero: sim.numero,
-        tecnico: data.tecnico || tecnicoLogueado || "",
-        cliente: data.cliente,
-        direccion: data.direccion || "",
-        numero_servicio: data.numero_servicio || "",
-        ...(numeroSimARetirar ? { numero_sim_a_retirar: numeroSimARetirar } : {}),
-      }),
-    });
-    const respuesta = await res.json();
-    if (!res.ok) throw new Error(respuesta.error || "Error desconocido");
+    // Si ya se decidió al elegir la SIM (ver el listener de
+    // simInstalarSelect), se usa esa decisión directo. Si no, se
+    // manda "usar" tal cual — el servidor hace su propia verificación
+    // y, si hace falta, enviarAccionSimConRespaldo se encarga de
+    // mostrar el mismo aviso de reemplazar/dejar las dos antes de
+    // reintentar. Antes este respaldo se hacía acá mismo con una
+    // copia de la lógica de comparación del frontend — ahora la
+    // verificación real la hace el servidor, así que no hace falta
+    // duplicarla: si el chequeo previo del frontend falló por
+    // cualquier motivo (fue justo lo que le pasó a un técnico), el
+    // servidor lo atrapa igual antes de guardar en silencio.
+    const numeroSimARetirar = decisionSimInstalar ? decisionSimInstalar.numeroSimARetirar : null;
+    const payload = {
+      recurso: "sim",
+      accion: numeroSimARetirar ? "reemplazar" : "usar",
+      numero: sim.numero,
+      tecnico: data.tecnico || tecnicoLogueado || "",
+      cliente: data.cliente,
+      direccion: data.direccion || "",
+      numero_servicio: data.numero_servicio || "",
+      numero_cliente: data.numero_cliente || "",
+      ...(numeroSimARetirar ? { numero_sim_a_retirar: numeroSimARetirar } : {}),
+    };
+    await enviarAccionSimConRespaldo(payload, SERVICIOS_API_TOKEN);
   } catch (err) {
     showToast("El parte se envió, pero no se pudo registrar la SIM instalada: " + err.message);
   }
@@ -7162,16 +7137,13 @@ let simExistenteParaReemplazo = "";
 
 async function marcarSimComoUsada(cliente) {
   try {
-    const res = await fetch("/api/recurso-uso", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-      body: JSON.stringify({ recurso: "sim",
-        accion: "usar", numero: simSeleccionada, tecnico: tecnicoLogueado || "", cliente,
-        direccion: simDireccionInstalacion.value.trim(), numero_cliente: simNumeroClienteActivo,
-        numero_abonado: simNumeroAbonadoActivo }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    const payload = {
+      recurso: "sim",
+      accion: "usar", numero: simSeleccionada, tecnico: tecnicoLogueado || "", cliente,
+      direccion: simDireccionInstalacion.value.trim(), numero_cliente: simNumeroClienteActivo,
+      numero_abonado: simNumeroAbonadoActivo,
+    };
+    await enviarAccionSimConRespaldo(payload, SERVICIOS_API_TOKEN);
     showToast("SIM marcada como usada.");
     renderSimDetalle();
   } catch (err) {

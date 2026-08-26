@@ -65,3 +65,54 @@ function buscarSimExistenteEnCliente(nombreCliente, numeroCliente, simsCache, nu
   });
   return porNombre ? { tipo: "sin_certeza", sim: porNombre } : { tipo: "ninguna" };
 }
+
+// Envía una acción de SIM (usar/reemplazar) y maneja sola la
+// respuesta 409 "cliente_ya_tiene_linea" que puede devolver el
+// servidor — esa es la verificación de respaldo que hace el backend
+// por su cuenta (ver sims.js), independiente de lo que el frontend ya
+// haya chequeado antes. Así, aunque el chequeo previo del frontend
+// falle por el motivo que sea (caché vacío, red, un bug futuro), esta
+// función siempre termina mostrando el mismo aviso de "reemplazar o
+// dejar las dos" antes de que la SIM quede instalada en silencio.
+async function enviarAccionSimConRespaldo(payload, token) {
+  const intentar = async (cuerpo) => {
+    const res = await fetch("/api/recurso-uso", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+      body: JSON.stringify(cuerpo),
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, status: res.status, data };
+  };
+
+  const primero = await intentar(payload);
+  if (primero.ok) return primero.data;
+
+  if (primero.status === 409 && primero.data.error === "cliente_ya_tiene_linea") {
+    const existente = primero.data.linea_existente;
+    let siguienteCuerpo;
+    if (primero.data.certeza === "confirmada") {
+      const reemplazar = confirm(
+        `Este cliente ya tiene la línea N° ${existente.numero} de ${existente.empresa}` +
+        `${existente.tipo ? " " + existente.tipo : ""}, a nombre de "${existente.cliente}".\n\n` +
+        `Aceptar = reemplazarla (vuelve a tu stock).\nCancelar = dejar las dos líneas instaladas.`
+      );
+      siguienteCuerpo = reemplazar
+        ? { ...payload, accion: "reemplazar", numero_sim_a_retirar: existente.numero }
+        : { ...payload, confirmar_dejar_ambas: true };
+    } else {
+      alert(
+        `No pude confirmar con certeza si este cliente ya tiene otra línea (no tengo su número de cliente).\n\n` +
+        `Encontré algo parecido: línea N° ${existente.numero} de ${existente.empresa}, a nombre de "${existente.cliente}".\n\n` +
+        `Si es el mismo cliente, retirala vos mismo desde "SIM instaladas" antes de continuar. Si no es el mismo, seguí tranquilo.`
+      );
+      siguienteCuerpo = { ...payload, confirmar_dejar_ambas: true };
+    }
+
+    const segundo = await intentar(siguienteCuerpo);
+    if (!segundo.ok) throw new Error(segundo.data.error || "Error desconocido");
+    return segundo.data;
+  }
+
+  throw new Error(primero.data.error || "Error desconocido");
+}
