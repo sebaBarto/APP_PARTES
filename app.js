@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.75.0";
+const APP_VERSION = "3.75.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -2395,6 +2395,21 @@ async function asignarSimInstaladaAlCliente(data) {
     // cualquier motivo (fue justo lo que le pasó a un técnico), el
     // servidor lo atrapa igual antes de guardar en silencio.
     const numeroSimARetirar = decisionSimInstalar ? decisionSimInstalar.numeroSimARetirar : null;
+
+    // Última chance de resolver el número de cliente antes de mandar
+    // — puede haber pasado bastante entre elegir el cliente y llegar
+    // acá (completar el resto del parte, sacar fotos, firmar), y
+    // data.numero_cliente es una foto del momento en que se armó el
+    // formulario. Si por algún motivo llegó vacío, se reintenta acá
+    // con el nombre, para no perder la verificación por número
+    // aunque el cliente sí esté cargado en la base.
+    let numeroClienteFinal = data.numero_cliente || "";
+    if (!numeroClienteFinal) {
+      await cargarClientesGeneral();
+      const cli = buscarClientePorNombre(data.cliente);
+      numeroClienteFinal = cli ? cli.numero_cliente || "" : "";
+    }
+
     const payload = {
       recurso: "sim",
       accion: numeroSimARetirar ? "reemplazar" : "usar",
@@ -2403,7 +2418,7 @@ async function asignarSimInstaladaAlCliente(data) {
       cliente: data.cliente,
       direccion: data.direccion || "",
       numero_servicio: data.numero_servicio || "",
-      numero_cliente: data.numero_cliente || "",
+      numero_cliente: numeroClienteFinal,
       ...(numeroSimARetirar ? { numero_sim_a_retirar: numeroSimARetirar } : {}),
     };
     await enviarAccionSimConRespaldo(payload, SERVICIOS_API_TOKEN);
