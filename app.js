@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.75.1";
+const APP_VERSION = "3.76.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -429,6 +429,7 @@ const historialSyncLabel = document.getElementById("historialSyncLabel");
 const historialStatus = document.getElementById("historialStatus");
 const historialList = document.getElementById("historialList");
 const historialModoLabel = document.getElementById("historialModoLabel");
+const historialSearch = document.getElementById("historialSearch");
 const verStockBtn = document.getElementById("verStockBtn");
 const volverDeStockBtn = document.getElementById("volverDeStockBtn");
 const refreshStockBtn = document.getElementById("refreshStockBtn");
@@ -4170,8 +4171,20 @@ async function cargarYRenderGuardias() {
 
 // ---------- Historial (extendido, con filtros por período) ----------
 let histPeriodoActivo = "4dias";
+let histPasadoActivo = "todos";
 const histFechaEspecificaWrap = document.getElementById("histFechaEspecificaWrap");
 const histFechaEspecifica = document.getElementById("histFechaEspecifica");
+
+document.querySelectorAll(".hist-pasado-chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    document.querySelectorAll(".hist-pasado-chip").forEach((c) => c.classList.remove("active"));
+    chip.classList.add("active");
+    histPasadoActivo = chip.dataset.pasado;
+    renderHistorialReciente();
+  });
+});
+
+historialSearch.addEventListener("input", renderHistorialReciente);
 
 tileHistorialBtn.addEventListener("click", () => {
   showScreen("historial");
@@ -4262,6 +4275,18 @@ function renderHistorialReciente() {
   if (!veTodo) {
     filtrados = filtrados.filter((h) => h.tecnico === tecnicoLogueado || h.tecnico2 === tecnicoLogueado);
   }
+
+  if (histPasadoActivo === "si") {
+    filtrados = filtrados.filter((h) => !!h.pasado_sistema_offline);
+  } else if (histPasadoActivo === "no") {
+    filtrados = filtrados.filter((h) => !h.pasado_sistema_offline);
+  }
+
+  const terminoBusqueda = normalizeText(historialSearch.value);
+  if (terminoBusqueda) {
+    filtrados = filtrados.filter((h) => h.cliente && normalizeText(h.cliente).includes(terminoBusqueda));
+  }
+
   filtrados.sort((a, b) => {
     const claveA = `${a.fecha} ${a.hora_entrada || ""}`;
     const claveB = `${b.fecha} ${b.hora_entrada || ""}`;

@@ -864,7 +864,10 @@ html, body {
 .dash-periodo-chip,
 .dash-fin-periodo-chip,
 .dash-veh-periodo-chip,
-.dash-sims-periodo-chip {
+.dash-sims-periodo-chip,
+.hist-periodo-chip,
+.hist-pasado-chip,
+.stock-periodo-chip {
   flex: 1;
   font-family: 'Space Grotesk', sans-serif;
   font-weight: 600;
@@ -880,7 +883,10 @@ html, body {
 .dash-periodo-chip.active,
 .dash-fin-periodo-chip.active,
 .dash-veh-periodo-chip.active,
-.dash-sims-periodo-chip.active {
+.dash-sims-periodo-chip.active,
+.hist-periodo-chip.active,
+.hist-pasado-chip.active,
+.stock-periodo-chip.active {
   background: #101820;
   color: #F5A623;
   border-color: #101820;
@@ -889,7 +895,10 @@ html, body {
 .dash-periodo-chip:hover,
 .dash-fin-periodo-chip:hover,
 .dash-veh-periodo-chip:hover,
-.dash-sims-periodo-chip:hover {
+.dash-sims-periodo-chip:hover,
+.hist-periodo-chip:hover,
+.hist-pasado-chip:hover,
+.stock-periodo-chip:hover {
   border-color: var(--amber);
 }
 .dash-periodo-chip:focus-visible,
@@ -904,7 +913,10 @@ html, body {
 .dash-periodo-chip:active,
 .dash-fin-periodo-chip:active,
 .dash-veh-periodo-chip:active,
-.dash-sims-periodo-chip:active {
+.dash-sims-periodo-chip:active,
+.hist-periodo-chip:active,
+.hist-pasado-chip:active,
+.stock-periodo-chip:active {
   transform: scale(0.96);
 }
 .dash-card-num-chico { font-size: 18px; }
