@@ -119,6 +119,13 @@ module.exports = async (req, res) => {
     // el PDF en sí (no hay dónde adjuntarlo sin gastar espacio/otro
     // sistema de archivos) — para el PDF original sigue haciendo
     // falta el mail.
+    //
+    // IMPORTANTE: la ruta /api/comodatos del backend (sat-backend-d1)
+    // hace su PROPIO JSON.stringify de "detalle" al guardar (y su
+    // propio JSON.parse al leer) — por eso acá "detalle" va como
+    // objeto plano, NO pre-stringificado, para no terminar con un
+    // JSON dentro de un JSON. Esa misma ruta ignora "estado_envio" en
+    // el POST (siempre guarda "pendiente"), así que no se manda.
     try {
       const { BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN } = process.env;
       if (BACKEND_NUEVO_URL && BACKEND_NUEVO_TOKEN) {
@@ -130,8 +137,7 @@ module.exports = async (req, res) => {
             cliente: datos.comodatario || "",
             direccion: datos.direccion_comodatario || "",
             fecha,
-            estado_envio: "enviado",
-            detalle: JSON.stringify({ ...datos, tecnico: tecnico || "", cliente_email: cliente_email || "", clienteOk }),
+            detalle: { ...datos, tecnico: tecnico || "", cliente_email: cliente_email || "", clienteOk },
           }),
         });
       }

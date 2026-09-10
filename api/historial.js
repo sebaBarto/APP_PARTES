@@ -307,10 +307,10 @@ module.exports = async (req, res) => {
         res.status(r.status).json(data);
         return;
       }
-      // Comodatos: el backend guarda cliente/dirección/fecha como
-      // columnas sueltas y el resto (bienes, abono, DNI, técnico,
-      // etc.) empaquetado como JSON en "detalle" — acá se desempaqueta
-      // para que admin.html reciba un solo objeto plano por comodato.
+      // Comodatos: la ruta /api/comodatos del backend ya devuelve
+      // "detalle" como objeto (hace su propio JSON.parse al leer de
+      // la base) — acá solo se aplana en un único objeto por
+      // comodato para que admin.html no tenga que desarmar nada.
       if (req.query && req.query.tipo === "comodatos") {
         const r = await fetch(`${BACKEND_NUEVO_URL}/api/comodatos`, { headers: headersBackendNuevo });
         if (!r.ok) {
@@ -319,8 +319,7 @@ module.exports = async (req, res) => {
         }
         const data = await r.json();
         const lista = (Array.isArray(data) ? data : []).map((c) => {
-          let detalle = {};
-          try { detalle = JSON.parse(c.detalle || "{}"); } catch (err) { detalle = {}; }
+          const detalle = c.detalle && typeof c.detalle === "object" ? c.detalle : {};
           return {
             id: c.id,
             cliente: c.cliente || "",
