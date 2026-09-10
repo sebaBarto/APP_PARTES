@@ -21,13 +21,16 @@
 const { enviarATodos, enviarASeleccionados } = require("../lib/push-sender");
 
 const GUARDIAS_PATH = "guardias-config.json";
-const VEHICULOS_PATH = "vehiculos-config.json";
-const VEHICULOS_HISTORIAL_PATH = "vehiculos-historial.json";
-const HERRAMIENTAS_PATH = "herramientas-config.json";
 const TECNICOS_PATH = "tecnicos.json";
-const HISTORIAL_PATH = "historial.json"; // OJO: ver nota en chequearFelicitacionSemanal
 const CONFIG_PATH = "config.json";
 const ESTADO_PATH = "notificaciones-estado.json";
+
+// NOTA: vehiculos-config.json, vehiculos-historial.json,
+// herramientas-config.json e historial.json YA NO SE LEEN DE ACÁ —
+// esas colecciones viven en el backend nuevo (D1) desde la
+// migración; leerlas de GitHub devolvía datos congelados del día de
+// la migración. Se corrigió para leer todo del backend real
+// (fetchBackendArray, más abajo).
 
 async function leerJSON(ghHeaders, path, valorDefault) {
   const url = `https://api.github.com/repos/${process.env.GITHUB_DATA_REPO}/contents/${path}`;
@@ -385,7 +388,7 @@ async function chequearResumenSemanal(headersBackendNuevo, estado, ahora) {
 // Recordatorio de devolver el vehículo al final del día — lunes a
 // viernes (no fin de semana ni feriado), a los técnicos "en la
 // calle" que todavía tienen un vehículo tomado a esa altura del día.
-async function chequearRecordatorioDevolverVehiculo(ghHeaders, estado, ahora) {
+async function chequearRecordatorioDevolverVehiculo(ghHeaders, headersBackendNuevo, estado, ahora) {
   const diaSemana = ahora.getDay();
   if (diaSemana === 0 || diaSemana === 6) return null; // solo lunes a viernes
   // Esta franja comparte cron con la de la mañana (todos los días) —
@@ -401,7 +404,10 @@ async function chequearRecordatorioDevolverVehiculo(ghHeaders, estado, ahora) {
   const enCalle = new Set((tecnicos || []).filter((t) => t.en_calle).map((t) => t.nombre));
   if (enCalle.size === 0) return null;
 
-  const { data: historialVehiculos } = await leerJSON(ghHeaders, VEHICULOS_HISTORIAL_PATH, []);
+  // OJO: esto ANTES leía "vehiculos-historial.json" de GitHub — pero
+  // el historial de uso de vehículos se guarda en el backend nuevo
+  // (D1) desde la migración, así que ese archivo quedó congelado.
+  const historialVehiculos = await fetchBackendArray("/api/vehiculos/historial", headersBackendNuevo);
   const destinatarios = [...new Set(
     (historialVehiculos || [])
       .filter((h) => h.tecnico && enCalle.has(h.tecnico) && !h.hora_devolucion && !h.accion)
@@ -423,7 +429,7 @@ async function chequearRecordatorioDevolverVehiculo(ghHeaders, estado, ahora) {
   return destinatarios;
 }
 
-async function chequearRecordatorioTecnicosEnCalle(ghHeaders, estado, ahora) {
+async function chequearRecordatorioTecnicosEnCalle(ghHeaders, headersBackendNuevo, estado, ahora) {
   const diaSemana = ahora.getDay(); // 0 = domingo ... 6 = sábado
   if (diaSemana === 0 || diaSemana === 6) return null;
 
@@ -438,13 +444,18 @@ async function chequearRecordatorioTecnicosEnCalle(ghHeaders, estado, ahora) {
 
   // Si un técnico ya tomó vehículo Y ya tomó alguna herramienta, no
   // hace falta recordárselo — se salta del envío.
-  const { data: historialVehiculos } = await leerJSON(ghHeaders, VEHICULOS_HISTORIAL_PATH, []);
+  //
+  // OJO: esto ANTES leía "vehiculos-historial.json" y
+  // "herramientas-config.json" de GitHub — ambas colecciones ya
+  // viven en el backend nuevo (D1) desde la migración, así que esos
+  // dos archivos quedaron congelados con lo que tenían ese día.
+  const historialVehiculos = await fetchBackendArray("/api/vehiculos/historial", headersBackendNuevo);
   const tienenVehiculoTomado = new Set(
     (historialVehiculos || [])
       .filter((h) => h.tecnico && !h.hora_devolucion && !h.accion) // registro "tomar" todavía abierto
       .map((h) => h.tecnico)
   );
-  const { data: herramientas } = await leerJSON(ghHeaders, HERRAMIENTAS_PATH, []);
+  const herramientas = await fetchBackendArray("/api/herramientas", headersBackendNuevo);
   const tienenHerramientaTomada = new Set(
     (herramientas || [])
       .filter((h) => h.tecnico_actual && (h.estado === "uso" || h.estado === "cliente"))
@@ -469,8 +480,12 @@ async function chequearRecordatorioTecnicosEnCalle(ghHeaders, estado, ahora) {
   return destinatarios;
 }
 
-async function chequearVehiculos(ghHeaders, estado, hoy) {
-  const { data: vehiculos } = await leerJSON(ghHeaders, VEHICULOS_PATH, []);
+async function chequearVehiculos(headersBackendNuevo, estado, hoy) {
+  // OJO: esto ANTES leía "vehiculos-config.json" de GitHub — la
+  // colección "vehiculos" (km_actual, umbrales de mantenimiento) ya
+  // vive en el backend nuevo (D1) desde la migración, así que ese
+  // archivo quedó congelado con los valores de ese día.
+  const vehiculos = await fetchBackendArray("/api/vehiculos", headersBackendNuevo);
   if (!estado.vehiculos) estado.vehiculos = {};
 
   for (const v of vehiculos) {
@@ -510,10 +525,10 @@ module.exports = async (req, res) => {
     const ahora = ahoraArgentina();
 
     const tecnicoDeGuardia = await chequearGuardia(ghHeaders, estado, ahora);
-    await chequearVehiculos(ghHeaders, estado, ahora);
-    const tecnicosRecordados = await chequearRecordatorioTecnicosEnCalle(ghHeaders, estado, ahora);
+    await chequearVehiculos(headersBackendNuevo, estado, ahora);
+    const tecnicosRecordados = await chequearRecordatorioTecnicosEnCalle(ghHeaders, headersBackendNuevo, estado, ahora);
     const ganadoresSemana = await chequearFelicitacionSemanal(ghHeaders, headersBackendNuevo, estado, ahora);
-    const recordadosDevolver = await chequearRecordatorioDevolverVehiculo(ghHeaders, estado, ahora);
+    const recordadosDevolver = await chequearRecordatorioDevolverVehiculo(ghHeaders, headersBackendNuevo, estado, ahora);
     const resumenSemanal = await chequearResumenSemanal(headersBackendNuevo, estado, ahora);
 
     await guardarJSON(ghHeaders, ESTADO_PATH, estado, shaEstado);
