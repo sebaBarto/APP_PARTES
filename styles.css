@@ -886,7 +886,8 @@ html, body {
 .dash-sims-periodo-chip,
 .hist-periodo-chip,
 .hist-pasado-chip,
-.stock-periodo-chip {
+.stock-periodo-chip,
+.stock-pasado-chip {
   flex: 1;
   font-family: 'Space Grotesk', sans-serif;
   font-weight: 600;
@@ -905,7 +906,8 @@ html, body {
 .dash-sims-periodo-chip.active,
 .hist-periodo-chip.active,
 .hist-pasado-chip.active,
-.stock-periodo-chip.active {
+.stock-periodo-chip.active,
+.stock-pasado-chip.active {
   background: #101820;
   color: #F5A623;
   border-color: #101820;
@@ -917,7 +919,8 @@ html, body {
 .dash-sims-periodo-chip:hover,
 .hist-periodo-chip:hover,
 .hist-pasado-chip:hover,
-.stock-periodo-chip:hover {
+.stock-periodo-chip:hover,
+.stock-pasado-chip:hover {
   border-color: var(--amber);
 }
 .dash-periodo-chip:focus-visible,
@@ -935,7 +938,8 @@ html, body {
 .dash-sims-periodo-chip:active,
 .hist-periodo-chip:active,
 .hist-pasado-chip:active,
-.stock-periodo-chip:active {
+.stock-periodo-chip:active,
+.stock-pasado-chip:active {
   transform: scale(0.96);
 }
 .dash-card-num-chico { font-size: 18px; }

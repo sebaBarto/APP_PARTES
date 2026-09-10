@@ -521,6 +521,28 @@
         <input class="field-input" type="date" id="stockFechaEspecifica">
       </div>
 
+      <div class="field-group">
+        <input class="field-input search-input" id="stockSearch" type="search" placeholder="Buscar por cliente, modelo, N° o dirección...">
+      </div>
+
+      <div class="dash-periodo-tabs">
+        <button type="button" class="stock-pasado-chip active" data-pasado="todos">Todos</button>
+        <button type="button" class="stock-pasado-chip" data-pasado="no">No pasados</button>
+        <button type="button" class="stock-pasado-chip" data-pasado="si">Pasados</button>
+      </div>
+
+      <button type="button" class="btn btn-secondary" id="descargarExcelStockBtn" style="margin-bottom:14px;">⬇ Descargar Excel</button>
+
+      <div class="historial-seleccion-bar hidden" id="stockSeleccionBar">
+        <label class="historial-select-all">
+          <input type="checkbox" id="stockSeleccionarTodos">
+          Seleccionar todos
+        </label>
+        <button type="button" class="btn btn-primary btn-small" id="stockMarcarSeleccionadosBtn" disabled>
+          Marcar seleccionados como pasados (<span id="stockSeleccionCount">0</span>)
+        </button>
+      </div>
+
       <p class="list-status" id="stockStatus"></p>
 
       <div id="stockList" class="historial-list"></div>
@@ -1237,6 +1259,12 @@
       <div class="field-group hidden" id="histFechaEspecificaWrap">
         <label class="field-label" for="histFechaEspecifica">Elegí el día</label>
         <input class="field-input" type="date" id="histFechaEspecifica">
+      </div>
+
+      <div class="field-group hidden" id="historialFiltroTecnicoWrap">
+        <select class="field-input" id="historialFiltroTecnico">
+          <option value="">Todos los técnicos</option>
+        </select>
       </div>
 
       <div class="field-group">

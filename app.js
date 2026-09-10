@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.77.0";
+const APP_VERSION = "3.78.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -436,6 +436,8 @@ const historialSeleccionBar = document.getElementById("historialSeleccionBar");
 const historialSeleccionarTodos = document.getElementById("historialSeleccionarTodos");
 const historialMarcarSeleccionadosBtn = document.getElementById("historialMarcarSeleccionadosBtn");
 const historialSeleccionCount = document.getElementById("historialSeleccionCount");
+const historialFiltroTecnicoWrap = document.getElementById("historialFiltroTecnicoWrap");
+const historialFiltroTecnico = document.getElementById("historialFiltroTecnico");
 const verStockBtn = document.getElementById("verStockBtn");
 const volverDeStockBtn = document.getElementById("volverDeStockBtn");
 const refreshStockBtn = document.getElementById("refreshStockBtn");
@@ -444,6 +446,12 @@ const stockStatus = document.getElementById("stockStatus");
 const stockList = document.getElementById("stockList");
 const stockFechaEspecificaWrap = document.getElementById("stockFechaEspecificaWrap");
 const stockFechaEspecifica = document.getElementById("stockFechaEspecifica");
+const stockSearch = document.getElementById("stockSearch");
+const descargarExcelStockBtn = document.getElementById("descargarExcelStockBtn");
+const stockSeleccionBar = document.getElementById("stockSeleccionBar");
+const stockSeleccionarTodos = document.getElementById("stockSeleccionarTodos");
+const stockMarcarSeleccionadosBtn = document.getElementById("stockMarcarSeleccionadosBtn");
+const stockSeleccionCount = document.getElementById("stockSeleccionCount");
 const volverDeGuardiasBtn = document.getElementById("volverDeGuardiasBtn");
 const guardiaStatus = document.getElementById("guardiaStatus");
 const guardiaActualWrap = document.getElementById("guardiaActualWrap");
@@ -4233,10 +4241,24 @@ document.querySelectorAll(".hist-pasado-chip").forEach((chip) => {
   });
 });
 
+// Arma las opciones del filtro por técnico en Historial (solo se
+// muestra a quien tiene historial_todos, ya que si no siempre ve
+// solo lo propio).
+function poblarFiltroTecnicoHistorial() {
+  const nombres = Object.keys(tecnicosPasswords).sort();
+  const actual = historialFiltroTecnico.value;
+  historialFiltroTecnico.innerHTML = `<option value="">Todos los técnicos</option>${nombres.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("")}`;
+  historialFiltroTecnico.value = actual;
+}
+historialFiltroTecnico.addEventListener("change", renderHistorialReciente);
+
 historialSearch.addEventListener("input", renderHistorialReciente);
 
 tileHistorialBtn.addEventListener("click", () => {
   showScreen("historial");
+  const veTodoHistorial = permisosDelTecnico(tecnicoLogueado).historial_todos;
+  historialFiltroTecnicoWrap.classList.toggle("hidden", !veTodoHistorial);
+  if (veTodoHistorial) poblarFiltroTecnicoHistorial();
   fetchHistorialReciente();
 });
 volverDeHistorialBtn.addEventListener("click", () => {
@@ -4378,6 +4400,11 @@ function renderHistorialReciente() {
 
   if (!veTodo) {
     filtrados = filtrados.filter((h) => h.tecnico === tecnicoLogueado || h.tecnico2 === tecnicoLogueado);
+  } else {
+    const filtroTecnico = historialFiltroTecnico.value;
+    if (filtroTecnico) {
+      filtrados = filtrados.filter((h) => h.tecnico === filtroTecnico || h.tecnico2 === filtroTecnico);
+    }
   }
 
   if (histPasadoActivo === "si") {
@@ -4500,6 +4527,9 @@ function renderHistorialReciente() {
 // ---------- Historial de Stock (materiales instalados/retirados) ----------
 let stockCache = [];
 let stockPeriodoActivo = "semana";
+let stockPasadoActivo = "todos";
+let stockSeleccionados = new Set();
+let stockFiltradoActual = [];
 
 verStockBtn.addEventListener("click", () => {
   showScreen("stock");
@@ -4522,6 +4552,55 @@ document.querySelectorAll(".stock-periodo-chip").forEach((chip) => {
 });
 stockFechaEspecifica.addEventListener("change", renderStock);
 
+document.querySelectorAll(".stock-pasado-chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    document.querySelectorAll(".stock-pasado-chip").forEach((c) => c.classList.remove("active"));
+    chip.classList.add("active");
+    stockPasadoActivo = chip.dataset.pasado;
+    renderStock();
+  });
+});
+
+stockSearch.addEventListener("input", renderStock);
+
+stockSeleccionarTodos.addEventListener("change", () => {
+  const seleccionables = stockFiltradoActual.filter((m) => permisosDelTecnico(tecnicoLogueado).marcar_pasado_sistema && !m.pasado_sistema_offline);
+  if (stockSeleccionarTodos.checked) {
+    seleccionables.forEach((m) => stockSeleccionados.add(m.id));
+  } else {
+    seleccionables.forEach((m) => stockSeleccionados.delete(m.id));
+  }
+  renderStock();
+});
+
+stockMarcarSeleccionadosBtn.addEventListener("click", marcarStockSeleccionadosComoPasados);
+
+descargarExcelStockBtn.addEventListener("click", () => {
+  if (stockFiltradoActual.length === 0) {
+    showToast("No hay movimientos para descargar con estos filtros.");
+    return;
+  }
+  const filas = stockFiltradoActual.map((m) => ({
+    "N° Servicio": m.numero_servicio || "",
+    "N° Cliente": m.numero_cliente || "",
+    Cliente: m.cliente || "",
+    Dirección: m.direccion || "",
+    Modelo: m.modelo || "",
+    Categoría: m.categoria || "",
+    "Cant. instalada": m.cantidad_instalada || 0,
+    "Cant. retirada": m.cantidad_retirada || 0,
+    Técnico: m.tecnico || "",
+    Fecha: m.fecha || "",
+    "Cargado a mano": m.es_manual ? "Sí" : "No",
+    "Pasado a sistema": m.pasado_sistema_offline ? "Sí" : "No",
+    "Pasado por": m.pasado_sistema_por || "",
+  }));
+  const hoja = XLSX.utils.json_to_sheet(filas);
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, "Stock");
+  XLSX.writeFile(libro, `stock_${stockPeriodoActivo}_${fechaActualISOVehiculo()}.xlsx`);
+});
+
 async function fetchStock() {
   stockStatus.textContent = "Cargando...";
   stockList.innerHTML = "";
@@ -4538,6 +4617,17 @@ async function fetchStock() {
   }
 }
 
+async function enviarMarcarStockPasadoSistema(m, marcarComo) {
+  const res = await fetch("/api/historial", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+    body: JSON.stringify({ accion: "marcar_pasado_sistema_stock", id: m.id, pasado: marcarComo, tecnico: tecnicoLogueado || "" }),
+  });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  m.pasado_sistema_offline = marcarComo ? 1 : 0;
+  m.pasado_sistema_por = marcarComo ? tecnicoLogueado || "" : "";
+}
+
 async function marcarStockPasadoSistema(m, marcarComo) {
   const ok = confirm(
     marcarComo
@@ -4546,37 +4636,86 @@ async function marcarStockPasadoSistema(m, marcarComo) {
   );
   if (!ok) return;
   try {
-    const res = await fetch("/api/historial", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-      body: JSON.stringify({ accion: "marcar_pasado_sistema_stock", id: m.id, pasado: marcarComo, tecnico: tecnicoLogueado || "" }),
-    });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    m.pasado_sistema_offline = marcarComo ? 1 : 0;
-    m.pasado_sistema_por = marcarComo ? tecnicoLogueado || "" : "";
+    await enviarMarcarStockPasadoSistema(m, marcarComo);
+    stockSeleccionados.delete(m.id);
     renderStock();
   } catch (err) {
     showToast("No se pudo actualizar: " + err.message);
   }
 }
 
+async function marcarStockSeleccionadosComoPasados() {
+  const ids = Array.from(stockSeleccionados);
+  if (ids.length === 0) return;
+  const ok = confirm(`¿Confirmás que marcás ${ids.length} movimiento(s) como pasados a tu sistema?`);
+  if (!ok) return;
+  stockMarcarSeleccionadosBtn.disabled = true;
+  const objetivos = ids.map((id) => stockCache.find((m) => m.id === id)).filter(Boolean);
+  const resultados = await Promise.allSettled(objetivos.map((m) => enviarMarcarStockPasadoSistema(m, true)));
+  const exitos = resultados.filter((r) => r.status === "fulfilled").length;
+  const fallos = resultados.length - exitos;
+  stockSeleccionados.clear();
+  renderStock();
+  showToast(fallos > 0 ? `${exitos} marcado(s), ${fallos} fallaron.` : `${exitos} movimiento(s) marcados como pasados.`);
+}
+
+function actualizarBarraSeleccionStock(seleccionables) {
+  if (seleccionables.length === 0) {
+    stockSeleccionBar.classList.add("hidden");
+    return;
+  }
+  stockSeleccionBar.classList.remove("hidden");
+  const seleccionadosVisibles = seleccionables.filter((m) => stockSeleccionados.has(m.id)).length;
+  stockSeleccionCount.textContent = String(seleccionadosVisibles);
+  stockMarcarSeleccionadosBtn.disabled = seleccionadosVisibles === 0;
+  stockSeleccionarTodos.checked = seleccionadosVisibles > 0 && seleccionadosVisibles === seleccionables.length;
+  stockSeleccionarTodos.indeterminate = seleccionadosVisibles > 0 && seleccionadosVisibles < seleccionables.length;
+}
+
 function renderStock() {
   const puedeMarcarPasado = permisosDelTecnico(tecnicoLogueado).marcar_pasado_sistema;
   const rango = obtenerRangoPeriodo(stockPeriodoActivo, stockFechaEspecifica);
-  const filtrados = stockCache
-    .filter((m) => fechaEnRango(m.fecha, rango))
-    .sort((a, b) => {
-      const claveA = `${a.fecha || ""} ${a.hora || ""}`;
-      const claveB = `${b.fecha || ""} ${b.hora || ""}`;
-      return claveB.localeCompare(claveA);
+  let filtrados = stockCache.filter((m) => fechaEnRango(m.fecha, rango));
+
+  if (stockPasadoActivo === "si") {
+    filtrados = filtrados.filter((m) => !!m.pasado_sistema_offline);
+  } else if (stockPasadoActivo === "no") {
+    filtrados = filtrados.filter((m) => !m.pasado_sistema_offline);
+  }
+
+  const terminoBusqueda = normalizeText(stockSearch.value);
+  if (terminoBusqueda) {
+    filtrados = filtrados.filter((m) => {
+      const haystack = normalizeText([m.cliente, m.modelo, m.numero_servicio, m.direccion].join(" "));
+      return haystack.includes(terminoBusqueda);
     });
+  }
+
+  // Los no pasados a sistema van primero; dentro de cada grupo, más reciente primero.
+  filtrados.sort((a, b) => {
+    const aPend = a.pasado_sistema_offline ? 1 : 0;
+    const bPend = b.pasado_sistema_offline ? 1 : 0;
+    if (aPend !== bPend) return aPend - bPend;
+    const claveA = `${a.fecha || ""} ${a.hora || ""}`;
+    const claveB = `${b.fecha || ""} ${b.hora || ""}`;
+    return claveB.localeCompare(claveA);
+  });
+
+  stockFiltradoActual = filtrados;
+
+  const idsVisibles = new Set(filtrados.map((m) => m.id));
+  stockSeleccionados.forEach((id) => {
+    if (!idsVisibles.has(id)) stockSeleccionados.delete(id);
+  });
 
   stockList.innerHTML = "";
   if (filtrados.length === 0) {
     stockStatus.textContent = "No hay movimientos de stock en ese período.";
+    actualizarBarraSeleccionStock([]);
     return;
   }
   stockStatus.textContent = `${filtrados.length} movimiento(s).`;
+  const seleccionables = [];
   filtrados.forEach((m) => {
     let fechaTexto = m.fecha || "";
     if (m.fecha) {
@@ -4590,28 +4729,48 @@ function renderStock() {
 
     const card = document.createElement("div");
     card.className = "historial-card" + (m.pasado_sistema_offline ? " historial-card-pasado" : "");
+    const puedeSeleccionar = puedeMarcarPasado && !m.pasado_sistema_offline;
+    if (puedeSeleccionar) seleccionables.push(m);
+    const seleccionHtml = puedeSeleccionar ? `
+      <label class="historial-card-seleccionar" title="Seleccionar para marcar en lote">
+        <input type="checkbox" class="stock-check-seleccion" ${stockSeleccionados.has(m.id) ? "checked" : ""}>
+      </label>
+    ` : "";
     card.innerHTML = `
-      <div class="historial-card-num">N° ${escapeHtml(m.numero_servicio || "s/n")}${m.numero_cliente ? " · Cliente " + escapeHtml(m.numero_cliente) : ""}</div>
+      <div class="historial-card-header-izq">
+        ${seleccionHtml}
+        <div class="historial-card-num">N° ${escapeHtml(m.numero_servicio || "s/n")}${m.numero_cliente ? " · Cliente " + escapeHtml(m.numero_cliente) : ""}</div>
+      </div>
       <div class="historial-card-cliente">${escapeHtml(m.modelo)}${m.categoria ? " · " + escapeHtml(m.categoria) : ""}</div>
       <div class="historial-card-direccion">${escapeHtml(m.cliente)} — ${escapeHtml(m.direccion || "")}</div>
       <div class="historial-card-horario">${escapeHtml(m.tecnico)} — ${fechaTexto}</div>
       <div class="historial-card-badges">${partes.join("")}</div>
       ${puedeMarcarPasado ? `
         <label class="historial-card-check">
-          <input type="checkbox" ${m.pasado_sistema_offline ? "checked" : ""}>
+          <input type="checkbox" class="stock-check-pasado" ${m.pasado_sistema_offline ? "checked" : ""}>
           ${m.pasado_sistema_offline ? `Pasado a sistema (${escapeHtml(m.pasado_sistema_por || "")})` : "Pasado a mi sistema"}
         </label>
       ` : ""}
     `;
     if (puedeMarcarPasado) {
-      const checkbox = card.querySelector("input[type=checkbox]");
+      const checkbox = card.querySelector(".stock-check-pasado");
       checkbox.addEventListener("click", (e) => {
         e.preventDefault();
         marcarStockPasadoSistema(m, !m.pasado_sistema_offline);
       });
     }
+    if (puedeSeleccionar) {
+      const checkboxSel = card.querySelector(".stock-check-seleccion");
+      checkboxSel.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (checkboxSel.checked) stockSeleccionados.add(m.id);
+        else stockSeleccionados.delete(m.id);
+        actualizarBarraSeleccionStock(seleccionables);
+      });
+    }
     stockList.appendChild(card);
   });
+  actualizarBarraSeleccionStock(seleccionables);
 }
 
 // ---------- Presencia en obra (llegada/salida) ----------
