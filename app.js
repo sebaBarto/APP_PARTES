@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.76.0";
+const APP_VERSION = "3.76.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -4323,6 +4323,9 @@ function renderHistorialReciente() {
         <span class="historial-card-cobrar" title="Tiene un valor a cobrar">$</span>
       </div>
     ` : "";
+    const textoResena = (h.tarea || h.observaciones || "").trim();
+    const resenaCorta = textoResena.length > 160 ? textoResena.slice(0, 160).trim() + "…" : textoResena;
+    const resenaHtml = resenaCorta ? `<div class="historial-card-resena">${escapeHtml(resenaCorta)}</div>` : "";
     card.innerHTML = `
       <div class="historial-card-header">
         <div class="historial-card-num">N° ${escapeHtml(h.numero_servicio || h.id_parte)}</div>
@@ -4331,6 +4334,7 @@ function renderHistorialReciente() {
       <div class="historial-card-cliente">${escapeHtml(h.cliente)}</div>
       <div class="historial-card-direccion">${escapeHtml(h.direccion)}${h.localidad ? ", " + escapeHtml(h.localidad) : ""}</div>
       <div class="historial-card-horario">${fechaTexto} — ${h.hora_entrada || "?"} a ${h.hora_salida || "?"}</div>
+      ${resenaHtml}
       ${clavesHtml}
       ${puedeMarcarPasado ? `
         <label class="historial-card-check">
