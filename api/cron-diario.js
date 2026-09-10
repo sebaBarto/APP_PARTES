@@ -13,7 +13,10 @@
 //
 // Variables de entorno:
 //   CRON_SECRET, GITHUB_DATA_TOKEN, GITHUB_DATA_REPO,
-//   VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT
+//   VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT,
+//   BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN (para leer partes/encuestas/
+//   comodatos/emergencias/stock/vehículos, que ya viven en D1),
+//   SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS (para el resumen semanal)
 
 const { enviarATodos, enviarASeleccionados } = require("../lib/push-sender");
 
@@ -22,7 +25,7 @@ const VEHICULOS_PATH = "vehiculos-config.json";
 const VEHICULOS_HISTORIAL_PATH = "vehiculos-historial.json";
 const HERRAMIENTAS_PATH = "herramientas-config.json";
 const TECNICOS_PATH = "tecnicos.json";
-const HISTORIAL_PATH = "historial.json";
+const HISTORIAL_PATH = "historial.json"; // OJO: ver nota en chequearFelicitacionSemanal
 const CONFIG_PATH = "config.json";
 const ESTADO_PATH = "notificaciones-estado.json";
 
@@ -48,6 +51,20 @@ async function guardarJSON(ghHeaders, path, contenido, sha) {
       sha: sha || undefined,
     }),
   });
+}
+
+// Trae una lista desde el backend nuevo (Cloudflare + D1) — partes,
+// encuestas, comodatos, etc. ya viven ahí, no en GitHub. Devuelve []
+// si falla, para que un problema acá nunca tumbe el resto del cron.
+async function fetchBackendArray(ruta, headersBackendNuevo) {
+  try {
+    const r = await fetch(`${process.env.BACKEND_NUEVO_URL}${ruta}`, { headers: headersBackendNuevo });
+    if (!r.ok) return [];
+    const data = await r.json();
+    return Array.isArray(data) ? data : [];
+  } catch (err) {
+    return [];
+  }
 }
 
 // Fecha/hora actual en Argentina (UTC-3 todo el año, sin horario de verano).
@@ -164,7 +181,7 @@ async function esFeriadoArgentina(fecha) {
 // cuándo dispare el cron en esa franja), se le manda a TODO el equipo
 // un aviso público felicitando al técnico que más servicios resolvió
 // esa semana (lunes a hoy). Se puede apagar desde admin.html.
-async function chequearFelicitacionSemanal(ghHeaders, estado, ahora) {
+async function chequearFelicitacionSemanal(ghHeaders, headersBackendNuevo, estado, ahora) {
   if (ahora.getDay() !== 5) return null; // solo viernes
   // Los viernes disparan DOS invocaciones del mismo cron (la de la
   // mañana de todos los días, y la de la tarde solo de los viernes) —
@@ -185,7 +202,11 @@ async function chequearFelicitacionSemanal(ghHeaders, estado, ahora) {
   const lunesStr = `${lunes.getFullYear()}-${String(lunes.getMonth() + 1).padStart(2, "0")}-${String(lunes.getDate()).padStart(2, "0")}`;
   const hoyStr = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, "0")}-${String(ahora.getDate()).padStart(2, "0")}`;
 
-  const { data: historial } = await leerJSON(ghHeaders, HISTORIAL_PATH, []);
+  // OJO: esto ANTES leía "historial.json" de GitHub — pero desde que
+  // los partes se guardan en el backend nuevo (D1), nadie escribe más
+  // ese archivo, así que quedó congelado en lo que tenía el día de la
+  // migración (v3.53). Se corrigió para leer directo del backend.
+  const historial = await fetchBackendArray("/api/partes", headersBackendNuevo);
   const conteos = {};
   (historial || []).forEach((h) => {
     if (!h.fecha || !h.tecnico) return;
@@ -210,6 +231,155 @@ async function chequearFelicitacionSemanal(ghHeaders, estado, ahora) {
 
   estado.ultima_semana_felicitacion = semanaActual;
   return ganadores;
+}
+
+// ---------- Resumen semanal por mail (no push) ----------
+// Se manda los lunes con un pantallazo de la semana anterior (lunes a
+// domingo): partes completados, facturación, satisfacción, comodatos,
+// emergencias, gasto en vehículos, y los pendientes acumulados de
+// "pasar a sistema". Reutiliza las credenciales SMTP que ya están
+// configuradas en Vercel (las mismas de los mails de partes/comodatos).
+let transporterResumenCache = null;
+function getTransporterResumen() {
+  if (transporterResumenCache) return transporterResumenCache;
+  const nodemailer = require("nodemailer");
+  const puerto = Number(process.env.SMTP_PORT || 465);
+  transporterResumenCache = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: puerto,
+    secure: puerto === 465,
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    connectionTimeout: 8000,
+    greetingTimeout: 8000,
+    socketTimeout: 8000,
+  });
+  return transporterResumenCache;
+}
+
+// Lunes a domingo de la semana ANTERIOR a "ahora" (que se espera que
+// sea un lunes — así el resumen siempre cubre una semana ya cerrada).
+function rangoSemanaAnterior(ahora) {
+  const diaSemana = ahora.getDay() || 7; // 1=lunes...7=domingo
+  const lunesEsta = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate() - (diaSemana - 1));
+  const lunesAnterior = new Date(lunesEsta);
+  lunesAnterior.setDate(lunesAnterior.getDate() - 7);
+  const domingoAnterior = new Date(lunesEsta);
+  domingoAnterior.setDate(domingoAnterior.getDate() - 1);
+  const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return { desde: fmt(lunesAnterior), hasta: fmt(domingoAnterior) };
+}
+
+async function chequearResumenSemanal(headersBackendNuevo, estado, ahora) {
+  if (ahora.getDay() !== 1) return null; // solo lunes
+
+  const semanaActual = numeroSemanaIso(ahora);
+  if (estado.ultima_semana_resumen === semanaActual) return null;
+
+  const { SMTP_HOST, SMTP_USER, SMTP_PASS } = process.env;
+  if (!process.env.BACKEND_NUEVO_URL || !SMTP_HOST || !SMTP_USER || !SMTP_PASS) {
+    return null; // faltan variables — no se manda, no rompe el resto del cron
+  }
+
+  const { desde, hasta } = rangoSemanaAnterior(ahora);
+  const enRango = (fecha) => !!fecha && fecha >= desde && fecha <= hasta;
+  const enRangoDesdeDatetime = (fechaHora) => !!fechaHora && fechaHora.slice(0, 10) >= desde && fechaHora.slice(0, 10) <= hasta;
+
+  const [partes, encuestas, comodatos, emergencias, stock, vehiculosHist] = await Promise.all([
+    fetchBackendArray("/api/partes", headersBackendNuevo),
+    fetchBackendArray("/api/encuestas", headersBackendNuevo),
+    fetchBackendArray("/api/comodatos", headersBackendNuevo),
+    fetchBackendArray("/api/emergencias", headersBackendNuevo),
+    fetchBackendArray("/api/stock", headersBackendNuevo),
+    fetchBackendArray("/api/vehiculos/historial", headersBackendNuevo),
+  ]);
+
+  const partesSemana = partes.filter((p) => enRango(p.fecha));
+  const totalFacturado = partesSemana.reduce((suma, p) => suma + (parseFloat(p.costo_final) || 0), 0);
+  const partesSinPasar = partes.filter((p) => !p.pasado_sistema_offline).length;
+  const stockSinPasar = stock.filter((m) => !m.pasado_sistema_offline).length;
+
+  const encuestasSemana = encuestas.filter((e) => enRangoDesdeDatetime(e.creado_en));
+  const promedioSemana = encuestasSemana.length > 0
+    ? encuestasSemana.reduce((suma, e) => suma + e.puntaje, 0) / encuestasSemana.length
+    : null;
+
+  const comodatosSemana = comodatos.filter((c) => enRango(c.fecha));
+  const emergenciasSemana = emergencias.filter((e) => enRangoDesdeDatetime(e.fecha_carga));
+
+  const conteoPartesPorTecnico = {};
+  partesSemana.forEach((p) => {
+    if (!p.tecnico) return;
+    conteoPartesPorTecnico[p.tecnico] = (conteoPartesPorTecnico[p.tecnico] || 0) + 1;
+  });
+  const rankingPartes = Object.entries(conteoPartesPorTecnico)
+    .map(([nombre, cantidad]) => ({ nombre, cantidad }))
+    .sort((a, b) => b.cantidad - a.cantidad);
+
+  const satPorTecnico = {};
+  encuestasSemana.forEach((e) => {
+    const nombre = e.tecnico || "Sin técnico";
+    if (!satPorTecnico[nombre]) satPorTecnico[nombre] = { suma: 0, cantidad: 0 };
+    satPorTecnico[nombre].suma += e.puntaje;
+    satPorTecnico[nombre].cantidad += 1;
+  });
+  const rankingSatisfaccion = Object.entries(satPorTecnico)
+    .map(([nombre, { suma, cantidad }]) => ({ nombre, promedio: suma / cantidad, cantidad }))
+    .sort((a, b) => b.promedio - a.promedio);
+
+  const eventosVehiculosSemana = vehiculosHist.filter((h) => h.accion === "evento" && enRango(h.fecha));
+  const gastoVehiculos = eventosVehiculosSemana.reduce((suma, h) => suma + (parseFloat(h.monto) || 0), 0);
+
+  const fmtMoneda = (n) => "$" + Math.round(n).toLocaleString("es-AR");
+  const fila = (etiqueta, valor) => `<tr><td style="padding:5px 14px 5px 0; color:#101820;">${etiqueta}</td><td style="padding:5px 0; text-align:right; font-weight:700; color:#101820;">${valor}</td></tr>`;
+  const tabla = (filas) => `<table style="width:100%; border-collapse:collapse; margin-bottom:20px;">${filas}</table>`;
+
+  const html = `
+    <div style="font-family: Arial, Helvetica, sans-serif; color:#101820; max-width:560px; margin:0 auto;">
+      <h2 style="margin-bottom:2px;">📊 Resumen semanal — Servicio Técnico SAT</h2>
+      <p style="color:#6B7680; margin-top:0; margin-bottom:22px;">Semana del ${desde} al ${hasta}</p>
+
+      ${tabla([
+        fila("Servicios completados", partesSemana.length),
+        fila("Total facturado", fmtMoneda(totalFacturado)),
+        fila("Comodatos firmados", comodatosSemana.length),
+        fila("Emergencias cargadas", emergenciasSemana.length),
+        fila("Promedio de satisfacción", promedioSemana != null ? `${promedioSemana.toFixed(1)} ⭐ (${encuestasSemana.length})` : "Sin calificaciones"),
+        fila("Gasto en vehículos (combustible/mecánico/etc.)", fmtMoneda(gastoVehiculos)),
+      ].join(""))}
+
+      <h3 style="margin-bottom:6px;">⚠️ Pendientes acumulados</h3>
+      ${tabla([
+        fila("Partes sin pasar a sistema", partesSinPasar),
+        fila("Movimientos de stock sin pasar a sistema", stockSinPasar),
+      ].join(""))}
+
+      ${rankingPartes.length > 0 ? `
+        <h3 style="margin-bottom:6px;">Servicios completados por técnico</h3>
+        ${tabla(rankingPartes.map((t) => fila(t.nombre, t.cantidad)).join(""))}
+      ` : ""}
+
+      ${rankingSatisfaccion.length > 0 ? `
+        <h3 style="margin-bottom:6px;">Satisfacción por técnico (esta semana)</h3>
+        ${tabla(rankingSatisfaccion.map((t) => fila(t.nombre, `${t.promedio.toFixed(1)} ⭐ (${t.cantidad})`)).join(""))}
+      ` : ""}
+    </div>
+  `;
+
+  try {
+    const transporter = getTransporterResumen();
+    await transporter.sendMail({
+      from: `"Servicio Técnico SAT" <${process.env.SMTP_USER}>`,
+      to: "tecnica@sat365.com.ar, ventas@sat365.com.ar",
+      subject: `Resumen semanal SAT — ${desde} al ${hasta}`,
+      html,
+    });
+  } catch (err) {
+    console.error("[cron-diario] No se pudo mandar el resumen semanal:", err);
+    return null; // no se marca como enviado, para reintentar en la corrida de la tarde
+  }
+
+  estado.ultima_semana_resumen = semanaActual;
+  return { desde, hasta, partes: partesSemana.length };
 }
 
 // Recordatorio de devolver el vehículo al final del día — lunes a
@@ -335,18 +505,20 @@ module.exports = async (req, res) => {
       Authorization: `Bearer ${process.env.GITHUB_DATA_TOKEN}`,
       Accept: "application/vnd.github+json",
     };
+    const headersBackendNuevo = { Authorization: `Bearer ${process.env.BACKEND_NUEVO_TOKEN || ""}` };
     const { data: estado, sha: shaEstado } = await leerJSON(ghHeaders, ESTADO_PATH, {});
     const ahora = ahoraArgentina();
 
     const tecnicoDeGuardia = await chequearGuardia(ghHeaders, estado, ahora);
     await chequearVehiculos(ghHeaders, estado, ahora);
     const tecnicosRecordados = await chequearRecordatorioTecnicosEnCalle(ghHeaders, estado, ahora);
-    const ganadoresSemana = await chequearFelicitacionSemanal(ghHeaders, estado, ahora);
+    const ganadoresSemana = await chequearFelicitacionSemanal(ghHeaders, headersBackendNuevo, estado, ahora);
     const recordadosDevolver = await chequearRecordatorioDevolverVehiculo(ghHeaders, estado, ahora);
+    const resumenSemanal = await chequearResumenSemanal(headersBackendNuevo, estado, ahora);
 
     await guardarJSON(ghHeaders, ESTADO_PATH, estado, shaEstado);
 
-    res.status(200).json({ ok: true, guardia_notificada: tecnicoDeGuardia || null, recordatorio_en_calle: tecnicosRecordados || null, felicitacion_semanal: ganadoresSemana || null, recordatorio_devolver: recordadosDevolver || null });
+    res.status(200).json({ ok: true, guardia_notificada: tecnicoDeGuardia || null, recordatorio_en_calle: tecnicosRecordados || null, felicitacion_semanal: ganadoresSemana || null, recordatorio_devolver: recordadosDevolver || null, resumen_semanal: resumenSemanal || null });
   } catch (err) {
     res.status(500).json({ error: "Error interno en el cron diario", detail: String(err.message || err) });
   }
