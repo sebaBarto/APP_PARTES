@@ -149,7 +149,16 @@
     width: auto; background: #FFFFFF; color: var(--steel); border: 1.5px solid var(--border);
     padding: 12px 6px; font-size: 11.5px; box-shadow: none; border-radius: var(--r-md);
     display: flex; flex-direction: column; align-items: center; gap: 4px; line-height: 1.25;
+    position: relative;
     transition: transform 140ms var(--ease), box-shadow 220ms var(--ease), background 140ms var(--ease), color 140ms var(--ease), border-color 140ms var(--ease);
+  }
+  .tab-badge {
+    position: absolute; top: -6px; right: -6px;
+    min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px;
+    background: var(--acc-alert); color: #FFFFFF;
+    font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 10.5px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 0 2px #FFFFFF;
   }
   /* Red de seguridad: cualquier ícono SVG con fill="none" tiene que
      tener siempre un color de trazo, para no quedar invisible. */
@@ -265,7 +274,7 @@
       <button type="button" class="tab-btn" id="tabEncuestasBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 14s1.5 2 4 2 4-2 4-2"/><circle cx="9" cy="9" r="1"/><circle cx="15" cy="9" r="1"/><circle cx="12" cy="12" r="10"/></svg></span>Satisfacción</button>
       <button type="button" class="tab-btn" id="tabComodatosBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span>Comodatos</button>
       <button type="button" class="tab-btn" id="tabClavesClienteBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>Claves por cliente</button>
-      <button type="button" class="tab-btn" id="tabEmergenciaBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.29 3.86l-8.18 14.18A2 2 0 0 0 3.82 21h16.36a2 2 0 0 0 1.71-3l-8.18-14.14a2 2 0 0 0-3.42 0z"/></svg></span>Emergencias</button>
+      <button type="button" class="tab-btn" id="tabEmergenciaBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.29 3.86l-8.18 14.18A2 2 0 0 0 3.82 21h16.36a2 2 0 0 0 1.71-3l-8.18-14.14a2 2 0 0 0-3.42 0z"/></svg></span>Emergencias<span class="tab-badge hidden" id="emergenciasBadge">0</span></button>
     </div>
 
     <div id="panelServicios">
@@ -664,6 +673,11 @@
         <div style="color:#6B7680; font-size:13px;" id="encuestasResumen">Sin calificaciones todavía.</div>
       </div>
 
+      <div class="card" style="margin-bottom:16px;">
+        <label>Promedio por técnico</label>
+        <div id="encuestasRankingTecnicos" style="margin-top:8px;"></div>
+      </div>
+
       <div class="card">
         <p class="status" id="encuestasStatus">Cargando...</p>
         <div id="encuestasLista"></div>
@@ -803,6 +817,7 @@ const clavesClienteDetalle = document.getElementById("clavesClienteDetalle");
 const clavesClienteDetalleContenido = document.getElementById("clavesClienteDetalleContenido");
 const encuestasPromedio = document.getElementById("encuestasPromedio");
 const encuestasResumen = document.getElementById("encuestasResumen");
+const encuestasRankingTecnicos = document.getElementById("encuestasRankingTecnicos");
 const encuestasStatus = document.getElementById("encuestasStatus");
 const encuestasLista = document.getElementById("encuestasLista");
 const tabComodatosBtn = document.getElementById("tabComodatosBtn");
@@ -813,7 +828,6 @@ const comodatosLista = document.getElementById("comodatosLista");
 const tabEmergenciaBtn = document.getElementById("tabEmergenciaBtn");
 const panelEmergencia = document.getElementById("panelEmergencia");
 let emergenciaCargadaUnaVezAdmin = false;
-let emergenciasCargadasUnaVezAdmin = false;
 let planosCargadosUnaVezAdmin = false;
 
 const TABS = [
@@ -835,7 +849,6 @@ const TABS = [
   { btn: tabComodatosBtn, panel: panelComodatos, onShow: () => cargarComodatosAdmin() },
   { btn: tabClavesClienteBtn, panel: panelClavesCliente, onShow: () => cargarClavesClienteAdmin() },
   { btn: tabEmergenciaBtn, panel: panelEmergencia, onShow: () => { if (!emergenciaCargadaUnaVezAdmin) { emergenciaCargadaUnaVezAdmin = true; cargarEmergenciasAdmin(); } } },
-  { btn: tabEmergenciaBtn, panel: panelEmergencia, onShow: () => { if (!emergenciasCargadasUnaVezAdmin) { emergenciasCargadasUnaVezAdmin = true; cargarEmergenciasAdmin(); } } },
 ];
 
 TABS.forEach(({ btn, panel, onShow }) => {
@@ -1040,6 +1053,10 @@ pwBtn.addEventListener("click", async () => {
       loginCard.classList.add("hidden");
       mainCard.classList.remove("hidden");
       cargarConfigAdmin();
+      // Se carga sin esperar a que entren a la pestaña, para que el
+      // numerito de "sin revisar" ya se vea apenas abren admin.html.
+      emergenciaCargadaUnaVezAdmin = true;
+      cargarEmergenciasAdmin();
     } else if (data.bloqueado) {
       pwError.textContent = `Demasiados intentos fallidos — probá de nuevo en ${data.minutos_restantes} minuto(s).`;
     } else {
@@ -3006,6 +3023,7 @@ async function cargarEncuestasAdmin() {
     if (encuestas.length === 0) {
       encuestasPromedio.textContent = "—";
       encuestasResumen.textContent = "Sin calificaciones todavía.";
+      encuestasRankingTecnicos.innerHTML = "";
       encuestasStatus.textContent = "";
       encuestasLista.innerHTML = "";
       return;
@@ -3015,6 +3033,27 @@ async function cargarEncuestasAdmin() {
     encuestasPromedio.textContent = promedio.toFixed(1);
     encuestasResumen.textContent = `${encuestas.length} calificación(es) recibida(s).`;
     encuestasStatus.textContent = "";
+
+    // Ranking por técnico — mismos puntajes, agrupados y ordenados de
+    // mejor a peor promedio (a igual promedio, gana el que tiene más
+    // calificaciones, por ser un promedio más confiable).
+    const porTecnico = {};
+    encuestas.forEach((e) => {
+      const nombre = e.tecnico || "Sin técnico asignado";
+      if (!porTecnico[nombre]) porTecnico[nombre] = { suma: 0, cantidad: 0 };
+      porTecnico[nombre].suma += e.puntaje;
+      porTecnico[nombre].cantidad += 1;
+    });
+    const ranking = Object.entries(porTecnico)
+      .map(([nombre, { suma, cantidad }]) => ({ nombre, promedio: suma / cantidad, cantidad }))
+      .sort((a, b) => b.promedio - a.promedio || b.cantidad - a.cantidad);
+
+    encuestasRankingTecnicos.innerHTML = ranking.map((t) => `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px solid #EEE;">
+        <span>${escapeHtmlAdmin(t.nombre)}</span>
+        <span style="color:#6B7680; font-size:13px;">${t.promedio.toFixed(1)} ⭐ (${t.cantidad})</span>
+      </div>
+    `).join("");
 
     const emojis = { 1: "😞", 2: "🙁", 3: "😐", 4: "🙂", 5: "😄" };
     encuestasLista.innerHTML = encuestas.map((e) => {
@@ -3265,6 +3304,7 @@ planosBuscarAdmin.addEventListener("input", dibujarResultadosPlanosAdmin);
 // ---------- Servicios de emergencia ----------
 const emergenciaAdminStatus = document.getElementById("emergenciaAdminStatus");
 const emergenciaAdminLista = document.getElementById("emergenciaAdminLista");
+const emergenciasBadge = document.getElementById("emergenciasBadge");
 let emergenciasCacheAdmin = [];
 
 async function cargarEmergenciasAdmin() {
@@ -3286,11 +3326,17 @@ async function cargarEmergenciasAdmin() {
 
 function dibujarEmergenciasAdmin() {
   emergenciaAdminLista.innerHTML = "";
+  const pendientes = emergenciasCacheAdmin.filter((e) => !e.revisado).length;
+  if (pendientes > 0) {
+    emergenciasBadge.textContent = pendientes > 99 ? "99+" : String(pendientes);
+    emergenciasBadge.classList.remove("hidden");
+  } else {
+    emergenciasBadge.classList.add("hidden");
+  }
   if (emergenciasCacheAdmin.length === 0) {
     emergenciaAdminStatus.textContent = "Todavía no se cargó ningún servicio de emergencia.";
     return;
   }
-  const pendientes = emergenciasCacheAdmin.filter((e) => !e.revisado).length;
   emergenciaAdminStatus.textContent = `${emergenciasCacheAdmin.length} en total — ${pendientes} sin pasar todavía.`;
 
   const ordenados = emergenciasCacheAdmin
