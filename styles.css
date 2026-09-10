@@ -213,12 +213,31 @@ html, body {
    con la clase .panel-tiles-grid / .panel-tile-grid. */
 .panel-tiles.panel-tiles-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 .panel-tile.panel-tile-grid {
+  position: relative;
   flex-direction: column;
   justify-content: center;
   gap: 12px;
   padding: 22px 12px 18px;
   background: #FFFFFF;
   border-color: #D8DCD4;
+}
+.panel-tile-count {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 10px;
+  background: #E4402C;
+  color: #FFFFFF;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 2px #FFFFFF;
 }
 .panel-tile.panel-tile-grid:active { border-color: #F5A623; background: #FFFFFF; transform: scale(0.96); }
 .panel-tile-icon-badge {
@@ -1097,6 +1116,33 @@ html, body {
   line-height: 1.45;
   font-style: italic;
 }
+.historial-seleccion-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: #FFFFFF;
+  border: 1.5px solid #D8DCD4;
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.historial-select-all {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  color: #101820;
+  cursor: pointer;
+}
+.historial-card-seleccionar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.historial-card-header-izq { display: flex; align-items: center; gap: 8px; }
 .historial-card-claves {
   font-size: 12px;
   color: #101820;

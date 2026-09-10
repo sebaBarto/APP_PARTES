@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.76.1";
+const APP_VERSION = "3.77.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -430,6 +430,12 @@ const historialStatus = document.getElementById("historialStatus");
 const historialList = document.getElementById("historialList");
 const historialModoLabel = document.getElementById("historialModoLabel");
 const historialSearch = document.getElementById("historialSearch");
+const historialPendientesBadge = document.getElementById("historialPendientesBadge");
+const descargarExcelHistorialBtn = document.getElementById("descargarExcelHistorialBtn");
+const historialSeleccionBar = document.getElementById("historialSeleccionBar");
+const historialSeleccionarTodos = document.getElementById("historialSeleccionarTodos");
+const historialMarcarSeleccionadosBtn = document.getElementById("historialMarcarSeleccionadosBtn");
+const historialSeleccionCount = document.getElementById("historialSeleccionCount");
 const verStockBtn = document.getElementById("verStockBtn");
 const volverDeStockBtn = document.getElementById("volverDeStockBtn");
 const refreshStockBtn = document.getElementById("refreshStockBtn");
@@ -844,7 +850,7 @@ function entrarComoTecnico(nombreTecnico) {
   actualizarAccesoDashboardFinanciero();
   showScreen("home");
   fetchServicios();
-  precargarHistorialParaVisitas();
+  precargarHistorialParaVisitas().then(actualizarBadgeHistorialPendientes);
   precargarCronogramaParaSugerencias();
   cargarClientesGeneral(); // precarga, para que esté lista al completar un parte (número de cliente en Stock, etc.)
   actualizarAccesoCredencial();
@@ -1589,6 +1595,7 @@ verCronogramaBtn.addEventListener("click", async () => {
   cronoDiaActivo = ""; // fuerza a buscar el día de hoy de nuevo al entrar
   cargarResumenEmergenciasEnCronograma();
   await precargarHistorialParaVisitas(); // primero esto, para que "resuelto" salga bien desde el primer render
+  actualizarBadgeHistorialPendientes();
   fetchCronograma();
 });
 refreshCronogramaBtn.addEventListener("click", fetchCronograma);
@@ -4172,8 +4179,50 @@ async function cargarYRenderGuardias() {
 // ---------- Historial (extendido, con filtros por período) ----------
 let histPeriodoActivo = "4dias";
 let histPasadoActivo = "todos";
+let historialSeleccionados = new Set(); // ids (id_parte) marcados para la acción en lote
+let historialFiltradoActual = []; // última lista filtrada/ordenada, para exportar a Excel
 const histFechaEspecificaWrap = document.getElementById("histFechaEspecificaWrap");
 const histFechaEspecifica = document.getElementById("histFechaEspecifica");
+
+historialSeleccionarTodos.addEventListener("change", () => {
+  const seleccionables = historialFiltradoActual.filter((h) => permisosDelTecnico(tecnicoLogueado).marcar_pasado_sistema && !h.pasado_sistema_offline);
+  if (historialSeleccionarTodos.checked) {
+    seleccionables.forEach((h) => historialSeleccionados.add(h.id_parte));
+  } else {
+    seleccionables.forEach((h) => historialSeleccionados.delete(h.id_parte));
+  }
+  renderHistorialReciente();
+});
+
+historialMarcarSeleccionadosBtn.addEventListener("click", marcarSeleccionadosComoPasados);
+
+descargarExcelHistorialBtn.addEventListener("click", () => {
+  if (historialFiltradoActual.length === 0) {
+    showToast("No hay servicios para descargar con estos filtros.");
+    return;
+  }
+  const filas = historialFiltradoActual.map((h) => ({
+    "N° Servicio": h.numero_servicio || h.id_parte || "",
+    Cliente: h.cliente || "",
+    Dirección: h.direccion || "",
+    Localidad: h.localidad || "",
+    Fecha: h.fecha || "",
+    "Hora entrada": h.hora_entrada || "",
+    "Hora salida": h.hora_salida || "",
+    Técnico: h.tecnico || "",
+    "Técnico 2": h.tecnico2 || "",
+    Tarea: h.tarea || "",
+    Observaciones: h.observaciones || "",
+    "Costo final": h.costo_final || "",
+    "Forma de pago": h.forma_pago || "",
+    "Pasado a sistema": h.pasado_sistema_offline ? "Sí" : "No",
+    "Pasado por": h.pasado_sistema_por || "",
+  }));
+  const hoja = XLSX.utils.json_to_sheet(filas);
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, "Historial");
+  XLSX.writeFile(libro, `historial_${histPeriodoActivo}_${fechaActualISOVehiculo()}.xlsx`);
+});
 
 document.querySelectorAll(".hist-pasado-chip").forEach((chip) => {
   chip.addEventListener("click", () => {
@@ -4220,9 +4269,21 @@ async function fetchHistorialReciente() {
     historialCache = Array.isArray(data) ? data : [];
     historialSyncLabel.textContent = formatSyncTime(new Date());
     renderHistorialReciente();
+    actualizarBadgeHistorialPendientes();
   } catch (err) {
     historialStatus.textContent = "No se pudo cargar el historial.";
   }
+}
+
+async function enviarMarcarPasadoSistema(h, marcarComo) {
+  const res = await fetch("/api/historial", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+    body: JSON.stringify({ accion: "marcar_pasado_sistema", id_parte: h.id_parte, pasado: marcarComo, tecnico: tecnicoLogueado || "" }),
+  });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  h.pasado_sistema_offline = marcarComo;
+  h.pasado_sistema_por = marcarComo ? tecnicoLogueado || "" : "";
 }
 
 async function marcarPartePasadoSistema(h, marcarComo) {
@@ -4234,18 +4295,61 @@ async function marcarPartePasadoSistema(h, marcarComo) {
   );
   if (!ok) return;
   try {
-    const res = await fetch("/api/historial", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-      body: JSON.stringify({ accion: "marcar_pasado_sistema", id_parte: h.id_parte, pasado: marcarComo, tecnico: tecnicoLogueado || "" }),
-    });
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    h.pasado_sistema_offline = marcarComo;
-    h.pasado_sistema_por = marcarComo ? tecnicoLogueado || "" : "";
+    await enviarMarcarPasadoSistema(h, marcarComo);
+    historialSeleccionados.delete(h.id_parte);
     renderHistorialReciente();
+    actualizarBadgeHistorialPendientes();
   } catch (err) {
     showToast(`No se pudo ${verbo}: ` + err.message);
   }
+}
+
+async function marcarSeleccionadosComoPasados() {
+  const ids = Array.from(historialSeleccionados);
+  if (ids.length === 0) return;
+  const ok = confirm(`¿Confirmás que marcás ${ids.length} parte(s) como pasados a tu sistema?`);
+  if (!ok) return;
+  historialMarcarSeleccionadosBtn.disabled = true;
+  const objetivos = ids.map((id) => historialCache.find((h) => h.id_parte === id)).filter(Boolean);
+  const resultados = await Promise.allSettled(objetivos.map((h) => enviarMarcarPasadoSistema(h, true)));
+  const exitos = resultados.filter((r) => r.status === "fulfilled").length;
+  const fallos = resultados.length - exitos;
+  historialSeleccionados.clear();
+  renderHistorialReciente();
+  actualizarBadgeHistorialPendientes();
+  showToast(fallos > 0 ? `${exitos} marcado(s), ${fallos} fallaron.` : `${exitos} parte(s) marcados como pasados.`);
+}
+
+function actualizarBadgeHistorialPendientes() {
+  const permisos = permisosDelTecnico(tecnicoLogueado);
+  if (!permisos.marcar_pasado_sistema) {
+    historialPendientesBadge.classList.add("hidden");
+    return;
+  }
+  let items = historialCache;
+  if (!permisos.historial_todos) {
+    items = items.filter((h) => h.tecnico === tecnicoLogueado || h.tecnico2 === tecnicoLogueado);
+  }
+  const pendientes = items.filter((h) => !h.pasado_sistema_offline).length;
+  if (pendientes > 0) {
+    historialPendientesBadge.textContent = pendientes > 99 ? "99+" : String(pendientes);
+    historialPendientesBadge.classList.remove("hidden");
+  } else {
+    historialPendientesBadge.classList.add("hidden");
+  }
+}
+
+function actualizarBarraSeleccionHistorial(seleccionables) {
+  if (seleccionables.length === 0) {
+    historialSeleccionBar.classList.add("hidden");
+    return;
+  }
+  historialSeleccionBar.classList.remove("hidden");
+  const seleccionadosVisibles = seleccionables.filter((h) => historialSeleccionados.has(h.id_parte)).length;
+  historialSeleccionCount.textContent = String(seleccionadosVisibles);
+  historialMarcarSeleccionadosBtn.disabled = seleccionadosVisibles === 0;
+  historialSeleccionarTodos.checked = seleccionadosVisibles > 0 && seleccionadosVisibles === seleccionables.length;
+  historialSeleccionarTodos.indeterminate = seleccionadosVisibles > 0 && seleccionadosVisibles < seleccionables.length;
 }
 
 function renderHistorialReciente() {
@@ -4284,21 +4388,40 @@ function renderHistorialReciente() {
 
   const terminoBusqueda = normalizeText(historialSearch.value);
   if (terminoBusqueda) {
-    filtrados = filtrados.filter((h) => h.cliente && normalizeText(h.cliente).includes(terminoBusqueda));
+    filtrados = filtrados.filter((h) => {
+      const haystack = normalizeText([h.cliente, h.numero_servicio, h.direccion].join(" "));
+      return haystack.includes(terminoBusqueda);
+    });
   }
 
+  // Los no pasados a sistema van primero (son los que hay que accionar);
+  // dentro de cada grupo, más reciente primero.
   filtrados.sort((a, b) => {
+    const aPend = a.pasado_sistema_offline ? 1 : 0;
+    const bPend = b.pasado_sistema_offline ? 1 : 0;
+    if (aPend !== bPend) return aPend - bPend;
     const claveA = `${a.fecha} ${a.hora_entrada || ""}`;
     const claveB = `${b.fecha} ${b.hora_entrada || ""}`;
     return claveB.localeCompare(claveA);
   });
 
+  historialFiltradoActual = filtrados;
+
+  // Ya no tiene sentido mantener seleccionados ítems que salieron de la
+  // vista filtrada actual (o que alguien más ya pasó a sistema).
+  const idsVisibles = new Set(filtrados.map((h) => h.id_parte));
+  historialSeleccionados.forEach((id) => {
+    if (!idsVisibles.has(id)) historialSeleccionados.delete(id);
+  });
+
   historialList.innerHTML = "";
   if (filtrados.length === 0) {
     historialStatus.textContent = "No hay servicios completados en ese período.";
+    actualizarBarraSeleccionHistorial([]);
     return;
   }
   historialStatus.textContent = `${filtrados.length} servicio(s).`;
+  const seleccionables = [];
   filtrados.forEach((h) => {
     let fechaTexto = h.fecha || "";
     if (h.fecha) {
@@ -4326,9 +4449,19 @@ function renderHistorialReciente() {
     const textoResena = (h.tarea || h.observaciones || "").trim();
     const resenaCorta = textoResena.length > 160 ? textoResena.slice(0, 160).trim() + "…" : textoResena;
     const resenaHtml = resenaCorta ? `<div class="historial-card-resena">${escapeHtml(resenaCorta)}</div>` : "";
+    const puedeSeleccionar = puedeMarcarPasado && !h.pasado_sistema_offline;
+    if (puedeSeleccionar) seleccionables.push(h);
+    const seleccionHtml = puedeSeleccionar ? `
+      <label class="historial-card-seleccionar" title="Seleccionar para marcar en lote">
+        <input type="checkbox" class="historial-check-seleccion" ${historialSeleccionados.has(h.id_parte) ? "checked" : ""}>
+      </label>
+    ` : "";
     card.innerHTML = `
       <div class="historial-card-header">
-        <div class="historial-card-num">N° ${escapeHtml(h.numero_servicio || h.id_parte)}</div>
+        <div class="historial-card-header-izq">
+          ${seleccionHtml}
+          <div class="historial-card-num">N° ${escapeHtml(h.numero_servicio || h.id_parte)}</div>
+        </div>
         ${pagoHtml}
       </div>
       <div class="historial-card-cliente">${escapeHtml(h.cliente)}</div>
@@ -4338,20 +4471,30 @@ function renderHistorialReciente() {
       ${clavesHtml}
       ${puedeMarcarPasado ? `
         <label class="historial-card-check">
-          <input type="checkbox" ${h.pasado_sistema_offline ? "checked" : ""}>
+          <input type="checkbox" class="historial-check-pasado" ${h.pasado_sistema_offline ? "checked" : ""}>
           ${h.pasado_sistema_offline ? `Pasado a sistema (${escapeHtml(h.pasado_sistema_por || "")})` : "Pasado a mi sistema"}
         </label>
       ` : ""}
     `;
     if (puedeMarcarPasado) {
-      const checkbox = card.querySelector("input[type=checkbox]");
+      const checkbox = card.querySelector(".historial-check-pasado");
       checkbox.addEventListener("click", (e) => {
         e.preventDefault();
         marcarPartePasadoSistema(h, !h.pasado_sistema_offline);
       });
     }
+    if (puedeSeleccionar) {
+      const checkboxSel = card.querySelector(".historial-check-seleccion");
+      checkboxSel.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (checkboxSel.checked) historialSeleccionados.add(h.id_parte);
+        else historialSeleccionados.delete(h.id_parte);
+        actualizarBarraSeleccionHistorial(seleccionables);
+      });
+    }
     historialList.appendChild(card);
   });
+  actualizarBarraSeleccionHistorial(seleccionables);
 }
 
 // ---------- Historial de Stock (materiales instalados/retirados) ----------

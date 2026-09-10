@@ -111,6 +111,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M9 3h6"/></svg>
           </span>
           <span class="panel-tile-label">Historial</span>
+          <span class="panel-tile-count hidden" id="historialPendientesBadge">0</span>
         </button>
         <button type="button" class="panel-tile panel-tile-grid tile-credencial hidden" id="tileCredencialBtn">
           <span class="panel-tile-icon-badge">
@@ -1239,13 +1240,25 @@
       </div>
 
       <div class="field-group">
-        <input class="field-input search-input" id="historialSearch" type="search" placeholder="Buscar por cliente...">
+        <input class="field-input search-input" id="historialSearch" type="search" placeholder="Buscar por cliente, N° o dirección...">
       </div>
 
       <div class="dash-periodo-tabs">
         <button type="button" class="hist-pasado-chip active" data-pasado="todos">Todos</button>
         <button type="button" class="hist-pasado-chip" data-pasado="no">No pasados</button>
         <button type="button" class="hist-pasado-chip" data-pasado="si">Pasados</button>
+      </div>
+
+      <button type="button" class="btn btn-secondary" id="descargarExcelHistorialBtn" style="margin-bottom:14px;">⬇ Descargar Excel</button>
+
+      <div class="historial-seleccion-bar hidden" id="historialSeleccionBar">
+        <label class="historial-select-all">
+          <input type="checkbox" id="historialSeleccionarTodos">
+          Seleccionar todos
+        </label>
+        <button type="button" class="btn btn-primary btn-small" id="historialMarcarSeleccionadosBtn" disabled>
+          Marcar seleccionados como pasados (<span id="historialSeleccionCount">0</span>)
+        </button>
       </div>
 
       <p class="list-status" id="historialStatus"></p>
