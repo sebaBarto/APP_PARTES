@@ -54,7 +54,7 @@ module.exports = async (req, res) => {
   try {
     let body = req.body;
     if (typeof body === "string") body = JSON.parse(body);
-    const { datos, firma_comodatario_base64, cliente_email } = body || {};
+    const { datos, firma_comodatario_base64, cliente_email, tecnico, fecha_iso } = body || {};
 
     if (!datos) {
       res.status(400).json({ error: "Faltan los datos del comodato" });
@@ -109,6 +109,34 @@ module.exports = async (req, res) => {
         // El mail al cliente es best-effort — si falla, no se pierde
         // el comodato (ya llegó a oficina), solo se informa.
       }
+    }
+
+    // Guarda el comodato en la base (tabla "comodatos", hasta ahora sin
+    // usar) para que quede consultable desde admin.html aunque se
+    // pierda o se borre el mail de oficina. Best-effort: si esto
+    // falla, no se corta nada — lo que importa (el mail a oficina) ya
+    // se mandó bien. OJO: acá se guardan los DATOS del comodato, no
+    // el PDF en sí (no hay dónde adjuntarlo sin gastar espacio/otro
+    // sistema de archivos) — para el PDF original sigue haciendo
+    // falta el mail.
+    try {
+      const { BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN } = process.env;
+      if (BACKEND_NUEVO_URL && BACKEND_NUEVO_TOKEN) {
+        const fecha = fecha_iso || `${datos.anio}-01-01`;
+        await fetch(`${BACKEND_NUEVO_URL}/api/comodatos`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${BACKEND_NUEVO_TOKEN}` },
+          body: JSON.stringify({
+            cliente: datos.comodatario || "",
+            direccion: datos.direccion_comodatario || "",
+            fecha,
+            estado_envio: "enviado",
+            detalle: JSON.stringify({ ...datos, tecnico: tecnico || "", cliente_email: cliente_email || "", clienteOk }),
+          }),
+        });
+      }
+    } catch (err) {
+      console.error("No se pudo guardar el comodato en el backend (no crítico, el mail ya se envió):", err);
     }
 
     res.status(200).json({ ok: true, oficinaOk, clienteOk });

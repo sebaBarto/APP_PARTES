@@ -263,6 +263,7 @@
       <button type="button" class="tab-btn" id="tabPlanosBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 9h18M9 9v12M14 3v6M9 15h5"/></svg></span>Planos</button>
       <button type="button" class="tab-btn" id="tabInstalacionesBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 18v3"/><circle cx="8" cy="9" r="1"/><circle cx="12" cy="9" r="1"/><circle cx="16" cy="9" r="1"/></svg></span>Instalaciones</button>
       <button type="button" class="tab-btn" id="tabEncuestasBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 14s1.5 2 4 2 4-2 4-2"/><circle cx="9" cy="9" r="1"/><circle cx="15" cy="9" r="1"/><circle cx="12" cy="12" r="10"/></svg></span>Satisfacción</button>
+      <button type="button" class="tab-btn" id="tabComodatosBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span>Comodatos</button>
       <button type="button" class="tab-btn" id="tabClavesClienteBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>Claves por cliente</button>
       <button type="button" class="tab-btn" id="tabEmergenciaBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.29 3.86l-8.18 14.18A2 2 0 0 0 3.82 21h16.36a2 2 0 0 0 1.71-3l-8.18-14.14a2 2 0 0 0-3.42 0z"/></svg></span>Emergencias</button>
     </div>
@@ -669,6 +670,24 @@
       </div>
     </div>
 
+    <div id="panelComodatos" class="hidden">
+      <h1>Comodatos</h1>
+      <p class="subtitle">
+        Contratos de comodato firmados en el celular. Ojo: acá se guardan los <b>datos</b> del
+        contrato (comodatario, bienes, DNI, etc.), no el PDF en sí — el PDF firmado solo queda
+        en el mail que llegó al firmarse.
+      </p>
+
+      <div class="card" style="margin-bottom:16px;">
+        <input type="text" class="field-input" id="comodatosBuscarInput" placeholder="Buscar por comodatario, dirección o técnico...">
+      </div>
+
+      <div class="card">
+        <p class="status" id="comodatosStatus">Cargando...</p>
+        <div id="comodatosLista"></div>
+      </div>
+    </div>
+
     <div id="panelClavesCliente" class="hidden">
       <h1>Claves por cliente</h1>
       <p class="subtitle">
@@ -786,6 +805,11 @@ const encuestasPromedio = document.getElementById("encuestasPromedio");
 const encuestasResumen = document.getElementById("encuestasResumen");
 const encuestasStatus = document.getElementById("encuestasStatus");
 const encuestasLista = document.getElementById("encuestasLista");
+const tabComodatosBtn = document.getElementById("tabComodatosBtn");
+const panelComodatos = document.getElementById("panelComodatos");
+const comodatosBuscarInput = document.getElementById("comodatosBuscarInput");
+const comodatosStatus = document.getElementById("comodatosStatus");
+const comodatosLista = document.getElementById("comodatosLista");
 const tabEmergenciaBtn = document.getElementById("tabEmergenciaBtn");
 const panelEmergencia = document.getElementById("panelEmergencia");
 let emergenciaCargadaUnaVezAdmin = false;
@@ -808,6 +832,7 @@ const TABS = [
   { btn: tabPlanosBtn, panel: panelPlanos, onShow: () => { consultarEstadoSincronizacionPlanos(); if (!planosCargadosUnaVezAdmin) { planosCargadosUnaVezAdmin = true; cargarPlanosAdmin(); } } },
   { btn: tabInstalacionesBtn, panel: panelInstalaciones, onShow: () => cargarInstalacionesAdmin() },
   { btn: tabEncuestasBtn, panel: panelEncuestas, onShow: () => cargarEncuestasAdmin() },
+  { btn: tabComodatosBtn, panel: panelComodatos, onShow: () => cargarComodatosAdmin() },
   { btn: tabClavesClienteBtn, panel: panelClavesCliente, onShow: () => cargarClavesClienteAdmin() },
   { btn: tabEmergenciaBtn, panel: panelEmergencia, onShow: () => { if (!emergenciaCargadaUnaVezAdmin) { emergenciaCargadaUnaVezAdmin = true; cargarEmergenciasAdmin(); } } },
   { btn: tabEmergenciaBtn, panel: panelEmergencia, onShow: () => { if (!emergenciasCargadasUnaVezAdmin) { emergenciasCargadasUnaVezAdmin = true; cargarEmergenciasAdmin(); } } },
@@ -3008,6 +3033,70 @@ async function cargarEncuestasAdmin() {
     encuestasStatus.className = "status err";
     encuestasStatus.textContent = "No se pudo cargar: " + err.message;
   }
+}
+
+// ---------- Comodatos ----------
+let comodatosCache = [];
+
+comodatosBuscarInput.addEventListener("input", renderComodatosAdmin);
+
+async function cargarComodatosAdmin() {
+  comodatosStatus.className = "status";
+  comodatosStatus.textContent = "Cargando...";
+  comodatosLista.innerHTML = "";
+  try {
+    const res = await fetch("/api/historial?tipo=comodatos", {
+      headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    comodatosCache = Array.isArray(data) ? data : [];
+    renderComodatosAdmin();
+  } catch (err) {
+    comodatosStatus.className = "status err";
+    comodatosStatus.textContent = "No se pudo cargar: " + err.message;
+  }
+}
+
+function renderComodatosAdmin() {
+  const termino = (comodatosBuscarInput.value || "").trim().toLowerCase();
+  const filtrados = !termino ? comodatosCache : comodatosCache.filter((c) => {
+    const haystack = [c.comodatario, c.direccion_comodatario, c.tecnico].map((v) => (v || "").toLowerCase()).join(" ");
+    return haystack.includes(termino);
+  });
+
+  if (comodatosCache.length === 0) {
+    comodatosStatus.className = "status";
+    comodatosStatus.textContent = "Sin comodatos guardados todavía.";
+    comodatosLista.innerHTML = "";
+    return;
+  }
+  comodatosStatus.className = "status";
+  comodatosStatus.textContent = `${filtrados.length} de ${comodatosCache.length} comodato(s).`;
+
+  const ordenados = [...filtrados].sort((a, b) => (b.fecha || "").localeCompare(a.fecha || ""));
+
+  comodatosLista.innerHTML = ordenados.map((c) => {
+    const fecha = c.fecha || "";
+    return `
+      <div style="padding:12px 0; border-bottom:1px solid #EEE;">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px;">
+          <b>${escapeHtmlAdmin(c.comodatario || c.cliente || "Sin nombre")}</b>
+          <span style="color:#6B7680; font-size:12px;">${escapeHtmlAdmin(fecha)}</span>
+        </div>
+        <div style="color:#6B7680; font-size:13px; margin-top:2px;">
+          ${escapeHtmlAdmin(c.direccion_comodatario || c.direccion || "")}${c.ciudad_comodatario ? ", " + escapeHtmlAdmin(c.ciudad_comodatario) : ""}
+        </div>
+        <div style="font-size:13px; margin-top:6px; white-space:pre-line;">
+          ${c.bienes ? escapeHtmlAdmin(c.bienes) : "<i>Sin detalle de bienes</i>"}
+        </div>
+        <div style="color:#6B7680; font-size:12px; margin-top:6px;">
+          ${c.tecnico ? "Técnico: " + escapeHtmlAdmin(c.tecnico) + " · " : ""}${c.abono_mensual ? "Abono: $" + escapeHtmlAdmin(String(c.abono_mensual)) + " · " : ""}Firmó: ${escapeHtmlAdmin(c.aclaracion_comodatario || "")}${c.dni_comodatario ? " (DNI " + escapeHtmlAdmin(c.dni_comodatario) + ")" : ""}${c.cliente_email ? " · Copia enviada a " + escapeHtmlAdmin(c.cliente_email) : ""}
+        </div>
+      </div>
+    `;
+  }).join("");
 }
 
 async function cargarInstalacionesAdmin() {

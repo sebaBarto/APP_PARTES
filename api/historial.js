@@ -307,6 +307,32 @@ module.exports = async (req, res) => {
         res.status(r.status).json(data);
         return;
       }
+      // Comodatos: el backend guarda cliente/dirección/fecha como
+      // columnas sueltas y el resto (bienes, abono, DNI, técnico,
+      // etc.) empaquetado como JSON en "detalle" — acá se desempaqueta
+      // para que admin.html reciba un solo objeto plano por comodato.
+      if (req.query && req.query.tipo === "comodatos") {
+        const r = await fetch(`${BACKEND_NUEVO_URL}/api/comodatos`, { headers: headersBackendNuevo });
+        if (!r.ok) {
+          res.status(502).json({ error: "No se pudo leer el listado de comodatos" });
+          return;
+        }
+        const data = await r.json();
+        const lista = (Array.isArray(data) ? data : []).map((c) => {
+          let detalle = {};
+          try { detalle = JSON.parse(c.detalle || "{}"); } catch (err) { detalle = {}; }
+          return {
+            id: c.id,
+            cliente: c.cliente || "",
+            direccion: c.direccion || "",
+            fecha: c.fecha || "",
+            estado_envio: c.estado_envio || "",
+            ...detalle,
+          };
+        });
+        res.status(200).json(lista);
+        return;
+      }
       if (req.query && req.query.tipo === "claves_cliente") {
         const qs = req.query.numero_cliente ? `?numero_cliente=${encodeURIComponent(req.query.numero_cliente)}` : "";
         const r = await fetch(`${BACKEND_NUEVO_URL}/api/partes/claves-cliente${qs}`, { headers: headersBackendNuevo });
