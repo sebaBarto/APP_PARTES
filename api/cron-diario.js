@@ -20,17 +20,20 @@
 
 const { enviarATodos, enviarASeleccionados } = require("../lib/push-sender");
 
-const GUARDIAS_PATH = "guardias-config.json";
 const TECNICOS_PATH = "tecnicos.json";
-const CONFIG_PATH = "config.json";
 const ESTADO_PATH = "notificaciones-estado.json";
 
 // NOTA: vehiculos-config.json, vehiculos-historial.json,
-// herramientas-config.json e historial.json YA NO SE LEEN DE ACÁ —
-// esas colecciones viven en el backend nuevo (D1) desde la
-// migración; leerlas de GitHub devolvía datos congelados del día de
-// la migración. Se corrigió para leer todo del backend real
-// (fetchBackendArray, más abajo).
+// herramientas-config.json, historial.json, guardias-config.json y
+// config.json YA NO SE LEEN DE ACÁ — esas colecciones viven en el
+// backend nuevo (D1) desde la migración; leerlas de GitHub devolvía
+// datos congelados del día de la migración (confirmado con Seba:
+// la secuencia de guardias se editó varias veces después de la
+// migración y el push seguía mandando datos viejos). Se corrigió
+// para leer todo del backend real (fetchBackendArray/
+// fetchBackendObject, más abajo). Lo único que sigue en GitHub es
+// TECNICOS_PATH (técnicos/contraseñas/permisos), que todavía no se
+// cortó al backend nuevo.
 
 async function leerJSON(ghHeaders, path, valorDefault) {
   const url = `https://api.github.com/repos/${process.env.GITHUB_DATA_REPO}/contents/${path}`;
@@ -70,6 +73,19 @@ async function fetchBackendArray(ruta, headersBackendNuevo) {
   }
 }
 
+// Igual que fetchBackendArray pero para un solo objeto (guardias,
+// config) — devuelve null si falla.
+async function fetchBackendObject(ruta, headersBackendNuevo) {
+  try {
+    const r = await fetch(`${process.env.BACKEND_NUEVO_URL}${ruta}`, { headers: headersBackendNuevo });
+    if (!r.ok) return null;
+    const data = await r.json();
+    return data && typeof data === "object" ? data : null;
+  } catch (err) {
+    return null;
+  }
+}
+
 // Fecha/hora actual en Argentina (UTC-3 todo el año, sin horario de verano).
 function ahoraArgentina() {
   const ahoraUTC = new Date();
@@ -84,14 +100,24 @@ function numeroSemanaIso(fecha) {
   return `${d.getUTCFullYear()}-W${Math.ceil(((d - inicioAno) / 86400000 + 1) / 7)}`;
 }
 
-async function chequearGuardia(ghHeaders, estado, ahora) {
+async function chequearGuardia(headersBackendNuevo, estado, ahora) {
   if (ahora.getDay() !== 1) return null; // solo lunes
 
   const semanaActual = numeroSemanaIso(ahora);
   if (estado.ultima_semana_guardia_notificada === semanaActual) return null;
 
-  const { data: guardias } = await leerJSON(ghHeaders, GUARDIAS_PATH, { fecha_inicio_referencia: "", secuencia: [] });
-  const secuencia = guardias.secuencia || [];
+  // OJO: esto ANTES leía "guardias-config.json" de GitHub — pero
+  // admin.html guarda la configuración de guardias DIRECTO en el
+  // backend nuevo (D1) desde la migración, sin tocar GitHub para
+  // nada. Confirmado con Seba que la secuencia se editó varias veces
+  // después de la migración, así que ese archivo venía mandando el
+  // push con el técnico incorrecto. El mail a Security24 (que sí lee
+  // D1, ver nota más abajo) no se vio afectado por este bug.
+  const guardias = await fetchBackendObject("/api/guardias", headersBackendNuevo) || { fecha_inicio_referencia: "", secuencia: [] };
+  let secuencia = guardias.secuencia || [];
+  if (typeof secuencia === "string") {
+    try { secuencia = JSON.parse(secuencia); } catch (err) { secuencia = []; }
+  }
   if (!guardias.fecha_inicio_referencia || secuencia.length === 0) return null;
 
   const [y, m, d] = guardias.fecha_inicio_referencia.split("-").map(Number);
@@ -195,7 +221,11 @@ async function chequearFelicitacionSemanal(ghHeaders, headersBackendNuevo, estad
   const semanaActual = numeroSemanaIso(ahora);
   if (estado.ultima_semana_felicitacion === semanaActual) return null; // ya se mandó esta semana
 
-  const { data: config } = await leerJSON(ghHeaders, CONFIG_PATH, {});
+  // OJO: esto ANTES leía "config.json" de GitHub — admin.html guarda
+  // esta configuración directo en el backend nuevo (D1) desde la
+  // migración, así que el toggle de acá podía no reflejar lo que se
+  // ve/edita en admin.html.
+  const config = await fetchBackendObject("/api/config", headersBackendNuevo);
   if (config && config.felicitacion_semanal_activa === false) return null;
 
   // Lunes de esta semana, a las 00:00
@@ -524,7 +554,7 @@ module.exports = async (req, res) => {
     const { data: estado, sha: shaEstado } = await leerJSON(ghHeaders, ESTADO_PATH, {});
     const ahora = ahoraArgentina();
 
-    const tecnicoDeGuardia = await chequearGuardia(ghHeaders, estado, ahora);
+    const tecnicoDeGuardia = await chequearGuardia(headersBackendNuevo, estado, ahora);
     await chequearVehiculos(headersBackendNuevo, estado, ahora);
     const tecnicosRecordados = await chequearRecordatorioTecnicosEnCalle(ghHeaders, headersBackendNuevo, estado, ahora);
     const ganadoresSemana = await chequearFelicitacionSemanal(ghHeaders, headersBackendNuevo, estado, ahora);
