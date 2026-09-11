@@ -285,6 +285,7 @@ html, body {
 .tile-comodato .panel-tile-icon-badge { background: var(--acc-purple); }
 .tile-planos .panel-tile-icon-badge { background: var(--acc-navy); }
 .tile-emergencia .panel-tile-icon-badge { background: var(--acc-alert); }
+.tile-notas .panel-tile-icon-badge { background: var(--acc-coral); }
 .tile-herr-libre .panel-tile-icon-badge { background: var(--ok, #3FAE6E); }
 .tile-herr-uso .panel-tile-icon-badge { background: var(--acc-coral); }
 .tile-herr-cliente .panel-tile-icon-badge { background: var(--acc-gold); }
