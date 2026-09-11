@@ -514,6 +514,12 @@
       <h1>Vehículos de la empresa</h1>
       <p class="subtitle">Kilometraje actual y umbrales de mantenimiento por vehículo. Los umbrales son configurables: agregá los que necesites (cambio de aceite, mecánico, cubiertas, VTV, o cualquier otro).</p>
 
+      <div class="card" style="margin-bottom:16px;">
+        <label>Estado actual</label>
+        <p class="status" id="vehiculosEstadoStatus">Cargando...</p>
+        <div id="vehiculosEstadoLista"></div>
+      </div>
+
       <p class="status" id="vehiculosStatus"></p>
 
       <div id="vehiculosFilas"></div>
@@ -1925,6 +1931,8 @@ const vehiculosStatus = document.getElementById("vehiculosStatus");
 const agregarVehiculoBtn = document.getElementById("agregarVehiculoBtn");
 agregarVehiculoBtn.addEventListener("click", () => renderFilaVehiculo({ nombre: "", km_actual: 0, umbrales: [] }));
 const vehiculosFilas = document.getElementById("vehiculosFilas");
+const vehiculosEstadoStatus = document.getElementById("vehiculosEstadoStatus");
+const vehiculosEstadoLista = document.getElementById("vehiculosEstadoLista");
 const guardarVehiculosBtn = document.getElementById("guardarVehiculosBtn");
 const guardarVehiculosStatus = document.getElementById("guardarVehiculosStatus");
 
@@ -2019,6 +2027,144 @@ async function cargarVehiculosAdmin() {
       : "Todavía no hay ningún vehículo cargado — agregá el primero.";
   } catch (err) {
     vehiculosStatus.textContent = "No se pudo cargar la configuración de vehículos.";
+  }
+  cargarEstadoVehiculosAdmin();
+}
+
+// ---------- Estado actual de vehículos (quién lo tiene ahora, y qué
+// tan cerca está cada uno de su próximo vencimiento) ----------
+let vehiculosHistorialAdminCache = [];
+
+// Misma lógica que calcularAlertasVehiculo en api/cron-diario.js —
+// se duplica acá porque esa vive del lado de Vercel y esto corre en
+// el navegador. Si se cambia una, conviene revisar la otra.
+function calcularAlertasVehiculoAdmin(vehiculoConfig, hoy) {
+  const alertas = [];
+  (vehiculoConfig.umbrales || []).forEach((u) => {
+    if (!u.nombre || !u.valor) return;
+    let nivel = null;
+    let mensaje = "";
+    if (u.tipo === "fecha") {
+      const [y, m, d] = u.valor.split("-").map(Number);
+      const fechaLimite = new Date(y, m - 1, d);
+      const diasRestantes = Math.round((fechaLimite - hoy) / 86400000);
+      const avisoAntes = Number(u.aviso_antes) || 0;
+      if (diasRestantes <= 0) { nivel = "urgente"; mensaje = `${u.nombre}: venció`; }
+      else if (diasRestantes <= avisoAntes) { nivel = "atencion"; mensaje = `${u.nombre}: faltan ${diasRestantes} día(s)`; }
+    } else {
+      const kmActual = Number(vehiculoConfig.km_actual) || 0;
+      const valor = Number(u.valor) || 0;
+      const restante = valor - kmActual;
+      const avisoAntes = Number(u.aviso_antes) || 0;
+      if (restante <= 0) { nivel = "urgente"; mensaje = `${u.nombre}: ya se pasó por ${Math.abs(restante)} km`; }
+      else if (restante <= avisoAntes) { nivel = "atencion"; mensaje = `${u.nombre}: faltan ${restante} km`; }
+    }
+    if (nivel) alertas.push({ nombre: u.nombre, nivel, mensaje });
+  });
+  return alertas;
+}
+
+async function cargarEstadoVehiculosAdmin() {
+  vehiculosEstadoStatus.className = "status";
+  vehiculosEstadoStatus.textContent = "Cargando...";
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const [resConfig, resHist] = await Promise.all([
+      fetch("/api/datos?coleccion=vehiculos", { headers, cache: "no-store" }),
+      fetch("/api/recurso-uso?recurso=vehiculo", { headers, cache: "no-store" }),
+    ]);
+    const config = await resConfig.json();
+    const historial = await resHist.json();
+    if (!resConfig.ok) throw new Error(config.error || "Error desconocido");
+    vehiculosHistorialAdminCache = Array.isArray(historial) ? historial : [];
+    vehiculosEstadoStatus.textContent = "";
+    renderEstadoVehiculosAdmin(Array.isArray(config) ? config : []);
+  } catch (err) {
+    vehiculosEstadoStatus.className = "status err";
+    vehiculosEstadoStatus.textContent = "No se pudo cargar: " + err.message;
+  }
+}
+
+function renderEstadoVehiculosAdmin(config) {
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+
+  // Un registro "abierto" es el mismo criterio que se usa en todos
+  // lados de la app: tiene técnico, no tiene hora_devolucion, y no es
+  // un evento (combustible/gomería/etc, que no cierra el préstamo).
+  const abiertos = vehiculosHistorialAdminCache.filter((h) => h.tecnico && !h.hora_devolucion && !h.accion);
+
+  if (config.length === 0) {
+    vehiculosEstadoLista.innerHTML = "<p style='color:#6B7680;'>Todavía no hay ningún vehículo cargado.</p>";
+    return;
+  }
+
+  vehiculosEstadoLista.innerHTML = config.map((v) => {
+    const abierto = abiertos.find((h) => h.vehiculo === v.nombre);
+    const alertas = calcularAlertasVehiculoAdmin(v, hoy);
+    const alertasHtml = alertas.map((a) => {
+      const color = a.nivel === "urgente" ? "#B5541A" : "#8A6D1F";
+      const fondo = a.nivel === "urgente" ? "#FBE8DC" : "#FBF3D9";
+      return `<span style="background:${fondo}; color:${color}; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; margin-right:6px;">${escapeHtmlAdmin(a.mensaje)}</span>`;
+    }).join("");
+
+    let estadoHtml;
+    if (abierto) {
+      const fechaTomaMs = abierto.fecha ? new Date(abierto.fecha).getTime() : NaN;
+      const dias = isNaN(fechaTomaMs) ? null : Math.floor((hoy.getTime() - fechaTomaMs) / 86400000);
+      estadoHtml = `
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:6px; flex-wrap:wrap;">
+          <span style="color:#B5541A; font-size:13px;">🔴 Con <b>${escapeHtmlAdmin(abierto.tecnico)}</b> desde el ${escapeHtmlAdmin(abierto.fecha || "")}${dias != null && dias > 0 ? ` (${dias} día${dias === 1 ? "" : "s"})` : ""}</span>
+          <button type="button" class="btn-secondary-admin forzar-devolucion-btn" data-vehiculo="${escapeHtmlAdmin(v.nombre)}" data-tecnico="${escapeHtmlAdmin(abierto.tecnico)}" style="font-size:12px; padding:4px 10px;">Forzar devolución</button>
+        </div>
+      `;
+    } else {
+      estadoHtml = `<div style="color:#1F6B34; font-size:13px; margin-top:6px;">🟢 Libre</div>`;
+    }
+
+    return `
+      <div class="card" style="margin-bottom:10px;">
+        <b>${escapeHtmlAdmin(v.nombre)}</b> <span style="color:#6B7680; font-size:12px;">— ${Number(v.km_actual || 0).toLocaleString("es-AR")} km</span>
+        ${alertasHtml ? `<div style="margin-top:6px;">${alertasHtml}</div>` : ""}
+        ${estadoHtml}
+      </div>
+    `;
+  }).join("");
+
+  vehiculosEstadoLista.querySelectorAll(".forzar-devolucion-btn").forEach((btn) => {
+    btn.addEventListener("click", () => forzarDevolucionVehiculo(btn.dataset.vehiculo, btn.dataset.tecnico));
+  });
+}
+
+async function forzarDevolucionVehiculo(vehiculo, tecnico) {
+  const km = prompt(`Kilometraje con el que devolvés "${vehiculo}" (a nombre de ${tecnico}):`);
+  if (km === null) return; // canceló
+  if (!km.trim() || isNaN(Number(km))) {
+    alert("Tenés que poner un kilometraje válido.");
+    return;
+  }
+  const ok = confirm(`¿Confirmás que "${vehiculo}" queda devuelto (estaba a nombre de ${tecnico})?`);
+  if (!ok) return;
+  try {
+    const res = await fetch("/api/recurso-uso", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({
+        recurso: "vehiculo",
+        accion: "devolver",
+        vehiculo,
+        tecnico,
+        hora_devolucion: new Date().toTimeString().slice(0, 5),
+        km_devolucion: km.trim(),
+        evento: "Devolución forzada desde administración",
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    alert("Listo, quedó devuelto.");
+    cargarEstadoVehiculosAdmin();
+  } catch (err) {
+    alert("No se pudo forzar la devolución: " + err.message);
   }
 }
 
