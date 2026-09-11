@@ -1330,6 +1330,12 @@
           <datalist id="notaClientesLista"></datalist>
         </div>
 
+        <div class="field-group">
+          <label class="field-label" for="notaServicioInput">Servicio puntual (opcional)</label>
+          <input class="field-input" id="notaServicioInput" type="text" placeholder="N° de servicio o cliente..." list="notaServiciosLista">
+          <datalist id="notaServiciosLista"></datalist>
+        </div>
+
         <label class="historial-select-all" style="margin-bottom:14px;">
           <input type="checkbox" id="notaUrgenteInput">
           Marcar como urgente
@@ -1345,6 +1351,11 @@
         <button type="button" class="nota-tab-chip active" data-tab="recibidas">Recibidas</button>
         <button type="button" class="nota-tab-chip" data-tab="enviadas">Enviadas</button>
       </div>
+
+      <label class="check-inline" style="margin: 4px 0 14px;">
+        <input type="checkbox" id="notaOcultarLeidasCheck">
+        <span>Ocultar leídas de hace más de 3 días</span>
+      </label>
 
       <p class="list-status" id="notasStatus"></p>
 

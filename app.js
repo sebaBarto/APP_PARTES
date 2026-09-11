@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.80.1";
+const APP_VERSION = "3.81.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -4784,6 +4784,7 @@ function renderStock() {
 let notasCache = [];
 let notaTabActiva = "recibidas";
 let notaClienteEncontrado = null;
+let notaServicioEncontrado = null;
 let notasModalYaMostrado = false;
 
 const tileNotasBtn = document.getElementById("tileNotasBtn");
@@ -4794,9 +4795,11 @@ const notaFormWrap = document.getElementById("notaFormWrap");
 const notaMensajeInput = document.getElementById("notaMensajeInput");
 const notaDestinatariosLista = document.getElementById("notaDestinatariosLista");
 const notaClienteInput = document.getElementById("notaClienteInput");
+const notaServicioInput = document.getElementById("notaServicioInput");
 const notaUrgenteInput = document.getElementById("notaUrgenteInput");
 const notaEnviarBtn = document.getElementById("notaEnviarBtn");
 const notaCancelarBtn = document.getElementById("notaCancelarBtn");
+const notaOcultarLeidasCheck = document.getElementById("notaOcultarLeidasCheck");
 const notasStatus = document.getElementById("notasStatus");
 const notasList = document.getElementById("notasList");
 const notasModalOverlay = document.getElementById("notasModalOverlay");
@@ -4825,14 +4828,17 @@ notaNuevaBtn.addEventListener("click", () => {
   if (iraMostrar) {
     poblarDestinatariosNota();
     poblarDatalistClientesNota();
+    poblarDatalistServiciosNota();
   }
 });
 notaCancelarBtn.addEventListener("click", () => {
   notaFormWrap.classList.add("hidden");
   notaMensajeInput.value = "";
   notaClienteInput.value = "";
+  notaServicioInput.value = "";
   notaUrgenteInput.checked = false;
   notaClienteEncontrado = null;
+  notaServicioEncontrado = null;
 });
 
 function poblarDestinatariosNota() {
@@ -4865,6 +4871,23 @@ notaClienteInput.addEventListener("input", () => {
   notaClienteEncontrado = buscarClientePorNombre(notaClienteInput.value.trim());
 });
 
+// Igual que el buscador de cliente, pero contra los servicios
+// pendientes — el datalist muestra "N° - Cliente" y al elegir uno se
+// resuelve buscando el que empieza con ese número.
+function poblarDatalistServiciosNota() {
+  const datalist = document.getElementById("notaServiciosLista");
+  datalist.innerHTML = (serviciosCache || [])
+    .filter((s) => s.numero_servicio)
+    .map((s) => `<option value="${escapeHtml(s.numero_servicio + " - " + (s.cliente || ""))}"></option>`)
+    .join("");
+}
+
+notaServicioInput.addEventListener("input", () => {
+  const texto = notaServicioInput.value.trim();
+  const numeroBuscado = texto.split(" - ")[0].trim();
+  notaServicioEncontrado = (serviciosCache || []).find((s) => s.numero_servicio === numeroBuscado) || null;
+});
+
 notaEnviarBtn.addEventListener("click", async () => {
   const mensaje = notaMensajeInput.value.trim();
   if (!mensaje) {
@@ -4888,6 +4911,7 @@ notaEnviarBtn.addEventListener("click", async () => {
         urgente: notaUrgenteInput.checked,
         numero_cliente: notaClienteEncontrado ? notaClienteEncontrado.numero_cliente : "",
         cliente: notaClienteEncontrado ? notaClienteEncontrado.nombre : notaClienteInput.value.trim(),
+        numero_servicio: notaServicioEncontrado ? notaServicioEncontrado.numero_servicio : "",
         destinatarios,
       }),
     });
@@ -4896,8 +4920,10 @@ notaEnviarBtn.addEventListener("click", async () => {
     notaFormWrap.classList.add("hidden");
     notaMensajeInput.value = "";
     notaClienteInput.value = "";
+    notaServicioInput.value = "";
     notaUrgenteInput.checked = false;
     notaClienteEncontrado = null;
+    notaServicioEncontrado = null;
     notaTabActiva = "enviadas";
     document.querySelectorAll(".nota-tab-chip").forEach((c) => c.classList.toggle("active", c.dataset.tab === "enviadas"));
     await fetchNotas();
@@ -4943,11 +4969,20 @@ function agruparNotasEnviadas(filas) {
   const mapa = new Map();
   filas.forEach((f) => {
     if (!mapa.has(f.id)) {
-      mapa.set(f.id, { id: f.id, de: f.de, mensaje: f.mensaje, urgente: f.urgente, cliente: f.cliente, creado_en: f.creado_en, destinatarios: [] });
+      mapa.set(f.id, { id: f.id, de: f.de, mensaje: f.mensaje, urgente: f.urgente, cliente: f.cliente, numero_servicio: f.numero_servicio, creado_en: f.creado_en, destinatarios: [] });
     }
     mapa.get(f.id).destinatarios.push({ tecnico: f.tecnico, leido: f.leido });
   });
-  return [...mapa.values()].sort((a, b) => b.id - a.id);
+  return [...mapa.values()].sort(ordenarUrgentesPrimero);
+}
+
+// Urgentes arriba de todo, sin importar cuándo llegaron; dentro de
+// cada grupo (urgentes / no urgentes), la más nueva primero.
+function ordenarUrgentesPrimero(a, b) {
+  const aUrg = a.urgente ? 1 : 0;
+  const bUrg = b.urgente ? 1 : 0;
+  if (aUrg !== bUrg) return bUrg - aUrg;
+  return b.id - a.id;
 }
 
 function actualizarBadgeNotas() {
@@ -4960,14 +4995,26 @@ function actualizarBadgeNotas() {
   }
 }
 
+notaOcultarLeidasCheck.addEventListener("change", renderNotas);
+
 function renderNotas() {
   notasList.innerHTML = "";
   let items;
   if (notaTabActiva === "recibidas") {
-    items = notasCache.filter((f) => f.tecnico === tecnicoLogueado).sort((a, b) => b.id - a.id);
+    items = notasCache.filter((f) => f.tecnico === tecnicoLogueado).sort(ordenarUrgentesPrimero);
   } else {
     items = agruparNotasEnviadas(notasCache.filter((f) => f.de === tecnicoLogueado));
   }
+
+  if (notaOcultarLeidasCheck.checked) {
+    const limite = Date.now() - 3 * 24 * 60 * 60 * 1000;
+    items = items.filter((n) => {
+      const yaLeida = notaTabActiva === "recibidas" ? !!n.leido : n.destinatarios.every((d) => d.leido);
+      const esVieja = n.creado_en && new Date(n.creado_en).getTime() < limite;
+      return !(yaLeida && esVieja);
+    });
+  }
+
   if (items.length === 0) {
     notasStatus.textContent = notaTabActiva === "recibidas" ? "No tenés notas." : "Todavía no mandaste ninguna nota.";
     return;
@@ -4981,6 +5028,7 @@ function renderNotas() {
     card.className = "historial-card" + (n.urgente ? " nota-card-urgente" : "") + (noLeida ? " nota-card-no-leida" : "");
 
     const clienteHtml = n.cliente ? `<div class="historial-card-direccion">📍 ${escapeHtml(n.cliente)}</div>` : "";
+    const servicioHtml = n.numero_servicio ? `<div class="historial-card-direccion">🧾 Servicio N° ${escapeHtml(n.numero_servicio)}</div>` : "";
     const deHtml = notaTabActiva === "recibidas" ? `<div class="nota-card-de">De: ${escapeHtml(n.de)}</div>` : "";
     const paraHtml = notaTabActiva === "enviadas"
       ? `<div class="nota-card-de">Para: ${n.destinatarios.map((d) => `${escapeHtml(d.tecnico)}${d.leido ? " ✓" : ""}`).join(", ")}</div>`
@@ -4993,6 +5041,7 @@ function renderNotas() {
       ${deHtml}
       <div class="historial-card-cliente">${escapeHtml(n.mensaje)}</div>
       ${clienteHtml}
+      ${servicioHtml}
       ${paraHtml}
     `;
 

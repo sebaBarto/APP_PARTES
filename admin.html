@@ -3192,7 +3192,7 @@ function renderNotasAdmin() {
   const mapa = new Map();
   notasAdminCache.forEach((f) => {
     if (!mapa.has(f.id)) {
-      mapa.set(f.id, { id: f.id, de: f.de, mensaje: f.mensaje, urgente: f.urgente, cliente: f.cliente, creado_en: f.creado_en, destinatarios: [] });
+      mapa.set(f.id, { id: f.id, de: f.de, mensaje: f.mensaje, urgente: f.urgente, cliente: f.cliente, numero_servicio: f.numero_servicio, creado_en: f.creado_en, destinatarios: [] });
     }
     mapa.get(f.id).destinatarios.push({ tecnico: f.tecnico, leido: f.leido, leido_en: f.leido_en });
   });
@@ -3200,7 +3200,7 @@ function renderNotasAdmin() {
 
   const termino = (notasAdminBuscarInput.value || "").trim().toLowerCase();
   const filtradas = !termino ? notas : notas.filter((n) => {
-    const haystack = [n.de, n.mensaje, n.cliente, ...n.destinatarios.map((d) => d.tecnico)].map((v) => (v || "").toLowerCase()).join(" ");
+    const haystack = [n.de, n.mensaje, n.cliente, n.numero_servicio, ...n.destinatarios.map((d) => d.tecnico)].map((v) => (v || "").toLowerCase()).join(" ");
     return haystack.includes(termino);
   });
 
@@ -3223,6 +3223,7 @@ function renderNotasAdmin() {
         </div>
         <div style="font-size:13px; margin-top:6px; white-space:pre-line;">${escapeHtmlAdmin(n.mensaje)}</div>
         ${n.cliente ? `<div style="color:#6B7680; font-size:12px; margin-top:6px;">📍 ${escapeHtmlAdmin(n.cliente)}</div>` : ""}
+        ${n.numero_servicio ? `<div style="color:#6B7680; font-size:12px; margin-top:4px;">🧾 Servicio N° ${escapeHtmlAdmin(n.numero_servicio)}</div>` : ""}
         <div style="color:#6B7680; font-size:12px; margin-top:6px;">
           Para: ${n.destinatarios.map((d) => `${escapeHtmlAdmin(d.tecnico)}${d.leido ? " ✓ leída" : " (sin leer)"}`).join(", ")}
         </div>
