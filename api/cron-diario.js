@@ -510,6 +510,52 @@ async function chequearRecordatorioTecnicosEnCalle(ghHeaders, headersBackendNuev
   return destinatarios;
 }
 
+// ---------- Instalaciones sin actividad hace muchos días ----------
+// Una instalación puede durar varias jornadas por diseño (se abre una
+// vez, se van marcando días), pero si queda abierta mucho tiempo sin
+// que nadie marque un día nuevo, probablemente se perdió de vista —
+// mismo espíritu que "servicio estancado" para partes.
+async function chequearInstalacionesAbandonadas(headersBackendNuevo, estado, ahora) {
+  const abiertas = await fetchBackendArray("/api/instalaciones/abiertas", headersBackendNuevo);
+  if (abiertas.length === 0) return null;
+  if (!estado.instalaciones_avisadas) estado.instalaciones_avisadas = {};
+
+  const avisadas = [];
+  for (const inst of abiertas) {
+    const detalle = await fetchBackendObject(`/api/instalaciones/${inst.id}`, headersBackendNuevo);
+    if (!detalle) continue;
+
+    const dias = detalle.dias || [];
+    const fechasActividad = dias.map((d) => d.fecha_llegada).filter(Boolean).sort();
+    const ultimaFecha = fechasActividad.length > 0 ? fechasActividad[fechasActividad.length - 1] : detalle.fecha;
+    if (!ultimaFecha) continue;
+
+    const [y, m, d] = ultimaFecha.split("-").map(Number);
+    const fechaActividad = new Date(y, m - 1, d);
+    const diasSinActividad = Math.floor((ahora.getTime() - fechaActividad.getTime()) / (24 * 60 * 60 * 1000));
+    if (diasSinActividad < 10) continue;
+
+    // Evita reavisar todos los días de la misma instalación con la
+    // misma última fecha de actividad — si vuelve a tener actividad,
+    // ultimaFecha cambia y se vuelve a poder avisar en el futuro.
+    const clave = String(inst.id);
+    if (estado.instalaciones_avisadas[clave] === ultimaFecha) continue;
+
+    const destinatario = detalle.tecnico ? [detalle.tecnico] : [];
+    if (destinatario.length > 0) {
+      await enviarASeleccionados(destinatario, {
+        titulo: "🏗️ Instalación sin actividad",
+        cuerpo: `La instalación de ${detalle.cliente || "un cliente"} lleva ${diasSinActividad} días sin marcar actividad. ¿Sigue en curso?`,
+        url: "/",
+        importante: true,
+      });
+    }
+    estado.instalaciones_avisadas[clave] = ultimaFecha;
+    avisadas.push(detalle.cliente || `#${inst.id}`);
+  }
+  return avisadas.length > 0 ? avisadas : null;
+}
+
 async function chequearVehiculos(headersBackendNuevo, estado, hoy) {
   // OJO: esto ANTES leía "vehiculos-config.json" de GitHub — la
   // colección "vehiculos" (km_actual, umbrales de mantenimiento) ya
@@ -560,10 +606,11 @@ module.exports = async (req, res) => {
     const ganadoresSemana = await chequearFelicitacionSemanal(ghHeaders, headersBackendNuevo, estado, ahora);
     const recordadosDevolver = await chequearRecordatorioDevolverVehiculo(ghHeaders, headersBackendNuevo, estado, ahora);
     const resumenSemanal = await chequearResumenSemanal(headersBackendNuevo, estado, ahora);
+    const instalacionesAvisadas = await chequearInstalacionesAbandonadas(headersBackendNuevo, estado, ahora);
 
     await guardarJSON(ghHeaders, ESTADO_PATH, estado, shaEstado);
 
-    res.status(200).json({ ok: true, guardia_notificada: tecnicoDeGuardia || null, recordatorio_en_calle: tecnicosRecordados || null, felicitacion_semanal: ganadoresSemana || null, recordatorio_devolver: recordadosDevolver || null, resumen_semanal: resumenSemanal || null });
+    res.status(200).json({ ok: true, guardia_notificada: tecnicoDeGuardia || null, recordatorio_en_calle: tecnicosRecordados || null, felicitacion_semanal: ganadoresSemana || null, recordatorio_devolver: recordadosDevolver || null, resumen_semanal: resumenSemanal || null, instalaciones_avisadas: instalacionesAvisadas || null });
   } catch (err) {
     res.status(500).json({ error: "Error interno en el cron diario", detail: String(err.message || err) });
   }

@@ -173,6 +173,40 @@ async function mandarMailResumenInstalacion(instalacionId, backendUrl, headersBa
     html,
     attachments: adjuntos,
   });
+
+  // Copia al cliente, si dejó su mail al abrir la instalación — una
+  // versión más simple (sin GPS ni el detalle técnico interno), como
+  // confirmación de que el trabajo quedó terminado. Best-effort: si
+  // esto falla, no revierte nada — el mail a oficina ya salió bien,
+  // que es lo que importa de verdad.
+  const emailValido = typeof inst.cliente_email === "string" && /^[^\s@<>\r\n]+@[^\s@<>\r\n]+\.[^\s@<>\r\n]+$/.test(inst.cliente_email.trim());
+  if (emailValido) {
+    try {
+      const htmlCliente = `
+        <div style="font-family: Arial, Helvetica, sans-serif; color:#101820;">
+          <h2 style="margin-bottom:4px;">✔ Instalación finalizada</h2>
+          <p style="color:#6B7680; margin-top:0;">
+            ${escapeHtmlMail(inst.direccion || "")}<br>
+            Técnico: ${escapeHtmlMail(inst.tecnico)}
+          </p>
+          <p>Te confirmamos que tu instalación quedó completa. Resumen de lo instalado:</p>
+          <h3>Zonas de alarma</h3>
+          <ul>${zonasHtml}</ul>
+          <h3>Canales de cámaras</h3>
+          <ul>${canalesHtml}</ul>
+          <p style="color:#6B7680; margin-top:20px;">Cualquier consulta, contactanos a través de www.sat365.com.ar.</p>
+        </div>
+      `;
+      await transporter.sendMail({
+        from: `"Servicio Técnico SAT" <${process.env.SMTP_USER}>`,
+        to: inst.cliente_email.trim(),
+        subject: `Tu instalación quedó completa — ${inst.cliente}`,
+        html: htmlCliente,
+      });
+    } catch (errCliente) {
+      console.error("No se pudo mandar la copia al cliente del resumen de instalación:", errCliente);
+    }
+  }
 }
 
 module.exports = async (req, res) => {

@@ -652,6 +652,7 @@
 
       <div class="card" style="margin-bottom:16px;">
         <input type="text" id="instalacionesBuscarAdmin" placeholder="Buscar por cliente o técnico...">
+        <button type="button" class="btn btn-secondary" id="descargarExcelInstalacionesBtn" style="margin-top:10px;">⬇ Descargar Excel</button>
         <p class="status" id="instalacionesAdminStatus">Cargando...</p>
         <div id="instalacionesAdminLista"></div>
       </div>
@@ -2926,6 +2927,7 @@ const planosBuscarAdmin = document.getElementById("planosBuscarAdmin");
 const planosAdminStatus = document.getElementById("planosAdminStatus");
 const planosAdminResultados = document.getElementById("planosAdminResultados");
 const instalacionesBuscarAdmin = document.getElementById("instalacionesBuscarAdmin");
+const descargarExcelInstalacionesBtn = document.getElementById("descargarExcelInstalacionesBtn");
 const instalacionesAdminStatus = document.getElementById("instalacionesAdminStatus");
 const instalacionesAdminLista = document.getElementById("instalacionesAdminLista");
 const instalacionesAdminDetalle = document.getElementById("instalacionesAdminDetalle");
@@ -3276,6 +3278,29 @@ function renderInstalacionesAdminLista() {
 }
 
 instalacionesBuscarAdmin.addEventListener("input", renderInstalacionesAdminLista);
+
+descargarExcelInstalacionesBtn.addEventListener("click", () => {
+  const busqueda = normalizeText(instalacionesBuscarAdmin.value.trim());
+  const filtradas = instalacionesCacheAdmin.filter((inst) =>
+    !busqueda || normalizeText(inst.cliente).includes(busqueda) || normalizeText(inst.tecnico).includes(busqueda)
+  );
+  if (filtradas.length === 0) {
+    alert("No hay instalaciones para descargar con este filtro.");
+    return;
+  }
+  const filas = filtradas.map((inst) => ({
+    "N°": inst.id,
+    Cliente: inst.cliente || "",
+    "N° Cliente": inst.numero_cliente || "",
+    Técnico: inst.tecnico || "",
+    Fecha: inst.fecha || "",
+    Estado: inst.estado === "cerrada" ? "Cerrada" : "Abierta",
+  }));
+  const hoja = XLSX.utils.json_to_sheet(filas);
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, "Instalaciones");
+  XLSX.writeFile(libro, `instalaciones_${new Date().toISOString().slice(0, 10)}.xlsx`);
+});
 
 document.getElementById("instalacionesVolverListaBtn").addEventListener("click", () => {
   instalacionesAdminDetalle.classList.add("hidden");

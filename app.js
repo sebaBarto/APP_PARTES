@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.81.0";
+const APP_VERSION = "3.82.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -261,6 +261,7 @@ const tileInstaladorBtn = document.getElementById("tileInstaladorBtn");
 const volverDeInstalacionBtn = document.getElementById("volverDeInstalacionBtn");
 const instalacionClienteInput = document.getElementById("instalacionClienteInput");
 const instalacionDireccionInput = document.getElementById("instalacionDireccionInput");
+const instalacionClienteEmailInput = document.getElementById("instalacionClienteEmailInput");
 const instalacionIniciarBtn = document.getElementById("instalacionIniciarBtn");
 const instalacionClienteCard = document.getElementById("instalacionClienteCard");
 const instalacionDetalleWrap = document.getElementById("instalacionDetalleWrap");
@@ -5303,6 +5304,7 @@ function resetearPantallaInstalacion() {
   instCanalesAgregadas = [];
   instalacionClienteInput.value = "";
   instalacionDireccionInput.value = "";
+  instalacionClienteEmailInput.value = "";
   instObservacionesInput.value = "";
   instalacionClienteCard.classList.remove("hidden");
   instalacionesAbiertasParaSumarseWrap.classList.add("hidden");
@@ -5434,6 +5436,7 @@ instalacionIniciarBtn.addEventListener("click", async () => {
       body: JSON.stringify({
         accion: "crear_instalacion", tecnico: tecnicoLogueado, cliente: nombreInstalacion,
         direccion: instalacionDireccionInput.value.trim(),
+        cliente_email: instalacionClienteEmailInput.value.trim(),
         fecha: ahora.toISOString().slice(0, 10), hora: ahora.toTimeString().slice(0, 5),
       }),
     });
