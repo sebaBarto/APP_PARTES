@@ -577,6 +577,12 @@
       <h1>Herramientas especiales</h1>
       <p class="subtitle">Escaleras especiales, la computadora, taladros puntuales, etc. — cargá el nombre de cada una; el estado y quién la tiene lo va actualizando la app sola a medida que los técnicos la usan.</p>
 
+      <div class="card" style="margin-bottom:16px;">
+        <label>Estado actual</label>
+        <p class="status" id="herramientasEstadoStatus"></p>
+        <div id="herramientasEstadoLista"></div>
+      </div>
+
       <p class="status" id="herramientasStatus"></p>
 
       <div id="herramientasFilas"></div>
@@ -2766,6 +2772,8 @@ guardarSimsBtn.addEventListener("click", async () => {
 // ---------- Herramientas especiales ----------
 const herramientasStatus = document.getElementById("herramientasStatus");
 const herramientasFilas = document.getElementById("herramientasFilas");
+const herramientasEstadoStatus = document.getElementById("herramientasEstadoStatus");
+const herramientasEstadoLista = document.getElementById("herramientasEstadoLista");
 const agregarHerramientaBtn = document.getElementById("agregarHerramientaBtn");
 const guardarHerramientasBtn = document.getElementById("guardarHerramientasBtn");
 const guardarHerramientasStatus = document.getElementById("guardarHerramientasStatus");
@@ -2833,9 +2841,36 @@ async function cargarHerramientasAdmin() {
     herramientasStatus.textContent = Array.isArray(herramientas) && herramientas.length > 0
       ? ""
       : "Todavía no hay ninguna herramienta cargada — agregá la primera.";
+    renderEstadoHerramientasAdmin(Array.isArray(herramientas) ? herramientas : []);
   } catch (err) {
     herramientasStatus.textContent = "No se pudo cargar la lista de herramientas.";
   }
+}
+
+function renderEstadoHerramientasAdmin(herramientas) {
+  herramientasEstadoStatus.className = "status";
+  herramientasEstadoStatus.textContent = "";
+
+  if (herramientas.length === 0) {
+    herramientasEstadoLista.innerHTML = "<p style='color:#6B7680;'>Todavía no hay ninguna herramienta cargada.</p>";
+    return;
+  }
+
+  herramientasEstadoLista.innerHTML = herramientas.map((h) => {
+    let estadoHtml;
+    if (h.estado === "uso" || h.estado === "cliente") {
+      const lugar = h.estado === "cliente" ? ` en lo de ${escapeHtmlAdmin(h.cliente || "un cliente")}` : "";
+      estadoHtml = `🔴 Con <b>${escapeHtmlAdmin(h.tecnico_actual || "alguien")}</b>${lugar}`;
+    } else {
+      estadoHtml = "🟢 Libre";
+    }
+    return `
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #EEE;">
+        <b>${escapeHtmlAdmin(h.nombre)}</b>
+        <span style="font-size:13px; color:${h.estado === "libre" ? "#1F6B34" : "#B5541A"};">${estadoHtml}</span>
+      </div>
+    `;
+  }).join("");
 }
 
 agregarHerramientaBtn.addEventListener("click", () => renderFilaHerramienta(null));
