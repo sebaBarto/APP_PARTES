@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.79.1";
+const APP_VERSION = "3.80.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -129,6 +129,7 @@ const screens = {
   consultas: document.getElementById("screen-consultas"),
   guardias: document.getElementById("screen-guardias"),
   historial: document.getElementById("screen-historial"),
+  notas: document.getElementById("screen-notas"),
   stock: document.getElementById("screen-stock"),
   credencial: document.getElementById("screen-credencial"),
   vehiculos: document.getElementById("screen-vehiculos"),
@@ -859,6 +860,7 @@ function entrarComoTecnico(nombreTecnico) {
   showScreen("home");
   fetchServicios();
   precargarHistorialParaVisitas().then(actualizarBadgeHistorialPendientes);
+  precargarNotasYAvisar();
   precargarCronogramaParaSugerencias();
   cargarClientesGeneral(); // precarga, para que esté lista al completar un parte (número de cliente en Stock, etc.)
   actualizarAccesoCredencial();
@@ -4772,6 +4774,257 @@ function renderStock() {
   });
   actualizarBarraSeleccionStock(seleccionables);
 }
+
+// ---------- Notas entre usuarios ----------
+// Cada fila que llega de /api/datos?coleccion=notas es (nota,
+// destinatario) — una nota mandada a 3 personas llega como 3 filas
+// con el mismo "id" pero distinto "tecnico"/"leido". Se filtra por
+// tecnico===yo para "Recibidas", y se agrupa por id para "Enviadas"
+// (así se ve a quién le llegó y a quién todavía no).
+let notasCache = [];
+let notaTabActiva = "recibidas";
+let notaClienteEncontrado = null;
+let notasModalYaMostrado = false;
+
+const tileNotasBtn = document.getElementById("tileNotasBtn");
+const notasPendientesBadge = document.getElementById("notasPendientesBadge");
+const volverDeNotasBtn = document.getElementById("volverDeNotasBtn");
+const notaNuevaBtn = document.getElementById("notaNuevaBtn");
+const notaFormWrap = document.getElementById("notaFormWrap");
+const notaMensajeInput = document.getElementById("notaMensajeInput");
+const notaDestinatariosLista = document.getElementById("notaDestinatariosLista");
+const notaClienteInput = document.getElementById("notaClienteInput");
+const notaUrgenteInput = document.getElementById("notaUrgenteInput");
+const notaEnviarBtn = document.getElementById("notaEnviarBtn");
+const notaCancelarBtn = document.getElementById("notaCancelarBtn");
+const notasStatus = document.getElementById("notasStatus");
+const notasList = document.getElementById("notasList");
+const notasModalOverlay = document.getElementById("notasModalOverlay");
+const notasModalResumen = document.getElementById("notasModalResumen");
+const notasModalVerBtn = document.getElementById("notasModalVerBtn");
+const notasModalDespuesBtn = document.getElementById("notasModalDespuesBtn");
+
+tileNotasBtn.addEventListener("click", () => {
+  showScreen("notas");
+  fetchNotas();
+});
+volverDeNotasBtn.addEventListener("click", () => showScreen("home"));
+
+document.querySelectorAll(".nota-tab-chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    document.querySelectorAll(".nota-tab-chip").forEach((c) => c.classList.remove("active"));
+    chip.classList.add("active");
+    notaTabActiva = chip.dataset.tab;
+    renderNotas();
+  });
+});
+
+notaNuevaBtn.addEventListener("click", () => {
+  const iraMostrar = notaFormWrap.classList.contains("hidden");
+  notaFormWrap.classList.toggle("hidden");
+  if (iraMostrar) {
+    poblarDestinatariosNota();
+    poblarDatalistClientesNota();
+  }
+});
+notaCancelarBtn.addEventListener("click", () => {
+  notaFormWrap.classList.add("hidden");
+  notaMensajeInput.value = "";
+  notaClienteInput.value = "";
+  notaUrgenteInput.checked = false;
+  notaClienteEncontrado = null;
+});
+
+function poblarDestinatariosNota() {
+  const nombres = Object.keys(tecnicosPasswords || {}).sort();
+  notaDestinatariosLista.innerHTML = `
+    <label class="historial-select-all" style="width:100%;">
+      <input type="checkbox" id="notaDestTodos"> Todos
+    </label>
+    ${nombres.map((n) => `
+      <label class="historial-select-all" style="width:auto;">
+        <input type="checkbox" class="nota-dest-check" value="${escapeHtml(n)}"> ${escapeHtml(n)}
+      </label>
+    `).join("")}
+  `;
+  const todosCheck = document.getElementById("notaDestTodos");
+  todosCheck.addEventListener("change", () => {
+    document.querySelectorAll(".nota-dest-check").forEach((c) => { c.checked = todosCheck.checked; });
+  });
+}
+
+function poblarDatalistClientesNota() {
+  const datalist = document.getElementById("notaClientesLista");
+  datalist.innerHTML = (clientesGeneralCache || [])
+    .filter((c) => c.nombre)
+    .map((c) => `<option value="${escapeHtml(c.nombre)}"></option>`)
+    .join("");
+}
+
+notaClienteInput.addEventListener("input", () => {
+  notaClienteEncontrado = buscarClientePorNombre(notaClienteInput.value.trim());
+});
+
+notaEnviarBtn.addEventListener("click", async () => {
+  const mensaje = notaMensajeInput.value.trim();
+  if (!mensaje) {
+    showToast("Escribí un mensaje.");
+    return;
+  }
+  const destinatarios = [...document.querySelectorAll(".nota-dest-check:checked")].map((c) => c.value);
+  if (destinatarios.length === 0) {
+    showToast("Elegí al menos un destinatario.");
+    return;
+  }
+  notaEnviarBtn.disabled = true;
+  try {
+    const res = await fetch("/api/datos?coleccion=notas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({
+        accion: "crear",
+        de: tecnicoLogueado || "",
+        mensaje,
+        urgente: notaUrgenteInput.checked,
+        numero_cliente: notaClienteEncontrado ? notaClienteEncontrado.numero_cliente : "",
+        cliente: notaClienteEncontrado ? notaClienteEncontrado.nombre : notaClienteInput.value.trim(),
+        destinatarios,
+      }),
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    showToast("Nota enviada.");
+    notaFormWrap.classList.add("hidden");
+    notaMensajeInput.value = "";
+    notaClienteInput.value = "";
+    notaUrgenteInput.checked = false;
+    notaClienteEncontrado = null;
+    notaTabActiva = "enviadas";
+    document.querySelectorAll(".nota-tab-chip").forEach((c) => c.classList.toggle("active", c.dataset.tab === "enviadas"));
+    await fetchNotas();
+  } catch (err) {
+    showToast("No se pudo enviar la nota: " + err.message);
+  } finally {
+    notaEnviarBtn.disabled = false;
+  }
+});
+
+async function fetchNotas() {
+  notasStatus.textContent = "Cargando...";
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/datos?coleccion=notas", { headers, cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    notasCache = Array.isArray(data) ? data : [];
+    renderNotas();
+    actualizarBadgeNotas();
+  } catch (err) {
+    notasStatus.textContent = "No se pudieron cargar las notas.";
+  }
+}
+
+async function marcarNotaLeida(n) {
+  try {
+    const res = await fetch("/api/datos?coleccion=notas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({ accion: "marcar_leida", nota_id: n.id, tecnico: tecnicoLogueado || "" }),
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    n.leido = 1;
+    renderNotas();
+    actualizarBadgeNotas();
+  } catch (err) {
+    showToast("No se pudo marcar como leída: " + err.message);
+  }
+}
+
+function agruparNotasEnviadas(filas) {
+  const mapa = new Map();
+  filas.forEach((f) => {
+    if (!mapa.has(f.id)) {
+      mapa.set(f.id, { id: f.id, de: f.de, mensaje: f.mensaje, urgente: f.urgente, cliente: f.cliente, creado_en: f.creado_en, destinatarios: [] });
+    }
+    mapa.get(f.id).destinatarios.push({ tecnico: f.tecnico, leido: f.leido });
+  });
+  return [...mapa.values()].sort((a, b) => b.id - a.id);
+}
+
+function actualizarBadgeNotas() {
+  const pendientes = notasCache.filter((f) => f.tecnico === tecnicoLogueado && !f.leido).length;
+  if (pendientes > 0) {
+    notasPendientesBadge.textContent = pendientes > 99 ? "99+" : String(pendientes);
+    notasPendientesBadge.classList.remove("hidden");
+  } else {
+    notasPendientesBadge.classList.add("hidden");
+  }
+}
+
+function renderNotas() {
+  notasList.innerHTML = "";
+  let items;
+  if (notaTabActiva === "recibidas") {
+    items = notasCache.filter((f) => f.tecnico === tecnicoLogueado).sort((a, b) => b.id - a.id);
+  } else {
+    items = agruparNotasEnviadas(notasCache.filter((f) => f.de === tecnicoLogueado));
+  }
+  if (items.length === 0) {
+    notasStatus.textContent = notaTabActiva === "recibidas" ? "No tenés notas." : "Todavía no mandaste ninguna nota.";
+    return;
+  }
+  notasStatus.textContent = `${items.length} nota(s).`;
+
+  items.forEach((n) => {
+    const fecha = n.creado_en ? new Date(n.creado_en).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
+    const noLeida = notaTabActiva === "recibidas" && !n.leido;
+    const card = document.createElement("div");
+    card.className = "historial-card" + (n.urgente ? " nota-card-urgente" : "") + (noLeida ? " nota-card-no-leida" : "");
+
+    const clienteHtml = n.cliente ? `<div class="historial-card-direccion">📍 ${escapeHtml(n.cliente)}</div>` : "";
+    const deHtml = notaTabActiva === "recibidas" ? `<div class="nota-card-de">De: ${escapeHtml(n.de)}</div>` : "";
+    const paraHtml = notaTabActiva === "enviadas"
+      ? `<div class="nota-card-de">Para: ${n.destinatarios.map((d) => `${escapeHtml(d.tecnico)}${d.leido ? " ✓" : ""}`).join(", ")}</div>`
+      : "";
+
+    card.innerHTML = `
+      <div class="historial-card-header">
+        <div class="historial-card-num">${n.urgente ? "🔴 " : ""}${fecha}</div>
+      </div>
+      ${deHtml}
+      <div class="historial-card-cliente">${escapeHtml(n.mensaje)}</div>
+      ${clienteHtml}
+      ${paraHtml}
+    `;
+
+    if (noLeida) {
+      card.style.cursor = "pointer";
+      card.addEventListener("click", () => marcarNotaLeida(n));
+    }
+    notasList.appendChild(card);
+  });
+}
+
+async function precargarNotasYAvisar() {
+  await fetchNotas();
+  const pendientes = notasCache.filter((f) => f.tecnico === tecnicoLogueado && !f.leido);
+  if (pendientes.length > 0 && !notasModalYaMostrado) {
+    notasModalYaMostrado = true;
+    const urgentes = pendientes.filter((f) => f.urgente).length;
+    notasModalResumen.textContent = `Tenés ${pendientes.length} nota${pendientes.length === 1 ? "" : "s"} sin leer${urgentes > 0 ? ` (${urgentes} urgente${urgentes === 1 ? "" : "s"})` : ""}.`;
+    notasModalOverlay.classList.remove("hidden");
+  }
+}
+
+notasModalVerBtn.addEventListener("click", () => {
+  notasModalOverlay.classList.add("hidden");
+  showScreen("notas");
+  notaTabActiva = "recibidas";
+  document.querySelectorAll(".nota-tab-chip").forEach((c) => c.classList.toggle("active", c.dataset.tab === "recibidas"));
+  renderNotas();
+});
+notasModalDespuesBtn.addEventListener("click", () => {
+  notasModalOverlay.classList.add("hidden");
+});
 
 // ---------- Presencia en obra (llegada/salida) ----------
 let presenciaHistorialCache = [];

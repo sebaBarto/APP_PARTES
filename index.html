@@ -106,6 +106,13 @@
           </span>
           <span class="panel-tile-label">Guardias</span>
         </button>
+        <button type="button" class="panel-tile panel-tile-grid tile-notas" id="tileNotasBtn">
+          <span class="panel-tile-icon-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v13H8l-4 4z"/><path d="M8 9h8M8 13h5"/></svg>
+          </span>
+          <span class="panel-tile-label">Notas</span>
+          <span class="panel-tile-count hidden" id="notasPendientesBadge">0</span>
+        </button>
         <button type="button" class="panel-tile panel-tile-grid tile-historial" id="tileHistorialBtn">
           <span class="panel-tile-icon-badge">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M9 3h6"/></svg>
@@ -1298,6 +1305,67 @@
       <button class="btn btn-secondary" id="volverDeHistorialBtn" type="button">Volver</button>
     </div>
   </section>
+
+  <section class="screen" id="screen-notas">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">NOTAS</p>
+      <p class="subtitle-consultas">Recordatorios entre compañeros — los ve solo a quien se los mandás.</p>
+
+      <button type="button" class="btn btn-primary" id="notaNuevaBtn" style="margin-bottom:14px;">+ Nueva nota</button>
+
+      <div id="notaFormWrap" class="hidden" style="margin-bottom:18px; padding:14px; border:1.5px solid var(--border, #D8DCD4); border-radius:14px;">
+        <div class="field-group">
+          <label class="field-label" for="notaMensajeInput">Mensaje</label>
+          <textarea class="field-input" id="notaMensajeInput" rows="3" placeholder="Escribí el recordatorio..."></textarea>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label">Para</label>
+          <div id="notaDestinatariosLista" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="notaClienteInput">Cliente (opcional)</label>
+          <input class="field-input" id="notaClienteInput" type="text" placeholder="Escribí para buscar el cliente..." list="notaClientesLista">
+          <datalist id="notaClientesLista"></datalist>
+        </div>
+
+        <label class="historial-select-all" style="margin-bottom:14px;">
+          <input type="checkbox" id="notaUrgenteInput">
+          Marcar como urgente
+        </label>
+
+        <div style="display:flex; gap:10px;">
+          <button type="button" class="btn btn-primary" id="notaEnviarBtn">Mandar</button>
+          <button type="button" class="btn btn-ghost" id="notaCancelarBtn">Cancelar</button>
+        </div>
+      </div>
+
+      <div class="dash-periodo-tabs">
+        <button type="button" class="nota-tab-chip active" data-tab="recibidas">Recibidas</button>
+        <button type="button" class="nota-tab-chip" data-tab="enviadas">Enviadas</button>
+      </div>
+
+      <p class="list-status" id="notasStatus"></p>
+
+      <div id="notasList" class="historial-list"></div>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDeNotasBtn" type="button">Volver</button>
+    </div>
+  </section>
+
+  <div id="notasModalOverlay" class="hidden" style="position:fixed; inset:0; background:rgba(16,24,32,0.55); z-index:9000; display:flex; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:#FFFFFF; border-radius:16px; padding:22px; max-width:360px; width:100%;">
+      <p class="hint-eyebrow review-eyebrow" style="margin-top:0;">📝 TENÉS NOTAS NUEVAS</p>
+      <p id="notasModalResumen" style="margin:8px 0 18px; color:#101820;"></p>
+      <div style="display:flex; gap:10px;">
+        <button type="button" class="btn btn-primary" id="notasModalVerBtn">Ver notas</button>
+        <button type="button" class="btn btn-ghost" id="notasModalDespuesBtn">Después</button>
+      </div>
+    </div>
+  </div>
 
   <!-- GUARDIA TÉCNICA -->
   <section class="screen" id="screen-guardias">

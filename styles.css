@@ -887,7 +887,8 @@ html, body {
 .hist-periodo-chip,
 .hist-pasado-chip,
 .stock-periodo-chip,
-.stock-pasado-chip {
+.stock-pasado-chip,
+.nota-tab-chip {
   flex: 1;
   font-family: 'Space Grotesk', sans-serif;
   font-weight: 600;
@@ -907,7 +908,8 @@ html, body {
 .hist-periodo-chip.active,
 .hist-pasado-chip.active,
 .stock-periodo-chip.active,
-.stock-pasado-chip.active {
+.stock-pasado-chip.active,
+.nota-tab-chip.active {
   background: #101820;
   color: #F5A623;
   border-color: #101820;
@@ -920,7 +922,8 @@ html, body {
 .hist-periodo-chip:hover,
 .hist-pasado-chip:hover,
 .stock-periodo-chip:hover,
-.stock-pasado-chip:hover {
+.stock-pasado-chip:hover,
+.nota-tab-chip:hover {
   border-color: var(--amber);
 }
 .dash-periodo-chip:focus-visible,
@@ -939,7 +942,8 @@ html, body {
 .hist-periodo-chip:active,
 .hist-pasado-chip:active,
 .stock-periodo-chip:active,
-.stock-pasado-chip:active {
+.stock-pasado-chip:active,
+.nota-tab-chip:active {
   transform: scale(0.96);
 }
 .dash-card-num-chico { font-size: 18px; }
@@ -1075,6 +1079,9 @@ html, body {
 .historial-card:nth-child(10) { animation-delay: 270ms; }
 .historial-card:nth-child(n+11) { animation-delay: 300ms; }
 .historial-card-pasado { background: #EAF6EC; border-color: #A8D5B0; }
+.nota-card-no-leida { border-left: 4px solid #101820; }
+.nota-card-urgente { background: #FCEEEC; border-color: #E4B8B2; }
+.nota-card-de { font-size: 12px; color: #6B7680; margin-top: 4px; }
 .historial-card-en-obra { background: #EAF1FB; border-color: #A8C4E8; }
 .historial-card-check {
   display: flex;

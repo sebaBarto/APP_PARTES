@@ -236,6 +236,37 @@ async function manejarColeccionCortada(nombreColeccion, metodo, body, backendUrl
     }
   }
 
+  if (nombreColeccion === "notas") {
+    if (metodo === "GET") {
+      const r = await fetch(`${backendUrl}/api/notas`, { headers });
+      return { status: r.status, data: await r.json() };
+    }
+    if (metodo === "POST") {
+      const r = await fetch(`${backendUrl}/api/notas`, { method: "POST", headers, body: JSON.stringify(body) });
+      const data = await r.json();
+
+      // Si se acaba de crear una nota (no una marca de "leída"), se
+      // avisa por push a cada destinatario — el mensaje completo
+      // queda en la app, acá solo va un adelanto.
+      const accion = body && body.accion ? body.accion : "crear";
+      if (accion === "crear" && r.ok && Array.isArray(body.destinatarios) && body.destinatarios.length > 0) {
+        try {
+          const { enviarASeleccionados } = require("../lib/push-sender");
+          const adelanto = (body.mensaje || "").slice(0, 100);
+          await enviarASeleccionados(body.destinatarios, {
+            titulo: body.urgente ? "🔴 Nota urgente" : "📝 Nueva nota",
+            cuerpo: `${body.de || "Alguien"}: ${adelanto}`,
+            url: "/",
+            importante: !!body.urgente,
+          });
+        } catch (errPush) {
+          // si falla el envío del aviso, no se rompe el guardado en sí
+        }
+      }
+      return { status: r.status, data };
+    }
+  }
+
   if (nombreColeccion === "vehiculos") {
     if (metodo === "GET") {
       const r = await fetch(`${backendUrl}/api/vehiculos`, { headers });
@@ -570,7 +601,7 @@ module.exports = async (req, res) => {
   // El resto sigue en GitHub por ahora; se van cortando de a una,
   // probando cada una antes de seguir con la próxima. La app en el
   // celular no cambia en nada — sigue pidiendo lo mismo de siempre.
-  const COLECCIONES_YA_CORTADAS = ["clientes", "materiales", "credenciales", "consultas-categorias", "config", "guardias", "push-subscripciones", "servicios_emergencia", "vehiculos", "herramientas", "sims", "sims_instaladas"];
+  const COLECCIONES_YA_CORTADAS = ["clientes", "materiales", "credenciales", "consultas-categorias", "config", "guardias", "push-subscripciones", "servicios_emergencia", "vehiculos", "herramientas", "sims", "sims_instaladas", "notas"];
   if (COLECCIONES_YA_CORTADAS.includes(nombreColeccion)) {
     const { BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN } = process.env;
     if (!BACKEND_NUEVO_URL || !BACKEND_NUEVO_TOKEN) {

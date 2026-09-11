@@ -273,6 +273,7 @@
       <button type="button" class="tab-btn" id="tabInstalacionesBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 18v3"/><circle cx="8" cy="9" r="1"/><circle cx="12" cy="9" r="1"/><circle cx="16" cy="9" r="1"/></svg></span>Instalaciones</button>
       <button type="button" class="tab-btn" id="tabEncuestasBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 14s1.5 2 4 2 4-2 4-2"/><circle cx="9" cy="9" r="1"/><circle cx="15" cy="9" r="1"/><circle cx="12" cy="12" r="10"/></svg></span>Satisfacción</button>
       <button type="button" class="tab-btn" id="tabComodatosBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span>Comodatos</button>
+      <button type="button" class="tab-btn" id="tabNotasBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v13H8l-4 4z"/><path d="M8 9h8M8 13h5"/></svg></span>Notas</button>
       <button type="button" class="tab-btn" id="tabClavesClienteBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>Claves por cliente</button>
       <button type="button" class="tab-btn" id="tabEmergenciaBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.29 3.86l-8.18 14.18A2 2 0 0 0 3.82 21h16.36a2 2 0 0 0 1.71-3l-8.18-14.14a2 2 0 0 0-3.42 0z"/></svg></span>Emergencias<span class="tab-badge hidden" id="emergenciasBadge">0</span></button>
     </div>
@@ -702,6 +703,23 @@
       </div>
     </div>
 
+    <div id="panelNotas" class="hidden">
+      <h1>Notas entre usuarios</h1>
+      <p class="subtitle">
+        Todo lo que se mandaron entre técnicos y oficina — no se puede borrar desde acá, queda
+        como registro por si después hace falta reconstruir quién le avisó qué a quién.
+      </p>
+
+      <div class="card" style="margin-bottom:16px;">
+        <input type="text" class="field-input" id="notasAdminBuscarInput" placeholder="Buscar por texto, quién manda o quién recibe...">
+      </div>
+
+      <div class="card">
+        <p class="status" id="notasAdminStatus">Cargando...</p>
+        <div id="notasAdminLista"></div>
+      </div>
+    </div>
+
     <div id="panelClavesCliente" class="hidden">
       <h1>Claves por cliente</h1>
       <p class="subtitle">
@@ -825,6 +843,11 @@ const panelComodatos = document.getElementById("panelComodatos");
 const comodatosBuscarInput = document.getElementById("comodatosBuscarInput");
 const comodatosStatus = document.getElementById("comodatosStatus");
 const comodatosLista = document.getElementById("comodatosLista");
+const tabNotasBtn = document.getElementById("tabNotasBtn");
+const panelNotas = document.getElementById("panelNotas");
+const notasAdminBuscarInput = document.getElementById("notasAdminBuscarInput");
+const notasAdminStatus = document.getElementById("notasAdminStatus");
+const notasAdminLista = document.getElementById("notasAdminLista");
 const tabEmergenciaBtn = document.getElementById("tabEmergenciaBtn");
 const panelEmergencia = document.getElementById("panelEmergencia");
 let emergenciaCargadaUnaVezAdmin = false;
@@ -847,6 +870,7 @@ const TABS = [
   { btn: tabInstalacionesBtn, panel: panelInstalaciones, onShow: () => cargarInstalacionesAdmin() },
   { btn: tabEncuestasBtn, panel: panelEncuestas, onShow: () => cargarEncuestasAdmin() },
   { btn: tabComodatosBtn, panel: panelComodatos, onShow: () => cargarComodatosAdmin() },
+  { btn: tabNotasBtn, panel: panelNotas, onShow: () => cargarNotasAdmin() },
   { btn: tabClavesClienteBtn, panel: panelClavesCliente, onShow: () => cargarClavesClienteAdmin() },
   { btn: tabEmergenciaBtn, panel: panelEmergencia, onShow: () => { if (!emergenciaCargadaUnaVezAdmin) { emergenciaCargadaUnaVezAdmin = true; cargarEmergenciasAdmin(); } } },
 ];
@@ -3132,6 +3156,75 @@ function renderComodatosAdmin() {
         </div>
         <div style="color:#6B7680; font-size:12px; margin-top:6px;">
           ${c.tecnico ? "Técnico: " + escapeHtmlAdmin(c.tecnico) + " · " : ""}${c.abono_mensual ? "Abono: $" + escapeHtmlAdmin(String(c.abono_mensual)) + " · " : ""}Firmó: ${escapeHtmlAdmin(c.aclaracion_comodatario || "")}${c.dni_comodatario ? " (DNI " + escapeHtmlAdmin(c.dni_comodatario) + ")" : ""}${c.cliente_email ? " · Copia enviada a " + escapeHtmlAdmin(c.cliente_email) : ""}
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+// ---------- Notas entre usuarios ----------
+let notasAdminCache = []; // filas planas (nota, destinatario) — se agrupan por id acá abajo
+
+notasAdminBuscarInput.addEventListener("input", renderNotasAdmin);
+
+async function cargarNotasAdmin() {
+  notasAdminStatus.className = "status";
+  notasAdminStatus.textContent = "Cargando...";
+  notasAdminLista.innerHTML = "";
+  try {
+    const res = await fetch("/api/datos?coleccion=notas", {
+      headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    notasAdminCache = Array.isArray(data) ? data : [];
+    renderNotasAdmin();
+  } catch (err) {
+    notasAdminStatus.className = "status err";
+    notasAdminStatus.textContent = "No se pudo cargar: " + err.message;
+  }
+}
+
+function renderNotasAdmin() {
+  // Agrupa las filas (nota, destinatario) en una tarjeta por nota,
+  // con la lista completa de a quién se le mandó y si ya la vio.
+  const mapa = new Map();
+  notasAdminCache.forEach((f) => {
+    if (!mapa.has(f.id)) {
+      mapa.set(f.id, { id: f.id, de: f.de, mensaje: f.mensaje, urgente: f.urgente, cliente: f.cliente, creado_en: f.creado_en, destinatarios: [] });
+    }
+    mapa.get(f.id).destinatarios.push({ tecnico: f.tecnico, leido: f.leido, leido_en: f.leido_en });
+  });
+  const notas = [...mapa.values()].sort((a, b) => b.id - a.id);
+
+  const termino = (notasAdminBuscarInput.value || "").trim().toLowerCase();
+  const filtradas = !termino ? notas : notas.filter((n) => {
+    const haystack = [n.de, n.mensaje, n.cliente, ...n.destinatarios.map((d) => d.tecnico)].map((v) => (v || "").toLowerCase()).join(" ");
+    return haystack.includes(termino);
+  });
+
+  if (notas.length === 0) {
+    notasAdminStatus.className = "status";
+    notasAdminStatus.textContent = "Todavía no se mandó ninguna nota.";
+    notasAdminLista.innerHTML = "";
+    return;
+  }
+  notasAdminStatus.className = "status";
+  notasAdminStatus.textContent = `${filtradas.length} de ${notas.length} nota(s).`;
+
+  notasAdminLista.innerHTML = filtradas.map((n) => {
+    const fecha = n.creado_en ? new Date(n.creado_en).toLocaleString("es-AR") : "";
+    return `
+      <div style="padding:12px 0; border-bottom:1px solid #EEE;">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px;">
+          <b>${n.urgente ? "🔴 " : ""}${escapeHtmlAdmin(n.de)}</b>
+          <span style="color:#6B7680; font-size:12px;">${escapeHtmlAdmin(fecha)}</span>
+        </div>
+        <div style="font-size:13px; margin-top:6px; white-space:pre-line;">${escapeHtmlAdmin(n.mensaje)}</div>
+        ${n.cliente ? `<div style="color:#6B7680; font-size:12px; margin-top:6px;">📍 ${escapeHtmlAdmin(n.cliente)}</div>` : ""}
+        <div style="color:#6B7680; font-size:12px; margin-top:6px;">
+          Para: ${n.destinatarios.map((d) => `${escapeHtmlAdmin(d.tecnico)}${d.leido ? " ✓ leída" : " (sin leer)"}`).join(", ")}
         </div>
       </div>
     `;
