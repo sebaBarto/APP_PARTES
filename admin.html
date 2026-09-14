@@ -1679,7 +1679,7 @@ function renderFilaGuardia(nombre, telefono) {
     const siguiente = fila.nextElementSibling;
     if (siguiente) guardiasFilas.insertBefore(siguiente, fila);
   });
-  fila.querySelector(".quitar-guardia").addEventListener("click", () => fila.remove());
+  fila.querySelector(".quitar-guardia").addEventListener("click", () => { fila.remove(); poblarSelectExcepcionGuardia(); });
   guardiasFilas.appendChild(fila);
 }
 
@@ -1741,7 +1741,6 @@ function renderExcepcionesGuardia() {
 }
 
 guardiaExcepcionAgregarBtn.addEventListener("click", () => {
-  poblarSelectExcepcionGuardia(); // por si se agregó/editó un técnico en la secuencia recién
   const fecha = guardiaExcepcionFecha.value;
   const tecnico = guardiaExcepcionTecnico.value;
   if (!fecha) {
@@ -1763,6 +1762,15 @@ guardiaExcepcionAgregarBtn.addEventListener("click", () => {
 });
 
 agregarGuardiaBtn.addEventListener("click", () => renderFilaGuardia("", ""));
+
+// El desplegable de "quién cubre la excepción" se arma con los
+// nombres de la secuencia de arriba — se refresca cuando cambian
+// (agregar/quitar fila, o terminar de escribir un nombre), pero
+// NUNCA en el momento de agregar la excepción en sí (eso resetearía
+// la selección que el admin ya había hecho, a la primera opción).
+guardiasFilas.addEventListener("blur", (e) => {
+  if (e.target.classList && e.target.classList.contains("guardia-nombre")) poblarSelectExcepcionGuardia();
+}, true);
 
 guardarGuardiasBtn.addEventListener("click", async () => {
   const fecha = guardiasFechaInicio.value;

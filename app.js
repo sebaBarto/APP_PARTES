@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.85.0";
+const APP_VERSION = "3.85.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -4863,7 +4863,11 @@ function abrirFormularioNota(destinatarioPrefijado) {
 }
 notaCancelarBtn.addEventListener("click", limpiarFormularioNota);
 
+let notaFormGeneracion = 0; // se incrementa cada vez que el formulario se limpia/cierra —
+// así una subida de foto que sigue en curso en ese momento no "resucita" en la nota siguiente.
+
 function limpiarFormularioNota() {
+  notaFormGeneracion++;
   notaFormWrap.classList.add("hidden");
   notaMensajeInput.value = "";
   notaClienteInput.value = "";
@@ -4889,6 +4893,7 @@ function leerArchivoComoBase64Nota(file) {
 notaFotoInput.addEventListener("change", async () => {
   const archivo = notaFotoInput.files && notaFotoInput.files[0];
   if (!archivo) return;
+  const generacionAlSubir = notaFormGeneracion;
   notaFotoPreviewWrap.classList.remove("hidden");
   notaFotoPreviewImg.src = "";
   notaEnviarBtn.disabled = true;
@@ -4902,16 +4907,20 @@ notaFotoInput.addEventListener("change", async () => {
     });
     const data = await res.json();
     if (!res.ok || !data.ok) throw new Error(data.error || "Error desconocido");
+    if (generacionAlSubir !== notaFormGeneracion) return; // se canceló/mandó el formulario mientras subía — no aplicar sobre el siguiente
     notaFotoUrl = `${window.location.origin}/api/foto?id=${data.id}`;
     notaFotoPreviewImg.src = notaFotoUrl;
   } catch (err) {
+    if (generacionAlSubir !== notaFormGeneracion) return;
     showToast("No se pudo subir la foto: " + err.message);
     notaFotoPreviewWrap.classList.add("hidden");
     notaFotoInput.value = "";
     notaFotoUrl = "";
   } finally {
-    notaEnviarBtn.disabled = false;
-    notaEnviarBtn.textContent = "Mandar";
+    if (generacionAlSubir === notaFormGeneracion) {
+      notaEnviarBtn.disabled = false;
+      notaEnviarBtn.textContent = "Mandar";
+    }
   }
 });
 notaFotoQuitarBtn.addEventListener("click", () => {
@@ -5120,7 +5129,7 @@ function renderNotas() {
       ? `<div class="nota-card-de">Para: ${n.destinatarios.map((d) => `${escapeHtml(d.tecnico)}${d.leido ? " ✓" : ""}`).join(", ")}</div>`
       : "";
     const responderHtml = notaTabActiva === "recibidas"
-      ? `<button type="button" class="btn btn-ghost nota-responder-btn" style="margin-top:8px; padding:4px 10px; font-size:12px;">↩ Responder</button>`
+      ? `<button type="button" class="btn btn-ghost-light nota-responder-btn" style="margin-top:8px; padding:4px 10px; font-size:12px;">↩ Responder</button>`
       : "";
 
     card.innerHTML = `
