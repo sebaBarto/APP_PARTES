@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.85.1";
+const APP_VERSION = "3.85.2";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -4881,15 +4881,6 @@ function limpiarFormularioNota() {
   notaFotoPreviewImg.src = "";
 }
 
-function leerArchivoComoBase64Nota(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
 notaFotoInput.addEventListener("change", async () => {
   const archivo = notaFotoInput.files && notaFotoInput.files[0];
   if (!archivo) return;
@@ -4899,7 +4890,11 @@ notaFotoInput.addEventListener("change", async () => {
   notaEnviarBtn.disabled = true;
   notaEnviarBtn.textContent = "Subiendo foto...";
   try {
-    const base64 = await leerArchivoComoBase64Nota(archivo);
+    // Comprimir antes de subir — igual que el resto de la app
+    // (partes, instalaciones). Sin esto, una foto sacada directo con
+    // la cámara del celular (varios MB) puede superar el límite de
+    // tamaño que acepta la función de Vercel y subir corrupta/rota.
+    const base64 = await comprimirImagen(archivo, 1600, 0.75);
     const res = await fetch("/api/foto", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
