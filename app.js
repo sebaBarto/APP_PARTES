@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.85.2";
+const APP_VERSION = "3.86.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -5610,6 +5610,10 @@ instalacionActivaBtn.addEventListener("click", async () => {
   try {
     const ubicacion = await obtenerUbicacionActual();
     instalacionActivaBtn.textContent = "📍 Marcar entrada de hoy";
+    if (!ubicacion) {
+      showToast("No se pudo obtener tu ubicación — activá el GPS/ubicación del celular e intentá de nuevo.");
+      return;
+    }
     const ahora = new Date();
     const res = await fetch("/api/recurso-uso", {
       method: "POST",
@@ -5618,7 +5622,7 @@ instalacionActivaBtn.addEventListener("click", async () => {
         recurso: "presencia", accion: "llegada", tecnico: tecnicoLogueado, cliente,
         direccion: instalacionDireccionInput.value.trim(),
         fecha: ahora.toISOString().slice(0, 10), hora: ahora.toTimeString().slice(0, 5),
-        lat: ubicacion?.lat, lng: ubicacion?.lng, precision: ubicacion?.precision,
+        lat: ubicacion.lat, lng: ubicacion.lng, precision: ubicacion.precision,
         instalacion_id: instalacionActivaId,
       }),
     });
@@ -5640,6 +5644,10 @@ instalacionSalidaBtn.addEventListener("click", async () => {
   try {
     const ubicacion = await obtenerUbicacionActual();
     instalacionSalidaBtn.textContent = "📍 Marcar salida de hoy";
+    if (!ubicacion) {
+      showToast("No se pudo obtener tu ubicación — activá el GPS/ubicación del celular e intentá de nuevo.");
+      return;
+    }
     const ahora = new Date();
     const res = await fetch("/api/recurso-uso", {
       method: "POST",
@@ -5647,7 +5655,7 @@ instalacionSalidaBtn.addEventListener("click", async () => {
       body: JSON.stringify({
         recurso: "presencia", accion: "salida", tecnico: tecnicoLogueado,
         fecha: ahora.toISOString().slice(0, 10), hora: ahora.toTimeString().slice(0, 5),
-        lat: ubicacion?.lat, lng: ubicacion?.lng, precision: ubicacion?.precision,
+        lat: ubicacion.lat, lng: ubicacion.lng, precision: ubicacion.precision,
       }),
     });
     const data = await res.json();
