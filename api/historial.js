@@ -366,6 +366,16 @@ module.exports = async (req, res) => {
         res.status(200).json(lista);
         return;
       }
+      if (req.query && req.query.tipo === "guardia_historial") {
+        const r = await fetch(`${BACKEND_NUEVO_URL}/api/guardia-historial`, { headers: headersBackendNuevo });
+        if (!r.ok) {
+          res.status(502).json({ error: "No se pudo leer el historial de guardias" });
+          return;
+        }
+        const data = await r.json();
+        res.status(200).json(Array.isArray(data) ? data : []);
+        return;
+      }
       if (req.query && req.query.tipo === "claves_cliente") {
         const qs = req.query.numero_cliente ? `?numero_cliente=${encodeURIComponent(req.query.numero_cliente)}` : "";
         const r = await fetch(`${BACKEND_NUEVO_URL}/api/partes/claves-cliente${qs}`, { headers: headersBackendNuevo });

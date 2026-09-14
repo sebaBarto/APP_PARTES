@@ -488,6 +488,33 @@
       <button id="guardarGuardiasBtn" type="button">Guardar cambios</button>
       <p class="status" id="guardarGuardiasStatus"></p>
 
+      <div class="card" style="margin-top:20px;">
+        <label>Excepciones puntuales</label>
+        <p class="subtitle">
+          Para una semana específica sin tener que reordenar toda la secuencia (por vacaciones, un
+          cambio puntual, etc.). Se guarda junto con lo de arriba, con el mismo botón "Guardar cambios".
+        </p>
+        <div class="field-row">
+          <div style="flex:1;">
+            <label for="guardiaExcepcionFecha">Lunes de esa semana</label>
+            <input type="date" id="guardiaExcepcionFecha">
+          </div>
+          <div style="flex:1;">
+            <label for="guardiaExcepcionTecnico">Técnico que la cubre</label>
+            <select id="guardiaExcepcionTecnico"></select>
+          </div>
+        </div>
+        <button type="button" class="btn-secondary-admin" id="guardiaExcepcionAgregarBtn" style="margin-top:8px;">+ Agregar excepción</button>
+        <div id="guardiaExcepcionesLista" style="margin-top:12px;"></div>
+      </div>
+
+      <div class="card" style="margin-top:16px;">
+        <label>Historial de guardias</label>
+        <p class="subtitle">Registro real de quién estuvo de guardia cada semana — queda fijo aunque después cambies la secuencia de arriba.</p>
+        <p class="status" id="guardiaHistorialStatus">Cargando...</p>
+        <div id="guardiaHistorialLista"></div>
+      </div>
+
       <div class="card" style="margin-top:24px;">
         <label>Aviso a Security24 (cambio de guardia)</label>
         <p class="subtitle" style="margin-top:2px;">Se manda solo, automáticamente, todos los lunes a las 9:00. Si por algún motivo no llegó, lo podés disparar a mano acá.</p>
@@ -873,7 +900,7 @@ const TABS = [
   { btn: tabMaterialesBtn, panel: panelMateriales, onShow: () => cargarMaterialesAdmin() },
   { btn: tabClientesBtn, panel: panelClientes, onShow: () => { if (!clientesCargadosUnaVez) { clientesCargadosUnaVez = true; cargarClientesAdmin(); } } },
   { btn: tabConsultasBtn, panel: panelConsultas, onShow: () => { if (!consultasCatCargadasUnaVez) { consultasCatCargadasUnaVez = true; cargarConsultasCatAdmin(); } } },
-  { btn: tabGuardiasBtn, panel: panelGuardias, onShow: () => { if (!guardiasCargadasUnaVez) { guardiasCargadasUnaVez = true; cargarGuardiasAdmin(); } cargarEstadoAvisoGuardia(); } },
+  { btn: tabGuardiasBtn, panel: panelGuardias, onShow: () => { if (!guardiasCargadasUnaVez) { guardiasCargadasUnaVez = true; cargarGuardiasAdmin(); } cargarEstadoAvisoGuardia(); cargarGuardiaHistorialAdmin(); } },
   { btn: tabCredencialesBtn, panel: panelCredenciales, onShow: () => cargarCredencialesAdmin() },
   { btn: tabVehiculosBtn, panel: panelVehiculos, onShow: () => { if (!vehiculosCargadosUnaVez) { vehiculosCargadosUnaVez = true; cargarVehiculosAdmin(); } } },
   { btn: tabSimsBtn, panel: panelSims, onShow: () => cargarSimsAdmin() },
@@ -1616,6 +1643,12 @@ const guardiasStatus = document.getElementById("guardiasStatus");
 const guardiasFilas = document.getElementById("guardiasFilas");
 const agregarGuardiaBtn = document.getElementById("agregarGuardiaBtn");
 const guardarGuardiasBtn = document.getElementById("guardarGuardiasBtn");
+const guardiaExcepcionFecha = document.getElementById("guardiaExcepcionFecha");
+const guardiaExcepcionTecnico = document.getElementById("guardiaExcepcionTecnico");
+const guardiaExcepcionAgregarBtn = document.getElementById("guardiaExcepcionAgregarBtn");
+const guardiaExcepcionesLista = document.getElementById("guardiaExcepcionesLista");
+const guardiaHistorialStatus = document.getElementById("guardiaHistorialStatus");
+const guardiaHistorialLista = document.getElementById("guardiaHistorialLista");
 const guardarGuardiasStatus = document.getElementById("guardarGuardiasStatus");
 
 function renderFilaGuardia(nombre, telefono) {
@@ -1650,6 +1683,8 @@ function renderFilaGuardia(nombre, telefono) {
   guardiasFilas.appendChild(fila);
 }
 
+let excepcionesGuardiaActuales = {};
+
 async function cargarGuardiasAdmin() {
   guardiasStatus.textContent = "Cargando configuración de guardias...";
   guardiasFilas.innerHTML = "";
@@ -1665,10 +1700,67 @@ async function cargarGuardiasAdmin() {
     guardiasStatus.textContent = (data.secuencia || []).length > 0
       ? ""
       : "Todavía no hay ninguna secuencia cargada — agregá los 3 técnicos en el orden que rotan.";
+
+    excepcionesGuardiaActuales = (data.excepciones && typeof data.excepciones === "object") ? data.excepciones : {};
+    poblarSelectExcepcionGuardia();
+    renderExcepcionesGuardia();
   } catch (err) {
     guardiasStatus.textContent = "No se pudo cargar la configuración de guardias.";
   }
 }
+
+// El teléfono de cada técnico solo se guarda dentro de la secuencia
+// de guardias (no hay un campo de teléfono en la lista general de
+// técnicos) — por eso quien puede cubrir una excepción sale de las
+// filas de la secuencia ya cargadas acá mismo, así el teléfono
+// siempre está disponible sin tener que pedirlo aparte.
+function poblarSelectExcepcionGuardia() {
+  const filas = Array.from(guardiasFilas.querySelectorAll(":scope > .guardia-fila"));
+  const nombres = filas.map((fila) => fila.querySelector(".guardia-nombre").value.trim()).filter(Boolean);
+  guardiaExcepcionTecnico.innerHTML = nombres.map((n) => `<option value="${escapeHtmlAdmin(n)}">${escapeHtmlAdmin(n)}</option>`).join("");
+}
+
+function renderExcepcionesGuardia() {
+  const fechas = Object.keys(excepcionesGuardiaActuales).sort();
+  if (fechas.length === 0) {
+    guardiaExcepcionesLista.innerHTML = "<p style='color:#6B7680; font-size:13px;'>Sin excepciones cargadas.</p>";
+    return;
+  }
+  guardiaExcepcionesLista.innerHTML = fechas.map((fecha) => `
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid #EEE;">
+      <span style="font-size:13px;">Semana del <b>${escapeHtmlAdmin(fecha)}</b>: ${escapeHtmlAdmin(excepcionesGuardiaActuales[fecha])}</span>
+      <button type="button" class="excepcion-quitar-btn" data-fecha="${escapeHtmlAdmin(fecha)}" style="background:none; border:none; color:#B5541A; cursor:pointer; font-size:12px;">Quitar</button>
+    </div>
+  `).join("");
+  guardiaExcepcionesLista.querySelectorAll(".excepcion-quitar-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      delete excepcionesGuardiaActuales[btn.dataset.fecha];
+      renderExcepcionesGuardia();
+    });
+  });
+}
+
+guardiaExcepcionAgregarBtn.addEventListener("click", () => {
+  poblarSelectExcepcionGuardia(); // por si se agregó/editó un técnico en la secuencia recién
+  const fecha = guardiaExcepcionFecha.value;
+  const tecnico = guardiaExcepcionTecnico.value;
+  if (!fecha) {
+    alert("Elegí la fecha del lunes de esa semana.");
+    return;
+  }
+  const dia = new Date(fecha + "T00:00:00").getDay();
+  if (dia !== 1) {
+    alert("Tiene que ser un lunes — es el día en que arranca cada semana de guardia.");
+    return;
+  }
+  if (!tecnico) {
+    alert("Agregá primero al menos un técnico a la secuencia de arriba (con nombre y teléfono) para poder elegirlo acá.");
+    return;
+  }
+  excepcionesGuardiaActuales[fecha] = tecnico;
+  renderExcepcionesGuardia();
+  guardiaExcepcionFecha.value = "";
+});
 
 agregarGuardiaBtn.addEventListener("click", () => renderFilaGuardia("", ""));
 
@@ -1701,7 +1793,7 @@ guardarGuardiasBtn.addEventListener("click", async () => {
         "Content-Type": "application/json",
         Authorization: "Bearer " + SERVICIOS_API_TOKEN,
       },
-      body: JSON.stringify({ fecha_inicio_referencia: fecha, secuencia }),
+      body: JSON.stringify({ fecha_inicio_referencia: fecha, secuencia, excepciones: excepcionesGuardiaActuales }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error desconocido");
@@ -1714,6 +1806,34 @@ guardarGuardiasBtn.addEventListener("click", async () => {
     guardarGuardiasBtn.disabled = false;
   }
 });
+
+async function cargarGuardiaHistorialAdmin() {
+  guardiaHistorialStatus.className = "status";
+  guardiaHistorialStatus.textContent = "Cargando...";
+  try {
+    const res = await fetch("/api/historial?tipo=guardia_historial", {
+      headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    const filas = Array.isArray(data) ? data : [];
+    if (filas.length === 0) {
+      guardiaHistorialStatus.textContent = "Todavía no hay registros (se van sumando cada lunes).";
+      guardiaHistorialLista.innerHTML = "";
+      return;
+    }
+    guardiaHistorialStatus.textContent = "";
+    guardiaHistorialLista.innerHTML = filas.slice(0, 20).map((f) => `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:5px 0; border-bottom:1px solid #EEE; font-size:13px;">
+        <span>Semana del <b>${escapeHtmlAdmin(f.semana_inicio)}</b>: ${escapeHtmlAdmin(f.tecnico)}${f.fue_excepcion ? " <span style='color:#B5541A;'>(excepción)</span>" : ""}</span>
+      </div>
+    `).join("");
+  } catch (err) {
+    guardiaHistorialStatus.className = "status err";
+    guardiaHistorialStatus.textContent = "No se pudo cargar: " + err.message;
+  }
+}
 
 // ---------- Aviso manual a Security24 ----------
 const guardiaAvisoEstado = document.getElementById("guardiaAvisoEstado");
@@ -3375,7 +3495,7 @@ function renderNotasAdmin() {
   const mapa = new Map();
   notasAdminCache.forEach((f) => {
     if (!mapa.has(f.id)) {
-      mapa.set(f.id, { id: f.id, de: f.de, mensaje: f.mensaje, urgente: f.urgente, cliente: f.cliente, numero_servicio: f.numero_servicio, creado_en: f.creado_en, destinatarios: [] });
+      mapa.set(f.id, { id: f.id, de: f.de, mensaje: f.mensaje, urgente: f.urgente, cliente: f.cliente, numero_servicio: f.numero_servicio, foto_url: f.foto_url, creado_en: f.creado_en, destinatarios: [] });
     }
     mapa.get(f.id).destinatarios.push({ tecnico: f.tecnico, leido: f.leido, leido_en: f.leido_en });
   });
@@ -3407,6 +3527,7 @@ function renderNotasAdmin() {
         <div style="font-size:13px; margin-top:6px; white-space:pre-line;">${escapeHtmlAdmin(n.mensaje)}</div>
         ${n.cliente ? `<div style="color:#6B7680; font-size:12px; margin-top:6px;">📍 ${escapeHtmlAdmin(n.cliente)}</div>` : ""}
         ${n.numero_servicio ? `<div style="color:#6B7680; font-size:12px; margin-top:4px;">🧾 Servicio N° ${escapeHtmlAdmin(n.numero_servicio)}</div>` : ""}
+        ${n.foto_url ? `<a href="${escapeHtmlAdmin(n.foto_url)}" target="_blank" rel="noopener"><img src="${escapeHtmlAdmin(n.foto_url)}" style="max-width:200px; border-radius:8px; margin-top:6px; display:block;"></a>` : ""}
         <div style="color:#6B7680; font-size:12px; margin-top:6px;">
           Para: ${n.destinatarios.map((d) => `${escapeHtmlAdmin(d.tecnico)}${d.leido ? " ✓ leída" : " (sin leer)"}`).join(", ")}
         </div>

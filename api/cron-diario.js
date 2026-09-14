@@ -118,6 +118,10 @@ async function chequearGuardia(headersBackendNuevo, estado, ahora) {
   if (typeof secuencia === "string") {
     try { secuencia = JSON.parse(secuencia); } catch (err) { secuencia = []; }
   }
+  let excepciones = guardias.excepciones || {};
+  if (typeof excepciones === "string") {
+    try { excepciones = JSON.parse(excepciones); } catch (err) { excepciones = {}; }
+  }
   if (!guardias.fecha_inicio_referencia || secuencia.length === 0) return null;
 
   const [y, m, d] = guardias.fecha_inicio_referencia.split("-").map(Number);
@@ -126,7 +130,16 @@ async function chequearGuardia(headersBackendNuevo, estado, ahora) {
   if (diffMs < 0) return null;
   const semanas = Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000));
   const indice = ((semanas % secuencia.length) + secuencia.length) % secuencia.length;
-  const tecnico = secuencia[indice];
+
+  // El lunes de ESTA semana (00:00), para cruzar contra "excepciones"
+  // — misma clave que arma admin.html: YYYY-MM-DD del lunes.
+  const lunesEstaSemana = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
+  const claveSemana = `${lunesEstaSemana.getFullYear()}-${String(lunesEstaSemana.getMonth() + 1).padStart(2, "0")}-${String(lunesEstaSemana.getDate()).padStart(2, "0")}`;
+  const nombreExcepcion = excepciones[claveSemana];
+  const fueExcepcion = !!nombreExcepcion;
+  const tecnico = fueExcepcion
+    ? (secuencia.find((t) => t.nombre === nombreExcepcion) || { nombre: nombreExcepcion, telefono: "" })
+    : secuencia[indice];
 
   const resultadoPush = await enviarATodos({
     titulo: "🚨 Cambio de guardia",
@@ -142,6 +155,29 @@ async function chequearGuardia(headersBackendNuevo, estado, ahora) {
   // edita admin.html). Antes los DOS sistemas lo mandaban en
   // paralelo, el mismo lunes a la misma hora — quedaba duplicado (o,
   // peor, ambos podían fallar en silencio sin que el otro lo cubriera).
+  //
+  // IMPORTANTE — pendiente de confirmar con Seba: ese cron de
+  // Cloudflare también necesita enterarse de "excepciones" para no
+  // desincronizarse del push de acá. Sin verlo no puedo ajustarlo.
+
+  // Deja un registro real de quién estuvo de guardia esta semana —
+  // a diferencia de calcularlo al vuelo (que se reescribe solo si
+  // después se edita la secuencia), esto queda fijo para siempre,
+  // aunque la config cambie más adelante.
+  try {
+    await fetch(`${process.env.BACKEND_NUEVO_URL}/api/guardia-historial`, {
+      method: "POST",
+      headers: { ...headersBackendNuevo, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        semana_inicio: claveSemana,
+        tecnico: tecnico.nombre,
+        telefono: tecnico.telefono || "",
+        fue_excepcion: fueExcepcion,
+      }),
+    });
+  } catch (errHistorial) {
+    console.error("[cron-diario] No se pudo guardar el historial de guardias:", errHistorial);
+  }
 
   estado.ultima_semana_guardia_notificada = semanaActual;
   return tecnico.nombre;

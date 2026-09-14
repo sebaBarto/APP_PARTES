@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.84.0";
+const APP_VERSION = "3.85.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -4129,6 +4129,20 @@ function indiceGuardiaEnFecha(fechaInicioRef, cantidad, fecha) {
   return ((semanas % cantidad) + cantidad) % cantidad;
 }
 
+// Si hay una excepción cargada para la semana de "fecha" (mismo
+// formato de clave que usa admin.html: el lunes de esa semana en
+// YYYY-MM-DD), esa gana por sobre lo que daría la secuencia normal.
+function resolverTecnicoSemana(secuencia, excepciones, inicioRef, fecha) {
+  const claveSemana = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}-${String(fecha.getDate()).padStart(2, "0")}`;
+  if (excepciones && excepciones[claveSemana]) {
+    const nombreExcepcion = excepciones[claveSemana];
+    const enSecuencia = secuencia.find((t) => t.nombre === nombreExcepcion);
+    return enSecuencia || { nombre: nombreExcepcion, telefono: "" };
+  }
+  const indice = indiceGuardiaEnFecha(inicioRef, secuencia.length, fecha);
+  return secuencia[indice];
+}
+
 async function cargarYRenderGuardias() {
   guardiaStatus.textContent = "Cargando...";
   guardiaActualWrap.classList.add("hidden");
@@ -4139,6 +4153,7 @@ async function cargarYRenderGuardias() {
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     const secuencia = data.secuencia || [];
+    const excepciones = data.excepciones || {};
     if (!data.fecha_inicio_referencia || secuencia.length === 0) {
       guardiaStatus.textContent = "Todavía no se cargó la secuencia de guardias.";
       return;
@@ -4152,8 +4167,7 @@ async function cargarYRenderGuardias() {
       guardiaStatus.textContent = `La secuencia todavía no arrancó (empieza el ${d}/${m}/${y} a las 9:00).`;
     } else {
       guardiaStatus.textContent = "";
-      const indiceActual = indiceGuardiaEnFecha(inicioRef, secuencia.length, ahora);
-      const actual = secuencia[indiceActual];
+      const actual = resolverTecnicoSemana(secuencia, excepciones, inicioRef, ahora);
       guardiaActualNombre.textContent = actual.nombre;
       guardiaLlamarBtn.href = "tel:" + (actual.telefono || "").replace(/[^\d+]/g, "");
       const numeroWa = limpiarTelefonoWhatsapp(actual.telefono);
@@ -4169,8 +4183,8 @@ async function cargarYRenderGuardias() {
     // Retrocedemos una semana para incluir el turno vigente en la lista.
     cursor = new Date(cursor.getTime() - 7 * 24 * 60 * 60 * 1000);
     for (let i = 0; i < 5; i++) {
-      const indice = indiceGuardiaEnFecha(inicioRef, secuencia.length, cursor);
-      proximos.push({ fecha: new Date(cursor), tecnico: secuencia[indice] });
+      const tecnico = resolverTecnicoSemana(secuencia, excepciones, inicioRef, cursor);
+      proximos.push({ fecha: new Date(cursor), tecnico });
       cursor = new Date(cursor.getTime() + 7 * 24 * 60 * 60 * 1000);
     }
     guardiaProximosList.innerHTML = "";
@@ -4786,6 +4800,7 @@ let notasCache = [];
 let notaTabActiva = "recibidas";
 let notaClienteEncontrado = null;
 let notaServicioEncontrado = null;
+let notaFotoUrl = "";
 let notasModalYaMostrado = false;
 
 const tileNotasBtn = document.getElementById("tileNotasBtn");
@@ -4797,10 +4812,15 @@ const notaMensajeInput = document.getElementById("notaMensajeInput");
 const notaDestinatariosLista = document.getElementById("notaDestinatariosLista");
 const notaClienteInput = document.getElementById("notaClienteInput");
 const notaServicioInput = document.getElementById("notaServicioInput");
+const notaFotoInput = document.getElementById("notaFotoInput");
+const notaFotoPreviewWrap = document.getElementById("notaFotoPreviewWrap");
+const notaFotoPreviewImg = document.getElementById("notaFotoPreviewImg");
+const notaFotoQuitarBtn = document.getElementById("notaFotoQuitarBtn");
 const notaUrgenteInput = document.getElementById("notaUrgenteInput");
 const notaEnviarBtn = document.getElementById("notaEnviarBtn");
 const notaCancelarBtn = document.getElementById("notaCancelarBtn");
 const notaOcultarLeidasCheck = document.getElementById("notaOcultarLeidasCheck");
+const notaSearchInput = document.getElementById("notaSearchInput");
 const notasStatus = document.getElementById("notasStatus");
 const notasList = document.getElementById("notasList");
 const notasModalOverlay = document.getElementById("notasModalOverlay");
@@ -4825,14 +4845,25 @@ document.querySelectorAll(".nota-tab-chip").forEach((chip) => {
 
 notaNuevaBtn.addEventListener("click", () => {
   const iraMostrar = notaFormWrap.classList.contains("hidden");
-  notaFormWrap.classList.toggle("hidden");
-  if (iraMostrar) {
-    poblarDestinatariosNota();
-    poblarDatalistClientesNota();
-    poblarDatalistServiciosNota();
-  }
+  if (iraMostrar) abrirFormularioNota();
+  else notaFormWrap.classList.add("hidden");
 });
-notaCancelarBtn.addEventListener("click", () => {
+
+function abrirFormularioNota(destinatarioPrefijado) {
+  notaFormWrap.classList.remove("hidden");
+  poblarDestinatariosNota();
+  poblarDatalistClientesNota();
+  poblarDatalistServiciosNota();
+  if (destinatarioPrefijado) {
+    const check = notaDestinatariosLista.querySelector(`.nota-dest-check[value="${CSS.escape(destinatarioPrefijado)}"]`);
+    if (check) check.checked = true;
+  }
+  notaMensajeInput.focus();
+  notaFormWrap.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+notaCancelarBtn.addEventListener("click", limpiarFormularioNota);
+
+function limpiarFormularioNota() {
   notaFormWrap.classList.add("hidden");
   notaMensajeInput.value = "";
   notaClienteInput.value = "";
@@ -4840,6 +4871,54 @@ notaCancelarBtn.addEventListener("click", () => {
   notaUrgenteInput.checked = false;
   notaClienteEncontrado = null;
   notaServicioEncontrado = null;
+  notaFotoUrl = "";
+  notaFotoInput.value = "";
+  notaFotoPreviewWrap.classList.add("hidden");
+  notaFotoPreviewImg.src = "";
+}
+
+function leerArchivoComoBase64Nota(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+notaFotoInput.addEventListener("change", async () => {
+  const archivo = notaFotoInput.files && notaFotoInput.files[0];
+  if (!archivo) return;
+  notaFotoPreviewWrap.classList.remove("hidden");
+  notaFotoPreviewImg.src = "";
+  notaEnviarBtn.disabled = true;
+  notaEnviarBtn.textContent = "Subiendo foto...";
+  try {
+    const base64 = await leerArchivoComoBase64Nota(archivo);
+    const res = await fetch("/api/foto", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({ base64 }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || "Error desconocido");
+    notaFotoUrl = `${window.location.origin}/api/foto?id=${data.id}`;
+    notaFotoPreviewImg.src = notaFotoUrl;
+  } catch (err) {
+    showToast("No se pudo subir la foto: " + err.message);
+    notaFotoPreviewWrap.classList.add("hidden");
+    notaFotoInput.value = "";
+    notaFotoUrl = "";
+  } finally {
+    notaEnviarBtn.disabled = false;
+    notaEnviarBtn.textContent = "Mandar";
+  }
+});
+notaFotoQuitarBtn.addEventListener("click", () => {
+  notaFotoUrl = "";
+  notaFotoInput.value = "";
+  notaFotoPreviewWrap.classList.add("hidden");
+  notaFotoPreviewImg.src = "";
 });
 
 function poblarDestinatariosNota() {
@@ -4913,18 +4992,13 @@ notaEnviarBtn.addEventListener("click", async () => {
         numero_cliente: notaClienteEncontrado ? notaClienteEncontrado.numero_cliente : "",
         cliente: notaClienteEncontrado ? notaClienteEncontrado.nombre : notaClienteInput.value.trim(),
         numero_servicio: notaServicioEncontrado ? notaServicioEncontrado.numero_servicio : "",
+        foto_url: notaFotoUrl,
         destinatarios,
       }),
     });
     if (!res.ok) throw new Error("HTTP " + res.status);
     showToast("Nota enviada.");
-    notaFormWrap.classList.add("hidden");
-    notaMensajeInput.value = "";
-    notaClienteInput.value = "";
-    notaServicioInput.value = "";
-    notaUrgenteInput.checked = false;
-    notaClienteEncontrado = null;
-    notaServicioEncontrado = null;
+    limpiarFormularioNota();
     notaTabActiva = "enviadas";
     document.querySelectorAll(".nota-tab-chip").forEach((c) => c.classList.toggle("active", c.dataset.tab === "enviadas"));
     await fetchNotas();
@@ -4970,7 +5044,7 @@ function agruparNotasEnviadas(filas) {
   const mapa = new Map();
   filas.forEach((f) => {
     if (!mapa.has(f.id)) {
-      mapa.set(f.id, { id: f.id, de: f.de, mensaje: f.mensaje, urgente: f.urgente, cliente: f.cliente, numero_servicio: f.numero_servicio, creado_en: f.creado_en, destinatarios: [] });
+      mapa.set(f.id, { id: f.id, de: f.de, mensaje: f.mensaje, urgente: f.urgente, cliente: f.cliente, numero_servicio: f.numero_servicio, foto_url: f.foto_url, creado_en: f.creado_en, destinatarios: [] });
     }
     mapa.get(f.id).destinatarios.push({ tecnico: f.tecnico, leido: f.leido });
   });
@@ -4997,6 +5071,7 @@ function actualizarBadgeNotas() {
 }
 
 notaOcultarLeidasCheck.addEventListener("change", renderNotas);
+notaSearchInput.addEventListener("input", renderNotas);
 
 function renderNotas() {
   notasList.innerHTML = "";
@@ -5016,6 +5091,15 @@ function renderNotas() {
     });
   }
 
+  const termino = normalizeText(notaSearchInput.value.trim());
+  if (termino) {
+    items = items.filter((n) => {
+      const personas = notaTabActiva === "recibidas" ? n.de : n.destinatarios.map((d) => d.tecnico).join(" ");
+      const haystack = normalizeText([n.mensaje, n.cliente, personas].join(" "));
+      return haystack.includes(termino);
+    });
+  }
+
   if (items.length === 0) {
     notasStatus.textContent = notaTabActiva === "recibidas" ? "No tenés notas." : "Todavía no mandaste ninguna nota.";
     return;
@@ -5030,9 +5114,13 @@ function renderNotas() {
 
     const clienteHtml = n.cliente ? `<div class="historial-card-direccion">📍 ${escapeHtml(n.cliente)}</div>` : "";
     const servicioHtml = n.numero_servicio ? `<div class="historial-card-direccion">🧾 Servicio N° ${escapeHtml(n.numero_servicio)}</div>` : "";
+    const fotoHtml = n.foto_url ? `<a href="${escapeHtml(n.foto_url)}" target="_blank" rel="noopener"><img src="${escapeHtml(n.foto_url)}" style="max-width:100%; border-radius:8px; margin-top:8px; display:block;"></a>` : "";
     const deHtml = notaTabActiva === "recibidas" ? `<div class="nota-card-de">De: ${escapeHtml(n.de)}</div>` : "";
     const paraHtml = notaTabActiva === "enviadas"
       ? `<div class="nota-card-de">Para: ${n.destinatarios.map((d) => `${escapeHtml(d.tecnico)}${d.leido ? " ✓" : ""}`).join(", ")}</div>`
+      : "";
+    const responderHtml = notaTabActiva === "recibidas"
+      ? `<button type="button" class="btn btn-ghost nota-responder-btn" style="margin-top:8px; padding:4px 10px; font-size:12px;">↩ Responder</button>`
       : "";
 
     card.innerHTML = `
@@ -5043,12 +5131,24 @@ function renderNotas() {
       <div class="historial-card-cliente">${escapeHtml(n.mensaje)}</div>
       ${clienteHtml}
       ${servicioHtml}
+      ${fotoHtml}
       ${paraHtml}
+      ${responderHtml}
     `;
 
     if (noLeida) {
       card.style.cursor = "pointer";
-      card.addEventListener("click", () => marcarNotaLeida(n));
+      card.addEventListener("click", (e) => {
+        if (e.target.closest(".nota-responder-btn") || e.target.closest("a")) return;
+        marcarNotaLeida(n);
+      });
+    }
+    const btnResponder = card.querySelector(".nota-responder-btn");
+    if (btnResponder) {
+      btnResponder.addEventListener("click", (e) => {
+        e.stopPropagation();
+        abrirFormularioNota(n.de);
+      });
     }
     notasList.appendChild(card);
   });

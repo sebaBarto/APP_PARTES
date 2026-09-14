@@ -1340,6 +1340,15 @@
           <datalist id="notaServiciosLista"></datalist>
         </div>
 
+        <div class="field-group">
+          <label class="field-label">Foto (opcional)</label>
+          <input class="field-input" type="file" accept="image/*" id="notaFotoInput">
+          <div id="notaFotoPreviewWrap" class="hidden" style="margin-top:8px;">
+            <img id="notaFotoPreviewImg" style="max-width:100%; border-radius:10px; display:block;">
+            <button type="button" class="btn btn-ghost" id="notaFotoQuitarBtn" style="margin-top:6px;">Quitar foto</button>
+          </div>
+        </div>
+
         <label class="historial-select-all" style="margin-bottom:14px;">
           <input type="checkbox" id="notaUrgenteInput">
           Marcar como urgente
@@ -1349,6 +1358,10 @@
           <button type="button" class="btn btn-primary" id="notaEnviarBtn">Mandar</button>
           <button type="button" class="btn btn-ghost" id="notaCancelarBtn">Cancelar</button>
         </div>
+      </div>
+
+      <div class="field-group">
+        <input class="field-input search-input" id="notaSearchInput" type="search" placeholder="Buscar por texto, cliente o persona...">
       </div>
 
       <div class="dash-periodo-tabs">
