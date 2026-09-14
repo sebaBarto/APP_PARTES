@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.83.0";
+const APP_VERSION = "3.84.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -7560,15 +7560,43 @@ function dibujarSimsLista() {
 
     const colapsados = obtenerColapsadosSims();
 
+    const barra = document.createElement("div");
+    barra.className = "sim-grupos-barra";
+    barra.innerHTML = `
+      <button type="button" class="btn-chip" id="simsColapsarTodosBtn">Colapsar todos</button>
+      <button type="button" class="btn-chip" id="simsExpandirTodosBtn">Expandir todos</button>
+      <button type="button" class="btn-chip" id="simsRestablecerOrdenBtn">Restablecer orden</button>
+    `;
+    simsGrupos.appendChild(barra);
+    barra.querySelector("#simsColapsarTodosBtn").addEventListener("click", () => {
+      orden.forEach((n) => colapsados.add(n));
+      guardarColapsadosSims(colapsados);
+      dibujarSimsLista();
+    });
+    barra.querySelector("#simsExpandirTodosBtn").addEventListener("click", () => {
+      colapsados.clear();
+      guardarColapsadosSims(colapsados);
+      dibujarSimsLista();
+    });
+    barra.querySelector("#simsRestablecerOrdenBtn").addEventListener("click", () => {
+      guardarOrdenTecnicosSims([]);
+      dibujarSimsLista();
+    });
+
     orden.forEach((nombreTec, idx) => {
       const grupo = document.createElement("div");
       grupo.className = "sim-grupo";
+
+      const items = porTecnico[nombreTec];
+      const enStock = items.filter((s) => s.estado === "stock").length;
+      const enUso = items.filter((s) => s.estado === "uso").length;
+      const desglose = [enStock > 0 ? `${enStock} en stock` : "", enUso > 0 ? `${enUso} en uso` : ""].filter(Boolean).join(", ");
 
       const estaColapsado = colapsados.has(nombreTec);
       const titulo = document.createElement("div");
       titulo.className = "sim-grupo-titulo sim-grupo-header";
       titulo.innerHTML = `
-        <span>${nombreTec === propio ? "Tus SIMs" : escapeHtml(nombreTec)} <span class="sim-grupo-count">(${porTecnico[nombreTec].length})</span></span>
+        <span>${nombreTec === propio ? "Tus SIMs" : escapeHtml(nombreTec)} <span class="sim-grupo-count">(${items.length}${desglose ? " — " + desglose : ""})</span></span>
         <span class="sim-grupo-controles">
           <button type="button" class="sim-grupo-btn sim-grupo-subir" ${idx === 0 ? "disabled" : ""} title="Subir">▲</button>
           <button type="button" class="sim-grupo-btn sim-grupo-bajar" ${idx === orden.length - 1 ? "disabled" : ""} title="Bajar">▼</button>
@@ -7579,7 +7607,7 @@ function dibujarSimsLista() {
 
       const contenido = document.createElement("div");
       contenido.className = "sim-grupo-contenido" + (estaColapsado ? " hidden" : "");
-      porTecnico[nombreTec].forEach((s) => contenido.appendChild(crearCard(s, false)));
+      items.forEach((s) => contenido.appendChild(crearCard(s, false)));
       grupo.appendChild(contenido);
 
       simsGrupos.appendChild(grupo);

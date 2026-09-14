@@ -1423,6 +1423,23 @@ html, body {
 }
 .sim-grupo-btn:disabled { opacity: 0.3; cursor: default; }
 .sim-grupo-btn:active { transform: scale(0.94); }
+.sim-grupos-barra {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.btn-chip {
+  background: transparent;
+  color: #C7CCC3;
+  border: 1.5px solid #4A5560;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.btn-chip:active { transform: scale(0.96); }
 .ocupacion-dia-card {
   background: #FFFFFF;
   border: 1.5px solid #D8DCD4;
