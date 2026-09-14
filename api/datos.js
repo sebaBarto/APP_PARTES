@@ -173,6 +173,11 @@ async function manejarColeccionCortada(nombreColeccion, metodo, body, backendUrl
       if (data && typeof data.secuencia === "string") {
         try { data.secuencia = JSON.parse(data.secuencia); } catch (err) { data.secuencia = []; }
       }
+      // Mismo caso que "secuencia" — "excepciones" también se guarda
+      // como texto (JSON) en la base nueva.
+      if (data && typeof data.excepciones === "string") {
+        try { data.excepciones = JSON.parse(data.excepciones); } catch (err) { data.excepciones = {}; }
+      }
       return { status: r.status, data };
     }
     if (metodo === "POST") {
