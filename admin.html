@@ -3660,22 +3660,32 @@ async function mostrarDetalleInstalacionAdmin(id) {
       ${inst.observaciones ? `<h3>Observaciones</h3><p style="background:#F4F5F0; border-radius:8px; padding:12px 14px;">${escapeHtmlAdmin(inst.observaciones)}</p>` : ""}
       <h3>Fotos</h3>
       <div style="display:flex; flex-wrap:wrap;">${fotosHtml}</div>
-      ${inst.estado === "abierta" ? `
-        <button type="button" id="instalacionBorrarBtn" style="margin-top:16px; background:#C0392B; color:#fff; border:none; padding:10px 16px; border-radius:8px; cursor:pointer; font-weight:600;">🗑 Borrar esta instalación</button>
-      ` : ""}
+      <button type="button" id="instalacionBorrarBtn" style="margin-top:16px; background:#C0392B; color:#fff; border:none; padding:10px 16px; border-radius:8px; cursor:pointer; font-weight:600;">🗑 Borrar esta instalación</button>
     `;
 
-    if (inst.estado === "abierta") {
-      document.getElementById("instalacionBorrarBtn").addEventListener("click", () => borrarInstalacionAdmin(id, inst.cliente));
-    }
+    document.getElementById("instalacionBorrarBtn").addEventListener("click", () => borrarInstalacionAdmin(id, inst.cliente, inst.estado));
   } catch (err) {
     instalacionesAdminDetalleContenido.innerHTML = `<p style="color:#C0392B;">No se pudo cargar: ${escapeHtmlAdmin(err.message)}</p>`;
   }
 }
 
-async function borrarInstalacionAdmin(id, cliente) {
-  const confirmar = confirm(`¿Borrar la instalación "${cliente}"? Se pierde todo — días marcados, zonas, canales y fotos. Esto no se puede deshacer.`);
-  if (!confirmar) return;
+async function borrarInstalacionAdmin(id, cliente, estado) {
+  // Las cerradas son trabajo terminado (posiblemente ya facturado) —
+  // acá pesa más el riesgo de un clic de más, así que además del
+  // confirm normal, para esas pide escribir el nombre del cliente a
+  // mano. Para las abiertas (trabajo en curso, nada que perder salvo
+  // lo cargado hasta ahora) alcanza con el confirm de siempre.
+  if (estado === "cerrada") {
+    const escrito = prompt(`Esta instalación ya está CERRADA (trabajo terminado). Para borrarla de verdad, escribí el nombre del cliente tal cual aparece arriba:\n\n"${cliente}"`);
+    if (escrito === null) return;
+    if (escrito.trim() !== cliente.trim()) {
+      alert("No coincide con el nombre del cliente — no se borró nada.");
+      return;
+    }
+  } else {
+    const confirmar = confirm(`¿Borrar la instalación "${cliente}"? Se pierde todo — días marcados, zonas, canales y fotos. Esto no se puede deshacer.`);
+    if (!confirmar) return;
+  }
   try {
     const res = await fetch("/api/historial", {
       method: "POST",
