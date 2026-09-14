@@ -1392,6 +1392,37 @@ html, body {
   color: #F5A623;
   margin: 18px 0 8px;
 }
+.sim-grupo-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sim-grupo-count {
+  color: #9AA3A9;
+  font-weight: 400;
+}
+.sim-grupo-controles {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.sim-grupo-btn {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: #F4F5F0;
+  border-radius: 6px;
+  width: 26px;
+  height: 26px;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sim-grupo-btn:disabled { opacity: 0.3; cursor: default; }
+.sim-grupo-btn:active { transform: scale(0.94); }
 .ocupacion-dia-card {
   background: #FFFFFF;
   border: 1.5px solid #D8DCD4;

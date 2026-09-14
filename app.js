@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.82.0";
+const APP_VERSION = "3.83.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -7450,6 +7450,33 @@ volverDeSimDetalleBtn.addEventListener("click", () => showScreen("sims"));
 
 let simsListaCache = [];
 
+// El orden y el colapso de los grupos de SIMs por técnico son
+// preferencias personales de quien mira la pantalla (con permiso
+// sims_ver_todas) — se guardan en este celular, no en el servidor,
+// así cada uno los arma a su gusto sin pisar el de otro.
+function obtenerOrdenTecnicosSims() {
+  try {
+    const guardado = JSON.parse(localStorage.getItem("sims_orden_tecnicos") || "[]");
+    return Array.isArray(guardado) ? guardado : [];
+  } catch (err) {
+    return [];
+  }
+}
+function guardarOrdenTecnicosSims(orden) {
+  localStorage.setItem("sims_orden_tecnicos", JSON.stringify(orden));
+}
+function obtenerColapsadosSims() {
+  try {
+    const guardado = JSON.parse(localStorage.getItem("sims_colapsados") || "[]");
+    return new Set(Array.isArray(guardado) ? guardado : []);
+  } catch (err) {
+    return new Set();
+  }
+}
+function guardarColapsadosSims(set) {
+  localStorage.setItem("sims_colapsados", JSON.stringify([...set]));
+}
+
 async function renderSimsLista() {
   simsListaStatus.textContent = "Cargando...";
   simsGrupos.innerHTML = "";
@@ -7515,18 +7542,74 @@ function dibujarSimsLista() {
   simsListaStatus.textContent = "";
 
   if (veTodas) {
-    // Agrupadas por técnico, para que quede claro de quién es cada una.
+    // Agrupadas por técnico, para que quede claro de quién es cada
+    // una — con orden personalizable (▲▼) y colapso por grupo, ambos
+    // guardados en este celular (no es algo que tenga que verse igual
+    // para todos los que tienen este permiso).
     const porTecnico = {};
     listaVisible.forEach((s) => {
       const clave = s.tecnico_actual || "(sin asignar)";
       (porTecnico[clave] = porTecnico[clave] || []).push(s);
     });
-    Object.keys(porTecnico).sort().forEach((nombreTec) => {
-      const titulo = document.createElement("p");
-      titulo.className = "sim-grupo-titulo";
-      titulo.textContent = nombreTec === propio ? "Tus SIMs" : nombreTec;
-      simsGrupos.appendChild(titulo);
-      porTecnico[nombreTec].forEach((s) => simsGrupos.appendChild(crearCard(s, false)));
+
+    const nombresPresentes = Object.keys(porTecnico);
+    const ordenGuardado = obtenerOrdenTecnicosSims();
+    let orden = ordenGuardado.filter((n) => nombresPresentes.includes(n));
+    const faltantes = nombresPresentes.filter((n) => !orden.includes(n)).sort();
+    orden = [...orden, ...faltantes];
+
+    const colapsados = obtenerColapsadosSims();
+
+    orden.forEach((nombreTec, idx) => {
+      const grupo = document.createElement("div");
+      grupo.className = "sim-grupo";
+
+      const estaColapsado = colapsados.has(nombreTec);
+      const titulo = document.createElement("div");
+      titulo.className = "sim-grupo-titulo sim-grupo-header";
+      titulo.innerHTML = `
+        <span>${nombreTec === propio ? "Tus SIMs" : escapeHtml(nombreTec)} <span class="sim-grupo-count">(${porTecnico[nombreTec].length})</span></span>
+        <span class="sim-grupo-controles">
+          <button type="button" class="sim-grupo-btn sim-grupo-subir" ${idx === 0 ? "disabled" : ""} title="Subir">▲</button>
+          <button type="button" class="sim-grupo-btn sim-grupo-bajar" ${idx === orden.length - 1 ? "disabled" : ""} title="Bajar">▼</button>
+          <button type="button" class="sim-grupo-btn sim-grupo-colapsar" title="${estaColapsado ? "Mostrar" : "Ocultar"}">${estaColapsado ? "▸" : "▾"}</button>
+        </span>
+      `;
+      grupo.appendChild(titulo);
+
+      const contenido = document.createElement("div");
+      contenido.className = "sim-grupo-contenido" + (estaColapsado ? " hidden" : "");
+      porTecnico[nombreTec].forEach((s) => contenido.appendChild(crearCard(s, false)));
+      grupo.appendChild(contenido);
+
+      simsGrupos.appendChild(grupo);
+
+      const btnSubir = titulo.querySelector(".sim-grupo-subir");
+      const btnBajar = titulo.querySelector(".sim-grupo-bajar");
+      const btnColapsar = titulo.querySelector(".sim-grupo-colapsar");
+
+      btnSubir.addEventListener("click", () => {
+        const i = orden.indexOf(nombreTec);
+        if (i <= 0) return;
+        [orden[i - 1], orden[i]] = [orden[i], orden[i - 1]];
+        guardarOrdenTecnicosSims(orden);
+        dibujarSimsLista();
+      });
+      btnBajar.addEventListener("click", () => {
+        const i = orden.indexOf(nombreTec);
+        if (i === -1 || i >= orden.length - 1) return;
+        [orden[i + 1], orden[i]] = [orden[i], orden[i + 1]];
+        guardarOrdenTecnicosSims(orden);
+        dibujarSimsLista();
+      });
+      btnColapsar.addEventListener("click", () => {
+        if (colapsados.has(nombreTec)) colapsados.delete(nombreTec);
+        else colapsados.add(nombreTec);
+        guardarColapsadosSims(colapsados);
+        contenido.classList.toggle("hidden");
+        btnColapsar.textContent = colapsados.has(nombreTec) ? "▸" : "▾";
+        btnColapsar.title = colapsados.has(nombreTec) ? "Mostrar" : "Ocultar";
+      });
     });
     return;
   }
