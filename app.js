@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.86.0";
+const APP_VERSION = "3.87.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -7462,6 +7462,7 @@ async function intentarEnviarComodato(item, interactivo) {
       cliente_email: item.cliente_email,
       tecnico: item.tecnico,
       fecha_iso: item.fecha_iso,
+      cantidad: item.cantidad,
     }),
   });
   const data = await res.json().catch(() => ({}));
@@ -7501,7 +7502,12 @@ comConfirmarFirmaBtn.addEventListener("click", async () => {
   };
   const firmaBase64 = normalizarFirmaParaMail(comodatoSignCanvas).replace(/^data:image\/png;base64,/, "");
   const clienteEmail = comFDClienteEmail.value.trim();
-  const item = { tipo: "comodato", datos, firma_comodatario_base64: firmaBase64, cliente_email: clienteEmail, tecnico: tecnicoLogueado || "", fecha_iso: hoy.toISOString().slice(0, 10) };
+  // Cantidad total de unidades prestadas — suma de cada artículo
+  // agregado (ej: 2 PIR + 1 central = 3), más 1 si además se cargó
+  // algo en "otro artículo" (ese campo es texto libre, sin cantidad
+  // propia, así que solo se puede contar como una unidad más).
+  const cantidadTotal = comodatoBienesAgregados.reduce((suma, b) => suma + (Number(b.cantidad) || 0), 0) + (comFDOtroArticulo.value.trim() ? 1 : 0);
+  const item = { tipo: "comodato", datos, firma_comodatario_base64: firmaBase64, cliente_email: clienteEmail, tecnico: tecnicoLogueado || "", fecha_iso: hoy.toISOString().slice(0, 10), cantidad: cantidadTotal };
 
   comConfirmarFirmaBtn.disabled = true;
   comodatoEnviandoAviso.style.display = "block";

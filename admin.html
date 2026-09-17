@@ -3466,7 +3466,8 @@ function renderComodatosAdmin() {
           ${c.articulos ? escapeHtmlAdmin(c.articulos) : "<i>Sin detalle de bienes</i>"}
         </div>
         <div style="color:#6B7680; font-size:12px; margin-top:6px;">
-          ${c.tecnico ? "Técnico: " + escapeHtmlAdmin(c.tecnico) + " · " : ""}${c.abono ? "Abono: $" + escapeHtmlAdmin(String(c.abono)) + " · " : ""}Firmó: ${escapeHtmlAdmin(c.firma_aclaracion || "")}${c.firma_dni ? " (DNI " + escapeHtmlAdmin(c.firma_dni) + ")" : ""}${c.cliente_email ? " · Copia enviada a " + escapeHtmlAdmin(c.cliente_email) : ""}
+          ${c.tecnico ? "Técnico: " + escapeHtmlAdmin(c.tecnico) + " · " : ""}${c.cantidad ? "Cantidad: " + escapeHtmlAdmin(String(c.cantidad)) + " · " : ""}${c.abono ? "Abono: $" + escapeHtmlAdmin(String(c.abono)) + " · " : ""}Firmó: ${escapeHtmlAdmin(c.firma_aclaracion || "")}${c.firma_dni ? " (DNI " + escapeHtmlAdmin(c.firma_dni) + ")" : ""}${c.cliente_email ? " · Copia enviada a " + escapeHtmlAdmin(c.cliente_email) : ""}
+          ${c.pdf_ref ? ` · <a href="${escapeHtmlAdmin(c.pdf_ref)}" target="_blank" rel="noopener">Ver PDF</a>` : ""}
         </div>
       </div>
     `;

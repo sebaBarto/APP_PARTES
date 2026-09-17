@@ -54,7 +54,7 @@ module.exports = async (req, res) => {
   try {
     let body = req.body;
     if (typeof body === "string") body = JSON.parse(body);
-    const { datos, firma_comodatario_base64, cliente_email, tecnico, fecha_iso } = body || {};
+    const { datos, firma_comodatario_base64, cliente_email, tecnico, fecha_iso, cantidad } = body || {};
 
     if (!datos) {
       res.status(400).json({ error: "Faltan los datos del comodato" });
@@ -76,6 +76,33 @@ module.exports = async (req, res) => {
 
     let oficinaOk = false;
     let clienteOk = false;
+
+    // Sube el PDF al mismo storage que ya usan las fotos (mismo repo
+    // de GitHub, carpeta "documentos/" en vez de "fotos/") — así queda
+    // un link accesible desde admin.html (pdf_ref), sin depender solo
+    // del mail. Best-effort: si falla, el mail sigue su curso igual.
+    let pdfRef = "";
+    try {
+      const { GITHUB_DATA_TOKEN, GITHUB_DATA_REPO } = process.env;
+      if (GITHUB_DATA_TOKEN && GITHUB_DATA_REPO) {
+        const fileId = require("crypto").randomBytes(8).toString("hex");
+        const putRes = await fetch(`https://api.github.com/repos/${GITHUB_DATA_REPO}/contents/documentos/${fileId}.pdf`, {
+          method: "PUT",
+          headers: { Authorization: `Bearer ${GITHUB_DATA_TOKEN}`, Accept: "application/vnd.github+json", "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: `Sube PDF de comodato (${new Date().toISOString()})`,
+            content: Buffer.from(pdfBytes).toString("base64"),
+          }),
+        });
+        if (putRes.ok) {
+          pdfRef = `https://${req.headers.host}/api/foto?id=${fileId}&tipo=pdf`;
+        } else {
+          console.error("No se pudo subir el PDF del comodato:", await putRes.text());
+        }
+      }
+    } catch (errPdf) {
+      console.error("Error subiendo el PDF del comodato (no crítico, el mail sigue su curso):", errPdf);
+    }
 
     try {
       await transporter.sendMail({
@@ -145,6 +172,8 @@ module.exports = async (req, res) => {
             firma_base64: firma_comodatario_base64 || "",
             tecnico: tecnico || "",
             estado_envio: "enviado",
+            pdf_ref: pdfRef,
+            cantidad: cantidad != null ? Number(cantidad) : null,
           }),
         });
       }
