@@ -111,33 +111,40 @@ module.exports = async (req, res) => {
       }
     }
 
-    // Guarda el comodato en la base (tabla "comodatos", hasta ahora sin
-    // usar) para que quede consultable desde admin.html aunque se
-    // pierda o se borre el mail de oficina. Best-effort: si esto
-    // falla, no se corta nada — lo que importa (el mail a oficina) ya
-    // se mandó bien. OJO: acá se guardan los DATOS del comodato, no
-    // el PDF en sí (no hay dónde adjuntarlo sin gastar espacio/otro
-    // sistema de archivos) — para el PDF original sigue haciendo
+    // Guarda el comodato en la base (tabla "comodatos"). Best-effort:
+    // si esto falla, no se corta nada — lo que importa (el mail a
+    // oficina) ya se mandó bien. OJO: acá se guardan los DATOS del
+    // comodato, no el PDF en sí (no hay pdf_ref todavía porque no se
+    // sube a ningún storage) — para el PDF original sigue haciendo
     // falta el mail.
     //
-    // IMPORTANTE: la ruta /api/comodatos del backend (sat-backend-d1)
-    // hace su PROPIO JSON.stringify de "detalle" al guardar (y su
-    // propio JSON.parse al leer) — por eso acá "detalle" va como
-    // objeto plano, NO pre-stringificado, para no terminar con un
-    // JSON dentro de un JSON. Esa misma ruta ignora "estado_envio" en
-    // el POST (siempre guarda "pendiente"), así que no se manda.
+    // IMPORTANTE: la tabla real "comodatos" en D1 tiene su propia
+    // columna por cada dato (comodatario, direccion, ciudad,
+    // articulos, abono, firma_aclaracion, firma_cargo, firma_dni,
+    // firma_base64, tecnico, etc.) — NO existe (ni existió nunca) un
+    // campo "detalle" ni "cliente" ni "fecha" en esa tabla. La
+    // versión anterior de este código mandaba esos nombres viejos y
+    // el guardado fallaba en silencio siempre, desde el principio.
     try {
       const { BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN } = process.env;
       if (BACKEND_NUEVO_URL && BACKEND_NUEVO_TOKEN) {
-        const fecha = fecha_iso || `${datos.anio}-01-01`;
         await fetch(`${BACKEND_NUEVO_URL}/api/comodatos`, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${BACKEND_NUEVO_TOKEN}` },
           body: JSON.stringify({
-            cliente: datos.comodatario || "",
+            comodatario: datos.comodatario || "",
             direccion: datos.direccion_comodatario || "",
-            fecha,
-            detalle: { ...datos, tecnico: tecnico || "", cliente_email: cliente_email || "", clienteOk },
+            ciudad: datos.ciudad_comodatario || "",
+            representado_por: datos.representado_por || "",
+            cliente_email: cliente_email || "",
+            articulos: datos.bienes || "",
+            abono: datos.abono_mensual ? Number(datos.abono_mensual) : null,
+            firma_aclaracion: datos.aclaracion_comodatario || "",
+            firma_cargo: datos.cargo_comodatario || "",
+            firma_dni: datos.dni_comodatario || "",
+            firma_base64: firma_comodatario_base64 || "",
+            tecnico: tecnico || "",
+            estado_envio: "enviado",
           }),
         });
       }

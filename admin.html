@@ -3436,7 +3436,7 @@ async function cargarComodatosAdmin() {
 function renderComodatosAdmin() {
   const termino = (comodatosBuscarInput.value || "").trim().toLowerCase();
   const filtrados = !termino ? comodatosCache : comodatosCache.filter((c) => {
-    const haystack = [c.comodatario, c.direccion_comodatario, c.tecnico].map((v) => (v || "").toLowerCase()).join(" ");
+    const haystack = [c.comodatario, c.direccion, c.tecnico].map((v) => (v || "").toLowerCase()).join(" ");
     return haystack.includes(termino);
   });
 
@@ -3449,24 +3449,24 @@ function renderComodatosAdmin() {
   comodatosStatus.className = "status";
   comodatosStatus.textContent = `${filtrados.length} de ${comodatosCache.length} comodato(s).`;
 
-  const ordenados = [...filtrados].sort((a, b) => (b.fecha || "").localeCompare(a.fecha || ""));
+  const ordenados = [...filtrados].sort((a, b) => (b.creado_en || "").localeCompare(a.creado_en || ""));
 
   comodatosLista.innerHTML = ordenados.map((c) => {
-    const fecha = c.fecha || "";
+    const fecha = c.creado_en ? new Date(c.creado_en).toLocaleString("es-AR") : "";
     return `
       <div style="padding:12px 0; border-bottom:1px solid #EEE;">
         <div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px;">
-          <b>${escapeHtmlAdmin(c.comodatario || c.cliente || "Sin nombre")}</b>
+          <b>${escapeHtmlAdmin(c.comodatario || "Sin nombre")}</b>
           <span style="color:#6B7680; font-size:12px;">${escapeHtmlAdmin(fecha)}</span>
         </div>
         <div style="color:#6B7680; font-size:13px; margin-top:2px;">
-          ${escapeHtmlAdmin(c.direccion_comodatario || c.direccion || "")}${c.ciudad_comodatario ? ", " + escapeHtmlAdmin(c.ciudad_comodatario) : ""}
+          ${escapeHtmlAdmin(c.direccion || "")}${c.ciudad ? ", " + escapeHtmlAdmin(c.ciudad) : ""}
         </div>
         <div style="font-size:13px; margin-top:6px; white-space:pre-line;">
-          ${c.bienes ? escapeHtmlAdmin(c.bienes) : "<i>Sin detalle de bienes</i>"}
+          ${c.articulos ? escapeHtmlAdmin(c.articulos) : "<i>Sin detalle de bienes</i>"}
         </div>
         <div style="color:#6B7680; font-size:12px; margin-top:6px;">
-          ${c.tecnico ? "Técnico: " + escapeHtmlAdmin(c.tecnico) + " · " : ""}${c.abono_mensual ? "Abono: $" + escapeHtmlAdmin(String(c.abono_mensual)) + " · " : ""}Firmó: ${escapeHtmlAdmin(c.aclaracion_comodatario || "")}${c.dni_comodatario ? " (DNI " + escapeHtmlAdmin(c.dni_comodatario) + ")" : ""}${c.cliente_email ? " · Copia enviada a " + escapeHtmlAdmin(c.cliente_email) : ""}
+          ${c.tecnico ? "Técnico: " + escapeHtmlAdmin(c.tecnico) + " · " : ""}${c.abono ? "Abono: $" + escapeHtmlAdmin(String(c.abono)) + " · " : ""}Firmó: ${escapeHtmlAdmin(c.firma_aclaracion || "")}${c.firma_dni ? " (DNI " + escapeHtmlAdmin(c.firma_dni) + ")" : ""}${c.cliente_email ? " · Copia enviada a " + escapeHtmlAdmin(c.cliente_email) : ""}
         </div>
       </div>
     `;

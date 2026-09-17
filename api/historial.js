@@ -341,10 +341,10 @@ module.exports = async (req, res) => {
         res.status(r.status).json(data);
         return;
       }
-      // Comodatos: la ruta /api/comodatos del backend ya devuelve
-      // "detalle" como objeto (hace su propio JSON.parse al leer de
-      // la base) — acá solo se aplana en un único objeto por
-      // comodato para que admin.html no tenga que desarmar nada.
+      // Comodatos: la tabla real ya tiene una columna por dato
+      // (comodatario, direccion, articulos, firma_*, etc.) — no hay
+      // ningún "detalle" JSON que desarmar, así que esto es un
+      // passthrough directo.
       if (req.query && req.query.tipo === "comodatos") {
         const r = await fetch(`${BACKEND_NUEVO_URL}/api/comodatos`, { headers: headersBackendNuevo });
         if (!r.ok) {
@@ -352,18 +352,7 @@ module.exports = async (req, res) => {
           return;
         }
         const data = await r.json();
-        const lista = (Array.isArray(data) ? data : []).map((c) => {
-          const detalle = c.detalle && typeof c.detalle === "object" ? c.detalle : {};
-          return {
-            id: c.id,
-            cliente: c.cliente || "",
-            direccion: c.direccion || "",
-            fecha: c.fecha || "",
-            estado_envio: c.estado_envio || "",
-            ...detalle,
-          };
-        });
-        res.status(200).json(lista);
+        res.status(200).json(Array.isArray(data) ? data : []);
         return;
       }
       if (req.query && req.query.tipo === "guardia_historial") {
