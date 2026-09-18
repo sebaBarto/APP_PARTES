@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.88.0";
+const APP_VERSION = "3.88.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -5208,11 +5208,26 @@ const seguimientoLlegueBtn = document.getElementById("seguimientoLlegueBtn");
 // Busca, dentro del cronograma de HOY para este técnico, la primera
 // tarea vinculada a un servicio real que venga DESPUÉS (por horario)
 // de la que se acaba de cerrar.
+// Mismo criterio tolerante que ya usa encontrarServicioPorTarea para
+// nombres de cliente — acá para nombres de técnico. Hace falta
+// porque el cronograma puede tener el nombre completo con segundo
+// nombre ("Marcos Manuel Pellegrini") mientras que el login usa uno
+// más corto ("Marcos Pellegrini") — un "===" exacto nunca matcheaba.
+function coincideNombreTecnico(nombreCronograma, nombreLogueado) {
+  if (!nombreCronograma || !nombreLogueado) return false;
+  const palabrasCortas = normalizeText(nombreLogueado).split(/\s+/).filter((p) => p.length > 1);
+  const normLargo = normalizeText(nombreCronograma);
+  return palabrasCortas.length > 0 && palabrasCortas.every((palabra) => normLargo.includes(palabra));
+}
+
 function encontrarProximaTareaCronograma(numeroServicioActual) {
   if (!numeroServicioActual) return null;
-  const fechaHoyISO = new Date().toISOString().slice(0, 10);
+  // Fecha local (no toISOString, que es UTC y puede dar el día
+  // siguiente durante la noche en Argentina, UTC-3).
+  const ahora = new Date();
+  const fechaHoyISO = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, "0")}-${String(ahora.getDate()).padStart(2, "0")}`;
   const tareasHoy = cronogramaCache
-    .filter((t) => t.tecnico === tecnicoLogueado && t.fecha === fechaHoyISO)
+    .filter((t) => coincideNombreTecnico(t.tecnico, tecnicoLogueado) && t.fecha === fechaHoyISO)
     .sort((a, b) => (a.hora_inicio || "").localeCompare(b.hora_inicio || ""));
 
   const indiceActual = tareasHoy.findIndex((t) => {
