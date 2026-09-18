@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Seguimiento en vivo — SAT</title>
+<meta name="robots" content="noindex">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root {
+    --ink: #101820;
+    --panel: #1B2530;
+    --paper: #F4F5F0;
+    --amber: #F5A623;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--ink);
+    color: var(--paper);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 40px;
+  }
+  .logo-img { width: 140px; max-width: 50%; height: auto; margin-bottom: 8px; }
+  .subtitulo-empresa {
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: #8A9089;
+    text-transform: uppercase;
+    margin-bottom: 22px;
+  }
+  .card {
+    background: var(--panel);
+    border-radius: 16px;
+    padding: 20px;
+    width: 100%;
+    max-width: 480px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  }
+  h1 { font-size: 18px; margin: 0 0 4px; color: #FFFFFF; }
+  .subestado { font-size: 13px; color: #A8AEA6; margin: 0 0 16px; }
+  #mapa {
+    width: 100%;
+    height: 340px;
+    border-radius: 12px;
+    background: #0D141B;
+    margin-bottom: 12px;
+  }
+  .actualizado {
+    font-size: 12px;
+    color: #6B7680;
+    text-align: center;
+  }
+  .pantalla-estado { text-align: center; padding: 30px 10px; }
+  .pantalla-estado .icono { font-size: 44px; margin-bottom: 12px; }
+  .pantalla-estado p { color: #A8AEA6; font-size: 14px; line-height: 1.5; margin: 0; }
+  .hidden { display: none !important; }
+  .pulso {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--amber); display: inline-block;
+    box-shadow: 0 0 0 rgba(245,166,35,0.6);
+    animation: pulso 1.8s infinite;
+  }
+  @keyframes pulso {
+    0% { box-shadow: 0 0 0 0 rgba(245,166,35,0.6); }
+    70% { box-shadow: 0 0 0 12px rgba(245,166,35,0); }
+    100% { box-shadow: 0 0 0 0 rgba(245,166,35,0); }
+  }
+</style>
+</head>
+<body>
+  <img src="/icons/logo.png" alt="SAT" class="logo-img">
+  <div class="subtitulo-empresa">Servicio Técnico SAT</div>
+
+  <div class="card">
+    <div id="cargandoWrap" class="pantalla-estado">
+      <div class="icono">📍</div>
+      <p>Buscando la ubicación...</p>
+    </div>
+
+    <div id="errorWrap" class="pantalla-estado hidden">
+      <div class="icono">⏱</div>
+      <h1 id="errorTitulo">Este enlace ya no está disponible</h1>
+      <p id="errorTexto">Puede que haya vencido, o que el técnico ya haya llegado hace rato. Cualquier consulta, contactanos a través de www.sat365.com.ar.</p>
+    </div>
+
+    <div id="llegadoWrap" class="pantalla-estado hidden">
+      <div class="icono">✔️</div>
+      <h1>¡Tu técnico ya llegó!</h1>
+      <p>Este enlace de seguimiento ya cumplió su función.</p>
+    </div>
+
+    <div id="enCaminoWrap" class="hidden">
+      <h1><span class="pulso"></span>&nbsp; Tu técnico está en camino</h1>
+      <p class="subestado" id="subestadoTexto">Posición aproximada — se va actualizando solo</p>
+      <div id="mapa"></div>
+      <p class="actualizado" id="actualizadoTexto"></p>
+    </div>
+  </div>
+
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get("id");
+
+  const cargandoWrap = document.getElementById("cargandoWrap");
+  const errorWrap = document.getElementById("errorWrap");
+  const llegadoWrap = document.getElementById("llegadoWrap");
+  const enCaminoWrap = document.getElementById("enCaminoWrap");
+  const subestadoTexto = document.getElementById("subestadoTexto");
+  const actualizadoTexto = document.getElementById("actualizadoTexto");
+
+  let mapa = null;
+  let marcadorTecnico = null;
+  let marcadorDestino = null;
+  let intervalo = null;
+
+  function ocultarTodo() {
+    cargandoWrap.classList.add("hidden");
+    errorWrap.classList.add("hidden");
+    llegadoWrap.classList.add("hidden");
+    enCaminoWrap.classList.add("hidden");
+  }
+
+  function mostrarError(titulo, texto) {
+    ocultarTodo();
+    document.getElementById("errorTitulo").textContent = titulo || "Este enlace ya no está disponible";
+    document.getElementById("errorTexto").textContent = texto || "Cualquier consulta, contactanos a través de www.sat365.com.ar.";
+    errorWrap.classList.remove("hidden");
+    if (intervalo) { clearInterval(intervalo); intervalo = null; }
+  }
+
+  function formatoHaceCuanto(fechaTexto) {
+    if (!fechaTexto) return "";
+    // El backend guarda la fecha en UTC (datetime('now') de SQLite) —
+    // se le agrega la "Z" si no la tiene, para que el navegador la
+    // interprete como UTC y no como hora local.
+    const iso = /Z$|[+-]\d\d:\d\d$/.test(fechaTexto) ? fechaTexto : fechaTexto.replace(" ", "T") + "Z";
+    const segundos = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+    if (segundos < 60) return "actualizado hace un momento";
+    const minutos = Math.round(segundos / 60);
+    return `actualizado hace ${minutos} minuto${minutos === 1 ? "" : "s"}`;
+  }
+
+  function actualizarMapa(datos) {
+    const hayPosicionTecnico = datos.lat_actual != null && datos.lng_actual != null;
+    const hayDestino = datos.lat_destino != null && datos.lng_destino != null;
+
+    if (!mapa) {
+      const centro = hayPosicionTecnico
+        ? [datos.lat_actual, datos.lng_actual]
+        : hayDestino
+          ? [datos.lat_destino, datos.lng_destino]
+          : [-32.9468, -60.6393]; // Rosario, como último respaldo
+      mapa = L.map("mapa").setView(centro, 14);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "© OpenStreetMap",
+        maxZoom: 19,
+      }).addTo(mapa);
+    }
+
+    if (hayDestino && !marcadorDestino) {
+      marcadorDestino = L.marker([datos.lat_destino, datos.lng_destino], {
+        icon: L.divIcon({ className: "", html: "🏠", iconSize: [26, 26] }),
+      }).addTo(mapa).bindPopup(datos.direccion_destino || "Destino");
+    }
+
+    if (hayPosicionTecnico) {
+      if (!marcadorTecnico) {
+        marcadorTecnico = L.marker([datos.lat_actual, datos.lng_actual], {
+          icon: L.divIcon({ className: "", html: "🚐", iconSize: [28, 28] }),
+        }).addTo(mapa);
+      } else {
+        marcadorTecnico.setLatLng([datos.lat_actual, datos.lng_actual]);
+      }
+      if (marcadorDestino) {
+        mapa.fitBounds([[datos.lat_actual, datos.lng_actual], [datos.lat_destino, datos.lng_destino]], { padding: [30, 30] });
+      } else {
+        mapa.setView([datos.lat_actual, datos.lng_actual], mapa.getZoom() < 13 ? 14 : mapa.getZoom());
+      }
+      actualizadoTexto.textContent = formatoHaceCuanto(datos.actualizado_en);
+    } else {
+      actualizadoTexto.textContent = "Todavía no hay una posición para mostrar — en cuanto el técnico se mueva, va a aparecer acá.";
+    }
+
+    setTimeout(() => mapa.invalidateSize(), 50);
+  }
+
+  async function consultar() {
+    try {
+      const res = await fetch(`/api/recurso-uso?recurso=seguimiento&id=${encodeURIComponent(id)}`, { cache: "no-store" });
+      if (res.status === 404) {
+        mostrarError("No encontramos ese seguimiento", "Revisá que el link esté completo.");
+        return;
+      }
+      if (!res.ok) throw new Error("Error de red");
+      const datos = await res.json();
+
+      if (datos.estado === "vencido") {
+        mostrarError();
+        return;
+      }
+      if (datos.estado === "llegado") {
+        ocultarTodo();
+        llegadoWrap.classList.remove("hidden");
+        if (intervalo) { clearInterval(intervalo); intervalo = null; }
+        return;
+      }
+
+      ocultarTodo();
+      enCaminoWrap.classList.remove("hidden");
+      actualizarMapa(datos);
+    } catch (err) {
+      // un error de red pasajero no debería tirar toda la página —
+      // se reintenta solo en la próxima vuelta del intervalo
+    }
+  }
+
+  if (!id) {
+    mostrarError("Falta el enlace completo", "Pedile a tu técnico que te comparta el link de nuevo.");
+  } else {
+    consultar();
+    intervalo = setInterval(consultar, 15000);
+  }
+</script>
+</body>
+</html>

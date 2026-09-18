@@ -123,6 +123,129 @@ async function postHerramientaNuevo(headersBackendNuevo, body, res) {
 }
 
 // ============================================================
+// SEGUIMIENTO EN VIVO — cuando se cierra un parte, se avisa al
+// próximo cliente agendado (según el cronograma) que el técnico va
+// en camino, con un link para ver su posición aproximada.
+// ============================================================
+let transporterSeguimientoCache = null;
+function getTransporterSeguimiento() {
+  if (transporterSeguimientoCache) return transporterSeguimientoCache;
+  const nodemailer = require("nodemailer");
+  const puerto = Number(process.env.SMTP_PORT || 465);
+  transporterSeguimientoCache = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: puerto,
+    secure: puerto === 465,
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    connectionTimeout: 8000,
+    greetingTimeout: 8000,
+    socketTimeout: 8000,
+  });
+  return transporterSeguimientoCache;
+}
+
+// El GET es el único de todo este archivo que no requiere login — lo
+// abre el cliente final desde el link del mail/WhatsApp, sin cuenta
+// en la app. Solo puede leer UN seguimiento puntual por su id (un
+// token largo e impredecible en la URL), nunca una lista — no expone
+// nada de otros técnicos, otros clientes ni del resto del sistema.
+async function getSeguimientoNuevo(headersBackendNuevo, id, res) {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+  if (!id) {
+    res.status(400).json({ error: "Falta el id del seguimiento" });
+    return;
+  }
+  try {
+    const r = await fetch(`${process.env.BACKEND_NUEVO_URL}/api/seguimientos/${encodeURIComponent(id)}`, { headers: headersBackendNuevo });
+    const data = await r.json();
+    res.status(r.status).json(data);
+  } catch (err) {
+    res.status(500).json({ error: "Error interno al leer el seguimiento" });
+  }
+}
+
+async function postSeguimientoNuevo(headersBackendNuevo, body, res) {
+  // "reenviar_mail" no crea nada nuevo — solo reenvía el link de un
+  // seguimiento que YA existe (usado por el botón "Mandar por mail"
+  // cuando el técnico completa el mail a mano después de que el
+  // seguimiento ya se creó sin uno). Se resuelve toda acá mismo, sin
+  // tocar el backend de Cloudflare para nada.
+  if (body.accion === "reenviar_mail") {
+    if (!body.id || !body.cliente_email || !body.origen) {
+      res.status(400).json({ error: "Faltan datos para reenviar el mail" });
+      return;
+    }
+    const emailValido = /^[^\s@<>\r\n]+@[^\s@<>\r\n]+\.[^\s@<>\r\n]+$/.test(String(body.cliente_email).trim());
+    if (!emailValido) {
+      res.status(400).json({ error: "El mail no parece válido" });
+      return;
+    }
+    try {
+      const link = `${body.origen}/seguimiento.html?id=${body.id}`;
+      const transporter = getTransporterSeguimiento();
+      await transporter.sendMail({
+        from: `"Servicio Técnico SAT" <${process.env.SMTP_USER}>`,
+        to: body.cliente_email.trim(),
+        subject: "🚐 Tu técnico está en camino",
+        html: `
+          <div style="font-family: Arial, Helvetica, sans-serif; color:#101820;">
+            <h2 style="margin-bottom:4px;">🚐 Tu técnico está en camino</h2>
+            <p style="color:#6B7680; margin-top:0;">Servicio Técnico SAT</p>
+            <p>Podés seguir su recorrido (posición aproximada) acá:</p>
+            <p><a href="${link}" style="display:inline-block; background:#101820; color:#F5A623; padding:10px 18px; border-radius:8px; text-decoration:none; font-weight:600;">Ver ubicación en vivo</a></p>
+            <p style="color:#6B7680; font-size:13px;">El link deja de funcionar solo después de un rato, o cuando el técnico llegue.</p>
+          </div>
+        `,
+      });
+      res.status(200).json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ error: "No se pudo mandar el mail: " + String(err.message || err) });
+    }
+    return;
+  }
+
+  const r = await fetch(`${process.env.BACKEND_NUEVO_URL}/api/seguimientos/accion`, {
+    method: "POST",
+    headers: { ...headersBackendNuevo, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await r.json();
+  if (!r.ok) { res.status(r.status).json(data); return; }
+
+  // Al crear un seguimiento nuevo, si hay mail del cliente, se le
+  // manda automáticamente el link — best-effort: si el mail falla,
+  // el seguimiento ya quedó creado igual (el técnico todavía puede
+  // mandarlo a mano por WhatsApp).
+  if (body.accion === "crear" && data.id && body.cliente_email && body.origen) {
+    try {
+      const emailValido = /^[^\s@<>\r\n]+@[^\s@<>\r\n]+\.[^\s@<>\r\n]+$/.test(String(body.cliente_email).trim());
+      if (emailValido) {
+        const link = `${body.origen}/seguimiento.html?id=${data.id}`;
+        const transporter = getTransporterSeguimiento();
+        await transporter.sendMail({
+          from: `"Servicio Técnico SAT" <${process.env.SMTP_USER}>`,
+          to: body.cliente_email.trim(),
+          subject: "🚐 Tu técnico está en camino",
+          html: `
+            <div style="font-family: Arial, Helvetica, sans-serif; color:#101820;">
+              <h2 style="margin-bottom:4px;">🚐 Tu técnico está en camino</h2>
+              <p style="color:#6B7680; margin-top:0;">Servicio Técnico SAT</p>
+              <p>Podés seguir su recorrido (posición aproximada) acá:</p>
+              <p><a href="${link}" style="display:inline-block; background:#101820; color:#F5A623; padding:10px 18px; border-radius:8px; text-decoration:none; font-weight:600;">Ver ubicación en vivo</a></p>
+              <p style="color:#6B7680; font-size:13px;">El link deja de funcionar solo después de un rato, o cuando el técnico llegue.</p>
+            </div>
+          `,
+        });
+      }
+    } catch (errMail) {
+      console.error("No se pudo mandar el mail de seguimiento (no crítico):", errMail);
+    }
+  }
+
+  res.status(200).json(data);
+}
+
+// ============================================================
 // PRESENCIA EN OBRA (llegada/salida) — ya cortado al backend nuevo
 // ============================================================
 async function getPresenciaNuevo(headersBackendNuevo, tecnico, res) {
@@ -196,21 +319,28 @@ async function postPresenciaNuevo(headersBackendNuevo, body, res) {
 // Handler principal
 // ============================================================
 module.exports = async (req, res) => {
-  const authHeader = req.headers["authorization"] || "";
-  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
-  if (!process.env.SERVICIOS_API_TOKEN || token !== process.env.SERVICIOS_API_TOKEN) {
-    res.status(401).json({ error: "No autorizado" });
-    return;
-  }
-
-  const { BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN } = process.env;
-  const headersBackendNuevo = { Authorization: `Bearer ${BACKEND_NUEVO_TOKEN}` };
-
   let body = req.body;
   if (typeof body === "string") {
     try { body = JSON.parse(body); } catch (err) { body = {}; }
   }
   const recurso = (req.query && req.query.recurso) || (body && body.recurso);
+
+  // Único caso sin token de toda esta función: el GET de "seguimiento"
+  // lo abre el cliente final desde un link de mail/WhatsApp, sin login
+  // en la app — solo puede leer un seguimiento puntual por su id.
+  const esSeguimientoPublico = req.method === "GET" && recurso === "seguimiento";
+
+  if (!esSeguimientoPublico) {
+    const authHeader = req.headers["authorization"] || "";
+    const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+    if (!process.env.SERVICIOS_API_TOKEN || token !== process.env.SERVICIOS_API_TOKEN) {
+      res.status(401).json({ error: "No autorizado" });
+      return;
+    }
+  }
+
+  const { BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN } = process.env;
+  const headersBackendNuevo = { Authorization: `Bearer ${BACKEND_NUEVO_TOKEN}` };
 
   try {
     if (!BACKEND_NUEVO_URL || !BACKEND_NUEVO_TOKEN) {
@@ -222,12 +352,13 @@ module.exports = async (req, res) => {
       if (recurso === "vehiculo") return await getVehiculoNuevo(headersBackendNuevo, res);
       if (recurso === "sim") return await getSimNuevo(headersBackendNuevo, res, req.query);
       if (recurso === "herramienta") return await getHerramientaNuevo(headersBackendNuevo, res);
+      if (recurso === "seguimiento") return await getSeguimientoNuevo(headersBackendNuevo, req.query.id, res);
       if (recurso === "presencia") {
         if (req.query.historial) return await getPresenciaHistorialNuevo(headersBackendNuevo, res);
         if (req.query.presencias_de_instalacion) return await getPresenciasDeInstalacionNuevo(headersBackendNuevo, req.query.presencias_de_instalacion, res);
         return await getPresenciaNuevo(headersBackendNuevo, req.query.tecnico, res);
       }
-      res.status(400).json({ error: "Falta indicar el recurso (?recurso=vehiculo|sim|herramienta|presencia)" });
+      res.status(400).json({ error: "Falta indicar el recurso (?recurso=vehiculo|sim|herramienta|presencia|seguimiento)" });
       return;
     }
 
@@ -236,7 +367,8 @@ module.exports = async (req, res) => {
       if (recurso === "sim") return await postSimNuevo(headersBackendNuevo, body, res);
       if (recurso === "herramienta") return await postHerramientaNuevo(headersBackendNuevo, body, res);
       if (recurso === "presencia") return await postPresenciaNuevo(headersBackendNuevo, body, res);
-      res.status(400).json({ error: "Falta indicar el recurso (vehiculo, sim, herramienta o presencia)" });
+      if (recurso === "seguimiento") return await postSeguimientoNuevo(headersBackendNuevo, body, res);
+      res.status(400).json({ error: "Falta indicar el recurso (vehiculo, sim, herramienta, presencia o seguimiento)" });
       return;
     }
 

@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.87.0";
+const APP_VERSION = "3.88.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -3375,6 +3375,7 @@ confirmSignBtn.addEventListener("click", async () => {
   sugerenciasWrap.classList.add("hidden");
   sugerenciasList.innerHTML = "";
   vehiculoRecordatorioWrap.classList.add("hidden");
+  seguimientoDoneWrap.classList.add("hidden");
   if (oficinaOk) {
     verificarYSugerirCercanos(data);
     verificarPrimerServicioSinVehiculo(data);
@@ -3384,6 +3385,9 @@ confirmSignBtn.addEventListener("click", async () => {
     // todavía estaba en camino (confuso, aunque no era ningún error
     // real: apenas terminaba de guardar, quedaba bien).
     await asignarSimInstaladaAlCliente(data);
+    // Este, en cambio, no se espera — no es crítico, y no tiene
+    // sentido demorar la pantalla de "enviado" por un extra.
+    if (data.numero_servicio) iniciarSeguimientoSiCorresponde(data);
   }
 
   let mensajeFoto = "";
@@ -5180,7 +5184,234 @@ notasModalDespuesBtn.addEventListener("click", () => {
   notasModalOverlay.classList.add("hidden");
 });
 
+// ---------- Seguimiento en vivo (avisarle al próximo cliente que el
+// técnico va en camino, con un link de mapa) ----------
+// Cuando se cierra un parte con éxito, se busca en el cronograma cuál
+// es la siguiente tarea de HOY para este mismo técnico, después de la
+// que se acaba de cerrar. Si esa tarea está vinculada a un servicio
+// real (con cliente/dirección), se crea un "seguimiento": un link
+// público (sin login) que muestra un mapa con la posición aproximada
+// del técnico, actualizada mientras tenga la app abierta.
+let seguimientoActivoId = localStorage.getItem("seguimiento_activo_id") || null;
+let seguimientoWatchId = null;
+let seguimientoUltimoEnvio = 0;
+
+const seguimientoDoneWrap = document.getElementById("seguimientoDoneWrap");
+const seguimientoProximoNombre = document.getElementById("seguimientoProximoNombre");
+const seguimientoEmailInput = document.getElementById("seguimientoEmailInput");
+const seguimientoMandarMailBtn = document.getElementById("seguimientoMandarMailBtn");
+const seguimientoWhatsappBtn = document.getElementById("seguimientoWhatsappBtn");
+const seguimientoHomeBanner = document.getElementById("seguimientoHomeBanner");
+const seguimientoHomeNombre = document.getElementById("seguimientoHomeNombre");
+const seguimientoLlegueBtn = document.getElementById("seguimientoLlegueBtn");
+
+// Busca, dentro del cronograma de HOY para este técnico, la primera
+// tarea vinculada a un servicio real que venga DESPUÉS (por horario)
+// de la que se acaba de cerrar.
+function encontrarProximaTareaCronograma(numeroServicioActual) {
+  if (!numeroServicioActual) return null;
+  const fechaHoyISO = new Date().toISOString().slice(0, 10);
+  const tareasHoy = cronogramaCache
+    .filter((t) => t.tecnico === tecnicoLogueado && t.fecha === fechaHoyISO)
+    .sort((a, b) => (a.hora_inicio || "").localeCompare(b.hora_inicio || ""));
+
+  const indiceActual = tareasHoy.findIndex((t) => {
+    const s = encontrarServicioPorTarea(t.tarea);
+    return s && s.numero_servicio === numeroServicioActual;
+  });
+  if (indiceActual === -1) return null;
+
+  for (let i = indiceActual + 1; i < tareasHoy.length; i++) {
+    const servicio = encontrarServicioPorTarea(tareasHoy[i].tarea);
+    if (servicio) return servicio;
+  }
+  return null;
+}
+
+async function iniciarSeguimientoSiCorresponde(dataParteRecienEnviado) {
+  try {
+    if (seguimientoActivoId) return; // ya hay uno en curso, no se pisa
+    const proximo = encontrarProximaTareaCronograma(dataParteRecienEnviado.numero_servicio);
+    if (!proximo) return;
+
+    await cargarClientesGeneral();
+    const clienteInfo = proximo.numero_cliente
+      ? (clientesGeneralCache || []).find((c) => c.numero_cliente === proximo.numero_cliente)
+      : null;
+
+    // Geocodificación best-effort — si falla, el seguimiento se crea
+    // igual, solo que el mapa del cliente no va a tener el pin de
+    // "destino" hasta que haya una primera posición del técnico.
+    let latDestino = null;
+    let lngDestino = null;
+    try {
+      const geoRes = await fetch("/api/geocode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+        body: JSON.stringify({ items: [{ id: "destino", direccion: proximo.direccion, localidad: proximo.localidad || "" }] }),
+      });
+      const geoData = await geoRes.json();
+      const encontrado = (geoData.results || []).find((r) => r.id === "destino");
+      if (encontrado && !encontrado.error && !encontrado.pendiente) {
+        latDestino = encontrado.lat;
+        lngDestino = encontrado.lon;
+      }
+    } catch (errGeo) {
+      // sin geocodificación, se sigue igual
+    }
+
+    const res = await fetch("/api/recurso-uso?recurso=seguimiento", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({
+        accion: "crear",
+        tecnico: tecnicoLogueado || "",
+        numero_servicio_origen: dataParteRecienEnviado.numero_servicio || "",
+        numero_servicio_destino: proximo.numero_servicio || "",
+        numero_cliente_destino: proximo.numero_cliente || "",
+        cliente_destino: proximo.cliente || "",
+        direccion_destino: proximo.direccion || "",
+        lat_destino: latDestino,
+        lng_destino: lngDestino,
+        cliente_email: (clienteInfo && clienteInfo.email) || "",
+        origen: window.location.origin,
+        horas_vencimiento: 2,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) return;
+
+    seguimientoActivoId = data.id;
+    localStorage.setItem("seguimiento_activo_id", data.id);
+    localStorage.setItem("seguimiento_activo_cliente", proximo.cliente || "");
+    localStorage.setItem("seguimiento_activo_telefono", (clienteInfo && clienteInfo.telefono) || "");
+
+    iniciarWatcherUbicacion();
+    mostrarSeguimientoEnPantallas(proximo.cliente, (clienteInfo && clienteInfo.telefono) || "", (clienteInfo && clienteInfo.email) || "");
+  } catch (err) {
+    // el seguimiento es un extra — si algo falla acá, nunca debe
+    // afectar al envío del parte en sí, que ya terminó bien
+    console.error("No se pudo iniciar el seguimiento:", err);
+  }
+}
+
+function mostrarSeguimientoEnPantallas(nombreCliente, telefono, email) {
+  seguimientoProximoNombre.textContent = nombreCliente || "el próximo cliente";
+  seguimientoEmailInput.value = email || "";
+  seguimientoDoneWrap.classList.remove("hidden");
+  seguimientoDoneWrap.dataset.telefono = telefono || "";
+
+  seguimientoHomeNombre.textContent = nombreCliente || "";
+  seguimientoHomeBanner.classList.remove("hidden");
+}
+
+seguimientoMandarMailBtn.addEventListener("click", async () => {
+  const email = seguimientoEmailInput.value.trim();
+  if (!email) {
+    showToast("Escribí el mail del cliente primero.");
+    return;
+  }
+  if (!seguimientoActivoId) {
+    showToast("No hay ningún seguimiento activo para mandar.");
+    return;
+  }
+  seguimientoMandarMailBtn.disabled = true;
+  try {
+    const res = await fetch("/api/recurso-uso?recurso=seguimiento", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({
+        accion: "reenviar_mail",
+        id: seguimientoActivoId,
+        cliente_email: email,
+        origen: window.location.origin,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    showToast("Mail enviado.");
+  } catch (err) {
+    showToast("No se pudo mandar el mail: " + err.message);
+  } finally {
+    seguimientoMandarMailBtn.disabled = false;
+  }
+});
+
+seguimientoWhatsappBtn.addEventListener("click", () => {
+  if (!seguimientoActivoId) return;
+  const link = `${window.location.origin}/seguimiento.html?id=${seguimientoActivoId}`;
+  const telefono = seguimientoDoneWrap.dataset.telefono || localStorage.getItem("seguimiento_activo_telefono") || "";
+  const numeroWa = limpiarTelefonoWhatsapp(telefono);
+  const mensaje = `Hola! Soy de Servicio Técnico SAT, voy en camino. Podés seguir mi recorrido acá: ${link}`;
+  const url = numeroWa ? `https://wa.me/${numeroWa}?text=${encodeURIComponent(mensaje)}` : `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
+  window.open(url, "_blank");
+});
+
+function iniciarWatcherUbicacion() {
+  if (!navigator.geolocation || seguimientoWatchId != null) return;
+  seguimientoWatchId = navigator.geolocation.watchPosition(
+    (pos) => {
+      const ahora = Date.now();
+      if (ahora - seguimientoUltimoEnvio < 20000) return; // como mucho cada 20s, para no gastar de más
+      seguimientoUltimoEnvio = ahora;
+      fetch("/api/recurso-uso?recurso=seguimiento", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+        body: JSON.stringify({
+          accion: "actualizar_ubicacion",
+          id: seguimientoActivoId,
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          precision: pos.coords.accuracy,
+        }),
+      }).catch(() => {});
+    },
+    () => {}, // si falla la ubicación, simplemente no se manda esa actualización
+    { enableHighAccuracy: false, maximumAge: 15000, timeout: 20000 }
+  );
+}
+
+function detenerSeguimientoActivo() {
+  if (seguimientoWatchId != null && navigator.geolocation) {
+    navigator.geolocation.clearWatch(seguimientoWatchId);
+    seguimientoWatchId = null;
+  }
+  seguimientoActivoId = null;
+  localStorage.removeItem("seguimiento_activo_id");
+  localStorage.removeItem("seguimiento_activo_cliente");
+  localStorage.removeItem("seguimiento_activo_telefono");
+  seguimientoDoneWrap.classList.add("hidden");
+  seguimientoHomeBanner.classList.add("hidden");
+}
+
+seguimientoLlegueBtn.addEventListener("click", async () => {
+  if (!seguimientoActivoId) { detenerSeguimientoActivo(); return; }
+  seguimientoLlegueBtn.disabled = true;
+  try {
+    await fetch("/api/recurso-uso?recurso=seguimiento", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({ accion: "llegue", id: seguimientoActivoId }),
+    });
+  } catch (err) {
+    // aunque falle el aviso, se corta igual del lado del técnico
+  } finally {
+    detenerSeguimientoActivo();
+    seguimientoLlegueBtn.disabled = false;
+  }
+});
+
+// Si quedó un seguimiento activo de antes de recargar la página (se
+// cerró/reabrió la app a mitad de un viaje), se retoma solo.
+if (seguimientoActivoId) {
+  const clienteGuardado = localStorage.getItem("seguimiento_activo_cliente") || "";
+  seguimientoHomeNombre.textContent = clienteGuardado;
+  seguimientoHomeBanner.classList.remove("hidden");
+  iniciarWatcherUbicacion();
+}
+
 // ---------- Presencia en obra (llegada/salida) ----------
+
 let presenciaHistorialCache = [];
 let presenciaPeriodoActivo = "semana";
 let presenciaClienteEncontrado = null;

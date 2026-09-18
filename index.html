@@ -79,6 +79,11 @@
         <button type="button" class="btn btn-ghost btn-small" id="reintentarColaBtn">Reintentar ahora</button>
       </div>
 
+      <div class="cola-envios-banner hidden" id="seguimientoHomeBanner">
+        <span>🚐 En camino a <b id="seguimientoHomeNombre"></b></span>
+        <button type="button" class="btn btn-ghost btn-small" id="seguimientoLlegueBtn">Llegué</button>
+      </div>
+
       <button type="button" class="btn btn-ghost btn-small" id="activarNotificacionesBtn" style="margin-bottom:14px;"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15" style="vertical-align:-2px; margin-right:4px;"><path d="M12 3a5 5 0 0 0-5 5c0 6-3 8-3 8h16s-3-2-3-8a5 5 0 0 0-5-5z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>Activar notificaciones</button>
 
       <div class="panel-tiles panel-tiles-grid">
@@ -1893,6 +1898,17 @@
       <p class="status-aviso status-info">Es el primer parte que cerrás hoy y no encontramos que hayas tomado ningún vehículo de la empresa.</p>
       <button type="button" class="btn btn-secondary" id="vehiculoRecordatorioOkBtn">Sí, es correcto — no uso vehículo</button>
       <button type="button" class="btn btn-primary" id="vehiculoRecordatorioIrBtn" style="margin-top:8px;">Tomar un vehículo ahora</button>
+    </div>
+
+    <div id="seguimientoDoneWrap" class="vehiculo-recordatorio-wrap hidden">
+      <p class="dash-subtitulo" style="margin-top:0;">📍 Próximo: <span id="seguimientoProximoNombre"></span></p>
+      <p class="status-aviso status-info">Ya le avisamos que vas en camino — tu ubicación aproximada se va a ir actualizando mientras tengas la app abierta.</p>
+      <div class="field-group" style="margin: 10px 0;">
+        <label class="field-label" for="seguimientoEmailInput">Mail del cliente (opcional)</label>
+        <input class="field-input" id="seguimientoEmailInput" type="email" placeholder="Si lo sabés, se lo mandamos ya">
+      </div>
+      <button type="button" class="btn btn-secondary" id="seguimientoMandarMailBtn">Mandar por mail</button>
+      <button type="button" class="btn btn-secondary" id="seguimientoWhatsappBtn" style="margin-top:8px;">Compartir por WhatsApp</button>
     </div>
 
     <div id="sugerenciasWrap" class="sugerencias-wrap hidden">
