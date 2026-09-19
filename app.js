@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.89.0";
+const APP_VERSION = "3.90.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -5394,7 +5394,47 @@ seguimientoWhatsappBtn.addEventListener("click", () => {
   window.open(url, "_blank");
 });
 
+// Wake Lock — evita que la pantalla se apague sola mientras el
+// seguimiento está activo (la causa más común de que se corte el
+// envío de ubicación: no es que se cierre la app, es que se apaga la
+// pantalla por inactividad mientras el técnico maneja). No es
+// rastreo en segundo plano real — si el técnico abre otra app o
+// bloquea el celular a mano, se sigue cortando igual — pero cubre el
+// caso más frecuente. Soportado en Android y en iPhones más nuevos;
+// donde no está soportado, simplemente no hace nada (no rompe nada).
+let seguimientoWakeLock = null;
+
+async function solicitarWakeLockSeguimiento() {
+  if (!("wakeLock" in navigator)) return;
+  try {
+    seguimientoWakeLock = await navigator.wakeLock.request("screen");
+    seguimientoWakeLock.addEventListener("release", () => { seguimientoWakeLock = null; });
+  } catch (err) {
+    // puede fallar por batería baja o por decisión del navegador —
+    // no es crítico, el resto del seguimiento sigue funcionando igual
+    seguimientoWakeLock = null;
+  }
+}
+
+function liberarWakeLockSeguimiento() {
+  if (seguimientoWakeLock) {
+    seguimientoWakeLock.release().catch(() => {});
+    seguimientoWakeLock = null;
+  }
+}
+
+// El wake lock se suelta solo apenas la pestaña deja de estar visible
+// (por ejemplo, el técnico mira otra app un segundo) — hay que
+// pedirlo de nuevo cuando vuelve a estar visible, si el seguimiento
+// sigue activo.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && seguimientoActivoId && !seguimientoWakeLock) {
+    solicitarWakeLockSeguimiento();
+  }
+});
+
 function iniciarWatcherUbicacion() {
+  solicitarWakeLockSeguimiento();
   if (!navigator.geolocation || seguimientoWatchId != null) return;
   seguimientoWatchId = navigator.geolocation.watchPosition(
     (pos) => {
@@ -5423,6 +5463,7 @@ function detenerSeguimientoActivo() {
     navigator.geolocation.clearWatch(seguimientoWatchId);
     seguimientoWatchId = null;
   }
+  liberarWakeLockSeguimiento();
   seguimientoActivoId = null;
   localStorage.removeItem("seguimiento_activo_id");
   localStorage.removeItem("seguimiento_activo_cliente");
