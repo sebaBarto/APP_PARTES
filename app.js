@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.88.1";
+const APP_VERSION = "3.89.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -5198,6 +5198,9 @@ let seguimientoUltimoEnvio = 0;
 
 const seguimientoDoneWrap = document.getElementById("seguimientoDoneWrap");
 const seguimientoProximoNombre = document.getElementById("seguimientoProximoNombre");
+const seguimientoYaAvisadoMail = document.getElementById("seguimientoYaAvisadoMail");
+const seguimientoYaAvisadoMailDireccion = document.getElementById("seguimientoYaAvisadoMailDireccion");
+const seguimientoSinMailWrap = document.getElementById("seguimientoSinMailWrap");
 const seguimientoEmailInput = document.getElementById("seguimientoEmailInput");
 const seguimientoMandarMailBtn = document.getElementById("seguimientoMandarMailBtn");
 const seguimientoWhatsappBtn = document.getElementById("seguimientoWhatsappBtn");
@@ -5249,10 +5252,23 @@ async function iniciarSeguimientoSiCorresponde(dataParteRecienEnviado) {
     const proximo = encontrarProximaTareaCronograma(dataParteRecienEnviado.numero_servicio);
     if (!proximo) return;
 
-    await cargarClientesGeneral();
-    const clienteInfo = proximo.numero_cliente
-      ? (clientesGeneralCache || []).find((c) => c.numero_cliente === proximo.numero_cliente)
-      : null;
+    // Se pide la lista de clientes FRESCA (no la cacheada del login)
+    // — el mail puede haberse guardado recién, en este mismo turno
+    // del técnico o en el de otro, y clientesGeneralCache solo se
+    // carga una vez por sesión.
+    let clienteInfo = null;
+    if (proximo.numero_cliente) {
+      try {
+        const resClientes = await fetch("/api/datos?coleccion=clientes", {
+          headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+          cache: "no-store",
+        });
+        const clientesFrescos = await resClientes.json();
+        clienteInfo = (Array.isArray(clientesFrescos) ? clientesFrescos : []).find((c) => c.numero_cliente === proximo.numero_cliente) || null;
+      } catch (errClientes) {
+        // si falla, se sigue sin el mail — el técnico lo puede cargar a mano
+      }
+    }
 
     // Geocodificación best-effort — si falla, el seguimiento se crea
     // igual, solo que el mapa del cliente no va a tener el pin de
@@ -5275,6 +5291,7 @@ async function iniciarSeguimientoSiCorresponde(dataParteRecienEnviado) {
       // sin geocodificación, se sigue igual
     }
 
+    const emailDestino = (clienteInfo && clienteInfo.email) || "";
     const res = await fetch("/api/recurso-uso?recurso=seguimiento", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
@@ -5288,7 +5305,7 @@ async function iniciarSeguimientoSiCorresponde(dataParteRecienEnviado) {
         direccion_destino: proximo.direccion || "",
         lat_destino: latDestino,
         lng_destino: lngDestino,
-        cliente_email: (clienteInfo && clienteInfo.email) || "",
+        cliente_email: emailDestino,
         origen: window.location.origin,
         horas_vencimiento: 2,
       }),
@@ -5302,7 +5319,7 @@ async function iniciarSeguimientoSiCorresponde(dataParteRecienEnviado) {
     localStorage.setItem("seguimiento_activo_telefono", (clienteInfo && clienteInfo.telefono) || "");
 
     iniciarWatcherUbicacion();
-    mostrarSeguimientoEnPantallas(proximo.cliente, (clienteInfo && clienteInfo.telefono) || "", (clienteInfo && clienteInfo.email) || "");
+    mostrarSeguimientoEnPantallas(proximo.cliente, (clienteInfo && clienteInfo.telefono) || "", emailDestino);
   } catch (err) {
     // el seguimiento es un extra — si algo falla acá, nunca debe
     // afectar al envío del parte en sí, que ya terminó bien
@@ -5312,9 +5329,21 @@ async function iniciarSeguimientoSiCorresponde(dataParteRecienEnviado) {
 
 function mostrarSeguimientoEnPantallas(nombreCliente, telefono, email) {
   seguimientoProximoNombre.textContent = nombreCliente || "el próximo cliente";
-  seguimientoEmailInput.value = email || "";
   seguimientoDoneWrap.classList.remove("hidden");
   seguimientoDoneWrap.dataset.telefono = telefono || "";
+
+  // Si ya teníamos el mail cargado, el aviso automático ya salió —
+  // se muestra el cartel de confirmación en vez del campo para
+  // cargarlo (evita que el técnico lo mande de nuevo sin necesidad).
+  if (email) {
+    seguimientoYaAvisadoMailDireccion.textContent = email;
+    seguimientoYaAvisadoMail.classList.remove("hidden");
+    seguimientoSinMailWrap.classList.add("hidden");
+  } else {
+    seguimientoYaAvisadoMail.classList.add("hidden");
+    seguimientoSinMailWrap.classList.remove("hidden");
+    seguimientoEmailInput.value = "";
+  }
 
   seguimientoHomeNombre.textContent = nombreCliente || "";
   seguimientoHomeBanner.classList.remove("hidden");
@@ -5345,6 +5374,9 @@ seguimientoMandarMailBtn.addEventListener("click", async () => {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || "Error desconocido");
     showToast("Mail enviado.");
+    seguimientoYaAvisadoMailDireccion.textContent = email;
+    seguimientoYaAvisadoMail.classList.remove("hidden");
+    seguimientoSinMailWrap.classList.add("hidden");
   } catch (err) {
     showToast("No se pudo mandar el mail: " + err.message);
   } finally {

@@ -1903,11 +1903,16 @@
     <div id="seguimientoDoneWrap" class="vehiculo-recordatorio-wrap hidden">
       <p class="dash-subtitulo" style="margin-top:0;">📍 Próximo: <span id="seguimientoProximoNombre"></span></p>
       <p class="status-aviso status-info">Ya le avisamos que vas en camino — tu ubicación aproximada se va a ir actualizando mientras tengas la app abierta.</p>
-      <div class="field-group" style="margin: 10px 0;">
-        <label class="field-label" for="seguimientoEmailInput">Mail del cliente (opcional)</label>
-        <input class="field-input" id="seguimientoEmailInput" type="email" placeholder="Si lo sabés, se lo mandamos ya">
+
+      <p class="status-aviso status-info hidden" id="seguimientoYaAvisadoMail" style="color:#1F6B34;">✅ Ya le mandamos un mail avisándole (<span id="seguimientoYaAvisadoMailDireccion"></span>).</p>
+
+      <div id="seguimientoSinMailWrap">
+        <div class="field-group" style="margin: 10px 0;">
+          <label class="field-label" for="seguimientoEmailInput">Mail del cliente (no lo teníamos cargado)</label>
+          <input class="field-input" id="seguimientoEmailInput" type="email" placeholder="Si lo sabés, se lo mandamos ya">
+        </div>
+        <button type="button" class="btn btn-secondary" id="seguimientoMandarMailBtn">Mandar por mail</button>
       </div>
-      <button type="button" class="btn btn-secondary" id="seguimientoMandarMailBtn">Mandar por mail</button>
       <button type="button" class="btn btn-secondary" id="seguimientoWhatsappBtn" style="margin-top:8px;">Compartir por WhatsApp</button>
     </div>
 
