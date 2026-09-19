@@ -164,6 +164,20 @@ async function getSeguimientoNuevo(headersBackendNuevo, id, res) {
   }
 }
 
+// Listado completo — a diferencia del anterior, ESTE sí requiere
+// login (lo exige el gate de más arriba, porque acá sí va con id
+// vacío). Lo usa admin.html para el historial.
+async function getSeguimientosListaNuevo(headersBackendNuevo, res) {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+  try {
+    const r = await fetch(`${process.env.BACKEND_NUEVO_URL}/api/seguimientos`, { headers: headersBackendNuevo });
+    const data = await r.json();
+    res.status(r.status).json(Array.isArray(data) ? data : []);
+  } catch (err) {
+    res.status(500).json({ error: "Error interno al leer el listado de seguimientos" });
+  }
+}
+
 async function postSeguimientoNuevo(headersBackendNuevo, body, res) {
   // "reenviar_mail" no crea nada nuevo — solo reenvía el link de un
   // seguimiento que YA existe (usado por el botón "Mandar por mail"
@@ -328,7 +342,11 @@ module.exports = async (req, res) => {
   // Único caso sin token de toda esta función: el GET de "seguimiento"
   // lo abre el cliente final desde un link de mail/WhatsApp, sin login
   // en la app — solo puede leer un seguimiento puntual por su id.
-  const esSeguimientoPublico = req.method === "GET" && recurso === "seguimiento";
+  // Único caso sin token de toda esta función: leer UN seguimiento
+  // puntual por su id (el link que abre el cliente final). Pedir la
+  // LISTA completa (sin id) sigue exigiendo login — ahí sí se ve la
+  // ubicación y el cliente de todos los técnicos, eso no es público.
+  const esSeguimientoPublico = req.method === "GET" && recurso === "seguimiento" && !!(req.query && req.query.id);
 
   if (!esSeguimientoPublico) {
     const authHeader = req.headers["authorization"] || "";
@@ -352,7 +370,7 @@ module.exports = async (req, res) => {
       if (recurso === "vehiculo") return await getVehiculoNuevo(headersBackendNuevo, res);
       if (recurso === "sim") return await getSimNuevo(headersBackendNuevo, res, req.query);
       if (recurso === "herramienta") return await getHerramientaNuevo(headersBackendNuevo, res);
-      if (recurso === "seguimiento") return await getSeguimientoNuevo(headersBackendNuevo, req.query.id, res);
+      if (recurso === "seguimiento") return req.query.id ? await getSeguimientoNuevo(headersBackendNuevo, req.query.id, res) : await getSeguimientosListaNuevo(headersBackendNuevo, res);
       if (recurso === "presencia") {
         if (req.query.historial) return await getPresenciaHistorialNuevo(headersBackendNuevo, res);
         if (req.query.presencias_de_instalacion) return await getPresenciasDeInstalacionNuevo(headersBackendNuevo, req.query.presencias_de_instalacion, res);

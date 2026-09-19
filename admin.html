@@ -274,6 +274,7 @@
       <button type="button" class="tab-btn" id="tabEncuestasBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 14s1.5 2 4 2 4-2 4-2"/><circle cx="9" cy="9" r="1"/><circle cx="15" cy="9" r="1"/><circle cx="12" cy="12" r="10"/></svg></span>Satisfacción</button>
       <button type="button" class="tab-btn" id="tabComodatosBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span>Comodatos</button>
       <button type="button" class="tab-btn" id="tabNotasBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v13H8l-4 4z"/><path d="M8 9h8M8 13h5"/></svg></span>Notas</button>
+      <button type="button" class="tab-btn" id="tabSeguimientosBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 C7 8 5 12 5 15 a7 7 0 0 0 14 0 C19 12 17 8 12 2 Z"/><circle cx="12" cy="15" r="2.5"/></svg></span>Seguimientos</button>
       <button type="button" class="tab-btn" id="tabClavesClienteBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>Claves por cliente</button>
       <button type="button" class="tab-btn" id="tabEmergenciaBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.29 3.86l-8.18 14.18A2 2 0 0 0 3.82 21h16.36a2 2 0 0 0 1.71-3l-8.18-14.14a2 2 0 0 0-3.42 0z"/></svg></span>Emergencias<span class="tab-badge hidden" id="emergenciasBadge">0</span></button>
     </div>
@@ -760,6 +761,23 @@
       </div>
     </div>
 
+    <div id="panelSeguimientos" class="hidden">
+      <h1>Seguimientos en vivo</h1>
+      <p class="subtitle">
+        Cada vez que se cierra un parte y queda un próximo cliente agendado, se arma uno de estos
+        — para poder revisar después si el aviso salió bien y a quién.
+      </p>
+
+      <div class="card" style="margin-bottom:16px;">
+        <input type="text" class="field-input" id="seguimientosAdminBuscarInput" placeholder="Buscar por técnico o cliente...">
+      </div>
+
+      <div class="card">
+        <p class="status" id="seguimientosAdminStatus">Cargando...</p>
+        <div id="seguimientosAdminLista"></div>
+      </div>
+    </div>
+
     <div id="panelClavesCliente" class="hidden">
       <h1>Claves por cliente</h1>
       <p class="subtitle">
@@ -888,6 +906,11 @@ const panelNotas = document.getElementById("panelNotas");
 const notasAdminBuscarInput = document.getElementById("notasAdminBuscarInput");
 const notasAdminStatus = document.getElementById("notasAdminStatus");
 const notasAdminLista = document.getElementById("notasAdminLista");
+const tabSeguimientosBtn = document.getElementById("tabSeguimientosBtn");
+const panelSeguimientos = document.getElementById("panelSeguimientos");
+const seguimientosAdminBuscarInput = document.getElementById("seguimientosAdminBuscarInput");
+const seguimientosAdminStatus = document.getElementById("seguimientosAdminStatus");
+const seguimientosAdminLista = document.getElementById("seguimientosAdminLista");
 const tabEmergenciaBtn = document.getElementById("tabEmergenciaBtn");
 const panelEmergencia = document.getElementById("panelEmergencia");
 let emergenciaCargadaUnaVezAdmin = false;
@@ -911,6 +934,7 @@ const TABS = [
   { btn: tabEncuestasBtn, panel: panelEncuestas, onShow: () => cargarEncuestasAdmin() },
   { btn: tabComodatosBtn, panel: panelComodatos, onShow: () => cargarComodatosAdmin() },
   { btn: tabNotasBtn, panel: panelNotas, onShow: () => cargarNotasAdmin() },
+  { btn: tabSeguimientosBtn, panel: panelSeguimientos, onShow: () => cargarSeguimientosAdmin() },
   { btn: tabClavesClienteBtn, panel: panelClavesCliente, onShow: () => cargarClavesClienteAdmin() },
   { btn: tabEmergenciaBtn, panel: panelEmergencia, onShow: () => { if (!emergenciaCargadaUnaVezAdmin) { emergenciaCargadaUnaVezAdmin = true; cargarEmergenciasAdmin(); } } },
 ];
@@ -3539,6 +3563,68 @@ function renderNotasAdmin() {
         ${n.foto_url ? `<a href="${escapeHtmlAdmin(n.foto_url)}" target="_blank" rel="noopener"><img src="${escapeHtmlAdmin(n.foto_url)}" style="max-width:200px; border-radius:8px; margin-top:6px; display:block;"></a>` : ""}
         <div style="color:#6B7680; font-size:12px; margin-top:6px;">
           Para: ${n.destinatarios.map((d) => `${escapeHtmlAdmin(d.tecnico)}${d.leido ? " ✓ leída" : " (sin leer)"}`).join(", ")}
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+// ---------- Seguimientos en vivo ----------
+let seguimientosAdminCache = [];
+
+seguimientosAdminBuscarInput.addEventListener("input", renderSeguimientosAdmin);
+
+async function cargarSeguimientosAdmin() {
+  seguimientosAdminStatus.className = "status";
+  seguimientosAdminStatus.textContent = "Cargando...";
+  try {
+    const res = await fetch("/api/recurso-uso?recurso=seguimiento", {
+      headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    seguimientosAdminCache = Array.isArray(data) ? data : [];
+    renderSeguimientosAdmin();
+  } catch (err) {
+    seguimientosAdminStatus.className = "status err";
+    seguimientosAdminStatus.textContent = "No se pudo cargar: " + err.message;
+  }
+}
+
+function renderSeguimientosAdmin() {
+  const termino = (seguimientosAdminBuscarInput.value || "").trim().toLowerCase();
+  const filtrados = !termino ? seguimientosAdminCache : seguimientosAdminCache.filter((s) => {
+    const haystack = [s.tecnico, s.cliente_destino].map((v) => (v || "").toLowerCase()).join(" ");
+    return haystack.includes(termino);
+  });
+
+  if (seguimientosAdminCache.length === 0) {
+    seguimientosAdminStatus.className = "status";
+    seguimientosAdminStatus.textContent = "Todavía no se generó ningún seguimiento.";
+    seguimientosAdminLista.innerHTML = "";
+    return;
+  }
+  seguimientosAdminStatus.className = "status";
+  seguimientosAdminStatus.textContent = `${filtrados.length} de ${seguimientosAdminCache.length} seguimiento(s).`;
+
+  const ordenados = [...filtrados].sort((a, b) => (b.creado_en || "").localeCompare(a.creado_en || ""));
+  const etiquetaEstado = { en_camino: "🟠 En camino", llegado: "✅ Llegó", vencido: "⏱ Venció sin marcar llegada" };
+
+  seguimientosAdminLista.innerHTML = ordenados.map((s) => {
+    const fecha = s.creado_en ? new Date(s.creado_en).toLocaleString("es-AR") : "";
+    const tuvoUbicacion = s.lat_actual != null && s.lng_actual != null;
+    return `
+      <div style="padding:12px 0; border-bottom:1px solid #EEE;">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px;">
+          <b>${escapeHtmlAdmin(s.tecnico || "")}</b>
+          <span style="color:#6B7680; font-size:12px;">${escapeHtmlAdmin(fecha)}</span>
+        </div>
+        <div style="font-size:13px; margin-top:4px;">→ ${escapeHtmlAdmin(s.cliente_destino || "")}${s.direccion_destino ? " — " + escapeHtmlAdmin(s.direccion_destino) : ""}</div>
+        <div style="color:#6B7680; font-size:12px; margin-top:6px;">
+          ${etiquetaEstado[s.estado] || escapeHtmlAdmin(s.estado || "")}
+          ${tuvoUbicacion ? " · llegó a mandar ubicación" : " · nunca mandó ubicación (quizás cerró la app enseguida)"}
+          · <a href="/seguimiento.html?id=${escapeHtmlAdmin(s.id)}" target="_blank" rel="noopener">Ver mapa</a>
         </div>
       </div>
     `;
