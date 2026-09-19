@@ -13,6 +13,7 @@
     --panel: #1B2530;
     --paper: #F4F5F0;
     --amber: #F5A623;
+    --slate: #5C7A8A;
   }
   * { box-sizing: border-box; }
   body {
@@ -42,7 +43,7 @@
     max-width: 480px;
     box-shadow: 0 8px 24px rgba(0,0,0,0.3);
   }
-  h1 { font-size: 18px; margin: 0 0 4px; color: #FFFFFF; }
+  h1 { font-size: 18px; margin: 0 0 4px; color: #FFFFFF; display: flex; align-items: center; gap: 8px; }
   .subestado { font-size: 13px; color: #A8AEA6; margin: 0 0 16px; }
   #mapa {
     width: 100%;
@@ -51,18 +52,25 @@
     background: #0D141B;
     margin-bottom: 12px;
   }
-  .actualizado {
-    font-size: 12px;
-    color: #6B7680;
-    text-align: center;
+  .info-fila {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    font-size: 13px;
   }
+  .info-fila:first-of-type { border-top: none; padding-top: 0; }
+  .info-etiqueta { color: #8A9089; display: flex; align-items: center; gap: 6px; }
+  .info-valor { color: #FFFFFF; font-weight: 600; text-align: right; }
+  .actualizado { font-size: 12px; color: #6B7680; text-align: center; margin-top: 10px; }
   .pantalla-estado { text-align: center; padding: 30px 10px; }
   .pantalla-estado .icono { font-size: 44px; margin-bottom: 12px; }
   .pantalla-estado p { color: #A8AEA6; font-size: 14px; line-height: 1.5; margin: 0; }
   .hidden { display: none !important; }
-  .pulso {
-    width: 14px; height: 14px; border-radius: 50%;
-    background: var(--amber); display: inline-block;
+  .pulso-punto {
+    width: 12px; height: 12px; border-radius: 50%;
+    background: var(--amber); display: inline-block; flex-shrink: 0;
     box-shadow: 0 0 0 rgba(245,166,35,0.6);
     animation: pulso 1.8s infinite;
   }
@@ -71,6 +79,32 @@
     70% { box-shadow: 0 0 0 12px rgba(245,166,35,0); }
     100% { box-shadow: 0 0 0 0 rgba(245,166,35,0); }
   }
+  /* Marcador del técnico en el mapa — mismo pulso, pero detrás del ícono */
+  .marcador-tecnico { position: relative; width: 42px; height: 42px; }
+  .marcador-tecnico .anillo {
+    position: absolute; inset: 0; border-radius: 50%;
+    background: rgba(245,166,35,0.3);
+    animation: pulso-anillo 1.8s infinite;
+  }
+  @keyframes pulso-anillo {
+    0% { transform: scale(0.7); opacity: 1; }
+    100% { transform: scale(1.6); opacity: 0; }
+  }
+  .marcador-tecnico .insignia {
+    position: relative; width: 42px; height: 42px;
+    background: var(--ink); border: 2.5px solid var(--amber); border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.4);
+  }
+  .marcador-destino {
+    width: 32px; height: 32px;
+    background: #FFFFFF; border: 2.5px solid var(--slate);
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+  }
+  .marcador-destino svg { transform: rotate(45deg); }
 </style>
 </head>
 <body>
@@ -85,20 +119,34 @@
 
     <div id="errorWrap" class="pantalla-estado hidden">
       <div class="icono">⏱</div>
-      <h1 id="errorTitulo">Este enlace ya no está disponible</h1>
+      <h1 id="errorTitulo" style="justify-content:center;">Este enlace ya no está disponible</h1>
       <p id="errorTexto">Puede que haya vencido, o que el técnico ya haya llegado hace rato. Cualquier consulta, contactanos a través de www.sat365.com.ar.</p>
     </div>
 
     <div id="llegadoWrap" class="pantalla-estado hidden">
       <div class="icono">✔️</div>
-      <h1>¡Tu técnico ya llegó!</h1>
+      <h1 style="justify-content:center;">¡Tu técnico ya llegó!</h1>
       <p>Este enlace de seguimiento ya cumplió su función.</p>
     </div>
 
     <div id="enCaminoWrap" class="hidden">
-      <h1><span class="pulso"></span>&nbsp; Tu técnico está en camino</h1>
+      <h1><span class="pulso-punto"></span> Tu técnico está en camino</h1>
       <p class="subestado" id="subestadoTexto">Posición aproximada — se va actualizando solo</p>
       <div id="mapa"></div>
+
+      <div class="info-fila hidden" id="filaTecnico">
+        <span class="info-etiqueta">Técnico</span>
+        <span class="info-valor" id="infoTecnico"></span>
+      </div>
+      <div class="info-fila hidden" id="filaDistancia">
+        <span class="info-etiqueta">Distancia aproximada</span>
+        <span class="info-valor" id="infoDistancia"></span>
+      </div>
+      <div class="info-fila hidden" id="filaDireccion">
+        <span class="info-etiqueta">Tu dirección</span>
+        <span class="info-valor" id="infoDireccion"></span>
+      </div>
+
       <p class="actualizado" id="actualizadoTexto"></p>
     </div>
   </div>
@@ -111,13 +159,57 @@
   const errorWrap = document.getElementById("errorWrap");
   const llegadoWrap = document.getElementById("llegadoWrap");
   const enCaminoWrap = document.getElementById("enCaminoWrap");
-  const subestadoTexto = document.getElementById("subestadoTexto");
   const actualizadoTexto = document.getElementById("actualizadoTexto");
+  const filaTecnico = document.getElementById("filaTecnico");
+  const infoTecnico = document.getElementById("infoTecnico");
+  const filaDistancia = document.getElementById("filaDistancia");
+  const infoDistancia = document.getElementById("infoDistancia");
+  const filaDireccion = document.getElementById("filaDireccion");
+  const infoDireccion = document.getElementById("infoDireccion");
 
   let mapa = null;
   let marcadorTecnico = null;
   let marcadorDestino = null;
   let intervalo = null;
+
+  // Ícono del técnico: una furgoneta simple, con un anillo pulsante
+  // atrás (indica "en vivo") — nada de emoji, para que se vea igual
+  // de prolijo en cualquier celular.
+  const iconoTecnico = L.divIcon({
+    className: "",
+    html: `
+      <div class="marcador-tecnico">
+        <div class="anillo"></div>
+        <div class="insignia">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F5A623" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 16V8.8a1 1 0 0 1 .5-.87L9 5h6l4.5 3a1 1 0 0 1 .5.87V16"/>
+            <path d="M3 16h1.5M19.5 16H21"/>
+            <path d="M9 5v3H4"/>
+            <circle cx="7.5" cy="16.5" r="1.7"/>
+            <circle cx="16.5" cy="16.5" r="1.7"/>
+            <path d="M9.2 16.5h5.6"/>
+          </svg>
+        </div>
+      </div>
+    `,
+    iconSize: [42, 42],
+    iconAnchor: [21, 21],
+  });
+
+  // Ícono del destino: un pin con una casa adentro.
+  const iconoDestino = L.divIcon({
+    className: "",
+    html: `
+      <div class="marcador-destino">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5C7A8A" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 10.5 12 3l9 7.5"/>
+          <path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/>
+        </svg>
+      </div>
+    `,
+    iconSize: [32, 32],
+    iconAnchor: [16, 30],
+  });
 
   function ocultarTodo() {
     cargandoWrap.classList.add("hidden");
@@ -146,6 +238,16 @@
     return `actualizado hace ${minutos} minuto${minutos === 1 ? "" : "s"}`;
   }
 
+  // Distancia en línea recta (fórmula de Haversine) — no es la
+  // distancia real por calle, así que se muestra como "aprox.".
+  function distanciaKm(lat1, lng1, lat2, lng2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
   function actualizarMapa(datos) {
     const hayPosicionTecnico = datos.lat_actual != null && datos.lng_actual != null;
     const hayDestino = datos.lat_destino != null && datos.lng_destino != null;
@@ -156,7 +258,7 @@
         : hayDestino
           ? [datos.lat_destino, datos.lng_destino]
           : [-32.9468, -60.6393]; // Rosario, como último respaldo
-      mapa = L.map("mapa").setView(centro, 14);
+      mapa = L.map("mapa", { zoomControl: true }).setView(centro, 14);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: "© OpenStreetMap",
         maxZoom: 19,
@@ -164,26 +266,36 @@
     }
 
     if (hayDestino && !marcadorDestino) {
-      marcadorDestino = L.marker([datos.lat_destino, datos.lng_destino], {
-        icon: L.divIcon({ className: "", html: "🏠", iconSize: [26, 26] }),
-      }).addTo(mapa).bindPopup(datos.direccion_destino || "Destino");
+      marcadorDestino = L.marker([datos.lat_destino, datos.lng_destino], { icon: iconoDestino })
+        .addTo(mapa).bindPopup(datos.direccion_destino || "Tu dirección");
+    }
+
+    if (datos.direccion_destino) {
+      infoDireccion.textContent = datos.direccion_destino;
+      filaDireccion.classList.remove("hidden");
+    }
+    if (datos.tecnico) {
+      infoTecnico.textContent = datos.tecnico;
+      filaTecnico.classList.remove("hidden");
     }
 
     if (hayPosicionTecnico) {
       if (!marcadorTecnico) {
-        marcadorTecnico = L.marker([datos.lat_actual, datos.lng_actual], {
-          icon: L.divIcon({ className: "", html: "🚐", iconSize: [28, 28] }),
-        }).addTo(mapa);
+        marcadorTecnico = L.marker([datos.lat_actual, datos.lng_actual], { icon: iconoTecnico }).addTo(mapa);
       } else {
         marcadorTecnico.setLatLng([datos.lat_actual, datos.lng_actual]);
       }
       if (marcadorDestino) {
-        mapa.fitBounds([[datos.lat_actual, datos.lng_actual], [datos.lat_destino, datos.lng_destino]], { padding: [30, 30] });
+        mapa.fitBounds([[datos.lat_actual, datos.lng_actual], [datos.lat_destino, datos.lng_destino]], { padding: [40, 40] });
+        const km = distanciaKm(datos.lat_actual, datos.lng_actual, datos.lat_destino, datos.lng_destino);
+        infoDistancia.textContent = km < 1 ? `${Math.round(km * 1000)} m (aprox.)` : `${km.toFixed(1)} km (aprox.)`;
+        filaDistancia.classList.remove("hidden");
       } else {
         mapa.setView([datos.lat_actual, datos.lng_actual], mapa.getZoom() < 13 ? 14 : mapa.getZoom());
       }
       actualizadoTexto.textContent = formatoHaceCuanto(datos.actualizado_en);
     } else {
+      filaDistancia.classList.add("hidden");
       actualizadoTexto.textContent = "Todavía no hay una posición para mostrar — en cuanto el técnico se mueva, va a aparecer acá.";
     }
 
