@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.98.0";
+const APP_VERSION = "3.98.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -431,6 +431,10 @@ const refreshHistorialBtn = document.getElementById("refreshHistorialBtn");
 const historialSyncLabel = document.getElementById("historialSyncLabel");
 const historialStatus = document.getElementById("historialStatus");
 const historialList = document.getElementById("historialList");
+const parteDetalleModalOverlay = document.getElementById("parteDetalleModalOverlay");
+const parteDetalleModalStatus = document.getElementById("parteDetalleModalStatus");
+const parteDetalleModalContenido = document.getElementById("parteDetalleModalContenido");
+const parteDetalleModalCerrarBtn = document.getElementById("parteDetalleModalCerrarBtn");
 const historialModoLabel = document.getElementById("historialModoLabel");
 const historialSearch = document.getElementById("historialSearch");
 const historialPendientesBadge = document.getElementById("historialPendientesBadge");
@@ -4987,10 +4991,6 @@ const notaSearchInput = document.getElementById("notaSearchInput");
 const notasStatus = document.getElementById("notasStatus");
 const notasList = document.getElementById("notasList");
 const notasModalOverlay = document.getElementById("notasModalOverlay");
-const parteDetalleModalOverlay = document.getElementById("parteDetalleModalOverlay");
-const parteDetalleModalStatus = document.getElementById("parteDetalleModalStatus");
-const parteDetalleModalContenido = document.getElementById("parteDetalleModalContenido");
-const parteDetalleModalCerrarBtn = document.getElementById("parteDetalleModalCerrarBtn");
 const notasModalResumen = document.getElementById("notasModalResumen");
 const notasModalVerBtn = document.getElementById("notasModalVerBtn");
 const notasModalDespuesBtn = document.getElementById("notasModalDespuesBtn");
