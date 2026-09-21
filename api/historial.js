@@ -57,11 +57,16 @@ function mapearHaciaBackendNuevo(v) {
   return {
     id: v.id_parte || v.id || undefined, // si no viene, el backend nuevo genera uno
     numero_servicio: v.numero_servicio || "",
+    tipo_servicio: v.tipo_servicio || "",
     cliente: v.cliente || "",
     numero_cliente: v.numero_cliente || "",
     direccion: v.direccion || "",
     localidad: v.localidad || "",
+    cliente_email: v.cliente_email || "",
     tarea: v.tarea || "",
+    materiales: v.materiales || "",
+    materiales_otros: v.materiales_retirados || v.materiales_otros || "",
+    sim_instalada_texto: v.sim_instalada_texto || "",
     tecnico: v.tecnico || "",
     tecnico_segundo: v.tecnico2 || "",
     fecha: v.fecha || "",
@@ -72,9 +77,20 @@ function mapearHaciaBackendNuevo(v) {
     imprevisto: v.imprevisto || "",
     importe: numeroLimpio(v.importe),
     descuento_tipo: v.descuento || "",
-    descuento_pct: numeroLimpio(v.descuento),
+    // Antes esto intentaba sacar el % de descuento del TEXTO de
+    // v.descuento (la etiqueta, ej. "50%" o "Por presupuesto N°
+    // 123") -- con "Por presupuesto N° 123" terminaba guardando 123
+    // como si fuera un 123% de descuento. Ahora la app manda el
+    // número limpio directamente (v.descuento_pct), sin tener que
+    // adivinarlo de un texto.
+    descuento_pct: numeroLimpio(v.descuento_pct),
+    numero_presupuesto: v.numero_presupuesto || "",
     costo_final: numeroLimpio(v.costo_final),
     forma_pago: v.forma_pago || "",
+    firma_aclaracion: v.firma_aclaracion || "",
+    firma_cargo: v.firma_cargo || "",
+    foto_ref: v.foto_ref || "",
+    firma_img_ref: v.firma_img_ref || "",
     claves: JSON.stringify(Array.isArray(v.claves) ? v.claves : []),
   };
 }

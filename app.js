@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.99.0";
+const APP_VERSION = "3.100.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -3092,7 +3092,7 @@ clearSignBtn.addEventListener("click", clearSignature);
 // decide qué mostrar según el resultado. Se usa tanto para el envío
 // en el momento como para los reintentos automáticos en segundo plano.
 async function intentarEnviarParte(payload, interactivo) {
-  const { idParte, data, signatureImgTag, fotoBase64: fb64, fotoMimeType: fmt } = payload;
+  const { idParte, data, signatureImgTag, signatureDataUrl, fotoBase64: fb64, fotoMimeType: fmt } = payload;
 
   let fotoLink = "";
   let fotoError = "";
@@ -3121,6 +3121,28 @@ async function intentarEnviarParte(payload, interactivo) {
     } catch (err) {
       fotoError = err.message || String(err);
       console.error("Error subiendo foto:", err);
+    }
+  }
+
+  // La firma se sube igual que la foto — antes solo quedaba embebida
+  // en el mail (como imagen incrustada en el HTML), sin ningún link
+  // que se pudiera volver a abrir después desde la app.
+  let firmaLink = "";
+  if (signatureDataUrl) {
+    try {
+      const firmaRes = await fetch("/api/foto", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+        body: JSON.stringify({ base64: signatureDataUrl }),
+      });
+      const firmaData = await firmaRes.json();
+      if (firmaRes.ok && firmaData.id) {
+        firmaLink = `${window.location.origin}/api/foto?id=${firmaData.id}`;
+      } else {
+        console.error("Error subiendo firma:", firmaData);
+      }
+    } catch (err) {
+      console.error("Error subiendo firma:", err);
     }
   }
 
@@ -3186,11 +3208,16 @@ async function intentarEnviarParte(payload, interactivo) {
           numero_servicio: data.numero_servicio || "",
           numero_cliente: data.numero_cliente || "",
           es_instalacion: data.es_instalacion,
+          tipo_servicio: data.tipo_servicio || "",
           id_parte: idParte,
           cliente: data.cliente,
           direccion: data.direccion,
           localidad: data.localidad,
+          cliente_email: data.cliente_email || "",
           tarea: data.tarea,
+          materiales: data.materiales || "",
+          materiales_retirados: data.materiales_retirados || "",
+          sim_instalada_texto: data.sim_instalada_texto || "",
           observaciones: data.observaciones,
           tecnico: data.tecnico,
           tecnico2: data.tecnico2,
@@ -3199,9 +3226,16 @@ async function intentarEnviarParte(payload, interactivo) {
           hora_salida: data.hora_salida,
           importe: data.importe,
           descuento: data.descuento,
+          descuento_pct: data.descuento_pct,
+          numero_presupuesto: data.numero_presupuesto || "",
           costo_final: data.costo_final,
           forma_pago: data.forma_pago,
           imprevisto: data.imprevisto,
+          firma_aclaracion: data.firma_aclaracion || "",
+          firma_cargo: data.firma_cargo || "",
+          claves: data.claves,
+          foto_ref: fotoLink,
+          firma_img_ref: firmaLink,
         }),
       });
       if (!histRes.ok) {
@@ -3362,6 +3396,18 @@ confirmSignBtn.addEventListener("click", async () => {
   const data = getFormData();
   data.firma_aclaracion = aclaracion;
   data.firma_cargo = signCargo.value.trim();
+  data.numero_presupuesto = numeroPresupuestoInput.value.trim();
+  data.descuento_pct = getDescuentoPct();
+  // Garantiza que el costo final SIEMPRE quede con un valor (importe
+  // menos el descuento aplicado) aunque el técnico haya dejado el
+  // campo en blanco sin querer -- antes, si quedaba vacío, se
+  // guardaba vacío en la base sin ningún respaldo.
+  if (!data.costo_final) {
+    const importeNum = parseMonto(document.getElementById("f_importe").value);
+    if (!isNaN(importeNum)) {
+      data.costo_final = formatMonto(importeNum - (importeNum * data.descuento_pct / 100));
+    }
+  }
   // El N° de parte que se muestra y se manda por mail toma el N° de
   // servicio real (el que viene del listado precargado). Solo se genera
   // uno automático si el técnico cargó el parte manualmente, sin elegir
@@ -3370,7 +3416,7 @@ confirmSignBtn.addEventListener("click", async () => {
   const signatureDataUrl = normalizarFirmaParaMail(canvas);
   const signatureImgTag = `<img src="${signatureDataUrl}" alt="Firma del cliente" width="320" height="110" style="display:block; width:320px; height:110px; border:0;" />`;
 
-  const payload = { tipo: "parte", idParte, data, signatureImgTag, fotoBase64, fotoMimeType };
+  const payload = { tipo: "parte", idParte, data, signatureImgTag, signatureDataUrl, fotoBase64, fotoMimeType };
 
   showScreen("sending");
   setStatus("ENVIANDO", "busy");
@@ -4590,12 +4636,15 @@ async function abrirParteDetalleModal(idParte) {
     // Cada fila guarda su valor "de verdad" (sin el redondeo de
     // pantalla) en este array, y el botón de copiar lo lee de ahí por
     // índice — así no hay que escapar texto con saltos de línea o
-    // comillas dentro de un atributo HTML.
+    // comillas dentro de un atributo HTML. opciones.copiar permite
+    // que lo que se copia sea distinto de lo que se muestra (ej: el
+    // horario muestra "14:00 a 17:30 (3.50 hs)" pero copia solo "3.50").
     const valoresParaCopiar = [];
-    const fila = (etiqueta, valor, opciones = {}) => {
-      if (!valor) return "";
+    const fila = (etiqueta, valorMostrar, opciones = {}) => {
+      if (!valorMostrar) return "";
+      const aCopiar = opciones.copiar !== undefined ? opciones.copiar : valorMostrar;
       const idx = valoresParaCopiar.length;
-      valoresParaCopiar.push(String(valor));
+      valoresParaCopiar.push(String(aCopiar));
       const estiloValor = opciones.fondo
         ? `background:${opciones.fondo}; color:${opciones.color}; border-radius:8px; padding:6px 8px; margin-top:2px;`
         : "";
@@ -4607,7 +4656,7 @@ async function abrirParteDetalleModal(idParte) {
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
             </button>
           </div>
-          <div style="white-space:pre-line; ${estiloValor}">${escapeHtml(String(valor))}</div>
+          <div style="white-space:pre-line; ${estiloValor}">${escapeHtml(String(valorMostrar))}</div>
         </div>
       `;
     };
@@ -4620,7 +4669,18 @@ async function abrirParteDetalleModal(idParte) {
 
     // Misma cuenta que ya usa el mail a oficina (redondea a 5 min).
     const demora = calcularTiempoTranscurrido(p.hora_entrada, p.hora_salida);
-    const horarioTexto = `${fechaTexto} — ${p.hora_entrada || "?"} a ${p.hora_salida || "?"}${demora ? ` (${demora} hs)` : ""}`;
+    const horarioTexto = `${p.hora_entrada || "?"} a ${p.hora_salida || "?"}${demora ? ` (${demora} hs)` : ""}`;
+
+    // Respaldo para partes viejos que se guardaron antes de que el
+    // costo final quedara garantizado siempre -- si sigue faltando,
+    // se calcula acá mismo a partir del importe y el % de descuento,
+    // en vez de mostrar el campo vacío.
+    let costoFinalTexto = p.costo_final ? "$" + p.costo_final : "";
+    if (!costoFinalTexto && p.importe) {
+      const pct = Number(p.descuento_pct) || 0;
+      const calculado = Number(p.importe) - (Number(p.importe) * pct / 100);
+      if (!isNaN(calculado)) costoFinalTexto = "$" + calculado.toFixed(2) + " (calculado, no se había guardado)";
+    }
 
     parteDetalleModalContenido.innerHTML = `
       ${fila("N° de servicio", p.numero_servicio || p.id)}
@@ -4630,7 +4690,8 @@ async function abrirParteDetalleModal(idParte) {
       ${fila("Dirección", [p.direccion, p.localidad].filter(Boolean).join(", "))}
       ${fila("Teléfono", p.telefono)}
       ${fila("Técnico(s)", [p.tecnico, p.tecnico_segundo].filter(Boolean).join(" y "))}
-      ${fila("Fecha y horario", horarioTexto)}
+      ${fila("Fecha", fechaTexto)}
+      ${fila("Horario", horarioTexto, { copiar: demora || horarioTexto })}
       ${fila("Tarea", p.tarea)}
       ${fila("Materiales usados", p.materiales, { fondo: "#E1F0E4", color: "#1F6B34" })}
       ${fila("Materiales retirados", p.materiales_otros, { fondo: "#FBE8DC", color: "#B5541A" })}
@@ -4641,10 +4702,22 @@ async function abrirParteDetalleModal(idParte) {
       ${fila("Importe", p.importe ? "$" + p.importe : "")}
       ${fila("Descuento", p.descuento_tipo ? `${p.descuento_tipo}${p.descuento_pct ? " (" + p.descuento_pct + "%)" : ""}` : "")}
       ${fila("N° de presupuesto", p.numero_presupuesto)}
-      ${fila("Costo final", p.costo_final ? "$" + p.costo_final : "")}
+      ${fila("Costo final", costoFinalTexto, { copiar: (costoFinalTexto.match(/[\d.]+/) || [""])[0] })}
       ${fila("Forma de pago", p.forma_pago)}
       ${fila("Firmó", [p.firma_aclaracion, p.firma_cargo].filter(Boolean).join(" — "))}
       ${fila("Mail del cliente", p.cliente_email)}
+      ${p.foto_ref ? `
+        <div style="padding:8px 0; border-bottom:1px solid #F4F5F0;">
+          <div style="color:#8A9089; font-size:12px; margin-bottom:6px;">Foto</div>
+          <a href="${escapeHtml(p.foto_ref)}" target="_blank" rel="noopener"><img src="${escapeHtml(p.foto_ref)}" style="max-width:100%; border-radius:8px; display:block;"></a>
+        </div>
+      ` : ""}
+      ${p.firma_img_ref ? `
+        <div style="padding:8px 0; border-bottom:1px solid #F4F5F0;">
+          <div style="color:#8A9089; font-size:12px; margin-bottom:6px;">Firma</div>
+          <a href="${escapeHtml(p.firma_img_ref)}" target="_blank" rel="noopener"><img src="${escapeHtml(p.firma_img_ref)}" style="max-width:100%; max-height:140px; background:#F4F5F0; border-radius:8px; display:block;"></a>
+        </div>
+      ` : ""}
     `;
 
     parteDetalleModalContenido.querySelectorAll(".copiar-campo-btn").forEach((btn) => {
