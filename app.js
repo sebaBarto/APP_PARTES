@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.98.1";
+const APP_VERSION = "3.99.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -4586,18 +4586,41 @@ async function abrirParteDetalleModal(idParte) {
       const [y, m, d] = p.fecha.split("-");
       fechaTexto = `${d}/${m}/${y}`;
     }
-    const fila = (etiqueta, valor) => valor ? `
-      <div style="padding:8px 0; border-bottom:1px solid #F4F5F0;">
-        <div style="color:#8A9089; font-size:12px;">${escapeHtml(etiqueta)}</div>
-        <div style="white-space:pre-line;">${escapeHtml(String(valor))}</div>
-      </div>
-    ` : "";
+
+    // Cada fila guarda su valor "de verdad" (sin el redondeo de
+    // pantalla) en este array, y el botón de copiar lo lee de ahí por
+    // índice — así no hay que escapar texto con saltos de línea o
+    // comillas dentro de un atributo HTML.
+    const valoresParaCopiar = [];
+    const fila = (etiqueta, valor, opciones = {}) => {
+      if (!valor) return "";
+      const idx = valoresParaCopiar.length;
+      valoresParaCopiar.push(String(valor));
+      const estiloValor = opciones.fondo
+        ? `background:${opciones.fondo}; color:${opciones.color}; border-radius:8px; padding:6px 8px; margin-top:2px;`
+        : "";
+      return `
+        <div style="padding:8px 0; border-bottom:1px solid #F4F5F0;">
+          <div style="display:flex; justify-content:space-between; align-items:baseline; gap:8px;">
+            <div style="color:#8A9089; font-size:12px;">${escapeHtml(etiqueta)}</div>
+            <button type="button" class="copiar-campo-btn" data-copiar-idx="${idx}" title="Copiar" style="background:none; border:none; cursor:pointer; padding:2px; color:#8A9089; flex-shrink:0;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+          <div style="white-space:pre-line; ${estiloValor}">${escapeHtml(String(valor))}</div>
+        </div>
+      `;
+    };
 
     const claves = Array.isArray(p.claves) ? p.claves : [];
     const clavesTexto = claves.map((c) => {
       const detalle = [c.usuario && `Usuario: ${c.usuario}`, c.clave && `Clave: ${c.clave}`, c.codigo && `Código: ${c.codigo}`].filter(Boolean).join(" · ");
       return `${c.titulo}${detalle ? " — " + detalle : ""}`;
     }).join("\n");
+
+    // Misma cuenta que ya usa el mail a oficina (redondea a 5 min).
+    const demora = calcularTiempoTranscurrido(p.hora_entrada, p.hora_salida);
+    const horarioTexto = `${fechaTexto} — ${p.hora_entrada || "?"} a ${p.hora_salida || "?"}${demora ? ` (${demora} hs)` : ""}`;
 
     parteDetalleModalContenido.innerHTML = `
       ${fila("N° de servicio", p.numero_servicio || p.id)}
@@ -4607,10 +4630,10 @@ async function abrirParteDetalleModal(idParte) {
       ${fila("Dirección", [p.direccion, p.localidad].filter(Boolean).join(", "))}
       ${fila("Teléfono", p.telefono)}
       ${fila("Técnico(s)", [p.tecnico, p.tecnico_segundo].filter(Boolean).join(" y "))}
-      ${fila("Fecha y horario", `${fechaTexto} — ${p.hora_entrada || "?"} a ${p.hora_salida || "?"}`)}
+      ${fila("Fecha y horario", horarioTexto)}
       ${fila("Tarea", p.tarea)}
-      ${fila("Materiales usados", p.materiales)}
-      ${fila("Materiales retirados", p.materiales_otros)}
+      ${fila("Materiales usados", p.materiales, { fondo: "#E1F0E4", color: "#1F6B34" })}
+      ${fila("Materiales retirados", p.materiales_otros, { fondo: "#FBE8DC", color: "#B5541A" })}
       ${fila("SIM instalada", p.sim_instalada_texto)}
       ${fila("Observaciones", p.observaciones)}
       ${fila("Imprevisto", p.imprevisto)}
@@ -4623,6 +4646,18 @@ async function abrirParteDetalleModal(idParte) {
       ${fila("Firmó", [p.firma_aclaracion, p.firma_cargo].filter(Boolean).join(" — "))}
       ${fila("Mail del cliente", p.cliente_email)}
     `;
+
+    parteDetalleModalContenido.querySelectorAll(".copiar-campo-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const valor = valoresParaCopiar[Number(btn.dataset.copiarIdx)];
+        try {
+          await navigator.clipboard.writeText(valor);
+          showToast("Copiado.");
+        } catch (err) {
+          showToast("No se pudo copiar.");
+        }
+      });
+    });
   } catch (err) {
     parteDetalleModalStatus.classList.remove("hidden");
     parteDetalleModalStatus.textContent = "No se pudo cargar: " + err.message;
