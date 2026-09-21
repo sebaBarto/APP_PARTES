@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.92.0";
+const APP_VERSION = "3.93.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -7020,6 +7020,7 @@ let chartSimsGeneral = null;
 let chartsSimsPorTecnico = {};
 const COLORES_COMPANIA_SIM = { Movistar: "#2E9E4F", Personal: "#29ABE2", Claro: "#E4402C" };
 let dashSimsPeriodoActivo = "mes";
+let dashSimsGruposExpandidos = new Set(); // técnicos que el usuario dejó desplegados
 
 verDashboardSimsBtn.addEventListener("click", () => {
   showScreen("dashboardSims");
@@ -7083,24 +7084,79 @@ function renderDashSims() {
     return;
   }
   dashSimsStatus.textContent = "";
+
+  // Se agrupa por técnico — complementa el gráfico de arriba (que ya
+  // muestra cuántos movimientos hizo cada uno) dejando entrar al
+  // detalle de cuáles fueron, sin tener que scrollear una lista
+  // plana mezclada con la de todos los demás.
+  const gruposMapa = new Map();
   filtrados.forEach((h) => {
-    let fechaTexto = h.fecha || "";
-    if (h.fecha) {
-      const [y, m, d] = h.fecha.split("-");
-      fechaTexto = `${d}/${m}/${y}`;
-    }
-    let detalle = "";
-    if (h.accion === "usar") detalle = `Cliente: ${escapeHtml(h.cliente) || "?"}`;
-    else if (h.accion === "transferir") detalle = `A: ${escapeHtml(h.tecnico_nuevo) || "?"}`;
-    else if (h.accion === "reemplazar") detalle = `Cliente: ${escapeHtml(h.cliente) || "?"} · reemplazó a la SIM ${escapeHtml(h.sim_retirada) || "?"} (${escapeHtml(h.empresa_retirada) || "?"})`;
+    const clave = h.tecnico || "Sin técnico";
+    if (!gruposMapa.has(clave)) gruposMapa.set(clave, []);
+    gruposMapa.get(clave).push(h);
+  });
+
+  // Orden: el técnico con más movimientos primero.
+  const grupos = [...gruposMapa.entries()]
+    .map(([tecnico, movimientos]) => ({ tecnico, movimientos }))
+    .sort((a, b) => b.movimientos.length - a.movimientos.length);
+
+  grupos.forEach((grupo) => {
+    const conteoPorAccion = {};
+    grupo.movimientos.forEach((h) => {
+      const etiqueta = ETIQUETA_ACCION_SIM[h.accion] || h.accion;
+      conteoPorAccion[etiqueta] = (conteoPorAccion[etiqueta] || 0) + 1;
+    });
+    const resumenAcciones = Object.entries(conteoPorAccion).map(([etiqueta, n]) => `${n}× ${etiqueta}`).join(" · ");
+
+    const expandido = dashSimsGruposExpandidos.has(grupo.tecnico);
     const card = document.createElement("div");
     card.className = "historial-card";
-    card.innerHTML = `
-      <div class="historial-card-num">${h.empresa || ""} · ${escapeHtml(h.numero)}</div>
-      <div class="historial-card-cliente">${escapeHtml(h.tecnico)} — ${ETIQUETA_ACCION_SIM[h.accion] || h.accion}</div>
-      <div class="historial-card-direccion">${fechaTexto}${h.hora ? " " + h.hora : ""}</div>
-      <div class="historial-card-horario">${detalle}</div>
+
+    const cabecera = document.createElement("div");
+    cabecera.style.cursor = "pointer";
+    cabecera.innerHTML = `
+      <div class="historial-card-header-izq">
+        <div class="historial-card-num">${escapeHtml(grupo.tecnico)}</div>
+        <span style="margin-left:auto; color:#8A9089;">${expandido ? "▲" : "▼"}</span>
+      </div>
+      <div class="historial-card-cliente">${grupo.movimientos.length} movimiento${grupo.movimientos.length === 1 ? "" : "s"}</div>
+      <div class="historial-card-horario">${resumenAcciones}</div>
     `;
+    cabecera.addEventListener("click", () => {
+      if (dashSimsGruposExpandidos.has(grupo.tecnico)) dashSimsGruposExpandidos.delete(grupo.tecnico);
+      else dashSimsGruposExpandidos.add(grupo.tecnico);
+      renderDashSims();
+    });
+    card.appendChild(cabecera);
+
+    if (expandido) {
+      const detalleWrap = document.createElement("div");
+      detalleWrap.style.cssText = "margin-top:10px; padding-top:10px; border-top:1px dashed #D8DCD4;";
+      grupo.movimientos.forEach((h) => {
+        let fechaTexto = h.fecha || "";
+        if (h.fecha) {
+          const [y, m, d] = h.fecha.split("-");
+          fechaTexto = `${d}/${m}/${y}`;
+        }
+        let detalle = "";
+        if (h.accion === "usar") detalle = `Cliente: ${escapeHtml(h.cliente) || "?"}`;
+        else if (h.accion === "transferir") detalle = `A: ${escapeHtml(h.tecnico_nuevo) || "?"}`;
+        else if (h.accion === "reemplazar") detalle = `Cliente: ${escapeHtml(h.cliente) || "?"} · reemplazó a la SIM ${escapeHtml(h.sim_retirada) || "?"} (${escapeHtml(h.empresa_retirada) || "?"})`;
+
+        const linea = document.createElement("div");
+        linea.style.cssText = "padding:8px 0; border-bottom:1px solid #F4F5F0;";
+        linea.innerHTML = `
+          <div class="historial-card-num">${h.empresa || ""} · ${escapeHtml(h.numero)}</div>
+          <div class="historial-card-cliente">${ETIQUETA_ACCION_SIM[h.accion] || h.accion}</div>
+          <div class="historial-card-direccion">${fechaTexto}${h.hora ? " " + h.hora : ""}</div>
+          <div class="historial-card-horario">${detalle}</div>
+        `;
+        detalleWrap.appendChild(linea);
+      });
+      card.appendChild(detalleWrap);
+    }
+
     dashSimsList.appendChild(card);
   });
 }
