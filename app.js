@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.90.0";
+const APP_VERSION = "3.91.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -5207,6 +5207,7 @@ const seguimientoWhatsappBtn = document.getElementById("seguimientoWhatsappBtn")
 const seguimientoHomeBanner = document.getElementById("seguimientoHomeBanner");
 const seguimientoHomeNombre = document.getElementById("seguimientoHomeNombre");
 const seguimientoLlegueBtn = document.getElementById("seguimientoLlegueBtn");
+const seguimientoCancelarBtn = document.getElementById("seguimientoCancelarBtn");
 
 // Busca, dentro del cronograma de HOY para este técnico, la primera
 // tarea vinculada a un servicio real que venga DESPUÉS (por horario)
@@ -5248,7 +5249,24 @@ function encontrarProximaTareaCronograma(numeroServicioActual) {
 
 async function iniciarSeguimientoSiCorresponde(dataParteRecienEnviado) {
   try {
-    if (seguimientoActivoId) return; // ya hay uno en curso, no se pisa
+    if (seguimientoActivoId) {
+      // Puede que el anterior ya haya terminado (llegó, venció, o se
+      // canceló) sin que este celular se haya enterado — antes de
+      // asumir que sigue bloqueando, se chequea el estado real contra
+      // el servidor. Sin esto, un solo "Llegué" olvidado dejaba sin
+      // avisar a TODOS los clientes siguientes del día.
+      try {
+        const resCheck = await fetch(`/api/recurso-uso?recurso=seguimiento&id=${encodeURIComponent(seguimientoActivoId)}`, { cache: "no-store" });
+        const dataCheck = await resCheck.json();
+        if (dataCheck.estado && dataCheck.estado !== "en_camino") {
+          detenerSeguimientoActivo();
+        } else {
+          return; // sigue realmente activo, no se pisa
+        }
+      } catch (errCheck) {
+        return; // si no se puede confirmar el estado, mejor no arriesgarse a pisarlo
+      }
+    }
     const proximo = encontrarProximaTareaCronograma(dataParteRecienEnviado.numero_servicio);
     if (!proximo) return;
 
@@ -5486,6 +5504,25 @@ seguimientoLlegueBtn.addEventListener("click", async () => {
   } finally {
     detenerSeguimientoActivo();
     seguimientoLlegueBtn.disabled = false;
+  }
+});
+
+seguimientoCancelarBtn.addEventListener("click", async () => {
+  if (!seguimientoActivoId) { detenerSeguimientoActivo(); return; }
+  const confirmar = confirm("¿Cancelar el seguimiento? El cliente va a dejar de ver tu ubicación.");
+  if (!confirmar) return;
+  seguimientoCancelarBtn.disabled = true;
+  try {
+    await fetch("/api/recurso-uso?recurso=seguimiento", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({ accion: "cancelar", id: seguimientoActivoId }),
+    });
+  } catch (err) {
+    // aunque falle el aviso, se corta igual del lado del técnico
+  } finally {
+    detenerSeguimientoActivo();
+    seguimientoCancelarBtn.disabled = false;
   }
 });
 

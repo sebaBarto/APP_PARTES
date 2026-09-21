@@ -3609,7 +3609,7 @@ function renderSeguimientosAdmin() {
   seguimientosAdminStatus.textContent = `${filtrados.length} de ${seguimientosAdminCache.length} seguimiento(s).`;
 
   const ordenados = [...filtrados].sort((a, b) => (b.creado_en || "").localeCompare(a.creado_en || ""));
-  const etiquetaEstado = { en_camino: "🟠 En camino", llegado: "✅ Llegó", vencido: "⏱ Venció sin marcar llegada" };
+  const etiquetaEstado = { en_camino: "🟠 En camino", llegado: "✅ Llegó", vencido: "⏱ Venció sin marcar llegada", cancelado: "❌ Cancelado por el técnico" };
 
   seguimientosAdminLista.innerHTML = ordenados.map((s) => {
     const fecha = s.creado_en ? new Date(s.creado_en).toLocaleString("es-AR") : "";

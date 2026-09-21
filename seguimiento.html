@@ -316,6 +316,10 @@
         mostrarError();
         return;
       }
+      if (datos.estado === "cancelado") {
+        mostrarError("El técnico canceló este viaje", "Puede que haya cambiado de planes. Cualquier consulta, contactanos a través de www.sat365.com.ar.");
+        return;
+      }
       if (datos.estado === "llegado") {
         ocultarTodo();
         llegadoWrap.classList.remove("hidden");

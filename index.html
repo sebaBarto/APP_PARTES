@@ -81,7 +81,10 @@
 
       <div class="cola-envios-banner hidden" id="seguimientoHomeBanner">
         <span>🚐 En camino a <b id="seguimientoHomeNombre"></b></span>
-        <button type="button" class="btn btn-ghost btn-small" id="seguimientoLlegueBtn">Llegué</button>
+        <div style="display:flex; gap:6px; flex-shrink:0;">
+          <button type="button" class="btn btn-ghost btn-small" id="seguimientoCancelarBtn" title="Cancelar sin marcar llegada">Cancelar</button>
+          <button type="button" class="btn btn-ghost btn-small" id="seguimientoLlegueBtn">Llegué</button>
+        </div>
       </div>
 
       <button type="button" class="btn btn-ghost btn-small" id="activarNotificacionesBtn" style="margin-bottom:14px;"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15" style="vertical-align:-2px; margin-right:4px;"><path d="M12 3a5 5 0 0 0-5 5c0 6-3 8-3 8h16s-3-2-3-8a5 5 0 0 0-5-5z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>Activar notificaciones</button>
