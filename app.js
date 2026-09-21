@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.96.0";
+const APP_VERSION = "3.97.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -5331,7 +5331,7 @@ function encontrarProximaTareaCronograma(numeroServicioActual) {
 
   for (let i = indiceActual + 1; i < tareasHoy.length; i++) {
     const servicio = encontrarServicioPorTarea(tareasHoy[i].tarea);
-    if (servicio) return servicio;
+    if (servicio) return { servicio, hora_inicio: tareasHoy[i].hora_inicio || "" };
   }
   return null;
 }
@@ -5356,8 +5356,35 @@ async function iniciarSeguimientoSiCorresponde(dataParteRecienEnviado) {
         return; // si no se puede confirmar el estado, mejor no arriesgarse a pisarlo
       }
     }
-    const proximo = encontrarProximaTareaCronograma(dataParteRecienEnviado.numero_servicio);
-    if (!proximo) return;
+    const resultadoProximo = encontrarProximaTareaCronograma(dataParteRecienEnviado.numero_servicio);
+    if (!resultadoProximo) return;
+    const proximo = resultadoProximo.servicio;
+
+    // Alerta de atraso a la oficina — si ya pasaron 20+ minutos desde
+    // la hora prevista para el próximo turno, se avisa (no al
+    // cliente, a la oficina, para que sepa que el día se está
+    // atrasando sin tener que ir chequeando el cronograma a mano).
+    // Fire-and-forget: no bloquea nada de lo que sigue.
+    if (resultadoProximo.hora_inicio) {
+      const [hIni, mIni] = resultadoProximo.hora_inicio.split(":").map(Number);
+      if (!isNaN(hIni) && !isNaN(mIni)) {
+        const ahoraDate = new Date();
+        const atrasoMin = (ahoraDate.getHours() * 60 + ahoraDate.getMinutes()) - (hIni * 60 + mIni);
+        if (atrasoMin >= 20) {
+          fetch("/api/recurso-uso?recurso=seguimiento", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+            body: JSON.stringify({
+              accion: "avisar_atraso",
+              tecnico: tecnicoLogueado || "",
+              cliente_proximo: proximo.cliente || "",
+              hora_prevista: resultadoProximo.hora_inicio,
+              atraso_minutos: atrasoMin,
+            }),
+          }).catch(() => {});
+        }
+      }
+    }
 
     // Se pide la lista de clientes FRESCA (no la cacheada del login)
     // — el mail puede haberse guardado recién, en este mismo turno

@@ -179,6 +179,36 @@ async function getSeguimientosListaNuevo(headersBackendNuevo, res) {
 }
 
 async function postSeguimientoNuevo(headersBackendNuevo, body, res) {
+  // "avisar_atraso" — mail directo a la oficina cuando un técnico
+  // cierra un parte con 20+ minutos de atraso sobre su próximo turno
+  // agendado. No toca la base para nada, ni el backend de Cloudflare
+  // — es un aviso puntual, no algo que haga falta consultar después.
+  if (body.accion === "avisar_atraso") {
+    if (!process.env.OFICINA_EMAIL) {
+      res.status(200).json({ ok: true }); // no hay a quién avisar; no es un error del técnico
+      return;
+    }
+    try {
+      const transporter = getTransporterSeguimiento();
+      await transporter.sendMail({
+        from: `"Servicio Técnico SAT" <${process.env.SMTP_USER}>`,
+        to: process.env.OFICINA_EMAIL,
+        subject: `⏰ ${body.tecnico || "Un técnico"} va con atraso`,
+        html: `
+          <div style="font-family: Arial, Helvetica, sans-serif; color:#101820;">
+            <h2 style="margin-bottom:4px;">⏰ Atraso detectado</h2>
+            <p><b>${body.tecnico || "Un técnico"}</b> recién está cerrando un servicio, con <b>${body.atraso_minutos || "?"} minutos</b> de atraso sobre el próximo turno agendado${body.cliente_proximo ? ` con <b>${body.cliente_proximo}</b>` : ""}${body.hora_prevista ? ` (previsto para las ${body.hora_prevista})` : ""}.</p>
+          </div>
+        `,
+      });
+      res.status(200).json({ ok: true });
+    } catch (err) {
+      // no crítico — no debe afectar nada del lado del técnico
+      res.status(200).json({ ok: false });
+    }
+    return;
+  }
+
   // "reenviar_mail" no crea nada nuevo — solo reenvía el link de un
   // seguimiento que YA existe (usado por el botón "Mandar por mail"
   // cuando el técnico completa el mail a mano después de que el

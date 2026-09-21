@@ -248,6 +248,33 @@ module.exports = async (req, res) => {
         body: JSON.stringify({ parte_id: parte, puntaje, cliente, tecnico, fecha_parte: fechaParte }),
       });
       const dataEncuesta = await rEncuesta.json();
+
+      // Alerta a la oficina si la calificación es baja (1 o 2) — no
+      // crítico, si el mail falla no debe afectar la respuesta al
+      // cliente, que ya calificó bien igual.
+      if (!dataEncuesta.ya_calificado && Number(puntaje) <= 2 && process.env.OFICINA_EMAIL) {
+        try {
+          const transporter = getTransporter();
+          await transporter.sendMail({
+            from: `"Servicio Técnico SAT" <${process.env.SMTP_USER}>`,
+            to: process.env.OFICINA_EMAIL,
+            subject: `⚠️ Calificación baja (${puntaje}/5) — ${cliente || "cliente sin identificar"}`,
+            html: `
+              <div style="font-family: Arial, Helvetica, sans-serif; color:#101820;">
+                <h2 style="margin-bottom:4px;">⚠️ Un cliente calificó mal un servicio</h2>
+                <p><b>Puntaje:</b> ${puntaje}/5</p>
+                <p><b>Cliente:</b> ${cliente || "sin identificar"}</p>
+                <p><b>Técnico:</b> ${tecnico || "sin identificar"}</p>
+                <p><b>Fecha del parte:</b> ${fechaParte || "sin identificar"}</p>
+                <p><b>N° de parte:</b> ${parte}</p>
+              </div>
+            `,
+          });
+        } catch (errMail) {
+          console.error("No se pudo mandar la alerta de encuesta baja (no crítico):", errMail);
+        }
+      }
+
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       if (dataEncuesta.ya_calificado) {
         res.status(200).send(paginaHtml("Ya habías calificado este servicio", "Gracias igual por tu tiempo."));
