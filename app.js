@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.91.0";
+const APP_VERSION = "3.92.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -4551,6 +4551,7 @@ let stockPeriodoActivo = "semana";
 let stockPasadoActivo = "todos";
 let stockSeleccionados = new Set();
 let stockFiltradoActual = [];
+let stockGruposExpandidos = new Set(); // ids de parte que el técnico dejó desplegados
 
 verStockBtn.addEventListener("click", () => {
   showScreen("stock");
@@ -4736,59 +4737,132 @@ function renderStock() {
     return;
   }
   stockStatus.textContent = `${filtrados.length} movimiento(s).`;
-  const seleccionables = [];
+
+  // Se agrupa por parte (N° de servicio) — un técnico piensa en
+  // términos de "qué cargué en esta visita", no en movimientos
+  // sueltos. La clave preferida es parte_id (más precisa); si algún
+  // movimiento viejo/manual no lo tiene, se cae a numero_servicio, y
+  // si tampoco hay eso, queda solo (no se agrupa con nada).
+  const gruposMapa = new Map();
   filtrados.forEach((m) => {
-    let fechaTexto = m.fecha || "";
-    if (m.fecha) {
-      const [y, mm, d] = m.fecha.split("-");
+    const clave = m.parte_id || m.numero_servicio || `individual-${m.id}`;
+    if (!gruposMapa.has(clave)) gruposMapa.set(clave, []);
+    gruposMapa.get(clave).push(m);
+  });
+
+  // El orden de los grupos respeta el mismo criterio que antes tenían
+  // los movimientos sueltos: los que tengan algo pendiente de pasar a
+  // sistema van primero, y dentro de cada tanda, el más reciente.
+  const grupos = [...gruposMapa.entries()].map(([clave, movimientos]) => {
+    const tienePendiente = movimientos.some((m) => !m.pasado_sistema_offline);
+    const claveOrden = movimientos.reduce((max, m) => {
+      const c = `${m.fecha || ""} ${m.hora || ""}`;
+      return c > max ? c : max;
+    }, "");
+    return { clave, movimientos, tienePendiente, claveOrden };
+  });
+  grupos.sort((a, b) => {
+    if (a.tienePendiente !== b.tienePendiente) return a.tienePendiente ? -1 : 1;
+    return b.claveOrden.localeCompare(a.claveOrden);
+  });
+
+  const seleccionables = [];
+  grupos.forEach((grupo) => {
+    const primero = grupo.movimientos[0];
+    let fechaTexto = primero.fecha || "";
+    if (primero.fecha) {
+      const [y, mm, d] = primero.fecha.split("-");
       fechaTexto = `${d}/${mm}/${y}`;
     }
-    const partes = [];
-    if (m.cantidad_instalada > 0) partes.push(`<span class="badge-stock badge-instalado">↑ Instaló x${m.cantidad_instalada}</span>`);
-    if (m.cantidad_retirada > 0) partes.push(`<span class="badge-stock badge-retirado">↓ Retiró x${m.cantidad_retirada}</span>`);
-    if (m.es_manual) partes.push(`<span class="badge-material-manual">✎ Cargado a mano</span>`);
+    const totalInstalado = grupo.movimientos.reduce((s, m) => s + (m.cantidad_instalada || 0), 0);
+    const totalRetirado = grupo.movimientos.reduce((s, m) => s + (m.cantidad_retirada || 0), 0);
+    const resumenPartes = [];
+    if (totalInstalado > 0) resumenPartes.push(`<span class="badge-stock badge-instalado">↑ ${totalInstalado} instalado${totalInstalado === 1 ? "" : "s"}</span>`);
+    if (totalRetirado > 0) resumenPartes.push(`<span class="badge-stock badge-retirado">↓ ${totalRetirado} retirado${totalRetirado === 1 ? "" : "s"}</span>`);
 
+    const expandido = stockGruposExpandidos.has(grupo.clave);
     const card = document.createElement("div");
-    card.className = "historial-card" + (m.pasado_sistema_offline ? " historial-card-pasado" : "");
-    const puedeSeleccionar = puedeMarcarPasado && !m.pasado_sistema_offline;
-    if (puedeSeleccionar) seleccionables.push(m);
-    const seleccionHtml = puedeSeleccionar ? `
-      <label class="historial-card-seleccionar" title="Seleccionar para marcar en lote">
-        <input type="checkbox" class="stock-check-seleccion" ${stockSeleccionados.has(m.id) ? "checked" : ""}>
-      </label>
-    ` : "";
-    card.innerHTML = `
+    card.className = "historial-card" + (grupo.tienePendiente ? "" : " historial-card-pasado");
+
+    const cabecera = document.createElement("div");
+    cabecera.style.cursor = "pointer";
+    cabecera.innerHTML = `
       <div class="historial-card-header-izq">
-        ${seleccionHtml}
-        <div class="historial-card-num">N° ${escapeHtml(m.numero_servicio || "s/n")}${m.numero_cliente ? " · Cliente " + escapeHtml(m.numero_cliente) : ""}</div>
+        <div class="historial-card-num">N° ${escapeHtml(primero.numero_servicio || "s/n")}${primero.numero_cliente ? " · Cliente " + escapeHtml(primero.numero_cliente) : ""}</div>
+        <span style="margin-left:auto; color:#8A9089;">${expandido ? "▲" : "▼"}</span>
       </div>
-      <div class="historial-card-cliente">${escapeHtml(m.modelo)}${m.categoria ? " · " + escapeHtml(m.categoria) : ""}</div>
-      <div class="historial-card-direccion">${escapeHtml(m.cliente)} — ${escapeHtml(m.direccion || "")}</div>
-      <div class="historial-card-horario">${escapeHtml(m.tecnico)} — ${fechaTexto}</div>
-      <div class="historial-card-badges">${partes.join("")}</div>
-      ${puedeMarcarPasado ? `
-        <label class="historial-card-check">
-          <input type="checkbox" class="stock-check-pasado" ${m.pasado_sistema_offline ? "checked" : ""}>
-          ${m.pasado_sistema_offline ? `Pasado a sistema (${escapeHtml(m.pasado_sistema_por || "")})` : "Pasado a mi sistema"}
-        </label>
-      ` : ""}
+      <div class="historial-card-direccion">${escapeHtml(primero.cliente)} — ${escapeHtml(primero.direccion || "")}</div>
+      <div class="historial-card-horario">${escapeHtml(primero.tecnico)} — ${fechaTexto} · ${grupo.movimientos.length} artículo${grupo.movimientos.length === 1 ? "" : "s"}</div>
+      <div class="historial-card-badges">${resumenPartes.join("")}</div>
     `;
-    if (puedeMarcarPasado) {
-      const checkbox = card.querySelector(".stock-check-pasado");
-      checkbox.addEventListener("click", (e) => {
-        e.preventDefault();
-        marcarStockPasadoSistema(m, !m.pasado_sistema_offline);
+    cabecera.addEventListener("click", () => {
+      if (stockGruposExpandidos.has(grupo.clave)) stockGruposExpandidos.delete(grupo.clave);
+      else stockGruposExpandidos.add(grupo.clave);
+      renderStock();
+    });
+    card.appendChild(cabecera);
+
+    if (expandido) {
+      const detalle = document.createElement("div");
+      detalle.style.cssText = "margin-top:10px; padding-top:10px; border-top:1px dashed #D8DCD4;";
+      grupo.movimientos.forEach((m) => {
+        const partesLinea = [];
+        if (m.cantidad_instalada > 0) partesLinea.push(`<span class="badge-stock badge-instalado">↑ Instaló x${m.cantidad_instalada}</span>`);
+        if (m.cantidad_retirada > 0) partesLinea.push(`<span class="badge-stock badge-retirado">↓ Retiró x${m.cantidad_retirada}</span>`);
+        if (m.es_manual) partesLinea.push(`<span class="badge-material-manual">✎ Cargado a mano</span>`);
+
+        const puedeSeleccionar = puedeMarcarPasado && !m.pasado_sistema_offline;
+        if (puedeSeleccionar) seleccionables.push(m);
+        const seleccionHtml = puedeSeleccionar ? `
+          <label class="historial-card-seleccionar" title="Seleccionar para marcar en lote">
+            <input type="checkbox" class="stock-check-seleccion" ${stockSeleccionados.has(m.id) ? "checked" : ""}>
+          </label>
+        ` : "";
+
+        const linea = document.createElement("div");
+        linea.style.cssText = "padding:8px 0; border-bottom:1px solid #F4F5F0;";
+        linea.innerHTML = `
+          <div class="historial-card-header-izq">
+            ${seleccionHtml}
+            <div class="historial-card-cliente" style="margin:0;">${escapeHtml(m.modelo)}${m.categoria ? " · " + escapeHtml(m.categoria) : ""}</div>
+          </div>
+          <div class="historial-card-badges">${partesLinea.join("")}</div>
+          ${puedeMarcarPasado ? `
+            <label class="historial-card-check">
+              <input type="checkbox" class="stock-check-pasado" ${m.pasado_sistema_offline ? "checked" : ""}>
+              ${m.pasado_sistema_offline ? `Pasado a sistema (${escapeHtml(m.pasado_sistema_por || "")})` : "Pasado a mi sistema"}
+            </label>
+          ` : ""}
+        `;
+        if (puedeMarcarPasado) {
+          const checkbox = linea.querySelector(".stock-check-pasado");
+          checkbox.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            marcarStockPasadoSistema(m, !m.pasado_sistema_offline);
+          });
+        }
+        if (puedeSeleccionar) {
+          const checkboxSel = linea.querySelector(".stock-check-seleccion");
+          checkboxSel.addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (checkboxSel.checked) stockSeleccionados.add(m.id);
+            else stockSeleccionados.delete(m.id);
+            actualizarBarraSeleccionStock(seleccionables);
+          });
+        }
+        detalle.appendChild(linea);
+      });
+      card.appendChild(detalle);
+    } else {
+      // aunque esté colapsado, sus movimientos siguen contando para
+      // "seleccionar todos" — si no, ese botón dejaría afuera todo lo
+      // que el técnico no llegó a desplegar
+      grupo.movimientos.forEach((m) => {
+        if (puedeMarcarPasado && !m.pasado_sistema_offline) seleccionables.push(m);
       });
     }
-    if (puedeSeleccionar) {
-      const checkboxSel = card.querySelector(".stock-check-seleccion");
-      checkboxSel.addEventListener("click", (e) => {
-        e.stopPropagation();
-        if (checkboxSel.checked) stockSeleccionados.add(m.id);
-        else stockSeleccionados.delete(m.id);
-        actualizarBarraSeleccionStock(seleccionables);
-      });
-    }
+
     stockList.appendChild(card);
   });
   actualizarBarraSeleccionStock(seleccionables);
