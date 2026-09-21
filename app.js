@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.94.0";
+const APP_VERSION = "3.95.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -493,7 +493,15 @@ const verDashboardVehiculosBtn = document.getElementById("verDashboardVehiculosB
 const volverDeDashboardVehiculosBtn = document.getElementById("volverDeDashboardVehiculosBtn");
 const refreshDashVehiculosBtn = document.getElementById("refreshDashVehiculosBtn");
 const dashVehiculosSyncLabel = document.getElementById("dashVehiculosSyncLabel");
-const dashVehiculosFiltro = document.getElementById("dashVehiculosFiltro");
+const dashVehListaWrap = document.getElementById("dashVehListaWrap");
+const dashVehDetalleWrap = document.getElementById("dashVehDetalleWrap");
+const dashVehBuscarInput = document.getElementById("dashVehBuscarInput");
+const dashVehListaStatus = document.getElementById("dashVehListaStatus");
+const dashVehListaVehiculos = document.getElementById("dashVehListaVehiculos");
+const dashVehVolverListaBtn = document.getElementById("dashVehVolverListaBtn");
+const dashVehNombreSeleccionado = document.getElementById("dashVehNombreSeleccionado");
+const dashVehGastoCombustibleTotalNum = document.getElementById("dashVehGastoCombustibleTotalNum");
+const dashVehGastoMantenimientoTotalNum = document.getElementById("dashVehGastoMantenimientoTotalNum");
 const dashVehFechaEspecificaWrap = document.getElementById("dashVehFechaEspecificaWrap");
 const dashVehFechaEspecifica = document.getElementById("dashVehFechaEspecifica");
 const dashVehGastoCombustibleNum = document.getElementById("dashVehGastoCombustibleNum");
@@ -6751,15 +6759,26 @@ vehiculoDevolverBtn.addEventListener("click", async () => {
 
 // ---------- Dashboard de vehículos ----------
 let dashVehiculosCache = [];
+let dashVehConfigCache = [];
 let dashVehPeriodoActivo = "mes";
+let dashVehVehiculoSeleccionado = "";
 
 verDashboardVehiculosBtn.addEventListener("click", () => {
+  dashVehVehiculoSeleccionado = "";
+  dashVehDetalleWrap.classList.add("hidden");
+  dashVehListaWrap.classList.remove("hidden");
   showScreen("dashboardVehiculos");
   fetchDashVehiculos();
 });
 volverDeDashboardVehiculosBtn.addEventListener("click", () => showScreen("dashboardsMenu"));
 refreshDashVehiculosBtn.addEventListener("click", fetchDashVehiculos);
-dashVehiculosFiltro.addEventListener("change", renderDashVehiculos);
+dashVehBuscarInput.addEventListener("input", renderListaVehiculosDash);
+dashVehVolverListaBtn.addEventListener("click", () => {
+  dashVehVehiculoSeleccionado = "";
+  dashVehDetalleWrap.classList.add("hidden");
+  dashVehListaWrap.classList.remove("hidden");
+});
+
 document.querySelectorAll(".dash-veh-periodo-chip").forEach((chip) => {
   chip.addEventListener("click", () => {
     document.querySelectorAll(".dash-veh-periodo-chip").forEach((c) => c.classList.remove("active"));
@@ -6770,44 +6789,87 @@ document.querySelectorAll(".dash-veh-periodo-chip").forEach((chip) => {
       dashVehFechaEspecifica.value = new Date().toISOString().slice(0, 10);
     }
     renderDashVehiculos();
+    renderResumenGastoFlota();
   });
 });
-dashVehFechaEspecifica.addEventListener("change", renderDashVehiculos);
-
-async function poblarFiltroVehiculosDashboard() {
-  const actual = dashVehiculosFiltro.value;
-  try {
-    const vehiculos = await fetchVehiculosConfig();
-    const opciones = vehiculos.map((v) => `<option value="${v.nombre}">${v.nombre}</option>`).join("");
-    dashVehiculosFiltro.innerHTML = `<option value="">Todos los vehículos</option>${opciones}`;
-    dashVehiculosFiltro.value = actual;
-  } catch (err) {
-    // si falla, se queda con lo que ya estaba cargado (o vacío)
-  }
-}
+dashVehFechaEspecifica.addEventListener("change", () => { renderDashVehiculos(); renderResumenGastoFlota(); });
 
 async function fetchDashVehiculos() {
-  dashVehiculosStatus.textContent = "Cargando...";
-  dashVehiculosList.innerHTML = "";
+  dashVehListaStatus.textContent = "Cargando...";
   try {
-    await poblarFiltroVehiculosDashboard();
     const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
-    const res = await fetch("/api/recurso-uso?recurso=vehiculo", { headers, cache: "no-store" });
+    const [vehiculos, res] = await Promise.all([
+      fetchVehiculosConfig().catch(() => []),
+      fetch("/api/recurso-uso?recurso=vehiculo", { headers, cache: "no-store" }),
+    ]);
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     dashVehiculosCache = Array.isArray(data) ? data : [];
+    dashVehConfigCache = Array.isArray(vehiculos) ? vehiculos : [];
     dashVehiculosSyncLabel.textContent = formatSyncTime(new Date());
-    renderDashVehiculos();
+    renderListaVehiculosDash();
+    renderResumenGastoFlota();
+    if (dashVehVehiculoSeleccionado) renderDashVehiculos();
   } catch (err) {
-    dashVehiculosStatus.textContent = "No se pudo cargar el historial de vehículos.";
+    dashVehListaStatus.textContent = "No se pudo cargar el historial de vehículos.";
   }
 }
 
+const formatoPesosVeh = (n) => "$" + Math.round(n).toLocaleString("es-AR");
+
+// Suma de gastos de TODA la flota en el período elegido — se muestra
+// en la pantalla de la lista, antes de elegir un vehículo puntual.
+function renderResumenGastoFlota() {
+  const rango = obtenerRangoPeriodo(dashVehPeriodoActivo, dashVehFechaEspecifica);
+  const enRango = dashVehiculosCache.filter((h) => fechaEnRango(h.fecha, rango));
+  const eventosConMonto = enRango.filter((h) => h.accion === "evento" && h.monto);
+  const gastoCombustible = eventosConMonto.filter((h) => h.tipo_evento === "Carga de combustible").reduce((acc, h) => acc + (Number(h.monto) || 0), 0);
+  const gastoMantenimiento = eventosConMonto.filter((h) => h.tipo_evento !== "Carga de combustible").reduce((acc, h) => acc + (Number(h.monto) || 0), 0);
+  dashVehGastoCombustibleTotalNum.textContent = gastoCombustible > 0 ? formatoPesosVeh(gastoCombustible) : "—";
+  dashVehGastoMantenimientoTotalNum.textContent = gastoMantenimiento > 0 ? formatoPesosVeh(gastoMantenimiento) : "—";
+}
+
+function renderListaVehiculosDash() {
+  const termino = normalizeText(dashVehBuscarInput.value || "");
+  const filtrados = !termino ? dashVehConfigCache : dashVehConfigCache.filter((v) => normalizeText(v.nombre || "").includes(termino));
+
+  if (dashVehConfigCache.length === 0) {
+    dashVehListaStatus.textContent = "No hay vehículos cargados.";
+    dashVehListaVehiculos.innerHTML = "";
+    return;
+  }
+  dashVehListaStatus.textContent = `${filtrados.length} vehículo(s).`;
+
+  dashVehListaVehiculos.innerHTML = filtrados.map((v) => {
+    // "Abierto" = tomado y sin devolver todavía — mismo criterio que
+    // ya usa el resto de la app para saber si un vehículo está en uso.
+    const abierto = dashVehiculosCache.find((h) => h.vehiculo === v.nombre && h.hora_toma && !h.hora_devolucion);
+    const estadoTexto = abierto ? `🔴 En uso — ${escapeHtml(abierto.tecnico)}` : "🟢 Libre";
+    const cantidad = dashVehiculosCache.filter((h) => h.vehiculo === v.nombre).length;
+    return `
+      <div class="historial-card" style="cursor:pointer;" data-vehiculo="${escapeHtml(v.nombre)}">
+        <div class="historial-card-num">${escapeHtml(v.nombre)}</div>
+        <div class="historial-card-cliente">${estadoTexto}</div>
+        <div class="historial-card-direccion">${cantidad} registro${cantidad === 1 ? "" : "s"}${v.km_actual ? " · " + Number(v.km_actual).toLocaleString("es-AR") + " km" : ""}</div>
+      </div>
+    `;
+  }).join("");
+
+  dashVehListaVehiculos.querySelectorAll("[data-vehiculo]").forEach((card) => {
+    card.addEventListener("click", () => {
+      dashVehVehiculoSeleccionado = card.dataset.vehiculo;
+      dashVehNombreSeleccionado.textContent = dashVehVehiculoSeleccionado;
+      dashVehListaWrap.classList.add("hidden");
+      dashVehDetalleWrap.classList.remove("hidden");
+      renderDashVehiculos();
+    });
+  });
+}
+
 function filtrarDashVehiculos() {
-  const filtro = dashVehiculosFiltro.value;
-  const rango = obtenerRangoPeriodo(dashVehPeriodoActivo);
+  const rango = obtenerRangoPeriodo(dashVehPeriodoActivo, dashVehFechaEspecifica);
   return dashVehiculosCache
-    .filter((h) => (!filtro || h.vehiculo === filtro) && fechaEnRango(h.fecha, rango))
+    .filter((h) => h.vehiculo === dashVehVehiculoSeleccionado && fechaEnRango(h.fecha, rango))
     .sort((a, b) => {
       const claveA = `${a.fecha || ""} ${a.hora_toma || ""}`;
       const claveB = `${b.fecha || ""} ${b.hora_toma || ""}`;
@@ -6822,7 +6884,6 @@ function renderDashVehiculos() {
   // los montos cargados en "Registrar un evento sin devolver el
   // vehículo", para tener a la vista cuánto se está gastando, no solo
   // el detalle uno por uno en la lista de abajo.
-  const formatoPesos = (n) => "$" + Math.round(n).toLocaleString("es-AR");
   const eventosConMonto = filtrados.filter((h) => h.accion === "evento" && h.monto);
   const gastoCombustible = eventosConMonto
     .filter((h) => h.tipo_evento === "Carga de combustible")
@@ -6830,8 +6891,8 @@ function renderDashVehiculos() {
   const gastoMantenimiento = eventosConMonto
     .filter((h) => h.tipo_evento !== "Carga de combustible")
     .reduce((acc, h) => acc + (Number(h.monto) || 0), 0);
-  dashVehGastoCombustibleNum.textContent = gastoCombustible > 0 ? formatoPesos(gastoCombustible) : "—";
-  dashVehGastoMantenimientoNum.textContent = gastoMantenimiento > 0 ? formatoPesos(gastoMantenimiento) : "—";
+  dashVehGastoCombustibleNum.textContent = gastoCombustible > 0 ? formatoPesosVeh(gastoCombustible) : "—";
+  dashVehGastoMantenimientoNum.textContent = gastoMantenimiento > 0 ? formatoPesosVeh(gastoMantenimiento) : "—";
 
   dashVehiculosList.innerHTML = "";
   if (filtrados.length === 0) {
@@ -6891,7 +6952,7 @@ descargarExcelVehiculosBtn.addEventListener("click", () => {
   const libro = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(libro, hoja, "Vehículos");
   const hoy = fechaActualISOVehiculo();
-  XLSX.writeFile(libro, `vehiculos_${dashVehPeriodoActivo}_${hoy}.xlsx`);
+  XLSX.writeFile(libro, `vehiculos_${dashVehVehiculoSeleccionado || "todos"}_${dashVehPeriodoActivo}_${hoy}.xlsx`);
 });
 
 // ---------- Dashboard de Herramientas ----------

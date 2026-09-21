@@ -425,46 +425,65 @@
     <div class="review-scroll">
       <p class="hint-eyebrow review-eyebrow">DASHBOARD DE VEHÍCULOS</p>
 
-      <div class="list-toolbar">
-        <button class="btn btn-ghost btn-small" id="refreshDashVehiculosBtn" type="button">↻ Actualizar</button>
-        <span class="list-sync-label" id="dashVehiculosSyncLabel"></span>
-      </div>
-
-      <div class="dash-periodo-tabs">
-        <button type="button" class="dash-veh-periodo-chip" data-periodo="dia">Día</button>
-        <button type="button" class="dash-veh-periodo-chip" data-periodo="semana">Semana</button>
-        <button type="button" class="dash-veh-periodo-chip active" data-periodo="mes">Mes</button>
-        <button type="button" class="dash-veh-periodo-chip" data-periodo="todo">Todo</button>
-        <button type="button" class="dash-veh-periodo-chip" data-periodo="fecha">Fecha</button>
-      </div>
-
-      <div class="field-group hidden" id="dashVehFechaEspecificaWrap">
-        <label class="field-label" for="dashVehFechaEspecifica">Elegí el día</label>
-        <input class="field-input" type="date" id="dashVehFechaEspecifica">
-      </div>
-
-      <div class="field-group">
-        <select class="field-input" id="dashVehiculosFiltro">
-          <option value="">Todos los vehículos</option>
-        </select>
-      </div>
-
-      <div class="dash-cards-row">
-        <div class="dash-card">
-          <div class="dash-card-num dash-card-num-chico" id="dashVehGastoCombustibleNum">–</div>
-          <div class="dash-card-label">Gasto en combustible</div>
+      <div id="dashVehListaWrap">
+        <div class="list-toolbar">
+          <button class="btn btn-ghost btn-small" id="refreshDashVehiculosBtn" type="button">↻ Actualizar</button>
+          <span class="list-sync-label" id="dashVehiculosSyncLabel"></span>
         </div>
-        <div class="dash-card">
-          <div class="dash-card-num dash-card-num-chico" id="dashVehGastoMantenimientoNum">–</div>
-          <div class="dash-card-label">Gasto en gomería/mecánico/lavadero</div>
+
+        <div class="field-group">
+          <input class="field-input" type="text" id="dashVehBuscarInput" placeholder="Buscar vehículo...">
         </div>
+
+        <div class="dash-cards-row">
+          <div class="dash-card">
+            <div class="dash-card-num dash-card-num-chico" id="dashVehGastoCombustibleTotalNum">–</div>
+            <div class="dash-card-label">Gasto en combustible (toda la flota)</div>
+          </div>
+          <div class="dash-card">
+            <div class="dash-card-num dash-card-num-chico" id="dashVehGastoMantenimientoTotalNum">–</div>
+            <div class="dash-card-label">Gasto en gomería/mecánico/lavadero (toda la flota)</div>
+          </div>
+        </div>
+
+        <p class="list-status" id="dashVehListaStatus"></p>
+        <div id="dashVehListaVehiculos" class="historial-list"></div>
       </div>
 
-      <button type="button" class="btn btn-secondary hidden" id="descargarExcelVehiculosBtn" style="margin-bottom:14px;">⬇ Descargar Excel del período</button>
+      <div id="dashVehDetalleWrap" class="hidden">
+        <button type="button" class="btn btn-ghost btn-small" id="dashVehVolverListaBtn" style="margin-bottom:10px;">‹ Todos los vehículos</button>
+        <p class="dash-subtitulo" id="dashVehNombreSeleccionado" style="margin-top:0;"></p>
 
-      <p class="list-status" id="dashVehiculosStatus"></p>
+        <div class="dash-periodo-tabs">
+          <button type="button" class="dash-veh-periodo-chip" data-periodo="dia">Día</button>
+          <button type="button" class="dash-veh-periodo-chip" data-periodo="semana">Semana</button>
+          <button type="button" class="dash-veh-periodo-chip active" data-periodo="mes">Mes</button>
+          <button type="button" class="dash-veh-periodo-chip" data-periodo="todo">Todo</button>
+          <button type="button" class="dash-veh-periodo-chip" data-periodo="fecha">Fecha</button>
+        </div>
 
-      <div id="dashVehiculosList" class="historial-list"></div>
+        <div class="field-group hidden" id="dashVehFechaEspecificaWrap">
+          <label class="field-label" for="dashVehFechaEspecifica">Elegí el día</label>
+          <input class="field-input" type="date" id="dashVehFechaEspecifica">
+        </div>
+
+        <div class="dash-cards-row">
+          <div class="dash-card">
+            <div class="dash-card-num dash-card-num-chico" id="dashVehGastoCombustibleNum">–</div>
+            <div class="dash-card-label">Gasto en combustible</div>
+          </div>
+          <div class="dash-card">
+            <div class="dash-card-num dash-card-num-chico" id="dashVehGastoMantenimientoNum">–</div>
+            <div class="dash-card-label">Gasto en gomería/mecánico/lavadero</div>
+          </div>
+        </div>
+
+        <button type="button" class="btn btn-secondary hidden" id="descargarExcelVehiculosBtn" style="margin-bottom:14px;">⬇ Descargar Excel del período</button>
+
+        <p class="list-status" id="dashVehiculosStatus"></p>
+
+        <div id="dashVehiculosList" class="historial-list"></div>
+      </div>
     </div>
 
     <div class="action-bar">
