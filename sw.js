@@ -1,6 +1,6 @@
 // Versión del caché: subir este número cada vez que se publican cambios
 // importantes fuerza a los celulares a descartar la copia vieja.
-const CACHE_NAME = "parte-tecnico-v68";
+const CACHE_NAME = "parte-tecnico-v69";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -38,9 +38,13 @@ self.addEventListener("fetch", (event) => {
 
   // Para los archivos propios de la app: red primero (así siempre se ve
   // la última versión publicada), y si no hay conexión, se usa la copia
-  // guardada como respaldo.
+  // guardada como respaldo. cache:"no-store" es clave acá -- sin esto,
+  // el fetch de la red igual puede resolverse con la copia que el
+  // navegador (no el service worker, la caché HTTP del navegador en
+  // sí) tenga guardada, dejando a alguien viendo una versión vieja
+  // aunque tenga conexión.
   event.respondWith(
-    fetch(event.request)
+    fetch(event.request, { cache: "no-store" })
       .then((response) => {
         const copy = response.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
