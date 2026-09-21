@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.95.0";
+const APP_VERSION = "3.96.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -413,6 +413,7 @@ const vehiculoEvento = document.getElementById("vehiculoEvento");
 const vehiculoEventoDetalleWrap = document.getElementById("vehiculoEventoDetalleWrap");
 const vehiculoEventoDetalle = document.getElementById("vehiculoEventoDetalle");
 const vehiculoDevolverBtn = document.getElementById("vehiculoDevolverBtn");
+const vehiculoForzarLiberarBtn = document.getElementById("vehiculoForzarLiberarBtn");
 const volverDeCredencialBtn = document.getElementById("volverDeCredencialBtn");
 const credencialStatus = document.getElementById("credencialStatus");
 const credencialCardWrap = document.getElementById("credencialCardWrap");
@@ -6595,6 +6596,7 @@ async function renderVehiculoDetalle() {
   vehiculoAlertasWrap.classList.add("hidden");
   vehiculoTomarWrap.classList.add("hidden");
   vehiculoDevolverWrap.classList.add("hidden");
+  vehiculoForzarLiberarBtn.classList.add("hidden");
   vehiculoEventoSinDevolverWrap.classList.add("hidden");
   try {
     const [config, historial] = await Promise.all([fetchVehiculosConfig(), fetchVehiculosHistorial()]);
@@ -6618,6 +6620,7 @@ async function renderVehiculoDetalle() {
       vehiculoTomarWrap.classList.remove("hidden");
     } else if (abierto.tecnico === tecnicoActual) {
       vehiculoEnUsoInfo.textContent = `Lo tomaste vos hoy a las ${abierto.hora_toma}.`;
+      vehiculoForzarLiberarBtn.classList.add("hidden");
       vehiculoHoraDevolucion.parentElement.classList.remove("hidden");
       vehiculoKmDevolucion.parentElement.classList.remove("hidden");
       vehiculoEvento.parentElement.classList.remove("hidden");
@@ -6640,6 +6643,8 @@ async function renderVehiculoDetalle() {
     } else {
       vehiculoEnUsoInfo.textContent = `Este vehículo lo tiene ${abierto.tecnico} desde las ${abierto.hora_toma}. No se puede tomar hasta que lo devuelva.`;
       vehiculoDevolverWrap.classList.remove("hidden");
+      vehiculoForzarLiberarBtn.classList.remove("hidden");
+      vehiculoForzarLiberarBtn.dataset.tecnicoActual = abierto.tecnico;
       vehiculoHoraDevolucion.parentElement.classList.add("hidden");
       vehiculoKmDevolucion.parentElement.classList.add("hidden");
       vehiculoEvento.parentElement.classList.add("hidden");
@@ -6754,6 +6759,47 @@ vehiculoDevolverBtn.addEventListener("click", async () => {
     showToast("No se pudo registrar: " + err.message);
   } finally {
     vehiculoDevolverBtn.disabled = false;
+  }
+});
+
+// Cuando otro técnico se olvidó de devolver el vehículo, cualquiera
+// puede forzar la liberación desde acá — con una advertencia clara y
+// dejando registrado en el log tanto quién liberó como quién lo
+// tenía antes, para que quede trazabilidad de lo que pasó. OJO: no
+// se pide kilometraje acá — el que libera no manejó el vehículo, así
+// que no tiene forma de saberlo; se manda vacío para no pisar el
+// km_actual con un número inventado.
+vehiculoForzarLiberarBtn.addEventListener("click", async () => {
+  const tecnicoQueLoTenia = vehiculoForzarLiberarBtn.dataset.tecnicoActual || "otro técnico";
+  const confirmar = confirm(
+    `¿Forzar la liberación de "${vehiculoSeleccionado}"?\n\n` +
+    `Lo tenía tomado ${tecnicoQueLoTenia}. Esta acción queda registrada en el historial, con tu nombre y el de quién lo tenía antes.\n\n` +
+    `Usalo solo si estás seguro de que en verdad está libre (por ejemplo, si ${tecnicoQueLoTenia} se olvidó de devolverlo).`
+  );
+  if (!confirmar) return;
+  vehiculoForzarLiberarBtn.disabled = true;
+  try {
+    const res = await fetch("/api/recurso-uso", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({
+        recurso: "vehiculo",
+        accion: "devolver",
+        vehiculo: vehiculoSeleccionado,
+        tecnico: tecnicoQueLoTenia, // tiene que matchear el registro abierto para poder cerrarlo
+        hora_devolucion: horaActualHHMM(),
+        km_devolucion: "",
+        evento: `Liberación forzada por ${tecnicoLogueado || "Oficina"} — anteriormente lo tenía ${tecnicoQueLoTenia}`,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    showToast(`Liberaste "${vehiculoSeleccionado}". Ahora lo podés tomar vos.`);
+    renderVehiculoDetalle();
+  } catch (err) {
+    showToast("No se pudo liberar: " + err.message);
+  } finally {
+    vehiculoForzarLiberarBtn.disabled = false;
   }
 });
 
