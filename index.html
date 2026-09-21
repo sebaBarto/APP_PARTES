@@ -1431,6 +1431,17 @@
     </div>
   </div>
 
+  <div id="parteDetalleModalOverlay" class="hidden" style="position:fixed; inset:0; background:rgba(16,24,32,0.6); z-index:9000; display:flex; align-items:flex-start; justify-content:center; padding:20px; overflow-y:auto;">
+    <div style="background:#FFFFFF; border-radius:16px; padding:22px; max-width:480px; width:100%; margin:20px 0; color:#101820;">
+      <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px;">
+        <p class="hint-eyebrow review-eyebrow" style="margin:0;">DETALLE DEL PARTE</p>
+        <button type="button" id="parteDetalleModalCerrarBtn" style="background:none; border:none; font-size:22px; line-height:1; color:#6B7680; cursor:pointer; padding:0;">×</button>
+      </div>
+      <p class="list-status" id="parteDetalleModalStatus" style="margin-top:10px;">Cargando...</p>
+      <div id="parteDetalleModalContenido"></div>
+    </div>
+  </div>
+
   <!-- GUARDIA TÉCNICA -->
   <section class="screen" id="screen-guardias">
     <div class="review-scroll">

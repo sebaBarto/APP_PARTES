@@ -323,6 +323,29 @@ module.exports = async (req, res) => {
         res.status(200).send(buffer);
         return;
       }
+      // ?tipo=parte&id=X trae UN parte completo, con TODAS las
+      // columnas sin recortar (a diferencia del listado normal, que
+      // pasa por mapearDesdeBackendNuevo y deja afuera cosas como
+      // materiales, importe detallado, firma, foto, etc. — para no
+      // sobrecargar la lista). Reutiliza el mismo /api/partes que ya
+      // se pide para el listado, no hace falta nada nuevo del backend.
+      if (req.query && req.query.tipo === "parte" && req.query.id) {
+        const r = await fetch(`${BACKEND_NUEVO_URL}/api/partes`, { headers: headersBackendNuevo });
+        if (!r.ok) {
+          res.status(502).json({ error: "No se pudo leer el parte" });
+          return;
+        }
+        const partes = await r.json();
+        const encontrado = (Array.isArray(partes) ? partes : []).find((p) => p.id === req.query.id);
+        if (!encontrado) {
+          res.status(404).json({ error: "No se encontró ese parte" });
+          return;
+        }
+        let claves = [];
+        try { claves = JSON.parse(encontrado.claves || "[]"); } catch (err) { claves = []; }
+        res.status(200).json({ ...encontrado, claves });
+        return;
+      }
       // ?tipo=stock trae el historial de stock en vez del de partes
       // (mismo archivo, para no gastar otro de los 12 slots de Vercel).
       if (req.query && req.query.tipo === "stock") {

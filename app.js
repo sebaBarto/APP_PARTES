@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.97.0";
+const APP_VERSION = "3.98.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -4493,6 +4493,7 @@ function renderHistorialReciente() {
     }
     const card = document.createElement("div");
     card.className = "historial-card" + (h.pasado_sistema_offline ? " historial-card-pasado" : "");
+    card.style.cursor = "pointer";
     const clavesHtml = (h.claves && h.claves.length > 0) ? `
       <div class="historial-card-claves">
         🔑 ${h.claves.map((c) => {
@@ -4543,6 +4544,7 @@ function renderHistorialReciente() {
       const checkbox = card.querySelector(".historial-check-pasado");
       checkbox.addEventListener("click", (e) => {
         e.preventDefault();
+        e.stopPropagation();
         marcarPartePasadoSistema(h, !h.pasado_sistema_offline);
       });
     }
@@ -4555,10 +4557,78 @@ function renderHistorialReciente() {
         actualizarBarraSeleccionHistorial(seleccionables);
       });
     }
+    card.addEventListener("click", () => abrirParteDetalleModal(h.id_parte));
     historialList.appendChild(card);
   });
   actualizarBarraSeleccionHistorial(seleccionables);
 }
+
+async function abrirParteDetalleModal(idParte) {
+  parteDetalleModalOverlay.classList.remove("hidden");
+  parteDetalleModalStatus.classList.remove("hidden");
+  parteDetalleModalStatus.textContent = "Cargando...";
+  parteDetalleModalContenido.innerHTML = "";
+  try {
+    const res = await fetch(`/api/historial?tipo=parte&id=${encodeURIComponent(idParte)}`, {
+      headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      cache: "no-store",
+    });
+    const p = await res.json();
+    if (!res.ok) throw new Error(p.error || "Error desconocido");
+    parteDetalleModalStatus.classList.add("hidden");
+
+    let fechaTexto = p.fecha || "";
+    if (p.fecha) {
+      const [y, m, d] = p.fecha.split("-");
+      fechaTexto = `${d}/${m}/${y}`;
+    }
+    const fila = (etiqueta, valor) => valor ? `
+      <div style="padding:8px 0; border-bottom:1px solid #F4F5F0;">
+        <div style="color:#8A9089; font-size:12px;">${escapeHtml(etiqueta)}</div>
+        <div style="white-space:pre-line;">${escapeHtml(String(valor))}</div>
+      </div>
+    ` : "";
+
+    const claves = Array.isArray(p.claves) ? p.claves : [];
+    const clavesTexto = claves.map((c) => {
+      const detalle = [c.usuario && `Usuario: ${c.usuario}`, c.clave && `Clave: ${c.clave}`, c.codigo && `Código: ${c.codigo}`].filter(Boolean).join(" · ");
+      return `${c.titulo}${detalle ? " — " + detalle : ""}`;
+    }).join("\n");
+
+    parteDetalleModalContenido.innerHTML = `
+      ${fila("N° de servicio", p.numero_servicio || p.id)}
+      ${fila("Tipo", p.tipo_servicio)}
+      ${fila("Cliente", p.cliente)}
+      ${fila("N° de cliente", p.numero_cliente)}
+      ${fila("Dirección", [p.direccion, p.localidad].filter(Boolean).join(", "))}
+      ${fila("Teléfono", p.telefono)}
+      ${fila("Técnico(s)", [p.tecnico, p.tecnico_segundo].filter(Boolean).join(" y "))}
+      ${fila("Fecha y horario", `${fechaTexto} — ${p.hora_entrada || "?"} a ${p.hora_salida || "?"}`)}
+      ${fila("Tarea", p.tarea)}
+      ${fila("Materiales usados", p.materiales)}
+      ${fila("Materiales retirados", p.materiales_otros)}
+      ${fila("SIM instalada", p.sim_instalada_texto)}
+      ${fila("Observaciones", p.observaciones)}
+      ${fila("Imprevisto", p.imprevisto)}
+      ${clavesTexto ? fila("Claves", clavesTexto) : ""}
+      ${fila("Importe", p.importe ? "$" + p.importe : "")}
+      ${fila("Descuento", p.descuento_tipo ? `${p.descuento_tipo}${p.descuento_pct ? " (" + p.descuento_pct + "%)" : ""}` : "")}
+      ${fila("N° de presupuesto", p.numero_presupuesto)}
+      ${fila("Costo final", p.costo_final ? "$" + p.costo_final : "")}
+      ${fila("Forma de pago", p.forma_pago)}
+      ${fila("Firmó", [p.firma_aclaracion, p.firma_cargo].filter(Boolean).join(" — "))}
+      ${fila("Mail del cliente", p.cliente_email)}
+    `;
+  } catch (err) {
+    parteDetalleModalStatus.classList.remove("hidden");
+    parteDetalleModalStatus.textContent = "No se pudo cargar: " + err.message;
+  }
+}
+
+parteDetalleModalCerrarBtn.addEventListener("click", () => parteDetalleModalOverlay.classList.add("hidden"));
+parteDetalleModalOverlay.addEventListener("click", (e) => {
+  if (e.target === parteDetalleModalOverlay) parteDetalleModalOverlay.classList.add("hidden");
+});
 
 // ---------- Historial de Stock (materiales instalados/retirados) ----------
 let stockCache = [];
@@ -4917,6 +4987,10 @@ const notaSearchInput = document.getElementById("notaSearchInput");
 const notasStatus = document.getElementById("notasStatus");
 const notasList = document.getElementById("notasList");
 const notasModalOverlay = document.getElementById("notasModalOverlay");
+const parteDetalleModalOverlay = document.getElementById("parteDetalleModalOverlay");
+const parteDetalleModalStatus = document.getElementById("parteDetalleModalStatus");
+const parteDetalleModalContenido = document.getElementById("parteDetalleModalContenido");
+const parteDetalleModalCerrarBtn = document.getElementById("parteDetalleModalCerrarBtn");
 const notasModalResumen = document.getElementById("notasModalResumen");
 const notasModalVerBtn = document.getElementById("notasModalVerBtn");
 const notasModalDespuesBtn = document.getElementById("notasModalDespuesBtn");
