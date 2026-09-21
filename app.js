@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.93.0";
+const APP_VERSION = "3.94.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -505,7 +505,13 @@ const verDashboardHerramientasBtn = document.getElementById("verDashboardHerrami
 const volverDeDashboardHerramientasBtn = document.getElementById("volverDeDashboardHerramientasBtn");
 const refreshDashHerramientasBtn = document.getElementById("refreshDashHerramientasBtn");
 const dashHerramientasSyncLabel = document.getElementById("dashHerramientasSyncLabel");
-const dashHerramientasFiltro = document.getElementById("dashHerramientasFiltro");
+const dashHerrListaWrap = document.getElementById("dashHerrListaWrap");
+const dashHerrDetalleWrap = document.getElementById("dashHerrDetalleWrap");
+const dashHerrBuscarInput = document.getElementById("dashHerrBuscarInput");
+const dashHerrListaStatus = document.getElementById("dashHerrListaStatus");
+const dashHerrListaHerramientas = document.getElementById("dashHerrListaHerramientas");
+const dashHerrVolverListaBtn = document.getElementById("dashHerrVolverListaBtn");
+const dashHerrNombreSeleccionado = document.getElementById("dashHerrNombreSeleccionado");
 const dashHerrFechaEspecificaWrap = document.getElementById("dashHerrFechaEspecificaWrap");
 const dashHerrFechaEspecifica = document.getElementById("dashHerrFechaEspecifica");
 const descargarExcelHerramientasBtn = document.getElementById("descargarExcelHerramientasBtn");
@@ -6890,15 +6896,25 @@ descargarExcelVehiculosBtn.addEventListener("click", () => {
 
 // ---------- Dashboard de Herramientas ----------
 let dashHerramientasCache = [];
+let dashHerrConfigCache = [];
 let dashHerrPeriodoActivo = "mes";
+let dashHerrHerramientaSeleccionada = "";
 
 verDashboardHerramientasBtn.addEventListener("click", () => {
+  dashHerrHerramientaSeleccionada = "";
+  dashHerrDetalleWrap.classList.add("hidden");
+  dashHerrListaWrap.classList.remove("hidden");
   showScreen("dashboardHerramientas");
   fetchDashHerramientas();
 });
 volverDeDashboardHerramientasBtn.addEventListener("click", () => showScreen("dashboardsMenu"));
 refreshDashHerramientasBtn.addEventListener("click", fetchDashHerramientas);
-dashHerramientasFiltro.addEventListener("change", renderDashHerramientas);
+dashHerrBuscarInput.addEventListener("input", renderListaHerramientasDash);
+dashHerrVolverListaBtn.addEventListener("click", () => {
+  dashHerrHerramientaSeleccionada = "";
+  dashHerrDetalleWrap.classList.add("hidden");
+  dashHerrListaWrap.classList.remove("hidden");
+});
 
 document.querySelectorAll(".dash-herr-periodo-chip").forEach((chip) => {
   chip.addEventListener("click", () => {
@@ -6914,39 +6930,67 @@ document.querySelectorAll(".dash-herr-periodo-chip").forEach((chip) => {
 });
 dashHerrFechaEspecifica.addEventListener("change", renderDashHerramientas);
 
-async function poblarFiltroHerramientasDashboard() {
-  const actual = dashHerramientasFiltro.value;
-  try {
-    const herramientas = await fetchHerramientasConfig();
-    const opciones = herramientas.map((h) => `<option value="${h.nombre}">${h.nombre}</option>`).join("");
-    dashHerramientasFiltro.innerHTML = `<option value="">Todas las herramientas</option>${opciones}`;
-    dashHerramientasFiltro.value = actual || "";
-  } catch (err) {
-    // si falla, se sigue igual con "todas"
-  }
-}
-
 async function fetchDashHerramientas() {
-  dashHerramientasStatus.textContent = "Cargando...";
+  dashHerrListaStatus.textContent = "Cargando...";
   try {
-    await poblarFiltroHerramientasDashboard();
     const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
-    const res = await fetch("/api/recurso-uso?recurso=herramienta", { headers, cache: "no-store" });
+    const [herramientas, res] = await Promise.all([
+      fetchHerramientasConfig().catch(() => []),
+      fetch("/api/recurso-uso?recurso=herramienta", { headers, cache: "no-store" }),
+    ]);
     if (!res.ok) throw new Error("HTTP " + res.status);
     dashHerramientasCache = await res.json();
     if (!Array.isArray(dashHerramientasCache)) dashHerramientasCache = [];
+    dashHerrConfigCache = Array.isArray(herramientas) ? herramientas : [];
     dashHerramientasSyncLabel.textContent = "Actualizado " + formatSyncTime(new Date());
-    renderDashHerramientas();
+    renderListaHerramientasDash();
+    if (dashHerrHerramientaSeleccionada) renderDashHerramientas();
   } catch (err) {
-    dashHerramientasStatus.textContent = "No se pudo cargar el historial de herramientas.";
+    dashHerrListaStatus.textContent = "No se pudo cargar el historial de herramientas.";
   }
 }
 
+function renderListaHerramientasDash() {
+  const termino = normalizeText(dashHerrBuscarInput.value || "");
+  // Se lista el catálogo completo (no solo las que ya tienen
+  // movimientos) para poder elegir cualquiera, incluso una que
+  // todavía no registró nada.
+  const filtradas = !termino ? dashHerrConfigCache : dashHerrConfigCache.filter((h) => normalizeText(h.nombre || "").includes(termino));
+
+  if (dashHerrConfigCache.length === 0) {
+    dashHerrListaStatus.textContent = "No hay herramientas cargadas.";
+    dashHerrListaHerramientas.innerHTML = "";
+    return;
+  }
+  dashHerrListaStatus.textContent = `${filtradas.length} herramienta(s).`;
+
+  dashHerrListaHerramientas.innerHTML = filtradas.map((h) => {
+    const cantidad = dashHerramientasCache.filter((m) => m.herramienta === h.nombre).length;
+    const estadoTexto = h.estado === "libre" ? "🟢 Libre" : `🔴 En uso${h.tecnico_actual ? " — " + escapeHtml(h.tecnico_actual) : ""}`;
+    return `
+      <div class="historial-card" style="cursor:pointer;" data-herramienta="${escapeHtml(h.nombre)}">
+        <div class="historial-card-num">${escapeHtml(h.nombre)}</div>
+        <div class="historial-card-cliente">${estadoTexto}</div>
+        <div class="historial-card-direccion">${cantidad} movimiento${cantidad === 1 ? "" : "s"} registrado${cantidad === 1 ? "" : "s"}</div>
+      </div>
+    `;
+  }).join("");
+
+  dashHerrListaHerramientas.querySelectorAll("[data-herramienta]").forEach((card) => {
+    card.addEventListener("click", () => {
+      dashHerrHerramientaSeleccionada = card.dataset.herramienta;
+      dashHerrNombreSeleccionado.textContent = dashHerrHerramientaSeleccionada;
+      dashHerrListaWrap.classList.add("hidden");
+      dashHerrDetalleWrap.classList.remove("hidden");
+      renderDashHerramientas();
+    });
+  });
+}
+
 function filtrarDashHerramientas() {
-  const filtro = dashHerramientasFiltro.value;
   const rango = obtenerRangoPeriodo(dashHerrPeriodoActivo, dashHerrFechaEspecifica);
   return dashHerramientasCache
-    .filter((h) => (!filtro || h.herramienta === filtro) && fechaEnRango(h.fecha, rango))
+    .filter((h) => h.herramienta === dashHerrHerramientaSeleccionada && fechaEnRango(h.fecha, rango))
     .sort((a, b) => {
       const claveA = `${a.fecha || ""} ${a.hora || ""}`;
       const claveB = `${b.fecha || ""} ${b.hora || ""}`;
@@ -7011,7 +7055,7 @@ descargarExcelHerramientasBtn.addEventListener("click", () => {
   const libro = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(libro, hoja, "Herramientas");
   const hoy = fechaActualISOVehiculo();
-  XLSX.writeFile(libro, `herramientas_${dashHerrPeriodoActivo}_${hoy}.xlsx`);
+  XLSX.writeFile(libro, `herramientas_${dashHerrHerramientaSeleccionada || "todas"}_${dashHerrPeriodoActivo}_${hoy}.xlsx`);
 });
 
 // ---------- Dashboard de SIMs ----------

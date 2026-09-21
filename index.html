@@ -477,35 +477,43 @@
     <div class="review-scroll">
       <p class="hint-eyebrow review-eyebrow">DASHBOARD DE HERRAMIENTAS</p>
 
-      <div class="list-toolbar">
-        <button class="btn btn-ghost btn-small" id="refreshDashHerramientasBtn" type="button">↻ Actualizar</button>
-        <span class="list-sync-label" id="dashHerramientasSyncLabel"></span>
+      <div id="dashHerrListaWrap">
+        <div class="list-toolbar">
+          <button class="btn btn-ghost btn-small" id="refreshDashHerramientasBtn" type="button">↻ Actualizar</button>
+          <span class="list-sync-label" id="dashHerramientasSyncLabel"></span>
+        </div>
+
+        <div class="field-group">
+          <input class="field-input" type="text" id="dashHerrBuscarInput" placeholder="Buscar herramienta...">
+        </div>
+
+        <p class="list-status" id="dashHerrListaStatus"></p>
+        <div id="dashHerrListaHerramientas" class="historial-list"></div>
       </div>
 
-      <div class="dash-periodo-tabs">
-        <button type="button" class="dash-herr-periodo-chip" data-periodo="dia">Día</button>
-        <button type="button" class="dash-herr-periodo-chip" data-periodo="semana">Semana</button>
-        <button type="button" class="dash-herr-periodo-chip active" data-periodo="mes">Mes</button>
-        <button type="button" class="dash-herr-periodo-chip" data-periodo="todo">Todo</button>
-        <button type="button" class="dash-herr-periodo-chip" data-periodo="fecha">Fecha</button>
+      <div id="dashHerrDetalleWrap" class="hidden">
+        <button type="button" class="btn btn-ghost btn-small" id="dashHerrVolverListaBtn" style="margin-bottom:10px;">‹ Todas las herramientas</button>
+        <p class="dash-subtitulo" id="dashHerrNombreSeleccionado" style="margin-top:0;"></p>
+
+        <div class="dash-periodo-tabs">
+          <button type="button" class="dash-herr-periodo-chip" data-periodo="dia">Día</button>
+          <button type="button" class="dash-herr-periodo-chip" data-periodo="semana">Semana</button>
+          <button type="button" class="dash-herr-periodo-chip active" data-periodo="mes">Mes</button>
+          <button type="button" class="dash-herr-periodo-chip" data-periodo="todo">Todo</button>
+          <button type="button" class="dash-herr-periodo-chip" data-periodo="fecha">Fecha</button>
+        </div>
+
+        <div class="field-group hidden" id="dashHerrFechaEspecificaWrap">
+          <label class="field-label" for="dashHerrFechaEspecifica">Elegí el día</label>
+          <input class="field-input" type="date" id="dashHerrFechaEspecifica">
+        </div>
+
+        <button type="button" class="btn btn-secondary hidden" id="descargarExcelHerramientasBtn" style="margin-bottom:14px;">⬇ Descargar Excel del período</button>
+
+        <p class="list-status" id="dashHerramientasStatus"></p>
+
+        <div id="dashHerramientasList" class="historial-list"></div>
       </div>
-
-      <div class="field-group hidden" id="dashHerrFechaEspecificaWrap">
-        <label class="field-label" for="dashHerrFechaEspecifica">Elegí el día</label>
-        <input class="field-input" type="date" id="dashHerrFechaEspecifica">
-      </div>
-
-      <div class="field-group">
-        <select class="field-input" id="dashHerramientasFiltro">
-          <option value="">Todas las herramientas</option>
-        </select>
-      </div>
-
-      <button type="button" class="btn btn-secondary hidden" id="descargarExcelHerramientasBtn" style="margin-bottom:14px;">⬇ Descargar Excel del período</button>
-
-      <p class="list-status" id="dashHerramientasStatus"></p>
-
-      <div id="dashHerramientasList" class="historial-list"></div>
     </div>
 
     <div class="action-bar">
