@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.101.0";
+const APP_VERSION = "3.102.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -3241,12 +3241,11 @@ async function intentarEnviarParte(payload, interactivo) {
       if (!histRes.ok) {
         const histData = await histRes.json().catch(() => ({}));
         console.error("Error registrando historial:", histData);
-        // Antes esto era solo un toast (fácil de pasar por alto, y
-        // encima el mensaje era genérico). Ahora, si el backend avisa
-        // que el número de servicio ya estaba usado (el caso real que
-        // hizo perder un parte en silencio), se lo muestra al técnico
-        // con una alerta que no se puede ignorar, con el motivo
-        // específico que ya manda el backend.
+        // Este caso (backend avisando error) ahora es rarísimo — el
+        // backend reintenta solo con sufijo /2, /3, etc. antes de
+        // rendirse. Si aun así llega acá, es porque ni 10 intentos
+        // alcanzaron, así que sí amerita una alerta que no se pueda
+        // ignorar.
         if (interactivo) {
           if (histData.id_duplicado) {
             alert(`⚠️ ATENCIÓN: ${histData.error}\n\nEl mail a la oficina SÍ se mandó, pero este parte NO quedó guardado en el sistema — avisale a la oficina de este problema para que lo carguen a mano.`);
@@ -3255,6 +3254,16 @@ async function intentarEnviarParte(payload, interactivo) {
           }
         }
       } else {
+        // Si el número de servicio ya estaba usado (un número
+        // reciclado, una prueba vieja, lo que sea), el backend lo
+        // guardó igual, agregándole un sufijo /2, /3, etc. para no
+        // pisar el que ya existía. Se avisa (sin frenar nada — el
+        // parte ya está guardado) para que quede claro que ese
+        // número de servicio tiene algo raro para revisar.
+        const histData = await histRes.json().catch(() => ({}));
+        if (histData.duplicado && interactivo) {
+          alert(`ℹ️ El número de servicio "${idParte}" ya se había usado antes en otro parte — este quedó guardado como "${histData.numero_servicio}" para no pisar el anterior. No hace falta que hagas nada ahora, pero convendría avisarle a la oficina para que revisen de dónde salió ese número repetido.`);
+        }
         // Movimientos de stock (materiales instalados/retirados) —
         // no bloquea nada si falla, el parte ya quedó guardado.
         try {
