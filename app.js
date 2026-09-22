@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.100.1";
+const APP_VERSION = "3.101.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -3241,7 +3241,19 @@ async function intentarEnviarParte(payload, interactivo) {
       if (!histRes.ok) {
         const histData = await histRes.json().catch(() => ({}));
         console.error("Error registrando historial:", histData);
-        if (interactivo) showToast("El mail se envió, pero no se pudo registrar en el dashboard.");
+        // Antes esto era solo un toast (fácil de pasar por alto, y
+        // encima el mensaje era genérico). Ahora, si el backend avisa
+        // que el número de servicio ya estaba usado (el caso real que
+        // hizo perder un parte en silencio), se lo muestra al técnico
+        // con una alerta que no se puede ignorar, con el motivo
+        // específico que ya manda el backend.
+        if (interactivo) {
+          if (histData.id_duplicado) {
+            alert(`⚠️ ATENCIÓN: ${histData.error}\n\nEl mail a la oficina SÍ se mandó, pero este parte NO quedó guardado en el sistema — avisale a la oficina de este problema para que lo carguen a mano.`);
+          } else {
+            showToast("El mail se envió, pero no se pudo registrar en el dashboard.");
+          }
+        }
       } else {
         // Movimientos de stock (materiales instalados/retirados) —
         // no bloquea nada si falla, el parte ya quedó guardado.
