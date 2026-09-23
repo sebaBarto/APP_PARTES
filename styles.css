@@ -1653,6 +1653,26 @@ html, body {
 }
 .vehiculo-recordatorio-wrap { width: 100%; max-width: 320px; margin-bottom: 8px; }
 .vehiculo-recordatorio-wrap .btn { width: 100%; }
+/* Variante con más peso visual, para avisos que de verdad necesitan
+   que el técnico los note (a diferencia de un informativo común) —
+   mismo lenguaje ámbar que .cola-envios-banner, con un ícono y un
+   pulso sutil para que no se pierda debajo del tilde verde de
+   "Enviado". */
+.aviso-atencion-card {
+  background: rgba(245,166,35,0.12);
+  border: 1.5px solid #F5A623;
+  border-radius: 12px;
+  padding: 14px 16px;
+  animation: pulso-atencion 2.2s ease-in-out 3;
+}
+.aviso-atencion-card .aviso-atencion-titulo {
+  display: flex; align-items: center; gap: 8px;
+  color: #F5A623; font-weight: 700; margin: 0 0 6px;
+}
+@keyframes pulso-atencion {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245,166,35,0.35); }
+  50% { box-shadow: 0 0 0 8px rgba(245,166,35,0); }
+}
 .sugerencia-card {
   background: rgba(255,255,255,0.06);
   border: 1.5px solid #2A3743;
