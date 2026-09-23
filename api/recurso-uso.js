@@ -323,6 +323,20 @@ async function postRendicionNuevo(headersBackendNuevo, body, res) {
   const destinoMail = process.env.ADMINISTRACION_EMAIL || process.env.OFICINA_EMAIL;
   if (body.accion === "crear" && data.id && destinoMail) {
     try {
+      // foto_ref puede ser una URL sola (formato viejo) o una lista en
+      // JSON con varias fotos — hay que entender los dos formatos acá
+      // también, no solo en la app y en admin.html.
+      let fotosLinks = "<p>Sin foto adjunta.</p>";
+      if (body.foto_ref) {
+        let fotos;
+        try {
+          const parseado = JSON.parse(body.foto_ref);
+          fotos = Array.isArray(parseado) ? parseado : [body.foto_ref];
+        } catch (err) {
+          fotos = [body.foto_ref];
+        }
+        fotosLinks = fotos.map((f, i) => `<p><a href="${f}">${fotos.length > 1 ? "Ver foto " + (i + 1) : "Ver foto del ticket"}</a></p>`).join("");
+      }
       const transporter = getTransporterSeguimiento();
       await transporter.sendMail({
         from: `"Servicio Técnico SAT" <${process.env.SMTP_USER}>`,
@@ -334,9 +348,10 @@ async function postRendicionNuevo(headersBackendNuevo, body, res) {
             <p><b>Técnico:</b> ${body.tecnico || "sin identificar"}</p>
             <p><b>Categoría:</b> ${body.categoria || "sin categoría"}</p>
             <p><b>Detalle:</b> ${body.detalle || "-"}</p>
+            ${body.cliente ? `<p><b>Cliente:</b> ${body.cliente}</p>` : ""}
             <p><b>Monto:</b> ${body.monto ? "$" + body.monto : "sin monto"}</p>
             <p><b>Fecha:</b> ${body.fecha || "-"}</p>
-            ${body.foto_ref ? `<p><a href="${body.foto_ref}">Ver foto del ticket</a></p>` : "<p>Sin foto adjunta.</p>"}
+            ${fotosLinks}
           </div>
         `,
       });
