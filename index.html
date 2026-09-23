@@ -164,6 +164,12 @@
           </span>
           <span class="panel-tile-label">Comodato</span>
         </button>
+        <button type="button" class="panel-tile panel-tile-grid tile-rendicion" id="tileRendicionBtn">
+          <span class="panel-tile-icon-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h12v19l-3-2-3 2-3-2-3 2V2z"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="11" x2="15" y2="11"/><line x1="9" y1="15" x2="12" y2="15"/></svg>
+          </span>
+          <span class="panel-tile-label">Rendir ticket</span>
+        </button>
         <button type="button" class="panel-tile panel-tile-grid tile-planos" id="tilePlanosBtn">
           <span class="panel-tile-icon-badge">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 9h18M9 9v12M14 3v6M9 15h5"/></svg>
@@ -1230,6 +1236,56 @@
     <div class="action-bar">
       <button class="btn btn-secondary" id="comVolverFormBtn" type="button">← Volver a los datos</button>
       <button class="btn btn-primary" id="comConfirmarFirmaBtn" type="button">Confirmar y enviar</button>
+    </div>
+  </section>
+
+  <section class="screen" id="screen-rendicion">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">RENDIR TICKET</p>
+
+      <div class="field-group">
+        <label class="field-label" for="rendCategoria">Categoría</label>
+        <select class="field-input" id="rendCategoria">
+          <option value="Materiales">Materiales / Ferretería</option>
+          <option value="Combustible">Combustible</option>
+          <option value="Estacionamiento">Estacionamiento</option>
+          <option value="Otro">Otro</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="rendDetalle">¿Qué compraste?</label>
+        <input class="field-input" type="text" id="rendDetalle" placeholder="Ej: tornillos, caja de brocas...">
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="rendMonto">Monto</label>
+        <input class="field-input" type="number" inputmode="decimal" id="rendMonto" placeholder="0">
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="rendFecha">Fecha</label>
+        <input class="field-input" type="date" id="rendFecha">
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="rendFotoInput">Foto del ticket (opcional)</label>
+        <input class="field-input" type="file" accept="image/*" capture="environment" id="rendFotoInput">
+        <div id="rendFotoPreviewWrap" class="hidden" style="margin-top:8px;">
+          <img id="rendFotoPreviewImg" style="max-width:160px; border-radius:8px; display:block;">
+          <button type="button" class="btn btn-ghost-light" id="rendFotoQuitarBtn" style="margin-top:6px;">Quitar foto</button>
+        </div>
+      </div>
+
+      <button type="button" class="btn btn-primary" id="rendEnviarBtn" style="width:100%; margin-top:10px;">Enviar rendición</button>
+
+      <h3 style="margin-top:28px; color:#F4F5F0;">Mis rendiciones</h3>
+      <p class="list-status" id="rendMisStatus">Cargando...</p>
+      <div id="rendMisLista" class="historial-list"></div>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDeRendicionBtn" type="button">Volver</button>
     </div>
   </section>
 

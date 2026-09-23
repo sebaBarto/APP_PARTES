@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.104.0";
+const APP_VERSION = "3.105.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -145,6 +145,7 @@ const screens = {
   herramientaDetalle: document.getElementById("screen-herramienta-detalle"),
   comodatoForm: document.getElementById("screen-comodato-form"),
   comodatoFirma: document.getElementById("screen-comodato-firma"),
+  rendicion: document.getElementById("screen-rendicion"),
   form: document.getElementById("screen-form"),
   claves: document.getElementById("screen-claves"),
   sign: document.getElementById("screen-sign"),
@@ -5476,6 +5477,168 @@ notasModalVerBtn.addEventListener("click", () => {
 notasModalDespuesBtn.addEventListener("click", () => {
   notasModalOverlay.classList.add("hidden");
 });
+
+// ---------- Rendir ticket (gastos de bolsillo del técnico) ----------
+const tileRendicionBtn = document.getElementById("tileRendicionBtn");
+const volverDeRendicionBtn = document.getElementById("volverDeRendicionBtn");
+const rendCategoria = document.getElementById("rendCategoria");
+const rendDetalle = document.getElementById("rendDetalle");
+const rendMonto = document.getElementById("rendMonto");
+const rendFecha = document.getElementById("rendFecha");
+const rendFotoInput = document.getElementById("rendFotoInput");
+const rendFotoPreviewWrap = document.getElementById("rendFotoPreviewWrap");
+const rendFotoPreviewImg = document.getElementById("rendFotoPreviewImg");
+const rendFotoQuitarBtn = document.getElementById("rendFotoQuitarBtn");
+const rendEnviarBtn = document.getElementById("rendEnviarBtn");
+const rendMisStatus = document.getElementById("rendMisStatus");
+const rendMisLista = document.getElementById("rendMisLista");
+
+let rendFotoUrl = "";
+let rendFormGeneracion = 0; // mismo truco que en Notas -- evita que una
+// foto que sigue subiendo en segundo plano "resucite" en el siguiente envío.
+let rendicionesCache = [];
+
+function limpiarFormularioRendicion() {
+  rendFormGeneracion++;
+  rendCategoria.value = "Materiales";
+  rendDetalle.value = "";
+  rendMonto.value = "";
+  rendFecha.value = new Date().toISOString().slice(0, 10);
+  rendFotoUrl = "";
+  rendFotoInput.value = "";
+  rendFotoPreviewWrap.classList.add("hidden");
+  rendFotoPreviewImg.src = "";
+}
+
+tileRendicionBtn.addEventListener("click", () => {
+  limpiarFormularioRendicion();
+  showScreen("rendicion");
+  cargarMisRendiciones();
+});
+volverDeRendicionBtn.addEventListener("click", () => showScreen("home"));
+
+rendFotoInput.addEventListener("change", async () => {
+  const archivo = rendFotoInput.files && rendFotoInput.files[0];
+  if (!archivo) return;
+  const generacionAlSubir = rendFormGeneracion;
+  rendFotoPreviewWrap.classList.remove("hidden");
+  rendFotoPreviewImg.src = "";
+  rendEnviarBtn.disabled = true;
+  rendEnviarBtn.textContent = "Subiendo foto...";
+  try {
+    const base64 = await comprimirImagen(archivo, 1600, 0.75);
+    const res = await fetch("/api/foto", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({ base64 }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || "Error desconocido");
+    if (generacionAlSubir !== rendFormGeneracion) return;
+    rendFotoUrl = `${window.location.origin}/api/foto?id=${data.id}`;
+    rendFotoPreviewImg.src = rendFotoUrl;
+  } catch (err) {
+    if (generacionAlSubir !== rendFormGeneracion) return;
+    showToast("No se pudo subir la foto: " + err.message);
+    rendFotoPreviewWrap.classList.add("hidden");
+    rendFotoInput.value = "";
+    rendFotoUrl = "";
+  } finally {
+    if (generacionAlSubir === rendFormGeneracion) {
+      rendEnviarBtn.disabled = false;
+      rendEnviarBtn.textContent = "Enviar rendición";
+    }
+  }
+});
+
+rendFotoQuitarBtn.addEventListener("click", () => {
+  rendFotoUrl = "";
+  rendFotoInput.value = "";
+  rendFotoPreviewWrap.classList.add("hidden");
+  rendFotoPreviewImg.src = "";
+});
+
+rendEnviarBtn.addEventListener("click", async () => {
+  const detalle = rendDetalle.value.trim();
+  const monto = rendMonto.value.trim();
+  if (!detalle) {
+    showToast("Contá qué compraste.");
+    return;
+  }
+  if (!monto || isNaN(Number(monto))) {
+    showToast("Cargá un monto válido.");
+    return;
+  }
+  rendEnviarBtn.disabled = true;
+  try {
+    const res = await fetch("/api/recurso-uso?recurso=rendicion", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({
+        accion: "crear",
+        tecnico: tecnicoLogueado || "",
+        categoria: rendCategoria.value,
+        detalle,
+        monto,
+        fecha: rendFecha.value || new Date().toISOString().slice(0, 10),
+        foto_ref: rendFotoUrl,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || "Error desconocido");
+    showToast("Rendición enviada.");
+    limpiarFormularioRendicion();
+    cargarMisRendiciones();
+  } catch (err) {
+    showToast("No se pudo enviar: " + err.message);
+  } finally {
+    rendEnviarBtn.disabled = false;
+    rendEnviarBtn.textContent = "Enviar rendición";
+  }
+});
+
+async function cargarMisRendiciones() {
+  rendMisStatus.textContent = "Cargando...";
+  rendMisLista.innerHTML = "";
+  try {
+    const res = await fetch("/api/recurso-uso?recurso=rendicion", {
+      headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      cache: "no-store",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    rendicionesCache = (Array.isArray(data) ? data : []).filter((r) => r.tecnico === tecnicoLogueado);
+    renderMisRendiciones();
+  } catch (err) {
+    rendMisStatus.textContent = "No se pudo cargar: " + err.message;
+  }
+}
+
+function renderMisRendiciones() {
+  if (rendicionesCache.length === 0) {
+    rendMisStatus.textContent = "Todavía no rendiste ningún ticket.";
+    rendMisLista.innerHTML = "";
+    return;
+  }
+  rendMisStatus.textContent = `${rendicionesCache.length} rendición(es).`;
+  const etiquetaEstado = { pendiente: "🟠 Pendiente", pagado: "✅ Pagado", rechazado: "❌ Rechazado" };
+  const ordenadas = [...rendicionesCache].sort((a, b) => (b.creado_en || "").localeCompare(a.creado_en || ""));
+  rendMisLista.innerHTML = ordenadas.map((r) => {
+    let fechaTexto = r.fecha || "";
+    if (r.fecha) {
+      const [y, m, d] = r.fecha.split("-");
+      fechaTexto = `${d}/${m}/${y}`;
+    }
+    return `
+      <div class="historial-card">
+        <div class="historial-card-num">${escapeHtml(r.categoria || "")} — $${escapeHtml(String(r.monto ?? ""))}</div>
+        <div class="historial-card-cliente">${escapeHtml(r.detalle || "")}</div>
+        <div class="historial-card-direccion">${escapeHtml(fechaTexto)}</div>
+        <div class="historial-card-badges">${etiquetaEstado[r.estado] || escapeHtml(r.estado || "")}${r.foto_ref ? ` · <a href="${escapeHtml(r.foto_ref)}" target="_blank" rel="noopener">Ver foto</a>` : ""}</div>
+      </div>
+    `;
+  }).join("");
+}
 
 // ---------- Seguimiento en vivo (avisarle al próximo cliente que el
 // técnico va en camino, con un link de mapa) ----------

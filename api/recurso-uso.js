@@ -290,6 +290,61 @@ async function postSeguimientoNuevo(headersBackendNuevo, body, res) {
 }
 
 // ============================================================
+// RENDIR TICKET — un técnico carga un gasto de su bolsillo (con
+// foto opcional del ticket) para que la oficina lo revise y marque
+// como pagado.
+// ============================================================
+async function getRendicionesNuevo(headersBackendNuevo, res) {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+  try {
+    const r = await fetch(`${process.env.BACKEND_NUEVO_URL}/api/rendiciones`, { headers: headersBackendNuevo });
+    const data = await r.json();
+    res.status(r.status).json(Array.isArray(data) ? data : []);
+  } catch (err) {
+    res.status(500).json({ error: "Error interno al leer las rendiciones" });
+  }
+}
+
+async function postRendicionNuevo(headersBackendNuevo, body, res) {
+  const r = await fetch(`${process.env.BACKEND_NUEVO_URL}/api/rendiciones`, {
+    method: "POST",
+    headers: { ...headersBackendNuevo, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await r.json();
+  if (!r.ok) { res.status(r.status).json(data); return; }
+
+  // Al crear una rendición nueva, se avisa por mail a la oficina —
+  // best-effort: si el mail falla, la rendición ya quedó guardada
+  // igual, no se pierde nada.
+  if (body.accion === "crear" && data.id && process.env.OFICINA_EMAIL) {
+    try {
+      const transporter = getTransporterSeguimiento();
+      await transporter.sendMail({
+        from: `"Servicio Técnico SAT" <${process.env.SMTP_USER}>`,
+        to: process.env.OFICINA_EMAIL,
+        subject: `🧾 Rendición de ${body.tecnico || "un técnico"} — ${body.categoria || "gasto"}`,
+        html: `
+          <div style="font-family: Arial, Helvetica, sans-serif; color:#101820;">
+            <h2 style="margin-bottom:4px;">🧾 Nueva rendición de ticket</h2>
+            <p><b>Técnico:</b> ${body.tecnico || "sin identificar"}</p>
+            <p><b>Categoría:</b> ${body.categoria || "sin categoría"}</p>
+            <p><b>Detalle:</b> ${body.detalle || "-"}</p>
+            <p><b>Monto:</b> ${body.monto ? "$" + body.monto : "sin monto"}</p>
+            <p><b>Fecha:</b> ${body.fecha || "-"}</p>
+            ${body.foto_ref ? `<p><a href="${body.foto_ref}">Ver foto del ticket</a></p>` : "<p>Sin foto adjunta.</p>"}
+          </div>
+        `,
+      });
+    } catch (errMail) {
+      console.error("No se pudo mandar el mail de rendición (no crítico):", errMail);
+    }
+  }
+
+  res.status(200).json(data);
+}
+
+// ============================================================
 // PRESENCIA EN OBRA (llegada/salida) — ya cortado al backend nuevo
 // ============================================================
 async function getPresenciaNuevo(headersBackendNuevo, tecnico, res) {
@@ -401,12 +456,13 @@ module.exports = async (req, res) => {
       if (recurso === "sim") return await getSimNuevo(headersBackendNuevo, res, req.query);
       if (recurso === "herramienta") return await getHerramientaNuevo(headersBackendNuevo, res);
       if (recurso === "seguimiento") return req.query.id ? await getSeguimientoNuevo(headersBackendNuevo, req.query.id, res) : await getSeguimientosListaNuevo(headersBackendNuevo, res);
+      if (recurso === "rendicion") return await getRendicionesNuevo(headersBackendNuevo, res);
       if (recurso === "presencia") {
         if (req.query.historial) return await getPresenciaHistorialNuevo(headersBackendNuevo, res);
         if (req.query.presencias_de_instalacion) return await getPresenciasDeInstalacionNuevo(headersBackendNuevo, req.query.presencias_de_instalacion, res);
         return await getPresenciaNuevo(headersBackendNuevo, req.query.tecnico, res);
       }
-      res.status(400).json({ error: "Falta indicar el recurso (?recurso=vehiculo|sim|herramienta|presencia|seguimiento)" });
+      res.status(400).json({ error: "Falta indicar el recurso (?recurso=vehiculo|sim|herramienta|presencia|seguimiento|rendicion)" });
       return;
     }
 
@@ -416,7 +472,8 @@ module.exports = async (req, res) => {
       if (recurso === "herramienta") return await postHerramientaNuevo(headersBackendNuevo, body, res);
       if (recurso === "presencia") return await postPresenciaNuevo(headersBackendNuevo, body, res);
       if (recurso === "seguimiento") return await postSeguimientoNuevo(headersBackendNuevo, body, res);
-      res.status(400).json({ error: "Falta indicar el recurso (vehiculo, sim, herramienta, presencia o seguimiento)" });
+      if (recurso === "rendicion") return await postRendicionNuevo(headersBackendNuevo, body, res);
+      res.status(400).json({ error: "Falta indicar el recurso (vehiculo, sim, herramienta, presencia, seguimiento o rendicion)" });
       return;
     }
 
