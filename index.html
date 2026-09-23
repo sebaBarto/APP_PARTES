@@ -1259,6 +1259,11 @@
       </div>
 
       <div class="field-group">
+        <label class="field-label" for="rendCliente">¿Para qué cliente? (opcional)</label>
+        <input class="field-input" type="text" id="rendCliente" placeholder="Si fue para un service puntual">
+      </div>
+
+      <div class="field-group">
         <label class="field-label" for="rendMonto">Monto</label>
         <input class="field-input" type="number" inputmode="decimal" id="rendMonto" placeholder="0">
       </div>
@@ -1269,12 +1274,9 @@
       </div>
 
       <div class="field-group">
-        <label class="field-label" for="rendFotoInput">Foto del ticket (opcional)</label>
-        <input class="field-input" type="file" accept="image/*" capture="environment" id="rendFotoInput">
-        <div id="rendFotoPreviewWrap" class="hidden" style="margin-top:8px;">
-          <img id="rendFotoPreviewImg" style="max-width:160px; border-radius:8px; display:block;">
-          <button type="button" class="btn btn-ghost-light" id="rendFotoQuitarBtn" style="margin-top:6px;">Quitar foto</button>
-        </div>
+        <label class="field-label" for="rendFotoInput">Fotos del ticket (opcional, podés elegir varias o sacarlas con la cámara)</label>
+        <input class="field-input" type="file" accept="image/*" multiple id="rendFotoInput">
+        <div id="rendFotoPreviewWrap" class="hidden" style="margin-top:8px; display:flex; flex-wrap:wrap; gap:8px;"></div>
       </div>
 
       <button type="button" class="btn btn-primary" id="rendEnviarBtn" style="width:100%; margin-top:10px;">Enviar rendición</button>

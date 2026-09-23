@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.105.1";
+const APP_VERSION = "3.106.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -5483,17 +5483,16 @@ const tileRendicionBtn = document.getElementById("tileRendicionBtn");
 const volverDeRendicionBtn = document.getElementById("volverDeRendicionBtn");
 const rendCategoria = document.getElementById("rendCategoria");
 const rendDetalle = document.getElementById("rendDetalle");
+const rendCliente = document.getElementById("rendCliente");
 const rendMonto = document.getElementById("rendMonto");
 const rendFecha = document.getElementById("rendFecha");
 const rendFotoInput = document.getElementById("rendFotoInput");
 const rendFotoPreviewWrap = document.getElementById("rendFotoPreviewWrap");
-const rendFotoPreviewImg = document.getElementById("rendFotoPreviewImg");
-const rendFotoQuitarBtn = document.getElementById("rendFotoQuitarBtn");
 const rendEnviarBtn = document.getElementById("rendEnviarBtn");
 const rendMisStatus = document.getElementById("rendMisStatus");
 const rendMisLista = document.getElementById("rendMisLista");
 
-let rendFotoUrl = "";
+let rendFotosUrls = []; // varias fotos posibles -- se manda como JSON en foto_ref
 let rendFormGeneracion = 0; // mismo truco que en Notas -- evita que una
 // foto que sigue subiendo en segundo plano "resucite" en el siguiente envío.
 let rendicionesCache = [];
@@ -5502,12 +5501,12 @@ function limpiarFormularioRendicion() {
   rendFormGeneracion++;
   rendCategoria.value = "Materiales";
   rendDetalle.value = "";
+  rendCliente.value = "";
   rendMonto.value = "";
   rendFecha.value = new Date().toISOString().slice(0, 10);
-  rendFotoUrl = "";
+  rendFotosUrls = [];
   rendFotoInput.value = "";
-  rendFotoPreviewWrap.classList.add("hidden");
-  rendFotoPreviewImg.src = "";
+  renderRendFotosPreview();
 }
 
 tileRendicionBtn.addEventListener("click", () => {
@@ -5517,45 +5516,60 @@ tileRendicionBtn.addEventListener("click", () => {
 });
 volverDeRendicionBtn.addEventListener("click", () => showScreen("home"));
 
-rendFotoInput.addEventListener("change", async () => {
-  const archivo = rendFotoInput.files && rendFotoInput.files[0];
-  if (!archivo) return;
-  const generacionAlSubir = rendFormGeneracion;
-  rendFotoPreviewWrap.classList.remove("hidden");
-  rendFotoPreviewImg.src = "";
-  rendEnviarBtn.disabled = true;
-  rendEnviarBtn.textContent = "Subiendo foto...";
-  try {
-    const base64 = await comprimirImagen(archivo, 1600, 0.75);
-    const res = await fetch("/api/foto", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-      body: JSON.stringify({ base64 }),
-    });
-    const data = await res.json();
-    if (!res.ok || !data.ok) throw new Error(data.error || "Error desconocido");
-    if (generacionAlSubir !== rendFormGeneracion) return;
-    rendFotoUrl = `${window.location.origin}/api/foto?id=${data.id}`;
-    rendFotoPreviewImg.src = rendFotoUrl;
-  } catch (err) {
-    if (generacionAlSubir !== rendFormGeneracion) return;
-    showToast("No se pudo subir la foto: " + err.message);
+function renderRendFotosPreview() {
+  if (rendFotosUrls.length === 0) {
     rendFotoPreviewWrap.classList.add("hidden");
-    rendFotoInput.value = "";
-    rendFotoUrl = "";
-  } finally {
-    if (generacionAlSubir === rendFormGeneracion) {
-      rendEnviarBtn.disabled = false;
-      rendEnviarBtn.textContent = "Enviar rendición";
+    rendFotoPreviewWrap.innerHTML = "";
+    return;
+  }
+  rendFotoPreviewWrap.classList.remove("hidden");
+  rendFotoPreviewWrap.innerHTML = rendFotosUrls.map((url, idx) => `
+    <div style="position:relative;">
+      <img src="${url}" style="width:70px; height:70px; object-fit:cover; border-radius:8px; display:block;">
+      <button type="button" class="rend-foto-quitar" data-idx="${idx}" title="Quitar esta foto"
+        style="position:absolute; top:-6px; right:-6px; background:#C0392B; color:#fff; border:none; border-radius:50%; width:20px; height:20px; cursor:pointer; font-size:13px; line-height:1;">×</button>
+    </div>
+  `).join("");
+  rendFotoPreviewWrap.querySelectorAll(".rend-foto-quitar").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      rendFotosUrls.splice(Number(btn.dataset.idx), 1);
+      renderRendFotosPreview();
+    });
+  });
+}
+
+// Sube todas las fotos elegidas (varias de galería de una, o de a una
+// si se van sacando con la cámara) -- se pueden ir agregando en más
+// de una tanda, no se pisan las que ya se subieron antes.
+rendFotoInput.addEventListener("change", async () => {
+  const archivos = Array.from(rendFotoInput.files || []);
+  if (archivos.length === 0) return;
+  const generacionAlSubir = rendFormGeneracion;
+  rendEnviarBtn.disabled = true;
+  for (let i = 0; i < archivos.length; i++) {
+    rendEnviarBtn.textContent = archivos.length > 1 ? `Subiendo foto ${i + 1} de ${archivos.length}...` : "Subiendo foto...";
+    try {
+      const base64 = await comprimirImagen(archivos[i], 1600, 0.75);
+      const res = await fetch("/api/foto", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+        body: JSON.stringify({ base64 }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || "Error desconocido");
+      if (generacionAlSubir !== rendFormGeneracion) return;
+      rendFotosUrls.push(`${window.location.origin}/api/foto?id=${data.id}`);
+    } catch (err) {
+      if (generacionAlSubir !== rendFormGeneracion) return;
+      showToast(`No se pudo subir una foto: ${err.message}`);
     }
   }
-});
-
-rendFotoQuitarBtn.addEventListener("click", () => {
-  rendFotoUrl = "";
-  rendFotoInput.value = "";
-  rendFotoPreviewWrap.classList.add("hidden");
-  rendFotoPreviewImg.src = "";
+  if (generacionAlSubir === rendFormGeneracion) {
+    renderRendFotosPreview();
+    rendFotoInput.value = "";
+    rendEnviarBtn.disabled = false;
+    rendEnviarBtn.textContent = "Enviar rendición";
+  }
 });
 
 rendEnviarBtn.addEventListener("click", async () => {
@@ -5579,9 +5593,10 @@ rendEnviarBtn.addEventListener("click", async () => {
         tecnico: tecnicoLogueado || "",
         categoria: rendCategoria.value,
         detalle,
+        cliente: rendCliente.value.trim(),
         monto,
         fecha: rendFecha.value || new Date().toISOString().slice(0, 10),
-        foto_ref: rendFotoUrl,
+        foto_ref: rendFotosUrls.length > 0 ? JSON.stringify(rendFotosUrls) : "",
       }),
     });
     const data = await res.json();
@@ -5614,6 +5629,18 @@ async function cargarMisRendiciones() {
   }
 }
 
+// El foto_ref de una rendición puede ser una URL sola (formato viejo)
+// o una lista en JSON (varias fotos) -- esto entiende los dos casos.
+function fotosDeRendicion(r) {
+  if (!r.foto_ref) return [];
+  try {
+    const parseado = JSON.parse(r.foto_ref);
+    return Array.isArray(parseado) ? parseado : [r.foto_ref];
+  } catch (err) {
+    return [r.foto_ref];
+  }
+}
+
 function renderMisRendiciones() {
   if (rendicionesCache.length === 0) {
     rendMisStatus.textContent = "Todavía no rendiste ningún ticket.";
@@ -5629,12 +5656,18 @@ function renderMisRendiciones() {
       const [y, m, d] = r.fecha.split("-");
       fechaTexto = `${d}/${m}/${y}`;
     }
+    const fotos = fotosDeRendicion(r);
+    const fotosTexto = fotos.length === 1
+      ? ` · <a href="${escapeHtml(fotos[0])}" target="_blank" rel="noopener">Ver foto</a>`
+      : fotos.length > 1
+        ? ` · ${fotos.map((f, i) => `<a href="${escapeHtml(f)}" target="_blank" rel="noopener">Foto ${i + 1}</a>`).join(" ")}`
+        : "";
     return `
       <div class="historial-card">
         <div class="historial-card-num">${escapeHtml(r.categoria || "")} — $${escapeHtml(String(r.monto ?? ""))}</div>
         <div class="historial-card-cliente">${escapeHtml(r.detalle || "")}</div>
-        <div class="historial-card-direccion">${escapeHtml(fechaTexto)}</div>
-        <div class="historial-card-badges">${etiquetaEstado[r.estado] || escapeHtml(r.estado || "")}${r.foto_ref ? ` · <a href="${escapeHtml(r.foto_ref)}" target="_blank" rel="noopener">Ver foto</a>` : ""}</div>
+        <div class="historial-card-direccion">${escapeHtml(fechaTexto)}${r.cliente ? " — " + escapeHtml(r.cliente) : ""}</div>
+        <div class="historial-card-badges">${etiquetaEstado[r.estado] || escapeHtml(r.estado || "")}${fotosTexto}</div>
       </div>
     `;
   }).join("");

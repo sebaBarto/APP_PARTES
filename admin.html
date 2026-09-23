@@ -3693,7 +3693,7 @@ function renderRendicionesAdmin() {
   if (filtroEstado) filtrados = filtrados.filter((r) => r.estado === filtroEstado);
   if (termino) {
     filtrados = filtrados.filter((r) => {
-      const haystack = [r.tecnico, r.detalle, r.categoria].map((v) => (v || "").toLowerCase()).join(" ");
+      const haystack = [r.tecnico, r.detalle, r.categoria, r.cliente].map((v) => (v || "").toLowerCase()).join(" ");
       return haystack.includes(termino);
     });
   }
@@ -3717,16 +3717,28 @@ function renderRendicionesAdmin() {
       const [y, m, d] = r.fecha.split("-");
       fechaTexto = `${d}/${m}/${y}`;
     }
+    // foto_ref puede ser una URL sola (formato viejo) o una lista en
+    // JSON (varias fotos, agregado después) -- se entienden los dos.
+    let fotos = [];
+    if (r.foto_ref) {
+      try {
+        const parseado = JSON.parse(r.foto_ref);
+        fotos = Array.isArray(parseado) ? parseado : [r.foto_ref];
+      } catch (err) {
+        fotos = [r.foto_ref];
+      }
+    }
+    const fotosTexto = fotos.map((f, i) => `<a href="${escapeHtmlAdmin(f)}" target="_blank" rel="noopener">${fotos.length > 1 ? "Foto " + (i + 1) : "Ver foto"}</a>`).join(" ");
     return `
       <div style="padding:12px 0; border-bottom:1px solid #EEE;">
         <div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px;">
           <b>${escapeHtmlAdmin(r.tecnico || "")}</b>
           <span style="color:#6B7680; font-size:12px;">${escapeHtmlAdmin(fechaTexto)}</span>
         </div>
-        <div style="font-size:13px; margin-top:4px;">${escapeHtmlAdmin(r.categoria || "")} — ${escapeHtmlAdmin(r.detalle || "")}</div>
+        <div style="font-size:13px; margin-top:4px;">${escapeHtmlAdmin(r.categoria || "")} — ${escapeHtmlAdmin(r.detalle || "")}${r.cliente ? " (" + escapeHtmlAdmin(r.cliente) + ")" : ""}</div>
         <div style="color:#6B7680; font-size:12px; margin-top:6px;">
           $${escapeHtmlAdmin(String(r.monto ?? ""))} · ${etiquetaEstado[r.estado] || escapeHtmlAdmin(r.estado || "")}
-          ${r.foto_ref ? ` · <a href="${escapeHtmlAdmin(r.foto_ref)}" target="_blank" rel="noopener">Ver foto</a>` : ""}
+          ${fotosTexto ? ` · ${fotosTexto}` : ""}
         </div>
         <label style="display:flex; align-items:center; gap:6px; margin-top:8px; font-size:13px; cursor:pointer;">
           <input type="checkbox" class="rendicion-check-pagado" data-id="${escapeHtmlAdmin(r.id)}" ${r.estado === "pagado" ? "checked" : ""}>
