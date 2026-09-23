@@ -796,6 +796,8 @@
         </select>
       </div>
 
+      <button type="button" class="btn btn-secondary" id="descargarExcelRendicionesBtn" style="margin-bottom:16px;">⬇ Descargar Excel (lo que esté filtrado)</button>
+
       <div class="card">
         <p class="status" id="rendicionesAdminStatus">Cargando...</p>
         <div id="rendicionesAdminLista"></div>
@@ -941,6 +943,7 @@ const rendicionesAdminBuscarInput = document.getElementById("rendicionesAdminBus
 const rendicionesAdminFiltroEstado = document.getElementById("rendicionesAdminFiltroEstado");
 const rendicionesAdminStatus = document.getElementById("rendicionesAdminStatus");
 const rendicionesAdminLista = document.getElementById("rendicionesAdminLista");
+const descargarExcelRendicionesBtn = document.getElementById("descargarExcelRendicionesBtn");
 const tabEmergenciaBtn = document.getElementById("tabEmergenciaBtn");
 const panelEmergencia = document.getElementById("panelEmergencia");
 let emergenciaCargadaUnaVezAdmin = false;
@@ -3686,7 +3689,7 @@ async function cargarRendicionesAdmin() {
   }
 }
 
-function renderRendicionesAdmin() {
+function rendicionesFiltradas() {
   const termino = (rendicionesAdminBuscarInput.value || "").trim().toLowerCase();
   const filtroEstado = rendicionesAdminFiltroEstado.value;
   let filtrados = rendicionesAdminCache;
@@ -3697,6 +3700,11 @@ function renderRendicionesAdmin() {
       return haystack.includes(termino);
     });
   }
+  return filtrados;
+}
+
+function renderRendicionesAdmin() {
+  const filtrados = rendicionesFiltradas();
 
   if (rendicionesAdminCache.length === 0) {
     rendicionesAdminStatus.className = "status";
@@ -3744,6 +3752,7 @@ function renderRendicionesAdmin() {
           <input type="checkbox" class="rendicion-check-pagado" data-id="${escapeHtmlAdmin(r.id)}" ${r.estado === "pagado" ? "checked" : ""}>
           Pagado
         </label>
+        ${r.estado !== "rechazado" ? `<button type="button" class="btn btn-ghost btn-small rendicion-rechazar-btn" data-id="${escapeHtmlAdmin(r.id)}" style="margin-top:6px;">✕ Rechazar</button>` : ""}
       </div>
     `;
   }).join("");
@@ -3771,7 +3780,56 @@ function renderRendicionesAdmin() {
       }
     });
   });
+
+  rendicionesAdminLista.querySelectorAll(".rendicion-rechazar-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const motivo = prompt("¿Por qué se rechaza esta rendición? (se le avisa al técnico con este motivo)");
+      if (motivo === null) return; // canceló
+      btn.disabled = true;
+      try {
+        const res = await fetch("/api/recurso-uso?recurso=rendicion", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+          body: JSON.stringify({
+            accion: "rechazar",
+            id: btn.dataset.id,
+            observaciones_admin: motivo,
+          }),
+        });
+        if (!res.ok) throw new Error("No se pudo guardar");
+        await cargarRendicionesAdmin();
+      } catch (err) {
+        alert("No se pudo rechazar: " + err.message);
+        btn.disabled = false;
+      }
+    });
+  });
 }
+
+descargarExcelRendicionesBtn.addEventListener("click", () => {
+  const filtrados = rendicionesFiltradas();
+  if (filtrados.length === 0) {
+    alert("No hay rendiciones para descargar con ese filtro.");
+    return;
+  }
+  const etiquetaEstado = { pendiente: "Pendiente", pagado: "Pagado", rechazado: "Rechazado" };
+  const filas = filtrados.map((r) => ({
+    Técnico: r.tecnico || "",
+    Categoría: r.categoria || "",
+    Detalle: r.detalle || "",
+    Cliente: r.cliente || "",
+    Monto: r.monto ?? "",
+    Fecha: r.fecha || "",
+    Estado: etiquetaEstado[r.estado] || r.estado || "",
+    "Fecha de pago": r.fecha_pago || "",
+    "Pagado por": r.pagado_por || "",
+    Observaciones: r.observaciones_admin || "",
+  }));
+  const hoja = XLSX.utils.json_to_sheet(filas);
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, "Rendiciones");
+  XLSX.writeFile(libro, `rendiciones_${new Date().toISOString().slice(0, 10)}.xlsx`);
+});
 
 async function cargarInstalacionesAdmin() {
   instalacionesAdminStatus.textContent = "Cargando...";

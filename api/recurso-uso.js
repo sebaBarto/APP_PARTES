@@ -360,6 +360,32 @@ async function postRendicionNuevo(headersBackendNuevo, body, res) {
     }
   }
 
+  // Cuando la oficina marca pagado o rechaza, se le avisa por push al
+  // técnico que la cargó — antes solo se enteraba si entraba a mirar
+  // "Mis rendiciones" por su cuenta.
+  if ((body.accion === "marcar_pagado" || body.accion === "rechazar") && data.tecnico) {
+    try {
+      const { enviarASeleccionados } = require("../lib/push-sender");
+      const montoTexto = data.monto ? `$${data.monto}` : "tu rendición";
+      if (body.accion === "marcar_pagado" && body.pagado) {
+        await enviarASeleccionados([data.tecnico], {
+          titulo: "✅ Rendición pagada",
+          cuerpo: `Te pagaron ${montoTexto} (${data.categoria || "gasto"}).`,
+          url: "/",
+        });
+      } else if (body.accion === "rechazar") {
+        await enviarASeleccionados([data.tecnico], {
+          titulo: "❌ Rendición rechazada",
+          cuerpo: `Tu rendición de ${montoTexto} (${data.categoria || "gasto"}) fue rechazada.`,
+          url: "/",
+          importante: true,
+        });
+      }
+    } catch (errPush) {
+      // si falla el aviso, no se rompe el guardado del estado en sí
+    }
+  }
+
   res.status(200).json(data);
 }
 
