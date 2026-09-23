@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.103.0";
+const APP_VERSION = "3.104.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -347,6 +347,7 @@ const herramientaTomarWrap = document.getElementById("herramientaTomarWrap");
 const herramientaTomarBtn = document.getElementById("herramientaTomarBtn");
 const herramientaEnUsoWrap = document.getElementById("herramientaEnUsoWrap");
 const herramientaDevolverBtn = document.getElementById("herramientaDevolverBtn");
+const herramientaDevolverObservacion = document.getElementById("herramientaDevolverObservacion");
 const herramientaClienteInput = document.getElementById("herramientaClienteInput");
 const herramientaDejarEnClienteBtn = document.getElementById("herramientaDejarEnClienteBtn");
 const herramientaTecnicoNuevoSelect = document.getElementById("herramientaTecnicoNuevoSelect");
@@ -7367,6 +7368,7 @@ function renderDashHerramientas() {
       <div class="historial-card-num">${escapeHtml(h.herramienta)}</div>
       <div class="historial-card-cliente">${escapeHtml(descripcionAccionHerramienta(h))}</div>
       <div class="historial-card-direccion">${fechaTexto}${h.hora ? " — " + h.hora : ""}</div>
+      ${h.detalle && h.accion !== "transferir" ? `<div class="historial-card-horario">💬 ${escapeHtml(h.detalle)}</div>` : ""}
     `;
     dashHerramientasList.appendChild(card);
   });
@@ -7909,6 +7911,7 @@ async function renderHerramientaDetalle() {
   herramientaTomarWrap.classList.add("hidden");
   herramientaEnUsoWrap.classList.add("hidden");
   herramientaEnClienteWrap.classList.add("hidden");
+  herramientaDevolverObservacion.value = "";
   try {
     const herramientas = await fetchHerramientasConfig();
     const h = herramientas.find((x) => x.nombre === herramientaSeleccionada);
@@ -7988,7 +7991,9 @@ herramientaTomarBtn.addEventListener("click", async () => {
 herramientaDevolverBtn.addEventListener("click", async () => {
   herramientaDevolverBtn.disabled = true;
   try {
-    await llamarHerramientaUso("devolver");
+    const observacion = herramientaDevolverObservacion.value.trim();
+    await llamarHerramientaUso("devolver", observacion ? { detalle: observacion } : {});
+    herramientaDevolverObservacion.value = "";
     showToast(`Devolviste "${herramientaSeleccionada}".`);
     showScreen("herramientas");
     renderHerramientasPicker();
