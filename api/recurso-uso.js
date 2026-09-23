@@ -314,15 +314,19 @@ async function postRendicionNuevo(headersBackendNuevo, body, res) {
   const data = await r.json();
   if (!r.ok) { res.status(r.status).json(data); return; }
 
-  // Al crear una rendición nueva, se avisa por mail a la oficina —
-  // best-effort: si el mail falla, la rendición ya quedó guardada
-  // igual, no se pierde nada.
-  if (body.accion === "crear" && data.id && process.env.OFICINA_EMAIL) {
+  // Al crear una rendición nueva, se avisa por mail — a
+  // ADMINISTRACION_EMAIL si está configurada (para que esto vaya
+  // puntualmente a administración, no a la casilla general de
+  // "oficina" que usan las demás funciones), si no a OFICINA_EMAIL
+  // como respaldo. Best-effort: si el mail falla, la rendición ya
+  // quedó guardada igual, no se pierde nada.
+  const destinoMail = process.env.ADMINISTRACION_EMAIL || process.env.OFICINA_EMAIL;
+  if (body.accion === "crear" && data.id && destinoMail) {
     try {
       const transporter = getTransporterSeguimiento();
       await transporter.sendMail({
         from: `"Servicio Técnico SAT" <${process.env.SMTP_USER}>`,
-        to: process.env.OFICINA_EMAIL,
+        to: destinoMail,
         subject: `🧾 Rendición de ${body.tecnico || "un técnico"} — ${body.categoria || "gasto"}`,
         html: `
           <div style="font-family: Arial, Helvetica, sans-serif; color:#101820;">
