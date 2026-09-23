@@ -283,6 +283,7 @@ html, body {
 .tile-presencia .panel-tile-icon-badge { background: var(--acc-guardia, #4A6FA5); }
 .tile-instalador .panel-tile-icon-badge { background: var(--acc-navy); }
 .tile-comodato .panel-tile-icon-badge { background: var(--acc-purple); }
+.tile-rendicion .panel-tile-icon-badge { background: var(--acc-teal); }
 .tile-planos .panel-tile-icon-badge { background: var(--acc-navy); }
 .tile-emergencia .panel-tile-icon-badge { background: var(--acc-alert); }
 .tile-notas .panel-tile-icon-badge { background: var(--acc-coral); }
