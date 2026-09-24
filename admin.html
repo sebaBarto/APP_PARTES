@@ -3857,7 +3857,6 @@ descargarExcelRendicionesBtn.addEventListener("click", () => {
 
 // ---------- Coordinación ----------
 let coordinacionServiciosCache = [];
-let coordinacionCronogramaTecnicos = [];
 let coordinacionListaOrdenadaActual = [];
 
 coordinacionBuscarInput.addEventListener("input", renderCoordinacionAdmin);
@@ -3888,20 +3887,83 @@ async function cargarCoordinacionAdmin() {
   coordinacionStatus.textContent = "Cargando...";
   try {
     const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
-    const [resServicios, resCronograma] = await Promise.all([
+    const [resServicios, resEncuestas] = await Promise.all([
       fetch("/api/servicios", { headers, cache: "no-store" }),
-      fetch("/api/cronograma", { headers, cache: "no-store" }),
+      fetch("/api/historial?tipo=encuestas", { headers, cache: "no-store" }),
     ]);
     const dataServicios = await resServicios.json();
     coordinacionServiciosCache = Array.isArray(dataServicios) ? dataServicios : [];
-    const dataCronograma = await resCronograma.json();
-    coordinacionCronogramaTecnicos = Array.isArray(dataCronograma.tecnicos) ? dataCronograma.tecnicos : [];
+    const dataEncuestas = await resEncuestas.json().catch(() => []);
+    coordinacionEncuestasCache = Array.isArray(dataEncuestas) ? dataEncuestas : [];
     renderCoordinacionAdmin();
   } catch (err) {
     coordinacionStatus.className = "status err";
     coordinacionStatus.textContent = "No se pudo cargar: " + err.message;
   }
 }
+
+// Palabras que, si aparecen en la tarea, sugieren que el service no es
+// un mantenimiento de rutina sino algo que probablemente el cliente
+// esté sintiendo como urgente de verdad (sistema caído, sin señal,
+// etc.) — lista corta a propósito, para no marcar todo como urgente.
+const PALABRAS_URGENCIA = ["no anda", "no funciona", "no prende", "no enciende", "sin señal", "no conecta", "robo", "asalto", "urgente", "emergencia"];
+
+// Puntaje objetivo de prioridad — la idea es que la lista se ordene
+// sola por esto, en vez de por quién llamó última vez. Tres señales,
+// cada una suma independiente de las demás:
+//  - Antigüedad (ya estancado según los umbrales configurados)
+//  - Palabras de la tarea que sugieren que está realmente roto
+//  - El cliente calificó mal (1-2★) un service reciente (últimos 60
+//    días) — señal de que ya está descontento, conviene no sumarle
+//    otro service mal atendido
+function calcularPrioridadCoordinacion(servicio) {
+  let puntos = 0;
+  const motivos = [];
+
+  if (servicio.__dias != null && servicio.__dias >= DIAS_URGENTE_ADMIN) {
+    puntos += 3;
+    motivos.push(`${servicio.__dias} días esperando`);
+  } else if (servicio.__dias != null && servicio.__dias >= DIAS_ATENCION_ADMIN) {
+    puntos += 1;
+    motivos.push(`${servicio.__dias} días esperando`);
+  }
+
+  const tareaTexto = normalizeTextAdmin(servicio.tarea || "");
+  const palabraEncontrada = PALABRAS_URGENCIA.find((p) => tareaTexto.includes(normalizeTextAdmin(p)));
+  if (palabraEncontrada) {
+    puntos += 3;
+    motivos.push(`menciona "${palabraEncontrada}"`);
+  }
+
+  if (servicio.cliente) {
+    const nombreCliente = normalizeTextAdmin(servicio.cliente);
+    const encuestaMala = coordinacionEncuestasCache.find((e) => {
+      if (!e.cliente || Number(e.puntaje) > 2) return false;
+      if (normalizeTextAdmin(e.cliente) !== nombreCliente) return false;
+      const fecha = e.fecha_parte ? new Date(e.fecha_parte) : (e.creado_en ? new Date(e.creado_en) : null);
+      if (!fecha || isNaN(fecha)) return true; // sin fecha clara, se cuenta igual
+      const diasDesdeEncuesta = Math.floor((Date.now() - fecha.getTime()) / 86400000);
+      return diasDesdeEncuesta <= 60;
+    });
+    if (encuestaMala) {
+      puntos += 2;
+      motivos.push(`calificó ${encuestaMala.puntaje}★ hace poco`);
+    }
+  }
+
+  const nivel = puntos >= 3 ? "alta" : puntos >= 1 ? "media" : "baja";
+  return { nivel, motivos };
+}
+
+// Texto sin acentos/mayúsculas, para comparar de forma tolerante
+// (admin.html no comparte el normalizeText de app.js).
+function normalizeTextAdmin(s) {
+  return String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+let coordinacionEncuestasCache = [];
+let DIAS_ATENCION_ADMIN = 3;
+let DIAS_URGENTE_ADMIN = 7;
 
 function renderCoordinacionAdmin() {
   const termino = (coordinacionBuscarInput.value || "").trim().toLowerCase();
@@ -3919,111 +3981,43 @@ function renderCoordinacionAdmin() {
     coordinacionLista.innerHTML = "";
     return;
   }
+
+  const conDatos = filtrados.map((s) => {
+    const conDias = { ...s, __dias: diasEstancadoAdmin(s) };
+    const { nivel, motivos } = calcularPrioridadCoordinacion(conDias);
+    return { ...conDias, __prioridad: nivel, __motivos: motivos };
+  });
+  const ordenPrioridad = { alta: 0, media: 1, baja: 2 };
+  conDatos.sort((a, b) => {
+    if (ordenPrioridad[a.__prioridad] !== ordenPrioridad[b.__prioridad]) return ordenPrioridad[a.__prioridad] - ordenPrioridad[b.__prioridad];
+    return (b.__dias ?? -1) - (a.__dias ?? -1);
+  });
+  coordinacionListaOrdenadaActual = conDatos;
+
   coordinacionStatus.className = "status";
-  coordinacionStatus.textContent = `${filtrados.length} de ${coordinacionServiciosCache.length} servicio(s) — el más viejo primero.`;
+  const cantAlta = conDatos.filter((s) => s.__prioridad === "alta").length;
+  coordinacionStatus.textContent = `${filtrados.length} de ${coordinacionServiciosCache.length} servicio(s)${cantAlta > 0 ? ` — ${cantAlta} con prioridad alta` : ""}. Ordenados por prioridad sugerida.`;
 
-  const conDias = filtrados.map((s) => ({ ...s, __dias: diasEstancadoAdmin(s) }));
-  conDias.sort((a, b) => (b.__dias ?? -1) - (a.__dias ?? -1));
-  coordinacionListaOrdenadaActual = conDias;
+  const estiloPrioridad = {
+    alta: { color: "#C0392B", texto: "🔴 Prioridad alta" },
+    media: { color: "#B5541A", texto: "🟠 Prioridad media" },
+    baja: { color: "#6B7680", texto: "Prioridad baja" },
+  };
 
-  coordinacionLista.innerHTML = conDias.map((s, idx) => {
-    let badge = "";
-    if (s.__dias != null && s.__dias >= 7) badge = `<span style="color:#C0392B; font-weight:700; font-size:12px;">🔴 Hace ${s.__dias} días</span>`;
-    else if (s.__dias != null && s.__dias >= 3) badge = `<span style="color:#B5541A; font-weight:600; font-size:12px;">🟠 Hace ${s.__dias} días</span>`;
-    else if (s.__dias != null) badge = `<span style="color:#6B7680; font-size:12px;">Hace ${s.__dias} día${s.__dias === 1 ? "" : "s"}</span>`;
+  coordinacionLista.innerHTML = conDatos.map((s) => {
+    const p = estiloPrioridad[s.__prioridad];
     return `
       <div style="padding:12px 0; border-bottom:1px solid #EEE;">
         <div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px;">
           <b>${escapeHtmlAdmin(s.cliente || "")}</b>
-          ${badge}
+          <span style="color:${p.color}; font-weight:700; font-size:12px; white-space:nowrap;">${p.texto}</span>
         </div>
         <div style="font-size:13px; color:#6B7680; margin-top:2px;">${escapeHtmlAdmin(s.direccion || "")}${s.localidad ? ", " + escapeHtmlAdmin(s.localidad) : ""}</div>
         <div style="font-size:13px; margin-top:4px;">${escapeHtmlAdmin(s.tarea || "")}</div>
-        <button type="button" class="btn btn-secondary btn-small coordinacion-asignar-btn" data-idx="${idx}" style="margin-top:8px;">📅 Asignar</button>
-        <div class="coordinacion-form-asignar hidden" data-idx="${idx}" style="margin-top:10px; padding:10px; background:#F4F5F0; border-radius:8px;">
-          <select class="field-input coordinacion-tecnico-select" style="margin-bottom:8px;">
-            ${coordinacionCronogramaTecnicos.map((t) => `<option value="${escapeHtmlAdmin(t)}">${escapeHtmlAdmin(t)}</option>`).join("")}
-          </select>
-          <input type="date" class="field-input coordinacion-fecha-input" style="margin-bottom:8px;">
-          <input type="time" class="field-input coordinacion-hora-input" style="margin-bottom:8px;">
-          <button type="button" class="btn btn-primary btn-small coordinacion-confirmar-btn" data-idx="${idx}">Confirmar</button>
-        </div>
+        ${s.__motivos.length > 0 ? `<div style="font-size:12px; color:${p.color}; margin-top:4px;">Por qué: ${escapeHtmlAdmin(s.__motivos.join(" · "))}</div>` : ""}
       </div>
     `;
   }).join("");
-
-  coordinacionLista.querySelectorAll(".coordinacion-asignar-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const form = coordinacionLista.querySelector(`.coordinacion-form-asignar[data-idx="${btn.dataset.idx}"]`);
-      form.classList.toggle("hidden");
-      if (!form.classList.contains("hidden")) {
-        const fechaInput = form.querySelector(".coordinacion-fecha-input");
-        if (!fechaInput.value) fechaInput.value = new Date().toISOString().slice(0, 10);
-      }
-    });
-  });
-
-  coordinacionLista.querySelectorAll(".coordinacion-confirmar-btn").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const idx = Number(btn.dataset.idx);
-      const servicio = coordinacionListaOrdenadaActual[idx];
-      const form = btn.closest(".coordinacion-form-asignar");
-      const tecnico = form.querySelector(".coordinacion-tecnico-select").value;
-      const fecha = form.querySelector(".coordinacion-fecha-input").value;
-      const hora = form.querySelector(".coordinacion-hora-input").value;
-      if (!tecnico || !fecha) {
-        alert("Elegí técnico y fecha.");
-        return;
-      }
-      btn.disabled = true;
-      btn.textContent = "Asignando...";
-      try {
-        await asignarServicioACronograma(servicio, tecnico, fecha, hora);
-        alert(`Listo — se asignó a ${tecnico} para el ${fecha}.`);
-        form.classList.add("hidden");
-      } catch (err) {
-        alert("No se pudo asignar: " + err.message);
-      } finally {
-        btn.disabled = false;
-        btn.textContent = "Confirmar";
-      }
-    });
-  });
-}
-
-async function asignarServicioACronograma(servicio, tecnico, fecha, hora) {
-  const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
-  // Se pide el cronograma FRESCO justo antes de escribir (no el que
-  // quedó en caché al entrar a la pantalla) — minimiza la chance de
-  // pisar una carga de Excel que haya pasado mientras tanto.
-  const res = await fetch("/api/cronograma", { headers, cache: "no-store" });
-  const data = await res.json();
-  const tareasActuales = Array.isArray(data.tareas) ? data.tareas : [];
-  const tecnicosActuales = Array.isArray(data.tecnicos) ? data.tecnicos : coordinacionCronogramaTecnicos;
-
-  // Reusa la etiqueta de día si ya hay alguna tarea ese día (para no
-  // generar una pestaña con otro texto para la misma fecha); si es un
-  // día que todavía no tiene nada, arma una etiqueta simple.
-  const existente = tareasActuales.find((t) => t.fecha === fecha);
-  const diaLabel = existente ? existente.dia_label : new Date(fecha + "T00:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "numeric" });
-
-  const nuevaTarea = {
-    fecha,
-    dia_label: diaLabel,
-    tecnico,
-    hora_inicio: hora || "",
-    hora_fin: "",
-    tarea: `Servicio: ${servicio.cliente || ""}${servicio.direccion ? " - " + servicio.direccion : ""}\n${servicio.tarea || ""}`.trim(),
-  };
-
-  const tareasNuevas = [...tareasActuales, nuevaTarea];
-  const resPost = await fetch("/api/cronograma", {
-    method: "POST",
-    headers: { ...headers, "Content-Type": "application/json" },
-    body: JSON.stringify({ tareas: tareasNuevas, tecnicos: tecnicosActuales }),
-  });
-  const dataPost = await resPost.json();
-  if (!resPost.ok) throw new Error(dataPost.error || "Error desconocido");
 }
 
 async function cargarInstalacionesAdmin() {
