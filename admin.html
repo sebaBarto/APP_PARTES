@@ -4065,7 +4065,11 @@ coordinacionGenerarSugerenciaBtn.addEventListener("click", async () => {
     // Solo los de prioridad alta y media entran al plan -- los de
     // baja prioridad quedan para "cuando haya un hueco", no hace
     // falta agendarlos ya.
-    const candidatos = coordinacionListaOrdenadaActual.filter((s) => s.__prioridad !== "baja" && s.direccion);
+    // Ahora entran TODOS los pendientes con dirección (antes solo los
+    // de prioridad alta/media) — se ordenan igual por prioridad
+    // dentro de cada zona, así que lo más urgente sigue yendo primero
+    // en los primeros días, pero nada queda afuera del plan.
+    const candidatos = coordinacionListaOrdenadaActual.filter((s) => s.direccion);
     if (candidatos.length === 0) {
       coordinacionSugerenciaStatus.textContent = "No hay servicios de prioridad alta o media con dirección cargada para agrupar.";
       return;
@@ -4083,7 +4087,21 @@ coordinacionGenerarSugerenciaBtn.addEventListener("click", async () => {
     const porId = {};
     (geoData.results || []).forEach((r) => { porId[r.id] = r; });
     const tecnicosData = await tecnicosRes.json().catch(() => []);
-    const nombresTecnicos = (Array.isArray(tecnicosData) ? tecnicosData : []).map((t) => t.nombre).filter(Boolean);
+    // Solo rota entre el equipo de servicio técnico (no instaladores,
+    // no cuentas de oficina) — se busca el nombre completo real en el
+    // padrón por coincidencia tolerante (todas las palabras del
+    // nombre corto tienen que estar en el nombre guardado), y si no
+    // se encuentra, se usa tal cual como quedó escrito acá.
+    const EQUIPO_SERVICIO_TECNICO = ["Cristian", "Marcos Torres", "Sebastian Purello"];
+    const padron = (Array.isArray(tecnicosData) ? tecnicosData : []).map((t) => t.nombre).filter(Boolean);
+    const nombresTecnicos = EQUIPO_SERVICIO_TECNICO.map((nombreCorto) => {
+      const palabras = normalizeTextAdmin(nombreCorto).split(/\s+/).filter(Boolean);
+      const encontrado = padron.find((nombreCompleto) => {
+        const normCompleto = normalizeTextAdmin(nombreCompleto);
+        return palabras.every((p) => normCompleto.includes(p));
+      });
+      return encontrado || nombreCorto;
+    });
 
     const conUbicacion = candidatos
       .map((s, idx) => ({ ...s, __geo: porId[`s${idx}`] }))
@@ -4153,7 +4171,7 @@ coordinacionGenerarSugerenciaBtn.addEventListener("click", async () => {
       `;
     }).join("");
 
-    coordinacionSugerenciaStatus.textContent = `Plan para ${lotes.length} día(s), repartiendo ${conUbicacion.length} servicio(s) de prioridad alta/media${nombresTecnicos.length === 0 ? " (no se encontró la lista de técnicos, así que no hay nombre sugerido)" : ""}.`;
+    coordinacionSugerenciaStatus.textContent = `Plan para ${lotes.length} día(s), repartiendo ${conUbicacion.length} servicio(s) pendiente(s) entre ${nombresTecnicos.join(", ")}.`;
   } catch (err) {
     coordinacionSugerenciaStatus.textContent = "No se pudo generar la sugerencia: " + err.message;
   } finally {
