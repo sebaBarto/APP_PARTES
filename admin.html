@@ -808,9 +808,15 @@
     <div id="panelCoordinacion" class="hidden">
       <h1>Coordinación</h1>
       <p class="subtitle">
-        Servicios pendientes, ordenados por antigüedad (el más viejo primero) — para asignarlos
-        antes de que el cliente tenga que llamar a quejarse.
+        Servicios pendientes, ordenados por prioridad sugerida — para decidir qué atender antes de
+        que el cliente tenga que llamar a quejarse.
       </p>
+
+      <div class="card" style="margin-bottom:16px;">
+        <button type="button" class="btn btn-primary" id="coordinacionGenerarSugerenciaBtn" style="width:100%;">📋 Generar sugerencia para los próximos días</button>
+        <p class="status" id="coordinacionSugerenciaStatus" style="margin-top:8px;"></p>
+        <div id="coordinacionSugerenciaLista"></div>
+      </div>
 
       <div class="card" style="margin-bottom:16px;">
         <input type="text" class="field-input" id="coordinacionBuscarInput" placeholder="Buscar por cliente, dirección o localidad...">
@@ -967,6 +973,9 @@ const panelCoordinacion = document.getElementById("panelCoordinacion");
 const coordinacionBuscarInput = document.getElementById("coordinacionBuscarInput");
 const coordinacionStatus = document.getElementById("coordinacionStatus");
 const coordinacionLista = document.getElementById("coordinacionLista");
+const coordinacionGenerarSugerenciaBtn = document.getElementById("coordinacionGenerarSugerenciaBtn");
+const coordinacionSugerenciaStatus = document.getElementById("coordinacionSugerenciaStatus");
+const coordinacionSugerenciaLista = document.getElementById("coordinacionSugerenciaLista");
 const tabEmergenciaBtn = document.getElementById("tabEmergenciaBtn");
 const panelEmergencia = document.getElementById("panelEmergencia");
 let emergenciaCargadaUnaVezAdmin = false;
@@ -4019,6 +4028,138 @@ function renderCoordinacionAdmin() {
     `;
   }).join("");
 }
+
+// ---------- Sugerencia automática para los próximos días ----------
+// Junta 3 cosas para armar el plan: la prioridad ya calculada, una
+// distancia calculada (mismo geocodificador que ya usa la app para
+// "servicios cercanos"), y un peso de esfuerzo inferido de palabras
+// clave en la tarea (no hay ningún dato real de "dificultad" cargado
+// en el sistema, así que esto es una aproximación, no un hecho).
+
+const PALABRAS_TRABAJO_LARGO = ["instalacion", "instalar", "cableado", "puesta en marcha", "obra", "sistema nuevo", "camaras nuevas"];
+const PALABRAS_TRABAJO_CORTO = ["revision", "cambio de bateria", "chequeo", "control", "prueba", "mantenimiento", "reset"];
+const RADIO_ZONA_METROS = 3000; // servicios a menos de esto se consideran "la misma zona"
+const CAPACIDAD_POR_DIA = 3.5; // en "unidades de esfuerzo" -- ver calcularEsfuerzo()
+
+function calcularEsfuerzo(servicio) {
+  const texto = normalizeTextAdmin(servicio.tarea || "");
+  if (PALABRAS_TRABAJO_LARGO.some((p) => texto.includes(normalizeTextAdmin(p)))) return 2;
+  if (PALABRAS_TRABAJO_CORTO.some((p) => texto.includes(normalizeTextAdmin(p)))) return 0.5;
+  return 1;
+}
+
+function distanciaMetrosAdmin(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+coordinacionGenerarSugerenciaBtn.addEventListener("click", async () => {
+  coordinacionGenerarSugerenciaBtn.disabled = true;
+  coordinacionSugerenciaStatus.textContent = "Ubicando los servicios en el mapa...";
+  coordinacionSugerenciaLista.innerHTML = "";
+  try {
+    // Solo los de prioridad alta y media entran al plan -- los de
+    // baja prioridad quedan para "cuando haya un hueco", no hace
+    // falta agendarlos ya.
+    const candidatos = coordinacionListaOrdenadaActual.filter((s) => s.__prioridad !== "baja" && s.direccion);
+    if (candidatos.length === 0) {
+      coordinacionSugerenciaStatus.textContent = "No hay servicios de prioridad alta o media con dirección cargada para agrupar.";
+      return;
+    }
+
+    const [geoRes, tecnicosRes] = await Promise.all([
+      fetch("/api/geocode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+        body: JSON.stringify({ items: candidatos.map((s, idx) => ({ id: `s${idx}`, direccion: s.direccion, localidad: s.localidad || "" })) }),
+      }),
+      fetch("/api/datos?coleccion=tecnicos", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" }),
+    ]);
+    const geoData = await geoRes.json();
+    const porId = {};
+    (geoData.results || []).forEach((r) => { porId[r.id] = r; });
+    const tecnicosData = await tecnicosRes.json().catch(() => []);
+    const nombresTecnicos = (Array.isArray(tecnicosData) ? tecnicosData : []).map((t) => t.nombre).filter(Boolean);
+
+    const conUbicacion = candidatos
+      .map((s, idx) => ({ ...s, __geo: porId[`s${idx}`] }))
+      .filter((s) => s.__geo && !s.__geo.error && !s.__geo.pendiente);
+
+    if (conUbicacion.length === 0) {
+      coordinacionSugerenciaStatus.textContent = "No se pudo ubicar ninguna de las direcciones en el mapa.";
+      return;
+    }
+
+    // Agrupa por zona: parte del de mayor prioridad restante, junta
+    // todo lo que esté a menos de RADIO_ZONA_METROS, y repite con lo
+    // que va quedando -- así cada zona arranca desde el service más
+    // urgente que la representa.
+    const restantes = [...conUbicacion];
+    const zonas = [];
+    while (restantes.length > 0) {
+      const base = restantes.shift();
+      const grupo = [base];
+      for (let i = restantes.length - 1; i >= 0; i--) {
+        const dist = distanciaMetrosAdmin(base.__geo.lat, base.__geo.lon, restantes[i].__geo.lat, restantes[i].__geo.lon);
+        if (dist <= RADIO_ZONA_METROS) {
+          grupo.push(restantes[i]);
+          restantes.splice(i, 1);
+        }
+      }
+      zonas.push(grupo);
+    }
+
+    // Dentro de cada zona, arma "lotes" de un día según la capacidad
+    // (en unidades de esfuerzo, no en cantidad de servicios sueltos).
+    const lotes = [];
+    zonas.forEach((zona) => {
+      let loteActual = [];
+      let esfuerzoActual = 0;
+      zona.forEach((s) => {
+        const esfuerzo = calcularEsfuerzo(s);
+        if (esfuerzoActual + esfuerzo > CAPACIDAD_POR_DIA && loteActual.length > 0) {
+          lotes.push(loteActual);
+          loteActual = [];
+          esfuerzoActual = 0;
+        }
+        loteActual.push(s);
+        esfuerzoActual += esfuerzo;
+      });
+      if (loteActual.length > 0) lotes.push(loteActual);
+    });
+
+    // Un técnico distinto por lote, rotando -- evita que a uno solo
+    // le caigan dos zonas lejos entre sí el mismo día. Es una
+    // sugerencia de reparto parejo, no una asignación real: quién
+    // está disponible ese día lo decide Seba.
+    coordinacionSugerenciaLista.innerHTML = lotes.map((lote, i) => {
+      const tecnicoSugerido = nombresTecnicos.length > 0 ? nombresTecnicos[i % nombresTecnicos.length] : null;
+      const localidadesLote = [...new Set(lote.map((s) => s.localidad).filter(Boolean))].join(", ");
+      return `
+        <div style="padding:12px; margin-top:10px; background:#F4F5F0; border-radius:10px;">
+          <div style="font-weight:700;">Día ${i + 1}${tecnicoSugerido ? ` — sugerido: ${escapeHtmlAdmin(tecnicoSugerido)}` : ""}</div>
+          <div style="font-size:12px; color:#6B7680; margin-bottom:6px;">${lote.length} servicio${lote.length === 1 ? "" : "s"}${localidadesLote ? " — " + escapeHtmlAdmin(localidadesLote) : ""}</div>
+          ${lote.map((s) => `
+            <div style="font-size:13px; padding:4px 0; border-top:1px solid #E2E5DD;">
+              <b>${escapeHtmlAdmin(s.cliente || "")}</b> — ${escapeHtmlAdmin(s.direccion || "")}
+              <span style="color:${s.__prioridad === "alta" ? "#C0392B" : "#B5541A"};"> · ${s.__prioridad === "alta" ? "🔴" : "🟠"}</span>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }).join("");
+
+    coordinacionSugerenciaStatus.textContent = `Plan para ${lotes.length} día(s), repartiendo ${conUbicacion.length} servicio(s) de prioridad alta/media${nombresTecnicos.length === 0 ? " (no se encontró la lista de técnicos, así que no hay nombre sugerido)" : ""}.`;
+  } catch (err) {
+    coordinacionSugerenciaStatus.textContent = "No se pudo generar la sugerencia: " + err.message;
+  } finally {
+    coordinacionGenerarSugerenciaBtn.disabled = false;
+  }
+});
 
 async function cargarInstalacionesAdmin() {
   instalacionesAdminStatus.textContent = "Cargando...";
