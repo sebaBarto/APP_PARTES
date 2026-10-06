@@ -879,6 +879,10 @@
           </select>
           <label style="margin-top:8px; display:block;">Columna de la fecha de visita</label>
           <select class="field-input" id="semaforoImportColFecha"></select>
+          <label style="margin-top:8px; display:block;">Columna del estado del cliente (opcional — ej. "Activo")</label>
+          <select class="field-input" id="semaforoImportColEstado"></select>
+          <label style="margin-top:8px; display:block;">Columna de la dirección (opcional — ayuda a distinguir clientes con el mismo nombre)</label>
+          <select class="field-input" id="semaforoImportColDireccion"></select>
           <p class="status" id="semaforoImportPreview" style="margin-top:10px;"></p>
           <button type="button" class="btn btn-primary" id="semaforoImportBtn" disabled>Importar</button>
         </div>
@@ -4362,8 +4366,11 @@ function detectarModoIdentificador(filas, idxId) {
   return numericos / muestra.length >= 0.7 ? "numero" : "nombre";
 }
 
-// Procesa las filas del Excel importado -> última fecha por cliente.
-function procesarFilasImport(filas, idxId, idxFecha, modo, indiceNombres) {
+// Procesa las filas del Excel importado -> por cliente: la última fecha de
+// visita (puede quedar vacía) y su estado (ej. "Activo"). Los clientes sin
+// fecha igual se importan: en un listado completo de clientes, "sin fecha"
+// quiere decir que nunca tuvo un servicio.
+function procesarFilasImport(filas, idxId, idxFecha, modo, indiceNombres, idxEstado = -1, idxDireccion = -1) {
   const porCliente = new Map();
   let total = 0, sinFecha = 0, sinCliente = 0, fechaMin = "", fechaMax = "";
   filas.forEach((fila) => {
@@ -4373,16 +4380,37 @@ function procesarFilasImport(filas, idxId, idxFecha, modo, indiceNombres) {
     const fechaVacia = fechaCruda === "" || fechaCruda == null;
     if (idVacio && fechaVacia) return; // fila vacía
     total++;
-    const fecha = fechaAISO(fechaCruda);
-    if (!fecha) { sinFecha++; return; }
-    const numero = modo === "numero" ? canonNumCliente(idCrudo) : resolverNumeroPorNombre(indiceNombres, String(idCrudo ?? ""), "");
+    if (idVacio) { sinCliente++; return; }
+    const direccion = idxDireccion >= 0 ? String(fila[idxDireccion] ?? "") : "";
+    const numero = modo === "numero" ? canonNumCliente(idCrudo) : resolverNumeroPorNombre(indiceNombres, String(idCrudo), direccion);
     if (!numero) { sinCliente++; return; }
-    const prev = porCliente.get(numero);
-    if (!prev || fecha > prev) porCliente.set(numero, fecha);
-    if (!fechaMin || fecha < fechaMin) fechaMin = fecha;
-    if (!fechaMax || fecha > fechaMax) fechaMax = fecha;
+    const fecha = fechaAISO(fechaCruda);
+    const estado = idxEstado >= 0 ? String(fila[idxEstado] ?? "").trim() : "";
+    const actual = porCliente.get(numero) || { fecha: "", estado: "" };
+    if (!fecha) {
+      sinFecha++;
+    } else {
+      if (fecha > actual.fecha) actual.fecha = fecha;
+      if (!fechaMin || fecha < fechaMin) fechaMin = fecha;
+      if (!fechaMax || fecha > fechaMax) fechaMax = fecha;
+    }
+    if (estado) actual.estado = estado;
+    porCliente.set(numero, actual);
   });
   return { porCliente, total, sinFecha, sinCliente, fechaMin, fechaMax };
+}
+
+// Estado de cada cliente según la columna "Estado" del archivo importado del
+// sistema de oficina (ej. "Activo", "Baja"). "Activo" = empieza con "activ"
+// (así "Inactivo" no cuenta como activo).
+function estadoOficinaPorCliente(historicas) {
+  const mapa = new Map();
+  historicas.forEach((h) => {
+    const clave = canonNumCliente(h.numero_cliente);
+    const estado = String(h.estado ?? "").trim();
+    if (clave && estado) mapa.set(clave, { estado, activo: /^activ/.test(normalizeTextAdmin(estado).trim()) });
+  });
+  return mapa;
 }
 
 // Estado de "abonado" de cada cliente según el módulo de SIMs: tiene una SIM
@@ -4424,6 +4452,8 @@ const semaforoImportMapa = document.getElementById("semaforoImportMapa");
 const semaforoImportColId = document.getElementById("semaforoImportColId");
 const semaforoImportModo = document.getElementById("semaforoImportModo");
 const semaforoImportColFecha = document.getElementById("semaforoImportColFecha");
+const semaforoImportColEstado = document.getElementById("semaforoImportColEstado");
+const semaforoImportColDireccion = document.getElementById("semaforoImportColDireccion");
 const semaforoImportPreview = document.getElementById("semaforoImportPreview");
 const semaforoImportBtn = document.getElementById("semaforoImportBtn");
 const semaforoImportStatus = document.getElementById("semaforoImportStatus");
@@ -4432,7 +4462,7 @@ let semaforoClientes = [];
 let semaforoFilas = [];
 let semaforoHayHistorial = false;
 let semaforoFiltro = "rojo";
-let semaforoSimsDisponibles = false;
+let semaforoFuenteAbonado = "ninguna"; // de dónde sale el estado de abonado: "oficina" (columna Estado importada) | "sims" | "ninguna"
 let semaforoImportCrudo = null;
 const SEMAFORO_MAX_RENDER = 300;
 const SEMAFORO_ESTILO = {
@@ -4505,12 +4535,22 @@ async function cargarSemaforoVisitas() {
 
     const ultimas = ultimaVisitaPorCliente(visitas);
     semaforoHayHistorial = arr(historicas).length > 0;
-    // Estado de abonado (según SIMs): si no se pudo cargar el módulo de SIMs,
-    // se oculta el filtro en vez de marcar a todos como "sin línea".
+    // Estado de abonado. Si el archivo importado del sistema de oficina trae la
+    // columna "Estado", se usa ESE (es el dato real); si no, se usa como
+    // aproximación el estado de la línea de la SIM instalada; y si no hay
+    // ninguno de los dos, se oculta el filtro en vez de marcar a todos igual.
+    const estadosOficina = estadoOficinaPorCliente(arr(historicas));
     const estadoAbonado = estadoAbonadoPorCliente(semaforoClientes, arr(sims));
-    semaforoSimsDisponibles = arr(sims).length > 0;
-    if (semaforoSimsDisponibles) { semaforoFiltroAbonado.classList.remove("hidden"); semaforoAbonadoNota.classList.remove("hidden"); }
-    else { semaforoFiltroAbonado.classList.add("hidden"); semaforoAbonadoNota.classList.add("hidden"); }
+    semaforoFuenteAbonado = estadosOficina.size > 0 ? "oficina" : (arr(sims).length > 0 ? "sims" : "ninguna");
+    configurarFiltroAbonado();
+    const abonadoDe = (c) => {
+      const clave = canonNumCliente(c.numero_cliente);
+      if (semaforoFuenteAbonado === "oficina") {
+        const eo = estadosOficina.get(clave);
+        return eo ? { abonado: eo.activo ? "activo" : "inactivo", texto: eo.estado } : { abonado: "sin_linea", texto: "" };
+      }
+      return { abonado: estadoAbonado.get(clave) || "sin_linea", texto: "" };
+    };
     const hoy = new Date();
     const rank = { rojo: 0, amarillo: 1, verde: 2, sin_dato: 3 };
 
@@ -4522,7 +4562,7 @@ async function cargarSemaforoVisitas() {
         localidad: c.localidad || "", telefono: c.telefono || "",
         ultima: u ? u.fecha : "", fuente: u ? u.fuente : "",
         estado: cls.estado, dias: cls.dias, sinVisita: cls.sinVisita,
-        abonado: estadoAbonado.get(canonNumCliente(c.numero_cliente)) || "sin_linea",
+        abonado: abonadoDe(c).abonado, estadoOficina: abonadoDe(c).texto,
       };
     }).sort((a, b) => {
       if (rank[a.estado] !== rank[b.estado]) return rank[a.estado] - rank[b.estado];
@@ -4548,9 +4588,28 @@ async function cargarSemaforoVisitas() {
   }
 }
 
+// Arma las opciones del filtro de abonado según de dónde sale el dato (y lo oculta si no hay ninguna fuente).
+function configurarFiltroAbonado() {
+  if (semaforoFuenteAbonado === "ninguna") {
+    semaforoFiltroAbonado.classList.add("hidden"); semaforoAbonadoNota.classList.add("hidden");
+    return;
+  }
+  const previo = semaforoFiltroAbonado.value;
+  const esOficina = semaforoFuenteAbonado === "oficina";
+  const opciones = esOficina
+    ? [["todos", "Abonado: todos"], ["activo", "Solo clientes ACTIVOS"], ["inactivo", "No activos (baja, suspendido, etc.)"], ["sin_linea", "Sin dato de estado"]]
+    : [["todos", "Abonado: todos"], ["activo", "Solo abonados ACTIVOS (línea activa)"], ["inactivo", "Abonado inactivo (línea dada de baja)"], ["sin_linea", "Sin línea instalada"]];
+  semaforoFiltroAbonado.innerHTML = opciones.map(([v, t]) => `<option value="${v}">${t}</option>`).join("");
+  semaforoFiltroAbonado.value = opciones.some(([v]) => v === previo) ? previo : "todos";
+  semaforoAbonadoNota.textContent = esOficina
+    ? 'Estado según la columna "Estado" del archivo importado de tu sistema de oficina.'
+    : "Abonado activo = el cliente tiene una SIM instalada con la línea en estado Activo (dato del módulo de SIMs). Importá el archivo de tu sistema con la columna Estado para usar el estado real.";
+  semaforoFiltroAbonado.classList.remove("hidden"); semaforoAbonadoNota.classList.remove("hidden");
+}
+
 // Base de clientes según el filtro de abonado (los contadores de colores se calculan sobre esto).
 function filasSemaforoPorAbonado() {
-  const f = semaforoSimsDisponibles ? semaforoFiltroAbonado.value : "todos";
+  const f = semaforoFuenteAbonado !== "ninguna" ? semaforoFiltroAbonado.value : "todos";
   return f === "todos" ? semaforoFilas : semaforoFilas.filter((x) => x.abonado === f);
 }
 
@@ -4587,7 +4646,9 @@ function renderSemaforo() {
     const est = SEMAFORO_ESTILO[f.estado];
     const detalle = f.ultima ? `Última visita: ${fechaISOaLocal(f.ultima)} (${escapeHtmlAdmin(f.fuente)})` : (f.sinVisita ? "Sin visitas registradas" : "Sin dato de visitas");
     const dias = f.dias != null ? `Hace ${f.dias} día${f.dias === 1 ? "" : "s"}` : "";
-    const tagAbonado = semaforoSimsDisponibles ? " · " + ({ activo: "📶 Abonado activo", inactivo: "📵 Línea inactiva", sin_linea: "Sin línea instalada" }[f.abonado]) : "";
+    const tagAbonado = semaforoFuenteAbonado === "ninguna" ? "" : " · " + (semaforoFuenteAbonado === "oficina"
+      ? (f.estadoOficina ? (f.abonado === "activo" ? "✅ " : "⛔ ") + "Estado: " + escapeHtmlAdmin(f.estadoOficina) : "Sin dato de estado")
+      : { activo: "📶 Abonado activo", inactivo: "📵 Línea inactiva", sin_linea: "Sin línea instalada" }[f.abonado]);
     return `
       <div style="padding:10px 0; border-bottom:1px solid #EEE;">
         <div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px;">
@@ -4612,7 +4673,7 @@ semaforoExcelBtn.addEventListener("click", () => {
     Dirección: f.direccion,
     Localidad: f.localidad,
     Teléfono: f.telefono,
-    Abonado: semaforoSimsDisponibles ? ({ activo: "Activo", inactivo: "Línea inactiva", sin_linea: "Sin línea instalada" }[f.abonado]) : "",
+    Abonado: semaforoFuenteAbonado === "oficina" ? (f.estadoOficina || "Sin dato de estado") : semaforoFuenteAbonado === "sims" ? ({ activo: "Activo", inactivo: "Línea inactiva", sin_linea: "Sin línea instalada" }[f.abonado]) : "",
     "Última visita": fechaISOaLocal(f.ultima),
     "Días desde la última visita": f.dias ?? "",
     "Fuente de la última visita": f.fuente,
@@ -4626,6 +4687,11 @@ semaforoExcelBtn.addEventListener("click", () => {
 // ---- Importar historial de visitas desde el sistema de oficina ----
 function poblarSelectColumnas(select, encabezados, idxSeleccionado) {
   select.innerHTML = encabezados.map((e, i) => `<option value="${i}" ${i === idxSeleccionado ? "selected" : ""}>${escapeHtmlAdmin(e)}</option>`).join("");
+}
+
+// Igual que poblarSelectColumnas pero con una primera opción "(ninguna)" (-1).
+function poblarSelectColumnasOpcional(select, encabezados, idxSeleccionado) {
+  select.innerHTML = `<option value="-1">(ninguna)</option>` + encabezados.map((e, i) => `<option value="${i}" ${i === idxSeleccionado ? "selected" : ""}>${escapeHtmlAdmin(e)}</option>`).join("");
 }
 
 semaforoImportFile.addEventListener("change", async () => {
@@ -4654,6 +4720,8 @@ semaforoImportFile.addEventListener("change", async () => {
 
     poblarSelectColumnas(semaforoImportColId, encabezados, idxId);
     poblarSelectColumnas(semaforoImportColFecha, encabezados, idxFecha);
+    poblarSelectColumnasOpcional(semaforoImportColEstado, encabezados, adivinar(/^estado/));
+    poblarSelectColumnasOpcional(semaforoImportColDireccion, encabezados, adivinar(/direccion|domicilio/));
     semaforoImportModo.value = detectarModoIdentificador(filas, idxId);
     semaforoImportMapa.classList.remove("hidden");
     actualizarPreviewImport();
@@ -4667,6 +4735,8 @@ semaforoImportColId.addEventListener("change", () => {
   actualizarPreviewImport();
 });
 semaforoImportColFecha.addEventListener("change", actualizarPreviewImport);
+semaforoImportColEstado.addEventListener("change", actualizarPreviewImport);
+semaforoImportColDireccion.addEventListener("change", actualizarPreviewImport);
 semaforoImportModo.addEventListener("change", actualizarPreviewImport);
 
 function calcularImportActual() {
@@ -4676,7 +4746,9 @@ function calcularImportActual() {
     Number(semaforoImportColId.value),
     Number(semaforoImportColFecha.value),
     semaforoImportModo.value,
-    construirIndiceNombres(semaforoClientes)
+    construirIndiceNombres(semaforoClientes),
+    Number(semaforoImportColEstado.value),
+    Number(semaforoImportColDireccion.value)
   );
 }
 
@@ -4684,15 +4756,29 @@ function actualizarPreviewImport() {
   const r = calcularImportActual();
   if (!r) return;
   const modo = semaforoImportModo.value;
-  let texto = `${r.total} fila(s) leída(s) → ${r.porCliente.size} cliente(s) con fecha válida.`;
+  const valores = [...r.porCliente.values()];
+  const conFecha = valores.filter((v) => v.fecha).length;
+  let texto = `${r.total} fila(s) leída(s) → ${r.porCliente.size} cliente(s) identificados, ${conFecha} con fecha de última visita.`;
   if (r.fechaMin) texto += ` Fechas de ${fechaISOaLocal(r.fechaMin)} a ${fechaISOaLocal(r.fechaMax)}.`;
-  if (r.sinFecha) texto += ` ${r.sinFecha} fila(s) sin fecha reconocible.`;
+  const sinVisita = r.porCliente.size - conFecha;
+  if (sinVisita > 0) texto += ` ${sinVisita} sin fecha de visita (se cargan como "sin visitas registradas").`;
+  const porEstado = {};
+  valores.forEach((v) => { if (v.estado) porEstado[v.estado] = (porEstado[v.estado] || 0) + 1; });
+  const estadosTexto = Object.entries(porEstado).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([e, n]) => `${e}: ${n}`).join(" · ");
+  if (estadosTexto) texto += ` Estados: ${estadosTexto}.`;
   if (r.sinCliente) texto += ` ${r.sinCliente} fila(s) sin cliente identificable${modo === "nombre" ? " (nombre que no está en el listado o que se repite)" : ""}.`;
   if (modo === "numero" && semaforoClientes.length > 0) {
     const conocidos = new Set(semaforoClientes.map((c) => canonNumCliente(c.numero_cliente)));
     const noEncontrados = [...r.porCliente.keys()].filter((k) => !conocidos.has(k)).length;
     if (noEncontrados > 0) texto += ` ⚠️ ${noEncontrados} número(s) no figuran en el listado de clientes — revisá que sea la columna correcta.`;
   }
+  // Ejemplos de fechas leídas (priorizando las que podrían confundirse día/mes),
+  // para que se pueda chequear a ojo contra el Excel antes de importar.
+  const nombreDe = new Map(semaforoClientes.map((c) => [canonNumCliente(c.numero_cliente), c.nombre || ""]));
+  const conFechaEntries = [...r.porCliente.entries()].filter(([, v]) => v.fecha);
+  const ambiguas = conFechaEntries.filter(([, v]) => { const [, m, dd] = v.fecha.split("-").map(Number); return dd <= 12 && dd !== m; });
+  const ejemplos = (ambiguas.length > 0 ? ambiguas : conFechaEntries).slice(0, 3).map(([k, v]) => `${nombreDe.get(k) || "N° " + k} → ${fechaISOaLocal(v.fecha)}`);
+  if (ejemplos.length > 0) texto += ` Ejemplos de fechas leídas (chequeá que coincidan con tu Excel): ${ejemplos.join(" · ")}.`;
   semaforoImportPreview.textContent = texto;
   semaforoImportBtn.disabled = r.porCliente.size === 0;
 }
@@ -4700,8 +4786,8 @@ function actualizarPreviewImport() {
 semaforoImportBtn.addEventListener("click", async () => {
   const r = calcularImportActual();
   if (!r || r.porCliente.size === 0) return;
-  const filas = [...r.porCliente.entries()].map(([numero_cliente, fecha]) => ({ numero_cliente, fecha }));
-  if (!confirm(`Se van a cargar ${filas.length} cliente(s) con la fecha de su última visita. Si ya tenían una más reciente, se conserva esa. ¿Seguimos?`)) return;
+  const filas = [...r.porCliente.entries()].map(([numero_cliente, v]) => ({ numero_cliente, fecha: v.fecha, estado: v.estado }));
+  if (!confirm(`Se van a cargar ${filas.length} cliente(s) (${filas.filter((f) => f.fecha).length} con fecha de última visita, ${filas.filter((f) => f.estado).length} con estado). Si ya tenían una fecha más reciente, se conserva esa. ¿Seguimos?`)) return;
   semaforoImportBtn.disabled = true;
   try {
     const TROZO = 400;
