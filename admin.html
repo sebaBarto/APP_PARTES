@@ -4534,7 +4534,8 @@ async function cargarSemaforoVisitas() {
     });
 
     const ultimas = ultimaVisitaPorCliente(visitas);
-    semaforoHayHistorial = arr(historicas).length > 0;
+    const ignorados = new Set(arr(historicas).filter((h) => Number(h.ignorado) === 1).map((h) => canonNumCliente(h.numero_cliente)));
+    semaforoHayHistorial = arr(historicas).some((h) => h.ultima_visita || h.estado);
     // Estado de abonado. Si el archivo importado del sistema de oficina trae la
     // columna "Estado", se usa ESE (es el dato real); si no, se usa como
     // aproximación el estado de la línea de la SIM instalada; y si no hay
@@ -4563,6 +4564,7 @@ async function cargarSemaforoVisitas() {
         ultima: u ? u.fecha : "", fuente: u ? u.fuente : "",
         estado: cls.estado, dias: cls.dias, sinVisita: cls.sinVisita,
         abonado: abonadoDe(c).abonado, estadoOficina: abonadoDe(c).texto,
+        ignorado: ignorados.has(canonNumCliente(c.numero_cliente)),
       };
     }).sort((a, b) => {
       if (rank[a.estado] !== rank[b.estado]) return rank[a.estado] - rank[b.estado];
@@ -4571,7 +4573,7 @@ async function cargarSemaforoVisitas() {
       return a.nombre.localeCompare(b.nombre, "es");
     });
 
-    semaforoFuentes.textContent = `Al ${fechaISOaLocal(hoyLocalISO())} · Considera ${arr(partes).length} parte(s), ${arr(instalaciones).length} instalación(es), ${arr(presencias).length} presencia(s) en obra y el historial importado (${arr(historicas).length} cliente(s)). Visitas registradas en la app desde ${desdeApp ? fechaISOaLocal(desdeApp) : "—"}.`;
+    semaforoFuentes.textContent = `Al ${fechaISOaLocal(hoyLocalISO())} · Considera ${arr(partes).length} parte(s), ${arr(instalaciones).length} instalación(es), ${arr(presencias).length} presencia(s) en obra y el historial importado (${arr(historicas).filter((h) => h.ultima_visita || h.estado).length} cliente(s)). Visitas registradas en la app desde ${desdeApp ? fechaISOaLocal(desdeApp) : "—"}.`;
 
     if (!semaforoHayHistorial) {
       semaforoAviso.classList.remove("hidden");
@@ -4580,7 +4582,7 @@ async function cargarSemaforoVisitas() {
       semaforoAviso.classList.add("hidden");
     }
 
-    if (!semaforoFilas.some((f) => f.estado === semaforoFiltro)) semaforoFiltro = "todos";
+    if (semaforoFiltro !== "ignorados" && !semaforoFilas.some((f) => f.estado === semaforoFiltro)) semaforoFiltro = "todos";
     renderSemaforo();
   } catch (err) {
     semaforoStatus.className = "status err";
@@ -4610,26 +4612,30 @@ function configurarFiltroAbonado() {
 // Base de clientes según el filtro de abonado (los contadores de colores se calculan sobre esto).
 function filasSemaforoPorAbonado() {
   const f = semaforoFuenteAbonado !== "ninguna" ? semaforoFiltroAbonado.value : "todos";
-  return f === "todos" ? semaforoFilas : semaforoFilas.filter((x) => x.abonado === f);
+  const visibles = semaforoFilas.filter((x) => !x.ignorado);
+  return f === "todos" ? visibles : visibles.filter((x) => x.abonado === f);
 }
 
 function filasSemaforoFiltradas() {
   const termino = normalizeTextAdmin(semaforoBuscar.value || "").trim();
-  return filasSemaforoPorAbonado().filter((f) => {
-    if (semaforoFiltro !== "todos" && f.estado !== semaforoFiltro) return false;
+  const base = semaforoFiltro === "ignorados" ? semaforoFilas.filter((x) => x.ignorado) : filasSemaforoPorAbonado();
+  return base.filter((f) => {
+    if (semaforoFiltro !== "todos" && semaforoFiltro !== "ignorados" && f.estado !== semaforoFiltro) return false;
     if (!termino) return true;
     return normalizeTextAdmin(`${f.nombre} ${f.numero} ${f.direccion} ${f.localidad}`).includes(termino);
   });
 }
 
 function renderSemaforo() {
+  const cantIgnorados = semaforoFilas.filter((f) => f.ignorado).length;
+  if (semaforoFiltro === "ignorados" && cantIgnorados === 0) semaforoFiltro = "todos";
   const cuentas = { rojo: 0, amarillo: 0, verde: 0, sin_dato: 0 };
   const baseAbonado = filasSemaforoPorAbonado();
   baseAbonado.forEach((f) => { cuentas[f.estado]++; });
-  const defs = [["rojo", "🔴 Más de un año"], ["amarillo", "🟡 Por cumplir el año"], ["verde", "🟢 Al día"], ["sin_dato", "⚫ Sin dato"], ["todos", "Todos"]];
+  const defs = [["rojo", "🔴 Más de un año"], ["amarillo", "🟡 Por cumplir el año"], ["verde", "🟢 Al día"], ["sin_dato", "⚫ Sin dato"], ["todos", "Todos"], ["ignorados", "🚫 Ignorados"]];
   semaforoChips.innerHTML = defs.map(([clave, etiqueta]) => {
-    const n = clave === "todos" ? baseAbonado.length : cuentas[clave];
-    if (clave === "sin_dato" && n === 0) return "";
+    const n = clave === "todos" ? baseAbonado.length : clave === "ignorados" ? cantIgnorados : cuentas[clave];
+    if ((clave === "sin_dato" || clave === "ignorados") && n === 0) return "";
     const activo = semaforoFiltro === clave;
     return `<button type="button" class="semaforo-chip" data-estado="${clave}" style="padding:8px 14px; border-radius:999px; cursor:pointer; font-weight:600; font-size:13px; border:2px solid ${activo ? "#101820" : "#D8DCD4"}; background:${activo ? "#101820" : "#fff"}; color:${activo ? "#F5A623" : "#101820"};">${etiqueta} · ${n}</button>`;
   }).join("");
@@ -4657,9 +4663,37 @@ function renderSemaforo() {
         </div>
         <div style="font-size:13px; color:#6B7680; margin-top:2px;">${f.numero ? "N° " + escapeHtmlAdmin(f.numero) + " · " : ""}${escapeHtmlAdmin(f.direccion)}${f.localidad ? ", " + escapeHtmlAdmin(f.localidad) : ""}</div>
         <div style="font-size:12px; color:#6B7680; margin-top:2px;">${detalle}${tagAbonado}</div>
+        <div style="margin-top:6px;"><button type="button" class="btn btn-ghost btn-small semaforo-ignorar-btn" data-numero="${escapeHtmlAdmin(f.numero)}" data-ignorar="${f.ignorado ? "0" : "1"}">${f.ignorado ? "↩ Restaurar" : "🚫 Ignorar"}</button></div>
       </div>
     `;
   }).join("");
+
+  semaforoLista.querySelectorAll(".semaforo-ignorar-btn").forEach((b) => {
+    b.addEventListener("click", () => cambiarIgnorado(b.dataset.numero, b.dataset.ignorar === "1"));
+  });
+}
+
+// Marca (o desmarca) un cliente como "ignorado": sale del semáforo y de sus
+// contadores — pensado para cuentas internas (vehículos, stock, depósitos).
+// Se puede ver y restaurar desde el filtro "🚫 Ignorados".
+async function cambiarIgnorado(numero, ignorar) {
+  const clave = canonNumCliente(numero);
+  const fila = semaforoFilas.find((f) => canonNumCliente(f.numero) === clave);
+  if (!fila) return;
+  if (ignorar && !confirm(`¿Ignorar a "${fila.nombre}"? Deja de aparecer en el semáforo (lo podés ver y restaurar desde "Ignorados").`)) return;
+  try {
+    const res = await fetch("/api/datos?coleccion=visitas_historicas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({ accion: "ignorar", numero_cliente: clave, ignorado: ignorar }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) throw new Error((data.error || "no se pudo guardar") + (data.detalle ? " — " + data.detalle : ""));
+    fila.ignorado = ignorar;
+    renderSemaforo();
+  } catch (err) {
+    alert("No se pudo guardar: " + err.message);
+  }
 }
 
 semaforoExcelBtn.addEventListener("click", () => {

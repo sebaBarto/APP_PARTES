@@ -281,7 +281,8 @@ async function manejarColeccionCortada(nombreColeccion, metodo, body, backendUrl
       return { status: r.status, data: await r.json() };
     }
     if (metodo === "POST") {
-      const r = await fetch(`${backendUrl}/api/visitas-historicas/importar`, { method: "POST", headers, body: JSON.stringify(body) });
+      const destino = body && body.accion === "ignorar" ? "ignorar" : "importar";
+      const r = await fetch(`${backendUrl}/api/visitas-historicas/${destino}`, { method: "POST", headers, body: JSON.stringify(body) });
       return { status: r.status, data: await r.json() };
     }
   }
