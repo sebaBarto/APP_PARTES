@@ -4663,7 +4663,7 @@ semaforoImportBtn.addEventListener("click", async () => {
         body: JSON.stringify({ accion: "importar", filas: filas.slice(i, i + TROZO) }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.ok) throw new Error(data.error || "no se pudo guardar");
+      if (!res.ok || !data.ok) throw new Error((data.error || "no se pudo guardar") + (data.detalle ? " — " + data.detalle : ""));
     }
     semaforoImportStatus.textContent = `Listo — ${filas.length} cliente(s) importados.`;
     semaforoImportFile.value = "";
