@@ -842,6 +842,13 @@
       <div class="card" style="margin-bottom:16px;">
         <div id="semaforoChips" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;"></div>
         <input type="text" class="field-input" id="semaforoBuscar" placeholder="Buscar por cliente, número, dirección o localidad...">
+        <select class="field-input" id="semaforoFiltroAbonado" style="margin-top:10px;">
+          <option value="todos">Abonado: todos</option>
+          <option value="activo">Solo abonados ACTIVOS (línea activa)</option>
+          <option value="inactivo">Abonado inactivo (línea dada de baja)</option>
+          <option value="sin_linea">Sin línea instalada</option>
+        </select>
+        <p class="subtitle" id="semaforoAbonadoNota" style="font-size:12px; margin-top:6px;">Abonado activo = el cliente tiene una SIM instalada con la línea en estado Activo (dato del módulo de SIMs).</p>
         <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
           <button type="button" class="btn btn-secondary" id="semaforoExcelBtn">⬇ Descargar Excel (lo filtrado)</button>
           <button type="button" class="btn btn-ghost" id="semaforoActualizarBtn">↻ Actualizar</button>
@@ -4377,12 +4384,36 @@ function procesarFilasImport(filas, idxId, idxFecha, modo, indiceNombres) {
   });
   return { porCliente, total, sinFecha, sinCliente, fechaMin, fechaMax };
 }
+
+// Estado de "abonado" de cada cliente según el módulo de SIMs: tiene una SIM
+// instalada con la línea Activa ("activo"), o solo líneas dadas de baja
+// ("inactivo"). Si no tiene ninguna SIM instalada no figura en el mapa
+// ("sin línea"). Se vincula por número de cliente y, si la SIM no lo trae,
+// por N° de abonado.
+function estadoAbonadoPorCliente(clientes, sims) {
+  const porAbonado = new Map();
+  clientes.forEach((c) => {
+    const ab = canonNumCliente(c.numero_abonado);
+    if (ab) porAbonado.set(ab, canonNumCliente(c.numero_cliente));
+  });
+  const mapa = new Map();
+  sims.forEach((s) => {
+    const clave = canonNumCliente(s.numero_cliente) || porAbonado.get(canonNumCliente(s.numero_abonado)) || "";
+    if (!clave) return;
+    const activa = normalizeTextAdmin(s.estado_linea || "Activo").trim() !== "inactivo";
+    if (activa) mapa.set(clave, "activo");
+    else if (!mapa.has(clave)) mapa.set(clave, "inactivo");
+  });
+  return mapa;
+}
 // <CORE_END>
 
 // ---- Pantalla ----
 const semaforoAviso = document.getElementById("semaforoAviso");
 const semaforoChips = document.getElementById("semaforoChips");
 const semaforoBuscar = document.getElementById("semaforoBuscar");
+const semaforoFiltroAbonado = document.getElementById("semaforoFiltroAbonado");
+const semaforoAbonadoNota = document.getElementById("semaforoAbonadoNota");
 const semaforoExcelBtn = document.getElementById("semaforoExcelBtn");
 const semaforoActualizarBtn = document.getElementById("semaforoActualizarBtn");
 const semaforoStatus = document.getElementById("semaforoStatus");
@@ -4401,6 +4432,7 @@ let semaforoClientes = [];
 let semaforoFilas = [];
 let semaforoHayHistorial = false;
 let semaforoFiltro = "rojo";
+let semaforoSimsDisponibles = false;
 let semaforoImportCrudo = null;
 const SEMAFORO_MAX_RENDER = 300;
 const SEMAFORO_ESTILO = {
@@ -4422,6 +4454,7 @@ function hoyLocalISO() {
 }
 
 semaforoBuscar.addEventListener("input", renderSemaforo);
+semaforoFiltroAbonado.addEventListener("change", renderSemaforo);
 semaforoActualizarBtn.addEventListener("click", () => cargarSemaforoVisitas());
 
 async function cargarSemaforoVisitas() {
@@ -4432,12 +4465,13 @@ async function cargarSemaforoVisitas() {
     const h = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
     const pedir = (url) => fetch(url, { headers: h, cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).catch(() => []);
     const arr = (x) => (Array.isArray(x) ? x : []);
-    const [clientes, partes, instalaciones, presencias, historicas] = await Promise.all([
+    const [clientes, partes, instalaciones, presencias, historicas, sims] = await Promise.all([
       pedir("/api/datos?coleccion=clientes"),
       pedir("/api/historial"),
       pedir("/api/historial?tipo=instalaciones"),
       pedir("/api/recurso-uso?recurso=presencia&historial=1"),
       pedir("/api/datos?coleccion=visitas_historicas"),
+      pedir("/api/datos?coleccion=sims_instaladas"),
     ]);
 
     semaforoClientes = arr(clientes);
@@ -4471,6 +4505,12 @@ async function cargarSemaforoVisitas() {
 
     const ultimas = ultimaVisitaPorCliente(visitas);
     semaforoHayHistorial = arr(historicas).length > 0;
+    // Estado de abonado (según SIMs): si no se pudo cargar el módulo de SIMs,
+    // se oculta el filtro en vez de marcar a todos como "sin línea".
+    const estadoAbonado = estadoAbonadoPorCliente(semaforoClientes, arr(sims));
+    semaforoSimsDisponibles = arr(sims).length > 0;
+    if (semaforoSimsDisponibles) { semaforoFiltroAbonado.classList.remove("hidden"); semaforoAbonadoNota.classList.remove("hidden"); }
+    else { semaforoFiltroAbonado.classList.add("hidden"); semaforoAbonadoNota.classList.add("hidden"); }
     const hoy = new Date();
     const rank = { rojo: 0, amarillo: 1, verde: 2, sin_dato: 3 };
 
@@ -4482,6 +4522,7 @@ async function cargarSemaforoVisitas() {
         localidad: c.localidad || "", telefono: c.telefono || "",
         ultima: u ? u.fecha : "", fuente: u ? u.fuente : "",
         estado: cls.estado, dias: cls.dias, sinVisita: cls.sinVisita,
+        abonado: estadoAbonado.get(canonNumCliente(c.numero_cliente)) || "sin_linea",
       };
     }).sort((a, b) => {
       if (rank[a.estado] !== rank[b.estado]) return rank[a.estado] - rank[b.estado];
@@ -4507,9 +4548,15 @@ async function cargarSemaforoVisitas() {
   }
 }
 
+// Base de clientes según el filtro de abonado (los contadores de colores se calculan sobre esto).
+function filasSemaforoPorAbonado() {
+  const f = semaforoSimsDisponibles ? semaforoFiltroAbonado.value : "todos";
+  return f === "todos" ? semaforoFilas : semaforoFilas.filter((x) => x.abonado === f);
+}
+
 function filasSemaforoFiltradas() {
   const termino = normalizeTextAdmin(semaforoBuscar.value || "").trim();
-  return semaforoFilas.filter((f) => {
+  return filasSemaforoPorAbonado().filter((f) => {
     if (semaforoFiltro !== "todos" && f.estado !== semaforoFiltro) return false;
     if (!termino) return true;
     return normalizeTextAdmin(`${f.nombre} ${f.numero} ${f.direccion} ${f.localidad}`).includes(termino);
@@ -4518,10 +4565,11 @@ function filasSemaforoFiltradas() {
 
 function renderSemaforo() {
   const cuentas = { rojo: 0, amarillo: 0, verde: 0, sin_dato: 0 };
-  semaforoFilas.forEach((f) => { cuentas[f.estado]++; });
+  const baseAbonado = filasSemaforoPorAbonado();
+  baseAbonado.forEach((f) => { cuentas[f.estado]++; });
   const defs = [["rojo", "🔴 Más de un año"], ["amarillo", "🟡 Por cumplir el año"], ["verde", "🟢 Al día"], ["sin_dato", "⚫ Sin dato"], ["todos", "Todos"]];
   semaforoChips.innerHTML = defs.map(([clave, etiqueta]) => {
-    const n = clave === "todos" ? semaforoFilas.length : cuentas[clave];
+    const n = clave === "todos" ? baseAbonado.length : cuentas[clave];
     if (clave === "sin_dato" && n === 0) return "";
     const activo = semaforoFiltro === clave;
     return `<button type="button" class="semaforo-chip" data-estado="${clave}" style="padding:8px 14px; border-radius:999px; cursor:pointer; font-weight:600; font-size:13px; border:2px solid ${activo ? "#101820" : "#D8DCD4"}; background:${activo ? "#101820" : "#fff"}; color:${activo ? "#F5A623" : "#101820"};">${etiqueta} · ${n}</button>`;
@@ -4539,6 +4587,7 @@ function renderSemaforo() {
     const est = SEMAFORO_ESTILO[f.estado];
     const detalle = f.ultima ? `Última visita: ${fechaISOaLocal(f.ultima)} (${escapeHtmlAdmin(f.fuente)})` : (f.sinVisita ? "Sin visitas registradas" : "Sin dato de visitas");
     const dias = f.dias != null ? `Hace ${f.dias} día${f.dias === 1 ? "" : "s"}` : "";
+    const tagAbonado = semaforoSimsDisponibles ? " · " + ({ activo: "📶 Abonado activo", inactivo: "📵 Línea inactiva", sin_linea: "Sin línea instalada" }[f.abonado]) : "";
     return `
       <div style="padding:10px 0; border-bottom:1px solid #EEE;">
         <div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px;">
@@ -4546,7 +4595,7 @@ function renderSemaforo() {
           <span style="color:${est.color}; font-weight:700; font-size:12px; white-space:nowrap;">${dias}</span>
         </div>
         <div style="font-size:13px; color:#6B7680; margin-top:2px;">${f.numero ? "N° " + escapeHtmlAdmin(f.numero) + " · " : ""}${escapeHtmlAdmin(f.direccion)}${f.localidad ? ", " + escapeHtmlAdmin(f.localidad) : ""}</div>
-        <div style="font-size:12px; color:#6B7680; margin-top:2px;">${detalle}</div>
+        <div style="font-size:12px; color:#6B7680; margin-top:2px;">${detalle}${tagAbonado}</div>
       </div>
     `;
   }).join("");
@@ -4563,6 +4612,7 @@ semaforoExcelBtn.addEventListener("click", () => {
     Dirección: f.direccion,
     Localidad: f.localidad,
     Teléfono: f.telefono,
+    Abonado: semaforoSimsDisponibles ? ({ activo: "Activo", inactivo: "Línea inactiva", sin_linea: "Sin línea instalada" }[f.abonado]) : "",
     "Última visita": fechaISOaLocal(f.ultima),
     "Días desde la última visita": f.dias ?? "",
     "Fuente de la última visita": f.fuente,
