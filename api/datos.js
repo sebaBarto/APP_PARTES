@@ -272,6 +272,20 @@ async function manejarColeccionCortada(nombreColeccion, metodo, body, backendUrl
     }
   }
 
+  // Historial de visitas importado del sistema de oficina (una fila por
+  // cliente con la fecha de su última visita) — alimenta el semáforo
+  // de visitas de admin.html.
+  if (nombreColeccion === "visitas_historicas") {
+    if (metodo === "GET") {
+      const r = await fetch(`${backendUrl}/api/visitas-historicas`, { headers });
+      return { status: r.status, data: await r.json() };
+    }
+    if (metodo === "POST") {
+      const r = await fetch(`${backendUrl}/api/visitas-historicas/importar`, { method: "POST", headers, body: JSON.stringify(body) });
+      return { status: r.status, data: await r.json() };
+    }
+  }
+
   if (nombreColeccion === "vehiculos") {
     if (metodo === "GET") {
       const r = await fetch(`${backendUrl}/api/vehiculos`, { headers });
@@ -606,7 +620,7 @@ module.exports = async (req, res) => {
   // El resto sigue en GitHub por ahora; se van cortando de a una,
   // probando cada una antes de seguir con la próxima. La app en el
   // celular no cambia en nada — sigue pidiendo lo mismo de siempre.
-  const COLECCIONES_YA_CORTADAS = ["clientes", "materiales", "credenciales", "consultas-categorias", "config", "guardias", "push-subscripciones", "servicios_emergencia", "vehiculos", "herramientas", "sims", "sims_instaladas", "notas"];
+  const COLECCIONES_YA_CORTADAS = ["clientes", "materiales", "credenciales", "consultas-categorias", "config", "guardias", "push-subscripciones", "servicios_emergencia", "vehiculos", "herramientas", "sims", "sims_instaladas", "notas", "visitas_historicas"];
   if (COLECCIONES_YA_CORTADAS.includes(nombreColeccion)) {
     const { BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN } = process.env;
     if (!BACKEND_NUEVO_URL || !BACKEND_NUEVO_TOKEN) {
