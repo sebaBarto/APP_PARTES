@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.106.1";
+const APP_VERSION = "3.107.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -881,8 +881,12 @@ function entrarComoTecnico(nombreTecnico) {
   actualizarAccesoDashboardFinanciero();
   showScreen("home");
   fetchServicios();
-  precargarHistorialParaVisitas().then(actualizarBadgeHistorialPendientes);
+  precargarHistorialParaVisitas().then(() => {
+    actualizarBadgeHistorialPendientes();
+    prepararFelicitacionSemanal();
+  });
   precargarNotasYAvisar();
+  prepararAvisoSimsPendientes();
   precargarCronogramaParaSugerencias();
   cargarClientesGeneral(); // precarga, para que esté lista al completar un parte (número de cliente en Stock, etc.)
   actualizarAccesoCredencial();
@@ -5477,6 +5481,129 @@ notasModalVerBtn.addEventListener("click", () => {
 notasModalDespuesBtn.addEventListener("click", () => {
   notasModalOverlay.classList.add("hidden");
 });
+
+// ---------- Avisos al iniciar sesión (SIMs por aceptar / felicitación semanal) ----------
+// Mismo formato que el cartel de notas sin leer. Se encolan para mostrar
+// de a uno; se muestran por debajo del cartel de notas (z-index menor).
+const avisoInicioOverlay = document.getElementById("avisoInicioOverlay");
+const avisoInicioEyebrow = document.getElementById("avisoInicioEyebrow");
+const avisoInicioTexto = document.getElementById("avisoInicioTexto");
+const avisoInicioAccionBtn = document.getElementById("avisoInicioAccionBtn");
+const avisoInicioCerrarBtn = document.getElementById("avisoInicioCerrarBtn");
+let colaAvisosInicio = [];
+let avisoInicioActual = null;
+
+function encolarAvisoInicio(aviso) {
+  colaAvisosInicio.push(aviso);
+  if (!avisoInicioActual) mostrarSiguienteAvisoInicio();
+}
+function mostrarSiguienteAvisoInicio() {
+  avisoInicioActual = colaAvisosInicio.shift() || null;
+  if (!avisoInicioActual) {
+    avisoInicioOverlay.classList.add("hidden");
+    return;
+  }
+  avisoInicioEyebrow.textContent = avisoInicioActual.eyebrow;
+  avisoInicioTexto.textContent = avisoInicioActual.texto;
+  avisoInicioAccionBtn.textContent = avisoInicioActual.accionTexto;
+  avisoInicioCerrarBtn.textContent = avisoInicioActual.cerrarTexto || "Después";
+  avisoInicioOverlay.classList.remove("hidden");
+}
+avisoInicioAccionBtn.addEventListener("click", () => {
+  const a = avisoInicioActual;
+  avisoInicioActual = null;
+  avisoInicioOverlay.classList.add("hidden");
+  if (a && a.accion) a.accion();
+  mostrarSiguienteAvisoInicio();
+});
+avisoInicioCerrarBtn.addEventListener("click", () => {
+  avisoInicioActual = null;
+  mostrarSiguienteAvisoInicio();
+});
+
+async function prepararAvisoSimsPendientes() {
+  if (!tecnicoLogueado) return;
+  const tecnicoAlPedir = tecnicoLogueado;
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch(`/api/recurso-uso?recurso=sim&pendientes=1&tecnico=${encodeURIComponent(tecnicoAlPedir)}`, { headers, cache: "no-store" });
+    if (!res.ok) return;
+    const pendientes = await res.json();
+    if (!Array.isArray(pendientes) || pendientes.length === 0) return;
+    if (tecnicoAlPedir !== tecnicoLogueado) return; // cerró sesión / cambió de usuario mientras tanto
+    const n = pendientes.length;
+    const origenes = [...new Set(pendientes.map((t) => t.tecnico_origen).filter(Boolean))];
+    encolarAvisoInicio({
+      eyebrow: "📲 TENÉS SIMs POR ACEPTAR",
+      texto: `Tenés ${n} SIM${n === 1 ? "" : "s"} pendiente${n === 1 ? "" : "s"} de aceptar o rechazar${origenes.length ? " (de " + origenes.join(", ") + ")" : ""}.`,
+      accionTexto: "Revisar",
+      accion: () => {
+        showScreen("sims");
+        renderSimsLista();
+        cargarTransferenciasPendientes();
+      },
+    });
+  } catch (err) {
+    // silencioso — el aviso simplemente no aparece
+  }
+}
+
+// Felicitación semanal: la misma que sale por push los viernes, pero
+// mostrada en pantalla al entrar. Se calcula con el historial ya
+// precargado (lunes a hoy), igual que el cron. Viernes desde las 15hs
+// hasta el domingo (para quien no abrió la app el viernes). Una sola vez
+// por semana y por técnico.
+async function prepararFelicitacionSemanal() {
+  if (!tecnicoLogueado) return;
+  try {
+    const partes = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Argentina/Buenos_Aires", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23", weekday: "short" }).formatToParts(new Date());
+    const p = {};
+    partes.forEach((x) => { p[x.type] = x.value; });
+    const dow = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 7 }[p.weekday];
+    const hora = Number(p.hour);
+    if (dow < 5 || (dow === 5 && hora < 15)) return;
+    const hoyStr = `${p.year}-${p.month}-${p.day}`;
+    const d = new Date(`${hoyStr}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() - (dow - 1));
+    const lunesStr = d.toISOString().slice(0, 10);
+    const claveVisto = `felicitacion_vista_${tecnicoLogueado}_${lunesStr}`;
+    try { if (localStorage.getItem(claveVisto)) return; } catch (e) {}
+
+    // Respeta el interruptor de admin (felicitacion_semanal_activa)
+    try {
+      const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+      const r = await fetch("/api/datos?coleccion=config", { headers, cache: "no-store" });
+      if (r.ok) {
+        const cfg = await r.json();
+        if (cfg && cfg.felicitacion_semanal_activa === false) return;
+      }
+    } catch (e) {}
+
+    const conteos = {};
+    (historialCache || []).forEach((h) => {
+      if (!h.fecha || !h.tecnico) return;
+      if (h.fecha < lunesStr || h.fecha > hoyStr) return;
+      conteos[h.tecnico] = (conteos[h.tecnico] || 0) + 1;
+    });
+    const nombres = Object.keys(conteos);
+    if (nombres.length === 0) return;
+    const max = Math.max(...nombres.map((n) => conteos[n]));
+    const ganadores = nombres.filter((n) => conteos[n] === max);
+    const soyGanador = ganadores.includes(tecnicoLogueado);
+    let texto;
+    if (ganadores.length === 1) {
+      texto = soyGanador
+        ? `¡Felicitaciones! Fuiste quien más servicios resolvió esta semana (${max}). 🎉`
+        : `${ganadores[0]} resolvió más servicios esta semana (${max}). ¡Felicitaciones! 🎉`;
+    } else {
+      texto = `¡Empate esta semana entre ${ganadores.join(" y ")}, con ${max} servicios cada uno! 🎉`;
+    }
+    try { localStorage.setItem(claveVisto, "1"); } catch (e) {}
+    encolarAvisoInicio({ eyebrow: "🏆 MEJOR DESEMPEÑO DE LA SEMANA", texto, accionTexto: "¡Gracias!", cerrarTexto: "Cerrar" });
+  } catch (err) {
+    // silencioso
+  }
+}
 
 // ---------- Rendir ticket (gastos de bolsillo del técnico) ----------
 const tileRendicionBtn = document.getElementById("tileRendicionBtn");

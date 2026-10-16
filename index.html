@@ -1493,6 +1493,17 @@
     </div>
   </div>
 
+  <div id="avisoInicioOverlay" class="hidden" style="position:fixed; inset:0; background:rgba(16,24,32,0.55); z-index:8990; display:flex; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:#FFFFFF; border-radius:16px; padding:22px; max-width:360px; width:100%;">
+      <p id="avisoInicioEyebrow" class="hint-eyebrow review-eyebrow" style="margin-top:0;"></p>
+      <p id="avisoInicioTexto" style="margin:8px 0 18px; color:#101820;"></p>
+      <div style="display:flex; gap:10px;">
+        <button type="button" class="btn btn-primary" id="avisoInicioAccionBtn">Ver</button>
+        <button type="button" class="btn btn-ghost-light" id="avisoInicioCerrarBtn">Después</button>
+      </div>
+    </div>
+  </div>
+
   <div id="parteDetalleModalOverlay" class="hidden" style="position:fixed; inset:0; background:rgba(16,24,32,0.6); z-index:9000; display:flex; align-items:flex-start; justify-content:center; padding:20px; overflow-y:auto;">
     <div style="background:#FFFFFF; border-radius:16px; padding:22px; max-width:480px; width:100%; margin:20px 0; color:#101820;">
       <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:4px;">
