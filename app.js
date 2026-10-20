@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.110.0";
+const APP_VERSION = "3.110.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -5142,7 +5142,13 @@ tileNotasBtn.addEventListener("click", () => {
   showScreen("notas");
   fetchNotas();
 });
-volverDeNotasBtn.addEventListener("click", () => showScreen("home"));
+volverDeNotasBtn.addEventListener("click", () => {
+  showScreen("home");
+  // Si estuvo mirando "Recibidas", lo que tenía en pantalla se da por
+  // leído (antes había que tocar cada nota una por una, y quien las lee
+  // sin tocarlas las seguía viendo como pendientes en cada ingreso).
+  if (notaTabActiva === "recibidas") marcarNotasLeidas(notasSinLeerDelTecnico());
+});
 
 document.querySelectorAll(".nota-tab-chip").forEach((chip) => {
   chip.addEventListener("click", () => {
@@ -5354,6 +5360,27 @@ async function marcarNotaLeida(n) {
   }
 }
 
+// Marca varias notas como leídas de una vez (en paralelo). Devuelve
+// cuántas se pudieron marcar. Un solo repintado al final.
+async function marcarNotasLeidas(lista) {
+  if (!lista || lista.length === 0) return 0;
+  const resultados = await Promise.allSettled(lista.map(async (n) => {
+    const res = await fetch("/api/datos?coleccion=notas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({ accion: "marcar_leida", nota_id: n.id, tecnico: tecnicoLogueado || "" }),
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    n.leido = 1;
+  }));
+  renderNotas();
+  actualizarBadgeNotas();
+  return resultados.filter((r) => r.status === "fulfilled").length;
+}
+function notasSinLeerDelTecnico() {
+  return notasCache.filter((f) => f.tecnico === tecnicoLogueado && !f.leido);
+}
+
 function agruparNotasEnviadas(filas) {
   const mapa = new Map();
   filas.forEach((f) => {
@@ -5434,7 +5461,10 @@ function renderNotas() {
       ? `<div class="nota-card-de">Para: ${n.destinatarios.map((d) => `${escapeHtml(d.tecnico)}${d.leido ? " ✓" : ""}`).join(", ")}</div>`
       : "";
     const responderHtml = notaTabActiva === "recibidas"
-      ? `<button type="button" class="btn btn-ghost-light nota-responder-btn" style="margin-top:8px; padding:4px 10px; font-size:12px;">↩ Responder</button>`
+      ? `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
+          <button type="button" class="btn btn-ghost-light nota-responder-btn" style="padding:4px 10px; font-size:12px;">↩ Responder</button>
+          ${noLeida ? '<button type="button" class="btn btn-ghost-light nota-leida-btn" style="padding:4px 10px; font-size:12px;">✓ Marcar como leída</button>' : ""}
+        </div>`
       : "";
 
     card.innerHTML = `
@@ -5461,11 +5491,35 @@ function renderNotas() {
     if (btnResponder) {
       btnResponder.addEventListener("click", (e) => {
         e.stopPropagation();
+        if (noLeida) marcarNotaLeida(n); // si la va a responder, ya la leyó
         abrirFormularioNota(n.de);
+      });
+    }
+    const btnLeida = card.querySelector(".nota-leida-btn");
+    if (btnLeida) {
+      btnLeida.addEventListener("click", (e) => {
+        e.stopPropagation();
+        marcarNotaLeida(n);
       });
     }
     notasList.appendChild(card);
   });
+
+  // Atajo: marcar todas las pendientes de una vez
+  const pendientesAca = notaTabActiva === "recibidas" ? items.filter((n) => !n.leido) : [];
+  if (pendientesAca.length > 1) {
+    const btnTodas = document.createElement("button");
+    btnTodas.type = "button";
+    btnTodas.className = "btn btn-secondary";
+    btnTodas.style.marginBottom = "10px";
+    btnTodas.textContent = `✓ Marcar las ${pendientesAca.length} como leídas`;
+    btnTodas.addEventListener("click", async () => {
+      btnTodas.disabled = true;
+      const ok = await marcarNotasLeidas(pendientesAca);
+      if (ok < pendientesAca.length) showToast("Algunas no se pudieron marcar. Probá de nuevo.");
+    });
+    notasList.insertBefore(btnTodas, notasList.firstChild);
+  }
 }
 
 async function precargarNotasYAvisar() {
