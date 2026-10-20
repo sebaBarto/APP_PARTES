@@ -1923,3 +1923,6 @@ html[data-theme="night"] .ajuste-volumen { background: #1B2530; border-color: #2
 #probarSonidosBtn .ajuste-ico { color: currentColor; margin-right: 6px; width: 16px; height: 16px; }
 html[data-theme="night"] .ajuste-ico, html[data-theme="night"] .ajuste-volumen-ico { color: #F5A623; }
 html[data-theme="night"] #probarSonidosBtn .ajuste-ico { color: currentColor; }
+
+/* Ícono de línea en el título de los carteles de aviso */
+.aviso-ico { width: 15px; height: 15px; vertical-align: -3px; margin-right: 6px; stroke: currentColor; }

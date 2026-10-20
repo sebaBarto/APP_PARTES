@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.112.1";
+const APP_VERSION = "3.112.2";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -5798,15 +5798,15 @@ function mostrarSiguienteCartelTest() {
   }
   const c = cartelTestActual;
   if (c.tipo === "poner") {
-    recordatorioTestEyebrow.textContent = "📍 LLEGASTE AL SERVICIO";
+    recordatorioTestEyebrow.innerHTML = tituloAvisoHtml("pin", "LLEGASTE AL SERVICIO");
     recordatorioTestTitulo.textContent = "PONER EL CLIENTE EN TEST";
     recordatorioTestDetalle.textContent = "Antes de empezar, poné la cuenta en test.";
-    recordatorioTestOkBtn.textContent = "✅ Ya lo puse en test";
+    recordatorioTestOkBtn.innerHTML = tituloAvisoHtml("check", "Ya lo puse en test");
   } else {
-    recordatorioTestEyebrow.textContent = "✔ SERVICIO CERRADO";
+    recordatorioTestEyebrow.innerHTML = tituloAvisoHtml("check", "SERVICIO CERRADO");
     recordatorioTestTitulo.textContent = "QUITAR EL CLIENTE DE TEST Y NOTIFICAR CAMBIOS";
     recordatorioTestDetalle.textContent = "No te vayas sin sacarlo de test y avisar lo que modificaste.";
-    recordatorioTestOkBtn.textContent = "✅ Listo, ya lo hice";
+    recordatorioTestOkBtn.innerHTML = tituloAvisoHtml("check", "Listo, ya lo hice");
   }
   recordatorioTestCliente.textContent = c.cliente || "";
   recordatorioTestOverlay.classList.remove("hidden");
@@ -5938,6 +5938,18 @@ async function iniciarRecordatorioTestGeo() {
   testGeoTimerRefresco = setTimeout(() => { if (tecnicoLogueado) iniciarRecordatorioTestGeo(); }, 30 * 60 * 1000);
 }
 
+// Íconos de línea para los títulos de los carteles de aviso (en vez de emojis)
+const ICONOS_AVISO = {
+  pin: '<path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/>',
+  check: '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.5"/>',
+  sim: '<path d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><rect x="9.5" y="12" width="5" height="5" rx="1"/>',
+  trophy: '<path d="M8 21h8M12 17v4M7 4h10v6a5 5 0 0 1-10 0z"/><path d="M7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3"/>',
+};
+function tituloAvisoHtml(icono, texto) {
+  const d = ICONOS_AVISO[icono] || "";
+  return `<svg class="aviso-ico" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>${escapeHtml(texto)}`;
+}
+
 // ---------- Avisos al iniciar sesión (SIMs por aceptar / felicitación semanal) ----------
 // Mismo formato que el cartel de notas sin leer. Se encolan para mostrar
 // de a uno; se muestran por debajo del cartel de notas (z-index menor).
@@ -5959,7 +5971,7 @@ function mostrarSiguienteAvisoInicio() {
     avisoInicioOverlay.classList.add("hidden");
     return;
   }
-  avisoInicioEyebrow.textContent = avisoInicioActual.eyebrow;
+  avisoInicioEyebrow.innerHTML = tituloAvisoHtml(avisoInicioActual.icono, avisoInicioActual.eyebrow);
   avisoInicioTexto.textContent = avisoInicioActual.texto;
   avisoInicioAccionBtn.textContent = avisoInicioActual.accionTexto;
   avisoInicioCerrarBtn.textContent = avisoInicioActual.cerrarTexto || "Después";
@@ -5990,7 +6002,8 @@ async function prepararAvisoSimsPendientes() {
     const n = pendientes.length;
     const origenes = [...new Set(pendientes.map((t) => t.tecnico_origen).filter(Boolean))];
     encolarAvisoInicio({
-      eyebrow: "📲 TENÉS SIMs POR ACEPTAR",
+      icono: "sim",
+      eyebrow: "TENÉS SIMs POR ACEPTAR",
       texto: `Tenés ${n} SIM${n === 1 ? "" : "s"} pendiente${n === 1 ? "" : "s"} de aceptar o rechazar${origenes.length ? " (de " + origenes.join(", ") + ")" : ""}.`,
       accionTexto: "Revisar",
       accion: () => {
@@ -6055,7 +6068,7 @@ async function prepararFelicitacionSemanal() {
       texto = `¡Empate esta semana entre ${ganadores.join(" y ")}, con ${max} servicios cada uno! 🎉`;
     }
     try { localStorage.setItem(claveVisto, "1"); } catch (e) {}
-    encolarAvisoInicio({ eyebrow: "🏆 MEJOR DESEMPEÑO DE LA SEMANA", texto, accionTexto: "¡Gracias!", cerrarTexto: "Cerrar" });
+    encolarAvisoInicio({ icono: "trophy", eyebrow: "MEJOR DESEMPEÑO DE LA SEMANA", texto, accionTexto: "¡Gracias!", cerrarTexto: "Cerrar" });
   } catch (err) {
     // silencioso
   }
