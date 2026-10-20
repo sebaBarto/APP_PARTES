@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.112.2";
+const APP_VERSION = "3.113.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -5550,7 +5550,7 @@ notasModalDespuesBtn.addEventListener("click", () => {
 
 // ---------- Ajustes (apariencia + carteles de aviso) ----------
 // Se guardan solo en este celular (localStorage).
-const AJUSTES_DEFECTO = { tema: "clasico", tamano: "normal", avisoTestPoner: true, avisoTestQuitar: true, sonidoBotones: true, vibracionBotones: true, sonidoResultado: true, volumen: 50, estiloSonido: "suave", avisoSims: true, avisoFelicitacion: true };
+const AJUSTES_DEFECTO = { tema: "clasico", tamano: "normal", avisoTestPoner: true, avisoTestQuitar: true, sonidoBotones: true, vibracionBotones: true, sonidoResultado: true, sonidoFelicitacion: true, confetiFelicitacion: true, volumen: 50, estiloSonido: "suave", avisoSims: true, avisoFelicitacion: true };
 function leerAjustes() {
   try {
     const guardado = JSON.parse(localStorage.getItem("ajustes_app") || "{}");
@@ -5646,6 +5646,7 @@ document.getElementById("probarSonidosBtn").addEventListener("click", () => {
   sonarToque(true);
   setTimeout(() => sonarExito(true), 350);
   setTimeout(() => sonarError(true), 1300);
+  setTimeout(() => { sonarVitoreo(true); lanzarConfeti(true); }, 2300);
 });
 document.querySelectorAll("#ajusteEstiloSonido .ajuste-tema-chip").forEach((chip) => {
   chip.addEventListener("click", () => {
@@ -5726,6 +5727,96 @@ function tonoSuave(ctx, freq, inicio, dur, vol, tipo) {
 function vibrar(patron) {
   try { if (navigator.vibrate) navigator.vibrate(patron); } catch (e) {}
 }
+// Vitoreo: fanfarria corta + aplauso (ráfagas de ruido filtrado). Dura ~3 s.
+function sonarVitoreo(forzar) {
+  if (!leerAjustes().sonidoFelicitacion && !forzar) return;
+  const ctx = obtenerAudio();
+  if (!ctx) return;
+  const mult = multiplicadorVolumen();
+  // Fanfarria ascendente
+  [[523, 0, 0.16], [659, 0.16, 0.16], [784, 0.32, 0.16], [1047, 0.48, 0.7]].forEach(([f, ini, dur]) => {
+    tonoSuave(ctx, f, ini, dur, Math.min(0.5, 0.11 * mult), "triangle");
+    tonoSuave(ctx, f * 2, ini, dur, Math.min(0.5, 0.03 * mult), "sine");
+  });
+  // Aplauso: muchas palmadas cortas, más densas al medio
+  const base = ctx.currentTime + 0.35;
+  const palmadas = 70;
+  for (let i = 0; i < palmadas; i++) {
+    const u = Math.random();
+    const t = base + (u * 0.5 + Math.pow(Math.random(), 1.4) * 2.0); // entre 0 y ~2.5 s
+    const dur = 0.035 + Math.random() * 0.05;
+    const largo = Math.max(1, Math.floor(ctx.sampleRate * dur));
+    const buf = ctx.createBuffer(1, largo, ctx.sampleRate);
+    const datos = buf.getChannelData(0);
+    for (let k = 0; k < largo; k++) datos[k] = (Math.random() * 2 - 1) * (1 - k / largo);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const filtro = ctx.createBiquadFilter();
+    filtro.type = "bandpass";
+    filtro.frequency.value = 1300 + Math.random() * 2400;
+    filtro.Q.value = 0.9;
+    const gain = ctx.createGain();
+    // un poco menos fuerte hacia el final (se va apagando)
+    const caida = 1 - Math.min(1, (t - base) / 3);
+    gain.gain.value = Math.min(1, (0.35 + Math.random() * 0.3) * mult * (0.4 + 0.6 * caida));
+    src.connect(filtro); filtro.connect(gain); gain.connect(ctx.destination);
+    src.start(t);
+  }
+  vibrar([60, 40, 60, 40, 120]);
+}
+// Papel picado: lluvia de confeti en un canvas a pantalla completa
+// (por encima de todo, sin bloquear los toques). Dura ~5 s y se borra solo.
+function lanzarConfeti(forzar) {
+  if (!leerAjustes().confetiFelicitacion && !forzar) return;
+  try { if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches && !forzar) return; } catch (e) {}
+  const canvas = document.createElement("canvas");
+  canvas.style.cssText = "position:fixed; inset:0; width:100vw; height:100vh; pointer-events:none; z-index:9999;";
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const W = window.innerWidth, H = window.innerHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  document.body.appendChild(canvas);
+  const g = canvas.getContext("2d");
+  g.scale(dpr, dpr);
+  const colores = ["#F5A623", "#17A2A0", "#E4402C", "#6C63C4", "#2E9E4F", "#2E86DE", "#FFD98E", "#FFFFFF"];
+  const cantidad = Math.min(170, Math.round(W / 3));
+  const piezas = [];
+  for (let i = 0; i < cantidad; i++) {
+    piezas.push({
+      x: Math.random() * W,
+      y: -20 - Math.random() * H * 0.6,          // salen escalonadas desde arriba
+      w: 6 + Math.random() * 7,
+      h: 9 + Math.random() * 9,
+      vx: (Math.random() - 0.5) * 1.6,
+      vy: 2 + Math.random() * 3.2,
+      rot: Math.random() * Math.PI * 2,
+      vr: (Math.random() - 0.5) * 0.35,
+      sway: Math.random() * Math.PI * 2,
+      color: colores[Math.floor(Math.random() * colores.length)],
+    });
+  }
+  const DURACION = 5200;
+  const t0 = performance.now();
+  function cuadro(ahora) {
+    const t = ahora - t0;
+    g.clearRect(0, 0, W, H);
+    g.globalAlpha = t > DURACION - 900 ? Math.max(0, (DURACION - t) / 900) : 1; // se desvanece al final
+    piezas.forEach((p) => {
+      p.x += p.vx + Math.sin(p.sway + t / 400) * 0.9;
+      p.y += p.vy;
+      p.rot += p.vr;
+      g.save();
+      g.translate(p.x, p.y);
+      g.rotate(p.rot);
+      g.scale(1, Math.cos(p.rot * 1.7)); // simula el giro del papelito
+      g.fillStyle = p.color;
+      g.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      g.restore();
+    });
+    if (t < DURACION) requestAnimationFrame(cuadro);
+    else canvas.remove();
+  }
+  requestAnimationFrame(cuadro);
+}
 // forzar = true: para las pruebas desde Ajustes (suena aunque el interruptor esté apagado)
 function sonarToque(forzar) {
   const aj = leerAjustes();
@@ -5744,6 +5835,7 @@ function sonarError(forzar) {
 }
 // Un solo oyente para todos los botones/menús de la app
 document.addEventListener("click", (e) => {
+  obtenerAudio(); // desbloquea el audio con cualquier toque (aunque los sonidos de botón estén apagados)
   const el = e.target.closest && e.target.closest("button, .panel-tile, .servicio-card, .crono-tarea-card, .sim-card, .consulta-manual-item");
   if (!el || el.disabled || el.id === "probarSonidosBtn" || el.closest("#ajusteEstiloSonido")) return;
   sonarToque();
@@ -5976,6 +6068,8 @@ function mostrarSiguienteAvisoInicio() {
   avisoInicioAccionBtn.textContent = avisoInicioActual.accionTexto;
   avisoInicioCerrarBtn.textContent = avisoInicioActual.cerrarTexto || "Después";
   avisoInicioOverlay.classList.remove("hidden");
+  if (typeof avisoInicioActual.sonido === "function") avisoInicioActual.sonido();
+  if (typeof avisoInicioActual.efecto === "function") avisoInicioActual.efecto();
 }
 avisoInicioAccionBtn.addEventListener("click", () => {
   const a = avisoInicioActual;
@@ -6068,7 +6162,7 @@ async function prepararFelicitacionSemanal() {
       texto = `¡Empate esta semana entre ${ganadores.join(" y ")}, con ${max} servicios cada uno! 🎉`;
     }
     try { localStorage.setItem(claveVisto, "1"); } catch (e) {}
-    encolarAvisoInicio({ icono: "trophy", eyebrow: "MEJOR DESEMPEÑO DE LA SEMANA", texto, accionTexto: "¡Gracias!", cerrarTexto: "Cerrar" });
+    encolarAvisoInicio({ sonido: () => sonarVitoreo(), efecto: () => lanzarConfeti(), icono: "trophy", eyebrow: "MEJOR DESEMPEÑO DE LA SEMANA", texto, accionTexto: "¡Gracias!", cerrarTexto: "Cerrar" });
   } catch (err) {
     // silencioso
   }
