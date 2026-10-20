@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.113.1";
+const APP_VERSION = "3.114.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -724,6 +724,7 @@ function showScreen(name) {
   // La tuerquita de Ajustes solo se ve con sesión iniciada (no en el login)
   const btnAjustes = document.getElementById("ajustesBtn");
   if (btnAjustes) btnAjustes.classList.toggle("hidden", name === "login");
+  try { actualizarWakeLockPantalla(name); } catch (e) { /* los ajustes todavía no cargaron */ }
 }
 
 function setStatus(text, mode) {
@@ -897,6 +898,7 @@ function entrarComoTecnico(nombreTecnico) {
   actualizarAccesoCredencial();
   actualizarAccesoExcelDashboards();
   actualizarAccesoSeccionesPanel();
+  aplicarMosaicos();
   actualizarSaludoPanel();
   verificarEstadoNotificaciones();
   actualizarBadgeColaEnvios();
@@ -5550,7 +5552,7 @@ notasModalDespuesBtn.addEventListener("click", () => {
 
 // ---------- Ajustes (apariencia + carteles de aviso) ----------
 // Se guardan solo en este celular (localStorage).
-const AJUSTES_DEFECTO = { tema: "clasico", tamano: "normal", avisoTestPoner: true, avisoTestQuitar: true, sonidoBotones: true, vibracionBotones: true, sonidoResultado: true, sonidoFelicitacion: true, confetiFelicitacion: true, volumen: 50, estiloSonido: "suave", avisoSims: true, avisoFelicitacion: true };
+const AJUSTES_DEFECTO = { tema: "clasico", tamano: "normal", avisoTestPoner: true, avisoTestQuitar: true, sonidoBotones: true, vibracionBotones: true, sonidoResultado: true, sonidoFelicitacion: true, confetiFelicitacion: true, volumen: 50, botonesGrandes: false, pantallaEncendida: false, appMapas: "google", bloqueoHuella: false, cierreInactividad: 0, mosaicos: { orden: [], ocultos: [] }, estiloSonido: "suave", avisoSims: true, avisoFelicitacion: true };
 function leerAjustes() {
   try {
     const guardado = JSON.parse(localStorage.getItem("ajustes_app") || "{}");
@@ -5565,10 +5567,10 @@ function guardarAjustes(ajustes) {
 function aplicarTema() {
   let t = leerAjustes().tema;
   if (t === "auto") t = (window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches) ? "night" : "day";
-  if (t === "night" || t === "day") document.documentElement.setAttribute("data-theme", t);
+  if (t === "night" || t === "day" || t === "contraste") document.documentElement.setAttribute("data-theme", t);
   else document.documentElement.removeAttribute("data-theme");
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", t === "day" ? "#EEF0EA" : "#101820");
+  if (meta) meta.setAttribute("content", t === "contraste" ? "#FFFFFF" : t === "day" ? "#EEF0EA" : "#101820");
 }
 function aplicarTamano() {
   const esc = { chico: 0.88, normal: 1, grande: 1.2 }[leerAjustes().tamano] || 1;
@@ -5599,6 +5601,8 @@ function renderAjustes() {
   });
   const rangoVol = document.getElementById("ajusteVolumen");
   if (rangoVol) rangoVol.value = aj.volumen;
+  renderGruposChips();
+  renderMosaicosAjustes();
   document.querySelectorAll("#screen-ajustes input[data-ajuste]").forEach((inp) => {
     inp.checked = !!aj[inp.dataset.ajuste];
   });
@@ -5633,6 +5637,8 @@ document.querySelectorAll("#screen-ajustes input[data-ajuste]").forEach((inp) =>
     const aj = leerAjustes();
     aj[inp.dataset.ajuste] = inp.checked;
     guardarAjustes(aj);
+    if (inp.dataset.ajuste === "botonesGrandes") aplicarBotonesGrandes();
+    if (inp.dataset.ajuste === "pantallaEncendida") actualizarWakeLockPantalla();
     if (inp.dataset.ajuste === "avisoTestPoner") {
       if (inp.checked) iniciarRecordatorioTestGeo();
       else detenerRecordatorioTestGeo();
@@ -5642,6 +5648,7 @@ document.querySelectorAll("#screen-ajustes input[data-ajuste]").forEach((inp) =>
 });
 aplicarTema();
 aplicarTamano();
+aplicarBotonesGrandes();
 document.getElementById("probarSonidosBtn").addEventListener("click", () => {
   sonarToque(true);
   setTimeout(() => sonarExito(true), 350);
@@ -5840,6 +5847,232 @@ document.addEventListener("click", (e) => {
   if (!el || el.disabled || el.id === "probarSonidosBtn" || el.closest("#ajusteEstiloSonido")) return;
   sonarToque();
 }, true);
+
+// ---------- Opciones nuevas de Ajustes ----------
+// Botones grandes
+function aplicarBotonesGrandes() {
+  if (leerAjustes().botonesGrandes) document.documentElement.setAttribute("data-botones", "grandes");
+  else document.documentElement.removeAttribute("data-botones");
+}
+
+// Mantener la pantalla encendida mientras se carga un parte/instalación/firma/rendición
+const PANTALLAS_DE_TRABAJO = ["form", "claves", "sign", "sending", "instalacion", "comodatoForm", "comodatoFirma", "rendicion", "presencia"];
+let pantallaWakeLock = null;
+let pantallaActualNombre = "";
+function pantallaActivaNombre() {
+  const act = Object.entries(screens).find(([, el]) => el.dataset.active === "true");
+  return act ? act[0] : "";
+}
+async function actualizarWakeLockPantalla(nombre) {
+  pantallaActualNombre = nombre || pantallaActivaNombre();
+  const debeTenerla = leerAjustes().pantallaEncendida && PANTALLAS_DE_TRABAJO.includes(pantallaActualNombre) && !!tecnicoLogueado;
+  if (debeTenerla) {
+    if (pantallaWakeLock || !("wakeLock" in navigator)) return;
+    try {
+      pantallaWakeLock = await navigator.wakeLock.request("screen");
+      pantallaWakeLock.addEventListener("release", () => { pantallaWakeLock = null; });
+    } catch (e) { pantallaWakeLock = null; }
+  } else if (pantallaWakeLock) {
+    pantallaWakeLock.release().catch(() => {});
+    pantallaWakeLock = null;
+  }
+}
+
+// Cómo llegar (Google Maps / Waze)
+const comoLlegarBtn = document.getElementById("comoLlegarBtn");
+comoLlegarBtn.addEventListener("click", () => {
+  const dir = document.getElementById("f_direccion").value.trim();
+  const loc = document.getElementById("f_localidad").value.trim();
+  if (!dir) { showToast("Completá la dirección antes de pedir cómo llegar."); return; }
+  const q = encodeURIComponent([dir, loc, "Argentina"].filter(Boolean).join(", "));
+  const url = leerAjustes().appMapas === "waze"
+    ? `https://waze.com/ul?q=${q}&navigate=yes`
+    : `https://www.google.com/maps/dir/?api=1&destination=${q}`;
+  window.open(url, "_blank", "noopener");
+});
+
+// Mosaicos del inicio: orden y ocultos (por celular)
+function mosaicosDelInicio() {
+  return [...document.querySelectorAll("#screen-home .panel-tiles-grid > .panel-tile")];
+}
+function aplicarMosaicos() {
+  const m = leerAjustes().mosaicos || {};
+  const orden = Array.isArray(m.orden) ? m.orden : [];
+  const ocultos = new Set(Array.isArray(m.ocultos) ? m.ocultos : []);
+  mosaicosDelInicio().forEach((el, i) => {
+    const idx = orden.indexOf(el.id);
+    el.style.order = idx >= 0 ? idx : 1000 + i;
+    el.classList.toggle("mosaico-oculto", ocultos.has(el.id));
+  });
+}
+function renderMosaicosAjustes() {
+  const cont = document.getElementById("ajusteMosaicos");
+  if (!cont) return;
+  const m = leerAjustes().mosaicos || {};
+  const orden = Array.isArray(m.orden) ? m.orden : [];
+  const ocultos = new Set(Array.isArray(m.ocultos) ? m.ocultos : []);
+  const todos = mosaicosDelInicio();
+  // Solo los que este usuario tiene habilitados (permisos), en el orden actual
+  const visibles = todos
+    .filter((el) => !el.classList.contains("hidden"))
+    .sort((x, y) => {
+      const ix = orden.indexOf(x.id), iy = orden.indexOf(y.id);
+      return (ix >= 0 ? ix : 1000 + todos.indexOf(x)) - (iy >= 0 ? iy : 1000 + todos.indexOf(y));
+    });
+  const restoIds = todos.filter((el) => el.classList.contains("hidden")).map((el) => el.id);
+  const guardarOrden = (ids) => {
+    const aj = leerAjustes();
+    aj.mosaicos = { orden: ids.concat(restoIds), ocultos: [...ocultos] };
+    guardarAjustes(aj);
+    aplicarMosaicos();
+    renderMosaicosAjustes();
+  };
+  const flecha = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
+  const ojo = (tachado) => `<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>${tachado ? '<path d="M3 3l18 18"/>' : ""}</svg>`;
+  cont.innerHTML = "";
+  visibles.forEach((el, i) => {
+    const fila = document.createElement("div");
+    const oculto = ocultos.has(el.id);
+    fila.className = "mosaico-fila" + (oculto ? " oculto" : "");
+    const badge = el.querySelector(".panel-tile-icon-badge");
+    const etiqueta = (el.querySelector(".panel-tile-label")?.textContent || el.id).trim();
+    const cls = [...el.classList].find((c) => c.startsWith("tile-")) || "";
+    fila.innerHTML = `
+      <span class="${cls}">${badge ? badge.outerHTML : ""}</span>
+      <span class="mosaico-nombre">${escapeHtml(etiqueta)}</span>
+      <button type="button" class="mosaico-btn" data-acc="subir" title="Subir" aria-label="Subir" ${i === 0 ? "disabled" : ""}>${flecha("M6 15l6-6 6 6")}</button>
+      <button type="button" class="mosaico-btn" data-acc="bajar" title="Bajar" aria-label="Bajar" ${i === visibles.length - 1 ? "disabled" : ""}>${flecha("M6 9l6 6 6-6")}</button>
+      <button type="button" class="mosaico-btn" data-acc="ojo" title="${oculto ? "Mostrar" : "Ocultar"}" aria-label="${oculto ? "Mostrar" : "Ocultar"}">${ojo(oculto)}</button>`;
+    fila.querySelector('[data-acc="subir"]').addEventListener("click", () => {
+      const ids = visibles.map((x) => x.id); [ids[i - 1], ids[i]] = [ids[i], ids[i - 1]]; guardarOrden(ids);
+    });
+    fila.querySelector('[data-acc="bajar"]').addEventListener("click", () => {
+      const ids = visibles.map((x) => x.id); [ids[i + 1], ids[i]] = [ids[i], ids[i + 1]]; guardarOrden(ids);
+    });
+    fila.querySelector('[data-acc="ojo"]').addEventListener("click", () => {
+      if (ocultos.has(el.id)) ocultos.delete(el.id); else ocultos.add(el.id);
+      guardarOrden(visibles.map((x) => x.id));
+    });
+    cont.appendChild(fila);
+  });
+}
+
+// Grupos de botones tipo "chips" genéricos (mapa, cierre de sesión)
+const GRUPOS_CHIPS = [
+  { sel: "#ajusteMapas", attr: "mapa", clave: "appMapas", num: false },
+  { sel: "#ajusteCierre", attr: "cierre", clave: "cierreInactividad", num: true },
+];
+function renderGruposChips() {
+  const aj = leerAjustes();
+  GRUPOS_CHIPS.forEach((g) => {
+    document.querySelectorAll(`${g.sel} .ajuste-tema-chip`).forEach((chip) => {
+      const v = g.num ? Number(chip.dataset[g.attr]) : chip.dataset[g.attr];
+      chip.classList.toggle("active", v === aj[g.clave]);
+    });
+  });
+}
+GRUPOS_CHIPS.forEach((g) => {
+  document.querySelectorAll(`${g.sel} .ajuste-tema-chip`).forEach((chip) => {
+    chip.addEventListener("click", () => {
+      const aj = leerAjustes();
+      aj[g.clave] = g.num ? Number(chip.dataset[g.attr]) : chip.dataset[g.attr];
+      guardarAjustes(aj);
+      renderGruposChips();
+    });
+  });
+});
+
+// Restablecer todo
+document.getElementById("restablecerAjustesBtn").addEventListener("click", () => {
+  if (!confirm("¿Restablecer todos los ajustes (apariencia, tamaño, sonidos, avisos, mosaicos del inicio) a los valores de fábrica?")) return;
+  try { localStorage.removeItem("ajustes_app"); } catch (e) {}
+  aplicarTema(); aplicarTamano(); aplicarBotonesGrandes(); aplicarMosaicos();
+  actualizarWakeLockPantalla();
+  renderAjustes();
+  showToast("Ajustes restablecidos.");
+});
+
+// ----- Seguridad: huella al abrir + cierre por inactividad -----
+const bloqueoOverlay = document.getElementById("bloqueoOverlay");
+const bloqueoDesbloquearBtn = document.getElementById("bloqueoDesbloquearBtn");
+const bloqueoSalirBtn = document.getElementById("bloqueoSalirBtn");
+const bloqueoError = document.getElementById("bloqueoError");
+const huellaCache = {};
+async function tecnicoTieneHuella(nombre) {
+  if (!nombre || nombre === "__general__") return false;
+  if (huellaCache[nombre] !== undefined) return huellaCache[nombre];
+  try {
+    if (!window.SimpleWebAuthnBrowser || !window.SimpleWebAuthnBrowser.browserSupportsWebAuthn()) return false;
+    const res = await fetch("/api/datos?coleccion=tecnicos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({ accion: "webauthn_tiene_credencial", nombre }),
+    });
+    const data = await res.json();
+    huellaCache[nombre] = !!data.tiene;
+  } catch (e) {
+    return false; // sin conexión: no se bloquea (para no dejar afuera a nadie)
+  }
+  return huellaCache[nombre];
+}
+async function bloquearSiCorresponde() {
+  if (!tecnicoLogueado || !leerAjustes().bloqueoHuella) return;
+  if (!bloqueoOverlay.classList.contains("hidden")) return;
+  if (!(await tecnicoTieneHuella(tecnicoLogueado))) return;
+  bloqueoError.textContent = "";
+  bloqueoOverlay.classList.remove("hidden");
+  desbloquearConHuella(true);
+}
+async function desbloquearConHuella(silencioso) {
+  const nombre = tecnicoLogueado;
+  if (!nombre) return;
+  bloqueoDesbloquearBtn.disabled = true;
+  bloqueoError.textContent = "";
+  try {
+    const headers = { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const resOpc = await fetch("/api/datos?coleccion=tecnicos", { method: "POST", headers, body: JSON.stringify({ accion: "webauthn_login_opciones", nombre }) });
+    const opciones = await resOpc.json();
+    if (!resOpc.ok || opciones.error) throw new Error(opciones.error || "No se pudo iniciar");
+    const respuesta = await window.SimpleWebAuthnBrowser.startAuthentication({ optionsJSON: opciones });
+    const resVer = await fetch("/api/datos?coleccion=tecnicos", { method: "POST", headers, body: JSON.stringify({ accion: "webauthn_login_verificar", nombre, respuesta }) });
+    const dataVer = await resVer.json();
+    if (!resVer.ok || !dataVer.ok) throw new Error(dataVer.error || "No se pudo verificar");
+    bloqueoOverlay.classList.add("hidden");
+  } catch (err) {
+    if (!silencioso && err.name !== "NotAllowedError") bloqueoError.textContent = "No se pudo desbloquear. Probá de nuevo.";
+  } finally {
+    bloqueoDesbloquearBtn.disabled = false;
+  }
+}
+bloqueoDesbloquearBtn.addEventListener("click", () => desbloquearConHuella(false));
+bloqueoSalirBtn.addEventListener("click", () => {
+  bloqueoOverlay.classList.add("hidden");
+  cerrarSesionBtn.click();
+});
+
+let ultimaActividad = Date.now();
+let ultimoOculto = 0;
+["click", "touchstart", "keydown"].forEach((ev) => document.addEventListener(ev, () => { ultimaActividad = Date.now(); }, true));
+function revisarCierreInactividad() {
+  const min = Number(leerAjustes().cierreInactividad) || 0;
+  if (!min || !tecnicoLogueado) return;
+  if (Date.now() - ultimaActividad < min * 60000) return;
+  if (PANTALLAS_DE_TRABAJO.includes(pantallaActivaNombre())) return; // no corta una carga a medias
+  bloqueoOverlay.classList.add("hidden");
+  cerrarSesionBtn.click();
+  showToast("Cerraste sesión por inactividad.");
+}
+setInterval(revisarCierreInactividad, 60000);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") {
+    ultimoOculto = Date.now();
+  } else {
+    revisarCierreInactividad();
+    if (tecnicoLogueado && ultimoOculto && Date.now() - ultimoOculto > 2 * 60 * 1000) bloquearSiCorresponde();
+    // La pantalla encendida se pierde al ocultar la app: se vuelve a pedir
+    actualizarWakeLockPantalla();
+  }
+});
 
 // ---------- Recordatorio "cliente en TEST" (al llegar y al cerrar) ----------
 // 1) Al acercarse (por GPS, con la app abierta) a un servicio que tiene
@@ -10522,4 +10755,4 @@ async function abrirPlano(nombre, boton) {
 
 // Al abrir la app, si hay una sesión guardada y vigente, entra directo
 // sin pasar por el login (ver SESION_DURACION_MS más arriba).
-intentarRestaurarSesion();
+if (intentarRestaurarSesion()) bloquearSiCorresponde();

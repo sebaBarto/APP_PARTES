@@ -1838,46 +1838,46 @@ html[data-theme="night"] [style*="background:#F4F5F0"] { background: #243140 !im
 html[data-theme="night"] .btn-info-inline { color: #101820 !important; }
 
 /* ================= DÍA ================= */
-html[data-theme="day"] { color-scheme: light; }
-html[data-theme="day"] :is(html, body, .review-scroll, #screen-home .review-scroll, .action-bar) { background: #EEF0EA; color: #101820; }
-html[data-theme="day"] .app { box-shadow: 0 24px 60px rgba(16,24,32,0.18); }
-html[data-theme="day"] .topbar-status { color: #5C7A8A; border-color: #C7CCC3; }
-html[data-theme="day"] .topbar-ajustes { color: #5C7A8A; border-color: #C7CCC3; }
-html[data-theme="day"] .topbar-status.busy { color: #B5772A; border-color: #B5772A; }
-html[data-theme="day"] .topbar-mark { color: #E8A200; }
+html:is([data-theme="day"],[data-theme="contraste"]) { color-scheme: light; }
+html:is([data-theme="day"],[data-theme="contraste"]) :is(html, body, .review-scroll, #screen-home .review-scroll, .action-bar) { background: #EEF0EA; color: #101820; }
+html:is([data-theme="day"],[data-theme="contraste"]) .app { box-shadow: 0 24px 60px rgba(16,24,32,0.18); }
+html:is([data-theme="day"],[data-theme="contraste"]) .topbar-status { color: #5C7A8A; border-color: #C7CCC3; }
+html:is([data-theme="day"],[data-theme="contraste"]) .topbar-ajustes { color: #5C7A8A; border-color: #C7CCC3; }
+html:is([data-theme="day"],[data-theme="contraste"]) .topbar-status.busy { color: #B5772A; border-color: #B5772A; }
+html:is([data-theme="day"],[data-theme="contraste"]) .topbar-mark { color: #E8A200; }
 /* Ámbar sobre claro no tiene contraste: se usa un ámbar más oscuro */
-html[data-theme="day"] :is(.hint-eyebrow, .review-eyebrow, #screen-home .review-eyebrow, .panel-saludo, .dash-subtitulo, .sim-grupo-titulo,
+html:is([data-theme="day"],[data-theme="contraste"]) :is(.hint-eyebrow, .review-eyebrow, #screen-home .review-eyebrow, .panel-saludo, .dash-subtitulo, .sim-grupo-titulo,
   .aviso-atencion-card .aviso-atencion-titulo, .ajuste-seccion) { color: #A9680F; }
-html[data-theme="day"] .review-eyebrow::before { background: #A9680F; }
+html:is([data-theme="day"],[data-theme="contraste"]) .review-eyebrow::before { background: #A9680F; }
 /* Textos pensados para fondo oscuro */
-html[data-theme="day"] :is(.hint-text) { color: #4A5560; }
-html[data-theme="day"] :is(.field-label, .field-optional, .list-status, .subtitle-consultas, .list-sync-label, .campo-caption,
+html:is([data-theme="day"],[data-theme="contraste"]) :is(.hint-text) { color: #4A5560; }
+html:is([data-theme="day"],[data-theme="contraste"]) :is(.field-label, .field-optional, .list-status, .subtitle-consultas, .list-sync-label, .campo-caption,
   .sim-grupo-count, .consulta-manuales-usados, .capture-caption, .done-id, .ajuste-nota) { color: #5C6670; }
-html[data-theme="day"] .check-inline { color: #101820; }
-html[data-theme="day"] .status-aviso { color: #7A4E00; }
-html[data-theme="day"] .status-aviso.status-info { color: #6B7680; background: #FFFFFF; }
-html[data-theme="day"] .btn-secondary { color: #101820; border-color: #8A9089; }
-html[data-theme="day"] .btn-secondary:active { background: rgba(16,24,32,0.06); }
-html[data-theme="day"] :is(.btn-ghost, .btn-chip) { color: #3A4652; border-color: #B7BDB2; }
-html[data-theme="day"] :is(.btn-ghost, .btn-chip):active { background: rgba(16,24,32,0.06); }
-html[data-theme="day"] #screen-done .btn-secondary { color: #101820; border-color: #8A9089; }
-html[data-theme="day"] #screen-home .cola-envios-banner { color: #101820; }
-html[data-theme="day"] #screen-home .cola-envios-banner .btn-ghost { color: #A9680F; border-color: #A9680F; }
-html[data-theme="day"] .sim-grupo-btn { background: rgba(16,24,32,0.06); border-color: rgba(16,24,32,0.18); color: #101820; }
-html[data-theme="day"] .sugerencia-card { background: #FFFFFF; border-color: #D8DCD4; color: #101820; }
-html[data-theme="day"] .sugerencia-card-dist { color: #6B7680; }
-html[data-theme="day"] .vehiculo-alerta-card.atencion { color: #7A4E00; }
-html[data-theme="day"] .vehiculo-alerta-card.urgente { color: #A9332A; }
-html[data-theme="day"] .app-footer-credit, html[data-theme="day"] .app-version { color: #8A9089; }
-html[data-theme="day"] .login-huella-alternativa a { color: #5C6670; }
+html:is([data-theme="day"],[data-theme="contraste"]) .check-inline { color: #101820; }
+html:is([data-theme="day"],[data-theme="contraste"]) .status-aviso { color: #7A4E00; }
+html:is([data-theme="day"],[data-theme="contraste"]) .status-aviso.status-info { color: #6B7680; background: #FFFFFF; }
+html:is([data-theme="day"],[data-theme="contraste"]) .btn-secondary { color: #101820; border-color: #8A9089; }
+html:is([data-theme="day"],[data-theme="contraste"]) .btn-secondary:active { background: rgba(16,24,32,0.06); }
+html:is([data-theme="day"],[data-theme="contraste"]) :is(.btn-ghost, .btn-chip) { color: #3A4652; border-color: #B7BDB2; }
+html:is([data-theme="day"],[data-theme="contraste"]) :is(.btn-ghost, .btn-chip):active { background: rgba(16,24,32,0.06); }
+html:is([data-theme="day"],[data-theme="contraste"]) #screen-done .btn-secondary { color: #101820; border-color: #8A9089; }
+html:is([data-theme="day"],[data-theme="contraste"]) #screen-home .cola-envios-banner { color: #101820; }
+html:is([data-theme="day"],[data-theme="contraste"]) #screen-home .cola-envios-banner .btn-ghost { color: #A9680F; border-color: #A9680F; }
+html:is([data-theme="day"],[data-theme="contraste"]) .sim-grupo-btn { background: rgba(16,24,32,0.06); border-color: rgba(16,24,32,0.18); color: #101820; }
+html:is([data-theme="day"],[data-theme="contraste"]) .sugerencia-card { background: #FFFFFF; border-color: #D8DCD4; color: #101820; }
+html:is([data-theme="day"],[data-theme="contraste"]) .sugerencia-card-dist { color: #6B7680; }
+html:is([data-theme="day"],[data-theme="contraste"]) .vehiculo-alerta-card.atencion { color: #7A4E00; }
+html:is([data-theme="day"],[data-theme="contraste"]) .vehiculo-alerta-card.urgente { color: #A9332A; }
+html:is([data-theme="day"],[data-theme="contraste"]) .app-footer-credit, html:is([data-theme="day"],[data-theme="contraste"]) .app-version { color: #8A9089; }
+html:is([data-theme="day"],[data-theme="contraste"]) .login-huella-alternativa a { color: #5C6670; }
 /* Login */
-html[data-theme="day"] #screen-login .login-input { background: #FFFFFF; border-color: #C7CCC3; color: #101820; }
-html[data-theme="day"] #screen-login .btn-ghost { color: #3A4652; border-color: #B7BDB2; }
-html[data-theme="day"] #screen-login .status-info { color: #5C6670; background: rgba(16,24,32,0.05); }
-html[data-theme="day"] .login-error { color: #A9332A; }
+html:is([data-theme="day"],[data-theme="contraste"]) #screen-login .login-input { background: #FFFFFF; border-color: #C7CCC3; color: #101820; }
+html:is([data-theme="day"],[data-theme="contraste"]) #screen-login .btn-ghost { color: #3A4652; border-color: #B7BDB2; }
+html:is([data-theme="day"],[data-theme="contraste"]) #screen-login .status-info { color: #5C6670; background: rgba(16,24,32,0.05); }
+html:is([data-theme="day"],[data-theme="contraste"]) .login-error { color: #A9332A; }
 /* Etiquetas sueltas (inline) pensadas para fondo oscuro */
-html[data-theme="day"] [style*="color:#F4F5F0"], html[data-theme="day"] [style*="color: #F4F5F0"] { color: #101820 !important; }
-html[data-theme="day"] [style*="color:#FF8A80"] { color: #A9332A !important; }
+html:is([data-theme="day"],[data-theme="contraste"]) [style*="color:#F4F5F0"], html:is([data-theme="day"],[data-theme="contraste"]) [style*="color: #F4F5F0"] { color: #101820 !important; }
+html:is([data-theme="day"],[data-theme="contraste"]) [style*="color:#FF8A80"] { color: #A9332A !important; }
 
 /* Noche: estados activos/presionados que las reglas de arriba no deben pisar */
 html[data-theme="night"] :is(.crono-dia-chip.active, .discount-chip:has(input:checked), .check-instalacion:has(input:checked), .ajuste-tema-chip.active) {
@@ -1926,3 +1926,91 @@ html[data-theme="night"] #probarSonidosBtn .ajuste-ico { color: currentColor; }
 
 /* Ícono de línea en el título de los carteles de aviso */
 .aviso-ico { width: 15px; height: 15px; vertical-align: -3px; margin-right: 6px; stroke: currentColor; }
+
+
+/* ================= ALTO CONTRASTE (para usar al sol) =================
+   Fondo blanco, texto negro, bordes negros gruesos y letra más firme.
+   Hereda las reglas de "Día" y las refuerza. */
+html[data-theme="contraste"] { color-scheme: light; }
+html[data-theme="contraste"] :is(html, body, .review-scroll, #screen-home .review-scroll, .action-bar) { background: #FFFFFF; color: #000000; }
+html[data-theme="contraste"] body { font-weight: 600; }
+html[data-theme="contraste"] ::placeholder { color: #4A4A4A; }
+html[data-theme="contraste"] :is(
+  .modal-caja, .panel-tile, .panel-tile.panel-tile-grid, .field-input, .check-instalacion, .discount-chip,
+  .servicio-card:not(.estancado-urgente), .crono-dia-chip, .crono-tarea-card, .mapa-cercano-card,
+  .hist-periodo-chip, .hist-pasado-chip, .stock-periodo-chip, .stock-pasado-chip, .nota-tab-chip,
+  .dash-tecnico-card, .dash-card, .dash-repetido-card, .consulta-respuesta-wrap, .consulta-manual-item, .guardia-actual-wrap, .guardia-proximo-card,
+  .historial-card, .historial-seleccion-bar, .ocupacion-dia-card, .sim-card, .dash-chart-wrap, .cliente-sugerencias-list,
+  .ajuste-fila, .ajuste-tema-chip, .ajuste-volumen, .mosaico-fila, .cantidad-stepper, .sugerencia-card
+) { border: 2.5px solid #000000; color: #000000; }
+html[data-theme="contraste"] .dash-card { border-top-width: 5px; }
+html[data-theme="contraste"] :is(.field-label, .field-optional, .hint-text, .list-status, .campo-caption, .ajuste-nota,
+  .servicio-card-direccion, .servicio-card-cobrador, .historial-card-direccion, .historial-card-horario, .mapa-cercano-dist,
+  .dash-card-label, .dash-tecnico-stat, .ajuste-fila-texto span, .nota-card-de, .sim-card-numero, .guardia-proximo-fecha,
+  .cliente-sugerencia-direccion, .link-btn) { color: #1A1A1A; }
+html[data-theme="contraste"] :is(.hint-eyebrow, .review-eyebrow, #screen-home .review-eyebrow, .panel-saludo, .dash-subtitulo, .ajuste-seccion, .sim-grupo-titulo) { color: #5A2D00; font-weight: 700; }
+html[data-theme="contraste"] .review-eyebrow::before { background: #5A2D00; }
+html[data-theme="contraste"] .panel-tile-label, html[data-theme="contraste"] .servicio-card-cliente, html[data-theme="contraste"] .historial-card-cliente { color: #000000; font-weight: 700; }
+html[data-theme="contraste"] .btn-primary { background: #000000; color: #FFFFFF; border: 2.5px solid #000000; box-shadow: none; }
+html[data-theme="contraste"] :is(.btn-secondary, .btn-ghost, .btn-chip, .btn-ghost-light, .btn-secondary-en-card) { color: #000000; border: 2.5px solid #000000; background: #FFFFFF; font-weight: 700; }
+html[data-theme="contraste"] .topbar-status, html[data-theme="contraste"] .topbar-ajustes { color: #000000; border: 2px solid #000000; }
+html[data-theme="contraste"] :is(.hist-periodo-chip.active, .stock-periodo-chip.active, .stock-pasado-chip.active, .nota-tab-chip.active, .hist-pasado-chip.active, .crono-dia-chip.active, .ajuste-tema-chip.active) {
+  background: #000000; color: #FFFFFF; border-color: #000000;
+}
+html[data-theme="contraste"] .ajuste-tema-chip.active .ajuste-ico { color: #FFFFFF; }
+html[data-theme="contraste"] .ajuste-ico, html[data-theme="contraste"] .ajuste-volumen-ico { color: #000000; }
+html[data-theme="contraste"] .ajuste-switch { background: #6B6B6B; }
+html[data-theme="contraste"] .ajuste-fila input:checked + .ajuste-switch { background: #0B6B2E; }
+html[data-theme="contraste"] .panel-tile-count { box-shadow: 0 0 0 2px #FFFFFF; }
+html[data-theme="contraste"] .status-aviso { color: #3A1F00; background: #FFE9A8; border: 2px solid #000000; }
+html[data-theme="contraste"] .status-aviso.status-info { background: #FFFFFF; color: #000000; }
+html[data-theme="contraste"] .servicio-card.resuelto { background: #D9F2DD; }
+html[data-theme="contraste"] .field-input:focus { border-color: #000000; box-shadow: 0 0 0 4px rgba(0,0,0,0.25); }
+html[data-theme="contraste"] .btn:focus-visible, html[data-theme="contraste"] .panel-tile:focus-visible { box-shadow: 0 0 0 4px rgba(0,0,0,0.45); }
+
+/* ================= BOTONES GRANDES (guantes / manos sucias) ================= */
+html[data-botones="grandes"] .btn { padding: 19px 16px; font-size: 18px; min-height: 60px; }
+html[data-botones="grandes"] .btn-small { padding: 16px 18px; font-size: 16px; min-height: 54px; }
+html[data-botones="grandes"] .panel-tile.panel-tile-grid { padding: 30px 12px 26px; }
+html[data-botones="grandes"] .panel-tile-grid .panel-tile-label { font-size: 15.5px; }
+html[data-botones="grandes"] .panel-tile-icon-badge { width: 60px; height: 60px; }
+html[data-botones="grandes"] .panel-tile-icon-badge svg { width: 30px; height: 30px; }
+html[data-botones="grandes"] .field-input { min-height: 56px; font-size: 17px; padding-top: 14px; padding-bottom: 14px; }
+html[data-botones="grandes"] :is(.hist-periodo-chip, .hist-pasado-chip, .stock-periodo-chip, .stock-pasado-chip, .nota-tab-chip, .crono-dia-chip, .btn-chip, .discount-chip) { min-height: 52px; font-size: 15px; padding-left: 16px; padding-right: 16px; }
+html[data-botones="grandes"] .cantidad-stepper-btn { min-width: 56px; min-height: 56px; font-size: 22px; }
+html[data-botones="grandes"] .check-instalacion, html[data-botones="grandes"] .check-inline { padding-top: 16px; padding-bottom: 16px; }
+html[data-botones="grandes"] input[type="checkbox"] { width: 24px; height: 24px; }
+html[data-botones="grandes"] .servicio-card, html[data-botones="grandes"] .crono-tarea-card, html[data-botones="grandes"] .sim-card { padding-top: 18px; padding-bottom: 18px; }
+html[data-botones="grandes"] .topbar-ajustes { width: 40px; height: 40px; }
+html[data-botones="grandes"] .topbar-ajustes svg { width: 20px; height: 20px; }
+html[data-botones="grandes"] .ajuste-fila { padding-top: 16px; padding-bottom: 16px; }
+html[data-botones="grandes"] .ajuste-switch { width: 54px; height: 30px; border-radius: 15px; }
+html[data-botones="grandes"] .ajuste-switch::after { width: 24px; height: 24px; }
+html[data-botones="grandes"] .ajuste-fila input:checked + .ajuste-switch::after { transform: translateX(24px); }
+
+/* ================= Mosaicos del inicio: ordenar / ocultar ================= */
+.mosaico-oculto { display: none !important; }
+.mosaico-fila { display: flex; align-items: center; gap: 10px; padding: 8px 10px; margin-bottom: 8px; background: #FFFFFF; border: 1.5px solid #D8DCD4; border-radius: var(--r-md); color: #101820; }
+.mosaico-fila.oculto { opacity: 0.5; }
+.mosaico-fila .panel-tile-icon-badge { width: 34px; height: 34px; border-radius: 10px; }
+.mosaico-fila .panel-tile-icon-badge svg { width: 18px; height: 18px; }
+.mosaico-nombre { flex: 1; font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px; }
+.mosaico-btn { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; padding: 0; cursor: pointer; background: transparent; border: 1.5px solid #D8DCD4; border-radius: 10px; color: #101820; }
+.mosaico-btn svg { width: 18px; height: 18px; stroke: currentColor; }
+.mosaico-btn:disabled { opacity: 0.3; cursor: default; }
+html[data-theme="night"] .mosaico-fila { background: #1B2530; border-color: #2A3743; color: #F4F5F0; }
+html[data-theme="night"] .mosaico-btn { border-color: #3A4652; color: #F4F5F0; }
+html[data-botones="grandes"] .mosaico-btn { width: 44px; height: 44px; }
+
+/* Pantalla de bloqueo (huella) */
+.bloqueo-overlay { position: fixed; inset: 0; z-index: 9800; display: flex; align-items: center; justify-content: center; padding: 24px; background: #101820; }
+.bloqueo-caja { width: 100%; max-width: 320px; text-align: center; color: #F4F5F0; }
+.bloqueo-caja svg { width: 56px; height: 56px; stroke: #F5A623; margin-bottom: 10px; }
+.bloqueo-caja h2 { font-family: 'Space Grotesk', sans-serif; margin: 0 0 6px; font-size: 22px; }
+.bloqueo-caja p { color: #9AA3A9; margin: 0 0 18px; font-size: 14px; }
+.ajuste-temas .ajuste-tema-chip:last-child:nth-child(odd) { grid-column: 1 / -1; }
+.ajuste-peligro { color: #C0392B !important; border-color: #C0392B !important; }
+
+/* La pantalla de bloqueo es siempre oscura, en cualquier tema */
+html body .bloqueo-overlay .btn-primary { background: #F5A623; color: #101820; border: none; box-shadow: none; }
+html body .bloqueo-overlay .btn-ghost { background: transparent; color: #F4F5F0; border: 1.5px solid #4A5560; }
