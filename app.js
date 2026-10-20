@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.109.0";
+const APP_VERSION = "3.110.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -5492,7 +5492,7 @@ notasModalDespuesBtn.addEventListener("click", () => {
 
 // ---------- Ajustes (apariencia + carteles de aviso) ----------
 // Se guardan solo en este celular (localStorage).
-const AJUSTES_DEFECTO = { tema: "clasico", avisoTestPoner: true, avisoTestQuitar: true, avisoSims: true, avisoFelicitacion: true };
+const AJUSTES_DEFECTO = { tema: "clasico", tamano: "normal", avisoTestPoner: true, avisoTestQuitar: true, avisoSims: true, avisoFelicitacion: true };
 function leerAjustes() {
   try {
     const guardado = JSON.parse(localStorage.getItem("ajustes_app") || "{}");
@@ -5512,6 +5512,10 @@ function aplicarTema() {
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute("content", t === "day" ? "#EEF0EA" : "#101820");
 }
+function aplicarTamano() {
+  const esc = { chico: 0.88, normal: 1, grande: 1.2 }[leerAjustes().tamano] || 1;
+  document.documentElement.style.setProperty("--escala", esc);
+}
 // En modo Automático, acompaña al celular si cambia de claro a oscuro
 if (window.matchMedia) {
   const mq = matchMedia("(prefers-color-scheme: dark)");
@@ -5528,6 +5532,9 @@ function renderAjustes() {
   const aj = leerAjustes();
   document.querySelectorAll("#ajusteTemas .ajuste-tema-chip").forEach((chip) => {
     chip.classList.toggle("active", chip.dataset.tema === aj.tema);
+  });
+  document.querySelectorAll("#ajusteTamanos .ajuste-tema-chip").forEach((chip) => {
+    chip.classList.toggle("active", chip.dataset.tamano === aj.tamano);
   });
   document.querySelectorAll("#screen-ajustes input[data-ajuste]").forEach((inp) => {
     inp.checked = !!aj[inp.dataset.ajuste];
@@ -5549,6 +5556,15 @@ document.querySelectorAll("#ajusteTemas .ajuste-tema-chip").forEach((chip) => {
     renderAjustes();
   });
 });
+document.querySelectorAll("#ajusteTamanos .ajuste-tema-chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    const aj = leerAjustes();
+    aj.tamano = chip.dataset.tamano;
+    guardarAjustes(aj);
+    aplicarTamano();
+    renderAjustes();
+  });
+});
 document.querySelectorAll("#screen-ajustes input[data-ajuste]").forEach((inp) => {
   inp.addEventListener("change", () => {
     const aj = leerAjustes();
@@ -5562,6 +5578,7 @@ document.querySelectorAll("#screen-ajustes input[data-ajuste]").forEach((inp) =>
   });
 });
 aplicarTema();
+aplicarTamano();
 
 // ---------- Recordatorio "cliente en TEST" (al llegar y al cerrar) ----------
 // 1) Al acercarse (por GPS, con la app abierta) a un servicio que tiene

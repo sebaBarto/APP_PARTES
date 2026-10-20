@@ -1741,7 +1741,7 @@ html, body {
   background: #FFFFFF; border: 1.5px solid #D8DCD4; border-radius: var(--r-md);
   font-family: 'Inter', sans-serif; font-weight: 600; font-size: 14px; color: #101820; text-align: left;
 }
-.ajuste-tema-chip.active { border-color: #F5A623; background: rgba(245,166,35,0.12); box-shadow: 0 0 0 3px rgba(245,166,35,0.18); }
+.ajuste-tema-chip.active { border-color: #F5A623; background: #FFF3D6; box-shadow: 0 0 0 3px rgba(245,166,35,0.25); }
 .ajuste-tema-muestra { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid #8A9089; flex-shrink: 0; }
 .ajuste-fila {
   display: flex; align-items: center; justify-content: space-between; gap: 14px;
@@ -1887,3 +1887,24 @@ html[data-theme="night"] :is(.servicio-card:active, .crono-tarea-card:active, .s
 html[data-theme="night"] .servicio-card.estancado-atencion:not(.estancado-urgente) { border-color: #F5A623; }
 html[data-theme="night"] .ajuste-switch { background: #3A4652; }
 html[data-theme="night"] .ajuste-fila input:checked + .ajuste-switch { background: #3FAE6E; }
+
+/* ---------- Tamaño de letra e íconos (Ajustes > Tamaño) ----------
+   Se escala TODA la app con "zoom" (letras, íconos y espacios) y se
+   compensa el alto/ancho máximo para que siga ocupando la pantalla
+   justa. --escala: 0.88 (pequeño) / 1 (normal) / 1.2 (grande). */
+:root { --escala: 1; }
+.app {
+  zoom: var(--escala);
+  height: calc(100vh / var(--escala));
+  height: calc(100dvh / var(--escala));
+}
+@media (min-width: 640px) {
+  .app { height: calc(94dvh / var(--escala)); margin: calc(3vh / var(--escala)) auto; max-width: calc(640px / var(--escala)); }
+}
+@media (min-width: 1024px) {
+  .app { max-width: calc(760px / var(--escala)); }
+}
+.ajuste-tamanos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.ajuste-tamanos .ajuste-tema-chip { flex-direction: column; justify-content: center; gap: 2px; padding: 10px 6px; text-align: center; }
+.ajuste-tamanos .ajuste-tamano-letra { font-family: 'Space Grotesk', sans-serif; font-weight: 700; line-height: 1.1; }
+.ajuste-tamanos .ajuste-tamano-nombre { font-size: 12px; font-weight: 500; }

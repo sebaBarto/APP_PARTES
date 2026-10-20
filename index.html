@@ -19,6 +19,8 @@
     var a = JSON.parse(localStorage.getItem("ajustes_app") || "{}");
     var t = a.tema || "clasico";
     if (t === "auto") t = (window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches) ? "night" : "day";
+    var esc = { chico: 0.88, grande: 1.2 }[a.tamano];
+    if (esc) document.documentElement.style.setProperty("--escala", esc);
     if (t === "night" || t === "day") {
       document.documentElement.setAttribute("data-theme", t);
       var m = document.querySelector('meta[name="theme-color"]');
@@ -1269,6 +1271,13 @@
         <button type="button" class="ajuste-tema-chip" data-tema="auto"><span class="ajuste-tema-muestra" style="background:linear-gradient(135deg,#EEF0EA 50%,#1B2530 50%);"></span>Automático</button>
       </div>
       <p class="ajuste-nota">Automático sigue el modo claro/oscuro de tu celular.</p>
+
+      <p class="ajuste-seccion">Tamaño de letra e íconos</p>
+      <div class="ajuste-tamanos" id="ajusteTamanos">
+        <button type="button" class="ajuste-tema-chip" data-tamano="chico"><span class="ajuste-tamano-letra" style="font-size:15px;">Aa</span><span class="ajuste-tamano-nombre">Pequeño</span></button>
+        <button type="button" class="ajuste-tema-chip" data-tamano="normal"><span class="ajuste-tamano-letra" style="font-size:20px;">Aa</span><span class="ajuste-tamano-nombre">Normal</span></button>
+        <button type="button" class="ajuste-tema-chip" data-tamano="grande"><span class="ajuste-tamano-letra" style="font-size:26px;">Aa</span><span class="ajuste-tamano-nombre">Grande</span></button>
+      </div>
 
       <p class="ajuste-seccion">Carteles de aviso</p>
       <label class="ajuste-fila">
