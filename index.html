@@ -1265,10 +1265,10 @@
 
       <p class="ajuste-seccion" style="margin-top:6px;">Apariencia</p>
       <div class="ajuste-temas" id="ajusteTemas">
-        <button type="button" class="ajuste-tema-chip" data-tema="clasico"><span class="ajuste-tema-muestra" style="background:linear-gradient(135deg,#101820 50%,#FFFFFF 50%);"></span>Clásico</button>
-        <button type="button" class="ajuste-tema-chip" data-tema="day"><span class="ajuste-tema-muestra" style="background:#EEF0EA;"></span>☀️ Día</button>
-        <button type="button" class="ajuste-tema-chip" data-tema="night"><span class="ajuste-tema-muestra" style="background:#1B2530;"></span>🌙 Noche</button>
-        <button type="button" class="ajuste-tema-chip" data-tema="auto"><span class="ajuste-tema-muestra" style="background:linear-gradient(135deg,#EEF0EA 50%,#1B2530 50%);"></span>Automático</button>
+        <button type="button" class="ajuste-tema-chip" data-tema="clasico"><svg class="ajuste-ico" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg> Clásico</button>
+        <button type="button" class="ajuste-tema-chip" data-tema="day"><svg class="ajuste-ico" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg> Día</button>
+        <button type="button" class="ajuste-tema-chip" data-tema="night"><svg class="ajuste-ico" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg> Noche</button>
+        <button type="button" class="ajuste-tema-chip" data-tema="auto"><svg class="ajuste-ico" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></svg> Automático</button>
       </div>
       <p class="ajuste-nota">Automático sigue el modo claro/oscuro de tu celular.</p>
 
@@ -1281,45 +1281,45 @@
 
       <p class="ajuste-seccion">Sonido y vibración</p>
       <label class="ajuste-fila">
-        <span class="ajuste-fila-texto"><b>🔊 Sonido al tocar botones</b><span>Un "tic" suave al tocar los botones y menús.</span></span>
+        <span class="ajuste-fila-texto"><b><svg class="ajuste-ico" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>Sonido al tocar botones</b><span>Un "tic" suave al tocar los botones y menús.</span></span>
         <input type="checkbox" data-ajuste="sonidoBotones"><span class="ajuste-switch"></span>
       </label>
       <label class="ajuste-fila">
-        <span class="ajuste-fila-texto"><b>📳 Vibración al tocar botones</b><span>Una vibración corta (no funciona en iPhone).</span></span>
+        <span class="ajuste-fila-texto"><b><svg class="ajuste-ico" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="3" width="8" height="18" rx="2"/><path d="M4 8v8M20 8v8"/></svg>Vibración al tocar botones</b><span>Una vibración corta (no funciona en iPhone).</span></span>
         <input type="checkbox" data-ajuste="vibracionBotones"><span class="ajuste-switch"></span>
       </label>
       <label class="ajuste-fila">
-        <span class="ajuste-fila-texto"><b>✅ Sonido de parte enviado / error</b><span>Sonido de aprobación al cerrar un servicio y de error si no se pudo enviar.</span></span>
+        <span class="ajuste-fila-texto"><b><svg class="ajuste-ico" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a5 5 0 0 0-5 5c0 6-3 8-3 8h16s-3-2-3-8a5 5 0 0 0-5-5z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>Sonido de parte enviado / error</b><span>Sonido de aprobación al cerrar un servicio y de error si no se pudo enviar.</span></span>
         <input type="checkbox" data-ajuste="sonidoResultado"><span class="ajuste-switch"></span>
       </label>
       <div class="ajuste-volumen">
-        <span class="ajuste-volumen-ico">🔈</span>
+        <span class="ajuste-volumen-ico"><svg class="ajuste-ico" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg></span>
         <input type="range" id="ajusteVolumen" min="10" max="100" step="5" aria-label="Volumen de los sonidos">
-        <span class="ajuste-volumen-ico">🔊</span>
+        <span class="ajuste-volumen-ico"><svg class="ajuste-ico" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg></span>
       </div>
       <p class="ajuste-nota" style="margin:2px 0 10px;">Volumen de los sonidos de la app (se suma al volumen del celular).</p>
       <div class="ajuste-tamanos" id="ajusteEstiloSonido">
-        <button type="button" class="ajuste-tema-chip" data-estilo="suave"><span class="ajuste-tamano-letra" style="font-size:20px;">🎵</span><span class="ajuste-tamano-nombre">Suave</span></button>
-        <button type="button" class="ajuste-tema-chip" data-estilo="digital"><span class="ajuste-tamano-letra" style="font-size:20px;">👾</span><span class="ajuste-tamano-nombre">Digital</span></button>
-        <button type="button" class="ajuste-tema-chip" data-estilo="campana"><span class="ajuste-tamano-letra" style="font-size:20px;">🔔</span><span class="ajuste-tamano-nombre">Campana</span></button>
+        <button type="button" class="ajuste-tema-chip" data-estilo="suave"><svg class="ajuste-ico ajuste-ico-grande" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><span class="ajuste-tamano-nombre">Suave</span></button>
+        <button type="button" class="ajuste-tema-chip" data-estilo="digital"><svg class="ajuste-ico ajuste-ico-grande" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 17l6-6-6-6M12 19h8"/></svg><span class="ajuste-tamano-nombre">Digital</span></button>
+        <button type="button" class="ajuste-tema-chip" data-estilo="campana"><svg class="ajuste-ico ajuste-ico-grande" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a5 5 0 0 0-5 5c0 6-3 8-3 8h16s-3-2-3-8a5 5 0 0 0-5-5z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg><span class="ajuste-tamano-nombre">Campana</span></button>
       </div>
-      <button type="button" class="btn btn-secondary" id="probarSonidosBtn" style="margin:10px 0 6px;">▶ Probar sonidos</button>
+      <button type="button" class="btn btn-secondary" id="probarSonidosBtn" style="margin:10px 0 6px;"><svg class="ajuste-ico" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4l14 8-14 8z" fill="currentColor"/></svg> Probar sonidos</button>
 
       <p class="ajuste-seccion">Carteles de aviso</p>
       <label class="ajuste-fila">
-        <span class="ajuste-fila-texto"><b>📍 Poner el cliente en TEST</b><span>Al llegar a un servicio asignado (usa tu ubicación).</span></span>
+        <span class="ajuste-fila-texto"><b><svg class="ajuste-ico" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg>Poner el cliente en TEST</b><span>Al llegar a un servicio asignado (usa tu ubicación).</span></span>
         <input type="checkbox" data-ajuste="avisoTestPoner"><span class="ajuste-switch"></span>
       </label>
       <label class="ajuste-fila">
-        <span class="ajuste-fila-texto"><b>✔ Quitar el cliente de TEST</b><span>Al cerrar el servicio: quitarlo de test y notificar cambios.</span></span>
+        <span class="ajuste-fila-texto"><b><svg class="ajuste-ico" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.5"/></svg>Quitar el cliente de TEST</b><span>Al cerrar el servicio: quitarlo de test y notificar cambios.</span></span>
         <input type="checkbox" data-ajuste="avisoTestQuitar"><span class="ajuste-switch"></span>
       </label>
       <label class="ajuste-fila">
-        <span class="ajuste-fila-texto"><b>📲 SIMs por aceptar</b><span>Al iniciar sesión, si tenés SIMs pendientes de aceptar o rechazar.</span></span>
+        <span class="ajuste-fila-texto"><b><svg class="ajuste-ico" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v12a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><rect x="9.5" y="12" width="5" height="5" rx="1"/></svg>SIMs por aceptar</b><span>Al iniciar sesión, si tenés SIMs pendientes de aceptar o rechazar.</span></span>
         <input type="checkbox" data-ajuste="avisoSims"><span class="ajuste-switch"></span>
       </label>
       <label class="ajuste-fila">
-        <span class="ajuste-fila-texto"><b>🏆 Felicitación semanal</b><span>Mejor desempeño de la semana (viernes).</span></span>
+        <span class="ajuste-fila-texto"><b><svg class="ajuste-ico" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v6a5 5 0 0 1-10 0z"/><path d="M7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3"/></svg>Felicitación semanal</b><span>Mejor desempeño de la semana (viernes).</span></span>
         <input type="checkbox" data-ajuste="avisoFelicitacion"><span class="ajuste-switch"></span>
       </label>
       <p class="ajuste-nota">Estos ajustes valen solo para este celular. Los avisos de notas sin leer no se pueden apagar.</p>

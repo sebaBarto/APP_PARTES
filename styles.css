@@ -1913,3 +1913,13 @@ html[data-theme="night"] .ajuste-fila input:checked + .ajuste-switch { backgroun
 .ajuste-volumen input[type="range"] { flex: 1; accent-color: #F5A623; height: 28px; }
 .ajuste-volumen-ico { font-size: 16px; }
 html[data-theme="night"] .ajuste-volumen { background: #1B2530; border-color: #2A3743; }
+
+/* Íconos SVG de la pantalla de Ajustes (mismo estilo de línea que el resto de la app) */
+.ajuste-ico { width: 18px; height: 18px; vertical-align: -3px; margin-right: 6px; color: #B5772A; stroke: currentColor; flex-shrink: 0; }
+.ajuste-tema-chip .ajuste-ico { margin-right: 0; width: 20px; height: 20px; vertical-align: middle; }
+.ajuste-ico-grande { width: 26px; height: 26px; margin: 0 0 2px; vertical-align: middle; }
+.ajuste-volumen-ico { display: inline-flex; color: #B5772A; }
+.ajuste-volumen-ico .ajuste-ico { margin: 0; width: 20px; height: 20px; vertical-align: middle; }
+#probarSonidosBtn .ajuste-ico { color: currentColor; margin-right: 6px; width: 16px; height: 16px; }
+html[data-theme="night"] .ajuste-ico, html[data-theme="night"] .ajuste-volumen-ico { color: #F5A623; }
+html[data-theme="night"] #probarSonidosBtn .ajuste-ico { color: currentColor; }
