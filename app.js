@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.108.0";
+const APP_VERSION = "3.109.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -146,6 +146,7 @@ const screens = {
   comodatoForm: document.getElementById("screen-comodato-form"),
   comodatoFirma: document.getElementById("screen-comodato-firma"),
   rendicion: document.getElementById("screen-rendicion"),
+  ajustes: document.getElementById("screen-ajustes"),
   form: document.getElementById("screen-form"),
   claves: document.getElementById("screen-claves"),
   sign: document.getElementById("screen-sign"),
@@ -720,6 +721,9 @@ function showScreen(name) {
   Object.entries(screens).forEach(([key, el]) => {
     el.dataset.active = key === name ? "true" : "false";
   });
+  // La tuerquita de Ajustes solo se ve con sesión iniciada (no en el login)
+  const btnAjustes = document.getElementById("ajustesBtn");
+  if (btnAjustes) btnAjustes.classList.toggle("hidden", name === "login");
 }
 
 function setStatus(text, mode) {
@@ -5486,6 +5490,79 @@ notasModalDespuesBtn.addEventListener("click", () => {
   notasModalOverlay.classList.add("hidden");
 });
 
+// ---------- Ajustes (apariencia + carteles de aviso) ----------
+// Se guardan solo en este celular (localStorage).
+const AJUSTES_DEFECTO = { tema: "clasico", avisoTestPoner: true, avisoTestQuitar: true, avisoSims: true, avisoFelicitacion: true };
+function leerAjustes() {
+  try {
+    const guardado = JSON.parse(localStorage.getItem("ajustes_app") || "{}");
+    return Object.assign({}, AJUSTES_DEFECTO, guardado && typeof guardado === "object" ? guardado : {});
+  } catch (e) {
+    return Object.assign({}, AJUSTES_DEFECTO);
+  }
+}
+function guardarAjustes(ajustes) {
+  try { localStorage.setItem("ajustes_app", JSON.stringify(ajustes)); } catch (e) {}
+}
+function aplicarTema() {
+  let t = leerAjustes().tema;
+  if (t === "auto") t = (window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches) ? "night" : "day";
+  if (t === "night" || t === "day") document.documentElement.setAttribute("data-theme", t);
+  else document.documentElement.removeAttribute("data-theme");
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", t === "day" ? "#EEF0EA" : "#101820");
+}
+// En modo Automático, acompaña al celular si cambia de claro a oscuro
+if (window.matchMedia) {
+  const mq = matchMedia("(prefers-color-scheme: dark)");
+  const alCambiar = () => { if (leerAjustes().tema === "auto") aplicarTema(); };
+  if (mq.addEventListener) mq.addEventListener("change", alCambiar);
+  else if (mq.addListener) mq.addListener(alCambiar);
+}
+
+const ajustesBtn = document.getElementById("ajustesBtn");
+const volverDeAjustesBtn = document.getElementById("volverDeAjustesBtn");
+let pantallaAntesDeAjustes = "home";
+
+function renderAjustes() {
+  const aj = leerAjustes();
+  document.querySelectorAll("#ajusteTemas .ajuste-tema-chip").forEach((chip) => {
+    chip.classList.toggle("active", chip.dataset.tema === aj.tema);
+  });
+  document.querySelectorAll("#screen-ajustes input[data-ajuste]").forEach((inp) => {
+    inp.checked = !!aj[inp.dataset.ajuste];
+  });
+}
+ajustesBtn.addEventListener("click", () => {
+  const actual = Object.entries(screens).find(([, el]) => el.dataset.active === "true");
+  if (actual && actual[0] !== "ajustes") pantallaAntesDeAjustes = actual[0];
+  renderAjustes();
+  showScreen("ajustes");
+});
+volverDeAjustesBtn.addEventListener("click", () => showScreen(screens[pantallaAntesDeAjustes] ? pantallaAntesDeAjustes : "home"));
+document.querySelectorAll("#ajusteTemas .ajuste-tema-chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    const aj = leerAjustes();
+    aj.tema = chip.dataset.tema;
+    guardarAjustes(aj);
+    aplicarTema();
+    renderAjustes();
+  });
+});
+document.querySelectorAll("#screen-ajustes input[data-ajuste]").forEach((inp) => {
+  inp.addEventListener("change", () => {
+    const aj = leerAjustes();
+    aj[inp.dataset.ajuste] = inp.checked;
+    guardarAjustes(aj);
+    if (inp.dataset.ajuste === "avisoTestPoner") {
+      if (inp.checked) iniciarRecordatorioTestGeo();
+      else detenerRecordatorioTestGeo();
+    }
+    showToast("Guardado.");
+  });
+});
+aplicarTema();
+
 // ---------- Recordatorio "cliente en TEST" (al llegar y al cerrar) ----------
 // 1) Al acercarse (por GPS, con la app abierta) a un servicio que tiene
 //    asignado HOY en el cronograma: "PONER EL CLIENTE EN TEST".
@@ -5571,7 +5648,7 @@ recordatorioTestLuegoBtn.addEventListener("click", () => {
 
 // --- Cartel 2: al cerrar el parte ---
 function registrarTestPendienteDeQuitar(cliente) {
-  if (!cliente || !tecnicoLogueado) return;
+  if (!cliente || !tecnicoLogueado || !leerAjustes().avisoTestQuitar) return;
   const id = `${fechaHoyLocalISO()}|${normalizeText(cliente)}`;
   const lista = lsGetJSON("test_quitar_pendientes", []);
   if (!lista.some((p) => p.id === id)) {
@@ -5582,6 +5659,7 @@ function registrarTestPendienteDeQuitar(cliente) {
 }
 // Al entrar a la app: lo que quedó sin confirmar (de hoy o de días anteriores)
 function mostrarTestPendientesDeQuitar() {
+  if (!leerAjustes().avisoTestQuitar) return;
   lsGetJSON("test_quitar_pendientes", [])
     .filter((p) => p.tecnico === tecnicoLogueado)
     .forEach((p) => encolarCartelTest({ tipo: "quitar", key: p.id, cliente: p.cliente }));
@@ -5598,7 +5676,7 @@ function detenerRecordatorioTestGeo() {
 
 async function iniciarRecordatorioTestGeo() {
   detenerRecordatorioTestGeo();
-  if (!tecnicoLogueado || !navigator.geolocation) return;
+  if (!tecnicoLogueado || !navigator.geolocation || !leerAjustes().avisoTestPoner) return;
   const miGeneracion = testGeoGeneracion;
   const hoy = fechaHoyLocalISO();
   const avisados = lsGetJSON("test_avisados", {});
@@ -5653,6 +5731,7 @@ async function iniciarRecordatorioTestGeo() {
   if (testGeoObjetivos.length > 0) {
     testGeoWatchId = navigator.geolocation.watchPosition(
       (pos) => {
+        if (!leerAjustes().avisoTestPoner) return;
         const ahora = Date.now();
         const avis = lsGetJSON("test_avisados", {});
         testGeoObjetivos.forEach((o) => {
@@ -5713,7 +5792,7 @@ avisoInicioCerrarBtn.addEventListener("click", () => {
 });
 
 async function prepararAvisoSimsPendientes() {
-  if (!tecnicoLogueado) return;
+  if (!tecnicoLogueado || !leerAjustes().avisoSims) return;
   const tecnicoAlPedir = tecnicoLogueado;
   try {
     const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
@@ -5745,7 +5824,7 @@ async function prepararAvisoSimsPendientes() {
 // hasta el domingo (para quien no abrió la app el viernes). Una sola vez
 // por semana y por técnico.
 async function prepararFelicitacionSemanal() {
-  if (!tecnicoLogueado) return;
+  if (!tecnicoLogueado || !leerAjustes().avisoFelicitacion) return;
   try {
     const partes = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Argentina/Buenos_Aires", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23", weekday: "short" }).formatToParts(new Date());
     const p = {};

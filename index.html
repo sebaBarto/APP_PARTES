@@ -12,6 +12,21 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script>
+// Aplica el tema guardado antes de pintar la pantalla (evita el parpadeo).
+(function () {
+  try {
+    var a = JSON.parse(localStorage.getItem("ajustes_app") || "{}");
+    var t = a.tema || "clasico";
+    if (t === "auto") t = (window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches) ? "night" : "day";
+    if (t === "night" || t === "day") {
+      document.documentElement.setAttribute("data-theme", t);
+      var m = document.querySelector('meta[name="theme-color"]');
+      if (m) m.setAttribute("content", t === "day" ? "#EEF0EA" : "#101820");
+    }
+  } catch (e) {}
+})();
+</script>
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -31,7 +46,10 @@
       <span class="topbar-mark">●</span>
       <span class="topbar-title">PARTE&nbsp;TÉCNICO</span>
     </div>
-    <button type="button" class="topbar-status" id="statusPill">LISTO</button>
+    <div class="topbar-derecha">
+      <button type="button" class="topbar-ajustes hidden" id="ajustesBtn" title="Ajustes" aria-label="Ajustes"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+      <button type="button" class="topbar-status" id="statusPill">LISTO</button>
+    </div>
   </header>
 
   <!-- LOGIN -->
@@ -1236,6 +1254,42 @@
     <div class="action-bar">
       <button class="btn btn-secondary" id="comVolverFormBtn" type="button">← Volver a los datos</button>
       <button class="btn btn-primary" id="comConfirmarFirmaBtn" type="button">Confirmar y enviar</button>
+    </div>
+  </section>
+
+  <section class="screen" id="screen-ajustes">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">AJUSTES</p>
+
+      <p class="ajuste-seccion" style="margin-top:6px;">Apariencia</p>
+      <div class="ajuste-temas" id="ajusteTemas">
+        <button type="button" class="ajuste-tema-chip" data-tema="clasico"><span class="ajuste-tema-muestra" style="background:linear-gradient(135deg,#101820 50%,#FFFFFF 50%);"></span>Clásico</button>
+        <button type="button" class="ajuste-tema-chip" data-tema="day"><span class="ajuste-tema-muestra" style="background:#EEF0EA;"></span>☀️ Día</button>
+        <button type="button" class="ajuste-tema-chip" data-tema="night"><span class="ajuste-tema-muestra" style="background:#1B2530;"></span>🌙 Noche</button>
+        <button type="button" class="ajuste-tema-chip" data-tema="auto"><span class="ajuste-tema-muestra" style="background:linear-gradient(135deg,#EEF0EA 50%,#1B2530 50%);"></span>Automático</button>
+      </div>
+      <p class="ajuste-nota">Automático sigue el modo claro/oscuro de tu celular.</p>
+
+      <p class="ajuste-seccion">Carteles de aviso</p>
+      <label class="ajuste-fila">
+        <span class="ajuste-fila-texto"><b>📍 Poner el cliente en TEST</b><span>Al llegar a un servicio asignado (usa tu ubicación).</span></span>
+        <input type="checkbox" data-ajuste="avisoTestPoner"><span class="ajuste-switch"></span>
+      </label>
+      <label class="ajuste-fila">
+        <span class="ajuste-fila-texto"><b>✔ Quitar el cliente de TEST</b><span>Al cerrar el servicio: quitarlo de test y notificar cambios.</span></span>
+        <input type="checkbox" data-ajuste="avisoTestQuitar"><span class="ajuste-switch"></span>
+      </label>
+      <label class="ajuste-fila">
+        <span class="ajuste-fila-texto"><b>📲 SIMs por aceptar</b><span>Al iniciar sesión, si tenés SIMs pendientes de aceptar o rechazar.</span></span>
+        <input type="checkbox" data-ajuste="avisoSims"><span class="ajuste-switch"></span>
+      </label>
+      <label class="ajuste-fila">
+        <span class="ajuste-fila-texto"><b>🏆 Felicitación semanal</b><span>Mejor desempeño de la semana (viernes).</span></span>
+        <input type="checkbox" data-ajuste="avisoFelicitacion"><span class="ajuste-switch"></span>
+      </label>
+      <p class="ajuste-nota">Estos ajustes valen solo para este celular. Los avisos de notas sin leer no se pueden apagar.</p>
+
+      <button class="btn btn-secondary" id="volverDeAjustesBtn" type="button" style="margin-top:18px;">Volver</button>
     </div>
   </section>
 
