@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.111.0";
+const APP_VERSION = "3.112.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -5550,7 +5550,7 @@ notasModalDespuesBtn.addEventListener("click", () => {
 
 // ---------- Ajustes (apariencia + carteles de aviso) ----------
 // Se guardan solo en este celular (localStorage).
-const AJUSTES_DEFECTO = { tema: "clasico", tamano: "normal", avisoTestPoner: true, avisoTestQuitar: true, sonidoBotones: true, vibracionBotones: true, sonidoResultado: true, avisoSims: true, avisoFelicitacion: true };
+const AJUSTES_DEFECTO = { tema: "clasico", tamano: "normal", avisoTestPoner: true, avisoTestQuitar: true, sonidoBotones: true, vibracionBotones: true, sonidoResultado: true, volumen: 50, estiloSonido: "suave", avisoSims: true, avisoFelicitacion: true };
 function leerAjustes() {
   try {
     const guardado = JSON.parse(localStorage.getItem("ajustes_app") || "{}");
@@ -5594,6 +5594,11 @@ function renderAjustes() {
   document.querySelectorAll("#ajusteTamanos .ajuste-tema-chip").forEach((chip) => {
     chip.classList.toggle("active", chip.dataset.tamano === aj.tamano);
   });
+  document.querySelectorAll("#ajusteEstiloSonido .ajuste-tema-chip").forEach((chip) => {
+    chip.classList.toggle("active", chip.dataset.estilo === aj.estiloSonido);
+  });
+  const rangoVol = document.getElementById("ajusteVolumen");
+  if (rangoVol) rangoVol.value = aj.volumen;
   document.querySelectorAll("#screen-ajustes input[data-ajuste]").forEach((inp) => {
     inp.checked = !!aj[inp.dataset.ajuste];
   });
@@ -5638,10 +5643,27 @@ document.querySelectorAll("#screen-ajustes input[data-ajuste]").forEach((inp) =>
 aplicarTema();
 aplicarTamano();
 document.getElementById("probarSonidosBtn").addEventListener("click", () => {
-  sonarToque();
-  setTimeout(sonarExito, 350);
-  setTimeout(sonarError, 1300);
+  sonarToque(true);
+  setTimeout(() => sonarExito(true), 350);
+  setTimeout(() => sonarError(true), 1300);
 });
+document.querySelectorAll("#ajusteEstiloSonido .ajuste-tema-chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    const aj = leerAjustes();
+    aj.estiloSonido = chip.dataset.estilo;
+    guardarAjustes(aj);
+    renderAjustes();
+    sonarToque(true);
+    setTimeout(() => sonarExito(true), 300);
+  });
+});
+const ajusteVolumen = document.getElementById("ajusteVolumen");
+ajusteVolumen.addEventListener("input", () => {
+  const aj = leerAjustes();
+  aj.volumen = Number(ajusteVolumen.value);
+  guardarAjustes(aj);
+});
+ajusteVolumen.addEventListener("change", () => sonarToque(true)); // al soltar, se escucha el nuevo volumen
 
 // ---------- Sonidos y vibración (botones, parte enviado / error) ----------
 // Los sonidos se generan con Web Audio (sin archivos). El navegador solo
@@ -5659,7 +5681,36 @@ function obtenerAudio() {
     return audioCtx;
   } catch (e) { return null; }
 }
-// Una nota: frecuencia (Hz), cuándo empieza (s desde ahora), duración, volumen, forma de onda
+// Estilos de sonido. Cada nota: [frecuencia Hz, inicio s, duración s, volumen, onda]
+const ESTILOS_SONIDO = {
+  suave: {
+    toque: [[1400, 0, 0.05, 0.07, "triangle"]],
+    exito: [[523, 0, 0.16, 0.12, "sine"], [659, 0.12, 0.16, 0.12, "sine"], [784, 0.24, 0.32, 0.12, "sine"]],
+    error: [[220, 0, 0.2, 0.1, "sawtooth"], [165, 0.24, 0.3, 0.1, "sawtooth"]],
+  },
+  digital: {
+    toque: [[1900, 0, 0.03, 0.06, "square"]],
+    exito: [[659, 0, 0.08, 0.07, "square"], [880, 0.09, 0.08, 0.07, "square"], [1175, 0.18, 0.18, 0.07, "square"]],
+    error: [[150, 0, 0.12, 0.08, "square"], [150, 0.16, 0.12, 0.08, "square"], [110, 0.32, 0.24, 0.08, "square"]],
+  },
+  campana: {
+    toque: [[2200, 0, 0.09, 0.06, "sine"], [3300, 0, 0.06, 0.02, "sine"]],
+    exito: [[880, 0, 0.5, 0.1, "sine"], [1760, 0, 0.3, 0.03, "sine"], [1109, 0.14, 0.5, 0.1, "sine"], [1319, 0.28, 0.7, 0.1, "sine"], [2638, 0.28, 0.4, 0.03, "sine"]],
+    error: [[330, 0, 0.28, 0.12, "triangle"], [247, 0.22, 0.45, 0.12, "triangle"]],
+  },
+};
+// Volumen: 10..100 (50 = el de antes). Se multiplica el volumen de cada nota.
+function multiplicadorVolumen() {
+  const v = Number(leerAjustes().volumen);
+  return (isFinite(v) ? Math.min(100, Math.max(10, v)) : 50) / 50;
+}
+function reproducirSonido(tipo) {
+  const ctx = obtenerAudio();
+  if (!ctx) return;
+  const estilo = ESTILOS_SONIDO[leerAjustes().estiloSonido] || ESTILOS_SONIDO.suave;
+  const mult = multiplicadorVolumen();
+  (estilo[tipo] || []).forEach(([freq, inicio, dur, vol, onda]) => tonoSuave(ctx, freq, inicio, dur, Math.min(0.5, vol * mult), onda));
+}
 function tonoSuave(ctx, freq, inicio, dur, vol, tipo) {
   const osc = ctx.createOscillator();
   const gain = ctx.createGain();
@@ -5667,7 +5718,7 @@ function tonoSuave(ctx, freq, inicio, dur, vol, tipo) {
   osc.frequency.value = freq;
   const t0 = ctx.currentTime + inicio;
   gain.gain.setValueAtTime(0.0001, t0);
-  gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.012);
+  gain.gain.exponentialRampToValueAtTime(Math.max(vol, 0.0002), t0 + 0.012);
   gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
   osc.connect(gain); gain.connect(ctx.destination);
   osc.start(t0); osc.stop(t0 + dur + 0.02);
@@ -5675,37 +5726,26 @@ function tonoSuave(ctx, freq, inicio, dur, vol, tipo) {
 function vibrar(patron) {
   try { if (navigator.vibrate) navigator.vibrate(patron); } catch (e) {}
 }
-function sonarToque() {
+// forzar = true: para las pruebas desde Ajustes (suena aunque el interruptor esté apagado)
+function sonarToque(forzar) {
   const aj = leerAjustes();
-  if (aj.sonidoBotones) {
-    const ctx = obtenerAudio();
-    if (ctx) tonoSuave(ctx, 1400, 0, 0.05, 0.07, "triangle");
-  }
-  if (aj.vibracionBotones) vibrar(12);
+  if (aj.sonidoBotones || forzar) reproducirSonido("toque");
+  if (aj.vibracionBotones && !forzar) vibrar(12);
 }
-function sonarExito() {
-  if (!leerAjustes().sonidoResultado) return;
-  const ctx = obtenerAudio();
-  if (ctx) { // do-mi-sol ascendente
-    tonoSuave(ctx, 523, 0, 0.16, 0.12, "sine");
-    tonoSuave(ctx, 659, 0.12, 0.16, 0.12, "sine");
-    tonoSuave(ctx, 784, 0.24, 0.32, 0.12, "sine");
-  }
+function sonarExito(forzar) {
+  if (!leerAjustes().sonidoResultado && !forzar) return;
+  reproducirSonido("exito");
   vibrar([40, 60, 40]);
 }
-function sonarError() {
-  if (!leerAjustes().sonidoResultado) return;
-  const ctx = obtenerAudio();
-  if (ctx) { // dos zumbidos graves descendentes
-    tonoSuave(ctx, 220, 0, 0.2, 0.1, "sawtooth");
-    tonoSuave(ctx, 165, 0.24, 0.3, 0.1, "sawtooth");
-  }
+function sonarError(forzar) {
+  if (!leerAjustes().sonidoResultado && !forzar) return;
+  reproducirSonido("error");
   vibrar([200, 90, 200]);
 }
 // Un solo oyente para todos los botones/menús de la app
 document.addEventListener("click", (e) => {
   const el = e.target.closest && e.target.closest("button, .panel-tile, .servicio-card, .crono-tarea-card, .sim-card, .consulta-manual-item");
-  if (!el || el.disabled || el.id === "probarSonidosBtn") return;
+  if (!el || el.disabled || el.id === "probarSonidosBtn" || el.closest("#ajusteEstiloSonido")) return;
   sonarToque();
 }, true);
 

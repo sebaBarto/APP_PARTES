@@ -1292,7 +1292,18 @@
         <span class="ajuste-fila-texto"><b>✅ Sonido de parte enviado / error</b><span>Sonido de aprobación al cerrar un servicio y de error si no se pudo enviar.</span></span>
         <input type="checkbox" data-ajuste="sonidoResultado"><span class="ajuste-switch"></span>
       </label>
-      <button type="button" class="btn btn-ghost-light" id="probarSonidosBtn" style="margin-bottom:6px;">▶ Probar sonidos</button>
+      <div class="ajuste-volumen">
+        <span class="ajuste-volumen-ico">🔈</span>
+        <input type="range" id="ajusteVolumen" min="10" max="100" step="5" aria-label="Volumen de los sonidos">
+        <span class="ajuste-volumen-ico">🔊</span>
+      </div>
+      <p class="ajuste-nota" style="margin:2px 0 10px;">Volumen de los sonidos de la app (se suma al volumen del celular).</p>
+      <div class="ajuste-tamanos" id="ajusteEstiloSonido">
+        <button type="button" class="ajuste-tema-chip" data-estilo="suave"><span class="ajuste-tamano-letra" style="font-size:20px;">🎵</span><span class="ajuste-tamano-nombre">Suave</span></button>
+        <button type="button" class="ajuste-tema-chip" data-estilo="digital"><span class="ajuste-tamano-letra" style="font-size:20px;">👾</span><span class="ajuste-tamano-nombre">Digital</span></button>
+        <button type="button" class="ajuste-tema-chip" data-estilo="campana"><span class="ajuste-tamano-letra" style="font-size:20px;">🔔</span><span class="ajuste-tamano-nombre">Campana</span></button>
+      </div>
+      <button type="button" class="btn btn-secondary" id="probarSonidosBtn" style="margin:10px 0 6px;">▶ Probar sonidos</button>
 
       <p class="ajuste-seccion">Carteles de aviso</p>
       <label class="ajuste-fila">
