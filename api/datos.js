@@ -70,6 +70,7 @@ const COLECCIONES = {
   sims: { path: "sims-config.json", default: [] },
   herramientas: { path: "herramientas-config.json", default: [] },
   sims_instaladas: { path: "sims-instaladas.json", default: [] },
+  errores_app: { path: "errores-app.json", default: [] },
 };
 
 // Traduce cada colección que ya se cortó al backend nuevo — algunas
@@ -740,6 +741,38 @@ module.exports = async (req, res) => {
           const copia = [...lista];
           copia[idx] = { ...copia[idx], tecnico: body.tecnico };
           contenidoAGuardar = copia;
+        }
+      }
+
+      if (nombreColeccion === "errores_app") {
+        // El registro de errores se agrega (máx. 200, los más nuevos primero)
+        // y se puede vaciar con { accion: "limpiar" }.
+        const lista = Array.isArray(contenidoExistente) ? contenidoExistente : [];
+        if (body && body.accion === "limpiar") {
+          contenidoAGuardar = [];
+        } else if (body && typeof body === "object" && !Array.isArray(body)) {
+          const nuevo = {
+            fecha: new Date().toISOString(),
+            mensaje: String(body.mensaje || "").slice(0, 500),
+            origen: String(body.origen || "").slice(0, 200),
+            pila: String(body.pila || "").slice(0, 1500),
+            version: String(body.version || "").slice(0, 20),
+            tecnico: String(body.tecnico || "").slice(0, 60),
+            pantalla: String(body.pantalla || "").slice(0, 60),
+            dispositivo: String(body.dispositivo || "").slice(0, 200),
+            veces: 1,
+          };
+          const dup = lista.findIndex((e) => e.mensaje === nuevo.mensaje && e.origen === nuevo.origen && e.tecnico === nuevo.tecnico && e.version === nuevo.version);
+          if (dup !== -1) {
+            const previo = lista[dup];
+            const resto = lista.filter((_, i) => i !== dup);
+            contenidoAGuardar = [{ ...previo, fecha: nuevo.fecha, veces: (previo.veces || 1) + 1 }, ...resto].slice(0, 200);
+          } else {
+            contenidoAGuardar = [nuevo, ...lista].slice(0, 200);
+          }
+        } else {
+          res.status(400).json({ error: "Formato inválido" });
+          return;
         }
       }
 

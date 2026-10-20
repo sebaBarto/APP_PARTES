@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.114.1";
+const APP_VERSION = "3.115.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -94,6 +94,42 @@ const SERVICIOS_URL = "/api/servicios";
 // Cambiala antes de publicar — que sea larga y difícil de adivinar.
 const SERVICIOS_API_TOKEN = "54455ad29a4eb28e48ca915e3510ff95ceb682523fa74b32";
 // =======================================================
+
+// ===== Registro de errores de la app =====
+// Si algo falla en un celular (error de JavaScript o promesa rechazada),
+// se manda un aviso discreto a /api/datos?coleccion=errores_app para
+// verlo en admin.html > Errores. Tope por sesión y sin repetidos, y
+// nunca puede romper la app: todo va envuelto en try/catch.
+const ERRORES_MAX_POR_SESION = 5;
+const erroresYaEnviados = new Set();
+function registrarErrorApp(mensaje, origen, pila) {
+  try {
+    mensaje = String(mensaje || "").slice(0, 500);
+    if (!mensaje || erroresYaEnviados.size >= ERRORES_MAX_POR_SESION) return;
+    // Ruido típico que no es un fallo de la app
+    if (/ResizeObserver loop|Script error\.?$|Load failed|Failed to fetch|NetworkError/i.test(mensaje)) return;
+    const clave = mensaje + "|" + origen;
+    if (erroresYaEnviados.has(clave)) return;
+    erroresYaEnviados.add(clave);
+    let pantalla = "";
+    try { pantalla = pantallaActivaNombre(); } catch (e) { /* aún no cargó */ }
+    let tecnico = "";
+    try { tecnico = tecnicoLogueado || ""; } catch (e) { /* aún no cargó */ }
+    fetch("/api/datos?coleccion=errores_app", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({ mensaje, origen: origen || "", pila: pila || "", version: APP_VERSION, tecnico, pantalla, dispositivo: navigator.userAgent }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch (e) { /* el registro de errores jamás debe romper la app */ }
+}
+window.addEventListener("error", (ev) => {
+  registrarErrorApp(ev.message, (ev.filename || "").split("/").pop() + ":" + (ev.lineno || 0) + ":" + (ev.colno || 0), ev.error && ev.error.stack);
+});
+window.addEventListener("unhandledrejection", (ev) => {
+  const r = ev.reason;
+  registrarErrorApp("Promesa rechazada: " + (r && r.message ? r.message : r), "promesa", r && r.stack);
+});
 
 // Manda un mail (copia a oficina o al cliente) por nuestro propio
 // endpoint (/api/enviar-mail.js), que sale por SMTP directo desde la
