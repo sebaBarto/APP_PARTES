@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.114.0";
+const APP_VERSION = "3.114.1";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -2568,9 +2568,9 @@ let mapaLeafletInstance = null;
 // mapa que ni se estaba usando en ese momento).
 if (typeof L !== "undefined") {
   L.Icon.Default.mergeOptions({
-    iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
-    iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-    shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+    iconRetinaUrl: "vendor/leaflet/images/marker-icon-2x.png",
+    iconUrl: "vendor/leaflet/images/marker-icon.png",
+    shadowUrl: "vendor/leaflet/images/marker-shadow.png",
   });
 }
 
