@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.107.0";
+const APP_VERSION = "3.108.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -880,14 +880,15 @@ function entrarComoTecnico(nombreTecnico) {
   loginError.textContent = "";
   actualizarAccesoDashboardFinanciero();
   showScreen("home");
-  fetchServicios();
+  const promesaServicios = fetchServicios();
   precargarHistorialParaVisitas().then(() => {
     actualizarBadgeHistorialPendientes();
     prepararFelicitacionSemanal();
   });
   precargarNotasYAvisar();
   prepararAvisoSimsPendientes();
-  precargarCronogramaParaSugerencias();
+  Promise.allSettled([promesaServicios, precargarCronogramaParaSugerencias()]).then(iniciarRecordatorioTestGeo);
+  mostrarTestPendientesDeQuitar();
   cargarClientesGeneral(); // precarga, para que esté lista al completar un parte (número de cliente en Stock, etc.)
   actualizarAccesoCredencial();
   actualizarAccesoExcelDashboards();
@@ -1094,6 +1095,7 @@ loginHuellaBtn.addEventListener("click", async () => {
 cerrarSesionBtn.addEventListener("click", () => {
   borrarSesion();
   tecnicoLogueado = "";
+  detenerRecordatorioTestGeo();
   loginTecnicoSelect.value = "";
   loginPassword.value = "";
   showScreen("login");
@@ -3456,6 +3458,7 @@ confirmSignBtn.addEventListener("click", async () => {
     doneId.textContent = `N° de parte: ${idParte}`;
     doneMessage.textContent = "Sin conexión — el parte se guardó en el celular y se va a enviar solo apenas vuelva la señal.";
     showScreen("done");
+    registrarTestPendienteDeQuitar(data.cliente);
     return;
   }
 
@@ -3502,6 +3505,7 @@ confirmSignBtn.addEventListener("click", async () => {
     doneMessage.textContent = "No se pudo enviar en este momento — el parte quedó guardado y se va a reintentar solo cuando vuelva la conexión.";
     showScreen("done");
   }
+  registrarTestPendienteDeQuitar(data.cliente);
 });
 
 // ---------- Dashboard ----------
@@ -5481,6 +5485,193 @@ notasModalVerBtn.addEventListener("click", () => {
 notasModalDespuesBtn.addEventListener("click", () => {
   notasModalOverlay.classList.add("hidden");
 });
+
+// ---------- Recordatorio "cliente en TEST" (al llegar y al cerrar) ----------
+// 1) Al acercarse (por GPS, con la app abierta) a un servicio que tiene
+//    asignado HOY en el cronograma: "PONER EL CLIENTE EN TEST".
+// 2) Al cerrar el parte: "QUITAR EL CLIENTE DE TEST Y NOTIFICAR CAMBIOS".
+//    Queda pendiente (en el celular) hasta que el técnico toque "Listo",
+//    así que si lo posterga o cierra la app, vuelve a aparecer al entrar.
+const TEST_RADIO_METROS = 200;
+const TEST_SNOOZE_MS = 10 * 60 * 1000;
+const recordatorioTestOverlay = document.getElementById("recordatorioTestOverlay");
+const recordatorioTestEyebrow = document.getElementById("recordatorioTestEyebrow");
+const recordatorioTestTitulo = document.getElementById("recordatorioTestTitulo");
+const recordatorioTestCliente = document.getElementById("recordatorioTestCliente");
+const recordatorioTestDetalle = document.getElementById("recordatorioTestDetalle");
+const recordatorioTestOkBtn = document.getElementById("recordatorioTestOkBtn");
+const recordatorioTestLuegoBtn = document.getElementById("recordatorioTestLuegoBtn");
+
+let colaCartelesTest = [];
+let cartelTestActual = null;
+let testGeoObjetivos = []; // [{key, cliente, lat, lon}]
+let testGeoWatchId = null;
+let testGeoSnoozeHasta = {}; // key -> timestamp
+let testGeoGeneracion = 0;
+let testGeoTimerRefresco = null;
+
+function fechaHoyLocalISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function lsGetJSON(clave, defecto) {
+  try { const v = localStorage.getItem(clave); return v ? JSON.parse(v) : defecto; } catch (e) { return defecto; }
+}
+function lsSetJSON(clave, valor) {
+  try { localStorage.setItem(clave, JSON.stringify(valor)); } catch (e) {}
+}
+
+function encolarCartelTest(cartel) {
+  if (cartelTestActual && cartelTestActual.key === cartel.key && cartelTestActual.tipo === cartel.tipo) return;
+  if (colaCartelesTest.some((c) => c.key === cartel.key && c.tipo === cartel.tipo)) return;
+  colaCartelesTest.push(cartel);
+  if (!cartelTestActual) mostrarSiguienteCartelTest();
+}
+function mostrarSiguienteCartelTest() {
+  cartelTestActual = colaCartelesTest.shift() || null;
+  if (!cartelTestActual) {
+    recordatorioTestOverlay.classList.add("hidden");
+    return;
+  }
+  const c = cartelTestActual;
+  if (c.tipo === "poner") {
+    recordatorioTestEyebrow.textContent = "📍 LLEGASTE AL SERVICIO";
+    recordatorioTestTitulo.textContent = "PONER EL CLIENTE EN TEST";
+    recordatorioTestDetalle.textContent = "Antes de empezar, poné la cuenta en test.";
+    recordatorioTestOkBtn.textContent = "✅ Ya lo puse en test";
+  } else {
+    recordatorioTestEyebrow.textContent = "✔ SERVICIO CERRADO";
+    recordatorioTestTitulo.textContent = "QUITAR EL CLIENTE DE TEST Y NOTIFICAR CAMBIOS";
+    recordatorioTestDetalle.textContent = "No te vayas sin sacarlo de test y avisar lo que modificaste.";
+    recordatorioTestOkBtn.textContent = "✅ Listo, ya lo hice";
+  }
+  recordatorioTestCliente.textContent = c.cliente || "";
+  recordatorioTestOverlay.classList.remove("hidden");
+  try { if (navigator.vibrate) navigator.vibrate([300, 150, 300]); } catch (e) {}
+}
+recordatorioTestOkBtn.addEventListener("click", () => {
+  const c = cartelTestActual;
+  if (c) {
+    if (c.tipo === "poner") {
+      const avisados = lsGetJSON("test_avisados", {});
+      avisados[c.key] = true;
+      lsSetJSON("test_avisados", avisados);
+    } else {
+      lsSetJSON("test_quitar_pendientes", lsGetJSON("test_quitar_pendientes", []).filter((p) => p.id !== c.key));
+    }
+  }
+  mostrarSiguienteCartelTest();
+});
+recordatorioTestLuegoBtn.addEventListener("click", () => {
+  const c = cartelTestActual;
+  if (c && c.tipo === "poner") testGeoSnoozeHasta[c.key] = Date.now() + TEST_SNOOZE_MS;
+  // "quitar" sigue guardado como pendiente: reaparece al volver a entrar a la app
+  mostrarSiguienteCartelTest();
+});
+
+// --- Cartel 2: al cerrar el parte ---
+function registrarTestPendienteDeQuitar(cliente) {
+  if (!cliente || !tecnicoLogueado) return;
+  const id = `${fechaHoyLocalISO()}|${normalizeText(cliente)}`;
+  const lista = lsGetJSON("test_quitar_pendientes", []);
+  if (!lista.some((p) => p.id === id)) {
+    lista.push({ id, cliente, tecnico: tecnicoLogueado, fecha: fechaHoyLocalISO() });
+    lsSetJSON("test_quitar_pendientes", lista.slice(-30));
+  }
+  encolarCartelTest({ tipo: "quitar", key: id, cliente });
+}
+// Al entrar a la app: lo que quedó sin confirmar (de hoy o de días anteriores)
+function mostrarTestPendientesDeQuitar() {
+  lsGetJSON("test_quitar_pendientes", [])
+    .filter((p) => p.tecnico === tecnicoLogueado)
+    .forEach((p) => encolarCartelTest({ tipo: "quitar", key: p.id, cliente: p.cliente }));
+}
+
+// --- Cartel 1: por geolocalización ---
+function detenerRecordatorioTestGeo() {
+  testGeoGeneracion++;
+  if (testGeoWatchId != null && navigator.geolocation) navigator.geolocation.clearWatch(testGeoWatchId);
+  testGeoWatchId = null;
+  testGeoObjetivos = [];
+  if (testGeoTimerRefresco) { clearTimeout(testGeoTimerRefresco); testGeoTimerRefresco = null; }
+}
+
+async function iniciarRecordatorioTestGeo() {
+  detenerRecordatorioTestGeo();
+  if (!tecnicoLogueado || !navigator.geolocation) return;
+  const miGeneracion = testGeoGeneracion;
+  const hoy = fechaHoyLocalISO();
+  const avisados = lsGetJSON("test_avisados", {});
+
+  // Servicios de HOY asignados a este técnico, aún sin resolver
+  const vistos = new Set();
+  const candidatos = [];
+  cronogramaCache
+    .filter((t) => coincideNombreTecnico(t.tecnico, tecnicoLogueado) && t.fecha === hoy)
+    .forEach((t) => {
+      const s = encontrarServicioPorTarea(t.tarea);
+      if (!s || !s.direccion) return;
+      if (s.numero_servicio && (serviciosResueltos.has(s.numero_servicio) || historialCache.some((h) => h.numero_servicio === s.numero_servicio))) return;
+      const key = `${hoy}|${s.numero_servicio || normalizeText(s.cliente)}`;
+      if (vistos.has(key) || avisados[key]) return;
+      vistos.add(key);
+      candidatos.push({ key, cliente: s.cliente, direccion: s.direccion, localidad: s.localidad || "" });
+    });
+
+  if (candidatos.length > 0) {
+    // Geocodifica (puede venir "pendiente" la primera vez: se reintenta)
+    let porGeocodificar = candidatos.slice(0, 12);
+    for (let intento = 0; intento < 4 && porGeocodificar.length > 0; intento++) {
+      try {
+        const res = await fetch("/api/geocode", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+          body: JSON.stringify({ items: porGeocodificar.map((c, i) => ({ id: `t${i}`, direccion: c.direccion, localidad: c.localidad })) }),
+        });
+        const data = await res.json();
+        if (miGeneracion !== testGeoGeneracion) return;
+        const porId = {};
+        (data.results || []).forEach((r) => { porId[r.id] = r; });
+        const aunPendientes = [];
+        porGeocodificar.forEach((c, i) => {
+          const r = porId[`t${i}`];
+          if (r && !r.error && !r.pendiente && typeof r.lat === "number") {
+            testGeoObjetivos.push({ key: c.key, cliente: c.cliente, lat: r.lat, lon: r.lon });
+          } else if (r && r.pendiente) {
+            aunPendientes.push(c);
+          }
+        });
+        porGeocodificar = aunPendientes;
+      } catch (err) {
+        break;
+      }
+      if (porGeocodificar.length > 0) await new Promise((ok) => setTimeout(ok, 5000));
+      if (miGeneracion !== testGeoGeneracion) return;
+    }
+  }
+
+  if (testGeoObjetivos.length > 0) {
+    testGeoWatchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const ahora = Date.now();
+        const avis = lsGetJSON("test_avisados", {});
+        testGeoObjetivos.forEach((o) => {
+          if (avis[o.key] || (testGeoSnoozeHasta[o.key] || 0) > ahora) return;
+          const dist = distanciaMetros(pos.coords.latitude, pos.coords.longitude, o.lat, o.lon);
+          // Si el GPS es poco preciso, se da un poco más de margen (hasta 100 m)
+          if (dist <= TEST_RADIO_METROS + Math.min(pos.coords.accuracy || 0, 100)) {
+            encolarCartelTest({ tipo: "poner", key: o.key, cliente: o.cliente });
+          }
+        });
+      },
+      () => {}, // sin permiso de ubicación: simplemente no se dispara este cartel
+      { enableHighAccuracy: false, maximumAge: 20000, timeout: 30000 }
+    );
+  }
+
+  // Refresca la lista cada 30 min (por si cambió la agenda o se resolvió algo)
+  testGeoTimerRefresco = setTimeout(() => { if (tecnicoLogueado) iniciarRecordatorioTestGeo(); }, 30 * 60 * 1000);
+}
 
 // ---------- Avisos al iniciar sesión (SIMs por aceptar / felicitación semanal) ----------
 // Mismo formato que el cartel de notas sin leer. Se encolan para mostrar
