@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.110.1";
+const APP_VERSION = "3.111.0";
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).
@@ -3462,6 +3462,7 @@ confirmSignBtn.addEventListener("click", async () => {
     doneId.textContent = `N° de parte: ${idParte}`;
     doneMessage.textContent = "Sin conexión — el parte se guardó en el celular y se va a enviar solo apenas vuelva la señal.";
     showScreen("done");
+    sonarError();
     registrarTestPendienteDeQuitar(data.cliente);
     return;
   }
@@ -3499,15 +3500,18 @@ confirmSignBtn.addEventListener("click", async () => {
       ? "Copia enviada a la oficina y al cliente"
       : "Copia enviada a la oficina (sin mail de cliente)") + mensajeFoto;
     showScreen("done");
+    sonarExito();
   } else if (oficinaOk && clienteIntentado && !clienteOk) {
     doneMessage.textContent = "Enviado a la oficina, pero falló el envío al cliente" + mensajeFoto;
     showScreen("done");
+    sonarExito();
   } else {
     // Falló el envío principal (a oficina) — se guarda para reintentar
     // solo automáticamente en vez de perder el parte.
     agregarAColaEnvios(payload);
     doneMessage.textContent = "No se pudo enviar en este momento — el parte quedó guardado y se va a reintentar solo cuando vuelva la conexión.";
     showScreen("done");
+    sonarError();
   }
   registrarTestPendienteDeQuitar(data.cliente);
 });
@@ -5546,7 +5550,7 @@ notasModalDespuesBtn.addEventListener("click", () => {
 
 // ---------- Ajustes (apariencia + carteles de aviso) ----------
 // Se guardan solo en este celular (localStorage).
-const AJUSTES_DEFECTO = { tema: "clasico", tamano: "normal", avisoTestPoner: true, avisoTestQuitar: true, avisoSims: true, avisoFelicitacion: true };
+const AJUSTES_DEFECTO = { tema: "clasico", tamano: "normal", avisoTestPoner: true, avisoTestQuitar: true, sonidoBotones: true, vibracionBotones: true, sonidoResultado: true, avisoSims: true, avisoFelicitacion: true };
 function leerAjustes() {
   try {
     const guardado = JSON.parse(localStorage.getItem("ajustes_app") || "{}");
@@ -5633,6 +5637,77 @@ document.querySelectorAll("#screen-ajustes input[data-ajuste]").forEach((inp) =>
 });
 aplicarTema();
 aplicarTamano();
+document.getElementById("probarSonidosBtn").addEventListener("click", () => {
+  sonarToque();
+  setTimeout(sonarExito, 350);
+  setTimeout(sonarError, 1300);
+});
+
+// ---------- Sonidos y vibración (botones, parte enviado / error) ----------
+// Los sonidos se generan con Web Audio (sin archivos). El navegador solo
+// deja sonar después de un toque del usuario, por eso el contexto se crea
+// recién en el primer toque.
+let audioCtx = null;
+function obtenerAudio() {
+  try {
+    if (!audioCtx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      audioCtx = new AC();
+    }
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    return audioCtx;
+  } catch (e) { return null; }
+}
+// Una nota: frecuencia (Hz), cuándo empieza (s desde ahora), duración, volumen, forma de onda
+function tonoSuave(ctx, freq, inicio, dur, vol, tipo) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = tipo || "sine";
+  osc.frequency.value = freq;
+  const t0 = ctx.currentTime + inicio;
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.012);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  osc.connect(gain); gain.connect(ctx.destination);
+  osc.start(t0); osc.stop(t0 + dur + 0.02);
+}
+function vibrar(patron) {
+  try { if (navigator.vibrate) navigator.vibrate(patron); } catch (e) {}
+}
+function sonarToque() {
+  const aj = leerAjustes();
+  if (aj.sonidoBotones) {
+    const ctx = obtenerAudio();
+    if (ctx) tonoSuave(ctx, 1400, 0, 0.05, 0.07, "triangle");
+  }
+  if (aj.vibracionBotones) vibrar(12);
+}
+function sonarExito() {
+  if (!leerAjustes().sonidoResultado) return;
+  const ctx = obtenerAudio();
+  if (ctx) { // do-mi-sol ascendente
+    tonoSuave(ctx, 523, 0, 0.16, 0.12, "sine");
+    tonoSuave(ctx, 659, 0.12, 0.16, 0.12, "sine");
+    tonoSuave(ctx, 784, 0.24, 0.32, 0.12, "sine");
+  }
+  vibrar([40, 60, 40]);
+}
+function sonarError() {
+  if (!leerAjustes().sonidoResultado) return;
+  const ctx = obtenerAudio();
+  if (ctx) { // dos zumbidos graves descendentes
+    tonoSuave(ctx, 220, 0, 0.2, 0.1, "sawtooth");
+    tonoSuave(ctx, 165, 0.24, 0.3, 0.1, "sawtooth");
+  }
+  vibrar([200, 90, 200]);
+}
+// Un solo oyente para todos los botones/menús de la app
+document.addEventListener("click", (e) => {
+  const el = e.target.closest && e.target.closest("button, .panel-tile, .servicio-card, .crono-tarea-card, .sim-card, .consulta-manual-item");
+  if (!el || el.disabled || el.id === "probarSonidosBtn") return;
+  sonarToque();
+}, true);
 
 // ---------- Recordatorio "cliente en TEST" (al llegar y al cerrar) ----------
 // 1) Al acercarse (por GPS, con la app abierta) a un servicio que tiene
