@@ -4984,7 +4984,22 @@ function renderInstalacionesAdminLista() {
 
 instalacionesBuscarAdmin.addEventListener("input", renderInstalacionesAdminLista);
 
-descargarExcelInstalacionesBtn.addEventListener("click", () => {
+// Minutos entre "HH:MM" de ingreso y de salida. Si la salida es menor que
+// el ingreso se asume que cruzó la medianoche (suma 24 hs). Sin salida: null.
+function minutosTrabajadosDia(ingreso, salida) {
+  const aMin = (t) => {
+    const m = /^(\d{1,2}):(\d{2})/.exec(String(t || ""));
+    return m ? Number(m[1]) * 60 + Number(m[2]) : null;
+  };
+  const a = aMin(ingreso), b = aMin(salida);
+  if (a === null || b === null) return null;
+  return b >= a ? b - a : b + 1440 - a;
+}
+function formatoHorasMin(min) {
+  return `${Math.floor(min / 60)}:${String(min % 60).padStart(2, "0")}`;
+}
+
+descargarExcelInstalacionesBtn.addEventListener("click", async () => {
   const busqueda = normalizeText(instalacionesBuscarAdmin.value.trim());
   const filtradas = instalacionesCacheAdmin.filter((inst) =>
     !busqueda || normalizeText(inst.cliente).includes(busqueda) || normalizeText(inst.tecnico).includes(busqueda)
@@ -4993,6 +5008,31 @@ descargarExcelInstalacionesBtn.addEventListener("click", () => {
     alert("No hay instalaciones para descargar con este filtro.");
     return;
   }
+  const textoOriginal = descargarExcelInstalacionesBtn.textContent;
+  descargarExcelInstalacionesBtn.disabled = true;
+
+  // El listado no trae los días trabajados: se piden los detalles (de a 5)
+  const detalles = new Array(filtradas.length).fill(null);
+  let hechos = 0, fallidos = 0, siguiente = 0;
+  async function trabajador() {
+    while (siguiente < filtradas.length) {
+      const i = siguiente++;
+      try {
+        const res = await fetch(`/api/historial?tipo=instalacion&id=${filtradas[i].id}`, {
+          headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+          cache: "no-store",
+        });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        detalles[i] = await res.json();
+      } catch (err) {
+        fallidos++;
+      }
+      hechos++;
+      descargarExcelInstalacionesBtn.textContent = `Armando Excel... ${hechos}/${filtradas.length}`;
+    }
+  }
+  await Promise.all([trabajador(), trabajador(), trabajador(), trabajador(), trabajador()]);
+
   const filas = filtradas.map((inst) => ({
     "N°": inst.id,
     Cliente: inst.cliente || "",
@@ -5001,10 +5041,61 @@ descargarExcelInstalacionesBtn.addEventListener("click", () => {
     Fecha: inst.fecha || "",
     Estado: inst.estado === "cerrada" ? "Cerrada" : "Abierta",
   }));
-  const hoja = XLSX.utils.json_to_sheet(filas);
+
+  const filasDias = [];
+  const totales = new Map(); // instalación + técnico -> { dias, minutos, sinSalida }
+  filtradas.forEach((inst, i) => {
+    const det = detalles[i];
+    if (!det) return;
+    (det.dias || []).forEach((d) => {
+      const min = minutosTrabajadosDia(d.hora_llegada, d.hora_salida);
+      const tecnico = d.tecnico || inst.tecnico || "";
+      filasDias.push({
+        "N°": inst.id,
+        Cliente: inst.cliente || "",
+        "N° Cliente": inst.numero_cliente || "",
+        Estado: inst.estado === "cerrada" ? "Cerrada" : "Abierta",
+        Técnico: tecnico,
+        Fecha: d.fecha_llegada || "",
+        "Hora ingreso": d.hora_llegada || "",
+        "Hora salida": d.hora_salida || "(sigue en obra)",
+        "Horas trabajadas (hh:mm)": min === null ? "" : formatoHorasMin(min),
+        "Horas trabajadas (decimal)": min === null ? "" : Math.round((min / 60) * 100) / 100,
+      });
+      const clave = inst.id + "|" + tecnico;
+      if (!totales.has(clave)) totales.set(clave, { inst, tecnico, dias: 0, minutos: 0, sinSalida: 0 });
+      const t = totales.get(clave);
+      t.dias++;
+      if (min === null) t.sinSalida++; else t.minutos += min;
+    });
+  });
+  const filasTotales = [...totales.values()].map((t) => ({
+    "N°": t.inst.id,
+    Cliente: t.inst.cliente || "",
+    "N° Cliente": t.inst.numero_cliente || "",
+    Estado: t.inst.estado === "cerrada" ? "Cerrada" : "Abierta",
+    Técnico: t.tecnico,
+    "Días trabajados": t.dias,
+    "Total horas (hh:mm)": formatoHorasMin(t.minutos),
+    "Total horas (decimal)": Math.round((t.minutos / 60) * 100) / 100,
+    Observación: t.sinSalida ? `${t.sinSalida} día(s) sin hora de salida (no suman)` : "",
+  }));
+
   const libro = XLSX.utils.book_new();
+  const hoja = XLSX.utils.json_to_sheet(filas);
+  hoja["!cols"] = [{ wch: 6 }, { wch: 30 }, { wch: 11 }, { wch: 18 }, { wch: 12 }, { wch: 10 }];
   XLSX.utils.book_append_sheet(libro, hoja, "Instalaciones");
+  const hojaDias = XLSX.utils.json_to_sheet(filasDias);
+  hojaDias["!cols"] = [{ wch: 6 }, { wch: 30 }, { wch: 11 }, { wch: 10 }, { wch: 18 }, { wch: 12 }, { wch: 13 }, { wch: 16 }, { wch: 24 }, { wch: 26 }];
+  XLSX.utils.book_append_sheet(libro, hojaDias, "Horas por día");
+  const hojaTot = XLSX.utils.json_to_sheet(filasTotales);
+  hojaTot["!cols"] = [{ wch: 6 }, { wch: 30 }, { wch: 11 }, { wch: 10 }, { wch: 18 }, { wch: 15 }, { wch: 20 }, { wch: 22 }, { wch: 40 }];
+  XLSX.utils.book_append_sheet(libro, hojaTot, "Total por técnico");
   XLSX.writeFile(libro, `instalaciones_${new Date().toISOString().slice(0, 10)}.xlsx`);
+
+  descargarExcelInstalacionesBtn.disabled = false;
+  descargarExcelInstalacionesBtn.textContent = textoOriginal;
+  if (fallidos) alert(`Atención: no se pudo leer el detalle de ${fallidos} instalación(es); sus horas no figuran en el Excel. Volvé a intentar.`);
 });
 
 document.getElementById("instalacionesVolverListaBtn").addEventListener("click", () => {
