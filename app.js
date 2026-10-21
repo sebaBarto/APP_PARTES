@@ -3,7 +3,19 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.115.0";
+const APP_VERSION = "3.115.1";
+
+// Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
+// un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
+// Se detecta acá, antes de todo: se borran los cachés y se recarga una vez.
+if (!document.getElementById("ajustesBtn") && !sessionStorage.getItem("recarga_html_viejo")) {
+  try { sessionStorage.setItem("recarga_html_viejo", "1"); } catch (e) { /* sin sessionStorage */ }
+  Promise.all([
+    window.caches ? caches.keys().then((ks) => Promise.all(ks.map((k) => caches.delete(k)))) : null,
+    navigator.serviceWorker ? navigator.serviceWorker.getRegistrations().then((rs) => Promise.all(rs.map((r) => r.unregister()))) : null,
+  ].filter(Boolean)).catch(() => {}).then(() => location.reload());
+  throw new Error("index.html desactualizado: recargando");
+}
 
 // Clave pública de notificaciones push (VAPID) — es pública a
 // propósito, no es un secreto (la privada vive solo en Vercel).

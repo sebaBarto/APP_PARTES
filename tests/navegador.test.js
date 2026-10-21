@@ -73,3 +73,18 @@ test("un error de JavaScript se reporta a errores_app y respeta el tope", async 
   assert.ok(posts[0].version);
   await ctx.close();
 });
+
+test("con un index.html viejo (sin ajustesBtn) se recarga una sola vez, sin bucle", async () => {
+  const { ctx, page } = await nuevaPagina();
+  let pedidos = 0;
+  await page.route("**/index.html", async (route) => {
+    pedidos++;
+    const resp = await route.fetch();
+    const html = (await resp.text()).replace('id="ajustesBtn"', 'id="viejo"');
+    route.fulfill({ response: resp, body: html });
+  });
+  await page.goto(base + "/index.html");
+  await page.waitForTimeout(1500);
+  assert.strictEqual(pedidos, 2, "debía pedir el HTML exactamente 2 veces, pidió " + pedidos);
+  await ctx.close();
+});
