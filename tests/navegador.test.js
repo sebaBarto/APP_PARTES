@@ -112,12 +112,12 @@ test("el estilo del inicio (Nuevo/Clásico) se elige en Ajustes y se recuerda", 
   await page.goto(base + "/");
   await page.waitForTimeout(400);
   const estilo = () => page.evaluate(() => document.documentElement.getAttribute("data-inicio"));
-  assert.strictEqual(await estilo(), "nuevo");
+  assert.strictEqual(await estilo(), "clasico", "por defecto debe ser el clásico");
   await page.evaluate(() => { showScreen("ajustes"); renderAjustes(); });
-  await page.evaluate(() => document.querySelector('#ajusteEstiloInicio [data-estilo="clasico"]').click());
-  assert.strictEqual(await estilo(), "clasico");
+  await page.evaluate(() => document.querySelector('#ajusteEstiloInicio [data-estilo="nuevo"]').click());
+  assert.strictEqual(await estilo(), "nuevo");
   await page.reload();
   await page.waitForTimeout(400);
-  assert.strictEqual(await estilo(), "clasico");
+  assert.strictEqual(await estilo(), "nuevo");
   await ctx.close();
 });

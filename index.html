@@ -20,7 +20,7 @@
     var esc = { chico: 0.88, grande: 1.2 }[a.tamano];
     if (esc) document.documentElement.style.setProperty("--escala", esc);
     if (a.botonesGrandes) document.documentElement.setAttribute("data-botones", "grandes");
-    document.documentElement.setAttribute("data-inicio", a.estiloInicio === "clasico" ? "clasico" : "nuevo");
+    document.documentElement.setAttribute("data-inicio", a.estiloInicio === "nuevo" ? "nuevo" : "clasico");
     if (t === "night" || t === "day" || t === "contraste") {
       document.documentElement.setAttribute("data-theme", t);
       var m = document.querySelector('meta[name="theme-color"]');
