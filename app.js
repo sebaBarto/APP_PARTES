@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.124.0";
+const APP_VERSION = "3.125.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -46,6 +46,57 @@ if (typeof Chart !== "undefined") {
   if (typeof ChartDataLabels !== "undefined") Chart.defaults.set("plugins.datalabels", { display: false });
 }
 
+// Skin nuevo: los gráficos toman los colores del tema (texto, grilla, series oscuras).
+// Con el skin clásico este plugin no hace nada.
+if (typeof Chart !== "undefined") {
+  Chart.register({
+    id: "temaNuevo",
+    afterDestroy(chart) {
+      try { chart.canvas.parentElement.classList.remove("con-grafico"); } catch (e) { /* ya no está */ }
+    },
+    beforeInit(chart) {
+      try { chart.canvas.parentElement.classList.add("con-grafico"); } catch (e) { /* sin padre */ }
+      const raiz = document.documentElement;
+      if (raiz.dataset.inicio !== "nuevo") return;
+      const claro = raiz.dataset.theme === "day" || raiz.dataset.theme === "contraste";
+      const fg = claro ? "#101820" : "#E8ECEF";
+      const mut = claro ? "#4A5F6E" : "#9FB3C2";
+      const grilla = claro ? "rgba(16,24,32,0.10)" : "rgba(255,255,255,0.10)";
+      const fondo = claro ? "#FFFFFF" : "#17212B";
+      const co = chart.config.options = chart.config.options || {};
+      co.plugins = co.plugins || {};
+      co.plugins.title = Object.assign({}, co.plugins.title, { color: fg });
+      const leg = co.plugins.legend = Object.assign({}, co.plugins.legend);
+      leg.labels = Object.assign({}, leg.labels, { color: fg });
+      const dl = co.plugins.datalabels;
+      if (dl && typeof dl.color === "string" && dl.color.toLowerCase() === "#101820") co.plugins.datalabels = Object.assign({}, dl, { color: fg });
+      const tipo = chart.config.type;
+      if (tipo === "bar" || tipo === "line") {
+        co.scales = co.scales || {};
+        ["x", "y"].forEach((eje) => {
+          const sc = co.scales[eje] = Object.assign({}, co.scales[eje]);
+          if (eje === "y" && tipo === "bar" && sc.grace === undefined) sc.grace = "12%";
+          sc.ticks = Object.assign({}, sc.ticks, { color: mut });
+          sc.grid = Object.assign({}, sc.grid, { color: grilla });
+          sc.border = Object.assign({}, sc.border, { color: grilla });
+        });
+      }
+      const remapear = (c) => {
+        if (claro || typeof c !== "string") return c;
+        if (c.toLowerCase() === "#2e7d32") return "#5FD08A";
+        if (c.toLowerCase() === "#101820") return (chart.config.type === "doughnut" || chart.config.type === "pie") ? "#6F8CA0" : "#E8ECEF";
+        if (c === "rgba(16,24,32,0.1)") return "rgba(232,236,239,0.14)";
+        return c;
+      };
+      (chart.config.data.datasets || []).forEach((ds) => {
+        ds.borderColor = Array.isArray(ds.borderColor) ? ds.borderColor.map(remapear) : remapear(ds.borderColor);
+        ds.backgroundColor = Array.isArray(ds.backgroundColor) ? ds.backgroundColor.map(remapear) : remapear(ds.backgroundColor);
+        if (tipo === "doughnut" || tipo === "pie") { ds.borderColor = fondo; ds.borderWidth = 2; }
+      });
+    },
+  });
+}
+
 // Config de porcentaje reutilizable para los gráficos de torta — la
 // guía de UX de gráficos recomienda siempre mostrar el % en la propia
 // torta, no solo al pasar el mouse/dedo (accesibilidad).
@@ -55,7 +106,7 @@ const DATALABELS_PORCENTAJE = {
     const color = Array.isArray(bg) ? bg[ctx.dataIndex] : bg;
     // Texto oscuro sobre colores claros (ámbar, verdes claros), texto
     // blanco sobre colores oscuros (navy, rojos) — así siempre se lee bien.
-    const clarosConocidos = ["#F5A623", "#FFD98E", "#3FAE6E", "#2E7D32"];
+    const clarosConocidos = ["#F5A623", "#FFD98E", "#3FAE6E", "#2E7D32", "#E8ECEF"];
     return clarosConocidos.includes((color || "").toUpperCase()) ? "#101820" : "#FFFFFF";
   },
   font: { family: "'Space Grotesk', sans-serif", weight: "700", size: 12 },
@@ -8974,7 +9025,7 @@ async function fetchDashHerramientas() {
     dashHerramientasCache = await res.json();
     if (!Array.isArray(dashHerramientasCache)) dashHerramientasCache = [];
     dashHerrConfigCache = Array.isArray(herramientas) ? herramientas : [];
-    dashHerramientasSyncLabel.textContent = "Actualizado " + formatSyncTime(new Date());
+    dashHerramientasSyncLabel.textContent = formatSyncTime(new Date());
     renderListaHerramientasDash();
     if (dashHerrHerramientaSeleccionada) renderDashHerramientas();
   } catch (err) {

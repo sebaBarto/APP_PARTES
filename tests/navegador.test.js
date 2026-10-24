@@ -458,3 +458,55 @@ test("Servicios pendientes (skin nuevo): semáforo de antigüedad con conteo y f
   assert.strictEqual(await page.locator("#serviciosList .sv-c:visible").count(), 4);
   await ctx.close();
 });
+
+test("Skin nuevo en historial, notas, stock, SIMs y dashboards: filtros en ámbar, tarjetas con franja y gráficos legibles; el clásico no cambia", async () => {
+  const historial = [
+    { id_parte: "p1", numero_servicio: "4000", cliente: "Panadería Sur", direccion: "Mitre 100", fecha: diaISO(0), hora_entrada: "09:00", hora_salida: "10:00", tecnico: "Juan Pérez", costo_final: "12000", forma_pago: "PAGADO", es_instalacion: true, pasado_sistema_offline: 0 },
+    { id_parte: "p2", numero_servicio: "4001", cliente: "Kiosco Norte", direccion: "Belgrano 5", fecha: diaISO(-1), hora_entrada: "11:00", hora_salida: "12:00", tecnico: "Juan Pérez", costo_final: "0", es_instalacion: false, pasado_sistema_offline: 1 },
+  ];
+  const abrir = async (estilo, tema) => {
+    const { ctx, page, erroresPagina } = await nuevaPagina();
+    await page.route("**/api/**", (route) => {
+      const u = route.request().url();
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(u.includes("tipo=stock") ? [] : u.includes("/api/historial") ? historial : []) });
+    });
+    await page.goto(base + "/");
+    await page.evaluate(([e, t]) => localStorage.setItem("ajustes_app", JSON.stringify({ estiloInicio: e, tema: t, avisoFelicitacion: false })), [estilo, tema]);
+    await page.reload();
+    await page.waitForTimeout(500);
+    return { ctx, page, erroresPagina };
+  };
+  const css = (page, sel, prop) => page.locator(sel).first().evaluate((el, p) => getComputedStyle(el)[p], prop);
+
+  let { ctx, page, erroresPagina } = await abrir("nuevo", "night");
+  await page.evaluate(() => { tecnicoLogueado = "Juan Pérez"; showScreen("historial"); fetchHistorialReciente(); });
+  await page.waitForTimeout(700);
+  assert.strictEqual(await css(page, ".hist-periodo-chip.active", "backgroundColor"), "rgb(245, 166, 35)", "filtro activo en ámbar");
+  assert.strictEqual(await css(page, "#screen-historial .review-eyebrow", "fontSize"), "26px", "título grande");
+  const franjas = await page.locator("#historialList .historial-card").evaluateAll((els) => els.map((e) => getComputedStyle(e).borderLeftWidth));
+  assert.deepStrictEqual(franjas, ["5px", "5px"], "franja de estado en cada tarjeta");
+  assert.strictEqual(await css(page, ".dash-cards-row", "display"), "grid");
+  await page.evaluate(() => { showScreen("dashboard"); fetchDashboard(); });
+  await page.waitForTimeout(900);
+  const colorTitulo = await page.evaluate(() => { const c = Chart.getChart("dashChartTecnico"); return c && c.options.plugins.title.color; });
+  assert.strictEqual(colorTitulo, "#E8ECEF", "el título del gráfico se lee sobre fondo oscuro");
+  assert.strictEqual(await page.locator("#screen-dashboard .dash-chart-wrap:not(.con-grafico)").first().isVisible().catch(() => false), false, "sin marco vacío cuando no hay gráfico");
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+
+  ({ ctx, page, erroresPagina } = await abrir("nuevo", "day"));
+  await page.evaluate(() => { showScreen("dashboard"); fetchDashboard(); });
+  await page.waitForTimeout(900);
+  assert.strictEqual(await page.evaluate(() => Chart.getChart("dashChartTecnico").options.plugins.title.color), "#101820");
+  await ctx.close();
+
+  ({ ctx, page } = await abrir("clasico", "night"));
+  await page.evaluate(() => { tecnicoLogueado = "Juan Pérez"; showScreen("historial"); fetchHistorialReciente(); });
+  await page.waitForTimeout(500);
+  assert.notStrictEqual(await css(page, "#screen-historial .review-eyebrow", "fontSize"), "26px");
+  assert.strictEqual(await css(page, ".dash-cards-row", "display"), "flex", "el clásico mantiene sus tarjetas");
+  await page.evaluate(() => { showScreen("dashboard"); fetchDashboard(); });
+  await page.waitForTimeout(900);
+  assert.notStrictEqual(await page.evaluate(() => Chart.getChart("dashChartTecnico").options.plugins.title.color), "#E8ECEF", "el clásico no cambia los gráficos");
+  await ctx.close();
+});
