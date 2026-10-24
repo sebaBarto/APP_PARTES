@@ -2229,3 +2229,94 @@ html[data-inicio="nuevo"] #screen-home .tile-servicios .panel-tile-texto { displ
 html[data-inicio="nuevo"] #screen-home .tile-servicios .panel-tile-resumen:not(.hidden) { display: block; font-family: 'Inter', sans-serif; font-weight: 500; font-size: 13px; color: rgba(16,24,32,0.78); }
 html[data-inicio="nuevo"] #screen-home .tile-servicios .panel-tile-progreso:not(.hidden) { display: block; width: 100%; max-width: 220px; height: 5px; margin-top: 4px; border-radius: 3px; background: rgba(16,24,32,0.2); overflow: hidden; }
 html[data-inicio="nuevo"] #screen-home .tile-servicios .panel-tile-progreso > span { display: block; height: 100%; width: 0; background: #101820; border-radius: 3px; transition: width .4s ease; }
+
+/* ============================================================
+   PARTE (formulario) — estilo Nuevo: secciones claras y aviso de qué falta
+   ============================================================ */
+.solo-nuevo { display: none; }
+html[data-inicio="nuevo"] .solo-nuevo { display: inline; }
+html[data-inicio="nuevo"] .solo-clasico { display: none; }
+
+/* En el estilo Clásico las secciones no existen: son transparentes para el layout */
+.parte-seccion { display: contents; }
+.parte-seccion-titulo, .parte-faltantes { display: none; }
+
+html[data-inicio="nuevo"] #screen-form { --p-bg: #FFFFFF; --p-bd: #D8DCD4; --p-ink: #101820; --p-sub: #5C6670; --p-ok: #1F7A3D; --p-warn: #A9680F; }
+html[data-inicio="nuevo"][data-theme="night"] #screen-form { --p-bg: #1B2530; --p-bd: #2A3743; --p-ink: #F4F5F0; --p-sub: #9AA3A9; --p-ok: #5FD08A; --p-warn: #F5A623; }
+html[data-inicio="nuevo"][data-theme="contraste"] #screen-form { --p-bd: #101820; --p-sub: #2B3640; }
+
+html[data-inicio="nuevo"] #screen-form .parte-seccion {
+  display: block; background: var(--p-bg); border: 1px solid var(--p-bd); border-radius: 16px;
+  padding: 14px 14px 2px; margin: 0 0 14px;
+}
+html[data-inicio="nuevo"] #screen-form .parte-seccion-titulo {
+  display: block; margin: 0 0 12px; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 16px;
+  letter-spacing: -0.005em; color: var(--p-ink);
+}
+html[data-inicio="nuevo"] #screen-form .parte-eyebrow {
+  display: block; margin: 4px 0 16px; padding: 0; font-family: 'Space Grotesk', sans-serif; font-weight: 700;
+  font-size: 26px; line-height: 1.1; letter-spacing: -0.01em; color: var(--p-ink);
+}
+html[data-inicio="nuevo"] #screen-form .parte-eyebrow::before { display: none; }
+html[data-inicio="nuevo"] #screen-form .field-label {
+  font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--p-sub);
+}
+html[data-inicio="nuevo"][data-theme="night"] #screen-form .parte-seccion .field-input:not(:read-only) { background: #141C25; }
+
+html[data-inicio="nuevo"] #screen-form .parte-faltantes {
+  display: block; margin: 0 0 4px; text-align: center; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500;
+  color: #5FD08A;
+}
+html[data-inicio="nuevo"] #screen-form .parte-faltantes.faltan { color: #F5A623; }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) #screen-form .parte-faltantes { color: #1F7A3D; }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) #screen-form .parte-faltantes.faltan { color: #A9680F; }
+
+/* Parte (estilo Nuevo): ajustes de lectura */
+html[data-inicio="nuevo"] #screen-form { --pg-ink: #F4F5F0; }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) #screen-form { --pg-ink: #101820; }
+html[data-inicio="nuevo"] #screen-form .parte-eyebrow { color: var(--pg-ink); }
+/* Dirección y localidad una debajo de la otra (antes la dirección quedaba angosta y se cortaba) */
+html[data-inicio="nuevo"] #screen-form .parte-seccion .field-row:has(#f_direccion) { flex-direction: column; gap: 0; }
+html[data-inicio="nuevo"] #screen-form .parte-seccion .field-row:has(#f_direccion) > .field-group { width: 100%; max-width: none; flex: none; }
+html[data-inicio="nuevo"] #screen-form .parte-seccion div:has(> #verMapaBtn) { margin-bottom: 14px; }
+/* Botones secundarios dentro de las tarjetas claras */
+html[data-inicio="nuevo"]:not([data-theme="night"]) #screen-form .parte-seccion :is(.btn-ghost, .btn-secondary) { color: var(--p-ink); border-color: #B7BDB2; }
+html[data-inicio="nuevo"][data-theme="contraste"] #screen-form .parte-seccion :is(.btn-ghost, .btn-secondary) { border-color: #101820; }
+
+/* ============================================================
+   LOGIN — estilo Nuevo: alineado a la izquierda, campos del mismo ancho
+   y "Ingresar" como botón principal (ámbar)
+   ============================================================ */
+.login-saludo { display: none; }
+html[data-inicio="nuevo"] #screen-login { --l-ink: #F4F5F0; --l-sub: #9AA3A9; }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) #screen-login { --l-ink: #101820; --l-sub: #5C6670; }
+html[data-inicio="nuevo"] #screen-login { align-items: stretch; justify-content: flex-start; padding: 56px 24px 0; }
+html[data-inicio="nuevo"] #screen-login .login-wrap { align-items: stretch; text-align: left; max-width: 360px; width: 100%; margin: 0 auto; gap: 10px; }
+html[data-inicio="nuevo"] #screen-login .login-logo { width: 96px; max-width: none; margin: 8px 0 22px; }
+html[data-inicio="nuevo"] #screen-login .app-version { order: 99; margin: 18px 0 0; }
+html[data-inicio="nuevo"] #screen-login .login-saludo { display: block; margin: 0; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 32px; line-height: 1.05; letter-spacing: -0.02em; color: var(--l-ink); }
+html[data-inicio="nuevo"] #screen-login .login-title { margin: 0 0 14px; font-family: 'Inter', sans-serif; font-size: 15px; color: var(--l-sub); }
+html[data-inicio="nuevo"] #screen-login .login-input { text-align: left; font-size: 16px; padding: 14px 14px; border-radius: 12px; width: 100%; box-sizing: border-box; }
+html[data-inicio="nuevo"] #screen-login .password-field-wrap { width: 100%; }
+html[data-inicio="nuevo"] #screen-login .login-error { margin: 2px 0 0; min-height: 18px; text-align: left; }
+html[data-inicio="nuevo"] #screen-login .login-huella-alternativa { text-align: left; }
+html[data-inicio="nuevo"] #screen-login .action-bar { width: 100%; max-width: 408px; box-sizing: border-box; margin: 0 auto; padding-left: 24px; padding-right: 24px; }
+html[data-inicio="nuevo"] #screen-login #loginBtn { background: #F5A623; color: #101820; box-shadow: none; }
+html[data-inicio="nuevo"] #screen-login #loginBtn:active { background: #E39A1E; transform: scale(0.98); }
+html[data-inicio="nuevo"] #screen-login #actualizarAppBtn { border: 0; background: transparent; color: var(--l-sub); font-weight: 500; text-decoration: underline; min-height: 40px; }
+html[data-inicio="nuevo"] #screen-login .action-bar { max-width: 360px; padding-left: 0; padding-right: 0; }
+
+/* ============================================================
+   PANTALLAS DE CARGA — esqueleto (solo estilo Nuevo; el JS solo lo crea ahí)
+   ============================================================ */
+.esqueleto-lista { display: none; }
+html[data-inicio="nuevo"] .esqueleto-lista { display: grid; gap: 10px; margin: 6px 0 10px; }
+html[data-inicio="nuevo"] .esqueleto-card {
+  height: 78px; border-radius: 14px;
+  background: linear-gradient(90deg, rgba(128,140,150,0.14) 25%, rgba(128,140,150,0.28) 37%, rgba(128,140,150,0.14) 63%);
+  background-size: 400% 100%; animation: esqueleto-brillo 1.3s ease infinite;
+}
+html[data-inicio="nuevo"] .esqueleto-card:nth-child(2) { opacity: 0.8; }
+html[data-inicio="nuevo"] .esqueleto-card:nth-child(3) { opacity: 0.6; }
+@keyframes esqueleto-brillo { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+@media (prefers-reduced-motion: reduce) { html[data-inicio="nuevo"] .esqueleto-card { animation: none; } }

@@ -173,3 +173,57 @@ test("Próximo service: muestra la próxima tarea pendiente del técnico, saltea
   assert.match(await page.locator("#tileServiciosResumen").textContent(), /1 pendiente/);
   await ctx.close();
 });
+
+async function paginaConEstilo(estilo) {
+  const ctx = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 844 } });
+  const page = await ctx.newPage();
+  await page.addInitScript((e) => localStorage.setItem("ajustes_app", JSON.stringify({ estiloInicio: e })), estilo);
+  await page.route("**/api/**", (r) => r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+  await page.goto(base + "/");
+  await page.waitForTimeout(500);
+  return { ctx, page };
+}
+
+test("Parte: con el skin nuevo hay 4 secciones y un aviso de qué falta; con el clásico no se ven", async () => {
+  let { ctx, page } = await paginaConEstilo("nuevo");
+  await page.evaluate(() => { showScreen("form"); });
+  await page.waitForTimeout(300);
+  assert.strictEqual(await page.locator("#screen-form .parte-seccion-titulo:visible").count(), 4);
+  assert.match(await page.locator("#parteFaltantes").textContent(), /Falta completar: Cliente, Técnico, Fecha/);
+  await page.fill("#f_cliente", "Panadería Sur");
+  await page.waitForTimeout(900);
+  assert.match(await page.locator("#parteFaltantes").textContent(), /Técnico, Fecha/);
+  await ctx.close();
+  ({ ctx, page } = await paginaConEstilo("clasico"));
+  await page.evaluate(() => { showScreen("form"); });
+  assert.strictEqual(await page.locator("#screen-form .parte-seccion-titulo:visible").count(), 0);
+  assert.strictEqual(await page.locator("#parteFaltantes").isVisible(), false);
+  await ctx.close();
+});
+
+test("Login: con el skin nuevo hay saludo y los campos tienen el mismo ancho; con el clásico no cambia", async () => {
+  let { ctx, page } = await paginaConEstilo("nuevo");
+  assert.strictEqual(await page.locator(".login-saludo").isVisible(), true);
+  const anchos = await page.evaluate(() => [document.getElementById("loginTecnicoSelect").getBoundingClientRect().width, document.getElementById("loginPassword").getBoundingClientRect().width]);
+  assert.ok(Math.abs(anchos[0] - anchos[1]) < 1, "select y contraseña deben medir lo mismo: " + anchos);
+  await ctx.close();
+  ({ ctx, page } = await paginaConEstilo("clasico"));
+  assert.strictEqual(await page.locator(".login-saludo").isVisible(), false);
+  await ctx.close();
+});
+
+test("Carga: el esqueleto aparece con 'Cargando...' solo en el skin nuevo y se va al terminar", async () => {
+  let { ctx, page } = await paginaConEstilo("nuevo");
+  await page.evaluate(() => { showScreen("vehiculos"); vehiculosListaStatus.textContent = "Cargando..."; });
+  await page.waitForTimeout(150);
+  assert.strictEqual(await page.locator("#screen-vehiculos .esqueleto-card:visible").count(), 3);
+  await page.evaluate(() => { vehiculosListaStatus.textContent = ""; });
+  await page.waitForTimeout(150);
+  assert.strictEqual(await page.locator("#screen-vehiculos .esqueleto-card").count(), 0);
+  await ctx.close();
+  ({ ctx, page } = await paginaConEstilo("clasico"));
+  await page.evaluate(() => { showScreen("vehiculos"); vehiculosListaStatus.textContent = "Cargando..."; });
+  await page.waitForTimeout(150);
+  assert.strictEqual(await page.locator("#screen-vehiculos .esqueleto-card").count(), 0);
+  await ctx.close();
+});

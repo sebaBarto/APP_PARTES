@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.119.0";
+const APP_VERSION = "3.120.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -774,6 +774,7 @@ function showScreen(name) {
   if (btnAjustes) btnAjustes.classList.toggle("hidden", name === "login");
   try { actualizarWakeLockPantalla(name); } catch (e) { /* los ajustes todavía no cargaron */ }
   if (name === "home") { try { actualizarProximoService(); } catch (e) { /* aún no cargó */ } }
+  try { controlarFaltantesParte(name); } catch (e) { /* aún no cargó */ }
 }
 
 function setStatus(text, mode) {
@@ -1161,6 +1162,73 @@ function actualizarResumenDelDia() {
   } catch (e) {
     resumen.classList.add("hidden");
     progreso.classList.add("hidden");
+  }
+}
+
+// ---------- Pantallas de carga con esqueleto (estilo Nuevo) ----------
+// Cuando un listado dice "Cargando..." / "Buscando...", se le agregan debajo
+// unas tarjetas grises animadas con la forma de la lista. Se detecta solo,
+// mirando los textos de estado (.list-status), sin tocar cada pantalla.
+(function activarEsqueletos() {
+  const SEL = ".list-status";
+  const CARGANDO = /^(Cargando|Buscando servicios|Buscando cronograma)/;
+  function sincronizar(el) {
+    if (!el || !el.matches || !el.matches(SEL) || /^dash/.test(el.id)) return;
+    const quiere = document.documentElement.getAttribute("data-inicio") === "nuevo" && CARGANDO.test((el.textContent || "").trim());
+    const sig = el.nextElementSibling;
+    const esq = sig && sig.classList.contains("esqueleto-lista") ? sig : null;
+    if (quiere && !esq) {
+      const caja = document.createElement("div");
+      caja.className = "esqueleto-lista";
+      caja.setAttribute("aria-hidden", "true");
+      caja.innerHTML = '<div class="esqueleto-card"></div><div class="esqueleto-card"></div><div class="esqueleto-card"></div>';
+      el.insertAdjacentElement("afterend", caja);
+    } else if (!quiere && esq) {
+      esq.remove();
+    }
+  }
+  const obs = new MutationObserver((muts) => {
+    for (const m of muts) {
+      const base = m.target.nodeType === 3 ? m.target.parentElement : m.target;
+      if (base && base.closest) sincronizar(base.closest(SEL));
+    }
+  });
+  const iniciar = () => {
+    obs.observe(document.body, { subtree: true, childList: true, characterData: true });
+    document.querySelectorAll(SEL).forEach(sincronizar);
+  };
+  if (document.body) iniciar(); else document.addEventListener("DOMContentLoaded", iniciar);
+})();
+
+// ---------- Parte (estilo Nuevo): qué falta antes de pasar a la firma ----------
+let faltantesParteTimer = null;
+function actualizarFaltantesParte() {
+  const el = document.getElementById("parteFaltantes");
+  if (!el) return;
+  try {
+    const faltan = [];
+    if (!document.getElementById("f_cliente").value.trim()) faltan.push("Cliente");
+    if (!getTecnicoValue()) faltan.push("Técnico");
+    if (!document.getElementById("f_fecha").value) faltan.push("Fecha");
+    const importe = document.getElementById("f_importe").value.trim();
+    el.classList.toggle("faltan", faltan.length > 0);
+    if (faltan.length > 0) {
+      el.textContent = "Falta completar: " + faltan.join(", ");
+    } else if (importe && !getFormaPago()) {
+      el.classList.add("faltan");
+      el.textContent = "Cargaste un importe: elegí la forma de pago.";
+    } else {
+      el.textContent = "Listo para pasar a la firma.";
+    }
+  } catch (e) { el.textContent = ""; }
+}
+function controlarFaltantesParte(pantalla) {
+  if (pantalla === "form") {
+    actualizarFaltantesParte();
+    if (!faltantesParteTimer) faltantesParteTimer = setInterval(actualizarFaltantesParte, 700);
+  } else if (faltantesParteTimer) {
+    clearInterval(faltantesParteTimer);
+    faltantesParteTimer = null;
   }
 }
 
