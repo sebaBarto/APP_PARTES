@@ -346,3 +346,84 @@ test("Cobro: el botón elegido (descuento y forma de pago) se ve marcado en los 
     }
   }
 });
+
+function diaISO(n) { const x = new Date(); x.setDate(x.getDate() + n); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`; }
+const DIAS_ES = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+function etiquetaDia(n) { const f = diaISO(n); return `${DIAS_ES[new Date(f + "T12:00:00").getDay()]} ${f.slice(8, 10)}/${f.slice(5, 7)}`; }
+
+async function paginaCronograma(estilo, { tareas, servicios, historial }) {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route("**/api/**", (route) => {
+    const u = route.request().url();
+    let cuerpo = {};
+    if (u.includes("/api/cronograma")) cuerpo = { tareas, tecnicos: ["Juan Pérez", "Luis Gómez"] };
+    else if (u.includes("/api/servicios")) cuerpo = servicios;
+    else if (u.includes("/api/historial")) cuerpo = historial;
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(cuerpo) });
+  });
+  await page.goto(base + "/");
+  await page.evaluate((e) => localStorage.setItem("ajustes_app", JSON.stringify({ estiloInicio: e, avisoFelicitacion: false })), estilo);
+  await page.reload();
+  await page.waitForTimeout(500);
+  await page.evaluate(([s, h]) => { serviciosCache = s; historialCache = h; tecnicoLogueado = "Juan Pérez"; showScreen("cronograma"); cronoDiaActivo = ""; fetchCronograma(); }, [servicios, historial]);
+  await page.waitForTimeout(700);
+  return { ctx, page, erroresPagina };
+}
+
+test("Cronograma: una tarea ya hecha sigue 'Resuelta' aunque el servicio haya salido de la lista de pendientes", async () => {
+  const tareas = [
+    { tecnico: "Juan Pérez", fecha: diaISO(0), dia_label: etiquetaDia(0), hora_inicio: "09:00", hora_fin: "10:00", tarea: "Servicio: Panadería Sur\nMitre 100  -  Rosario\nSirena" },
+    { tecnico: "Juan Pérez", fecha: diaISO(0), dia_label: etiquetaDia(0), hora_inicio: "11:00", hora_fin: "12:00", tarea: "Servicio: Kiosco Norte\nBelgrano 55  -  Rosario\nSensor" },
+    { tecnico: "Juan Pérez", fecha: diaISO(0), dia_label: etiquetaDia(0), hora_inicio: "13:00", hora_fin: "14:00", tarea: "Servicio: Farmacia Central\nCórdoba 1  -  Rosario\nPanel" },
+  ];
+  // Panadería Sur ya NO está en la lista de pendientes (se retiró al hacerse), pero tiene su parte hoy.
+  // Kiosco Norte sigue pendiente. Farmacia Central tiene un parte VIEJO (otro servicio) que no debe contar.
+  const servicios = [{ numero_servicio: "901", cliente: "Kiosco Norte", direccion: "Belgrano 55", localidad: "Rosario", tarea: "Sensor" }];
+  const historial = [
+    { numero_servicio: "900", cliente: "Panadería Sur", fecha: diaISO(0), tecnico: "Juan Pérez" },
+    { numero_servicio: "700", cliente: "Farmacia Central", fecha: diaISO(-40), tecnico: "Luis Gómez" },
+  ];
+  for (const estilo of ["clasico", "nuevo"]) {
+    const { ctx, page, erroresPagina } = await paginaCronograma(estilo, { tareas, servicios, historial });
+    const estados = await page.locator("#cronoTareasList .crono-tarea-card").evaluateAll((els) => els.map((e) => e.dataset.estado));
+    assert.deepStrictEqual(estados, ["resuelto", "pendiente", "sin-vincular"], estilo);
+    assert.strictEqual(await page.evaluate(() => infoTarea(cronogramaCache[0]).resuelto), true, estilo);
+    assert.deepStrictEqual(erroresPagina, [], estilo);
+    await ctx.close();
+  }
+});
+
+test("Cronograma (skin nuevo): tarjetas con cliente destacado, días con cantidad y agenda propia primero; el clásico no cambia", async () => {
+  const tareas = [
+    { tecnico: "Juan Pérez", fecha: diaISO(0), dia_label: etiquetaDia(0), hora_inicio: "09:00", hora_fin: "10:00", tarea: "Servicio: Panadería Sur\nMitre 100  -  Rosario\nRevisar sirena" },
+    { tecnico: "Luis Gómez", fecha: diaISO(0), dia_label: etiquetaDia(0), hora_inicio: "10:00", hora_fin: "11:00", tarea: "Servicio: Marta De Simone\nSan Martín 2450  -  Funes\nBatería" },
+    { tecnico: "Luis Gómez", fecha: diaISO(1), dia_label: etiquetaDia(1), hora_inicio: "09:00", hora_fin: "10:00", tarea: "Servicio: Taller\nRuta 9  -  Roldán\nPanel" },
+  ];
+  let r = await paginaCronograma("nuevo", { tareas, servicios: [], historial: [] });
+  assert.strictEqual(await r.page.inputValue("#cronoTecnicoFiltro"), "Juan Pérez", "arranca con la agenda del técnico logueado");
+  assert.strictEqual(await r.page.locator("#cronoTareasList .crono-tarea-card").count(), 1);
+  assert.strictEqual((await r.page.locator(".crono-n-cliente").first().textContent()).trim(), "Panadería Sur");
+  assert.strictEqual(await r.page.locator(".crono-n:visible").count(), 1);
+  assert.strictEqual(await r.page.locator(".crono-c:visible").count(), 0);
+  assert.match(await r.page.locator(".crono-dia-chip.active .crono-dia-extra").textContent(), /Hoy · 1 tarea/);
+  await r.page.selectOption("#cronoTecnicoFiltro", "");
+  assert.match(await r.page.locator(".crono-dia-chip.active .crono-dia-extra").textContent(), /Hoy · 2 tareas/);
+  await r.ctx.close();
+  r = await paginaCronograma("clasico", { tareas, servicios: [], historial: [] });
+  assert.strictEqual(await r.page.inputValue("#cronoTecnicoFiltro"), "", "el clásico sigue mostrando todos");
+  assert.strictEqual(await r.page.locator(".crono-n:visible").count(), 0);
+  assert.strictEqual(await r.page.locator(".crono-c:visible").count(), 2);
+  await r.ctx.close();
+});
+
+test("Servicios pendientes: si un servicio ya hecho vuelve a aparecer en la lista, se avisa que ya tiene parte", async () => {
+  const { ctx, page } = await paginaConEstilo("clasico");
+  await page.evaluate((f) => {
+    historialCache = [{ numero_servicio: "900", cliente: "Panadería Sur", fecha: f, tecnico: "Juan Pérez" }];
+    renderServiciosList([{ numero_servicio: "900", cliente: "Panadería Sur", direccion: "Mitre 100", tarea: "Sirena" }, { numero_servicio: "901", cliente: "Kiosco Norte", direccion: "Belgrano 55", tarea: "PIR" }]);
+  }, diaISO(0));
+  const badges = await page.locator("#serviciosList .servicio-card-parte-badge").allTextContents();
+  assert.strictEqual(badges.length, 1);
+  assert.match(badges[0], /Ya tiene parte del/);
+  await ctx.close();
+});

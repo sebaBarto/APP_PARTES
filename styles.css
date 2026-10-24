@@ -2022,13 +2022,13 @@ html body .bloqueo-overlay .btn-ghost { background: transparent; color: #F4F5F0;
    arcoíris de antes. Escopeado a las pantallas de menú (inicio y submenús): los submenús que
    comparten .panel-tile no cambian.
    ============================================================ */
-html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) {
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas, #screen-cronograma) {
   --t-bg: #17212B; --t-bd: #2A3743; --t-fg: #F4F5F0; --t-ic: #9FB3C2; --t-press: #223140;
 }
-html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) {
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas, #screen-cronograma) {
   --t-bg: #FFFFFF; --t-bd: #D5D9CF; --t-fg: #101820; --t-ic: #4A5F6E; --t-press: #FFF3D6;
 }
-html[data-inicio="nuevo"][data-theme="contraste"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) { --t-bd: #101820; --t-ic: #101820; }
+html[data-inicio="nuevo"][data-theme="contraste"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas, #screen-cronograma) { --t-bd: #101820; --t-ic: #101820; }
 
 html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .home-cabecera { display: flex; align-items: center; gap: 16px; margin: 6px 0 18px; }
 html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-home-logo { width: 84px; max-width: none; margin: 0; flex-shrink: 0; }
@@ -2083,16 +2083,16 @@ html[data-inicio="nuevo"][data-botones="grandes"] :is(#screen-home, #screen-serv
 
 
 /* Submenús con el mismo estilo: fondo, título y estados */
-html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) { --t-page: #101820; --st-ok: #5FD08A; --st-uso: #F5A623; --st-cli: #D9B25A; }
-html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) { --t-page: #EEF0EA; --st-ok: #1F7A3D; --st-uso: #A9680F; --st-cli: #7A5B10; }
-html[data-inicio="nuevo"] :is(#screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .review-scroll { background: var(--t-page); color: var(--t-fg); }
-html[data-inicio="nuevo"] :is(#screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .review-eyebrow {
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas, #screen-cronograma) { --t-page: #101820; --st-ok: #5FD08A; --st-uso: #F5A623; --st-cli: #D9B25A; }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas, #screen-cronograma) { --t-page: #EEF0EA; --st-ok: #1F7A3D; --st-uso: #A9680F; --st-cli: #7A5B10; }
+html[data-inicio="nuevo"] :is(#screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas, #screen-cronograma) .review-scroll { background: var(--t-page); color: var(--t-fg); }
+html[data-inicio="nuevo"] :is(#screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas, #screen-cronograma) .review-eyebrow {
   display: block; margin: 6px 0 18px; padding: 0;
   font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 26px; line-height: 1.1;
   letter-spacing: -0.01em; color: var(--t-fg); text-transform: lowercase;
 }
-html[data-inicio="nuevo"] :is(#screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .review-eyebrow::first-letter { text-transform: uppercase; }
-html[data-inicio="nuevo"] :is(#screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .review-eyebrow::before { display: none; }
+html[data-inicio="nuevo"] :is(#screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas, #screen-cronograma) .review-eyebrow::first-letter { text-transform: uppercase; }
+html[data-inicio="nuevo"] :is(#screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas, #screen-cronograma) .review-eyebrow::before { display: none; }
 html[data-inicio="nuevo"] :is(#screen-vehiculos, #screen-herramientas) .list-status { color: var(--t-ic); }
 
 /* Teclas con estado (vehículos y herramientas): ícono a la izquierda, nombre y estado apilados */
@@ -2399,3 +2399,40 @@ html .discount-chip.sel::after {
   font: 700 11px/15px 'Space Grotesk', sans-serif; text-align: center;
   pointer-events: none;
 }
+
+/* ---- Cronograma semanal: skin nuevo + estilos de apoyo de ambos skins ---- */
+.crono-n { display: none; }
+.servicio-card-parte-badge { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #E1F0E4; color: #1F6B34; vertical-align: middle; }
+html[data-theme="night"] .servicio-card-parte-badge { background: rgba(46,158,79,0.22); color: #7BDB9A; }
+.estancado-urgente .servicio-card-parte-badge { background: #FFFFFF; color: #1F6B34; }
+html[data-inicio="nuevo"] #screen-cronograma .crono-c { display: none; }
+html[data-inicio="nuevo"] #screen-cronograma .crono-tarea-card { padding: 0; overflow: hidden; border-radius: 14px; background: var(--t-bg); border: 1.5px solid var(--t-bd); border-left: 5px solid var(--st-uso); color: var(--t-fg); }
+html[data-inicio="nuevo"] #screen-cronograma .crono-tarea-card[data-estado="resuelto"] { border-left-color: var(--st-ok); background: var(--t-bg); opacity: 0.8; }
+html[data-inicio="nuevo"] #screen-cronograma .crono-tarea-card[data-estado="sin-vincular"] { border-left-color: #8A949B; border-style: dashed; border-left-style: solid; }
+html[data-inicio="nuevo"] #screen-cronograma .crono-tarea-card:active { background: var(--t-press); }
+html[data-inicio="nuevo"] #screen-cronograma .crono-n { display: flex; gap: 12px; padding: 12px 14px 12px 12px; }
+html[data-inicio="nuevo"] #screen-cronograma .crono-n-hora { flex: 0 0 52px; display: flex; flex-direction: column; gap: 2px; font-family: 'IBM Plex Mono', monospace; }
+html[data-inicio="nuevo"] #screen-cronograma .crono-n-hora b { font-size: 17px; line-height: 1.1; color: var(--t-fg); }
+html[data-inicio="nuevo"] #screen-cronograma .crono-n-hora span { font-size: 12px; color: var(--t-ic); }
+html[data-inicio="nuevo"] #screen-cronograma .crono-n-cuerpo { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
+html[data-inicio="nuevo"] #screen-cronograma .crono-n-cliente { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 16px; line-height: 1.2; color: var(--t-fg); overflow-wrap: anywhere; }
+html[data-inicio="nuevo"] #screen-cronograma .crono-n-dir { font-size: 13px; color: var(--t-ic); overflow-wrap: anywhere; }
+html[data-inicio="nuevo"] #screen-cronograma .crono-n-detalle { font-size: 13px; color: var(--t-fg); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+html[data-inicio="nuevo"] #screen-cronograma .crono-n-pie { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+html[data-inicio="nuevo"] #screen-cronograma .crono-n-tec { font-size: 12px; font-weight: 600; color: var(--t-ic); }
+html[data-inicio="nuevo"] #screen-cronograma .crono-n-estado { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; }
+html[data-inicio="nuevo"] #screen-cronograma .crono-n-estado.e-resuelto { background: color-mix(in srgb, var(--st-ok) 18%, transparent); color: var(--st-ok); }
+html[data-inicio="nuevo"] #screen-cronograma .crono-n-estado.e-pendiente { background: color-mix(in srgb, var(--st-uso) 20%, transparent); color: var(--st-uso); }
+html[data-inicio="nuevo"] #screen-cronograma .crono-n-estado.e-sin-vincular { background: rgba(138,148,155,0.2); color: var(--t-ic); }
+/* días: dos líneas (día + cantidad), el activo relleno, y un borde que sugiere que hay más para deslizar */
+html[data-inicio="nuevo"] #screen-cronograma .crono-dias-tabs { gap: 8px; padding: 2px 28px 8px 0; scroll-snap-type: x proximity; -webkit-mask-image: linear-gradient(90deg, #000 90%, transparent); mask-image: linear-gradient(90deg, #000 90%, transparent); scrollbar-width: none; }
+html[data-inicio="nuevo"] #screen-cronograma .crono-dias-tabs::-webkit-scrollbar { display: none; }
+html[data-inicio="nuevo"] #screen-cronograma .crono-dia-chip { display: flex; flex-direction: column; align-items: center; gap: 1px; scroll-snap-align: center; border-radius: 14px; padding: 8px 14px; min-width: 76px; background: var(--t-bg); border-color: var(--t-bd); color: var(--t-fg); }
+html[data-inicio="nuevo"] #screen-cronograma .crono-dia-extra { display: block; font-size: 11px; opacity: 0.75; font-weight: 500; }
+html[data-inicio="nuevo"] #screen-cronograma .crono-dia-chip.active { background: #F5A623; border-color: #F5A623; color: #101820; font-weight: 700; }
+html[data-inicio="nuevo"] #screen-cronograma .crono-dia-chip.active .crono-dia-extra { opacity: 0.85; }
+html[data-inicio="nuevo"] #screen-cronograma select.field-input { color: var(--t-fg); background: var(--t-bg); border-color: var(--t-bd); opacity: 1; }
+html[data-inicio="nuevo"] #screen-cronograma .list-toolbar .btn-ghost { color: var(--t-fg); border-color: var(--t-bd); }
+html[data-inicio="nuevo"] #screen-cronograma .list-sync-label { color: var(--t-ic); }
+html[data-inicio="nuevo"] #screen-cronograma .crono-tarea-card { box-shadow: 0 1px 2px rgba(16, 24, 32, 0.08); }
+html[data-inicio="nuevo"][data-theme="night"] #screen-cronograma .crono-tarea-card { box-shadow: none; }

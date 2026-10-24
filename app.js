@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.122.1";
+const APP_VERSION = "3.123.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -1097,10 +1097,8 @@ function actualizarProximoService() {
         .filter((t) => t.fecha && t.fecha >= hoyISO && coincideNombreTecnico(t.tecnico, tecnicoLogueado))
         .sort((a, b) => (a.fecha + (a.hora_inicio || "")).localeCompare(b.fecha + (b.hora_inicio || "")));
       for (const t of candidatas) {
-        const serv = encontrarServicioPorTarea(t.tarea);
-        const num = serv && serv.numero_servicio;
-        const resuelto = !!num && (serviciosResueltos.has(num) || historialCache.some((h) => h.numero_servicio === num));
-        if (!resuelto) { proximaTareaInicio = { t, serv }; break; }
+        const info = infoTarea(t);
+        if (!info.resuelto) { proximaTareaInicio = { t, serv: info.servicio }; break; }
       }
     }
     if (!proximaTareaInicio) { card.classList.add("hidden"); return; }
@@ -1496,11 +1494,15 @@ function renderServiciosList(items) {
       claseEstancado = " estancado-atencion";
       badgeEstancado = `<span class="servicio-card-estancado-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="13" height="13" style="vertical-align:-2px; margin-right:3px;"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Hace ${dias} días</span>`;
     }
+    // Si el servicio volvió a aparecer en la lista (se subió de nuevo) pero ya tiene un parte hecho,
+    // se muestra igual pero avisando, para no perder la memoria de que ya se hizo.
+    const parteHecho = item.numero_servicio ? historialCache.find((h) => h.numero_servicio === item.numero_servicio) : null;
+    const badgeParte = parteHecho ? `<span class="servicio-card-parte-badge">✓ Ya tiene parte${parteHecho.fecha ? " del " + parteHecho.fecha.split("-").reverse().slice(0, 2).join("/") : ""}</span>` : "";
     const card = document.createElement("button");
     card.type = "button";
     card.className = "servicio-card" + claseEstancado;
     card.innerHTML = `
-      <div class="servicio-card-num">N° ${escapeHtml(item.numero_servicio)}${badgeEstancado}</div>
+      <div class="servicio-card-num">N° ${escapeHtml(item.numero_servicio)}${badgeEstancado}${badgeParte}</div>
       <div class="servicio-card-cliente">${escapeHtml(item.cliente)}</div>
       <div class="servicio-card-direccion">${escapeHtml(item.direccion)}${item.localidad ? ", " + escapeHtml(item.localidad) : ""}</div>
       <div class="servicio-card-tarea">${escapeHtml(item.tarea)}</div>
@@ -1741,6 +1743,7 @@ async function fetchCronograma() {
   }
 }
 
+let aplicarFiltroPropioCrono = false;
 function renderCronogramaDias() {
   const dias = [...new Set(cronogramaCache.map((t) => t.dia_label))]
     .filter(Boolean)
@@ -1761,9 +1764,11 @@ function renderCronogramaDias() {
     // Se prefiere el día de hoy si está en el cronograma — así el
     // técnico entra directo a lo que le importa, sin tener que
     // buscar entre los días pasados.
-    const fechaHoyISO = new Date().toISOString().slice(0, 10);
+    const hoyLocal = new Date();
+    const fechaHoyISO = `${hoyLocal.getFullYear()}-${String(hoyLocal.getMonth() + 1).padStart(2, "0")}-${String(hoyLocal.getDate()).padStart(2, "0")}`;
     const diaDeHoy = dias.find((d) => (cronogramaCache.find((t) => t.dia_label === d) || {}).fecha === fechaHoyISO);
     cronoDiaActivo = diaDeHoy || dias[0];
+    aplicarFiltroPropioCrono = document.documentElement.dataset.inicio === "nuevo";
   }
 
   cronoDiasTabs.innerHTML = "";
@@ -1771,7 +1776,13 @@ function renderCronogramaDias() {
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = "crono-dia-chip" + (dia === cronoDiaActivo ? " active" : "");
-    chip.textContent = dia;
+    const delDia = cronogramaCache.filter((t) => t.dia_label === dia);
+    const fechaDia = (delDia[0] || {}).fecha || "";
+    const hoyChip = new Date();
+    const esHoy = fechaDia === `${hoyChip.getFullYear()}-${String(hoyChip.getMonth() + 1).padStart(2, "0")}-${String(hoyChip.getDate()).padStart(2, "0")}`;
+    chip.dataset.dia = dia;
+    chip.dataset.hoy = esHoy ? "1" : "";
+    chip.innerHTML = `${escapeHtml(dia)}<span class="crono-dia-extra solo-nuevo"></span>`;
     chip.addEventListener("click", () => {
       cronoDiaActivo = dia;
       renderCronogramaDias();
@@ -1790,11 +1801,28 @@ function renderCronogramaDias() {
   cronoTecnicoFiltro.innerHTML = '<option value="">Todos los técnicos</option>' +
     tecnicos.map((t) => `<option value="${t}">${t}</option>`).join("");
   cronoTecnicoFiltro.value = tecnicos.includes(tecnicoActual) ? tecnicoActual : "";
+  // Skin nuevo: al entrar, el técnico ve primero SU agenda (puede cambiar a "Todos").
+  if (aplicarFiltroPropioCrono) {
+    aplicarFiltroPropioCrono = false;
+    const propio = tecnicos.find((n) => coincideNombreTecnico(n, tecnicoLogueado));
+    if (propio && tecnicoLogueado) cronoTecnicoFiltro.value = propio;
+  }
 
   renderCronogramaTareas();
 }
 
+// Cantidad de tareas de cada día (respetando el técnico elegido), debajo del día.
+function actualizarContadoresDias() {
+  const tec = cronoTecnicoFiltro.value;
+  cronoDiasTabs.querySelectorAll(".crono-dia-chip").forEach((chip) => {
+    const n = cronogramaCache.filter((t) => t.dia_label === chip.dataset.dia && (!tec || t.tecnico === tec)).length;
+    const extra = chip.querySelector(".crono-dia-extra");
+    if (extra) extra.textContent = (chip.dataset.hoy ? "Hoy · " : "") + (n === 1 ? "1 tarea" : n + " tareas");
+  });
+}
+
 function renderCronogramaTareas() {
+  actualizarContadoresDias();
   const tecnicoFiltro = cronoTecnicoFiltro.value;
   const tareas = cronogramaCache
     .filter((t) => t.dia_label === cronoDiaActivo)
@@ -1808,23 +1836,38 @@ function renderCronogramaTareas() {
   }
   cronoStatus.textContent = "";
   tareas.forEach((t) => {
-    const servicioVinculado = encontrarServicioPorTarea(t.tarea);
-    const vinculado = !!servicioVinculado;
-    // Antes esto se guardaba de forma temporal en el celular (se
-    // borraba solo al actualizar el listado de pendientes) — ahora
-    // se compara directo contra el historial real, así queda
-    // permanente sin importar cuándo se actualizó nada.
-    const resuelto = vinculado && servicioVinculado.numero_servicio &&
-      historialCache.some((h) => h.numero_servicio === servicioVinculado.numero_servicio);
+    const info = infoTarea(t);
+    const vinculado = info.vinculado;
+    const resuelto = info.resuelto;
+    const estado = resuelto ? "resuelto" : vinculado ? "pendiente" : "sin-vincular";
+    const fechaParte = info.parte && info.parte.fecha ? info.parte.fecha.split("-").reverse().slice(0, 2).join("/") : "";
+    const etiquetaEstado = resuelto ? "Resuelto" + (fechaParte ? " · " + fechaParte : "") : vinculado ? "Pendiente" : "Sin vincular";
+    const lineas = String(t.tarea || "").split("\n").map((l) => l.trim()).filter(Boolean);
+    const parsed = parsearTareaCronograma(t.tarea);
+    const clienteN = parsed.cliente || lineas[0] || "Servicio";
+    const dirN = [parsed.direccion, parsed.localidad].filter(Boolean).join(" · ");
+    const detalleN = lineas.slice(2).join(" · ");
     const card = document.createElement("button");
     card.type = "button";
+    card.dataset.estado = estado;
     card.className = "crono-tarea-card" + (vinculado ? "" : " sin-vincular") + (resuelto ? " resuelto" : "");
     card.innerHTML = `
-      <div class="crono-tarea-hora">${t.hora_inicio || ""} - ${t.hora_fin || ""}${
-        resuelto ? '<span class="crono-tarea-badge resuelto">RESUELTO</span>' : vinculado ? "" : '<span class="crono-tarea-badge">SIN VINCULAR</span>'
-      }</div>
-      <div class="crono-tarea-tecnico">${escapeHtml(t.tecnico)}</div>
-      <div class="crono-tarea-texto">${escapeHtml(t.tarea)}</div>
+      <div class="crono-c">
+        <div class="crono-tarea-hora">${t.hora_inicio || ""} - ${t.hora_fin || ""}${
+          resuelto ? '<span class="crono-tarea-badge resuelto">RESUELTO</span>' : vinculado ? "" : '<span class="crono-tarea-badge">SIN VINCULAR</span>'
+        }</div>
+        <div class="crono-tarea-tecnico">${escapeHtml(t.tecnico)}</div>
+        <div class="crono-tarea-texto">${escapeHtml(t.tarea)}</div>
+      </div>
+      <div class="crono-n">
+        <div class="crono-n-hora"><b>${escapeHtml(t.hora_inicio || "--:--")}</b>${t.hora_fin ? `<span>${escapeHtml(t.hora_fin)}</span>` : ""}</div>
+        <div class="crono-n-cuerpo">
+          <div class="crono-n-cliente">${escapeHtml(clienteN)}</div>
+          ${dirN ? `<div class="crono-n-dir">${escapeHtml(dirN)}</div>` : ""}
+          ${detalleN ? `<div class="crono-n-detalle">${escapeHtml(detalleN)}</div>` : ""}
+          <div class="crono-n-pie"><span class="crono-n-tec">${escapeHtml(t.tecnico)}</span><span class="crono-n-estado e-${estado}">${escapeHtml(etiquetaEstado)}</span></div>
+        </div>
+      </div>
     `;
     card.addEventListener("click", () => seleccionarTareaCronograma(t));
     cronoTareasList.appendChild(card);
@@ -1834,6 +1877,38 @@ function renderCronogramaTareas() {
 cronoTecnicoFiltro.addEventListener("change", renderCronogramaTareas);
 
 // ---------- Relación cronograma → servicio pendiente ----------
+// ¿Esta tarea del cronograma ya tiene un parte hecho? La "memoria" es el
+// historial de partes del servidor, que no se borra cuando el servicio sale
+// de la lista de pendientes:
+//  1) si la tarea todavía se vincula a un servicio pendiente, se busca su parte por número;
+//  2) si el servicio ya salió de la lista (o nunca se vinculó), se busca un parte del
+//     mismo cliente hecho entre 1 día antes y 3 días después de la fecha agendada.
+function clienteEnTexto(cliente, textoNorm) {
+  const palabras = normalizeText(cliente || "").split(/\s+/).filter((w) => w.length > 2);
+  return palabras.length > 0 && palabras.every((w) => textoNorm.includes(w));
+}
+function diasEntreISO(a, b) {
+  const x = Date.parse(a), y = Date.parse(b);
+  return isNaN(x) || isNaN(y) ? null : Math.round((x - y) / 86400000);
+}
+function infoTarea(t) {
+  const norm = normalizeText((t && t.tarea) || "");
+  const servicio = encontrarServicioPorTarea(t.tarea);
+  let parte = null;
+  if (servicio && servicio.numero_servicio) {
+    parte = historialCache.find((h) => h.numero_servicio === servicio.numero_servicio) || null;
+  }
+  if (!parte) {
+    parte = historialCache.find((h) => {
+      if (!h.cliente || !clienteEnTexto(h.cliente, norm)) return false;
+      const d = diasEntreISO(h.fecha, t.fecha);
+      return d !== null && d >= -1 && d <= 3;
+    }) || null;
+  }
+  const marcadoLocal = !!(servicio && servicio.numero_servicio && serviciosResueltos.has(servicio.numero_servicio));
+  return { servicio, vinculado: !!servicio, parte, resuelto: !!parte || marcadoLocal };
+}
+
 function encontrarServicioPorTarea(textoTarea) {
   const norm = normalizeText(textoTarea);
   // Antes exigía que el nombre del cliente apareciera exactamente
@@ -6650,9 +6725,10 @@ async function iniciarRecordatorioTestGeo() {
   cronogramaCache
     .filter((t) => coincideNombreTecnico(t.tecnico, tecnicoLogueado) && t.fecha === hoy)
     .forEach((t) => {
-      const s = encontrarServicioPorTarea(t.tarea);
+      const info = infoTarea(t);
+      const s = info.servicio;
       if (!s || !s.direccion) return;
-      if (s.numero_servicio && (serviciosResueltos.has(s.numero_servicio) || historialCache.some((h) => h.numero_servicio === s.numero_servicio))) return;
+      if (info.resuelto) return;
       const key = `${hoy}|${s.numero_servicio || normalizeText(s.cliente)}`;
       if (vistos.has(key) || avisados[key]) return;
       vistos.add(key);
