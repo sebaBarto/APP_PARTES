@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.117.0";
+const APP_VERSION = "3.118.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -773,6 +773,7 @@ function showScreen(name) {
   const btnAjustes = document.getElementById("ajustesBtn");
   if (btnAjustes) btnAjustes.classList.toggle("hidden", name === "login");
   try { actualizarWakeLockPantalla(name); } catch (e) { /* los ajustes todavía no cargaron */ }
+  if (name === "home") { try { actualizarProximoService(); } catch (e) { /* aún no cargó */ } }
 }
 
 function setStatus(text, mode) {
@@ -937,10 +938,11 @@ function entrarComoTecnico(nombreTecnico) {
   precargarHistorialParaVisitas().then(() => {
     actualizarBadgeHistorialPendientes();
     prepararFelicitacionSemanal();
+    actualizarProximoService();
   });
   precargarNotasYAvisar();
   prepararAvisoSimsPendientes();
-  Promise.allSettled([promesaServicios, precargarCronogramaParaSugerencias()]).then(iniciarRecordatorioTestGeo);
+  Promise.allSettled([promesaServicios, precargarCronogramaParaSugerencias()]).then(() => { actualizarProximoService(); iniciarRecordatorioTestGeo(); });
   mostrarTestPendientesDeQuitar();
   cargarClientesGeneral(); // precarga, para que esté lista al completar un parte (número de cliente en Stock, etc.)
   actualizarAccesoCredencial();
@@ -1050,6 +1052,57 @@ function actualizarSaludoPanel() {
     fechaEl.textContent = t.charAt(0).toUpperCase() + t.slice(1);
   }
 }
+
+// ---------- Próximo service (inicio, estilo Nuevo) ----------
+// Busca en el cronograma la próxima tarea del técnico logueado (de hoy
+// en adelante) que todavía no tenga parte hecho, y la muestra arriba
+// de todo en el inicio. Tocarla abre el parte, igual que en el cronograma.
+let proximaTareaInicio = null;
+function etiquetaDiaProximo(fechaISO) {
+  const hoy = new Date();
+  const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const manana = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + 1);
+  if (fechaISO === iso(hoy)) return "Hoy";
+  if (fechaISO === iso(manana)) return "Mañana";
+  const [y, m, d] = fechaISO.split("-").map(Number);
+  const dia = new Date(y, m - 1, d).toLocaleDateString("es-AR", { weekday: "long" });
+  return `${dia.charAt(0).toUpperCase() + dia.slice(1)} ${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}`;
+}
+function actualizarProximoService() {
+  const card = document.getElementById("proximoServiceCard");
+  if (!card) return;
+  try {
+    proximaTareaInicio = null;
+    if (tecnicoLogueado && Array.isArray(cronogramaCache)) {
+      const ahora = new Date();
+      const hoyISO = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, "0")}-${String(ahora.getDate()).padStart(2, "0")}`;
+      const candidatas = cronogramaCache
+        .filter((t) => t.fecha && t.fecha >= hoyISO && coincideNombreTecnico(t.tecnico, tecnicoLogueado))
+        .sort((a, b) => (a.fecha + (a.hora_inicio || "")).localeCompare(b.fecha + (b.hora_inicio || "")));
+      for (const t of candidatas) {
+        const serv = encontrarServicioPorTarea(t.tarea);
+        const num = serv && serv.numero_servicio;
+        const resuelto = !!num && (serviciosResueltos.has(num) || historialCache.some((h) => h.numero_servicio === num));
+        if (!resuelto) { proximaTareaInicio = { t, serv }; break; }
+      }
+    }
+    if (!proximaTareaInicio) { card.classList.add("hidden"); return; }
+    const { t, serv } = proximaTareaInicio;
+    const parsed = parsearTareaCronograma(t.tarea);
+    const cliente = (serv && serv.cliente) || parsed.cliente || "Servicio agendado";
+    const direccion = (serv && serv.direccion) || parsed.direccion;
+    const localidad = (serv && serv.localidad) || parsed.localidad;
+    document.getElementById("proximoServiceCuando").textContent = `${etiquetaDiaProximo(t.fecha)}${t.hora_inicio ? " · " + t.hora_inicio : ""}`;
+    document.getElementById("proximoServiceCliente").textContent = cliente;
+    document.getElementById("proximoServiceDonde").textContent = [direccion, localidad].filter(Boolean).join(" — ");
+    card.classList.remove("hidden");
+  } catch (e) {
+    card.classList.add("hidden");
+  }
+}
+document.getElementById("proximoServiceCard").addEventListener("click", () => {
+  if (proximaTareaInicio) seleccionarTareaCronograma(proximaTareaInicio.t);
+});
 
 // Muestra u oculta las tiles del panel principal según los permisos
 // del técnico logueado (configurados en admin.html → Técnicos). El

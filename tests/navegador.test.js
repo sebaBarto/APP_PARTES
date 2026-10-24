@@ -136,3 +136,32 @@ test("el skin nuevo se aplica también en los submenús, y el clásico no los to
   assert.ok(transparente(await radio("dashboardsMenu")), "dashboards: icono sin fondo en el nuevo");
   await ctx.close();
 });
+
+test("Próximo service: muestra la próxima tarea pendiente del técnico, salteando lo viejo, lo resuelto y lo ajeno", async () => {
+  const hoy = new Date();
+  const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const man = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + 1);
+  const ayer = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1);
+  const ctx = await browser.newContext({ serviceWorkers: "block" });
+  const page = await ctx.newPage();
+  await page.route("**/api/**", (r) => {
+    const u = r.request().url();
+    let body = "[]";
+    if (u.includes("/api/cronograma")) body = JSON.stringify({ tecnicos: [], tareas: [
+      { tecnico: "Marcos Manuel Pellegrini", fecha: iso(ayer), hora_inicio: "09:00", tarea: "Servicio: Viejo\nCalle 1  -  Rosario" },
+      { tecnico: "Marcos Manuel Pellegrini", fecha: iso(hoy), hora_inicio: "09:00", tarea: "Servicio: Ferretería López\nSan Martín 1234  -  Rosario" },
+      { tecnico: "Otro Técnico", fecha: iso(hoy), hora_inicio: "08:00", tarea: "Servicio: Ajeno\nX 1  -  Y" },
+      { tecnico: "Marcos Manuel Pellegrini", fecha: iso(man), hora_inicio: "11:30", tarea: "Servicio: Panadería Sur\nMitre 55  -  Funes" },
+    ] });
+    else if (u.includes("/api/historial")) body = JSON.stringify([{ numero_servicio: "123" }]);
+    else if (u.includes("/api/servicios")) body = JSON.stringify([{ numero_servicio: "123", cliente: "Ferretería López", direccion: "San Martín 1234", localidad: "Rosario" }]);
+    r.fulfill({ status: 200, contentType: "application/json", body });
+  });
+  await page.goto(base + "/");
+  await page.waitForTimeout(400);
+  await page.evaluate(() => entrarComoTecnico("Marcos Pellegrini"));
+  await page.waitForTimeout(1200);
+  assert.strictEqual(await page.locator("#proximoServiceCliente").textContent(), "Panadería Sur");
+  assert.match(await page.locator("#proximoServiceCuando").textContent(), /Mañana · 11:30/);
+  await ctx.close();
+});

@@ -2121,3 +2121,86 @@ html[data-inicio="nuevo"] .home-eyebrow-clasico { display: none; }
 html[data-inicio="nuevo"] #screen-servicios-menu .panel-tile.panel-tile-grid { grid-column: 1 / -1; }
 html[data-inicio="nuevo"] #screen-servicios-menu .panel-tile.panel-tile-grid:not(.tile-servicios-pendientes) { min-height: 72px; padding: 14px 18px; }
 html[data-inicio="nuevo"] #screen-servicios-menu .panel-tile-grid:not(.tile-servicios-pendientes) .panel-tile-label { font-size: 16.5px; }
+
+/* ---- Color sutil por sección: ícono en su color y un fondo apenas teñido ---- */
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tile-grid:not(.tile-servicios):not(.tile-servicios-pendientes) .panel-tile-icon-badge { width: 38px; height: 38px; border-radius: 11px; background: color-mix(in srgb, var(--ic, var(--t-ic)) 15%, transparent); }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tile-grid:not(.tile-servicios):not(.tile-servicios-pendientes) .panel-tile-icon-badge svg { width: 22px; height: 22px; stroke: var(--ic, var(--t-ic)); }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-manuales { --ic: #A29BF0; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-dashboards { --ic: #4FD1CE; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-guardias { --ic: #7FA6E0; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-notas { --ic: #FF7A66; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-historial { --ic: #9FB7C6; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-credencial { --ic: #E0B455; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-vehiculos { --ic: #5FD08A; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-sims { --ic: #5BA8F0; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-herramientas { --ic: #D1A27A; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-instalador { --ic: #8FA9C4; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-comodato { --ic: #C08ADB; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-rendicion { --ic: #4FD1CE; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-planos { --ic: #8FA9C4; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-emergencia { --ic: #FF6B5E; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-admin { --ic: #F5A623; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-cronograma { --ic: #A29BF0; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-dash-general { --ic: #4FD1CE; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-dash-financiero { --ic: #E0B455; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-dash-vehiculos { --ic: #5FD08A; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-dash-herramientas { --ic: #D1A27A; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-dash-stock { --ic: #E0B455; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-dash-sims { --ic: #5BA8F0; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-vehiculo-libre { --ic: #5FD08A; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-vehiculo-en-uso { --ic: #FF7A66; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-herr-libre { --ic: #5FD08A; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-herr-uso { --ic: #FF7A66; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-herr-cliente { --ic: #E0B455; }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tile-grid { --ic: initial; }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-manuales { --ic: var(--acc-indigo); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-dashboards { --ic: var(--acc-teal); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-guardias { --ic: var(--acc-guardia); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-notas { --ic: var(--acc-coral); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-historial { --ic: var(--acc-slate); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-credencial { --ic: var(--acc-gold); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-vehiculos { --ic: var(--acc-green); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-sims { --ic: var(--acc-blue); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-herramientas { --ic: var(--acc-brown); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-instalador { --ic: var(--acc-navy); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-comodato { --ic: var(--acc-purple); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-rendicion { --ic: var(--acc-teal); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-planos { --ic: var(--acc-navy); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-emergencia { --ic: var(--acc-alert); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-admin { --ic: var(--acc-gold); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-cronograma { --ic: var(--acc-indigo); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-dash-general { --ic: var(--acc-teal); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-dash-financiero { --ic: var(--acc-gold); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-dash-vehiculos { --ic: var(--acc-green); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-dash-herramientas { --ic: var(--acc-brown); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-dash-stock { --ic: var(--acc-gold); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-dash-sims { --ic: var(--acc-blue); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-vehiculo-libre { --ic: var(--acc-green); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-vehiculo-en-uso { --ic: var(--acc-coral); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-herr-libre { --ic: var(--acc-green); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-herr-uso { --ic: var(--acc-coral); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-herr-cliente { --ic: var(--acc-gold); }
+html[data-inicio="nuevo"][data-botones="grandes"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tile-grid:not(.tile-servicios):not(.tile-servicios-pendientes) .panel-tile-icon-badge { width: 44px; height: 44px; }
+@container (max-width: 345px) {
+  html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tile-grid:has(.vehiculo-panel-status) .panel-tile-icon-badge { justify-self: start; }
+}
+
+/* ---- Próximo service (solo estilo Nuevo) ---- */
+.proximo-service { display: none; }
+html[data-inicio="nuevo"] #screen-home .proximo-service:not(.hidden) {
+  display: grid; width: 100%; box-sizing: border-box; text-align: left; cursor: pointer;
+  grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; row-gap: 2px;
+  margin: 0 0 14px; padding: 14px 16px;
+  background: var(--t-bg); border: 1px solid var(--t-bd); border-radius: 14px; color: var(--t-fg);
+}
+html[data-inicio="nuevo"] #screen-home .proximo-service:active { background: var(--t-press); border-color: #F5A623; }
+html[data-inicio="nuevo"] #screen-home .proximo-service-titulo { grid-column: 1; font-family: 'Inter', sans-serif; font-size: 12.5px; color: var(--t-ic); }
+html[data-inicio="nuevo"] #screen-home .proximo-service-cuando { grid-column: 2; grid-row: 1; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 14px; color: #F5A623; white-space: nowrap; }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) #screen-home .proximo-service-cuando { color: #A9680F; }
+html[data-inicio="nuevo"] #screen-home .proximo-service-cliente { grid-column: 1 / -1; font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 18px; line-height: 1.2; margin-top: 4px; overflow-wrap: anywhere; }
+html[data-inicio="nuevo"] #screen-home .proximo-service-donde { grid-column: 1 / -1; font-family: 'Inter', sans-serif; font-size: 13px; color: var(--t-ic); }
+
+/* Ajuste de ancho: que "Herramientas" y similares entren sin cortarse */
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tile.panel-tile-grid:not(.tile-servicios):not(.tile-servicios-pendientes) { gap: 10px; padding-left: 12px; padding-right: 10px; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tile-grid:not(.tile-servicios):not(.tile-servicios-pendientes) .panel-tile-icon-badge { width: 36px; height: 36px; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tile-grid:not(.tile-servicios):not(.tile-servicios-pendientes) .panel-tile-label { font-size: 14px; }
