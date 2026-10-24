@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.125.0";
+const APP_VERSION = "3.126.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -1441,8 +1441,41 @@ function escapeHtml(s) {
 // Semáforo de antigüedad (skin nuevo): urgente / atención / al día según los
 // días que lleva el servicio en el listado (mismos umbrales que "estancado").
 let filtroSemaforo = "";
+// Cuántos días lleva el servicio dentro de la app (desde que apareció por
+// primera vez en el listado), no la fecha de ingreso del ERP. El registro es
+// compartido (servidor) y se cachea en el celular.
+let serviciosVistos = {};
+try { serviciosVistos = JSON.parse(localStorage.getItem("servicios_vistos") || "{}") || {}; } catch (e) { serviciosVistos = {}; }
+function diasEnLista(item) {
+  const reg = item && item.numero_servicio ? serviciosVistos[String(item.numero_servicio).trim()] : null;
+  if (!reg || !reg.primera) return 0;
+  const d = new Date(reg.primera);
+  if (isNaN(d)) return 0;
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  d.setHours(0, 0, 0, 0);
+  return Math.max(0, Math.round((hoy - d) / 86400000));
+}
+async function sincronizarServiciosVistos(lista) {
+  const url = "/api/datos?coleccion=servicios_vistos";
+  const headers = { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+  try {
+    const numeros = (lista || []).map((i) => String(i.numero_servicio || "").trim()).filter(Boolean);
+    const faltan = numeros.some((n) => !serviciosVistos[n]);
+    const hace = Date.now() - Number(localStorage.getItem("servicios_vistos_sync") || 0);
+    if (!faltan && hace < 6 * 3600 * 1000) return;
+    await fetch(url, { method: "POST", headers, body: JSON.stringify({ accion: "registrar", numeros }) });
+    const res = await fetch(url, { headers, cache: "no-store" });
+    if (!res.ok) return;
+    const mapa = await res.json();
+    if (!mapa || typeof mapa !== "object" || Array.isArray(mapa)) return;
+    serviciosVistos = mapa;
+    localStorage.setItem("servicios_vistos", JSON.stringify(mapa));
+    localStorage.setItem("servicios_vistos_sync", String(Date.now()));
+    renderServiciosList(filtrarServicios());
+  } catch (e) { /* sin conexión: se usa lo último guardado */ }
+}
 function estadoSemaforo(item) {
-  const dias = diasEstancado(item);
+  const dias = diasEnLista(item);
   if (dias != null && dias >= DIAS_URGENTE) return "urgente";
   if (dias != null && dias >= DIAS_ATENCION) return "atencion";
   return "ok";
@@ -1586,7 +1619,8 @@ function renderServiciosList(items) {
     card.className = "servicio-card" + claseEstancado;
     const estadoN = estadoSemaforo(item);
     card.dataset.estado = estadoN;
-    const edadN = dias == null ? "" : dias === 0 ? "Hoy" : dias === 1 ? "Hace 1 día" : `Hace ${dias} días`;
+    const diasN = diasEnLista(item);
+    const edadN = diasN === 0 ? "Entró hoy" : diasN === 1 ? "Hace 1 día en la lista" : `Hace ${diasN} días en la lista`;
     card.innerHTML = `
       <div class="sv-c">
         <div class="servicio-card-num">N° ${escapeHtml(item.numero_servicio)}${badgeEstancado}${badgeParte}</div>
@@ -1657,6 +1691,7 @@ async function fetchServicios() {
     localStorage.removeItem("servicios_resueltos");
     syncLabel.textContent = formatSyncTime(new Date());
     renderServiciosList(filtrarServicios());
+    sincronizarServiciosVistos(serviciosCache);
   } catch (err) {
     const cachedRaw = localStorage.getItem("servicios_cache");
     const cachedTime = localStorage.getItem("servicios_cache_time");

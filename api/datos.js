@@ -71,6 +71,9 @@ const COLECCIONES = {
   herramientas: { path: "herramientas-config.json", default: [] },
   sims_instaladas: { path: "sims-instaladas.json", default: [] },
   errores_app: { path: "errores-app.json", default: [] },
+  // { "<numero_servicio>": { primera: ISO, ultima: ISO } } — cuándo apareció
+  // por primera vez cada servicio en el listado de pendientes.
+  servicios_vistos: { path: "servicios-vistos.json", default: {} },
 };
 
 // Traduce cada colección que ya se cortó al backend nuevo — algunas
@@ -742,6 +745,43 @@ module.exports = async (req, res) => {
           copia[idx] = { ...copia[idx], tecnico: body.tecnico };
           contenidoAGuardar = copia;
         }
+      }
+
+      if (nombreColeccion === "servicios_vistos") {
+        // { accion: "registrar", numeros: [...] }: anota la primera vez que
+        // se vio cada servicio; no pisa las fechas ya registradas. Se
+        // olvidan los que hace más de 60 días que no aparecen en el listado.
+        const mapa = contenidoExistente && typeof contenidoExistente === "object" && !Array.isArray(contenidoExistente) ? { ...contenidoExistente } : {};
+        if (!body || body.accion !== "registrar" || !Array.isArray(body.numeros)) {
+          res.status(400).json({ error: "Formato inválido" });
+          return;
+        }
+        const ahora = Date.now();
+        const iso = new Date(ahora).toISOString();
+        let cambio = false;
+        body.numeros.slice(0, 2000).forEach((n) => {
+          const k = String(n || "").trim().slice(0, 40);
+          if (!k) return;
+          if (!mapa[k]) {
+            mapa[k] = { primera: iso, ultima: iso };
+            cambio = true;
+          } else if (!mapa[k].ultima || ahora - Date.parse(mapa[k].ultima) > 86400000) {
+            mapa[k].ultima = iso;
+            cambio = true;
+          }
+        });
+        Object.keys(mapa).forEach((k) => {
+          const u = Date.parse(mapa[k].ultima || mapa[k].primera);
+          if (u && ahora - u > 60 * 86400000) {
+            delete mapa[k];
+            cambio = true;
+          }
+        });
+        if (!cambio) {
+          res.status(200).json({ ok: true, sinCambios: true });
+          return;
+        }
+        contenidoAGuardar = mapa;
       }
 
       if (nombreColeccion === "errores_app") {

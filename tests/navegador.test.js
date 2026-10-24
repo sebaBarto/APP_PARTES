@@ -438,15 +438,20 @@ test("Servicios pendientes (skin nuevo): semáforo de antigüedad con conteo y f
     { numero_servicio: "3", cliente: "Nuevo", direccion: "C 3", tarea: "t", fecha_ingreso: diaISO(0) },
     { numero_servicio: "4", cliente: "Sin fecha", direccion: "D 4", tarea: "t" },
   ];
+  // La antigüedad es el tiempo dentro de la app (primera vez visto), NO fecha_ingreso:
+  // acá "Nuevo" (ingresó hoy en el ERP) lleva 12 días en la lista, y "Muy viejo" recién entró.
+  const vistos = { 1: { primera: new Date().toISOString() }, 2: { primera: diaISO(-4) + "T12:00:00" }, 3: { primera: diaISO(-12) + "T12:00:00" } };
   let { ctx, page, erroresPagina } = await paginaConEstilo("nuevo");
-  await page.evaluate((s) => { serviciosCache = s; showScreen("list"); renderServiciosList(filtrarServicios()); }, servicios);
+  await page.evaluate(([s, v]) => { serviciosVistos = v; serviciosCache = s; showScreen("list"); renderServiciosList(filtrarServicios()); }, [servicios, vistos]);
   assert.deepStrictEqual(await page.locator("#semaforoResumen b").allTextContents(), ["1", "1", "2"]);
-  assert.deepStrictEqual(await page.locator("#serviciosList .servicio-card").evaluateAll((e) => e.map((x) => x.dataset.estado)), ["urgente", "atencion", "ok", "ok"]);
+  assert.deepStrictEqual(await page.locator("#serviciosList .servicio-card").evaluateAll((e) => e.map((x) => x.dataset.estado)), ["ok", "atencion", "urgente", "ok"]);
   assert.strictEqual(await page.locator("#serviciosList .sv-n:visible").count(), 4);
   assert.strictEqual(await page.locator("#serviciosList .sv-c:visible").count(), 0);
-  assert.match(await page.locator("#serviciosList .sv-n-edad").first().textContent(), /Hace 12 días/);
+  assert.match(await page.locator("#serviciosList .sv-n-edad").first().textContent(), /Entró hoy/);
+  assert.match(await page.locator("#serviciosList .sv-n-edad").nth(2).textContent(), /Hace 12 días en la lista/);
   await page.click('#semaforoResumen [data-f="urgente"]');
   assert.strictEqual(await page.locator("#serviciosList .servicio-card").count(), 1);
+  assert.match(await page.locator("#serviciosList .sv-n-cliente").first().textContent(), /Nuevo/);
   await page.click('#semaforoResumen [data-f="urgente"]');
   assert.strictEqual(await page.locator("#serviciosList .servicio-card").count(), 4, "tocar de nuevo saca el filtro");
   assert.deepStrictEqual(erroresPagina, []);
