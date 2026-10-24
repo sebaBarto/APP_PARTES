@@ -515,3 +515,40 @@ test("Skin nuevo en historial, notas, stock, SIMs y dashboards: filtros en ámba
   assert.notStrictEqual(await page.evaluate(() => Chart.getChart("dashChartTecnico").options.plugins.title.color), "#E8ECEF", "el clásico no cambia los gráficos");
   await ctx.close();
 });
+
+test("Skin nuevo en guardias, rendición, presencia, credencial y comodatos: títulos grandes, estados con color y turno vigente; el clásico no cambia", async () => {
+  const rends = [
+    { tecnico: "Juan Pérez", categoria: "Combustible", monto: 100, fecha: diaISO(0), estado: "pagado", creado_en: new Date().toISOString() },
+    { tecnico: "Juan Pérez", categoria: "Otros", monto: 50, fecha: diaISO(-1), estado: "rechazado", creado_en: new Date(Date.now() - 1000).toISOString() },
+  ];
+  const abrir = async (estilo) => {
+    const { ctx, page, erroresPagina } = await nuevaPagina();
+    await page.route("**/api/**", (route) => {
+      const u = route.request().url();
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(u.includes("recurso=rendicion") ? rends : []) });
+    });
+    await page.goto(base + "/");
+    await page.evaluate((e) => localStorage.setItem("ajustes_app", JSON.stringify({ estiloInicio: e, tema: "night", avisoFelicitacion: false })), estilo);
+    await page.reload();
+    await page.waitForTimeout(400);
+    return { ctx, page, erroresPagina };
+  };
+  const css = (page, sel, prop) => page.locator(sel).first().evaluate((el, p) => getComputedStyle(el)[p], prop);
+  let { ctx, page, erroresPagina } = await abrir("nuevo");
+  await page.evaluate(() => { tecnicoLogueado = "Juan Pérez"; showScreen("rendicion"); cargarMisRendiciones(); });
+  await page.waitForTimeout(600);
+  assert.strictEqual(await css(page, "#screen-rendicion .review-eyebrow", "fontSize"), "26px");
+  const franjas = await page.locator("#rendMisLista .rend-card").evaluateAll((els) => els.map((e) => getComputedStyle(e).borderLeftColor));
+  assert.notStrictEqual(franjas[0], franjas[1], "pagado y rechazado se distinguen por color");
+  for (const pant of ["guardias", "consultas", "presencia", "credencial", "comodatoForm", "comodatoFirma", "ajustes"]) {
+    await page.evaluate((n) => showScreen(n), pant);
+    const sel = { guardias: "guardias", consultas: "consultas", presencia: "presencia", credencial: "credencial", comodatoForm: "comodato-form", comodatoFirma: "comodato-firma", ajustes: "ajustes" }[pant];
+    assert.strictEqual(await css(page, `#screen-${sel} .review-eyebrow`, "fontSize"), "26px", pant + ": título grande");
+  }
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+  ({ ctx, page } = await abrir("clasico"));
+  await page.evaluate(() => { showScreen("guardias"); });
+  assert.notStrictEqual(await css(page, "#screen-guardias .review-eyebrow", "fontSize"), "26px", "el clásico conserva su título");
+  await ctx.close();
+});

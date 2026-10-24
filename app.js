@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.126.1";
+const APP_VERSION = "3.127.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -4958,11 +4958,11 @@ async function cargarYRenderGuardias() {
       cursor = new Date(cursor.getTime() + 7 * 24 * 60 * 60 * 1000);
     }
     guardiaProximosList.innerHTML = "";
-    proximos.forEach(({ fecha, tecnico }) => {
+    proximos.forEach(({ fecha, tecnico }, idx) => {
       const dd = String(fecha.getDate()).padStart(2, "0");
       const mm = String(fecha.getMonth() + 1).padStart(2, "0");
       const card = document.createElement("div");
-      card.className = "guardia-proximo-card";
+      card.className = "guardia-proximo-card" + (idx === 0 && ahora >= inicioRef ? " guardia-proximo-vigente" : "");
       card.innerHTML = `<span>${escapeHtml(tecnico.nombre)}</span><span class="guardia-proximo-fecha">desde ${dd}/${mm}</span>`;
       guardiaProximosList.appendChild(card);
     });
@@ -7252,8 +7252,8 @@ function renderMisRendiciones() {
         ? ` · ${fotos.map((f, i) => `<a href="${escapeHtml(f)}" target="_blank" rel="noopener">Foto ${i + 1}</a>`).join(" ")}`
         : "";
     return `
-      <div class="historial-card">
-        <div class="historial-card-num">${escapeHtml(r.categoria || "")} — $${escapeHtml(String(r.monto ?? ""))}</div>
+      <div class="historial-card rend-card" data-estado="${escapeHtml(r.estado || "")}">
+        <div class="historial-card-num">${escapeHtml(r.categoria || "")} — <span class="rend-monto">$${escapeHtml(String(r.monto ?? ""))}</span></div>
         <div class="historial-card-cliente">${escapeHtml(r.detalle || "")}</div>
         <div class="historial-card-direccion">${escapeHtml(fechaTexto)}${r.cliente ? " — " + escapeHtml(r.cliente) : ""}</div>
         <div class="historial-card-badges">${etiquetaEstado[r.estado] || escapeHtml(r.estado || "")}${fotosTexto}</div>
