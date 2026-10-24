@@ -177,11 +177,13 @@ test("Próximo service: muestra la próxima tarea pendiente del técnico, saltea
 async function paginaConEstilo(estilo) {
   const ctx = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 844 } });
   const page = await ctx.newPage();
+  const erroresPagina = [];
+  page.on("pageerror", (e) => erroresPagina.push(e.message));
   await page.addInitScript((e) => localStorage.setItem("ajustes_app", JSON.stringify({ estiloInicio: e })), estilo);
   await page.route("**/api/**", (r) => r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
   await page.goto(base + "/");
   await page.waitForTimeout(500);
-  return { ctx, page };
+  return { ctx, page, erroresPagina };
 }
 
 test("Parte: con el skin nuevo hay 4 secciones y un aviso de qué falta; con el clásico no se ven", async () => {
@@ -420,10 +422,39 @@ test("Servicios pendientes: si un servicio ya hecho vuelve a aparecer en la list
   const { ctx, page } = await paginaConEstilo("clasico");
   await page.evaluate((f) => {
     historialCache = [{ numero_servicio: "900", cliente: "Panadería Sur", fecha: f, tecnico: "Juan Pérez" }];
+    showScreen("list");
     renderServiciosList([{ numero_servicio: "900", cliente: "Panadería Sur", direccion: "Mitre 100", tarea: "Sirena" }, { numero_servicio: "901", cliente: "Kiosco Norte", direccion: "Belgrano 55", tarea: "PIR" }]);
   }, diaISO(0));
-  const badges = await page.locator("#serviciosList .servicio-card-parte-badge").allTextContents();
+  const badges = await page.locator("#serviciosList .servicio-card-parte-badge:visible").allTextContents();
   assert.strictEqual(badges.length, 1);
   assert.match(badges[0], /Ya tiene parte del/);
+  await ctx.close();
+});
+
+test("Servicios pendientes (skin nuevo): semáforo de antigüedad con conteo y filtro; el clásico no cambia", async () => {
+  const servicios = [
+    { numero_servicio: "1", cliente: "Muy viejo", direccion: "A 1", tarea: "t", fecha_ingreso: diaISO(-12) },
+    { numero_servicio: "2", cliente: "Viejo", direccion: "B 2", tarea: "t", fecha_ingreso: diaISO(-4) },
+    { numero_servicio: "3", cliente: "Nuevo", direccion: "C 3", tarea: "t", fecha_ingreso: diaISO(0) },
+    { numero_servicio: "4", cliente: "Sin fecha", direccion: "D 4", tarea: "t" },
+  ];
+  let { ctx, page, erroresPagina } = await paginaConEstilo("nuevo");
+  await page.evaluate((s) => { serviciosCache = s; showScreen("list"); renderServiciosList(filtrarServicios()); }, servicios);
+  assert.deepStrictEqual(await page.locator("#semaforoResumen b").allTextContents(), ["1", "1", "2"]);
+  assert.deepStrictEqual(await page.locator("#serviciosList .servicio-card").evaluateAll((e) => e.map((x) => x.dataset.estado)), ["urgente", "atencion", "ok", "ok"]);
+  assert.strictEqual(await page.locator("#serviciosList .sv-n:visible").count(), 4);
+  assert.strictEqual(await page.locator("#serviciosList .sv-c:visible").count(), 0);
+  assert.match(await page.locator("#serviciosList .sv-n-edad").first().textContent(), /Hace 12 días/);
+  await page.click('#semaforoResumen [data-f="urgente"]');
+  assert.strictEqual(await page.locator("#serviciosList .servicio-card").count(), 1);
+  await page.click('#semaforoResumen [data-f="urgente"]');
+  assert.strictEqual(await page.locator("#serviciosList .servicio-card").count(), 4, "tocar de nuevo saca el filtro");
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+  ({ ctx, page } = await paginaConEstilo("clasico"));
+  await page.evaluate((s) => { serviciosCache = s; showScreen("list"); renderServiciosList(filtrarServicios()); }, servicios);
+  assert.strictEqual(await page.locator("#semaforoResumen").isVisible(), false);
+  assert.strictEqual(await page.locator("#serviciosList .sv-n:visible").count(), 0);
+  assert.strictEqual(await page.locator("#serviciosList .sv-c:visible").count(), 4);
   await ctx.close();
 });

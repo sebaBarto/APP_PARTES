@@ -2022,13 +2022,13 @@ html body .bloqueo-overlay .btn-ghost { background: transparent; color: #F4F5F0;
    arcoíris de antes. Escopeado a las pantallas de menú (inicio y submenús): los submenús que
    comparten .panel-tile no cambian.
    ============================================================ */
-html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas, #screen-cronograma) {
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas, #screen-cronograma, #screen-list) {
   --t-bg: #17212B; --t-bd: #2A3743; --t-fg: #F4F5F0; --t-ic: #9FB3C2; --t-press: #223140;
 }
-html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas, #screen-cronograma) {
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas, #screen-cronograma, #screen-list) {
   --t-bg: #FFFFFF; --t-bd: #D5D9CF; --t-fg: #101820; --t-ic: #4A5F6E; --t-press: #FFF3D6;
 }
-html[data-inicio="nuevo"][data-theme="contraste"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas, #screen-cronograma) { --t-bd: #101820; --t-ic: #101820; }
+html[data-inicio="nuevo"][data-theme="contraste"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas, #screen-cronograma, #screen-list) { --t-bd: #101820; --t-ic: #101820; }
 
 html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .home-cabecera { display: flex; align-items: center; gap: 16px; margin: 6px 0 18px; }
 html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-home-logo { width: 84px; max-width: none; margin: 0; flex-shrink: 0; }
@@ -2083,16 +2083,16 @@ html[data-inicio="nuevo"][data-botones="grandes"] :is(#screen-home, #screen-serv
 
 
 /* Submenús con el mismo estilo: fondo, título y estados */
-html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas, #screen-cronograma) { --t-page: #101820; --st-ok: #5FD08A; --st-uso: #F5A623; --st-cli: #D9B25A; }
-html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas, #screen-cronograma) { --t-page: #EEF0EA; --st-ok: #1F7A3D; --st-uso: #A9680F; --st-cli: #7A5B10; }
-html[data-inicio="nuevo"] :is(#screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas, #screen-cronograma) .review-scroll { background: var(--t-page); color: var(--t-fg); }
-html[data-inicio="nuevo"] :is(#screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas, #screen-cronograma) .review-eyebrow {
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas, #screen-cronograma, #screen-list) { --t-page: #101820; --st-ok: #5FD08A; --st-uso: #F5A623; --st-cli: #D9B25A; }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas, #screen-cronograma, #screen-list) { --t-page: #EEF0EA; --st-ok: #1F7A3D; --st-uso: #A9680F; --st-cli: #7A5B10; }
+html[data-inicio="nuevo"] :is(#screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas, #screen-cronograma, #screen-list) .review-scroll { background: var(--t-page); color: var(--t-fg); }
+html[data-inicio="nuevo"] :is(#screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas, #screen-cronograma, #screen-list) .review-eyebrow {
   display: block; margin: 6px 0 18px; padding: 0;
   font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 26px; line-height: 1.1;
   letter-spacing: -0.01em; color: var(--t-fg); text-transform: lowercase;
 }
-html[data-inicio="nuevo"] :is(#screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas, #screen-cronograma) .review-eyebrow::first-letter { text-transform: uppercase; }
-html[data-inicio="nuevo"] :is(#screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas, #screen-cronograma) .review-eyebrow::before { display: none; }
+html[data-inicio="nuevo"] :is(#screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas, #screen-cronograma, #screen-list) .review-eyebrow::first-letter { text-transform: uppercase; }
+html[data-inicio="nuevo"] :is(#screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas, #screen-cronograma, #screen-list) .review-eyebrow::before { display: none; }
 html[data-inicio="nuevo"] :is(#screen-vehiculos, #screen-herramientas) .list-status { color: var(--t-ic); }
 
 /* Teclas con estado (vehículos y herramientas): ícono a la izquierda, nombre y estado apilados */
@@ -2436,3 +2436,46 @@ html[data-inicio="nuevo"] #screen-cronograma .list-toolbar .btn-ghost { color: v
 html[data-inicio="nuevo"] #screen-cronograma .list-sync-label { color: var(--t-ic); }
 html[data-inicio="nuevo"] #screen-cronograma .crono-tarea-card { box-shadow: 0 1px 2px rgba(16, 24, 32, 0.08); }
 html[data-inicio="nuevo"][data-theme="night"] #screen-cronograma .crono-tarea-card { box-shadow: none; }
+
+/* ---- Servicios pendientes: skin nuevo con semáforo de antigüedad ---- */
+.sv-n { display: none; }
+.semaforo-resumen { display: none; }
+html[data-inicio="nuevo"] #screen-list .sv-c { display: none; }
+html[data-inicio="nuevo"] #screen-list { --rojo: #FF6B5E; }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) #screen-list { --rojo: #B3261E; }
+html[data-inicio="nuevo"] #screen-list .semaforo-resumen { display: flex; gap: 8px; margin: 0 0 12px; }
+html[data-inicio="nuevo"] #screen-list .semaforo-chip {
+  flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 6px;
+  font: inherit; font-size: 13px; color: var(--t-fg); background: var(--t-bg); border: 1.5px solid var(--t-bd);
+  border-radius: 12px; padding: 9px 6px; min-height: 44px; cursor: pointer; touch-action: manipulation;
+}
+html[data-inicio="nuevo"] #screen-list .semaforo-chip b { font-family: 'IBM Plex Mono', monospace; font-size: 16px; }
+html[data-inicio="nuevo"] #screen-list .semaforo-chip.activo { background: color-mix(in srgb, #F5A623 22%, var(--t-bg)); border-color: #F5A623; }
+.sem-punto { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+html[data-inicio="nuevo"] #screen-list .sem-punto.s-urgente { background: var(--rojo); }
+html[data-inicio="nuevo"] #screen-list .sem-punto.s-atencion { background: var(--st-uso); }
+html[data-inicio="nuevo"] #screen-list .sem-punto.s-ok { background: var(--st-ok); }
+html[data-inicio="nuevo"] #screen-list .servicio-card {
+  padding: 0; overflow: hidden; border-radius: 14px; background: var(--t-bg); border: 1.5px solid var(--t-bd);
+  border-left: 5px solid var(--st-ok); color: var(--t-fg); box-shadow: 0 1px 2px rgba(16, 24, 32, 0.08);
+}
+html[data-inicio="nuevo"][data-theme="night"] #screen-list .servicio-card { box-shadow: none; }
+html[data-inicio="nuevo"] #screen-list .servicio-card[data-estado="atencion"] { border-left-color: var(--st-uso); }
+html[data-inicio="nuevo"] #screen-list .servicio-card[data-estado="urgente"] { border-left-color: var(--rojo); background: color-mix(in srgb, var(--rojo) 9%, var(--t-bg)); }
+html[data-inicio="nuevo"] #screen-list .servicio-card:active { background: var(--t-press); transform: scale(0.99); }
+html[data-inicio="nuevo"] #screen-list .sv-n { display: flex; flex-direction: column; gap: 3px; padding: 12px 14px; text-align: left; }
+html[data-inicio="nuevo"] #screen-list .sv-n-fila { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+html[data-inicio="nuevo"] #screen-list .sv-n-num { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--t-ic); }
+html[data-inicio="nuevo"] #screen-list .sv-n-edad { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; }
+html[data-inicio="nuevo"] #screen-list .sv-n-edad:empty { display: none; }
+html[data-inicio="nuevo"] #screen-list .sv-n-edad.e-ok { background: color-mix(in srgb, var(--st-ok) 18%, transparent); color: var(--st-ok); }
+html[data-inicio="nuevo"] #screen-list .sv-n-edad.e-atencion { background: color-mix(in srgb, var(--st-uso) 20%, transparent); color: var(--st-uso); }
+html[data-inicio="nuevo"] #screen-list .sv-n-edad.e-urgente { background: color-mix(in srgb, var(--rojo) 20%, transparent); color: var(--rojo); }
+html[data-inicio="nuevo"] #screen-list .sv-n-cliente { font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 16px; line-height: 1.2; color: var(--t-fg); overflow-wrap: anywhere; }
+html[data-inicio="nuevo"] #screen-list .sv-n-dir { font-size: 13px; color: var(--t-ic); overflow-wrap: anywhere; }
+html[data-inicio="nuevo"] #screen-list .sv-n-tarea { font-size: 13px; color: var(--t-fg); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+html[data-inicio="nuevo"] #screen-list .sv-n-pie { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; font-size: 12px; color: var(--t-ic); }
+html[data-inicio="nuevo"] #screen-list .sv-n-pie .servicio-card-parte-badge { margin-left: 0; }
+html[data-inicio="nuevo"] #screen-list select.field-input, html[data-inicio="nuevo"] #screen-list .search-input { color: var(--t-fg); background: var(--t-bg); border-color: var(--t-bd); }
+html[data-inicio="nuevo"] #screen-list .list-toolbar .btn-ghost { color: var(--t-fg); border-color: var(--t-bd); }
+html[data-inicio="nuevo"] #screen-list .list-sync-label { color: var(--t-ic); }

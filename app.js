@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.123.0";
+const APP_VERSION = "3.124.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -1387,13 +1387,45 @@ function escapeHtml(s) {
     .replace(/'/g, "&#39;");
 }
 
+// Semáforo de antigüedad (skin nuevo): urgente / atención / al día según los
+// días que lleva el servicio en el listado (mismos umbrales que "estancado").
+let filtroSemaforo = "";
+function estadoSemaforo(item) {
+  const dias = diasEstancado(item);
+  if (dias != null && dias >= DIAS_URGENTE) return "urgente";
+  if (dias != null && dias >= DIAS_ATENCION) return "atencion";
+  return "ok";
+}
+function actualizarSemaforoResumen(lista) {
+  const cuenta = { urgente: 0, atencion: 0, ok: 0 };
+  lista.forEach((item) => { cuenta[estadoSemaforo(item)]++; });
+  const ids = { urgente: "semUrgente", atencion: "semAtencion", ok: "semOk" };
+  Object.keys(ids).forEach((k) => {
+    const el = document.getElementById(ids[k]);
+    if (el) el.textContent = cuenta[k];
+  });
+  document.querySelectorAll("#semaforoResumen .semaforo-chip").forEach((chip) => {
+    chip.classList.toggle("activo", chip.dataset.f === filtroSemaforo);
+  });
+}
+document.querySelectorAll("#semaforoResumen .semaforo-chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    filtroSemaforo = filtroSemaforo === chip.dataset.f ? "" : chip.dataset.f;
+    renderServiciosList(filtrarServicios());
+  });
+});
+
 function filtrarServicios() {
   const term = normalizeText(serviciosSearch.value);
   const sinResueltos = serviciosCache.filter(
     (item) => !(item.numero_servicio && serviciosResueltos.has(item.numero_servicio))
   );
-  if (!term) return sinResueltos;
-  return sinResueltos.filter((item) => {
+  try { actualizarSemaforoResumen(sinResueltos); } catch (e) { /* aún no cargó */ }
+  const conSemaforo = filtroSemaforo && document.documentElement.dataset.inicio === "nuevo"
+    ? sinResueltos.filter((item) => estadoSemaforo(item) === filtroSemaforo)
+    : sinResueltos;
+  if (!term) return conSemaforo;
+  return conSemaforo.filter((item) => {
     const haystack = normalizeText(
       [item.numero_servicio, item.cliente, item.direccion, item.localidad, item.tarea].join(" ")
     );
@@ -1501,12 +1533,27 @@ function renderServiciosList(items) {
     const card = document.createElement("button");
     card.type = "button";
     card.className = "servicio-card" + claseEstancado;
+    const estadoN = estadoSemaforo(item);
+    card.dataset.estado = estadoN;
+    const edadN = dias == null ? "" : dias === 0 ? "Hoy" : dias === 1 ? "Hace 1 día" : `Hace ${dias} días`;
     card.innerHTML = `
-      <div class="servicio-card-num">N° ${escapeHtml(item.numero_servicio)}${badgeEstancado}${badgeParte}</div>
-      <div class="servicio-card-cliente">${escapeHtml(item.cliente)}</div>
-      <div class="servicio-card-direccion">${escapeHtml(item.direccion)}${item.localidad ? ", " + escapeHtml(item.localidad) : ""}</div>
-      <div class="servicio-card-tarea">${escapeHtml(item.tarea)}</div>
-      ${item.cobrador ? `<div class="servicio-card-cobrador">Cobrador: ${escapeHtml(item.cobrador)}</div>` : ""}
+      <div class="sv-c">
+        <div class="servicio-card-num">N° ${escapeHtml(item.numero_servicio)}${badgeEstancado}${badgeParte}</div>
+        <div class="servicio-card-cliente">${escapeHtml(item.cliente)}</div>
+        <div class="servicio-card-direccion">${escapeHtml(item.direccion)}${item.localidad ? ", " + escapeHtml(item.localidad) : ""}</div>
+        <div class="servicio-card-tarea">${escapeHtml(item.tarea)}</div>
+        ${item.cobrador ? `<div class="servicio-card-cobrador">Cobrador: ${escapeHtml(item.cobrador)}</div>` : ""}
+      </div>
+      <div class="sv-n">
+        <div class="sv-n-fila">
+          <span class="sv-n-num">N° ${escapeHtml(item.numero_servicio)}</span>
+          <span class="sv-n-edad e-${estadoN}">${edadN ? edadN : ""}</span>
+        </div>
+        <div class="sv-n-cliente">${escapeHtml(item.cliente)}</div>
+        <div class="sv-n-dir">${escapeHtml(item.direccion)}${item.localidad ? " · " + escapeHtml(item.localidad) : ""}</div>
+        <div class="sv-n-tarea">${escapeHtml(item.tarea)}</div>
+        ${(item.cobrador || parteHecho) ? `<div class="sv-n-pie">${item.cobrador ? `<span>Cobrador: ${escapeHtml(item.cobrador)}</span>` : ""}${badgeParte}</div>` : ""}
+      </div>
     `;
     card.addEventListener("click", () => seleccionarServicio(item));
     serviciosListEl.appendChild(card);

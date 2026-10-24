@@ -320,6 +320,12 @@
         <input class="field-input search-input" id="serviciosSearch" type="search" placeholder="Buscar por cliente, dirección, N°...">
       </div>
 
+      <div class="semaforo-resumen" id="semaforoResumen">
+        <button type="button" class="semaforo-chip" data-f="urgente"><i class="sem-punto s-urgente"></i><b id="semUrgente">0</b><span>Urgentes</span></button>
+        <button type="button" class="semaforo-chip" data-f="atencion"><i class="sem-punto s-atencion"></i><b id="semAtencion">0</b><span>Atención</span></button>
+        <button type="button" class="semaforo-chip" data-f="ok"><i class="sem-punto s-ok"></i><b id="semOk">0</b><span>Al día</span></button>
+      </div>
+
       <div class="list-toolbar">
         <button class="btn btn-ghost btn-small" id="refreshServiciosBtn" type="button">↻ Actualizar</button>
         <span class="list-sync-label" id="syncLabel"></span>
