@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.127.0";
+const APP_VERSION = "3.128.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -47,7 +47,7 @@ if (typeof Chart !== "undefined") {
 }
 
 // Skin nuevo: los gráficos toman los colores del tema (texto, grilla, series oscuras).
-// Con el skin clásico este plugin no hace nada.
+// En el skin clásico solo actúa en modo noche.
 if (typeof Chart !== "undefined") {
   Chart.register({
     id: "temaNuevo",
@@ -57,7 +57,9 @@ if (typeof Chart !== "undefined") {
     beforeInit(chart) {
       try { chart.canvas.parentElement.classList.add("con-grafico"); } catch (e) { /* sin padre */ }
       const raiz = document.documentElement;
-      if (raiz.dataset.inicio !== "nuevo") return;
+      // Skin nuevo: siempre. Skin clásico: solo en modo noche, para que los
+      // títulos y ejes no queden oscuros sobre fondo oscuro.
+      if (raiz.dataset.inicio !== "nuevo" && raiz.dataset.theme !== "night") return;
       const claro = raiz.dataset.theme === "day" || raiz.dataset.theme === "contraste";
       const fg = claro ? "#101820" : "#E8ECEF";
       const mut = claro ? "#4A5F6E" : "#9FB3C2";
@@ -75,7 +77,7 @@ if (typeof Chart !== "undefined") {
         co.scales = co.scales || {};
         ["x", "y"].forEach((eje) => {
           const sc = co.scales[eje] = Object.assign({}, co.scales[eje]);
-          if (eje === "y" && tipo === "bar" && sc.grace === undefined) sc.grace = "12%";
+          if (eje === "y" && tipo === "bar" && !sc.grace) sc.grace = "12%"; // (el default resuelto es 0)
           sc.ticks = Object.assign({}, sc.ticks, { color: mut });
           sc.grid = Object.assign({}, sc.grid, { color: grilla });
           sc.border = Object.assign({}, sc.border, { color: grilla });
@@ -8607,7 +8609,7 @@ async function renderVehiculosPicker() {
 }
 
 async function renderVehiculoDetalle() {
-  vehiculoDetalleNombre.textContent = vehiculoSeleccionado.toUpperCase();
+  vehiculoDetalleNombre.textContent = document.documentElement.dataset.inicio === "nuevo" ? vehiculoSeleccionado : vehiculoSeleccionado.toUpperCase();
   vehiculoDetalleStatus.textContent = "Cargando...";
   vehiculoAlertasWrap.classList.add("hidden");
   vehiculoTomarWrap.classList.add("hidden");

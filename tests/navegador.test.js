@@ -512,7 +512,7 @@ test("Skin nuevo en historial, notas, stock, SIMs y dashboards: filtros en ámba
   assert.strictEqual(await css(page, ".dash-cards-row", "display"), "flex", "el clásico mantiene sus tarjetas");
   await page.evaluate(() => { showScreen("dashboard"); fetchDashboard(); });
   await page.waitForTimeout(900);
-  assert.notStrictEqual(await page.evaluate(() => Chart.getChart("dashChartTecnico").options.plugins.title.color), "#E8ECEF", "el clásico no cambia los gráficos");
+  assert.strictEqual(await page.evaluate(() => Chart.getChart("dashChartTecnico").options.plugins.title.color), "#E8ECEF", "clásico de noche: títulos de gráficos legibles");
   await ctx.close();
 });
 
@@ -540,9 +540,9 @@ test("Skin nuevo en guardias, rendición, presencia, credencial y comodatos: tí
   assert.strictEqual(await css(page, "#screen-rendicion .review-eyebrow", "fontSize"), "26px");
   const franjas = await page.locator("#rendMisLista .rend-card").evaluateAll((els) => els.map((e) => getComputedStyle(e).borderLeftColor));
   assert.notStrictEqual(franjas[0], franjas[1], "pagado y rechazado se distinguen por color");
-  for (const pant of ["guardias", "consultas", "presencia", "credencial", "comodatoForm", "comodatoFirma", "ajustes"]) {
+  for (const pant of ["guardias", "consultas", "presencia", "credencial", "comodatoForm", "comodatoFirma", "ajustes", "planos", "emergencia", "instalacion", "claves", "vehiculoDetalle", "herramientaDetalle"]) {
     await page.evaluate((n) => showScreen(n), pant);
-    const sel = { guardias: "guardias", consultas: "consultas", presencia: "presencia", credencial: "credencial", comodatoForm: "comodato-form", comodatoFirma: "comodato-firma", ajustes: "ajustes" }[pant];
+    const sel = { guardias: "guardias", consultas: "consultas", presencia: "presencia", credencial: "credencial", comodatoForm: "comodato-form", comodatoFirma: "comodato-firma", ajustes: "ajustes", planos: "planos", emergencia: "emergencia", instalacion: "instalacion", claves: "claves", vehiculoDetalle: "vehiculo-detalle", herramientaDetalle: "herramienta-detalle" }[pant];
     assert.strictEqual(await css(page, `#screen-${sel} .review-eyebrow`, "fontSize"), "26px", pant + ": título grande");
   }
   assert.deepStrictEqual(erroresPagina, []);
@@ -551,4 +551,25 @@ test("Skin nuevo en guardias, rendición, presencia, credencial y comodatos: tí
   await page.evaluate(() => { showScreen("guardias"); });
   assert.notStrictEqual(await css(page, "#screen-guardias .review-eyebrow", "fontSize"), "26px", "el clásico conserva su título");
   await ctx.close();
+});
+
+test("Skin clásico en modo noche: los títulos y ejes de los gráficos se leen (claros); de día no cambian", async () => {
+  const historial = [
+    { id_parte: "p1", numero_servicio: "1", cliente: "A", fecha: diaISO(0), hora_entrada: "09:00", hora_salida: "10:00", tecnico: "Juan Pérez", costo_final: "0", es_instalacion: false },
+  ];
+  for (const [tema, esperado] of [["night", "#E8ECEF"], ["day", undefined]]) {
+    const { ctx, page, erroresPagina } = await nuevaPagina();
+    await page.route("**/api/**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(route.request().url().includes("/api/historial") ? historial : []) }));
+    await page.goto(base + "/");
+    await page.evaluate((t) => localStorage.setItem("ajustes_app", JSON.stringify({ estiloInicio: "clasico", tema: t, avisoFelicitacion: false })), tema);
+    await page.reload();
+    await page.waitForTimeout(400);
+    await page.evaluate(() => { tecnicoLogueado = "Juan Pérez"; showScreen("dashboard"); fetchDashboard(); });
+    await page.waitForTimeout(900);
+    const color = await page.evaluate(() => Chart.getChart("dashChartTecnico").config.options.plugins.title.color);
+    if (esperado) assert.strictEqual(color, esperado, "título claro de noche");
+    else assert.notStrictEqual(color, "#E8ECEF", "de día el clásico queda como estaba");
+    assert.deepStrictEqual(erroresPagina, []);
+    await ctx.close();
+  }
 });
