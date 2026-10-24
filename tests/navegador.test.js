@@ -323,3 +323,26 @@ test("Admin: detecta materiales escritos a mano que se repiten y los agrega al c
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Cobro: el botón elegido (descuento y forma de pago) se ve marcado en los dos skins y temas", async () => {
+  for (const estilo of ["clasico", "nuevo"]) {
+    for (const tema of ["night", "day"]) {
+      const { ctx, page } = await paginaConEstilo(estilo);
+      await page.evaluate((t) => { document.documentElement.dataset.theme = t; showScreen("form"); }, tema);
+      await page.waitForTimeout(200);
+      const fondo = (sel) => page.locator(sel).evaluate((el) => getComputedStyle(el).backgroundColor);
+      const chip = (nombre, valor) => page.locator(`label.discount-chip:has(input[name='${nombre}'][value='${valor}'])`);
+      await chip("f_descuento_tipo", "50").scrollIntoViewIfNeeded();
+      await chip("f_descuento_tipo", "50").click();
+      await page.waitForTimeout(350); // la transición de color dura 0.15 s
+      assert.strictEqual(await fondo("label.discount-chip:has(input[value='50'])"), "rgb(245, 166, 35)", `${estilo}/${tema}: 50%`);
+      assert.notStrictEqual(await fondo("label.discount-chip:has(input[value='0'])"), "rgb(245, 166, 35)", `${estilo}/${tema}: sin descuento se desmarca`);
+      const primeraForma = page.locator("label.discount-chip:has(input[name='f_forma_pago'])").first();
+      await primeraForma.scrollIntoViewIfNeeded();
+      await primeraForma.click();
+      await page.waitForTimeout(350);
+      assert.strictEqual(await primeraForma.evaluate((el) => getComputedStyle(el).backgroundColor), "rgb(245, 166, 35)", `${estilo}/${tema}: forma de pago`);
+      await ctx.close();
+    }
+  }
+});

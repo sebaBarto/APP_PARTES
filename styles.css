@@ -2380,3 +2380,22 @@ html[data-theme="night"] .mat-fila-cant button { background: #1B2530; color: #F4
 .mat-catalogo[open] > summary { margin-bottom: 6px; }
 html[data-inicio="nuevo"] #screen-form .mat-chip { border-color: #D18A12; }
 html[data-inicio="nuevo"] #screen-form .mat-chip.activo { border-color: #F5A623; }
+
+/* ---- Botones elegidos (descuento / forma de pago): bien visibles en todos los temas y skins ----
+   Importante: lo elegido NO puede cambiar el ancho del botón (ni negrita ni texto extra), porque
+   si el botón se corre al soltar el dedo, el toque cae sobre otro botón. */
+html .discount-chip { font-weight: 600; }
+html .discount-chip.sel, html .discount-chip:has(input:checked) {
+  background: #F5A623 !important;
+  border-color: #D98E0B !important;
+  color: #101820 !important;
+  box-shadow: 0 0 0 2px rgba(245, 166, 35, 0.35);
+}
+html .discount-chip.sel::after {
+  content: "\2713";
+  position: absolute; top: -7px; right: -5px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #101820; color: #F5A623; border: 1.5px solid #F5A623;
+  font: 700 11px/15px 'Space Grotesk', sans-serif; text-align: center;
+  pointer-events: none;
+}

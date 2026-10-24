@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.122.0";
+const APP_VERSION = "3.122.1";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -789,7 +789,7 @@ function showScreen(name) {
   try { actualizarWakeLockPantalla(name); } catch (e) { /* los ajustes todavía no cargaron */ }
   if (name === "home") { try { actualizarProximoService(); } catch (e) { /* aún no cargó */ } }
   try { controlarFaltantesParte(name); } catch (e) { /* aún no cargó */ }
-  if (name === "form") { try { refrescarAtajosMateriales(); cargarHistorialMateriales(); } catch (e) { /* aún no cargó */ } }
+  if (name === "form") { try { sincronizarChipsElegidos(); refrescarAtajosMateriales(); cargarHistorialMateriales(); } catch (e) { /* aún no cargó */ } }
 }
 
 function setStatus(text, mode) {
@@ -1217,7 +1217,22 @@ function actualizarResumenDelDia() {
 
 // ---------- Parte (estilo Nuevo): qué falta antes de pasar a la firma ----------
 let faltantesParteTimer = null;
+// Marca visualmente (clase .sel) los botones de descuento / forma de pago elegidos.
+// No depende de :has() (que los Android viejos no entienden) ni de que el
+// cambio venga de un toque: también se sincroniza al restaurar o limpiar el parte.
+function sincronizarChipsElegidos() {
+  document.querySelectorAll("label.discount-chip").forEach((chip) => {
+    const input = chip.querySelector("input");
+    if (input) chip.classList.toggle("sel", !!input.checked);
+  });
+}
+document.addEventListener("change", (ev) => {
+  if (ev.target && ev.target.closest && ev.target.closest("label.discount-chip")) sincronizarChipsElegidos();
+});
+document.addEventListener("pointerup", () => setTimeout(sincronizarChipsElegidos, 60));
+
 function actualizarFaltantesParte() {
+  try { sincronizarChipsElegidos(); } catch (e) { /* aún no cargó */ }
   const el = document.getElementById("parteFaltantes");
   if (!el) return;
   try {
