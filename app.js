@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.116.0";
+const APP_VERSION = "3.116.1";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -5620,7 +5620,7 @@ notasModalDespuesBtn.addEventListener("click", () => {
 
 // ---------- Ajustes (apariencia + carteles de aviso) ----------
 // Se guardan solo en este celular (localStorage).
-const AJUSTES_DEFECTO = { tema: "clasico", tamano: "normal", avisoTestPoner: true, avisoTestQuitar: true, sonidoBotones: true, vibracionBotones: true, sonidoResultado: true, sonidoFelicitacion: true, confetiFelicitacion: true, volumen: 50, botonesGrandes: false, pantallaEncendida: false, appMapas: "google", bloqueoHuella: false, cierreInactividad: 0, mosaicos: { orden: [], ocultos: [] }, estiloSonido: "suave", avisoSims: true, avisoFelicitacion: true };
+const AJUSTES_DEFECTO = { tema: "clasico", tamano: "normal", avisoTestPoner: true, avisoTestQuitar: true, sonidoBotones: true, vibracionBotones: true, sonidoResultado: true, sonidoFelicitacion: true, confetiFelicitacion: true, volumen: 50, botonesGrandes: false, estiloInicio: "nuevo", pantallaEncendida: false, appMapas: "google", bloqueoHuella: false, cierreInactividad: 0, mosaicos: { orden: [], ocultos: [] }, estiloSonido: "suave", avisoSims: true, avisoFelicitacion: true };
 function leerAjustes() {
   try {
     const guardado = JSON.parse(localStorage.getItem("ajustes_app") || "{}");
@@ -6027,6 +6027,7 @@ function renderMosaicosAjustes() {
 
 // Grupos de botones tipo "chips" genéricos (mapa, cierre de sesión)
 const GRUPOS_CHIPS = [
+  { sel: "#ajusteEstiloInicio", attr: "estilo", clave: "estiloInicio", num: false },
   { sel: "#ajusteMapas", attr: "mapa", clave: "appMapas", num: false },
   { sel: "#ajusteCierre", attr: "cierre", clave: "cierreInactividad", num: true },
 ];
@@ -6046,15 +6047,19 @@ GRUPOS_CHIPS.forEach((g) => {
       aj[g.clave] = g.num ? Number(chip.dataset[g.attr]) : chip.dataset[g.attr];
       guardarAjustes(aj);
       renderGruposChips();
+      aplicarEstiloInicio();
     });
   });
 });
+function aplicarEstiloInicio() {
+  document.documentElement.setAttribute("data-inicio", leerAjustes().estiloInicio === "clasico" ? "clasico" : "nuevo");
+}
 
 // Restablecer todo
 document.getElementById("restablecerAjustesBtn").addEventListener("click", () => {
   if (!confirm("¿Restablecer todos los ajustes (apariencia, tamaño, sonidos, avisos, mosaicos del inicio) a los valores de fábrica?")) return;
   try { localStorage.removeItem("ajustes_app"); } catch (e) {}
-  aplicarTema(); aplicarTamano(); aplicarBotonesGrandes(); aplicarMosaicos();
+  aplicarTema(); aplicarTamano(); aplicarBotonesGrandes(); aplicarEstiloInicio(); aplicarMosaicos();
   actualizarWakeLockPantalla();
   renderAjustes();
   showToast("Ajustes restablecidos.");

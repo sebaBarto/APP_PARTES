@@ -20,6 +20,7 @@
     var esc = { chico: 0.88, grande: 1.2 }[a.tamano];
     if (esc) document.documentElement.style.setProperty("--escala", esc);
     if (a.botonesGrandes) document.documentElement.setAttribute("data-botones", "grandes");
+    document.documentElement.setAttribute("data-inicio", a.estiloInicio === "clasico" ? "clasico" : "nuevo");
     if (t === "night" || t === "day" || t === "contraste") {
       document.documentElement.setAttribute("data-theme", t);
       var m = document.querySelector('meta[name="theme-color"]');
@@ -96,6 +97,7 @@
           <p class="home-fecha" id="homeFecha"></p>
         </div>
       </header>
+      <p class="hint-eyebrow review-eyebrow home-eyebrow-clasico">PANEL PRINCIPAL</p>
 
       <div class="cola-envios-banner hidden" id="colaEnviosBanner">
         <span id="colaEnviosTexto"></span>
@@ -1294,6 +1296,11 @@
       </label>
 
       <p class="ajuste-seccion">Pantalla de inicio</p>
+      <div class="ajuste-tamanos" id="ajusteEstiloInicio" style="grid-template-columns:repeat(2,1fr);margin-bottom:10px;">
+        <button type="button" class="ajuste-tema-chip" data-estilo="nuevo"><span class="ajuste-tamano-nombre">Nuevo</span></button>
+        <button type="button" class="ajuste-tema-chip" data-estilo="clasico"><span class="ajuste-tamano-nombre">Clásico</span></button>
+      </div>
+      <p class="ajuste-nota" style="margin:0 0 10px;">Nuevo: teclas oscuras y Servicios Técnicos destacado. Clásico: tarjetas blancas con íconos de colores.</p>
       <p class="ajuste-nota" style="margin:0 0 8px;">Ordená los mosaicos con las flechas y ocultá los que no uses con el ojo.</p>
       <div id="ajusteMosaicos"></div>
 

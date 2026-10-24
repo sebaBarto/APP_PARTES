@@ -106,3 +106,18 @@ test("cada opción de Forma de pago se puede elegir con un toque", async () => {
   }
   await ctx.close();
 });
+
+test("el estilo del inicio (Nuevo/Clásico) se elige en Ajustes y se recuerda", async () => {
+  const { ctx, page } = await nuevaPagina();
+  await page.goto(base + "/");
+  await page.waitForTimeout(400);
+  const estilo = () => page.evaluate(() => document.documentElement.getAttribute("data-inicio"));
+  assert.strictEqual(await estilo(), "nuevo");
+  await page.evaluate(() => { showScreen("ajustes"); renderAjustes(); });
+  await page.evaluate(() => document.querySelector('#ajusteEstiloInicio [data-estilo="clasico"]').click());
+  assert.strictEqual(await estilo(), "clasico");
+  await page.reload();
+  await page.waitForTimeout(400);
+  assert.strictEqual(await estilo(), "clasico");
+  await ctx.close();
+});
