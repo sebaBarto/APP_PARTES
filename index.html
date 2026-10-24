@@ -1886,6 +1886,20 @@
       <div class="field-group">
         <label class="field-label" for="f_materiales">Materiales utilizados</label>
 
+        <div class="mat-rapidos-wrap hidden" id="matRapidosUsadosWrap">
+          <p class="mat-rapidos-titulo">Más usados</p>
+          <div class="mat-rapidos" id="matRapidosUsados"></div>
+        </div>
+        <div class="mat-buscador">
+          <input class="field-input" type="search" id="matBuscarUsados" placeholder="Buscar material (ej: bat, sirena)" autocomplete="off" enterkeyhint="search">
+          <div class="mat-resultados hidden" id="matResultadosUsados"></div>
+        </div>
+
+        <div id="materialesAgregadosList" class="materiales-agregados-list"></div>
+
+        <details class="mat-catalogo">
+          <summary>Ver catálogo completo</summary>
+
         <div class="field-row">
           <div class="field-group grow">
             <select class="field-input" id="matCategoriaSelect">
@@ -1911,7 +1925,7 @@
         <button type="button" class="hint-text hidden" id="matVolverCatalogoBtn" style="background:none; border:none; text-decoration:underline; cursor:pointer; padding:0; margin:2px 0 8px;">← Volver al catálogo</button>
         <button type="button" class="btn btn-ghost btn-small" id="agregarMaterialBtn" style="margin-bottom:10px;">+ Agregar</button>
 
-        <div id="materialesAgregadosList" class="materiales-agregados-list"></div>
+        </details>
 
         <textarea class="field-input field-textarea" id="f_materiales" placeholder="Otros materiales / detalles adicionales que no estén en las categorías" style="margin-top:8px;"></textarea>
       </div>
@@ -1932,6 +1946,21 @@
 
       <div class="field-group">
         <label class="field-label" for="f_materiales_retirados">Materiales retirados</label>
+
+        <div class="mat-rapidos-wrap hidden" id="matRapidosRetiradosWrap">
+          <p class="mat-rapidos-titulo">Más usados</p>
+          <div class="mat-rapidos" id="matRapidosRetirados"></div>
+        </div>
+        <button type="button" class="btn btn-ghost btn-small hidden" id="matRetCopiarBtn" style="margin-bottom:8px;">↩ Retiré lo mismo que instalé</button>
+        <div class="mat-buscador">
+          <input class="field-input" type="search" id="matBuscarRetirados" placeholder="Buscar material (ej: bat, sirena)" autocomplete="off" enterkeyhint="search">
+          <div class="mat-resultados hidden" id="matResultadosRetirados"></div>
+        </div>
+
+        <div id="materialesRetiradosAgregadosList" class="materiales-agregados-list"></div>
+
+        <details class="mat-catalogo">
+          <summary>Ver catálogo completo</summary>
 
         <div class="field-row">
           <div class="field-group grow">
@@ -1958,7 +1987,7 @@
         <button type="button" class="hint-text hidden" id="matRetVolverCatalogoBtn" style="background:none; border:none; text-decoration:underline; cursor:pointer; padding:0; margin:2px 0 8px;">← Volver al catálogo</button>
         <button type="button" class="btn btn-ghost btn-small" id="agregarMaterialRetiradoBtn" style="margin-bottom:10px;">+ Agregar</button>
 
-        <div id="materialesRetiradosAgregadosList" class="materiales-agregados-list"></div>
+        </details>
 
         <textarea class="field-input field-textarea" id="f_materiales_retirados" placeholder="Otros materiales retirados que no estén en las categorías" style="margin-top:8px;"></textarea>
       </div>

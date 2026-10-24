@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.121.0";
+const APP_VERSION = "3.122.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -789,6 +789,7 @@ function showScreen(name) {
   try { actualizarWakeLockPantalla(name); } catch (e) { /* los ajustes todavía no cargaron */ }
   if (name === "home") { try { actualizarProximoService(); } catch (e) { /* aún no cargó */ } }
   try { controlarFaltantesParte(name); } catch (e) { /* aún no cargó */ }
+  if (name === "form") { try { refrescarAtajosMateriales(); cargarHistorialMateriales(); } catch (e) { /* aún no cargó */ } }
 }
 
 function setStatus(text, mode) {
@@ -2380,20 +2381,7 @@ matVolverCatalogoBtn.addEventListener("click", () => {
 });
 
 function renderMaterialesAgregados() {
-  materialesAgregadosList.innerHTML = "";
-  materialesAgregados.forEach((item, idx) => {
-    const fila = document.createElement("div");
-    fila.className = "material-agregado-item";
-    fila.innerHTML = `
-      <span>${escapeHtml(item.modelo)} — x${item.cantidad}${item.manual ? ' <span class="badge-material-manual">Manual</span>' : ""}</span>
-      <button type="button" class="quitar" title="Quitar">✕</button>
-    `;
-    fila.querySelector(".quitar").addEventListener("click", () => {
-      materialesAgregados.splice(idx, 1);
-      renderMaterialesAgregados();
-    });
-    materialesAgregadosList.appendChild(fila);
-  });
+  renderListaMateriales(materialesAgregadosList, materialesAgregados, "usados");
 }
 
 agregarMaterialBtn.addEventListener("click", () => {
@@ -2440,6 +2428,196 @@ const agregarMaterialRetiradoBtn = document.getElementById("agregarMaterialRetir
 const materialesRetiradosAgregadosList = document.getElementById("materialesRetiradosAgregadosList");
 let materialesRetiradosAgregados = [];
 
+// ---------- Atajos de materiales: "Más usados", buscador y cantidad en la fila ----------
+// Usan el catálogo (materialesCatalogo) y el historial de stock ya guardado
+// (modelo/técnico/fecha de cada movimiento). No cambian cómo se guarda el parte.
+function normMat(s) {
+  return normalizeText(String(s || "")).replace(/\s+/g, " ").trim();
+}
+
+let stockMaterialesHist = [];
+try { stockMaterialesHist = JSON.parse(localStorage.getItem("stock_materiales_cache") || "[]"); } catch (e) { stockMaterialesHist = []; }
+let stockMaterialesCargadoEn = 0;
+
+async function cargarHistorialMateriales() {
+  if (Date.now() - stockMaterialesCargadoEn < 30 * 60 * 1000) return;
+  try {
+    const res = await fetch("/api/historial?tipo=stock", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if (Array.isArray(data)) {
+      stockMaterialesHist = data
+        .map((m) => ({ modelo: m.modelo, tecnico: m.tecnico || "", fecha: m.fecha || "", parte: m.parte_id || m.numero_servicio || String(m.id || ""), i: Number(m.cantidad_instalada) || 0, r: Number(m.cantidad_retirada) || 0 }))
+        .filter((m) => m.modelo);
+      try { localStorage.setItem("stock_materiales_cache", JSON.stringify(stockMaterialesHist.slice(-4000))); } catch (e) { /* sin espacio: se usa solo en memoria */ }
+      stockMaterialesCargadoEn = Date.now();
+    }
+  } catch (err) {
+    // sin conexión: se siguen usando las fichas del último historial guardado
+  }
+  refrescarAtajosMateriales();
+}
+
+function modelosDelCatalogo() {
+  return (materialesCatalogo || []).flatMap((c) => (c.modelos || []).map((m) => ({ modelo: m, categoria: c.categoria })));
+}
+
+// Los 8 materiales más usados (o retirados) del técnico logueado en los
+// últimos 120 días; si tiene pocos, se completa con lo más usado por el equipo.
+function materialesFrecuentes(tipo) {
+  const campo = tipo === "usados" ? "i" : "r";
+  const limite = Date.now() - 120 * 86400000;
+  const propios = new Map();
+  const todos = new Map();
+  stockMaterialesHist.forEach((m) => {
+    if (!m[campo]) return;
+    const t = Date.parse(m.fecha);
+    if (t && t < limite) return;
+    const k = normMat(m.modelo);
+    const sumar = (mapa) => {
+      const e = mapa.get(k) || { modelo: m.modelo, partes: new Set() };
+      e.partes.add(m.parte);
+      mapa.set(k, e);
+    };
+    sumar(todos);
+    if (tecnicoLogueado && coincideNombreTecnico(m.tecnico, tecnicoLogueado)) sumar(propios);
+  });
+  const ordenar = (mapa) => [...mapa.values()].sort((a, b) => b.partes.size - a.partes.size || a.modelo.localeCompare(b.modelo));
+  const catalogo = modelosDelCatalogo();
+  const salida = [];
+  const vistos = new Set();
+  [ordenar(propios), ordenar(todos)].forEach((lista) => lista.forEach((e) => {
+    const k = normMat(e.modelo);
+    if (salida.length >= 8 || vistos.has(k)) return;
+    vistos.add(k);
+    const canon = catalogo.find((x) => normMat(x.modelo) === k);
+    salida.push(canon ? canon.modelo : e.modelo);
+  }));
+  return salida;
+}
+
+function listaMateriales(tipo) { return tipo === "usados" ? materialesAgregados : materialesRetiradosAgregados; }
+
+function agregarMaterialRapido(tipo, modelo) {
+  const nombre = String(modelo || "").trim();
+  if (!nombre) return;
+  const arr = listaMateriales(tipo);
+  const k = normMat(nombre);
+  const canon = modelosDelCatalogo().find((x) => normMat(x.modelo) === k);
+  const existente = arr.find((i) => normMat(i.modelo) === k);
+  if (existente) existente.cantidad += 1;
+  else arr.push({ modelo: canon ? canon.modelo : nombre, cantidad: 1, manual: !canon });
+  if (tipo === "usados") renderMaterialesAgregados(); else renderMaterialesRetiradosAgregados();
+  guardarBorradorActual();
+}
+
+function renderListaMateriales(el, arr, tipo) {
+  el.innerHTML = "";
+  arr.forEach((item, idx) => {
+    const fila = document.createElement("div");
+    fila.className = "material-agregado-item";
+    fila.innerHTML = `
+      <span class="mat-fila-nombre">${escapeHtml(item.modelo)}${item.manual ? ' <span class="badge-material-manual">Manual</span>' : ""}</span>
+      <span class="mat-fila-cant">
+        <button type="button" class="mat-menos" aria-label="Restar uno">−</button>
+        <b>x${item.cantidad}</b>
+        <button type="button" class="mat-mas" aria-label="Sumar uno">+</button>
+      </span>
+      <button type="button" class="quitar" title="Quitar">✕</button>
+    `;
+    const redibujar = () => { (tipo === "usados" ? renderMaterialesAgregados : renderMaterialesRetiradosAgregados)(); guardarBorradorActual(); };
+    fila.querySelector(".mat-menos").addEventListener("click", () => { if (item.cantidad > 1) { item.cantidad -= 1; redibujar(); } });
+    fila.querySelector(".mat-mas").addEventListener("click", () => { item.cantidad += 1; redibujar(); });
+    fila.querySelector(".quitar").addEventListener("click", () => { arr.splice(idx, 1); redibujar(); });
+    el.appendChild(fila);
+  });
+  try { refrescarAtajosMateriales(); } catch (e) { /* aún no cargó */ }
+}
+
+function refrescarAtajosMateriales() {
+  [["usados", "Usados"], ["retirados", "Retirados"]].forEach(([tipo, T]) => {
+    const wrap = document.getElementById("matRapidos" + T + "Wrap");
+    const cont = document.getElementById("matRapidos" + T);
+    if (!wrap || !cont) return;
+    const frecuentes = materialesFrecuentes(tipo);
+    wrap.classList.toggle("hidden", frecuentes.length === 0);
+    const arr = listaMateriales(tipo);
+    cont.innerHTML = "";
+    frecuentes.forEach((nombre) => {
+      const k = normMat(nombre);
+      const ya = arr.find((i) => normMat(i.modelo) === k);
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "mat-chip" + (ya ? " activo" : "");
+      b.dataset.modelo = nombre;
+      b.innerHTML = `${escapeHtml(nombre)}${ya ? ` <span class="mat-chip-n">×${ya.cantidad}</span>` : ""}`;
+      cont.appendChild(b);
+    });
+  });
+  const copiar = document.getElementById("matRetCopiarBtn");
+  if (copiar) copiar.classList.toggle("hidden", materialesAgregados.length === 0);
+}
+
+function buscarMateriales(texto) {
+  const tokens = normMat(texto).split(" ").filter(Boolean);
+  if (tokens.length === 0) return [];
+  const pool = [];
+  const vistos = new Set();
+  modelosDelCatalogo().forEach((x) => { vistos.add(normMat(x.modelo)); pool.push(x); });
+  // también lo que ya se cargó a mano en otros partes
+  stockMaterialesHist.forEach((m) => {
+    const k = normMat(m.modelo);
+    if (!vistos.has(k)) { vistos.add(k); pool.push({ modelo: m.modelo, categoria: "Usado antes" }); }
+  });
+  return pool
+    .filter((x) => { const h = normMat(x.modelo + " " + x.categoria); return tokens.every((t) => h.includes(t)); })
+    .slice(0, 6);
+}
+
+function montarBuscadorMateriales(tipo, T) {
+  const input = document.getElementById("matBuscar" + T);
+  const resultados = document.getElementById("matResultados" + T);
+  const cont = document.getElementById("matRapidos" + T);
+  if (!input || !resultados || !cont) return;
+  const cerrar = () => { resultados.classList.add("hidden"); resultados.innerHTML = ""; };
+  input.addEventListener("input", () => {
+    const q = input.value.trim();
+    if (!q) { cerrar(); return; }
+    const hallados = buscarMateriales(q);
+    const exacto = hallados.some((x) => normMat(x.modelo) === normMat(q));
+    resultados.innerHTML = hallados.map((x) => `<button type="button" class="mat-resultado" data-modelo="${escapeHtml(x.modelo)}">${escapeHtml(x.modelo)}<small>${escapeHtml(x.categoria)}</small></button>`).join("")
+      + (exacto ? "" : `<button type="button" class="mat-resultado mat-resultado-nuevo" data-modelo="${escapeHtml(q)}">+ Agregar "${escapeHtml(q)}" como material nuevo</button>`);
+    resultados.classList.remove("hidden");
+    try { resultados.scrollIntoView({ block: "nearest" }); } catch (e) { /* navegador viejo */ }
+  });
+  input.addEventListener("keydown", (ev) => { if (ev.key === "Escape") { input.value = ""; cerrar(); } });
+  resultados.addEventListener("click", (ev) => {
+    const b = ev.target.closest(".mat-resultado");
+    if (!b) return;
+    agregarMaterialRapido(tipo, b.dataset.modelo);
+    input.value = "";
+    cerrar();
+  });
+  cont.addEventListener("click", (ev) => {
+    const b = ev.target.closest(".mat-chip");
+    if (b) agregarMaterialRapido(tipo, b.dataset.modelo);
+  });
+}
+montarBuscadorMateriales("usados", "Usados");
+montarBuscadorMateriales("retirados", "Retirados");
+document.getElementById("matRetCopiarBtn").addEventListener("click", () => {
+  let agregados = 0;
+  materialesAgregados.forEach((item) => {
+    if (!materialesRetiradosAgregados.some((r) => normMat(r.modelo) === normMat(item.modelo))) {
+      materialesRetiradosAgregados.push({ modelo: item.modelo, cantidad: item.cantidad, manual: !!item.manual });
+      agregados++;
+    }
+  });
+  renderMaterialesRetiradosAgregados();
+  guardarBorradorActual();
+  showToast(agregados ? "Copiado a retirados. Ajustá las cantidades si hace falta." : "Ya estaban todos en retirados.");
+});
+
 function poblarCategoriasMaterialesRetirados() {
   const opciones = materialesCatalogo.map((c) => `<option value="${c.categoria}">${c.categoria}</option>`).join("");
   matRetCategoriaSelect.innerHTML = `<option value="" disabled selected>Categoría</option>${opciones}`;
@@ -2476,20 +2654,7 @@ matRetVolverCatalogoBtn.addEventListener("click", () => {
 });
 
 function renderMaterialesRetiradosAgregados() {
-  materialesRetiradosAgregadosList.innerHTML = "";
-  materialesRetiradosAgregados.forEach((item, idx) => {
-    const fila = document.createElement("div");
-    fila.className = "material-agregado-item";
-    fila.innerHTML = `
-      <span>${escapeHtml(item.modelo)} — x${item.cantidad}${item.manual ? ' <span class="badge-material-manual">Manual</span>' : ""}</span>
-      <button type="button" class="quitar" title="Quitar">✕</button>
-    `;
-    fila.querySelector(".quitar").addEventListener("click", () => {
-      materialesRetiradosAgregados.splice(idx, 1);
-      renderMaterialesRetiradosAgregados();
-    });
-    materialesRetiradosAgregadosList.appendChild(fila);
-  });
+  renderListaMateriales(materialesRetiradosAgregadosList, materialesRetiradosAgregados, "retirados");
 }
 
 agregarMaterialRetiradoBtn.addEventListener("click", () => {

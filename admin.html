@@ -435,6 +435,12 @@
 
       <p class="status" id="materialesStatus"></p>
 
+      <div id="materialesSugeridosCard" class="card hidden" style="margin-bottom:16px;">
+        <h2 style="margin:0 0 4px; font-size:16px;">Materiales cargados a mano que se repiten</h2>
+        <p class="subtitle" style="margin:0 0 10px;">Los técnicos los escribieron a mano en 3 partes o más. Agregalos al catálogo para que les salgan como opción fija. Después tocá «Guardar cambios».</p>
+        <div id="materialesSugeridosLista"></div>
+      </div>
+
       <div id="categoriasFilas"></div>
 
       <button id="agregarCategoriaBtn" type="button" class="btn-secondary-admin" style="margin-bottom:14px;">+ Agregar categoría</button>
@@ -1438,6 +1444,7 @@ async function cargarMaterialesAdmin() {
 
     const lista = Array.isArray(data) && data.length > 0 ? data : MATERIALES_RESPALDO;
     lista.forEach((c) => renderFilaCategoria(c.categoria, c.modelos));
+    cargarSugeridosMateriales(lista);
     materialesStatus.textContent = Array.isArray(data) && data.length > 0
       ? ""
       : "Todavía no se guardó ningún catálogo — se precargó con categorías de ejemplo. Editalas y guardá para publicarlo.";
@@ -1446,6 +1453,115 @@ async function cargarMaterialesAdmin() {
     MATERIALES_RESPALDO.forEach((c) => renderFilaCategoria(c.categoria, c.modelos));
     materialesStatus.textContent = "No se pudo conectar — se muestra un catálogo de respaldo. Revisalo antes de guardar.";
   }
+}
+
+// ---------- Sugerencias: materiales escritos a mano que se repiten ----------
+const MIN_PARTES_SUGERIDO = 3;
+const materialesSugeridosCard = document.getElementById("materialesSugeridosCard");
+const materialesSugeridosLista = document.getElementById("materialesSugeridosLista");
+
+function normMatAdmin(s) { return normalizeTextAdmin(String(s || "")).replace(/\s+/g, " ").trim(); }
+function ignoradosMaterialesAdmin() {
+  try { return JSON.parse(localStorage.getItem("materiales_ignorados_admin") || "[]"); } catch (e) { return []; }
+}
+function nombresCategoriasAdmin() {
+  return Array.from(categoriasFilas.querySelectorAll(".categoria-nombre")).map((i) => i.value.trim()).filter(Boolean);
+}
+function categoriaSugeridaPara(nombre) {
+  const prefijos = normMatAdmin(nombre).split(" ").filter((w) => w.length >= 4).map((w) => w.slice(0, 4));
+  let mejor = "", mejorPuntaje = 0;
+  nombresCategoriasAdmin().forEach((c) => {
+    const nc = normMatAdmin(c);
+    const puntaje = prefijos.filter((p) => nc.includes(p)).length;
+    if (puntaje > mejorPuntaje) { mejor = c; mejorPuntaje = puntaje; }
+  });
+  return mejor;
+}
+
+// Devuelve [{nombre, partes, tecnicos[], ultima}] — solo lo que NO está en el catálogo
+function agruparMaterialesManuales(movimientos, catalogo) {
+  const enCatalogo = new Set();
+  catalogo.forEach((c) => (c.modelos || []).forEach((m) => enCatalogo.add(normMatAdmin(m))));
+  const grupos = new Map();
+  movimientos.forEach((m) => {
+    const nombre = String(m.modelo || "").trim();
+    if (!nombre) return;
+    const k = normMatAdmin(nombre);
+    if (enCatalogo.has(k)) return;
+    const g = grupos.get(k) || { variantes: new Map(), partes: new Set(), tecnicos: new Set(), ultima: "" };
+    g.variantes.set(nombre, (g.variantes.get(nombre) || 0) + 1);
+    g.partes.add(m.parte_id || ((m.numero_servicio || "") + "|" + (m.fecha || "")) || String(m.id || ""));
+    if (m.tecnico) g.tecnicos.add(m.tecnico);
+    if ((m.fecha || "") > g.ultima) g.ultima = m.fecha || "";
+    grupos.set(k, g);
+  });
+  const ignorados = new Set(ignoradosMaterialesAdmin());
+  return [...grupos.entries()]
+    .filter(([k, g]) => g.partes.size >= MIN_PARTES_SUGERIDO && !ignorados.has(k))
+    .map(([k, g]) => ({
+      clave: k,
+      nombre: [...g.variantes.entries()].sort((a, b) => b[1] - a[1])[0][0],
+      partes: g.partes.size,
+      tecnicos: [...g.tecnicos],
+      ultima: g.ultima,
+    }))
+    .sort((a, b) => b.partes - a.partes || a.nombre.localeCompare(b.nombre));
+}
+
+function renderSugeridosMateriales(sugeridos) {
+  materialesSugeridosCard.classList.toggle("hidden", sugeridos.length === 0);
+  materialesSugeridosLista.innerHTML = "";
+  sugeridos.forEach((sug) => {
+    const fila = document.createElement("div");
+    fila.className = "sugerido-material";
+    fila.style.cssText = "border-top:1px solid #E2E5DC; padding:10px 0;";
+    const sugerida = categoriaSugeridaPara(sug.nombre);
+    const opciones = nombresCategoriasAdmin().map((c) => `<option value="${escapeHtmlAdmin(c)}"${c === sugerida ? " selected" : ""}>${escapeHtmlAdmin(c)}</option>`).join("");
+    fila.innerHTML = `
+      <div style="font-weight:600;">${escapeHtmlAdmin(sug.nombre)}</div>
+      <div style="font-size:12px; opacity:.75; margin:2px 0 8px;">${sug.partes} partes · ${sug.tecnicos.length} técnico(s)${sug.tecnicos.length ? ": " + escapeHtmlAdmin(sug.tecnicos.slice(0, 4).join(", ")) : ""}${sug.ultima ? " · último: " + escapeHtmlAdmin(sug.ultima) : ""}</div>
+      <div class="field-row" style="align-items:center; gap:8px; flex-wrap:wrap;">
+        <select class="sug-categoria" style="flex:1; min-width:160px;">
+          <option value="" disabled${sugerida ? "" : " selected"}>Elegí la categoría</option>${opciones}<option value="__nueva__">+ Categoría nueva…</option>
+        </select>
+        <button type="button" class="sug-agregar">Agregar al catálogo</button>
+        <button type="button" class="btn-secondary-admin sug-ignorar">Ignorar</button>
+      </div>`;
+    fila.querySelector(".sug-ignorar").addEventListener("click", () => {
+      const lista = ignoradosMaterialesAdmin(); lista.push(sug.clave);
+      try { localStorage.setItem("materiales_ignorados_admin", JSON.stringify(lista)); } catch (e) { /* sin almacenamiento */ }
+      fila.remove(); if (!materialesSugeridosLista.children.length) materialesSugeridosCard.classList.add("hidden");
+    });
+    fila.querySelector(".sug-agregar").addEventListener("click", () => {
+      let cat = fila.querySelector(".sug-categoria").value;
+      if (!cat) { materialesStatus.className = "status err"; materialesStatus.textContent = "Elegí una categoría para «" + sug.nombre + "»."; return; }
+      if (cat === "__nueva__") {
+        cat = (prompt("Nombre de la categoría nueva:") || "").trim();
+        if (!cat) return;
+        renderFilaCategoria(cat, []);
+      }
+      const filaCat = Array.from(categoriasFilas.querySelectorAll(".categoria-fila"))
+        .find((f) => f.querySelector(".categoria-nombre").value.trim() === cat);
+      if (!filaCat) return;
+      const area = filaCat.querySelector(".categoria-modelos");
+      area.value = (area.value.trim() ? area.value.trim() + "\n" : "") + sug.nombre;
+      materialesStatus.className = "status ok";
+      materialesStatus.textContent = "«" + sug.nombre + "» agregado a «" + cat + "». Falta tocar «Guardar cambios» para publicarlo.";
+      fila.remove(); if (!materialesSugeridosLista.children.length) materialesSugeridosCard.classList.add("hidden");
+    });
+    materialesSugeridosLista.appendChild(fila);
+  });
+}
+
+async function cargarSugeridosMateriales(catalogo) {
+  materialesSugeridosCard.classList.add("hidden");
+  try {
+    const res = await fetch("/api/historial?tipo=stock", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!Array.isArray(data)) return;
+    renderSugeridosMateriales(agruparMaterialesManuales(data, catalogo));
+  } catch (err) { /* sin sugerencias si no hay conexión */ }
 }
 
 agregarCategoriaBtn.addEventListener("click", () => renderFilaCategoria("", []));

@@ -247,3 +247,79 @@ test("Parte: la tarea a realizar queda fija y 'Tarea realizada' arranca vacía, 
     await ctx.close();
   }
 });
+
+const STOCK_PRUEBA = (() => {
+  const hoy = new Date().toISOString().slice(0, 10);
+  const m = [];
+  for (let i = 0; i < 4; i++) m.push({ modelo: "Batería 12V 7Ah", tecnico: "Juan Pérez", fecha: hoy, parte_id: "p" + i, cantidad_instalada: 1, cantidad_retirada: 1 });
+  for (let i = 0; i < 3; i++) m.push({ modelo: "Sirena exterior", tecnico: "Juan Pérez", fecha: hoy, parte_id: "q" + i, cantidad_instalada: 1, cantidad_retirada: 0 });
+  for (let i = 0; i < 2; i++) m.push({ modelo: "Fuente 12V 2A", tecnico: "Otro Técnico", fecha: hoy, parte_id: "r" + i, cantidad_instalada: 1, cantidad_retirada: 0 });
+  return m;
+})();
+const CATALOGO_PRUEBA = [{ categoria: "Baterías", modelos: ["Batería 12V 7Ah", "Batería 12V 4Ah"] }, { categoria: "Sirenas", modelos: ["Sirena interior", "Sirena exterior"] }];
+
+test("Materiales: fichas 'Más usados', cantidad en la fila, buscador y 'Retiré lo mismo' (ambos skins)", async () => {
+  for (const estilo of ["clasico", "nuevo"]) {
+    const { ctx, page, erroresPagina } = await nuevaPagina();
+    await page.route("**/api/**", (route) => {
+      const u = route.request().url();
+      const cuerpo = u.includes("tipo=stock") ? STOCK_PRUEBA : u.includes("coleccion=materiales") ? CATALOGO_PRUEBA : {};
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(cuerpo) });
+    });
+    await page.goto(base + "/");
+    await page.evaluate((e) => localStorage.setItem("ajustes_app", JSON.stringify({ estiloInicio: e, avisoFelicitacion: false })), estilo);
+    await page.reload();
+    await page.waitForTimeout(500);
+    await page.evaluate(() => { tecnicoLogueado = "Juan Pérez"; seleccionarServicio({ numero_servicio: "1", cliente: "X", direccion: "Y", tarea: "t" }); showScreen("form"); });
+    await page.waitForTimeout(700);
+    const fichas = await page.locator("#matRapidosUsados .mat-chip").allTextContents();
+    assert.match(fichas[0], /Batería 12V 7Ah/, estilo);
+    assert.match(fichas[1], /Sirena exterior/, estilo);
+    assert.ok(fichas.some((t) => /Fuente 12V 2A/.test(t)), estilo + ": completa con lo del equipo");
+    await page.click("#matRapidosUsados .mat-chip >> nth=0");
+    await page.click("#matRapidosUsados .mat-chip >> nth=0");
+    assert.deepStrictEqual(await page.evaluate(() => materialesAgregados.map((m) => [m.modelo, m.cantidad, m.manual])), [["Batería 12V 7Ah", 2, false]], estilo);
+    await page.click("#materialesAgregadosList .mat-menos");
+    await page.click("#materialesAgregadosList .mat-mas");
+    await page.click("#materialesAgregadosList .mat-mas");
+    assert.strictEqual(await page.evaluate(() => materialesAgregados[0].cantidad), 3, estilo + ": stepper de la fila");
+    await page.fill("#matBuscarUsados", "sir ext");
+    await page.click("#matResultadosUsados .mat-resultado >> nth=0");
+    assert.strictEqual(await page.evaluate(() => materialesAgregados.length), 2, estilo + ": buscador agrega del catálogo");
+    await page.fill("#matBuscarUsados", "cable utp");
+    await page.click("#matResultadosUsados .mat-resultado-nuevo");
+    assert.deepStrictEqual(await page.evaluate(() => { const u = materialesAgregados[2]; return [u.modelo, u.manual]; }), ["cable utp", true], estilo + ": material nuevo queda como manual");
+    await page.click("#matRetCopiarBtn");
+    assert.strictEqual(await page.evaluate(() => materialesRetiradosAgregados.length), 3, estilo + ": copia a retirados");
+    assert.match(await page.evaluate(() => getMaterialesUtilizados()), /Batería 12V 7Ah x3, Sirena exterior x1, cable utp x1/, estilo);
+    assert.deepStrictEqual(erroresPagina, [], estilo);
+    await ctx.close();
+  }
+});
+
+test("Admin: detecta materiales escritos a mano que se repiten y los agrega al catálogo", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(500);
+  const sug = await page.evaluate(({ stock, cat }) => {
+    const s = stock.concat([1, 2, 3].map((i) => ({ modelo: "  cable   UTP cat6 ", tecnico: "Ana", fecha: "2026-10-01", parte_id: "u" + i })), [1, 2].map((i) => ({ modelo: "Tornillo", tecnico: "Ana", fecha: "2026-10-01", parte_id: "t" + i })));
+    return agruparMaterialesManuales(s, cat).map((g) => [g.nombre.trim(), g.partes]);
+  }, { stock: STOCK_PRUEBA, cat: CATALOGO_PRUEBA });
+  assert.deepStrictEqual(sug, [["cable   UTP cat6", 3]], "solo lo que no está en el catálogo y se repite 3+ veces");
+  await page.evaluate((cat) => {
+    document.getElementById("mainCard").classList.remove("hidden");
+    document.getElementById("panelMateriales").classList.remove("hidden");
+    cat.forEach((c) => renderFilaCategoria(c.categoria, c.modelos));
+    renderFilaCategoria("Cables", ["Cable coaxil"]);
+    renderSugeridosMateriales([{ clave: "cable utp cat6", nombre: "Cable UTP cat6", partes: 3, tecnicos: ["Ana"], ultima: "2026-10-01" }]);
+  }, CATALOGO_PRUEBA);
+  assert.strictEqual(await page.locator("#materialesSugeridosCard").isVisible(), true);
+  assert.strictEqual(await page.inputValue("#materialesSugeridosLista .sug-categoria"), "Cables", "sugiere la categoría por parecido de nombre");
+  await page.click("#materialesSugeridosLista .sug-agregar");
+  const modelos = await page.evaluate(() => Array.from(document.querySelectorAll(".categoria-fila")).map((f) => f.querySelector(".categoria-modelos").value));
+  assert.ok(modelos.some((v) => v.includes("Cable coaxil") && v.includes("Cable UTP cat6")));
+  assert.strictEqual(await page.locator("#materialesSugeridosCard").isVisible(), false);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
