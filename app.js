@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.126.0";
+const APP_VERSION = "3.126.1";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -1460,10 +1460,15 @@ async function sincronizarServiciosVistos(lista) {
   const headers = { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN };
   try {
     const numeros = (lista || []).map((i) => String(i.numero_servicio || "").trim()).filter(Boolean);
+    const desde = {};
+    (lista || []).forEach((i) => {
+      const f = parsearFechaIngreso(i.fecha_ingreso);
+      if (f && i.numero_servicio) desde[String(i.numero_servicio).trim()] = f.toISOString();
+    });
     const faltan = numeros.some((n) => !serviciosVistos[n]);
     const hace = Date.now() - Number(localStorage.getItem("servicios_vistos_sync") || 0);
     if (!faltan && hace < 6 * 3600 * 1000) return;
-    await fetch(url, { method: "POST", headers, body: JSON.stringify({ accion: "registrar", numeros }) });
+    await fetch(url, { method: "POST", headers, body: JSON.stringify({ accion: "registrar", numeros, desde }) });
     const res = await fetch(url, { headers, cache: "no-store" });
     if (!res.ok) return;
     const mapa = await res.json();

@@ -759,11 +759,20 @@ module.exports = async (req, res) => {
         const ahora = Date.now();
         const iso = new Date(ahora).toISOString();
         let cambio = false;
+        // Solo la primera vez que se usa el registro (vacío) se siembra con la
+        // fecha de ingreso de cada servicio (body.desde[numero]); después, todo
+        // servicio nuevo cuenta desde que aparece en la app.
+        const sembrar = Object.keys(mapa).length === 0 && body.desde && typeof body.desde === "object";
         body.numeros.slice(0, 2000).forEach((n) => {
           const k = String(n || "").trim().slice(0, 40);
           if (!k) return;
           if (!mapa[k]) {
-            mapa[k] = { primera: iso, ultima: iso };
+            let primera = iso;
+            if (sembrar) {
+              const t = Date.parse(body.desde[k]);
+              if (t && t <= ahora && ahora - t < 3650 * 86400000) primera = new Date(t).toISOString();
+            }
+            mapa[k] = { primera, ultima: iso };
             cambio = true;
           } else if (!mapa[k].ultima || ahora - Date.parse(mapa[k].ultima) > 86400000) {
             mapa[k].ultima = iso;
