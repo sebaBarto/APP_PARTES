@@ -121,3 +121,18 @@ test("el estilo del inicio (Nuevo/Clásico) se elige en Ajustes y se recuerda", 
   assert.strictEqual(await estilo(), "nuevo");
   await ctx.close();
 });
+
+test("el skin nuevo se aplica también en los submenús, y el clásico no los toca", async () => {
+  const { ctx, page } = await nuevaPagina();
+  await page.goto(base + "/");
+  await page.waitForTimeout(400);
+  const radio = (n) => page.evaluate((id) => { showScreen(id); const t = document.querySelector("#screen-" + (id === "serviciosMenu" ? "servicios-menu" : "dashboards-menu") + " .panel-tile-icon-badge"); return getComputedStyle(t).backgroundColor; }, n);
+  const transparente = (c) => c === "rgba(0, 0, 0, 0)" || c === "transparent";
+  assert.ok(!transparente(await radio("serviciosMenu")), "en clásico los iconos llevan fondo de color");
+  await page.evaluate(() => { localStorage.setItem("ajustes_app", JSON.stringify({ estiloInicio: "nuevo" })); });
+  await page.reload();
+  await page.waitForTimeout(400);
+  assert.ok(transparente(await radio("serviciosMenu")), "servicios: icono sin fondo en el nuevo");
+  assert.ok(transparente(await radio("dashboardsMenu")), "dashboards: icono sin fondo en el nuevo");
+  await ctx.close();
+});

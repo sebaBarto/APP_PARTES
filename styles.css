@@ -2019,66 +2019,95 @@ html body .bloqueo-overlay .btn-ghost { background: transparent; color: #F4F5F0;
    INICIO (screen-home) — rediseño "panel de alarma"
    Una sola pieza protagonista (Servicios Técnicos, ámbar); el resto
    son teclas oscuras y planas con el ícono en línea, sin la paleta
-   arcoíris de antes. Escopeado a #screen-home: los submenús que
+   arcoíris de antes. Escopeado a las pantallas de menú (inicio y submenús): los submenús que
    comparten .panel-tile no cambian.
    ============================================================ */
-html[data-inicio="nuevo"] #screen-home {
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) {
   --t-bg: #17212B; --t-bd: #2A3743; --t-fg: #F4F5F0; --t-ic: #9FB3C2; --t-press: #223140;
 }
-html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) #screen-home {
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) {
   --t-bg: #FFFFFF; --t-bd: #D5D9CF; --t-fg: #101820; --t-ic: #4A5F6E; --t-press: #FFF3D6;
 }
-html[data-inicio="nuevo"][data-theme="contraste"] #screen-home { --t-bd: #101820; --t-ic: #101820; }
+html[data-inicio="nuevo"][data-theme="contraste"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) { --t-bd: #101820; --t-ic: #101820; }
 
-html[data-inicio="nuevo"] #screen-home .home-cabecera { display: flex; align-items: center; gap: 16px; margin: 6px 0 18px; }
-html[data-inicio="nuevo"] #screen-home .panel-home-logo { width: 84px; max-width: none; margin: 0; flex-shrink: 0; }
-html[data-inicio="nuevo"] #screen-home .home-saludo-wrap { min-width: 0; }
-html[data-inicio="nuevo"] #screen-home .panel-saludo {
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .home-cabecera { display: flex; align-items: center; gap: 16px; margin: 6px 0 18px; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-home-logo { width: 84px; max-width: none; margin: 0; flex-shrink: 0; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .home-saludo-wrap { min-width: 0; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-saludo {
   text-align: left; margin: 0;
   font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 26px; line-height: 1.1;
   color: var(--t-fg); letter-spacing: -0.01em;
 }
-html[data-inicio="nuevo"] #screen-home .home-fecha { margin: 4px 0 0; font-family: 'Inter', sans-serif; font-size: 13px; color: var(--t-ic); }
-html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) #screen-home .panel-saludo { color: #101820; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .home-fecha { margin: 4px 0 0; font-family: 'Inter', sans-serif; font-size: 13px; color: var(--t-ic); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-saludo { color: #101820; }
 
-html[data-inicio="nuevo"] #screen-home .panel-tiles.panel-tiles-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 0; }
-html[data-inicio="nuevo"] #screen-home .panel-tiles-grid { container-type: inline-size; }
-html[data-inicio="nuevo"] #screen-home .panel-tile-grid .panel-tile-label { min-width: 0; overflow-wrap: break-word; }
-html[data-inicio="nuevo"] #screen-home .panel-tile.panel-tile-grid {
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tiles.panel-tiles-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 0; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tiles-grid { container-type: inline-size; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tile-grid .panel-tile-label { min-width: 0; overflow-wrap: break-word; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tile.panel-tile-grid {
   flex-direction: row; justify-content: flex-start; align-items: center; gap: 12px;
   min-height: 64px; padding: 10px 14px;
   background: var(--t-bg); border: 1px solid var(--t-bd); border-radius: 14px;
   box-shadow: none; color: var(--t-fg);
 }
-html[data-inicio="nuevo"] #screen-home .panel-tile.panel-tile-grid:active { background: var(--t-press); border-color: #F5A623; transform: scale(0.97); }
-html[data-inicio="nuevo"] #screen-home .panel-tile-icon-badge { width: 28px; height: 28px; border-radius: 0; background: transparent; }
-html[data-inicio="nuevo"] #screen-home .panel-tile-icon-badge svg { width: 24px; height: 24px; stroke: var(--t-ic); }
-html[data-inicio="nuevo"] #screen-home .panel-tile-grid .panel-tile-label {
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tile.panel-tile-grid:active { background: var(--t-press); border-color: #F5A623; transform: scale(0.97); }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tile-icon-badge { width: 28px; height: 28px; border-radius: 0; background: transparent; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tile-icon-badge svg { width: 24px; height: 24px; stroke: var(--t-ic); }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tile-grid .panel-tile-label {
   font-size: 14.5px; line-height: 1.15; text-align: left; color: var(--t-fg); letter-spacing: 0;
 }
-html[data-inicio="nuevo"][data-theme="contraste"] #screen-home .panel-tile-grid .panel-tile-label { color: #000; }
-html[data-inicio="nuevo"] #screen-home .panel-tile-count { top: 8px; right: 8px; box-shadow: none; }
+html[data-inicio="nuevo"][data-theme="contraste"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tile-grid .panel-tile-label { color: #000; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tile-count { top: 8px; right: 8px; box-shadow: none; }
 
 /* La pieza protagonista: el trabajo del día */
-html[data-inicio="nuevo"] #screen-home .panel-tile.panel-tile-grid.tile-servicios {
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tile.panel-tile-grid:is(.tile-servicios, .tile-servicios-pendientes) {
   grid-column: 1 / -1; min-height: 88px; padding: 14px 18px; gap: 16px;
   background: #F5A623; border-color: #F5A623; border-radius: 18px;
 }
-html[data-inicio="nuevo"] #screen-home .tile-servicios .panel-tile-icon-badge { width: 36px; height: 36px; background: transparent; }
-html[data-inicio="nuevo"] #screen-home .tile-servicios .panel-tile-icon-badge svg { width: 34px; height: 34px; stroke: #101820; stroke-width: 2.2; }
-html[data-inicio="nuevo"] #screen-home .tile-servicios .panel-tile-label { font-size: 21px; font-weight: 700; color: #101820; }
-html[data-inicio="nuevo"] #screen-home .panel-tile.panel-tile-grid.tile-servicios:active { background: #E39A1E; border-color: #E39A1E; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) :is(.tile-servicios, .tile-servicios-pendientes) .panel-tile-icon-badge { width: 36px; height: 36px; background: transparent; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) :is(.tile-servicios, .tile-servicios-pendientes) .panel-tile-icon-badge svg { width: 34px; height: 34px; stroke: #101820; stroke-width: 2.2; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) :is(.tile-servicios, .tile-servicios-pendientes) .panel-tile-label { font-size: 21px; font-weight: 700; color: #101820; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tile.panel-tile-grid:is(.tile-servicios, .tile-servicios-pendientes):active { background: #E39A1E; border-color: #E39A1E; }
 
 /* Ajustes de accesibilidad existentes */
-html[data-inicio="nuevo"][data-botones="grandes"] #screen-home .panel-tile.panel-tile-grid { min-height: 76px; padding: 12px 16px; }
-html[data-inicio="nuevo"][data-botones="grandes"] #screen-home .panel-tile-grid .panel-tile-label { font-size: 16px; }
-html[data-inicio="nuevo"][data-botones="grandes"] #screen-home .panel-tile-icon-badge { width: 32px; height: 32px; }
-html[data-inicio="nuevo"][data-botones="grandes"] #screen-home .panel-tile-icon-badge svg { width: 28px; height: 28px; }
+html[data-inicio="nuevo"][data-botones="grandes"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tile.panel-tile-grid { min-height: 76px; padding: 12px 16px; }
+html[data-inicio="nuevo"][data-botones="grandes"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tile-grid .panel-tile-label { font-size: 16px; }
+html[data-inicio="nuevo"][data-botones="grandes"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tile-icon-badge { width: 32px; height: 32px; }
+html[data-inicio="nuevo"][data-botones="grandes"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tile-icon-badge svg { width: 28px; height: 28px; }
 
 /* Pantallas angostas o letra grande: el ícono pasa arriba del nombre para que no se corten las palabras */
 @container (max-width: 345px) {
-  html[data-inicio="nuevo"] #screen-home .panel-tile.panel-tile-grid:not(.tile-servicios) { flex-direction: column; align-items: flex-start; justify-content: center; gap: 8px; min-height: 84px; padding: 12px 14px; }
-  html[data-inicio="nuevo"] #screen-home .panel-tile-grid:not(.tile-servicios) .panel-tile-label { width: 100%; }
+  html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tile.panel-tile-grid:not(.tile-servicios):not(.tile-servicios-pendientes) { flex-direction: column; align-items: flex-start; justify-content: center; gap: 8px; min-height: 84px; padding: 12px 14px; }
+  html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tile-grid:not(.tile-servicios):not(.tile-servicios-pendientes) .panel-tile-label { width: 100%; }
+}
+
+
+/* Submenús con el mismo estilo: fondo, título y estados */
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) { --t-page: #101820; --st-ok: #5FD08A; --st-uso: #F5A623; --st-cli: #D9B25A; }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) { --t-page: #EEF0EA; --st-ok: #1F7A3D; --st-uso: #A9680F; --st-cli: #7A5B10; }
+html[data-inicio="nuevo"] :is(#screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .review-scroll { background: var(--t-page); color: var(--t-fg); }
+html[data-inicio="nuevo"] :is(#screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .review-eyebrow {
+  display: block; margin: 6px 0 18px; padding: 0;
+  font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 26px; line-height: 1.1;
+  letter-spacing: -0.01em; color: var(--t-fg); text-transform: lowercase;
+}
+html[data-inicio="nuevo"] :is(#screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .review-eyebrow::first-letter { text-transform: uppercase; }
+html[data-inicio="nuevo"] :is(#screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .review-eyebrow::before { display: none; }
+html[data-inicio="nuevo"] :is(#screen-vehiculos, #screen-herramientas) .list-status { color: var(--t-ic); }
+
+/* Teclas con estado (vehículos y herramientas): ícono a la izquierda, nombre y estado apilados */
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tile.panel-tile-grid:has(.vehiculo-panel-status) {
+  display: grid; grid-template-columns: 28px minmax(0, 1fr); grid-template-areas: "ic nombre" "ic estado";
+  column-gap: 12px; row-gap: 2px; align-items: center; align-content: center; min-height: 72px;
+}
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tile-grid:has(.vehiculo-panel-status) .panel-tile-icon-badge { grid-area: ic; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tile-grid:has(.vehiculo-panel-status) .panel-tile-label { grid-area: nombre; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tile-grid .vehiculo-panel-status { grid-area: estado; text-align: left; font-size: 12px; line-height: 1.25; margin: 0; color: var(--t-ic) !important; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-vehiculo-libre .vehiculo-panel-status, html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-herr-libre .vehiculo-panel-status { color: var(--st-ok) !important; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-vehiculo-en-uso .vehiculo-panel-status, html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-herr-uso .vehiculo-panel-status { color: var(--st-uso) !important; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-herr-cliente .vehiculo-panel-status { color: var(--st-cli) !important; }
+@container (max-width: 345px) {
+  html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .panel-tile.panel-tile-grid:has(.vehiculo-panel-status) { grid-template-columns: minmax(0, 1fr); grid-template-areas: "ic" "nombre" "estado"; row-gap: 6px; }
 }
 
 /* ---- Estilo "Clásico" del inicio (elegible en Ajustes): cabecera de antes ---- */
@@ -2087,3 +2116,8 @@ html[data-inicio="nuevo"][data-botones="grandes"] #screen-home .panel-tile-icon-
 html[data-inicio="nuevo"] .home-cabecera { flex-direction: row; }
 html[data-inicio="nuevo"] .home-fecha { display: block; }
 html[data-inicio="nuevo"] .home-eyebrow-clasico { display: none; }
+
+/* Servicios técnicos: solo hay dos teclas, las dos a lo ancho */
+html[data-inicio="nuevo"] #screen-servicios-menu .panel-tile.panel-tile-grid { grid-column: 1 / -1; }
+html[data-inicio="nuevo"] #screen-servicios-menu .panel-tile.panel-tile-grid:not(.tile-servicios-pendientes) { min-height: 72px; padding: 14px 18px; }
+html[data-inicio="nuevo"] #screen-servicios-menu .panel-tile-grid:not(.tile-servicios-pendientes) .panel-tile-label { font-size: 16.5px; }
