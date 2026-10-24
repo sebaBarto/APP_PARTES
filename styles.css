@@ -2320,3 +2320,18 @@ html[data-inicio="nuevo"] .esqueleto-card:nth-child(2) { opacity: 0.8; }
 html[data-inicio="nuevo"] .esqueleto-card:nth-child(3) { opacity: 0.6; }
 @keyframes esqueleto-brillo { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
 @media (prefers-reduced-motion: reduce) { html[data-inicio="nuevo"] .esqueleto-card { animation: none; } }
+
+/* ---- Tarea a realizar (fija) + Tarea realizada (editable) — ambos skins ---- */
+.tarea-asignada-texto {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border-left: 4px solid #F5A623;
+  background: rgba(245, 166, 35, 0.14);
+  font-size: 14px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+html[data-inicio="nuevo"] #screen-form .tarea-asignada-texto { color: var(--p-ink, #101820); background: rgba(245, 166, 35, 0.16); }
+html[data-inicio="nuevo"][data-theme="night"] #screen-form .tarea-asignada-texto { color: var(--p-ink, #E8ECEF); }

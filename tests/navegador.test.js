@@ -227,3 +227,23 @@ test("Carga: el esqueleto aparece con 'Cargando...' solo en el skin nuevo y se v
   assert.strictEqual(await page.locator("#screen-vehiculos .esqueleto-card").count(), 0);
   await ctx.close();
 });
+
+test("Parte: la tarea a realizar queda fija y 'Tarea realizada' arranca vacía, en los dos skins", async () => {
+  for (const estilo of ["clasico", "nuevo"]) {
+    const { ctx, page } = await paginaConEstilo(estilo);
+    await page.evaluate(() => {
+      seleccionarServicio({ numero_servicio: "123", cliente: "Panadería Sur", direccion: "Mitre 100", localidad: "Rosario", tarea: "Revisar sirena que no suena" });
+      showScreen("form");
+    });
+    await page.waitForTimeout(300);
+    assert.strictEqual(await page.locator("#tareaAsignadaTexto").isVisible(), true, estilo);
+    assert.strictEqual((await page.locator("#tareaAsignadaTexto").textContent()).trim(), "Revisar sirena que no suena", estilo);
+    assert.strictEqual(await page.inputValue("#f_tarea"), "", estilo);
+    assert.strictEqual(await page.evaluate(() => getFormData().tarea), "Revisar sirena que no suena", estilo + ": sin escribir, se guarda la asignada");
+    await page.fill("#f_tarea", "Cambié la sirena");
+    assert.strictEqual(await page.evaluate(() => getFormData().tarea), "Cambié la sirena", estilo);
+    await page.evaluate(() => resetForm());
+    assert.strictEqual(await page.locator("#tareaAsignadaWrap").isVisible(), false, estilo + ": se oculta al limpiar");
+    await ctx.close();
+  }
+});

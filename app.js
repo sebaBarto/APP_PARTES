@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.120.0";
+const APP_VERSION = "3.121.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -637,6 +637,18 @@ let currentNumeroCliente = "";
 // reales de la lista (con número de servicio) — los partes cargados
 // con "Cargar parte sin servicio" no tienen una clave estable para
 // guardar un borrador, así que no se guardan.
+// "Tarea a realizar": lo que pidió el cliente / agendó la oficina. Se muestra
+// fija (no editable) arriba de "Tarea realizada", que queda vacía para que el
+// técnico escriba lo que hizo. Si no hay tarea asignada, el recuadro no aparece.
+let tareaAsignada = "";
+function setTareaAsignada(texto) {
+  tareaAsignada = String(texto || "").trim();
+  const wrap = document.getElementById("tareaAsignadaWrap");
+  const caja = document.getElementById("tareaAsignadaTexto");
+  if (caja) caja.textContent = tareaAsignada;
+  if (wrap) wrap.classList.toggle("hidden", !tareaAsignada);
+}
+
 function claveBorrador(numeroServicio) {
   return `borrador_parte_${numeroServicio}`;
 }
@@ -648,6 +660,7 @@ function armarBorrador() {
     localidad: document.getElementById("f_localidad").value,
     cliente_email: document.getElementById("f_cliente_email").value,
     tarea: document.getElementById("f_tarea").value,
+    tarea_asignada: tareaAsignada,
     materiales_otros: document.getElementById("f_materiales").value,
     materiales_agregados: materialesAgregados,
     materiales_retirados: document.getElementById("f_materiales_retirados").value,
@@ -717,6 +730,7 @@ function restaurarBorradorSiExiste(numeroServicio) {
   document.getElementById("f_localidad").value = b.localidad || "";
   document.getElementById("f_cliente_email").value = b.cliente_email || "";
   document.getElementById("f_tarea").value = b.tarea || "";
+  setTareaAsignada(b.tarea_asignada || "");
   document.getElementById("f_materiales").value = b.materiales_otros || "";
   materialesAgregados = Array.isArray(b.materiales_agregados) ? b.materiales_agregados : [];
   renderMaterialesAgregados();
@@ -1639,7 +1653,8 @@ function seleccionarServicio(item) {
   document.getElementById("f_cliente").value = item.cliente ?? "";
   document.getElementById("f_direccion").value = item.direccion ?? "";
   if (item.localidad) document.getElementById("f_localidad").value = item.localidad;
-  document.getElementById("f_tarea").value = item.tarea ?? "";
+  setTareaAsignada(item.tarea);
+  document.getElementById("f_tarea").value = "";
   actualizarBotonLlamar(item.telefono);
   actualizarBotonWhatsapp(item.telefono);
   actualizarBotonVerPlano(item.numero_cliente);
@@ -1858,7 +1873,8 @@ function seleccionarTareaCronograma(t) {
   document.getElementById("f_cliente").value = parsed.cliente;
   document.getElementById("f_direccion").value = parsed.direccion;
   if (parsed.localidad) document.getElementById("f_localidad").value = parsed.localidad;
-  document.getElementById("f_tarea").value = (t.tarea || "").replace(/\n/g, " ");
+  setTareaAsignada((t.tarea || "").replace(/\n/g, " "));
+  document.getElementById("f_tarea").value = "";
   actualizarBotonLlamar(null);
   actualizarBotonWhatsapp(null);
   autocompletarTecnico();
@@ -3052,7 +3068,8 @@ function getFormData() {
     direccion: document.getElementById("f_direccion").value.trim(),
     localidad: document.getElementById("f_localidad").value.trim(),
     cliente_email: document.getElementById("f_cliente_email").value.trim(),
-    tarea: document.getElementById("f_tarea").value.trim(),
+    // Si el técnico no escribió nada, se guarda la tarea asignada (como pasaba antes con el texto precargado).
+    tarea: document.getElementById("f_tarea").value.trim() || tareaAsignada,
     materiales: getMaterialesUtilizados(),
     sim_instalada_texto: getSimInstaladaTexto(),
     materiales_retirados: getMaterialesRetirados(),
@@ -3085,6 +3102,7 @@ function resetForm() {
   ["f_cliente","f_direccion","f_localidad","f_cliente_email","f_tarea",
    "f_materiales","f_materiales_retirados","f_importe","f_costo_final",
    "f_observaciones"].forEach(id => document.getElementById(id).value = "");
+  setTareaAsignada("");
   tecnicoSelect.value = "";
   tecnicoOtro.value = "";
   tecnicoOtro.style.display = "none";
