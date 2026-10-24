@@ -154,7 +154,10 @@ test("Próximo service: muestra la próxima tarea pendiente del técnico, saltea
       { tecnico: "Marcos Manuel Pellegrini", fecha: iso(man), hora_inicio: "11:30", tarea: "Servicio: Panadería Sur\nMitre 55  -  Funes" },
     ] });
     else if (u.includes("/api/historial")) body = JSON.stringify([{ numero_servicio: "123" }]);
-    else if (u.includes("/api/servicios")) body = JSON.stringify([{ numero_servicio: "123", cliente: "Ferretería López", direccion: "San Martín 1234", localidad: "Rosario" }]);
+    else if (u.includes("/api/servicios")) body = JSON.stringify([
+      { numero_servicio: "123", cliente: "Ferretería López", direccion: "San Martín 1234", localidad: "Rosario" },
+      { numero_servicio: "456", cliente: "Panadería Sur", telefono: "341 555-1234", direccion: "Mitre 55", localidad: "Funes" },
+    ]);
     r.fulfill({ status: 200, contentType: "application/json", body });
   });
   await page.goto(base + "/");
@@ -163,5 +166,10 @@ test("Próximo service: muestra la próxima tarea pendiente del técnico, saltea
   await page.waitForTimeout(1200);
   assert.strictEqual(await page.locator("#proximoServiceCliente").textContent(), "Panadería Sur");
   assert.match(await page.locator("#proximoServiceCuando").textContent(), /Mañana · 11:30/);
+  assert.strictEqual(await page.locator("#proximoLlamarBtn").getAttribute("href"), "tel:3415551234");
+  assert.match(await page.locator("#proximoCaminoBtn").getAttribute("href"), /^https:\/\/wa\.me\/549341555123/);
+  assert.match(await page.locator("#proximoComoLlegarBtn").getAttribute("href"), /google\.com\/maps\/dir.*Mitre%2055/);
+  // resumen del día: 1 servicio pendiente con parte hecho hoy no cuenta como pendiente (123 está resuelto)
+  assert.match(await page.locator("#tileServiciosResumen").textContent(), /1 pendiente/);
   await ctx.close();
 });

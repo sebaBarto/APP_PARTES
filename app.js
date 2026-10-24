@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.118.0";
+const APP_VERSION = "3.119.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -1071,6 +1071,7 @@ function etiquetaDiaProximo(fechaISO) {
 function actualizarProximoService() {
   const card = document.getElementById("proximoServiceCard");
   if (!card) return;
+  actualizarResumenDelDia();
   try {
     proximaTareaInicio = null;
     if (tecnicoLogueado && Array.isArray(cronogramaCache)) {
@@ -1095,14 +1096,73 @@ function actualizarProximoService() {
     document.getElementById("proximoServiceCuando").textContent = `${etiquetaDiaProximo(t.fecha)}${t.hora_inicio ? " · " + t.hora_inicio : ""}`;
     document.getElementById("proximoServiceCliente").textContent = cliente;
     document.getElementById("proximoServiceDonde").textContent = [direccion, localidad].filter(Boolean).join(" — ");
+    actualizarAccionesProximo(serv, direccion, localidad);
     card.classList.remove("hidden");
   } catch (e) {
     card.classList.add("hidden");
   }
 }
-document.getElementById("proximoServiceCard").addEventListener("click", () => {
+document.getElementById("proximoServiceMain").addEventListener("click", () => {
   if (proximaTareaInicio) seleccionarTareaCronograma(proximaTareaInicio.t);
 });
+// Botones de la tarjeta: llamar, cómo llegar y avisar que voy en camino
+function actualizarAccionesProximo(serv, direccion, localidad) {
+  const tel = (serv && serv.telefono || "").toString().trim();
+  const llamar = document.getElementById("proximoLlamarBtn");
+  const camino = document.getElementById("proximoCaminoBtn");
+  const llegar = document.getElementById("proximoComoLlegarBtn");
+  if (tel) {
+    llamar.href = "tel:" + tel.replace(/[^\d+]/g, "");
+    llamar.classList.remove("hidden");
+    const numWa = limpiarTelefonoWhatsapp(tel);
+    const nombre = tecnicoLogueado || "un técnico";
+    const msg = `Hola! Soy ${nombre}, técnico de SAT (seguridad electrónica). Le escribo para avisarle que estoy en camino a su domicilio para el servicio técnico. ¡Nos vemos pronto!`;
+    camino.href = `https://wa.me/${numWa}?text=${encodeURIComponent(msg)}`;
+    camino.classList.toggle("hidden", !numWa);
+  } else {
+    llamar.classList.add("hidden");
+    camino.classList.add("hidden");
+  }
+  if (direccion) {
+    const q = encodeURIComponent([direccion, localidad, "Argentina"].filter(Boolean).join(", "));
+    llegar.href = leerAjustes().appMapas === "waze"
+      ? `https://waze.com/ul?q=${q}&navigate=yes`
+      : `https://www.google.com/maps/dir/?api=1&destination=${q}`;
+    llegar.classList.remove("hidden");
+  } else {
+    llegar.classList.add("hidden");
+  }
+}
+
+// Resumen del día en el botón Servicios Técnicos: partes hechos hoy,
+// agenda de hoy y pendientes en total.
+function actualizarResumenDelDia() {
+  const resumen = document.getElementById("tileServiciosResumen");
+  const progreso = document.getElementById("tileServiciosProgreso");
+  if (!resumen || !progreso) return;
+  try {
+    if (!tecnicoLogueado) { resumen.classList.add("hidden"); progreso.classList.add("hidden"); return; }
+    const ahora = new Date();
+    const hoyISO = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, "0")}-${String(ahora.getDate()).padStart(2, "0")}`;
+    const hechos = historialCache.filter((h) => h.fecha === hoyISO && coincideNombreTecnico(h.tecnico, tecnicoLogueado)).length;
+    const agenda = cronogramaCache.filter((t) => t.fecha === hoyISO && coincideNombreTecnico(t.tecnico, tecnicoLogueado)).length;
+    const pendientes = serviciosCache.filter((sv) => !(sv.numero_servicio && (serviciosResueltos.has(sv.numero_servicio) || historialCache.some((h) => h.numero_servicio === sv.numero_servicio)))).length;
+    const partes = [];
+    partes.push(agenda > 0 && hechos <= agenda ? `Hoy ${hechos} de ${agenda} hechos` : `Hoy ${hechos} hecho${hechos === 1 ? "" : "s"}`);
+    partes.push(`${pendientes} pendiente${pendientes === 1 ? "" : "s"}`);
+    resumen.textContent = partes.join(" · ");
+    resumen.classList.remove("hidden");
+    if (agenda > 0) {
+      document.getElementById("tileServiciosProgresoBarra").style.width = Math.min(100, Math.round((hechos / agenda) * 100)) + "%";
+      progreso.classList.remove("hidden");
+    } else {
+      progreso.classList.add("hidden");
+    }
+  } catch (e) {
+    resumen.classList.add("hidden");
+    progreso.classList.add("hidden");
+  }
+}
 
 // Muestra u oculta las tiles del panel principal según los permisos
 // del técnico logueado (configurados en admin.html → Técnicos). El
