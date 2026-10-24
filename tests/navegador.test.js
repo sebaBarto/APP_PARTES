@@ -88,3 +88,21 @@ test("con un index.html viejo (sin ajustesBtn) se recarga una sola vez, sin bucl
   assert.strictEqual(pedidos, 2, "debía pedir el HTML exactamente 2 veces, pidió " + pedidos);
   await ctx.close();
 });
+
+test("cada opción de Forma de pago se puede elegir con un toque", async () => {
+  const ctx = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 800 }, hasTouch: true, isMobile: true });
+  const page = await ctx.newPage();
+  await page.route("**/api/**", (r) => r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+  await page.goto(base + "/");
+  await page.waitForTimeout(500);
+  await page.evaluate(() => showScreen("form"));
+  for (const valor of ["PAGADO", "TRANSFIERE", "PAGA CON ABONO", "DEBITO", "PAGA EN OF"]) {
+    const chip = page.locator(`label.discount-chip:has(input[value="${valor}"])`);
+    await chip.scrollIntoViewIfNeeded();
+    const box = await chip.boundingBox();
+    await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2);
+    await page.waitForTimeout(100);
+    assert.strictEqual(await page.evaluate(() => getFormaPago()), valor);
+  }
+  await ctx.close();
+});

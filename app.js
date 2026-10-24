@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.115.1";
+const APP_VERSION = "3.115.2";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -2063,6 +2063,21 @@ descuentoRadios.forEach((r) => {
     numeroPresupuestoInput.style.display = tipo === "presupuesto" ? "block" : "none";
     if (tipo !== "presupuesto") numeroPresupuestoInput.value = "";
     recalcularCostoFinal();
+  });
+});
+
+// Forma de pago: además del tilde nativo del label, se marca también al
+// levantar el dedo (pointerup). Así no depende de que el "click" llegue
+// completo (en algunos celulares se pierde si el teclado se está cerrando
+// o la pantalla se acomoda justo al tocar).
+document.querySelectorAll("label.discount-chip input[name='f_forma_pago']").forEach((radio) => {
+  const chip = radio.closest("label");
+  if (!chip) return;
+  chip.style.touchAction = "manipulation";
+  chip.addEventListener("pointerup", (ev) => {
+    if (ev.pointerType === "mouse" || radio.checked) return;
+    radio.checked = true;
+    radio.dispatchEvent(new Event("change", { bubbles: true }));
   });
 });
 
