@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.137.0";
+const APP_VERSION = "3.137.1";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -5196,12 +5196,17 @@ function renderFotoConsulta() {
   const q = consultaFotoPreview.querySelector(".consulta-foto-quitar");
   if (q) q.addEventListener("click", () => { consultaFotoDataUrl = ""; renderFotoConsulta(); });
 }
-consultaFotoInput.addEventListener("change", async () => {
-  const f = consultaFotoInput.files && consultaFotoInput.files[0];
-  consultaFotoInput.value = "";
-  if (!f) return;
-  try { consultaFotoDataUrl = await comprimirImagen(f, 1280, 0.72); renderFotoConsulta(); }
-  catch (e) { showToast("No se pudo leer la foto."); }
+// Dos entradas: la cámara directa (capture) y la galería. En muchos Android
+// el selector de archivos solo ofrece la galería, por eso van separadas.
+[consultaFotoInput, document.getElementById("consultaCamaraInput")].forEach((input) => {
+  if (!input) return;
+  input.addEventListener("change", async () => {
+    const f = input.files && input.files[0];
+    input.value = "";
+    if (!f) return;
+    try { consultaFotoDataUrl = await comprimirImagen(f, 1280, 0.72); renderFotoConsulta(); }
+    catch (e) { showToast("No se pudo leer la foto."); }
+  });
 });
 
 function renderHiloConsulta() {

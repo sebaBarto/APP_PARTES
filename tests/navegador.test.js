@@ -944,6 +944,7 @@ test("Manuales: datos del equipo (crear con autor y fecha, editar queda registra
   await page.click("#preguntarBtn");
   await page.waitForTimeout(400);
   assert.ok(consultas[0].imagen && consultas[0].imagen.startsWith("data:image/jpeg"), "manda la foto achicada");
+  assert.strictEqual(await page.locator("#consultaCamaraInput").getAttribute("capture"), "environment", "hay botón para sacar la foto con la cámara");
   assert.strictEqual(consultas[0].archivo, "m1", "con un solo manual ya viene elegido");
   await page.fill("#consultaRepreguntaInput", "¿Y si no tengo el código instalador?");
   await page.click("#repreguntarBtn");

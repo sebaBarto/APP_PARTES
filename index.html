@@ -1812,7 +1812,12 @@
         <label class="field-label" for="consultaPreguntaInput">Tu pregunta</label>
         <textarea class="field-input field-textarea" id="consultaPreguntaInput" placeholder="Ej: ¿Cómo se resetea la central a valores de fábrica?"></textarea>
         <div class="consulta-foto-row">
-          <label class="btn btn-ghost btn-small consulta-foto-btn" for="consultaFotoInput">📷 Agregar foto del equipo o del error</label>
+          <span class="field-label" style="margin:0;">Foto del equipo o del error (opcional)</span>
+          <div class="consulta-foto-botones">
+            <label class="btn btn-ghost btn-small consulta-foto-btn" for="consultaCamaraInput">📷 Sacar foto</label>
+            <label class="btn btn-ghost btn-small consulta-foto-btn" for="consultaFotoInput">🖼 Elegir de la galería</label>
+          </div>
+          <input type="file" id="consultaCamaraInput" accept="image/*" capture="environment" hidden>
           <input type="file" id="consultaFotoInput" accept="image/*" hidden>
           <div id="consultaFotoPreview" class="consulta-foto-preview hidden"></div>
         </div>

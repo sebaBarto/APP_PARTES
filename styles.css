@@ -3040,3 +3040,6 @@ html[data-inicio="nuevo"] #simEstadoFisicoWrap.hidden { display: none; }
 html[data-inicio="nuevo"] #simEstadoFisicoWrap > :not(.btn) { flex-basis: 100%; }
 html[data-inicio="nuevo"] #simEstadoFisicoWrap .btn { width: auto; flex: 1 1 140px; margin: 0 !important; }
 html[data-inicio="nuevo"] #simEstadoFisicoWrap .btn.hidden { display: none !important; }
+
+.consulta-foto-botones { display: flex; gap: 8px; width: 100%; }
+.consulta-foto-botones .consulta-foto-btn { flex: 1 1 0; text-align: center; margin: 0; }
