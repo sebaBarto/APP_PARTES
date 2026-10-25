@@ -907,3 +907,73 @@ test("Manuales: preguntar sobre un manual puntual, respuesta con formato, consul
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Manuales: datos del equipo (crear con autor y fecha, editar queda registrado), repreguntar con historial y foto", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  let datos = [];
+  const consultas = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request();
+    const u = req.url();
+    const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("coleccion=datos_equipo") && req.method() === "POST") {
+      const b = JSON.parse(req.postData());
+      if (b.accion === "crear") datos.unshift({ id: "d1", titulo: b.titulo, contenido: b.contenido, categoria: b.categoria, origen: b.origen === "ia" ? "ia" : "tecnico", autor: b.autor, fecha: "2026-10-20T15:00:00Z", ediciones: [] });
+      if (b.accion === "editar") { const d = datos.find((x) => x.id === b.id); Object.assign(d, { titulo: b.titulo, contenido: b.contenido }); d.ediciones.push({ autor: b.autor, fecha: "2026-10-22T15:00:00Z" }); }
+      return json({ ok: true, lista: datos });
+    }
+    if (u.includes("coleccion=datos_equipo")) return json(datos);
+    if (u.includes("coleccion=consultas-categorias")) return json([{ categoria: "Comunicadores", carpeta_drive_id: "x" }]);
+    if (u.includes("/api/consultas") && req.method() === "POST") {
+      const b = JSON.parse(req.postData());
+      consultas.push(b);
+      return json({ respuesta: b.historial ? "Usá el código maestro 1234." : "Entrá con el código instalador.", manuales_usados: ["Comunicador X.pdf"] });
+    }
+    if (u.includes("/api/consultas")) return json([{ id: "m1", nombre: "Comunicador X.pdf" }]);
+    json([]);
+  });
+  await page.goto(base + "/");
+  await page.evaluate(() => { tecnicoLogueado = "Juan Pérez"; localStorage.removeItem("datos_equipo_cache"); verConsultasBtn.click(); });
+  await page.waitForTimeout(400);
+  await page.selectOption("#consultaCategoriaSelect", "Comunicadores");
+  await page.waitForTimeout(300);
+  await page.fill("#consultaPreguntaInput", "¿Cómo programo el APN?");
+  const png = await page.evaluate(() => { const c = document.createElement("canvas"); c.width = 800; c.height = 600; c.getContext("2d").fillRect(0, 0, 400, 300); return c.toDataURL("image/png").split(",")[1]; });
+  await page.setInputFiles("#consultaFotoInput", { name: "display.png", mimeType: "image/png", buffer: Buffer.from(png, "base64") });
+  await page.waitForTimeout(300);
+  await page.click("#preguntarBtn");
+  await page.waitForTimeout(400);
+  assert.ok(consultas[0].imagen && consultas[0].imagen.startsWith("data:image/jpeg"), "manda la foto achicada");
+  assert.strictEqual(consultas[0].archivo, "m1", "con un solo manual ya viene elegido");
+  await page.fill("#consultaRepreguntaInput", "¿Y si no tengo el código instalador?");
+  await page.click("#repreguntarBtn");
+  await page.waitForTimeout(400);
+  assert.deepStrictEqual(consultas[1].historial.map((t) => t.pregunta), ["¿Cómo programo el APN?"], "la repregunta lleva lo anterior");
+  assert.ok(!consultas[1].imagen, "la foto se manda una sola vez");
+  assert.strictEqual(await page.locator("#consultaHiloList .hilo-turno").count(), 1);
+  assert.match(await page.locator("#consultaRespuestaTexto").textContent(), /código maestro/);
+
+  // Compartir con el equipo
+  await page.click("#consultaCompartirBtn");
+  assert.strictEqual(await page.locator("#manTabEquipo").isVisible(), true);
+  assert.strictEqual(await page.inputValue("#equipoFormTituloInput"), "¿Cómo programo el APN?");
+  await page.fill("#equipoFormTituloInput", "APN Claro para comunicadores");
+  await page.click("#equipoGuardarBtn");
+  await page.waitForTimeout(300);
+  assert.match(await page.locator(".equipo-card .equipo-meta").textContent(), /Aportó Juan Pérez el 20\/10\/2026/);
+  assert.strictEqual(await page.locator(".equipo-card .equipo-ia").count(), 1, "marca que vino de la IA");
+  // Otro técnico edita
+  await page.evaluate(() => { tecnicoLogueado = "Luis Gómez"; renderDatosEquipo(); });
+  assert.strictEqual(await page.locator(".equipo-card .eq-borrar").count(), 0, "no puede borrar lo de otro");
+  await page.click(".equipo-card .eq-editar");
+  await page.fill("#equipoFormContenido", "APN: igprs.claro.com.ar");
+  await page.click("#equipoGuardarBtn");
+  await page.waitForTimeout(300);
+  assert.match(await page.locator(".equipo-card .equipo-meta").textContent(), /Editado por Luis Gómez el 22\/10\/2026/);
+  await page.fill("#equipoBuscar", "igprs");
+  assert.strictEqual(await page.locator(".equipo-card").count(), 1);
+  await page.fill("#equipoBuscar", "movistar");
+  assert.strictEqual(await page.locator(".equipo-card").count(), 0);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

@@ -1762,7 +1762,13 @@
   <!-- CONSULTAS CON IA -->
   <section class="screen" id="screen-consultas">
     <div class="review-scroll">
-      <p class="hint-eyebrow review-eyebrow">CONSULTAS A MANUALES (<span class="acr">IA</span>)</p>
+      <p class="hint-eyebrow review-eyebrow">MANUALES</p>
+      <div class="man-tabs" role="tablist" id="manTabs">
+        <button type="button" role="tab" data-tab="ia" class="active" aria-selected="true">Preguntar a la IA</button>
+        <button type="button" role="tab" data-tab="equipo" aria-selected="false">Datos del equipo</button>
+      </div>
+
+      <div id="manTabIa">
       <p class="subtitle-consultas">La respuesta se genera con IA en base a los manuales cargados — puede equivocarse, verificá lo importante.</p>
 
       <div class="field-group">
@@ -1789,6 +1795,11 @@
       <div class="field-group">
         <label class="field-label" for="consultaPreguntaInput">Tu pregunta</label>
         <textarea class="field-input field-textarea" id="consultaPreguntaInput" placeholder="Ej: ¿Cómo se resetea la central a valores de fábrica?"></textarea>
+        <div class="consulta-foto-row">
+          <label class="btn btn-ghost btn-small consulta-foto-btn" for="consultaFotoInput">📷 Agregar foto del equipo o del error</label>
+          <input type="file" id="consultaFotoInput" accept="image/*" hidden>
+          <div id="consultaFotoPreview" class="consulta-foto-preview hidden"></div>
+        </div>
       </div>
 
       <button type="button" class="btn btn-primary" id="preguntarBtn" style="margin-bottom:14px;">Preguntar</button>
@@ -1796,14 +1807,57 @@
       <p class="list-status" id="consultaStatus"></p>
 
       <div id="consultaRespuestaWrap" class="consulta-respuesta-wrap hidden">
+        <div id="consultaHiloList" class="consulta-hilo"></div>
         <p class="dash-subtitulo" style="margin-top:0;">Respuesta</p>
         <div id="consultaRespuestaTexto" class="consulta-respuesta-texto"></div>
         <p class="consulta-manuales-usados" id="consultaManualesUsados"></p>
+        <div class="consulta-acciones">
+          <button type="button" class="btn btn-ghost btn-small" id="consultaCompartirBtn">Compartir con el equipo</button>
+          <button type="button" class="btn btn-ghost btn-small" id="consultaNuevaBtn">Nueva consulta</button>
+        </div>
+        <div class="consulta-repregunta" id="consultaRepreguntaWrap">
+          <label class="field-label" for="consultaRepreguntaInput">¿Querés repreguntar sobre esto?</label>
+          <textarea class="field-input field-textarea" id="consultaRepreguntaInput" placeholder="Ej: ¿Y si no tengo el código instalador?"></textarea>
+          <button type="button" class="btn btn-secondary" id="repreguntarBtn">Repreguntar</button>
+        </div>
       </div>
 
       <div id="consultaRecientesWrap" class="hidden" style="margin-top:18px;">
         <p class="dash-subtitulo">Tus consultas recientes</p>
         <div id="consultaRecientesList" class="consulta-recientes-list"></div>
+      </div>
+      </div>
+
+      <div id="manTabEquipo" class="hidden">
+        <p class="subtitle-consultas">Datos que fueron dejando los técnicos para todo el equipo: APNs, códigos de fábrica, configuraciones, trucos. Cualquiera puede agregar o corregir, y queda registrado quién y cuándo.</p>
+        <div class="equipo-barra">
+          <input class="field-input" id="equipoBuscar" type="search" placeholder="Buscar (ej: APN Claro, código instalador)..." autocomplete="off">
+          <select class="field-input" id="equipoFiltroCat"><option value="">Todas las categorías</option></select>
+        </div>
+        <button type="button" class="btn btn-primary" id="equipoNuevoBtn">+ Agregar un dato</button>
+
+        <div class="card equipo-form hidden" id="equipoForm">
+          <p class="dash-subtitulo" style="margin-top:0;" id="equipoFormTitulo">Nuevo dato para el equipo</p>
+          <input type="hidden" id="equipoFormId">
+          <div class="field-group">
+            <label class="field-label" for="equipoFormTituloInput">Título</label>
+            <input class="field-input" id="equipoFormTituloInput" type="text" maxlength="150" placeholder="Ej: APN de Claro para comunicadores">
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="equipoFormCategoria">Categoría</label>
+            <select class="field-input" id="equipoFormCategoria"></select>
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="equipoFormContenido">El dato</label>
+            <textarea class="field-input field-textarea" id="equipoFormContenido" maxlength="6000" rows="6" placeholder="Ej: APN: igprs.claro.com.ar — Usuario: clarogprs — Clave: clarogprs999"></textarea>
+          </div>
+          <input type="hidden" id="equipoFormOrigen">
+          <button type="button" class="btn btn-primary" id="equipoGuardarBtn">Guardar para el equipo</button>
+          <button type="button" class="btn btn-ghost" id="equipoCancelarBtn" style="margin-top:8px;">Cancelar</button>
+        </div>
+
+        <p class="list-status" id="equipoStatus"></p>
+        <div id="equipoLista" class="equipo-lista"></div>
       </div>
     </div>
 

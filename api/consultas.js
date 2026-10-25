@@ -31,7 +31,7 @@ async function leerCategorias(ghHeaders, apiUrl) {
 async function listarArchivosCarpeta(accessToken, folderId) {
   const url = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(
     `'${folderId}' in parents and trashed = false and mimeType = 'application/pdf'`
-  )}&fields=files(id,name,size)&pageSize=50`;
+  )}&fields=files(id,name,size)&pageSize=100&supportsAllDrives=true&includeItemsFromAllDrives=true`;
   const r = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
   if (!r.ok) throw new Error("No se pudo listar los manuales de esa categoría en Drive");
   const data = await r.json();
@@ -39,12 +39,88 @@ async function listarArchivosCarpeta(accessToken, folderId) {
 }
 
 async function descargarArchivo(accessToken, fileId) {
-  const r = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+  const r = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&supportsAllDrives=true`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!r.ok) throw new Error("No se pudo descargar un manual desde Drive");
   const buffer = Buffer.from(await r.arrayBuffer());
   return buffer;
+}
+
+function ghHeadersBase() {
+  return { Authorization: `Bearer ${process.env.GITHUB_DATA_TOKEN}`, Accept: "application/vnd.github+json" };
+}
+function apiUrlCategorias() {
+  return `https://api.github.com/repos/${process.env.GITHUB_DATA_REPO}/contents/${CATEGORIAS_PATH}`;
+}
+
+// Conversación: el primer turno lleva los manuales; si hay repreguntas, se
+// agregan las respuestas anteriores y la pregunta nueva (con la foto, si hay).
+function armarTurnos(partesDocumentos, promptTexto, historial, pregunta, imagen) {
+  const fotoParte = imagen ? [{ inline_data: { mime_type: imagen.slice(5, imagen.indexOf(";")), data: imagen.split(",")[1] } }] : [];
+  if (!historial.length) {
+    return [{ role: "user", parts: [...partesDocumentos, ...fotoParte, { text: promptTexto }] }];
+  }
+  const turnos = [{ role: "user", parts: [...partesDocumentos, { text: promptTexto }] }, { role: "model", parts: [{ text: String(historial[0].respuesta).slice(0, 8000) }] }];
+  historial.slice(1).forEach((t) => {
+    turnos.push({ role: "user", parts: [{ text: String(t.pregunta).slice(0, 2000) }] });
+    turnos.push({ role: "model", parts: [{ text: String(t.respuesta).slice(0, 8000) }] });
+  });
+  turnos.push({ role: "user", parts: [...fotoParte, { text: `Repregunta del técnico (mismo formato, basado en los manuales): ${pregunta}` }] });
+  return turnos;
+}
+
+// Panel admin: subir un manual a la carpeta de Drive de la categoría.
+// El servidor solo abre una "subida reanudable" en Drive y el navegador
+// manda el PDF directo a Google (Vercel no acepta archivos de más de ~4 MB).
+// Requiere que la cuenta de servicio tenga permiso de Editor en la carpeta.
+async function manejarAdminManuales(req, res, body, ghHeaders, apiUrl) {
+  const categorias = await leerCategorias(ghHeaders, apiUrl);
+  const cat = categorias.find((c) => c.categoria === body.categoria);
+  if (!cat || !cat.carpeta_drive_id) {
+    res.status(404).json({ error: "No se encontró esa categoría o no tiene carpeta de Drive configurada" });
+    return;
+  }
+  const accessToken = await getAccessToken("https://www.googleapis.com/auth/drive");
+  if (body.accion === "borrar_manual") {
+    const r = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(body.archivo)}?supportsAllDrives=true`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ trashed: true }),
+    });
+    if (!r.ok) {
+      const det = await r.text();
+      res.status(r.status === 403 || r.status === 404 ? 403 : 502).json({ error: "Drive no dejó borrar el manual (la cuenta de servicio necesita permiso de Editor en la carpeta)", detail: det.slice(0, 300) });
+      return;
+    }
+    res.status(200).json({ ok: true });
+    return;
+  }
+  const nombre = String(body.nombre || "").replace(/[\\/:*?"<>|]+/g, " ").trim().slice(0, 150) || "manual.pdf";
+  const tamano = Number(body.tamano || 0);
+  const r = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json; charset=UTF-8",
+      "X-Upload-Content-Type": "application/pdf",
+      ...(tamano ? { "X-Upload-Content-Length": String(tamano) } : {}),
+      ...(req.headers.origin ? { Origin: req.headers.origin } : {}),
+    },
+    body: JSON.stringify({ name: /\.pdf$/i.test(nombre) ? nombre : nombre + ".pdf", parents: [cat.carpeta_drive_id], mimeType: "application/pdf" }),
+  });
+  if (!r.ok) {
+    const det = await r.text();
+    const sinCuota = /storageQuota|quota/i.test(det);
+    res.status(502).json({
+      error: sinCuota
+        ? "Drive no deja que la cuenta de servicio guarde archivos en esa carpeta (no tiene espacio propio). Para subir desde acá, la carpeta tiene que estar en una Unidad compartida; si no, subilo directo en Drive."
+        : "No se pudo preparar la subida en Drive (la cuenta de servicio necesita permiso de Editor en la carpeta).",
+      detail: det.slice(0, 300),
+    });
+    return;
+  }
+  res.status(200).json({ ok: true, url_subida: r.headers.get("location") });
 }
 
 module.exports = async (req, res) => {
@@ -117,7 +193,16 @@ module.exports = async (req, res) => {
   try {
     let body = req.body;
     if (typeof body === "string") body = JSON.parse(body);
-    const { categoria, pregunta, archivo } = body || {};
+    if (body && (body.accion === "iniciar_subida_manual" || body.accion === "borrar_manual")) {
+      await manejarAdminManuales(req, res, body, ghHeadersBase(), apiUrlCategorias());
+      return;
+    }
+    const { categoria, archivo } = body || {};
+    // Foto opcional (display, código de error, cableado): JPG achicado en el celular.
+    const imagen = typeof (body && body.imagen) === "string" && /^data:image\/(jpeg|png|webp);base64,/.test(body.imagen) && body.imagen.length < 3500000 ? body.imagen : "";
+    const pregunta = String((body && body.pregunta) || "").trim() || (imagen ? "¿Qué significa lo que se ve en la foto y cómo lo resuelvo?" : "");
+    // Repreguntas: las preguntas y respuestas anteriores de esta misma consulta.
+    const historial = Array.isArray(body && body.historial) ? body.historial.slice(-4).filter((t) => t && t.pregunta && t.respuesta) : [];
     if (!categoria || !pregunta) {
       res.status(400).json({ error: "Falta la categoría o la pregunta" });
       return;
@@ -177,7 +262,8 @@ module.exports = async (req, res) => {
       `Formato: castellano rioplatense, concreto y breve, para leer en el celular parado frente al equipo. ` +
       `Si es un procedimiento, dalo en pasos numerados con las teclas o códigos exactos. ` +
       `Al final agregá una línea "Fuente:" con el nombre del manual y la página o sección.\n\n` +
-      `Pregunta: ${pregunta}`;
+      (imagen ? `El técnico adjuntó una foto (display, código de error, cableado o equipo): usala para entender la consulta.\n` : "") +
+      `Pregunta: ${historial.length ? historial[0].pregunta : pregunta}`;
 
     const geminiRes = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent`,
@@ -185,7 +271,7 @@ module.exports = async (req, res) => {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
         body: JSON.stringify({
-          contents: [{ parts: [...partesDocumentos, { text: promptTexto }] }],
+          contents: armarTurnos(partesDocumentos, promptTexto, historial, pregunta, imagen),
         }),
       }
     );

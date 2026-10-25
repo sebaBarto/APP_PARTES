@@ -489,7 +489,7 @@
 
     <div id="panelConsultas" class="hidden">
       <h1>Consultas con IA (manuales)</h1>
-      <p class="subtitle">Cada categoría apunta a una carpeta de Drive con los manuales en PDF de esa categoría. Compartí cada carpeta con <code>sat-fotos-uploader@partes-503719.iam.gserviceaccount.com</code> (permiso Lector).</p>
+      <p class="subtitle">Cada categoría apunta a una carpeta de Drive con los manuales en PDF de esa categoría. Compartí cada carpeta con <code>sat-fotos-uploader@partes-503719.iam.gserviceaccount.com</code> (permiso Lector; Editor si querés subir manuales desde acá).</p>
 
       <p class="status" id="consultasCatStatus"></p>
 
@@ -498,6 +498,26 @@
       <button id="agregarCategoriaConsultaBtn" type="button" class="btn-secondary-admin" style="margin-bottom:14px;">+ Agregar categoría</button>
       <button id="guardarConsultasCatBtn" type="button">Guardar cambios</button>
       <p class="status" id="guardarConsultasCatStatus"></p>
+
+      <div class="card" style="margin-top:22px;">
+        <h3 style="margin-top:0;">Manuales de cada categoría</h3>
+        <p class="subtitle" style="margin-top:0;">Subí o borrá manuales en PDF sin entrar a Drive. Para esto la cuenta de servicio necesita permiso de <b>Editor</b> en la carpeta. Si Drive no lo permite, usá "Abrir la carpeta en Drive".</p>
+        <select id="manualesAdminCategoria" style="margin-bottom:10px;"><option value="">Elegí una categoría</option></select>
+        <div id="manualesAdminAcciones" class="hidden">
+          <a id="manualesAdminCarpetaLink" href="#" target="_blank" rel="noopener" style="display:inline-block; margin-bottom:10px;">Abrir la carpeta en Drive ↗</a>
+          <input type="file" id="manualesAdminArchivo" accept="application/pdf" multiple>
+          <p class="status" id="manualesAdminStatus"></p>
+          <div id="manualesAdminLista"></div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:22px;">
+        <h3 style="margin-top:0;">Datos del equipo</h3>
+        <p class="subtitle" style="margin-top:0;">Lo que los técnicos fueron dejando en Manuales → Datos del equipo. Desde acá la oficina puede borrar lo que esté mal o desactualizado.</p>
+        <input type="text" id="datosEquipoAdminBuscar" placeholder="Buscar...">
+        <p class="status" id="datosEquipoAdminStatus"></p>
+        <div id="datosEquipoAdminLista"></div>
+      </div>
     </div>
 
     <div id="panelGuardias" class="hidden">
@@ -1103,7 +1123,7 @@ const TABS = [
   { btn: tabTecnicosBtn, panel: panelTecnicos, onShow: () => { if (!tecnicosCargadosUnaVez) { tecnicosCargadosUnaVez = true; cargarTecnicosAdmin(); } } },
   { btn: tabMaterialesBtn, panel: panelMateriales, onShow: () => cargarMaterialesAdmin() },
   { btn: tabClientesBtn, panel: panelClientes, onShow: () => { if (!clientesCargadosUnaVez) { clientesCargadosUnaVez = true; cargarClientesAdmin(); } } },
-  { btn: tabConsultasBtn, panel: panelConsultas, onShow: () => { if (!consultasCatCargadasUnaVez) { consultasCatCargadasUnaVez = true; cargarConsultasCatAdmin(); } } },
+  { btn: tabConsultasBtn, panel: panelConsultas, onShow: () => { if (!consultasCatCargadasUnaVez) { consultasCatCargadasUnaVez = true; cargarConsultasCatAdmin(); } cargarCategoriasManualesAdmin(); cargarDatosEquipoAdmin(); } },
   { btn: tabGuardiasBtn, panel: panelGuardias, onShow: () => { if (!guardiasCargadasUnaVez) { guardiasCargadasUnaVez = true; cargarGuardiasAdmin(); } cargarEstadoAvisoGuardia(); cargarGuardiaHistorialAdmin(); } },
   { btn: tabCredencialesBtn, panel: panelCredenciales, onShow: () => cargarCredencialesAdmin() },
   { btn: tabVehiculosBtn, panel: panelVehiculos, onShow: () => { if (!vehiculosCargadosUnaVez) { vehiculosCargadosUnaVez = true; cargarVehiculosAdmin(); } } },
@@ -1955,6 +1975,127 @@ guardarConsultasCatBtn.addEventListener("click", async () => {
     guardarConsultasCatBtn.disabled = false;
   }
 });
+
+// ---------- Manuales: subir / borrar desde el panel ----------
+const manualesAdminCategoria = document.getElementById("manualesAdminCategoria");
+const manualesAdminStatus = document.getElementById("manualesAdminStatus");
+const manualesAdminLista = document.getElementById("manualesAdminLista");
+let categoriasManualesAdmin = [];
+async function cargarCategoriasManualesAdmin() {
+  try {
+    const res = await fetch("/api/datos?coleccion=consultas-categorias", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+    categoriasManualesAdmin = res.ok ? await res.json() : [];
+  } catch (e) { categoriasManualesAdmin = []; }
+  const previo = manualesAdminCategoria.value;
+  manualesAdminCategoria.innerHTML = '<option value="">Elegí una categoría</option>' + (categoriasManualesAdmin || []).map((c) => `<option value="${escapeHtmlAdmin(c.categoria)}">${escapeHtmlAdmin(c.categoria)}</option>`).join("");
+  if (previo) { manualesAdminCategoria.value = previo; }
+}
+manualesAdminCategoria.addEventListener("change", listarManualesAdmin);
+async function listarManualesAdmin() {
+  const cat = manualesAdminCategoria.value;
+  const acciones = document.getElementById("manualesAdminAcciones");
+  acciones.classList.toggle("hidden", !cat);
+  if (!cat) return;
+  const datosCat = (categoriasManualesAdmin || []).find((c) => c.categoria === cat);
+  document.getElementById("manualesAdminCarpetaLink").href = datosCat ? `https://drive.google.com/drive/folders/${encodeURIComponent(datosCat.carpeta_drive_id)}` : "#";
+  manualesAdminStatus.className = "status";
+  manualesAdminStatus.textContent = "Cargando manuales...";
+  manualesAdminLista.innerHTML = "";
+  try {
+    const res = await fetch(`/api/consultas?categoria=${encodeURIComponent(cat)}`, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error desconocido");
+    manualesAdminStatus.textContent = `${data.length} manual(es) en esta categoría.`;
+    manualesAdminLista.innerHTML = data.map((m) => `
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px solid #EEE;">
+        <span>📄 ${escapeHtmlAdmin(m.nombre)}</span>
+        <button type="button" class="btn-secondary-admin manual-borrar-btn" data-id="${escapeHtmlAdmin(m.id)}" data-nombre="${escapeHtmlAdmin(m.nombre)}" style="width:auto; padding:6px 12px;">Borrar</button>
+      </div>`).join("");
+    manualesAdminLista.querySelectorAll(".manual-borrar-btn").forEach((b) => b.addEventListener("click", async () => {
+      if (!confirm(`¿Mandar a la papelera de Drive "${b.dataset.nombre}"?`)) return;
+      b.disabled = true;
+      try {
+        const r = await fetch("/api/consultas", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ accion: "borrar_manual", categoria: cat, archivo: b.dataset.id }) });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.error || "Error desconocido");
+        listarManualesAdmin();
+      } catch (err) { alert("No se pudo borrar: " + err.message); b.disabled = false; }
+    }));
+  } catch (err) {
+    manualesAdminStatus.className = "status err";
+    manualesAdminStatus.textContent = "No se pudieron listar los manuales: " + err.message;
+  }
+}
+document.getElementById("manualesAdminArchivo").addEventListener("change", async (ev) => {
+  const cat = manualesAdminCategoria.value;
+  const archivos = Array.from(ev.target.files || []);
+  ev.target.value = "";
+  if (!cat || !archivos.length) return;
+  let ok = 0;
+  for (let i = 0; i < archivos.length; i++) {
+    const f = archivos[i];
+    manualesAdminStatus.className = "status";
+    manualesAdminStatus.textContent = `Subiendo ${i + 1} de ${archivos.length}: ${f.name}...`;
+    try {
+      // 1) el servidor abre la subida en Drive; 2) el archivo va directo a Google
+      const r = await fetch("/api/consultas", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ accion: "iniciar_subida_manual", categoria: cat, nombre: f.name, tamano: f.size }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.url_subida) throw new Error(d.error || "No se pudo preparar la subida");
+      const put = await fetch(d.url_subida, { method: "PUT", headers: { "Content-Type": "application/pdf" }, body: f });
+      if (!put.ok) throw new Error("Drive rechazó el archivo (HTTP " + put.status + ")");
+      ok++;
+    } catch (err) {
+      manualesAdminStatus.className = "status err";
+      manualesAdminStatus.textContent = `No se pudo subir "${f.name}": ${err.message}`;
+      if (ok === 0) return;
+    }
+  }
+  manualesAdminStatus.className = "status ok";
+  manualesAdminStatus.textContent = `Listo: ${ok} manual(es) subido(s). Ya los ven los técnicos.`;
+  listarManualesAdmin();
+});
+
+// ---------- Datos del equipo (moderación) ----------
+let datosEquipoAdminCache = [];
+async function cargarDatosEquipoAdmin() {
+  const st = document.getElementById("datosEquipoAdminStatus");
+  st.className = "status";
+  st.textContent = "Cargando...";
+  try {
+    const res = await fetch("/api/datos?coleccion=datos_equipo", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+    datosEquipoAdminCache = res.ok ? await res.json() : [];
+    renderDatosEquipoAdmin();
+  } catch (e) { st.textContent = "No se pudieron cargar."; }
+}
+function renderDatosEquipoAdmin() {
+  const st = document.getElementById("datosEquipoAdminStatus");
+  const cont = document.getElementById("datosEquipoAdminLista");
+  const t = normalizeText(document.getElementById("datosEquipoAdminBuscar").value || "");
+  const lista = (datosEquipoAdminCache || []).filter((d) => !t || normalizeText(`${d.titulo} ${d.contenido} ${d.autor} ${d.categoria}`).includes(t));
+  st.textContent = `${lista.length} dato(s).`;
+  const f = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleDateString("es-AR"); };
+  cont.innerHTML = lista.map((d) => {
+    const ult = (d.ediciones || []).slice(-1)[0];
+    return `<div style="padding:10px 0; border-bottom:1px solid #EEE;">
+      <b>${escapeHtmlAdmin(d.titulo)}</b> <span style="font-size:12px; color:#6B7680;">· ${escapeHtmlAdmin(d.categoria || "")}</span>
+      <div style="white-space:pre-line; font-size:13px; margin:4px 0;">${escapeHtmlAdmin(d.contenido)}</div>
+      <div style="font-size:12px; color:#6B7680;">Aportó ${escapeHtmlAdmin(d.autor || "")} el ${f(d.fecha)}${ult ? ` · editado por ${escapeHtmlAdmin(ult.autor)} el ${f(ult.fecha)}` : ""}</div>
+      <button type="button" class="btn-secondary-admin dato-equipo-borrar" data-id="${escapeHtmlAdmin(d.id)}" style="width:auto; padding:6px 12px; margin-top:6px;">Borrar</button>
+    </div>`;
+  }).join("");
+  cont.querySelectorAll(".dato-equipo-borrar").forEach((b) => b.addEventListener("click", async () => {
+    if (!confirm("¿Borrar este dato para todo el equipo?")) return;
+    b.disabled = true;
+    try {
+      const r = await fetch("/api/datos?coleccion=datos_equipo", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ accion: "borrar", id: b.dataset.id, admin: true, autor: "Oficina" }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "Error desconocido");
+      datosEquipoAdminCache = d.lista || [];
+      renderDatosEquipoAdmin();
+    } catch (err) { alert("No se pudo borrar: " + err.message); b.disabled = false; }
+  }));
+}
+document.getElementById("datosEquipoAdminBuscar").addEventListener("input", renderDatosEquipoAdmin);
 
 // ---------- Guardia técnica rotativa ----------
 const guardiasFechaInicio = document.getElementById("guardiasFechaInicio");

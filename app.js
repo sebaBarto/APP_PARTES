@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.135.0";
+const APP_VERSION = "3.136.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -4949,8 +4949,10 @@ verConsultasBtn.addEventListener("click", () => {
   consultaManualesWrap.classList.add("hidden");
   consultaManualSelectWrap.classList.add("hidden");
   consultaStatus.textContent = "";
+  hiloConsulta = []; hiloMeta = null;
   if (!consultasCategoriasCargadas) cargarConsultasCategorias();
   renderConsultasRecientes();
+  cambiarTabManuales("ia");
 });
 
 consultaCategoriaSelect.addEventListener("change", () => {
@@ -5124,6 +5126,7 @@ function leerConsultasRecientes() {
 }
 function guardarConsultaReciente(item) {
   const lista = [item, ...leerConsultasRecientes().filter((c) => !(c.pregunta === item.pregunta && c.categoria === item.categoria))].slice(0, 10);
+  if (item.hilo) item.archivo = hiloMeta && hiloMeta.archivo;
   try { localStorage.setItem(CONSULTAS_RECIENTES_KEY, JSON.stringify(lista)); } catch (e) { /* sin espacio */ }
 }
 function mostrarRespuestaConsulta(c) {
@@ -5146,39 +5149,69 @@ function renderConsultasRecientes() {
     b.innerHTML = `<span class="crc-preg">${escapeHtml(c.pregunta)}</span><span class="crc-meta">${escapeHtml(c.categoria)}${c.manualNombre ? " · " + escapeHtml(c.manualNombre) : ""}${fecha ? " · " + fecha : ""}</span>`;
     b.addEventListener("click", () => {
       consultaPreguntaInput.value = c.pregunta;
-      mostrarRespuestaConsulta(c);
+      hiloConsulta = Array.isArray(c.hilo) && c.hilo.length ? c.hilo.slice() : [{ pregunta: c.pregunta, respuesta: c.respuesta }];
+      hiloMeta = { categoria: c.categoria, archivo: c.archivo || "", manualNombre: c.manualNombre || "", manuales: c.manuales || [] };
+      renderHiloConsulta();
       consultaRespuestaWrap.scrollIntoView({ behavior: "smooth", block: "start" });
     });
     cont.appendChild(b);
   });
 }
 
-preguntarBtn.addEventListener("click", async () => {
-  const categoria = consultaCategoriaSelect.value;
-  const pregunta = consultaPreguntaInput.value.trim();
-  if (!categoria) {
-    showToast("Elegí una categoría antes de preguntar.");
-    return;
-  }
-  if (!pregunta) {
-    showToast("Escribí tu pregunta antes de enviarla.");
-    return;
-  }
-  const archivo = consultaManualSelect.value || "";
-  const manualNombre = archivo ? nombreManualCorto((manualesCategoriaActual.find((m) => m.id === archivo) || {}).nombre) : "";
+// ---- Conversación con la IA: foto opcional y repreguntas ----
+let hiloConsulta = [];      // [{ pregunta, respuesta }] de la consulta actual
+let hiloMeta = null;        // { categoria, archivo, manualNombre, manuales }
+let consultaFotoDataUrl = "";
+const consultaFotoInput = document.getElementById("consultaFotoInput");
+const consultaFotoPreview = document.getElementById("consultaFotoPreview");
+const consultaRepreguntaInput = document.getElementById("consultaRepreguntaInput");
+const repreguntarBtn = document.getElementById("repreguntarBtn");
+const consultaHiloList = document.getElementById("consultaHiloList");
 
-  preguntarBtn.disabled = true;
-  consultaRespuestaWrap.classList.add("hidden");
+function renderFotoConsulta() {
+  consultaFotoPreview.classList.toggle("hidden", !consultaFotoDataUrl);
+  consultaFotoPreview.innerHTML = consultaFotoDataUrl
+    ? `<img src="${consultaFotoDataUrl}" alt="Foto adjunta"><button type="button" class="consulta-foto-quitar" aria-label="Quitar foto">✕</button>` : "";
+  const q = consultaFotoPreview.querySelector(".consulta-foto-quitar");
+  if (q) q.addEventListener("click", () => { consultaFotoDataUrl = ""; renderFotoConsulta(); });
+}
+consultaFotoInput.addEventListener("change", async () => {
+  const f = consultaFotoInput.files && consultaFotoInput.files[0];
+  consultaFotoInput.value = "";
+  if (!f) return;
+  try { consultaFotoDataUrl = await comprimirImagen(f, 1280, 0.72); renderFotoConsulta(); }
+  catch (e) { showToast("No se pudo leer la foto."); }
+});
+
+function renderHiloConsulta() {
+  // Las vueltas anteriores quedan arriba, la última respuesta abajo.
+  consultaHiloList.innerHTML = hiloConsulta.slice(0, -1).map((t) =>
+    `<div class="hilo-turno"><p class="hilo-preg">${escapeHtml(t.pregunta)}</p><div class="consulta-respuesta-texto">${formatearRespuestaIA(t.respuesta)}</div></div>`).join("");
+  const ultima = hiloConsulta[hiloConsulta.length - 1];
+  if (!ultima) return;
+  consultaRespuestaTexto.innerHTML = (hiloConsulta.length > 1 ? `<p class="hilo-preg">${escapeHtml(ultima.pregunta)}</p>` : "") + formatearRespuestaIA(ultima.respuesta);
+  consultaManualesUsados.textContent = hiloMeta && hiloMeta.manuales && hiloMeta.manuales.length ? `Basado en: ${hiloMeta.manuales.join(", ")}` : "";
+  consultaRespuestaWrap.classList.remove("hidden");
+}
+
+async function enviarConsulta(pregunta, esRepregunta) {
+  const categoria = esRepregunta ? hiloMeta.categoria : consultaCategoriaSelect.value;
+  if (!categoria) { showToast("Elegí una categoría antes de preguntar."); return; }
+  if (!pregunta && !consultaFotoDataUrl) { showToast(esRepregunta ? "Escribí la repregunta." : "Escribí tu pregunta o agregá una foto."); return; }
+  const archivo = esRepregunta ? hiloMeta.archivo : (consultaManualSelect.value || "");
+  const manualNombre = esRepregunta ? hiloMeta.manualNombre : (archivo ? nombreManualCorto((manualesCategoriaActual.find((m) => m.id === archivo) || {}).nombre) : "");
+  const boton = esRepregunta ? repreguntarBtn : preguntarBtn;
+  boton.disabled = true;
+  if (!esRepregunta) { consultaRespuestaWrap.classList.add("hidden"); hiloConsulta = []; }
   const inicio = Date.now();
   const base = archivo ? `Leyendo "${manualNombre}" y consultando a la IA` : "Leyendo todos los manuales de la categoría y consultando a la IA";
   consultaStatus.textContent = base + "...";
   const reloj = setInterval(() => { consultaStatus.textContent = `${base}... ${Math.round((Date.now() - inicio) / 1000)} s`; }, 1000);
-
   try {
     const res = await fetch("/api/consultas", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-      body: JSON.stringify({ categoria, pregunta, archivo: archivo || undefined }),
+      body: JSON.stringify({ categoria, pregunta, archivo: archivo || undefined, imagen: consultaFotoDataUrl || undefined, historial: esRepregunta ? hiloConsulta : undefined }),
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -5187,16 +5220,203 @@ preguntarBtn.addEventListener("click", async () => {
       throw new Error((data.error || "Error desconocido") + (detalle ? ` — ${detalle}` : ""));
     }
     consultaStatus.textContent = "";
-    const item = { categoria, pregunta, manualNombre, respuesta: data.respuesta, manuales: data.manuales_usados || [], fecha: new Date().toISOString() };
-    mostrarRespuestaConsulta(item);
+    const preguntaMostrada = pregunta || "(consulta con foto)";
+    if (!esRepregunta) hiloMeta = { categoria, archivo, manualNombre, manuales: data.manuales_usados || [] };
+    hiloConsulta.push({ pregunta: preguntaMostrada, respuesta: data.respuesta });
+    renderHiloConsulta();
+    consultaFotoDataUrl = ""; renderFotoConsulta();
+    if (esRepregunta) consultaRepreguntaInput.value = "";
+    const item = { categoria, pregunta: hiloConsulta[0].pregunta, manualNombre, respuesta: data.respuesta, manuales: hiloMeta.manuales, hilo: hiloConsulta.slice(), fecha: new Date().toISOString() };
     guardarConsultaReciente(item);
     renderConsultasRecientes();
   } catch (err) {
     consultaStatus.textContent = (navigator.onLine === false ? "Sin señal: " : "No se pudo obtener una respuesta: ") + err.message;
   } finally {
     clearInterval(reloj);
-    preguntarBtn.disabled = false;
+    boton.disabled = false;
   }
+}
+preguntarBtn.addEventListener("click", () => enviarConsulta(consultaPreguntaInput.value.trim(), false));
+repreguntarBtn.addEventListener("click", () => enviarConsulta(consultaRepreguntaInput.value.trim(), true));
+document.getElementById("consultaNuevaBtn").addEventListener("click", () => {
+  hiloConsulta = []; hiloMeta = null;
+  consultaRespuestaWrap.classList.add("hidden");
+  consultaPreguntaInput.value = "";
+  consultaPreguntaInput.focus();
+});
+document.getElementById("consultaCompartirBtn").addEventListener("click", () => {
+  if (!hiloConsulta.length) return;
+  const contenido = hiloConsulta.map((t, i) => (hiloConsulta.length > 1 ? `${i === 0 ? "" : "\n"}Pregunta: ${t.pregunta}\n` : "") + t.respuesta).join("\n");
+  cambiarTabManuales("equipo");
+  abrirFormEquipo({ titulo: hiloConsulta[0].pregunta.slice(0, 150), contenido, categoria: hiloMeta ? hiloMeta.categoria : "", origen: "ia" });
+});
+
+// ---------- Datos del equipo (sección cooperativa de Manuales) ----------
+let datosEquipoCache = [];
+const CATEGORIAS_EQUIPO_FIJAS = ["General", "APN y líneas", "Códigos y claves de fábrica", "Configuraciones"];
+const equipoLista = document.getElementById("equipoLista");
+const equipoStatus = document.getElementById("equipoStatus");
+const equipoForm = document.getElementById("equipoForm");
+
+function cambiarTabManuales(tab) {
+  document.querySelectorAll("#manTabs button").forEach((b) => {
+    const act = b.dataset.tab === tab;
+    b.classList.toggle("active", act);
+    b.setAttribute("aria-selected", act ? "true" : "false");
+  });
+  document.getElementById("manTabIa").classList.toggle("hidden", tab !== "ia");
+  document.getElementById("manTabEquipo").classList.toggle("hidden", tab !== "equipo");
+  if (tab === "equipo") cargarDatosEquipo();
+}
+document.querySelectorAll("#manTabs button").forEach((b) => b.addEventListener("click", () => cambiarTabManuales(b.dataset.tab)));
+
+function categoriasEquipo() {
+  const set = new Set(CATEGORIAS_EQUIPO_FIJAS);
+  (consultasCategoriasCache || []).forEach((c) => c.categoria && set.add(c.categoria));
+  datosEquipoCache.forEach((d) => d.categoria && set.add(d.categoria));
+  return [...set];
+}
+function poblarCategoriasEquipo() {
+  const cats = categoriasEquipo();
+  const filtro = document.getElementById("equipoFiltroCat");
+  const elegido = filtro.value;
+  filtro.innerHTML = '<option value="">Todas las categorías</option>' + cats.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
+  filtro.value = cats.includes(elegido) ? elegido : "";
+  const sel = document.getElementById("equipoFormCategoria");
+  const prev = sel.value;
+  sel.innerHTML = cats.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
+  if (prev && cats.includes(prev)) sel.value = prev;
+}
+
+async function cargarDatosEquipo() {
+  try { datosEquipoCache = JSON.parse(localStorage.getItem("datos_equipo_cache") || "[]"); } catch (e) { datosEquipoCache = []; }
+  if (!consultasCategoriasCargadas) cargarConsultasCategorias().then(poblarCategoriasEquipo);
+  poblarCategoriasEquipo();
+  renderDatosEquipo();
+  equipoStatus.textContent = datosEquipoCache.length ? "" : "Cargando...";
+  try {
+    const res = await fetch("/api/datos?coleccion=datos_equipo", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    datosEquipoCache = Array.isArray(data) ? data : [];
+    try { localStorage.setItem("datos_equipo_cache", JSON.stringify(datosEquipoCache)); } catch (e) { /* sin espacio */ }
+    equipoStatus.textContent = "";
+    poblarCategoriasEquipo();
+    renderDatosEquipo();
+  } catch (err) {
+    equipoStatus.textContent = datosEquipoCache.length ? "Sin señal: mostrando lo último guardado en el celular." : "No se pudieron cargar los datos del equipo.";
+  }
+}
+
+function fechaCortaAR(iso) {
+  const d = new Date(iso);
+  return isNaN(d) ? "" : d.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+function renderDatosEquipo() {
+  const term = normalizeText(document.getElementById("equipoBuscar").value || "");
+  const cat = document.getElementById("equipoFiltroCat").value;
+  const lista = datosEquipoCache.filter((d) => (!cat || d.categoria === cat) && (!term || normalizeText(`${d.titulo} ${d.contenido} ${d.categoria} ${d.autor}`).includes(term)));
+  equipoLista.innerHTML = "";
+  if (!lista.length) {
+    if (!equipoStatus.textContent || equipoStatus.textContent === "Cargando...") {
+      equipoLista.innerHTML = `<p class="list-status">${datosEquipoCache.length ? "Nada coincide con esa búsqueda." : "Todavía no hay datos. Sé el primero en dejar uno: un APN, un código de fábrica, un truco de configuración."}</p>`;
+    }
+    return;
+  }
+  lista.forEach((d) => {
+    const card = document.createElement("div");
+    card.className = "equipo-card";
+    const ult = (d.ediciones || [])[(d.ediciones || []).length - 1];
+    const propio = tecnicoLogueado && d.autor === tecnicoLogueado;
+    card.innerHTML = `
+      <div class="equipo-card-top"><span class="equipo-cat">${escapeHtml(d.categoria || "General")}</span>${d.origen === "ia" ? '<span class="equipo-ia">Respuesta de la IA revisada</span>' : ""}</div>
+      <p class="equipo-titulo">${escapeHtml(d.titulo)}</p>
+      <div class="equipo-contenido consulta-respuesta-texto">${formatearRespuestaIA(d.contenido)}</div>
+      <p class="equipo-meta">Aportó <b>${escapeHtml(d.autor || "")}</b> el ${fechaCortaAR(d.fecha)}${ult ? ` · Editado por <b>${escapeHtml(ult.autor)}</b> el ${fechaCortaAR(ult.fecha)}${d.ediciones.length > 1 ? ` (${d.ediciones.length} ediciones)` : ""}` : ""}</p>
+      <div class="equipo-acciones">
+        <button type="button" class="btn btn-ghost btn-small eq-copiar">Copiar</button>
+        <button type="button" class="btn btn-ghost btn-small eq-editar">Editar / agregar</button>
+        ${propio ? '<button type="button" class="btn btn-ghost btn-small eq-borrar">Borrar</button>' : ""}
+      </div>`;
+    card.querySelector(".eq-copiar").addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(`${d.titulo}\n${d.contenido}`); showToast("Copiado."); } catch (e) { showToast("No se pudo copiar."); }
+    });
+    card.querySelector(".eq-editar").addEventListener("click", () => abrirFormEquipo(d));
+    const borrar = card.querySelector(".eq-borrar");
+    if (borrar) borrar.addEventListener("click", async () => {
+      if (!confirm(`¿Borrar "${d.titulo}" para todo el equipo?`)) return;
+      await guardarDatoEquipo({ accion: "borrar", id: d.id }, "Borrado.");
+    });
+    equipoLista.appendChild(card);
+  });
+}
+document.getElementById("equipoBuscar").addEventListener("input", renderDatosEquipo);
+document.getElementById("equipoFiltroCat").addEventListener("change", renderDatosEquipo);
+
+function abrirFormEquipo(d) {
+  poblarCategoriasEquipo();
+  const editando = !!(d && d.id);
+  document.getElementById("equipoFormTitulo").textContent = editando ? "Editar o agregar información" : "Nuevo dato para el equipo";
+  document.getElementById("equipoFormId").value = editando ? d.id : "";
+  document.getElementById("equipoFormTituloInput").value = (d && d.titulo) || "";
+  document.getElementById("equipoFormContenido").value = (d && d.contenido) || "";
+  document.getElementById("equipoFormOrigen").value = (d && d.origen) || "";
+  const cats = categoriasEquipo();
+  const sel = document.getElementById("equipoFormCategoria");
+  sel.value = d && d.categoria && cats.includes(d.categoria) ? d.categoria : (document.getElementById("equipoFiltroCat").value || "General");
+  equipoForm.classList.remove("hidden");
+  document.getElementById("equipoNuevoBtn").classList.add("hidden");
+  equipoForm.scrollIntoView({ behavior: "smooth", block: "start" });
+  document.getElementById("equipoFormTituloInput").focus();
+}
+function cerrarFormEquipo() {
+  equipoForm.classList.add("hidden");
+  document.getElementById("equipoNuevoBtn").classList.remove("hidden");
+}
+document.getElementById("equipoNuevoBtn").addEventListener("click", () => abrirFormEquipo(null));
+document.getElementById("equipoCancelarBtn").addEventListener("click", cerrarFormEquipo);
+
+async function guardarDatoEquipo(cuerpo, mensajeOk) {
+  const body = JSON.stringify({ ...cuerpo, autor: tecnicoLogueado || "Oficina" });
+  for (let intento = 0; intento < 2; intento++) {
+    try {
+      const res = await fetch("/api/datos?coleccion=datos_equipo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+        body,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 502 && intento === 0) continue; // otro técnico guardó justo al mismo tiempo: se reintenta
+      if (!res.ok || !data.ok) throw new Error(data.error || "Error desconocido");
+      datosEquipoCache = Array.isArray(data.lista) ? data.lista : datosEquipoCache;
+      try { localStorage.setItem("datos_equipo_cache", JSON.stringify(datosEquipoCache)); } catch (e) { /* sin espacio */ }
+      poblarCategoriasEquipo();
+      renderDatosEquipo();
+      showToast(mensajeOk);
+      return true;
+    } catch (err) {
+      showToast((navigator.onLine === false ? "Sin señal: " : "No se pudo guardar: ") + err.message);
+      return false;
+    }
+  }
+  showToast("No se pudo guardar. Probá de nuevo.");
+  return false;
+}
+document.getElementById("equipoGuardarBtn").addEventListener("click", async () => {
+  const id = document.getElementById("equipoFormId").value;
+  const titulo = document.getElementById("equipoFormTituloInput").value.trim();
+  const contenido = document.getElementById("equipoFormContenido").value.trim();
+  if (!titulo || !contenido) { showToast("Completá el título y el dato."); return; }
+  const btn = document.getElementById("equipoGuardarBtn");
+  btn.disabled = true;
+  const ok = await guardarDatoEquipo({
+    accion: id ? "editar" : "crear", id: id || undefined, titulo, contenido,
+    categoria: document.getElementById("equipoFormCategoria").value,
+    origen: document.getElementById("equipoFormOrigen").value || undefined,
+  }, id ? "Cambios guardados para todo el equipo." : "Guardado: ya lo ve todo el equipo.");
+  btn.disabled = false;
+  if (ok) cerrarFormEquipo();
 });
 
 // ---------- Guardia técnica rotativa ----------

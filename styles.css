@@ -2967,3 +2967,46 @@ html[data-inicio="nuevo"] .app .cm-guardado { border-radius: 3px; background: rg
 html[data-inicio="nuevo"]:is([data-theme="day"], [data-theme="contraste"]) .app .cm-guardado { color: #1F7A3D; }
 html[data-inicio="nuevo"] .app :is(.consulta-reciente, .consulta-manual-item, .consulta-respuesta-wrap) { box-shadow: none !important; }
 html[data-inicio="nuevo"] .app #consultaRespuestaWrap { border-left: 4px solid var(--sat-am) !important; }
+
+/* ===== Manuales: pestañas, foto, repreguntas y datos del equipo ===== */
+.man-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 4px 0 14px; }
+.man-tabs button { min-height: 44px; border-radius: 10px; border: 1.5px solid #D8DCD4; background: #FFFFFF; color: #101820; font: 600 14px 'Space Grotesk', sans-serif; cursor: pointer; }
+.man-tabs button.active { background: #101820; color: #F5A623; border-color: #101820; }
+html[data-theme="night"] .man-tabs button { background: #1B2530; border-color: #2A3743; color: #F4F5F0; }
+html[data-theme="night"] .man-tabs button.active { background: #F5A623; color: #101820; border-color: #F5A623; }
+.consulta-foto-row { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.consulta-foto-btn { width: auto !important; }
+.consulta-foto-preview { position: relative; }
+.consulta-foto-preview img { width: 120px; height: 90px; object-fit: cover; border-radius: 8px; display: block; }
+.consulta-foto-quitar { position: absolute; top: -8px; right: -8px; width: 26px; height: 26px; border-radius: 50%; border: none; background: #C0392B; color: #fff; cursor: pointer; }
+.consulta-hilo .hilo-turno { padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px dashed rgba(127,127,127,0.35); }
+.hilo-preg { font-weight: 700; margin: 0 0 6px; }
+.consulta-acciones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.consulta-acciones .btn { width: auto; flex: 1 1 auto; }
+.consulta-repregunta { margin-top: 12px; }
+.consulta-repregunta .btn { margin-top: 8px; }
+.equipo-barra { display: grid; grid-template-columns: 1fr; gap: 8px; margin-bottom: 10px; }
+.equipo-form { margin-top: 12px; }
+.equipo-lista { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.equipo-card { padding: 12px 14px; border-radius: 10px; border: 1.5px solid #D8DCD4; background: #FFFFFF; color: #101820; }
+html[data-theme="night"] .equipo-card { background: #1B2530; border-color: #2A3743; color: #F4F5F0; }
+.equipo-card-top { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.equipo-cat, .equipo-ia { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: rgba(127,127,127,0.15); }
+.equipo-ia { background: rgba(108,99,196,0.16); }
+.equipo-titulo { font-weight: 700; font-size: 16px; margin: 0 0 6px; }
+.equipo-contenido { font-size: 15px; }
+.equipo-meta { font-size: 12.5px; color: #6B7680; margin: 8px 0 0; }
+html[data-theme="night"] .equipo-meta { color: #9AA3A9; }
+.equipo-acciones { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.equipo-acciones .btn { width: auto; flex: 1 1 auto; }
+
+html[data-inicio="nuevo"] .app .man-tabs button { border-radius: 4px !important; font-family: var(--f-titulo) !important; font-weight: 700; font-size: 16px; background: var(--sat-sup) !important; border-color: var(--sat-borde) !important; color: var(--sat-texto) !important; }
+html[data-inicio="nuevo"] .app .man-tabs button.active { background: var(--sat-am) !important; border-color: var(--sat-am) !important; color: var(--sat-tinta) !important; }
+html[data-inicio="nuevo"] .app .equipo-card { border-radius: 6px !important; background: var(--sat-sup) !important; border-color: var(--sat-borde) !important; color: var(--sat-texto) !important; border-left: 4px solid var(--sat-am) !important; }
+html[data-inicio="nuevo"] .app .equipo-titulo { font-family: var(--f-titulo) !important; font-size: 19px; }
+html[data-inicio="nuevo"] .app :is(.equipo-cat, .equipo-ia) { border-radius: 3px; font-family: var(--f-titulo) !important; font-size: 13px; }
+html[data-inicio="nuevo"] .app .equipo-cat { background: var(--sat-sup2); color: var(--sat-texto); border: 1px solid var(--sat-borde); }
+html[data-inicio="nuevo"] .app .equipo-meta { color: var(--sat-tenue) !important; font-size: 13.5px; }
+html[data-inicio="nuevo"] .app .consulta-foto-preview img { border-radius: 4px; border: 2px solid var(--sat-am); }
+.equipo-contenido p { margin: 0 0 3px; }
+.equipo-contenido ol, .equipo-contenido ul { margin: 2px 0 4px; }

@@ -74,6 +74,9 @@ const COLECCIONES = {
   // { "<numero_servicio>": { primera: ISO, ultima: ISO } } — cuándo apareció
   // por primera vez cada servicio en el listado de pendientes.
   servicios_vistos: { path: "servicios-vistos.json", default: {} },
+  // Sección cooperativa de Manuales: datos que aportan los técnicos
+  // (APNs, códigos, trucos), con quién lo cargó, cuándo y quién lo editó.
+  datos_equipo: { path: "datos-equipo.json", default: [] },
 };
 
 // Traduce cada colección que ya se cortó al backend nuevo — algunas
@@ -793,6 +796,47 @@ module.exports = async (req, res) => {
         contenidoAGuardar = mapa;
       }
 
+      if (nombreColeccion === "datos_equipo") {
+        const lista = Array.isArray(contenidoExistente) ? contenidoExistente.slice() : [];
+        const txt = (v, max) => String(v == null ? "" : v).trim().slice(0, max);
+        const ahoraIso = new Date().toISOString();
+        const accion = body && body.accion;
+        const autor = txt(body && body.autor, 60) || "Sin nombre";
+        if (accion === "crear") {
+          const titulo = txt(body.titulo, 150);
+          const contenido = txt(body.contenido, 6000);
+          if (!titulo || !contenido) { res.status(400).json({ error: "Falta el título o el contenido" }); return; }
+          if (lista.length >= 2000) { res.status(400).json({ error: "Se llegó al máximo de datos guardados" }); return; }
+          lista.unshift({
+            id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+            titulo, contenido, categoria: txt(body.categoria, 60) || "General",
+            origen: body.origen === "ia" ? "ia" : "tecnico",
+            autor, fecha: ahoraIso, ediciones: [],
+          });
+        } else if (accion === "editar") {
+          const i = lista.findIndex((d) => d.id === body.id);
+          if (i === -1) { res.status(404).json({ error: "Ese dato ya no existe (puede que alguien lo haya borrado)" }); return; }
+          const titulo = txt(body.titulo, 150);
+          const contenido = txt(body.contenido, 6000);
+          if (!titulo || !contenido) { res.status(400).json({ error: "Falta el título o el contenido" }); return; }
+          const previo = lista[i];
+          lista[i] = {
+            ...previo, titulo, contenido, categoria: txt(body.categoria, 60) || previo.categoria || "General",
+            ediciones: [...(previo.ediciones || []), { autor, fecha: ahoraIso }].slice(-30),
+          };
+        } else if (accion === "borrar") {
+          const i = lista.findIndex((d) => d.id === body.id);
+          if (i === -1) { res.status(404).json({ error: "Ese dato ya no existe" }); return; }
+          // Lo puede borrar quien lo cargó, o la oficina desde el panel admin.
+          if (!body.admin && lista[i].autor !== autor) { res.status(403).json({ error: "Solo lo puede borrar quien lo cargó, o la oficina" }); return; }
+          lista.splice(i, 1);
+        } else {
+          res.status(400).json({ error: "Acción inválida" });
+          return;
+        }
+        contenidoAGuardar = lista;
+      }
+
       if (nombreColeccion === "errores_app") {
         // El registro de errores se agrega (máx. 200, los más nuevos primero)
         // y se puede vaciar con { accion: "limpiar" }.
@@ -860,6 +904,10 @@ module.exports = async (req, res) => {
         }
       }
 
+      if (nombreColeccion === "datos_equipo") {
+        res.status(200).json({ ok: true, lista: contenidoAGuardar });
+        return;
+      }
       res.status(200).json({ ok: true, count: Array.isArray(body) ? body.length : undefined });
     } catch (err) {
       res.status(500).json({ error: `Error interno al guardar ${nombreColeccion}` });
