@@ -977,3 +977,81 @@ test("Manuales: datos del equipo (crear con autor y fecha, editar queda registra
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Admin SIMs: guardar la tabla no pisa lo que cambió en la app ni re-manda las instaladas como stock", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(300);
+  const r = await page.evaluate(() => {
+    const base = new Map([
+      ["1", { numero: "1", empresa: "Claro", tipo: "Estándar", tecnico_actual: "Juan", estado: "stock", cliente: "", ubicacion_tipo: "tecnico" }],
+      ["2", { numero: "2", empresa: "Movistar", tipo: "", tecnico_actual: "Oficina", estado: "stock", cliente: "", ubicacion_tipo: "oficina" }],
+      ["3", { numero: "3", empresa: "Personal", tipo: "Estándar", tecnico_actual: "Luis", estado: "stock", cliente: "", ubicacion_tipo: "tecnico" }],
+      ["9", { numero: "9", empresa: "Claro", tipo: "Estándar", tecnico_actual: "Juan", estado: "uso", cliente: "Kiosco", ubicacion_tipo: "cliente" }],
+    ]);
+    // Mientras la pestaña estaba abierta, en la app: la 1 se transfirió a Luis y se marcó defectuosa,
+    // la 3 se instaló (ya no está en stock) y apareció la 5 nueva.
+    const servidor = [
+      { numero: "1", empresa: "Claro", tipo: "Estándar", tecnico_actual: "Luis", tecnico_anterior: "Juan", estado: "stock", estado_fisico: "Defectuosa", cliente: "", ubicacion_tipo: "tecnico" },
+      { numero: "2", empresa: "Movistar", tipo: "", tecnico_actual: "Oficina", estado: "stock", cliente: "", ubicacion_tipo: "oficina" },
+      { numero: "5", empresa: "Claro", tipo: "Estándar", tecnico_actual: "Oficina", estado: "stock", cliente: "", ubicacion_tipo: "oficina" },
+      { numero: "9", empresa: "Claro", tipo: "Estándar", tecnico_actual: "Juan", estado: "uso", cliente: "Kiosco", ubicacion_tipo: "cliente" },
+    ];
+    // En el admin solo se cambió el tipo de la 2 y se agregó la 7.
+    const tabla = [
+      { numero: "1", empresa: "Claro", tipo: "Estándar", tecnico_actual: "Juan", estado: "stock", cliente: "" },
+      { numero: "2", empresa: "Movistar", tipo: "Mini", tecnico_actual: "Oficina", estado: "stock", cliente: "" },
+      { numero: "3", empresa: "Personal", tipo: "Estándar", tecnico_actual: "Luis", estado: "stock", cliente: "" },
+      { numero: "9", empresa: "Claro", tipo: "Estándar", tecnico_actual: "Juan", estado: "stock", cliente: "Kiosco" },
+      { numero: "7", empresa: "Movistar", tipo: "", tecnico_actual: "Oficina", estado: "stock", cliente: "" },
+    ];
+    return unirSimsConServidor(tabla, servidor, base);
+  });
+  const porNum = Object.fromEntries(r.lista.map((x) => [x.numero, x]));
+  assert.strictEqual(porNum["1"].tecnico_actual, "Luis", "respeta la transferencia hecha en la app");
+  assert.strictEqual(porNum["1"].estado_fisico, "Defectuosa", "no pierde el estado físico");
+  assert.strictEqual(porNum["2"].tipo, "Mini", "aplica lo editado en el admin");
+  assert.ok(!porNum["3"], "no revive la que se instaló");
+  assert.ok(!porNum["9"], "no manda las instaladas como stock");
+  assert.ok(porNum["5"], "conserva la que se agregó en la app");
+  assert.ok(porNum["7"], "agrega la nueva del admin");
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("SIMs: un parte que quedó en la cola sin señal registra igual la SIM instalada al enviarse; sin señal se puede elegir la SIM", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const accionesSim = [];
+  let conSenal = true;
+  await page.route("**/api/**", (route) => {
+    const req = route.request();
+    const u = req.url();
+    if (!conSenal) return route.abort("internetdisconnected");
+    if (u.includes("/api/recurso-uso") && req.method() === "POST") { const b = JSON.parse(req.postData()); if (b.recurso === "sim") accionesSim.push(b); }
+    if (u.includes("coleccion=sims")) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([
+      { numero: "341-1", empresa: "Claro", tipo: "Estándar", tecnico_actual: "Juan Pérez", estado: "stock", ubicacion_tipo: "tecnico" },
+      { numero: "341-2", empresa: "Claro", tipo: "Estándar", tecnico_actual: "Juan Pérez", estado: "stock", ubicacion_tipo: "tecnico", estado_fisico: "Defectuosa" },
+    ]) });
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, id: "x" }) });
+  });
+  await page.goto(base + "/");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { tecnicoLogueado = "Juan Pérez"; return cargarOpcionesSimInstalar(); });
+  assert.strictEqual(await page.locator("#simInstalarSelect option[value]:not([value=''])").count(), 1, "la defectuosa no se ofrece para instalar");
+  conSenal = false;
+  await page.evaluate(() => cargarOpcionesSimInstalar());
+  assert.strictEqual(await page.locator("#simInstalarSelect option[value='341-1']").count(), 1, "sin señal usa la lista guardada");
+  conSenal = true;
+  await page.evaluate(() => {
+    localStorage.setItem("cola_envios_pendientes", JSON.stringify([{ tipo: "parte", idParte: "P1", data: { cliente: "Kiosco Norte", tecnico: "Juan Pérez", numero_cliente: "77", direccion: "Belgrano 5" }, signatureImgTag: "", signatureDataUrl: "", sim: { numero: "341-1", numeroSimARetirar: null } }]));
+    return procesarColaEnvios();
+  });
+  await page.waitForTimeout(500);
+  assert.strictEqual(accionesSim.length, 1, "se registra la SIM al salir el parte de la cola");
+  assert.strictEqual(accionesSim[0].accion, "usar");
+  assert.strictEqual(accionesSim[0].numero, "341-1");
+  assert.strictEqual(accionesSim[0].cliente, "Kiosco Norte");
+  assert.deepStrictEqual(erroresPagina.filter((e) => !/internetdisconnected|Failed to fetch/i.test(e)), []);
+  await ctx.close();
+});

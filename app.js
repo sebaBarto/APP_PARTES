@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.136.0";
+const APP_VERSION = "3.136.1";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -3127,11 +3127,19 @@ async function cargarOpcionesSimInstalar() {
   if (!tecnicoLogueado) return; // el login general no tiene stock propio
   try {
     const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
-    const res = await fetch("/api/datos?coleccion=sims", { headers, cache: "no-store" });
-    if (!res.ok) return;
-    const sims = await res.json();
+    let sims = null;
+    try {
+      const res = await fetch("/api/datos?coleccion=sims", { headers, cache: "no-store" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      sims = await res.json();
+      try { localStorage.setItem("sims_cache", JSON.stringify(sims)); } catch (e) { /* sin espacio */ }
+    } catch (errRed) {
+      // Sin señal: se usa la última lista guardada, para poder elegir igual la SIM instalada.
+      try { sims = JSON.parse(localStorage.getItem("sims_cache") || "null"); } catch (e) { sims = null; }
+      if (!sims) return;
+    }
     simsEnStockPropio = (Array.isArray(sims) ? sims : []).filter(
-      (s) => s.tecnico_actual === tecnicoLogueado && s.estado === "stock"
+      (s) => s.tecnico_actual === tecnicoLogueado && s.estado === "stock" && s.ubicacion_tipo !== "cliente" && (!s.estado_fisico || s.estado_fisico === "Disponible")
     );
     if (simsEnStockPropio.length === 0) return;
     const opciones = simsEnStockPropio
@@ -3253,8 +3261,17 @@ simInstalarSelect.addEventListener("change", validarSimAInstalar);
 
 // Después de enviar el parte con éxito, si se eligió una SIM, la marca
 // como usada en el cliente del servicio (sale del stock del técnico).
-async function asignarSimInstaladaAlCliente(data) {
+// La SIM elegida en el parte, guardada junto al parte: si el parte queda en
+// la cola sin señal, la SIM se registra igual cuando se envía (antes quedaba
+// para siempre en el stock del técnico).
+function simElegidaParaParte() {
   const sim = getSimAInstalarSeleccionada();
+  if (!sim) return null;
+  return { numero: sim.numero, numeroSimARetirar: decisionSimInstalar ? decisionSimInstalar.numeroSimARetirar : null };
+}
+async function asignarSimInstaladaAlCliente(data, simGuardada) {
+  const elegida = simGuardada !== undefined ? simGuardada : simElegidaParaParte();
+  const sim = elegida ? { numero: elegida.numero } : null;
   if (!sim || !data.cliente) return;
   try {
     // Si ya se decidió al elegir la SIM (ver el listener de
@@ -3268,7 +3285,7 @@ async function asignarSimInstaladaAlCliente(data) {
     // duplicarla: si el chequeo previo del frontend falló por
     // cualquier motivo (fue justo lo que le pasó a un técnico), el
     // servidor lo atrapa igual antes de guardar en silencio.
-    const numeroSimARetirar = decisionSimInstalar ? decisionSimInstalar.numeroSimARetirar : null;
+    const numeroSimARetirar = elegida.numeroSimARetirar || null;
 
     // Última chance de resolver el número de cliente antes de mandar
     // — puede haber pasado bastante entre elegir el cliente y llegar
@@ -4227,6 +4244,9 @@ async function procesarColaEnvios() {
           : await intentarEnviarParte(item, false);
       if (resultado.oficinaOk) {
         enviadosOk++;
+        if (tipo === "parte" && item.sim) {
+          try { await asignarSimInstaladaAlCliente(item.data, item.sim); } catch (e) { /* se avisa adentro */ }
+        }
       } else {
         restantes.push(item);
       }
@@ -4283,7 +4303,7 @@ confirmSignBtn.addEventListener("click", async () => {
   const signatureDataUrl = normalizarFirmaParaMail(canvas);
   const signatureImgTag = `<img src="${signatureDataUrl}" alt="Firma del cliente" width="320" height="110" style="display:block; width:320px; height:110px; border:0;" />`;
 
-  const payload = { tipo: "parte", idParte, data, signatureImgTag, signatureDataUrl, fotoBase64, fotoMimeType };
+  const payload = { tipo: "parte", idParte, data, signatureImgTag, signatureDataUrl, fotoBase64, fotoMimeType, sim: simElegidaParaParte() };
 
   showScreen("sending");
   setStatus("ENVIANDO", "busy");
@@ -4318,7 +4338,7 @@ confirmSignBtn.addEventListener("click", async () => {
     // segundo siguiente, viendo el dato viejo porque el guardado
     // todavía estaba en camino (confuso, aunque no era ningún error
     // real: apenas terminaba de guardar, quedaba bien).
-    await asignarSimInstaladaAlCliente(data);
+    await asignarSimInstaladaAlCliente(data, payload.sim);
     // Este, en cambio, no se espera — no es crítico, y no tiene
     // sentido demorar la pantalla de "enviado" por un extra.
     if (data.numero_servicio) iniciarSeguimientoSiCorresponde(data);

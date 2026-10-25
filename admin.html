@@ -2854,6 +2854,7 @@ function poblarDatalistClientesSims() {
 }
 let simsCompletos = []; // todas las SIMs, tal como están guardadas/recién subidas/recién transferidas
 let numerosExistentesEnServidor = new Set(); // para saber si una fila ya existe del lado del servidor
+let simsBaseAdmin = new Map(); // cómo estaba cada SIM al abrir la pestaña (para saber qué cambió acá y qué cambió en la app)
 
 const COLORES_COMPANIA_SIM_ADMIN = { Movistar: "#2E9E4F", Personal: "#29ABE2", Claro: "#E4402C" };
 
@@ -3171,6 +3172,7 @@ async function cargarSimsAdmin() {
     const tecnicos = await resTecnicos.json();
     simsCompletos = Array.isArray(sims) ? sims : [];
     numerosExistentesEnServidor = new Set(simsCompletos.map((s) => s.numero));
+    simsBaseAdmin = new Map(simsCompletos.map((s) => [s.numero, { ...s }]));
     nombresTecnicosParaSims = (Array.isArray(tecnicos) ? tecnicos : []).map((t) => t.nombre);
     try {
       const servicios = resServicios ? await resServicios.json() : [];
@@ -3195,6 +3197,45 @@ agregarSimBtn.addEventListener("click", () => {
   simsCompletos.push({ empresa: "Movistar", tipo: "Estándar", numero: "", tecnico_actual: "Oficina", estado: "stock", cliente: "" });
   dibujarTablaSims();
 });
+
+// Une lo editado en esta pestaña con el estado ACTUAL del servidor.
+// Antes se mandaba la tabla tal como estaba al abrirla: si mientras tanto
+// un técnico transfería, instalaba o marcaba una SIM como defectuosa, al
+// tocar "Guardar" se pisaba ese cambio; y las SIMs ya instaladas en un
+// cliente se volvían a mandar como "stock" (quedaban en las dos tablas).
+// Ahora: solo se aplica lo que se cambió acá; todo lo demás se toma del
+// servidor tal como está en este momento.
+function unirSimsConServidor(filasTabla, servidor, base) {
+  const srv = new Map((servidor || []).map((x) => [x.numero, x]));
+  const enTabla = new Set();
+  const resultado = [];
+  let respetados = 0;
+  filasTabla.forEach((f) => {
+    if (!f.numero || enTabla.has(f.numero)) return;
+    enTabla.add(f.numero);
+    const b = base.get(f.numero);
+    const actual = srv.get(f.numero);
+    if (!actual) {
+      if (b) return; // existía al abrir y ya no está (se instaló o se borró desde la app): no se revive
+      resultado.push({ ...f }); // SIM nueva cargada acá (a mano o por Excel)
+      return;
+    }
+    if (actual.ubicacion_tipo === "cliente") return; // instalada: vive en el registro de instaladas
+    const unida = { ...actual };
+    ["empresa", "tipo", "cliente"].forEach((k) => {
+      if (!b || String(f[k] ?? "") !== String(b[k] ?? "")) unida[k] = f[k];
+    });
+    if (b && f.tecnico_actual !== b.tecnico_actual) unida.tecnico_actual = f.tecnico_actual; // reasignada acá (Excel)
+    if (b && JSON.stringify(actual) !== JSON.stringify(b)) respetados++;
+    resultado.push(unida);
+  });
+  // SIMs que aparecieron en el servidor después de abrir la pestaña: se conservan.
+  let nuevasEnApp = 0;
+  srv.forEach((x, numero) => {
+    if (!enTabla.has(numero) && !base.has(numero) && x.ubicacion_tipo !== "cliente") { resultado.push(x); nuevasEnApp++; }
+  });
+  return { lista: resultado, respetados, nuevasEnApp };
+}
 
 function leerFilasSimsDeLaTabla() {
   const filas = Array.from(simsTablaBody.querySelectorAll(":scope > .sim-fila-tabla"));
@@ -3297,9 +3338,9 @@ guardarSimsBtn.addEventListener("click", async () => {
     return;
   }
 
-  const lista = leerFilasSimsDeLaTabla().filter((s) => s.numero);
+  const filasTabla = leerFilasSimsDeLaTabla().filter((s) => s.numero);
 
-  if (lista.length === 0) {
+  if (filasTabla.length === 0) {
     guardarSimsStatus.className = "status err";
     guardarSimsStatus.textContent = "Agregá al menos una SIM con número de línea.";
     return;
@@ -3308,7 +3349,13 @@ guardarSimsBtn.addEventListener("click", async () => {
   guardarSimsBtn.disabled = true;
   guardarSimsStatus.className = "status";
   guardarSimsStatus.textContent = "Guardando...";
+  let union = { lista: filasTabla, respetados: 0, nuevasEnApp: 0 };
   try {
+    const resActual = await fetch("/api/datos?coleccion=sims", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+    if (!resActual.ok) throw new Error("no se pudo leer el estado actual de las SIMs para no pisar cambios de la app");
+    const actual = await resActual.json();
+    union = unirSimsConServidor(filasTabla, Array.isArray(actual) ? actual : [], simsBaseAdmin);
+    const lista = union.lista;
     const res = await fetch("/api/datos?coleccion=sims", {
       method: "POST",
       headers: {
@@ -3338,17 +3385,22 @@ guardarSimsBtn.addEventListener("click", async () => {
       // se va a migrar sola la próxima vez que se abra esta pestaña
     }
 
-    if (migradas > 0) {
+    try {
       const resSims = await fetch("/api/datos?coleccion=sims", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
-      simsCompletos = await resSims.json();
-    } else {
+      const frescas = await resSims.json();
+      simsCompletos = Array.isArray(frescas) ? frescas : lista;
+    } catch (errRecarga) {
       simsCompletos = lista;
     }
     dibujarTablaSims();
     guardarSimsStatus.className = "status ok";
-    guardarSimsStatus.textContent = migradas > 0
+    simsBaseAdmin = new Map(simsCompletos.map((x) => [x.numero, { ...x }]));
+    numerosExistentesEnServidor = new Set(simsCompletos.map((x) => x.numero));
+    const avisoApp = union.respetados || union.nuevasEnApp
+      ? ` Se respetaron ${union.respetados + union.nuevasEnApp} cambio(s) hechos desde la app mientras esta pestaña estaba abierta.` : "";
+    guardarSimsStatus.textContent = (migradas > 0
       ? `Listo — además, ${migradas} SIM(s) que quedaron "en uso" se movieron solas al registro de instaladas.`
-      : "Listo — la lista de SIMs ya está disponible en la app.";
+      : "Listo — la lista de SIMs ya está disponible en la app.") + avisoApp;
   } catch (err) {
     guardarSimsStatus.className = "status err";
     guardarSimsStatus.textContent = "No se pudo guardar: " + err.message;
