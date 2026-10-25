@@ -2740,7 +2740,7 @@ html[data-inicio="nuevo"] .app .review-eyebrow * { font-weight: inherit !importa
 html[data-inicio="nuevo"] .app .review-eyebrow .acr { text-transform: none !important; }
 /* Superficies heredadas del modo noche general: pasan al grafito cálido */
 html[data-inicio="nuevo"] .app :is(
-  .modal-caja, .panel-tile, .field-input, .check-instalacion, .discount-chip, .crono-dia-chip,
+  .modal-caja, .field-input, .check-instalacion, .discount-chip, .crono-dia-chip,
   .hist-periodo-chip, .hist-pasado-chip, .stock-periodo-chip, .stock-pasado-chip, .nota-tab-chip,
   .dash-tecnico-card, .consulta-respuesta-wrap, .consulta-manual-item, .guardia-proximo-card,
   .historial-seleccion-bar, .ocupacion-dia-card, .sim-card, .dash-chart-wrap, .cliente-sugerencias-list,
@@ -2752,3 +2752,9 @@ html[data-inicio="nuevo"] .app :is(.review-eyebrow, .btn, .panel-tile-label, .fi
 html[data-inicio="nuevo"] .app .mosaico-fila { background: var(--sat-sup) !important; border-color: var(--sat-borde) !important; border-radius: 6px !important; }
 html[data-inicio="nuevo"] .app .mosaico-fila button { border-radius: 4px !important; background: transparent !important; border-color: var(--sat-borde) !important; color: var(--sat-texto) !important; }
 html[data-inicio="nuevo"] .app .ajuste-seccion { font-family: var(--f-titulo) !important; font-weight: 700; font-size: 18px; color: var(--sat-texto) !important; letter-spacing: 0; text-transform: none; }
+
+/* Tecla destacada de "Servicios pendientes" (menú de Servicios Técnicos): mismo hexágono amarillo que la del inicio */
+html[data-inicio="nuevo"] #screen-servicios-menu .panel-tile.tile-servicios-pendientes {
+  clip-path: var(--sat-hex); border-radius: 0 !important; background: var(--sat-am) !important; color: var(--sat-tinta) !important; border-color: transparent !important; padding-left: 30px !important; padding-right: 30px !important;
+}
+html[data-inicio="nuevo"] #screen-servicios-menu .panel-tile.tile-servicios-pendientes :is(.panel-tile-label, .panel-tile-sub, span) { color: var(--sat-tinta) !important; }

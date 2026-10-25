@@ -679,6 +679,12 @@ test("Identidad SAT (skin nuevo): amarillo del logo, Barlow, logo en la barra y 
   assert.strictEqual(await est("#screen-form .btn-primary", "backgroundColor"), "rgb(255, 192, 51)");
   assert.match(await est("#screen-form .btn-primary", "clipPath"), /polygon/);
   assert.strictEqual(await page.locator(".topbar-logo").isVisible(), true);
+  for (const tema of ["night", "day", "contraste"]) {
+    await page.evaluate((t) => { document.documentElement.dataset.theme = t; showScreen("serviciosMenu"); }, tema);
+    const tecla = page.locator("#tileServiciosPendientesBtn");
+    assert.strictEqual(await tecla.evaluate((el) => getComputedStyle(el).backgroundColor), "rgb(255, 192, 51)", tema + ": Servicios pendientes en amarillo");
+    assert.strictEqual(await tecla.locator(".panel-tile-label").evaluate((el) => getComputedStyle(el).color), "rgb(13, 12, 13)", tema + ": letra negra legible");
+  }
   assert.ok(await page.evaluate(() => document.fonts.check("700 italic 20px 'Barlow Semi Condensed'")), "la fuente está disponible");
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
