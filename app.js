@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.129.0";
+const APP_VERSION = "3.130.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -83,10 +83,20 @@ if (typeof Chart !== "undefined") {
           sc.border = Object.assign({}, sc.border, { color: grilla });
         });
       }
+      const nuevo = raiz.dataset.inicio === "nuevo";
+      if (nuevo) {
+        // Identidad SAT: Barlow en los gráficos.
+        const fTit = { family: "'Barlow Semi Condensed', 'Barlow', sans-serif", weight: "700", size: 16 };
+        co.plugins.title = Object.assign({}, co.plugins.title, { font: fTit });
+        leg.labels = Object.assign({}, leg.labels, { font: { family: "'Barlow', sans-serif", size: 13 } });
+        if (co.scales) Object.values(co.scales).forEach((sc) => { sc.ticks = Object.assign({}, sc.ticks, { font: { family: "'Barlow', sans-serif", size: 12 } }); });
+      }
       const remapear = (c) => {
-        if (claro || typeof c !== "string") return c;
+        if (typeof c !== "string") return c;
+        if (nuevo && c.toUpperCase() === "#F5A623") return "#FFC033";
+        if (claro) return c;
         if (c.toLowerCase() === "#2e7d32") return "#5FD08A";
-        if (c.toLowerCase() === "#101820") return (chart.config.type === "doughnut" || chart.config.type === "pie") ? "#6F8CA0" : "#E8ECEF";
+        if (c.toLowerCase() === "#101820") return (chart.config.type === "doughnut" || chart.config.type === "pie") ? (nuevo ? "#8A857C" : "#6F8CA0") : (nuevo ? "#EEECE7" : "#E8ECEF");
         if (c === "rgba(16,24,32,0.1)") return "rgba(232,236,239,0.14)";
         return c;
       };

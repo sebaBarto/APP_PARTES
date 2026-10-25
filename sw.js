@@ -1,6 +1,6 @@
 // Versión del caché: subir este número cada vez que se publican cambios
 // importantes fuerza a los celulares a descartar la copia vieja.
-const CACHE_NAME = "parte-tecnico-v106";
+const CACHE_NAME = "parte-tecnico-v107";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -28,6 +28,13 @@ const VENDOR_FILES = [
   "./vendor/fonts/inter-latin-400-normal.woff2",
   "./vendor/fonts/inter-latin-500-normal.woff2",
   "./vendor/fonts/inter-latin-600-normal.woff2",
+  "./vendor/fonts/barlow-latin-400-normal.woff2",
+  "./vendor/fonts/barlow-latin-500-normal.woff2",
+  "./vendor/fonts/barlow-latin-600-normal.woff2",
+  "./vendor/fonts/barlow-semi-condensed-latin-600-normal.woff2",
+  "./vendor/fonts/barlow-semi-condensed-latin-700-normal.woff2",
+  "./vendor/fonts/barlow-semi-condensed-latin-700-italic.woff2",
+  "./vendor/fonts/barlow-semi-condensed-latin-800-italic.woff2",
   "./vendor/leaflet/leaflet.css",
   "./vendor/leaflet/leaflet.js",
   "./vendor/leaflet/images/marker-icon.png",

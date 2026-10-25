@@ -333,17 +333,18 @@ test("Cobro: el botón elegido (descuento y forma de pago) se ve marcado en los 
       await page.evaluate((t) => { document.documentElement.dataset.theme = t; showScreen("form"); }, tema);
       await page.waitForTimeout(200);
       const fondo = (sel) => page.locator(sel).evaluate((el) => getComputedStyle(el).backgroundColor);
+      const amarillo = estilo === "nuevo" ? "rgb(255, 192, 51)" : "rgb(245, 166, 35)"; // amarillo SAT del logo en el skin nuevo
       const chip = (nombre, valor) => page.locator(`label.discount-chip:has(input[name='${nombre}'][value='${valor}'])`);
       await chip("f_descuento_tipo", "50").scrollIntoViewIfNeeded();
       await chip("f_descuento_tipo", "50").click();
       await page.waitForTimeout(350); // la transición de color dura 0.15 s
-      assert.strictEqual(await fondo("label.discount-chip:has(input[value='50'])"), "rgb(245, 166, 35)", `${estilo}/${tema}: 50%`);
-      assert.notStrictEqual(await fondo("label.discount-chip:has(input[value='0'])"), "rgb(245, 166, 35)", `${estilo}/${tema}: sin descuento se desmarca`);
+      assert.strictEqual(await fondo("label.discount-chip:has(input[value='50'])"), amarillo, `${estilo}/${tema}: 50%`);
+      assert.notStrictEqual(await fondo("label.discount-chip:has(input[value='0'])"), amarillo, `${estilo}/${tema}: sin descuento se desmarca`);
       const primeraForma = page.locator("label.discount-chip:has(input[name='f_forma_pago'])").first();
       await primeraForma.scrollIntoViewIfNeeded();
       await primeraForma.click();
       await page.waitForTimeout(350);
-      assert.strictEqual(await primeraForma.evaluate((el) => getComputedStyle(el).backgroundColor), "rgb(245, 166, 35)", `${estilo}/${tema}: forma de pago`);
+      assert.strictEqual(await primeraForma.evaluate((el) => getComputedStyle(el).backgroundColor), amarillo, `${estilo}/${tema}: forma de pago`);
       await ctx.close();
     }
   }
@@ -486,8 +487,8 @@ test("Skin nuevo en historial, notas, stock, SIMs y dashboards: filtros en ámba
   let { ctx, page, erroresPagina } = await abrir("nuevo", "night");
   await page.evaluate(() => { tecnicoLogueado = "Juan Pérez"; showScreen("historial"); fetchHistorialReciente(); });
   await page.waitForTimeout(700);
-  assert.strictEqual(await css(page, ".hist-periodo-chip.active", "backgroundColor"), "rgb(245, 166, 35)", "filtro activo en ámbar");
-  assert.strictEqual(await css(page, "#screen-historial .review-eyebrow", "fontSize"), "26px", "título grande");
+  assert.strictEqual(await css(page, ".hist-periodo-chip.active", "backgroundColor"), "rgb(255, 192, 51)", "filtro activo en amarillo SAT");
+  assert.strictEqual(await css(page, "#screen-historial .review-eyebrow", "fontSize"), "30px", "título grande");
   const franjas = await page.locator("#historialList .historial-card").evaluateAll((els) => els.map((e) => getComputedStyle(e).borderLeftWidth));
   assert.deepStrictEqual(franjas, ["5px", "5px"], "franja de estado en cada tarjeta");
   assert.strictEqual(await css(page, ".dash-cards-row", "display"), "grid");
@@ -508,7 +509,7 @@ test("Skin nuevo en historial, notas, stock, SIMs y dashboards: filtros en ámba
   ({ ctx, page } = await abrir("clasico", "night"));
   await page.evaluate(() => { tecnicoLogueado = "Juan Pérez"; showScreen("historial"); fetchHistorialReciente(); });
   await page.waitForTimeout(500);
-  assert.notStrictEqual(await css(page, "#screen-historial .review-eyebrow", "fontSize"), "26px");
+  assert.ok(!["26px", "30px"].includes(await css(page, "#screen-historial .review-eyebrow", "fontSize")));
   assert.strictEqual(await css(page, ".dash-cards-row", "display"), "flex", "el clásico mantiene sus tarjetas");
   await page.evaluate(() => { showScreen("dashboard"); fetchDashboard(); });
   await page.waitForTimeout(900);
@@ -537,7 +538,7 @@ test("Skin nuevo en guardias, rendición, presencia, credencial y comodatos: tí
   let { ctx, page, erroresPagina } = await abrir("nuevo");
   await page.evaluate(() => { tecnicoLogueado = "Juan Pérez"; showScreen("rendicion"); cargarMisRendiciones(); });
   await page.waitForTimeout(600);
-  assert.strictEqual(await css(page, "#screen-rendicion .review-eyebrow", "fontSize"), "26px");
+  assert.strictEqual(await css(page, "#screen-rendicion .review-eyebrow", "fontSize"), "30px");
   const franjas = await page.locator("#rendMisLista .rend-card").evaluateAll((els) => els.map((e) => getComputedStyle(e).borderLeftColor));
   assert.notStrictEqual(franjas[0], franjas[1], "pagado y rechazado se distinguen por color");
   assert.match(await page.locator("#rendMisLista .rend-motivo").textContent(), /Falta la foto del ticket/, "el técnico ve por qué se rechazó");
@@ -545,13 +546,13 @@ test("Skin nuevo en guardias, rendición, presencia, credencial y comodatos: tí
   for (const pant of ["guardias", "consultas", "presencia", "credencial", "comodatoForm", "comodatoFirma", "ajustes", "planos", "emergencia", "instalacion", "claves", "vehiculoDetalle", "herramientaDetalle"]) {
     await page.evaluate((n) => showScreen(n), pant);
     const sel = { guardias: "guardias", consultas: "consultas", presencia: "presencia", credencial: "credencial", comodatoForm: "comodato-form", comodatoFirma: "comodato-firma", ajustes: "ajustes", planos: "planos", emergencia: "emergencia", instalacion: "instalacion", claves: "claves", vehiculoDetalle: "vehiculo-detalle", herramientaDetalle: "herramienta-detalle" }[pant];
-    assert.strictEqual(await css(page, `#screen-${sel} .review-eyebrow`, "fontSize"), "26px", pant + ": título grande");
+    assert.strictEqual(await css(page, `#screen-${sel} .review-eyebrow`, "fontSize"), "30px", pant + ": título grande");
   }
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
   ({ ctx, page } = await abrir("clasico"));
   await page.evaluate(() => { showScreen("guardias"); });
-  assert.notStrictEqual(await css(page, "#screen-guardias .review-eyebrow", "fontSize"), "26px", "el clásico conserva su título");
+  assert.ok(!["26px", "30px"].includes(await css(page, "#screen-guardias .review-eyebrow", "fontSize")), "el clásico conserva su título");
   await ctx.close();
 });
 
@@ -664,5 +665,26 @@ test("Admin rendiciones: totales pendientes por técnico, pagar todo, miniaturas
   await page.waitForTimeout(500);
   assert.deepStrictEqual(pagados.sort(), ["a", "b"]);
   assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Identidad SAT (skin nuevo): amarillo del logo, Barlow, logo en la barra y botón principal hexagonal; el clásico conserva su letra", async () => {
+  let { ctx, page, erroresPagina } = await paginaConEstilo("nuevo");
+  await page.evaluate(() => showScreen("form"));
+  const est = (sel, p) => page.locator(sel).first().evaluate((el, q) => getComputedStyle(el)[q], p);
+  assert.match(await est("#screen-form .field-input", "fontFamily"), /Barlow/);
+  assert.match(await est("#screen-form .review-eyebrow", "fontFamily"), /Barlow Semi Condensed/);
+  assert.strictEqual(await est("#screen-form .review-eyebrow", "fontStyle"), "italic");
+  assert.strictEqual(await est("#screen-form .field-label", "textTransform"), "none", "rótulos sin mayúsculas");
+  assert.strictEqual(await est("#screen-form .btn-primary", "backgroundColor"), "rgb(255, 192, 51)");
+  assert.match(await est("#screen-form .btn-primary", "clipPath"), /polygon/);
+  assert.strictEqual(await page.locator(".topbar-logo").isVisible(), true);
+  assert.ok(await page.evaluate(() => document.fonts.check("700 italic 20px 'Barlow Semi Condensed'")), "la fuente está disponible");
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+  ({ ctx, page } = await paginaConEstilo("clasico"));
+  await page.evaluate(() => showScreen("form"));
+  assert.doesNotMatch(await page.locator("#screen-form .field-input").first().evaluate((el) => getComputedStyle(el).fontFamily), /Barlow/);
+  assert.strictEqual(await page.locator(".topbar-logo").isVisible(), false);
   await ctx.close();
 });
