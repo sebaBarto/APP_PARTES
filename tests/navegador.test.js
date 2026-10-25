@@ -814,9 +814,12 @@ test("Instalación: retoma lo guardado, autoguarda zonas sin pisar, fotos achica
   assert.strictEqual(await page.locator("#instDiasList .historial-card").count(), 1, "dos técnicos el mismo día = un día");
   assert.match(await page.locator("#instDiasResumen").textContent(), /1 día de obra · 7 h 30 min/);
 
-  await page.fill("#instZonaNumeroInput", "2");
-  await page.fill("#instZonaDescripcionInput", "Magnético puerta");
-  await page.click("#agregarZonaBtn");
+  assert.strictEqual(await page.inputValue("#instZonaNumeroInput"), "2", "el número siguiente ya viene puesto");
+  await page.click('#instZonaAtajos button[data-txt="Magnético"]');
+  assert.strictEqual(await page.inputValue("#instZonaDescripcionInput"), "Magnético ");
+  await page.type("#instZonaDescripcionInput", "puerta");
+  await page.press("#instZonaDescripcionInput", "Enter");
+  assert.strictEqual(await page.inputValue("#instZonaNumeroInput"), "3", "y pasa al siguiente");
   await page.waitForTimeout(1000);
   const guardado = posts.find((p) => p.accion === "guardar_items_instalacion" && p.tipo === "zona");
   assert.ok(guardado, "se autoguarda");
@@ -828,6 +831,35 @@ test("Instalación: retoma lo guardado, autoguarda zonas sin pisar, fotos achica
   const foto = posts.find((p) => p.accion === "subir_foto_instalacion");
   assert.ok(foto && foto.base64.startsWith("data:image/jpeg"), "la foto se convierte a JPG achicado");
   assert.ok(foto.base64.length < 1500000, "pesa menos de ~1 MB");
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Admin instalaciones: horas totales en la lista y por técnico en el detalle", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  await page.route("**/api/historial**", (route) => {
+    const u = route.request().url();
+    const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("tipo=instalaciones")) return json([{ id: 7, cliente: "Distribuidora Norte", tecnico: "Juan", fecha: "2026-10-20", estado: "cerrada" }]);
+    if (u.includes("tipo=instalacion&id=7")) return json({ id: 7, cliente: "Distribuidora Norte", tecnico: "Juan", estado: "cerrada", zonas: [], canales: [], fotos: [], dias: [
+      { tecnico: "Juan", fecha_llegada: "2026-10-20", hora_llegada: "08:00", hora_salida: "17:00" },
+      { tecnico: "Luis", fecha_llegada: "2026-10-20", hora_llegada: "09:00", hora_salida: "13:30" },
+      { tecnico: "Juan", fecha_llegada: "2026-10-21", hora_llegada: "08:00", hora_salida: "12:00" },
+    ] });
+    json([]);
+  });
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { document.getElementById("mainCard").classList.remove("hidden"); document.getElementById("panelInstalaciones").classList.remove("hidden"); return cargarInstalacionesAdmin(); });
+  await page.waitForTimeout(500);
+  assert.match(await page.locator(".inst-horas-lista").textContent(), /17:30 h en 2 días/);
+  await page.click(".fila-lista-clickeable");
+  await page.waitForTimeout(300);
+  const det = await page.locator("#instalacionesAdminDetalleContenido").textContent();
+  assert.match(det, /17:30 h/);
+  assert.match(det, /Juan\s*2\s*13:00/);
+  assert.match(det, /Luis\s*1\s*4:30/);
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });

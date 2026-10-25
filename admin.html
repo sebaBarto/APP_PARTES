@@ -5148,6 +5148,8 @@ async function cargarInstalacionesAdmin() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error desconocido");
     instalacionesCacheAdmin = Array.isArray(data) ? data : [];
+    // las abiertas pueden haber sumado horas: se recalculan; las cerradas quedan en memoria
+    instalacionesCacheAdmin.forEach((inst) => { if (inst.estado !== "cerrada") horasInstalacionCache.delete(String(inst.id)); });
     renderInstalacionesAdminLista();
   } catch (err) {
     instalacionesAdminStatus.className = "status err";
@@ -5172,6 +5174,7 @@ function renderInstalacionesAdminLista() {
       <div class="fila-lista-clickeable" data-id="${inst.id}" style="padding:10px 0; border-bottom:1px solid #EEE; cursor:pointer;">
         <b>${escapeHtmlAdmin(inst.cliente)}</b>${inst.numero_cliente ? " · Cliente " + escapeHtmlAdmin(inst.numero_cliente) : ""}${badge}<br>
         <span style="color:#6B7680; font-size:13px;">${escapeHtmlAdmin(inst.tecnico)} — ${fechaTexto}</span>
+        <span class="inst-horas-lista" data-id="${inst.id}" style="color:#101820; font-size:13px; font-weight:600; margin-left:6px;">${horasInstalacionCache.has(String(inst.id)) ? textoHorasListaInstalacion(horasInstalacionCache.get(String(inst.id))) : ""}</span>
       </div>
     `;
   }).join("") || "<p style='color:#6B7680;'>No hay instalaciones cargadas.</p>";
@@ -5179,6 +5182,49 @@ function renderInstalacionesAdminLista() {
   instalacionesAdminLista.querySelectorAll(".fila-lista-clickeable").forEach((fila) => {
     fila.addEventListener("click", () => mostrarDetalleInstalacionAdmin(fila.dataset.id));
   });
+  completarHorasListaInstalaciones(filtradas);
+}
+
+// ---- Horas totales por instalación (lista y detalle) ----
+const horasInstalacionCache = new Map(); // id -> { minutos, dias, porTecnico: Map(tecnico -> {minutos, dias, sinSalida}), sinSalida }
+function calcularHorasInstalacion(det) {
+  const porTecnico = new Map();
+  const fechas = new Set();
+  let minutos = 0, sinSalida = 0;
+  (det.dias || []).forEach((d) => {
+    const tec = d.tecnico || det.tecnico || "";
+    if (!porTecnico.has(tec)) porTecnico.set(tec, { minutos: 0, dias: 0, sinSalida: 0 });
+    const t = porTecnico.get(tec);
+    t.dias++;
+    if (d.fecha_llegada) fechas.add(d.fecha_llegada);
+    const min = minutosTrabajadosDia(d.hora_llegada, d.hora_salida);
+    if (min === null) { t.sinSalida++; sinSalida++; } else { t.minutos += min; minutos += min; }
+  });
+  return { minutos, dias: fechas.size, porTecnico, sinSalida };
+}
+function textoHorasListaInstalacion(h) {
+  if (!h || !h.dias) return "· sin días marcados";
+  return `· ${formatoHorasMin(h.minutos)} h en ${h.dias} día${h.dias === 1 ? "" : "s"}${h.sinSalida ? " (falta alguna salida)" : ""}`;
+}
+let horasListaGeneracion = 0;
+async function completarHorasListaInstalaciones(lista) {
+  const gen = ++horasListaGeneracion;
+  const pendientes = lista.filter((inst) => !horasInstalacionCache.has(String(inst.id)));
+  let siguiente = 0;
+  async function trabajador() {
+    while (siguiente < pendientes.length && gen === horasListaGeneracion) {
+      const inst = pendientes[siguiente++];
+      try {
+        const res = await fetch(`/api/historial?tipo=instalacion&id=${inst.id}`, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+        if (!res.ok) continue;
+        const h = calcularHorasInstalacion(await res.json());
+        horasInstalacionCache.set(String(inst.id), h);
+        const el = instalacionesAdminLista.querySelector(`.inst-horas-lista[data-id="${inst.id}"]`);
+        if (el) el.textContent = textoHorasListaInstalacion(h);
+      } catch (err) { /* se deja sin horas */ }
+    }
+  }
+  await Promise.all([trabajador(), trabajador(), trabajador(), trabajador()]);
 }
 
 instalacionesBuscarAdmin.addEventListener("input", renderInstalacionesAdminLista);
@@ -5326,8 +5372,20 @@ async function mostrarDetalleInstalacionAdmin(id) {
       const linkSalida = (d.hora_salida && d.lat_salida && d.lng_salida)
         ? ` <a href="https://www.google.com/maps?q=${d.lat_salida},${d.lng_salida}" target="_blank" rel="noopener" style="color:#4A6FA5;">📍 ver ubicación${d.precision_salida ? ` (±${Math.round(d.precision_salida)}m)` : ""}</a>`
         : (d.hora_salida ? ` <span style="color:#B5541A; font-size:12px;">(sin ubicación)</span>` : "");
-      return `<li>Día ${idx + 1} (${fechaTexto}) — <b>${escapeHtmlAdmin(d.tecnico)}</b>: entrada ${escapeHtmlAdmin(d.hora_llegada || "")}${linkEntrada}${d.hora_salida ? `, salida ${escapeHtmlAdmin(d.hora_salida)}${linkSalida}` : " — sigue en obra"}</li>`;
+      const minDia = minutosTrabajadosDia(d.hora_llegada, d.hora_salida);
+      return `<li>${fechaTexto} — <b>${escapeHtmlAdmin(d.tecnico)}</b>: entrada ${escapeHtmlAdmin(d.hora_llegada || "")}${linkEntrada}${d.hora_salida ? `, salida ${escapeHtmlAdmin(d.hora_salida)}${linkSalida} <b>(${formatoHorasMin(minDia)} h)</b>` : " — sigue en obra"}</li>`;
     }).join("") || "<li style='color:#6B7680;'>Sin días marcados.</li>";
+    const horas = calcularHorasInstalacion(inst);
+    horasInstalacionCache.set(String(id), horas);
+    const filasTecnicos = [...horas.porTecnico.entries()].map(([tec, t]) =>
+      `<tr><td style="padding:4px 10px 4px 0;">${escapeHtmlAdmin(tec)}</td><td style="padding:4px 10px; text-align:right;">${t.dias}</td><td style="padding:4px 0 4px 10px; text-align:right; font-weight:700;">${formatoHorasMin(t.minutos)}</td></tr>`).join("");
+    const horasHtml = horas.porTecnico.size
+      ? `<div style="background:#F4F5F0; border-radius:8px; padding:12px 14px;">
+          <div style="font-size:22px; font-weight:800;">${formatoHorasMin(horas.minutos)} h <span style="font-size:14px; font-weight:500; color:#6B7680;">en ${horas.dias} día${horas.dias === 1 ? "" : "s"} de obra (sumando técnicos)</span></div>
+          <table style="margin-top:8px; border-collapse:collapse; font-size:14px;"><tr style="color:#6B7680;"><td style="padding:2px 10px 2px 0;">Técnico</td><td style="padding:2px 10px; text-align:right;">Marcas</td><td style="padding:2px 0 2px 10px; text-align:right;">Horas</td></tr>${filasTecnicos}</table>
+          ${horas.sinSalida ? `<p style="color:#B5541A; font-size:13px; margin:8px 0 0;">${horas.sinSalida} día(s) sin hora de salida: no suman al total.</p>` : ""}
+        </div>`
+      : "<p style='color:#6B7680;'>Sin días marcados.</p>";
     const estadoBadge = inst.estado === "cerrada"
       ? `<span style="background:#E1F0E4;color:#1F6B34;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:700;">Cerrada</span>`
       : `<span style="background:#FBE8DC;color:#B5541A;padding:3px 9px;border-radius:999px;font-size:12px;font-weight:700;">Abierta</span>`;
@@ -5336,6 +5394,8 @@ async function mostrarDetalleInstalacionAdmin(id) {
       <h2 style="margin-top:0;">${escapeHtmlAdmin(inst.cliente)} ${estadoBadge}</h2>
       <p style="color:#6B7680;">${escapeHtmlAdmin(inst.direccion || "")}${inst.numero_cliente ? " · Cliente " + escapeHtmlAdmin(inst.numero_cliente) : ""}</p>
       <p style="color:#6B7680;">Abierta por ${escapeHtmlAdmin(inst.tecnico)} el ${escapeHtmlAdmin(inst.fecha || "")} ${escapeHtmlAdmin(inst.hora || "")}</p>
+      <h3>Horas trabajadas</h3>
+      ${horasHtml}
       <h3>Días trabajados</h3>
       <ul>${diasHtml}</ul>
       <h3>Zonas de alarma</h3>

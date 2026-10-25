@@ -2928,3 +2928,14 @@ html[data-inicio="nuevo"] #instalacionDetalleWrap > .card:first-child { backgrou
 html[data-inicio="nuevo"] .app .material-agregado-item { background: var(--sat-sup2) !important; border: 1px solid var(--sat-borde) !important; border-radius: 4px !important; color: var(--sat-texto) !important; }
 html[data-inicio="nuevo"] .app .inst-guardado { margin: 6px 0 0; font-size: 14px; }
 html[data-inicio="nuevo"] #screen-instalacion #instDiasResumen { margin: 0 0 10px; font-size: 15px; font-weight: 600; }
+
+/* Atajos de tipo de zona / cámara (instalación) */
+.inst-atajos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.inst-atajos button {
+  min-height: 40px; padding: 0 12px; border-radius: 999px; border: 1.5px solid #D8DCD4; background: #FFFFFF; color: #101820;
+  font: 600 14px 'Inter', sans-serif; cursor: pointer;
+}
+html[data-theme="night"] .inst-atajos button { background: #1B2530; border-color: #2A3743; color: #F4F5F0; }
+.inst-atajos button:active { border-color: #F5A623; }
+html[data-inicio="nuevo"] .app .inst-atajos button { border-radius: 4px !important; background: var(--sat-sup2) !important; border-color: var(--sat-borde) !important; color: var(--sat-texto) !important; font-family: var(--f-titulo) !important; font-weight: 700; font-size: 15px; }
+html[data-inicio="nuevo"] .app .inst-atajos button:active { border-color: var(--sat-am) !important; }

@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.133.0";
+const APP_VERSION = "3.134.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -8263,6 +8263,8 @@ async function cargarDetalleInstalacion() {
     renderInstZonas();
     renderInstCanales();
     pintarFotosInstalacion(inst.fotos || []);
+    instZonaNumeroInput.value = ""; instCanalNumeroInput.value = "";
+    prepararNumeroInst();
   } catch (err) {
     // sin señal: se sigue con lo que haya en pantalla
   }
@@ -8551,9 +8553,8 @@ agregarZonaBtn.addEventListener("click", () => {
   instZonasAgregadas.push({ numero, descripcion });
   renderInstZonas();
   programarGuardadoItems("zona");
-  instZonaNumeroInput.value = "";
+  instZonaNumeroInput.value = siguienteNumeroInst(instZonasAgregadas);
   instZonaDescripcionInput.value = "";
-  instZonaNumeroInput.focus();
 });
 guardarZonasBtn.addEventListener("click", async () => {
   if (!instalacionActivaId) return;
@@ -8591,10 +8592,33 @@ agregarCanalBtn.addEventListener("click", () => {
   instCanalesAgregadas.push({ numero, descripcion });
   renderInstCanales();
   programarGuardadoItems("canal");
-  instCanalNumeroInput.value = "";
+  instCanalNumeroInput.value = siguienteNumeroInst(instCanalesAgregadas);
   instCanalDescripcionInput.value = "";
-  instCanalNumeroInput.focus();
 });
+// Atajos de zonas y canales: el tipo completa la descripción (después se le
+// agrega dónde va, ej. "PIR living") y el número siguiente se pone solo.
+function siguienteNumeroInst(lista) {
+  const nums = lista.map((z) => parseInt(z.numero, 10)).filter((n) => isFinite(n));
+  return String(nums.length ? Math.max(...nums) + 1 : 1);
+}
+function prepararNumeroInst() {
+  if (!instZonaNumeroInput.value.trim()) instZonaNumeroInput.value = siguienteNumeroInst(instZonasAgregadas);
+  if (!instCanalNumeroInput.value.trim()) instCanalNumeroInput.value = siguienteNumeroInst(instCanalesAgregadas);
+}
+[["instZonaAtajos", () => instZonaNumeroInput, () => instZonaDescripcionInput, () => instZonasAgregadas],
+ ["instCanalAtajos", () => instCanalNumeroInput, () => instCanalDescripcionInput, () => instCanalesAgregadas]].forEach(([id, num, desc, lista]) => {
+  const cont = document.getElementById(id);
+  if (!cont) return;
+  cont.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+    if (!num().value.trim()) num().value = siguienteNumeroInst(lista());
+    desc().value = b.dataset.txt + " ";
+    desc().focus();
+    try { desc().setSelectionRange(desc().value.length, desc().value.length); } catch (e) { /* nada */ }
+  }));
+});
+instZonaDescripcionInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); agregarZonaBtn.click(); } });
+instCanalDescripcionInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); agregarCanalBtn.click(); } });
+
 guardarCanalesBtn.addEventListener("click", async () => {
   if (!instalacionActivaId) return;
   guardarCanalesBtn.disabled = true;
