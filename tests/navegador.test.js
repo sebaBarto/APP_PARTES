@@ -1055,3 +1055,99 @@ test("SIMs: un parte que quedó en la cola sin señal registra igual la SIM inst
   assert.deepStrictEqual(erroresPagina.filter((e) => !/internetdisconnected|Failed to fetch/i.test(e)), []);
   await ctx.close();
 });
+
+test("Admin Control de SIMs: tablero con stock bajo, problemas, dormidas, historial de una línea y conciliación", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  const hoy = new Date();
+  const hace = (d) => { const x = new Date(hoy); x.setDate(x.getDate() - d); return x.toISOString().slice(0, 10); };
+  const stock = [
+    { numero: "341 555-0001", empresa: "Claro", tecnico_actual: "Juan", ubicacion_tipo: "tecnico" },
+    { numero: "341 555-0002", empresa: "Claro", tecnico_actual: "Juan", ubicacion_tipo: "tecnico", estado_fisico: "Defectuosa" },
+    { numero: "341 555-0003", empresa: "Movistar", tecnico_actual: "Juan", ubicacion_tipo: "tecnico" },
+    { numero: "341 555-0004", empresa: "Movistar", tecnico_actual: "Juan", ubicacion_tipo: "tecnico" },
+    { numero: "341 555-0005", empresa: "Claro", tecnico_actual: "Oficina", ubicacion_tipo: "oficina" },
+  ];
+  const instaladas = [
+    { numero: "3415550010", empresa: "Claro", cliente: "Kiosco Norte", estado_linea: "Activo" },
+    { numero: "3415550011", empresa: "Claro", cliente: "Panadería Sur", estado_linea: "Activo" },
+  ];
+  const historial = [
+    { fecha: hace(5), hora: "10:00", numero: "341 555-0001", accion: "transferir", tecnico: "Oficina", tecnico_nuevo: "Juan" },
+    { fecha: hace(90), hora: "10:00", numero: "341 555-0003", accion: "transferir", tecnico: "Oficina", tecnico_nuevo: "Juan" },
+    { fecha: hace(3), hora: "09:00", numero: "341 555-0002", accion: "marcar_estado_fisico", tecnico: "Juan" },
+    { fecha: hace(40), hora: "11:00", numero: "3415550010", accion: "usar", tecnico: "Juan", cliente: "Kiosco Norte" },
+  ];
+  await page.route("**/api/**", (route) => {
+    const u = route.request().url();
+    const body = u.includes("coleccion=sims_instaladas") ? instaladas : u.includes("coleccion=sims") ? stock : u.includes("recurso=sim") ? historial : [];
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+  });
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { localStorage.clear(); document.getElementById("mainCard").classList.remove("hidden"); document.getElementById("panelSimsControl").classList.remove("hidden"); document.getElementById("simsControlMinimo").value = "2"; document.getElementById("simsControlDias").value = "60"; return cargarControlSims(); });
+  const filaJuan = await page.locator("#simsControlTablero tbody tr", { hasText: "Juan" }).locator("td").allTextContents();
+  assert.deepStrictEqual(filaJuan.map((t) => t.trim()), ["Juan", "1", "2", "0", "3", "1"], "Claro 1 (la defectuosa no cuenta), Movistar 2, Personal 0, 1 con problema");
+  const rojos = await page.locator("#simsControlTablero tbody tr", { hasText: "Juan" }).locator("td[style*='B3261E']").count();
+  assert.strictEqual(rojos, 2, "Claro y Personal por debajo del mínimo");
+  assert.match(await page.locator("#simsControlProblemas").textContent(), /341 555-0002[\s\S]*Defectuosa/);
+  const dormidas = await page.locator("#simsControlDormidas tbody tr").allTextContents();
+  assert.ok(dormidas.some((t) => t.includes("0003")) && dormidas.some((t) => t.includes("0004")), "90 días y sin movimientos");
+  assert.ok(!dormidas.some((t) => t.includes("0005")), "la reserva de Oficina no cuenta como dormida");
+  assert.ok(!dormidas.some((t) => t.includes("0001")), "la que se movió hace 5 días no");
+  await page.fill("#simsControlLineaInput", "0010");
+  assert.match(await page.locator("#simsControlLineaResultado").textContent(), /Instalada en Kiosco Norte[\s\S]*Instalada en cliente/);
+  const r = await page.evaluate(() => {
+    const c = conciliarSims([{ "Nro Línea": "54 9 341 555-0010", Estado: "Activa" }, { "Nro Línea": "3415559999", Estado: "Activa" }, { "Nro Línea": "3415550001", Estado: "Activa" }, { "Nro Línea": "3415558888", Estado: "Baja" }], "Claro");
+    return { sin: c.sinRegistrar, stock: c.enStock.map((x) => x.numero), no: c.noEnPlanilla.map((x) => x.numero), ok: c.coinciden.length, total: c.totalPlanilla };
+  });
+  assert.deepStrictEqual(r, { sin: ["3415559999"], stock: ["341 555-0001"], no: ["3415550011"], ok: 1, total: 3 });
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Mis SIMs (skin nuevo): resumen por empresa con stock bajo, buscador, historial de la SIM y transferencias mandadas; el clásico no cambia", async () => {
+  const sims = [
+    { numero: "341 555-0101", empresa: "Claro", tipo: "M2M", tecnico_actual: "Juan Pérez", estado: "stock", ubicacion_tipo: "tecnico" },
+    { numero: "341 555-0202", empresa: "Movistar", tecnico_actual: "Juan Pérez", estado: "stock", ubicacion_tipo: "tecnico" },
+    { numero: "341 555-0303", empresa: "Movistar", tecnico_actual: "Juan Pérez", estado: "stock", ubicacion_tipo: "tecnico" },
+  ];
+  const abrir = async (estilo) => {
+    const { ctx, page, erroresPagina } = await nuevaPagina();
+    await page.route("**/api/**", (route) => {
+      const u = route.request().url();
+      const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+      if (u.includes("coleccion=sims")) return json(sims);
+      if (u.includes("pendientes=1") && u.includes("Luis")) return json([{ id: 4, numero: "341 555-0404", empresa: "Claro", tecnico_origen: "Juan Pérez", tecnico_destino: "Luis Gómez", fecha: "2026-10-20" }]);
+      if (u.includes("pendientes=1")) return json([]);
+      if (u.includes("recurso=sim")) return json([{ fecha: "2026-10-01", hora: "10:00", numero: "341 555-0101", accion: "transferir", tecnico: "Oficina", tecnico_nuevo: "Juan Pérez" }]);
+      json([]);
+    });
+    await page.goto(base + "/");
+    await page.evaluate((e) => localStorage.setItem("ajustes_app", JSON.stringify({ estiloInicio: e, avisoFelicitacion: false })), estilo);
+    await page.reload();
+    await page.waitForTimeout(300);
+    await page.evaluate(() => { tecnicoLogueado = "Juan Pérez"; tecnicosPasswords = { "Juan Pérez": "x", "Luis Gómez": "y" }; tileSimsBtn.click(); });
+    await page.waitForTimeout(500);
+    return { ctx, page, erroresPagina };
+  };
+  let { ctx, page, erroresPagina } = await abrir("nuevo");
+  assert.deepStrictEqual((await page.locator("#simsResumenChips .sims-chip b").allTextContents()), ["1", "2", "0"]);
+  assert.match(await page.locator("#simsStockBajo").textContent(), /Claro \(1\), Personal \(ninguna\)/);
+  await page.fill("#simsBuscarInput", "0202");
+  assert.strictEqual(await page.locator("#simsGrupos .sim-card").count(), 1);
+  await page.fill("#simsBuscarInput", "");
+  await page.click('#simsResumenChips .sims-chip[data-emp="Movistar"]');
+  assert.strictEqual(await page.locator("#simsGrupos .sim-card").count(), 2, "tocar la empresa filtra");
+  assert.strictEqual(await page.locator("#simsMandadasWrap").isVisible(), true);
+  assert.match(await page.locator("#simsMandadasList").textContent(), /341 555-0404[\s\S]*Para Luis Gómez/);
+  await page.evaluate(() => { simSeleccionada = "341 555-0101"; showScreen("simDetalle"); return renderSimDetalle(); });
+  await page.waitForTimeout(400);
+  assert.match(await page.locator("#simHistorialLista").textContent(), /Transferida[\s\S]*de Oficina a Juan Pérez/);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+  ({ ctx, page } = await abrir("clasico"));
+  assert.strictEqual(await page.locator("#simsResumenWrap").isVisible(), false);
+  assert.strictEqual(await page.locator("#simsMandadasWrap").isVisible(), false);
+  await ctx.close();
+});

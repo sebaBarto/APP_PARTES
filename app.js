@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.136.1";
+const APP_VERSION = "3.137.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -894,7 +894,7 @@ function actualizarBarraSuperior(name) {
     const otros = Array.from(bar.querySelectorAll("button, a")).filter((b) => b !== volver && !b.classList.contains("hidden") && getComputedStyle(b).display !== "none");
     if (otros.length === 0) bar.classList.add("solo-volver");
   }
-  const nombresCortos = { consultas: "Manuales", dashboardFinanciero: "Financiero" };
+  const nombresCortos = { consultas: "Manuales", dashboardFinanciero: "Financiero", simDetalle: "Ficha de la SIM", simRegistro: "SIMs instaladas" };
   if (seccion) seccion.textContent = name === "home" ? "Servicio técnico" : (nombresCortos[name] || nombreDePantalla(pantalla) || "Servicio técnico");
   document.querySelector(".topbar")?.classList.toggle("en-seccion", name !== "home" && name !== "login");
 }
@@ -1700,6 +1700,7 @@ async function cargarConfig() {
     const data = await res.json();
     if (data.dias_atencion) DIAS_ATENCION = data.dias_atencion;
     if (data.dias_urgente) DIAS_URGENTE = data.dias_urgente;
+    if (data.sims_stock_minimo) SIMS_STOCK_MINIMO = Number(data.sims_stock_minimo) || SIMS_STOCK_MINIMO;
     localStorage.setItem("config_cache", JSON.stringify({ dias_atencion: DIAS_ATENCION, dias_urgente: DIAS_URGENTE }));
     if (data.app_version_actual) verificarVersionDisponible(data.app_version_actual);
   } catch (err) {
@@ -11071,8 +11072,11 @@ async function fetchSimsConfig() {
 
 tileSimsBtn.addEventListener("click", () => {
   showScreen("sims");
+  simsHistorialCache = null;
+  try { document.getElementById("simsBuscarInput").value = ""; simsFiltroEmpresa = ""; } catch (e) { /* aún no cargó */ }
   renderSimsLista();
   cargarTransferenciasPendientes();
+  cargarTransferenciasMandadas();
 });
 volverDeSimsBtn.addEventListener("click", () => showScreen("home"));
 volverDeSimDetalleBtn.addEventListener("click", () => showScreen("sims"));
@@ -11111,6 +11115,8 @@ async function renderSimsLista() {
   simsGrupos.innerHTML = "";
   try {
     simsListaCache = await fetchSimsConfig();
+    try { localStorage.setItem("sims_cache", JSON.stringify(simsListaCache)); } catch (e) { /* sin espacio */ }
+    renderResumenSims();
     dibujarSimsLista();
   } catch (err) {
     simsListaStatus.textContent = "No se pudo cargar la lista de SIMs.";
@@ -11275,7 +11281,127 @@ function dibujarSimsLista() {
   titulo.className = "sim-grupo-titulo";
   titulo.textContent = "Tus SIMs";
   simsGrupos.appendChild(titulo);
-  listaVisible.forEach((s) => simsGrupos.appendChild(crearCard(s, false)));
+  const filtroNum = esSkinNuevo() ? (document.getElementById("simsBuscarInput").value || "").replace(/\D/g, "") : "";
+  const filtroEmp = esSkinNuevo() ? simsFiltroEmpresa : "";
+  const mostradas = listaVisible.filter((s) => (!filtroNum || String(s.numero).replace(/\D/g, "").includes(filtroNum)) && (!filtroEmp || s.empresa === filtroEmp));
+  if (!mostradas.length) {
+    const p = document.createElement("p");
+    p.className = "list-status";
+    p.textContent = "Ninguna SIM coincide con esa búsqueda.";
+    simsGrupos.appendChild(p);
+  }
+  mostradas.forEach((s) => simsGrupos.appendChild(crearCard(s, false)));
+}
+
+// ---- Mis SIMs (skin nuevo): resumen por empresa, buscador y stock bajo ----
+let simsFiltroEmpresa = "";
+let SIMS_STOCK_MINIMO = 2;
+function esSkinNuevo() { return document.documentElement.dataset.inicio === "nuevo"; }
+function renderResumenSims() {
+  const wrap = document.getElementById("simsResumenWrap");
+  if (!wrap) return;
+  const propias = simsListaCache.filter((s) => s.ubicacion_tipo === "tecnico" && s.tecnico_actual === (tecnicoLogueado || ""));
+  wrap.hidden = !esSkinNuevo() || !tecnicoLogueado;
+  if (wrap.hidden) return;
+  const disponibles = propias.filter((s) => !s.estado_fisico || s.estado_fisico === "Disponible");
+  const empresas = ["Claro", "Movistar", "Personal"];
+  const cuenta = Object.fromEntries(empresas.map((e) => [e, disponibles.filter((s) => s.empresa === e).length]));
+  document.getElementById("simsResumenChips").innerHTML = empresas.map((e) => `
+    <button type="button" class="sims-chip${simsFiltroEmpresa === e ? " activo" : ""}" data-emp="${e}">
+      <span class="sim-card-dot" style="background:${COLORES_COMPANIA_SIM[e] || "#8A9089"};"></span>${e} <b>${cuenta[e]}</b>
+    </button>`).join("");
+  document.querySelectorAll("#simsResumenChips .sims-chip").forEach((b) => b.addEventListener("click", () => {
+    simsFiltroEmpresa = simsFiltroEmpresa === b.dataset.emp ? "" : b.dataset.emp;
+    renderResumenSims();
+    dibujarSimsLista();
+  }));
+  const bajas = empresas.filter((e) => cuenta[e] < SIMS_STOCK_MINIMO);
+  const aviso = document.getElementById("simsStockBajo");
+  aviso.classList.toggle("hidden", bajas.length === 0);
+  aviso.innerHTML = bajas.length
+    ? `<b>Stock bajo:</b> ${bajas.map((e) => `${e} (${cuenta[e] === 0 ? "ninguna" : cuenta[e]})`).join(", ")}. Pedile a la oficina antes de quedarte sin.`
+    : "";
+}
+document.getElementById("simsBuscarInput").addEventListener("input", () => dibujarSimsLista());
+
+// ---- Transferencias que mandé y todavía no aceptaron (skin nuevo) ----
+async function cargarTransferenciasMandadas() {
+  const wrap = document.getElementById("simsMandadasWrap");
+  const lista = document.getElementById("simsMandadasList");
+  if (!wrap || !esSkinNuevo() || !tecnicoLogueado) { if (wrap) wrap.hidden = true; return; }
+  const otros = Object.keys(tecnicosPasswords || {}).filter((n) => n !== tecnicoLogueado);
+  const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+  const resultados = await Promise.all(otros.map((n) =>
+    fetch(`/api/recurso-uso?recurso=sim&pendientes=1&tecnico=${encodeURIComponent(n)}`, { headers, cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : [])).catch(() => [])));
+  const mias = resultados.flat().filter((t) => t && t.tecnico_origen === tecnicoLogueado);
+  wrap.hidden = mias.length === 0;
+  lista.innerHTML = mias.map((t) => `
+    <div class="sim-mandada">
+      <div><b>${escapeHtml(t.empresa || "")}</b> · ${escapeHtml(t.numero)}<br><span class="sim-mandada-a">Para ${escapeHtml(t.tecnico_destino || "")}${t.fecha ? " · desde el " + escapeHtml(String(t.fecha).split("-").reverse().join("/")) : ""}</span></div>
+      <button type="button" class="btn btn-ghost btn-small sim-cancelar-transf" data-id="${escapeHtml(String(t.id))}" data-destino="${escapeHtml(t.tecnico_destino || "")}">Cancelar</button>
+    </div>`).join("");
+  lista.querySelectorAll(".sim-cancelar-transf").forEach((b) => b.addEventListener("click", async () => {
+    if (!confirm("¿Cancelar esta transferencia? La SIM sigue en tu stock.")) return;
+    b.disabled = true;
+    try {
+      const res = await fetch("/api/recurso-uso", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+        body: JSON.stringify({ recurso: "sim", accion: "rechazar_transferencia", tecnico: b.dataset.destino, cancelada_por: tecnicoLogueado, id_transferencia: Number(b.dataset.id) }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Error desconocido");
+      showToast("Transferencia cancelada.");
+      cargarTransferenciasMandadas();
+      renderSimsLista();
+    } catch (err) {
+      showToast("No se pudo cancelar: " + err.message);
+      b.disabled = false;
+    }
+  }));
+}
+
+// ---- Historial de una SIM (skin nuevo) ----
+const ETIQUETA_ACCION_SIM_LARGA = {
+  usar: "Instalada en un cliente", reemplazar: "Instalada reemplazando otra línea", devolver: "Devuelta al stock",
+  transferir: "Transferida", aceptar_transferencia: "Transferencia aceptada", rechazar_transferencia: "Transferencia rechazada",
+  retirar_de_registro: "Retirada de un cliente", marcar_estado_fisico: "Cambio de estado", revertir: "Revertida", alta: "Alta",
+};
+let simsHistorialCache = null;
+async function renderHistorialSim(numero) {
+  const wrap = document.getElementById("simHistorialWrap");
+  if (!wrap) return;
+  wrap.hidden = !esSkinNuevo();
+  if (wrap.hidden) return;
+  const st = document.getElementById("simHistorialStatus");
+  const ol = document.getElementById("simHistorialLista");
+  ol.innerHTML = "";
+  st.textContent = "Cargando historial...";
+  try {
+    if (!simsHistorialCache) {
+      const res = await fetch("/api/recurso-uso?recurso=sim", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      simsHistorialCache = Array.isArray(data) ? data : [];
+    }
+    if (numero !== simSeleccionada) return;
+    const movs = simsHistorialCache.filter((h) => h.numero === numero || h.sim_retirada === numero)
+      .sort((a, b) => `${b.fecha || ""} ${b.hora || ""}`.localeCompare(`${a.fecha || ""} ${a.hora || ""}`));
+    st.textContent = movs.length ? "" : "Sin movimientos registrados todavía.";
+    ol.innerHTML = movs.map((h) => {
+      const fecha = h.fecha ? h.fecha.split("-").reverse().join("/") : "";
+      let que = ETIQUETA_ACCION_SIM_LARGA[h.accion] || String(h.accion || "").replace(/_/g, " ");
+      let detalle = "";
+      if (h.sim_retirada === numero && h.numero !== numero) { que = "Retirada al reemplazarla por otra"; detalle = `en ${h.cliente || "el cliente"} (la nueva es ${h.numero})`; }
+      else if (h.accion === "transferir") detalle = `de ${h.tecnico || "?"} a ${h.tecnico_nuevo || "?"}`;
+      else if (h.accion === "usar" || h.accion === "reemplazar" || h.accion === "retirar_de_registro") detalle = `${h.cliente ? "en " + h.cliente : ""}${h.numero_servicio ? " · servicio " + h.numero_servicio : ""}`;
+      else if (h.accion === "marcar_estado_fisico") detalle = h.estado_fisico || h.detalle || "";
+      return `<li><span class="sh-fecha">${escapeHtml(fecha)}${h.hora ? " " + escapeHtml(h.hora) : ""}</span><span class="sh-que">${escapeHtml(que)}</span>${detalle ? `<span class="sh-detalle">${escapeHtml(detalle)}</span>` : ""}<span class="sh-quien">${escapeHtml(h.tecnico || "")}</span></li>`;
+    }).join("");
+  } catch (err) {
+    st.textContent = "No se pudo cargar el historial.";
+  }
 }
 
 async function poblarClientesParaSim() {
@@ -11471,6 +11597,7 @@ async function renderSimDetalle() {
     const colorEmpresaDetalle = COLORES_COMPANIA_SIM[sim.empresa] || "#8A9089";
     simDetalleNombre.innerHTML = `<span class="sim-card-dot" style="background:${colorEmpresaDetalle};"></span>${sim.empresa}${sim.tipo ? " · " + sim.tipo : ""} — ${sim.numero}`;
     simDetalleStatus.textContent = "";
+    renderHistorialSim(sim.numero);
 
     const esPropia = sim.tecnico_actual === (tecnicoLogueado || "") || !!permisosDelTecnico(tecnicoLogueado).sims_ver_todas;
     if (!esPropia) {

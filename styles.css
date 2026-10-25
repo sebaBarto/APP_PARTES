@@ -3010,3 +3010,33 @@ html[data-inicio="nuevo"] .app .equipo-meta { color: var(--sat-tenue) !important
 html[data-inicio="nuevo"] .app .consulta-foto-preview img { border-radius: 4px; border: 2px solid var(--sat-am); }
 .equipo-contenido p { margin: 0 0 3px; }
 .equipo-contenido ol, .equipo-contenido ul { margin: 2px 0 4px; }
+/* Bloques que solo existen en el skin nuevo (se muestran por JS con hidden=false) */
+html:not([data-inicio="nuevo"]) .solo-nuevo-bloque { display: none !important; }
+
+/* ===== SIMs (skin nuevo): resumen, stock bajo, mandadas e historial ===== */
+html[data-inicio="nuevo"] .sims-resumen { margin-bottom: 12px; }
+html[data-inicio="nuevo"] .sims-resumen-chips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
+html[data-inicio="nuevo"] .sims-chip {
+  display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 46px; padding: 0 6px; cursor: pointer;
+  border-radius: 4px; border: 1.5px solid var(--sat-borde); background: var(--sat-sup); color: var(--sat-texto);
+  font-family: var(--f-titulo) !important; font-weight: 600; font-size: 15px;
+}
+html[data-inicio="nuevo"] .sims-chip b { font-size: 20px; font-weight: 800; }
+html[data-inicio="nuevo"] .sims-chip.activo { border-color: var(--sat-am); box-shadow: inset 0 -3px 0 var(--sat-am); }
+html[data-inicio="nuevo"] .sims-stock-bajo { margin-bottom: 10px; padding: 10px 12px; border-radius: 4px; border-left: 4px solid var(--rojo, #FF6B5E); background: color-mix(in srgb, var(--rojo, #FF6B5E) 12%, var(--sat-sup)); color: var(--sat-texto); font-size: 15px; }
+html[data-inicio="nuevo"] .sim-mandada { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; margin-bottom: 8px; border-radius: 6px; border: 1.5px dashed var(--sat-am); background: var(--sat-sup); color: var(--sat-texto); }
+html[data-inicio="nuevo"] .sim-mandada .btn { width: auto; flex-shrink: 0; }
+html[data-inicio="nuevo"] .sim-mandada-a { font-size: 13.5px; color: var(--sat-tenue); }
+html[data-inicio="nuevo"] .sim-historial { margin-top: 18px; }
+html[data-inicio="nuevo"] .sim-historial-lista { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--sat-borde); }
+html[data-inicio="nuevo"] .sim-historial-lista li { position: relative; display: grid; gap: 1px; padding: 0 0 14px 12px; color: var(--sat-texto); }
+html[data-inicio="nuevo"] .sim-historial-lista li::before { content: ""; position: absolute; left: -21px; top: 4px; width: 10px; height: 10px; border-radius: 2px; background: var(--sat-am); }
+html[data-inicio="nuevo"] .sim-historial-lista .sh-fecha { font-size: 13px; color: var(--sat-tenue); }
+html[data-inicio="nuevo"] .sim-historial-lista .sh-que { font-family: var(--f-titulo) !important; font-weight: 700; font-size: 16px; }
+html[data-inicio="nuevo"] .sim-historial-lista .sh-detalle { font-size: 14.5px; }
+html[data-inicio="nuevo"] .sim-historial-lista .sh-quien { font-size: 13px; color: var(--sat-tenue); }
+html[data-inicio="nuevo"] #simEstadoFisicoWrap { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+html[data-inicio="nuevo"] #simEstadoFisicoWrap.hidden { display: none; }
+html[data-inicio="nuevo"] #simEstadoFisicoWrap > :not(.btn) { flex-basis: 100%; }
+html[data-inicio="nuevo"] #simEstadoFisicoWrap .btn { width: auto; flex: 1 1 140px; margin: 0 !important; }
+html[data-inicio="nuevo"] #simEstadoFisicoWrap .btn.hidden { display: none !important; }

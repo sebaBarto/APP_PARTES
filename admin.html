@@ -191,7 +191,8 @@
   #tabCredencialesBtn:not(.active) .tab-icon { color: var(--acc-gold); }
   #tabVehiculosBtn:not(.active) .tab-icon { color: var(--acc-green); }
   #tabSimsBtn:not(.active) .tab-icon,
-  #tabSimsInstaladasBtn:not(.active) .tab-icon { color: var(--acc-blue); }
+  #tabSimsInstaladasBtn:not(.active) .tab-icon,
+  #tabSimsControlBtn:not(.active) .tab-icon { color: var(--acc-blue); }
   #tabHerramientasBtn:not(.active) .tab-icon { color: var(--acc-brown); }
   #tabPlanosBtn:not(.active) .tab-icon { color: var(--acc-navy); }
   #tabEmergenciaBtn:not(.active) .tab-icon { color: var(--acc-alert); }
@@ -287,6 +288,7 @@
       <button type="button" class="tab-btn" id="tabSimsBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h6l4 4v12a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><rect x="9.5" y="10" width="5" height="5.5" rx="1"/></svg></span>SIMs</button>
       <button type="button" class="tab-btn" id="tabHerramientasBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h16v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M8 8V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="4" y1="12" x2="20" y2="12"/></svg></span>Herramientas</button>
       <button type="button" class="tab-btn" id="tabSimsInstaladasBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg></span>SIMs instaladas</button>
+      <button type="button" class="tab-btn" id="tabSimsControlBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg></span>Control de SIMs</button>
       <button type="button" class="tab-btn" id="tabPlanosBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 9h18M9 9v12M14 3v6M9 15h5"/></svg></span>Planos</button>
       <button type="button" class="tab-btn" id="tabInstalacionesBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 18v3"/><circle cx="8" cy="9" r="1"/><circle cx="12" cy="9" r="1"/><circle cx="16" cy="9" r="1"/></svg></span>Instalaciones</button>
       <button type="button" class="tab-btn" id="tabEncuestasBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 14s1.5 2 4 2 4-2 4-2"/><circle cx="9" cy="9" r="1"/><circle cx="15" cy="9" r="1"/><circle cx="12" cy="12" r="10"/></svg></span>Satisfacción</button>
@@ -666,6 +668,50 @@
       <button id="agregarHerramientaBtn" type="button" class="btn-secondary-admin" style="margin-bottom:14px;">+ Agregar herramienta</button>
       <button id="guardarHerramientasBtn" type="button">Guardar cambios</button>
       <p class="status" id="guardarHerramientasStatus"></p>
+    </div>
+
+    <div id="panelSimsControl" class="hidden">
+      <h1>Control de SIMs</h1>
+      <p class="subtitle">Para poner orden: cuánto tiene cada uno, qué está con problemas, qué lleva mucho sin moverse, el historial de cualquier línea y la conciliación contra la planilla de la empresa.</p>
+      <button type="button" class="btn-secondary-admin" id="simsControlRecargarBtn" style="width:auto; margin-bottom:12px;">↻ Actualizar datos</button>
+      <p class="status" id="simsControlStatus"></p>
+
+      <div class="card">
+        <h3 style="margin-top:0;">Stock por técnico</h3>
+        <p class="subtitle" style="margin-top:0;">SIMs disponibles en mano de cada uno (sin contar defectuosas ni extraviadas). En rojo, por debajo del mínimo de <input type="number" id="simsControlMinimo" min="0" max="20" value="2" style="width:60px; display:inline-block; padding:4px 6px;">.</p>
+        <div class="sims-tabla-wrap"><table class="sims-tabla" id="simsControlTablero"></table></div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0;">SIMs con problemas</h3>
+        <p class="subtitle" style="margin-top:0;">Marcadas como defectuosas o extraviadas: para reclamarlas a la empresa o darlas de baja.</p>
+        <div id="simsControlProblemas"></div>
+        <button type="button" class="btn-secondary-admin" id="simsControlProblemasExcel" style="width:auto; margin-top:8px;">⬇ Excel</button>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0;">SIMs dormidas</h3>
+        <p class="subtitle" style="margin-top:0;">En stock de un técnico (no de Oficina) y sin ningún movimiento hace más de <input type="number" id="simsControlDias" min="7" max="365" value="60" style="width:70px; display:inline-block; padding:4px 6px;"> días. Suelen ser las que se perdieron o se instalaron sin registrar.</p>
+        <div id="simsControlDormidas"></div>
+        <button type="button" class="btn-secondary-admin" id="simsControlDormidasExcel" style="width:auto; margin-top:8px;">⬇ Excel</button>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0;">Historial de una línea</h3>
+        <input type="text" id="simsControlLineaInput" placeholder="Número de línea (alcanza con los últimos dígitos)" inputmode="numeric">
+        <div id="simsControlLineaResultado" style="margin-top:10px;"></div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin-top:0;">Conciliación con la planilla de la empresa</h3>
+        <p class="subtitle" style="margin-top:0;">Subí el Excel o CSV de líneas que te pasa la empresa (Claro, Movistar o Personal). Se compara por número de línea contra lo instalado y el stock de SAT. Si la planilla tiene una columna de estado, solo se toman las líneas activas.</p>
+        <div class="field-row">
+          <select id="simsConcEmpresa" style="max-width:180px;"><option>Claro</option><option>Movistar</option><option>Personal</option></select>
+          <input type="file" id="simsConcArchivo" accept=".xlsx,.xls,.csv">
+        </div>
+        <p class="status" id="simsConcStatus"></p>
+        <div id="simsConcResultado"></div>
+      </div>
     </div>
 
     <div id="panelSimsInstaladas" class="hidden">
@@ -1058,6 +1104,8 @@ const tabHerramientasBtn = document.getElementById("tabHerramientasBtn");
 const panelHerramientas = document.getElementById("panelHerramientas");
 let herramientasCargadasUnaVez = false;
 const tabSimsInstaladasBtn = document.getElementById("tabSimsInstaladasBtn");
+const tabSimsControlBtn = document.getElementById("tabSimsControlBtn");
+const panelSimsControl = document.getElementById("panelSimsControl");
 const panelSimsInstaladas = document.getElementById("panelSimsInstaladas");
 let simsInstaladasCargadasUnaVez = false;
 const tabPlanosBtn = document.getElementById("tabPlanosBtn");
@@ -1130,6 +1178,7 @@ const TABS = [
   { btn: tabSimsBtn, panel: panelSims, onShow: () => cargarSimsAdmin() },
   { btn: tabHerramientasBtn, panel: panelHerramientas, onShow: () => { if (!herramientasCargadasUnaVez) { herramientasCargadasUnaVez = true; cargarHerramientasAdmin(); } } },
   { btn: tabSimsInstaladasBtn, panel: panelSimsInstaladas, onShow: () => cargarSimsInstaladasAdmin() },
+  { btn: tabSimsControlBtn, panel: panelSimsControl, onShow: () => cargarControlSims() },
   { btn: tabPlanosBtn, panel: panelPlanos, onShow: () => { consultarEstadoSincronizacionPlanos(); if (!planosCargadosUnaVezAdmin) { planosCargadosUnaVezAdmin = true; cargarPlanosAdmin(); } } },
   { btn: tabInstalacionesBtn, panel: panelInstalaciones, onShow: () => cargarInstalacionesAdmin() },
   { btn: tabEncuestasBtn, panel: panelEncuestas, onShow: () => cargarEncuestasAdmin() },
@@ -3407,6 +3456,221 @@ guardarSimsBtn.addEventListener("click", async () => {
   } finally {
     guardarSimsBtn.disabled = false;
   }
+});
+
+// ---------- Control de SIMs (tablero, problemas, dormidas, historial, conciliación) ----------
+let controlSims = { stock: [], instaladas: [], historial: [] };
+const EMPRESAS_SIM = ["Claro", "Movistar", "Personal"];
+function soloDigitosLinea(n) { const d = String(n || "").replace(/\D/g, ""); return d.length > 10 ? d.slice(-10) : d; }
+function fechaAR(iso) { return iso ? String(iso).slice(0, 10).split("-").reverse().join("/") : ""; }
+function ultimoMovimientoPorNumero(historial) {
+  const m = new Map();
+  historial.forEach((h) => {
+    [h.numero, h.sim_retirada].filter(Boolean).forEach((num) => {
+      const k = soloDigitosLinea(num);
+      const f = `${h.fecha || ""} ${h.hora || ""}`;
+      if (!m.has(k) || f > m.get(k).clave) m.set(k, { clave: f, h });
+    });
+  });
+  return m;
+}
+
+async function cargarControlSims() {
+  const st = document.getElementById("simsControlStatus");
+  st.className = "status";
+  st.textContent = "Cargando stock, instaladas e historial...";
+  const h = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+  try {
+    const [rs, ri, rh] = await Promise.all([
+      fetch("/api/datos?coleccion=sims", { headers: h, cache: "no-store" }),
+      fetch("/api/datos?coleccion=sims_instaladas", { headers: h, cache: "no-store" }),
+      fetch("/api/recurso-uso?recurso=sim", { headers: h, cache: "no-store" }),
+    ]);
+    const [stock, inst, hist] = await Promise.all([rs.json(), ri.json(), rh.json()]);
+    controlSims = {
+      stock: Array.isArray(stock) ? stock : [],
+      instaladas: Array.isArray(inst) ? inst : [],
+      historial: Array.isArray(hist) ? hist : [],
+    };
+    st.textContent = `${controlSims.stock.filter((x) => x.ubicacion_tipo !== "cliente").length} en stock · ${controlSims.instaladas.length} instaladas · ${controlSims.historial.length} movimientos.`;
+    renderControlSims();
+  } catch (err) {
+    st.className = "status err";
+    st.textContent = "No se pudieron cargar los datos: " + err.message;
+  }
+}
+document.getElementById("simsControlRecargarBtn").addEventListener("click", cargarControlSims);
+
+function simsEnStockControl() { return controlSims.stock.filter((x) => x.ubicacion_tipo !== "cliente"); }
+
+function renderControlSims() {
+  renderTableroSims();
+  renderProblemasSims();
+  renderDormidasSims();
+  renderLineaSim();
+}
+
+function renderTableroSims() {
+  const minimo = Number(document.getElementById("simsControlMinimo").value) || 0;
+  const stock = simsEnStockControl();
+  const nombres = [...new Set(stock.map((x) => x.tecnico_actual || "Oficina"))].sort((a, b) => (a === "Oficina") - (b === "Oficina") || a.localeCompare(b));
+  const celda = (n, bajo) => `<td style="text-align:center; font-weight:700; ${bajo ? "color:#B3261E; background:#FDECEA;" : ""}">${n}</td>`;
+  const filas = nombres.map((t) => {
+    const delTec = stock.filter((x) => (x.tecnico_actual || "Oficina") === t);
+    const ok = delTec.filter((x) => !x.estado_fisico || x.estado_fisico === "Disponible");
+    const prob = delTec.length - ok.length;
+    const esTec = t !== "Oficina";
+    return `<tr><td><b>${escapeHtmlAdmin(t)}</b></td>${EMPRESAS_SIM.map((e) => { const n = ok.filter((x) => x.empresa === e).length; return celda(n, esTec && n < minimo); }).join("")}<td style="text-align:center;">${ok.length}</td><td style="text-align:center; ${prob ? "color:#B5541A; font-weight:700;" : ""}">${prob || ""}</td></tr>`;
+  }).join("");
+  document.getElementById("simsControlTablero").innerHTML = `<thead><tr><th>Quién</th>${EMPRESAS_SIM.map((e) => `<th>${e}</th>`).join("")}<th>Total</th><th>Con problema</th></tr></thead><tbody>${filas || '<tr><td colspan="6">No hay SIMs en stock.</td></tr>'}</tbody>`;
+}
+document.getElementById("simsControlMinimo").addEventListener("input", () => { try { localStorage.setItem("sims_control_minimo", document.getElementById("simsControlMinimo").value); } catch (e) { /* nada */ } renderTableroSims(); });
+document.getElementById("simsControlDias").addEventListener("input", () => { try { localStorage.setItem("sims_control_dias", document.getElementById("simsControlDias").value); } catch (e) { /* nada */ } renderDormidasSims(); });
+try {
+  const m = localStorage.getItem("sims_control_minimo"); if (m) document.getElementById("simsControlMinimo").value = m;
+  const d = localStorage.getItem("sims_control_dias"); if (d) document.getElementById("simsControlDias").value = d;
+} catch (e) { /* nada */ }
+
+function problemasSims() {
+  const ult = new Map();
+  controlSims.historial.filter((h) => h.accion === "marcar_estado_fisico").forEach((h) => {
+    const k = soloDigitosLinea(h.numero); const f = `${h.fecha || ""} ${h.hora || ""}`;
+    if (!ult.has(k) || f > ult.get(k)) ult.set(k, f);
+  });
+  return simsEnStockControl().filter((x) => x.estado_fisico && x.estado_fisico !== "Disponible")
+    .map((x) => ({ ...x, desde: (ult.get(soloDigitosLinea(x.numero)) || "").trim() }));
+}
+function tablaSimple(cabeceras, filas, vacio) {
+  if (!filas.length) return `<p class="status">${vacio}</p>`;
+  return `<div class="sims-tabla-wrap"><table class="sims-tabla"><thead><tr>${cabeceras.map((c) => `<th>${c}</th>`).join("")}</tr></thead><tbody>${filas.map((f) => `<tr>${f.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+}
+function renderProblemasSims() {
+  const lista = problemasSims();
+  document.getElementById("simsControlProblemas").innerHTML = tablaSimple(["Número", "Empresa", "Estado", "Lo tiene", "Desde"],
+    lista.map((x) => [escapeHtmlAdmin(x.numero), escapeHtmlAdmin(x.empresa || ""), `<b style="color:${x.estado_fisico === "Extraviada" ? "#B3261E" : "#B5541A"};">${escapeHtmlAdmin(x.estado_fisico)}</b>`, escapeHtmlAdmin(x.tecnico_actual || "Oficina"), fechaAR(x.desde)]),
+    "No hay SIMs marcadas como defectuosas o extraviadas.");
+}
+document.getElementById("simsControlProblemasExcel").addEventListener("click", () => {
+  const filas = problemasSims().map((x) => ({ Número: x.numero, Empresa: x.empresa || "", Estado: x.estado_fisico, "Lo tiene": x.tecnico_actual || "Oficina", Desde: fechaAR(x.desde) }));
+  if (!filas.length) { alert("No hay SIMs con problemas."); return; }
+  const libro = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filas), "Con problemas");
+  XLSX.writeFile(libro, `sims_con_problemas_${new Date().toISOString().slice(0, 10)}.xlsx`);
+});
+
+function dormidasSims() {
+  const dias = Number(document.getElementById("simsControlDias").value) || 60;
+  const ult = ultimoMovimientoPorNumero(controlSims.historial);
+  const hoy = new Date();
+  // Las de Oficina son la reserva: que estén quietas es normal.
+  return simsEnStockControl().filter((x) => (x.tecnico_actual || "Oficina") !== "Oficina").map((x) => {
+    const u = ult.get(soloDigitosLinea(x.numero));
+    const fecha = u ? u.clave.trim().slice(0, 10) : "";
+    const d = fecha ? Math.floor((hoy - new Date(fecha + "T12:00:00")) / 86400000) : null;
+    return { ...x, ultimo: fecha, dias: d };
+  }).filter((x) => x.dias === null || x.dias >= dias)
+    .sort((a, b) => (b.dias === null ? 1e9 : b.dias) - (a.dias === null ? 1e9 : a.dias));
+}
+function renderDormidasSims() {
+  const lista = dormidasSims();
+  document.getElementById("simsControlDormidas").innerHTML = tablaSimple(["Número", "Empresa", "Lo tiene", "Último movimiento", "Días"],
+    lista.map((x) => [escapeHtmlAdmin(x.numero), escapeHtmlAdmin(x.empresa || ""), escapeHtmlAdmin(x.tecnico_actual || "Oficina"), x.ultimo ? fechaAR(x.ultimo) : "<i>sin movimientos registrados</i>", x.dias === null ? "—" : `<b>${x.dias}</b>`]),
+    "No hay SIMs dormidas con ese criterio.");
+}
+document.getElementById("simsControlDormidasExcel").addEventListener("click", () => {
+  const filas = dormidasSims().map((x) => ({ Número: x.numero, Empresa: x.empresa || "", "Lo tiene": x.tecnico_actual || "Oficina", "Último movimiento": x.ultimo ? fechaAR(x.ultimo) : "sin movimientos registrados", Días: x.dias ?? "" }));
+  if (!filas.length) { alert("No hay SIMs dormidas."); return; }
+  const libro = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filas), "Dormidas");
+  XLSX.writeFile(libro, `sims_dormidas_${new Date().toISOString().slice(0, 10)}.xlsx`);
+});
+
+const ETIQUETA_ACCION_SIM_ADMIN = { usar: "Instalada en cliente", reemplazar: "Instalada reemplazando otra", devolver: "Devuelta al stock", transferir: "Transferida", aceptar_transferencia: "Transferencia aceptada", rechazar_transferencia: "Transferencia rechazada", retirar_de_registro: "Retirada de un cliente", marcar_estado_fisico: "Cambio de estado", revertir: "Revertida" };
+function renderLineaSim() {
+  const q = soloDigitosLinea(document.getElementById("simsControlLineaInput").value);
+  const cont = document.getElementById("simsControlLineaResultado");
+  if (q.length < 3) { cont.innerHTML = '<p class="status">Escribí al menos 3 dígitos.</p>'; return; }
+  const coincide = (n) => soloDigitosLinea(n).endsWith(q) || soloDigitosLinea(n).includes(q);
+  const numeros = [...new Set([...controlSims.stock.map((x) => x.numero), ...controlSims.instaladas.map((x) => x.numero), ...controlSims.historial.map((h) => h.numero)].filter((n) => n && coincide(n)))];
+  if (!numeros.length) { cont.innerHTML = '<p class="status">No hay ninguna línea con esos números.</p>'; return; }
+  cont.innerHTML = numeros.slice(0, 5).map((num) => {
+    const k = soloDigitosLinea(num);
+    const enStock = controlSims.stock.find((x) => soloDigitosLinea(x.numero) === k && x.ubicacion_tipo !== "cliente");
+    const inst = controlSims.instaladas.find((x) => soloDigitosLinea(x.numero) === k);
+    const dondeEsta = inst ? `Instalada en <b>${escapeHtmlAdmin(inst.cliente || "?")}</b>${inst.direccion ? " — " + escapeHtmlAdmin(inst.direccion) : ""}${inst.estado_linea ? ` (${escapeHtmlAdmin(inst.estado_linea)})` : ""}`
+      : enStock ? `En stock de <b>${escapeHtmlAdmin(enStock.tecnico_actual || "Oficina")}</b>${enStock.estado_fisico && enStock.estado_fisico !== "Disponible" ? ` · <b>${escapeHtmlAdmin(enStock.estado_fisico)}</b>` : ""}` : "<i>No figura ni en stock ni instalada</i>";
+    const movs = controlSims.historial.filter((h) => soloDigitosLinea(h.numero) === k || soloDigitosLinea(h.sim_retirada) === k)
+      .sort((a, b) => `${b.fecha || ""} ${b.hora || ""}`.localeCompare(`${a.fecha || ""} ${a.hora || ""}`));
+    const lineas = movs.map((h) => {
+      let que = ETIQUETA_ACCION_SIM_ADMIN[h.accion] || String(h.accion || "").replace(/_/g, " ");
+      let det = "";
+      if (soloDigitosLinea(h.sim_retirada) === k && soloDigitosLinea(h.numero) !== k) { que = "Retirada al reemplazarla"; det = `en ${h.cliente || "?"} (la nueva es ${h.numero})`; }
+      else if (h.accion === "transferir") det = `de ${h.tecnico || "?"} a ${h.tecnico_nuevo || "?"}`;
+      else if (h.cliente) det = `${h.cliente}${h.numero_servicio ? " · servicio " + h.numero_servicio : ""}`;
+      return `<li><b>${fechaAR(h.fecha)} ${escapeHtmlAdmin(h.hora || "")}</b> — ${escapeHtmlAdmin(que)}${det ? ": " + escapeHtmlAdmin(det) : ""} <span style="color:#6B7680;">(${escapeHtmlAdmin(h.tecnico || "")})</span></li>`;
+    }).join("");
+    return `<div style="padding:10px 0; border-bottom:1px solid #EEE;"><div style="font-size:16px;"><b>${escapeHtmlAdmin(num)}</b> · ${escapeHtmlAdmin((enStock || inst || {}).empresa || "")}</div><div style="margin:4px 0 6px;">${dondeEsta}</div><ul style="margin:0; padding-left:18px;">${lineas || "<li>Sin movimientos registrados.</li>"}</ul></div>`;
+  }).join("") + (numeros.length > 5 ? `<p class="status">Hay ${numeros.length} líneas que coinciden: escribí más dígitos.</p>` : "");
+}
+document.getElementById("simsControlLineaInput").addEventListener("input", renderLineaSim);
+
+// Conciliación: planilla de la empresa vs. lo que SAT tiene registrado.
+function encontrarColumna(cabeceras, patron) { return cabeceras.find((c) => patron.test(normalizeText(c))); }
+function conciliarSims(filasPlanilla, empresa) {
+  const cab = Object.keys(filasPlanilla[0] || {});
+  const colNum = encontrarColumna(cab, /linea|numero|msisdn|telefono|nro|celular/);
+  const colEstado = encontrarColumna(cab, /estado/);
+  if (!colNum) throw new Error("No se encontró la columna del número de línea (Línea, Número, MSISDN o Teléfono).");
+  const activas = filasPlanilla.filter((f) => !colEstado || /activ/i.test(String(f[colEstado] || ""))).map((f) => soloDigitosLinea(f[colNum])).filter((n) => n.length >= 8);
+  const setPlanilla = new Set(activas);
+  const inst = new Map(controlSims.instaladas.map((x) => [soloDigitosLinea(x.numero), x]));
+  const stock = new Map(simsEnStockControl().map((x) => [soloDigitosLinea(x.numero), x]));
+  const sinRegistrar = [], enStock = [], coinciden = [];
+  setPlanilla.forEach((n) => {
+    if (inst.has(n)) coinciden.push(n);
+    else if (stock.has(n)) enStock.push(stock.get(n));
+    else sinRegistrar.push(n);
+  });
+  const noEnPlanilla = controlSims.instaladas.filter((x) => (x.empresa || "") === empresa && !/inactiv|baja/i.test(x.estado_linea || "") && !setPlanilla.has(soloDigitosLinea(x.numero)));
+  return { colNum, colEstado, totalPlanilla: setPlanilla.size, sinRegistrar, enStock, noEnPlanilla, coinciden };
+}
+let ultimaConciliacion = null;
+document.getElementById("simsConcArchivo").addEventListener("change", (ev) => {
+  const f = ev.target.files[0];
+  ev.target.value = "";
+  if (!f) return;
+  const st = document.getElementById("simsConcStatus");
+  st.className = "status"; st.textContent = "Leyendo planilla...";
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      if (!controlSims.instaladas.length && !controlSims.stock.length) await cargarControlSims();
+      const wb = XLSX.read(e.target.result, { type: "array" });
+      const filas = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
+      if (!filas.length) throw new Error("La planilla está vacía.");
+      const empresa = document.getElementById("simsConcEmpresa").value;
+      const r = conciliarSims(filas, empresa);
+      ultimaConciliacion = { ...r, empresa };
+      st.className = "status ok";
+      st.textContent = `${r.totalPlanilla} líneas activas en la planilla de ${empresa} (columna "${r.colNum}"${r.colEstado ? `, filtrando por "${r.colEstado}"` : ""}). ${r.coinciden.length} coinciden con lo instalado.`;
+      const bloque = (titulo, ayuda, cab, filas2, vacio) => `<h4 style="margin:16px 0 4px;">${titulo} <span style="color:#6B7680; font-weight:500;">(${filas2.length})</span></h4><p class="subtitle" style="margin:0 0 6px;">${ayuda}</p>${tablaSimple(cab, filas2, vacio)}`;
+      document.getElementById("simsConcResultado").innerHTML =
+        bloque("Activas en la empresa, sin registrar en SAT", "Se están pagando y no figuran ni instaladas ni en stock: averiguar dónde están o darlas de baja.", ["Número"], r.sinRegistrar.map((n) => [n]), "Ninguna.") +
+        bloque("Activas en la empresa pero en stock de SAT", "Probablemente se instalaron sin registrarlo en la app (o se activaron sin usar).", ["Número", "Lo tiene"], r.enStock.map((x) => [escapeHtmlAdmin(x.numero), escapeHtmlAdmin(x.tecnico_actual || "Oficina")]), "Ninguna.") +
+        bloque(`Instaladas en SAT que no están activas en ${empresa}`, "Pueden estar dadas de baja: revisar con el cliente o actualizar el registro.", ["Número", "Cliente", "Dirección"], r.noEnPlanilla.map((x) => [escapeHtmlAdmin(x.numero), escapeHtmlAdmin(x.cliente || ""), escapeHtmlAdmin(x.direccion || "")]), "Ninguna.") +
+        `<button type="button" class="btn-secondary-admin" id="simsConcExcel" style="width:auto; margin-top:12px;">⬇ Descargar diferencias en Excel</button>`;
+      document.getElementById("simsConcExcel").addEventListener("click", () => {
+        const c = ultimaConciliacion;
+        const libro = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(c.sinRegistrar.length ? c.sinRegistrar.map((n) => ({ Número: n })) : [{ Número: "(ninguna)" }]), "Sin registrar en SAT");
+        XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(c.enStock.length ? c.enStock.map((x) => ({ Número: x.numero, "Lo tiene": x.tecnico_actual || "Oficina" })) : [{ Número: "(ninguna)" }]), "Activas en stock");
+        XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(c.noEnPlanilla.length ? c.noEnPlanilla.map((x) => ({ Número: x.numero, Cliente: x.cliente || "", Dirección: x.direccion || "" })) : [{ Número: "(ninguna)" }]), "No activas en la empresa");
+        XLSX.writeFile(libro, `conciliacion_${c.empresa}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      });
+    } catch (err) {
+      st.className = "status err";
+      st.textContent = "No se pudo conciliar: " + err.message;
+    }
+  };
+  reader.readAsArrayBuffer(f);
 });
 
 // ---------- Herramientas especiales ----------

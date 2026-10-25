@@ -810,6 +810,17 @@
         <div id="simsTransferenciasPendientesList"></div>
       </div>
 
+      <div class="solo-nuevo-bloque" id="simsMandadasWrap" hidden>
+        <p class="dash-subtitulo" style="margin-top:0;">Mandadas, esperando que las acepten</p>
+        <div id="simsMandadasList"></div>
+      </div>
+
+      <div class="solo-nuevo-bloque sims-resumen" id="simsResumenWrap" hidden>
+        <div class="sims-resumen-chips" id="simsResumenChips"></div>
+        <div class="sims-stock-bajo hidden" id="simsStockBajo"></div>
+        <input class="field-input" id="simsBuscarInput" type="search" inputmode="numeric" placeholder="Buscar por número (ej: los últimos 4)..." autocomplete="off">
+      </div>
+
       <p class="list-status" id="simsListaStatus"></p>
       <div id="simsGrupos"></div>
     </div>
@@ -964,6 +975,11 @@
         <button type="button" class="btn btn-ghost btn-small" id="simMarcarDefectuosaBtn">Marcar como Defectuosa</button>
         <button type="button" class="btn btn-ghost btn-small" id="simMarcarExtraviadaBtn" style="margin-left:8px;">Marcar como Extraviada</button>
         <button type="button" class="btn btn-ghost btn-small hidden" id="simMarcarDisponibleBtn">Volver a marcar como Disponible</button>
+      </div>
+          <div class="solo-nuevo-bloque sim-historial" id="simHistorialWrap" hidden>
+        <p class="dash-subtitulo">Historial de esta SIM</p>
+        <p class="list-status" id="simHistorialStatus"></p>
+        <ol class="sim-historial-lista" id="simHistorialLista"></ol>
       </div>
     </div>
     <div class="action-bar">
