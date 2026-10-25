@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.134.0";
+const APP_VERSION = "3.135.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -894,7 +894,8 @@ function actualizarBarraSuperior(name) {
     const otros = Array.from(bar.querySelectorAll("button, a")).filter((b) => b !== volver && !b.classList.contains("hidden") && getComputedStyle(b).display !== "none");
     if (otros.length === 0) bar.classList.add("solo-volver");
   }
-  if (seccion) seccion.textContent = name === "home" ? "Servicio técnico" : (nombreDePantalla(pantalla) || "Servicio técnico");
+  const nombresCortos = { consultas: "Manuales", dashboardFinanciero: "Financiero" };
+  if (seccion) seccion.textContent = name === "home" ? "Servicio técnico" : (nombresCortos[name] || nombreDePantalla(pantalla) || "Servicio técnico");
   document.querySelector(".topbar")?.classList.toggle("en-seccion", name !== "home" && name !== "login");
 }
 document.getElementById("topbarVolverBtn").addEventListener("click", () => {
@@ -4918,6 +4919,12 @@ volverDeDashboardFinancieroBtn.addEventListener("click", () => {
 // ---------- Consultas a manuales con IA ----------
 let consultasCategoriasCache = [];
 let consultasCategoriasCargadas = false;
+let manualesCategoriaActual = [];
+const consultaManualSelect = document.getElementById("consultaManualSelect");
+const consultaManualSelectWrap = document.getElementById("consultaManualSelectWrap");
+const consultaManualesFiltro = document.getElementById("consultaManualesFiltro");
+const CACHE_MANUALES = "manuales-sat-v1";
+const CONSULTAS_RECIENTES_KEY = "consultas_recientes";
 
 async function cargarConsultasCategorias() {
   try {
@@ -4926,29 +4933,44 @@ async function cargarConsultasCategorias() {
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     consultasCategoriasCache = Array.isArray(data) ? data : [];
+    consultasCategoriasCargadas = true;
   } catch (err) {
     consultasCategoriasCache = [];
   }
   const opciones = consultasCategoriasCache
-    .map((c) => `<option value="${c.categoria}">${c.categoria}</option>`)
+    .map((c) => `<option value="${escapeHtml(c.categoria)}">${escapeHtml(c.categoria)}</option>`)
     .join("");
   consultaCategoriaSelect.innerHTML = `<option value="" disabled selected>Elegí una categoría</option>${opciones}`;
-  consultasCategoriasCargadas = true;
 }
 
 verConsultasBtn.addEventListener("click", () => {
   showScreen("consultas");
   consultaRespuestaWrap.classList.add("hidden");
   consultaManualesWrap.classList.add("hidden");
+  consultaManualSelectWrap.classList.add("hidden");
   consultaStatus.textContent = "";
   if (!consultasCategoriasCargadas) cargarConsultasCategorias();
+  renderConsultasRecientes();
 });
 
 consultaCategoriaSelect.addEventListener("change", () => {
   cargarManualesDeCategoria(consultaCategoriaSelect.value);
 });
 
+// ¿Qué manuales ya están guardados en el celular para verlos sin señal?
+async function manualesGuardados() {
+  try {
+    if (!("caches" in window)) return new Set();
+    const cache = await caches.open(CACHE_MANUALES);
+    const claves = await cache.keys();
+    return new Set(claves.map((r) => decodeURIComponent(new URL(r.url).pathname.split("/").pop())));
+  } catch (e) { return new Set(); }
+}
+
 async function cargarManualesDeCategoria(categoria) {
+  manualesCategoriaActual = [];
+  consultaManualSelect.innerHTML = '<option value="">Todos los de la categoría (más lento)</option>';
+  consultaManualSelectWrap.classList.add("hidden");
   if (!categoria) {
     consultaManualesWrap.classList.add("hidden");
     return;
@@ -4956,6 +4978,8 @@ async function cargarManualesDeCategoria(categoria) {
   consultaManualesWrap.classList.remove("hidden");
   consultaManualesStatus.textContent = "Buscando manuales...";
   consultaManualesList.innerHTML = "";
+  consultaManualesFiltro.value = "";
+  consultaManualesFiltro.classList.add("hidden");
   try {
     const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
     const res = await fetch(`/api/consultas?categoria=${encodeURIComponent(categoria)}`, { headers, cache: "no-store" });
@@ -4965,53 +4989,169 @@ async function cargarManualesDeCategoria(categoria) {
       consultaManualesStatus.textContent = "No hay manuales cargados en esta categoría todavía.";
       return;
     }
+    manualesCategoriaActual = data.slice().sort((x, y) => x.nombre.localeCompare(y.nombre, "es"));
     consultaManualesStatus.textContent = "";
-    data.forEach((manual) => {
-      const item = document.createElement("button");
-      item.type = "button";
-      item.className = "consulta-manual-item";
-      item.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="vertical-align:-2px; margin-right:4px; flex-shrink:0;"><path d="M8 3h6l4 4v12a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v4h4"/></svg>${escapeHtml(manual.nombre)}`;
-      item.addEventListener("click", () => abrirManual(categoria, manual.id, manual.nombre, item));
-      consultaManualesList.appendChild(item);
-    });
+    consultaManualesFiltro.classList.toggle("hidden", manualesCategoriaActual.length <= 5);
+    consultaManualSelect.innerHTML = '<option value="">Todos los de la categoría (más lento)</option>' +
+      manualesCategoriaActual.map((m) => `<option value="${escapeHtml(m.id)}">${escapeHtml(nombreManualCorto(m.nombre))}</option>`).join("");
+    if (manualesCategoriaActual.length === 1) consultaManualSelect.value = manualesCategoriaActual[0].id;
+    consultaManualSelectWrap.classList.toggle("hidden", manualesCategoriaActual.length < 2);
+    await renderListaManuales();
   } catch (err) {
-    consultaManualesStatus.textContent = "No se pudieron cargar los manuales de esta categoría.";
+    // Sin señal: se muestran los que estén guardados en el celular.
+    const guardados = await manualesGuardados();
+    const offline = JSON.parse(localStorage.getItem("manuales_nombres") || "{}");
+    const propios = [...guardados].filter((id) => offline[id] && offline[id].categoria === categoria).map((id) => ({ id, nombre: offline[id].nombre }));
+    if (propios.length) {
+      manualesCategoriaActual = propios;
+      consultaManualesStatus.textContent = "Sin señal: estos son los manuales que tenés guardados en el celular.";
+      await renderListaManuales();
+    } else {
+      consultaManualesStatus.textContent = "No se pudieron cargar los manuales de esta categoría.";
+    }
   }
 }
 
+function nombreManualCorto(nombre) {
+  return String(nombre || "").replace(/\.pdf$/i, "");
+}
+
+let renderManualesGen = 0;
+async function renderListaManuales() {
+  const gen = ++renderManualesGen;
+  const term = normalizeText(consultaManualesFiltro.value || "");
+  const guardados = await manualesGuardados();
+  if (gen !== renderManualesGen) return; // llegó otra búsqueda más nueva
+  const lista = manualesCategoriaActual.filter((m) => !term || normalizeText(m.nombre).includes(term));
+  consultaManualesList.innerHTML = "";
+  if (!lista.length) {
+    consultaManualesList.innerHTML = '<p class="list-status">Ningún manual coincide con esa búsqueda.</p>';
+    return;
+  }
+  lista.forEach((manual) => {
+    const item = document.createElement("button");
+    item.type = "button";
+    item.className = "consulta-manual-item";
+    const enCel = guardados.has(manual.id);
+    item.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14" style="vertical-align:-2px; margin-right:4px; flex-shrink:0;"><path d="M8 3h6l4 4v12a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v4h4"/></svg><span class="cm-nombre">${escapeHtml(nombreManualCorto(manual.nombre))}</span>${enCel ? '<span class="cm-guardado" title="Se puede abrir sin señal">En el celular</span>' : ""}`;
+    item.addEventListener("click", () => abrirManual(consultaCategoriaSelect.value, manual.id, manual.nombre, item));
+    consultaManualesList.appendChild(item);
+  });
+}
+consultaManualesFiltro.addEventListener("input", () => { renderListaManuales(); });
+
+// Abre el manual. La primera vez lo baja y lo deja guardado en el celular
+// (para verlo sin señal en la obra). En Android se baja como archivo con su
+// nombre, así lo abre el visor de PDF del teléfono (las pestañas "blob:"
+// muchas veces quedan en blanco en Android).
 async function abrirManual(categoria, archivoId, nombre, botonElemento) {
-  // Se abre la pestaña ya mismo (todavía vacía), antes de esperar la
-  // descarga — así los navegadores que bloquean popups fuera de un
-  // gesto directo del usuario (como Safari) no la bloquean.
-  const nuevaVentana = window.open("", "_blank");
-  const textoOriginal = botonElemento.textContent;
-  botonElemento.textContent = "Abriendo...";
+  const esAndroid = /Android/i.test(navigator.userAgent);
+  const nuevaVentana = esAndroid ? null : window.open("", "_blank");
+  const nombreEl = botonElemento.querySelector(".cm-nombre");
+  const textoOriginal = nombreEl ? nombreEl.textContent : botonElemento.textContent;
+  if (nombreEl) nombreEl.textContent = "Abriendo..."; 
   botonElemento.disabled = true;
   try {
-    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
-    const res = await fetch(
-      `/api/consultas?categoria=${encodeURIComponent(categoria)}&archivo=${encodeURIComponent(archivoId)}`,
-      { headers }
-    );
-    if (!res.ok) throw new Error("HTTP " + res.status);
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    if (nuevaVentana) {
+    let blob = null;
+    let cache = null;
+    const clave = `/manual-cache/${encodeURIComponent(archivoId)}`;
+    try { if ("caches" in window) { cache = await caches.open(CACHE_MANUALES); const g = await cache.match(clave); if (g) blob = await g.blob(); } } catch (e) { /* sin cache */ }
+    if (!blob) {
+      const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+      const res = await fetch(`/api/consultas?categoria=${encodeURIComponent(categoria)}&archivo=${encodeURIComponent(archivoId)}`, { headers });
+      if (!res.ok) throw new Error(navigator.onLine === false ? "sin señal y no está guardado en el celular" : "HTTP " + res.status);
+      blob = await res.blob();
+      try {
+        if (cache) {
+          await cache.put(clave, new Response(blob, { headers: { "Content-Type": "application/pdf" } }));
+          const nombres = JSON.parse(localStorage.getItem("manuales_nombres") || "{}");
+          nombres[archivoId] = { nombre, categoria };
+          localStorage.setItem("manuales_nombres", JSON.stringify(nombres));
+        }
+      } catch (e) { /* sin espacio: se abre igual */ }
+    }
+    const url = URL.createObjectURL(new Blob([blob], { type: "application/pdf" }));
+    if (esAndroid) {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = /\.pdf$/i.test(nombre) ? nombre : nombre + ".pdf";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      showToast("Manual descargado: abrilo desde la notificación o desde Descargas.");
+    } else if (nuevaVentana) {
       nuevaVentana.location.href = url;
     } else {
       window.open(url, "_blank");
     }
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
   } catch (err) {
     if (nuevaVentana) nuevaVentana.close();
     showToast("No se pudo abrir el manual: " + err.message);
   } finally {
-    botonElemento.textContent = textoOriginal;
+    if (nombreEl) nombreEl.textContent = textoOriginal;
     botonElemento.disabled = false;
+    renderListaManuales();
   }
 }
 volverDeConsultasBtn.addEventListener("click", () => {
   showScreen("home");
 });
+
+// La IA responde con un markdown simple (**negrita**, listas, títulos):
+// se muestra con formato en vez de con asteriscos sueltos.
+function formatearRespuestaIA(texto) {
+  const lineas = escapeHtml(String(texto || "")).split(/\r?\n/);
+  let html = "", lista = null;
+  const cerrar = () => { if (lista) { html += `</${lista}>`; lista = null; } };
+  const inline = (t) => t.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/(^|[^*])\*(?!\s)(.+?)\*(?!\*)/g, "$1<i>$2</i>").replace(/`([^`]+)`/g, "<code>$1</code>");
+  lineas.forEach((l) => {
+    const num = l.match(/^\s*(\d+)[.)]\s+(.*)$/);
+    const vin = l.match(/^\s*[-*•]\s+(.*)$/);
+    const tit = l.match(/^\s*#{1,6}\s+(.*)$/);
+    if (num) { if (lista !== "ol") { cerrar(); html += "<ol>"; lista = "ol"; } html += `<li>${inline(num[2])}</li>`; }
+    else if (vin) { if (lista !== "ul") { cerrar(); html += "<ul>"; lista = "ul"; } html += `<li>${inline(vin[1])}</li>`; }
+    else if (tit) { cerrar(); html += `<p class="cr-titulo">${inline(tit[1])}</p>`; }
+    else if (!l.trim()) { cerrar(); }
+    else { cerrar(); html += `<p>${inline(l)}</p>`; }
+  });
+  cerrar();
+  return html;
+}
+
+function leerConsultasRecientes() {
+  try { return JSON.parse(localStorage.getItem(CONSULTAS_RECIENTES_KEY) || "[]"); } catch (e) { return []; }
+}
+function guardarConsultaReciente(item) {
+  const lista = [item, ...leerConsultasRecientes().filter((c) => !(c.pregunta === item.pregunta && c.categoria === item.categoria))].slice(0, 10);
+  try { localStorage.setItem(CONSULTAS_RECIENTES_KEY, JSON.stringify(lista)); } catch (e) { /* sin espacio */ }
+}
+function mostrarRespuestaConsulta(c) {
+  consultaRespuestaTexto.innerHTML = formatearRespuestaIA(c.respuesta);
+  consultaManualesUsados.textContent = c.manuales && c.manuales.length ? `Basado en: ${c.manuales.join(", ")}` : "";
+  consultaRespuestaWrap.classList.remove("hidden");
+}
+function renderConsultasRecientes() {
+  const wrap = document.getElementById("consultaRecientesWrap");
+  const cont = document.getElementById("consultaRecientesList");
+  if (!wrap || !cont) return;
+  const lista = leerConsultasRecientes();
+  wrap.classList.toggle("hidden", lista.length === 0);
+  cont.innerHTML = "";
+  lista.forEach((c) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "consulta-reciente";
+    const fecha = c.fecha ? new Date(c.fecha).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" }) : "";
+    b.innerHTML = `<span class="crc-preg">${escapeHtml(c.pregunta)}</span><span class="crc-meta">${escapeHtml(c.categoria)}${c.manualNombre ? " · " + escapeHtml(c.manualNombre) : ""}${fecha ? " · " + fecha : ""}</span>`;
+    b.addEventListener("click", () => {
+      consultaPreguntaInput.value = c.pregunta;
+      mostrarRespuestaConsulta(c);
+      consultaRespuestaWrap.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    cont.appendChild(b);
+  });
+}
 
 preguntarBtn.addEventListener("click", async () => {
   const categoria = consultaCategoriaSelect.value;
@@ -5024,31 +5164,37 @@ preguntarBtn.addEventListener("click", async () => {
     showToast("Escribí tu pregunta antes de enviarla.");
     return;
   }
+  const archivo = consultaManualSelect.value || "";
+  const manualNombre = archivo ? nombreManualCorto((manualesCategoriaActual.find((m) => m.id === archivo) || {}).nombre) : "";
 
   preguntarBtn.disabled = true;
   consultaRespuestaWrap.classList.add("hidden");
-  consultaStatus.textContent = "Buscando en los manuales y consultando a la IA... puede tardar unos segundos.";
+  const inicio = Date.now();
+  const base = archivo ? `Leyendo "${manualNombre}" y consultando a la IA` : "Leyendo todos los manuales de la categoría y consultando a la IA";
+  consultaStatus.textContent = base + "...";
+  const reloj = setInterval(() => { consultaStatus.textContent = `${base}... ${Math.round((Date.now() - inicio) / 1000)} s`; }, 1000);
 
   try {
     const res = await fetch("/api/consultas", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-      body: JSON.stringify({ categoria, pregunta }),
+      body: JSON.stringify({ categoria, pregunta, archivo: archivo || undefined }),
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const detalle = typeof data.detail === "string" ? data.detail : JSON.stringify(data.detail || "");
+      if (res.status === 429 || res.status === 504) throw new Error(data.error || "La consulta tardó demasiado. Probá eligiendo un manual puntual.");
+      const detalle = typeof data.detail === "string" ? data.detail : "";
       throw new Error((data.error || "Error desconocido") + (detalle ? ` — ${detalle}` : ""));
     }
-
     consultaStatus.textContent = "";
-    consultaRespuestaTexto.textContent = data.respuesta;
-    const usados = data.manuales_usados || [];
-    consultaManualesUsados.textContent = usados.length > 0 ? `Basado en: ${usados.join(", ")}` : "";
-    consultaRespuestaWrap.classList.remove("hidden");
+    const item = { categoria, pregunta, manualNombre, respuesta: data.respuesta, manuales: data.manuales_usados || [], fecha: new Date().toISOString() };
+    mostrarRespuestaConsulta(item);
+    guardarConsultaReciente(item);
+    renderConsultasRecientes();
   } catch (err) {
-    consultaStatus.textContent = "No se pudo obtener una respuesta: " + err.message;
+    consultaStatus.textContent = (navigator.onLine === false ? "Sin señal: " : "No se pudo obtener una respuesta: ") + err.message;
   } finally {
+    clearInterval(reloj);
     preguntarBtn.disabled = false;
   }
 });

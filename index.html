@@ -1774,8 +1774,16 @@
 
       <div id="consultaManualesWrap" class="hidden" style="margin-bottom:16px;">
         <p class="dash-subtitulo" style="margin-top:0;">Ver el manual directo</p>
+        <input class="field-input hidden" id="consultaManualesFiltro" type="search" placeholder="Buscar manual por marca o modelo..." autocomplete="off" style="margin-bottom:8px;">
         <p class="list-status" id="consultaManualesStatus"></p>
         <div id="consultaManualesList" class="consulta-manuales-list"></div>
+      </div>
+
+      <div class="field-group hidden" id="consultaManualSelectWrap">
+        <label class="field-label" for="consultaManualSelect">¿Sobre qué manual es la pregunta?</label>
+        <select class="field-input" id="consultaManualSelect">
+          <option value="">Todos los de la categoría (más lento)</option>
+        </select>
       </div>
 
       <div class="field-group">
@@ -1791,6 +1799,11 @@
         <p class="dash-subtitulo" style="margin-top:0;">Respuesta</p>
         <div id="consultaRespuestaTexto" class="consulta-respuesta-texto"></div>
         <p class="consulta-manuales-usados" id="consultaManualesUsados"></p>
+      </div>
+
+      <div id="consultaRecientesWrap" class="hidden" style="margin-top:18px;">
+        <p class="dash-subtitulo">Tus consultas recientes</p>
+        <div id="consultaRecientesList" class="consulta-recientes-list"></div>
       </div>
     </div>
 

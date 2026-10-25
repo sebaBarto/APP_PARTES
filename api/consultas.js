@@ -117,7 +117,7 @@ module.exports = async (req, res) => {
   try {
     let body = req.body;
     if (typeof body === "string") body = JSON.parse(body);
-    const { categoria, pregunta } = body || {};
+    const { categoria, pregunta, archivo } = body || {};
     if (!categoria || !pregunta) {
       res.status(400).json({ error: "Falta la categoría o la pregunta" });
       return;
@@ -136,10 +136,20 @@ module.exports = async (req, res) => {
     }
 
     const accessToken = await getAccessToken("https://www.googleapis.com/auth/drive.readonly");
-    const archivos = await listarArchivosCarpeta(accessToken, cat.carpeta_drive_id);
+    let archivos = await listarArchivosCarpeta(accessToken, cat.carpeta_drive_id);
     if (archivos.length === 0) {
       res.status(404).json({ error: "No hay manuales (PDF) en la carpeta de esa categoría" });
       return;
+    }
+    // Si el técnico eligió un manual puntual, se pregunta solo sobre ese:
+    // mucho más rápido y la respuesta no mezcla equipos distintos.
+    if (archivo) {
+      const elegido = archivos.filter((a) => a.id === archivo);
+      if (elegido.length === 0) {
+        res.status(404).json({ error: "Ese manual ya no está en la carpeta de la categoría" });
+        return;
+      }
+      archivos = elegido;
     }
 
     const partesDocumentos = [];
@@ -158,12 +168,16 @@ module.exports = async (req, res) => {
       });
     }
 
+    const nombresManuales = archivos.filter((a) => !omitidos.includes(a.name)).map((a) => a.name).join(", ");
     const promptTexto =
       `Sos un asistente técnico para instaladores de sistemas de seguridad electrónica ` +
-      `(alarmas, cámaras, control de accesos). Respondé la siguiente pregunta del técnico ` +
-      `basándote ÚNICAMENTE en el contenido de los manuales adjuntos. Si la respuesta no ` +
-      `está en los manuales, decilo claramente en vez de inventar algo. Sé concreto y breve, ` +
-      `como para leer rápido desde un celular.\n\nPregunta: ${pregunta}`;
+      `(alarmas, cámaras, control de accesos) de una empresa argentina. Respondé la pregunta del técnico ` +
+      `basándote ÚNICAMENTE en el contenido de los manuales adjuntos (${nombresManuales}). ` +
+      `Si la respuesta no está en los manuales, decilo claramente en vez de inventar algo.\n` +
+      `Formato: castellano rioplatense, concreto y breve, para leer en el celular parado frente al equipo. ` +
+      `Si es un procedimiento, dalo en pasos numerados con las teclas o códigos exactos. ` +
+      `Al final agregá una línea "Fuente:" con el nombre del manual y la página o sección.\n\n` +
+      `Pregunta: ${pregunta}`;
 
     const geminiRes = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent`,
@@ -177,6 +191,10 @@ module.exports = async (req, res) => {
     );
     const geminiData = await geminiRes.json();
     if (!geminiRes.ok) {
+      if (geminiRes.status === 429) {
+        res.status(429).json({ error: "Se alcanzó el límite de consultas gratuitas a la IA por ahora. Probá de nuevo en unos minutos, o abrí el manual directo." });
+        return;
+      }
       res.status(502).json({ error: "No se pudo consultar la IA", detail: geminiData.error || geminiData });
       return;
     }

@@ -863,3 +863,47 @@ test("Admin instalaciones: horas totales en la lista y por técnico en el detall
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Manuales: preguntar sobre un manual puntual, respuesta con formato, consultas recientes, filtro y guardado sin señal", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const preguntas = [];
+  const manuales = ["DSC PC1616.pdf", "DSC PC1832.pdf", "Garnet A2K4.pdf", "Garnet A2K8.pdf", "Paradox SP4000.pdf", "Paradox SP6000.pdf"].map((n, i) => ({ id: "m" + i, nombre: n }));
+  await page.route("**/api/**", (route) => {
+    const req = route.request();
+    const u = req.url();
+    const json = (o, st) => route.fulfill({ status: st || 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("coleccion=consultas-categorias")) return json([{ categoria: "Centrales de alarma", carpeta_drive_id: "x" }]);
+    if (u.includes("/api/consultas") && req.method() === "POST") {
+      preguntas.push(JSON.parse(req.postData()));
+      return json({ respuesta: "Para resetear:\n1. Entrá a **programación** con *8*.\n2. Marcá `999`.\nFuente: Garnet A2K4, pág. 12", manuales_usados: ["Garnet A2K4.pdf"] });
+    }
+    if (u.includes("/api/consultas") && u.includes("archivo=")) return route.fulfill({ status: 200, contentType: "application/pdf", body: Buffer.from("%PDF-1.4\n%%EOF") });
+    if (u.includes("/api/consultas")) return json(manuales);
+    json([]);
+  });
+  await page.goto(base + "/");
+  await page.evaluate(() => localStorage.removeItem("consultas_recientes"));
+  await page.evaluate(() => verConsultasBtn.click());
+  await page.waitForTimeout(400);
+  await page.selectOption("#consultaCategoriaSelect", "Centrales de alarma");
+  await page.waitForTimeout(400);
+  assert.strictEqual(await page.locator("#consultaManualesFiltro").isVisible(), true, "con muchos manuales aparece el buscador");
+  await page.fill("#consultaManualesFiltro", "garnet");
+  await page.waitForTimeout(200);
+  assert.strictEqual(await page.locator("#consultaManualesList .consulta-manual-item").count(), 2);
+  await page.selectOption("#consultaManualSelect", "m2");
+  await page.fill("#consultaPreguntaInput", "¿Cómo reseteo la central?");
+  await page.click("#preguntarBtn");
+  await page.waitForTimeout(400);
+  assert.strictEqual(preguntas[0].archivo, "m2", "pregunta solo sobre el manual elegido");
+  assert.strictEqual(await page.locator("#consultaRespuestaTexto ol li").count(), 2, "pasos como lista numerada");
+  assert.strictEqual(await page.locator("#consultaRespuestaTexto b").textContent(), "programación");
+  assert.strictEqual(await page.locator("#consultaRecientesList .consulta-reciente").count(), 1, "queda en consultas recientes");
+  // abrir un manual lo guarda en el celular
+  await page.locator("#consultaManualesList .consulta-manual-item").first().click();
+  await page.waitForTimeout(600);
+  assert.strictEqual(await page.evaluate(async () => (await (await caches.open("manuales-sat-v1")).keys()).length), 1);
+  assert.strictEqual(await page.locator("#consultaManualesList .cm-guardado").count(), 1, "se marca como guardado en el celular");
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
