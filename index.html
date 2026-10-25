@@ -1037,7 +1037,8 @@
 
       <div class="card" id="instalacionClienteCard">
         <label class="field-label" for="instalacionClienteInput">Nombre de la instalación</label>
-        <input class="field-input" id="instalacionClienteInput" type="text" placeholder="Ej: Distribuidora Norte, o el nombre que prefieras">
+        <input class="field-input" id="instalacionClienteInput" type="text" placeholder="Ej: Distribuidora Norte, o el nombre que prefieras" list="instClientesLista" autocomplete="off">
+        <datalist id="instClientesLista"></datalist>
         <div class="field-group" style="margin-top:8px;">
           <label class="field-label" for="instalacionDireccionInput">Dirección (opcional)</label>
           <input class="field-input" id="instalacionDireccionInput" type="text" placeholder="Dirección del lugar">
@@ -1063,15 +1064,16 @@
 
         <div class="card" style="margin-top:16px;">
           <label>Días trabajados hasta ahora</label>
+          <p class="hint-text" id="instDiasResumen"></p>
           <div id="instDiasList" class="historial-list"></div>
         </div>
 
-        <button class="btn btn-secondary" id="instalacionCerrarBtn" type="button" style="margin-top:16px;">Cerrar instalación</button>
+        <button class="btn btn-secondary hidden" id="instalacionCerrarBtn" type="button" style="margin-top:16px;">Cerrar instalación</button>
       </div>
 
       <div id="instalacionDetalleWrap" class="hidden">
         <div class="card" style="margin-top:16px;">
-          <p class="hint-text">Última etapa — cargá lo que instalaste y guardá para cerrar definitivamente.</p>
+          <p class="hint-text">Andá cargando zonas, canales y fotos a medida que avanza la obra: se guardan solos. Cuando terminen, tocá "Guardar y cerrar instalación".</p>
         </div>
 
         <div class="card" style="margin-top:16px;">
@@ -1086,7 +1088,8 @@
           </div>
           <button type="button" class="btn btn-ghost btn-small" id="agregarZonaBtn" style="margin:8px 0;">+ Agregar zona</button>
           <div id="instZonasList" class="materiales-agregados-list"></div>
-          <button type="button" class="btn btn-secondary" id="guardarZonasBtn" style="margin-top:8px;">Guardar zonas</button>
+          <p class="hint-text inst-guardado" id="instZonasEstado"></p>
+          <button type="button" class="btn btn-secondary hidden" id="guardarZonasBtn" style="margin-top:8px;">Guardar zonas</button>
         </div>
 
         <div class="card" style="margin-top:16px;">
@@ -1101,12 +1104,13 @@
           </div>
           <button type="button" class="btn btn-ghost btn-small" id="agregarCanalBtn" style="margin:8px 0;">+ Agregar canal</button>
           <div id="instCanalesList" class="materiales-agregados-list"></div>
-          <button type="button" class="btn btn-secondary" id="guardarCanalesBtn" style="margin-top:8px;">Guardar canales</button>
+          <p class="hint-text inst-guardado" id="instCanalesEstado"></p>
+          <button type="button" class="btn btn-secondary hidden" id="guardarCanalesBtn" style="margin-top:8px;">Guardar canales</button>
         </div>
 
         <div class="card" style="margin-top:16px;">
           <label>Fotos</label>
-          <input type="file" id="instFotoInput" accept="image/*" multiple style="margin-top:6px;">
+          <input type="file" id="instFotoInput" class="field-input" accept="image/*" multiple style="margin-top:6px;">
           <p class="status" id="instFotosStatus"></p>
           <div id="instFotosGrid" class="instalacion-fotos-grid"></div>
         </div>

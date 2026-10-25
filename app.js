@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.132.1";
+const APP_VERSION = "3.133.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -8150,6 +8150,7 @@ volverDeInstalacionBtn.addEventListener("click", () => showScreen("home"));
 
 function resetearPantallaInstalacion() {
   instalacionActivaId = null;
+  try { instDetalleCargado = false; } catch (e) { /* aún no cargó */ }
   instalacionActivaEstado = null;
   instZonasAgregadas = [];
   instCanalesAgregadas = [];
@@ -8165,14 +8166,33 @@ function resetearPantallaInstalacion() {
   renderInstCanales();
   instFotosGrid.innerHTML = "";
   instFotosStatus.textContent = "";
+  ["instZonasEstado", "instCanalesEstado", "instDiasResumen"].forEach((id) => { const el = document.getElementById(id); if (el) el.textContent = ""; });
 }
 
 // Al entrar a la pantalla, se fija primero si ya hay una instalación
 // abierta sin cerrar para este técnico — si la hay, la retoma
 // directo (con sus días ya marcados), en vez de arrancar siempre de
 // cero como si no existiera.
+async function poblarClientesInstalacion() {
+  await cargarClientesGeneral();
+  const lista = document.getElementById("instClientesLista");
+  if (!lista) return;
+  const vistos = new Set();
+  lista.innerHTML = (clientesGeneralCache || [])
+    .filter((c) => c.nombre && !vistos.has(c.nombre) && vistos.add(c.nombre))
+    .map((c) => `<option value="${escapeHtml(c.nombre)}"></option>`).join("");
+}
+instalacionClienteInput.addEventListener("input", () => {
+  const c = buscarClientePorNombre(instalacionClienteInput.value.trim());
+  if (!c) return;
+  if (c.direccion && !instalacionDireccionInput.value.trim()) instalacionDireccionInput.value = [c.direccion, c.localidad].filter(Boolean).join(", ");
+  const mail = c.email || c.mail || c.cliente_email;
+  if (mail && !instalacionClienteEmailInput.value.trim()) instalacionClienteEmailInput.value = mail;
+});
+
 async function verificarInstalacionAbierta() {
   resetearPantallaInstalacion();
+  poblarClientesInstalacion();
   try {
     const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
 
@@ -8215,7 +8235,76 @@ function mostrarInstalacionAbierta(inst) {
   instalacionClienteCard.classList.add("hidden");
   instalacionesAbiertasParaSumarseWrap.classList.add("hidden");
   instalacionAbiertaWrap.classList.remove("hidden");
+  instalacionDetalleWrap.classList.remove("hidden");
   actualizarEstadoDiaInstalacion();
+  cargarDetalleInstalacion();
+}
+
+// Trae lo que ya se guardó (zonas, canales, fotos) para seguir cargando
+// sobre eso — antes, al volver a entrar, las listas aparecían vacías.
+async function cargarDetalleInstalacion() {
+  if (!instalacionActivaId) return;
+  const id = instalacionActivaId;
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch(`/api/historial?tipo=instalacion&id=${id}`, { headers, cache: "no-store" });
+    const inst = await res.json();
+    if (!res.ok || id !== instalacionActivaId) return;
+    // Se suman a lo que el técnico haya agregado mientras cargaba (sin duplicar).
+    const unir = (servidor, locales) => {
+      const lista = (servidor || []).map((z) => ({ numero: String(z.numero ?? ""), descripcion: z.descripcion || "" }));
+      locales.forEach((z) => { if (!lista.some((x) => x.numero === z.numero && x.descripcion === z.descripcion)) lista.push(z); });
+      return lista;
+    };
+    instZonasAgregadas = unir(inst.zonas, instZonasAgregadas);
+    instCanalesAgregadas = unir(inst.canales, instCanalesAgregadas);
+    instDetalleCargado = true;
+    if (inst.observaciones && !instObservacionesInput.value) instObservacionesInput.value = inst.observaciones;
+    renderInstZonas();
+    renderInstCanales();
+    pintarFotosInstalacion(inst.fotos || []);
+  } catch (err) {
+    // sin señal: se sigue con lo que haya en pantalla
+  }
+}
+
+// Autoguardado de zonas/canales (se manda la lista completa, como antes).
+const instGuardadoTimers = {};
+let instDetalleCargado = false; // hasta saber qué hay guardado, no se pisa nada en el servidor
+function programarGuardadoItems(tipo) {
+  const estado = document.getElementById(tipo === "zona" ? "instZonasEstado" : "instCanalesEstado");
+  if (estado) estado.textContent = "Guardando…";
+  clearTimeout(instGuardadoTimers[tipo]);
+  instGuardadoTimers[tipo] = setTimeout(() => guardarItemsInstalacion(tipo), 700);
+}
+async function guardarItemsInstalacion(tipo) {
+  if (!instalacionActivaId) return false;
+  // Se manda la lista completa: si todavía no se leyó lo guardado (sin
+  // señal al entrar), primero se lee y se une, para no borrar nada.
+  if (!instDetalleCargado) {
+    await cargarDetalleInstalacion();
+    if (!instDetalleCargado) {
+      const est = document.getElementById(tipo === "zona" ? "instZonasEstado" : "instCanalesEstado");
+      if (est) est.textContent = "Sin señal: se guarda cuando vuelva la conexión.";
+      return false;
+    }
+  }
+  const items = tipo === "zona" ? instZonasAgregadas : instCanalesAgregadas;
+  const estado = document.getElementById(tipo === "zona" ? "instZonasEstado" : "instCanalesEstado");
+  try {
+    const res = await fetch("/api/historial", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({ accion: "guardar_items_instalacion", instalacion_id: instalacionActivaId, tipo, items }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) throw new Error(data.error || "Error desconocido");
+    if (estado) estado.textContent = items.length ? `✓ Guardado (${items.length})` : "";
+    return true;
+  } catch (err) {
+    if (estado) estado.textContent = "No se pudo guardar (¿sin señal?). Se reintenta al cerrar.";
+    return false;
+  }
 }
 
 async function mostrarInstalacionesParaSumarse() {
@@ -8299,6 +8388,8 @@ instalacionIniciarBtn.addEventListener("click", async () => {
     instalacionClienteCard.classList.add("hidden");
     instalacionesAbiertasParaSumarseWrap.classList.add("hidden");
     instalacionAbiertaWrap.classList.remove("hidden");
+    instalacionDetalleWrap.classList.remove("hidden");
+    instDetalleCargado = true;
     instDiaLlegadaWrap.classList.remove("hidden");
     instDiaSalidaWrap.classList.add("hidden");
     renderInstDias([]);
@@ -8309,23 +8400,44 @@ instalacionIniciarBtn.addEventListener("click", async () => {
   }
 });
 
+function minutosEntre(h1, h2) {
+  const m = (h) => { const [hh, mm] = String(h || "").split(":").map(Number); return isFinite(hh) ? hh * 60 + (mm || 0) : null; };
+  const a = m(h1), b = m(h2);
+  if (a === null || b === null) return 0;
+  return b >= a ? b - a : 0;
+}
+function textoHoras(min) {
+  const h = Math.floor(min / 60), m = min % 60;
+  return h ? `${h} h${m ? " " + m + " min" : ""}` : `${m} min`;
+}
+// Días agrupados por fecha, con cada técnico y sus horas (antes cada
+// marca contaba como un "día", y con un ayudante se duplicaban).
 function renderInstDias(dias) {
   instDiasList.innerHTML = "";
+  const resumen = document.getElementById("instDiasResumen");
   if (!dias || dias.length === 0) {
     instDiasList.innerHTML = "<p style='color:#6B7680; font-size:13px;'>Todavía no marcaste ningún día.</p>";
+    if (resumen) resumen.textContent = "";
     return;
   }
-  dias.forEach((d, idx) => {
-    const [y, m, dd] = d.fecha_llegada.split("-");
-    const fechaTexto = `${dd}/${m}/${y}`;
+  const porFecha = {};
+  dias.forEach((d) => { (porFecha[d.fecha_llegada] = porFecha[d.fecha_llegada] || []).push(d); });
+  const fechas = Object.keys(porFecha).sort();
+  let totalMin = 0;
+  fechas.forEach((fecha, idx) => {
+    const [y, m, dd] = fecha.split("-");
+    const enObra = porFecha[fecha].some((d) => !d.hora_salida);
     const card = document.createElement("div");
-    card.className = "historial-card" + (!d.hora_salida ? " historial-card-en-obra" : "");
-    card.innerHTML = `
-      <div class="historial-card-num">Día ${idx + 1} — ${fechaTexto}</div>
-      <div class="historial-card-horario">Entrada ${d.hora_llegada}${d.hora_salida ? ` — Salida ${d.hora_salida}` : " — <b>sigue en obra</b>"}</div>
-    `;
+    card.className = "historial-card" + (enObra ? " historial-card-en-obra" : "");
+    const lineas = porFecha[fecha].map((d) => {
+      const min = d.hora_salida ? minutosEntre(d.hora_llegada, d.hora_salida) : 0;
+      totalMin += min;
+      return `<div class="historial-card-horario">${escapeHtml(d.tecnico || "")}: ${escapeHtml(d.hora_llegada || "")}${d.hora_salida ? ` a ${escapeHtml(d.hora_salida)} (${textoHoras(min)})` : " — <b>sigue en obra</b>"}</div>`;
+    }).join("");
+    card.innerHTML = `<div class="historial-card-num">Día ${idx + 1} — ${dd}/${m}/${y}</div>${lineas}`;
     instDiasList.appendChild(card);
   });
+  if (resumen) resumen.textContent = `${fechas.length} día${fechas.length === 1 ? "" : "s"} de obra · ${textoHoras(totalMin)} de trabajo en total (sumando técnicos).`;
 }
 
 async function actualizarEstadoDiaInstalacion() {
@@ -8428,7 +8540,7 @@ function renderInstZonas() {
     const fila = document.createElement("div");
     fila.className = "material-agregado-item";
     fila.innerHTML = `<span>Zona ${escapeHtml(z.numero)} — ${escapeHtml(z.descripcion)}</span><button type="button" class="quitar" title="Quitar">✕</button>`;
-    fila.querySelector(".quitar").addEventListener("click", () => { instZonasAgregadas.splice(idx, 1); renderInstZonas(); });
+    fila.querySelector(".quitar").addEventListener("click", () => { instZonasAgregadas.splice(idx, 1); renderInstZonas(); programarGuardadoItems("zona"); });
     instZonasList.appendChild(fila);
   });
 }
@@ -8438,6 +8550,7 @@ agregarZonaBtn.addEventListener("click", () => {
   if (!numero) { showToast("Escribí el número de zona."); return; }
   instZonasAgregadas.push({ numero, descripcion });
   renderInstZonas();
+  programarGuardadoItems("zona");
   instZonaNumeroInput.value = "";
   instZonaDescripcionInput.value = "";
   instZonaNumeroInput.focus();
@@ -8467,7 +8580,7 @@ function renderInstCanales() {
     const fila = document.createElement("div");
     fila.className = "material-agregado-item";
     fila.innerHTML = `<span>Canal ${escapeHtml(z.numero)} — ${escapeHtml(z.descripcion)}</span><button type="button" class="quitar" title="Quitar">✕</button>`;
-    fila.querySelector(".quitar").addEventListener("click", () => { instCanalesAgregadas.splice(idx, 1); renderInstCanales(); });
+    fila.querySelector(".quitar").addEventListener("click", () => { instCanalesAgregadas.splice(idx, 1); renderInstCanales(); programarGuardadoItems("canal"); });
     instCanalesList.appendChild(fila);
   });
 }
@@ -8477,6 +8590,7 @@ agregarCanalBtn.addEventListener("click", () => {
   if (!numero) { showToast("Escribí el número de canal."); return; }
   instCanalesAgregadas.push({ numero, descripcion });
   renderInstCanales();
+  programarGuardadoItems("canal");
   instCanalNumeroInput.value = "";
   instCanalDescripcionInput.value = "";
   instCanalNumeroInput.focus();
@@ -8509,58 +8623,71 @@ function leerArchivoComoBase64Instalacion(file) {
   });
 }
 
+function pintarFotosInstalacion(fotos) {
+  const id = instalacionActivaId;
+  instFotosGrid.innerHTML = "";
+  fotos.forEach((nombre) => {
+    const item = document.createElement("div");
+    item.className = "instalacion-foto-item";
+    item.innerHTML = `
+      <img src="/api/historial?tipo=foto-instalacion&id=${id}&nombre=${encodeURIComponent(nombre)}" loading="lazy" alt="Foto de la instalación">
+      <button type="button" class="instalacion-foto-borrar" title="Borrar">✕</button>
+    `;
+    item.querySelector("button").addEventListener("click", async () => {
+      if (!confirm("¿Borrar esta foto de la instalación?")) return;
+      try {
+        const res = await fetch("/api/historial", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+          body: JSON.stringify({ accion: "borrar_foto_instalacion", instalacion_id: id, nombre }),
+        });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        renderInstFotos();
+      } catch (err) {
+        showToast("No se pudo borrar la foto.");
+      }
+    });
+    instFotosGrid.appendChild(item);
+  });
+  instFotosStatus.textContent = fotos.length ? `${fotos.length} foto${fotos.length === 1 ? "" : "s"} guardada${fotos.length === 1 ? "" : "s"}.` : "";
+}
+
 async function renderInstFotos() {
   if (!instalacionActivaId) return;
   try {
     const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
     const res = await fetch(`/api/historial?tipo=instalacion&id=${instalacionActivaId}`, { headers, cache: "no-store" });
     const data = await res.json();
-    const fotos = data.fotos || [];
-    instFotosGrid.innerHTML = "";
-    fotos.forEach((nombre) => {
-      const item = document.createElement("div");
-      item.className = "instalacion-foto-item";
-      item.innerHTML = `
-        <img src="/api/historial?tipo=foto-instalacion&id=${instalacionActivaId}&nombre=${encodeURIComponent(nombre)}" loading="lazy">
-        <button type="button" class="instalacion-foto-borrar" title="Borrar">✕</button>
-      `;
-      item.querySelector("button").addEventListener("click", async () => {
-        try {
-          await fetch("/api/historial", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-            body: JSON.stringify({ accion: "borrar_foto_instalacion", instalacion_id: instalacionActivaId, nombre }),
-          });
-          renderInstFotos();
-        } catch (err) {
-          showToast("No se pudo borrar la foto.");
-        }
-      });
-      instFotosGrid.appendChild(item);
-    });
+    if (!res.ok) return;
+    pintarFotosInstalacion(data.fotos || []);
   } catch (err) {
     // si falla, se deja la grilla como estaba
   }
 }
 
+// Las fotos se achican antes de subirlas (una foto de celular pesa varios
+// MB y el servidor rechaza envíos de más de ~4 MB: antes fallaban sin avisar).
 instFotoInput.addEventListener("change", async () => {
   if (!instalacionActivaId) return;
   const archivos = Array.from(instFotoInput.files || []);
   if (archivos.length === 0) return;
+  let fallidas = 0;
   for (let i = 0; i < archivos.length; i++) {
     instFotosStatus.textContent = `Subiendo foto ${i + 1} de ${archivos.length}...`;
     try {
-      const base64 = await leerArchivoComoBase64Instalacion(archivos[i]);
-      await fetch("/api/historial", {
+      const base64 = await comprimirImagen(archivos[i], 1600, 0.75);
+      const res = await fetch("/api/historial", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
         body: JSON.stringify({ accion: "subir_foto_instalacion", instalacion_id: instalacionActivaId, nombre_archivo: `foto-${Date.now()}-${i}.jpg`, base64 }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.ok === false) throw new Error(data.error || "HTTP " + res.status);
     } catch (err) {
-      showToast(`No se pudo subir una foto: ${err.message}`);
+      fallidas++;
     }
   }
-  instFotosStatus.textContent = "";
+  if (fallidas) showToast(fallidas === archivos.length ? "No se pudieron subir las fotos. Revisá la señal e intentá de nuevo." : `${fallidas} foto(s) no se pudieron subir. Probá de nuevo con esas.`);
   instFotoInput.value = "";
   renderInstFotos();
 });
@@ -8571,11 +8698,10 @@ instalacionGuardarYCerrarBtn.addEventListener("click", async () => {
   instalacionGuardarYCerrarBtn.textContent = "Guardando...";
   try {
     const headers = { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN };
-    if (instZonasAgregadas.length > 0) {
-      await fetch("/api/historial", { method: "POST", headers, body: JSON.stringify({ accion: "guardar_items_instalacion", instalacion_id: instalacionActivaId, tipo: "zona", items: instZonasAgregadas }) });
-    }
-    if (instCanalesAgregadas.length > 0) {
-      await fetch("/api/historial", { method: "POST", headers, body: JSON.stringify({ accion: "guardar_items_instalacion", instalacion_id: instalacionActivaId, tipo: "canal", items: instCanalesAgregadas }) });
+    clearTimeout(instGuardadoTimers.zona);
+    clearTimeout(instGuardadoTimers.canal);
+    if (!(await guardarItemsInstalacion("zona")) || !(await guardarItemsInstalacion("canal"))) {
+      throw new Error("no se pudieron guardar las zonas o los canales (¿sin señal?)");
     }
     const res = await fetch("/api/historial", { method: "POST", headers, body: JSON.stringify({ accion: "cerrar_instalacion", instalacion_id: instalacionActivaId, observaciones: instObservacionesInput.value.trim() }) });
     const data = await res.json();
@@ -8587,8 +8713,8 @@ instalacionGuardarYCerrarBtn.addEventListener("click", async () => {
       // después sin tener que volver a escribir todo).
       if (data.error && data.error.includes("sin salida")) {
         showToast(data.error);
-        instalacionDetalleWrap.classList.add("hidden");
         instalacionAbiertaWrap.classList.remove("hidden");
+        instalacionAbiertaWrap.scrollIntoView({ behavior: "smooth", block: "start" });
         actualizarEstadoDiaInstalacion();
         return;
       }

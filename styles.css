@@ -2920,3 +2920,11 @@ html[data-inicio="nuevo"] .credencial-card-serial-n { color: #A9A49B; }
 html[data-inicio="nuevo"] .credencial-card-reloj { background: #FFC033; color: #0D0C0D; }
 html[data-inicio="nuevo"] .credencial-card-footer { background: #0D0C0D !important; color: #A9A49B !important; border-top-color: #2D2A26; }
 html[data-inicio="nuevo"] .credencial-card-estado.vigente { background: #1F7A3D; }
+
+/* Instalación (skin nuevo) */
+html[data-inicio="nuevo"] #screen-instalacion .card > label:first-child { display: block; font-family: var(--f-titulo) !important; font-weight: 700; font-size: 19px; color: var(--sat-texto); margin-bottom: 8px; }
+html[data-inicio="nuevo"] #screen-instalacion #instalacionActivaTexto { font-family: var(--f-titulo) !important; font-weight: 700; font-size: 19px; color: var(--sat-texto) !important; margin: 0 0 12px; }
+html[data-inicio="nuevo"] #instalacionDetalleWrap > .card:first-child { background: transparent !important; border: 0 !important; padding: 0 2px !important; }
+html[data-inicio="nuevo"] .app .material-agregado-item { background: var(--sat-sup2) !important; border: 1px solid var(--sat-borde) !important; border-radius: 4px !important; color: var(--sat-texto) !important; }
+html[data-inicio="nuevo"] .app .inst-guardado { margin: 6px 0 0; font-size: 14px; }
+html[data-inicio="nuevo"] #screen-instalacion #instDiasResumen { margin: 0 0 10px; font-size: 15px; font-weight: 600; }

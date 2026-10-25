@@ -784,3 +784,50 @@ test("Credencial (skin nuevo): vertical con estado de vigencia, reloj en vivo y 
   assert.strictEqual(await page.locator("#credencialReloj").isVisible(), false);
   await ctx.close();
 });
+
+test("Instalación: retoma lo guardado, autoguarda zonas sin pisar, fotos achicadas, días agrupados con horas", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const posts = [];
+  const hoy = diaISO(0);
+  await page.route("**/api/**", (route) => {
+    const req = route.request();
+    const u = req.url();
+    const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (req.method() === "POST" && u.includes("/api/historial")) { posts.push(JSON.parse(req.postData())); return json({ ok: true }); }
+    if (u.includes("tipo=instalacion_abierta")) return json({ abierta: { id: 5, cliente: "Distribuidora Norte", direccion: "Ruta 9" } });
+    if (u.includes("tipo=instalacion&id=5")) return json({ id: 5, cliente: "Distribuidora Norte", zonas: [{ numero: "1", descripcion: "PIR living" }], canales: [], fotos: ["a.jpg"] });
+    if (u.includes("presencias_de_instalacion=5")) return json([
+      { tecnico: "Juan Pérez", fecha_llegada: hoy, hora_llegada: "08:00", hora_salida: "12:30" },
+      { tecnico: "Luis Gómez", fecha_llegada: hoy, hora_llegada: "09:00", hora_salida: "12:00" },
+    ]);
+    if (u.includes("recurso=presencia")) return json({ activa: null });
+    if (u.includes("tipo=foto-instalacion")) return route.fulfill({ status: 200, contentType: "image/png", body: Buffer.from("89504e470d0a1a0a", "hex") });
+    return json([]);
+  });
+  await page.goto(base + "/");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { tecnicoLogueado = "Juan Pérez"; showScreen("instalacion"); return verificarInstalacionAbierta(); });
+  await page.waitForTimeout(500);
+  assert.strictEqual(await page.locator("#instalacionDetalleWrap").isVisible(), true, "se puede cargar durante la obra");
+  assert.strictEqual(await page.locator("#instZonasList .material-agregado-item").count(), 1, "retoma la zona guardada");
+  assert.strictEqual(await page.locator("#instFotosGrid .instalacion-foto-item").count(), 1, "muestra la foto guardada");
+  assert.strictEqual(await page.locator("#instDiasList .historial-card").count(), 1, "dos técnicos el mismo día = un día");
+  assert.match(await page.locator("#instDiasResumen").textContent(), /1 día de obra · 7 h 30 min/);
+
+  await page.fill("#instZonaNumeroInput", "2");
+  await page.fill("#instZonaDescripcionInput", "Magnético puerta");
+  await page.click("#agregarZonaBtn");
+  await page.waitForTimeout(1000);
+  const guardado = posts.find((p) => p.accion === "guardar_items_instalacion" && p.tipo === "zona");
+  assert.ok(guardado, "se autoguarda");
+  assert.deepStrictEqual(guardado.items.map((z) => z.numero), ["1", "2"], "manda la lista completa, sin perder la guardada");
+
+  const png = await page.evaluate(() => { const c = document.createElement("canvas"); c.width = 3000; c.height = 2000; const x = c.getContext("2d"); for (let i = 0; i < 400; i++) { x.fillStyle = `hsl(${i},70%,50%)`; x.fillRect(Math.random() * 3000, Math.random() * 2000, 200, 200); } return c.toDataURL("image/png").split(",")[1]; });
+  await page.setInputFiles("#instFotoInput", { name: "obra.png", mimeType: "image/png", buffer: Buffer.from(png, "base64") });
+  await page.waitForTimeout(1500);
+  const foto = posts.find((p) => p.accion === "subir_foto_instalacion");
+  assert.ok(foto && foto.base64.startsWith("data:image/jpeg"), "la foto se convierte a JPG achicado");
+  assert.ok(foto.base64.length < 1500000, "pesa menos de ~1 MB");
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
