@@ -491,9 +491,15 @@ test("Skin nuevo en historial, notas, stock, SIMs y dashboards: filtros en ámba
   assert.strictEqual(await css(page, "#screen-historial .review-eyebrow", "fontSize"), "30px", "título grande");
   const franjas = await page.locator("#historialList .historial-card").evaluateAll((els) => els.map((e) => getComputedStyle(e).borderLeftWidth));
   assert.deepStrictEqual(franjas, ["5px", "5px"], "franja de estado en cada tarjeta");
-  assert.strictEqual(await css(page, ".dash-cards-row", "display"), "grid");
   await page.evaluate(() => { showScreen("dashboard"); fetchDashboard(); });
   await page.waitForTimeout(900);
+  // El skin nuevo reemplaza las tarjetas por cifra principal + mosaicos
+  assert.strictEqual(await css(page, "#screen-dashboard .dash-cards-row", "display"), "none");
+  assert.strictEqual(await css(page, "#dashTiles", "display"), "grid");
+  const delMes = historial.filter((h) => h.fecha.slice(0, 7) === diaISO(0).slice(0, 7)).length;
+  assert.strictEqual(await page.locator("#dashHero .dash-hero-num").textContent(), String(delMes), "cifra principal: resueltos del mes");
+  assert.strictEqual(await page.evaluate(() => Chart.getChart("dashChartTecnico").options.indexAxis), "y", "técnicos en barras horizontales");
+  assert.strictEqual(await page.evaluate(() => Chart.getChart("dashChartTecnico").data.datasets[0].maxBarThickness), 24, "barras finas");
   const colorTitulo = await page.evaluate(() => { const c = Chart.getChart("dashChartTecnico"); return c && c.options.plugins.title.color; });
   assert.strictEqual(colorTitulo, "#E8ECEF", "el título del gráfico se lee sobre fondo oscuro");
   assert.strictEqual(await page.locator("#screen-dashboard .dash-chart-wrap:not(.con-grafico)").first().isVisible().catch(() => false), false, "sin marco vacío cuando no hay gráfico");
@@ -1150,5 +1156,35 @@ test("Mis SIMs (skin nuevo): resumen por empresa con stock bajo, buscador, histo
   ({ ctx, page } = await abrir("clasico"));
   assert.strictEqual(await page.locator("#simsResumenWrap").isVisible(), false);
   assert.strictEqual(await page.locator("#simsMandadasWrap").isVisible(), false);
+  await ctx.close();
+});
+
+test("Dashboard financiero (skin nuevo): cifra principal con variación, mosaicos y cobrado por forma de pago; el clásico no cambia", async () => {
+  const hoy = diaISO(0);
+  const historial = [
+    { id_parte: "a", fecha: hoy, costo_final: "10000", forma_pago: "PAGADO", tecnico: "Juan" },
+    { id_parte: "b", fecha: hoy, costo_final: "5000", forma_pago: "TRANSFIERE", tecnico: "Juan" },
+    { id_parte: "c", fecha: hoy, costo_final: "0", tecnico: "Juan" },
+  ];
+  const abrir = async (estilo) => {
+    const { ctx, page, erroresPagina } = await nuevaPagina();
+    await page.route("**/api/**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(route.request().url().includes("/api/historial") ? historial : []) }));
+    await page.goto(base + "/");
+    await page.evaluate((e) => localStorage.setItem("ajustes_app", JSON.stringify({ estiloInicio: e, tema: "night", avisoFelicitacion: false })), estilo);
+    await page.reload();
+    await page.waitForTimeout(300);
+    await page.evaluate(() => { tecnicoLogueado = "Seba Barto"; showScreen("dashboardFinanciero"); return fetchDashboardFinanciero(); });
+    await page.waitForTimeout(600);
+    return { ctx, page, erroresPagina };
+  };
+  let { ctx, page, erroresPagina } = await abrir("nuevo");
+  assert.strictEqual(await page.locator("#dashFinHero .dash-hero-num").textContent(), "$15.000");
+  assert.match(await page.locator("#dashFinTiles").textContent(), /2\s*Servicios cobrados[\s\S]*1\s*Sin cargo\s*33% del total[\s\S]*\$7\.500\s*Ticket promedio/);
+  assert.deepStrictEqual(await page.evaluate(() => Chart.getChart("dashChartFinPago").data.labels), ["Pagado", "Transfiere"]);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+  ({ ctx, page } = await abrir("clasico"));
+  assert.strictEqual(await page.locator("#dashFinHero").isVisible(), false);
+  assert.strictEqual(await page.locator("#screen-dashboard-financiero .dash-cards-row").first().isVisible(), true);
   await ctx.close();
 });

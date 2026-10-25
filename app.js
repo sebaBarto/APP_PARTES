@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.137.1";
+const APP_VERSION = "3.138.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -91,9 +91,28 @@ if (typeof Chart !== "undefined") {
         leg.labels = Object.assign({}, leg.labels, { font: { family: "'Barlow', sans-serif", size: 13 } });
         if (co.scales) Object.values(co.scales).forEach((sc) => { sc.ticks = Object.assign({}, sc.ticks, { font: { family: "'Barlow', sans-serif", size: 12 } }); });
       }
+      // Skin nuevo: una sola serie va en el amarillo SAT (de día, un ocre que
+      // se lee sobre blanco); las barras finas con la punta redondeada.
+      const acento = claro ? "#B87F00" : "#FFC033";
+      const lavado = claro ? "rgba(184,127,0,0.10)" : "rgba(255,192,51,0.10)";
+      if (nuevo) {
+        co.locale = "es-AR"; // 50.000 y no 50,000
+        const horizontal = co.indexAxis === "y";
+        if (tipo === "line" && co.scales && co.scales.x) co.scales.x.grid = Object.assign({}, co.scales.x.grid, { display: false });
+        if (tipo === "bar" && co.scales) {
+          const ejeCat = horizontal ? "y" : "x";
+          if (co.scales[ejeCat]) co.scales[ejeCat].grid = Object.assign({}, co.scales[ejeCat].grid, { display: false });
+        }
+        (chart.config.data.datasets || []).forEach((ds) => {
+          if (tipo === "bar") { ds.borderRadius = 4; ds.borderSkipped = "start"; ds.maxBarThickness = 24; }
+          if (tipo === "line") { ds.borderWidth = 2; ds.pointHoverRadius = 5; if (ds.pointRadius === undefined || (chart.config.data.labels || []).length > 15) ds.pointRadius = 0; }
+        });
+      }
       const remapear = (c) => {
         if (typeof c !== "string") return c;
-        if (nuevo && c.toUpperCase() === "#F5A623") return "#FFC033";
+        if (nuevo && ["#F5A623", "#2E7D32"].includes(c.toUpperCase())) return acento;
+        if (nuevo && c.toLowerCase() === "#101820" && tipo === "line") return acento;
+        if (nuevo && c === "rgba(16,24,32,0.1)") return lavado;
         if (claro) return c;
         if (c.toLowerCase() === "#2e7d32") return "#5FD08A";
         if (c.toLowerCase() === "#101820") return (chart.config.type === "doughnut" || chart.config.type === "pie") ? (nuevo ? "#8A857C" : "#6F8CA0") : (nuevo ? "#EEECE7" : "#E8ECEF");
@@ -894,7 +913,7 @@ function actualizarBarraSuperior(name) {
     const otros = Array.from(bar.querySelectorAll("button, a")).filter((b) => b !== volver && !b.classList.contains("hidden") && getComputedStyle(b).display !== "none");
     if (otros.length === 0) bar.classList.add("solo-volver");
   }
-  const nombresCortos = { consultas: "Manuales", dashboardFinanciero: "Financiero", simDetalle: "Ficha de la SIM", simRegistro: "SIMs instaladas" };
+  const nombresCortos = { consultas: "Manuales", dashboard: "Dashboard", dashboardFinanciero: "Financiero", dashboardVehiculos: "Vehículos", dashboardHerramientas: "Herramientas", dashboardSims: "SIMs", simDetalle: "Ficha de la SIM", simRegistro: "SIMs instaladas" };
   if (seccion) seccion.textContent = name === "home" ? "Servicio técnico" : (nombresCortos[name] || nombreDePantalla(pantalla) || "Servicio técnico");
   document.querySelector(".topbar")?.classList.toggle("en-seccion", name !== "home" && name !== "login");
 }
@@ -4471,6 +4490,157 @@ function minutosEntre(entrada, salida) {
   return total;
 }
 
+
+// ======================================================================
+// Dashboards del skin nuevo: cifra principal, variación, mini-gráfico,
+// mosaicos y barra de proporción (el skin clásico sigue con sus tarjetas).
+// ======================================================================
+function coloresDash() {
+  const claro = ["day", "contraste"].includes(document.documentElement.dataset.theme);
+  // Par validado (contraste y daltonismo) para comparar dos cosas: ocre SAT + azul.
+  return claro
+    ? { acento: "#B87F00", lavado: "rgba(184,127,0,0.10)", par: ["#B87F00", "#2F6AA8"], superficie: "#FFFFFF", gris: "#C4C1B8" }
+    : { acento: "#FFC033", lavado: "rgba(255,192,51,0.10)", par: ["#BE8B00", "#4A86C4"], superficie: "#23211E", gris: "#4A4741" };
+}
+function serieDiaria(rango, filas, valorDe) {
+  const porDia = {};
+  const cursor = new Date(rango.desde);
+  const hoy = new Date();
+  while (cursor <= rango.hasta && cursor <= hoy) {
+    porDia[fechaLocalISO(cursor)] = 0;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  filas.forEach((h) => { if (h.fecha && h.fecha in porDia) porDia[h.fecha] += valorDe(h); });
+  return Object.keys(porDia).sort().map((k) => porDia[k]);
+}
+function sparklineSVG(valores) {
+  if (!valores || valores.length < 2) return "";
+  const c = coloresDash();
+  const W = 300, H = 56, P = 5;
+  const max = Math.max(...valores, 1);
+  const x = (i) => P + (i * (W - 2 * P)) / (valores.length - 1);
+  const y = (v) => H - P - (v / max) * (H - 2 * P);
+  const puntos = valores.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`);
+  const ultimo = valores.length - 1;
+  return `<svg class="dash-spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M${x(0)},${H - P} L${puntos.join(" L")} L${x(ultimo)},${H - P} Z" fill="${c.lavado}" stroke="none"/>
+    <polyline points="${puntos.join(" ")}" fill="none" stroke="${c.acento}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+  </svg><span class="dash-spark-punto" style="left:calc(${(x(ultimo) / W) * 100}% - 6px); top:calc(${(y(valores[ultimo]) / H) * 100}% - 6px); background:${c.acento}; box-shadow:0 0 0 2px ${c.superficie};"></span>`;
+}
+function deltaPill(actual, anterior, periodoAnterior, subirEsBueno = true) {
+  if (anterior == null) return "";
+  if (anterior === 0 && actual === 0) return `<span class="dash-delta neutro">Igual que ${periodoAnterior}</span>`;
+  if (anterior === 0) return `<span class="dash-delta ${subirEsBueno ? "bien" : "mal"}">▲ Más que ${periodoAnterior} (sin registros)</span>`;
+  const cambio = Math.round(((actual - anterior) / anterior) * 100);
+  if (Math.abs(cambio) < 1) return `<span class="dash-delta neutro">= Igual que ${periodoAnterior}</span>`;
+  const sube = cambio > 0;
+  const clase = sube === subirEsBueno ? "bien" : "mal";
+  return `<span class="dash-delta ${clase}">${sube ? "▲" : "▼"} ${Math.abs(cambio)}% vs. ${periodoAnterior}</span>`;
+}
+const TEXTO_PERIODO = { dia: ["hoy", "ayer"], semana: ["esta semana", "la semana pasada"], mes: ["este mes", "el mes pasado"] };
+function heroDash({ valor, etiqueta, delta, serie }) {
+  return `<div class="dash-hero-num">${valor}</div>
+    <div class="dash-hero-label">${etiqueta}</div>
+    ${delta || ""}
+    ${serie ? `<div class="dash-spark-wrap">${sparklineSVG(serie)}</div>` : ""}`;
+}
+function tileDash({ valor, etiqueta, nota, estado }) {
+  return `<div class="dash-tile${estado ? " estado-" + estado : ""}">
+    <div class="dash-tile-num">${valor}</div>
+    <div class="dash-tile-label">${estado === "atencion" ? "⚠ " : ""}${etiqueta}</div>
+    ${nota ? `<div class="dash-tile-nota">${nota}</div>` : ""}
+  </div>`;
+}
+function renderDashGeneralNuevo(d) {
+  const hero = document.getElementById("dashHero");
+  const tiles = document.getElementById("dashTiles");
+  const mix = document.getElementById("dashMix");
+  const activo = esSkinNuevo();
+  [hero, tiles, mix].forEach((el) => { if (el) el.hidden = !activo; });
+  if (!activo) return;
+  const [ahora, antes] = TEXTO_PERIODO[dashPeriodoActivo] || ["en el período", "el período anterior"];
+  const rangoAnterior = obtenerRangoPeriodoAnterior(dashPeriodoActivo);
+  const anterior = rangoAnterior ? historialCache.filter((h) => fechaEnRango(h.fecha, rangoAnterior)).length : null;
+  const serie = dashPeriodoActivo === "dia" ? null : serieDiaria(d.rango, d.enPeriodo, () => 1);
+  hero.innerHTML = heroDash({
+    valor: d.enPeriodo.length,
+    etiqueta: `servicio${d.enPeriodo.length === 1 ? "" : "s"} resuelto${d.enPeriodo.length === 1 ? "" : "s"} ${ahora}`,
+    delta: deltaPill(d.enPeriodo.length, anterior, antes),
+    serie,
+  });
+  const diasTranscurridos = Math.max(1, serie ? serie.length : 1);
+  tiles.innerHTML = [
+    tileDash({ valor: d.pendientes, etiqueta: "Pendientes ahora" }),
+    tileDash({ valor: d.estancados, etiqueta: d.estancados ? "Esperando hace 3+ días" : "Ninguno trabado", estado: d.estancados ? "atencion" : "ok" }),
+    tileDash({ valor: d.tiempoPromedio, etiqueta: "Tiempo promedio en el cliente" }),
+    tileDash({ valor: (d.enPeriodo.length / diasTranscurridos).toFixed(1).replace(".", ","), etiqueta: "Resueltos por día", nota: dashPeriodoActivo === "dia" ? "" : `en ${diasTranscurridos} día${diasTranscurridos === 1 ? "" : "s"}` }),
+  ].join("");
+  const total = d.instalaciones + d.servicios;
+  const c = coloresDash();
+  mix.innerHTML = total ? `
+    <div class="dash-mix-titulo">Qué se hizo ${ahora}</div>
+    <div class="dash-mix-barra" role="img" aria-label="${d.instalaciones} instalaciones y ${d.servicios} servicios técnicos">
+      ${d.instalaciones ? `<span style="flex:${d.instalaciones}; background:${c.par[0]};"></span>` : ""}
+      ${d.servicios ? `<span style="flex:${d.servicios}; background:${c.par[1]};"></span>` : ""}
+    </div>
+    <div class="dash-mix-leyenda">
+      <span><i style="background:${c.par[0]};"></i>Instalaciones <b>${d.instalaciones}</b> · ${Math.round((d.instalaciones / total) * 100)}%</span>
+      <span><i style="background:${c.par[1]};"></i>Servicios técnicos <b>${d.servicios}</b> · ${Math.round((d.servicios / total) * 100)}%</span>
+    </div>` : "";
+  mix.hidden = !total;
+}
+function renderDashFinNuevo(d) {
+  const hero = document.getElementById("dashFinHero");
+  const tiles = document.getElementById("dashFinTiles");
+  const pagoWrap = document.getElementById("dashFinPagoWrap");
+  const activo = esSkinNuevo();
+  [hero, tiles, pagoWrap].forEach((el) => { if (el) el.hidden = !activo; });
+  if (!activo) return;
+  const [ahora, antes] = TEXTO_PERIODO[dashFinPeriodoActivo] || ["en el período", "el período anterior"];
+  const rangoAnt = obtenerRangoPeriodoAnterior(dashFinPeriodoActivo);
+  const montoAnt = rangoAnt ? historialCache.filter((h) => fechaEnRango(h.fecha, rangoAnt) && !esBonificado(h.costo_final)).reduce((a, h) => a + (parseMonto(h.costo_final) || 0), 0) : null;
+  const serie = dashFinPeriodoActivo === "dia" ? null : serieDiaria(d.rango, d.enPeriodo.filter((h) => !esBonificado(h.costo_final)), (h) => parseMonto(h.costo_final) || 0);
+  hero.innerHTML = heroDash({
+    valor: "$" + Math.round(d.montoTotal).toLocaleString("es-AR"),
+    etiqueta: `cobrado ${ahora}`,
+    delta: deltaPill(d.montoTotal, montoAnt, antes),
+    serie,
+  });
+  const total = d.pagos + d.bonificados;
+  tiles.innerHTML = [
+    tileDash({ valor: d.pagos, etiqueta: "Servicios cobrados" }),
+    tileDash({ valor: d.bonificados, etiqueta: "Sin cargo", nota: total ? `${Math.round((d.bonificados / total) * 100)}% del total` : "" }),
+    tileDash({ valor: d.pagos ? "$" + Math.round(d.montoTotal / d.pagos).toLocaleString("es-AR") : "—", etiqueta: "Ticket promedio" }),
+  ].join("");
+  // Cobrado por forma de pago (barras horizontales, de mayor a menor)
+  const porForma = {};
+  d.enPeriodo.filter((h) => !esBonificado(h.costo_final)).forEach((h) => {
+    const f = (h.forma_pago || "Sin indicar").toString().trim() || "Sin indicar";
+    const k = f.charAt(0).toUpperCase() + f.slice(1).toLowerCase();
+    porForma[k] = (porForma[k] || 0) + (parseMonto(h.costo_final) || 0);
+  });
+  const formas = Object.keys(porForma).sort((a, b) => porForma[b] - porForma[a]);
+  if (chartFinPago) { chartFinPago.destroy(); chartFinPago = null; }
+  if (!formas.length) { pagoWrap.hidden = true; return; }
+  pagoWrap.style.height = `${80 + formas.length * 40}px`;
+  chartFinPago = new Chart(document.getElementById("dashChartFinPago"), {
+    type: "bar",
+    data: { labels: formas, datasets: [{ label: "Cobrado", data: formas.map((f) => porForma[f]), backgroundColor: "#F5A623" }] },
+    options: {
+      indexAxis: "y", responsive: true, maintainAspectRatio: false,
+      layout: { padding: { right: 70 } },
+      plugins: {
+        legend: { display: false },
+        title: { display: true, text: "Cobrado por forma de pago" },
+        datalabels: { display: true, anchor: "end", align: "right", clip: false, color: "#101820", font: { weight: "700", size: 12 }, formatter: (v) => "$" + Math.round(v).toLocaleString("es-AR") },
+        tooltip: { callbacks: { label: (ctx) => " $" + Math.round(ctx.raw).toLocaleString("es-AR") } },
+      },
+      scales: { x: { beginAtZero: true, ticks: { callback: (v) => "$" + (v >= 1000 ? Math.round(v / 1000) + " mil" : v) } } },
+    },
+  });
+}
+let chartFinPago = null;
+
 async function fetchDashboard() {
   dashStatus.textContent = "Cargando datos...";
   dashTecnicosList.innerHTML = "";
@@ -4544,6 +4714,9 @@ async function renderDashboard() {
   } else {
     dashTiempoPromedioNum.textContent = "—";
   }
+  try {
+    renderDashGeneralNuevo({ rango, enPeriodo, pendientes: pendientesActuales, estancados, tiempoPromedio: dashTiempoPromedioNum.textContent, instalaciones, servicios: serviciosComunes });
+  } catch (e) { /* el resto del dashboard sigue */ }
 
   const canvasTipo = document.getElementById("dashChartTipo");
   if (chartTipo) chartTipo.destroy();
@@ -4654,6 +4827,7 @@ async function renderDashboard() {
         const medalla = medallas[nombre] || "";
         const card = document.createElement("div");
         card.className = "dash-tecnico-card";
+        card.style.setProperty("--avance", String(Math.round((stats.cantidad / Math.max(1, porTecnico[nombresOrdenados[0]].cantidad)) * 100) / 100));
         card.innerHTML = `
           <div class="dash-tecnico-nombre">${escapeHtml(nombre)}${medalla ? ` <span class="dash-medalla ${medalla.clase}" title="Ranking de ${etiquetaPeriodo}">${medalla.texto}</span>` : ""}</div>
           <div class="dash-tecnico-stats">
@@ -4711,6 +4885,23 @@ function renderChartTecnico(porTecnico) {
   if (chartTecnico) chartTecnico.destroy();
   const nombres = Object.keys(porTecnico).sort((a, b) => porTecnico[b].cantidad - porTecnico[a].cantidad);
   if (nombres.length === 0) return;
+  if (esSkinNuevo()) {
+    canvas.parentElement.style.height = `${90 + nombres.length * 40}px`;
+    chartTecnico = new Chart(canvas, {
+      type: "bar",
+      data: { labels: nombres, datasets: [{ label: "Resueltos", data: nombres.map((n) => porTecnico[n].cantidad), backgroundColor: "#F5A623" }] },
+      options: {
+        indexAxis: "y", responsive: true, maintainAspectRatio: false, layout: { padding: { right: 36 } },
+        plugins: {
+          legend: { display: false }, title: { display: true, text: "Resueltos por técnico" },
+          datalabels: { display: true, anchor: "end", align: "right", clip: false, color: "#101820", font: { weight: "700", size: 13 }, formatter: (v) => (v > 0 ? v : "") },
+        },
+        scales: { x: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 } } },
+      },
+    });
+    return;
+  }
+  canvas.parentElement.style.height = "";
   chartTecnico = new Chart(canvas, {
     type: "bar",
     data: {
@@ -4785,6 +4976,25 @@ function renderChartDistancia(porTecnico) {
   if (chartDistancia) chartDistancia.destroy();
   const nombres = Object.keys(porTecnico).filter((n) => porTecnico[n].distanciaKm > 0);
   if (nombres.length === 0) return;
+  if (esSkinNuevo()) {
+    // Una torta con muchos técnicos no se compara bien: barras ordenadas.
+    nombres.sort((a, b) => porTecnico[b].distanciaKm - porTecnico[a].distanciaKm);
+    canvas.parentElement.style.height = `${90 + nombres.length * 40}px`;
+    chartDistancia = new Chart(canvas, {
+      type: "bar",
+      data: { labels: nombres, datasets: [{ label: "Km", data: nombres.map((n) => Math.round(porTecnico[n].distanciaKm * 10) / 10), backgroundColor: "#F5A623" }] },
+      options: {
+        indexAxis: "y", responsive: true, maintainAspectRatio: false, layout: { padding: { right: 56 } },
+        plugins: {
+          legend: { display: false }, title: { display: true, text: "Distancia aproximada recorrida" },
+          datalabels: { display: true, anchor: "end", align: "right", clip: false, color: "#101820", font: { weight: "700", size: 12 }, formatter: (v) => `${String(v).replace(".", ",")} km` },
+        },
+        scales: { x: { beginAtZero: true, ticks: { callback: (v) => v + " km" } } },
+      },
+    });
+    return;
+  }
+  canvas.parentElement.style.height = "";
   chartDistancia = new Chart(canvas, {
     type: "pie",
     data: {
@@ -4885,6 +5095,8 @@ function renderDashboardFinanciero() {
   } else {
     dashFinTotalDelta.innerHTML = "";
   }
+
+  try { renderDashFinNuevo({ rango, enPeriodo, pagos, bonificados, montoTotal }); } catch (e) { /* el resto sigue */ }
 
   // Gráfico: monto generado por día a lo largo del período.
   const porDia = {};

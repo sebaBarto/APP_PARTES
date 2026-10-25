@@ -3043,3 +3043,45 @@ html[data-inicio="nuevo"] #simEstadoFisicoWrap .btn.hidden { display: none !impo
 
 .consulta-foto-botones { display: flex; gap: 8px; width: 100%; }
 .consulta-foto-botones .consulta-foto-btn { flex: 1 1 0; text-align: center; margin: 0; }
+
+/* =====================================================================
+   DASHBOARDS (skin nuevo): una cifra principal por pantalla, mosaicos
+   con la misma letra, barra de proporción y gráficos de marcas finas.
+   ===================================================================== */
+html[data-inicio="nuevo"] :is(#screen-dashboard, #screen-dashboard-financiero) .dash-cards-row { display: none !important; }
+html[data-inicio="nuevo"] #screen-dashboard .dash-chart-wrap:has(#dashChartTipo) { display: none !important; }
+html[data-inicio="nuevo"] .dash-hero {
+  position: relative; margin: 4px 0 12px; padding: 16px 16px 10px; border-radius: 6px;
+  background: var(--sat-sup); border: 1px solid var(--sat-borde); border-top: 4px solid var(--sat-am); overflow: hidden;
+}
+html[data-inicio="nuevo"] .dash-hero-num { font-family: var(--f-titulo) !important; font-weight: 800; font-style: italic; font-size: 64px; line-height: 0.95; color: var(--sat-texto); letter-spacing: -0.01em; }
+html[data-inicio="nuevo"] .dash-hero-label { margin: 4px 0 8px; font-size: 16px; color: var(--sat-tenue); }
+html[data-inicio="nuevo"] .dash-delta { display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 3px; font-family: var(--f-titulo) !important; font-weight: 700; font-size: 14px; }
+html[data-inicio="nuevo"] .dash-delta.bien { background: rgba(95,208,138,0.14); color: #5FD08A; }
+html[data-inicio="nuevo"] .dash-delta.mal { background: rgba(255,107,94,0.14); color: #FF8A80; }
+html[data-inicio="nuevo"] .dash-delta.neutro { background: var(--sat-sup2); color: var(--sat-tenue); }
+html[data-inicio="nuevo"]:is([data-theme="day"], [data-theme="contraste"]) .dash-delta.bien { background: #E1F0E4; color: #1F6B34; }
+html[data-inicio="nuevo"]:is([data-theme="day"], [data-theme="contraste"]) .dash-delta.mal { background: #FBE3E1; color: #A1251B; }
+html[data-inicio="nuevo"] .dash-spark-wrap { position: relative; height: 56px; margin: 12px -4px 0; }
+html[data-inicio="nuevo"] .dash-spark { width: 100%; height: 100%; display: block; }
+html[data-inicio="nuevo"] .dash-spark-punto { position: absolute; width: 12px; height: 12px; border-radius: 50%; }
+html[data-inicio="nuevo"] .dash-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+html[data-inicio="nuevo"] #dashFinTiles { grid-template-columns: repeat(3, 1fr); }
+html[data-inicio="nuevo"] .dash-tile { padding: 12px 12px 10px; border-radius: 6px; background: var(--sat-sup); border: 1px solid var(--sat-borde); min-width: 0; }
+html[data-inicio="nuevo"] .dash-tile-num { font-family: var(--f-titulo) !important; font-weight: 800; font-size: 30px; line-height: 1; color: var(--sat-texto); overflow-wrap: anywhere; }
+html[data-inicio="nuevo"] #dashFinTiles .dash-tile-num { font-size: 22px; }
+html[data-inicio="nuevo"] .dash-tile-label { margin-top: 6px; font-size: 14px; line-height: 1.25; color: var(--sat-tenue); }
+html[data-inicio="nuevo"] .dash-tile-nota { margin-top: 2px; font-size: 12.5px; color: var(--sat-tenue); }
+html[data-inicio="nuevo"] .dash-tile.estado-atencion { border-left: 4px solid #F0A04B; }
+html[data-inicio="nuevo"] .dash-tile.estado-atencion .dash-tile-label { color: var(--sat-texto); font-weight: 600; }
+html[data-inicio="nuevo"] .dash-mix { margin-bottom: 12px; padding: 14px 16px; border-radius: 6px; background: var(--sat-sup); border: 1px solid var(--sat-borde); }
+html[data-inicio="nuevo"] .dash-mix-titulo { font-family: var(--f-titulo) !important; font-weight: 700; font-size: 16px; color: var(--sat-texto); margin-bottom: 10px; }
+html[data-inicio="nuevo"] .dash-mix-barra { display: flex; gap: 2px; height: 18px; border-radius: 4px; overflow: hidden; background: var(--sat-sup); }
+html[data-inicio="nuevo"] .dash-mix-barra span { display: block; min-width: 4px; }
+html[data-inicio="nuevo"] .dash-mix-leyenda { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; font-size: 14px; color: var(--sat-tenue); }
+html[data-inicio="nuevo"] .dash-mix-leyenda i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: 0; }
+html[data-inicio="nuevo"] .dash-mix-leyenda b { color: var(--sat-texto); }
+html[data-inicio="nuevo"] :is(#screen-dashboard, #screen-dashboard-financiero, #screen-dashboard-vehiculos, #screen-dashboard-herramientas, #screen-dashboard-sims) .dash-chart-wrap { border-radius: 6px !important; background: var(--sat-sup) !important; border: 1px solid var(--sat-borde) !important; padding: 10px 8px 6px !important; }
+/* Tarjetas por técnico con barra de avance respecto del primero */
+html[data-inicio="nuevo"] #screen-dashboard .dash-tecnico-card { position: relative; padding-bottom: 16px !important; }
+html[data-inicio="nuevo"] #screen-dashboard .dash-tecnico-card::after { content: ""; position: absolute; left: 14px; bottom: 8px; height: 4px; width: calc((100% - 28px) * var(--avance, 0)); border-radius: 2px; background: var(--sat-am); }
