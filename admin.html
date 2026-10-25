@@ -4054,6 +4054,7 @@ function renderRendicionesAdmin() {
           $${escapeHtmlAdmin(String(r.monto ?? ""))} · ${etiquetaEstado[r.estado] || escapeHtmlAdmin(r.estado || "")}
           ${fotosTexto ? ` · ${fotosTexto}` : ""}
         </div>
+        ${r.estado === "rechazado" && r.observaciones_admin ? `<div style="font-size:12px; margin-top:4px; color:#B3261E;">Motivo: ${escapeHtmlAdmin(r.observaciones_admin)}</div>` : ""}
         <label style="display:flex; align-items:center; gap:6px; margin-top:8px; font-size:13px; cursor:pointer;">
           <input type="checkbox" class="rendicion-check-pagado" data-id="${escapeHtmlAdmin(r.id)}" ${r.estado === "pagado" ? "checked" : ""}>
           Pagado

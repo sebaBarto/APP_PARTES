@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.128.1";
+const APP_VERSION = "3.128.2";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -1527,6 +1527,13 @@ function filtrarServicios() {
 // Umbrales para marcar un servicio como "estancado" — se administran
 // desde admin.html (pestaña "Servicios pendientes"), estos valores acá
 // son solo el respaldo de arranque hasta que se cargue la config real.
+// Fecha YYYY-MM-DD en hora local (Argentina). toISOString() usa UTC, y de
+// 21:00 a 24:00 daba la fecha del día siguiente.
+function fechaLocalISO(d) {
+  d = d || new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 let DIAS_ATENCION = 3;
 let DIAS_URGENTE = 7;
 
@@ -5062,7 +5069,7 @@ document.querySelectorAll(".hist-periodo-chip").forEach((chip) => {
     histPeriodoActivo = chip.dataset.periodo;
     histFechaEspecificaWrap.classList.toggle("hidden", histPeriodoActivo !== "fecha");
     if (histPeriodoActivo === "fecha" && !histFechaEspecifica.value) {
-      histFechaEspecifica.value = new Date().toISOString().slice(0, 10);
+      histFechaEspecifica.value = fechaLocalISO();
     }
     renderHistorialReciente();
   });
@@ -5467,7 +5474,7 @@ document.querySelectorAll(".stock-periodo-chip").forEach((chip) => {
     stockPeriodoActivo = chip.dataset.periodo;
     stockFechaEspecificaWrap.classList.toggle("hidden", stockPeriodoActivo !== "fecha");
     if (stockPeriodoActivo === "fecha" && !stockFechaEspecifica.value) {
-      stockFechaEspecifica.value = new Date().toISOString().slice(0, 10);
+      stockFechaEspecifica.value = fechaLocalISO();
     }
     renderStock();
   });
@@ -7094,7 +7101,7 @@ function limpiarFormularioRendicion() {
   rendDetalle.value = "";
   rendCliente.value = "";
   rendMonto.value = "";
-  rendFecha.value = new Date().toISOString().slice(0, 10);
+  rendFecha.value = fechaLocalISO();
   rendFotosUrls = [];
   rendFotoInput.value = "";
   renderRendFotosPreview();
@@ -7186,7 +7193,7 @@ rendEnviarBtn.addEventListener("click", async () => {
         detalle,
         cliente: rendCliente.value.trim(),
         monto,
-        fecha: rendFecha.value || new Date().toISOString().slice(0, 10),
+        fecha: rendFecha.value || fechaLocalISO(),
         foto_ref: rendFotosUrls.length > 0 ? JSON.stringify(rendFotosUrls) : "",
       }),
     });
@@ -7259,6 +7266,7 @@ function renderMisRendiciones() {
         <div class="historial-card-cliente">${escapeHtml(r.detalle || "")}</div>
         <div class="historial-card-direccion">${escapeHtml(fechaTexto)}${r.cliente ? " — " + escapeHtml(r.cliente) : ""}</div>
         <div class="historial-card-badges">${etiquetaEstado[r.estado] || escapeHtml(r.estado || "")}${fotosTexto}</div>
+        ${r.estado === "rechazado" && r.observaciones_admin ? `<div class="rend-motivo">Motivo: ${escapeHtml(r.observaciones_admin)}</div>` : ""}
       </div>
     `;
   }).join("");
@@ -7737,7 +7745,7 @@ presenciaMarcarLlegadaBtn.addEventListener("click", async () => {
         recurso: "presencia", accion: "llegada", tecnico: tecnicoLogueado, cliente,
         direccion: presenciaDireccionInput.value.trim(),
         numero_cliente: presenciaClienteEncontrado ? presenciaClienteEncontrado.numero_cliente || "" : "",
-        fecha: ahora.toISOString().slice(0, 10),
+        fecha: fechaLocalISO(ahora),
         hora: ahora.toTimeString().slice(0, 5),
         lat: ubicacion?.lat, lng: ubicacion?.lng, precision: ubicacion?.precision,
       }),
@@ -7767,7 +7775,7 @@ presenciaMarcarSalidaBtn.addEventListener("click", async () => {
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
       body: JSON.stringify({
         recurso: "presencia", accion: "salida", tecnico: tecnicoLogueado,
-        fecha: ahora.toISOString().slice(0, 10), hora: ahora.toTimeString().slice(0, 5),
+        fecha: fechaLocalISO(ahora), hora: ahora.toTimeString().slice(0, 5),
         lat: ubicacion?.lat, lng: ubicacion?.lng, precision: ubicacion?.precision,
       }),
     });
@@ -7791,7 +7799,7 @@ document.querySelectorAll(".presencia-periodo-chip").forEach((chip) => {
     presenciaPeriodoActivo = chip.dataset.periodo;
     presenciaFechaEspecificaWrap.classList.toggle("hidden", presenciaPeriodoActivo !== "fecha");
     if (presenciaPeriodoActivo === "fecha" && !presenciaFechaEspecifica.value) {
-      presenciaFechaEspecifica.value = new Date().toISOString().slice(0, 10);
+      presenciaFechaEspecifica.value = fechaLocalISO();
     }
     renderHistorialPresencia();
   });
@@ -7974,7 +7982,7 @@ async function sumarmeAInstalacion(id, cliente, direccion) {
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
       body: JSON.stringify({
         recurso: "presencia", accion: "llegada", tecnico: tecnicoLogueado, cliente, direccion,
-        fecha: ahora.toISOString().slice(0, 10), hora: ahora.toTimeString().slice(0, 5),
+        fecha: fechaLocalISO(ahora), hora: ahora.toTimeString().slice(0, 5),
         lat: ubicacion?.lat, lng: ubicacion?.lng, precision: ubicacion?.precision,
         instalacion_id: Number(id),
       }),
@@ -8004,7 +8012,7 @@ instalacionIniciarBtn.addEventListener("click", async () => {
         accion: "crear_instalacion", tecnico: tecnicoLogueado, cliente: nombreInstalacion,
         direccion: instalacionDireccionInput.value.trim(),
         cliente_email: instalacionClienteEmailInput.value.trim(),
-        fecha: ahora.toISOString().slice(0, 10), hora: ahora.toTimeString().slice(0, 5),
+        fecha: fechaLocalISO(ahora), hora: ahora.toTimeString().slice(0, 5),
       }),
     });
     const data = await res.json();
@@ -8084,7 +8092,7 @@ instalacionActivaBtn.addEventListener("click", async () => {
       body: JSON.stringify({
         recurso: "presencia", accion: "llegada", tecnico: tecnicoLogueado, cliente,
         direccion: instalacionDireccionInput.value.trim(),
-        fecha: ahora.toISOString().slice(0, 10), hora: ahora.toTimeString().slice(0, 5),
+        fecha: fechaLocalISO(ahora), hora: ahora.toTimeString().slice(0, 5),
         lat: ubicacion.lat, lng: ubicacion.lng, precision: ubicacion.precision,
         instalacion_id: instalacionActivaId,
       }),
@@ -8117,7 +8125,7 @@ instalacionSalidaBtn.addEventListener("click", async () => {
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
       body: JSON.stringify({
         recurso: "presencia", accion: "salida", tecnico: tecnicoLogueado,
-        fecha: ahora.toISOString().slice(0, 10), hora: ahora.toTimeString().slice(0, 5),
+        fecha: fechaLocalISO(ahora), hora: ahora.toTimeString().slice(0, 5),
         lat: ubicacion.lat, lng: ubicacion.lng, precision: ubicacion.precision,
       }),
     });
@@ -8850,7 +8858,7 @@ document.querySelectorAll(".dash-veh-periodo-chip").forEach((chip) => {
     dashVehPeriodoActivo = chip.dataset.periodo;
     dashVehFechaEspecificaWrap.classList.toggle("hidden", dashVehPeriodoActivo !== "fecha");
     if (dashVehPeriodoActivo === "fecha" && !dashVehFechaEspecifica.value) {
-      dashVehFechaEspecifica.value = new Date().toISOString().slice(0, 10);
+      dashVehFechaEspecifica.value = fechaLocalISO();
     }
     renderDashVehiculos();
     renderResumenGastoFlota();
@@ -9048,7 +9056,7 @@ document.querySelectorAll(".dash-herr-periodo-chip").forEach((chip) => {
     dashHerrPeriodoActivo = chip.dataset.periodo;
     dashHerrFechaEspecificaWrap.classList.toggle("hidden", dashHerrPeriodoActivo !== "fecha");
     if (dashHerrPeriodoActivo === "fecha" && !dashHerrFechaEspecifica.value) {
-      dashHerrFechaEspecifica.value = new Date().toISOString().slice(0, 10);
+      dashHerrFechaEspecifica.value = fechaLocalISO();
     }
     renderDashHerramientas();
   });
@@ -10166,7 +10174,7 @@ comConfirmarFirmaBtn.addEventListener("click", async () => {
   // algo en "otro artículo" (ese campo es texto libre, sin cantidad
   // propia, así que solo se puede contar como una unidad más).
   const cantidadTotal = comodatoBienesAgregados.reduce((suma, b) => suma + (Number(b.cantidad) || 0), 0) + (comFDOtroArticulo.value.trim() ? 1 : 0);
-  const item = { tipo: "comodato", datos, firma_comodatario_base64: firmaBase64, cliente_email: clienteEmail, tecnico: tecnicoLogueado || "", fecha_iso: hoy.toISOString().slice(0, 10), cantidad: cantidadTotal };
+  const item = { tipo: "comodato", datos, firma_comodatario_base64: firmaBase64, cliente_email: clienteEmail, tecnico: tecnicoLogueado || "", fecha_iso: fechaLocalISO(hoy), cantidad: cantidadTotal };
 
   comConfirmarFirmaBtn.disabled = true;
   comodatoEnviandoAviso.style.display = "block";
@@ -11127,7 +11135,7 @@ async function renderOcupacionSemana() {
 
     ocupacionSemanaStatus.textContent = "";
     ocupacionSemanaList.innerHTML = dias.map((d) => {
-      const fechaISO = d.toISOString().slice(0, 10);
+      const fechaISO = fechaLocalISO(d);
       const etiquetaDia = d.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "short" });
 
       const delCronograma = (cronogramaCache || [])

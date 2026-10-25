@@ -376,7 +376,7 @@ async function postRendicionNuevo(headersBackendNuevo, body, res) {
       } else if (body.accion === "rechazar") {
         await enviarASeleccionados([data.tecnico], {
           titulo: "❌ Rendición rechazada",
-          cuerpo: `Tu rendición de ${montoTexto} (${data.categoria || "gasto"}) fue rechazada.`,
+          cuerpo: `Tu rendición de ${montoTexto} (${data.categoria || "gasto"}) fue rechazada.${body.observaciones_admin ? " Motivo: " + String(body.observaciones_admin).slice(0, 120) : ""}`,
           url: "/",
           importante: true,
         });

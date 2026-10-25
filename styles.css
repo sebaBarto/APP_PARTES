@@ -2633,3 +2633,6 @@ html[data-inicio="nuevo"] #screen-instalacion .hint-eyebrow:not(.review-eyebrow)
 html[data-inicio="nuevo"] #screen-instalacion .hint-eyebrow:not(.review-eyebrow)::before { display: none; }
 html[data-inicio="nuevo"] :is(#screen-vehiculo-detalle, #screen-herramienta-detalle, #screen-emergencia, #screen-instalacion) .status-aviso { margin-bottom: 12px; border-radius: 12px; }
 html[data-inicio="nuevo"] :is(#screen-vehiculo-detalle, #screen-herramienta-detalle, #screen-emergencia, #screen-instalacion, #screen-planos, #screen-claves) .btn-secondary { color: var(--t-fg); border-color: var(--t-bd); }
+
+.rend-motivo { margin-top: 6px; font-size: 13px; color: #B3261E; }
+html[data-theme="night"] .rend-motivo { color: #FF8A80; }

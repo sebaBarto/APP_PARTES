@@ -519,7 +519,7 @@ test("Skin nuevo en historial, notas, stock, SIMs y dashboards: filtros en ámba
 test("Skin nuevo en guardias, rendición, presencia, credencial y comodatos: títulos grandes, estados con color y turno vigente; el clásico no cambia", async () => {
   const rends = [
     { tecnico: "Juan Pérez", categoria: "Combustible", monto: 100, fecha: diaISO(0), estado: "pagado", creado_en: new Date().toISOString() },
-    { tecnico: "Juan Pérez", categoria: "Otros", monto: 50, fecha: diaISO(-1), estado: "rechazado", creado_en: new Date(Date.now() - 1000).toISOString() },
+    { tecnico: "Juan Pérez", categoria: "Otros", monto: 50, fecha: diaISO(-1), estado: "rechazado", observaciones_admin: "Falta la foto del ticket", creado_en: new Date(Date.now() - 1000).toISOString() },
   ];
   const abrir = async (estilo) => {
     const { ctx, page, erroresPagina } = await nuevaPagina();
@@ -540,6 +540,8 @@ test("Skin nuevo en guardias, rendición, presencia, credencial y comodatos: tí
   assert.strictEqual(await css(page, "#screen-rendicion .review-eyebrow", "fontSize"), "26px");
   const franjas = await page.locator("#rendMisLista .rend-card").evaluateAll((els) => els.map((e) => getComputedStyle(e).borderLeftColor));
   assert.notStrictEqual(franjas[0], franjas[1], "pagado y rechazado se distinguen por color");
+  assert.match(await page.locator("#rendMisLista .rend-motivo").textContent(), /Falta la foto del ticket/, "el técnico ve por qué se rechazó");
+  assert.strictEqual(await page.evaluate(() => fechaLocalISO(new Date(2026, 9, 24, 23, 30))), "2026-10-24", "de noche no salta al día siguiente");
   for (const pant of ["guardias", "consultas", "presencia", "credencial", "comodatoForm", "comodatoFirma", "ajustes", "planos", "emergencia", "instalacion", "claves", "vehiculoDetalle", "herramientaDetalle"]) {
     await page.evaluate((n) => showScreen(n), pant);
     const sel = { guardias: "guardias", consultas: "consultas", presencia: "presencia", credencial: "credencial", comodatoForm: "comodato-form", comodatoFirma: "comodato-firma", ajustes: "ajustes", planos: "planos", emergencia: "emergencia", instalacion: "instalacion", claves: "claves", vehiculoDetalle: "vehiculo-detalle", herramientaDetalle: "herramienta-detalle" }[pant];
