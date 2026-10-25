@@ -840,6 +840,12 @@
           <option value="pagado">Pagados</option>
           <option value="rechazado">Rechazados</option>
         </select>
+        <input type="month" class="field-input" id="rendicionesAdminMes" title="Filtrar por mes (vacío = todos)" style="max-width:180px;">
+      </div>
+
+      <div class="card" id="rendicionesTotalesCard" style="margin-bottom:16px;">
+        <h3 style="margin:0 0 8px;">Pendiente de pagar por técnico</h3>
+        <div id="rendicionesTotalesLista"></div>
       </div>
 
       <button type="button" class="btn btn-secondary" id="descargarExcelRendicionesBtn" style="margin-bottom:16px;">⬇ Descargar Excel (lo que esté filtrado)</button>
@@ -3976,6 +3982,62 @@ let rendicionesAdminCache = [];
 
 rendicionesAdminBuscarInput.addEventListener("input", renderRendicionesAdmin);
 rendicionesAdminFiltroEstado.addEventListener("change", renderRendicionesAdmin);
+const rendicionesAdminMes = document.getElementById("rendicionesAdminMes");
+const rendicionesTotalesLista = document.getElementById("rendicionesTotalesLista");
+rendicionesAdminMes.addEventListener("change", renderRendicionesAdmin);
+const pesosAdmin = (n) => "$" + (Number(n) || 0).toLocaleString("es-AR", { maximumFractionDigits: 2 });
+
+async function marcarRendicionPagada(id, pagado) {
+  const res = await fetch("/api/recurso-uso?recurso=rendicion", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+    body: JSON.stringify({ accion: "marcar_pagado", id, pagado, pagado_por: "Admin" }),
+  });
+  if (!res.ok) throw new Error("No se pudo guardar");
+}
+
+// Totales pendientes por técnico (respeta el filtro de mes y la búsqueda,
+// no el de estado) con un botón para pagar todo de una vez.
+function renderTotalesRendiciones() {
+  const estadoPrevio = rendicionesAdminFiltroEstado.value;
+  rendicionesAdminFiltroEstado.value = "";
+  const base = rendicionesFiltradas();
+  rendicionesAdminFiltroEstado.value = estadoPrevio;
+  const porTecnico = {};
+  base.filter((r) => r.estado === "pendiente").forEach((r) => {
+    const t = r.tecnico || "Sin técnico";
+    porTecnico[t] = porTecnico[t] || { total: 0, ids: [] };
+    porTecnico[t].total += Number(r.monto) || 0;
+    porTecnico[t].ids.push(r.id);
+  });
+  const nombres = Object.keys(porTecnico).sort((a, b) => porTecnico[b].total - porTecnico[a].total);
+  if (nombres.length === 0) {
+    rendicionesTotalesLista.innerHTML = '<p class="status">No hay nada pendiente de pagar.</p>';
+    return;
+  }
+  rendicionesTotalesLista.innerHTML = nombres.map((t) => `
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px solid #EEE;">
+      <div><b>${escapeHtmlAdmin(t)}</b> <span style="color:#6B7680; font-size:12px;">(${porTecnico[t].ids.length})</span></div>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <b style="font-size:16px;">${pesosAdmin(porTecnico[t].total)}</b>
+        <button type="button" class="btn btn-secondary btn-small rend-pagar-todo" data-tecnico="${escapeHtmlAdmin(t)}">Pagar todo</button>
+      </div>
+    </div>`).join("");
+  rendicionesTotalesLista.querySelectorAll(".rend-pagar-todo").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const datos = porTecnico[btn.dataset.tecnico];
+      if (!confirm(`¿Marcar como pagadas las ${datos.ids.length} rendiciones pendientes de ${btn.dataset.tecnico} por ${pesosAdmin(datos.total)}?`)) return;
+      btn.disabled = true;
+      let fallidas = 0;
+      for (let i = 0; i < datos.ids.length; i++) {
+        btn.textContent = `Pagando ${i + 1}/${datos.ids.length}...`;
+        try { await marcarRendicionPagada(datos.ids[i], true); } catch (e) { fallidas++; }
+      }
+      if (fallidas) alert(`${fallidas} no se pudieron marcar. Probá de nuevo.`);
+      await cargarRendicionesAdmin();
+    });
+  });
+}
 
 async function cargarRendicionesAdmin() {
   rendicionesAdminStatus.className = "status";
@@ -4000,6 +4062,8 @@ function rendicionesFiltradas() {
   const filtroEstado = rendicionesAdminFiltroEstado.value;
   let filtrados = rendicionesAdminCache;
   if (filtroEstado) filtrados = filtrados.filter((r) => r.estado === filtroEstado);
+  const mes = rendicionesAdminMes ? rendicionesAdminMes.value : "";
+  if (mes) filtrados = filtrados.filter((r) => (r.fecha || "").startsWith(mes));
   if (termino) {
     filtrados = filtrados.filter((r) => {
       const haystack = [r.tecnico, r.detalle, r.categoria, r.cliente].map((v) => (v || "").toLowerCase()).join(" ");
@@ -4011,6 +4075,7 @@ function rendicionesFiltradas() {
 
 function renderRendicionesAdmin() {
   const filtrados = rendicionesFiltradas();
+  renderTotalesRendiciones();
 
   if (rendicionesAdminCache.length === 0) {
     rendicionesAdminStatus.className = "status";
@@ -4042,7 +4107,8 @@ function renderRendicionesAdmin() {
         fotos = [r.foto_ref];
       }
     }
-    const fotosTexto = fotos.map((f, i) => `<a href="${escapeHtmlAdmin(f)}" target="_blank" rel="noopener">${fotos.length > 1 ? "Foto " + (i + 1) : "Ver foto"}</a>`).join(" ");
+    const fotosTexto = "";
+    const miniaturas = fotos.length ? `<div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">${fotos.map((f, i) => `<a href="${escapeHtmlAdmin(f)}" target="_blank" rel="noopener" title="Ver foto ${i + 1} completa"><img src="${escapeHtmlAdmin(f)}" loading="lazy" alt="Ticket ${i + 1}" style="width:64px; height:64px; object-fit:cover; border-radius:8px; border:1px solid #DDD; display:block;"></a>`).join("")}</div>` : `<div style="font-size:12px; color:#B5772A; margin-top:6px;">Sin foto del ticket</div>`;
     return `
       <div style="padding:12px 0; border-bottom:1px solid #EEE;">
         <div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px;">
@@ -4051,9 +4117,10 @@ function renderRendicionesAdmin() {
         </div>
         <div style="font-size:13px; margin-top:4px;">${escapeHtmlAdmin(r.categoria || "")} — ${escapeHtmlAdmin(r.detalle || "")}${r.cliente ? " (" + escapeHtmlAdmin(r.cliente) + ")" : ""}</div>
         <div style="color:#6B7680; font-size:12px; margin-top:6px;">
-          $${escapeHtmlAdmin(String(r.monto ?? ""))} · ${etiquetaEstado[r.estado] || escapeHtmlAdmin(r.estado || "")}
+          <b style="color:#101820; font-size:14px;">${pesosAdmin(r.monto)}</b> · ${etiquetaEstado[r.estado] || escapeHtmlAdmin(r.estado || "")}
           ${fotosTexto ? ` · ${fotosTexto}` : ""}
         </div>
+        ${miniaturas}
         ${r.estado === "rechazado" && r.observaciones_admin ? `<div style="font-size:12px; margin-top:4px; color:#B3261E;">Motivo: ${escapeHtmlAdmin(r.observaciones_admin)}</div>` : ""}
         <label style="display:flex; align-items:center; gap:6px; margin-top:8px; font-size:13px; cursor:pointer;">
           <input type="checkbox" class="rendicion-check-pagado" data-id="${escapeHtmlAdmin(r.id)}" ${r.estado === "pagado" ? "checked" : ""}>
@@ -4125,7 +4192,7 @@ descargarExcelRendicionesBtn.addEventListener("click", () => {
     Categoría: r.categoria || "",
     Detalle: r.detalle || "",
     Cliente: r.cliente || "",
-    Monto: r.monto ?? "",
+    Monto: Number(r.monto) || 0,
     Fecha: r.fecha || "",
     Estado: etiquetaEstado[r.estado] || r.estado || "",
     "Fecha de pago": r.fecha_pago || "",
@@ -4135,6 +4202,21 @@ descargarExcelRendicionesBtn.addEventListener("click", () => {
   const hoja = XLSX.utils.json_to_sheet(filas);
   const libro = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(libro, hoja, "Rendiciones");
+  // Hojas de resumen para cerrar el mes: por técnico y por categoría.
+  const resumir = (clave) => {
+    const acc = {};
+    filtrados.filter((r) => r.estado !== "rechazado").forEach((r) => {
+      const k = r[clave] || "(sin dato)";
+      acc[k] = acc[k] || { total: 0, pendiente: 0, pagado: 0, cantidad: 0 };
+      const m = Number(r.monto) || 0;
+      acc[k].total += m; acc[k].cantidad++;
+      if (r.estado === "pagado") acc[k].pagado += m; else acc[k].pendiente += m;
+    });
+    return Object.entries(acc).sort((a, b) => b[1].total - a[1].total)
+      .map(([k, v]) => ({ [clave === "tecnico" ? "Técnico" : "Categoría"]: k, Cantidad: v.cantidad, Total: v.total, Pagado: v.pagado, Pendiente: v.pendiente }));
+  };
+  XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(resumir("tecnico")), "Por técnico");
+  XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(resumir("categoria")), "Por categoría");
   XLSX.writeFile(libro, `rendiciones_${new Date().toISOString().slice(0, 10)}.xlsx`);
 });
 

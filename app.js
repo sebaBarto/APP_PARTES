@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.128.2";
+const APP_VERSION = "3.129.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -4032,6 +4032,9 @@ function actualizarBadgeColaEnvios() {
         if ((item.tipo || "parte") === "comodato") {
           return `Comodato: ${(item.datos && item.datos.comodatario) || "sin nombre"}`;
         }
+        if (item.tipo === "rendicion") {
+          return `Rendición: ${(item.cuerpo && item.cuerpo.categoria) || ""} ${item.cuerpo ? formatoPesos(item.cuerpo.monto) : ""}`.trim();
+        }
         const tecnico = (item.data && item.data.tecnico) || "técnico sin especificar";
         const cliente = (item.data && item.data.cliente) || "";
         return cliente ? `${tecnico} (${cliente})` : tecnico;
@@ -4061,7 +4064,9 @@ async function procesarColaEnvios() {
       const tipo = item.tipo || "parte"; // los ya guardados antes de este cambio no tienen tipo -> son partes
       const resultado = tipo === "comodato"
         ? await intentarEnviarComodato(item, false)
-        : await intentarEnviarParte(item, false);
+        : tipo === "rendicion"
+          ? await intentarEnviarRendicionPendiente(item)
+          : await intentarEnviarParte(item, false);
       if (resultado.oficinaOk) {
         enviadosOk++;
       } else {
@@ -7090,10 +7095,47 @@ const rendEnviarBtn = document.getElementById("rendEnviarBtn");
 const rendMisStatus = document.getElementById("rendMisStatus");
 const rendMisLista = document.getElementById("rendMisLista");
 
-let rendFotosUrls = []; // varias fotos posibles -- se manda como JSON en foto_ref
+// Cada foto es { url } (ya subida) o { base64 } (sin señal: se sube después,
+// desde la cola de envíos). Se manda como JSON en foto_ref.
+let rendFotos = [];
 let rendFormGeneracion = 0; // mismo truco que en Notas -- evita que una
 // foto que sigue subiendo en segundo plano "resucite" en el siguiente envío.
 let rendicionesCache = [];
+const rendSinTicket = document.getElementById("rendSinTicket");
+const rendSinTicketWrap = document.getElementById("rendSinTicketWrap");
+const rendFotoLabel = document.getElementById("rendFotoLabel");
+const rendResumen = document.getElementById("rendResumen");
+const CATEGORIAS_SIN_TICKET = ["Estacionamiento", "Peaje"];
+
+// Montos con la costumbre argentina: punto de miles, coma decimal ("18.500,50").
+function parseMontoRendicion(texto) {
+  const limpio = String(texto || "").replace(/[^\d,.]/g, "");
+  if (!limpio) return NaN;
+  return parseFloat(limpio.replace(/\./g, "").replace(",", "."));
+}
+function formatoPesos(n) {
+  const num = Number(n);
+  if (!isFinite(num)) return String(n ?? "");
+  return "$" + num.toLocaleString("es-AR", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+function fotoRendicionObligatoria() {
+  return !CATEGORIAS_SIN_TICKET.includes(rendCategoria.value) && !rendSinTicket.checked;
+}
+function actualizarAyudaFotoRendicion() {
+  const exenta = CATEGORIAS_SIN_TICKET.includes(rendCategoria.value);
+  rendSinTicketWrap.classList.toggle("hidden", exenta);
+  rendFotoLabel.textContent = fotoRendicionObligatoria()
+    ? "Foto del ticket (obligatoria — podés elegir varias o sacarlas con la cámara)"
+    : "Foto del ticket (opcional)";
+}
+rendCategoria.addEventListener("change", actualizarAyudaFotoRendicion);
+rendSinTicket.addEventListener("change", actualizarAyudaFotoRendicion);
+
+rendMonto.addEventListener("blur", () => {
+  const n = parseMontoRendicion(rendMonto.value);
+  if (isFinite(n) && n > 0) rendMonto.value = n.toLocaleString("es-AR", { maximumFractionDigits: 2 });
+});
 
 function limpiarFormularioRendicion() {
   rendFormGeneracion++;
@@ -7102,43 +7144,70 @@ function limpiarFormularioRendicion() {
   rendCliente.value = "";
   rendMonto.value = "";
   rendFecha.value = fechaLocalISO();
-  rendFotosUrls = [];
+  rendFotos = [];
   rendFotoInput.value = "";
+  rendSinTicket.checked = false;
+  actualizarAyudaFotoRendicion();
   renderRendFotosPreview();
+}
+
+async function poblarClientesRendicion() {
+  await cargarClientesGeneral();
+  const lista = document.getElementById("rendClientesLista");
+  if (!lista) return;
+  const vistos = new Set();
+  lista.innerHTML = (clientesGeneralCache || [])
+    .filter((c) => c.nombre && !vistos.has(c.nombre) && vistos.add(c.nombre))
+    .map((c) => `<option value="${escapeHtml(c.nombre)}"></option>`)
+    .join("");
 }
 
 tileRendicionBtn.addEventListener("click", () => {
   limpiarFormularioRendicion();
   showScreen("rendicion");
   cargarMisRendiciones();
+  poblarClientesRendicion();
 });
 volverDeRendicionBtn.addEventListener("click", () => showScreen("home"));
 
 function renderRendFotosPreview() {
-  if (rendFotosUrls.length === 0) {
+  if (rendFotos.length === 0) {
     rendFotoPreviewWrap.classList.add("hidden");
     rendFotoPreviewWrap.innerHTML = "";
     return;
   }
   rendFotoPreviewWrap.classList.remove("hidden");
-  rendFotoPreviewWrap.innerHTML = rendFotosUrls.map((url, idx) => `
+  rendFotoPreviewWrap.innerHTML = rendFotos.map((f, idx) => `
     <div style="position:relative;">
-      <img src="${url}" style="width:70px; height:70px; object-fit:cover; border-radius:8px; display:block;">
+      <img src="${escapeHtml(f.url || f.base64)}" style="width:70px; height:70px; object-fit:cover; border-radius:8px; display:block;">
+      ${f.base64 ? '<span class="rend-foto-pend" title="Se sube sola cuando vuelva la señal">sin subir</span>' : ""}
       <button type="button" class="rend-foto-quitar" data-idx="${idx}" title="Quitar esta foto"
         style="position:absolute; top:-6px; right:-6px; background:#C0392B; color:#fff; border:none; border-radius:50%; width:20px; height:20px; cursor:pointer; font-size:13px; line-height:1;">×</button>
     </div>
   `).join("");
   rendFotoPreviewWrap.querySelectorAll(".rend-foto-quitar").forEach((btn) => {
     btn.addEventListener("click", () => {
-      rendFotosUrls.splice(Number(btn.dataset.idx), 1);
+      rendFotos.splice(Number(btn.dataset.idx), 1);
       renderRendFotosPreview();
     });
   });
 }
 
+async function subirFotoRendicion(base64) {
+  const res = await fetch("/api/foto", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+    body: JSON.stringify({ base64 }),
+  });
+  const data = await res.json();
+  if (!res.ok || !data.ok) throw new Error(data.error || "Error desconocido");
+  return `${window.location.origin}/api/foto?id=${data.id}`;
+}
+
 // Sube todas las fotos elegidas (varias de galería de una, o de a una
 // si se van sacando con la cámara) -- se pueden ir agregando en más
-// de una tanda, no se pisan las que ya se subieron antes.
+// de una tanda, no se pisan las que ya se subieron antes. Sin señal, la
+// foto queda guardada en el celular y se sube junto con el envío.
 rendFotoInput.addEventListener("change", async () => {
   const archivos = Array.from(rendFotoInput.files || []);
   if (archivos.length === 0) return;
@@ -7146,20 +7215,20 @@ rendFotoInput.addEventListener("change", async () => {
   rendEnviarBtn.disabled = true;
   for (let i = 0; i < archivos.length; i++) {
     rendEnviarBtn.textContent = archivos.length > 1 ? `Subiendo foto ${i + 1} de ${archivos.length}...` : "Subiendo foto...";
+    let base64 = null;
     try {
-      const base64 = await comprimirImagen(archivos[i], 1600, 0.75);
-      const res = await fetch("/api/foto", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-        body: JSON.stringify({ base64 }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error || "Error desconocido");
+      base64 = await comprimirImagen(archivos[i], 1600, 0.75);
+      const url = await subirFotoRendicion(base64);
       if (generacionAlSubir !== rendFormGeneracion) return;
-      rendFotosUrls.push(`${window.location.origin}/api/foto?id=${data.id}`);
+      rendFotos.push({ url });
     } catch (err) {
       if (generacionAlSubir !== rendFormGeneracion) return;
-      showToast(`No se pudo subir una foto: ${err.message}`);
+      if (base64) {
+        rendFotos.push({ base64: await comprimirImagen(archivos[i], 1200, 0.6).catch(() => base64) });
+        showToast("Sin señal: la foto queda guardada y se sube sola después.");
+      } else {
+        showToast(`No se pudo leer una foto: ${err.message}`);
+      }
     }
   }
   if (generacionAlSubir === rendFormGeneracion) {
@@ -7170,40 +7239,84 @@ rendFotoInput.addEventListener("change", async () => {
   }
 });
 
+async function postRendicion(cuerpo) {
+  const res = await fetch("/api/recurso-uso?recurso=rendicion", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+    body: JSON.stringify(cuerpo),
+  });
+  let data = {};
+  try { data = await res.json(); } catch (e) { /* sin cuerpo */ }
+  if (!res.ok || !data.ok) {
+    const err = new Error(data.error || "Error desconocido");
+    err.delServidor = res.status >= 400 && res.status < 500;
+    throw err;
+  }
+  return data;
+}
+
+// Para la cola sin conexión: sube las fotos que quedaron guardadas y manda la rendición.
+async function intentarEnviarRendicionPendiente(item) {
+  const urls = [];
+  for (const f of item.fotos || []) {
+    urls.push(f.url ? f.url : await subirFotoRendicion(f.base64));
+  }
+  const cuerpo = { ...item.cuerpo, foto_ref: urls.length ? JSON.stringify(urls) : "" };
+  await postRendicion(cuerpo);
+  return { oficinaOk: true };
+}
+
 rendEnviarBtn.addEventListener("click", async () => {
   const detalle = rendDetalle.value.trim();
-  const monto = rendMonto.value.trim();
+  const monto = parseMontoRendicion(rendMonto.value);
   if (!detalle) {
     showToast("Contá qué compraste.");
+    rendDetalle.focus();
     return;
   }
-  if (!monto || isNaN(Number(monto))) {
-    showToast("Cargá un monto válido.");
+  if (!isFinite(monto) || monto <= 0) {
+    showToast("Cargá un monto válido (mayor a cero).");
+    rendMonto.focus();
     return;
   }
+  if (fotoRendicionObligatoria() && rendFotos.length === 0) {
+    showToast("Falta la foto del ticket. Si no te dieron, tildá \"No me dieron ticket\".");
+    return;
+  }
+  const fecha = rendFecha.value || fechaLocalISO();
+  const parecida = rendicionesCache.find((r) => r.estado !== "rechazado" && r.fecha === fecha && Math.abs(Number(r.monto) - monto) < 0.01);
+  if (parecida && !confirm(`Ya mandaste una rendición de ${formatoPesos(monto)} con fecha ${fecha.split("-").reverse().join("/")} (${parecida.categoria || ""}). ¿Es otra distinta y querés mandarla igual?`)) {
+    return;
+  }
+  const cuerpo = {
+    accion: "crear",
+    tecnico: tecnicoLogueado || "",
+    categoria: rendCategoria.value,
+    detalle: rendSinTicket.checked && !CATEGORIAS_SIN_TICKET.includes(rendCategoria.value) ? detalle + " (sin ticket)" : detalle,
+    cliente: rendCliente.value.trim(),
+    monto: String(monto),
+    fecha,
+  };
   rendEnviarBtn.disabled = true;
   try {
-    const res = await fetch("/api/recurso-uso?recurso=rendicion", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-      body: JSON.stringify({
-        accion: "crear",
-        tecnico: tecnicoLogueado || "",
-        categoria: rendCategoria.value,
-        detalle,
-        cliente: rendCliente.value.trim(),
-        monto,
-        fecha: rendFecha.value || fechaLocalISO(),
-        foto_ref: rendFotosUrls.length > 0 ? JSON.stringify(rendFotosUrls) : "",
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok || !data.ok) throw new Error(data.error || "Error desconocido");
+    if (rendFotos.some((f) => f.base64)) throw Object.assign(new Error("fotos sin subir"), { sinSenal: true });
+    await postRendicion({ ...cuerpo, foto_ref: rendFotos.length > 0 ? JSON.stringify(rendFotos.map((f) => f.url)) : "" });
     showToast("Rendición enviada.");
     limpiarFormularioRendicion();
     cargarMisRendiciones();
   } catch (err) {
-    showToast("No se pudo enviar: " + err.message);
+    if (err.delServidor) {
+      showToast("No se pudo enviar: " + err.message);
+    } else {
+      // Sin señal (o el servidor no respondió): queda en la cola y se manda sola.
+      try {
+        agregarAColaEnvios({ tipo: "rendicion", cuerpo, fotos: rendFotos.slice() });
+        showToast("Sin señal: la rendición quedó guardada y se manda sola cuando vuelva la conexión.");
+        limpiarFormularioRendicion();
+      } catch (errCola) {
+        showToast("No se pudo guardar en el celular (poco espacio). Probá de nuevo con señal.");
+      }
+    }
   } finally {
     rendEnviarBtn.disabled = false;
     rendEnviarBtn.textContent = "Enviar rendición";
@@ -7243,9 +7356,15 @@ function renderMisRendiciones() {
   if (rendicionesCache.length === 0) {
     rendMisStatus.textContent = "Todavía no rendiste ningún ticket.";
     rendMisLista.innerHTML = "";
+    rendResumen.classList.add("hidden");
     return;
   }
   rendMisStatus.textContent = `${rendicionesCache.length} rendición(es).`;
+  const pendientes = rendicionesCache.filter((r) => r.estado === "pendiente");
+  const deuda = pendientes.reduce((t, r) => t + (Number(r.monto) || 0), 0);
+  const enCola = obtenerColaEnvios().filter((i) => i.tipo === "rendicion" && i.cuerpo && i.cuerpo.tecnico === tecnicoLogueado).length;
+  rendResumen.classList.toggle("hidden", !(pendientes.length || enCola));
+  rendResumen.innerHTML = `${pendientes.length ? `Te deben <b>${formatoPesos(deuda)}</b> · ${pendientes.length} pendiente${pendientes.length === 1 ? "" : "s"}` : ""}${enCola ? `${pendientes.length ? "<br>" : ""}${enCola} sin enviar todavía (sin señal)` : ""}`;
   const etiquetaEstado = { pendiente: "🟠 Pendiente", pagado: "✅ Pagado", rechazado: "❌ Rechazado" };
   const ordenadas = [...rendicionesCache].sort((a, b) => (b.creado_en || "").localeCompare(a.creado_en || ""));
   rendMisLista.innerHTML = ordenadas.map((r) => {
@@ -7262,7 +7381,7 @@ function renderMisRendiciones() {
         : "";
     return `
       <div class="historial-card rend-card" data-estado="${escapeHtml(r.estado || "")}">
-        <div class="historial-card-num">${escapeHtml(r.categoria || "")} — <span class="rend-monto">$${escapeHtml(String(r.monto ?? ""))}</span></div>
+        <div class="historial-card-num">${escapeHtml(r.categoria || "")} — <span class="rend-monto">${escapeHtml(formatoPesos(r.monto))}</span></div>
         <div class="historial-card-cliente">${escapeHtml(r.detalle || "")}</div>
         <div class="historial-card-direccion">${escapeHtml(fechaTexto)}${r.cliente ? " — " + escapeHtml(r.cliente) : ""}</div>
         <div class="historial-card-badges">${etiquetaEstado[r.estado] || escapeHtml(r.estado || "")}${fotosTexto}</div>

@@ -2636,3 +2636,12 @@ html[data-inicio="nuevo"] :is(#screen-vehiculo-detalle, #screen-herramienta-deta
 
 .rend-motivo { margin-top: 6px; font-size: 13px; color: #B3261E; }
 html[data-theme="night"] .rend-motivo { color: #FF8A80; }
+
+/* Rendición: resumen de lo adeudado, "no me dieron ticket" y fotos sin subir */
+.rend-resumen { margin: 6px 0 10px; padding: 12px 14px; border-radius: 12px; background: #FFF4DF; border: 1.5px solid #F5A623; color: #101820; font-size: 15px; line-height: 1.4; }
+.rend-resumen b { font-size: 18px; }
+html[data-theme="night"] .rend-resumen { background: rgba(245,166,35,0.12); color: #F4F5F0; }
+.rend-sin-ticket { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-size: 14px; cursor: pointer; }
+.rend-sin-ticket input { width: 20px; height: 20px; accent-color: #F5A623; }
+.rend-sin-ticket.hidden { display: none; }
+.rend-foto-pend { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(16,24,32,0.75); color: #FFD98E; font-size: 10px; text-align: center; border-radius: 0 0 8px 8px; padding: 2px 0; }

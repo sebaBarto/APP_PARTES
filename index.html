@@ -1417,6 +1417,9 @@
           <option value="Materiales">Materiales / Ferretería</option>
           <option value="Combustible">Combustible</option>
           <option value="Estacionamiento">Estacionamiento</option>
+          <option value="Peaje">Peaje</option>
+          <option value="Viáticos">Viáticos / Comida</option>
+          <option value="Envíos">Envíos / Correo</option>
           <option value="Otro">Otro</option>
         </select>
       </div>
@@ -1428,12 +1431,13 @@
 
       <div class="field-group">
         <label class="field-label" for="rendCliente">¿Para qué cliente? (opcional)</label>
-        <input class="field-input" type="text" id="rendCliente" placeholder="Si fue para un service puntual">
+        <input class="field-input" type="text" id="rendCliente" placeholder="Si fue para un service puntual" list="rendClientesLista" autocomplete="off">
+        <datalist id="rendClientesLista"></datalist>
       </div>
 
       <div class="field-group">
         <label class="field-label" for="rendMonto">Monto</label>
-        <input class="field-input" type="number" inputmode="decimal" id="rendMonto" placeholder="0">
+        <input class="field-input" type="text" inputmode="decimal" id="rendMonto" placeholder="$ 0" autocomplete="off">
       </div>
 
       <div class="field-group">
@@ -1442,14 +1446,16 @@
       </div>
 
       <div class="field-group">
-        <label class="field-label" for="rendFotoInput">Fotos del ticket (opcional, podés elegir varias o sacarlas con la cámara)</label>
+        <label class="field-label" for="rendFotoInput" id="rendFotoLabel">Foto del ticket (obligatoria — podés elegir varias o sacarlas con la cámara)</label>
         <input class="field-input" type="file" accept="image/*" multiple id="rendFotoInput">
         <div id="rendFotoPreviewWrap" class="hidden" style="margin-top:8px; display:flex; flex-wrap:wrap; gap:8px;"></div>
+        <label class="rend-sin-ticket" id="rendSinTicketWrap"><input type="checkbox" id="rendSinTicket"> No me dieron ticket</label>
       </div>
 
       <button type="button" class="btn btn-primary" id="rendEnviarBtn" style="width:100%; margin-top:10px;">Enviar rendición</button>
 
       <h3 style="margin-top:28px; color:#F4F5F0;">Mis rendiciones</h3>
+      <div id="rendResumen" class="rend-resumen hidden"></div>
       <p class="list-status" id="rendMisStatus">Cargando...</p>
       <div id="rendMisLista" class="historial-list"></div>
     </div>

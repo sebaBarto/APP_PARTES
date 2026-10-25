@@ -576,3 +576,93 @@ test("Skin clásico en modo noche: los títulos y ejes de los gráficos se leen 
     await ctx.close();
   }
 });
+
+test("Rendición: foto obligatoria (salvo estacionamiento o 'sin ticket'), monto argentino, aviso de repetida, cola sin señal y 'te deben'", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const enviados = [];
+  let conSenal = true;
+  await page.route("**/api/**", (route) => {
+    const req = route.request();
+    const u = req.url();
+    if (u.includes("recurso=rendicion") && req.method() === "POST") {
+      if (!conSenal) return route.abort("internetdisconnected");
+      enviados.push(JSON.parse(req.postData()));
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, id: "x" }) });
+    }
+    if (u.includes("recurso=rendicion")) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{ tecnico: "Juan Pérez", categoria: "Combustible", monto: 12000, fecha: "2026-10-20", estado: "pendiente" }, { tecnico: "Juan Pérez", categoria: "Otros", monto: 500, fecha: "2026-10-19", estado: "pendiente" }]) });
+    route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+  });
+  await page.goto(base + "/");
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { tecnicoLogueado = "Juan Pérez"; tileRendicionBtn.click(); });
+  await page.waitForTimeout(500);
+  assert.match(await page.locator("#rendResumen").textContent(), /Te deben \$12\.500 · 2 pendientes/);
+  assert.strictEqual(await page.evaluate(() => parseMontoRendicion("18.500,50")), 18500.5);
+
+  await page.fill("#rendDetalle", "Nafta");
+  await page.fill("#rendMonto", "18.500");
+  await page.locator("#rendMonto").blur();
+  await page.click("#rendEnviarBtn");
+  assert.strictEqual(enviados.length, 0, "sin foto no se manda");
+  await page.check("#rendSinTicket");
+  await page.fill("#rendFecha", "2026-10-20");
+  await page.fill("#rendMonto", "12000");
+  page.once("dialog", (d) => d.dismiss());
+  await page.click("#rendEnviarBtn");
+  await page.waitForTimeout(200);
+  assert.strictEqual(enviados.length, 0, "repetida: si dice que no, no se manda");
+  await page.fill("#rendMonto", "18.500");
+  await page.click("#rendEnviarBtn");
+  await page.waitForTimeout(300);
+  assert.strictEqual(enviados.length, 1);
+  assert.strictEqual(enviados[0].monto, "18500");
+  assert.match(enviados[0].detalle, /sin ticket/);
+
+  await page.selectOption("#rendCategoria", "Estacionamiento");
+  assert.strictEqual(await page.locator("#rendSinTicketWrap").isVisible(), false, "estacionamiento no pide ticket");
+  await page.fill("#rendDetalle", "Estacionamiento centro");
+  await page.fill("#rendMonto", "1500");
+  conSenal = false;
+  await page.click("#rendEnviarBtn");
+  await page.waitForTimeout(300);
+  assert.strictEqual(await page.evaluate(() => obtenerColaEnvios().filter((i) => i.tipo === "rendicion").length), 1, "sin señal queda en la cola");
+  conSenal = true;
+  await page.evaluate(() => procesarColaEnvios());
+  await page.waitForTimeout(400);
+  assert.strictEqual(enviados.length, 2, "al volver la señal se manda sola");
+  assert.strictEqual(enviados[1].categoria, "Estacionamiento");
+  assert.strictEqual(await page.evaluate(() => obtenerColaEnvios().length), 0);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Admin rendiciones: totales pendientes por técnico, pagar todo, miniaturas y filtro por mes", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const pagados = [];
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  await page.route("**/api/recurso-uso**", (route) => {
+    const req = route.request();
+    if (req.method() === "POST") { pagados.push(JSON.parse(req.postData()).id); return route.fulfill({ status: 200, contentType: "application/json", body: "{}" }); }
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([
+      { id: "a", tecnico: "Juan", categoria: "Combustible", monto: 1000, fecha: "2026-10-02", estado: "pendiente", foto_ref: JSON.stringify(["https://x/f1.jpg"]) },
+      { id: "b", tecnico: "Juan", categoria: "Peaje", monto: 500, fecha: "2026-10-03", estado: "pendiente" },
+      { id: "c", tecnico: "Luis", categoria: "Otro", monto: 300, fecha: "2026-09-10", estado: "pendiente" },
+    ]) });
+  });
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { document.getElementById("mainCard").classList.remove("hidden"); document.getElementById("panelRendiciones").classList.remove("hidden"); return cargarRendicionesAdmin(); });
+  await page.waitForTimeout(300);
+  const filas = await page.locator("#rendicionesTotalesLista > div").allTextContents();
+  assert.match(filas[0], /Juan[\s\S]*\$1\.500/);
+  assert.match(filas[1], /Luis[\s\S]*\$300/);
+  assert.strictEqual(await page.locator("#rendicionesAdminLista img").count(), 1, "miniatura de la foto");
+  await page.fill("#rendicionesAdminMes", "2026-10");
+  assert.strictEqual(await page.locator("#rendicionesTotalesLista > div").count(), 1, "el mes filtra");
+  page.once("dialog", (d) => d.accept());
+  await page.click("#rendicionesTotalesLista .rend-pagar-todo");
+  await page.waitForTimeout(500);
+  assert.deepStrictEqual(pagados.sort(), ["a", "b"]);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
