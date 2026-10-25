@@ -2829,3 +2829,77 @@ html[data-inicio="nuevo"]:is([data-theme="day"], [data-theme="contraste"]) .app 
 ) { color: #46433C !important; }
 html[data-inicio="nuevo"]:is([data-theme="day"], [data-theme="contraste"]) .app ::placeholder { color: #6E6A62; }
 html[data-inicio="nuevo"]:is([data-theme="day"], [data-theme="contraste"]) .app .field-label { color: #2B2925 !important; }
+
+/* =====================================================================
+   CREDENCIAL (skin nuevo): formato vertical tipo credencial de colgar,
+   blanca como un documento impreso, con la banda negra y amarilla de SAT.
+   Muestra si está vigente y un reloj en vivo para que no sirva una captura.
+   ===================================================================== */
+html[data-inicio="nuevo"] .credencial-card {
+  background: #FFFFFF !important; border: 1px solid #0D0C0D; outline: none; border-radius: 10px !important;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.35) !important; max-width: 380px; margin: 0 auto; color: #0D0C0D;
+}
+html[data-inicio="nuevo"] .credencial-card * { font-family: 'Barlow', sans-serif !important; }
+html[data-inicio="nuevo"] .credencial-card-header { order: 0; background: #0D0C0D; padding: 14px 18px 12px; justify-content: space-between; }
+html[data-inicio="nuevo"] .credencial-card-logo { height: 34px; }
+html[data-inicio="nuevo"] .credencial-card-empresa { flex: 0 1 auto; text-align: right; color: #EEECE7; font-family: 'Barlow Semi Condensed', sans-serif !important; font-weight: 600; font-size: 15px; letter-spacing: 0; line-height: 1.1; }
+html[data-inicio="nuevo"] .credencial-card-serial { display: none; }
+/* Banda amarilla con un brillo que la recorre (señal de que la pantalla está viva) */
+html[data-inicio="nuevo"] .credencial-card-holo {
+  position: absolute; left: 0; right: 0; top: 60px; z-index: 3; height: 8px;
+  background: linear-gradient(100deg, #FFC033 0%, #FFC033 40%, #FFF3CF 50%, #FFC033 60%, #FFC033 100%);
+  background-size: 250% 100%; animation: credencialBrillo 3.2s linear infinite;
+}
+@keyframes credencialBrillo { 0% { background-position: 100% 0; } 100% { background-position: -150% 0; } }
+@media (prefers-reduced-motion: reduce) { html[data-inicio="nuevo"] .credencial-card-holo { animation: none; } }
+html[data-inicio="nuevo"] .credencial-card-watermark, html[data-inicio="nuevo"] .credencial-card-sello { display: none; }
+
+html[data-inicio="nuevo"] .credencial-card-body { flex-direction: column; align-items: center; text-align: center; gap: 14px; padding: 30px 20px 18px; }
+html[data-inicio="nuevo"] .credencial-card-foto {
+  width: 148px !important; height: 148px !important; border-radius: 8px !important; object-fit: cover;
+  border: 4px solid #FFC033 !important; background: #F1F0EC; box-shadow: none !important;
+}
+html[data-inicio="nuevo"] .credencial-card-datos { width: 100%; }
+html[data-inicio="nuevo"] .credencial-card-nombre { font-family: 'Barlow Semi Condensed', sans-serif !important; font-style: italic; font-weight: 800 !important; font-size: 30px !important; line-height: 1.05; color: #0D0C0D !important; }
+html[data-inicio="nuevo"] .credencial-card-cargo { font-size: 17px !important; font-weight: 600; color: #6E5000 !important; letter-spacing: 0 !important; margin: 4px 0 10px !important; }
+html[data-inicio="nuevo"] .credencial-card-estado:empty { display: none; }
+html[data-inicio="nuevo"] .credencial-card-estado {
+  display: inline-flex; align-items: center; gap: 6px; margin: 0 0 12px; padding: 5px 12px; border-radius: 4px;
+  font-family: 'Barlow Semi Condensed', sans-serif !important; font-weight: 700; font-size: 16px;
+}
+html[data-inicio="nuevo"] .credencial-card-estado.vigente { background: #1F7A3D; color: #FFFFFF; }
+html[data-inicio="nuevo"] .credencial-card-estado.vencida { background: #B3261E; color: #FFFFFF; }
+html[data-inicio="nuevo"] .credencial-card-estado.vigente::before { content: "\2713"; font-weight: 800; }
+html[data-inicio="nuevo"] .credencial-card-estado.vencida::before { content: "!"; font-weight: 800; }
+html[data-inicio="nuevo"] .credencial-card-dato {
+  display: flex; justify-content: space-between; gap: 12px; padding: 7px 2px; margin: 0 !important;
+  border-top: 1px solid #E2E1DC; font-size: 16px !important; color: #0D0C0D !important; text-align: right;
+}
+html[data-inicio="nuevo"] .credencial-card-dato b { color: #5B574F !important; font-weight: 500 !important; text-align: left; }
+/* La vigencia ya se ve en la etiqueta verde/roja */
+html[data-inicio="nuevo"] .credencial-card-datos > .credencial-card-dato:last-child { display: none; }
+
+html[data-inicio="nuevo"] .credencial-card-seguridad {
+  display: flex; align-items: center; gap: 14px; margin: 0 16px; padding: 14px 0; border-top: 2px solid #0D0C0D; background: none !important;
+}
+html[data-inicio="nuevo"] .credencial-card-qr { width: 92px !important; height: 92px !important; padding: 0 !important; border: 0 !important; flex-shrink: 0; background: #FFFFFF; }
+html[data-inicio="nuevo"] .credencial-card-verificar { align-items: flex-start; gap: 4px; min-width: 0; }
+html[data-inicio="nuevo"] .credencial-card-autorizado { font-family: 'Barlow Semi Condensed', sans-serif !important; font-weight: 700 !important; font-size: 19px !important; letter-spacing: 0 !important; color: #0D0C0D !important; line-height: 1.1; }
+html[data-inicio="nuevo"] .credencial-card-serial-n { font-size: 14px; color: #5B574F; }
+html[data-inicio="nuevo"] .credencial-card-reloj {
+  margin-top: 4px; padding: 4px 8px; border-radius: 4px; background: #0D0C0D; color: #FFC033;
+  font-family: 'Barlow Semi Condensed', sans-serif !important; font-weight: 700; font-size: 16px; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+html[data-inicio="nuevo"] .credencial-card-footer { background: #F1F0EC !important; color: #46433C !important; font-size: 13px !important; padding: 9px 14px !important; border-top: 1px solid #E2E1DC; }
+
+/* Pantalla completa: vertical, sin girar el celular */
+html[data-inicio="nuevo"] .credencial-card.pantalla-completa {
+  position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) !important;
+  width: min(94vw, 460px) !important; max-width: min(94vw, 460px) !important; max-height: 96vh; overflow-y: auto; margin: 0; z-index: 1001;
+}
+html[data-inicio="nuevo"] .credencial-card.pantalla-completa .credencial-card-foto { width: 190px !important; height: 190px !important; }
+html[data-inicio="nuevo"] .credencial-card.pantalla-completa .credencial-card-nombre { font-size: 36px !important; }
+html[data-inicio="nuevo"] .credencial-card.pantalla-completa .credencial-card-dato { font-size: 18px !important; }
+html[data-inicio="nuevo"] .credencial-card.pantalla-completa .credencial-card-qr { width: 110px !important; height: 110px !important; }
+html[data-inicio="nuevo"] .credencial-card.pantalla-completa .credencial-card-reloj { font-size: 20px; }
+html[data-inicio="nuevo"] .credencial-card.pantalla-completa .credencial-card-holo { top: 60px; }

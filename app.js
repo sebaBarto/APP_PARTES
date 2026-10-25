@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.131.0";
+const APP_VERSION = "3.132.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -8762,6 +8762,21 @@ async function fetchYRenderCredencial() {
       credencialVigencia.textContent = "-";
     }
     credencialSerial.textContent = generarSerialCredencial(propia.nombre, propia.dni);
+    const serialN = document.getElementById("credencialSerialN");
+    if (serialN) serialN.textContent = "Credencial " + credencialSerial.textContent;
+    // Estado de vigencia, para que el cliente vea de un vistazo si es válida.
+    const estado = document.getElementById("credencialEstado");
+    if (estado) {
+      estado.className = "credencial-card-estado solo-nuevo";
+      if (propia.vigencia) {
+        const vigente = propia.vigencia >= fechaLocalISO();
+        estado.classList.add(vigente ? "vigente" : "vencida");
+        estado.textContent = (vigente ? "Vigente hasta " : "Vencida el ") + credencialVigencia.textContent;
+      } else {
+        estado.textContent = "";
+      }
+    }
+    iniciarRelojCredencial();
     credencialQr.innerHTML = "";
     new QRCode(credencialQr, {
       text: "https://www.sat365.com.ar",
@@ -8780,6 +8795,23 @@ async function fetchYRenderCredencial() {
 // Genera un "número de serie" con aspecto de credencial oficial, a
 // partir del nombre y el DNI — no hace falta que la oficina cargue
 // ningún dato extra, sale solo y siempre es igual para la misma persona.
+// Reloj en vivo en la credencial (skin nuevo): segundos que corren, así
+// una captura de pantalla vieja no pasa por una credencial real.
+let relojCredencialTimer = null;
+function iniciarRelojCredencial() {
+  const el = document.getElementById("credencialReloj");
+  if (!el) return;
+  const pintar = () => {
+    if (screens.credencial.dataset.active !== "true") { clearInterval(relojCredencialTimer); relojCredencialTimer = null; return; }
+    const d = new Date();
+    const dos = (n) => String(n).padStart(2, "0");
+    el.textContent = `${dos(d.getDate())}/${dos(d.getMonth() + 1)}/${d.getFullYear()} · ${dos(d.getHours())}:${dos(d.getMinutes())}:${dos(d.getSeconds())}`;
+  };
+  clearInterval(relojCredencialTimer);
+  pintar();
+  relojCredencialTimer = setInterval(pintar, 1000);
+}
+
 function generarSerialCredencial(nombre, dni) {
   const texto = `${nombre || ""}|${dni || ""}`;
   let hash = 0;

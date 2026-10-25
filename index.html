@@ -1497,6 +1497,7 @@
           <div class="credencial-card-datos">
             <div class="credencial-card-nombre" id="credencialNombre"></div>
             <div class="credencial-card-cargo" id="credencialCargo"></div>
+            <div class="credencial-card-estado solo-nuevo" id="credencialEstado"></div>
             <div class="credencial-card-dato"><b>DNI:</b> <span id="credencialDni"></span></div>
             <div class="credencial-card-dato"><b>Contacto:</b> <span id="credencialTelefono"></span></div>
             <div class="credencial-card-dato"><b>Válida hasta:</b> <span id="credencialVigencia"></span></div>
@@ -1505,10 +1506,12 @@
         <div class="credencial-card-seguridad">
           <div id="credencialQr" class="credencial-card-qr"></div>
           <div class="credencial-card-verificar">
-            <span class="credencial-card-autorizado">PERSONAL<br>AUTORIZADO</span>
+            <span class="credencial-card-autorizado"><span class="solo-clasico">PERSONAL<br>AUTORIZADO</span><span class="solo-nuevo">Personal autorizado</span></span>
+            <span class="credencial-card-serial-n solo-nuevo" id="credencialSerialN"></span>
+            <span class="credencial-card-reloj solo-nuevo" id="credencialReloj" aria-live="off"></span>
           </div>
         </div>
-        <div class="credencial-card-footer">Tocá la credencial para mostrarla en pantalla completa.</div>
+        <div class="credencial-card-footer"><span class="solo-clasico">Tocá la credencial para mostrarla en pantalla completa.</span><span class="solo-nuevo">Tocá para mostrarla en grande · La hora en vivo confirma que no es una captura</span></div>
       </div>
 
       <div class="card" style="margin-top:18px;">

@@ -755,3 +755,32 @@ test("Skin nuevo: inicio con 'Tu próximo servicio' (pasa al siguiente al termin
   assert.strictEqual(await page.locator("#partePasos").isVisible(), false);
   await ctx.close();
 });
+
+test("Credencial (skin nuevo): vertical con estado de vigencia, reloj en vivo y pantalla completa sin girar; el clásico no cambia", async () => {
+  const abrir = async (estilo, vigencia) => {
+    const { ctx, page, erroresPagina } = await nuevaPagina();
+    await page.route("**/api/**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(route.request().url().includes("coleccion=credenciales") ? [{ nombre: "Juan Pérez", cargo: "Técnico", dni: "30123456", telefono_contacto: "341", vigencia }] : []) }));
+    await page.goto(base + "/");
+    await page.evaluate((e) => localStorage.setItem("ajustes_app", JSON.stringify({ estiloInicio: e, avisoFelicitacion: false })), estilo);
+    await page.reload();
+    await page.waitForTimeout(300);
+    await page.evaluate(() => { tecnicoLogueado = "Juan Pérez"; showScreen("credencial"); return fetchYRenderCredencial(); });
+    return { ctx, page, erroresPagina };
+  };
+  let { ctx, page, erroresPagina } = await abrir("nuevo", "2099-12-31");
+  assert.match(await page.locator("#credencialEstado").textContent(), /Vigente hasta 31\/12\/2099/);
+  const r1 = await page.locator("#credencialReloj").textContent();
+  await page.waitForTimeout(1100);
+  assert.notStrictEqual(await page.locator("#credencialReloj").textContent(), r1, "el reloj corre");
+  await page.click("#credencialCardWrap");
+  assert.match(await page.locator("#credencialCardWrap").evaluate((el) => getComputedStyle(el).transform), /^matrix\(1, 0, 0, 1,/, "pantalla completa sin rotar");
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+  ({ ctx, page } = await abrir("nuevo", "2020-01-01"));
+  assert.match(await page.locator("#credencialEstado").textContent(), /Vencida el 01\/01\/2020/);
+  await ctx.close();
+  ({ ctx, page } = await abrir("clasico", "2099-12-31"));
+  assert.strictEqual(await page.locator("#credencialEstado").isVisible(), false);
+  assert.strictEqual(await page.locator("#credencialReloj").isVisible(), false);
+  await ctx.close();
+});
