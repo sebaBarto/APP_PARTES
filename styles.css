@@ -2026,7 +2026,7 @@ html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dash
   --t-bg: #23211E; --t-bd: #3B3833; --t-fg: #EEECE7; --t-ic: #A9A49B; --t-press: #2D2A26;
 }
 html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas, #screen-cronograma, #screen-list, #screen-historial, #screen-notas, #screen-stock, #screen-sims, #screen-sim-registro, #screen-sim-detalle, #screen-dashboard, #screen-dashboard-financiero, #screen-dashboard-vehiculos, #screen-dashboard-herramientas, #screen-dashboard-sims, #screen-presencia, #screen-guardias, #screen-consultas, #screen-rendicion, #screen-credencial, #screen-comodato-form, #screen-comodato-firma, #screen-vehiculo-detalle, #screen-herramienta-detalle, #screen-planos, #screen-emergencia, #screen-instalacion, #screen-mapa, #screen-claves) {
-  --t-bg: #FFFFFF; --t-bd: #C4C1B8; --t-fg: #191816; --t-ic: #5B574F; --t-press: #FFF0C7;
+  --t-bg: #FFFFFF; --t-bd: #C4C1B8; --t-fg: #191816; --t-ic: #46433C; --t-press: #FFF0C7;
 }
 html[data-inicio="nuevo"][data-theme="contraste"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas, #screen-cronograma, #screen-list, #screen-historial, #screen-notas, #screen-stock, #screen-sims, #screen-sim-registro, #screen-sim-detalle, #screen-dashboard, #screen-dashboard-financiero, #screen-dashboard-vehiculos, #screen-dashboard-herramientas, #screen-dashboard-sims, #screen-presencia, #screen-guardias, #screen-consultas, #screen-rendicion, #screen-credencial, #screen-comodato-form, #screen-comodato-firma, #screen-vehiculo-detalle, #screen-herramienta-detalle, #screen-planos, #screen-emergencia, #screen-instalacion, #screen-mapa, #screen-claves) { --t-bd: #191816; --t-ic: #191816; }
 
@@ -2666,7 +2666,7 @@ html[data-inicio="nuevo"] {
 }
 html[data-inicio="nuevo"]:is([data-theme="day"], [data-theme="contraste"]) {
   --sat-fondo: #E2E1DC; --sat-sup: #FFFFFF; --sat-sup2: #F1F0EC; --sat-borde: #C4C1B8;
-  --sat-texto: #191816; --sat-tenue: #5B574F;
+  --sat-texto: #191816; --sat-tenue: #46433C;
 }
 html[data-inicio="nuevo"][data-theme="contraste"] { --sat-fondo: #FFFFFF; --sat-borde: #0D0C0D; --sat-tenue: #2B2925; }
 
@@ -2758,3 +2758,74 @@ html[data-inicio="nuevo"] #screen-servicios-menu .panel-tile.tile-servicios-pend
   clip-path: var(--sat-hex); border-radius: 0 !important; background: var(--sat-am) !important; color: var(--sat-tinta) !important; border-color: transparent !important; padding-left: 30px !important; padding-right: 30px !important;
 }
 html[data-inicio="nuevo"] #screen-servicios-menu .panel-tile.tile-servicios-pendientes :is(.panel-tile-label, .panel-tile-sub, span) { color: var(--sat-tinta) !important; }
+
+/* ===== Inicio (skin nuevo): "Tu próximo servicio" bien visible arriba ===== */
+html[data-inicio="nuevo"] #screen-home .proximo-service:not(.hidden) {
+  border: 2px solid var(--sat-am) !important; border-radius: 6px !important; background: var(--sat-sup) !important; margin-top: 6px;
+}
+html[data-inicio="nuevo"] #screen-home .proximo-service-main { padding: 14px 16px 8px; }
+html[data-inicio="nuevo"] #screen-home .proximo-service-titulo { font-family: var(--f-titulo) !important; font-weight: 700; font-size: 15px !important; color: var(--sat-tenue) !important; }
+html[data-inicio="nuevo"] #screen-home .proximo-service-cuando {
+  background: var(--sat-am); color: var(--sat-tinta) !important; padding: 2px 8px; border-radius: 3px; font-size: 15px !important; align-self: start;
+}
+html[data-inicio="nuevo"] #screen-home .proximo-service-cliente { font-family: var(--f-titulo) !important; font-weight: 700 !important; font-size: 24px !important; margin-top: 6px !important; }
+html[data-inicio="nuevo"] #screen-home .proximo-service-donde { font-size: 15px !important; color: var(--sat-texto) !important; }
+html[data-inicio="nuevo"] #screen-home .proximo-service-tarea:not(:empty) {
+  grid-column: 1 / -1; display: block; margin-top: 8px; padding: 8px 10px; background: var(--sat-sup2); border-left: 3px solid var(--sat-am);
+  font-size: 15px; line-height: 1.35; color: var(--sat-texto); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}
+html[data-inicio="nuevo"] #screen-home .proximo-service-tarea:empty { display: none; }
+html[data-inicio="nuevo"] #screen-home .proximo-empezar { display: block; width: calc(100% - 24px); margin: 4px 12px 10px; }
+html[data-inicio="nuevo"] #screen-home .proximo-service-acciones { padding: 0 12px 12px; }
+.proximo-empezar, .proximo-vacio { display: none; }
+html[data-inicio="nuevo"] #screen-home .proximo-vacio:not(.hidden) {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 6px 0 14px; padding: 12px 14px;
+  border: 1.5px dashed var(--sat-borde); border-radius: 6px; color: var(--sat-tenue); font-size: 15px;
+}
+html[data-inicio="nuevo"] #screen-home .proximo-vacio .btn { width: auto; flex-shrink: 0; }
+html[data-inicio="nuevo"] #screen-home .proximo-accion { border-radius: 4px !important; font-size: 14px !important; background: transparent !important; border-color: var(--sat-borde) !important; color: var(--sat-texto) !important; }
+
+/* ===== Parte (skin nuevo): barra de pasos fija ===== */
+.parte-pasos { display: none; }
+html[data-inicio="nuevo"] #screen-form .parte-pasos {
+  position: sticky; top: 0; z-index: 5; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px;
+  margin: 0 -18px 14px; padding: 8px 18px; background: var(--sat-fondo); border-bottom: 1px solid var(--sat-borde);
+}
+html[data-inicio="nuevo"] #screen-form .parte-pasos button {
+  display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 4px;
+  background: transparent; border: 0; border-bottom: 3px solid transparent; border-radius: 0;
+  font-family: var(--f-titulo) !important; font-weight: 700; font-size: 15px; color: var(--sat-tenue); cursor: pointer;
+}
+html[data-inicio="nuevo"] #screen-form .parte-pasos button.actual { color: var(--sat-texto); border-bottom-color: var(--sat-am); }
+html[data-inicio="nuevo"] #screen-form .parte-pasos .pp-marca {
+  width: 18px; height: 18px; flex-shrink: 0; border-radius: 50%; border: 2px solid var(--sat-borde); box-sizing: border-box;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 11px; line-height: 1; color: var(--sat-tinta);
+}
+html[data-inicio="nuevo"] #screen-form .parte-pasos button.hecho .pp-marca { background: #3FAE6E; border-color: #3FAE6E; }
+html[data-inicio="nuevo"] #screen-form .parte-pasos button.hecho .pp-marca::after { content: "\2713"; font-weight: 700; color: #0D0C0D; }
+
+/* ===== Barra superior (skin nuevo): volver y pantalla actual ===== */
+.topbar-volver { display: none; }
+html[data-inicio="nuevo"] .topbar-volver:not(.hidden) {
+  display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; margin: -6px 2px -6px -10px;
+  background: transparent; border: 0; border-radius: 4px; color: #EEECE7; cursor: pointer;
+}
+html[data-inicio="nuevo"] .topbar-volver svg { width: 26px; height: 26px; stroke: currentColor; }
+html[data-inicio="nuevo"] .topbar-volver:active { background: #2D2A26; }
+html[data-inicio="nuevo"] .topbar.en-seccion .topbar-logo { height: 20px; }
+html[data-inicio="nuevo"] .topbar-title { position: relative; max-width: 52vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Indicador: la sección donde estás queda subrayada en amarillo */
+html[data-inicio="nuevo"] .topbar.en-seccion #topbarSeccion { border-bottom: 3px solid var(--sat-am); padding-bottom: 2px; }
+html[data-inicio="nuevo"] .topbar-brand { min-width: 0; }
+/* El "Volver" de abajo se reemplaza por la flecha de arriba */
+html[data-inicio="nuevo"] .volver-arriba { display: none !important; }
+html[data-inicio="nuevo"] .action-bar.solo-volver { display: none !important; }
+
+/* ===== Tema día (skin nuevo): textos chicos con más contraste para leer al sol ===== */
+html[data-inicio="nuevo"]:is([data-theme="day"], [data-theme="contraste"]) .app :is(
+  .list-sync-label, .hint-text, .field-optional, .campo-caption, .subtitle, .subtitle-consultas, .list-status, .status,
+  .dash-card-label, .historial-card-direccion, .historial-card-horario, .historial-card-num, .sv-n-dir, .sv-n-num, .crono-n-dir,
+  .guardia-proximo-fecha, .proximo-service-titulo, .ajuste-fila small, .ajuste-desc, .mat-chips-titulo
+) { color: #46433C !important; }
+html[data-inicio="nuevo"]:is([data-theme="day"], [data-theme="contraste"]) .app ::placeholder { color: #6E6A62; }
+html[data-inicio="nuevo"]:is([data-theme="day"], [data-theme="contraste"]) .app .field-label { color: #2B2925 !important; }

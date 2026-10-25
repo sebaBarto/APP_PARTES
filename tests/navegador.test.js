@@ -694,3 +694,64 @@ test("Identidad SAT (skin nuevo): amarillo del logo, Barlow, logo en la barra y 
   assert.strictEqual(await page.locator(".topbar-logo").isVisible(), false);
   await ctx.close();
 });
+
+test("Skin nuevo: inicio con 'Tu próximo servicio' (pasa al siguiente al terminar), barra de pasos del parte, volver arriba y contraste de día", async () => {
+  let { ctx, page, erroresPagina } = await paginaConEstilo("nuevo");
+  // Próximo servicio: el primero ya tiene parte -> muestra el segundo, con la tarea y cuántos quedan
+  await page.evaluate((hoy) => {
+    tecnicoLogueado = "Juan Pérez"; cronogramaCargadoOk = true;
+    cronogramaCache = [
+      { fecha: hoy, hora_inicio: "09:00", tecnico: "Juan Pérez", tarea: "Servicio: Kiosco Norte\nBelgrano 5 - Rosario" },
+      { fecha: hoy, hora_inicio: "11:30", tecnico: "Juan Pérez", tarea: "Servicio: Panadería Sur\nMitre 100 - Funes\nRevisar sirena" },
+      { fecha: hoy, hora_inicio: "15:00", tecnico: "Juan Pérez", tarea: "Servicio: Farmacia Central\nSan Martín 900 - Rosario" },
+    ];
+    historialCache = [{ cliente: "Kiosco Norte", fecha: hoy }];
+    showScreen("home");
+  }, diaISO(0));
+  assert.strictEqual(await page.locator("#proximoServiceCliente").textContent(), "Panadería Sur");
+  assert.match(await page.locator("#proximoServiceTarea").textContent(), /Revisar sirena/);
+  assert.match(await page.locator("#proximoServiceCard .proximo-service-titulo").textContent(), /quedan 2 hoy/);
+  assert.strictEqual(await page.locator("#proximoEmpezarBtn").isVisible(), true);
+  await page.evaluate((hoy) => { historialCache.unshift({ cliente: "Panadería Sur", fecha: hoy }); showScreen("home"); }, diaISO(0));
+  assert.strictEqual(await page.locator("#proximoServiceCliente").textContent(), "Farmacia Central", "al terminar uno pasa al que sigue");
+  await page.evaluate(() => { cronogramaCache = []; showScreen("home"); });
+  assert.strictEqual(await page.locator("#proximoVacio").isVisible(), true, "sin agenda lo dice y ofrece ver pendientes");
+
+  // Volver arriba: aparece fuera del inicio, reemplaza al de abajo y vuelve atrás
+  assert.strictEqual(await page.locator("#topbarVolverBtn").isVisible(), false, "en el inicio no hay volver");
+  await page.evaluate(() => showScreen("serviciosMenu"));
+  await page.evaluate(() => showScreen("list"));
+  assert.strictEqual(await page.locator("#topbarVolverBtn").isVisible(), true);
+  assert.strictEqual(await page.locator("#topbarSeccion").textContent(), "Servicios pendientes", "la barra dice dónde estás");
+  assert.strictEqual(await page.locator("#volverDeServiciosBtn").isVisible(), false, "el Volver de abajo se oculta");
+  await page.click("#topbarVolverBtn");
+  assert.strictEqual(await page.evaluate(() => screens.serviciosMenu.dataset.active), "true");
+
+  // Barra de pasos del parte
+  await page.evaluate(() => showScreen("form"));
+  assert.strictEqual(await page.locator("#partePasos button").count(), 4);
+  assert.strictEqual(await page.locator("#partePasos button.hecho").count(), 0);
+  await page.fill("#f_cliente", "Panadería Sur");
+  await page.fill("#f_tarea", "Cambio de sirena");
+  await page.evaluate(() => actualizarPasosParte());
+  assert.deepStrictEqual(await page.locator("#partePasos button").evaluateAll((bs) => bs.map((b) => b.classList.contains("hecho"))), [true, true, false, false]);
+  await page.click('#partePasos button[data-paso="2"]');
+  await page.waitForTimeout(600);
+  assert.strictEqual(await page.locator("#partePasos button.actual").getAttribute("data-paso"), "2", "lleva a Cobro");
+  assert.strictEqual(await page.locator("#partePasos").evaluate((el) => getComputedStyle(el).position), "sticky");
+
+  // Contraste de día
+  await page.evaluate(() => { document.documentElement.dataset.theme = "day"; showScreen("historial"); });
+  assert.strictEqual(await page.locator("#screen-historial .list-sync-label").evaluate((el) => getComputedStyle(el).color), "rgb(70, 67, 60)");
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+
+  // Clásico: nada de esto aparece y el Volver de abajo sigue
+  ({ ctx, page } = await paginaConEstilo("clasico"));
+  await page.evaluate(() => showScreen("list"));
+  assert.strictEqual(await page.locator("#topbarVolverBtn").isVisible(), false);
+  assert.strictEqual(await page.locator("#volverDeServiciosBtn").isVisible(), true);
+  await page.evaluate(() => showScreen("form"));
+  assert.strictEqual(await page.locator("#partePasos").isVisible(), false);
+  await ctx.close();
+});

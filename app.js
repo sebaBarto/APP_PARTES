@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.130.1";
+const APP_VERSION = "3.131.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -852,8 +852,55 @@ function showScreen(name) {
   try { actualizarWakeLockPantalla(name); } catch (e) { /* los ajustes todavía no cargaron */ }
   if (name === "home") { try { actualizarProximoService(); } catch (e) { /* aún no cargó */ } }
   try { controlarFaltantesParte(name); } catch (e) { /* aún no cargó */ }
+  try { actualizarBarraSuperior(name); } catch (e) { /* aún no cargó */ }
+  if (name === "form") { try { pasoParteElegido = null; } catch (e) { /* aún no cargó */ } }
   if (name === "form") { try { sincronizarChipsElegidos(); refrescarAtajosMateriales(); cargarHistorialMateriales(); } catch (e) { /* aún no cargó */ } }
 }
+
+// ---------- Barra superior (skin nuevo): volver arriba a la izquierda y
+// nombre de la pantalla actual ----------
+function botonVolverDe(pantalla) {
+  if (!pantalla) return null;
+  const candidatos = Array.from(pantalla.querySelectorAll(".action-bar button, .action-bar a, button.link-btn"));
+  const visibles = candidatos.filter((b) => !b.classList.contains("hidden") && b.style.display !== "none");
+  return visibles.find((b) => /^volver|^back/i.test(b.id)) ||
+    visibles.find((b) => /^(←\s*)?volver/i.test(b.textContent.trim())) ||
+    visibles.find((b) => /^cancelar$/i.test(b.textContent.trim())) || null;
+}
+function nombreDePantalla(pantalla) {
+  const t = pantalla && pantalla.querySelector(".review-eyebrow");
+  if (!t) return "";
+  const nuevo = t.querySelector(".solo-nuevo");
+  const texto = ((nuevo && nuevo.textContent) || t.textContent || "").replace(/\s+/g, " ").trim();
+  if (!texto) return "";
+  // Los títulos vienen en mayúsculas: se pasan a oración, respetando siglas conocidas.
+  const oracion = texto === texto.toUpperCase() ? texto.charAt(0) + texto.slice(1).toLowerCase() : texto;
+  return oracion.replace(/\bsims\b/gi, "SIMs").replace(/\(ia\)/i, "(IA)");
+}
+function actualizarBarraSuperior(name) {
+  const pantalla = screens[name];
+  const btn = document.getElementById("topbarVolverBtn");
+  const seccion = document.getElementById("topbarSeccion");
+  document.querySelectorAll(".volver-arriba").forEach((b) => b.classList.remove("volver-arriba"));
+  document.querySelectorAll(".action-bar.solo-volver").forEach((b) => b.classList.remove("solo-volver"));
+  const volver = ["home", "login", "sending", "done"].includes(name) ? null : botonVolverDe(pantalla);
+  if (btn) {
+    btn.classList.toggle("hidden", !volver);
+    btn._destino = volver;
+  }
+  if (volver && /^volver$/i.test(volver.textContent.trim()) && volver.closest(".action-bar")) {
+    volver.classList.add("volver-arriba");
+    const bar = volver.closest(".action-bar");
+    const otros = Array.from(bar.querySelectorAll("button, a")).filter((b) => b !== volver && !b.classList.contains("hidden") && getComputedStyle(b).display !== "none");
+    if (otros.length === 0) bar.classList.add("solo-volver");
+  }
+  if (seccion) seccion.textContent = name === "home" ? "Servicio técnico" : (nombreDePantalla(pantalla) || "Servicio técnico");
+  document.querySelector(".topbar")?.classList.toggle("en-seccion", name !== "home" && name !== "login");
+}
+document.getElementById("topbarVolverBtn").addEventListener("click", () => {
+  const btn = document.getElementById("topbarVolverBtn");
+  if (btn._destino) btn._destino.click();
+});
 
 function setStatus(text, mode) {
   statusPill.textContent = text;
@@ -1105,18 +1152,39 @@ async function precargarHistorialParaVisitas() {
 // Precarga el cronograma en segundo plano al loguearse, para poder
 // detectar si el técnico ya terminó toda su agenda del día y sugerirle
 // servicios pendientes cercanos al finalizar un parte.
+let cronogramaCargadoOk = false;
 async function precargarCronogramaParaSugerencias() {
   try {
     const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
     const res = await fetch("/api/cronograma", { headers, cache: "no-store" });
-    if (!res.ok) return;
+    if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
     cronogramaCache = Array.isArray(data.tareas) ? data.tareas : [];
     cronogramaTecnicosCache = Array.isArray(data.tecnicos) ? data.tecnicos : [];
+    cronogramaCargadoOk = true;
+    localStorage.setItem("cronograma_cache", JSON.stringify(cronogramaCache));
+    localStorage.setItem("cronograma_tecnicos_cache", JSON.stringify(cronogramaTecnicosCache));
+    localStorage.setItem("cronograma_cache_time", String(Date.now()));
   } catch (err) {
-    // silencioso — la sugerencia de servicios cercanos simplemente no aparece
+    // Sin señal: se usa el último cronograma guardado, así el inicio igual
+    // muestra el próximo servicio.
+    try {
+      const guardado = JSON.parse(localStorage.getItem("cronograma_cache") || "null");
+      if (Array.isArray(guardado) && (!cronogramaCache || cronogramaCache.length === 0)) {
+        cronogramaCache = guardado;
+        cronogramaTecnicosCache = JSON.parse(localStorage.getItem("cronograma_tecnicos_cache") || "[]");
+        cronogramaCargadoOk = true;
+      }
+    } catch (e) { /* nada guardado */ }
   }
 }
+// Al volver a la app (estaba en segundo plano) se refresca el próximo
+// servicio si el cronograma tiene más de 10 minutos.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible" || !tecnicoLogueado) return;
+  const hace = Date.now() - Number(localStorage.getItem("cronograma_cache_time") || 0);
+  if (hace > 10 * 60 * 1000) precargarCronogramaParaSugerencias().then(() => { try { actualizarProximoService(); } catch (e) { /* aún no cargó */ } });
+});
 
 // Solo Sebastian Bartolozzi ve el botón del dashboard financiero.
 // Saluda por el nombre de pila del técnico logueado, arriba a la
@@ -1159,14 +1227,29 @@ function actualizarProximoService() {
       const candidatas = cronogramaCache
         .filter((t) => t.fecha && t.fecha >= hoyISO && coincideNombreTecnico(t.tecnico, tecnicoLogueado))
         .sort((a, b) => (a.fecha + (a.hora_inicio || "")).localeCompare(b.fecha + (b.hora_inicio || "")));
+      let quedanHoy = 0;
       for (const t of candidatas) {
         const info = infoTarea(t);
-        if (!info.resuelto) { proximaTareaInicio = { t, serv: info.servicio }; break; }
+        if (info.resuelto) continue;
+        if (!proximaTareaInicio) proximaTareaInicio = { t, serv: info.servicio };
+        if (t.fecha === hoyISO) quedanHoy++;
       }
+      const tit = document.querySelector("#proximoServiceCard .proximo-service-titulo");
+      if (tit) tit.textContent = quedanHoy > 1 ? `Tu próximo servicio · quedan ${quedanHoy} hoy` : "Tu próximo servicio";
     }
-    if (!proximaTareaInicio) { card.classList.add("hidden"); return; }
+    const vacio = document.getElementById("proximoVacio");
+    if (!proximaTareaInicio) {
+      card.classList.add("hidden");
+      // Solo se avisa "no tenés más" si el cronograma se pudo leer (si no, no sabemos).
+      if (vacio) vacio.classList.toggle("hidden", !(tecnicoLogueado && cronogramaCargadoOk));
+      return;
+    }
+    if (vacio) vacio.classList.add("hidden");
     const { t, serv } = proximaTareaInicio;
     const parsed = parsearTareaCronograma(t.tarea);
+    const lineasExtra = (t.tarea || "").split("\n").map((l) => l.trim()).filter(Boolean).slice(2).join(" · ");
+    const tareaEl = document.getElementById("proximoServiceTarea");
+    if (tareaEl) tareaEl.textContent = (serv && serv.tarea) || lineasExtra || "";
     const cliente = (serv && serv.cliente) || parsed.cliente || "Servicio agendado";
     const direccion = (serv && serv.direccion) || parsed.direccion;
     const localidad = (serv && serv.localidad) || parsed.localidad;
@@ -1182,6 +1265,10 @@ function actualizarProximoService() {
 document.getElementById("proximoServiceMain").addEventListener("click", () => {
   if (proximaTareaInicio) seleccionarTareaCronograma(proximaTareaInicio.t);
 });
+document.getElementById("proximoEmpezarBtn").addEventListener("click", () => {
+  if (proximaTareaInicio) seleccionarTareaCronograma(proximaTareaInicio.t);
+});
+document.getElementById("proximoVerPendientesBtn").addEventListener("click", () => showScreen("list"));
 // Botones de la tarjeta: llamar, cómo llegar y avisar que voy en camino
 function actualizarAccionesProximo(serv, direccion, localidad) {
   const tel = (serv && serv.telefono || "").toString().trim();
@@ -1312,7 +1399,64 @@ function actualizarFaltantesParte() {
       el.textContent = "Listo para pasar a la firma.";
     }
   } catch (e) { el.textContent = ""; }
+  try { actualizarPasosParte(); } catch (e) { /* aún no cargó */ }
 }
+// Barra de pasos del parte (skin nuevo): marca qué sección está completa y
+// en cuál estás, y lleva a cada una con un toque.
+function estadoPasosParte() {
+  const v = (id) => ((document.getElementById(id) || {}).value || "").trim();
+  let formaPago = "", descuento = "0";
+  try { formaPago = getFormaPago(); descuento = getDescuentoTipo(); } catch (e) { /* aún no cargó */ }
+  return [
+    !!v("f_cliente"),
+    !!v("f_tarea"),
+    !!formaPago || descuento === "100" || descuento === "presupuesto",
+    !!(getTecnicoValue() && v("f_fecha")),
+  ];
+}
+let pasoParteElegido = null; // el que se tocó en la barra, hasta que el técnico desplace a mano
+function seccionActualParte() {
+  if (pasoParteElegido !== null) return pasoParteElegido;
+  const scroll = document.querySelector("#screen-form .review-scroll");
+  const secciones = document.querySelectorAll("#screen-form .parte-seccion");
+  const barra = document.getElementById("partePasos");
+  if (!scroll || !secciones.length) return 0;
+  const tope = scroll.getBoundingClientRect().top + (barra ? barra.offsetHeight : 0) + 40;
+  let actual = 0;
+  secciones.forEach((sec, i) => { if (sec.getBoundingClientRect().top <= tope) actual = i; });
+  if (scroll.scrollTop + scroll.clientHeight >= scroll.scrollHeight - 4) actual = secciones.length - 1;
+  return actual;
+}
+function actualizarPasosParte() {
+  const barra = document.getElementById("partePasos");
+  if (!barra) return;
+  const hechos = estadoPasosParte();
+  const actual = seccionActualParte();
+  barra.querySelectorAll("button").forEach((b, i) => {
+    b.classList.toggle("hecho", !!hechos[i]);
+    b.classList.toggle("actual", i === actual);
+    b.setAttribute("aria-current", i === actual ? "step" : "false");
+  });
+}
+document.querySelectorAll("#partePasos button").forEach((b) => {
+  b.addEventListener("click", () => {
+    const sec = document.querySelectorAll("#screen-form .parte-seccion")[Number(b.dataset.paso)];
+    const scroll = document.querySelector("#screen-form .review-scroll");
+    const barra = document.getElementById("partePasos");
+    if (!sec || !scroll) return;
+    pasoParteElegido = Number(b.dataset.paso);
+    actualizarPasosParte();
+    const destino = scroll.scrollTop + sec.getBoundingClientRect().top - scroll.getBoundingClientRect().top - (barra ? barra.offsetHeight : 0) - 8;
+    scroll.scrollTo({ top: Math.max(0, destino), behavior: "smooth" });
+  });
+});
+(function () {
+  const scroll = document.querySelector("#screen-form .review-scroll");
+  if (!scroll) return;
+  scroll.addEventListener("scroll", () => { try { actualizarPasosParte(); } catch (e) { /* nada */ } }, { passive: true });
+  ["touchstart", "wheel", "keydown"].forEach((ev) => scroll.addEventListener(ev, () => { pasoParteElegido = null; }, { passive: true }));
+})();
+
 function controlarFaltantesParte(pantalla) {
   if (pantalla === "form") {
     actualizarFaltantesParte();
@@ -3880,6 +4024,9 @@ async function intentarEnviarParte(payload, interactivo) {
       imprevisto: data.imprevisto,
     });
     oficinaOk = true;
+    // Se anota en la memoria local del historial, así el inicio pasa
+    // enseguida al servicio que sigue sin esperar a recargar.
+    try { historialCache.unshift({ numero_servicio: data.numero_servicio || "", cliente: data.cliente || "", fecha: data.fecha || fechaLocalISO(), tecnico: data.tecnico || tecnicoLogueado || "" }); } catch (e) { /* sin historial */ }
     if (data.numero_servicio) {
       serviciosResueltos.add(data.numero_servicio);
       localStorage.setItem("servicios_resueltos", JSON.stringify([...serviciosResueltos]));
