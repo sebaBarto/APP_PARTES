@@ -2903,3 +2903,20 @@ html[data-inicio="nuevo"] .credencial-card.pantalla-completa .credencial-card-da
 html[data-inicio="nuevo"] .credencial-card.pantalla-completa .credencial-card-qr { width: 110px !important; height: 110px !important; }
 html[data-inicio="nuevo"] .credencial-card.pantalla-completa .credencial-card-reloj { font-size: 20px; }
 html[data-inicio="nuevo"] .credencial-card.pantalla-completa .credencial-card-holo { top: 60px; }
+
+/* Credencial (skin nuevo) en oscuro: negro SAT con detalles en amarillo */
+html[data-inicio="nuevo"] .credencial-card { background: #141312 !important; border-color: #3B3833; color: #EEECE7; }
+html[data-inicio="nuevo"] .credencial-card-header { background: #0D0C0D; }
+html[data-inicio="nuevo"] .credencial-card-foto { background: #2D2A26 !important; }
+html[data-inicio="nuevo"] .credencial-card-nombre { color: #FFFFFF !important; }
+html[data-inicio="nuevo"] .credencial-card-cargo { color: #FFC033 !important; }
+html[data-inicio="nuevo"] .credencial-card-dato { border-top-color: #2D2A26; color: #EEECE7 !important; }
+html[data-inicio="nuevo"] .credencial-card-dato b { color: #A9A49B !important; }
+html[data-inicio="nuevo"] .credencial-card-seguridad { border-top-color: #FFC033; }
+/* El QR necesita fondo blanco para que se pueda escanear */
+html[data-inicio="nuevo"] .credencial-card-qr { background: #FFFFFF !important; padding: 6px !important; border-radius: 4px; box-sizing: border-box; }
+html[data-inicio="nuevo"] .credencial-card-autorizado { color: #FFFFFF !important; }
+html[data-inicio="nuevo"] .credencial-card-serial-n { color: #A9A49B; }
+html[data-inicio="nuevo"] .credencial-card-reloj { background: #FFC033; color: #0D0C0D; }
+html[data-inicio="nuevo"] .credencial-card-footer { background: #0D0C0D !important; color: #A9A49B !important; border-top-color: #2D2A26; }
+html[data-inicio="nuevo"] .credencial-card-estado.vigente { background: #1F7A3D; }
