@@ -569,6 +569,7 @@ test("Skin clásico en modo noche: los títulos y ejes de los gráficos se leen 
     const color = await page.evaluate(() => Chart.getChart("dashChartTecnico").config.options.plugins.title.color);
     if (esperado) assert.strictEqual(color, esperado, "título claro de noche");
     else assert.notStrictEqual(color, "#E8ECEF", "de día el clásico queda como estaba");
+    assert.strictEqual(await page.locator("#screen-dashboard .dash-chart-wrap:not(.con-grafico)").evaluateAll((els) => els.filter((e) => getComputedStyle(e).display !== "none").length), 0, "sin recuadros vacíos en el clásico");
     assert.deepStrictEqual(erroresPagina, []);
     await ctx.close();
   }
