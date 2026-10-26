@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.160.0";
+const APP_VERSION = "3.161.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -2093,6 +2093,7 @@ verPlanoClienteBtn.addEventListener("click", async () => {
 });
 
 function seleccionarServicio(item) {
+  tareaCronogramaEnCurso = "";
   currentNumeroServicio = item.numero_servicio ?? "";
   currentNumeroCliente = item.numero_cliente ?? "";
   document.getElementById("f_cliente").value = item.cliente ?? "";
@@ -2117,6 +2118,7 @@ function seleccionarServicio(item) {
 
 refreshServiciosBtn.addEventListener("click", fetchServicios);
 manualReportBtn.addEventListener("click", () => {
+  tareaCronogramaEnCurso = "";
   currentNumeroServicio = "";
   currentNumeroCliente = "";
   actualizarBotonLlamar(null);
@@ -2612,6 +2614,27 @@ function diasEntreISO(a, b) {
   const x = Date.parse(a), y = Date.parse(b);
   return isNaN(x) || isNaN(y) ? null : Math.round((x - y) / 86400000);
 }
+// Tareas del cronograma que el técnico ya cerró desde este celular (se
+// recuerda la tarea con la que se abrió el parte). Así una tarea cuyo
+// texto no coincide con el nombre del cliente del parte (ej. "M20")
+// igual deja de aparecer como "Tu próximo servicio" apenas se cierra.
+function claveTareaCronograma(t) {
+  return t ? `${t.fecha || ""}|${t.hora_inicio || ""}|${normalizeText(t.tarea || "").slice(0, 80)}` : "";
+}
+let tareaCronogramaEnCurso = "";
+const tareasCronogramaHechas = (() => {
+  try {
+    const lista = JSON.parse(localStorage.getItem("tareas_cronograma_hechas") || "[]");
+    const limite = Date.now() - 21 * 864e5;
+    return new Map((Array.isArray(lista) ? lista : []).filter((x) => x && x.k && (x.cuando || 0) > limite).map((x) => [x.k, x.cuando]));
+  } catch (e) { return new Map(); }
+})();
+function marcarTareaCronogramaHecha(clave) {
+  if (!clave) return;
+  tareasCronogramaHechas.set(clave, Date.now());
+  try { localStorage.setItem("tareas_cronograma_hechas", JSON.stringify([...tareasCronogramaHechas].map(([k, cuando]) => ({ k, cuando })).slice(-200))); } catch (e) { /* nada */ }
+}
+
 function infoTarea(t) {
   const norm = normalizeText((t && t.tarea) || "");
   const servicio = encontrarServicioPorTarea(t.tarea);
@@ -2620,13 +2643,22 @@ function infoTarea(t) {
     parte = historialCache.find((h) => h.numero_servicio === servicio.numero_servicio) || null;
   }
   if (!parte) {
+    // Un parte de esos días que corresponda a la tarea: el nombre del
+    // cliente del parte está en el texto de la tarea, O al revés (la tarea
+    // dice "M20" y el parte es de "M20 Rosario"), O la tarea menciona el
+    // N° de servicio del parte.
+    const clienteTarea = parsearTareaCronograma(t.tarea).cliente;
     parte = historialCache.find((h) => {
-      if (!h.cliente || !clienteEnTexto(h.cliente, norm)) return false;
       const d = diasEntreISO(h.fecha, t.fecha);
-      return d !== null && d >= -1 && d <= 3;
+      if (d === null || d < -1 || d > 3) return false;
+      if (h.cliente && clienteEnTexto(h.cliente, norm)) return true;
+      if (h.cliente && clienteTarea && clienteEnTexto(clienteTarea, normalizeText(h.cliente))) return true;
+      const num = String(h.numero_servicio || "").trim();
+      return num.length >= 3 && new RegExp(`(^|\\D)${num.replace(/[^\w]/g, "")}(\\D|$)`).test(norm);
     }) || null;
   }
-  const marcadoLocal = !!(servicio && servicio.numero_servicio && serviciosResueltos.has(servicio.numero_servicio));
+  const marcadoLocal = !!(servicio && servicio.numero_servicio && serviciosResueltos.has(servicio.numero_servicio))
+    || tareasCronogramaHechas.has(claveTareaCronograma(t));
   return { servicio, vinculado: !!servicio, parte, resuelto: !!parte || marcadoLocal };
 }
 
@@ -2678,8 +2710,10 @@ function seleccionarTareaCronograma(t) {
   const match = encontrarServicioPorTarea(t.tarea);
   if (match) {
     seleccionarServicio(match);
+    tareaCronogramaEnCurso = claveTareaCronograma(t);
     return;
   }
+  tareaCronogramaEnCurso = claveTareaCronograma(t);
   const parsed = parsearTareaCronograma(t.tarea);
   currentNumeroServicio = "";
   document.getElementById("f_cliente").value = parsed.cliente;
@@ -4767,6 +4801,10 @@ confirmSignBtn.addEventListener("click", async () => {
     : `<img src="${signatureDataUrl}" alt="Firma del cliente" width="320" height="110" style="display:block; width:320px; height:110px; border:0;" />`;
 
   const payload = { tipo: "parte", idParte, data, signatureImgTag, signatureDataUrl, fotoBase64, fotoMimeType, sim: simElegidaParaParte() };
+  // La tarea del cronograma con la que se abrió este parte queda hecha
+  // (aunque salga por la cola sin señal): deja de ser "Tu próximo servicio".
+  marcarTareaCronogramaHecha(tareaCronogramaEnCurso);
+  tareaCronogramaEnCurso = "";
 
   showScreen("sending");
   setStatus("ENVIANDO", "busy");

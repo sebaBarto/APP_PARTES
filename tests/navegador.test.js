@@ -731,6 +731,20 @@ test("Skin nuevo: inicio con 'Tu próximo servicio' (pasa al siguiente al termin
   assert.strictEqual(await page.locator("#proximoEmpezarBtn").isVisible(), true);
   await page.evaluate((hoy) => { historialCache.unshift({ cliente: "Panadería Sur", fecha: hoy }); showScreen("home"); }, diaISO(0));
   assert.strictEqual(await page.locator("#proximoServiceCliente").textContent(), "Farmacia Central", "al terminar uno pasa al que sigue");
+  // La tarea dice solo "M20" y el parte quedó a nombre de "M20 Rosario Centro": cuenta como hecha
+  await page.evaluate((hoy) => {
+    cronogramaCache = [
+      { fecha: hoy, hora_inicio: "08:00", tecnico: "Juan Pérez", tarea: "M20" },
+      { fecha: hoy, hora_inicio: "10:00", tecnico: "Juan Pérez", tarea: "Visita mensual" },
+      { fecha: hoy, hora_inicio: "16:00", tecnico: "Juan Pérez", tarea: "Servicio: Bar Oeste\nOroño 50 - Rosario" },
+    ];
+    historialCache = [{ cliente: "M20 Rosario Centro", fecha: hoy }];
+    showScreen("home");
+  }, diaISO(0));
+  assert.strictEqual(await page.locator("#proximoServiceCliente").textContent(), "Visita mensual");
+  // Se cierra el parte abierto desde esa tarea (aunque el cliente se cargue con otro nombre): pasa a la siguiente
+  await page.evaluate(() => { seleccionarTareaCronograma(cronogramaCache[1]); marcarTareaCronogramaHecha(tareaCronogramaEnCurso); resetForm(); showScreen("home"); });
+  assert.strictEqual(await page.locator("#proximoServiceCliente").textContent(), "Bar Oeste");
   await page.evaluate(() => { cronogramaCache = []; showScreen("home"); });
   assert.strictEqual(await page.locator("#proximoVacio").isVisible(), true, "sin agenda lo dice y ofrece ver pendientes");
 
