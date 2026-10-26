@@ -380,6 +380,64 @@ button { color: var(--amber); }
 .cartel-admin-botones { display: flex; gap: 8px; justify-content: flex-end; }
 .cartel-admin-botones button { width: auto; padding: 10px 18px; }
 .cartel-admin-botones .cartel-si.peligro { background: #B3261E; color: #fff; box-shadow: none; }
+
+/* ---------- Rediseño práctico (v3.149) ---------- */
+button { width: auto; padding: 10px 18px; border-radius: 10px; font-size: 14px; font-weight: 700; box-shadow: none; }
+#pwBtn, .login-card button:not(.password-toggle-btn) { width: 100%; }
+.card { border-radius: 14px; padding: 18px; }
+input[type="password"], input[type="text"], input[type="number"], input[type="date"], select, textarea { padding: 9px 11px; margin-bottom: 12px; border-radius: 9px; }
+input[type="file"] { padding: 8px; font-size: 13px; }
+input[type="file"]::file-selector-button { margin-right: 10px; padding: 7px 14px; border: 1.5px solid var(--ink); border-radius: 8px; background: #fff; color: var(--ink); font-family: inherit; font-weight: 700; cursor: pointer; }
+.btn-secondary-admin { padding: 8px 14px; border-radius: 9px; font-size: 13px; }
+.btn-quitar-tecnico { width: 38px; height: 38px; min-width: 38px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 9px; background: #fff; color: #B3261E; border: 1.5px solid #E7C1BB; box-shadow: none; font-size: 15px; }
+.btn-quitar-tecnico:hover { background: #FDECEA; }
+.btn-icono { width: 38px; height: 38px; padding: 0; border-radius: 9px; background: #fff; color: var(--ink); border: 1.5px solid var(--border); box-shadow: none; font-size: 17px; }
+.btn-icono:hover { border-color: var(--ink); }
+.btn-small { padding: 6px 12px !important; font-size: 12.5px !important; width: auto !important; }
+.rendicion-rechazar-btn { background: #fff !important; color: #B3261E !important; border: 1.5px solid #E7C1BB !important; box-shadow: none !important; }
+/* Guardar: cuando hay cambios queda fijo abajo de la pantalla */
+[id^="guardar"][id$="Btn"] { min-width: 180px; }
+[id^="guardar"][id$="Btn"].pendiente-guardar { position: sticky; bottom: 14px; z-index: 40; display: block; margin-left: auto; padding: 13px 26px;
+  background: var(--amber); color: var(--ink); box-shadow: 0 10px 24px -8px rgba(13,12,13,0.45); }
+[id^="guardar"][id$="Btn"].pendiente-guardar::before { content: "● "; }
+/* Técnicos */
+.tecnico-fila.card { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-bottom: 12px; }
+.tecnico-fila.card > div { flex: 1 1 220px; }
+.tecnico-fila .tecnico-en-calle-check { flex: 1 1 100%; margin: 0; }
+.permisos-det { flex: 1 1 100%; border-top: 1px solid #EEECE6; padding-top: 8px; }
+.permisos-det summary { cursor: pointer; font-weight: 700; font-size: 13.5px; color: var(--ink); list-style: none; }
+.permisos-det summary::before { content: "▸ "; color: var(--steel); }
+.permisos-det[open] summary::before { content: "▾ "; }
+.permisos-cuenta { font-weight: 500; color: var(--steel); }
+.permisos-det .permisos-tecnico-grid { margin-top: 8px; }
+/* Guardias */
+.guardia-linea { align-items: flex-end; gap: 10px; flex-wrap: wrap; }
+.guardia-botones { display: flex; gap: 6px; margin-bottom: 12px; flex: 0 0 auto !important; }
+#guardiasFilas { counter-reset: guardia; }
+.guardia-fila .guardia-orden { counter-increment: guardia; flex: 0 0 auto !important; width: 30px; height: 30px; margin-bottom: 16px; border-radius: 50%; background: var(--ink); color: var(--amber); display: grid; place-items: center; font-weight: 800; font-size: 13px; }
+.guardia-fila .guardia-orden::before { content: counter(guardia); }
+.guardia-fila.card { padding: 12px 16px 2px; margin-bottom: 10px; }
+/* Credenciales */
+#credencialesFilas { display: grid; grid-template-columns: repeat(auto-fill, minmax(460px, 1fr)); gap: 14px; }
+@media (max-width: 599px) { #credencialesFilas { grid-template-columns: 1fr; } }
+.credencial-fila.card { display: flex; gap: 16px; margin: 0; padding: 16px; }
+.cred-foto-col { flex: 0 0 104px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.cred-foto-preview, .cred-foto-vacia { width: 104px; height: 128px; object-fit: cover; border-radius: 10px; border: 1px solid var(--border); background: var(--paper); }
+.cred-foto-vacia { align-items: center; justify-content: center; color: var(--steel); font-size: 12px; }
+.cred-foto-btn { margin: 0; font-size: 12.5px; font-weight: 700; color: var(--ink); text-decoration: underline; cursor: pointer; }
+.cred-datos { flex: 1; min-width: 0; }
+.cred-cab { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.cred-cab .cred-nombre { margin: 0; font-weight: 700; font-size: 16px; flex: 1; min-width: 0; }
+.cred-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+.cred-grid label { margin-bottom: 4px; }
+.cred-vig { flex-shrink: 0; font-size: 11.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; }
+.cred-vig.ok { background: #E1F0E4; color: #1F6B34; }
+.cred-vig.pronto { background: #FFF1D6; color: #8A5E00; }
+.cred-vig.vencida { background: #FDECEA; color: #A9332A; }
+.cred-vig.sin { background: var(--paper); color: var(--steel); }
+/* Tablas y listas */
+.sims-tabla tbody tr:nth-child(even) td { background: #FBFAF8; }
+.subtitle { font-size: 13.5px; }
 </style>
 </head>
 <body>
@@ -1405,7 +1463,15 @@ let planosCargadosUnaVezAdmin = false;
 // editado sin guardar, no se recarga: se avisa y se puede descartar.
 const PANELES_CON_GUARDAR = ["panelTecnicos", "panelMateriales", "panelClientes", "panelConsultas", "panelGuardias", "panelCredenciales", "panelVehiculos", "panelHerramientas"];
 const panelesConCambios = new Set();
+const BOTON_GUARDAR_DE_PANEL = { panelTecnicos: "guardarTecnicosBtn", panelMateriales: "guardarMaterialesBtn", panelConsultas: "guardarConsultasCatBtn", panelGuardias: "guardarGuardiasBtn", panelCredenciales: "guardarCredencialesBtn", panelVehiculos: "guardarVehiculosBtn", panelHerramientas: "guardarHerramientasBtn" };
+function marcarPanelConCambios(id) {
+  panelesConCambios.add(id);
+  const b = document.getElementById(BOTON_GUARDAR_DE_PANEL[id]);
+  if (b) b.classList.add("pendiente-guardar");
+}
 function marcarPanelLimpio(id) {
+  const b = document.getElementById(BOTON_GUARDAR_DE_PANEL[id]);
+  if (b) b.classList.remove("pendiente-guardar");
   panelesConCambios.delete(id);
   const aviso = document.getElementById("avisoCambios-" + id);
   if (aviso) aviso.remove();
@@ -1413,9 +1479,18 @@ function marcarPanelLimpio(id) {
 ["input", "change"].forEach((ev) => document.addEventListener(ev, (e) => {
   const panel = e.target.closest && e.target.closest("[id^='panel']");
   if (!panel || !PANELES_CON_GUARDAR.includes(panel.id)) return;
-  if (e.target.type === "file" || e.target.closest(".sin-cambios")) return;
-  panelesConCambios.add(panel.id);
+  if (e.target.closest(".sin-cambios")) return;
+  // Subir un Excel se guarda solo; la foto de una credencial sí es un cambio a guardar.
+  if (e.target.type === "file" && !e.target.classList.contains("cred-foto-input")) return;
+  marcarPanelConCambios(panel.id);
 }, true));
+// Agregar, quitar o reordenar filas también son cambios sin guardar.
+document.addEventListener("click", (e) => {
+  const b = e.target.closest && e.target.closest("button");
+  const panel = b && b.closest("[id^='panel']");
+  if (!panel || !PANELES_CON_GUARDAR.includes(panel.id) || /^guardar/.test(b.id || "")) return;
+  if (/quitar|subir|bajar|agregar/i.test(b.className + " " + b.id)) marcarPanelConCambios(panel.id);
+}, true);
 function recargarSiNoHayCambios(panel, cargar, siempre) {
   if (siempre) siempre();
   if (!panelesConCambios.has(panel.id)) { cargar(); return; }
@@ -1654,7 +1729,7 @@ const PERMISOS_TECNICO = [
 function renderFilaTecnico(nombre, password, permisos, enCalle) {
   const p = permisos || {};
   const fila = document.createElement("div");
-  fila.className = "field-row tecnico-fila";
+  fila.className = "field-row tecnico-fila card";
   const checksHtml = PERMISOS_TECNICO.map((perm) => `
     <label class="permiso-check">
       <input type="checkbox" class="tecnico-permiso" data-clave="${perm.clave}" ${p[perm.clave] ? "checked" : ""}>
@@ -1675,8 +1750,14 @@ function renderFilaTecnico(nombre, password, permisos, enCalle) {
       <input type="checkbox" class="tecnico-en-calle" ${enCalle ? "checked" : ""}>
       <span>Está en la calle (recibe el recordatorio de las 9:30)</span>
     </label>
-    <div class="permisos-tecnico-grid">${checksHtml}</div>
+    <details class="permisos-det"><summary>Permisos <span class="permisos-cuenta"></span></summary><div class="permisos-tecnico-grid">${checksHtml}</div></details>
   `;
+  const contarPermisos = () => {
+    const n = fila.querySelectorAll(".tecnico-permiso:checked").length;
+    fila.querySelector(".permisos-cuenta").textContent = n ? `· ${n} activo${n === 1 ? "" : "s"}` : "· ninguno";
+  };
+  contarPermisos();
+  fila.querySelectorAll(".tecnico-permiso").forEach((c) => c.addEventListener("change", contarPermisos));
   fila.querySelector(".btn-quitar-tecnico").addEventListener("click", () => fila.remove());
   tecnicosFilas.appendChild(fila);
 }
@@ -1973,12 +2054,20 @@ async function cargarMaterialesAdmin() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error desconocido");
 
-    const lista = Array.isArray(data) && data.length > 0 ? data : MATERIALES_RESPALDO;
+    const crudo = Array.isArray(data) && data.length > 0 ? data : MATERIALES_RESPALDO;
+    // Mismo problema que credenciales: modelos repetidos dentro de una categoría.
+    let repetidosMat = 0;
+    const lista = crudo.map((c) => {
+      const vistos = new Set();
+      const modelos = (c.modelos || []).filter((m) => { const k = normalizeText(m); if (vistos.has(k)) { repetidosMat++; return false; } vistos.add(k); return true; });
+      return { ...c, modelos };
+    });
     lista.forEach((c) => renderFilaCategoria(c.categoria, c.modelos));
     cargarSugeridosMateriales(lista);
     materialesStatus.textContent = Array.isArray(data) && data.length > 0
       ? ""
       : "Todavía no se guardó ningún catálogo — se precargó con categorías de ejemplo. Editalas y guardá para publicarlo.";
+    avisoRepetidas(materialesStatus, "panelMateriales", repetidosMat, "material(es)");
   } catch (err) {
     categoriasFilas.innerHTML = "";
     MATERIALES_RESPALDO.forEach((c) => renderFilaCategoria(c.categoria, c.modelos));
@@ -2433,10 +2522,15 @@ async function cargarConsultasCatAdmin() {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error desconocido");
-    (data || []).forEach((c) => renderFilaConsultaCategoria(c.categoria, c.carpeta_drive_id));
+    const vistasCat = new Set();
+    let repetidasCat = 0;
+    (data || []).filter((c) => { const k = normalizeText(c.categoria || "") + "|" + (c.carpeta_drive_id || ""); if (vistasCat.has(k)) { repetidasCat++; return false; } vistasCat.add(k); return true; })
+      .forEach((c) => renderFilaConsultaCategoria(c.categoria, c.carpeta_drive_id));
+    consultasCatStatus.className = "status";
     consultasCatStatus.textContent = Array.isArray(data) && data.length > 0
       ? ""
       : "Todavía no hay categorías cargadas — agregá la primera.";
+    avisoRepetidas(consultasCatStatus, "panelConsultas", repetidasCat, "categoría(s)");
   } catch (err) {
     consultasCatStatus.textContent = "No se pudo cargar la lista de categorías.";
   }
@@ -2620,7 +2714,8 @@ function renderFilaGuardia(nombre, telefono) {
   const fila = document.createElement("div");
   fila.className = "card guardia-fila";
   fila.innerHTML = `
-    <div class="field-row" style="align-items:flex-end;">
+    <div class="field-row guardia-linea">
+      <span class="guardia-orden" aria-hidden="true"></span>
       <div style="flex:1;">
         <label>Nombre</label>
         <input type="text" class="guardia-nombre" value="${nombre || ""}" placeholder="Nombre y apellido">
@@ -2629,11 +2724,11 @@ function renderFilaGuardia(nombre, telefono) {
         <label>Teléfono (WhatsApp/llamada)</label>
         <input type="text" class="guardia-telefono" value="${telefono || ""}" placeholder="341...">
       </div>
-    </div>
-    <div class="field-row">
-      <button type="button" class="btn-secondary-admin subir-guardia">↑ Subir</button>
-      <button type="button" class="btn-secondary-admin bajar-guardia">↓ Bajar</button>
-      <button type="button" class="btn-quitar-tecnico quitar-guardia" title="Quitar">✕</button>
+      <div class="guardia-botones">
+        <button type="button" class="btn-icono subir-guardia" title="Subir en el orden" aria-label="Subir">↑</button>
+        <button type="button" class="btn-icono bajar-guardia" title="Bajar en el orden" aria-label="Bajar">↓</button>
+        <button type="button" class="btn-quitar-tecnico quitar-guardia" title="Quitar">✕</button>
+      </div>
     </div>
   `;
   fila.querySelector(".subir-guardia").addEventListener("click", () => {
@@ -2913,40 +3008,62 @@ function comprimirFotoCredencial(file, maxDim, calidad) {
   });
 }
 
+// Antes, cada "Guardar cambios" volvía a agregar todas las credenciales
+// en el servidor (no las reemplazaba) y quedaban repetidas. Al cargar se
+// deja una por persona: la más nueva, completando con lo que tenga otra
+// copia (por ejemplo la foto). Con guardar una vez queda limpio.
+function unificarCredenciales(lista) {
+  const grupos = new Map();
+  (Array.isArray(lista) ? lista : []).forEach((c) => {
+    const k = normalizeText(String(c.nombre || "").trim()) || "__sin_nombre_" + (c.id || Math.random());
+    if (!grupos.has(k)) grupos.set(k, []);
+    grupos.get(k).push(c);
+  });
+  let repetidas = 0;
+  const unificadas = [...grupos.values()].map((copias) => {
+    repetidas += copias.length - 1;
+    copias.sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0));
+    const r = { ...copias[0] };
+    ["dni", "cargo", "telefono_contacto", "vigencia", "foto_base64"].forEach((campo) => {
+      if (!r[campo]) { const otra = copias.find((x) => x[campo]); if (otra) r[campo] = otra[campo]; }
+    });
+    return r;
+  });
+  return { unificadas, repetidas };
+}
+function avisoRepetidas(statusEl, panelId, n, que) {
+  if (!n) return;
+  marcarPanelConCambios(panelId);
+  statusEl.className = "status err";
+  statusEl.textContent = `Había ${n} ${que} repetida(s) — se muestra una sola de cada una. Tocá "Guardar cambios" una vez para que quede así también en el servidor.`;
+}
+
 function renderFilaCredencial(cred) {
   const fila = document.createElement("div");
   fila.className = "card credencial-fila";
+  const hoyISO = new Date().toISOString().slice(0, 10);
+  const en30 = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
+  const vig = cred.vigencia || "";
+  const estadoVig = !vig ? '<span class="cred-vig sin">Sin vigencia</span>' : vig < hoyISO ? '<span class="cred-vig vencida">Vencida</span>' : vig <= en30 ? '<span class="cred-vig pronto">Vence pronto</span>' : '<span class="cred-vig ok">Vigente</span>';
   fila.innerHTML = `
-    <div class="field-row" style="align-items:flex-end;">
-      <div style="flex:1;">
-        <label>Nombre (tiene que coincidir con el usuario de la pestaña Técnicos)</label>
-        <input type="text" class="cred-nombre" value="${cred.nombre || ""}" placeholder="Nombre y apellido">
-      </div>
-      <button type="button" class="btn-quitar-tecnico quitar-credencial" title="Quitar">✕</button>
+    <div class="cred-foto-col">
+      <img class="cred-foto-preview" src="${cred.foto_base64 || ""}" alt="" style="display:${cred.foto_base64 ? "block" : "none"};">
+      <div class="cred-foto-vacia" style="display:${cred.foto_base64 ? "none" : "flex"};">Sin foto</div>
+      <label class="cred-foto-btn">Cambiar foto<input type="file" class="cred-foto-input" accept="image/*" hidden></label>
     </div>
-    <div class="field-row">
-      <div style="flex:1;">
-        <label>DNI</label>
-        <input type="text" class="cred-dni" value="${cred.dni || ""}" placeholder="30.123.456">
+    <div class="cred-datos">
+      <div class="cred-cab">
+        <input type="text" class="cred-nombre" value="${escapeHtmlAdmin(cred.nombre || "")}" placeholder="Nombre y apellido (igual que en Técnicos)" aria-label="Nombre">
+        ${estadoVig}
+        <button type="button" class="btn-quitar-tecnico quitar-credencial" title="Quitar">✕</button>
       </div>
-      <div style="flex:1;">
-        <label>Cargo</label>
-        <input type="text" class="cred-cargo" value="${cred.cargo || ""}" placeholder="Técnico instalador">
-      </div>
-    </div>
-    <div class="field-row">
-      <div style="flex:1;">
-        <label>Teléfono de contacto</label>
-        <input type="text" class="cred-telefono" value="${cred.telefono_contacto || ""}" placeholder="341...">
-      </div>
-      <div style="flex:1;">
-        <label>Vigencia (válida hasta)</label>
-        <input type="date" class="cred-vigencia" value="${cred.vigencia || ""}">
+      <div class="cred-grid">
+        <div><label>DNI</label><input type="text" class="cred-dni" value="${escapeHtmlAdmin(cred.dni || "")}" placeholder="30.123.456"></div>
+        <div><label>Cargo</label><input type="text" class="cred-cargo" value="${escapeHtmlAdmin(cred.cargo || "")}" placeholder="Técnico instalador"></div>
+        <div><label>Teléfono de contacto</label><input type="text" class="cred-telefono" value="${escapeHtmlAdmin(cred.telefono_contacto || "")}" placeholder="341..."></div>
+        <div><label>Válida hasta</label><input type="date" class="cred-vigencia" value="${escapeHtmlAdmin(vig)}"></div>
       </div>
     </div>
-    <label>Foto (se comprime sola a un tamaño chico)</label>
-    <input type="file" class="cred-foto-input" accept="image/*">
-    <img class="cred-foto-preview" src="${cred.foto_base64 || ""}" style="max-width:100px; border-radius:8px; display:${cred.foto_base64 ? "block" : "none"}; margin-top:8px;">
   `;
   fila.dataset.foto = cred.foto_base64 || "";
   fila.querySelector(".quitar-credencial").addEventListener("click", () => fila.remove());
@@ -2958,6 +3075,7 @@ function renderFilaCredencial(cred) {
     const preview = fila.querySelector(".cred-foto-preview");
     preview.src = dataUrl;
     preview.style.display = "block";
+    fila.querySelector(".cred-foto-vacia").style.display = "none";
   });
   credencialesFilas.appendChild(fila);
 }
@@ -2972,10 +3090,14 @@ async function cargarCredencialesAdmin() {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error desconocido");
-    (data || []).forEach((c) => renderFilaCredencial(c));
-    credencialesStatus.textContent = Array.isArray(data) && data.length > 0
+    const { unificadas, repetidas } = unificarCredenciales(data);
+    unificadas.sort((a, b) => String(a.nombre || "").localeCompare(String(b.nombre || "")));
+    unificadas.forEach((c) => renderFilaCredencial(c));
+    credencialesStatus.className = "status";
+    credencialesStatus.textContent = unificadas.length > 0
       ? ""
       : "Todavía no hay ninguna credencial cargada — agregá la primera.";
+    avisoRepetidas(credencialesStatus, "panelCredenciales", repetidas, "credencial(es)");
   } catch (err) {
     credencialesStatus.textContent = "No se pudo cargar la lista de credenciales.";
   }

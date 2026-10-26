@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.148.0";
+const APP_VERSION = "3.149.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -10074,7 +10074,9 @@ async function fetchYRenderCredencial() {
     const res = await fetch("/api/datos?coleccion=credenciales", { headers, cache: "no-store" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     const data = await res.json();
-    const propia = (Array.isArray(data) ? data : []).find((c) => c.nombre === tecnicoLogueado);
+    // Si quedó repetida (pasaba antes al guardar en admin), se usa la más nueva.
+    const propia = (Array.isArray(data) ? data : []).filter((c) => c.nombre === tecnicoLogueado)
+      .sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0))[0];
     if (!propia) {
       credencialStatus.textContent = "No hay una credencial cargada para tu usuario todavía.";
       return;

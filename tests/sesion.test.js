@@ -92,3 +92,40 @@ test("La API rechaza pedidos sin pase y el login entrega uno", async () => {
     global.fetch = fetchViejo;
   }
 });
+
+test("Credenciales: guardar reemplaza la lista (no la vuelve a agregar) y si falla deja lo que había", async () => {
+  const llamadas = [];
+  let tabla = [{ id: 1, nombre: "Juan" }, { id: 2, nombre: "Juan" }];
+  let fallarPost = false;
+  const fetchViejo = global.fetch;
+  global.fetch = async (url, op = {}) => {
+    const u = String(url); const m = op.method || "GET";
+    if (u.includes("/api/credenciales")) {
+      llamadas.push(m);
+      if (m === "GET") return new Response(JSON.stringify(tabla));
+      if (m === "DELETE") { tabla = []; return new Response(JSON.stringify({ ok: true })); }
+      if (m === "POST") {
+        if (fallarPost) { fallarPost = false; return new Response(JSON.stringify({ error: "x" }), { status: 500 }); }
+        const nuevas = JSON.parse(op.body); tabla = tabla.concat(nuevas.map((x, i) => ({ id: 100 + i, ...x })));
+        return new Response(JSON.stringify({ ok: true, count: nuevas.length }));
+      }
+    }
+    return new Response("[]");
+  };
+  try {
+    const pase = crearSesion({ nombre: "", rol: "admin" });
+    let r = resFalso();
+    await datos(pedido("POST", { coleccion: "credenciales" }, [{ nombre: "Juan", dni: "1" }], pase), r);
+    assert.strictEqual(r.statusCode, 200);
+    assert.deepStrictEqual(llamadas, ["GET", "DELETE", "POST"]);
+    assert.strictEqual(tabla.length, 1, "queda una sola, sin repetidas");
+    // Si la carga falla, vuelve lo que había
+    fallarPost = true;
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "credenciales" }, [{ nombre: "Luis" }], pase), r);
+    assert.strictEqual(r.statusCode, 500);
+    assert.deepStrictEqual(tabla.map((x) => x.nombre), ["Juan"]);
+  } finally {
+    global.fetch = fetchViejo;
+  }
+});

@@ -84,6 +84,29 @@ const COLECCIONES = {
 // son un simple reenvío), y otras dos (materiales y categorías de
 // consultas) tienen una forma distinta, así que hay que armar/
 // desarmar la estructura de un lado al otro.
+// credenciales, materiales y categorías de manuales no tienen una clave
+// propia (solo un id que pone la base): el POST del backend AGREGA filas,
+// no reemplaza. Mandar la lista completa en cada "Guardar" duplicaba todo.
+// Ahora se reemplaza: se vacía la tabla (DELETE, que ya existía para las
+// migraciones) y se carga la lista nueva. Si la carga fallara, se vuelve a
+// poner lo que había antes, para no dejar la tabla vacía.
+async function reemplazarColeccionSinClave(ruta, filasNuevas, backendUrl, headers) {
+  const rPrevio = await fetch(`${backendUrl}${ruta}`, { headers });
+  if (!rPrevio.ok) throw new Error("No se pudo leer lo que había guardado");
+  const previas = await rPrevio.json();
+  const rBorrar = await fetch(`${backendUrl}${ruta}`, { method: "DELETE", headers });
+  if (!rBorrar.ok) throw new Error("No se pudo reemplazar la lista (el servidor no permitió vaciarla)");
+  const sinId = (lista) => (Array.isArray(lista) ? lista : []).map(({ id, ...resto }) => resto);
+  const r = await fetch(`${backendUrl}${ruta}`, { method: "POST", headers, body: JSON.stringify(sinId(filasNuevas)) });
+  if (!r.ok) {
+    if (sinId(previas).length) await fetch(`${backendUrl}${ruta}`, { method: "POST", headers, body: JSON.stringify(sinId(previas)) }).catch(() => {});
+    let detalle = ""; try { detalle = (await r.json()).error || ""; } catch (e) { /* nada */ }
+    return { status: r.status, data: { error: "No se pudo guardar" + (detalle ? ": " + detalle : "") + " — quedó lo que había antes." } };
+  }
+  const data = await r.json();
+  return { status: 200, data: { ok: data.ok !== false, count: data.count ?? filasNuevas.length } };
+}
+
 async function manejarColeccionCortada(nombreColeccion, metodo, body, backendUrl, headers) {
   if (nombreColeccion === "clientes") {
     if (metodo === "GET") {
@@ -120,9 +143,7 @@ async function manejarColeccionCortada(nombreColeccion, metodo, body, backendUrl
       (Array.isArray(body) ? body : []).forEach((cat) => {
         (cat.modelos || []).forEach((modelo) => filas.push({ categoria: cat.categoria, nombre: modelo, precio: null }));
       });
-      const r = await fetch(`${backendUrl}/api/materiales`, { method: "POST", headers, body: JSON.stringify(filas) });
-      const data = await r.json();
-      return { status: r.status, data: { ok: data.ok, count: data.count } };
+      return await reemplazarColeccionSinClave("/api/materiales", filas, backendUrl, headers);
     }
   }
 
@@ -136,9 +157,7 @@ async function manejarColeccionCortada(nombreColeccion, metodo, body, backendUrl
     }
     if (metodo === "POST") {
       const filas = (Array.isArray(body) ? body : []).map((c) => ({ nombre: c.categoria, manual_ref: c.carpeta_drive_id }));
-      const r = await fetch(`${backendUrl}/api/consultas-categorias`, { method: "POST", headers, body: JSON.stringify(filas) });
-      const data = await r.json();
-      return { status: r.status, data: { ok: data.ok, count: data.count } };
+      return await reemplazarColeccionSinClave("/api/consultas-categorias", filas, backendUrl, headers);
     }
   }
 
@@ -149,9 +168,7 @@ async function manejarColeccionCortada(nombreColeccion, metodo, body, backendUrl
       return { status: r.status, data: await r.json() };
     }
     if (metodo === "POST") {
-      const r = await fetch(`${backendUrl}/api/credenciales`, { method: "POST", headers, body: JSON.stringify(body) });
-      const data = await r.json();
-      return { status: r.status, data: { ok: data.ok, count: data.count } };
+      return await reemplazarColeccionSinClave("/api/credenciales", Array.isArray(body) ? body : [], backendUrl, headers);
     }
   }
 
