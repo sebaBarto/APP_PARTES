@@ -107,6 +107,12 @@
         <div id="homeBuscarResultados" class="home-buscar-resultados"></div>
       </div>
 
+      <button type="button" class="solo-nuevo-bloque home-vehiculo" id="homeVehiculoChip" hidden>
+        <span class="home-vehiculo-ico"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13l2-6a2 2 0 0 1 2-1h10a2 2 0 0 1 2 1l2 6"/><rect x="2" y="13" width="20" height="5" rx="1.5"/><circle cx="7" cy="18.5" r="1.5"/><circle cx="17" cy="18.5" r="1.5"/></svg></span>
+        <span class="home-vehiculo-txt"><b id="homeVehiculoNombre"></b><span id="homeVehiculoDesde"></span></span>
+        <span class="home-vehiculo-accion">Devolver ›</span>
+      </button>
+
       <div class="proximo-service hidden" id="proximoServiceCard">
         <button type="button" class="proximo-service-main" id="proximoServiceMain">
           <span class="proximo-service-titulo">Próximo service</span>
@@ -197,6 +203,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13l2-6a2 2 0 0 1 2-1h10a2 2 0 0 1 2 1l2 6"/><rect x="2" y="13" width="20" height="5" rx="1.5"/><circle cx="7" cy="18.5" r="1.5"/><circle cx="17" cy="18.5" r="1.5"/></svg>
           </span>
           <span class="panel-tile-label">Vehículos</span>
+          <span class="panel-tile-count panel-tile-count-texto hidden" id="vehiculosAvisoBadge">En uso</span>
         </button>
         <button type="button" class="panel-tile panel-tile-grid tile-sims" id="tileSimsBtn">
           <span class="panel-tile-icon-badge">
@@ -782,6 +789,33 @@
         <div class="field-group">
           <label class="field-label" for="vehiculoHoraToma">Hora en que lo tomás</label>
           <input class="field-input field-mono" id="vehiculoHoraToma" type="time">
+        </div>
+        <div class="veh-revision" id="vehiculoRevision">
+          <p class="veh-revision-tit">Revisión rápida <span>· opcional, un toque por ítem</span></p>
+          <div class="field-group">
+            <label class="field-label" for="vehiculoKmToma">Kilometraje del tablero</label>
+            <input class="field-input field-mono" id="vehiculoKmToma" type="number" min="0" inputmode="numeric">
+            <p class="veh-km-ayuda" id="vehiculoKmTomaAyuda"></p>
+          </div>
+          <div class="veh-rev-fila"><span class="veh-rev-label">Nafta</span>
+            <div class="veh-seg" data-rev="nafta"><button type="button" data-v="Reserva">Reserva</button><button type="button" data-v="¼">¼</button><button type="button" data-v="½">½</button><button type="button" data-v="¾">¾</button><button type="button" data-v="Lleno">Lleno</button></div></div>
+          <div class="veh-rev-fila"><span class="veh-rev-label">Luces</span>
+            <div class="veh-seg" data-rev="luces"><button type="button" data-v="Bien">Bien</button><button type="button" data-v="Problema" class="malo">Problema</button></div></div>
+          <div class="veh-rev-fila"><span class="veh-rev-label">Cubiertas</span>
+            <div class="veh-seg" data-rev="cubiertas"><button type="button" data-v="Bien">Bien</button><button type="button" data-v="Problema" class="malo">Problema</button></div></div>
+          <div class="veh-rev-fila"><span class="veh-rev-label">Limpieza</span>
+            <div class="veh-seg" data-rev="limpieza"><button type="button" data-v="Limpio">Limpio</button><button type="button" data-v="Sucio" class="malo">Sucio</button></div></div>
+          <div class="field-group" style="margin-top:12px;">
+            <label class="field-label" for="vehiculoRevisionObs">¿Algún golpe, daño o algo para avisar?</label>
+            <input class="field-input" id="vehiculoRevisionObs" type="text" placeholder="Ej: raspón en la puerta trasera">
+          </div>
+          <div class="veh-rendir-botones">
+            <button type="button" class="btn btn-secondary btn-small" id="vehiculoDanoCamaraBtn">📷 Foto del daño</button>
+            <button type="button" class="btn btn-secondary btn-small" id="vehiculoDanoGaleriaBtn">Elegir de la galería</button>
+          </div>
+          <input type="file" id="vehiculoDanoCamaraInput" accept="image/*" capture="environment" hidden>
+          <input type="file" id="vehiculoDanoGaleriaInput" accept="image/*" multiple hidden>
+          <div id="vehiculoDanoPreview" class="veh-ticket-preview"></div>
         </div>
         <button type="button" class="btn btn-primary" id="vehiculoTomarBtn">Tomar vehículo</button>
       </div>

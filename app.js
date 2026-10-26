@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.141.0";
+const APP_VERSION = "3.142.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -871,7 +871,7 @@ function showScreen(name) {
   if (btnAjustes) btnAjustes.classList.toggle("hidden", name === "login");
   try { actualizarWakeLockPantalla(name); } catch (e) { /* los ajustes todavía no cargaron */ }
   if (name === "home") { try { actualizarProximoService(); } catch (e) { /* aún no cargó */ } }
-  if (name === "home") { try { document.getElementById("homeBuscarWrap").hidden = !esSkinNuevo(); actualizarAvisosInicio(); } catch (e) { /* aún no cargó */ } }
+  if (name === "home") { try { document.getElementById("homeBuscarWrap").hidden = !esSkinNuevo(); actualizarAvisosInicio(); actualizarVehiculoInicio(); setTimeout(consumirIrPendiente, 300); } catch (e) { /* aún no cargó */ } }
   try { controlarFaltantesParte(name); } catch (e) { /* aún no cargó */ }
   try { actualizarBarraSuperior(name); } catch (e) { /* aún no cargó */ }
   if (name === "form") { try { pasoParteElegido = null; } catch (e) { /* aún no cargó */ } }
@@ -2224,7 +2224,7 @@ setInterval(actualizarPillConexion, 15000);
 
 // Deslizar hacia abajo para actualizar (en el celular, reemplaza los botones "Actualizar")
 const ACCION_REFRESCO = {
-  home: () => { precargarCronogramaParaSugerencias().then(() => actualizarProximoService()); fetchServicios(); actualizarAvisosInicio(true); },
+  home: () => { precargarCronogramaParaSugerencias().then(() => actualizarProximoService()); fetchServicios(); actualizarAvisosInicio(true); actualizarVehiculoInicio(); },
   notas: () => fetchNotas(),
   sims: () => { renderSimsLista(); cargarTransferenciasPendientes(); cargarTransferenciasMandadas(); },
   vehiculos: () => renderVehiculosPicker(),
@@ -3899,6 +3899,7 @@ async function verificarYSugerirCercanos(data) {
 async function verificarPrimerServicioSinVehiculo(data) {
   try {
     if (!data.tecnico || !data.fecha) return;
+    if (colaVehiculos().some((i) => i.cuerpo.accion === "tomar" && i.cuerpo.tecnico === data.tecnico)) return;
 
     const yaTeniaOtroHoy = historialCache.some((h) => h.tecnico === data.tecnico && h.fecha === data.fecha);
     if (yaTeniaOtroHoy) return; // no es el primer parte de hoy
@@ -4505,6 +4506,9 @@ function actualizarBadgeColaEnvios() {
         if ((item.tipo || "parte") === "comodato") {
           return `Comodato: ${(item.datos && item.datos.comodatario) || "sin nombre"}`;
         }
+        if (item.tipo === "vehiculo") {
+          return `Vehículo: ${TEXTO_ACCION_VEHICULO[item.cuerpo && item.cuerpo.accion] || ""} ${(item.cuerpo && item.cuerpo.vehiculo) || ""}`.trim();
+        }
         if (item.tipo === "rendicion") {
           return `Rendición: ${(item.cuerpo && item.cuerpo.categoria) || ""} ${item.cuerpo ? formatoPesos(item.cuerpo.monto) : ""}`.trim();
         }
@@ -4533,7 +4537,21 @@ async function procesarColaEnvios() {
 
   const restantes = [];
   let enviadosOk = 0;
+  let vehiculoTrabado = false;
+  const vehiculoDescartados = [];
   for (const item of cola) {
+    if (item.tipo === "vehiculo") {
+      // Van en orden: si uno no sale por señal, los que siguen esperan.
+      if (vehiculoTrabado) { restantes.push(item); continue; }
+      try {
+        await postAccionVehiculo(await cuerpoConFotosSubidas(item.cuerpo, item.fotos || []));
+        enviadosOk++;
+      } catch (err) {
+        if (err.delServidor) vehiculoDescartados.push(`${TEXTO_ACCION_VEHICULO[item.cuerpo.accion] || ""} ${item.cuerpo.vehiculo}: ${err.message}`);
+        else { vehiculoTrabado = true; restantes.push(item); }
+      }
+      continue;
+    }
     try {
       const tipo = item.tipo || "parte"; // los ya guardados antes de este cambio no tienen tipo -> son partes
       const resultado = tipo === "comodato"
@@ -4555,6 +4573,15 @@ async function procesarColaEnvios() {
   }
   guardarColaEnvios(restantes);
   procesandoColaEnvios = false;
+  if (vehiculoDescartados.length) {
+    alert("No se pudo registrar en el sistema:\n\n" + vehiculoDescartados.join("\n") + "\n\nRevisalo en Vehículos.");
+  }
+  if (cola.some((i) => i.tipo === "vehiculo")) {
+    try {
+      if (screens.vehiculos.dataset.active === "true") renderVehiculosPicker();
+      actualizarVehiculoInicio();
+    } catch (e) { /* aún no cargó */ }
+  }
 
   if (enviadosOk > 0) {
     showToast(`Se enviaron ${enviadosOk} envío(s) que estaban pendientes por falta de conexión.`);
@@ -9886,20 +9913,6 @@ function fechaActualISOVehiculo() {
   return `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, "0")}-${String(ahora.getDate()).padStart(2, "0")}`;
 }
 
-async function fetchVehiculosConfig() {
-  const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
-  const res = await fetch("/api/datos?coleccion=vehiculos", { headers, cache: "no-store" });
-  if (!res.ok) throw new Error("HTTP " + res.status);
-  const data = await res.json();
-  return Array.isArray(data) ? data : [];
-}
-async function fetchVehiculosHistorial() {
-  const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
-  const res = await fetch("/api/recurso-uso?recurso=vehiculo", { headers, cache: "no-store" });
-  if (!res.ok) throw new Error("HTTP " + res.status);
-  const data = await res.json();
-  return Array.isArray(data) ? data : [];
-}
 function encontrarRegistroAbierto(historial, vehiculo) {
   return [...historial].reverse().find((h) => h.vehiculo === vehiculo && !h.hora_devolucion && h.accion !== "evento") || null;
 }
@@ -9941,6 +9954,281 @@ tileVehiculosBtn.addEventListener("click", () => {
 });
 volverDeVehiculosBtn.addEventListener("click", () => showScreen("home"));
 volverDeVehiculoDetalleBtn.addEventListener("click", () => showScreen("vehiculos"));
+
+// ---------- Vehículos sin señal: caché local + cola de envíos ----------
+// Lo último que se leyó del servidor queda guardado en el celular, así
+// en la cochera o en un sótano igual se ve el estado. Tomar, devolver y
+// los eventos que no salen por falta de señal van a la misma cola que
+// los partes, y se aplican "por encima" de lo guardado para que el
+// técnico vea el resultado al instante.
+let vehiculosDesdeCache = false;
+function leerCacheVehiculos() {
+  try { return JSON.parse(localStorage.getItem("vehiculos_cache") || "{}") || {}; } catch (e) { return {}; }
+}
+function guardarCacheVehiculos(parte, datos) {
+  try {
+    const c = leerCacheVehiculos();
+    c[parte] = parte === "historial" ? datos.slice(-400) : datos;
+    c.cuando = Date.now();
+    localStorage.setItem("vehiculos_cache", JSON.stringify(c));
+  } catch (e) { /* sin espacio: no pasa nada */ }
+}
+async function fetchVehiculosConfig() {
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/datos?coleccion=vehiculos", { headers, cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    const lista = Array.isArray(data) ? data : [];
+    guardarCacheVehiculos("config", lista);
+    return lista;
+  } catch (err) {
+    const c = leerCacheVehiculos();
+    if (Array.isArray(c.config)) { vehiculosDesdeCache = true; return c.config; }
+    throw err;
+  }
+}
+async function fetchVehiculosHistorial() {
+  try {
+    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const res = await fetch("/api/recurso-uso?recurso=vehiculo", { headers, cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    const lista = Array.isArray(data) ? data : [];
+    guardarCacheVehiculos("historial", lista);
+    return lista;
+  } catch (err) {
+    const c = leerCacheVehiculos();
+    if (Array.isArray(c.historial)) { vehiculosDesdeCache = true; return c.historial; }
+    throw err;
+  }
+}
+function colaVehiculos() {
+  return obtenerColaEnvios().filter((i) => i.tipo === "vehiculo" && i.cuerpo);
+}
+function aplicarColaVehiculos(historial) {
+  const h = historial.map((x) => ({ ...x }));
+  colaVehiculos().forEach((item) => {
+    const c = item.cuerpo;
+    if (c.accion === "tomar") {
+      h.push({ vehiculo: c.vehiculo, tecnico: c.tecnico, fecha: c.fecha, hora_toma: c.hora_toma, hora_devolucion: "", pendiente: true });
+    } else if (c.accion === "devolver") {
+      const ab = [...h].reverse().find((x) => x.vehiculo === c.vehiculo && x.tecnico === c.tecnico && !x.hora_devolucion && x.accion !== "evento");
+      if (ab) { ab.hora_devolucion = c.hora_devolucion || "—"; ab.km_devolucion = c.km_devolucion; ab.pendiente = true; }
+    } else if (c.accion === "evento") {
+      h.push({ vehiculo: c.vehiculo, tecnico: c.tecnico, fecha: item.fecha || fechaLocalISO(), hora: c.hora, accion: "evento", tipo_evento: c.tipo_evento, km: c.km, monto: c.monto, detalle: c.detalle, pendiente: true });
+    }
+  });
+  return h;
+}
+async function historialVehiculosConCola() {
+  return aplicarColaVehiculos(await fetchVehiculosHistorial());
+}
+async function postAccionVehiculo(cuerpo) {
+  const res = await fetch("/api/recurso-uso", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+    body: JSON.stringify({ ...cuerpo, recurso: "vehiculo" }),
+  });
+  let data = {};
+  try { data = await res.json(); } catch (e) { /* sin cuerpo */ }
+  if (!res.ok) {
+    const err = new Error(data.error || "HTTP " + res.status);
+    err.delServidor = res.status >= 400 && res.status < 500;
+    throw err;
+  }
+  return data;
+}
+// Las fotos (daños de la revisión) se suben primero y sus links quedan
+// al final del detalle: "… · Fotos: url1 url2".
+async function cuerpoConFotosSubidas(cuerpo, fotos) {
+  if (!fotos || !fotos.length) return cuerpo;
+  const urls = [];
+  for (const f of fotos) urls.push(f.url ? f.url : await subirFotoRendicion(f.base64));
+  return { ...cuerpo, detalle: [cuerpo.detalle, "Fotos: " + urls.join(" ")].filter(Boolean).join(" · ") };
+}
+// Devuelve { ok } si salió, { enCola } si quedó guardado para después,
+// o tira error si el servidor lo rechazó (ej.: otro lo tomó antes).
+async function enviarAccionVehiculo(cuerpo, fotos = []) {
+  const encolar = () => {
+    agregarAColaEnvios({ tipo: "vehiculo", cuerpo, fotos, fecha: fechaLocalISO() });
+    return { enCola: true };
+  };
+  // Si ya hay algo de vehículos esperando, va detrás para respetar el orden (tomar → evento → devolver).
+  if (navigator.onLine === false || colaVehiculos().length > 0) {
+    const r = encolar();
+    if (navigator.onLine !== false) procesarColaEnvios();
+    return r;
+  }
+  try {
+    await postAccionVehiculo(await cuerpoConFotosSubidas(cuerpo, fotos));
+    return { ok: true };
+  } catch (err) {
+    if (err.delServidor) throw err;
+    return encolar();
+  }
+}
+const TEXTO_ACCION_VEHICULO = { tomar: "Tomar", devolver: "Devolver", evento: "Evento en" };
+setInterval(() => { if (navigator.onLine !== false && obtenerColaEnvios().length > 0) procesarColaEnvios(); }, 60000);
+
+// ---------- Revisión rápida al tomar el vehículo ----------
+const vehiculoKmToma = document.getElementById("vehiculoKmToma");
+const vehiculoRevisionObs = document.getElementById("vehiculoRevisionObs");
+const vehiculoDanoPreview = document.getElementById("vehiculoDanoPreview");
+const vehRevision = { nafta: "", luces: "", cubiertas: "", limpieza: "" };
+let vehDanoFotos = [];
+document.querySelectorAll("#vehiculoRevision .veh-seg").forEach((seg) => {
+  seg.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-v]");
+    if (!b) return;
+    const k = seg.dataset.rev;
+    vehRevision[k] = vehRevision[k] === b.dataset.v ? "" : b.dataset.v;
+    seg.querySelectorAll("button").forEach((x) => x.classList.toggle("activo", x.dataset.v === vehRevision[k]));
+  });
+});
+function limpiarRevisionVehiculo() {
+  Object.keys(vehRevision).forEach((k) => { vehRevision[k] = ""; });
+  document.querySelectorAll("#vehiculoRevision .veh-seg button").forEach((x) => x.classList.remove("activo"));
+  vehiculoKmToma.value = "";
+  vehiculoRevisionObs.value = "";
+  vehDanoFotos = [];
+  renderFotosVehiculo(vehiculoDanoPreview, () => vehDanoFotos);
+  ayudaKm(vehiculoKmToma, document.getElementById("vehiculoKmTomaAyuda"), "Son");
+}
+vehiculoKmToma.addEventListener("input", () => ayudaKm(vehiculoKmToma, document.getElementById("vehiculoKmTomaAyuda"), "Son"));
+function textoRevisionVehiculo() {
+  const p = [];
+  if (vehRevision.nafta) p.push(`Nafta ${vehRevision.nafta}`);
+  [["luces", "Luces"], ["cubiertas", "Cubiertas"], ["limpieza", "Limpieza"]].forEach(([k, et]) => {
+    const v = vehRevision[k];
+    if (v) p.push(`${et}: ${v === "Problema" || v === "Sucio" ? v.toUpperCase() : v.toLowerCase()}`);
+  });
+  const obs = vehiculoRevisionObs.value.trim();
+  if (obs) p.push(`Obs: ${obs}`);
+  return p.join(" · ");
+}
+function renderFotosVehiculo(cont, getLista) {
+  const lista = getLista();
+  cont.innerHTML = lista.map((f, i) => `
+    <span class="veh-ticket-foto"><img src="${escapeHtml(f.url || f.base64)}" alt="Foto ${i + 1}">${f.base64 ? '<span class="rend-foto-pend">sin subir</span>' : ""}
+    <button type="button" data-i="${i}" aria-label="Quitar foto">×</button></span>`).join("");
+  cont.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+    getLista().splice(Number(b.dataset.i), 1);
+    renderFotosVehiculo(cont, getLista);
+  }));
+}
+async function cargarFotosVehiculo(input, getLista, cont, boton, textoBoton) {
+  const archivos = Array.from(input.files || []);
+  input.value = "";
+  if (!archivos.length) return;
+  const lista = getLista();
+  boton.disabled = true;
+  boton.textContent = "Subiendo foto...";
+  try {
+    for (const archivo of archivos) {
+      let base64 = null;
+      try {
+        base64 = await comprimirImagen(archivo, 1600, 0.75);
+        const url = await subirFotoRendicion(base64);
+        if (lista !== getLista()) return;
+        lista.push({ url });
+      } catch (err) {
+        if (lista !== getLista()) return;
+        if (base64) {
+          lista.push({ base64: await comprimirImagen(archivo, 1200, 0.6).catch(() => base64) });
+          showToast("Sin señal: la foto queda guardada y se sube sola después.");
+        } else showToast("No se pudo leer la foto: " + err.message);
+      }
+    }
+    renderFotosVehiculo(cont, getLista);
+  } finally {
+    boton.disabled = false;
+    boton.textContent = textoBoton;
+  }
+}
+document.getElementById("vehiculoDanoCamaraBtn").addEventListener("click", () => document.getElementById("vehiculoDanoCamaraInput").click());
+document.getElementById("vehiculoDanoGaleriaBtn").addEventListener("click", () => document.getElementById("vehiculoDanoGaleriaInput").click());
+["vehiculoDanoCamaraInput", "vehiculoDanoGaleriaInput"].forEach((id) => {
+  const input = document.getElementById(id);
+  input.addEventListener("change", () => cargarFotosVehiculo(input, () => vehDanoFotos, vehiculoDanoPreview, vehiculoTomarBtn, "Tomar vehículo"));
+});
+function ultimaRevisionVehiculo(historial, nombre) {
+  return [...historial].reverse().find((h) => h.vehiculo === nombre && h.accion === "evento" && h.tipo_evento === "Revisión al tomar") || null;
+}
+// Detalle de evento con los links de fotos convertidos en "📷 Foto 1".
+function htmlDetalleVehiculo(texto) {
+  const s = String(texto || "");
+  const m = s.match(/(?:^| · )Fotos: (.+)$/);
+  const base = m ? s.slice(0, m.index) : s;
+  let html = escapeHtml(base);
+  if (m) {
+    const links = m[1].trim().split(/\s+/).filter((u) => /^https?:\/\//.test(u))
+      .map((u, i) => `<a href="${escapeHtml(u)}" target="_blank" rel="noopener">📷 Foto ${i + 1}</a>`).join(" ");
+    html += (html ? " · " : "") + links;
+  }
+  return html;
+}
+
+// ---------- El vehículo que tenés, en el inicio ----------
+function pintarVehiculoInicio(historial) {
+  const chip = document.getElementById("homeVehiculoChip");
+  const yo = tecnicoLogueado;
+  const mio = yo && esSkinNuevo() && !tileVehiculosBtn.classList.contains("hidden")
+    ? [...historial].reverse().find((h) => h.tecnico === yo && !h.hora_devolucion && h.accion !== "evento")
+    : null;
+  chip.hidden = !mio;
+  ponerBadge("vehiculosAvisoBadge", mio ? 1 : 0, mio && tomaVencida(mio) ? "Devolver" : "En uso");
+  document.getElementById("vehiculosAvisoBadge").classList.toggle("badge-alerta", !!(mio && tomaVencida(mio)));
+  if (!mio) return;
+  chip.dataset.vehiculo = mio.vehiculo;
+  chip.classList.toggle("vencida", tomaVencida(mio));
+  document.getElementById("homeVehiculoNombre").textContent = `Tenés ${mio.vehiculo}`;
+  const dur = duracionDesde(mio.fecha, mio.hora_toma);
+  document.getElementById("homeVehiculoDesde").textContent =
+    `Desde ${cuandoVehiculo(mio.fecha, mio.hora_toma)}${tomaVencida(mio) ? " · sin devolver" : dur ? " · " + dur : ""}${mio.pendiente ? " · por enviar" : ""}`;
+}
+async function actualizarVehiculoInicio() {
+  if (!esSkinNuevo() || !tecnicoLogueado || tileVehiculosBtn.classList.contains("hidden")) {
+    pintarVehiculoInicio([]);
+    return;
+  }
+  try { pintarVehiculoInicio(await historialVehiculosConCola()); } catch (e) { /* sin datos: queda como estaba */ }
+}
+document.getElementById("homeVehiculoChip").addEventListener("click", (e) => irADevolverVehiculo(e.currentTarget.dataset.vehiculo));
+async function irADevolverVehiculo(nombre) {
+  if (!nombre) {
+    try {
+      const h = await historialVehiculosConCola();
+      const ab = [...h].reverse().find((x) => x.tecnico === tecnicoLogueado && !x.hora_devolucion && x.accion !== "evento");
+      nombre = ab && ab.vehiculo;
+    } catch (e) { /* sin datos */ }
+  }
+  if (!nombre) { tileVehiculosBtn.click(); return; }
+  vehiculoSeleccionado = nombre;
+  showScreen("vehiculoDetalle");
+  await renderVehiculoDetalle();
+  if (screens.vehiculoDetalle.dataset.modo === "mio") ponerModoVehiculo("mio-devolver");
+}
+// La notificación de las 15 h ("acordate de devolver") abre directo la devolución.
+let irPendienteVehiculo = (() => {
+  try {
+    const ir = new URLSearchParams(location.search).get("ir");
+    if (ir) history.replaceState(null, "", location.pathname);
+    return ir === "devolver-vehiculo";
+  } catch (e) { return false; }
+})();
+function consumirIrPendiente() {
+  if (!irPendienteVehiculo || !tecnicoLogueado || screens.home.dataset.active !== "true") return;
+  irPendienteVehiculo = false;
+  irADevolverVehiculo();
+}
+if (navigator.serviceWorker) {
+  navigator.serviceWorker.addEventListener("message", (e) => {
+    const d = e.data || {};
+    if (d.tipo === "abrir-url" && String(d.url || "").includes("ir=devolver-vehiculo") && tecnicoLogueado) irADevolverVehiculo();
+  });
+}
+setTimeout(consumirIrPendiente, 1500);
 
 // --- Kilometraje: último conocido y control de lo que se carga ---
 function kmNumero(v) {
@@ -10033,8 +10321,10 @@ async function renderVehiculosPicker() {
   const nuevo = esSkinNuevo();
   vehiculosPanelTiles.classList.toggle("veh-lista", nuevo);
   try {
-    const [config, historial] = await Promise.all([fetchVehiculosConfig(), fetchVehiculosHistorial()]);
-    vehiculosListaStatus.textContent = config.length ? "" : "Todavía no hay vehículos cargados.";
+    vehiculosDesdeCache = false;
+    const [config, historial] = await Promise.all([fetchVehiculosConfig(), historialVehiculosConCola()]);
+    vehiculosListaStatus.textContent = !config.length ? "Todavía no hay vehículos cargados."
+      : vehiculosDesdeCache ? "Sin señal: se muestra lo último guardado en el celular." : "";
     const yo = tecnicoLogueado || "Oficina";
     const filas = config.map((v, i) => ({ v, i, abierto: encontrarRegistroAbierto(historial, v.nombre) }));
     if (nuevo) filas.sort((a, b) => ((b.abierto && b.abierto.tecnico === yo) - (a.abierto && a.abierto.tecnico === yo)) || a.i - b.i);
@@ -10105,12 +10395,13 @@ async function renderVehiculoDetalle() {
   vehiculoEnUsoInfo.classList.remove("status-error");
   screens.vehiculoDetalle.dataset.modo = "";
   try {
-    const [config, historial] = await Promise.all([fetchVehiculosConfig(), fetchVehiculosHistorial()]);
+    vehiculosDesdeCache = false;
+    const [config, historial] = await Promise.all([fetchVehiculosConfig(), historialVehiculosConCola()]);
     const vConfig = config.find((v) => v.nombre === vehiculoSeleccionado) || { nombre: vehiculoSeleccionado, km_actual: 0, umbrales: [] };
     const abierto = encontrarRegistroAbierto(historial, vehiculoSeleccionado);
     vehKmUltimo = ultimoKmVehiculo(vConfig, historial);
 
-    vehiculoDetalleStatus.textContent = `Kilometraje actual: ${formatoKm(vehKmUltimo)} km`;
+    vehiculoDetalleStatus.textContent = `Kilometraje actual: ${formatoKm(vehKmUltimo)} km${vehiculosDesdeCache ? " · sin señal, datos guardados" : ""}`;
 
     const alertas = calcularAlertasVehiculo({ ...vConfig, km_actual: vehKmUltimo });
     if (alertas.length > 0) {
@@ -10127,9 +10418,13 @@ async function renderVehiculoDetalle() {
 
     if (!abierto) {
       vehiculoHoraToma.value = horaActualHHMM();
+      limpiarRevisionVehiculo();
       vehiculoTomarWrap.classList.remove("hidden");
+      const rev = ultimaRevisionVehiculo(historial, vehiculoSeleccionado);
+      const revConProblema = rev && /PROBLEMA|SUCIO|Obs:|Fotos:/.test(rev.detalle || "");
       tarjeta = `<div class="veh-estado-tit libre">Libre</div>
-        <div class="veh-estado-sub">${uso ? `Último uso: ${escapeHtml(uso.tecnico)}, ${cuandoVehiculo(uso.fecha, uso.hora_devolucion)}` : "Listo para usar"}</div>`;
+        <div class="veh-estado-sub">${uso ? `Último uso: ${escapeHtml(uso.tecnico)}, ${cuandoVehiculo(uso.fecha, uso.hora_devolucion)}` : "Listo para usar"}</div>
+        ${rev ? `<div class="veh-estado-rev${revConProblema ? " problema" : ""}">Última revisión (${escapeHtml(rev.tecnico)}, ${cuandoVehiculo(rev.fecha, rev.hora)}): ${htmlDetalleVehiculo(rev.detalle) || "sin novedades"}</div>` : ""}`;
       screens.vehiculoDetalle.dataset.modo = "libre";
     } else if (abierto.tecnico === tecnicoActual) {
       const desde = cuandoVehiculo(abierto.fecha, abierto.hora_toma);
@@ -10165,7 +10460,7 @@ async function renderVehiculoDetalle() {
 
       const dur = duracionDesde(abierto.fecha, abierto.hora_toma);
       tarjeta = `<div class="veh-estado-tit ${vencida ? "vencida" : "mio"}">${vencida ? "Sin devolver" : "Lo tenés vos"}</div>
-        <div class="veh-estado-sub">Desde ${escapeHtml(desde)}${dur ? ` · ${dur}` : ""}</div>
+        <div class="veh-estado-sub">Desde ${escapeHtml(desde)}${dur ? ` · ${dur}` : ""}${abierto.pendiente ? " · se envía cuando haya señal" : ""}</div>
         <div class="veh-estado-acciones">
           <button type="button" class="veh-accion" data-ir-modo="mio-devolver"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>Devolver</button>
           <button type="button" class="veh-accion" data-ir-modo="mio-evento"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v17"/><path d="M3 22h12M6 8h6"/><path d="M15 11h2a2 2 0 0 1 2 2v4a1.5 1.5 0 0 0 3 0V9l-3-3"/></svg>Cargar evento</button>
@@ -10304,30 +10599,24 @@ vehiculoRegistrarEventoBtn.addEventListener("click", async () => {
   const detalleTexto = vehiculoEventoDetalleTexto.value.trim();
   const detalle = [detalleTexto, rendir ? "Rendido por el técnico" : "", notaKm].filter(Boolean).join(" · ");
   vehiculoRegistrarEventoBtn.disabled = true;
+  let resultadoEvento;
   try {
-    const res = await fetch("/api/recurso-uso", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-      body: JSON.stringify({
-        recurso: "vehiculo",
-        accion: "evento",
-        vehiculo: vehiculoSeleccionado,
-        tecnico: tecnicoLogueado || "Oficina",
-        hora: horaActualHHMM(),
-        tipo_evento: tipoEvento,
-        km: String(km),
-        monto: hayMonto ? String(monto) : "",
-        detalle,
-      }),
+    resultadoEvento = await enviarAccionVehiculo({
+      accion: "evento",
+      vehiculo: vehiculoSeleccionado,
+      tecnico: tecnicoLogueado || "Oficina",
+      hora: horaActualHHMM(),
+      tipo_evento: tipoEvento,
+      km: String(km),
+      monto: hayMonto ? String(monto) : "",
+      detalle,
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Error desconocido");
   } catch (err) {
     showToast("No se pudo registrar: " + err.message);
     vehiculoRegistrarEventoBtn.disabled = false;
     return;
   }
-  let mensaje = `Evento registrado: ${tipoEvento}.`;
+  let mensaje = resultadoEvento.enCola ? `Sin señal: el evento (${tipoEvento}) quedó guardado y se manda solo.` : `Evento registrado: ${tipoEvento}.`;
   if (rendir) {
     const esNafta = tipoEvento === "Carga de combustible";
     const cuerpo = {
@@ -10343,14 +10632,14 @@ vehiculoRegistrarEventoBtn.addEventListener("click", async () => {
     try {
       if (fotos.some((f) => f.base64)) throw Object.assign(new Error("fotos sin subir"), { sinSenal: true });
       await postRendicion({ ...cuerpo, foto_ref: fotos.length ? JSON.stringify(fotos.map((f) => f.url)) : "" });
-      mensaje = `Evento registrado y rendición de ${formatoPesos(monto)} enviada.`;
+      mensaje = resultadoEvento.enCola ? `Sin señal: el evento quedó guardado; la rendición de ${formatoPesos(monto)} ya se envió.` : `Evento registrado y rendición de ${formatoPesos(monto)} enviada.`;
     } catch (err) {
       if (err.delServidor) {
         mensaje = `El evento quedó registrado, pero la rendición no se pudo enviar (${err.message}). Cargala en Rendir ticket.`;
       } else {
         try {
           agregarAColaEnvios({ tipo: "rendicion", cuerpo, fotos });
-          mensaje = "Evento registrado. La rendición quedó guardada y se manda sola cuando vuelva la señal.";
+          mensaje = resultadoEvento.enCola ? "Sin señal: el evento y la rendición quedaron guardados y se mandan solos." : "Evento registrado. La rendición quedó guardada y se manda sola cuando vuelva la señal.";
         } catch (e) {
           mensaje = "El evento quedó registrado, pero no se pudo guardar la rendición. Cargala en Rendir ticket.";
         }
@@ -10365,25 +10654,50 @@ vehiculoRegistrarEventoBtn.addEventListener("click", async () => {
 });
 
 vehiculoTomarBtn.addEventListener("click", async () => {
+  const kmToma = kmNumero(vehiculoKmToma.value);
+  const revision = textoRevisionVehiculo();
+  const hayRevision = !!(kmToma || revision || vehDanoFotos.length);
+  let notaKm = "";
+  if (kmToma) {
+    notaKm = confirmarKm(kmToma);
+    if (notaKm === null) { vehiculoKmToma.focus(); return; }
+    // Al tomarlo, cualquier diferencia con la última devolución son km que nadie registró.
+    if (!notaKm && vehKmUltimo && kmToma - vehKmUltimo > 5) notaKm = `⚠ ${formatoKm(kmToma - vehKmUltimo)} km más que el último registro`;
+  }
+  const tecnico = tecnicoLogueado || "Oficina";
+  const vehiculo = vehiculoSeleccionado;
   vehiculoTomarBtn.disabled = true;
   try {
-    const res = await fetch("/api/recurso-uso", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-      body: JSON.stringify({
-        recurso: "vehiculo",
-        accion: "tomar",
-        vehiculo: vehiculoSeleccionado,
-        tecnico: tecnicoLogueado || "Oficina",
-        fecha: fechaActualISOVehiculo(),
-        hora_toma: vehiculoHoraToma.value || horaActualHHMM(),
-      }),
+    const r = await enviarAccionVehiculo({
+      accion: "tomar",
+      vehiculo,
+      tecnico,
+      fecha: fechaActualISOVehiculo(),
+      hora_toma: vehiculoHoraToma.value || horaActualHHMM(),
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Error desconocido");
-    showToast(`Tomaste ${vehiculoSeleccionado}.`);
+    let enCola = !!r.enCola;
+    if (hayRevision) {
+      try {
+        const r2 = await enviarAccionVehiculo({
+          accion: "evento",
+          vehiculo,
+          tecnico,
+          hora: horaActualHHMM(),
+          tipo_evento: "Revisión al tomar",
+          km: String(kmToma || vehKmUltimo || 0),
+          monto: "",
+          detalle: [revision, kmToma ? "" : "km no informado", notaKm].filter(Boolean).join(" · ") || "Sin novedades",
+        }, vehDanoFotos.slice());
+        enCola = enCola || !!r2.enCola;
+      } catch (err) {
+        showToast("Lo tomaste, pero la revisión no se pudo guardar: " + err.message);
+      }
+    }
+    showToast(enCola ? `Sin señal: quedó guardado que tomaste ${vehiculo}. Se manda solo cuando vuelva la conexión.` : `Tomaste ${vehiculo}.`);
+    limpiarRevisionVehiculo();
     showScreen("vehiculos");
     renderVehiculosPicker();
+    actualizarVehiculoInicio();
   } catch (err) {
     showToast("No se pudo registrar: " + err.message);
   } finally {
@@ -10406,24 +10720,18 @@ vehiculoDevolverBtn.addEventListener("click", async () => {
   ].filter(Boolean).join(" · ");
   vehiculoDevolverBtn.disabled = true;
   try {
-    const res = await fetch("/api/recurso-uso", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-      body: JSON.stringify({
-        recurso: "vehiculo",
-        accion: "devolver",
-        vehiculo: vehiculoSeleccionado,
-        tecnico: tecnicoLogueado || "Oficina",
-        hora_devolucion: vehiculoHoraDevolucion.value || horaActualHHMM(),
-        km_devolucion: String(km),
-        evento: eventoCompleto,
-      }),
+    const r = await enviarAccionVehiculo({
+      accion: "devolver",
+      vehiculo: vehiculoSeleccionado,
+      tecnico: tecnicoLogueado || "Oficina",
+      hora_devolucion: vehiculoHoraDevolucion.value || horaActualHHMM(),
+      km_devolucion: String(km),
+      evento: eventoCompleto,
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Error desconocido");
-    showToast(`Devolviste ${vehiculoSeleccionado}. ¡Gracias!`);
+    showToast(r.enCola ? `Sin señal: quedó guardado que devolviste ${vehiculoSeleccionado}. Se manda solo cuando vuelva la conexión.` : `Devolviste ${vehiculoSeleccionado}. ¡Gracias!`);
     showScreen("vehiculos");
     renderVehiculosPicker();
+    actualizarVehiculoInicio();
   } catch (err) {
     showToast("No se pudo registrar: " + err.message);
   } finally {
@@ -10773,7 +11081,7 @@ function renderDashVehiculos() {
         <div class="historial-card-num">${escapeHtml(h.vehiculo)}</div>
         <div class="historial-card-cliente">${escapeHtml(h.tecnico)} — ${escapeHtml(h.tipo_evento) || "Evento"}</div>
         <div class="historial-card-direccion">${fechaTexto}${h.hora ? " " + h.hora : ""} — Km: ${h.km || "?"}</div>
-        <div class="historial-card-horario">${h.monto ? "Monto: $" + h.monto : ""}${h.detalle ? (h.monto ? " · " : "") + escapeHtml(h.detalle) : ""}</div>
+        <div class="historial-card-horario">${h.monto ? "Monto: $" + h.monto : ""}${h.detalle ? (h.monto ? " · " : "") + htmlDetalleVehiculo(h.detalle) : ""}</div>
       `;
     } else {
       card.innerHTML = `

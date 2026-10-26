@@ -1329,3 +1329,62 @@ test("Vehículos: control de km, toma sin devolver de ayer, tarjetas y combustib
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Vehículos sin señal: tomar con revisión queda en la cola, se ve en el inicio y se manda en orden al volver la señal", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const posts = [];
+  let sinSenal = true;
+  await page.route("**/api/**", (route) => {
+    const req = route.request(); const u = req.url();
+    const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (req.method() === "POST") {
+      if (sinSenal) return route.abort("internetdisconnected");
+      posts.push(JSON.parse(req.postData() || "{}"));
+      return json({ ok: true, id: "f1" });
+    }
+    if (sinSenal && u.includes("vehiculo")) return route.abort("internetdisconnected");
+    if (u.includes("coleccion=vehiculos")) return json([{ nombre: "Kangoo", km_actual: 1000, umbrales: [] }]);
+    if (u.includes("recurso=vehiculo")) return json([]);
+    json([]);
+  });
+  await page.goto(base + "/");
+  await page.evaluate(() => {
+    localStorage.setItem("ajustes_app", JSON.stringify({ estiloInicio: "nuevo", avisoFelicitacion: false }));
+    localStorage.setItem("vehiculos_cache", JSON.stringify({ config: [{ nombre: "Kangoo", km_actual: 1000, umbrales: [] }], historial: [] }));
+  });
+  await page.reload();
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { tecnicoLogueado = "Juan Pérez"; vehiculoSeleccionado = "Kangoo"; showScreen("vehiculoDetalle"); return renderVehiculoDetalle(); });
+  assert.match(await page.locator("#vehiculoDetalleStatus").textContent(), /sin señal, datos guardados/);
+  // Revisión: km + nafta + cubiertas con problema
+  await page.fill("#vehiculoKmToma", "1010");
+  await page.click('[data-rev=nafta] [data-v="½"]');
+  await page.click("[data-rev=cubiertas] [data-v=Problema]");
+  await page.click("#vehiculoTomarBtn");
+  await page.waitForTimeout(400);
+  const cola = await page.evaluate(() => obtenerColaEnvios().map((i) => i.tipo + ":" + i.cuerpo.accion + ":" + (i.cuerpo.tipo_evento || "")));
+  assert.deepStrictEqual(cola, ["vehiculo:tomar:", "vehiculo:evento:Revisión al tomar"]);
+  // Se ve como tomado aunque no salió todavía, y aparece en el inicio
+  assert.match(await page.locator(".veh-card").first().textContent(), /Lo tenés vos/);
+  await page.evaluate(() => showScreen("home"));
+  await page.waitForTimeout(400);
+  assert.strictEqual(await page.locator("#homeVehiculoChip").isVisible(), true);
+  assert.match(await page.locator("#homeVehiculoChip").textContent(), /Tenés Kangoo[\s\S]*por enviar/);
+  assert.strictEqual(await page.locator("#vehiculosAvisoBadge").textContent(), "En uso");
+  // Tocar el aviso lleva directo a devolver
+  await page.click("#homeVehiculoChip");
+  await page.waitForTimeout(400);
+  assert.strictEqual(await page.evaluate(() => screens.vehiculoDetalle.dataset.modo), "mio-devolver");
+  // Vuelve la señal: se manda en orden
+  sinSenal = false;
+  await page.evaluate(() => procesarColaEnvios());
+  await page.waitForTimeout(500);
+  assert.deepStrictEqual(posts.map((p) => p.accion), ["tomar", "evento"]);
+  assert.strictEqual(posts[1].tipo_evento, "Revisión al tomar");
+  assert.strictEqual(posts[1].km, "1010");
+  assert.match(posts[1].detalle, /Nafta ½ · Cubiertas: PROBLEMA/);
+  assert.match(posts[1].detalle, /10 km más que el último registro/);
+  assert.strictEqual(await page.evaluate(() => obtenerColaEnvios().length), 0);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

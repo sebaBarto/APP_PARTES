@@ -3248,3 +3248,42 @@ html[data-inicio="nuevo"] #screen-vehiculo-detalle[data-modo="mio-evento"] #vehi
 html[data-inicio="nuevo"] #screen-vehiculo-detalle #vehiculoTomarBtn,
 html[data-inicio="nuevo"] #screen-vehiculo-detalle #vehiculoDevolverBtn { width: 100%; }
 html[data-inicio="nuevo"] #screen-vehiculo-detalle #vehiculoRegistrarEventoBtn { width: 100%; }
+
+/* Revisión rápida al tomar (los dos skins) */
+.veh-revision { margin: 4px 0 16px; padding: 12px; border-radius: 8px; border: 1px solid rgba(127,127,127,0.35); }
+.veh-revision-tit { margin: 0 0 10px; font-weight: 700; font-size: 15px; }
+.veh-revision-tit span { font-weight: 400; opacity: 0.7; font-size: 13px; }
+.veh-rev-fila { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+.veh-rev-label { width: 74px; flex-shrink: 0; font-size: 14px; font-weight: 600; }
+.veh-seg { display: flex; flex: 1; border: 1px solid rgba(127,127,127,0.45); border-radius: 6px; overflow: hidden; }
+.veh-seg button { flex: 1; min-height: 40px; padding: 0 4px; border: 0; border-left: 1px solid rgba(127,127,127,0.35); background: transparent; color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
+.veh-seg button:first-child { border-left: 0; }
+.veh-seg button.activo { background: #FFC033; color: #0D0C0D; font-weight: 700; }
+.veh-seg button.malo.activo { background: #E5533D; color: #fff; }
+html[data-theme="night"]:not([data-inicio="nuevo"]) .veh-revision { color: #E8EAEC; }
+
+/* Vehículo propio en el inicio */
+html[data-inicio="nuevo"] .home-vehiculo { display: flex; align-items: center; gap: 12px; width: 100%; margin: 0 0 12px; padding: 10px 12px; border-radius: 6px; cursor: pointer; text-align: left;
+  background: var(--sat-sup); border: 1px solid var(--sat-borde); border-left: 4px solid var(--sat-am); color: var(--sat-texto); font-family: var(--f-texto); }
+html[data-inicio="nuevo"] .home-vehiculo[hidden] { display: none; }
+html[data-inicio="nuevo"] .home-vehiculo-ico { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 6px; background: var(--sat-am); flex-shrink: 0; }
+html[data-inicio="nuevo"] .home-vehiculo-ico svg { width: 22px; height: 22px; stroke: var(--sat-tinta); }
+html[data-inicio="nuevo"] .home-vehiculo-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+html[data-inicio="nuevo"] .home-vehiculo-txt b { font-family: var(--f-titulo); font-size: 16px; }
+html[data-inicio="nuevo"] .home-vehiculo-txt span { font-size: 13px; color: var(--sat-tenue); }
+html[data-inicio="nuevo"] .home-vehiculo-accion { font-family: var(--f-titulo); font-weight: 700; font-size: 15px; color: var(--sat-am); white-space: nowrap; }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) .home-vehiculo-accion { color: #8A5E00; }
+html[data-inicio="nuevo"] .home-vehiculo.vencida { border-left-color: #E5533D; }
+html[data-inicio="nuevo"] .home-vehiculo.vencida .home-vehiculo-ico { background: #E5533D; }
+html[data-inicio="nuevo"] .home-vehiculo.vencida .home-vehiculo-ico svg { stroke: #fff; }
+html[data-inicio="nuevo"] .home-vehiculo.vencida .home-vehiculo-txt span { color: #FF7A66; }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) .home-vehiculo.vencida .home-vehiculo-txt span { color: #B23A27; }
+html[data-inicio="nuevo"] .panel-tile-count.badge-alerta { background: #E5533D !important; color: #fff !important; }
+html[data-inicio="nuevo"] .veh-estado-rev { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--sat-borde); font-size: 13.5px; color: var(--sat-tenue); line-height: 1.4; }
+html[data-inicio="nuevo"] .veh-estado-rev.problema { color: #FF8A80; }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) .veh-estado-rev.problema { color: #B23A27; }
+html[data-inicio="nuevo"] .veh-estado-rev a { color: var(--sat-am); }
+html[data-inicio="nuevo"] #vehiculoRevision { background: var(--sat-sup); border-color: var(--sat-borde); color: var(--sat-texto); }
+html[data-inicio="nuevo"] #vehiculoRevision .veh-revision-tit { font-family: var(--f-titulo); font-size: 17px; }
+html[data-inicio="nuevo"] .veh-seg { border-color: var(--sat-borde); }
+html[data-inicio="nuevo"] .veh-seg button { border-left-color: var(--sat-borde); }

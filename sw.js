@@ -1,6 +1,6 @@
 // Versión del caché: subir este número cada vez que se publican cambios
 // importantes fuerza a los celulares a descartar la copia vieja.
-const CACHE_NAME = "parte-tecnico-v122";
+const CACHE_NAME = "parte-tecnico-v123";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -145,7 +145,11 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientsList) => {
       for (const client of clientsList) {
-        if ("focus" in client) return client.focus();
+        if ("focus" in client) {
+          // La app ya está abierta: le avisa a dónde ir (ej.: devolver el vehículo).
+          try { client.postMessage({ tipo: "abrir-url", url }); } catch (e) { /* nada */ }
+          return client.focus();
+        }
       }
       if (self.clients.openWindow) return self.clients.openWindow(url);
     })

@@ -486,8 +486,8 @@ async function chequearRecordatorioDevolverVehiculo(ghHeaders, headersBackendNue
 
   await enviarASeleccionados(destinatarios, {
     titulo: "🚐 No te olvides",
-    cuerpo: "Antes de terminar el día, acordate de devolver el vehículo.",
-    url: "/",
+    cuerpo: "Antes de terminar el día, acordate de devolver el vehículo. Tocá acá para devolverlo.",
+    url: "/?ir=devolver-vehiculo",
     importante: true,
   });
 
