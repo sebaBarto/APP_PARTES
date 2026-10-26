@@ -1405,3 +1405,50 @@ test("El botón atrás de Android no cierra la app ni cambia de pantalla", async
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Historial (skin nuevo): búsqueda en todas las fechas y por tarea, agrupado por día, claves ocultas y filtros plegados", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const d = (n) => { const x = new Date(); x.setDate(x.getDate() - n); return x.getFullYear() + "-" + String(x.getMonth() + 1).padStart(2, "0") + "-" + String(x.getDate()).padStart(2, "0"); };
+  const partes = [
+    { id_parte: "a", numero_servicio: "1", cliente: "Kiosco Norte", direccion: "Belgrano 5", tarea: "Cambio de sirena", tecnico: "Juan Pérez", fecha: d(0), hora_entrada: "09:00", hora_salida: "10:30", claves: [{ titulo: "Alarma", usuario: "inst", clave: "9876" }] },
+    { id_parte: "b", numero_servicio: "2", cliente: "Farmacia Central", direccion: "San Martín 9", tarea: "Revisión de sensores", tecnico: "Juan Pérez", fecha: d(0), hora_entrada: "11:00", hora_salida: "11:45" },
+    { id_parte: "c", numero_servicio: "3", cliente: "Panadería Sur", direccion: "Mitre 100", tarea: "Batería del panel agotada", tecnico: "Juan Pérez", fecha: d(40), hora_entrada: "08:00", hora_salida: "09:00" },
+  ];
+  await page.route("**/api/**", (route) => {
+    const u = route.request().url();
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(u.includes("/api/historial") ? partes : []) });
+  });
+  await page.goto(base + "/");
+  await page.evaluate(() => localStorage.setItem("ajustes_app", JSON.stringify({ estiloInicio: "nuevo", avisoFelicitacion: false })));
+  await page.reload();
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { tecnicoLogueado = "Juan Pérez"; tileHistorialBtn.click(); });
+  await page.waitForTimeout(500);
+  // Agrupado por día con horas
+  assert.match(await page.locator(".hist-dia").first().textContent(), /Hoy[\s\S]*2 servicios · 2 h 15 min/);
+  // Claves ocultas hasta tocar
+  assert.strictEqual(await page.locator(".historial-card-claves").first().isVisible(), false);
+  await page.click(".hist-claves-btn");
+  assert.strictEqual(await page.locator(".historial-card-claves").first().isVisible(), true);
+  assert.strictEqual(await page.evaluate(() => screens.historial.dataset.active), "true", "tocar las claves no abre el detalle");
+  // Filtros plegados
+  assert.strictEqual(await page.locator("#descargarExcelHistorialBtn").isVisible(), false);
+  await page.click("#histFiltrosBtn");
+  assert.strictEqual(await page.locator("#descargarExcelHistorialBtn").isVisible(), true);
+  await page.click('.hist-pasado-chip[data-pasado="no"]');
+  assert.strictEqual(await page.locator("#histFiltrosCuenta").textContent(), "1");
+  await page.click('.hist-pasado-chip[data-pasado="todos"]');
+  // Búsqueda: por tarea, sin tilde, en todas las fechas aunque esté en "4 días"
+  await page.fill("#historialSearch", "bateria panel");
+  await page.waitForTimeout(200);
+  const cards = await page.locator(".historial-card").allTextContents();
+  assert.strictEqual(cards.length, 1);
+  assert.match(cards[0], /Panadería Sur/);
+  assert.match(await page.locator("#historialModoLabel").textContent(), /todas tus fechas/);
+  // Texto del período (antes decía "historial completo" en Semana/Mes)
+  await page.fill("#historialSearch", "");
+  await page.click('.hist-periodo-chip[data-periodo="mes"]');
+  assert.strictEqual(await page.locator("#historialModoLabel").textContent(), "Viendo este mes.");
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

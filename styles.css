@@ -3287,3 +3287,48 @@ html[data-inicio="nuevo"] #vehiculoRevision { background: var(--sat-sup); border
 html[data-inicio="nuevo"] #vehiculoRevision .veh-revision-tit { font-family: var(--f-titulo); font-size: 17px; }
 html[data-inicio="nuevo"] .veh-seg { border-color: var(--sat-borde); }
 html[data-inicio="nuevo"] .veh-seg button { border-left-color: var(--sat-borde); }
+
+/* ---------- Historial (skin nuevo): filtros compactos, días y claves ocultas ---------- */
+html[data-inicio="nuevo"] #screen-historial .review-scroll { display: flex; flex-direction: column; }
+html[data-inicio="nuevo"] #screen-historial .review-scroll > * { order: 20; }
+html[data-inicio="nuevo"] #screen-historial .review-eyebrow { order: 0; }
+html[data-inicio="nuevo"] #screen-historial #historialModoLabel { order: 1; margin-bottom: 10px; }
+html[data-inicio="nuevo"] #screen-historial .hist-buscar { order: 2; margin-bottom: 10px; }
+html[data-inicio="nuevo"] #screen-historial .hist-fila-periodo { order: 3; }
+html[data-inicio="nuevo"] #screen-historial #histFechaEspecificaWrap { order: 4; }
+html[data-inicio="nuevo"] #screen-historial #histFiltrosTit { order: 5; }
+html[data-inicio="nuevo"] #screen-historial #historialFiltroTecnicoWrap { order: 6; }
+html[data-inicio="nuevo"] #screen-historial .hist-pasado-tabs { order: 7; }
+html[data-inicio="nuevo"] #screen-historial #descargarExcelHistorialBtn { order: 8; }
+html[data-inicio="nuevo"] #screen-historial .hist-toolbar { order: 9; margin: 0 0 4px; min-height: 0; }
+html[data-inicio="nuevo"] #screen-historial #historialSeleccionBar { order: 10; }
+html[data-inicio="nuevo"] #screen-historial #historialStatus { order: 11; }
+html[data-inicio="nuevo"] #screen-historial #historialList { order: 12; }
+html[data-inicio="nuevo"] #screen-historial #refreshHistorialBtn { display: none; }
+html[data-inicio="nuevo"] #screen-historial .hist-toolbar .list-sync-label { margin-left: 0; font-size: 12px; }
+/* Lo que va dentro de "Filtros" solo se ve con el panel abierto */
+html[data-inicio="nuevo"] #screen-historial:not(.hist-filtros-abiertos) :is(#histFiltrosTit, #historialFiltroTecnicoWrap, .hist-pasado-tabs, #descargarExcelHistorialBtn) { display: none !important; }
+html[data-inicio="nuevo"] #screen-historial.hist-filtros-abiertos #histFiltrosTit { display: block; margin: 4px 0 8px; padding-top: 12px; border-top: 1px solid var(--sat-borde); font-family: var(--f-titulo); font-weight: 700; font-size: 15px; color: var(--sat-tenue); }
+html[data-inicio="nuevo"] #screen-historial.hist-filtros-abiertos #descargarExcelHistorialBtn { margin-bottom: 16px !important; padding-bottom: 12px; }
+html[data-inicio="nuevo"] .hist-fila-periodo { display: flex; align-items: stretch; gap: 8px; margin-bottom: 10px; }
+html[data-inicio="nuevo"] .hist-fila-periodo .hist-periodo-tabs { flex: 1; min-width: 0; margin: 0 !important; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+html[data-inicio="nuevo"] .hist-fila-periodo .hist-periodo-tabs::-webkit-scrollbar { display: none; }
+html[data-inicio="nuevo"] .hist-fila-periodo .hist-periodo-chip { flex-shrink: 0; white-space: nowrap; }
+html[data-inicio="nuevo"] .hist-filtros-btn { flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; border-radius: 6px; cursor: pointer;
+  background: var(--sat-sup); border: 1px solid var(--sat-borde); color: var(--sat-texto); font-family: var(--f-titulo); font-weight: 700; font-size: 14px; }
+html[data-inicio="nuevo"] .hist-filtros-btn[hidden] { display: none; }
+html[data-inicio="nuevo"] .hist-filtros-btn svg { width: 18px; height: 18px; stroke: currentColor; }
+html[data-inicio="nuevo"] .hist-filtros-btn[aria-expanded="true"] { border-color: var(--sat-am); }
+html[data-inicio="nuevo"] .hist-filtros-cuenta:empty { display: none; }
+html[data-inicio="nuevo"] .hist-filtros-cuenta { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--sat-am); color: var(--sat-tinta); font-size: 12px; line-height: 18px; text-align: center; }
+html[data-inicio="nuevo"] .hist-dia { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 18px 0 8px; padding-bottom: 6px; border-bottom: 2px solid var(--sat-am); }
+html[data-inicio="nuevo"] .hist-dia:first-child { margin-top: 4px; }
+html[data-inicio="nuevo"] .hist-dia-nombre { font-family: var(--f-titulo); font-weight: 700; font-size: 19px; color: var(--sat-texto); }
+html[data-inicio="nuevo"] .hist-dia-meta { font-size: 13px; color: var(--sat-tenue); font-variant-numeric: tabular-nums; white-space: nowrap; }
+html[data-inicio="nuevo"] .historial-card-claves.hist-claves-ocultas { display: none; }
+html[data-inicio="nuevo"] .hist-claves-btn { display: block; margin-top: 8px; padding: 6px 10px; border-radius: 4px; cursor: pointer; font-size: 13.5px; font-weight: 600;
+  background: var(--sat-sup2); border: 1px dashed var(--sat-borde); color: var(--sat-texto); font-family: var(--f-texto); }
+html[data-inicio="nuevo"] #screen-historial .hist-fila-periodo .hist-periodo-tabs { display: flex !important; flex-wrap: nowrap !important; grid-template-columns: none !important; gap: 6px; }
+html[data-inicio="nuevo"] #screen-historial .hist-fila-periodo .hist-periodo-chip { flex: 0 0 auto !important; width: auto !important; padding-left: 12px; padding-right: 12px; }
+html[data-inicio="nuevo"] #screen-historial .hist-filtros-btn { min-height: 40px; }
+html[data-inicio="nuevo"] #screen-historial.hist-buscando .hist-periodo-tabs { opacity: 0.45; }

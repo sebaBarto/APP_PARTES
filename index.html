@@ -1676,17 +1676,20 @@
       <p class="hint-eyebrow review-eyebrow">HISTORIAL</p>
       <p class="subtitle-consultas" id="historialModoLabel"></p>
 
-      <div class="list-toolbar">
+      <div class="list-toolbar hist-toolbar">
         <button class="btn btn-ghost btn-small" id="refreshHistorialBtn" type="button">↻ Actualizar</button>
         <span class="list-sync-label" id="historialSyncLabel"></span>
       </div>
 
-      <div class="dash-periodo-tabs">
+      <div class="hist-fila-periodo">
+      <div class="dash-periodo-tabs hist-periodo-tabs">
         <button type="button" class="hist-periodo-chip active" data-periodo="4dias">Últimos 4 días</button>
         <button type="button" class="hist-periodo-chip" data-periodo="semana">Semana</button>
         <button type="button" class="hist-periodo-chip" data-periodo="mes">Mes</button>
         <button type="button" class="hist-periodo-chip" data-periodo="todo">Todo</button>
         <button type="button" class="hist-periodo-chip" data-periodo="fecha">Fecha</button>
+      </div>
+      <button type="button" class="hist-filtros-btn solo-nuevo-bloque" id="histFiltrosBtn" hidden aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg>Filtros<span class="hist-filtros-cuenta" id="histFiltrosCuenta"></span></button>
       </div>
 
       <div class="field-group hidden" id="histFechaEspecificaWrap">
@@ -1700,16 +1703,17 @@
         </select>
       </div>
 
-      <div class="field-group">
+      <div class="field-group hist-buscar">
         <input class="field-input search-input" id="historialSearch" type="search" placeholder="Buscar por cliente, N° o dirección...">
       </div>
 
-      <div class="dash-periodo-tabs">
+      <div class="dash-periodo-tabs hist-pasado-tabs">
         <button type="button" class="hist-pasado-chip active" data-pasado="todos">Todos</button>
         <button type="button" class="hist-pasado-chip" data-pasado="no">No pasados</button>
         <button type="button" class="hist-pasado-chip" data-pasado="si">Pasados</button>
       </div>
 
+      <p class="hist-filtros-tit solo-nuevo-bloque" id="histFiltrosTit" hidden>Filtros</p>
       <button type="button" class="btn btn-secondary" id="descargarExcelHistorialBtn" style="margin-bottom:14px;">⬇ Descargar Excel</button>
 
       <div class="historial-seleccion-bar hidden" id="historialSeleccionBar">

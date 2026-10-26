@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.143.0";
+const APP_VERSION = "3.144.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -6144,6 +6144,10 @@ historialSearch.addEventListener("input", renderHistorialReciente);
 
 tileHistorialBtn.addEventListener("click", () => {
   showScreen("historial");
+  histFiltrosBtn.hidden = !esSkinNuevo();
+  document.getElementById("histFiltrosTit").hidden = !esSkinNuevo();
+  document.querySelector('.hist-periodo-chip[data-periodo="4dias"]').textContent = esSkinNuevo() ? "4 días" : "Últimos 4 días";
+  historialSearch.placeholder = esSkinNuevo() ? "Buscar cliente, N°, dirección, tarea, material..." : "Buscar por cliente, N° o dirección...";
   const veTodoHistorial = permisosDelTecnico(tecnicoLogueado).historial_todos;
   historialFiltroTecnicoWrap.classList.toggle("hidden", !veTodoHistorial);
   if (veTodoHistorial) poblarFiltroTecnicoHistorial();
@@ -6262,13 +6266,54 @@ function actualizarBarraSeleccionHistorial(seleccionables) {
   historialSeleccionarTodos.indeterminate = seleccionadosVisibles > 0 && seleccionadosVisibles < seleccionables.length;
 }
 
+function minutosEntre(desde, hasta) {
+  const a = /^(\d{1,2}):(\d{2})/.exec(desde || ""), b = /^(\d{1,2}):(\d{2})/.exec(hasta || "");
+  if (!a || !b) return 0;
+  const m = (Number(b[1]) * 60 + Number(b[2])) - (Number(a[1]) * 60 + Number(a[2]));
+  return m > 0 && m < 16 * 60 ? m : 0;
+}
+function textoMinutos(min) {
+  const h = Math.floor(min / 60), m = min % 60;
+  return h ? `${h} h${m ? " " + m + " min" : ""}` : `${m} min`;
+}
+function nombreDiaHistorial(fecha) {
+  if (!fecha) return "Sin fecha";
+  const hoy = fechaLocalISO();
+  const ay = new Date(); ay.setDate(ay.getDate() - 1);
+  if (fecha === hoy) return "Hoy";
+  if (fecha === fechaLocalISO(ay)) return "Ayer";
+  const [y, m, d] = fecha.split("-").map(Number);
+  const f = new Date(y, m - 1, d);
+  const dia = f.toLocaleDateString("es-AR", { weekday: "long" });
+  const anio = y !== new Date().getFullYear() ? `/${y}` : "";
+  return `${dia.charAt(0).toUpperCase() + dia.slice(1)} ${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}${anio}`;
+}
+// Skin nuevo: técnico, "pasados" y Excel quedan dentro de "Filtros".
+const histFiltrosBtn = document.getElementById("histFiltrosBtn");
+function actualizarCuentaFiltrosHistorial() {
+  const activos = (historialFiltroTecnico.value ? 1 : 0) + (histPasadoActivo !== "todos" ? 1 : 0);
+  document.getElementById("histFiltrosCuenta").textContent = activos ? String(activos) : "";
+  histFiltrosBtn.classList.toggle("con-filtros", activos > 0);
+}
+histFiltrosBtn.addEventListener("click", () => {
+  const abierto = screens.historial.classList.toggle("hist-filtros-abiertos");
+  histFiltrosBtn.setAttribute("aria-expanded", String(abierto));
+});
+
 function renderHistorialReciente() {
   const permisos = permisosDelTecnico(tecnicoLogueado);
   const veTodo = permisos.historial_todos;
   const puedeMarcarPasado = permisos.marcar_pasado_sistema;
 
+  const terminoBusqueda = normalizeText(historialSearch.value);
   let filtrados;
-  if (histPeriodoActivo === "4dias") {
+  screens.historial.classList.toggle("hist-buscando", !!terminoBusqueda);
+  if (terminoBusqueda) {
+    // Al buscar se busca en todas las fechas: el cliente que fuiste hace
+    // un mes tiene que aparecer aunque esté elegido "Últimos 4 días".
+    filtrados = historialCache.slice();
+    historialModoLabel.textContent = veTodo ? "Buscando en todas las fechas, de todo el equipo." : "Buscando en todas tus fechas.";
+  } else if (histPeriodoActivo === "4dias") {
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
     const limite = new Date(hoy);
@@ -6283,7 +6328,9 @@ function renderHistorialReciente() {
   } else {
     const rango = obtenerRangoPeriodo(histPeriodoActivo, histFechaEspecifica);
     filtrados = historialCache.filter((h) => fechaEnRango(h.fecha, rango));
-    historialModoLabel.textContent = (veTodo ? "Viendo el historial completo de todo el equipo." : "Viendo tu historial completo.");
+    const fechaElegida = histFechaEspecifica.value ? histFechaEspecifica.value.split("-").reverse().join("/") : "hoy";
+    const textoPeriodo = { semana: "esta semana", mes: "este mes", todo: "el historial completo", fecha: `el ${fechaElegida}` }[histPeriodoActivo] || "el período elegido";
+    historialModoLabel.textContent = veTodo ? `Viendo ${textoPeriodo} de todo el equipo.` : `Viendo ${textoPeriodo === "el historial completo" ? "tu historial completo" : textoPeriodo}.`;
   }
 
   if (!veTodo) {
@@ -6301,17 +6348,26 @@ function renderHistorialReciente() {
     filtrados = filtrados.filter((h) => !h.pasado_sistema_offline);
   }
 
-  const terminoBusqueda = normalizeText(historialSearch.value);
   if (terminoBusqueda) {
+    // Cada palabra tiene que aparecer en algún dato del parte (cliente,
+    // N°, dirección, tarea, observaciones, materiales, técnico...).
+    const palabras = terminoBusqueda.split(/\s+/).filter(Boolean);
     filtrados = filtrados.filter((h) => {
-      const haystack = normalizeText([h.cliente, h.numero_servicio, h.direccion].join(" "));
-      return haystack.includes(terminoBusqueda);
+      const haystack = normalizeText([
+        h.cliente, h.numero_servicio, h.id_parte, h.numero_cliente, h.direccion, h.localidad,
+        h.tarea, h.observaciones, h.imprevisto, h.materiales, h.materiales_otros,
+        h.tecnico, h.tecnico2, h.tecnico_segundo, h.forma_pago,
+      ].filter(Boolean).join(" "));
+      return palabras.every((w) => haystack.includes(w));
     });
   }
 
   // Los no pasados a sistema van primero (son los que hay que accionar);
-  // dentro de cada grupo, más reciente primero.
+  // dentro de cada grupo, más reciente primero. En el skin nuevo se
+  // agrupa por día (más nuevo arriba) y dentro del día van primero los no pasados.
+  const agrupar = esSkinNuevo();
   filtrados.sort((a, b) => {
+    if (agrupar && a.fecha !== b.fecha) return (b.fecha || "").localeCompare(a.fecha || "");
     const aPend = a.pasado_sistema_offline ? 1 : 0;
     const bPend = b.pasado_sistema_offline ? 1 : 0;
     if (aPend !== bPend) return aPend - bPend;
@@ -6330,14 +6386,28 @@ function renderHistorialReciente() {
   });
 
   historialList.innerHTML = "";
+  actualizarCuentaFiltrosHistorial();
   if (filtrados.length === 0) {
-    historialStatus.textContent = "No hay servicios completados en ese período.";
+    historialStatus.textContent = terminoBusqueda ? "No se encontró nada con esa búsqueda." : "No hay servicios completados en ese período.";
     actualizarBarraSeleccionHistorial([]);
     return;
   }
   historialStatus.textContent = `${filtrados.length} servicio(s).`;
   const seleccionables = [];
+  // Skin nuevo: encabezado por día con cantidad y horas trabajadas.
+  const porDia = {};
+  if (agrupar) filtrados.forEach((h) => { (porDia[h.fecha || ""] = porDia[h.fecha || ""] || []).push(h); });
+  let diaActual = null;
   filtrados.forEach((h) => {
+    if (agrupar && (h.fecha || "") !== diaActual) {
+      diaActual = h.fecha || "";
+      const delDia = porDia[diaActual];
+      const minutos = delDia.reduce((acc, x) => acc + minutosEntre(x.hora_entrada, x.hora_salida), 0);
+      const cab = document.createElement("div");
+      cab.className = "hist-dia";
+      cab.innerHTML = `<span class="hist-dia-nombre">${escapeHtml(nombreDiaHistorial(diaActual))}</span><span class="hist-dia-meta">${delDia.length} servicio${delDia.length === 1 ? "" : "s"}${minutos ? " · " + textoMinutos(minutos) : ""}</span>`;
+      historialList.appendChild(cab);
+    }
     let fechaTexto = h.fecha || "";
     if (h.fecha) {
       const [y, m, d] = h.fecha.split("-");
@@ -6347,7 +6417,8 @@ function renderHistorialReciente() {
     card.className = "historial-card" + (h.pasado_sistema_offline ? " historial-card-pasado" : "");
     card.style.cursor = "pointer";
     const clavesHtml = (h.claves && h.claves.length > 0) ? `
-      <div class="historial-card-claves">
+      ${agrupar ? `<button type="button" class="hist-claves-btn">🔑 ${h.claves.length === 1 ? "1 clave" : h.claves.length + " claves"} · tocá para ver</button>` : ""}
+      <div class="historial-card-claves${agrupar ? " hist-claves-ocultas" : ""}">
         🔑 ${h.claves.map((c) => {
           const detalle = [c.usuario && `Usuario: ${escapeHtml(c.usuario)}`, c.clave && `Clave: ${escapeHtml(c.clave)}`, c.codigo && `Código: ${escapeHtml(c.codigo)}`].filter(Boolean).join(" · ");
           return `<b>${escapeHtml(c.titulo)}</b>${detalle ? " — " + detalle : ""}`;
@@ -6407,6 +6478,15 @@ function renderHistorialReciente() {
         if (checkboxSel.checked) historialSeleccionados.add(h.id_parte);
         else historialSeleccionados.delete(h.id_parte);
         actualizarBarraSeleccionHistorial(seleccionables);
+      });
+    }
+    const clavesBtn = card.querySelector(".hist-claves-btn");
+    if (clavesBtn) {
+      clavesBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const caja = card.querySelector(".historial-card-claves");
+        const mostrar = caja.classList.toggle("hist-claves-ocultas") === false;
+        clavesBtn.textContent = mostrar ? "🔑 Ocultar claves" : `🔑 ${h.claves.length === 1 ? "1 clave" : h.claves.length + " claves"} · tocá para ver`;
       });
     }
     card.addEventListener("click", () => abrirParteDetalleModal(h.id_parte));
