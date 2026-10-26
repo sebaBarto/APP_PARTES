@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.145.2";
+const APP_VERSION = "3.146.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -6555,8 +6555,17 @@ function renderHistorialReciente() {
   actualizarBarraSeleccionHistorial(seleccionables);
 }
 
+// Foto o firma en grande (toca para cerrar).
+function ampliarImagenParte(src) {
+  const caja = document.createElement("div");
+  caja.className = "pd-lightbox";
+  caja.innerHTML = `<img src="${escapeHtml(src)}" alt=""><span class="pd-lightbox-x" aria-hidden="true">×</span>`;
+  caja.addEventListener("click", () => caja.remove());
+  document.body.appendChild(caja);
+}
 async function abrirParteDetalleModal(idParte) {
   parteDetalleModalOverlay.classList.remove("hidden");
+  parteDetalleModalOverlay.classList.toggle("pd-nuevo", esSkinNuevo());
   parteDetalleModalStatus.classList.remove("hidden");
   parteDetalleModalStatus.textContent = "Cargando...";
   parteDetalleModalContenido.innerHTML = "";
@@ -6624,6 +6633,86 @@ async function abrirParteDetalleModal(idParte) {
       if (!isNaN(calculado)) costoFinalTexto = "$" + calculado.toFixed(2);
     }
 
+    if (esSkinNuevo()) {
+      // ---- Skin nuevo: encabezado, acciones y secciones ----
+      const filaN = (etiqueta, valor, opciones = {}) => {
+        if (!valor) return "";
+        const idx = valoresParaCopiar.length;
+        valoresParaCopiar.push(String(opciones.copiar !== undefined ? opciones.copiar : valor));
+        return `<div class="pd-fila${opciones.clase ? " " + opciones.clase : ""}">
+          <div class="pd-fila-top"><span class="pd-etiqueta">${escapeHtml(etiqueta)}</span>
+            <button type="button" class="copiar-campo-btn pd-copiar" data-copiar-idx="${idx}" title="Copiar" aria-label="Copiar ${escapeHtml(etiqueta)}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button></div>
+          <div class="pd-valor">${escapeHtml(String(valor))}</div></div>`;
+      };
+      const seccion = (titulo, cuerpo) => (cuerpo.trim() ? `<section class="pd-sec"><h3 class="pd-sec-tit">${titulo}</h3>${cuerpo}</section>` : "");
+      const direccionCompleta = [p.direccion, p.localidad].filter(Boolean).join(", ");
+      const telefonoNum = String(p.telefono || "").replace(/[^\d+]/g, "");
+      const tecnicos = [p.tecnico, p.tecnico_segundo].filter(Boolean).join(" y ");
+      const ico = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+      const acciones = [
+        telefonoNum ? `<a class="pd-accion" href="tel:${escapeHtml(telefonoNum)}">${ico('<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3.1-8.6A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .3 2 .7 2.9a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.2-1.3a2 2 0 0 1 2.1-.5c.9.4 1.9.6 2.9.7a2 2 0 0 1 1.8 2.1z"/>')}Llamar</a>` : "",
+        direccionCompleta ? `<a class="pd-accion" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(direccionCompleta)}" target="_blank" rel="noopener">${ico('<path d="M3 11l19-9-9 19-2-8z"/>')}Cómo llegar</a>` : "",
+        p.cliente ? `<button type="button" class="pd-accion" id="pdFichaBtn">${ico('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/>')}Ficha</button>` : "",
+        `<button type="button" class="pd-accion" id="pdCompartirBtn">${ico('<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/>')}Compartir</button>`,
+      ].filter(Boolean).join("");
+      const fotoMini = p.foto_ref ? `<div class="pd-fila"><div class="pd-fila-top"><span class="pd-etiqueta">Foto</span></div>
+        <button type="button" class="pd-foto-mini" data-ampliar="${escapeHtml(p.foto_ref)}" aria-label="Ver foto grande"><img src="${escapeHtml(p.foto_ref)}" alt="Foto del trabajo"></button></div>` : "";
+      const claves = Array.isArray(p.claves) ? p.claves : [];
+      const clavesHtml = claves.length ? `<button type="button" class="hist-claves-btn pd-claves-btn" id="pdClavesBtn">🔑 ${claves.length === 1 ? "1 clave" : claves.length + " claves"} · tocá para ver</button>
+        <div class="pd-claves hidden" id="pdClaves">${filaN("Claves", clavesTexto)}</div>` : "";
+      const firmaHtml = (p.firma_img_ref || p.firma_aclaracion || p.firma_cargo || p.cliente_email) ? `<div class="pd-firma">
+        <h3 class="pd-sec-tit">Firma del cliente</h3>
+        ${p.firma_img_ref ? `<button type="button" class="pd-firma-img" data-ampliar="${escapeHtml(p.firma_img_ref)}" aria-label="Ver firma grande"><img src="${escapeHtml(p.firma_img_ref)}" alt="Firma del cliente"></button>` : ""}
+        ${filaN("Aclaración", p.firma_aclaracion)}
+        ${filaN("Cargo", p.firma_cargo)}
+        ${filaN("Mail del cliente", p.cliente_email)}
+      </div>` : "";
+
+      parteDetalleModalContenido.innerHTML = `
+        <div class="pd-cab">
+          <div class="pd-num">N° ${escapeHtml(p.numero_servicio || p.id || "")}${p.tipo_servicio ? " · " + escapeHtml(p.tipo_servicio) : ""}</div>
+          <h2 class="pd-cliente">${escapeHtml(p.cliente || "Sin cliente")}</h2>
+          <div class="pd-meta">${escapeHtml(p.fecha ? nombreDiaHistorial(p.fecha) + (nombreDiaHistorial(p.fecha).length < 6 ? " · " + fechaTexto : "") : "")}${p.hora_entrada || p.hora_salida ? " · " + escapeHtml(horarioTexto) : ""}</div>
+          ${tecnicos ? `<div class="pd-meta">${escapeHtml(tecnicos)}</div>` : ""}
+        </div>
+        <div class="pd-acciones">${acciones}</div>
+        ${seccion("Trabajo", filaN("Horario", horarioTexto, { copiar: demora || horarioTexto }) + filaN("Tarea", p.tarea) + filaN("Observaciones", p.observaciones) + filaN("Imprevisto", p.imprevisto, { clase: "pd-alerta" }) + filaN("SIM instalada", p.sim_instalada_texto) + fotoMini)}
+        ${seccion("Materiales", filaN("Instalados", p.materiales, { clase: "pd-mat-ok" }) + filaN("Retirados", p.materiales_otros, { clase: "pd-mat-ret" }))}
+        ${seccion("Cobro", filaN("Importe", p.importe ? "$" + p.importe : "") + filaN("Descuento", p.descuento_tipo ? `${p.descuento_tipo}${p.descuento_pct ? " (" + p.descuento_pct + "%)" : ""}` : "") + filaN("N° de presupuesto", p.numero_presupuesto) + filaN("Costo final", costoFinalTexto, { copiar: (costoFinalTexto.match(/[\d.]+/) || [""])[0], clase: "pd-total" }) + filaN("Forma de pago", p.forma_pago))}
+        ${seccion("Cliente", filaN("N° de servicio", p.numero_servicio || p.id) + filaN("N° de cliente", p.numero_cliente) + filaN("Dirección", direccionCompleta) + filaN("Teléfono", p.telefono) + clavesHtml)}
+        ${firmaHtml}
+        <button type="button" class="btn btn-secondary pd-cerrar" id="pdCerrarBtn">Cerrar</button>
+      `;
+      const q = (id) => parteDetalleModalContenido.querySelector("#" + id);
+      q("pdCerrarBtn").addEventListener("click", () => parteDetalleModalOverlay.classList.add("hidden"));
+      if (q("pdClavesBtn")) q("pdClavesBtn").addEventListener("click", () => {
+        const visible = q("pdClaves").classList.toggle("hidden") === false;
+        q("pdClavesBtn").textContent = visible ? "🔑 Ocultar claves" : `🔑 ${claves.length === 1 ? "1 clave" : claves.length + " claves"} · tocá para ver`;
+      });
+      if (q("pdFichaBtn")) q("pdFichaBtn").addEventListener("click", () => {
+        parteDetalleModalOverlay.classList.add("hidden");
+        const base = (typeof clientesGeneralCache !== "undefined" && Array.isArray(clientesGeneralCache) ? clientesGeneralCache : [])
+          .find((c) => (p.numero_cliente && String(c.numero_cliente) === String(p.numero_cliente)) || normalizeText(c.nombre || "") === normalizeText(p.cliente || ""));
+        abrirFichaCliente(base || { nombre: p.cliente, direccion: p.direccion, localidad: p.localidad, numero_cliente: p.numero_cliente, telefono: p.telefono });
+      });
+      q("pdCompartirBtn").addEventListener("click", async () => {
+        const texto = [
+          `Parte N° ${p.numero_servicio || p.id || ""} — ${p.cliente || ""}`,
+          [fechaTexto, horarioTexto].filter(Boolean).join(" · "),
+          direccionCompleta,
+          tecnicos ? `Técnico: ${tecnicos}` : "",
+          p.tarea ? `Tarea: ${p.tarea}` : "",
+          p.observaciones ? `Observaciones: ${p.observaciones}` : "",
+          p.materiales ? `Materiales: ${String(p.materiales).replace(/\n/g, ", ")}` : "",
+          costoFinalTexto ? `Costo final: ${costoFinalTexto}${p.forma_pago ? " (" + p.forma_pago + ")" : ""}` : "",
+        ].filter(Boolean).join("\n");
+        try {
+          if (navigator.share) { await navigator.share({ text: texto }); return; }
+        } catch (e) { if (e && e.name === "AbortError") return; }
+        window.open("https://wa.me/?text=" + encodeURIComponent(texto), "_blank", "noopener");
+      });
+      parteDetalleModalContenido.querySelectorAll("[data-ampliar]").forEach((b) => b.addEventListener("click", () => ampliarImagenParte(b.dataset.ampliar)));
+    } else {
     parteDetalleModalContenido.innerHTML = `
       ${fila("N° de servicio", p.numero_servicio || p.id)}
       ${fila("Tipo", p.tipo_servicio)}
@@ -6661,6 +6750,7 @@ async function abrirParteDetalleModal(idParte) {
         </div>
       ` : ""}
     `;
+    }
 
     parteDetalleModalContenido.querySelectorAll(".copiar-campo-btn").forEach((btn) => {
       btn.addEventListener("click", async () => {

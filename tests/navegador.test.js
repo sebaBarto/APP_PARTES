@@ -1509,3 +1509,35 @@ test("Skin nuevo: el esqueleto de carga se va cuando el estado se oculta (detall
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Skin nuevo: detalle del parte con encabezado, acciones, secciones, claves ocultas y firma al final", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const parte = { id: "p1", numero_servicio: "4100", cliente: "Panadería Sur", numero_cliente: "1203", direccion: "Mitre 100", localidad: "Funes", telefono: "341 555-1111", tecnico: "Juan Pérez", fecha: "2026-10-20", hora_entrada: "09:10", hora_salida: "10:35", tarea: "Cambio de sirena", materiales: "Sirena x1", costo_final: "22500", forma_pago: "PAGADO", claves: [{ titulo: "Alarma", clave: "5555" }], foto_ref: "/icons/logo.png", firma_img_ref: "/icons/logo.png", firma_aclaracion: "Marta Gómez", firma_cargo: "Encargada", cliente_email: "marta@x.com" };
+  await page.route("**/api/**", (route) => {
+    const u = route.request().url();
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(u.includes("tipo=parte") ? parte : []) });
+  });
+  await page.goto(base + "/");
+  await page.evaluate(() => localStorage.setItem("ajustes_app", JSON.stringify({ estiloInicio: "nuevo", avisoFelicitacion: false })));
+  await page.reload();
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { tecnicoLogueado = "Juan Pérez"; return abrirParteDetalleModal("p1"); });
+  assert.match(await page.locator(".pd-cab").textContent(), /N° 4100[\s\S]*Panadería Sur[\s\S]*09:10 a 10:35[\s\S]*Juan Pérez/);
+  assert.strictEqual(await page.locator('.pd-accion[href="tel:3415551111"]').count(), 1);
+  const titulos = await page.locator(".pd-sec-tit").allTextContents();
+  assert.deepStrictEqual(titulos.map((x) => x.trim().toLowerCase()), ["trabajo", "materiales", "cobro", "cliente", "firma del cliente"]);
+  assert.strictEqual(await page.locator("#pdClaves").isVisible(), false, "claves ocultas");
+  await page.click("#pdClavesBtn");
+  assert.match(await page.locator("#pdClaves").textContent(), /5555/);
+  assert.match(await page.locator(".pd-firma").textContent(), /Aclaración[\s\S]*Marta Gómez[\s\S]*Cargo[\s\S]*Encargada[\s\S]*Mail[\s\S]*marta@x\.com/);
+  await page.click(".pd-foto-mini");
+  assert.strictEqual(await page.locator(".pd-lightbox").count(), 1);
+  await page.click(".pd-lightbox");
+  assert.strictEqual(await page.locator(".pd-lightbox").count(), 0);
+  await page.click("#pdFichaBtn");
+  await page.waitForTimeout(300);
+  assert.strictEqual(await page.evaluate(() => screens.fichaCliente.dataset.active), "true");
+  assert.strictEqual(await page.locator("#parteDetalleModalOverlay").isVisible(), false);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

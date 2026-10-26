@@ -3332,3 +3332,47 @@ html[data-inicio="nuevo"] #screen-historial .hist-fila-periodo .hist-periodo-tab
 html[data-inicio="nuevo"] #screen-historial .hist-fila-periodo .hist-periodo-chip { flex: 0 0 auto !important; width: auto !important; padding-left: 12px; padding-right: 12px; }
 html[data-inicio="nuevo"] #screen-historial .hist-filtros-btn { min-height: 40px; }
 html[data-inicio="nuevo"] #screen-historial.hist-buscando .hist-periodo-tabs { opacity: 0.45; }
+
+/* ---------- Detalle del parte (skin nuevo) ---------- */
+html[data-inicio="nuevo"] #parteDetalleModalOverlay.pd-nuevo { background: rgba(8,8,8,0.72) !important; padding: 12px !important; }
+html[data-inicio="nuevo"] #parteDetalleModalOverlay.pd-nuevo > div { background: var(--sat-fondo) !important; color: var(--sat-texto) !important; border: 1px solid var(--sat-borde); border-radius: 8px !important; padding: 16px !important; margin: 8px 0 !important; position: relative; font-family: var(--f-texto); }
+html[data-inicio="nuevo"] #parteDetalleModalOverlay.pd-nuevo > div > div:first-child { margin: 0 !important; height: 0; }
+html[data-inicio="nuevo"] #parteDetalleModalOverlay.pd-nuevo .review-eyebrow { display: none; }
+html[data-inicio="nuevo"] #parteDetalleModalOverlay.pd-nuevo #parteDetalleModalCerrarBtn { position: absolute; top: 8px; right: 8px; width: 44px; height: 44px; border-radius: 50% !important; font-size: 30px !important; color: var(--sat-texto) !important; background: var(--sat-sup2) !important; display: grid; place-items: center; z-index: 2; }
+html[data-inicio="nuevo"] .pd-cab { padding: 2px 52px 14px 0; border-bottom: 2px solid var(--sat-am); margin-bottom: 12px; }
+html[data-inicio="nuevo"] .pd-num { font-size: 13px; font-weight: 600; color: var(--sat-tenue); letter-spacing: 0.02em; }
+html[data-inicio="nuevo"] .pd-cliente { margin: 2px 0 6px; font-family: var(--f-titulo); font-weight: 700; font-size: 26px; line-height: 1.1; color: var(--sat-texto); text-transform: none; }
+html[data-inicio="nuevo"] .pd-meta { font-size: 14.5px; color: var(--sat-tenue); line-height: 1.4; }
+html[data-inicio="nuevo"] .pd-acciones { display: grid; grid-template-columns: repeat(auto-fit, minmax(70px, 1fr)); gap: 8px; margin-bottom: 14px; }
+html[data-inicio="nuevo"] .pd-accion { display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 10px 4px; border-radius: 6px; cursor: pointer; text-decoration: none;
+  background: var(--sat-sup); border: 1px solid var(--sat-borde); color: var(--sat-texto); font-family: var(--f-titulo); font-weight: 700; font-size: 14px; }
+html[data-inicio="nuevo"] .pd-accion svg { width: 22px; height: 22px; stroke: var(--sat-am); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) .pd-accion svg { stroke: #8A5E00; }
+html[data-inicio="nuevo"] .pd-accion:active { transform: scale(0.97); }
+html[data-inicio="nuevo"] .pd-sec { margin-bottom: 12px; padding: 4px 14px; border-radius: 6px; background: var(--sat-sup); border: 1px solid var(--sat-borde); }
+html[data-inicio="nuevo"] .pd-sec-tit { margin: 10px 0 2px; font-family: var(--f-titulo); font-weight: 700; font-size: 13px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--sat-am); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) .pd-sec-tit { color: #8A5E00; }
+html[data-inicio="nuevo"] .pd-fila { padding: 9px 0; border-top: 1px solid var(--sat-borde); }
+html[data-inicio="nuevo"] .pd-sec-tit + .pd-fila { border-top: 0; }
+html[data-inicio="nuevo"] .pd-fila-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+html[data-inicio="nuevo"] .pd-etiqueta { font-size: 12.5px; color: var(--sat-tenue); }
+html[data-inicio="nuevo"] .pd-copiar { background: none; border: 0; padding: 4px; margin: -4px; cursor: pointer; color: var(--sat-tenue); }
+html[data-inicio="nuevo"] .pd-copiar svg { width: 15px; height: 15px; display: block; }
+html[data-inicio="nuevo"] .pd-valor { margin-top: 2px; white-space: pre-line; font-size: 15.5px; line-height: 1.4; color: var(--sat-texto); overflow-wrap: anywhere; }
+html[data-inicio="nuevo"] .pd-mat-ok .pd-valor { padding: 6px 10px; border-radius: 4px; border-left: 3px solid #4CAF6E; background: rgba(76,175,110,0.10); }
+html[data-inicio="nuevo"] .pd-mat-ret .pd-valor { padding: 6px 10px; border-radius: 4px; border-left: 3px solid #D9674F; background: rgba(217,103,79,0.10); }
+html[data-inicio="nuevo"] .pd-alerta .pd-valor { padding: 6px 10px; border-radius: 4px; border-left: 3px solid var(--sat-am); background: rgba(255,192,51,0.08); }
+html[data-inicio="nuevo"] .pd-total .pd-valor { font-family: var(--f-titulo); font-weight: 700; font-size: 22px; }
+html[data-inicio="nuevo"] .pd-claves-btn { margin: 4px 0 10px; }
+html[data-inicio="nuevo"] .pd-claves .pd-fila { border-top: 0; padding-top: 0; }
+html[data-inicio="nuevo"] .pd-foto-mini { display: block; margin-top: 6px; padding: 0; border: 1px solid var(--sat-borde); border-radius: 6px; overflow: hidden; background: none; cursor: zoom-in; width: 110px; height: 110px; }
+html[data-inicio="nuevo"] .pd-foto-mini img { width: 100%; height: 100%; object-fit: cover; display: block; }
+html[data-inicio="nuevo"] .pd-firma { margin: 18px 0 12px; padding-top: 14px; border-top: 1px dashed var(--sat-borde); }
+html[data-inicio="nuevo"] .pd-firma .pd-sec-tit { margin-top: 0; }
+html[data-inicio="nuevo"] .pd-firma-img { display: block; width: 100%; margin: 8px 0 4px; padding: 8px; border: 1px solid var(--sat-borde); border-radius: 6px; background: #F4F3EF; cursor: zoom-in; }
+html[data-inicio="nuevo"] .pd-firma-img img { display: block; width: 100%; max-height: 120px; object-fit: contain; }
+html[data-inicio="nuevo"] .pd-firma .pd-fila:first-of-type { border-top: 0; }
+html[data-inicio="nuevo"] .pd-cerrar { width: 100%; margin-top: 4px; }
+.pd-lightbox { position: fixed; inset: 0; z-index: 10000; background: rgba(0,0,0,0.92); display: grid; place-items: center; padding: 16px; cursor: zoom-out; }
+.pd-lightbox img { max-width: 100%; max-height: 100%; object-fit: contain; background: #F4F3EF; border-radius: 4px; }
+.pd-lightbox-x { position: absolute; top: 12px; right: 16px; color: #fff; font-size: 36px; line-height: 1; }
