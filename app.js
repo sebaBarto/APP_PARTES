@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.2.0";
+const APP_VERSION = "4.3.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -14292,7 +14292,7 @@ let peEstado = null;
 let peUltimoPdf = null; // { blob, nombre, numero }
 const pe = (id) => document.getElementById(id);
 function peNuevoEstado() {
-  return { modo: "listado", cliente: { nombre: "", numero_cliente: "", telefono: "", direccion: "", razon_social: "", cuit: "" }, clienteElegido: false, titulo: "", items: [], mano_obra: "", forma_pago: "Contado Efectivo" };
+  return { modo: "listado", cliente: { nombre: "", numero_cliente: "", telefono: "", direccion: "", razon_social: "", cuit: "" }, clienteElegido: false, titulo: "", items: [], mano_obra: "", forma_pago: "Contado Efectivo", revisionDe: "" };
 }
 function peGuardarBorrador() { try { localStorage.setItem(PE_BORRADOR, JSON.stringify(peEstado)); } catch (e) { /* nada */ } }
 function peLeerBorrador() {
@@ -14319,7 +14319,8 @@ async function peCargarLista() {
     const r = await fetch("/api/datos?coleccion=lista_precios", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || "HTTP " + r.status);
-    peLista = { items: Array.isArray(d.items) ? d.items : [], cotizacion_usd: Number(d.cotizacion_usd) || null, cargada: true };
+    peLista = { items: Array.isArray(d.items) ? d.items : [], cotizacion_usd: Number(d.cotizacion_usd) || null, cargada: true,
+      kits: Array.isArray(d.kits) ? d.kits : [], fotos: d.fotos && typeof d.fotos === "object" ? d.fotos : {}, actualizado: d.actualizado || "", cotizacion_actualizada: d.cotizacion_actualizada || "" };
     try { localStorage.setItem("lista_precios_cache", JSON.stringify(peLista)); } catch (e) { /* muy grande para guardar: queda solo en memoria */ }
   } catch (err) {
     try { const c = JSON.parse(localStorage.getItem("lista_precios_cache") || "null"); if (c && Array.isArray(c.items)) peLista = { ...c, cargada: true }; } catch (e) { /* nada */ }
@@ -14328,9 +14329,77 @@ async function peCargarLista() {
   est.textContent = n
     ? `Lista de precios: ${n.toLocaleString("es-AR")} artículos${peLista.cotizacion_usd ? ` · dólar a ${pePesos(peLista.cotizacion_usd)}` : ""}.`
     : "Todavía no hay lista de precios cargada (se carga desde el admin, en Materiales). Igual podés agregar artículos a mano.";
+  peRenderAvisoViejo();
+  peRenderKits();
   peRenderArticulos();
   peRenderItems();
 }
+// Aviso si los precios pueden estar viejos (lista de más de 30 días o dólar de más de 7).
+const PE_DIAS_LISTA_VIEJA = 30, PE_DIAS_COTIZ_VIEJA = 7;
+function peDiasDesde(v) { const d = fechaDelServidor(v); return d ? Math.floor((Date.now() - d.getTime()) / 864e5) : null; }
+function peRenderAvisoViejo() {
+  const avisos = [];
+  const dl = peDiasDesde(peLista.actualizado), dc = peDiasDesde(peLista.cotizacion_actualizada);
+  if (peLista.items.length && dl !== null && dl > PE_DIAS_LISTA_VIEJA) avisos.push(`la lista de precios es de hace ${dl} días`);
+  if (peLista.items.some((a) => a.m === "USD") && dc !== null && dc > PE_DIAS_COTIZ_VIEJA) avisos.push(`la cotización del dólar ($${Math.round(peLista.cotizacion_usd).toLocaleString("es-AR")}) es de hace ${dc} días`);
+  const box = pe("peAvisoViejo");
+  box.classList.toggle("hidden", !avisos.length);
+  box.textContent = avisos.length ? `⚠️ Ojo: ${avisos.join(" y ")}. Antes de mandarlo, confirmá con la oficina que los precios sigan vigentes.` : "";
+}
+function peRenderKits() {
+  const cont = pe("peKits");
+  const kits = peLista.kits || [];
+  cont.classList.toggle("hidden", !kits.length);
+  cont.innerHTML = kits.length ? `<span class="pe-kits-tit">Kits:</span>` + kits.map((k, i) => `<button type="button" class="pe-kit" data-i="${i}">+ ${escapeHtml(k.nombre)}</button>`).join("") : "";
+  cont.querySelectorAll(".pe-kit").forEach((b) => b.addEventListener("click", () => {
+    const k = kits[Number(b.dataset.i)];
+    const faltan = [];
+    let agregados = 0;
+    k.items.forEach((ki) => {
+      const a = peLista.items.find((x) => ki.c && x.c === ki.c) || peLista.items.find((x) => x.d === ki.d);
+      if (!a) { faltan.push(ki.d); return; }
+      const ya = peEstado.items.find((x) => !x.manual && x.d === a.d && x.c === (a.c || ""));
+      if (ya) ya.cant += ki.cant; else peEstado.items.push({ c: a.c || "", d: a.d, p: a.p, m: a.m, cant: ki.cant });
+      agregados++;
+    });
+    peRenderItems();
+    peGuardarBorrador();
+    showToast(faltan.length ? `Se agregó el kit, pero ${faltan.length} artículo(s) ya no están en la lista: ${faltan.slice(0, 2).join(", ")}` : `Se agregó el kit «${k.nombre}» (${agregados} artículos).`);
+  }));
+}
+// Últimos presupuestos hechos en este celular (para corregirlos).
+const PE_HECHOS = "presupuestos_express_hechos";
+function peLeerHechos() { try { const l = JSON.parse(localStorage.getItem(PE_HECHOS) || "[]"); return Array.isArray(l) ? l : []; } catch (e) { return []; } }
+function peGuardarHecho(numero, total) {
+  const l = peLeerHechos().filter((x) => x.numero !== numero);
+  const estado = JSON.parse(JSON.stringify(peEstado));
+  estado.revisionDe = "";
+  l.unshift({ numero, fecha: new Date().toISOString(), total, cliente: peEstado.cliente.nombre, titulo: peEstado.titulo, estado });
+  try { localStorage.setItem(PE_HECHOS, JSON.stringify(l.slice(0, 30))); } catch (e) { /* nada */ }
+}
+function peRenderHechos() {
+  const l = peLeerHechos();
+  pe("peHechosWrap").classList.toggle("hidden", !l.length);
+  pe("peHechos").innerHTML = l.slice(0, 10).map((x, i) => `<div class="pe-hecho"><div><b>${escapeHtml(x.numero)}</b> · ${escapeHtml(x.cliente || "")}<small>${new Date(x.fecha).toLocaleDateString("es-AR")}${x.titulo ? " · " + escapeHtml(x.titulo) : ""} · ${pePesos(x.total)}</small></div><button type="button" class="btn btn-secondary btn-small" data-corregir="${i}">Corregir</button></div>`).join("");
+  pe("peHechos").querySelectorAll("[data-corregir]").forEach((b) => b.addEventListener("click", () => {
+    const x = l[Number(b.dataset.corregir)];
+    if ((peEstado.items.length || peEstado.cliente.nombre) && !peEstado.revisionDe && !confirm(`Se va a reemplazar lo que tenés cargado por el presupuesto ${x.numero} para corregirlo. ¿Seguimos?`)) return;
+    peEstado = { ...peNuevoEstado(), ...JSON.parse(JSON.stringify(x.estado)), revisionDe: x.numero.replace(/-R\d+$/, "") };
+    peUltimoPdf = null;
+    pe("peResultado") && pe("peResultado").remove();
+    peGuardarBorrador();
+    peVolcarFormulario();
+    screens.presupuesto.querySelector(".review-scroll").scrollTop = 0;
+  }));
+}
+function peRenderRevision() {
+  const box = pe("peAvisoRevision");
+  box.classList.toggle("hidden", !peEstado.revisionDe);
+  box.innerHTML = peEstado.revisionDe ? `✏️ Corrigiendo el presupuesto <b>${escapeHtml(peEstado.revisionDe)}</b>: va a salir como ${escapeHtml(peEstado.revisionDe)}-R… <button type="button" class="link-btn" id="peCancelarRevBtn">No, es uno nuevo</button>` : "";
+  const c = pe("peCancelarRevBtn");
+  if (c) c.addEventListener("click", () => { peEstado.revisionDe = ""; peGuardarBorrador(); peRenderRevision(); });
+}
+
 function peAbrir() {
   peEstado = peLeerBorrador();
   peUltimoPdf = null;
@@ -14348,6 +14417,8 @@ function peVolcarFormulario() {
   pe("peManualWrap").classList.add("hidden");
   peRenderModo();
   peRenderItems();
+  peRenderRevision();
+  peRenderHechos();
 }
 function peRenderModo() {
   document.querySelectorAll(".pe-modo-btn").forEach((b) => b.classList.toggle("activo", b.dataset.modo === peEstado.modo));
@@ -14563,12 +14634,32 @@ async function peGenerarPdf(datos) {
     asegurar(40);
     texto("Materiales:", X, 10.5, fB); subrayar(X, ancho("Materiales:", 10.5, fB), 10.5);
     y -= 24;
-    datos.items.forEach((it) => {
+    // Fotos de los artículos que la oficina cargó (como en los presupuestos de siempre).
+    const fotos = peLista.fotos || {};
+    const imagenes = await Promise.all(datos.items.map(async (it) => {
+      const id = !it.manual && fotos[(it.c && String(it.c).trim()) || it.d];
+      if (!id) return null;
+      try {
+        const r = await fetch(`/api/foto?id=${encodeURIComponent(id)}`);
+        if (!r.ok) return null;
+        const b = new Uint8Array(await r.arrayBuffer());
+        return b[0] === 0x89 ? await doc.embedPng(b) : await doc.embedJpg(b);
+      } catch (e) { return null; }
+    }));
+    datos.items.forEach((it, i) => {
       const lineas = partir(it.d, 10, fN, ANCHO - 30);
-      asegurar(lineas.length * 12.5 + 10);
+      const img = imagenes[i];
+      const altoImg = img ? 54 : 0;
+      asegurar(lineas.length * 12.5 + 10 + (img ? altoImg + 8 : 0));
       const cant = String(it.cant);
       texto(cant, X + 18 - ancho(cant, 10, fN), 10, fN);
       lineas.forEach((l) => { texto(l, X + 28, 10, fN); y -= 12.5; });
+      if (img) {
+        const w = Math.min(110, altoImg * img.width / img.height);
+        const h = w * img.height / img.width;
+        pag.drawImage(img, { x: X + 28, y: y - h + 4, width: w, height: h });
+        y -= h + 4;
+      }
       y -= 9;
     });
   }
@@ -14576,7 +14667,7 @@ async function peGenerarPdf(datos) {
   y -= 6;
   const lineasTot = [["Total Materiales:", pePesos(datos.total_materiales) + ".-"], ["Total Mano de Obra:", pePesos(datos.mano_obra) + ".-"], ["TOTAL:", pePesos(datos.total) + ".-"]];
   const altoCaja = 70;
-  asegurar(altoCaja + 120);
+  asegurar(altoCaja + 175); // totales + pago + garantía + validez + pie: todo junto en la misma hoja
   pag.drawRectangle({ x: X - 8, y: y - altoCaja + 12, width: 262, height: altoCaja, color: gris, borderColor: grisOsc, borderWidth: 0.8 });
   lineasTot.forEach(([et, val], i) => {
     const tam = i === 2 ? 11.5 : 10.5;
@@ -14619,21 +14710,27 @@ pe("peGenerarBtn").addEventListener("click", async () => {
     const r = await fetch("/api/datos?coleccion=presupuestos_express", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-      body: JSON.stringify({ accion: "nuevo", cliente: c.nombre, numero_cliente: c.numero_cliente, titulo: peEstado.titulo, total_materiales: t.materiales, mano_obra: t.mano_obra, total: t.total, forma_pago: peEstado.forma_pago, cotizacion_usd: t.hayUsd ? peLista.cotizacion_usd : null, articulos: peEstado.items.length }),
+      body: JSON.stringify({ accion: peEstado.revisionDe ? "revision" : "nuevo", base: peEstado.revisionDe || undefined, cliente: c.nombre, numero_cliente: c.numero_cliente, titulo: peEstado.titulo, total_materiales: t.materiales, mano_obra: t.mano_obra, total: t.total, forma_pago: peEstado.forma_pago, cotizacion_usd: t.hayUsd ? peLista.cotizacion_usd : null, articulos: peEstado.items.length }),
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok || !d.numero) throw new Error(d.error || "No se pudo sacar el número de presupuesto (¿hay señal?)");
     const hoy = new Date();
     const datos = {
       numero: d.numero, fecha: `${String(hoy.getDate()).padStart(2, "0")}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${hoy.getFullYear()}`,
-      titulo: peEstado.titulo.trim(), cliente: { ...c }, items: peEstado.items.map((it) => ({ d: it.d, cant: it.cant })),
+      titulo: peEstado.titulo.trim(), cliente: { ...c }, items: peEstado.items.map((it) => ({ c: it.c || "", d: it.d, cant: it.cant, manual: !!it.manual })),
+      vence: (() => { const v = new Date(hoy.getTime() + 3 * 864e5); return `${String(v.getDate()).padStart(2, "0")}-${String(v.getMonth() + 1).padStart(2, "0")}-${v.getFullYear()}`; })(),
       total_materiales: t.materiales, mano_obra: t.mano_obra, total: t.total, forma_pago: peEstado.forma_pago,
     };
     const pdf = await peGenerarPdf(datos);
     const nombreArchivo = `Presupuesto_${d.numero}_${(c.nombre || "cliente").replace(/[^\wÁÉÍÓÚÑáéíóúñ]+/g, "_").slice(0, 40)}.pdf`;
-    peUltimoPdf = { blob: new Blob([pdf], { type: "application/pdf" }), nombre: nombreArchivo, numero: d.numero, total: t.total, cliente: c.nombre };
+    peUltimoPdf = { blob: new Blob([pdf], { type: "application/pdf" }), nombre: nombreArchivo, numero: d.numero, total: t.total, cliente: c.nombre, telefono: c.telefono, titulo: peEstado.titulo.trim(), vence: datos.vence, link: "" };
+    peGuardarHecho(d.numero, t.total);
+    peEstado.revisionDe = "";
+    peGuardarBorrador();
+    peRenderRevision();
+    peRenderHechos();
     peMostrarResultado();
-    peGuardarCopia(pdf, d.numero);
+    peUltimoPdf.copia = peGuardarCopia(pdf, d.numero).then((id) => { if (id && peUltimoPdf && peUltimoPdf.numero === d.numero) peUltimoPdf.link = `${location.origin}/api/foto?id=${id}&tipo=pdf`; return id; });
     await peCompartir(true);
   } catch (err) {
     showToast(err.message || "No se pudo generar el presupuesto.");
@@ -14651,8 +14748,9 @@ function peMostrarResultado() {
     pe("peGenerarBtn").insertAdjacentElement("afterend", box);
   }
   box.innerHTML = `<b>Presupuesto ${escapeHtml(peUltimoPdf.numero)} listo</b><span>${escapeHtml(peUltimoPdf.cliente)} · ${pePesos(peUltimoPdf.total)}</span>
-    <div class="pe-resultado-btns"><button type="button" class="btn btn-primary btn-small" id="peCompartirBtn">Compartir (WhatsApp)</button><button type="button" class="btn btn-secondary btn-small" id="peVerBtn">Ver / descargar PDF</button></div>`;
+    <div class="pe-resultado-btns"><button type="button" class="btn btn-primary btn-small" id="peWhatsappClienteBtn">Enviar al WhatsApp del cliente</button><button type="button" class="btn btn-secondary btn-small" id="peCompartirBtn">Compartir el PDF</button><button type="button" class="btn btn-secondary btn-small" id="peVerBtn">Ver / descargar</button></div>`;
   pe("peCompartirBtn").addEventListener("click", () => peCompartir(false));
+  pe("peWhatsappClienteBtn").addEventListener("click", peEnviarWhatsappCliente);
   pe("peVerBtn").addEventListener("click", () => {
     const url = URL.createObjectURL(peUltimoPdf.blob);
     const a = document.createElement("a");
@@ -14680,7 +14778,35 @@ async function peGuardarCopia(pdf, numero) {
     for (let i = 0; i < u8.length; i += 0x8000) bin += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
     const r = await fetch("/api/foto", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ base64: btoa(bin), tipo: "pdf" }) });
     const d = await r.json();
-    if (!r.ok || !d.id) return;
-    await fetch("/api/datos?coleccion=presupuestos_express", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ accion: "adjuntar_pdf", numero, pdf_id: d.id }) });
-  } catch (e) { /* no crítico */ }
+    if (!r.ok || !d.id) return "";
+    fetch("/api/datos?coleccion=presupuestos_express", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ accion: "adjuntar_pdf", numero, pdf_id: d.id }) }).catch(() => {});
+    return d.id;
+  } catch (e) { return ""; }
+}
+// Celular para WhatsApp: con código de área (Rosario 341 si viene de 7 dígitos), sin 0 ni 15.
+function peCelularWhatsapp(tel) {
+  let n = String(tel || "").replace(/\D/g, "");
+  if (!n) return "";
+  if (n.startsWith("54")) n = n.slice(2);
+  if (n.startsWith("9")) n = n.slice(1);
+  n = n.replace(/^0/, "");
+  if (n.length === 7) n = "341" + n;
+  const m = n.match(/^(\d{2,4})15(\d{6,8})$/);
+  if (m && (m[1] + m[2]).length === 10) n = m[1] + m[2];
+  return n.length === 10 ? "549" + n : "";
+}
+// Abre el chat del cliente con un mensaje listo y el link al PDF.
+async function peEnviarWhatsappCliente() {
+  if (!peUltimoPdf) return;
+  const sugerido = peCelularWhatsapp(peUltimoPdf.telefono);
+  const escrito = prompt("Celular de WhatsApp del cliente (con código de área, ej. 341 555 1234):", sugerido ? sugerido.replace(/^549/, "") : "");
+  if (escrito === null) return;
+  const numero = peCelularWhatsapp(escrito);
+  if (!numero) { showToast("Ese número no parece un celular con código de área (ej. 341 555 1234)."); return; }
+  const btn = pe("peWhatsappClienteBtn");
+  if (!peUltimoPdf.link && peUltimoPdf.copia) { btn.textContent = "Preparando el link..."; try { await peUltimoPdf.copia; } catch (e) { /* nada */ } btn.textContent = "Enviar al WhatsApp del cliente"; }
+  const nombre = String(peUltimoPdf.cliente || "").split(/[-,]/)[0].trim();
+  const texto = `Hola${nombre ? " " + nombre : ""}! Te enviamos el presupuesto ${peUltimoPdf.numero} de SAT${peUltimoPdf.titulo ? ` (${peUltimoPdf.titulo})` : ""}.\nTotal: ${pePesos(peUltimoPdf.total)} (precio final, IVA incluido). Válido hasta el ${peUltimoPdf.vence}.` + (peUltimoPdf.link ? `\nPodés verlo acá: ${peUltimoPdf.link}` : "\nTe paso el PDF a continuación.") + "\nCualquier consulta, a disposición.";
+  window.open(`https://wa.me/${numero}?text=${encodeURIComponent(texto)}`, "_blank", "noopener");
+  if (!peUltimoPdf.link) showToast("No se pudo subir el PDF: mandalo con «Compartir el PDF».");
 }

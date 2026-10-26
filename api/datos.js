@@ -194,9 +194,26 @@ async function manejarPresupuestoExpress(req, res, autorizacion, body) {
           actual.actualizado = new Date().toISOString();
           actual.actualizado_por = autorizacion.nombre || "";
           if (b.cotizacion_usd !== undefined && numeroArgentino(b.cotizacion_usd) > 0) actual.cotizacion_usd = numeroArgentino(b.cotizacion_usd);
+        } else if (b.accion === "kits") {
+          // Kits armados (ej. "Kit alarma básica"): nombre + artículos de la lista con su cantidad.
+          if (!Array.isArray(b.kits)) { res.status(400).json({ error: "Formato inválido" }); return; }
+          actual.kits = b.kits.slice(0, 100).map((k) => ({
+            nombre: String((k && k.nombre) || "").replace(/\s+/g, " ").trim().slice(0, 80),
+            items: (Array.isArray(k && k.items) ? k.items : []).slice(0, 60).map((it) => ({
+              c: String((it && it.c) || "").trim().slice(0, 60), d: String((it && it.d) || "").replace(/\s+/g, " ").trim().slice(0, 400),
+              cant: Math.max(1, Math.min(999, Math.round(Number(it && it.cant) || 1))),
+            })).filter((it) => it.d),
+          })).filter((k) => k.nombre && k.items.length);
+        } else if (b.accion === "foto") {
+          // Foto de un artículo (para el PDF). Clave: código si tiene, si no la descripción.
+          const clave = String(b.clave || "").trim().slice(0, 400);
+          if (!clave) { res.status(400).json({ error: "Falta el artículo" }); return; }
+          actual.fotos = actual.fotos && typeof actual.fotos === "object" ? actual.fotos : {};
+          if (b.id) actual.fotos[clave] = String(b.id).replace(/[^\w-]/g, "").slice(0, 60);
+          else delete actual.fotos[clave];
         } else { res.status(400).json({ error: "Acción inválida" }); return; }
         const r = await escribirArchivoDatos(RUTA_LISTA_PRECIOS, actual, sha, `Lista de precios (${b.accion}) — ${autorizacion.nombre || "admin"}`);
-        if (r.ok) { res.status(200).json({ ok: true, cantidad: actual.items.length, cotizacion_usd: actual.cotizacion_usd }); return; }
+        if (r.ok) { res.status(200).json({ ok: true, cantidad: actual.items.length, cotizacion_usd: actual.cotizacion_usd, kits: (actual.kits || []).length, fotos: Object.keys(actual.fotos || {}).length }); return; }
         if (r.status !== 409 && r.status !== 422) { res.status(502).json({ error: "No se pudo guardar la lista de precios" }); return; }
       }
       res.status(409).json({ error: "Otra persona estaba guardando al mismo tiempo. Probá de nuevo." });
@@ -228,6 +245,22 @@ async function manejarPresupuestoExpress(req, res, autorizacion, body) {
         const numero = "E-" + String(reg.ultimo).padStart(4, "0");
         reg.presupuestos.unshift({
           numero, fecha: new Date().toISOString(), emitido_por: autorizacion.nombre || "Oficina",
+          cliente: txt(b.cliente, 150), numero_cliente: txt(b.numero_cliente, 30), titulo: txt(b.titulo, 150),
+          total_materiales: numeroArgentino(b.total_materiales) || 0, mano_obra: numeroArgentino(b.mano_obra) || 0,
+          total: numeroArgentino(b.total) || 0, forma_pago: txt(b.forma_pago, 80), cotizacion_usd: numeroArgentino(b.cotizacion_usd) || null,
+          articulos: Math.max(0, Math.min(1000, Number(b.articulos) || 0)),
+        });
+        reg.presupuestos = reg.presupuestos.slice(0, 3000);
+        respuesta = { ok: true, numero };
+      } else if (b.accion === "revision") {
+        // Corrección de un presupuesto ya enviado: mismo número con -R1, -R2...
+        const base = txt(b.base, 20).replace(/-R\d+$/, "");
+        if (!/^E-\d{4,}$/.test(base)) { res.status(400).json({ error: "Número de presupuesto inválido" }); return; }
+        const previas = reg.presupuestos.filter((x) => x.numero === base || String(x.numero).startsWith(base + "-R"));
+        const n = previas.reduce((m, x) => Math.max(m, Number((String(x.numero).match(/-R(\d+)$/) || [0, 0])[1])), 0) + 1;
+        const numero = `${base}-R${n}`;
+        reg.presupuestos.unshift({
+          numero, revision_de: base, fecha: new Date().toISOString(), emitido_por: autorizacion.nombre || "Oficina",
           cliente: txt(b.cliente, 150), numero_cliente: txt(b.numero_cliente, 30), titulo: txt(b.titulo, 150),
           total_materiales: numeroArgentino(b.total_materiales) || 0, mano_obra: numeroArgentino(b.mano_obra) || 0,
           total: numeroArgentino(b.total) || 0, forma_pago: txt(b.forma_pago, 80), cotizacion_usd: numeroArgentino(b.cotizacion_usd) || null,

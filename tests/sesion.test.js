@@ -241,7 +241,7 @@ test("Presupuesto express: la lista de precios la carga solo la oficina y los n�
     assert.strictEqual(r.statusCode, 403, "un técnico no carga la lista");
     r = resFalso();
     await datos(pedido("POST", { coleccion: "lista_precios" }, { accion: "reemplazar", archivo: "lista.xlsx", items: [{ c: "B7", d: "Batería", p: "28.500,50" }, { d: "Central", p: 185, m: "USD" }, { d: "", p: 1 }] }, admin), r);
-    assert.deepStrictEqual(r.cuerpo, { ok: true, cantidad: 2, cotizacion_usd: null });
+    assert.deepStrictEqual(r.cuerpo, { ok: true, cantidad: 2, cotizacion_usd: null, kits: 0, fotos: 0 });
     r = resFalso();
     await datos(pedido("POST", { coleccion: "lista_precios" }, { accion: "cotizacion", valor: "1.450" }, admin), r);
     r = resFalso();
@@ -258,6 +258,24 @@ test("Presupuesto express: la lista de precios la carga solo la oficina y los n�
     await datos(pedido("POST", { coleccion: "presupuestos_express" }, { accion: "nuevo", cliente: "Otro", total: 5 }, admin), r);
     assert.strictEqual(r.cuerpo.numero, "E-0002");
     assert.deepStrictEqual(archivos["presupuestos-express.json"].presupuestos.map((p) => [p.numero, p.emitido_por]), [["E-0002", "Oficina"], ["E-0001", "Juan"]]);
+    // Correcciones: E-0001-R1, E-0001-R2 (aunque se pida desde una revisión)
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "presupuestos_express" }, { accion: "revision", base: "E-0001", cliente: "Tell", total: 90 }, juan), r);
+    assert.strictEqual(r.cuerpo.numero, "E-0001-R1");
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "presupuestos_express" }, { accion: "revision", base: "E-0001-R1", cliente: "Tell", total: 80 }, juan), r);
+    assert.strictEqual(r.cuerpo.numero, "E-0001-R2");
+    // Kits y fotos (solo la oficina), sin tocar la lista
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "lista_precios" }, { accion: "kits", kits: [{ nombre: "Kit base", items: [{ c: "B7", d: "Batería", cant: 2 }] }, { nombre: "", items: [] }] }, admin), r);
+    assert.strictEqual(r.cuerpo.kits, 1);
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "lista_precios" }, { accion: "foto", clave: "B7", id: "abc123" }, admin), r);
+    assert.strictEqual(r.cuerpo.fotos, 1);
+    assert.strictEqual(archivos["lista-precios.json"].items.length, 2, "la lista sigue igual");
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "lista_precios" }, { accion: "kits", kits: [] }, juan), r);
+    assert.strictEqual(r.statusCode, 403);
   } finally {
     global.fetch = fetchViejo;
   }

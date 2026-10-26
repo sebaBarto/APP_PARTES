@@ -1961,7 +1961,7 @@ test("Admin Clientes: se puede cargar un cliente a mano (obligatorios, aviso si 
 
 test("Presupuesto express: cliente del listado, artículos (en pesos y en dólares), mano de obra y PDF E-0001 para compartir", async () => {
   const { ctx, page, erroresPagina } = await nuevaPagina();
-  const lista = { cotizacion_usd: 1000, items: [
+  const lista = { cotizacion_usd: 1000, kits: [{ nombre: "Kit base", items: [{ c: "BAT7", d: "BATERIA 12V 7A/H", cant: 2 }] }], items: [
     { c: "SP6000", d: "CENTRAL PARADOX SP6000", p: 100, m: "USD" },
     { c: "BAT7", d: "BATERIA 12V 7A/H", p: 20000, m: "ARS" },
   ] };
@@ -1970,7 +1970,7 @@ test("Presupuesto express: cliente del listado, artículos (en pesos y en dólar
     const req = route.request(); const u = req.url();
     const j = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
     if (u.includes("lista_precios")) return j(lista);
-    if (u.includes("presupuestos_express")) { const b = JSON.parse(req.postData() || "{}"); pedidos.push(b); return j(b.accion === "nuevo" ? { ok: true, numero: "E-0001" } : { ok: true }); }
+    if (u.includes("presupuestos_express")) { const b = JSON.parse(req.postData() || "{}"); if (b.accion !== "adjuntar_pdf") pedidos.push(b); return j(b.accion === "nuevo" ? { ok: true, numero: "E-0001" } : b.accion === "revision" ? { ok: true, numero: b.base + "-R1" } : { ok: true }); }
     if (u.includes("coleccion=clientes")) return j([{ nombre: "Tell Cecilia", numero_cliente: "60", direccion: "Albarracín 8122", telefono: "4519509" }]);
     if (u.includes("/api/foto")) return j({ ok: true, id: "pdf1" });
     j([]);
@@ -1994,8 +1994,7 @@ test("Presupuesto express: cliente del listado, artículos (en pesos y en dólar
   await page.click(".pe-res");
   assert.strictEqual(await page.inputValue("#peNumCliente"), "60");
   await page.fill("#peArtBuscar", "sp6000"); await page.click(".pe-art");
-  await page.fill("#peArtBuscar", "bateria"); await page.click(".pe-art");
-  await page.click('[data-mas="1"]');
+  await page.click(".pe-kit"); // el kit trae 2 baterías
   assert.match(await page.textContent("#peTotales"), /Total materiales\$140\.000/);
   // Falta la mano de obra
   await page.click("#peGenerarBtn");
@@ -2009,6 +2008,21 @@ test("Presupuesto express: cliente del listado, artículos (en pesos y en dólar
   assert.deepStrictEqual(c, { nombre: "Presupuesto_E-0001_Tell_Cecilia.pdf", tipo: "application/pdf", inicio: "%PDF-" });
   assert.deepStrictEqual({ total: pedidos[0].total, mo: pedidos[0].mano_obra, fp: pedidos[0].forma_pago, cot: pedidos[0].cotizacion_usd }, { total: 190000, mo: 50000, fp: "A convenir", cot: 1000 });
   assert.match(await page.textContent("#peResultado"), /Presupuesto E-0001 listo/);
+  // Al WhatsApp del cliente: chat con su número (Rosario) y el link al PDF
+  await page.evaluate(() => { window.prompt = (m, d) => d; window.__wa = ""; window.open = (u) => { window.__wa = u; }; });
+  await page.click("#peWhatsappClienteBtn");
+  await page.waitForFunction(() => window.__wa);
+  const wa = decodeURIComponent(await page.evaluate(() => window.__wa));
+  assert.match(wa, /^https:\/\/wa\.me\/5493414519509\?text=Hola Tell Cecilia! Te enviamos el presupuesto E-0001[\s\S]*\$190\.000[\s\S]*api\/foto\?id=pdf1&tipo=pdf/);
+  // Corregir: sale como revisión del mismo número
+  await page.evaluate(() => { window.confirm = () => true; window.__compartido = null; });
+  await page.click("[data-corregir]");
+  assert.match(await page.textContent("#peAvisoRevision"), /Corrigiendo el presupuesto E-0001/);
+  assert.strictEqual(await page.inputValue("#peManoObra"), "50.000");
+  await page.fill("#peManoObra", "40000");
+  await page.click("#peGenerarBtn");
+  await page.waitForFunction(() => window.__compartido, null, { timeout: 15000 });
+  assert.deepStrictEqual({ a: pedidos.at(-1).accion, b: pedidos.at(-1).base }, { a: "revision", b: "E-0001" });
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });

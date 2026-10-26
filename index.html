@@ -1630,6 +1630,8 @@
     <div class="review-scroll">
       <p class="hint-eyebrow review-eyebrow">PRESUPUESTO EXPRESS</p>
       <p class="list-status" id="peListaEstado">Cargando lista de precios...</p>
+      <div class="pe-aviso hidden" id="peAvisoViejo"></div>
+      <div class="pe-aviso pe-aviso-rev hidden" id="peAvisoRevision"></div>
 
       <div class="pe-bloque">
         <h3 class="pe-tit"><span>1</span> Cliente</h3>
@@ -1666,6 +1668,7 @@
 
       <div class="pe-bloque">
         <h3 class="pe-tit"><span>3</span> Materiales</h3>
+        <div class="pe-kits hidden" id="peKits"></div>
         <input class="field-input" type="search" id="peArtBuscar" placeholder="Buscar artículo por nombre o código" autocomplete="off">
         <div id="peArtResultados" class="pe-resultados"></div>
         <div id="peItems" class="pe-items"></div>
@@ -1696,6 +1699,12 @@
       <p class="pe-nota" id="peNotaCotiz"></p>
       <button type="button" class="btn btn-primary" id="peGenerarBtn" style="width:100%; margin-top:6px;">Generar PDF y compartir</button>
       <button type="button" class="link-btn" id="peLimpiarBtn" style="margin-top:12px;">Empezar un presupuesto nuevo</button>
+
+      <div class="pe-bloque pe-hechos hidden" id="peHechosWrap" style="margin-top:20px;">
+        <h3 class="pe-tit">Mis últimos presupuestos</h3>
+        <p class="pe-nota" style="margin-top:0;">Si el cliente pidió un cambio, tocá «Corregir»: sale con el mismo número y -R1, -R2...</p>
+        <div id="peHechos"></div>
+      </div>
     </div>
 
     <div class="action-bar">

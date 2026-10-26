@@ -480,6 +480,21 @@ th .ayuda-btn { width: 18px; height: 18px; min-width: 18px; font-size: 11px; mar
 .lp-cotiz input { margin-bottom: 0; }
 .lp-mapeo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0 14px; }
 .lp-tabla { width: 100%; border-collapse: collapse; font-size: 13px; }
+.lp-sub { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+.lp-sub h4 { margin: 0 0 4px; font-size: 15px; }
+.lp-kit { border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 10px; }
+.lp-kit-cab { display: flex; gap: 8px; align-items: center; }
+.lp-kit-cab input { margin: 0; font-weight: 700; }
+.lp-kit-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.lp-kit-item input { width: 64px; margin: 0; padding: 6px 8px; }
+.lp-kit-item span { flex: 1; min-width: 0; }
+.lp-kit-buscar { margin: 10px 0 0; }
+.lp-buscar-res { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 6px; }
+.lp-buscar-res button { width: 100%; text-align: left; padding: 8px 10px; border-radius: 8px; background: var(--paper); color: var(--ink); border: 1px solid var(--border); box-shadow: none; font-family: inherit; font-weight: 500; font-size: 13px; }
+.lp-fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; margin-top: 8px; }
+.lp-foto { display: flex; align-items: center; gap: 8px; padding: 6px; border: 1px solid var(--border); border-radius: 10px; font-size: 12.5px; }
+.lp-foto img { width: 56px; height: 56px; object-fit: contain; background: #fff; border-radius: 6px; flex-shrink: 0; }
+.lp-foto span { flex: 1; min-width: 0; }
 .lp-tabla td { white-space: normal; }
 .cli-manual-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
 .cli-manual-grid .cli-manual-ancho { grid-column: 1 / -1; }
@@ -820,7 +835,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
         <div id="materialesSugeridosLista"></div>
       </div>
 
-      <div class="card lp-card" id="listaPreciosCard">
+      <div class="card lp-card sin-cambios" id="listaPreciosCard">
         <h3 style="margin:0 0 4px;">Lista de precios (para el Presupuesto express)</h3>
         <p class="subtitle" style="margin:0 0 12px;">Subí el Excel con los artículos y sus precios (con IVA). Es la base que usa el <b>Presupuesto express</b> para buscar artículos. Cada vez que lo subas de nuevo, reemplaza la lista anterior. Los artículos en dólares se pasan a pesos con la cotización de abajo.</p>
         <p class="status" id="lpEstado">Cargando...</p>
@@ -846,6 +861,27 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
           <button type="button" id="lpGuardarBtn" style="width:auto; padding:11px 22px;">Guardar esta lista de precios</button>
         </div>
         <p class="status" id="lpStatus"></p>
+
+        <div class="lp-sub">
+          <h4>Kits armados</h4>
+          <p class="subtitle" style="margin:0 0 10px;">Combos que se agregan al presupuesto con un toque (ej. "Kit alarma básica": central, teclado, batería, sirena y sensores). Los precios se toman siempre de la lista vigente.</p>
+          <div id="lpKits"></div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:8px;">
+            <button type="button" id="lpKitNuevoBtn" class="btn-secondary-admin" style="width:auto;">+ Nuevo kit</button>
+            <button type="button" id="lpKitsGuardarBtn" style="width:auto; padding:10px 20px;">Guardar kits</button>
+          </div>
+          <p class="status" id="lpKitsStatus"></p>
+        </div>
+
+        <div class="lp-sub">
+          <h4>Fotos de artículos</h4>
+          <p class="subtitle" style="margin:0 0 10px;">Las fotos salen debajo de cada material en el PDF, como en los presupuestos de siempre. Conviene cargarlas a los artículos que más se usan.</p>
+          <input type="text" id="lpFotoBuscar" placeholder="Buscar artículo para cargarle foto...">
+          <div id="lpFotoResultados" class="lp-buscar-res"></div>
+          <input type="file" id="lpFotoArchivo" accept="image/*" class="hidden">
+          <div id="lpFotosLista" class="lp-fotos"></div>
+          <p class="status" id="lpFotosStatus"></p>
+        </div>
       </div>
 
       <div id="categoriasFilas"></div>
@@ -875,7 +911,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
         <p class="status" id="clientesImportStatus"></p>
       </div>
 
-      <div class="card cli-manual" id="clienteManualCard">
+      <div class="card cli-manual sin-cambios" id="clienteManualCard">
         <h3 style="margin:0 0 4px;">Agregar un cliente a mano</h3>
         <p class="subtitle" style="margin:0 0 12px;">Para un cliente nuevo que todavía no está en el Excel (por ejemplo, una instalación en curso), así el instalador ya puede cargarle la SIM y los datos. Poné el nombre <b>tal cual figura en el sistema de oficina</b>. Cuando subas el Excel definitivo, si trae este mismo N° de cliente, lo pisa con lo del Excel.</p>
         <div class="cli-manual-grid">
@@ -1720,6 +1756,7 @@ document.addEventListener("click", (e) => {
   const b = e.target.closest && e.target.closest("button");
   const panel = b && b.closest("[id^='panel']");
   if (!panel || !PANELES_CON_GUARDAR.includes(panel.id) || /^guardar/.test(b.id || "")) return;
+  if (b.closest(".sin-cambios")) return; // tarjetas que se guardan solas (lista de precios, cliente a mano)
   if (/quitar|subir|bajar|agregar/i.test(b.className + " " + b.id)) marcarPanelConCambios(panel.id);
 }, true);
 function recargarSiNoHayCambios(panel, cargar, siempre) {
@@ -2886,18 +2923,29 @@ function numeroArgentinoAdmin(v) {
 }
 const pesosLP = (n) => "$" + Number(n || 0).toLocaleString("es-AR", { maximumFractionDigits: 2 });
 let lpArchivo = { nombre: "", filas: [], encabezado: [] };
+let lpDatos = { items: [], kits: [], fotos: {} };
+const LP_DIAS_LISTA_VIEJA = 30, LP_DIAS_COTIZ_VIEJA = 7;
+function diasDesdeLP(iso) { const d = fechaDelServidor(iso); return d ? Math.floor((Date.now() - d.getTime()) / 864e5) : null; }
+function claveArticuloLP(a) { return (a.c && String(a.c).trim()) || a.d; }
 async function cargarListaPreciosAdmin() {
   const st = document.getElementById("lpEstado");
   try {
     const r = await fetch("/api/datos?coleccion=lista_precios", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || "Error");
+    lpDatos = { ...d, items: Array.isArray(d.items) ? d.items : [], kits: Array.isArray(d.kits) ? d.kits : [], fotos: d.fotos && typeof d.fotos === "object" ? d.fotos : {} };
+    renderKitsLP(); renderFotosLP();
     const n = Array.isArray(d.items) ? d.items.length : 0;
     const usd = n ? d.items.filter((x) => x.m === "USD").length : 0;
+    const diasLista = diasDesdeLP(d.actualizado), diasCot = diasDesdeLP(d.cotizacion_actualizada);
+    const avisos = [];
+    if (n && diasLista !== null && diasLista > LP_DIAS_LISTA_VIEJA) avisos.push(`la lista de precios tiene ${diasLista} días`);
+    if (usd && diasCot !== null && diasCot > LP_DIAS_COTIZ_VIEJA) avisos.push(`la cotización del dólar tiene ${diasCot} días`);
     st.className = n ? "status ok" : "status";
     st.textContent = n
       ? `Lista cargada: ${n.toLocaleString("es-AR")} artículos${usd ? ` (${usd} en dólares)` : ""}${d.archivo ? ` — ${d.archivo}` : ""}${d.actualizado ? `, el ${fechaDelServidor(d.actualizado).toLocaleString("es-AR", { hour12: false })}` : ""}${d.actualizado_por ? ` por ${d.actualizado_por}` : ""}.`
       : "Todavía no se cargó ninguna lista de precios.";
+    if (avisos.length) { st.className = "status err"; st.textContent += ` ⚠️ Ojo: ${avisos.join(" y ")}. Conviene actualizar.`; }
     document.getElementById("lpCotizacion").value = d.cotizacion_usd ? String(d.cotizacion_usd).replace(".", ",") : "";
     document.getElementById("lpCotizacionStatus").textContent = d.cotizacion_usd ? `Cotización actual: ${pesosLP(d.cotizacion_usd)} por dólar${d.cotizacion_actualizada ? ` (desde el ${fechaDelServidor(d.cotizacion_actualizada).toLocaleDateString("es-AR")})` : ""}.` : "Sin cotización cargada: los artículos en dólares no se van a poder presupuestar.";
   } catch (e) {
@@ -3021,6 +3069,127 @@ document.getElementById("lpGuardarBtn").addEventListener("click", async () => {
     st.className = "status err"; st.textContent = "No se pudo guardar: " + e.message;
   } finally { btn.disabled = false; }
 });
+
+// ---------- Kits armados ----------
+function buscarArticulosLP(q, max) {
+  const palabras = normalizeTextAdmin(q).split(/\s+/).filter(Boolean);
+  if (!palabras.length) return [];
+  const out = [];
+  for (const a of lpDatos.items) {
+    const t = normalizeTextAdmin(a.d + " " + (a.c || ""));
+    if (palabras.every((w) => t.includes(w))) { out.push(a); if (out.length >= (max || 12)) break; }
+  }
+  return out;
+}
+function renderKitsLP() {
+  const cont = document.getElementById("lpKits");
+  if (!lpDatos.kits.length) { cont.innerHTML = '<p class="subtitle" style="margin:0;">Todavía no hay kits.</p>'; return; }
+  cont.innerHTML = lpDatos.kits.map((k, ki) => `<div class="lp-kit" data-kit="${ki}">
+    <div class="lp-kit-cab"><input type="text" class="lp-kit-nombre" value="${escapeHtmlAdmin(k.nombre)}" placeholder="Nombre del kit (ej. Kit alarma básica)"><button type="button" class="btn-icono lp-kit-borrar" title="Borrar kit">✕</button></div>
+    ${k.items.map((it, ii) => `<div class="lp-kit-item"><input type="number" min="1" class="lp-kit-cant" data-ii="${ii}" value="${it.cant}"><span>${escapeHtmlAdmin(it.d)}${it.c ? ` <small>(${escapeHtmlAdmin(it.c)})</small>` : ""}${lpDatos.items.length && !lpDatos.items.some((a) => (it.c && a.c === it.c) || a.d === it.d) ? ' <b style="color:#C0392B;">· ya no está en la lista</b>' : ""}</span><button type="button" class="btn-icono lp-kit-quitar" data-ii="${ii}" title="Quitar">✕</button></div>`).join("")}
+    <input type="text" class="lp-kit-buscar" placeholder="+ Agregar artículo al kit (buscar en la lista)">
+    <div class="lp-buscar-res lp-kit-res"></div>
+  </div>`).join("");
+  cont.querySelectorAll(".lp-kit").forEach((box) => {
+    const k = lpDatos.kits[Number(box.dataset.kit)];
+    box.querySelector(".lp-kit-nombre").addEventListener("input", (e) => { k.nombre = e.target.value; });
+    box.querySelector(".lp-kit-borrar").addEventListener("click", async () => { if (await confirmarAdmin(`¿Borrar el kit "${k.nombre || "sin nombre"}"?`)) { lpDatos.kits.splice(Number(box.dataset.kit), 1); renderKitsLP(); } });
+    box.querySelectorAll(".lp-kit-cant").forEach((inp) => inp.addEventListener("change", () => { k.items[Number(inp.dataset.ii)].cant = Math.max(1, Math.round(Number(inp.value) || 1)); }));
+    box.querySelectorAll(".lp-kit-quitar").forEach((b) => b.addEventListener("click", () => { k.items.splice(Number(b.dataset.ii), 1); renderKitsLP(); }));
+    const buscar = box.querySelector(".lp-kit-buscar"), res = box.querySelector(".lp-kit-res");
+    buscar.addEventListener("input", () => {
+      const lista = buscar.value.trim().length >= 2 ? buscarArticulosLP(buscar.value, 10) : [];
+      res.innerHTML = lista.map((a, i) => `<button type="button" data-i="${i}">${escapeHtmlAdmin(a.d)}${a.c ? ` <small>(${escapeHtmlAdmin(a.c)})</small>` : ""}</button>`).join("") || (buscar.value.trim().length >= 2 ? '<p class="subtitle" style="margin:4px 0;">Sin resultados en la lista.</p>' : "");
+      res.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+        const a = lista[Number(b.dataset.i)];
+        const ya = k.items.find((x) => x.d === a.d && x.c === (a.c || ""));
+        if (ya) ya.cant++; else k.items.push({ c: a.c || "", d: a.d, cant: 1 });
+        renderKitsLP();
+        document.querySelector(`.lp-kit[data-kit="${lpDatos.kits.indexOf(k)}"] .lp-kit-buscar`).focus();
+      }));
+    });
+  });
+}
+document.getElementById("lpKitNuevoBtn").addEventListener("click", () => {
+  if (!lpDatos.items.length) { document.getElementById("lpKitsStatus").className = "status err"; document.getElementById("lpKitsStatus").textContent = "Primero subí la lista de precios."; return; }
+  lpDatos.kits.push({ nombre: "", items: [] });
+  renderKitsLP();
+  const nombres = document.querySelectorAll(".lp-kit-nombre");
+  nombres[nombres.length - 1].focus();
+});
+document.getElementById("lpKitsGuardarBtn").addEventListener("click", async () => {
+  const st = document.getElementById("lpKitsStatus");
+  const incompletos = lpDatos.kits.filter((k) => !k.nombre.trim() || !k.items.length);
+  if (incompletos.length) { st.className = "status err"; st.textContent = "Cada kit necesita un nombre y al menos un artículo."; return; }
+  st.className = "status"; st.textContent = "Guardando...";
+  try {
+    const r = await fetch("/api/datos?coleccion=lista_precios", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ accion: "kits", kits: lpDatos.kits }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Error");
+    st.className = "status ok"; st.textContent = `Listo: ${d.kits} kit(s) guardado(s).`;
+  } catch (e) { st.className = "status err"; st.textContent = "No se pudo guardar: " + e.message; }
+});
+
+// ---------- Fotos de artículos ----------
+let lpFotoPara = null;
+function renderFotosLP() {
+  const cont = document.getElementById("lpFotosLista");
+  const claves = Object.keys(lpDatos.fotos || {});
+  cont.innerHTML = claves.length ? claves.map((k) => {
+    const a = lpDatos.items.find((x) => claveArticuloLP(x) === k);
+    return `<div class="lp-foto"><img src="/api/foto?id=${encodeURIComponent(lpDatos.fotos[k])}" alt="" loading="lazy"><span>${escapeHtmlAdmin(a ? a.d : k)}${a ? "" : ' <b style="color:#C0392B;">· no está en la lista</b>'}</span><button type="button" class="btn-icono" data-clave="${escapeHtmlAdmin(k)}" title="Quitar foto">✕</button></div>`;
+  }).join("") : '<p class="subtitle" style="margin:0;">Todavía no hay fotos cargadas.</p>';
+  cont.querySelectorAll("button[data-clave]").forEach((b) => b.addEventListener("click", () => guardarFotoLP(b.dataset.clave, "")));
+}
+document.getElementById("lpFotoBuscar").addEventListener("input", (e) => {
+  const res = document.getElementById("lpFotoResultados");
+  const lista = e.target.value.trim().length >= 2 ? buscarArticulosLP(e.target.value, 10) : [];
+  res.innerHTML = lista.map((a, i) => `<button type="button" data-i="${i}">${lpDatos.fotos[claveArticuloLP(a)] ? "📷 " : ""}${escapeHtmlAdmin(a.d)}${a.c ? ` <small>(${escapeHtmlAdmin(a.c)})</small>` : ""}</button>`).join("");
+  res.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { lpFotoPara = lista[Number(b.dataset.i)]; document.getElementById("lpFotoArchivo").click(); }));
+});
+function achicarImagenLP(file, max) {
+  return new Promise((ok, mal) => {
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, c.width, c.height);
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(img.src);
+      ok(c.toDataURL("image/jpeg", 0.82));
+    };
+    img.onerror = () => mal(new Error("No se pudo leer la imagen"));
+    img.src = URL.createObjectURL(file);
+  });
+}
+document.getElementById("lpFotoArchivo").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file || !lpFotoPara) return;
+  const st = document.getElementById("lpFotosStatus");
+  st.className = "status"; st.textContent = "Subiendo foto...";
+  try {
+    const base64 = await achicarImagenLP(file, 600);
+    const r = await fetch("/api/foto", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ base64 }) });
+    const d = await r.json();
+    if (!r.ok || !d.id) throw new Error(d.error || "No se pudo subir");
+    await guardarFotoLP(claveArticuloLP(lpFotoPara), d.id);
+    document.getElementById("lpFotoBuscar").value = ""; document.getElementById("lpFotoResultados").innerHTML = "";
+  } catch (err) { st.className = "status err"; st.textContent = "No se pudo cargar la foto: " + err.message; }
+});
+async function guardarFotoLP(clave, id) {
+  const st = document.getElementById("lpFotosStatus");
+  try {
+    const r = await fetch("/api/datos?coleccion=lista_precios", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ accion: "foto", clave, id }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Error");
+    if (id) lpDatos.fotos[clave] = id; else delete lpDatos.fotos[clave];
+    renderFotosLP();
+    st.className = "status ok"; st.textContent = id ? "Foto guardada." : "Foto quitada.";
+  } catch (e) { st.className = "status err"; st.textContent = "No se pudo guardar: " + e.message; }
+}
 
 // ---------- Categorías de consultas con IA ----------
 const consultasCatStatus = document.getElementById("consultasCatStatus");
