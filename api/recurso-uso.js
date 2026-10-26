@@ -21,7 +21,8 @@ async function getSimNuevo(headersBackendNuevo, res, query) {
   res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
   try {
     if (query && query.pendientes) {
-      const r = await fetch(`${process.env.BACKEND_NUEVO_URL}/api/sims/transferencias-pendientes?tecnico=${encodeURIComponent(query.tecnico || "")}`, { headers: headersBackendNuevo });
+      const filtro = query.todas ? "todas=1" : `tecnico=${encodeURIComponent(query.tecnico || "")}`;
+      const r = await fetch(`${process.env.BACKEND_NUEVO_URL}/api/sims/transferencias-pendientes?${filtro}`, { headers: headersBackendNuevo });
       const data = await r.json();
       res.status(r.status).json(data);
       return;
@@ -34,7 +35,16 @@ async function getSimNuevo(headersBackendNuevo, res, query) {
   }
 }
 
-async function postSimNuevo(headersBackendNuevo, body, res) {
+// Acciones que solo puede hacer la oficina (sesión del panel admin).
+const ACCIONES_SIM_OFICINA = ["alta_lote", "editar_stock", "dar_de_baja", "cancelar_transferencia", "editar_instalada"];
+async function postSimNuevo(headersBackendNuevo, body, res, req) {
+  if (body && ACCIONES_SIM_OFICINA.includes(body.accion)) {
+    const quien = require("../lib/sesion").autorizar(req);
+    if (!quien || quien.rol !== "admin") {
+      res.status(403).json({ error: "Esta acción solo se puede hacer desde el panel de la oficina" });
+      return;
+    }
+  }
   const r = await fetch(`${process.env.BACKEND_NUEVO_URL}/api/sims/accion`, {
     method: "POST",
     headers: { ...headersBackendNuevo, "Content-Type": "application/json" },
@@ -513,7 +523,7 @@ module.exports = async (req, res) => {
 
     if (req.method === "POST") {
       if (recurso === "vehiculo") return await postVehiculoNuevo(headersBackendNuevo, body, res);
-      if (recurso === "sim") return await postSimNuevo(headersBackendNuevo, body, res);
+      if (recurso === "sim") return await postSimNuevo(headersBackendNuevo, body, res, req);
       if (recurso === "herramienta") return await postHerramientaNuevo(headersBackendNuevo, body, res);
       if (recurso === "presencia") return await postPresenciaNuevo(headersBackendNuevo, body, res);
       if (recurso === "seguimiento") return await postSeguimientoNuevo(headersBackendNuevo, body, res);

@@ -985,44 +985,113 @@ test("Manuales: datos del equipo (crear con autor y fecha, editar queda registra
   await ctx.close();
 });
 
-test("Admin SIMs: guardar la tabla no pisa lo que cambió en la app ni re-manda las instaladas como stock", async () => {
+test("Admin SIMs: stock con resumen y filtros, acciones por fila y en lote, pendientes, alta sin duplicados, baja con motivo, instaladas y ficha de línea", async () => {
   const { ctx, page, erroresPagina } = await nuevaPagina();
+  const acciones = [];
+  const sims = [
+    { numero: "341 555-0001", empresa: "Claro", tipo: "Estándar", tecnico_actual: "Juan", estado: "stock", estado_fisico: "Disponible", ubicacion_tipo: "tecnico" },
+    { numero: "3415550002", empresa: "Movistar", tipo: "Mini", tecnico_actual: "Oficina", estado: "stock", estado_fisico: "Disponible", ubicacion_tipo: "oficina" },
+    { numero: "3415550003", empresa: "Movistar", tipo: "Estándar", tecnico_actual: "Oficina", estado: "stock", estado_fisico: "Defectuosa", ubicacion_tipo: "oficina" },
+    { numero: "3415550004", empresa: "Personal", tipo: "Estándar", tecnico_actual: "Juan", estado: "stock", estado_fisico: "Disponible", ubicacion_tipo: "tecnico" },
+    { numero: "3415550009", empresa: "Claro", tecnico_actual: "Luis", estado: "uso", ubicacion_tipo: "cliente", cliente: "Kiosco Norte" },
+  ];
+  const instaladas = [
+    { numero: "3415550009", cliente: "Kiosco Norte", direccion: "Belgrano 5", empresa: "Claro", estado_linea: "Activo", fecha_activacion: "2026-09-01", tecnico_instalador: "Luis" },
+    { numero: "3415550010", cliente: "Farmacia Central", direccion: "San Martín 9", empresa: "Movistar", estado_linea: "Inactivo", fecha_activacion: "2026-10-10", tecnico_instalador: "Juan" },
+  ];
+  const pendientes = [{ id: 7, numero: "3415550004", empresa: "Personal", tecnico_origen: "Juan", tecnico_destino: "Luis", fecha: "2026-10-20", hora: "10:00" }];
+  const historial = [{ fecha: "2026-10-20", hora: "10:00", numero: "3415550004", accion: "transferencia_pendiente", tecnico: "Juan", tecnico_nuevo: "Luis" }];
   await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  await page.route("**/api/**", (route) => {
+    const req = route.request(); const u = req.url();
+    const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (req.method() === "POST" && u.includes("/api/recurso-uso")) {
+      const b = JSON.parse(req.postData() || "{}");
+      acciones.push(b);
+      if (b.accion === "transferir") return json({ ok: true, pendiente: b.tecnico_nuevo !== "Oficina" });
+      if (b.accion === "alta_lote") return json({ ok: true, agregadas: b.sims.map((s) => ({ numero: s.numero })), repetidas: [], invalidas: [] });
+      return json({ ok: true, migradas: 0 });
+    }
+    if (u.includes("pendientes=1")) return json(pendientes);
+    if (u.includes("coleccion=sims_instaladas")) return json(instaladas);
+    if (u.includes("coleccion=sims")) return json(sims);
+    if (u.includes("coleccion=tecnicos")) return json([{ nombre: "Juan" }, { nombre: "Luis" }]);
+    if (u.includes("recurso=sim")) return json(historial);
+    json([]);
+  });
+  page.on("dialog", (d) => d.accept(d.type() === "prompt" ? "Devuelta a la empresa" : undefined));
   await page.goto(base + "/admin.html");
   await page.waitForTimeout(300);
-  const r = await page.evaluate(() => {
-    const base = new Map([
-      ["1", { numero: "1", empresa: "Claro", tipo: "Estándar", tecnico_actual: "Juan", estado: "stock", cliente: "", ubicacion_tipo: "tecnico" }],
-      ["2", { numero: "2", empresa: "Movistar", tipo: "", tecnico_actual: "Oficina", estado: "stock", cliente: "", ubicacion_tipo: "oficina" }],
-      ["3", { numero: "3", empresa: "Personal", tipo: "Estándar", tecnico_actual: "Luis", estado: "stock", cliente: "", ubicacion_tipo: "tecnico" }],
-      ["9", { numero: "9", empresa: "Claro", tipo: "Estándar", tecnico_actual: "Juan", estado: "uso", cliente: "Kiosco", ubicacion_tipo: "cliente" }],
-    ]);
-    // Mientras la pestaña estaba abierta, en la app: la 1 se transfirió a Luis y se marcó defectuosa,
-    // la 3 se instaló (ya no está en stock) y apareció la 5 nueva.
-    const servidor = [
-      { numero: "1", empresa: "Claro", tipo: "Estándar", tecnico_actual: "Luis", tecnico_anterior: "Juan", estado: "stock", estado_fisico: "Defectuosa", cliente: "", ubicacion_tipo: "tecnico" },
-      { numero: "2", empresa: "Movistar", tipo: "", tecnico_actual: "Oficina", estado: "stock", cliente: "", ubicacion_tipo: "oficina" },
-      { numero: "5", empresa: "Claro", tipo: "Estándar", tecnico_actual: "Oficina", estado: "stock", cliente: "", ubicacion_tipo: "oficina" },
-      { numero: "9", empresa: "Claro", tipo: "Estándar", tecnico_actual: "Juan", estado: "uso", cliente: "Kiosco", ubicacion_tipo: "cliente" },
-    ];
-    // En el admin solo se cambió el tipo de la 2 y se agregó la 7.
-    const tabla = [
-      { numero: "1", empresa: "Claro", tipo: "Estándar", tecnico_actual: "Juan", estado: "stock", cliente: "" },
-      { numero: "2", empresa: "Movistar", tipo: "Mini", tecnico_actual: "Oficina", estado: "stock", cliente: "" },
-      { numero: "3", empresa: "Personal", tipo: "Estándar", tecnico_actual: "Luis", estado: "stock", cliente: "" },
-      { numero: "9", empresa: "Claro", tipo: "Estándar", tecnico_actual: "Juan", estado: "stock", cliente: "Kiosco" },
-      { numero: "7", empresa: "Movistar", tipo: "", tecnico_actual: "Oficina", estado: "stock", cliente: "" },
-    ];
-    return unirSimsConServidor(tabla, servidor, base);
-  });
-  const porNum = Object.fromEntries(r.lista.map((x) => [x.numero, x]));
-  assert.strictEqual(porNum["1"].tecnico_actual, "Luis", "respeta la transferencia hecha en la app");
-  assert.strictEqual(porNum["1"].estado_fisico, "Defectuosa", "no pierde el estado físico");
-  assert.strictEqual(porNum["2"].tipo, "Mini", "aplica lo editado en el admin");
-  assert.ok(!porNum["3"], "no revive la que se instaló");
-  assert.ok(!porNum["9"], "no manda las instaladas como stock");
-  assert.ok(porNum["5"], "conserva la que se agregó en la app");
-  assert.ok(porNum["7"], "agrega la nueva del admin");
+  await page.evaluate(() => { document.getElementById("mainCard").classList.remove("hidden"); document.getElementById("panelSims").classList.remove("hidden"); return cargarSimsAdmin(); });
+
+  // Solo stock (la instalada no aparece), resumen y pendientes
+  assert.strictEqual(await page.locator("#simsTablaBody .sim-fila-tabla").count(), 4);
+  assert.match(await page.locator("#simsResumen").textContent(), /Total 4[\s\S]*Oficina 1[\s\S]*Juan 2[\s\S]*Pendientes de aceptar 1[\s\S]*Con problema 1/);
+  assert.match(await page.locator("#simsPendientesCard").textContent(), /3415550004[\s\S]*Juan[\s\S]*Luis/);
+  assert.match(await page.locator("#simsTablaBody").textContent(), /Pendiente: Luis la tiene que aceptar/);
+
+  // Filtro por chip
+  await page.click('.sims-chip[data-quien="Juan"]');
+  assert.strictEqual(await page.locator("#simsTablaBody .sim-fila-tabla").count(), 2);
+  await page.click('.sims-chip[data-quien="Juan"]');
+
+  // Transferir desde la fila (queda pendiente) y cancelar una pendiente
+  const filaOficina = page.locator("#simsTablaBody .sim-fila-tabla", { hasText: "3415550002" });
+  await filaOficina.locator(".sim-accion-select").selectOption("t:Juan");
+  await page.waitForTimeout(300);
+  assert.deepStrictEqual(acciones.filter((a) => a.accion === "transferir").map((a) => [a.numero, a.tecnico, a.tecnico_nuevo]), [["3415550002", "Oficina", "Juan"]]);
+  assert.match(await page.locator("#simsStatus").textContent(), /pendiente hasta que la acepte/);
+  await page.click(".sim-cancelar-pend");
+  await page.waitForTimeout(200);
+  assert.ok(acciones.some((a) => a.accion === "cancelar_transferencia" && a.id_transferencia === 7));
+
+  // Lote: marcar dos como defectuosas
+  await page.locator("#simsTablaBody .sim-fila-tabla", { hasText: "0001" }).locator(".sim-sel").check();
+  await page.locator("#simsTablaBody .sim-fila-tabla", { hasText: "0002" }).locator(".sim-sel").check();
+  assert.match(await page.locator("#simsLoteCuenta").textContent(), /2 seleccionadas/);
+  await page.selectOption("#simsLoteEstado", "Defectuosa");
+  await page.waitForTimeout(400);
+  assert.deepStrictEqual(acciones.filter((a) => a.accion === "marcar_estado_fisico").map((a) => [a.numero, a.tecnico, a.estado_fisico]).sort(), [["341 555-0001", "Juan", "Defectuosa"], ["3415550002", "Oficina", "Defectuosa"]]);
+
+  // Baja con motivo
+  await page.locator("#simsTablaBody .sim-fila-tabla", { hasText: "0003" }).locator(".sim-accion-select").selectOption("baja");
+  await page.selectOption(".sim-extra .x-motivo", "Perdida");
+  await page.click(".sim-extra .x-ok");
+  await page.waitForTimeout(300);
+  assert.ok(acciones.some((a) => a.accion === "dar_de_baja" && a.numero === "3415550003" && a.motivo === "Perdida"));
+
+  // Alta: los que ya existen (en otro formato) o están instalados no se mandan
+  await page.click("#simsAltaBtn");
+  await page.fill("#simsAltaNumeros", "0341 15 555-0001\n3415550009\n3415550500\n341 555 0500\n12");
+  await page.selectOption("#simsAltaEmpresa", "Claro");
+  await page.click("#simsAltaRevisarBtn");
+  const vista = await page.locator("#simsAltaVista").textContent();
+  assert.match(vista, /3415550500[\s\S]*Ya existen \(no se tocan\) \(3\)[\s\S]*stock de Juan[\s\S]*instalada en Kiosco Norte[\s\S]*repetida en la lista[\s\S]*Con error \(1\)/);
+  await page.click("#simsAltaConfirmarBtn");
+  await page.waitForTimeout(300);
+  const alta = acciones.find((a) => a.accion === "alta_lote");
+  assert.deepStrictEqual(alta.sims.map((s) => [s.numero, s.empresa]), [["3415550500", "Claro"]]);
+
+  // Ficha de la línea con nombres claros de los movimientos
+  await page.locator("#simsTablaBody .sim-num-link", { hasText: "3415550004" }).click();
+  await page.waitForTimeout(300);
+  assert.match(await page.locator(".sims-ficha").textContent(), /En stock de Juan[\s\S]*Transferencia enviada: de Juan a Luis/);
+  await page.click(".sims-ficha-cerrar");
+
+  // Instaladas: filtros, estado de una sola línea y retirar
+  await page.evaluate(() => { document.getElementById("panelSims").classList.add("hidden"); document.getElementById("panelSimsInstaladas").classList.remove("hidden"); return cargarSimsInstaladasAdmin(); });
+  assert.strictEqual(await page.locator("#simsInstaladasTablaBody tr").count(), 2);
+  await page.selectOption("#simsInstFiltroEstado", "Inactivo");
+  assert.strictEqual(await page.locator("#simsInstaladasTablaBody tr").count(), 1);
+  await page.click("#simsInstaladasTablaBody .badge-estado-sim");
+  await page.waitForTimeout(200);
+  assert.ok(acciones.some((a) => a.accion === "editar_instalada" && a.numero === "3415550010" && a.campos.estado_linea === "Activo"));
+  await page.selectOption("#simsInstFiltroEstado", "");
+  await page.locator("#simsInstaladasTablaBody tr", { hasText: "Kiosco Norte" }).locator(".sim-accion-select").selectOption("retirar");
+  await page.selectOption(".sim-extra .x-destino", "Oficina");
+  await page.click(".sim-extra .x-ok");
+  await page.waitForTimeout(300);
+  assert.ok(acciones.some((a) => a.accion === "retirar_de_registro" && a.numero === "3415550009" && a.tecnico === "Oficina"));
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });

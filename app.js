@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.146.0";
+const APP_VERSION = "3.147.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -11588,7 +11588,7 @@ async function fetchDashSims() {
   }
 }
 
-const ETIQUETA_ACCION_SIM = { usar: "Usada en cliente", devolver: "Devuelta a stock", transferir: "Transferida", reemplazar: "Reemplazo en cliente" };
+const ETIQUETA_ACCION_SIM = { usar: "Usada en cliente", devolver: "Devuelta a stock", transferir: "Transferida", reemplazar: "Reemplazo en cliente", transferencia_pendiente: "Transferencia enviada", transferencia_aceptada: "Transferencia aceptada", transferencia_rechazada: "Transferencia rechazada", transferencia_cancelada: "Transferencia cancelada", retirar_de_registro: "Retirada de un cliente", marcar_defectuosa: "Marcada defectuosa", marcar_extraviada: "Marcada extraviada", marcar_disponible: "Marcada disponible", alta: "Alta en el stock", baja: "Dada de baja", editar: "Corrección de datos", editar_instalada: "Datos corregidos" };
 
 function filtrarDashSims() {
   const rango = obtenerRangoPeriodo(dashSimsPeriodoActivo);
@@ -12878,7 +12878,10 @@ async function cargarTransferenciasMandadas() {
 const ETIQUETA_ACCION_SIM_LARGA = {
   usar: "Instalada en un cliente", reemplazar: "Instalada reemplazando otra línea", devolver: "Devuelta al stock",
   transferir: "Transferida", aceptar_transferencia: "Transferencia aceptada", rechazar_transferencia: "Transferencia rechazada",
-  retirar_de_registro: "Retirada de un cliente", marcar_estado_fisico: "Cambio de estado", revertir: "Revertida", alta: "Alta",
+  retirar_de_registro: "Retirada de un cliente", marcar_estado_fisico: "Cambio de estado", revertir: "Revertida", alta: "Alta en el stock",
+  transferencia_pendiente: "Transferencia enviada", transferencia_aceptada: "Transferencia aceptada", transferencia_rechazada: "Transferencia rechazada",
+  transferencia_cancelada: "Transferencia cancelada", marcar_defectuosa: "Marcada defectuosa", marcar_extraviada: "Marcada extraviada",
+  marcar_disponible: "Marcada disponible", baja: "Dada de baja", editar: "Corrección de datos", editar_instalada: "Datos corregidos",
 };
 let simsHistorialCache = null;
 async function renderHistorialSim(numero) {

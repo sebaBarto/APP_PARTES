@@ -249,6 +249,40 @@
   .btn-secondary-admin:active { background: rgba(16,24,32,0.06); }
 .sim-instalar-cliente-info { color: #6B7680; }
 .sim-instalar-cliente-info.ok { color: #2E7D32; font-weight: 600; }
+.sims-resumen { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+.sims-chip { display: inline-flex; align-items: baseline; gap: 6px; padding: 7px 12px; border-radius: 999px; border: 1.5px solid var(--border); background: #fff; cursor: pointer; font-size: 13px; width: auto; box-shadow: none; color: var(--ink); }
+.sims-chip b { font-size: 16px; }
+.sims-chip.activo { border-color: var(--ink); background: var(--ink); color: var(--amber); }
+.sims-chip.alerta b { color: #B3261E; }
+.sims-chip.pend b { color: #B5772A; }
+.sims-botonera { gap: 8px; flex-wrap: wrap; }
+.sims-filtros { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.sims-filtros input[type="text"] { flex: 1 1 220px; margin: 0; }
+.sims-filtros select { flex: 0 1 200px; margin: 0; }
+.sims-filtro-fecha { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; margin: 0; }
+.sims-filtro-fecha input { width: auto; margin: 0; }
+.sims-lote-bar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 12px; margin-bottom: 10px; border-radius: var(--r-md); background: var(--ink); color: #fff; }
+.sims-lote-bar select { width: auto; margin: 0; }
+.sims-lote-bar b { color: var(--amber); margin-right: 6px; }
+.sims-lote-bar .btn-secondary-admin { color: #fff; border-color: rgba(255,255,255,0.6); padding: 8px 14px; }
+.sims-lote-bar #simsLoteBajaBtn { color: #FFB4A8; border-color: #FFB4A8; }
+.sims-tabla .sim-num-link { background: none; border: 0; box-shadow: none; padding: 0; width: auto; color: var(--ink); font-weight: 700; text-decoration: underline dotted; cursor: pointer; font-family: 'IBM Plex Mono', monospace; font-size: 13px; }
+.sims-tabla tr.sim-seleccionada td { background: #FFF6E0; }
+.sims-tabla .sim-accion-select { min-width: 150px; }
+.sims-tabla td.sim-extra { background: #FAFAF7; white-space: normal; padding: 12px; }
+.sims-tabla td.sim-extra .field-row { gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+.sims-tabla td.sim-extra input, .sims-tabla td.sim-extra select { width: auto; min-width: 160px; }
+.sim-pend-badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #FFF1D6; color: #8A5E00; }
+.sim-ok-badge { color: #2E7D32; font-weight: 600; }
+.sims-vista { margin-top: 12px; padding: 12px; border-radius: var(--r-md); background: var(--paper); font-size: 13px; }
+.sims-vista h4 { margin: 10px 0 4px; }
+.sims-vista ul { margin: 0; padding-left: 18px; max-height: 180px; overflow: auto; }
+.sims-vista .err { color: #B3261E; }
+.sims-ficha-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(16,24,32,0.55); display: flex; align-items: flex-start; justify-content: center; padding: 30px 14px; overflow-y: auto; }
+.sims-ficha { background: #fff; border-radius: var(--r-lg); padding: 18px 20px; max-width: 560px; width: 100%; position: relative; }
+.sims-ficha-cerrar { position: absolute; top: 10px; right: 10px; width: 36px !important; height: 36px; padding: 0 !important; border-radius: 50% !important; background: var(--paper) !important; color: var(--ink) !important; box-shadow: none !important; font-size: 20px; }
+.badge-estado-sim.activa { background: #E1F0E4; color: #1F6B34; }
+.badge-estado-sim.inactiva { background: #F1E3E1; color: #8A2E22; }
 </style>
 </head>
 <body>
@@ -608,23 +642,56 @@
     </div>
 
     <div id="panelSims" class="hidden">
-      <h1>SIMs de los técnicos</h1>
-      <p class="subtitle">Tabla completa de líneas: número, empresa proveedora, y a quién está asignada (un técnico, o "Oficina" para stock general sin dueño). Para pasarle una a alguien, elegí el destino en esa fila y tocá "Transferir" — se guarda al toque. Los demás campos se editan en la tabla y se guardan juntos con "Guardar cambios".</p>
+      <h1>SIMs en stock</h1>
+      <p class="subtitle">Las SIMs que están en la Oficina o en mano de un técnico. Las que ya están en un cliente están en "SIMs instaladas". Cada cambio se guarda en el momento y queda en el historial de la línea (tocá un número para verlo).</p>
+
+      <div id="simsResumen" class="sims-resumen"></div>
 
       <div class="card">
-        <label>Excel de SIMs</label>
-        <p class="subtitle" style="margin-top:0;">Columnas: NUMERO DE LINEA, EMPRESA PROVEEDORA, ASIGNADO A (nombre de un técnico, o "Oficina"). Al subir, reemplaza toda la tabla de abajo (después hay que tocar "Guardar cambios" para publicarlo).</p>
-        <div class="field-row">
-          <button type="button" class="btn-secondary-admin" id="descargarExcelSimsBtn"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15" style="vertical-align:-2px; margin-right:4px;"><path d="M12 3v13M7 12l5 5 5-5"/><path d="M4 19h16"/></svg>Descargar Excel</button>
-          <button type="button" class="btn-secondary-admin" id="elegirExcelSimsBtn"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15" style="vertical-align:-2px; margin-right:4px;"><path d="M12 20V7M7 12l5-5 5 5"/><path d="M4 19h16"/></svg>Subir Excel</button>
+        <div class="field-row sims-botonera">
+          <button type="button" id="simsAltaBtn" style="width:auto;">+ Cargar SIMs nuevas</button>
+          <button type="button" class="btn-secondary-admin" id="descargarExcelSimsBtn" style="width:auto;">⬇ Descargar Excel</button>
+          <button type="button" class="btn-secondary-admin" id="elegirExcelSimsBtn" style="width:auto;">⬆ Subir Excel</button>
         </div>
-        <input type="file" id="simsExcelFile" accept=".xlsx,.xls" class="hidden">
+        <input type="file" id="simsExcelFile" accept=".xlsx,.xls,.csv" class="hidden">
+        <p class="subtitle" style="margin:8px 0 0;">Excel: columnas NUMERO DE LINEA, EMPRESA PROVEEDORA, Tipo y ASIGNADO A. Antes de aplicar se muestra qué se agrega, qué cambia y qué tiene error.</p>
         <p class="status" id="simsExcelStatus"></p>
+        <div id="simsExcelVista"></div>
       </div>
 
-      <div class="card">
-        <label for="simsBuscarAdmin">Buscar (número, cliente, empresa o técnico)</label>
-        <input type="text" id="simsBuscarAdmin" placeholder="Buscar...">
+      <div class="card hidden" id="simsAltaPanel">
+        <h3 style="margin-top:0;">Cargar SIMs nuevas</h3>
+        <label for="simsAltaNumeros">Números de línea (uno por renglón; se pueden pegar de una planilla)</label>
+        <textarea id="simsAltaNumeros" rows="6" placeholder="3415550101&#10;341 555-0102&#10;0341 15 555-0103"></textarea>
+        <div class="field-row">
+          <div><label for="simsAltaEmpresa">Empresa</label><select id="simsAltaEmpresa"><option>Movistar</option><option>Personal</option><option>Claro</option></select></div>
+          <div><label for="simsAltaTipo">Formato</label><select id="simsAltaTipo"><option>Estándar</option><option>Mini</option></select></div>
+          <div><label for="simsAltaDestino">Para</label><select id="simsAltaDestino"></select></div>
+        </div>
+        <p class="subtitle" style="margin:4px 0 10px;">Si son para un técnico, le llegan como transferencia y las tiene que aceptar en la app.</p>
+        <button type="button" class="btn-secondary-admin" id="simsAltaRevisarBtn" style="width:auto;">Revisar</button>
+        <div id="simsAltaVista"></div>
+      </div>
+
+      <div class="card hidden" id="simsPendientesCard">
+        <h3 style="margin-top:0;">Transferencias pendientes de aceptar</h3>
+        <p class="subtitle" style="margin-top:0;">Mientras no la acepten, la SIM sigue a nombre de quien la mandó y no se puede usar.</p>
+        <div id="simsPendientesLista"></div>
+      </div>
+
+      <div class="card sims-filtros">
+        <input type="text" id="simsBuscarAdmin" placeholder="Buscar número...">
+        <select id="simsFiltroQuien"><option value="">Todos</option></select>
+        <select id="simsFiltroEmpresa"><option value="">Todas las empresas</option><option>Claro</option><option>Movistar</option><option>Personal</option></select>
+        <select id="simsFiltroEstado"><option value="">Cualquier estado</option><option value="Disponible">Disponibles</option><option value="problema">Defectuosas o extraviadas</option><option value="pendiente">Con transferencia pendiente</option></select>
+      </div>
+
+      <div class="sims-lote-bar hidden" id="simsLoteBar">
+        <b id="simsLoteCuenta"></b>
+        <select id="simsLoteTransferir"><option value="">Transferir a...</option></select>
+        <select id="simsLoteEstado"><option value="">Marcar como...</option><option>Disponible</option><option>Defectuosa</option><option>Extraviada</option></select>
+        <button type="button" class="btn-secondary-admin" id="simsLoteBajaBtn" style="width:auto;">Dar de baja</button>
+        <button type="button" class="btn-secondary-admin" id="simsLoteLimpiarBtn" style="width:auto;">Deseleccionar</button>
       </div>
 
       <p class="status" id="simsStatus"></p>
@@ -633,22 +700,18 @@
         <table class="sims-tabla" id="simsTabla">
           <thead>
             <tr>
+              <th style="width:28px;"><input type="checkbox" id="simsSelTodas" title="Seleccionar las que se ven"></th>
               <th>Número de línea</th>
               <th>Empresa</th>
-              <th>Tipo</th>
-              <th>Cliente</th>
-              <th>Asignado a</th>
-              <th>Transferir a</th>
-              <th></th>
+              <th>Formato</th>
+              <th>Lo tiene</th>
+              <th>Estado</th>
+              <th>Acción</th>
             </tr>
           </thead>
           <tbody id="simsTablaBody"></tbody>
         </table>
       </div>
-
-      <button id="agregarSimBtn" type="button" class="btn-secondary-admin" style="margin:14px 0;">+ Agregar SIM</button>
-      <button id="guardarSimsBtn" type="button">Guardar cambios</button>
-      <p class="status" id="guardarSimsStatus"></p>
     </div>
 
     <div id="panelHerramientas" class="hidden">
@@ -716,38 +779,40 @@
 
     <div id="panelSimsInstaladas" class="hidden">
       <h1>SIMs instaladas en clientes</h1>
-      <p class="subtitle">
-        Registro de consulta de las líneas ya instaladas y funcionando en un cliente (a diferencia
-        del stock, esto no se edita línea por línea acá — se actualiza solo cuando un técnico
-        instala o retira una SIM desde la app, o importando una planilla nueva).
-      </p>
+      <p class="subtitle">Todas las líneas que están en un cliente. Se corrigen de a una (cada cambio queda en el historial de la línea) y se pueden retirar para devolverlas al stock.</p>
 
-      <div class="card" style="margin-bottom:16px;">
+      <div id="simsInstResumen" class="sims-resumen"></div>
+
+      <div class="card sims-filtros">
+        <input type="text" id="simsInstaladasBuscar" placeholder="Buscar cliente, número, dirección o abonado...">
+        <select id="simsInstFiltroEmpresa"><option value="">Todas las empresas</option><option>Claro</option><option>Movistar</option><option>Personal</option></select>
+        <select id="simsInstFiltroEstado"><option value="">Activas e inactivas</option><option value="Activo">Solo activas</option><option value="Inactivo">Solo inactivas</option></select>
+        <select id="simsInstFiltroInstalador"><option value="">Cualquier técnico</option></select>
+        <label class="sims-filtro-fecha">Activadas desde <input type="date" id="simsInstFiltroDesde"></label>
+        <label class="sims-filtro-fecha">hasta <input type="date" id="simsInstFiltroHasta"></label>
+      </div>
+
+      <p class="status" id="simsInstaladasStatus"></p>
+      <div class="sims-tabla-wrap" id="simsInstaladasResultadosWrap">
+        <table class="sims-tabla">
+          <thead>
+            <tr><th>Número</th><th>Cliente</th><th>Dirección</th><th>Abonado</th><th>Empresa</th><th>Activación</th><th>Instaló</th><th>Estado</th><th>Acción</th></tr>
+          </thead>
+          <tbody id="simsInstaladasTablaBody"></tbody>
+        </table>
+      </div>
+      <button type="button" class="btn-secondary-admin hidden" id="simsInstVerMasBtn" style="width:auto;">Ver más</button>
+      <button type="button" class="btn-secondary-admin" id="simsInstExcelBtn" style="width:auto; margin-left:6px;">⬇ Excel de lo filtrado</button>
+
+      <div class="card" style="margin-top:16px;">
         <label>Importar / actualizar desde Excel</label>
         <p class="subtitle" style="margin:0 0 10px;">
           Columnas esperadas: N° DE ABONADO, ESTADO DE LINEA, NOMBRE ABONADO, DIRECCION,
-          FECHA DE ACTIVACION, NUMERO DE LINEA, EMPRESA. Si un N° de abonado ya existe en el
-          registro, se actualiza; si es nuevo, se agrega — no borra nada que ya esté cargado.
+          FECHA DE ACTIVACION, NUMERO DE LINEA, EMPRESA. Si la línea ya está en el registro, se
+          actualiza; si es nueva, se agrega. No borra nada, y no toca las líneas que están en stock.
         </p>
         <input type="file" id="simsInstaladasExcelFile" accept=".xlsx,.xls,.csv">
         <p class="status" id="simsInstaladasImportStatus"></p>
-      </div>
-
-      <div class="card">
-        <label for="simsInstaladasBuscar">Buscar por cliente, número, dirección o N° de abonado</label>
-        <input type="text" id="simsInstaladasBuscar" placeholder="Escribí para buscar...">
-        <p class="status" id="simsInstaladasStatus"></p>
-        <div class="sims-tabla-wrap" id="simsInstaladasResultadosWrap" style="display:none;">
-          <table class="sims-tabla">
-            <thead>
-              <tr>
-                <th>N° Abonado</th><th>Cliente</th><th>Dirección</th><th>Empresa</th>
-                <th>Número</th><th>Activación</th><th>Estado</th>
-              </tr>
-            </thead>
-            <tbody id="simsInstaladasTablaBody"></tbody>
-          </table>
-        </div>
       </div>
     </div>
 
@@ -2878,466 +2943,456 @@ guardarVehiculosBtn.addEventListener("click", async () => {
   }
 });
 
-// ---------- SIMs de los técnicos (tabla completa) ----------
+// ---------- SIMs en stock (Oficina + técnicos) ----------
+// Cada acción se guarda en el momento contra el servidor (que deja el
+// movimiento en el historial). Ya no hay "Guardar cambios" de toda la
+// tabla: así no se pisa nada de lo que hacen los técnicos en la app.
 const simsStatus = document.getElementById("simsStatus");
 const simsTablaBody = document.getElementById("simsTablaBody");
 const simsBuscarAdmin = document.getElementById("simsBuscarAdmin");
-const agregarSimBtn = document.getElementById("agregarSimBtn");
+const simsFiltroQuien = document.getElementById("simsFiltroQuien");
+const simsFiltroEmpresa = document.getElementById("simsFiltroEmpresa");
+const simsFiltroEstado = document.getElementById("simsFiltroEstado");
 const descargarExcelSimsBtn = document.getElementById("descargarExcelSimsBtn");
 const elegirExcelSimsBtn = document.getElementById("elegirExcelSimsBtn");
 const simsExcelFile = document.getElementById("simsExcelFile");
 const simsExcelStatus = document.getElementById("simsExcelStatus");
-const guardarSimsBtn = document.getElementById("guardarSimsBtn");
-const guardarSimsStatus = document.getElementById("guardarSimsStatus");
 let nombresTecnicosParaSims = [];
 let serviciosPendientesParaSims = []; // para autocompletar cliente/dirección al instalar una SIM
 let clientesGeneralParaSims = []; // base completa de Clientes, para buscar al instalar una SIM
+let simsStock = [];        // solo las que están en stock (Oficina o técnico)
+let simsInstaladasTodas = []; // para detectar duplicados al cargar
+let simsPendientes = [];   // transferencias sin aceptar
+const simsSeleccionadas = new Set();
+const COLORES_COMPANIA_SIM_ADMIN = { Movistar: "#2E9E4F", Personal: "#29ABE2", Claro: "#E4402C" };
 
 function escapeHtmlAdmin(s) {
   const div = document.createElement("div");
   div.textContent = s ?? "";
   return div.innerHTML;
 }
+// Número comparable en formato argentino de 10 dígitos (igual que el servidor):
+// "+54 9 341 555-0101", "0341 15 555-0101" y "3415550101" son la misma línea.
+function digitosLineaAR(n) {
+  let d = String(n || "").replace(/\D/g, "");
+  if (d.length >= 12 && d.startsWith("54")) d = d.slice(2);
+  if (d.length === 11 && d.startsWith("9")) d = d.slice(1);
+  if (d.startsWith("0")) d = d.slice(1);
+  if (d.length === 12) {
+    for (const k of [2, 3, 4]) { if (d.substr(k, 2) === "15") { d = d.slice(0, k) + d.slice(k + 2); break; } }
+  }
+  return d.length > 10 ? d.slice(-10) : d;
+}
 
 // normalizeText, limpiarNumeroClienteParaComparar y
 // buscarSimExistenteEnCliente viven en sims-utils.js — compartidas
 // con app.js para que un arreglo futuro valga en los dos lugares.
-
 function buscarClienteSimsPorNombre(nombre) {
   const clave = normalizeText(nombre);
   if (!clave) return null;
   return clientesGeneralParaSims.find((c) => c.nombre && normalizeText(c.nombre) === clave) || null;
 }
-
 function poblarDatalistClientesSims() {
   const datalist = document.getElementById("simInstalarClientesLista");
   if (!datalist) return;
   datalist.innerHTML = clientesGeneralParaSims
     .filter((c) => c.nombre)
-    .map((c) => `<option value="${c.nombre.replace(/"/g, "&quot;")}"></option>`)
+    .map((c) => `<option value="${escapeHtmlAdmin(c.nombre)}"></option>`)
     .join("");
 }
-let simsCompletos = []; // todas las SIMs, tal como están guardadas/recién subidas/recién transferidas
-let numerosExistentesEnServidor = new Set(); // para saber si una fila ya existe del lado del servidor
-let simsBaseAdmin = new Map(); // cómo estaba cada SIM al abrir la pestaña (para saber qué cambió acá y qué cambió en la app)
 
-const COLORES_COMPANIA_SIM_ADMIN = { Movistar: "#2E9E4F", Personal: "#29ABE2", Claro: "#E4402C" };
-
-function renderFilaSimTabla(sim) {
-  const s = sim || { empresa: "Movistar", tipo: "Estándar", numero: "", tecnico_actual: "Oficina", estado: "stock", estado_fisico: "Disponible", ubicacion_tipo: "oficina", ubicacion_nombre: "Oficina", cliente: "" };
-  const esInstalada = s.ubicacion_tipo === "cliente";
-  const destinos = [...nombresTecnicosParaSims, "Oficina"].filter((n) => n !== s.tecnico_actual);
-  const opcionesDestino = destinos.map((n) => `<option value="${n}">${n}</option>`).join("");
-  const opcionesServicios = serviciosPendientesParaSims
-    .filter((sv) => sv.cliente)
-    .map((sv, idx) => `<option value="${idx}">${sv.cliente}${sv.direccion ? " — " + sv.direccion : ""}</option>`)
-    .join("");
-  const colorEmpresa = COLORES_COMPANIA_SIM_ADMIN[s.empresa] || "#8A9089";
-  const formatoFijo = s.empresa === "Claro" || s.empresa === "Personal";
-
-  const fila = document.createElement("tr");
-  fila.className = "sim-fila-tabla";
-  fila.dataset.tecnicoActual = s.tecnico_actual || "Oficina";
-  fila.innerHTML = `
-    <td style="border-left:4px solid ${colorEmpresa};"><input type="text" class="sim-numero" value="${s.numero || ""}" placeholder="341..." ${esInstalada ? "disabled" : ""}></td>
-    <td>
-      <span class="sim-empresa-dot" style="background:${colorEmpresa};"></span>
-      <select class="sim-empresa" ${esInstalada ? "disabled" : ""}>
-        <option ${s.empresa === "Movistar" ? "selected" : ""}>Movistar</option>
-        <option ${s.empresa === "Personal" ? "selected" : ""}>Personal</option>
-        <option ${s.empresa === "Claro" ? "selected" : ""}>Claro</option>
-      </select>
-    </td>
-    <td>
-      <select class="sim-tipo" ${(formatoFijo || esInstalada) ? "disabled" : ""}>
-        <option value="" ${!s.tipo ? "selected" : ""}>—</option>
-        <option value="Estándar" ${s.tipo === "Estándar" || formatoFijo ? "selected" : ""}>Estándar</option>
-        <option value="Mini" ${s.tipo === "Mini" ? "selected" : ""}>Mini</option>
-      </select>
-    </td>
-    <td><input type="text" class="sim-cliente" value="${s.cliente || ""}" placeholder="Cliente" ${esInstalada ? "disabled" : ""}></td>
-    <td>
-      ${esInstalada
-        ? `<span class="sim-asignado-a cliente">Cliente: ${s.ubicacion_nombre || "?"}</span>`
-        : `<span class="sim-asignado-a ${s.tecnico_actual === "Oficina" ? "oficina" : ""}">${s.tecnico_actual || "Oficina"}</span>`
-      }
-      ${s.estado_fisico && s.estado_fisico !== "Disponible" ? `<br><span class="sim-badge-fisico-admin">${s.estado_fisico}</span>` : ""}
-    </td>
-    <td>
-      ${esInstalada ? `<span style="color:#6B7680; font-size:13px;">Instalada — se retira desde la app del técnico</span>` : `
-      <div class="sim-transferir-celda">
-        <select class="sim-transferir-select">
-          <option value="" disabled selected>Elegir...</option>
-          ${opcionesDestino}
-          <option value="__cliente__">Instalar en cliente</option>
-        </select>
-        <div class="sim-instalar-cliente-panel hidden" style="margin-top:6px;">
-          <select class="sim-instalar-servicio-select">
-            <option value="" selected>Elegir un servicio pendiente...</option>
-            ${opcionesServicios}
-          </select>
-          <div class="sim-instalar-manual-wrap" style="margin-top:6px;">
-            <input type="text" class="sim-instalar-cliente-input" placeholder="Buscar cliente por nombre..." list="simInstalarClientesLista" style="margin-bottom:4px;">
-            <div class="sim-instalar-cliente-info" style="font-size:12px; margin-bottom:4px;"></div>
-            <input type="text" class="sim-instalar-abonado-input" placeholder="N° de abonado (opcional)" style="margin-bottom:4px;">
-            <input type="text" class="sim-instalar-direccion-input" placeholder="Dirección (opcional)">
-          </div>
-        </div>
-        <button type="button" class="btn-transferir-fila">Transferir</button>
-      </div>
-      `}
-    </td>
-    <td><button type="button" class="btn-quitar-fila" title="Quitar" ${esInstalada ? "disabled" : ""}>✕</button></td>
-  `;
-
-  fila.querySelector(".sim-empresa").addEventListener("change", (e) => {
-    const nuevoColor = COLORES_COMPANIA_SIM_ADMIN[e.target.value] || "#8A9089";
-    fila.querySelector("td").style.borderLeft = `4px solid ${nuevoColor}`;
-    fila.querySelector(".sim-empresa-dot").style.background = nuevoColor;
-    // Claro y Personal solo vienen en formato Estándar — Movistar es
-    // el único que tiene Mini también.
-    const tipoSelect = fila.querySelector(".sim-tipo");
-    if (e.target.value === "Claro" || e.target.value === "Personal") {
-      tipoSelect.value = "Estándar";
-      tipoSelect.disabled = true;
-    } else {
-      tipoSelect.disabled = false;
-    }
+async function accionSimAdmin(payload) {
+  const res = await fetch("/api/recurso-uso", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+    body: JSON.stringify({ recurso: "sim", ...payload }),
   });
-
-  fila.querySelector(".btn-quitar-fila").addEventListener("click", () => fila.remove());
-
-  // Una fila que representa una SIM ya instalada no tiene ninguno de
-  // los controles de transferir/instalar (se sacaron del HTML porque
-  // no aplican) — no hay nada más que conectar acá.
-  if (esInstalada) return fila;
-
-  const panelInstalarCliente = fila.querySelector(".sim-instalar-cliente-panel");
-  const selectServicio = fila.querySelector(".sim-instalar-servicio-select");
-  const manualWrap = fila.querySelector(".sim-instalar-manual-wrap");
-  const inputClienteManual = fila.querySelector(".sim-instalar-cliente-input");
-  const inputAbonadoManual = fila.querySelector(".sim-instalar-abonado-input");
-  const inputDireccionManual = fila.querySelector(".sim-instalar-direccion-input");
-  const clienteEncontradoInfo = fila.querySelector(".sim-instalar-cliente-info");
-
-  // Apenas lo que se escribió coincide con un cliente real (ignorando
-  // mayúsculas/tildes), se completan solos el abonado y la dirección
-  // — visible en pantalla, no recién al guardar — para que quede
-  // claro qué datos se van a usar.
-  inputClienteManual.addEventListener("input", () => {
-    const encontrado = buscarClienteSimsPorNombre(inputClienteManual.value.trim());
-    if (encontrado) {
-      inputAbonadoManual.value = encontrado.numero_abonado || "";
-      inputDireccionManual.value = encontrado.direccion || "";
-      clienteEncontradoInfo.textContent = `✓ Cliente encontrado en la base (${encontrado.numero_cliente || "sin número"})`;
-      clienteEncontradoInfo.className = "sim-instalar-cliente-info ok";
-    } else {
-      clienteEncontradoInfo.textContent = inputClienteManual.value.trim() ? "Cliente nuevo — no está en la base, se guarda tal cual se escribió." : "";
-      clienteEncontradoInfo.className = "sim-instalar-cliente-info";
-    }
-  });
-
-  fila.querySelector(".sim-transferir-select").addEventListener("change", (e) => {
-    panelInstalarCliente.classList.toggle("hidden", e.target.value !== "__cliente__");
-  });
-
-  selectServicio.addEventListener("change", () => {
-    if (selectServicio.value !== "") {
-      const servicio = serviciosPendientesParaSims.filter((sv) => sv.cliente)[Number(selectServicio.value)];
-      inputClienteManual.value = servicio ? servicio.cliente : "";
-      inputAbonadoManual.value = "";
-      inputDireccionManual.value = servicio ? servicio.direccion || "" : "";
-      inputClienteManual.dispatchEvent(new Event("input"));
-    }
-  });
-
-  fila.querySelector(".btn-transferir-fila").addEventListener("click", async () => {
-    const destino = fila.querySelector(".sim-transferir-select").value;
-    const numeroActual = fila.querySelector(".sim-numero").value.trim();
-    if (!destino) {
-      alert("Elegí a quién transferírsela.");
-      return;
-    }
-    if (!numeroActual) {
-      alert("Esta fila todavía no tiene número de línea cargado.");
-      return;
-    }
-
-    if (destino === "__cliente__") {
-      await instalarSimEnCliente(fila, numeroActual, inputClienteManual, inputAbonadoManual, inputDireccionManual);
-      return;
-    }
-
-    function reflejarCambioEnFila() {
-      fila.dataset.tecnicoActual = destino;
-      fila.querySelector(".sim-asignado-a").textContent = destino;
-      fila.querySelector(".sim-asignado-a").classList.toggle("oficina", destino === "Oficina");
-      const nuevosDestinos = [...nombresTecnicosParaSims, "Oficina"].filter((n) => n !== destino);
-      fila.querySelector(".sim-transferir-select").innerHTML =
-        `<option value="" disabled selected>Elegir...</option>${nuevosDestinos.map((n) => `<option value="${n}">${n}</option>`).join("")}<option value="__cliente__">Instalar en cliente</option>`;
-    }
-
-    // Si la fila es nueva (todavía no se guardó nada), no hay nada que
-    // transferir del lado del servidor — se actualiza solo acá, y
-    // queda pendiente de "Guardar cambios" como el resto de la fila.
-    if (!numerosExistentesEnServidor.has(numeroActual)) {
-      reflejarCambioEnFila();
-      simsStatus.className = "status ok";
-      simsStatus.textContent = `Asignada a ${destino} (todavía sin guardar — tocá "Guardar cambios" para publicarla).`;
-      return;
-    }
-
-    const boton = fila.querySelector(".btn-transferir-fila");
-    boton.disabled = true;
-    boton.textContent = "...";
-    try {
-      const res = await fetch("/api/recurso-uso", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-        body: JSON.stringify({
-          recurso: "sim",
-          accion: "transferir",
-          numero: numeroActual,
-          tecnico: fila.dataset.tecnicoActual,
-          tecnico_nuevo: destino,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Error desconocido");
-      // Refleja el cambio en la fila sin recargar toda la tabla.
-      reflejarCambioEnFila();
-      fila.querySelector(".sim-cliente").value = "";
-      const idx = simsCompletos.findIndex((x) => x.numero === numeroActual);
-      if (idx >= 0) {
-        simsCompletos[idx].tecnico_actual = destino;
-        simsCompletos[idx].estado = "stock";
-        simsCompletos[idx].cliente = "";
-      }
-      simsStatus.className = "status ok";
-      simsStatus.textContent = `Transferida a ${destino}.`;
-    } catch (err) {
-      alert("No se pudo transferir: " + err.message);
-    } finally {
-      boton.disabled = false;
-      boton.textContent = "Transferir";
-    }
-  });
-
-  return fila;
+  let data = {};
+  try { data = await res.json(); } catch (e) { /* sin cuerpo */ }
+  if (!res.ok) throw new Error(data.error || "Error " + res.status);
+  return data;
 }
+function pendienteDe(numero) { return simsPendientes.find((p) => p.numero === numero) || null; }
+function quienTiene(s) { return s.tecnico_actual || "Oficina"; }
+function avisoSims(texto, tipo) { simsStatus.className = "status" + (tipo ? " " + tipo : ""); simsStatus.textContent = texto; }
 
-// Instala una SIM directo en un cliente desde admin.html — pasa por
-// la misma acción real ("usar") que usa la app del técnico, así se
-// migra bien al registro de instaladas y no queda a mitad de camino
-// en el stock.
-async function instalarSimEnCliente(fila, numeroActual, inputClienteManual, inputAbonadoManual, inputDireccionManual) {
-  const textoEscrito = inputClienteManual.value.trim();
-  if (!textoEscrito) {
-    alert("Elegí un servicio pendiente o escribí el nombre del cliente.");
-    return;
-  }
-  // Si lo que se escribió coincide con un cliente real de la base
-  // (ignorando mayúsculas/tildes), se usa el nombre EXACTO como está
-  // guardado ahí — así se evita instalar la SIM bajo un nombre
-  // ligeramente distinto (con o sin tilde, etc.) al que ya existe,
-  // que después no aparecería al buscarla.
-  const clienteEncontrado = buscarClienteSimsPorNombre(textoEscrito);
-  const cliente = clienteEncontrado ? clienteEncontrado.nombre : textoEscrito;
-  const numeroAbonado = inputAbonadoManual.value.trim() || (clienteEncontrado ? clienteEncontrado.numero_abonado || "" : "");
-  const direccion = inputDireccionManual.value.trim() || (clienteEncontrado ? clienteEncontrado.direccion || "" : "");
-  const numeroClienteEncontrado = clienteEncontrado ? clienteEncontrado.numero_cliente : "";
-
-  if (!numerosExistentesEnServidor.has(numeroActual)) {
-    alert('Esta fila todavía no está guardada — tocá "Guardar cambios" primero, y después instalala en el cliente.');
-    return;
-  }
-
-  const boton = fila.querySelector(".btn-transferir-fila");
-  boton.disabled = true;
-  boton.textContent = "...";
+async function cargarSimsAdmin(silencioso) {
+  if (!silencioso) avisoSims("Cargando SIMs...");
   try {
-    // El servidor hace su propia verificación de "¿este cliente ya
-    // tiene otra línea?" antes de guardar (ver sims.js) — acá alcanza
-    // con mandar "usar"; enviarAccionSimConRespaldo se encarga de
-    // mostrar el aviso de reemplazar/dejar las dos si el servidor
-    // encuentra algo, sin tener que duplicar esa consulta acá.
-    const payload = {
-      recurso: "sim",
-      accion: "usar",
-      numero: numeroActual,
-      tecnico: fila.dataset.tecnicoActual,
-      cliente,
-      direccion,
-      numero_abonado: numeroAbonado,
-      numero_cliente: numeroClienteEncontrado || "",
-    };
-    const data = await enviarAccionSimConRespaldo(payload, SERVICIOS_API_TOKEN);
-    // Se instaló y ya se migró al registro — sale del stock acá mismo.
-    simsCompletos = simsCompletos.filter((x) => x.numero !== numeroActual);
-    fila.remove();
-    simsStatus.className = "status ok";
-    simsStatus.textContent = `Instalada en ${cliente} — ya figura completa en el registro de SIMs instaladas.`;
+    // Migración automática de SIMs viejas marcadas "en uso" con cliente.
+    if (!silencioso) {
+      try {
+        const m = await accionSimAdmin({ accion: "migrar_legacy_a_registro" });
+        if (m && m.migradas > 0) alert(`Se migraron ${m.migradas} SIM(s) que estaban "en uso" al registro de instaladas.`);
+      } catch (e) { /* no frena la carga */ }
+    }
+    const h = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const pedidos = [
+      fetch("/api/datos?coleccion=sims", { headers: h, cache: "no-store" }),
+      fetch("/api/recurso-uso?recurso=sim&pendientes=1&todas=1", { headers: h, cache: "no-store" }),
+    ];
+    if (!silencioso || !nombresTecnicosParaSims.length) {
+      pedidos.push(
+        fetch("/api/datos?coleccion=tecnicos", { headers: h, cache: "no-store" }),
+        fetch("/api/servicios", { headers: h, cache: "no-store" }).catch(() => null),
+        fetch("/api/datos?coleccion=clientes", { headers: h, cache: "no-store" }).catch(() => null),
+      );
+    }
+    const [rSims, rPend, rTec, rServ, rCli] = await Promise.all(pedidos);
+    if (!rSims.ok) throw new Error("HTTP " + rSims.status);
+    const todas = await rSims.json();
+    const lista = Array.isArray(todas) ? todas : [];
+    simsStock = lista.filter((s) => s.ubicacion_tipo !== "cliente");
+    simsInstaladasTodas = lista.filter((s) => s.ubicacion_tipo === "cliente");
+    try { const p = await rPend.json(); simsPendientes = Array.isArray(p) ? p : []; } catch (e) { simsPendientes = []; }
+    if (rTec) {
+      try { const t = await rTec.json(); nombresTecnicosParaSims = (Array.isArray(t) ? t : []).map((x) => x.nombre).filter(Boolean).sort(); } catch (e) { /* nada */ }
+      try { const s = rServ ? await rServ.json() : []; serviciosPendientesParaSims = Array.isArray(s) ? s : []; } catch (e) { serviciosPendientesParaSims = []; }
+      try { const c = rCli ? await rCli.json() : []; clientesGeneralParaSims = Array.isArray(c) ? c : []; } catch (e) { clientesGeneralParaSims = []; }
+      poblarDatalistClientesSims();
+      poblarSelectsDestinoSims();
+    }
+    const vigentes = new Set(simsStock.map((s) => s.numero));
+    [...simsSeleccionadas].forEach((n) => { if (!vigentes.has(n)) simsSeleccionadas.delete(n); });
+    controlSims.stock = lista; // la ficha de línea usa lo más nuevo
+    pintarResumenSims();
+    pintarPendientesSims();
+    dibujarTablaSims();
+    if (!silencioso) avisoSims("");
   } catch (err) {
-    alert("No se pudo instalar: " + err.message);
-    boton.disabled = false;
-    boton.textContent = "Transferir";
+    avisoSims("No se pudo cargar la lista de SIMs: " + err.message, "err");
   }
+}
+
+function destinosSims() { return [...nombresTecnicosParaSims, "Oficina"]; }
+function poblarSelectsDestinoSims() {
+  const quien = simsFiltroQuien.value;
+  simsFiltroQuien.innerHTML = `<option value="">Todos</option>${destinosSims().map((n) => `<option>${escapeHtmlAdmin(n)}</option>`).join("")}`;
+  simsFiltroQuien.value = quien;
+  document.getElementById("simsLoteTransferir").innerHTML = `<option value="">Transferir a...</option>${destinosSims().map((n) => `<option>${escapeHtmlAdmin(n)}</option>`).join("")}`;
+  document.getElementById("simsAltaDestino").innerHTML = ["Oficina", ...nombresTecnicosParaSims].map((n) => `<option>${escapeHtmlAdmin(n)}</option>`).join("");
+}
+
+function pintarResumenSims() {
+  const cont = document.getElementById("simsResumen");
+  const porQuien = new Map();
+  simsStock.forEach((s) => {
+    if (s.estado_fisico && s.estado_fisico !== "Disponible") return;
+    porQuien.set(quienTiene(s), (porQuien.get(quienTiene(s)) || 0) + 1);
+  });
+  const problemas = simsStock.filter((s) => s.estado_fisico && s.estado_fisico !== "Disponible").length;
+  const nombres = [...porQuien.keys()].sort((a, b) => (a !== "Oficina") - (b !== "Oficina") || a.localeCompare(b));
+  const activo = simsFiltroQuien.value;
+  cont.innerHTML = `<button type="button" class="sims-chip ${!activo && !simsFiltroEstado.value ? "activo" : ""}" data-quien="">Total <b>${simsStock.length}</b></button>`
+    + nombres.map((n) => `<button type="button" class="sims-chip ${activo === n ? "activo" : ""}" data-quien="${escapeHtmlAdmin(n)}">${escapeHtmlAdmin(n)} <b>${porQuien.get(n)}</b></button>`).join("")
+    + (simsPendientes.length ? `<button type="button" class="sims-chip pend ${simsFiltroEstado.value === "pendiente" ? "activo" : ""}" data-estado="pendiente">Pendientes de aceptar <b>${simsPendientes.length}</b></button>` : "")
+    + (problemas ? `<button type="button" class="sims-chip alerta ${simsFiltroEstado.value === "problema" ? "activo" : ""}" data-estado="problema">Con problema <b>${problemas}</b></button>` : "");
+  cont.querySelectorAll(".sims-chip").forEach((b) => b.addEventListener("click", () => {
+    if (b.dataset.estado) { simsFiltroEstado.value = simsFiltroEstado.value === b.dataset.estado ? "" : b.dataset.estado; simsFiltroQuien.value = ""; }
+    else { simsFiltroQuien.value = b.dataset.quien === simsFiltroQuien.value ? "" : b.dataset.quien; simsFiltroEstado.value = ""; }
+    pintarResumenSims();
+    dibujarTablaSims();
+  }));
+}
+
+function pintarPendientesSims() {
+  const card = document.getElementById("simsPendientesCard");
+  card.classList.toggle("hidden", simsPendientes.length === 0);
+  document.getElementById("simsPendientesLista").innerHTML = simsPendientes.length ? `<div class="sims-tabla-wrap"><table class="sims-tabla" style="min-width:560px;"><thead><tr><th>Número</th><th>Empresa</th><th>De</th><th>Para</th><th>Desde</th><th></th></tr></thead><tbody>${
+    simsPendientes.map((p) => `<tr><td><button type="button" class="sim-num-link" data-ficha="${escapeHtmlAdmin(p.numero)}">${escapeHtmlAdmin(p.numero)}</button></td><td>${escapeHtmlAdmin(p.empresa || "")}</td><td>${escapeHtmlAdmin(p.tecnico_origen)}</td><td><b>${escapeHtmlAdmin(p.tecnico_destino)}</b></td><td>${fechaAR(p.fecha)} ${escapeHtmlAdmin(p.hora || "")}</td><td><button type="button" class="btn-secondary-admin sim-cancelar-pend" data-id="${p.id}" style="width:auto; padding:6px 12px;">Cancelar</button></td></tr>`).join("")
+  }</tbody></table></div>` : "";
+  card.querySelectorAll(".sim-cancelar-pend").forEach((b) => b.addEventListener("click", () => cancelarTransferenciaSim(Number(b.dataset.id))));
+  card.querySelectorAll("[data-ficha]").forEach((b) => b.addEventListener("click", () => abrirFichaLineaSim(b.dataset.ficha)));
+}
+
+async function cancelarTransferenciaSim(id) {
+  const p = simsPendientes.find((x) => x.id === id);
+  if (!p || !confirm(`¿Cancelar la transferencia de ${p.numero} a ${p.tecnico_destino}? La SIM queda con ${p.tecnico_origen}.`)) return;
+  try {
+    await accionSimAdmin({ accion: "cancelar_transferencia", id_transferencia: id, tecnico: "Oficina" });
+    avisoSims(`Transferencia de ${p.numero} cancelada.`, "ok");
+    await cargarSimsAdmin(true);
+  } catch (err) { alert("No se pudo cancelar: " + err.message); }
+}
+
+function simsFiltradas() {
+  const q = simsBuscarAdmin.value.trim();
+  const qDig = digitosLineaAR(q);
+  const quien = simsFiltroQuien.value, empresa = simsFiltroEmpresa.value, estado = simsFiltroEstado.value;
+  return simsStock.filter((s) => {
+    if (q && !(qDig.length >= 3 ? digitosLineaAR(s.numero).includes(qDig) : String(s.numero).toLowerCase().includes(q.toLowerCase()))) return false;
+    if (quien && quienTiene(s) !== quien) return false;
+    if (empresa && s.empresa !== empresa) return false;
+    const fisico = s.estado_fisico || "Disponible";
+    if (estado === "Disponible" && (fisico !== "Disponible" || pendienteDe(s.numero))) return false;
+    if (estado === "problema" && fisico === "Disponible") return false;
+    if (estado === "pendiente" && !pendienteDe(s.numero)) return false;
+    return true;
+  }).sort((a, b) => (quienTiene(a) !== "Oficina") - (quienTiene(b) !== "Oficina") || quienTiene(a).localeCompare(quienTiene(b)) || String(a.numero).localeCompare(String(b.numero)));
 }
 
 function dibujarTablaSims() {
-  const busqueda = simsBuscarAdmin.value.trim().toLowerCase();
+  const lista = simsFiltradas();
   simsTablaBody.innerHTML = "";
-  const filtradas = !busqueda
-    ? simsCompletos
-    : simsCompletos.filter((s) =>
-        (s.numero || "").toLowerCase().includes(busqueda) ||
-        (s.cliente || "").toLowerCase().includes(busqueda) ||
-        (s.empresa || "").toLowerCase().includes(busqueda) ||
-        (s.tecnico_actual || "").toLowerCase().includes(busqueda)
-      );
-  if (filtradas.length === 0) {
-    simsStatus.textContent = busqueda ? "Ninguna SIM coincide con esa búsqueda." : "Todavía no hay ninguna SIM cargada — agregá la primera.";
-    return;
+  if (lista.length === 0) {
+    simsTablaBody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#6B7680; padding:18px;">${simsStock.length ? "Ninguna SIM coincide con los filtros." : "Todavía no hay SIMs en stock — cargá las primeras con \"+ Cargar SIMs nuevas\"."}</td></tr>`;
   }
-  simsStatus.textContent = "";
-  filtradas.forEach((s) => simsTablaBody.appendChild(renderFilaSimTabla(s)));
+  lista.forEach((s) => simsTablaBody.appendChild(renderFilaSimTabla(s)));
+  const selTodas = document.getElementById("simsSelTodas");
+  selTodas.checked = lista.length > 0 && lista.every((s) => simsSeleccionadas.has(s.numero));
+  actualizarBarraLoteSims();
 }
 
-simsBuscarAdmin.addEventListener("input", dibujarTablaSims);
-
-async function cargarSimsAdmin() {
-  simsStatus.textContent = "Cargando SIMs...";
-  simsTablaBody.innerHTML = "";
-  try {
-    // Migración automática: cualquier SIM que haya quedado marcada "en
-    // uso" con un cliente (de antes de que existiera el registro de
-    // instaladas separado) se pasa sola al registro y desaparece de
-    // acá — no hace falta hacer nada manual para esto.
+function renderFilaSimTabla(s) {
+  const fila = document.createElement("tr");
+  fila.className = "sim-fila-tabla" + (simsSeleccionadas.has(s.numero) ? " sim-seleccionada" : "");
+  const color = COLORES_COMPANIA_SIM_ADMIN[s.empresa] || "#8A9089";
+  const pend = pendienteDe(s.numero);
+  const fisico = s.estado_fisico || "Disponible";
+  const opcionesTransferir = destinosSims().filter((n) => n !== quienTiene(s)).map((n) => `<option value="t:${escapeHtmlAdmin(n)}">Transferir a ${escapeHtmlAdmin(n)}</option>`).join("");
+  const opcionesEstado = ["Disponible", "Defectuosa", "Extraviada"].filter((e) => e !== fisico).map((e) => `<option value="e:${e}">Marcar ${e.toLowerCase()}</option>`).join("");
+  fila.innerHTML = `
+    <td><input type="checkbox" class="sim-sel" ${simsSeleccionadas.has(s.numero) ? "checked" : ""} aria-label="Seleccionar ${escapeHtmlAdmin(s.numero)}"></td>
+    <td style="border-left:4px solid ${color};"><button type="button" class="sim-num-link" title="Ver historial de la línea">${escapeHtmlAdmin(s.numero)}</button></td>
+    <td><span class="sim-empresa-dot" style="background:${color};"></span>${escapeHtmlAdmin(s.empresa || "")}</td>
+    <td>${escapeHtmlAdmin(s.tipo || "—")}</td>
+    <td><span class="sim-asignado-a ${quienTiene(s) === "Oficina" ? "oficina" : ""}">${escapeHtmlAdmin(quienTiene(s))}</span></td>
+    <td>${pend ? `<span class="sim-pend-badge">⏳ Pendiente: ${escapeHtmlAdmin(pend.tecnico_destino)} la tiene que aceptar</span>` : fisico !== "Disponible" ? `<span class="sim-badge-fisico-admin">${escapeHtmlAdmin(fisico)}</span>` : '<span class="sim-ok-badge">Disponible</span>'}</td>
+    <td>
+      <select class="sim-accion-select">
+        <option value="">Elegir...</option>
+        ${pend ? `<option value="cancelar">Cancelar la transferencia</option>` : `<optgroup label="Mover">${opcionesTransferir}${fisico === "Disponible" ? '<option value="instalar">Instalar en un cliente</option>' : ""}</optgroup>`}
+        <optgroup label="Estado">${opcionesEstado}</optgroup>
+        <optgroup label="Datos"><option value="editar">Corregir empresa o formato</option><option value="baja">Dar de baja...</option></optgroup>
+      </select>
+    </td>`;
+  fila.querySelector(".sim-num-link").addEventListener("click", () => abrirFichaLineaSim(s.numero));
+  fila.querySelector(".sim-sel").addEventListener("change", (e) => {
+    if (e.target.checked) simsSeleccionadas.add(s.numero); else simsSeleccionadas.delete(s.numero);
+    fila.classList.toggle("sim-seleccionada", e.target.checked);
+    actualizarBarraLoteSims();
+  });
+  fila.querySelector(".sim-accion-select").addEventListener("change", async (e) => {
+    const v = e.target.value;
+    e.target.value = "";
+    if (!v) return;
+    if (v === "cancelar") return cancelarTransferenciaSim(pend.id);
+    if (v === "instalar") return abrirPanelFilaSim(fila, s, "instalar");
+    if (v === "editar") return abrirPanelFilaSim(fila, s, "editar");
+    if (v === "baja") return abrirPanelFilaSim(fila, s, "baja");
     try {
-      const resMigracion = await fetch("/api/recurso-uso", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-        body: JSON.stringify({ recurso: "sim", accion: "migrar_legacy_a_registro" }),
-      });
-      const dataMigracion = await resMigracion.json();
-      if (dataMigracion && dataMigracion.migradas > 0) {
-        alert(`Se migraron ${dataMigracion.migradas} SIM(s) que estaban "en uso" al registro de instaladas — ya no aparecen acá.`);
+      if (v.startsWith("t:")) {
+        const destino = v.slice(2);
+        const r = await accionSimAdmin({ accion: "transferir", numero: s.numero, tecnico: quienTiene(s), tecnico_nuevo: destino });
+        avisoSims(r.pendiente ? `${s.numero}: transferencia enviada a ${destino} — queda pendiente hasta que la acepte en la app.` : `${s.numero} quedó en ${destino}.`, "ok");
+      } else if (v.startsWith("e:")) {
+        await accionSimAdmin({ accion: "marcar_estado_fisico", numero: s.numero, tecnico: quienTiene(s), estado_fisico: v.slice(2) });
+        avisoSims(`${s.numero} marcada como ${v.slice(2).toLowerCase()}.`, "ok");
       }
-    } catch (errMigracion) {
-      // si falla la migración, no se interrumpe la carga normal de la tabla
-    }
-
-    const [resSims, resTecnicos, resServicios, resClientes] = await Promise.all([
-      fetch("/api/datos?coleccion=sims", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" }),
-      fetch("/api/datos?coleccion=tecnicos", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" }),
-      fetch("/api/servicios", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" }).catch(() => null),
-      fetch("/api/datos?coleccion=clientes", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" }).catch(() => null),
-    ]);
-    const sims = await resSims.json();
-    const tecnicos = await resTecnicos.json();
-    simsCompletos = Array.isArray(sims) ? sims : [];
-    numerosExistentesEnServidor = new Set(simsCompletos.map((s) => s.numero));
-    simsBaseAdmin = new Map(simsCompletos.map((s) => [s.numero, { ...s }]));
-    nombresTecnicosParaSims = (Array.isArray(tecnicos) ? tecnicos : []).map((t) => t.nombre);
-    try {
-      const servicios = resServicios ? await resServicios.json() : [];
-      serviciosPendientesParaSims = Array.isArray(servicios) ? servicios : [];
-    } catch (errServicios) {
-      serviciosPendientesParaSims = []; // si falla, igual se puede escribir el cliente a mano
-    }
-    try {
-      const clientes = resClientes ? await resClientes.json() : [];
-      clientesGeneralParaSims = Array.isArray(clientes) ? clientes : [];
-    } catch (errClientes) {
-      clientesGeneralParaSims = []; // si falla, igual se puede escribir el cliente a mano
-    }
-    poblarDatalistClientesSims();
-    dibujarTablaSims();
-  } catch (err) {
-    simsStatus.textContent = "No se pudo cargar la lista de SIMs.";
-  }
+      await cargarSimsAdmin(true);
+    } catch (err) { alert(`No se pudo hacer en ${s.numero}: ${err.message}`); }
+  });
+  return fila;
 }
 
-agregarSimBtn.addEventListener("click", () => {
-  simsCompletos.push({ empresa: "Movistar", tipo: "Estándar", numero: "", tecnico_actual: "Oficina", estado: "stock", cliente: "" });
+// Panel debajo de la fila para instalar, corregir o dar de baja.
+function abrirPanelFilaSim(fila, s, tipo) {
+  const previo = fila.nextElementSibling;
+  if (previo && previo.classList.contains("sim-fila-extra")) previo.remove();
+  const extra = document.createElement("tr");
+  extra.className = "sim-fila-extra";
+  let html = "";
+  if (tipo === "editar") {
+    html = `<div class="field-row"><div><label>Empresa</label><select class="x-empresa">${["Movistar", "Personal", "Claro"].map((e) => `<option ${e === s.empresa ? "selected" : ""}>${e}</option>`).join("")}</select></div>
+      <div><label>Formato</label><select class="x-tipo"><option ${s.tipo !== "Mini" ? "selected" : ""}>Estándar</option><option ${s.tipo === "Mini" ? "selected" : ""}>Mini</option></select></div>
+      <button type="button" class="x-ok" style="width:auto;">Guardar</button><button type="button" class="btn-secondary-admin x-cancel" style="width:auto;">Cancelar</button></div>
+      <p class="subtitle" style="margin:6px 0 0;">Claro y Personal vienen solo en formato Estándar. Si el número está mal, dala de baja y cargala de nuevo.</p>`;
+  } else if (tipo === "baja") {
+    html = `<div class="field-row"><div><label>Motivo de la baja</label><select class="x-motivo"><option>Rota / no funciona</option><option>Perdida</option><option>Devuelta a la empresa</option><option>Línea dada de baja por la empresa</option><option>Cargada por error</option><option value="otro">Otro...</option></select></div>
+      <div><label>Detalle (opcional)</label><input type="text" class="x-detalle" placeholder="Ej: no levanta señal"></div>
+      <button type="button" class="x-ok" style="width:auto; background:#B3261E; color:#fff;">Dar de baja</button><button type="button" class="btn-secondary-admin x-cancel" style="width:auto;">Cancelar</button></div>
+      <p class="subtitle" style="margin:6px 0 0;">Sale del stock y queda registrado en el historial de la línea quién la dio de baja, cuándo y por qué.</p>`;
+  } else {
+    const opcionesServicios = serviciosPendientesParaSims.filter((sv) => sv.cliente)
+      .map((sv, idx) => `<option value="${idx}">${escapeHtmlAdmin(sv.cliente)}${sv.direccion ? " — " + escapeHtmlAdmin(sv.direccion) : ""}</option>`).join("");
+    html = `<div class="field-row"><div><label>Servicio pendiente (opcional)</label><select class="x-servicio"><option value="">Elegir...</option>${opcionesServicios}</select></div>
+      <div><label>Cliente</label><input type="text" class="x-cliente" list="simInstalarClientesLista" placeholder="Buscar cliente..."></div>
+      <div><label>N° de abonado</label><input type="text" class="x-abonado"></div>
+      <div><label>Dirección</label><input type="text" class="x-direccion"></div>
+      <button type="button" class="x-ok" style="width:auto;">Instalar</button><button type="button" class="btn-secondary-admin x-cancel" style="width:auto;">Cancelar</button></div>
+      <p class="x-info sim-instalar-cliente-info" style="margin:6px 0 0;"></p>`;
+  }
+  extra.innerHTML = `<td colspan="7" class="sim-extra">${html}</td>`;
+  fila.after(extra);
+  const q = (c) => extra.querySelector(c);
+  q(".x-cancel").addEventListener("click", () => extra.remove());
+  if (tipo === "instalar") {
+    const info = q(".x-info");
+    q(".x-cliente").addEventListener("input", () => {
+      const c = buscarClienteSimsPorNombre(q(".x-cliente").value.trim());
+      if (c) { q(".x-abonado").value = c.numero_abonado || ""; q(".x-direccion").value = c.direccion || ""; info.textContent = `✓ Cliente de la base (N° ${c.numero_cliente || "sin número"})`; info.className = "x-info sim-instalar-cliente-info ok"; }
+      else { info.textContent = q(".x-cliente").value.trim() ? "Cliente nuevo — no está en la base, se guarda como se escribió." : ""; info.className = "x-info sim-instalar-cliente-info"; }
+    });
+    q(".x-servicio").addEventListener("change", (ev) => {
+      const sv = serviciosPendientesParaSims.filter((x) => x.cliente)[Number(ev.target.value)];
+      if (!sv) return;
+      q(".x-cliente").value = sv.cliente; q(".x-direccion").value = sv.direccion || ""; q(".x-abonado").value = "";
+      q(".x-cliente").dispatchEvent(new Event("input"));
+    });
+  }
+  q(".x-ok").addEventListener("click", async () => {
+    const boton = q(".x-ok");
+    boton.disabled = true;
+    try {
+      if (tipo === "editar") {
+        await accionSimAdmin({ accion: "editar_stock", numero: s.numero, tecnico: "Oficina", empresa: q(".x-empresa").value, tipo: q(".x-tipo").value });
+        avisoSims(`${s.numero} corregida.`, "ok");
+      } else if (tipo === "baja") {
+        const m = q(".x-motivo").value, det = q(".x-detalle").value.trim();
+        const motivo = m === "otro" ? det : [m, det].filter(Boolean).join(" — ");
+        if (!motivo) { alert("Escribí el motivo."); boton.disabled = false; return; }
+        if (!confirm(`¿Dar de baja ${s.numero} (${quienTiene(s)})?\nMotivo: ${motivo}`)) { boton.disabled = false; return; }
+        await accionSimAdmin({ accion: "dar_de_baja", numero: s.numero, tecnico: "Oficina", motivo });
+        avisoSims(`${s.numero} dada de baja.`, "ok");
+      } else {
+        const escrito = q(".x-cliente").value.trim();
+        if (!escrito) { alert("Elegí un servicio o escribí el cliente."); boton.disabled = false; return; }
+        const c = buscarClienteSimsPorNombre(escrito);
+        await enviarAccionSimConRespaldo({
+          recurso: "sim", accion: "usar", numero: s.numero, tecnico: quienTiene(s),
+          cliente: c ? c.nombre : escrito, direccion: q(".x-direccion").value.trim() || (c ? c.direccion || "" : ""),
+          numero_abonado: q(".x-abonado").value.trim() || (c ? c.numero_abonado || "" : ""), numero_cliente: c ? c.numero_cliente || "" : "",
+        }, SERVICIOS_API_TOKEN);
+        avisoSims(`${s.numero} instalada en ${c ? c.nombre : escrito} — ya está en "SIMs instaladas".`, "ok");
+      }
+      await cargarSimsAdmin(true);
+    } catch (err) {
+      alert("No se pudo: " + err.message);
+      boton.disabled = false;
+    }
+  });
+}
+
+// ---------- Selección y acciones en lote ----------
+function actualizarBarraLoteSims() {
+  const n = simsSeleccionadas.size;
+  document.getElementById("simsLoteBar").classList.toggle("hidden", n === 0);
+  document.getElementById("simsLoteCuenta").textContent = `${n} seleccionada${n === 1 ? "" : "s"}`;
+}
+document.getElementById("simsSelTodas").addEventListener("change", (e) => {
+  simsFiltradas().forEach((s) => { if (e.target.checked) simsSeleccionadas.add(s.numero); else simsSeleccionadas.delete(s.numero); });
   dibujarTablaSims();
 });
-
-// Une lo editado en esta pestaña con el estado ACTUAL del servidor.
-// Antes se mandaba la tabla tal como estaba al abrirla: si mientras tanto
-// un técnico transfería, instalaba o marcaba una SIM como defectuosa, al
-// tocar "Guardar" se pisaba ese cambio; y las SIMs ya instaladas en un
-// cliente se volvían a mandar como "stock" (quedaban en las dos tablas).
-// Ahora: solo se aplica lo que se cambió acá; todo lo demás se toma del
-// servidor tal como está en este momento.
-function unirSimsConServidor(filasTabla, servidor, base) {
-  const srv = new Map((servidor || []).map((x) => [x.numero, x]));
-  const enTabla = new Set();
-  const resultado = [];
-  let respetados = 0;
-  filasTabla.forEach((f) => {
-    if (!f.numero || enTabla.has(f.numero)) return;
-    enTabla.add(f.numero);
-    const b = base.get(f.numero);
-    const actual = srv.get(f.numero);
-    if (!actual) {
-      if (b) return; // existía al abrir y ya no está (se instaló o se borró desde la app): no se revive
-      resultado.push({ ...f }); // SIM nueva cargada acá (a mano o por Excel)
-      return;
-    }
-    if (actual.ubicacion_tipo === "cliente") return; // instalada: vive en el registro de instaladas
-    const unida = { ...actual };
-    ["empresa", "tipo", "cliente"].forEach((k) => {
-      if (!b || String(f[k] ?? "") !== String(b[k] ?? "")) unida[k] = f[k];
-    });
-    if (b && f.tecnico_actual !== b.tecnico_actual) unida.tecnico_actual = f.tecnico_actual; // reasignada acá (Excel)
-    if (b && JSON.stringify(actual) !== JSON.stringify(b)) respetados++;
-    resultado.push(unida);
-  });
-  // SIMs que aparecieron en el servidor después de abrir la pestaña: se conservan.
-  let nuevasEnApp = 0;
-  srv.forEach((x, numero) => {
-    if (!enTabla.has(numero) && !base.has(numero) && x.ubicacion_tipo !== "cliente") { resultado.push(x); nuevasEnApp++; }
-  });
-  return { lista: resultado, respetados, nuevasEnApp };
-}
-
-function leerFilasSimsDeLaTabla() {
-  const filas = Array.from(simsTablaBody.querySelectorAll(":scope > .sim-fila-tabla"));
-  return filas.map((fila) => ({
-    empresa: fila.querySelector(".sim-empresa").value,
-    tipo: fila.querySelector(".sim-tipo").value,
-    numero: fila.querySelector(".sim-numero").value.trim(),
-    tecnico_actual: fila.dataset.tecnicoActual,
-    estado: "stock",
-    cliente: fila.querySelector(".sim-cliente").value.trim(),
-  }));
-}
-
-descargarExcelSimsBtn.addEventListener("click", () => {
-  if (simsCompletos.length === 0) {
-    simsExcelStatus.className = "status err";
-    simsExcelStatus.textContent = "No hay SIMs cargadas todavía para descargar.";
-    return;
+document.getElementById("simsLoteLimpiarBtn").addEventListener("click", () => { simsSeleccionadas.clear(); dibujarTablaSims(); });
+async function aplicarLoteSims(texto, armarPedido) {
+  const elegidas = simsStock.filter((s) => simsSeleccionadas.has(s.numero));
+  const errores = [];
+  let hechas = 0, pendientes = 0;
+  for (let i = 0; i < elegidas.length; i++) {
+    avisoSims(`${texto}: ${i + 1} de ${elegidas.length}...`);
+    const pedido = armarPedido(elegidas[i]);
+    if (!pedido) continue;
+    try { const r = await accionSimAdmin(pedido); hechas++; if (r && r.pendiente) pendientes++; } catch (err) { errores.push(`${elegidas[i].numero}: ${err.message}`); }
   }
-  const filas = simsCompletos.map((s) => ({
-    "NUMERO DE LINEA": s.numero,
-    "EMPRESA PROVEEDORA": s.empresa,
-    Tipo: s.tipo,
-    "ASIGNADO A": s.ubicacion_tipo === "cliente" ? `Cliente: ${s.ubicacion_nombre || ""}` : (s.tecnico_actual || "Oficina"),
-    "ESTADO FISICO": s.estado_fisico || "Disponible",
-    Cliente: s.cliente,
-  }));
-  const hoja = XLSX.utils.json_to_sheet(filas);
+  simsSeleccionadas.clear();
+  await cargarSimsAdmin(true);
+  avisoSims(`${texto}: ${hechas} hecha(s)${pendientes ? `, ${pendientes} quedaron pendientes de aceptar` : ""}${errores.length ? `, ${errores.length} con error` : ""}.`, errores.length ? "err" : "ok");
+  if (errores.length) alert("No se pudieron hacer:\n\n" + errores.join("\n"));
+}
+document.getElementById("simsLoteTransferir").addEventListener("change", async (e) => {
+  const destino = e.target.value;
+  e.target.value = "";
+  if (!destino || !confirm(`¿Transferir ${simsSeleccionadas.size} SIM(s) a ${destino}?${destino !== "Oficina" ? "\nLe llegan como pendientes y las tiene que aceptar en la app." : ""}`)) return;
+  await aplicarLoteSims(`Transferir a ${destino}`, (s) => (quienTiene(s) === destino || pendienteDe(s.numero) ? null : { accion: "transferir", numero: s.numero, tecnico: quienTiene(s), tecnico_nuevo: destino }));
+});
+document.getElementById("simsLoteEstado").addEventListener("change", async (e) => {
+  const estado = e.target.value;
+  e.target.value = "";
+  if (!estado || !confirm(`¿Marcar ${simsSeleccionadas.size} SIM(s) como ${estado.toLowerCase()}?`)) return;
+  await aplicarLoteSims(`Marcar ${estado.toLowerCase()}`, (s) => ({ accion: "marcar_estado_fisico", numero: s.numero, tecnico: quienTiene(s), estado_fisico: estado }));
+});
+document.getElementById("simsLoteBajaBtn").addEventListener("click", async () => {
+  const motivo = (prompt(`Motivo para dar de baja ${simsSeleccionadas.size} SIM(s):`, "Devuelta a la empresa") || "").trim();
+  if (!motivo) return;
+  await aplicarLoteSims("Dar de baja", (s) => ({ accion: "dar_de_baja", numero: s.numero, tecnico: "Oficina", motivo }));
+});
+[simsBuscarAdmin].forEach((el) => el.addEventListener("input", dibujarTablaSims));
+[simsFiltroQuien, simsFiltroEmpresa, simsFiltroEstado].forEach((el) => el.addEventListener("change", () => { pintarResumenSims(); dibujarTablaSims(); }));
+
+// ---------- Alta de SIMs nuevas (pegar una lista) ----------
+const simsAltaPanel = document.getElementById("simsAltaPanel");
+document.getElementById("simsAltaBtn").addEventListener("click", () => {
+  simsAltaPanel.classList.toggle("hidden");
+  if (!simsAltaPanel.classList.contains("hidden")) document.getElementById("simsAltaNumeros").focus();
+});
+document.getElementById("simsAltaEmpresa").addEventListener("change", (e) => {
+  const tipo = document.getElementById("simsAltaTipo");
+  tipo.disabled = e.target.value !== "Movistar";
+  if (tipo.disabled) tipo.value = "Estándar";
+});
+document.getElementById("simsAltaEmpresa").dispatchEvent(new Event("change"));
+
+// Revisión local (sin escribir nada) de lo que se va a cargar.
+function revisarAltaSims(filas) {
+  const existentes = new Map();
+  simsStock.forEach((s) => existentes.set(digitosLineaAR(s.numero), `ya está en stock de ${quienTiene(s)}`));
+  simsInstaladasTodas.forEach((s) => existentes.set(digitosLineaAR(s.numero), `ya está instalada en ${s.cliente || s.ubicacion_nombre || "un cliente"}`));
+  const nuevas = [], repetidas = [], invalidas = [], vistos = new Set();
+  filas.forEach((f) => {
+    const d = digitosLineaAR(f.numero);
+    if (d.length < 8) { invalidas.push(`${f.numero || "(vacío)"}: número incompleto`); return; }
+    if (!["Claro", "Movistar", "Personal"].includes(f.empresa)) { invalidas.push(`${f.numero}: empresa "${f.empresa || "?"}" desconocida`); return; }
+    if (existentes.has(d)) { repetidas.push(`${f.numero}: ${existentes.get(d)}`); return; }
+    if (vistos.has(d)) { repetidas.push(`${f.numero}: repetida en la lista`); return; }
+    vistos.add(d);
+    nuevas.push({ ...f, numero: d });
+  });
+  return { nuevas, repetidas, invalidas };
+}
+function htmlVistaSims(grupos, botonTexto, idBoton) {
+  const lista = (titulo, items, clase) => items.length ? `<h4 class="${clase || ""}">${titulo} (${items.length})</h4><ul>${items.map((x) => `<li>${escapeHtmlAdmin(x)}</li>`).join("")}</ul>` : "";
+  const hayAlgo = grupos.some((g) => g.aplicar && g.items.length);
+  return `<div class="sims-vista">${grupos.map((g) => lista(g.titulo, g.items, g.clase)).join("") || "<p>No hay nada para hacer.</p>"}
+    ${hayAlgo ? `<button type="button" id="${idBoton}" style="width:auto; margin-top:10px;">${botonTexto}</button>` : ""}</div>`;
+}
+document.getElementById("simsAltaRevisarBtn").addEventListener("click", () => {
+  const empresa = document.getElementById("simsAltaEmpresa").value;
+  const tipo = document.getElementById("simsAltaTipo").value;
+  const destino = document.getElementById("simsAltaDestino").value || "Oficina";
+  const numeros = document.getElementById("simsAltaNumeros").value.split(/[\n,;\t]+/).map((x) => x.trim()).filter(Boolean);
+  const r = revisarAltaSims(numeros.map((numero) => ({ numero, empresa, tipo, tecnico_actual: destino })));
+  const vista = document.getElementById("simsAltaVista");
+  vista.innerHTML = htmlVistaSims([
+    { titulo: `Se cargan como ${empresa} ${tipo}, para ${destino}`, items: r.nuevas.map((x) => x.numero), aplicar: true },
+    { titulo: "Ya existen (no se tocan)", items: r.repetidas },
+    { titulo: "Con error", items: r.invalidas, clase: "err" },
+  ], `Cargar ${r.nuevas.length} SIM(s)`, "simsAltaConfirmarBtn");
+  const ok = document.getElementById("simsAltaConfirmarBtn");
+  if (ok) ok.addEventListener("click", async () => {
+    ok.disabled = true;
+    try {
+      const resp = await accionSimAdmin({ accion: "alta_lote", tecnico: "Oficina", sims: r.nuevas });
+      vista.innerHTML = `<div class="sims-vista">✓ Se cargaron ${resp.agregadas.length} SIM(s)${destino !== "Oficina" ? ` — le llegaron a ${escapeHtmlAdmin(destino)} para aceptar` : ""}.${resp.repetidas.length ? ` ${resp.repetidas.length} ya existían.` : ""}</div>`;
+      document.getElementById("simsAltaNumeros").value = "";
+      await cargarSimsAdmin(true);
+    } catch (err) { alert("No se pudo cargar: " + err.message); ok.disabled = false; }
+  });
+});
+
+// ---------- Excel: descargar / subir con vista previa ----------
+descargarExcelSimsBtn.addEventListener("click", () => {
+  if (simsStock.length === 0) { simsExcelStatus.className = "status err"; simsExcelStatus.textContent = "No hay SIMs en stock para descargar."; return; }
+  const filas = simsStock.map((s) => {
+    const p = pendienteDe(s.numero);
+    return { "NUMERO DE LINEA": s.numero, "EMPRESA PROVEEDORA": s.empresa, Tipo: s.tipo, "ASIGNADO A": quienTiene(s), "ESTADO FISICO": s.estado_fisico || "Disponible", "TRANSFERENCIA PENDIENTE": p ? `a ${p.tecnico_destino}` : "" };
+  });
   const libro = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(libro, hoja, "SIMs");
-  XLSX.writeFile(libro, `sims_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filas), "SIMs en stock");
+  XLSX.writeFile(libro, `sims_stock_${new Date().toISOString().slice(0, 10)}.xlsx`);
   simsExcelStatus.className = "status ok";
   simsExcelStatus.textContent = "Descargado.";
 });
-
 elegirExcelSimsBtn.addEventListener("click", () => simsExcelFile.click());
-
 simsExcelFile.addEventListener("change", () => {
   const file = simsExcelFile.files[0];
   if (!file) return;
@@ -3347,41 +3402,50 @@ simsExcelFile.addEventListener("change", () => {
   reader.onload = (e) => {
     try {
       const wb = XLSX.read(e.target.result, { type: "array" });
-      const hoja = wb.Sheets[wb.SheetNames[0]];
-      const filas = XLSX.utils.sheet_to_json(hoja, { defval: "" });
-
-      const nuevaLista = filas.map((row) => {
-        const estadoTexto = String(row["Estado"] || "").trim().toLowerCase();
-        const asignado = String(
-          row["ASIGNADO A"] ?? row["Asignado a"] ?? row["Técnico dueño"] ?? row["Tecnico dueño"] ?? ""
-        ).trim();
-        return {
-          empresa: normalizarEmpresa(row["EMPRESA PROVEEDORA"] ?? row["EMPRESA"] ?? row["Empresa"] ?? ""),
-          tipo: String(row["Tipo"] || "").trim(),
-          numero: String(row["NUMERO DE LINEA"] ?? row["Número"] ?? row["Numero"] ?? "").trim(),
-          tecnico_actual: asignado || "Oficina",
-          estado: estadoTexto.startsWith("en uso") || estadoTexto === "uso" ? "uso" : "stock",
-          cliente: String(row["Cliente"] || "").trim(),
-        };
-      }).filter((s) => s.numero);
-
-      if (nuevaLista.length === 0) {
-        simsExcelStatus.className = "status err";
-        simsExcelStatus.textContent = "No se encontraron filas con número de línea — revisá los encabezados (NUMERO DE LINEA, EMPRESA PROVEEDORA, ASIGNADO A).";
-        return;
-      }
-
-      // Se MEZCLA con lo que ya estaba cargado (por número de línea)
-      // en vez de reemplazar toda la lista — así no se pierden las
-      // SIMs que los técnicos ya tienen asignadas en su stock. Si un
-      // número ya existía, se actualiza con los datos del archivo; si
-      // es nuevo, se agrega.
-      const mapaSims = new Map(simsCompletos.map((s) => [s.numero, s]));
-      nuevaLista.forEach((s) => mapaSims.set(s.numero, s));
-      simsCompletos = [...mapaSims.values()];
-      dibujarTablaSims();
-      simsExcelStatus.className = "status ok";
-      simsExcelStatus.textContent = `Se sumaron/actualizaron ${nuevaLista.length} SIMs del archivo (total ahora: ${simsCompletos.length}) — revisá la tabla y tocá "Guardar cambios" para publicarlas.`;
+      const filas = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
+      const leidas = filas.map((row) => ({
+        numero: String(row["NUMERO DE LINEA"] ?? row["Número"] ?? row["Numero"] ?? "").trim(),
+        empresa: normalizarEmpresa(row["EMPRESA PROVEEDORA"] ?? row["EMPRESA"] ?? row["Empresa"] ?? ""),
+        tipo: String(row["Tipo"] || "").trim(),
+        asignado: String(row["ASIGNADO A"] ?? row["Asignado a"] ?? "").trim(),
+      })).filter((f) => f.numero);
+      if (!leidas.length) throw new Error("no hay filas con NUMERO DE LINEA");
+      const stockPorDig = new Map(simsStock.map((s) => [digitosLineaAR(s.numero), s]));
+      const instPorDig = new Map(simsInstaladasTodas.map((s) => [digitosLineaAR(s.numero), s]));
+      const conocidos = new Set([...nombresTecnicosParaSims.map((n) => n.toLowerCase()), "oficina"]);
+      const nuevas = [], cambios = [], movimientos = [], ignoradas = [];
+      leidas.forEach((f) => {
+        const d = digitosLineaAR(f.numero);
+        const enStock = stockPorDig.get(d);
+        if (instPorDig.has(d)) { ignoradas.push(`${f.numero}: está instalada en ${instPorDig.get(d).cliente || "un cliente"} — no se toca`); return; }
+        if (f.asignado && !conocidos.has(f.asignado.toLowerCase())) { ignoradas.push(`${f.numero}: "${f.asignado}" no es un técnico cargado`); return; }
+        const destino = f.asignado ? destinosSims().find((n) => n.toLowerCase() === f.asignado.toLowerCase()) : "";
+        if (!enStock) { nuevas.push({ numero: f.numero, empresa: f.empresa, tipo: f.tipo, tecnico_actual: destino || "Oficina" }); return; }
+        if ((f.empresa && f.empresa !== enStock.empresa) || (f.tipo && f.tipo !== (enStock.tipo || ""))) cambios.push({ s: enStock, empresa: f.empresa || enStock.empresa, tipo: f.tipo || enStock.tipo });
+        if (destino && destino !== quienTiene(enStock) && !pendienteDe(enStock.numero)) movimientos.push({ s: enStock, destino });
+      });
+      const alta = revisarAltaSims(nuevas);
+      const vista = document.getElementById("simsExcelVista");
+      vista.innerHTML = htmlVistaSims([
+        { titulo: "SIMs nuevas que se cargan", items: alta.nuevas.map((x) => `${x.numero} · ${x.empresa} · para ${x.tecnico_actual}`), aplicar: true },
+        { titulo: "Se corrige empresa o formato", items: cambios.map((c) => `${c.s.numero}: ${c.s.empresa} ${c.s.tipo || ""} → ${c.empresa} ${c.tipo || ""}`), aplicar: true },
+        { titulo: "Cambian de dueño (a técnicos les llega para aceptar)", items: movimientos.map((m) => `${m.s.numero}: ${quienTiene(m.s)} → ${m.destino}`), aplicar: true },
+        { titulo: "No se tocan", items: [...alta.repetidas, ...ignoradas] },
+        { titulo: "Con error", items: alta.invalidas, clase: "err" },
+      ], "Aplicar cambios", "simsExcelAplicarBtn");
+      simsExcelStatus.textContent = `${leidas.length} fila(s) leídas. Revisá abajo y tocá "Aplicar cambios".`;
+      const ok = document.getElementById("simsExcelAplicarBtn");
+      if (ok) ok.addEventListener("click", async () => {
+        ok.disabled = true;
+        const errores = [];
+        try {
+          if (alta.nuevas.length) await accionSimAdmin({ accion: "alta_lote", tecnico: "Oficina", sims: alta.nuevas });
+        } catch (err) { errores.push("Alta: " + err.message); }
+        for (const c of cambios) { try { await accionSimAdmin({ accion: "editar_stock", numero: c.s.numero, tecnico: "Oficina", empresa: c.empresa, tipo: c.tipo }); } catch (err) { errores.push(`${c.s.numero}: ${err.message}`); } }
+        for (const m of movimientos) { try { await accionSimAdmin({ accion: "transferir", numero: m.s.numero, tecnico: quienTiene(m.s), tecnico_nuevo: m.destino }); } catch (err) { errores.push(`${m.s.numero}: ${err.message}`); } }
+        vista.innerHTML = `<div class="sims-vista">${errores.length ? `<p class="err">Hubo ${errores.length} error(es):</p><ul>${errores.map((x) => `<li>${escapeHtmlAdmin(x)}</li>`).join("")}</ul>` : "✓ Listo, se aplicó todo."}</div>`;
+        await cargarSimsAdmin(true);
+      });
     } catch (err) {
       simsExcelStatus.className = "status err";
       simsExcelStatus.textContent = "No se pudo leer el archivo: " + err.message;
@@ -3392,92 +3456,40 @@ simsExcelFile.addEventListener("change", () => {
   reader.readAsArrayBuffer(file);
 });
 
-guardarSimsBtn.addEventListener("click", async () => {
-  // Si hay un filtro activo, la tabla en pantalla NO tiene todas las
-  // SIMs — solo las que coinciden con la búsqueda. Guardar en ese
-  // estado borraría del servidor todo lo que no se esté viendo en
-  // ese momento. Se bloquea el guardado hasta que se borre el filtro.
-  if (simsBuscarAdmin.value.trim()) {
-    guardarSimsStatus.className = "status err";
-    guardarSimsStatus.textContent = 'Borrá lo que escribiste en el buscador antes de guardar — así se guardan todas las SIMs, no solo las que ves filtradas.';
-    return;
-  }
-
-  const filasTabla = leerFilasSimsDeLaTabla().filter((s) => s.numero);
-
-  if (filasTabla.length === 0) {
-    guardarSimsStatus.className = "status err";
-    guardarSimsStatus.textContent = "Agregá al menos una SIM con número de línea.";
-    return;
-  }
-
-  guardarSimsBtn.disabled = true;
-  guardarSimsStatus.className = "status";
-  guardarSimsStatus.textContent = "Guardando...";
-  let union = { lista: filasTabla, respetados: 0, nuevasEnApp: 0 };
+// ---------- Ficha de una línea (dónde está + todo su historial) ----------
+// Trae lo último de stock, instaladas e historial (para la ficha de una línea).
+async function asegurarDatosControlSims() {
+  const h = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+  const [rs, ri, rh] = await Promise.all([
+    fetch("/api/datos?coleccion=sims", { headers: h, cache: "no-store" }),
+    fetch("/api/datos?coleccion=sims_instaladas", { headers: h, cache: "no-store" }),
+    fetch("/api/recurso-uso?recurso=sim", { headers: h, cache: "no-store" }),
+  ]);
+  const [stock, inst, hist] = await Promise.all([rs.json(), ri.json(), rh.json()]);
+  controlSims.stock = Array.isArray(stock) ? stock : [];
+  controlSims.instaladas = Array.isArray(inst) ? inst : [];
+  controlSims.historial = Array.isArray(hist) ? hist : [];
+}
+async function abrirFichaLineaSim(numero) {
+  const capa = document.createElement("div");
+  capa.className = "sims-ficha-overlay";
+  capa.innerHTML = `<div class="sims-ficha"><button type="button" class="sims-ficha-cerrar" aria-label="Cerrar">×</button><h3 style="margin:0 40px 8px 0;">Línea ${escapeHtmlAdmin(numero)}</h3><div class="sims-ficha-cuerpo"><p class="status">Cargando historial...</p></div></div>`;
+  const cerrar = () => capa.remove();
+  capa.addEventListener("click", (e) => { if (e.target === capa) cerrar(); });
+  capa.querySelector(".sims-ficha-cerrar").addEventListener("click", cerrar);
+  document.body.appendChild(capa);
   try {
-    const resActual = await fetch("/api/datos?coleccion=sims", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
-    if (!resActual.ok) throw new Error("no se pudo leer el estado actual de las SIMs para no pisar cambios de la app");
-    const actual = await resActual.json();
-    union = unirSimsConServidor(filasTabla, Array.isArray(actual) ? actual : [], simsBaseAdmin);
-    const lista = union.lista;
-    const res = await fetch("/api/datos?coleccion=sims", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: "Bearer " + SERVICIOS_API_TOKEN,
-      },
-      body: JSON.stringify(lista),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Error desconocido");
-
-    // Si al editar se dejó alguna SIM marcada "en uso" con un cliente
-    // (en vez de usar el traspaso automático desde la app), se migra
-    // sola al registro de instaladas ahora mismo, sin esperar a que
-    // se vuelva a abrir esta pestaña.
-    let migradas = 0;
-    try {
-      const resMigracion = await fetch("/api/recurso-uso", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-        body: JSON.stringify({ recurso: "sim", accion: "migrar_legacy_a_registro" }),
-      });
-      const dataMigracion = await resMigracion.json();
-      migradas = (dataMigracion && dataMigracion.migradas) || 0;
-    } catch (errMigracion) {
-      // si falla la migración, el guardado en sí ya se hizo bien;
-      // se va a migrar sola la próxima vez que se abra esta pestaña
-    }
-
-    try {
-      const resSims = await fetch("/api/datos?coleccion=sims", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
-      const frescas = await resSims.json();
-      simsCompletos = Array.isArray(frescas) ? frescas : lista;
-    } catch (errRecarga) {
-      simsCompletos = lista;
-    }
-    dibujarTablaSims();
-    guardarSimsStatus.className = "status ok";
-    simsBaseAdmin = new Map(simsCompletos.map((x) => [x.numero, { ...x }]));
-    numerosExistentesEnServidor = new Set(simsCompletos.map((x) => x.numero));
-    const avisoApp = union.respetados || union.nuevasEnApp
-      ? ` Se respetaron ${union.respetados + union.nuevasEnApp} cambio(s) hechos desde la app mientras esta pestaña estaba abierta.` : "";
-    guardarSimsStatus.textContent = (migradas > 0
-      ? `Listo — además, ${migradas} SIM(s) que quedaron "en uso" se movieron solas al registro de instaladas.`
-      : "Listo — la lista de SIMs ya está disponible en la app.") + avisoApp;
+    await asegurarDatosControlSims();
+    capa.querySelector(".sims-ficha-cuerpo").innerHTML = htmlFichaLineaSim(numero);
   } catch (err) {
-    guardarSimsStatus.className = "status err";
-    guardarSimsStatus.textContent = "No se pudo guardar: " + err.message;
-  } finally {
-    guardarSimsBtn.disabled = false;
+    capa.querySelector(".sims-ficha-cuerpo").innerHTML = `<p class="status err">No se pudo cargar: ${escapeHtmlAdmin(err.message)}</p>`;
   }
-});
+}
 
 // ---------- Control de SIMs (tablero, problemas, dormidas, historial, conciliación) ----------
 let controlSims = { stock: [], instaladas: [], historial: [] };
 const EMPRESAS_SIM = ["Claro", "Movistar", "Personal"];
-function soloDigitosLinea(n) { const d = String(n || "").replace(/\D/g, ""); return d.length > 10 ? d.slice(-10) : d; }
+function soloDigitosLinea(n) { return digitosLineaAR(n); }
 function fechaAR(iso) { return iso ? String(iso).slice(0, 10).split("-").reverse().join("/") : ""; }
 function ultimoMovimientoPorNumero(historial) {
   const m = new Map();
@@ -3549,7 +3561,8 @@ try {
 
 function problemasSims() {
   const ult = new Map();
-  controlSims.historial.filter((h) => h.accion === "marcar_estado_fisico").forEach((h) => {
+  // El servidor guarda "marcar_defectuosa" / "marcar_extraviada" / "marcar_disponible".
+  controlSims.historial.filter((h) => String(h.accion || "").startsWith("marcar_")).forEach((h) => {
     const k = soloDigitosLinea(h.numero); const f = `${h.fecha || ""} ${h.hora || ""}`;
     if (!ult.has(k) || f > ult.get(k)) ult.set(k, f);
   });
@@ -3599,7 +3612,39 @@ document.getElementById("simsControlDormidasExcel").addEventListener("click", ()
   XLSX.writeFile(libro, `sims_dormidas_${new Date().toISOString().slice(0, 10)}.xlsx`);
 });
 
-const ETIQUETA_ACCION_SIM_ADMIN = { usar: "Instalada en cliente", reemplazar: "Instalada reemplazando otra", devolver: "Devuelta al stock", transferir: "Transferida", aceptar_transferencia: "Transferencia aceptada", rechazar_transferencia: "Transferencia rechazada", retirar_de_registro: "Retirada de un cliente", marcar_estado_fisico: "Cambio de estado", revertir: "Revertida" };
+const ETIQUETA_ACCION_SIM_ADMIN = {
+  usar: "Instalada en cliente", reemplazar: "Instalada reemplazando otra", devolver: "Devuelta al stock", transferir: "Transferida",
+  transferencia_pendiente: "Transferencia enviada", transferencia_aceptada: "Transferencia aceptada", transferencia_rechazada: "Transferencia rechazada",
+  transferencia_cancelada: "Transferencia cancelada", aceptar_transferencia: "Transferencia aceptada", rechazar_transferencia: "Transferencia rechazada",
+  retirar_de_registro: "Retirada de un cliente", marcar_estado_fisico: "Cambio de estado", marcar_defectuosa: "Marcada defectuosa",
+  marcar_extraviada: "Marcada extraviada", marcar_disponible: "Marcada disponible", revertir: "Revertida",
+  alta: "Alta en el stock", baja: "Dada de baja", editar: "Corrección de datos", editar_instalada: "Datos de la instalación corregidos",
+};
+// Detalle de UNA línea: dónde está ahora y todos sus movimientos.
+function htmlFichaLineaSim(num) {
+  const k = soloDigitosLinea(num);
+  const enStock = controlSims.stock.find((x) => soloDigitosLinea(x.numero) === k && x.ubicacion_tipo !== "cliente");
+  const inst = controlSims.instaladas.find((x) => soloDigitosLinea(x.numero) === k);
+  const pend = (typeof simsPendientes !== "undefined" ? simsPendientes : []).find((p) => soloDigitosLinea(p.numero) === k);
+  const dondeEsta = inst ? `Instalada en <b>${escapeHtmlAdmin(inst.cliente || "?")}</b>${inst.direccion ? " — " + escapeHtmlAdmin(inst.direccion) : ""}${inst.estado_linea ? ` (${escapeHtmlAdmin(inst.estado_linea)})` : ""}${inst.tecnico_instalador ? ` · la instaló ${escapeHtmlAdmin(inst.tecnico_instalador)}` : ""}`
+    : enStock ? `En stock de <b>${escapeHtmlAdmin(enStock.tecnico_actual || "Oficina")}</b>${enStock.estado_fisico && enStock.estado_fisico !== "Disponible" ? ` · <b>${escapeHtmlAdmin(enStock.estado_fisico)}</b>` : ""}${pend ? ` · ⏳ pendiente de que la acepte ${escapeHtmlAdmin(pend.tecnico_destino)}` : ""}` : "<i>No figura ni en stock ni instalada (dada de baja o nunca cargada)</i>";
+  const movs = controlSims.historial.filter((h) => soloDigitosLinea(h.numero) === k || soloDigitosLinea(h.sim_retirada) === k)
+    .sort((a, b) => `${b.fecha || ""} ${b.hora || ""}`.localeCompare(`${a.fecha || ""} ${a.hora || ""}`) || (b.id || 0) - (a.id || 0));
+  const lineas = movs.map((h) => {
+    let que = ETIQUETA_ACCION_SIM_ADMIN[h.accion] || String(h.accion || "").replace(/_/g, " ");
+    let det = "";
+    if (soloDigitosLinea(h.sim_retirada) === k && soloDigitosLinea(h.numero) !== k) { que = "Retirada al reemplazarla"; det = `en ${h.cliente || "?"} (la nueva es ${h.numero})`; }
+    else if (h.accion === "transferir" || h.accion === "transferencia_pendiente" || h.accion === "transferencia_cancelada") det = `de ${h.tecnico || "?"} a ${h.tecnico_nuevo || "?"}`;
+    else if (h.accion === "transferencia_aceptada" || h.accion === "transferencia_rechazada") det = `la mandó ${h.tecnico_nuevo || "?"}`;
+    else if (h.accion === "baja") det = `motivo: ${h.cliente || "?"}${h.cliente_anterior ? ` (la tenía ${h.cliente_anterior})` : ""}`;
+    else if (h.accion === "editar") det = h.cliente || "";
+    else if (h.accion === "editar_instalada") det = `antes: ${h.cliente_anterior || ""}`;
+    else if (h.accion === "retirar_de_registro") det = `de ${h.cliente_anterior || "?"}`;
+    else if (h.cliente) det = `${h.cliente}${h.numero_servicio ? " · servicio " + h.numero_servicio : ""}`;
+    return `<li><b>${fechaAR(h.fecha)} ${escapeHtmlAdmin(h.hora || "")}</b> — ${escapeHtmlAdmin(que)}${det ? ": " + escapeHtmlAdmin(det) : ""} <span style="color:#6B7680;">(${escapeHtmlAdmin(h.tecnico || "")})</span></li>`;
+  }).join("");
+  return `<div style="padding:10px 0; border-bottom:1px solid #EEE;"><div style="font-size:16px;"><b>${escapeHtmlAdmin(num)}</b> · ${escapeHtmlAdmin((enStock || inst || {}).empresa || "")}</div><div style="margin:4px 0 6px;">${dondeEsta}</div><ul style="margin:0; padding-left:18px;">${lineas || "<li>Sin movimientos registrados.</li>"}</ul></div>`;
+}
 function renderLineaSim() {
   const q = soloDigitosLinea(document.getElementById("simsControlLineaInput").value);
   const cont = document.getElementById("simsControlLineaResultado");
@@ -3607,24 +3652,7 @@ function renderLineaSim() {
   const coincide = (n) => soloDigitosLinea(n).endsWith(q) || soloDigitosLinea(n).includes(q);
   const numeros = [...new Set([...controlSims.stock.map((x) => x.numero), ...controlSims.instaladas.map((x) => x.numero), ...controlSims.historial.map((h) => h.numero)].filter((n) => n && coincide(n)))];
   if (!numeros.length) { cont.innerHTML = '<p class="status">No hay ninguna línea con esos números.</p>'; return; }
-  cont.innerHTML = numeros.slice(0, 5).map((num) => {
-    const k = soloDigitosLinea(num);
-    const enStock = controlSims.stock.find((x) => soloDigitosLinea(x.numero) === k && x.ubicacion_tipo !== "cliente");
-    const inst = controlSims.instaladas.find((x) => soloDigitosLinea(x.numero) === k);
-    const dondeEsta = inst ? `Instalada en <b>${escapeHtmlAdmin(inst.cliente || "?")}</b>${inst.direccion ? " — " + escapeHtmlAdmin(inst.direccion) : ""}${inst.estado_linea ? ` (${escapeHtmlAdmin(inst.estado_linea)})` : ""}`
-      : enStock ? `En stock de <b>${escapeHtmlAdmin(enStock.tecnico_actual || "Oficina")}</b>${enStock.estado_fisico && enStock.estado_fisico !== "Disponible" ? ` · <b>${escapeHtmlAdmin(enStock.estado_fisico)}</b>` : ""}` : "<i>No figura ni en stock ni instalada</i>";
-    const movs = controlSims.historial.filter((h) => soloDigitosLinea(h.numero) === k || soloDigitosLinea(h.sim_retirada) === k)
-      .sort((a, b) => `${b.fecha || ""} ${b.hora || ""}`.localeCompare(`${a.fecha || ""} ${a.hora || ""}`));
-    const lineas = movs.map((h) => {
-      let que = ETIQUETA_ACCION_SIM_ADMIN[h.accion] || String(h.accion || "").replace(/_/g, " ");
-      let det = "";
-      if (soloDigitosLinea(h.sim_retirada) === k && soloDigitosLinea(h.numero) !== k) { que = "Retirada al reemplazarla"; det = `en ${h.cliente || "?"} (la nueva es ${h.numero})`; }
-      else if (h.accion === "transferir") det = `de ${h.tecnico || "?"} a ${h.tecnico_nuevo || "?"}`;
-      else if (h.cliente) det = `${h.cliente}${h.numero_servicio ? " · servicio " + h.numero_servicio : ""}`;
-      return `<li><b>${fechaAR(h.fecha)} ${escapeHtmlAdmin(h.hora || "")}</b> — ${escapeHtmlAdmin(que)}${det ? ": " + escapeHtmlAdmin(det) : ""} <span style="color:#6B7680;">(${escapeHtmlAdmin(h.tecnico || "")})</span></li>`;
-    }).join("");
-    return `<div style="padding:10px 0; border-bottom:1px solid #EEE;"><div style="font-size:16px;"><b>${escapeHtmlAdmin(num)}</b> · ${escapeHtmlAdmin((enStock || inst || {}).empresa || "")}</div><div style="margin:4px 0 6px;">${dondeEsta}</div><ul style="margin:0; padding-left:18px;">${lineas || "<li>Sin movimientos registrados.</li>"}</ul></div>`;
-  }).join("") + (numeros.length > 5 ? `<p class="status">Hay ${numeros.length} líneas que coinciden: escribí más dígitos.</p>` : "");
+  cont.innerHTML = numeros.slice(0, 5).map(htmlFichaLineaSim).join("") + (numeros.length > 5 ? `<p class="status">Hay ${numeros.length} líneas que coinciden: escribí más dígitos.</p>` : "");
 }
 document.getElementById("simsControlLineaInput").addEventListener("input", renderLineaSim);
 
@@ -3832,110 +3860,178 @@ guardarHerramientasBtn.addEventListener("click", async () => {
   }
 });
 
-// ---------- Registro de SIMs instaladas (solo consulta) ----------
+// ---------- SIMs instaladas en clientes ----------
 const simsInstaladasExcelFile = document.getElementById("simsInstaladasExcelFile");
 const simsInstaladasImportStatus = document.getElementById("simsInstaladasImportStatus");
 const simsInstaladasBuscar = document.getElementById("simsInstaladasBuscar");
 const simsInstaladasStatus = document.getElementById("simsInstaladasStatus");
-const simsInstaladasResultadosWrap = document.getElementById("simsInstaladasResultadosWrap");
 const simsInstaladasTablaBody = document.getElementById("simsInstaladasTablaBody");
 let simsInstaladasCache = [];
-const LIMITE_RESULTADOS_INSTALADAS = 50;
+let simsInstLimite = 100;
+const simsInstFiltros = ["simsInstFiltroEmpresa", "simsInstFiltroEstado", "simsInstFiltroInstalador", "simsInstFiltroDesde", "simsInstFiltroHasta"].map((id) => document.getElementById(id));
 
 async function cargarSimsInstaladasAdmin() {
+  simsInstaladasStatus.className = "status";
   simsInstaladasStatus.textContent = "Cargando el registro...";
   try {
-    const res = await fetch("/api/datos?coleccion=sims_instaladas", {
-      headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-      cache: "no-store",
-    });
+    const h = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const [res, rTec] = await Promise.all([
+      fetch("/api/datos?coleccion=sims_instaladas", { headers: h, cache: "no-store" }),
+      nombresTecnicosParaSims.length ? null : fetch("/api/datos?coleccion=tecnicos", { headers: h, cache: "no-store" }).catch(() => null),
+    ]);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error desconocido");
     simsInstaladasCache = Array.isArray(data) ? data : [];
-    simsInstaladasStatus.textContent = `${simsInstaladasCache.length} SIMs instaladas en el registro. Escribí arriba para buscar.`;
+    controlSims.instaladas = simsInstaladasCache;
+    if (rTec) { try { const t = await rTec.json(); nombresTecnicosParaSims = (Array.isArray(t) ? t : []).map((x) => x.nombre).filter(Boolean).sort(); } catch (e) { /* nada */ } }
+    const instaladores = [...new Set(simsInstaladasCache.map((s) => s.tecnico_instalador).filter(Boolean))].sort();
+    const sel = document.getElementById("simsInstFiltroInstalador");
+    const previo = sel.value;
+    sel.innerHTML = `<option value="">Cualquier técnico</option>${instaladores.map((n) => `<option>${escapeHtmlAdmin(n)}</option>`).join("")}`;
+    sel.value = previo;
+    dibujarResultadosSimsInstaladas();
   } catch (err) {
     simsInstaladasStatus.className = "status err";
     simsInstaladasStatus.textContent = "No se pudo cargar el registro: " + err.message;
   }
 }
 
-function dibujarResultadosSimsInstaladas() {
-  const busqueda = simsInstaladasBuscar.value.trim().toLowerCase();
-  if (!busqueda) {
-    simsInstaladasResultadosWrap.style.display = "none";
-    simsInstaladasStatus.className = "status";
-    simsInstaladasStatus.textContent = `${simsInstaladasCache.length} SIMs instaladas en el registro. Escribí arriba para buscar.`;
-    return;
-  }
-  const coincidencias = simsInstaladasCache.filter((s) =>
-    (s.cliente || "").toLowerCase().includes(busqueda) ||
-    (s.numero || "").toLowerCase().includes(busqueda) ||
-    (s.direccion || "").toLowerCase().includes(busqueda) ||
-    (s.numero_abonado || "").toLowerCase().includes(busqueda)
-  );
-
-  if (coincidencias.length === 0) {
-    simsInstaladasResultadosWrap.style.display = "none";
-    simsInstaladasStatus.className = "status";
-    simsInstaladasStatus.textContent = "Ninguna coincidencia.";
-    return;
-  }
-
-  simsInstaladasStatus.className = "status";
-  simsInstaladasStatus.textContent = coincidencias.length > LIMITE_RESULTADOS_INSTALADAS
-    ? `${coincidencias.length} coincidencias — mostrando las primeras ${LIMITE_RESULTADOS_INSTALADAS}. Afiná la búsqueda para acotar.`
-    : `${coincidencias.length} coincidencia(s).`;
-
-  simsInstaladasTablaBody.innerHTML = "";
-  coincidencias.slice(0, LIMITE_RESULTADOS_INSTALADAS).forEach((s) => {
-    const fila = document.createElement("tr");
-    const activa = (s.estado_linea || "Activo") !== "Inactivo";
-    fila.innerHTML = `
-      <td>${s.numero_abonado || ""}</td>
-      <td>${s.cliente || ""}</td>
-      <td>${s.direccion || ""}</td>
-      <td>${s.empresa || ""}</td>
-      <td>${s.numero || ""}</td>
-      <td>${s.fecha_activacion || ""}</td>
-      <td><button type="button" class="badge-estado-sim ${activa ? "activa" : "inactiva"}" title="Tocar para cambiar">${activa ? "Activa" : "Inactiva"}</button></td>
-    `;
-    fila.querySelector(".badge-estado-sim").addEventListener("click", () => cambiarEstadoSimInstalada(s.numero, activa ? "Inactivo" : "Activo"));
-    simsInstaladasTablaBody.appendChild(fila);
-  });
-  simsInstaladasResultadosWrap.style.display = "block";
+function simsInstFiltradas() {
+  const q = simsInstaladasBuscar.value.trim();
+  const qn = normalizeText(q), qd = digitosLineaAR(q);
+  const [fEmp, fEst, fInst, fDesde, fHasta] = simsInstFiltros.map((el) => el.value);
+  return simsInstaladasCache.filter((s) => {
+    if (q && !(normalizeText([s.cliente, s.direccion, s.numero_abonado, s.numero_cliente, s.numero].join(" ")).includes(qn) || (qd.length >= 3 && digitosLineaAR(s.numero).includes(qd)))) return false;
+    if (fEmp && s.empresa !== fEmp) return false;
+    if (fEst && (s.estado_linea || "Activo") !== fEst) return false;
+    if (fInst && s.tecnico_instalador !== fInst) return false;
+    const f = String(s.fecha_activacion || "").slice(0, 10);
+    if (fDesde && (!f || f < fDesde)) return false;
+    if (fHasta && (!f || f > fHasta)) return false;
+    return true;
+  }).sort((a, b) => String(b.fecha_activacion || "").localeCompare(String(a.fecha_activacion || "")) || String(a.cliente || "").localeCompare(String(b.cliente || "")));
 }
-simsInstaladasBuscar.addEventListener("input", dibujarResultadosSimsInstaladas);
 
-// Cambia el estado de una SIM instalada puntual (activa/inactiva) y
-// guarda enseguida — sin tener que ir a otra pantalla ni tocar el
-// resto de sus datos.
+function pintarResumenInstaladas() {
+  const total = simsInstaladasCache.length;
+  const inactivas = simsInstaladasCache.filter((s) => s.estado_linea === "Inactivo").length;
+  const porEmp = ["Claro", "Movistar", "Personal"].map((e) => [e, simsInstaladasCache.filter((s) => s.empresa === e).length]);
+  const fEmp = document.getElementById("simsInstFiltroEmpresa"), fEst = document.getElementById("simsInstFiltroEstado");
+  const cont = document.getElementById("simsInstResumen");
+  cont.innerHTML = `<button type="button" class="sims-chip ${!fEmp.value && !fEst.value ? "activo" : ""}" data-emp="" data-est="">Total <b>${total}</b></button>`
+    + porEmp.map(([e, n]) => `<button type="button" class="sims-chip ${fEmp.value === e ? "activo" : ""}" data-emp="${e}">${e} <b>${n}</b></button>`).join("")
+    + `<button type="button" class="sims-chip alerta ${fEst.value === "Inactivo" ? "activo" : ""}" data-est="Inactivo">Inactivas <b>${inactivas}</b></button>`;
+  cont.querySelectorAll(".sims-chip").forEach((b) => b.addEventListener("click", () => {
+    if (b.dataset.emp !== undefined) fEmp.value = fEmp.value === b.dataset.emp ? "" : b.dataset.emp;
+    if (b.dataset.est !== undefined) fEst.value = fEst.value === b.dataset.est ? "" : b.dataset.est;
+    if (b.dataset.emp === "" && b.dataset.est === "") { fEmp.value = ""; fEst.value = ""; }
+    simsInstLimite = 100;
+    dibujarResultadosSimsInstaladas();
+  }));
+}
+
+function dibujarResultadosSimsInstaladas() {
+  pintarResumenInstaladas();
+  const lista = simsInstFiltradas();
+  simsInstaladasStatus.className = "status";
+  simsInstaladasStatus.textContent = lista.length === simsInstaladasCache.length ? `${lista.length} líneas instaladas.` : `${lista.length} de ${simsInstaladasCache.length} líneas.`;
+  simsInstaladasTablaBody.innerHTML = lista.length ? "" : `<tr><td colspan="9" style="text-align:center; color:#6B7680; padding:18px;">Ninguna línea coincide con los filtros.</td></tr>`;
+  lista.slice(0, simsInstLimite).forEach((s) => simsInstaladasTablaBody.appendChild(filaSimInstalada(s)));
+  const verMas = document.getElementById("simsInstVerMasBtn");
+  verMas.classList.toggle("hidden", lista.length <= simsInstLimite);
+  verMas.textContent = `Ver más (quedan ${Math.max(0, lista.length - simsInstLimite)})`;
+}
+
+function filaSimInstalada(s) {
+  const tr = document.createElement("tr");
+  const activa = (s.estado_linea || "Activo") !== "Inactivo";
+  const color = COLORES_COMPANIA_SIM_ADMIN[s.empresa] || "#8A9089";
+  tr.innerHTML = `
+    <td style="border-left:4px solid ${color};"><button type="button" class="sim-num-link">${escapeHtmlAdmin(s.numero)}</button></td>
+    <td style="white-space:normal; min-width:150px;"><b>${escapeHtmlAdmin(s.cliente || "")}</b>${s.numero_cliente ? `<br><span style="color:#6B7680; font-size:12px;">Cliente N° ${escapeHtmlAdmin(s.numero_cliente)}</span>` : ""}</td>
+    <td style="white-space:normal; min-width:140px;">${escapeHtmlAdmin(s.direccion || "")}</td>
+    <td>${escapeHtmlAdmin(s.numero_abonado || "")}</td>
+    <td><span class="sim-empresa-dot" style="background:${color};"></span>${escapeHtmlAdmin(s.empresa || "")}</td>
+    <td>${fechaAR(s.fecha_activacion)}</td>
+    <td>${escapeHtmlAdmin(s.tecnico_instalador || "")}</td>
+    <td><button type="button" class="badge-estado-sim ${activa ? "activa" : "inactiva"}" title="Tocar para cambiar">${activa ? "Activa" : "Inactiva"}</button></td>
+    <td><select class="sim-accion-select"><option value="">Elegir...</option><option value="editar">Corregir datos</option><option value="retirar">Retirar y devolver al stock</option></select></td>`;
+  tr.querySelector(".sim-num-link").addEventListener("click", () => abrirFichaLineaSim(s.numero));
+  tr.querySelector(".badge-estado-sim").addEventListener("click", () => cambiarEstadoSimInstalada(s.numero, activa ? "Inactivo" : "Activo"));
+  tr.querySelector(".sim-accion-select").addEventListener("change", (e) => {
+    const v = e.target.value;
+    e.target.value = "";
+    if (v) abrirPanelInstalada(tr, s, v);
+  });
+  return tr;
+}
+
+function abrirPanelInstalada(tr, s, tipo) {
+  const previo = tr.nextElementSibling;
+  if (previo && previo.classList.contains("sim-fila-extra")) previo.remove();
+  const extra = document.createElement("tr");
+  extra.className = "sim-fila-extra";
+  const campo = (k, et, tipoInput = "text") => `<div><label>${et}</label><input type="${tipoInput}" class="x-${k}" value="${escapeHtmlAdmin(tipoInput === "date" ? String(s[k] || "").slice(0, 10) : s[k] || "")}"></div>`;
+  extra.innerHTML = `<td colspan="9" class="sim-extra">${tipo === "editar"
+    ? `<div class="field-row">${campo("cliente", "Cliente")}${campo("numero_cliente", "N° de cliente")}${campo("direccion", "Dirección")}${campo("numero_abonado", "N° de abonado")}${campo("fecha_activacion", "Activación", "date")}
+        <button type="button" class="x-ok" style="width:auto;">Guardar</button><button type="button" class="btn-secondary-admin x-cancel" style="width:auto;">Cancelar</button></div>`
+    : `<div class="field-row"><div><label>Devolver al stock de</label><select class="x-destino">${destinosSims().reverse().map((n) => `<option>${escapeHtmlAdmin(n)}</option>`).join("")}</select></div>
+        <button type="button" class="x-ok" style="width:auto;">Retirar</button><button type="button" class="btn-secondary-admin x-cancel" style="width:auto;">Cancelar</button></div>
+        <p class="subtitle" style="margin:6px 0 0;">La línea sale de ${escapeHtmlAdmin(s.cliente || "el cliente")} y vuelve al stock como disponible. Queda en el historial.</p>`}</td>`;
+  tr.after(extra);
+  extra.querySelector(".x-cancel").addEventListener("click", () => extra.remove());
+  extra.querySelector(".x-ok").addEventListener("click", async () => {
+    const boton = extra.querySelector(".x-ok");
+    boton.disabled = true;
+    try {
+      if (tipo === "editar") {
+        const campos = {};
+        ["cliente", "numero_cliente", "direccion", "numero_abonado", "fecha_activacion"].forEach((k) => {
+          const v = extra.querySelector(".x-" + k).value.trim();
+          if (v !== String(k === "fecha_activacion" ? String(s[k] || "").slice(0, 10) : s[k] || "")) campos[k] = v;
+        });
+        if (!Object.keys(campos).length) { extra.remove(); return; }
+        await accionSimAdmin({ accion: "editar_instalada", numero: s.numero, tecnico: "Oficina", campos });
+        simsInstaladasStatus.textContent = `${s.numero} corregida.`;
+      } else {
+        const destino = extra.querySelector(".x-destino").value;
+        if (!confirm(`¿Retirar ${s.numero} de ${s.cliente || "el cliente"} y devolverla al stock de ${destino}?`)) { boton.disabled = false; return; }
+        await accionSimAdmin({ accion: "retirar_de_registro", numero: s.numero, tecnico: destino });
+        simsInstaladasStatus.textContent = `${s.numero} retirada — ahora está en el stock de ${destino}.`;
+      }
+      await cargarSimsInstaladasAdmin();
+    } catch (err) {
+      alert("No se pudo: " + err.message);
+      boton.disabled = false;
+    }
+  });
+}
+
+// Activa/Inactiva de UNA línea (antes se re-guardaba la lista entera).
 async function cambiarEstadoSimInstalada(numero, nuevoEstado) {
   simsInstaladasStatus.className = "status";
   simsInstaladasStatus.textContent = "Guardando...";
   try {
-    const res = await fetch("/api/datos?coleccion=sims_instaladas", {
-      headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-      cache: "no-store",
-    });
-    const lista = await res.json();
-    const actualizada = (Array.isArray(lista) ? lista : []).map((s) =>
-      s.numero === numero ? { ...s, estado_linea: nuevoEstado } : s
-    );
-    const resGuardar = await fetch("/api/datos?coleccion=sims_instaladas", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-      body: JSON.stringify(actualizada),
-    });
-    if (!resGuardar.ok) throw new Error("HTTP " + resGuardar.status);
-    simsInstaladasCache = actualizada;
+    await accionSimAdmin({ accion: "editar_instalada", numero, tecnico: "Oficina", campos: { estado_linea: nuevoEstado } });
+    const s = simsInstaladasCache.find((x) => x.numero === numero);
+    if (s) s.estado_linea = nuevoEstado;
     dibujarResultadosSimsInstaladas();
-    simsInstaladasStatus.className = "status";
-    simsInstaladasStatus.textContent = `Marcada como ${nuevoEstado === "Activo" ? "activa" : "inactiva"}.`;
+    simsInstaladasStatus.textContent = `${numero} marcada como ${nuevoEstado === "Activo" ? "activa" : "inactiva"}.`;
   } catch (err) {
     simsInstaladasStatus.className = "status err";
     simsInstaladasStatus.textContent = "No se pudo guardar: " + err.message;
   }
 }
+simsInstaladasBuscar.addEventListener("input", () => { simsInstLimite = 100; dibujarResultadosSimsInstaladas(); });
+simsInstFiltros.forEach((el) => el.addEventListener("change", () => { simsInstLimite = 100; dibujarResultadosSimsInstaladas(); }));
+document.getElementById("simsInstVerMasBtn").addEventListener("click", () => { simsInstLimite += 200; dibujarResultadosSimsInstaladas(); });
+document.getElementById("simsInstExcelBtn").addEventListener("click", () => {
+  const filas = simsInstFiltradas().map((s) => ({ "NUMERO DE LINEA": s.numero, "NOMBRE ABONADO": s.cliente, "N° DE CLIENTE": s.numero_cliente || "", DIRECCION: s.direccion, "N° DE ABONADO": s.numero_abonado, EMPRESA: s.empresa, "FECHA DE ACTIVACION": s.fecha_activacion, "INSTALÓ": s.tecnico_instalador || "", "ESTADO DE LINEA": s.estado_linea || "Activo" }));
+  if (!filas.length) { alert("No hay líneas con esos filtros."); return; }
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filas), "SIMs instaladas");
+  XLSX.writeFile(libro, `sims_instaladas_${new Date().toISOString().slice(0, 10)}.xlsx`);
+});
 
 // Normaliza "MOVISTAR"/"movistar " -> "Movistar", para que coincida
 // con cómo ya se guarda el nombre de la empresa en el resto de la app.
@@ -3990,28 +4086,43 @@ simsInstaladasExcelFile.addEventListener("change", () => {
       // actualiza con los datos nuevos; si no existe, se agrega. Así
       // se puede reimportar una planilla actualizada sin perder los
       // datos ya cargados a mano ni duplicar filas.
-      const resExistente = await fetch("/api/datos?coleccion=sims_instaladas", {
-        headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-        cache: "no-store",
+      // Solo se mandan las filas de la planilla (el servidor agrega o
+      // actualiza por número de línea, nunca borra). Antes se re-mandaba
+      // el registro completo: una línea retirada mientras tanto volvía a
+      // aparecer como instalada. Tampoco se toca lo que está en stock.
+      const h = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+      const [rInst, rStock] = await Promise.all([
+        fetch("/api/datos?coleccion=sims_instaladas", { headers: h, cache: "no-store" }),
+        fetch("/api/datos?coleccion=sims", { headers: h, cache: "no-store" }),
+      ]);
+      const existentes = await rInst.json();
+      const todasSims = await rStock.json();
+      const instPorDig = new Map((Array.isArray(existentes) ? existentes : []).map((s) => [digitosLineaAR(s.numero), s]));
+      const enStock = new Set((Array.isArray(todasSims) ? todasSims : []).filter((s) => s.ubicacion_tipo !== "cliente").map((s) => digitosLineaAR(s.numero)));
+      const saltadasStock = [];
+      const aGuardar = [];
+      nuevos.forEach((s) => {
+        const d = digitosLineaAR(s.numero);
+        if (enStock.has(d)) { saltadasStock.push(s.numero); return; }
+        const previo = instPorDig.get(d);
+        // Conserva lo que la planilla no trae (número de cliente, quién la instaló) y el formato del número ya guardado.
+        aGuardar.push(previo ? { ...previo, ...s, numero: previo.numero, numero_cliente: previo.numero_cliente || "", tecnico_instalador: previo.tecnico_instalador || "" } : s);
       });
-      const existentes = await resExistente.json();
-      const registro = new Map((Array.isArray(existentes) ? existentes : []).map((s) => [s.numero_abonado, s]));
-      nuevos.forEach((s) => registro.set(s.numero_abonado, s));
-      const listaFinal = [...registro.values()];
 
-      simsInstaladasImportStatus.textContent = `Guardando ${listaFinal.length} registros...`;
-      const res = await fetch("/api/datos?coleccion=sims_instaladas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-        body: JSON.stringify(listaFinal),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Error desconocido");
-
-      simsInstaladasCache = listaFinal;
-      simsInstaladasImportStatus.className = "status ok";
-      simsInstaladasImportStatus.textContent = `Listo — ${nuevos.length} filas leídas de la planilla, ${listaFinal.length} en total en el registro.`;
-      dibujarResultadosSimsInstaladas();
+      simsInstaladasImportStatus.textContent = `Guardando ${aGuardar.length} registros...`;
+      if (aGuardar.length) {
+        const res = await fetch("/api/datos?coleccion=sims_instaladas", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+          body: JSON.stringify(aGuardar),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Error desconocido");
+      }
+      simsInstaladasImportStatus.className = saltadasStock.length ? "status err" : "status ok";
+      simsInstaladasImportStatus.textContent = `Listo — ${aGuardar.length} línea(s) agregadas o actualizadas.`
+        + (saltadasStock.length ? ` ${saltadasStock.length} no se tocaron porque están en el stock (si están instaladas de verdad, instalalas desde "SIMs"): ${saltadasStock.slice(0, 10).join(", ")}${saltadasStock.length > 10 ? "..." : ""}` : "");
+      await cargarSimsInstaladasAdmin();
     } catch (err) {
       simsInstaladasImportStatus.className = "status err";
       simsInstaladasImportStatus.textContent = "No se pudo importar: " + err.message;
