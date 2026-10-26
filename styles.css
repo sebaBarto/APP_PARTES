@@ -3391,3 +3391,15 @@ html[data-inicio="nuevo"][data-theme="day"] #screen-historial .historial-card-pr
 .instalacion-foto-item img.foto-error { cursor: default; background: repeating-linear-gradient(45deg, #EAD9D6, #EAD9D6 6px, #F3E7E5 6px, #F3E7E5 12px); }
 @keyframes fotoCargando { from { opacity: 0.45; } to { opacity: 0.9; } }
 html[data-theme="night"] .instalacion-foto-item img { background: #22303C; }
+
+/* Firma: "Nadie firma" (no había ningún responsable en el lugar) */
+.sign-sin-firma { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 12px; padding: 12px 14px; border-radius: 12px; border: 1.5px dashed #C9CDC4; background: #FFFFFF; font-size: 14px; line-height: 1.35; cursor: pointer; color: #101820; }
+.sign-sin-firma input { width: 20px; height: 20px; margin: 1px 0 0; flex-shrink: 0; accent-color: #F5A623; }
+.sign-sin-firma small { display: block; color: #6B7680; font-size: 12px; margin-top: 2px; }
+#screen-sign.sin-firma .sign-sin-firma { border-style: solid; border-color: #F5A623; background: #FFF6E0; }
+#screen-sign.sin-firma .sign-pad-wrap { opacity: 0.3; pointer-events: none; filter: grayscale(1); }
+#screen-sign.sin-firma .sign-campos, #screen-sign.sin-firma #clearSignBtn { display: none; }
+html[data-theme="night"] .sign-sin-firma { background: #17212B; border-color: #2A3743; color: #E8ECEF; }
+html[data-theme="night"] .sign-sin-firma small { color: #9FB3C2; }
+html[data-theme="night"] #screen-sign.sin-firma .sign-sin-firma { background: #3A2E0E; border-color: #FFC033; }
+html[data-inicio="nuevo"] .sign-sin-firma input { accent-color: #FFC033; }

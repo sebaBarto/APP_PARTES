@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.159.0";
+const APP_VERSION = "3.160.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -736,6 +736,20 @@ const backToFormBtn = document.getElementById("backToFormBtn");
 const clearSignBtn = document.getElementById("clearSignBtn");
 const confirmSignBtn = document.getElementById("confirmSignBtn");
 const signAclaracion = document.getElementById("signAclaracion");
+// "Nadie firma": el técnico declara que no había ningún responsable en el lugar.
+const signSinFirma = document.getElementById("signSinFirma");
+const TEXTO_SIN_FIRMA = "Sin firma: no había ningún responsable en el lugar";
+function aplicarModoSinFirma() {
+  const sin = !!(signSinFirma && signSinFirma.checked);
+  screens.sign.classList.toggle("sin-firma", sin);
+  // (en el skin nuevo los campos se reacomodan fuera de .sign-campos)
+  [signAclaracion, document.getElementById("signCargo")].forEach((el) => {
+    const grupo = el && (el.closest(".field-group") || el);
+    if (grupo) grupo.classList.toggle("hidden", sin);
+  });
+  if (sin) signAclaracion.blur();
+}
+if (signSinFirma) signSinFirma.addEventListener("change", aplicarModoSinFirma);
 const signCargo = document.getElementById("signCargo");
 const newReportBtn = document.getElementById("newReportBtn");
 const sendingLabel = document.getElementById("sendingLabel");
@@ -4257,6 +4271,7 @@ toSignBtn.addEventListener("click", () => {
     showToast('Tenés una clave escrita sin agregar — andá a "Claves" y tocá "+ Agregar" antes de continuar.');
     return;
   }
+  if (signSinFirma) { signSinFirma.checked = false; aplicarModoSinFirma(); }
   showScreen("sign");
   setupCanvas();
 });
@@ -4713,20 +4728,22 @@ window.addEventListener("online", procesarColaEnvios);
 reintentarColaBtn.addEventListener("click", procesarColaEnvios);
 
 confirmSignBtn.addEventListener("click", async () => {
-  if (!hasSignature) {
-    showToast("Falta la firma del cliente.");
+  const sinFirma = !!(signSinFirma && signSinFirma.checked);
+  if (!sinFirma && !hasSignature) {
+    showToast("Falta la firma del cliente. Si no había nadie, tildá «Nadie firma».");
     return;
   }
   const aclaracion = signAclaracion.value.trim();
-  if (!aclaracion) {
+  if (!sinFirma && !aclaracion) {
     showToast("Falta la aclaración de quien firma.");
     signAclaracion.focus();
     return;
   }
 
   const data = getFormData();
-  data.firma_aclaracion = aclaracion;
-  data.firma_cargo = signCargo.value.trim();
+  data.firma_aclaracion = sinFirma ? TEXTO_SIN_FIRMA : aclaracion;
+  data.firma_cargo = sinFirma ? `Declarado por ${data.tecnico || tecnicoLogueado || "el técnico"}` : signCargo.value.trim();
+  data.sin_firma = sinFirma;
   data.numero_presupuesto = numeroPresupuestoInput.value.trim();
   data.descuento_pct = getDescuentoPct();
   // Garantiza que el costo final SIEMPRE quede con un valor (importe
@@ -4744,8 +4761,10 @@ confirmSignBtn.addEventListener("click", async () => {
   // uno automático si el técnico cargó el parte manualmente, sin elegir
   // un servicio de la lista.
   const idParte = data.numero_servicio ? data.numero_servicio : generarIdParte();
-  const signatureDataUrl = normalizarFirmaParaMail(canvas);
-  const signatureImgTag = `<img src="${signatureDataUrl}" alt="Firma del cliente" width="320" height="110" style="display:block; width:320px; height:110px; border:0;" />`;
+  const signatureDataUrl = sinFirma ? "" : normalizarFirmaParaMail(canvas);
+  const signatureImgTag = sinFirma
+    ? `<div style="text-align:center; padding:22px 10px; color:#8A5E00; font-family:Arial, Helvetica, sans-serif; font-size:15px; font-weight:bold; letter-spacing:1px;">SIN FIRMA</div>`
+    : `<img src="${signatureDataUrl}" alt="Firma del cliente" width="320" height="110" style="display:block; width:320px; height:110px; border:0;" />`;
 
   const payload = { tipo: "parte", idParte, data, signatureImgTag, signatureDataUrl, fotoBase64, fotoMimeType, sim: simElegidaParaParte() };
 

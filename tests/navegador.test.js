@@ -1840,3 +1840,34 @@ test("Instalaciones: las fotos se ven (se piden con el pase de la sesión) y se 
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Firma: «Nadie firma» deja cerrar el parte sin firma ni aclaración y queda declarado en el mail", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const mails = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request();
+    if (req.url().includes("/api/enviar-mail") && req.method() === "POST") mails.push((JSON.parse(req.postData() || "{}").datos) || {});
+    route.fulfill({ status: 200, contentType: "application/json", body: req.url().includes("tecnicos") ? "[]" : '{"ok":true}' });
+  });
+  await page.goto(base + "/");
+  await page.evaluate(() => {
+    tecnicoLogueado = "Juan Pérez";
+    document.getElementById("f_cliente").value = "Panadería Sur";
+    document.getElementById("f_tarea").value = "Cambio de batería";
+    showScreen("sign"); setupCanvas();
+  });
+  // Sin tildar: pide la firma
+  await page.click("#confirmSignBtn");
+  assert.strictEqual(await page.evaluate(() => screens.sign.dataset.active), "true");
+  await page.check("#signSinFirma");
+  assert.strictEqual(await page.locator("#signAclaracion").isVisible(), false, "la aclaración se oculta");
+  await page.click("#confirmSignBtn");
+  await page.waitForFunction(() => screens.done.dataset.active === "true", null, { timeout: 8000 });
+  const m = mails.find((x) => x.firma_img);
+  assert.ok(m, "se mandó el mail");
+  assert.match(m.firma_img, /SIN FIRMA/);
+  assert.match(m.firma_aclaracion, /no había ningún responsable en el lugar/);
+  assert.match(m.firma_cargo || "", /Declarado por/);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
