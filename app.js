@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.138.0";
+const APP_VERSION = "3.139.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -9953,6 +9953,149 @@ const formatoPesosVeh = (n) => "$" + Math.round(n).toLocaleString("es-AR");
 
 // Suma de gastos de TODA la flota en el período elegido — se muestra
 // en la pantalla de la lista, antes de elegir un vehículo puntual.
+
+// ---- Mismo formato (cifra principal + mosaicos) para vehículos, herramientas y SIMs ----
+function textoPeriodoDash(periodo) {
+  if (periodo === "todo") return ["en total", null];
+  if (periodo === "fecha") return ["ese día", null];
+  return TEXTO_PERIODO[periodo] || ["en el período", null];
+}
+function pintarDashNuevo(heroId, tilesId, { valor, etiqueta, actual, anterior, antes, serie, subirEsBueno = true, tiles = [] }) {
+  const hero = document.getElementById(heroId);
+  const tl = document.getElementById(tilesId);
+  const activo = esSkinNuevo();
+  if (hero) hero.hidden = !activo;
+  if (tl) tl.hidden = !activo || !tiles.length;
+  if (!activo) return false;
+  if (hero) hero.innerHTML = heroDash({ valor, etiqueta, delta: antes && anterior != null ? deltaPill(actual, anterior, antes, subirEsBueno) : "", serie });
+  if (tl) tl.innerHTML = tiles.map(tileDash).join("");
+  return true;
+}
+function barrasHorizontalesDash(canvasId, wrapId, chartPrevio, titulo, etiquetas, valores, formato) {
+  const wrap = document.getElementById(wrapId);
+  if (chartPrevio) chartPrevio.destroy();
+  if (!esSkinNuevo() || !etiquetas.length || !valores.some((v) => v > 0)) { if (wrap) wrap.hidden = true; return null; }
+  wrap.hidden = false;
+  wrap.style.height = `${90 + etiquetas.length * 40}px`;
+  return new Chart(document.getElementById(canvasId), {
+    type: "bar",
+    data: { labels: etiquetas, datasets: [{ label: titulo, data: valores, backgroundColor: "#F5A623" }] },
+    options: {
+      indexAxis: "y", responsive: true, maintainAspectRatio: false, layout: { padding: { right: 72 } },
+      plugins: {
+        legend: { display: false }, title: { display: true, text: titulo },
+        datalabels: { display: true, anchor: "end", align: "right", clip: false, color: "#101820", font: { weight: "700", size: 12 }, formatter: (v) => (v > 0 ? formato(v) : "") },
+        tooltip: { callbacks: { label: (ctx) => " " + formato(ctx.raw) } },
+      },
+      scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
+    },
+  });
+}
+const gastoDeEventos = (filas) => filas.filter((h) => h.accion === "evento" && h.monto).reduce((acc, h) => {
+  const m = Number(h.monto) || 0;
+  if (h.tipo_evento === "Carga de combustible") acc.combustible += m; else acc.mantenimiento += m;
+  return acc;
+}, { combustible: 0, mantenimiento: 0 });
+let chartVehGasto = null;
+let chartHerrUsos = null;
+function renderVehiculosNuevo() {
+  const periodo = dashVehPeriodoActivo;
+  const rango = obtenerRangoPeriodo(periodo, dashVehFechaEspecifica);
+  const [ahora, antes] = textoPeriodoDash(periodo);
+  const enRango = dashVehiculosCache.filter((h) => fechaEnRango(h.fecha, rango));
+  const g = gastoDeEventos(enRango);
+  const rangoAnt = antes ? obtenerRangoPeriodoAnterior(periodo) : null;
+  const gAnt = rangoAnt ? gastoDeEventos(dashVehiculosCache.filter((h) => fechaEnRango(h.fecha, rangoAnt))) : null;
+  const enUso = dashVehConfigCache.filter((v) => dashVehiculosCache.some((h) => h.vehiculo === v.nombre && h.hora_toma && !h.hora_devolucion)).length;
+  const salidas = enRango.filter((h) => h.hora_toma).length;
+  const pintado = pintarDashNuevo("dashVehHero", "dashVehTiles", {
+    valor: formatoPesosVeh(g.combustible + g.mantenimiento),
+    etiqueta: `gastado en la flota ${ahora}`,
+    actual: g.combustible + g.mantenimiento, anterior: gAnt ? gAnt.combustible + gAnt.mantenimiento : null, antes, subirEsBueno: false,
+    serie: ["dia", "fecha", "todo"].includes(periodo) ? null : serieDiaria(rango, enRango.filter((h) => h.accion === "evento"), (h) => Number(h.monto) || 0),
+    tiles: [
+      { valor: formatoPesosVeh(g.combustible), etiqueta: "Combustible" },
+      { valor: formatoPesosVeh(g.mantenimiento), etiqueta: "Gomería, mecánico y lavadero" },
+      { valor: `${enUso}<small> de ${dashVehConfigCache.length}</small>`, etiqueta: "En la calle ahora", estado: enUso === dashVehConfigCache.length && enUso ? "atencion" : "" },
+      { valor: salidas, etiqueta: `Salidas ${ahora}` },
+    ],
+  });
+  if (!pintado) { const w = document.getElementById("dashVehGastoWrap"); if (w) w.hidden = true; return; }
+  const porVeh = dashVehConfigCache.map((v) => { const x = gastoDeEventos(enRango.filter((h) => h.vehiculo === v.nombre)); return [v.nombre, x.combustible + x.mantenimiento]; })
+    .sort((a, b) => b[1] - a[1]);
+  chartVehGasto = barrasHorizontalesDash("dashChartVehGasto", "dashVehGastoWrap", chartVehGasto, `Gasto por vehículo ${ahora}`, porVeh.map((x) => x[0]), porVeh.map((x) => x[1]), formatoPesosVeh);
+}
+function renderVehiculoDetalleNuevo(filtrados) {
+  const [ahora, antes] = textoPeriodoDash(dashVehPeriodoActivo);
+  const g = gastoDeEventos(filtrados);
+  const rangoAnt = antes ? obtenerRangoPeriodoAnterior(dashVehPeriodoActivo) : null;
+  const gAnt = rangoAnt ? gastoDeEventos(dashVehiculosCache.filter((h) => h.vehiculo === dashVehVehiculoSeleccionado && fechaEnRango(h.fecha, rangoAnt))) : null;
+  const conf = dashVehConfigCache.find((v) => v.nombre === dashVehVehiculoSeleccionado) || {};
+  pintarDashNuevo("dashVehDetHero", "dashVehDetTiles", {
+    valor: formatoPesosVeh(g.combustible + g.mantenimiento),
+    etiqueta: `gastado en este vehículo ${ahora}`,
+    actual: g.combustible + g.mantenimiento, anterior: gAnt ? gAnt.combustible + gAnt.mantenimiento : null, antes, subirEsBueno: false,
+    tiles: [
+      { valor: filtrados.filter((h) => h.hora_toma).length, etiqueta: `Salidas ${ahora}` },
+      { valor: filtrados.filter((h) => h.accion === "evento").length, etiqueta: "Eventos registrados" },
+      { valor: formatoPesosVeh(g.combustible), etiqueta: "Combustible" },
+      { valor: conf.km_actual ? Number(conf.km_actual).toLocaleString("es-AR") : "—", etiqueta: "Km actuales" },
+    ],
+  });
+}
+function renderHerramientasNuevo() {
+  const rango = obtenerRangoPeriodo("mes");
+  const [ahora, antes] = textoPeriodoDash("mes");
+  const usos = (filas) => filas.filter((m) => m.accion === "tomar" || m.accion === "dejar_en_cliente");
+  const delMes = dashHerramientasCache.filter((m) => fechaEnRango(m.fecha, rango));
+  const rangoAnt = obtenerRangoPeriodoAnterior("mes");
+  const usosAnt = usos(dashHerramientasCache.filter((m) => fechaEnRango(m.fecha, rangoAnt))).length;
+  const total = dashHerrConfigCache.length;
+  // Igual que la lista: todo lo que no está "libre" está afuera.
+  const enCliente = dashHerrConfigCache.filter((h) => h.estado === "cliente").length;
+  const enUso = dashHerrConfigCache.filter((h) => h.estado !== "libre" && h.estado !== "cliente").length;
+  const pintado = pintarDashNuevo("dashHerrHero", "dashHerrTiles", {
+    valor: `${enUso + enCliente}<small> de ${total}</small>`,
+    etiqueta: "herramientas afuera ahora",
+    tiles: [
+      { valor: total - enUso - enCliente, etiqueta: "Libres en el depósito" },
+      { valor: enUso, etiqueta: "En uso por un técnico" },
+      { valor: enCliente, etiqueta: "Dejadas en un cliente", estado: enCliente ? "atencion" : "" },
+      { valor: usos(delMes).length, etiqueta: `Usos ${ahora}`, nota: antes ? deltaTextoSimple(usos(delMes).length, usosAnt, antes) : "" },
+    ],
+  });
+  if (!pintado) { const w = document.getElementById("dashHerrUsosWrap"); if (w) w.hidden = true; return; }
+  const porHerr = dashHerrConfigCache.map((h) => [h.nombre, usos(delMes.filter((m) => m.herramienta === h.nombre)).length]).sort((a, b) => b[1] - a[1]);
+  chartHerrUsos = barrasHorizontalesDash("dashChartHerrUsos", "dashHerrUsosWrap", chartHerrUsos, `Más usadas ${ahora}`, porHerr.map((x) => x[0]), porHerr.map((x) => x[1]), (v) => `${v} uso${v === 1 ? "" : "s"}`);
+}
+function deltaTextoSimple(actual, anterior, antes) {
+  if (anterior == null) return "";
+  if (anterior === 0) return actual ? `${antes}: ninguno` : "";
+  const c = Math.round(((actual - anterior) / anterior) * 100);
+  return Math.abs(c) < 1 ? `igual que ${antes}` : `${c > 0 ? "▲" : "▼"} ${Math.abs(c)}% vs. ${antes}`;
+}
+function renderSimsDashNuevo(filtrados, sims) {
+  const periodo = dashSimsPeriodoActivo;
+  const rango = obtenerRangoPeriodo(periodo);
+  const [ahora, antes] = textoPeriodoDash(periodo);
+  const esInst = (h) => h.accion === "usar" || h.accion === "reemplazar";
+  const instaladas = filtrados.filter(esInst);
+  const rangoAnt = antes ? obtenerRangoPeriodoAnterior(periodo) : null;
+  const instAnt = rangoAnt ? dashSimsCache.filter((h) => fechaEnRango(h.fecha, rangoAnt) && esInst(h)).length : null;
+  pintarDashNuevo("dashSimsHero", "dashSimsTiles", {
+    valor: instaladas.length,
+    etiqueta: `SIM${instaladas.length === 1 ? "" : "s"} instalada${instaladas.length === 1 ? "" : "s"} en clientes ${ahora}`,
+    actual: instaladas.length, anterior: instAnt, antes,
+    serie: ["dia", "todo"].includes(periodo) ? null : serieDiaria(rango, instaladas, () => 1),
+    tiles: [
+      { valor: dashSimsEnStockNum.textContent, etiqueta: "En stock ahora" },
+      { valor: dashSimsEnUsoNum.textContent, etiqueta: "En uso ahora" },
+      { valor: filtrados.filter((h) => h.accion === "transferir").length, etiqueta: `Transferencias ${ahora}` },
+      { valor: filtrados.filter((h) => h.accion === "devolver" || h.accion === "retirar_de_registro").length, etiqueta: `Devueltas o retiradas ${ahora}` },
+    ],
+  });
+}
+
 function renderResumenGastoFlota() {
   const rango = obtenerRangoPeriodo(dashVehPeriodoActivo, dashVehFechaEspecifica);
   const enRango = dashVehiculosCache.filter((h) => fechaEnRango(h.fecha, rango));
@@ -9961,6 +10104,7 @@ function renderResumenGastoFlota() {
   const gastoMantenimiento = eventosConMonto.filter((h) => h.tipo_evento !== "Carga de combustible").reduce((acc, h) => acc + (Number(h.monto) || 0), 0);
   dashVehGastoCombustibleTotalNum.textContent = gastoCombustible > 0 ? formatoPesosVeh(gastoCombustible) : "—";
   dashVehGastoMantenimientoTotalNum.textContent = gastoMantenimiento > 0 ? formatoPesosVeh(gastoMantenimiento) : "—";
+  try { renderVehiculosNuevo(); } catch (e) { /* el resto sigue */ }
 }
 
 function renderListaVehiculosDash() {
@@ -10027,6 +10171,7 @@ function renderDashVehiculos() {
     .reduce((acc, h) => acc + (Number(h.monto) || 0), 0);
   dashVehGastoCombustibleNum.textContent = gastoCombustible > 0 ? formatoPesosVeh(gastoCombustible) : "—";
   dashVehGastoMantenimientoNum.textContent = gastoMantenimiento > 0 ? formatoPesosVeh(gastoMantenimiento) : "—";
+  try { renderVehiculoDetalleNuevo(filtrados); } catch (e) { /* el resto sigue */ }
 
   dashVehiculosList.innerHTML = "";
   if (filtrados.length === 0) {
@@ -10139,6 +10284,7 @@ async function fetchDashHerramientas() {
     dashHerrConfigCache = Array.isArray(herramientas) ? herramientas : [];
     dashHerramientasSyncLabel.textContent = formatSyncTime(new Date());
     renderListaHerramientasDash();
+    try { renderHerramientasNuevo(); } catch (e) { /* el resto sigue */ }
     if (dashHerrHerramientaSeleccionada) renderDashHerramientas();
   } catch (err) {
     dashHerrListaStatus.textContent = "No se pudo cargar el historial de herramientas.";
@@ -10317,6 +10463,7 @@ function filtrarDashSims() {
 
 function renderDashSims() {
   const filtrados = filtrarDashSims();
+  try { renderSimsDashNuevo(filtrados); } catch (e) { /* el resto sigue */ }
   dashSimsList.innerHTML = "";
   renderChartsSims(filtrados);
   if (filtrados.length === 0) {

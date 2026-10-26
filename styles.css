@@ -3085,3 +3085,5 @@ html[data-inicio="nuevo"] :is(#screen-dashboard, #screen-dashboard-financiero, #
 /* Tarjetas por técnico con barra de avance respecto del primero */
 html[data-inicio="nuevo"] #screen-dashboard .dash-tecnico-card { position: relative; padding-bottom: 16px !important; }
 html[data-inicio="nuevo"] #screen-dashboard .dash-tecnico-card::after { content: ""; position: absolute; left: 14px; bottom: 8px; height: 4px; width: calc((100% - 28px) * var(--avance, 0)); border-radius: 2px; background: var(--sat-am); }
+html[data-inicio="nuevo"] :is(#screen-dashboard-vehiculos, #screen-dashboard-sims) .dash-cards-row { display: none !important; }
+html[data-inicio="nuevo"] :is(.dash-hero-num, .dash-tile-num) small { font-size: 0.45em; font-style: normal; font-weight: 700; color: var(--sat-tenue); margin-left: 4px; }

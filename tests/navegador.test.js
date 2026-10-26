@@ -1188,3 +1188,38 @@ test("Dashboard financiero (skin nuevo): cifra principal con variación, mosaico
   assert.strictEqual(await page.locator("#screen-dashboard-financiero .dash-cards-row").first().isVisible(), true);
   await ctx.close();
 });
+
+test("Dashboards de vehículos, herramientas y SIMs (skin nuevo): cifra principal y mosaicos", async () => {
+  const hoy = diaISO(0);
+  const { ctx, page, erroresPagina } = await paginaConEstilo("nuevo");
+  await page.route("**/api/**", (route) => {
+    const u = route.request().url();
+    const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("coleccion=vehiculos")) return json([{ nombre: "Kangoo", km_actual: 1000 }, { nombre: "Moto", km_actual: 500 }]);
+    if (u.includes("recurso=vehiculo")) return json([
+      { vehiculo: "Kangoo", accion: "evento", tipo_evento: "Carga de combustible", monto: 30000, fecha: hoy },
+      { vehiculo: "Moto", accion: "evento", tipo_evento: "Gomería", monto: 5000, fecha: hoy },
+      { vehiculo: "Kangoo", tecnico: "Juan", fecha: hoy, hora_toma: "08:00" },
+    ]);
+    if (u.includes("coleccion=herramientas")) return json([{ nombre: "Escalera", estado: "libre" }, { nombre: "Taladro", estado: "uso", tecnico_actual: "Juan" }, { nombre: "Amoladora", estado: "cliente", cliente: "Kiosco" }]);
+    if (u.includes("recurso=herramienta")) return json([{ herramienta: "Taladro", accion: "tomar", fecha: hoy }, { herramienta: "Taladro", accion: "devolver", fecha: hoy }, { herramienta: "Amoladora", accion: "dejar_en_cliente", fecha: hoy }]);
+    if (u.includes("coleccion=sims")) return json([{ numero: "1", estado: "stock" }, { numero: "2", estado: "stock" }, { numero: "3", estado: "uso" }]);
+    if (u.includes("recurso=sim")) return json([{ fecha: hoy, accion: "usar", numero: "9" }, { fecha: hoy, accion: "reemplazar", numero: "8" }, { fecha: hoy, accion: "transferir", numero: "7" }]);
+    json([]);
+  });
+  await page.evaluate(() => { tecnicoLogueado = "Seba Barto"; showScreen("dashboardVehiculos"); return fetchDashVehiculos(); });
+  await page.waitForTimeout(300);
+  assert.strictEqual(await page.locator("#dashVehHero .dash-hero-num").textContent(), "$35.000");
+  assert.match(await page.locator("#dashVehTiles").textContent(), /\$30\.000\s*Combustible[\s\S]*\$5\.000[\s\S]*1 de 2\s*En la calle ahora/);
+  assert.deepStrictEqual(await page.evaluate(() => Chart.getChart("dashChartVehGasto").data.labels), ["Kangoo", "Moto"]);
+  await page.evaluate(() => { showScreen("dashboardHerramientas"); return fetchDashHerramientas(); });
+  await page.waitForTimeout(300);
+  assert.match(await page.locator("#dashHerrHero .dash-hero-num").textContent(), /^2\s*de 3$/);
+  assert.match(await page.locator("#dashHerrTiles").textContent(), /1\s*Libres[\s\S]*1\s*En uso[\s\S]*1\s*⚠ Dejadas en un cliente[\s\S]*2\s*Usos este mes/);
+  await page.evaluate(() => { showScreen("dashboardSims"); return fetchDashSims(); });
+  await page.waitForTimeout(300);
+  assert.strictEqual(await page.locator("#dashSimsHero .dash-hero-num").textContent(), "2", "usar + reemplazar");
+  assert.match(await page.locator("#dashSimsTiles").textContent(), /2\s*En stock ahora[\s\S]*1\s*En uso ahora[\s\S]*1\s*Transferencias/);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
