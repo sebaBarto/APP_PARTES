@@ -116,6 +116,7 @@ function mapearDesdeBackendNuevo(p) {
     es_instalacion: !!p.es_instalacion,
     importe: p.importe,
     descuento: p.descuento_tipo || "",
+    numero_presupuesto: p.numero_presupuesto || "",
     costo_final: p.costo_final,
     forma_pago: p.forma_pago || "",
     imprevisto: p.imprevisto || "",

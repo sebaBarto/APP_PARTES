@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.155.0";
+const APP_VERSION = "3.156.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -2992,6 +2992,17 @@ function formatMonto(num) {
 function getDescuentoTipo() {
   for (const r of descuentoRadios) if (r.checked) return r.value;
   return "0";
+}
+
+// Un parte del historial que el técnico marcó "Por presupuesto" (en el
+// historial viene la etiqueta del descuento, ej. "Por presupuesto N° 123").
+function esPartePorPresupuesto(h) {
+  return /^por presupuesto/.test(normalizeText(String((h && (h.descuento || h.descuento_tipo)) || "")).trim());
+}
+function numeroPresupuestoDe(h) {
+  if (h.numero_presupuesto) return String(h.numero_presupuesto).trim();
+  const m = String(h.descuento || h.descuento_tipo || "").match(/N[°º]\s*(.+)$/i);
+  return m ? m[1].trim() : "";
 }
 
 function getDescuentoPct() {
@@ -6416,7 +6427,7 @@ function renderHistorialReciente() {
       const haystack = normalizeText([
         h.cliente, h.numero_servicio, h.id_parte, h.numero_cliente, h.direccion, h.localidad,
         h.tarea, h.observaciones, h.imprevisto, h.materiales, h.materiales_otros,
-        h.tecnico, h.tecnico2, h.tecnico_segundo, h.forma_pago,
+        h.tecnico, h.tecnico2, h.tecnico_segundo, h.forma_pago, h.descuento, h.numero_presupuesto,
       ].filter(Boolean).join(" "));
       return palabras.every((w) => haystack.includes(w));
     });
@@ -6487,10 +6498,15 @@ function renderHistorialReciente() {
     ` : "";
     const costoFinalNum = parseFloat(h.costo_final);
     const tieneCobro = !isNaN(costoFinalNum) && costoFinalNum > 0;
-    const pagoHtml = tieneCobro ? `
+    // "Por presupuesto": el técnico lo marcó en el descuento del parte.
+    const presupuestoHtml = esPartePorPresupuesto(h)
+      ? `<span class="historial-card-presupuesto" title="El técnico lo marcó como «Por presupuesto»">Por presupuesto${numeroPresupuestoDe(h) ? " N° " + escapeHtml(numeroPresupuestoDe(h)) : ""}</span>`
+      : "";
+    const pagoHtml = (tieneCobro || presupuestoHtml) ? `
       <div class="historial-card-pago">
-        ${h.forma_pago ? `<span class="historial-card-metodo-pago">${escapeHtml(h.forma_pago)}</span>` : ""}
-        <span class="historial-card-cobrar" title="Tiene un valor a cobrar">$</span>
+        ${presupuestoHtml}
+        ${tieneCobro && h.forma_pago ? `<span class="historial-card-metodo-pago">${escapeHtml(h.forma_pago)}</span>` : ""}
+        ${tieneCobro ? `<span class="historial-card-cobrar" title="Tiene un valor a cobrar">$</span>` : ""}
       </div>
     ` : "";
     const textoResena = (h.tarea || h.observaciones || "").trim();

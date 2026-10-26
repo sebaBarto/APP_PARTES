@@ -1521,7 +1521,7 @@ test("Historial (skin nuevo): búsqueda en todas las fechas y por tarea, agrupad
   const d = (n) => { const x = new Date(); x.setDate(x.getDate() - n); return x.getFullYear() + "-" + String(x.getMonth() + 1).padStart(2, "0") + "-" + String(x.getDate()).padStart(2, "0"); };
   const partes = [
     { id_parte: "a", numero_servicio: "1", cliente: "Kiosco Norte", direccion: "Belgrano 5", tarea: "Cambio de sirena", tecnico: "Juan Pérez", fecha: d(0), hora_entrada: "09:00", hora_salida: "10:30", claves: [{ titulo: "Alarma", usuario: "inst", clave: "9876" }] },
-    { id_parte: "b", numero_servicio: "2", cliente: "Farmacia Central", direccion: "San Martín 9", tarea: "Revisión de sensores", tecnico: "Juan Pérez", fecha: d(0), hora_entrada: "11:00", hora_salida: "11:45" },
+    { id_parte: "b", numero_servicio: "2", cliente: "Farmacia Central", direccion: "San Martín 9", tarea: "Revisión de sensores", tecnico: "Juan Pérez", fecha: d(0), hora_entrada: "11:00", hora_salida: "11:45", descuento: "Por presupuesto N° 778", importe: 0 },
     { id_parte: "c", numero_servicio: "3", cliente: "Panadería Sur", direccion: "Mitre 100", tarea: "Batería del panel agotada", tecnico: "Juan Pérez", fecha: d(40), hora_entrada: "08:00", hora_salida: "09:00" },
   ];
   await page.route("**/api/**", (route) => {
@@ -1536,6 +1536,9 @@ test("Historial (skin nuevo): búsqueda en todas las fechas y por tarea, agrupad
   await page.waitForTimeout(500);
   // Agrupado por día con horas
   assert.match(await page.locator(".hist-dia").first().textContent(), /Hoy[\s\S]*2 servicios · 2 h 15 min/);
+  // "Por presupuesto" se ve en la tarjeta (aunque no tenga cobro) y se puede buscar
+  assert.strictEqual(await page.locator(".historial-card-presupuesto").count(), 1);
+  assert.match(await page.locator(".historial-card", { hasText: "Farmacia Central" }).locator(".historial-card-presupuesto").textContent(), /Por presupuesto N° 778/);
   // Claves ocultas hasta tocar
   assert.strictEqual(await page.locator(".historial-card-claves").first().isVisible(), false);
   await page.click(".hist-claves-btn");

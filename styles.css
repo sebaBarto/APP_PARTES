@@ -3378,3 +3378,9 @@ html[data-inicio="nuevo"] .pd-cerrar { width: 100%; margin-top: 4px; }
 .pd-lightbox img { max-width: 100%; max-height: 100%; object-fit: contain; background: #F4F3EF; border-radius: 4px; }
 .pd-lightbox-x { position: absolute; top: 12px; right: 16px; color: #fff; font-size: 36px; line-height: 1; }
 html[data-inicio="nuevo"] .pd-accion.pd-accion-cargando { opacity: 0.55; pointer-events: none; }
+
+/* Parte marcado "Por presupuesto" en el historial */
+.historial-card-presupuesto { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; color: #7A5300; background: #FFF1D0; border: 1px solid #F2C25B; border-radius: var(--r-pill); padding: 3px 9px; white-space: nowrap; }
+html[data-theme="night"] .historial-card-presupuesto { color: #FFC960; background: #3A2E0E; border-color: #6B5418; }
+html[data-inicio="nuevo"] #screen-historial .historial-card-presupuesto { font-size: 11px; color: #FFC033; background: color-mix(in srgb, #FFC033 16%, transparent); border-color: color-mix(in srgb, #FFC033 45%, transparent); }
+html[data-inicio="nuevo"][data-theme="day"] #screen-historial .historial-card-presupuesto, html[data-inicio="nuevo"][data-theme="contraste"] #screen-historial .historial-card-presupuesto { color: #7A5300; background: #FFF1D0; border-color: #F2C25B; }
