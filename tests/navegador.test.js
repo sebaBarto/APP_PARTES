@@ -1820,3 +1820,23 @@ test("Permisos: un permiso nuevo (ej. Administración) aparece sin cerrar sesió
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Instalaciones: las fotos se ven (se piden con el pase de la sesión) y se abren en grande al tocarlas", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const png = require("fs").readFileSync(require("path").join(__dirname, "..", "icons", "icon-192.png"));
+  const pedidos = [];
+  await page.route("**/api/historial?tipo=foto-instalacion**", (route) => {
+    const auth = route.request().headers()["authorization"] || "";
+    pedidos.push(auth);
+    if (!auth.includes("s1.PASE")) return route.fulfill({ status: 401, contentType: "application/json", body: '{"error":"No autorizado"}' });
+    route.fulfill({ status: 200, contentType: "image/png", body: png });
+  });
+  await page.goto(base + "/");
+  await page.evaluate(() => { guardarPaseApi("s1.PASE.F"); instalacionActivaId = "77"; pintarFotosInstalacion(["foto-1.jpg", "foto-2.jpg"]); });
+  await page.waitForFunction(() => [...document.querySelectorAll(".instalacion-foto-item img")].every((i) => i.complete && i.naturalWidth > 0 && i.dataset.lista));
+  assert.ok(pedidos.length >= 2 && pedidos.every((a) => a.includes("s1.PASE")), "las pide con el pase");
+  await page.evaluate(() => document.querySelector(".instalacion-foto-item img").click());
+  assert.strictEqual(await page.locator(".pd-lightbox img").count(), 1, "se abre en grande");
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.158.0";
+const APP_VERSION = "3.159.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -10082,6 +10082,27 @@ function leerArchivoComoBase64Instalacion(file) {
   });
 }
 
+// Las fotos de instalación se piden con el pase de la sesión: un <img src>
+// común no lo manda, y desde el cambio de seguridad el servidor las
+// rechazaba (se veían como imagen rota). Se bajan con fetch y se muestran
+// desde la memoria del celular; quedan guardadas mientras la app esté abierta.
+const fotosConPaseCache = new Map();
+function urlFotoConPase(url) {
+  if (fotosConPaseCache.has(url)) return fotosConPaseCache.get(url);
+  const promesa = fetch(url, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN } })
+    .then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.blob(); })
+    .then((blob) => URL.createObjectURL(blob))
+    .catch((err) => { fotosConPaseCache.delete(url); throw err; });
+  fotosConPaseCache.set(url, promesa);
+  return promesa;
+}
+function mostrarFotoConPase(img, url) {
+  img.classList.add("foto-cargando");
+  urlFotoConPase(url)
+    .then((src) => { img.src = src; img.classList.remove("foto-cargando"); img.dataset.lista = "1"; })
+    .catch(() => { img.classList.remove("foto-cargando"); img.classList.add("foto-error"); img.alt = "No se pudo cargar la foto"; });
+}
+
 function pintarFotosInstalacion(fotos) {
   const id = instalacionActivaId;
   instFotosGrid.innerHTML = "";
@@ -10089,10 +10110,14 @@ function pintarFotosInstalacion(fotos) {
     const item = document.createElement("div");
     item.className = "instalacion-foto-item";
     item.innerHTML = `
-      <img src="/api/historial?tipo=foto-instalacion&id=${id}&nombre=${encodeURIComponent(nombre)}" loading="lazy" alt="Foto de la instalación">
+      <img alt="Foto de la instalación" role="button" tabindex="0" title="Tocá para verla grande">
       <button type="button" class="instalacion-foto-borrar" title="Borrar">✕</button>
     `;
-    item.querySelector("button").addEventListener("click", async () => {
+    const img = item.querySelector("img");
+    mostrarFotoConPase(img, `/api/historial?tipo=foto-instalacion&id=${encodeURIComponent(id)}&nombre=${encodeURIComponent(nombre)}`);
+    img.addEventListener("click", () => { if (img.dataset.lista) ampliarImagenParte(img.src); });
+    item.querySelector("button").addEventListener("click", async (e) => {
+      e.stopPropagation();
       if (!confirm("¿Borrar esta foto de la instalación?")) return;
       try {
         const res = await fetch("/api/historial", {

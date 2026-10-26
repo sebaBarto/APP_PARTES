@@ -7017,7 +7017,7 @@ async function mostrarDetalleInstalacionAdmin(id) {
     const zonasHtml = (inst.zonas || []).map((z) => `<li>Zona ${escapeHtmlAdmin(z.numero)} — ${escapeHtmlAdmin(z.descripcion || "")}</li>`).join("") || "<li style='color:#6B7680;'>Sin zonas cargadas.</li>";
     const canalesHtml = (inst.canales || []).map((c) => `<li>Canal ${escapeHtmlAdmin(c.numero)} — ${escapeHtmlAdmin(c.descripcion || "")}</li>`).join("") || "<li style='color:#6B7680;'>Sin canales cargados.</li>";
     const fotosHtml = (inst.fotos || []).map((nombre) =>
-      `<img src="/api/historial?tipo=foto-instalacion&id=${id}&nombre=${encodeURIComponent(nombre)}" style="width:100px;height:100px;object-fit:cover;border-radius:8px;margin:4px;">`
+      `<img class="inst-foto-pase" data-url="/api/historial?tipo=foto-instalacion&id=${encodeURIComponent(id)}&nombre=${encodeURIComponent(nombre)}" alt="Foto de la instalación" title="Abrir en grande" style="width:100px;height:100px;object-fit:cover;border-radius:8px;margin:4px;background:#E6E4DE;cursor:zoom-in;">`
     ).join("") || "<p style='color:#6B7680;'>Sin fotos.</p>";
     const diasHtml = (inst.dias || []).map((d, idx) => {
       const [y, m, dd] = (d.fecha_llegada || "").split("-");
@@ -7065,6 +7065,18 @@ async function mostrarDetalleInstalacionAdmin(id) {
     `;
 
     document.getElementById("instalacionBorrarBtn").addEventListener("click", () => borrarInstalacionAdmin(id, inst.cliente, inst.estado));
+    // Las fotos piden el pase de la sesión (un <img src> común no lo manda).
+    instalacionesAdminDetalleContenido.querySelectorAll("img.inst-foto-pase").forEach(async (img) => {
+      try {
+        const r = await fetch(img.dataset.url, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN } });
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        img.src = URL.createObjectURL(await r.blob());
+        img.addEventListener("click", () => window.open(img.src, "_blank"));
+      } catch (e) {
+        img.alt = "No se pudo cargar"; img.title = "No se pudo cargar la foto";
+        img.style.background = "repeating-linear-gradient(45deg,#EAD9D6,#EAD9D6 6px,#F3E7E5 6px,#F3E7E5 12px)";
+      }
+    });
   } catch (err) {
     instalacionesAdminDetalleContenido.innerHTML = `<p style="color:#C0392B;">No se pudo cargar: ${escapeHtmlAdmin(err.message)}</p>`;
   }
