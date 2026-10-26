@@ -475,6 +475,12 @@ th .ayuda-btn { width: 18px; height: 18px; min-width: 18px; font-size: 11px; mar
 .aud-det { color: var(--ink-2, #6B6862); font-size: 12.5px; margin-top: 2px; }
 .aud-fila.acceso .aud-sec { background: #E8F1FB; color: #1D4F86; }
 @media (max-width: 640px) { .aud-fila { grid-template-columns: 44px 1fr; } .aud-fila .aud-cuerpo { grid-column: 1 / -1; } }
+.lp-cotiz { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+.lp-cotiz > div { flex: 1 1 220px; }
+.lp-cotiz input { margin-bottom: 0; }
+.lp-mapeo-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0 14px; }
+.lp-tabla { width: 100%; border-collapse: collapse; font-size: 13px; }
+.lp-tabla td { white-space: normal; }
 .cli-manual-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
 .cli-manual-grid .cli-manual-ancho { grid-column: 1 / -1; }
 @media (max-width: 560px) { .cli-manual-grid { grid-template-columns: 1fr; } }
@@ -812,6 +818,34 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
         <h2 style="margin:0 0 4px; font-size:16px;">Materiales cargados a mano que se repiten</h2>
         <p class="subtitle" style="margin:0 0 10px;">Los técnicos los escribieron a mano en 3 partes o más. Agregalos al catálogo para que les salgan como opción fija. Después tocá «Guardar cambios».</p>
         <div id="materialesSugeridosLista"></div>
+      </div>
+
+      <div class="card lp-card" id="listaPreciosCard">
+        <h3 style="margin:0 0 4px;">Lista de precios (para el Presupuesto express)</h3>
+        <p class="subtitle" style="margin:0 0 12px;">Subí el Excel con los artículos y sus precios (con IVA). Es la base que usa el <b>Presupuesto express</b> para buscar artículos. Cada vez que lo subas de nuevo, reemplaza la lista anterior. Los artículos en dólares se pasan a pesos con la cotización de abajo.</p>
+        <p class="status" id="lpEstado">Cargando...</p>
+        <div class="lp-cotiz">
+          <div><label for="lpCotizacion">Cotización del dólar (USD → $)</label><input type="text" id="lpCotizacion" inputmode="decimal" placeholder="Ej: 1450"></div>
+          <button type="button" id="lpCotizacionBtn" class="btn-secondary-admin" style="width:auto;">Guardar cotización</button>
+        </div>
+        <p class="status" id="lpCotizacionStatus"></p>
+        <label for="lpExcel" style="margin-top:6px;">Subir lista de precios (Excel o CSV)</label>
+        <input type="file" id="lpExcel" accept=".xlsx,.xls,.csv">
+        <div id="lpMapeo" class="hidden">
+          <p class="subtitle" style="margin:4px 0 10px;">Revisá que cada dato salga de la columna correcta (lo detecté solo, pero podés cambiarlo):</p>
+          <div class="lp-mapeo-grid">
+            <div><label for="lpColDesc">Descripción *</label><select id="lpColDesc"></select></div>
+            <div><label for="lpColPrecio">Precio *</label><select id="lpColPrecio"></select></div>
+            <div><label for="lpColPrecioUsd">Precio en dólares (si viene en otra columna)</label><select id="lpColPrecioUsd"></select></div>
+            <div><label for="lpColMoneda">Moneda (si hay una columna que lo dice)</label><select id="lpColMoneda"></select></div>
+            <div><label for="lpColCodigo">Código</label><select id="lpColCodigo"></select></div>
+            <div><label for="lpMonedaDefecto">Si no dice la moneda, el precio está en</label><select id="lpMonedaDefecto"><option value="ARS">Pesos</option><option value="USD">Dólares</option></select></div>
+          </div>
+          <p class="status" id="lpResumen"></p>
+          <div class="lp-vista" id="lpVista"></div>
+          <button type="button" id="lpGuardarBtn" style="width:auto; padding:11px 22px;">Guardar esta lista de precios</button>
+        </div>
+        <p class="status" id="lpStatus"></p>
       </div>
 
       <div id="categoriasFilas"></div>
@@ -1712,7 +1746,7 @@ const TABS = [
   { btn: tabServiciosBtn, panel: panelServicios },
   { btn: tabCronogramaBtn, panel: panelCronograma },
   { btn: tabTecnicosBtn, panel: panelTecnicos, onShow: () => recargarSiNoHayCambios(panelTecnicos, cargarTecnicosAdmin) },
-  { btn: tabMaterialesBtn, panel: panelMateriales, onShow: () => recargarSiNoHayCambios(panelMateriales, cargarMaterialesAdmin) },
+  { btn: tabMaterialesBtn, panel: panelMateriales, onShow: () => { recargarSiNoHayCambios(panelMateriales, cargarMaterialesAdmin); cargarListaPreciosAdmin(); } },
   { btn: tabClientesBtn, panel: panelClientes, onShow: () => recargarSiNoHayCambios(panelClientes, cargarClientesAdmin) },
   { btn: tabConsultasBtn, panel: panelConsultas, onShow: () => { recargarSiNoHayCambios(panelConsultas, cargarConsultasCatAdmin); cargarCategoriasManualesAdmin(); cargarDatosEquipoAdmin(); } },
   { btn: tabGuardiasBtn, panel: panelGuardias, onShow: () => { recargarSiNoHayCambios(panelGuardias, cargarGuardiasAdmin); cargarEstadoAvisoGuardia(); cargarGuardiaHistorialAdmin(); } },
@@ -1949,6 +1983,7 @@ const PERMISOS_TECNICO = [
   { clave: "herramientas", etiqueta: "Sección Herramientas" },
   { clave: "comodato", etiqueta: "Sección Comodato" },
   { clave: "agendar_emergencia", etiqueta: "Agendar servicios de emergencia (fuera de horario)" },
+  { clave: "presupuesto_express", etiqueta: "Presupuesto express (armar y enviar presupuestos rápidos)" },
   { clave: "admin", etiqueta: "Panel de Administración" },
 ];
 
@@ -2834,6 +2869,157 @@ clientesExcelFile.addEventListener("change", () => {
     }
   };
   reader.readAsArrayBuffer(file);
+});
+
+// ---------- Lista de precios (Presupuesto express) ----------
+// El Excel puede venir de distintos lugares, así que se detectan las
+// columnas solas (descripción, precio, moneda, código) y se muestran
+// para que la oficina las confirme antes de guardar.
+function numeroArgentinoAdmin(v) {
+  if (typeof v === "number") return isFinite(v) ? v : NaN;
+  let t = String(v == null ? "" : v).replace(/[^\d.,-]/g, "");
+  if (!t) return NaN;
+  if (t.includes(",") && t.includes(".")) t = t.lastIndexOf(",") > t.lastIndexOf(".") ? t.replace(/\./g, "").replace(",", ".") : t.replace(/,/g, "");
+  else if (t.includes(",")) t = t.replace(",", ".");
+  else if ((t.match(/\./g) || []).length > 1 || /^-?\d{1,3}\.\d{3}$/.test(t)) t = t.replace(/\./g, ""); // "1.450" = mil cuatrocientos cincuenta
+  return Number(t);
+}
+const pesosLP = (n) => "$" + Number(n || 0).toLocaleString("es-AR", { maximumFractionDigits: 2 });
+let lpArchivo = { nombre: "", filas: [], encabezado: [] };
+async function cargarListaPreciosAdmin() {
+  const st = document.getElementById("lpEstado");
+  try {
+    const r = await fetch("/api/datos?coleccion=lista_precios", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Error");
+    const n = Array.isArray(d.items) ? d.items.length : 0;
+    const usd = n ? d.items.filter((x) => x.m === "USD").length : 0;
+    st.className = n ? "status ok" : "status";
+    st.textContent = n
+      ? `Lista cargada: ${n.toLocaleString("es-AR")} artículos${usd ? ` (${usd} en dólares)` : ""}${d.archivo ? ` — ${d.archivo}` : ""}${d.actualizado ? `, el ${fechaDelServidor(d.actualizado).toLocaleString("es-AR", { hour12: false })}` : ""}${d.actualizado_por ? ` por ${d.actualizado_por}` : ""}.`
+      : "Todavía no se cargó ninguna lista de precios.";
+    document.getElementById("lpCotizacion").value = d.cotizacion_usd ? String(d.cotizacion_usd).replace(".", ",") : "";
+    document.getElementById("lpCotizacionStatus").textContent = d.cotizacion_usd ? `Cotización actual: ${pesosLP(d.cotizacion_usd)} por dólar${d.cotizacion_actualizada ? ` (desde el ${fechaDelServidor(d.cotizacion_actualizada).toLocaleDateString("es-AR")})` : ""}.` : "Sin cotización cargada: los artículos en dólares no se van a poder presupuestar.";
+  } catch (e) {
+    st.className = "status err"; st.textContent = "No se pudo leer la lista de precios: " + e.message;
+  }
+}
+document.getElementById("lpCotizacionBtn").addEventListener("click", async () => {
+  const st = document.getElementById("lpCotizacionStatus");
+  const v = numeroArgentinoAdmin(document.getElementById("lpCotizacion").value);
+  if (!(v > 0)) { st.className = "status err"; st.textContent = "Poné una cotización válida, por ejemplo 1450."; return; }
+  try {
+    const r = await fetch("/api/datos?coleccion=lista_precios", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ accion: "cotizacion", valor: v }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Error");
+    st.className = "status ok"; st.textContent = `Listo: ${pesosLP(v)} por dólar.`;
+  } catch (e) { st.className = "status err"; st.textContent = "No se pudo guardar: " + e.message; }
+});
+function normEncLP(s) { return normalizeTextAdmin(String(s || "")).replace(/[^a-z0-9$]+/g, " ").trim(); }
+function detectarColumnasLP(enc) {
+  const n = enc.map(normEncLP);
+  const buscar = (pruebas, evitar = []) => n.findIndex((h, i) => !evitar.includes(i) && pruebas.some((p) => p.test(h)));
+  const esUsd = /(usd|u s s|dolar|us\$|u\$s|\bus\b)/;
+  const desc = buscar([/descrip/, /detalle/, /producto/, /^articulo$/, /nombre/, /articulo/]);
+  const usd = buscar([/precio.*(usd|dolar|u\$s|us\$|u s s)/, /(usd|dolar|u\$s|us\$)/]);
+  let precio = buscar([/precio.*(final|venta|publico|lista|c iva|con iva)/, /^precio$/, /precio/, /\bpvp\b/, /importe/, /valor/], [usd]);
+  if (precio === -1 && usd !== -1) precio = usd;
+  const moneda = buscar([/moneda/, /divisa/]);
+  const codigo = buscar([/codigo/, /^cod/, /\bsku\b/, /\bref/], [desc]);
+  return { desc, precio, usd: usd !== precio ? usd : -1, moneda, codigo, esUsdPrecio: precio !== -1 && esUsd.test(n[precio] || "") };
+}
+function llenarSelectLP(id, enc, valor, opcional) {
+  const sel = document.getElementById(id);
+  sel.innerHTML = (opcional ? '<option value="-1">— (no hay)</option>' : "") + enc.map((h, i) => `<option value="${i}">${escapeHtmlAdmin(String(h || `Columna ${i + 1}`))}</option>`).join("");
+  sel.value = String(valor);
+}
+function itemsDesdeArchivoLP() {
+  const col = (id) => Number(document.getElementById(id).value);
+  const iDesc = col("lpColDesc"), iPrecio = col("lpColPrecio"), iUsd = col("lpColPrecioUsd"), iMon = col("lpColMoneda"), iCod = col("lpColCodigo");
+  const monDef = document.getElementById("lpMonedaDefecto").value;
+  const items = [];
+  let descartadas = 0;
+  lpArchivo.filas.forEach((f) => {
+    const d = String(f[iDesc] ?? "").replace(/\s+/g, " ").trim();
+    let precioTxt = f[iPrecio];
+    let p = numeroArgentinoAdmin(precioTxt);
+    let m = monDef;
+    if (iMon >= 0) { const mv = normalizeTextAdmin(String(f[iMon] ?? "")); if (/us|dol|u\$s/.test(mv)) m = "USD"; else if (mv) m = "ARS"; }
+    if (/u\$s|usd|us\$|dolar/i.test(String(precioTxt ?? ""))) m = "USD";
+    if (!(p > 0) && iUsd >= 0) { const pu = numeroArgentinoAdmin(f[iUsd]); if (pu > 0) { p = pu; m = "USD"; } }
+    if (!d || !(p > 0)) { if (d || String(precioTxt ?? "").trim()) descartadas++; return; }
+    items.push({ c: iCod >= 0 ? String(f[iCod] ?? "").trim() : "", d, p: Math.round(p * 100) / 100, m });
+  });
+  return { items, descartadas };
+}
+function actualizarVistaLP() {
+  const { items, descartadas } = itemsDesdeArchivoLP();
+  const usd = items.filter((x) => x.m === "USD").length;
+  const res = document.getElementById("lpResumen");
+  res.className = items.length ? "status ok" : "status err";
+  res.textContent = items.length
+    ? `${items.length.toLocaleString("es-AR")} artículos listos para guardar${usd ? ` (${usd} en dólares)` : ""}.${descartadas ? ` Se saltean ${descartadas} fila(s) sin descripción o sin precio.` : ""}`
+    : "Con estas columnas no sale ningún artículo con descripción y precio. Revisá la elección de columnas.";
+  document.getElementById("lpVista").innerHTML = items.length ? `<table class="lp-tabla"><thead><tr><th>Código</th><th>Descripción</th><th style="text-align:right;">Precio</th></tr></thead><tbody>${items.slice(0, 8).map((x) => `<tr><td>${escapeHtmlAdmin(x.c)}</td><td>${escapeHtmlAdmin(x.d)}</td><td style="text-align:right; white-space:nowrap;">${x.m === "USD" ? "US$ " + x.p.toLocaleString("es-AR") : pesosLP(x.p)}</td></tr>`).join("")}</tbody></table><p class="subtitle" style="margin:6px 0 12px;">Muestra de los primeros 8.</p>` : "";
+  document.getElementById("lpGuardarBtn").disabled = !items.length;
+}
+["lpColDesc", "lpColPrecio", "lpColPrecioUsd", "lpColMoneda", "lpColCodigo", "lpMonedaDefecto"].forEach((id) => document.getElementById(id).addEventListener("change", actualizarVistaLP));
+document.getElementById("lpExcel").addEventListener("change", (ev) => {
+  const file = ev.target.files[0];
+  if (!file) return;
+  const st = document.getElementById("lpStatus");
+  st.className = "status"; st.textContent = "Leyendo archivo...";
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: "array" });
+      const hoja = wb.Sheets[wb.SheetNames[0]];
+      const matriz = XLSX.utils.sheet_to_json(hoja, { header: 1, raw: true, defval: "" });
+      // La fila de encabezados puede no ser la primera: se busca la que tenga descripción y precio.
+      let iEnc = 0, mejor = -1, cols = null;
+      for (let i = 0; i < Math.min(matriz.length, 30); i++) {
+        const c = detectarColumnasLP((matriz[i] || []).map(String));
+        const puntos = (c.desc >= 0 ? 2 : 0) + (c.precio >= 0 ? 2 : 0) + (c.codigo >= 0 ? 1 : 0) + (c.moneda >= 0 ? 1 : 0);
+        if (puntos > mejor) { mejor = puntos; iEnc = i; cols = c; }
+        if (puntos >= 5) break;
+      }
+      const enc = (matriz[iEnc] || []).map((h) => String(h ?? "").trim());
+      const ancho = Math.max(enc.length, ...matriz.slice(iEnc + 1, iEnc + 50).map((f) => (f || []).length));
+      for (let i = 0; i < ancho; i++) if (!enc[i]) enc[i] = `Columna ${i + 1}`;
+      lpArchivo = { nombre: file.name, filas: matriz.slice(iEnc + 1).filter((f) => f && f.some((x) => String(x ?? "").trim())), encabezado: enc };
+      llenarSelectLP("lpColDesc", enc, cols && cols.desc >= 0 ? cols.desc : 0, false);
+      llenarSelectLP("lpColPrecio", enc, cols && cols.precio >= 0 ? cols.precio : Math.min(1, enc.length - 1), false);
+      llenarSelectLP("lpColPrecioUsd", enc, cols ? cols.usd : -1, true);
+      llenarSelectLP("lpColMoneda", enc, cols ? cols.moneda : -1, true);
+      llenarSelectLP("lpColCodigo", enc, cols ? cols.codigo : -1, true);
+      document.getElementById("lpMonedaDefecto").value = cols && cols.esUsdPrecio ? "USD" : "ARS";
+      document.getElementById("lpMapeo").classList.remove("hidden");
+      st.textContent = "";
+      actualizarVistaLP();
+    } catch (err) {
+      st.className = "status err"; st.textContent = "No se pudo leer el archivo: " + err.message;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+});
+document.getElementById("lpGuardarBtn").addEventListener("click", async () => {
+  const st = document.getElementById("lpStatus");
+  const { items } = itemsDesdeArchivoLP();
+  if (!items.length) return;
+  if (!await confirmarAdmin(`Se va a reemplazar la lista de precios actual por estos ${items.length.toLocaleString("es-AR")} artículos. ¿Seguimos?`)) return;
+  const btn = document.getElementById("lpGuardarBtn");
+  btn.disabled = true; st.className = "status"; st.textContent = "Guardando...";
+  try {
+    const r = await fetch("/api/datos?coleccion=lista_precios", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ accion: "reemplazar", archivo: lpArchivo.nombre, items }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Error");
+    st.className = "status ok"; st.textContent = `Listo: se guardaron ${d.cantidad.toLocaleString("es-AR")} artículos.`;
+    document.getElementById("lpMapeo").classList.add("hidden");
+    document.getElementById("lpExcel").value = "";
+    cargarListaPreciosAdmin();
+  } catch (e) {
+    st.className = "status err"; st.textContent = "No se pudo guardar: " + e.message;
+  } finally { btn.disabled = false; }
 });
 
 // ---------- Categorías de consultas con IA ----------

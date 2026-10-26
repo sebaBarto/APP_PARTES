@@ -100,6 +100,157 @@ async function tienePermisoAdmin(nombre) {
   return !!(t && t.permisos && t.permisos.admin);
 }
 
+// ============================================================
+// PRESUPUESTO EXPRESS
+//  - lista_precios: la base de artículos con precio (Excel que sube la
+//    oficina) + la cotización del dólar. Puede ser grande, así que se
+//    guarda compacta y se lee "cruda" (la API de GitHub no devuelve el
+//    contenido en base64 de archivos de más de 1 MB).
+//  - presupuestos_express: la numeración E-0001, E-0002... (se reserva
+//    el número en el servidor, así dos personas nunca sacan el mismo) y
+//    un registro de los que se emitieron.
+// ============================================================
+const RUTA_LISTA_PRECIOS = "lista-precios.json";
+const RUTA_PRESUPUESTOS_EXPRESS = "presupuestos-express.json";
+function headersGithubDatos(extra) {
+  return { Authorization: `Bearer ${process.env.GITHUB_DATA_TOKEN}`, Accept: "application/vnd.github+json", ...(extra || {}) };
+}
+function urlGithubDatos(ruta) {
+  return `https://api.github.com/repos/${process.env.GITHUB_DATA_REPO}/contents/${ruta}`;
+}
+async function leerArchivoDatos(ruta, porDefecto) {
+  // sha (sirve aunque el archivo pese más de 1 MB) + contenido crudo
+  const rMeta = await fetch(urlGithubDatos(ruta), { headers: headersGithubDatos() });
+  if (rMeta.status === 404) return { data: porDefecto, sha: undefined };
+  if (!rMeta.ok) throw new Error("No se pudo leer " + ruta);
+  const meta = await rMeta.json();
+  let texto;
+  if (meta.content && meta.encoding === "base64") texto = Buffer.from(meta.content, "base64").toString("utf-8");
+  else {
+    const rRaw = await fetch(urlGithubDatos(ruta), { headers: headersGithubDatos({ Accept: "application/vnd.github.raw" }) });
+    if (!rRaw.ok) throw new Error("No se pudo leer " + ruta);
+    texto = await rRaw.text();
+  }
+  let data = porDefecto;
+  try { data = JSON.parse(texto); } catch (e) { data = porDefecto; }
+  return { data, sha: meta.sha };
+}
+async function escribirArchivoDatos(ruta, data, sha, mensaje) {
+  const r = await fetch(urlGithubDatos(ruta), {
+    method: "PUT",
+    headers: headersGithubDatos({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ message: mensaje, content: Buffer.from(JSON.stringify(data)).toString("base64"), sha }),
+  });
+  return r;
+}
+function numeroArgentino(v) {
+  if (typeof v === "number") return isFinite(v) ? v : NaN;
+  let t = String(v == null ? "" : v).replace(/[^\d.,-]/g, "");
+  if (!t) return NaN;
+  if (t.includes(",") && t.includes(".")) t = t.lastIndexOf(",") > t.lastIndexOf(".") ? t.replace(/\./g, "").replace(",", ".") : t.replace(/,/g, "");
+  else if (t.includes(",")) t = t.replace(",", ".");
+  else if ((t.match(/\./g) || []).length > 1 || /^-?\d{1,3}\.\d{3}$/.test(t)) t = t.replace(/\./g, ""); // "1.450" = mil cuatrocientos cincuenta
+  return Number(t);
+}
+async function manejarPresupuestoExpress(req, res, autorizacion, body) {
+  const { GITHUB_DATA_TOKEN, GITHUB_DATA_REPO } = process.env;
+  if (!GITHUB_DATA_TOKEN || !GITHUB_DATA_REPO) { res.status(500).json({ error: "Faltan variables de entorno por configurar en Vercel" }); return; }
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+  const esAdmin = autorizacion.rol === "admin";
+  const coleccion = req.query.coleccion;
+  try {
+    if (coleccion === "lista_precios") {
+      const vacia = { actualizado: "", archivo: "", cotizacion_usd: null, items: [] };
+      if (req.method === "GET") {
+        const { data } = await leerArchivoDatos(RUTA_LISTA_PRECIOS, vacia);
+        res.status(200).json({ ...vacia, ...(data || {}) });
+        return;
+      }
+      if (req.method !== "POST") { res.status(405).json({ error: "Método no permitido" }); return; }
+      if (!esAdmin) { res.status(403).json({ error: "La lista de precios solo la carga la oficina" }); return; }
+      const b = body && typeof body === "object" ? body : {};
+      for (let intento = 0; intento < 3; intento++) {
+        const { data, sha } = await leerArchivoDatos(RUTA_LISTA_PRECIOS, vacia);
+        const actual = { ...vacia, ...(data || {}) };
+        if (b.accion === "cotizacion") {
+          const v = numeroArgentino(b.valor);
+          if (!(v > 0)) { res.status(400).json({ error: "Poné una cotización válida (mayor a 0)" }); return; }
+          actual.cotizacion_usd = v;
+          actual.cotizacion_actualizada = new Date().toISOString();
+          actual.cotizacion_por = autorizacion.nombre || "";
+        } else if (b.accion === "reemplazar") {
+          if (!Array.isArray(b.items) || b.items.length === 0) { res.status(400).json({ error: "La lista está vacía" }); return; }
+          if (b.items.length > 30000) { res.status(400).json({ error: "La lista tiene demasiados artículos (máximo 30.000)" }); return; }
+          const items = [];
+          for (const it of b.items) {
+            const d = String((it && it.d) || "").replace(/\s+/g, " ").trim().slice(0, 400);
+            const p = numeroArgentino(it && it.p);
+            if (!d || !(p >= 0)) continue;
+            items.push({ c: String((it && it.c) || "").trim().slice(0, 60), d, p: Math.round(p * 100) / 100, m: it && it.m === "USD" ? "USD" : "ARS" });
+          }
+          if (!items.length) { res.status(400).json({ error: "Ningún artículo tenía descripción y precio válidos" }); return; }
+          actual.items = items;
+          actual.archivo = String(b.archivo || "").slice(0, 200);
+          actual.actualizado = new Date().toISOString();
+          actual.actualizado_por = autorizacion.nombre || "";
+          if (b.cotizacion_usd !== undefined && numeroArgentino(b.cotizacion_usd) > 0) actual.cotizacion_usd = numeroArgentino(b.cotizacion_usd);
+        } else { res.status(400).json({ error: "Acción inválida" }); return; }
+        const r = await escribirArchivoDatos(RUTA_LISTA_PRECIOS, actual, sha, `Lista de precios (${b.accion}) — ${autorizacion.nombre || "admin"}`);
+        if (r.ok) { res.status(200).json({ ok: true, cantidad: actual.items.length, cotizacion_usd: actual.cotizacion_usd }); return; }
+        if (r.status !== 409 && r.status !== 422) { res.status(502).json({ error: "No se pudo guardar la lista de precios" }); return; }
+      }
+      res.status(409).json({ error: "Otra persona estaba guardando al mismo tiempo. Probá de nuevo." });
+      return;
+    }
+
+    // presupuestos_express
+    const vacio = { ultimo: 0, presupuestos: [] };
+    if (req.method === "GET") {
+      if (!esAdmin) { res.status(403).json({ error: "Solo la oficina ve el registro de presupuestos" }); return; }
+      const { data } = await leerArchivoDatos(RUTA_PRESUPUESTOS_EXPRESS, vacio);
+      res.status(200).json({ ...vacio, ...(data || {}) });
+      return;
+    }
+    if (req.method !== "POST") { res.status(405).json({ error: "Método no permitido" }); return; }
+    const b = body && typeof body === "object" ? body : {};
+    if (!esAdmin) {
+      const t = (await leerTecnicosGuardados()).find((x) => x.nombre === autorizacion.nombre);
+      if (!(t && t.permisos && t.permisos.presupuesto_express)) { res.status(403).json({ error: "No tenés habilitado el Presupuesto express" }); return; }
+    }
+    const txt = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
+    for (let intento = 0; intento < 4; intento++) {
+      const { data, sha } = await leerArchivoDatos(RUTA_PRESUPUESTOS_EXPRESS, vacio);
+      const reg = { ...vacio, ...(data || {}) };
+      if (!Array.isArray(reg.presupuestos)) reg.presupuestos = [];
+      let respuesta;
+      if (b.accion === "nuevo") {
+        reg.ultimo = (Number(reg.ultimo) || 0) + 1;
+        const numero = "E-" + String(reg.ultimo).padStart(4, "0");
+        reg.presupuestos.unshift({
+          numero, fecha: new Date().toISOString(), emitido_por: autorizacion.nombre || "Oficina",
+          cliente: txt(b.cliente, 150), numero_cliente: txt(b.numero_cliente, 30), titulo: txt(b.titulo, 150),
+          total_materiales: numeroArgentino(b.total_materiales) || 0, mano_obra: numeroArgentino(b.mano_obra) || 0,
+          total: numeroArgentino(b.total) || 0, forma_pago: txt(b.forma_pago, 80), cotizacion_usd: numeroArgentino(b.cotizacion_usd) || null,
+          articulos: Math.max(0, Math.min(1000, Number(b.articulos) || 0)),
+        });
+        reg.presupuestos = reg.presupuestos.slice(0, 3000);
+        respuesta = { ok: true, numero };
+      } else if (b.accion === "adjuntar_pdf") {
+        const e = reg.presupuestos.find((x) => x.numero === b.numero);
+        if (!e) { res.status(404).json({ error: "No existe ese presupuesto" }); return; }
+        e.pdf_id = txt(b.pdf_id, 80);
+        respuesta = { ok: true };
+      } else { res.status(400).json({ error: "Acción inválida" }); return; }
+      const r = await escribirArchivoDatos(RUTA_PRESUPUESTOS_EXPRESS, reg, sha, `Presupuesto express ${b.accion} — ${autorizacion.nombre || "admin"}`);
+      if (r.ok) { res.status(200).json(respuesta); return; }
+      if (r.status !== 409 && r.status !== 422) { res.status(502).json({ error: "No se pudo guardar el presupuesto" }); return; }
+    }
+    res.status(409).json({ error: "Muchos presupuestos al mismo tiempo. Probá de nuevo." });
+  } catch (err) {
+    res.status(500).json({ error: "Error interno: " + String(err.message || err) });
+  }
+}
+
 const COLECCIONES = {
   config: {
     path: "config.json",
@@ -531,6 +682,12 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
     };
   }
   // El registro de cambios solo lo ve la oficina, y nadie lo escribe a mano.
+  // ---------- Presupuesto express: lista de precios y numeración ----------
+  if (req.query && (req.query.coleccion === "lista_precios" || req.query.coleccion === "presupuestos_express")) {
+    if (!autorizacion) { res.status(401).json({ error: "No autorizado", sesion_vencida: true }); return; }
+    await manejarPresupuestoExpress(req, res, autorizacion, cuerpoAccion);
+    return;
+  }
   if (req.query && req.query.coleccion === "auditoria") {
     if (req.method !== "GET" || !autorizacion || autorizacion.rol !== "admin") {
       res.status(403).json({ error: "El registro de cambios solo se puede consultar desde el panel de administración" });

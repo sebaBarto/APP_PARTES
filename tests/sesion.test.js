@@ -217,3 +217,48 @@ test("Admin con usuario propio: entra solo quien tiene el permiso, el pase lleva
     global.fetch = fetchViejo;
   }
 });
+
+test("Presupuesto express: la lista de precios la carga solo la oficina y los números salen correlativos E-0001, E-0002", async () => {
+  const fetchViejo = global.fetch;
+  const archivos = {};
+  global.fetch = async (url, op = {}) => {
+    const u = String(url);
+    const ruta = (u.match(/contents\/([^?]+)/) || [])[1];
+    if (ruta === "tecnicos.json") return new Response(JSON.stringify({ content: Buffer.from(JSON.stringify([{ nombre: "Juan", permisos: { presupuesto_express: true } }, { nombre: "Luis", permisos: {} }])).toString("base64"), encoding: "base64", sha: "t" }));
+    if (ruta) {
+      if (op.method === "PUT") { archivos[ruta] = JSON.parse(Buffer.from(JSON.parse(op.body).content, "base64").toString("utf-8")); return new Response("{}", { status: 200 }); }
+      if (!archivos[ruta]) return new Response("{}", { status: 404 });
+      return new Response(JSON.stringify({ sha: "s", encoding: "base64", content: Buffer.from(JSON.stringify(archivos[ruta])).toString("base64") }));
+    }
+    return new Response("[]");
+  };
+  try {
+    const admin = crearSesion({ nombre: "Oficina", rol: "admin" });
+    const juan = crearSesion({ nombre: "Juan", rol: "tecnico" });
+    const luis = crearSesion({ nombre: "Luis", rol: "tecnico" });
+    let r = resFalso();
+    await datos(pedido("POST", { coleccion: "lista_precios" }, { accion: "reemplazar", items: [{ d: "Batería", p: "28.500,50" }] }, juan), r);
+    assert.strictEqual(r.statusCode, 403, "un técnico no carga la lista");
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "lista_precios" }, { accion: "reemplazar", archivo: "lista.xlsx", items: [{ c: "B7", d: "Batería", p: "28.500,50" }, { d: "Central", p: 185, m: "USD" }, { d: "", p: 1 }] }, admin), r);
+    assert.deepStrictEqual(r.cuerpo, { ok: true, cantidad: 2, cotizacion_usd: null });
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "lista_precios" }, { accion: "cotizacion", valor: "1.450" }, admin), r);
+    r = resFalso();
+    await datos(pedido("GET", { coleccion: "lista_precios" }, null, juan), r);
+    assert.strictEqual(r.cuerpo.cotizacion_usd, 1450);
+    assert.deepStrictEqual(r.cuerpo.items, [{ c: "B7", d: "Batería", p: 28500.5, m: "ARS" }, { c: "", d: "Central", p: 185, m: "USD" }]);
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "presupuestos_express" }, { accion: "nuevo", cliente: "Tell", total: 100 }, luis), r);
+    assert.strictEqual(r.statusCode, 403, "sin el permiso no emite");
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "presupuestos_express" }, { accion: "nuevo", cliente: "Tell", total: 100 }, juan), r);
+    assert.strictEqual(r.cuerpo.numero, "E-0001");
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "presupuestos_express" }, { accion: "nuevo", cliente: "Otro", total: 5 }, admin), r);
+    assert.strictEqual(r.cuerpo.numero, "E-0002");
+    assert.deepStrictEqual(archivos["presupuestos-express.json"].presupuestos.map((p) => [p.numero, p.emitido_por]), [["E-0002", "Oficina"], ["E-0001", "Juan"]]);
+  } finally {
+    global.fetch = fetchViejo;
+  }
+});

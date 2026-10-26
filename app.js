@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.1.0";
+const APP_VERSION = "4.2.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -330,6 +330,7 @@ const screens = {
   comodatoForm: document.getElementById("screen-comodato-form"),
   comodatoFirma: document.getElementById("screen-comodato-firma"),
   rendicion: document.getElementById("screen-rendicion"),
+  presupuesto: document.getElementById("screen-presupuesto"),
   ajustes: document.getElementById("screen-ajustes"),
   fichaCliente: document.getElementById("screen-ficha-cliente"),
   form: document.getElementById("screen-form"),
@@ -1083,7 +1084,7 @@ function permisosDelTecnico(nombre) {
     return {
       dash_general: true, dash_financiero: true, dash_vehiculos: true, dash_herramientas: true, dash_sims: true, dash_stock: true, instalador: true,
       historial_todos: true, vehiculos: true, sims: true, herramientas: true, marcar_pasado_sistema: true,
-      comodato: true, admin: true, agendar_emergencia: true, sims_ver_todas: true,
+      comodato: true, admin: true, agendar_emergencia: true, sims_ver_todas: true, presupuesto_express: true,
     };
   }
   if (tecnicosPermisos[nombre]) {
@@ -1109,6 +1110,7 @@ function permisosDelTecnico(nombre) {
     comodato: true,
     admin: nombre === "Sebastian Bartolozzi" || nombre === "Brenda Thiesing",
     agendar_emergencia: false,
+    presupuesto_express: false,
     sims_ver_todas: false,
   };
 }
@@ -1624,6 +1626,8 @@ function actualizarAccesoSeccionesPanel() {
   tileInstaladorBtn.classList.toggle("hidden", !permisos.instalador);
   tileComodatoBtn.classList.toggle("hidden", !permisos.comodato);
   tileEmergenciaBtn.classList.toggle("hidden", !permisos.agendar_emergencia);
+  const tilePresu = document.getElementById("tilePresupuestoBtn");
+  if (tilePresu) tilePresu.classList.toggle("hidden", !permisos.presupuesto_express);
 }
 
 function actualizarAccesoDashboardFinanciero() {
@@ -8185,7 +8189,7 @@ function aplicarBotonesGrandes() {
 }
 
 // Mantener la pantalla encendida mientras se carga un parte/instalación/firma/rendición
-const PANTALLAS_DE_TRABAJO = ["form", "claves", "sign", "sending", "instalacion", "comodatoForm", "comodatoFirma", "rendicion", "presencia"];
+const PANTALLAS_DE_TRABAJO = ["form", "claves", "sign", "sending", "instalacion", "comodatoForm", "comodatoFirma", "rendicion", "presencia", "presupuesto"];
 let pantallaWakeLock = null;
 let pantallaActualNombre = "";
 function pantallaActivaNombre() {
@@ -14273,3 +14277,410 @@ async function abrirPlano(nombre, boton) {
 // Al abrir la app, si hay una sesión guardada y vigente, entra directo
 // sin pasar por el login (ver SESION_DURACION_MS más arriba).
 if (intentarRestaurarSesion()) bloquearSiCorresponde();
+
+// ============================================================
+// PRESUPUESTO EXPRESS
+// Cliente (del listado o nuevo, sin agregarlo al listado), artículos de
+// la lista de precios que sube la oficina (con IVA; los que están en
+// dólares se pasan a pesos con la cotización cargada), mano de obra y
+// forma de pago -> PDF con el formato de los presupuestos de SAT, para
+// mandar por WhatsApp. El número (E-0001...) lo reserva el servidor.
+// ============================================================
+const PE_BORRADOR = "presupuesto_express_borrador";
+let peLista = { items: [], cotizacion_usd: null, cargada: false };
+let peEstado = null;
+let peUltimoPdf = null; // { blob, nombre, numero }
+const pe = (id) => document.getElementById(id);
+function peNuevoEstado() {
+  return { modo: "listado", cliente: { nombre: "", numero_cliente: "", telefono: "", direccion: "", razon_social: "", cuit: "" }, clienteElegido: false, titulo: "", items: [], mano_obra: "", forma_pago: "Contado Efectivo" };
+}
+function peGuardarBorrador() { try { localStorage.setItem(PE_BORRADOR, JSON.stringify(peEstado)); } catch (e) { /* nada */ } }
+function peLeerBorrador() {
+  try { const b = JSON.parse(localStorage.getItem(PE_BORRADOR) || "null"); if (b && b.cliente && Array.isArray(b.items)) return { ...peNuevoEstado(), ...b }; } catch (e) { /* nada */ }
+  return peNuevoEstado();
+}
+function peNumero(v) {
+  if (typeof v === "number") return isFinite(v) ? v : NaN;
+  let t = String(v == null ? "" : v).replace(/[^\d.,-]/g, "");
+  if (!t) return NaN;
+  if (t.includes(",") && t.includes(".")) t = t.lastIndexOf(",") > t.lastIndexOf(".") ? t.replace(/\./g, "").replace(",", ".") : t.replace(/,/g, "");
+  else if (t.includes(",")) t = t.replace(",", ".");
+  else if ((t.match(/\./g) || []).length > 1 || /^-?\d{1,3}\.\d{3}$/.test(t)) t = t.replace(/\./g, ""); // "1.450" = mil cuatrocientos cincuenta
+  return Number(t);
+}
+const pePesos = (n) => "$" + Math.round(Number(n) || 0).toLocaleString("es-AR");
+function pePrecioEnPesos(art) {
+  if (art.m === "USD") return peLista.cotizacion_usd > 0 ? art.p * peLista.cotizacion_usd : NaN;
+  return art.p;
+}
+async function peCargarLista() {
+  const est = pe("peListaEstado");
+  try {
+    const r = await fetch("/api/datos?coleccion=lista_precios", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "HTTP " + r.status);
+    peLista = { items: Array.isArray(d.items) ? d.items : [], cotizacion_usd: Number(d.cotizacion_usd) || null, cargada: true };
+    try { localStorage.setItem("lista_precios_cache", JSON.stringify(peLista)); } catch (e) { /* muy grande para guardar: queda solo en memoria */ }
+  } catch (err) {
+    try { const c = JSON.parse(localStorage.getItem("lista_precios_cache") || "null"); if (c && Array.isArray(c.items)) peLista = { ...c, cargada: true }; } catch (e) { /* nada */ }
+  }
+  const n = peLista.items.length;
+  est.textContent = n
+    ? `Lista de precios: ${n.toLocaleString("es-AR")} artículos${peLista.cotizacion_usd ? ` · dólar a ${pePesos(peLista.cotizacion_usd)}` : ""}.`
+    : "Todavía no hay lista de precios cargada (se carga desde el admin, en Materiales). Igual podés agregar artículos a mano.";
+  peRenderArticulos();
+  peRenderItems();
+}
+function peAbrir() {
+  peEstado = peLeerBorrador();
+  peUltimoPdf = null;
+  peVolcarFormulario();
+  showScreen("presupuesto");
+  cargarClientesGeneral();
+  peCargarLista();
+}
+function peVolcarFormulario() {
+  const c = peEstado.cliente;
+  pe("peNombre").value = c.nombre; pe("peNumCliente").value = c.numero_cliente; pe("peTelefono").value = c.telefono;
+  pe("peDireccion").value = c.direccion; pe("peRazonSocial").value = c.razon_social; pe("peCuit").value = c.cuit;
+  pe("peTitulo").value = peEstado.titulo; pe("peManoObra").value = peEstado.mano_obra; pe("peFormaPago").value = peEstado.forma_pago;
+  pe("peClienteBuscar").value = ""; pe("peClienteResultados").innerHTML = ""; pe("peArtBuscar").value = ""; pe("peArtResultados").innerHTML = "";
+  pe("peManualWrap").classList.add("hidden");
+  peRenderModo();
+  peRenderItems();
+}
+function peRenderModo() {
+  document.querySelectorAll(".pe-modo-btn").forEach((b) => b.classList.toggle("activo", b.dataset.modo === peEstado.modo));
+  const nuevo = peEstado.modo === "nuevo";
+  pe("peBuscarClienteWrap").classList.toggle("hidden", nuevo);
+  pe("peClienteCampos").classList.toggle("hidden", !(nuevo || peEstado.clienteElegido));
+  pe("peNotaNuevo").classList.toggle("hidden", !nuevo);
+}
+document.querySelectorAll(".pe-modo-btn").forEach((b) => b.addEventListener("click", () => {
+  if (peEstado.modo === b.dataset.modo) return;
+  peEstado.modo = b.dataset.modo;
+  peEstado.clienteElegido = false;
+  peEstado.cliente = peNuevoEstado().cliente;
+  peVolcarFormulario();
+  peGuardarBorrador();
+  if (peEstado.modo === "nuevo") pe("peNombre").focus(); else pe("peClienteBuscar").focus();
+}));
+pe("peClienteBuscar").addEventListener("input", () => {
+  const q = normalizeText(pe("peClienteBuscar").value.trim());
+  const cont = pe("peClienteResultados");
+  if (q.length < 2) { cont.innerHTML = ""; return; }
+  const palabras = q.split(/\s+/);
+  const lista = (clientesGeneralCache || []).filter((c) => {
+    const t = normalizeText([c.nombre, c.numero_cliente, c.direccion, c.localidad, c.numero_abonado].join(" "));
+    return palabras.every((w) => t.includes(w));
+  }).slice(0, 12);
+  cont.innerHTML = lista.length
+    ? lista.map((c, i) => `<button type="button" class="pe-res" data-i="${i}"><b>${escapeHtml(c.nombre || "")}</b><span>Cliente ${escapeHtml(c.numero_cliente || "?")} · ${escapeHtml([c.direccion, c.localidad].filter(Boolean).join(", "))}</span></button>`).join("")
+    : `<p class="pe-vacio">${clientesGeneralCache && clientesGeneralCache.length ? "No hay ningún cliente así en el listado. Si es nuevo, tocá «Cliente nuevo»." : "Cargando clientes..."}</p>`;
+  cont.querySelectorAll(".pe-res").forEach((b) => b.addEventListener("click", () => {
+    const c = lista[Number(b.dataset.i)];
+    peEstado.cliente = { nombre: c.nombre || "", numero_cliente: String(c.numero_cliente || ""), telefono: c.telefono || "", direccion: [c.direccion, c.localidad].filter(Boolean).join(", "), razon_social: "", cuit: "" };
+    peEstado.clienteElegido = true;
+    peVolcarFormulario();
+    peGuardarBorrador();
+  }));
+});
+[["peNombre", "nombre"], ["peNumCliente", "numero_cliente"], ["peTelefono", "telefono"], ["peDireccion", "direccion"], ["peRazonSocial", "razon_social"], ["peCuit", "cuit"]].forEach(([id, campo]) => {
+  pe(id).addEventListener("input", () => { peEstado.cliente[campo] = pe(id).value; pe(id).classList.remove("campo-falta"); peGuardarBorrador(); });
+});
+pe("peTitulo").addEventListener("input", () => { peEstado.titulo = pe("peTitulo").value; peGuardarBorrador(); });
+pe("peManoObra").addEventListener("input", () => { peEstado.mano_obra = pe("peManoObra").value; pe("peManoObra").classList.remove("campo-falta"); peRenderTotales(); peGuardarBorrador(); });
+pe("peFormaPago").addEventListener("change", () => { peEstado.forma_pago = pe("peFormaPago").value; peGuardarBorrador(); });
+
+function peRenderArticulos() {
+  const q = normalizeText(pe("peArtBuscar").value.trim());
+  const cont = pe("peArtResultados");
+  if (q.length < 2) { cont.innerHTML = ""; return; }
+  const palabras = q.split(/\s+/);
+  const lista = [];
+  for (const a of peLista.items) {
+    const t = normalizeText(a.d + " " + (a.c || ""));
+    if (palabras.every((w) => t.includes(w))) { lista.push(a); if (lista.length >= 25) break; }
+  }
+  cont.innerHTML = lista.length
+    ? lista.map((a, i) => {
+      const pesos = pePrecioEnPesos(a);
+      return `<button type="button" class="pe-res pe-art" data-i="${i}" ${isNaN(pesos) ? "disabled" : ""}>
+        <span class="pe-art-desc">${a.c ? `<small>${escapeHtml(a.c)}</small> ` : ""}${escapeHtml(a.d)}</span>
+        <span class="pe-art-precio">${isNaN(pesos) ? "Falta cotización" : pePesos(pesos)}${a.m === "USD" ? `<small>US$ ${a.p.toLocaleString("es-AR")}</small>` : ""}</span>
+        <span class="pe-art-mas" aria-hidden="true">+</span></button>`;
+    }).join("")
+    : `<p class="pe-vacio">${peLista.items.length ? "No encontré artículos con eso." : "No hay lista de precios cargada."} Podés agregarlo a mano abajo.</p>`;
+  cont.querySelectorAll(".pe-art").forEach((b) => b.addEventListener("click", () => {
+    const a = lista[Number(b.dataset.i)];
+    const ya = peEstado.items.find((x) => !x.manual && x.d === a.d && x.c === a.c);
+    if (ya) ya.cant += 1;
+    else peEstado.items.push({ c: a.c || "", d: a.d, p: a.p, m: a.m, cant: 1 });
+    pe("peArtBuscar").value = "";
+    cont.innerHTML = "";
+    peRenderItems();
+    peGuardarBorrador();
+    showToast("Agregado: " + a.d.slice(0, 50));
+  }));
+}
+pe("peArtBuscar").addEventListener("input", peRenderArticulos);
+pe("peManualAbrirBtn").addEventListener("click", () => { pe("peManualWrap").classList.toggle("hidden"); pe("peManualDesc").focus(); });
+pe("peManualAgregarBtn").addEventListener("click", () => {
+  const d = pe("peManualDesc").value.replace(/\s+/g, " ").trim();
+  const p = peNumero(pe("peManualPrecio").value);
+  const cant = Math.max(1, Math.round(peNumero(pe("peManualCant").value) || 1));
+  if (!d) { showToast("Escribí la descripción del artículo."); pe("peManualDesc").focus(); return; }
+  if (!(p >= 0)) { showToast("Poné el precio unitario en pesos."); pe("peManualPrecio").focus(); return; }
+  peEstado.items.push({ c: "", d, p, m: "ARS", cant, manual: true });
+  pe("peManualDesc").value = ""; pe("peManualPrecio").value = ""; pe("peManualCant").value = "1";
+  pe("peManualWrap").classList.add("hidden");
+  peRenderItems();
+  peGuardarBorrador();
+});
+function peSubtotal(it) { const u = pePrecioEnPesos(it); return isNaN(u) ? NaN : u * it.cant; }
+function peRenderItems() {
+  const cont = pe("peItems");
+  cont.innerHTML = peEstado.items.length ? peEstado.items.map((it, i) => {
+    const sub = peSubtotal(it);
+    return `<div class="pe-item">
+      <div class="pe-cant"><button type="button" data-menos="${i}" aria-label="Menos">−</button><input type="text" inputmode="numeric" data-cant="${i}" value="${it.cant}"><button type="button" data-mas="${i}" aria-label="Más">+</button></div>
+      <div class="pe-item-desc">${escapeHtml(it.d)}${it.manual ? ' <small class="pe-tag">a mano</small>' : ""}<small>${isNaN(sub) ? "Falta la cotización del dólar" : pePesos(pePrecioEnPesos(it)) + " c/u · " + pePesos(sub)}</small></div>
+      <button type="button" class="pe-quitar" data-quitar="${i}" aria-label="Quitar">✕</button></div>`;
+  }).join("") : '<p class="pe-vacio">Todavía no agregaste materiales.</p>';
+  cont.querySelectorAll("[data-menos]").forEach((b) => b.addEventListener("click", () => { const it = peEstado.items[b.dataset.menos]; it.cant = Math.max(1, it.cant - 1); peRenderItems(); peGuardarBorrador(); }));
+  cont.querySelectorAll("[data-mas]").forEach((b) => b.addEventListener("click", () => { peEstado.items[b.dataset.mas].cant += 1; peRenderItems(); peGuardarBorrador(); }));
+  cont.querySelectorAll("[data-cant]").forEach((inp) => inp.addEventListener("change", () => { peEstado.items[inp.dataset.cant].cant = Math.max(1, Math.round(peNumero(inp.value) || 1)); peRenderItems(); peGuardarBorrador(); }));
+  cont.querySelectorAll("[data-quitar]").forEach((b) => b.addEventListener("click", () => { peEstado.items.splice(Number(b.dataset.quitar), 1); peRenderItems(); peGuardarBorrador(); }));
+  peRenderTotales();
+}
+function peCalcular() {
+  let materiales = 0, faltaCotiz = false, hayUsd = false;
+  peEstado.items.forEach((it) => { const s = peSubtotal(it); if (it.m === "USD") hayUsd = true; if (isNaN(s)) faltaCotiz = true; else materiales += s; });
+  const mo = peNumero(peEstado.mano_obra);
+  return { materiales: Math.round(materiales), mano_obra: isNaN(mo) ? 0 : Math.round(mo), total: Math.round(materiales + (isNaN(mo) ? 0 : mo)), faltaCotiz, hayUsd };
+}
+function peRenderTotales() {
+  const t = peCalcular();
+  pe("peTotales").innerHTML = `<div><span>Total materiales</span><b>${pePesos(t.materiales)}</b></div><div><span>Mano de obra</span><b>${pePesos(t.mano_obra)}</b></div><div class="pe-total"><span>Total</span><b>${pePesos(t.total)}</b></div>`;
+  pe("peNotaCotiz").textContent = t.faltaCotiz ? "Hay artículos en dólares y no hay cotización cargada: pedile a la oficina que la cargue en el admin." : (t.hayUsd ? `Los artículos en dólares se calculan a ${pePesos(peLista.cotizacion_usd)} por dólar. Precios con IVA incluido.` : "Precios con IVA incluido.");
+}
+pe("tilePresupuestoBtn").addEventListener("click", peAbrir);
+pe("volverDePresupuestoBtn").addEventListener("click", () => showScreen("home"));
+pe("peLimpiarBtn").addEventListener("click", async () => {
+  if ((peEstado.items.length || peEstado.cliente.nombre) && !confirm("¿Borrar lo cargado y empezar un presupuesto nuevo?")) return;
+  peEstado = peNuevoEstado();
+  peUltimoPdf = null;
+  peGuardarBorrador();
+  peVolcarFormulario();
+  pe("peResultado") && pe("peResultado").remove();
+});
+
+// ---------- PDF ----------
+function peCargarPdfLib() {
+  if (window.PDFLib) return Promise.resolve(window.PDFLib);
+  return new Promise((ok, mal) => {
+    const sc = document.createElement("script");
+    sc.src = "vendor/pdf-lib.min.js";
+    sc.onload = () => (window.PDFLib ? ok(window.PDFLib) : mal(new Error("No cargó el generador de PDF")));
+    sc.onerror = () => mal(new Error("No se pudo cargar el generador de PDF (¿sin señal?)"));
+    document.head.appendChild(sc);
+  });
+}
+// Las letras estándar del PDF no tienen algunos símbolos: se reemplazan.
+function peTextoPdf(s) {
+  return String(s == null ? "" : s)
+    .replace(/[‘’‚]/g, "'").replace(/„/g, '"').replace(/[–—]/g, "-").replace(/…/g, "...")
+    .replace(/[\t\r]/g, " ")
+    .replace(/[^\n\x20-\x7E\xA0-\xFF“”]/g, "");
+}
+async function peGenerarPdf(datos) {
+  const { PDFDocument, StandardFonts, rgb } = await peCargarPdfLib();
+  const doc = await PDFDocument.create();
+  doc.setTitle(`Presupuesto ${datos.numero}`);
+  doc.setAuthor("SAT - Servicio Técnico");
+  const fN = await doc.embedFont(StandardFonts.Helvetica);
+  const fB = await doc.embedFont(StandardFonts.HelveticaBold);
+  const bytes = async (url) => new Uint8Array(await (await fetch(url)).arrayBuffer());
+  let logoSat = null, logoCemara = null;
+  try { logoSat = await doc.embedJpg(await bytes("assets/presupuesto/logo-sat.jpg")); } catch (e) { /* sin logo */ }
+  try { logoCemara = await doc.embedJpg(await bytes("assets/presupuesto/logo-cemara.jpg")); } catch (e) { /* sin logo */ }
+  const A4 = [595.28, 841.89];
+  const X = 86, ANCHO = A4[0] - X - 70, ABAJO = 70;
+  const negro = rgb(0, 0, 0), gris = rgb(0.85, 0.85, 0.85), grisOsc = rgb(0.35, 0.35, 0.35), amarillo = rgb(1, 0.753, 0.2);
+  let pag = doc.addPage(A4);
+  let y = A4[1] - 34;
+  const nuevaPagina = () => { pag = doc.addPage(A4); y = A4[1] - 60; };
+  const asegurar = (alto) => { if (y - alto < ABAJO) nuevaPagina(); };
+  const texto = (t, x, tam, fuente, color) => pag.drawText(peTextoPdf(t), { x, y, size: tam, font: fuente, color: color || negro });
+  const ancho = (t, tam, fuente) => fuente.widthOfTextAtSize(peTextoPdf(t), tam);
+  const subrayar = (x, w, tam) => pag.drawLine({ start: { x, y: y - 1.6 }, end: { x: x + w, y: y - 1.6 }, thickness: tam > 11 ? 0.9 : 0.7, color: negro });
+  const partir = (t, tam, fuente, w) => {
+    const out = [];
+    peTextoPdf(t).split("\n").forEach((par) => {
+      let linea = "";
+      par.split(/\s+/).filter(Boolean).forEach((pal) => {
+        const prueba = linea ? linea + " " + pal : pal;
+        if (fuente.widthOfTextAtSize(prueba, tam) > w && linea) { out.push(linea); linea = pal; } else linea = prueba;
+      });
+      if (linea) out.push(linea);
+    });
+    return out.length ? out : [""];
+  };
+  // Encabezado: logos
+  if (logoSat) { const h = 66, w = h * logoSat.width / logoSat.height; pag.drawImage(logoSat, { x: 38, y: y - h, width: w, height: h }); }
+  if (logoCemara) { const h = 54, w = h * logoCemara.width / logoCemara.height; pag.drawImage(logoCemara, { x: A4[0] - 38 - w, y: y - h - 4, width: w, height: h }); }
+  y -= 96;
+  // Título: "Presupuesto" ... “Título”
+  texto("Presupuesto", X, 12.5, fB); subrayar(X, ancho("Presupuesto", 12.5, fB), 12.5);
+  const tit = datos.titulo ? `“${datos.titulo.replace(/^["“]+|["”]+$/g, "")}”` : "";
+  if (tit) { const w = ancho(tit, 12.5, fB); texto(tit, X + ANCHO - w, 12.5, fB); }
+  y -= 4;
+  pag.drawLine({ start: { x: X, y }, end: { x: X + ANCHO, y }, thickness: 0.9, color: negro });
+  // Leyenda PRESUPUESTO EXPRESS
+  y -= 22;
+  pag.drawRectangle({ x: X, y: y - 5, width: ANCHO, height: 19, color: amarillo });
+  const ley = "PRESUPUESTO EXPRESS";
+  texto(ley, X + (ANCHO - ancho(ley, 11, fB)) / 2, 11, fB);
+  y -= 28;
+  // Datos
+  const filaDato = (etiqueta, valor) => {
+    texto(etiqueta + " ", X, 10.5, fN);
+    const w = ancho(etiqueta + " ", 10.5, fN);
+    partir(valor || "", 10.5, fB, ANCHO - w).forEach((l, i) => { if (i) { y -= 13.5; } texto(l, X + w, 10.5, fB); });
+    y -= 13.5;
+  };
+  filaDato("Fecha:", datos.fecha);
+  filaDato("N° Presupuesto:", datos.numero);
+  filaDato("N° Cliente:", datos.cliente.numero_cliente);
+  filaDato("Nombre:", datos.cliente.nombre);
+  filaDato("Dirección:", datos.cliente.direccion);
+  filaDato("Teléfono:", datos.cliente.telefono);
+  filaDato("Razón Social:", datos.cliente.razon_social);
+  filaDato("CUIT:", datos.cliente.cuit);
+  // Materiales
+  y -= 18;
+  if (datos.items.length) {
+    asegurar(40);
+    texto("Materiales:", X, 10.5, fB); subrayar(X, ancho("Materiales:", 10.5, fB), 10.5);
+    y -= 24;
+    datos.items.forEach((it) => {
+      const lineas = partir(it.d, 10, fN, ANCHO - 30);
+      asegurar(lineas.length * 12.5 + 10);
+      const cant = String(it.cant);
+      texto(cant, X + 18 - ancho(cant, 10, fN), 10, fN);
+      lineas.forEach((l) => { texto(l, X + 28, 10, fN); y -= 12.5; });
+      y -= 9;
+    });
+  }
+  // Totales (recuadro gris como el modelo)
+  y -= 6;
+  const lineasTot = [["Total Materiales:", pePesos(datos.total_materiales) + ".-"], ["Total Mano de Obra:", pePesos(datos.mano_obra) + ".-"], ["TOTAL:", pePesos(datos.total) + ".-"]];
+  const altoCaja = 70;
+  asegurar(altoCaja + 120);
+  pag.drawRectangle({ x: X - 8, y: y - altoCaja + 12, width: 262, height: altoCaja, color: gris, borderColor: grisOsc, borderWidth: 0.8 });
+  lineasTot.forEach(([et, val], i) => {
+    const tam = i === 2 ? 11.5 : 10.5;
+    texto(et, X, tam, fB); subrayar(X, ancho(et, tam, fB), tam);
+    texto(val, X + ancho(et, tam, fB) + 6, tam, fB);
+    y -= i === 1 ? 22 : 21;
+  });
+  y -= 14;
+  const pie = (et, val) => { texto(et, X, 10.5, fB); subrayar(X, ancho(et, 10.5, fB), 10.5); texto(val, X + ancho(et, 10.5, fB) + 6, 10.5, fB); y -= 21; };
+  pie("Forma de Pago:", datos.forma_pago);
+  pie("Garantía:", "12 meses");
+  pie("Validez:", "3 días");
+  const fin = "PRECIO FINAL - IVA INCLUIDO";
+  texto(fin, X + (ANCHO - ancho(fin, 10.5, fB)) / 2, 10.5, fB);
+  y -= 14;
+  pag.drawLine({ start: { x: X + 10, y }, end: { x: X + ANCHO - 10, y }, thickness: 0.6, color: negro });
+  y -= 22;
+  ["SAT - de Alfredo Thiesing", "Bv. Avellaneda 408 - Tel/Fax: 4377578 - WhatsApp: 341-3782085 - e-mail:", "thiesing@sat365.com.ar", "2000 Rosario - Santa Fe - Argentina"].forEach((l) => {
+    texto(l, X + (ANCHO - ancho(l, 10, fB)) / 2, 10, fB); y -= 13;
+  });
+  return await doc.save();
+}
+
+pe("peGenerarBtn").addEventListener("click", async () => {
+  const c = peEstado.cliente;
+  if (!c.nombre.trim()) {
+    if (peEstado.modo === "listado" && !peEstado.clienteElegido) { showToast("Elegí el cliente del listado, o tocá «Cliente nuevo»."); pe("peClienteBuscar").focus(); return; }
+    pe("peNombre").classList.add("campo-falta"); showToast("Falta el nombre del cliente."); pe("peNombre").focus(); return;
+  }
+  if (String(peEstado.mano_obra).trim() === "" || isNaN(peNumero(peEstado.mano_obra))) { pe("peManoObra").classList.add("campo-falta"); showToast("Poné el costo de la mano de obra (si no lleva, poné 0)."); pe("peManoObra").focus(); return; }
+  const t = peCalcular();
+  if (t.faltaCotiz) { showToast("Hay artículos en dólares sin cotización cargada."); return; }
+  if (!peEstado.items.length && !t.mano_obra) { showToast("Agregá algún material o la mano de obra."); return; }
+  const btn = pe("peGenerarBtn");
+  btn.disabled = true;
+  const textoBtn = btn.textContent;
+  btn.textContent = "Armando el presupuesto...";
+  try {
+    // El número se reserva en el servidor (E-0001, E-0002...).
+    const r = await fetch("/api/datos?coleccion=presupuestos_express", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({ accion: "nuevo", cliente: c.nombre, numero_cliente: c.numero_cliente, titulo: peEstado.titulo, total_materiales: t.materiales, mano_obra: t.mano_obra, total: t.total, forma_pago: peEstado.forma_pago, cotizacion_usd: t.hayUsd ? peLista.cotizacion_usd : null, articulos: peEstado.items.length }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.numero) throw new Error(d.error || "No se pudo sacar el número de presupuesto (¿hay señal?)");
+    const hoy = new Date();
+    const datos = {
+      numero: d.numero, fecha: `${String(hoy.getDate()).padStart(2, "0")}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${hoy.getFullYear()}`,
+      titulo: peEstado.titulo.trim(), cliente: { ...c }, items: peEstado.items.map((it) => ({ d: it.d, cant: it.cant })),
+      total_materiales: t.materiales, mano_obra: t.mano_obra, total: t.total, forma_pago: peEstado.forma_pago,
+    };
+    const pdf = await peGenerarPdf(datos);
+    const nombreArchivo = `Presupuesto_${d.numero}_${(c.nombre || "cliente").replace(/[^\wÁÉÍÓÚÑáéíóúñ]+/g, "_").slice(0, 40)}.pdf`;
+    peUltimoPdf = { blob: new Blob([pdf], { type: "application/pdf" }), nombre: nombreArchivo, numero: d.numero, total: t.total, cliente: c.nombre };
+    peMostrarResultado();
+    peGuardarCopia(pdf, d.numero);
+    await peCompartir(true);
+  } catch (err) {
+    showToast(err.message || "No se pudo generar el presupuesto.");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = textoBtn;
+  }
+});
+function peMostrarResultado() {
+  let box = pe("peResultado");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "peResultado";
+    box.className = "pe-resultado";
+    pe("peGenerarBtn").insertAdjacentElement("afterend", box);
+  }
+  box.innerHTML = `<b>Presupuesto ${escapeHtml(peUltimoPdf.numero)} listo</b><span>${escapeHtml(peUltimoPdf.cliente)} · ${pePesos(peUltimoPdf.total)}</span>
+    <div class="pe-resultado-btns"><button type="button" class="btn btn-primary btn-small" id="peCompartirBtn">Compartir (WhatsApp)</button><button type="button" class="btn btn-secondary btn-small" id="peVerBtn">Ver / descargar PDF</button></div>`;
+  pe("peCompartirBtn").addEventListener("click", () => peCompartir(false));
+  pe("peVerBtn").addEventListener("click", () => {
+    const url = URL.createObjectURL(peUltimoPdf.blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = peUltimoPdf.nombre; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+  });
+}
+async function peCompartir(automatico) {
+  if (!peUltimoPdf) return;
+  const archivo = new File([peUltimoPdf.blob], peUltimoPdf.nombre, { type: "application/pdf" });
+  const texto = `Presupuesto ${peUltimoPdf.numero} - SAT Servicio Técnico`;
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [archivo] })) { await navigator.share({ files: [archivo], title: texto, text: texto }); return; }
+  } catch (e) {
+    if (e && e.name === "AbortError") return;
+    if (automatico) return; // sin permiso para compartir solo: queda el botón «Compartir»
+  }
+  if (!automatico) pe("peVerBtn").click();
+}
+// Copia del PDF en el servidor (para que la oficina lo tenga); si falla no pasa nada.
+async function peGuardarCopia(pdf, numero) {
+  try {
+    let bin = "";
+    const u8 = new Uint8Array(pdf);
+    for (let i = 0; i < u8.length; i += 0x8000) bin += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+    const r = await fetch("/api/foto", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ base64: btoa(bin), tipo: "pdf" }) });
+    const d = await r.json();
+    if (!r.ok || !d.id) return;
+    await fetch("/api/datos?coleccion=presupuestos_express", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ accion: "adjuntar_pdf", numero, pdf_id: d.id }) });
+  } catch (e) { /* no crítico */ }
+}
