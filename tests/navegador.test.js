@@ -666,8 +666,8 @@ test("Admin rendiciones: totales pendientes por técnico, pagar todo, miniaturas
   assert.strictEqual(await page.locator("#rendicionesAdminLista img").count(), 1, "miniatura de la foto");
   await page.fill("#rendicionesAdminMes", "2026-10");
   assert.strictEqual(await page.locator("#rendicionesTotalesLista > div").count(), 1, "el mes filtra");
-  page.once("dialog", (d) => d.accept());
   await page.click("#rendicionesTotalesLista .rend-pagar-todo");
+  await page.click(".cartel-admin .cartel-si");
   await page.waitForTimeout(500);
   assert.deepStrictEqual(pagados.sort(), ["a", "b"]);
   assert.deepStrictEqual(erroresPagina, []);
@@ -1042,6 +1042,7 @@ test("Admin SIMs: stock con resumen y filtros, acciones por fila y en lote, pend
   assert.deepStrictEqual(acciones.filter((a) => a.accion === "transferir").map((a) => [a.numero, a.tecnico, a.tecnico_nuevo]), [["3415550002", "Oficina", "Juan"]]);
   assert.match(await page.locator("#simsStatus").textContent(), /pendiente hasta que la acepte/);
   await page.click(".sim-cancelar-pend");
+  await page.click(".cartel-admin .cartel-si");
   await page.waitForTimeout(200);
   assert.ok(acciones.some((a) => a.accion === "cancelar_transferencia" && a.id_transferencia === 7));
 
@@ -1050,6 +1051,7 @@ test("Admin SIMs: stock con resumen y filtros, acciones por fila y en lote, pend
   await page.locator("#simsTablaBody .sim-fila-tabla", { hasText: "0002" }).locator(".sim-sel").check();
   assert.match(await page.locator("#simsLoteCuenta").textContent(), /2 seleccionadas/);
   await page.selectOption("#simsLoteEstado", "Defectuosa");
+  await page.click(".cartel-admin .cartel-si");
   await page.waitForTimeout(400);
   assert.deepStrictEqual(acciones.filter((a) => a.accion === "marcar_estado_fisico").map((a) => [a.numero, a.tecnico, a.estado_fisico]).sort(), [["341 555-0001", "Juan", "Defectuosa"], ["3415550002", "Oficina", "Defectuosa"]]);
 
@@ -1057,6 +1059,7 @@ test("Admin SIMs: stock con resumen y filtros, acciones por fila y en lote, pend
   await page.locator("#simsTablaBody .sim-fila-tabla", { hasText: "0003" }).locator(".sim-accion-select").selectOption("baja");
   await page.selectOption(".sim-extra .x-motivo", "Perdida");
   await page.click(".sim-extra .x-ok");
+  await page.click(".cartel-admin .cartel-si");
   await page.waitForTimeout(300);
   assert.ok(acciones.some((a) => a.accion === "dar_de_baja" && a.numero === "3415550003" && a.motivo === "Perdida"));
 
@@ -1090,6 +1093,7 @@ test("Admin SIMs: stock con resumen y filtros, acciones por fila y en lote, pend
   await page.locator("#simsInstaladasTablaBody tr", { hasText: "Kiosco Norte" }).locator(".sim-accion-select").selectOption("retirar");
   await page.selectOption(".sim-extra .x-destino", "Oficina");
   await page.click(".sim-extra .x-ok");
+  await page.click(".cartel-admin .cartel-si");
   await page.waitForTimeout(300);
   assert.ok(acciones.some((a) => a.accion === "retirar_de_registro" && a.numero === "3415550009" && a.tecnico === "Oficina"));
   assert.deepStrictEqual(erroresPagina, []);
@@ -1607,6 +1611,83 @@ test("Skin nuevo: detalle del parte con encabezado, acciones, secciones, claves 
   await page.waitForTimeout(300);
   assert.strictEqual(await page.evaluate(() => screens.fichaCliente.dataset.active), "true");
   assert.strictEqual(await page.locator("#parteDetalleModalOverlay").isVisible(), false);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Admin: portada con pendientes, buscador de cliente, menú agrupado, sesión que sobrevive al F5 y guardados que no pisan lo de la app", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const ayer = (() => { const x = new Date(); x.setDate(x.getDate() - 1); return x.getFullYear() + "-" + String(x.getMonth() + 1).padStart(2, "0") + "-" + String(x.getDate()).padStart(2, "0"); })();
+  let vehiculosServidor = [{ nombre: "Kangoo", km_actual: 84000, umbrales: [] }];
+  let herramientasServidor = [{ nombre: "Escalera 6m", tipo: "escalera", estado: "libre", tecnico_actual: "", cliente: "" }];
+  const guardados = {};
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  await page.route("**/api/**", (route) => {
+    const req = route.request(); const u = req.url();
+    const json = (o, s = 200) => route.fulfill({ status: s, contentType: "application/json", body: JSON.stringify(o) });
+    const body = req.postData() || "";
+    if (body.includes("verificar_admin")) return json({ ok: true, sesion: "s1.ADMIN.F" });
+    if (req.method() === "POST" && u.includes("coleccion=")) { guardados[u.match(/coleccion=([a-z_-]+)/)[1]] = JSON.parse(body); return json({ ok: true }); }
+    if (u.includes("coleccion=servicios_emergencia")) return json([{ id: 1, cliente: "Kiosco Norte", revisado: 0 }, { id: 2, cliente: "Otro", revisado: 1 }]);
+    if (u.includes("recurso=rendicion")) return json([{ id: 1, estado: "pendiente", monto: 1500, tecnico: "Juan" }]);
+    if (u.includes("pendientes=1")) return json([]);
+    if (u.includes("recurso=vehiculo")) return json([{ vehiculo: "Kangoo", tecnico: "Juan", fecha: ayer, hora_toma: "08:00" }]);
+    if (u.includes("coleccion=vehiculos")) return json(vehiculosServidor);
+    if (u.includes("coleccion=herramientas")) return json(herramientasServidor);
+    if (u.includes("coleccion=tecnicos")) return json([{ nombre: "Juan" }]);
+    if (u.includes("coleccion=clientes")) return json([{ nombre: "Panadería Sur", numero_cliente: "1203", direccion: "Mitre 100", localidad: "Funes" }]);
+    if (u.includes("coleccion=sims_instaladas")) return json([{ numero: "3415550009", cliente: "Panadería Sur", numero_cliente: "1203", empresa: "Claro" }]);
+    if (u.includes("tipo=claves_cliente")) return json([{ numero_cliente: "1203", cliente: "Panadería Sur", claves: [{ titulo: "Alarma", clave: "5555" }] }]);
+    if (u.includes("/api/historial") && !u.includes("tipo=")) return json([{ cliente: "Panadería Sur", numero_cliente: "1203", fecha: "2026-10-01", tecnico: "Juan", tarea: "Cambio de batería", pasado_sistema_offline: 0 }]);
+    json([]);
+  });
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(300);
+  await page.fill("#pw", "x");
+  await page.click("#pwBtn");
+  await page.waitForTimeout(800);
+  // Portada
+  assert.strictEqual(await page.locator("#panelInicio").isVisible(), true, "entra a Inicio");
+  const tarjetas = await page.locator(".inicio-tarjeta").allTextContents();
+  assert.ok(tarjetas.some((x) => /^1\s*Emergencias sin revisar/.test(x.trim())));
+  assert.ok(tarjetas.some((x) => /Vehículos sin devolver[\s\S]*Kangoo \(Juan\)/.test(x)));
+  assert.ok(tarjetas.some((x) => /Rendiciones por aprobar[\s\S]*1\.500/.test(x)));
+  assert.ok(tarjetas.some((x) => /Partes sin pasar al sistema/.test(x)));
+  assert.strictEqual(await page.locator("#emergenciasBadge").textContent(), "1");
+  // Menú agrupado
+  assert.deepStrictEqual((await page.locator(".menu-grupo-tit").allTextContents()).slice(0, 3), ["Día a día", "Administración", "SIMs"]);
+  // Buscador de cliente
+  await page.fill("#inicioBuscarCliente", "panad");
+  await page.waitForTimeout(600);
+  await page.click(".ib-item");
+  const ficha = await page.locator(".ficha-adm").textContent();
+  assert.match(ficha, /Panadería Sur[\s\S]*Cambio de batería[\s\S]*3415550009/);
+  assert.strictEqual(await page.locator(".fa-claves").isVisible(), false, "claves ocultas");
+  // Sesión que sobrevive al F5
+  await page.reload();
+  await page.waitForTimeout(800);
+  assert.strictEqual(await page.locator("#mainCard").isVisible(), true, "sigue adentro después de recargar");
+  // Vehículos: un cambio de umbral no pisa los km que cargó un técnico mientras tanto
+  await page.click("#tabVehiculosBtn");
+  await page.waitForTimeout(500);
+  vehiculosServidor = [{ nombre: "Kangoo", km_actual: 84500, umbrales: [] }];
+  await page.click("#guardarVehiculosBtn");
+  await page.waitForTimeout(500);
+  assert.strictEqual(guardados.vehiculos[0].km_actual, 84500);
+  // Herramientas: no se pisa quién la tiene
+  await page.click("#tabHerramientasBtn");
+  await page.waitForTimeout(500);
+  herramientasServidor = [{ nombre: "Escalera 6m", tipo: "escalera", estado: "uso", tecnico_actual: "Juan", cliente: "" }];
+  await page.click("#guardarHerramientasBtn");
+  await page.waitForTimeout(500);
+  assert.deepStrictEqual([guardados.herramientas[0].estado, guardados.herramientas[0].tecnico_actual], ["uso", "Juan"]);
+  // Cambios sin guardar: al volver a la pestaña no se recarga encima, se avisa
+  await page.fill(".herramienta-nombre", "Escalera 7m");
+  await page.click("#tabInicioBtn");
+  await page.click("#tabHerramientasBtn");
+  await page.waitForTimeout(300);
+  assert.strictEqual(await page.locator(".herramienta-nombre").inputValue(), "Escalera 7m");
+  assert.match(await page.locator(".aviso-cambios").textContent(), /cambios sin guardar/);
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });

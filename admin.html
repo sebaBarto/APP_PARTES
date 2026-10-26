@@ -7,8 +7,15 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Cargar servicios pendientes</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Tipografías SAT (las mismas de la app, guardadas en vendor/fonts) */
+  @font-face { font-family: 'Barlow'; font-weight: 400; font-display: swap; src: url('vendor/fonts/barlow-latin-400-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'Barlow'; font-weight: 500; font-display: swap; src: url('vendor/fonts/barlow-latin-500-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'Barlow'; font-weight: 600 800; font-display: swap; src: url('vendor/fonts/barlow-latin-600-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'Barlow Semi Condensed'; font-weight: 600; font-display: swap; src: url('vendor/fonts/barlow-semi-condensed-latin-600-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'Barlow Semi Condensed'; font-weight: 700 800; font-display: swap; src: url('vendor/fonts/barlow-semi-condensed-latin-700-normal.woff2') format('woff2'); }
+  @font-face { font-family: 'IBM Plex Mono'; font-weight: 400 600; font-display: swap; src: url('vendor/fonts/ibm-plex-mono-latin-500-normal.woff2') format('woff2'); }
+</style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -57,7 +64,7 @@
   }
   * { box-sizing: border-box; }
   body {
-    margin: 0; font-family: 'Inter', sans-serif; color: var(--ink);
+    margin: 0; font-family: 'Barlow', system-ui, sans-serif; color: var(--ink);
     background: linear-gradient(180deg, #EAEDE6 0%, #F4F5F0 220px, #F4F5F0 100%);
     padding: 20px 16px 60px; min-height: 100vh;
   }
@@ -81,11 +88,11 @@
     background: var(--ink); display: inline-block; padding: 2px 8px; border-radius: var(--r-pill);
   }
   .admin-header-title {
-    font-family: 'Space Grotesk', sans-serif; font-size: 21px; font-weight: 700;
+    font-family: 'Barlow Semi Condensed', 'Barlow', sans-serif; font-size: 21px; font-weight: 700;
     margin: 0; color: var(--ink); letter-spacing: -0.01em;
   }
 
-  h1 { font-family: 'Space Grotesk', sans-serif; font-size: 19px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  h1 { font-family: 'Barlow Semi Condensed', 'Barlow', sans-serif; font-size: 19px; margin: 0 0 4px; letter-spacing: -0.01em; }
   .subtitle { color: var(--steel); font-size: 13px; margin: 0 0 22px; line-height: 1.5; }
 
   .card {
@@ -110,7 +117,7 @@
 
   button {
     width: 100%; padding: 13px; border: none; border-radius: var(--r-pill); background: var(--ink);
-    color: var(--amber); font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px;
+    color: var(--amber); font-family: 'Barlow Semi Condensed', 'Barlow', sans-serif; font-weight: 600; font-size: 14px;
     cursor: pointer; box-shadow: var(--shadow-amber);
     transition: transform 140ms var(--ease), box-shadow 220ms var(--ease), opacity 140ms var(--ease);
   }
@@ -164,7 +171,7 @@
     position: absolute; top: -6px; right: -6px;
     min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px;
     background: var(--acc-alert); color: #FFFFFF;
-    font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 10.5px;
+    font-family: 'Barlow Semi Condensed', 'Barlow', sans-serif; font-weight: 700; font-size: 10.5px;
     display: flex; align-items: center; justify-content: center;
     box-shadow: 0 0 0 2px #FFFFFF;
   }
@@ -283,6 +290,96 @@
 .sims-ficha-cerrar { position: absolute; top: 10px; right: 10px; width: 36px !important; height: 36px; padding: 0 !important; border-radius: 50% !important; background: var(--paper) !important; color: var(--ink) !important; box-shadow: none !important; font-size: 20px; }
 .badge-estado-sim.activa { background: #E1F0E4; color: #1F6B34; }
 .badge-estado-sim.inactiva { background: #F1E3E1; color: #8A2E22; }
+
+/* ---------- Menú agrupado (PC: lateral fijo · celular: botón Secciones) ---------- */
+.tabs { display: block; background: #FFFFFF; border: 1px solid var(--border); border-radius: var(--r-lg); padding: 8px; box-shadow: var(--shadow-card); margin-bottom: 18px; }
+.menu-grupo + .menu-grupo { margin-top: 4px; padding-top: 4px; border-top: 1px solid #EEF0EA; }
+.menu-grupo-tit { margin: 8px 10px 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--steel); }
+.tabs .tab-btn { width: 100%; flex-direction: row; justify-content: flex-start; align-items: center; gap: 10px; padding: 8px 10px; margin: 1px 0;
+  font-size: 13.5px; font-weight: 600; text-align: left; color: var(--ink); background: transparent; border: 0; border-radius: 8px; box-shadow: none; }
+.tabs .tab-btn:hover { background: var(--paper); }
+.tabs .tab-btn.active { background: var(--ink); color: var(--amber); box-shadow: none; }
+.tabs .tab-btn:active { transform: none; }
+.tabs .tab-icon svg { width: 18px; height: 18px; }
+.tabs .tab-badge { position: static; margin-left: auto; box-shadow: none; }
+.menu-movil-cab { display: none; }
+.nav-movil { display: none; }
+.admin-header { position: relative; }
+.btn-salir { position: absolute; right: 0; top: 50%; transform: translateY(-50%); width: auto; padding: 8px 16px; background: transparent; color: var(--ink); border: 1.5px solid var(--border); box-shadow: none; font-size: 13px; }
+.aviso-cambios { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; justify-content: space-between; margin: 0 0 14px; padding: 10px 14px; border-radius: var(--r-md); background: #FFF6E0; border: 1px solid #F0C870; font-size: 13px; }
+.aviso-cambios .btn-secondary-admin { width: auto; padding: 7px 14px; }
+@media (min-width: 900px) {
+  .wrap { max-width: 1320px; }
+  #mainCard:not(.hidden) { display: grid; grid-template-columns: 232px minmax(0, 1fr); column-gap: 24px; align-items: start; }
+  #mainCard > .tabs { grid-column: 1; grid-row: 1 / span 60; position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow-y: auto; margin: 0; }
+  #mainCard > :not(.tabs):not(.nav-movil) { grid-column: 2; min-width: 0; }
+}
+@media (max-width: 899px) {
+  #mainCard > .tabs { display: none; position: fixed; inset: 0; z-index: 9000; margin: 0; border-radius: 0; overflow-y: auto; padding: 12px 14px 40px; }
+  #mainCard.menu-abierto > .tabs { display: block; }
+  .menu-movil-cab { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px 8px; font-size: 17px; }
+  .menu-movil-cab button { width: 40px; height: 40px; padding: 0; border-radius: 50%; font-size: 24px; background: var(--paper); color: var(--ink); box-shadow: none; }
+  .tabs .tab-btn { padding: 11px 10px; font-size: 15px; }
+  .nav-movil { display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 50; margin: 0 -4px 16px; padding: 8px 10px; border-radius: var(--r-md); background: var(--ink); color: #fff; }
+  .nav-movil button { width: auto; padding: 8px 14px; font-size: 14px; background: var(--amber); color: var(--ink); box-shadow: none; }
+  .nav-movil span { font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .btn-salir { padding: 6px 12px; font-size: 12px; }
+  .admin-header { padding-right: 64px; }
+  .admin-header-title { font-size: 18px; }
+}
+/* ---------- Inicio: pendientes y buscador de cliente ---------- */
+.inicio-sub { margin: 18px 0 8px; font-size: 16px; }
+#inicioStatus:empty { display: none; }
+@media (max-width: 599px) { .inicio-grid { grid-template-columns: 1fr 1fr; gap: 8px; } .inicio-tarjeta { padding: 12px; } .inicio-tarjeta .it-num { font-size: 26px; } }
+.inicio-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.inicio-tarjeta { width: 100%; text-align: left; display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border-radius: var(--r-lg); cursor: pointer;
+  background: #fff; color: var(--ink); border: 1px solid var(--border); border-left: 5px solid #C9CDC4; box-shadow: var(--shadow-card); font-family: inherit; font-weight: 400; }
+.inicio-tarjeta:hover { box-shadow: var(--shadow-card-hover); }
+.inicio-tarjeta .it-num { font-family: 'Barlow Semi Condensed', 'Barlow', sans-serif; font-size: 30px; font-weight: 700; line-height: 1; }
+.inicio-tarjeta .it-tit { font-weight: 700; font-size: 14px; }
+.inicio-tarjeta .it-det { font-size: 12.5px; color: var(--steel); line-height: 1.35; }
+.inicio-tarjeta.urgente { border-left-color: #C0392B; }
+.inicio-tarjeta.urgente .it-num { color: #B3261E; }
+.inicio-tarjeta.atencion { border-left-color: #E0A000; }
+.inicio-tarjeta.atencion .it-num { color: #8A5E00; }
+.inicio-tarjeta.ok { border-left-color: #2E9E4F; opacity: 0.75; }
+.inicio-tarjeta.ok .it-num { color: #2E7D32; }
+.inicio-buscar-card label { margin-bottom: 6px; }
+.inicio-buscar-card input { margin-bottom: 6px; }
+.ib-item { display: block; width: 100%; text-align: left; padding: 10px 12px; margin: 4px 0; border-radius: var(--r-sm); background: var(--paper); color: var(--ink); border: 1px solid var(--border); box-shadow: none; font-family: inherit; font-weight: 400; font-size: 14px; }
+.ib-item b { font-weight: 700; }
+.ib-item span { color: var(--steel); font-size: 12.5px; }
+.ficha-adm { margin-top: 10px; }
+.ficha-adm h3 { margin: 4px 0 2px; font-size: 18px; }
+.ficha-adm .fa-sub { color: var(--steel); font-size: 13px; margin-bottom: 10px; }
+.ficha-adm .fa-sec { margin: 12px 0 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-md); }
+.ficha-adm .fa-sec h4 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--steel); }
+.ficha-adm .fa-sec ul { margin: 0; padding-left: 18px; font-size: 13.5px; }
+.ficha-adm .fa-sec li { margin: 3px 0; }
+.ficha-adm .fa-vacio { color: var(--steel); font-size: 13px; }
+.ficha-adm .fa-claves { display: none; }
+.ficha-adm .fa-claves.visible { display: block; }
+
+/* ---------- Identidad SAT y legibilidad (v3.148) ---------- */
+:root { --ink: #191816; --amber: #FFC033; --paper: #F1F0EC; --border: #D6D3CB; --steel: #5E5A52;
+  --shadow-amber: 0 6px 16px -8px rgba(255,192,51,0.55); }
+body { background: #ECEBE7; }
+h1 { font-size: 22px; font-weight: 700; }
+label { text-transform: none; letter-spacing: 0; font-family: inherit; font-size: 13px; font-weight: 600; color: #46433C; }
+th { font-family: inherit; font-size: 11.5px; letter-spacing: 0.03em; color: #5E5A52; }
+.sims-tabla th { font-family: inherit; font-size: 11.5px; color: #5E5A52; }
+.admin-header-eyebrow { font-family: 'Barlow Semi Condensed', sans-serif; font-size: 11px; color: var(--amber); }
+.admin-header-title { font-weight: 800; font-style: italic; letter-spacing: 0; }
+input:focus, select:focus, textarea:focus { border-color: #E0A000; box-shadow: 0 0 0 3px rgba(255,192,51,0.25); }
+button { color: var(--amber); }
+.login-card { border-top-color: var(--amber); }
+.tab-badge.hidden, .tab-badge:empty { display: none; }
+.cartel-admin-capa { position: fixed; inset: 0; z-index: 20000; background: rgba(13,12,13,0.5); display: flex; align-items: center; justify-content: center; padding: 16px; }
+.cartel-admin { background: #fff; border-radius: 14px; padding: 20px 22px 16px; max-width: 440px; width: 100%; box-shadow: 0 20px 50px -20px rgba(0,0,0,0.5); border-top: 4px solid var(--amber); }
+.cartel-admin-texto { margin: 0 0 16px; font-size: 15px; line-height: 1.45; white-space: pre-line; color: var(--ink); }
+.cartel-admin-botones { display: flex; gap: 8px; justify-content: flex-end; }
+.cartel-admin-botones button { width: auto; padding: 10px 18px; }
+.cartel-admin-botones .cartel-si.peligro { background: #B3261E; color: #fff; box-shadow: none; }
 </style>
 </head>
 <body>
@@ -295,6 +392,7 @@
       <p class="admin-header-eyebrow">Servicio Técnico SAT</p>
       <h1 class="admin-header-title">Panel de administración</h1>
     </div>
+    <button type="button" class="btn-salir hidden" id="salirPanelBtn">Salir</button>
   </div>
 
   <div id="loginCard" class="card login-card">
@@ -309,13 +407,19 @@
   </div>
 
   <div id="mainCard" class="hidden">
+    <div class="nav-movil">
+      <button type="button" id="navMovilBtn" aria-label="Ver secciones"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" width="18" height="18" style="vertical-align:-3px; margin-right:6px;"><path d="M4 6h16M4 12h16M4 18h16"/></svg>Secciones</button>
+      <span id="navMovilTitulo">Inicio</span>
+    </div>
     <div class="tabs">
+      <div class="menu-movil-cab"><b>Secciones</b><button type="button" id="menuMovilCerrarBtn" aria-label="Cerrar">×</button></div>
+      <button type="button" class="tab-btn" id="tabInicioBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg></span>Inicio</button>
       <button type="button" class="tab-btn active" id="tabServiciosBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6a1 1 0 0 1 1 1v1H8V4a1 1 0 0 1 1-1z"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="13" y2="18"/></svg></span>Servicios pendientes</button>
       <button type="button" class="tab-btn" id="tabCronogramaBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="3" x2="8" y2="7"/><line x1="16" y1="3" x2="16" y2="7"/><line x1="7" y1="14" x2="9" y2="14"/><line x1="15" y1="14" x2="17" y2="14"/></svg></span>Cronograma semanal</button>
       <button type="button" class="tab-btn" id="tabTecnicosBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg></span>Técnicos</button>
       <button type="button" class="tab-btn" id="tabMaterialesBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8l9-5 9 5-9 5-9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg></span>Materiales</button>
       <button type="button" class="tab-btn" id="tabClientesBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 6.5a3 3 0 0 1 0 5.8"/><path d="M19.5 20c0-2.5-1.7-4.6-4-5.4"/></svg></span>Clientes</button>
-      <button type="button" class="tab-btn" id="tabConsultasBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5c0-1.1.9-2 2-2h5c1.1 0 2 .9 2 2v14.5c0-1.1-.9-2-2-2H6c-1.1 0-2 .9-2 2z"/><path d="M20 5.5c0-1.1-.9-2-2-2h-5c-1.1 0-2 .9-2 2v14.5c0-1.1.9-2 2-2h5c1.1 0 2 .9 2 2z"/></svg></span>Consultas (IA)</button>
+      <button type="button" class="tab-btn" id="tabConsultasBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5c0-1.1.9-2 2-2h5c1.1 0 2 .9 2 2v14.5c0-1.1-.9-2-2-2H6c-1.1 0-2 .9-2 2z"/><path d="M20 5.5c0-1.1-.9-2-2-2h-5c-1.1 0-2 .9-2 2v14.5c0-1.1.9-2 2-2h5c1.1 0 2 .9 2 2z"/></svg></span>Manuales (IA)</button>
       <button type="button" class="tab-btn" id="tabGuardiasBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a5 5 0 0 0-5 5c0 6-3 8-3 8h16s-3-2-3-8a5 5 0 0 0-5-5z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg></span>Guardias</button>
       <button type="button" class="tab-btn" id="tabCredencialesBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10.5" r="2"/><path d="M6 16c0-1.7 1.3-3 3-3s3 1.3 3 3"/><path d="M14 9h4"/><path d="M14 13h4"/></svg></span>Credenciales</button>
       <button type="button" class="tab-btn" id="tabVehiculosBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13l2-6a2 2 0 0 1 2-1h10a2 2 0 0 1 2 1l2 6"/><rect x="2" y="13" width="20" height="5" rx="1.5"/><circle cx="7" cy="18.5" r="1.5"/><circle cx="17" cy="18.5" r="1.5"/></svg></span>Vehículos</button>
@@ -335,6 +439,22 @@
       <button type="button" class="tab-btn" id="tabSemaforoBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="20" rx="3"/><circle cx="12" cy="7" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="12" cy="17" r="1.2"/></svg></span>Semáforo visitas</button>
       <button type="button" class="tab-btn" id="tabClavesClienteBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>Claves por cliente</button>
       <button type="button" class="tab-btn" id="tabEmergenciaBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.29 3.86l-8.18 14.18A2 2 0 0 0 3.82 21h16.36a2 2 0 0 0 1.71-3l-8.18-14.14a2 2 0 0 0-3.42 0z"/></svg></span>Emergencias<span class="tab-badge hidden" id="emergenciasBadge">0</span></button>
+    </div>
+
+    <div id="panelInicio" class="hidden">
+      <h1>Inicio</h1>
+      <p class="subtitle" id="inicioFecha"></p>
+
+      <h3 class="inicio-sub" style="margin-top:0;">Para hacer</h3>
+      <p class="status" id="inicioStatus"></p>
+      <div class="inicio-grid" id="inicioPendientes"></div>
+
+      <div class="card inicio-buscar-card" style="margin-top:18px;">
+        <label for="inicioBuscarCliente">Buscar un cliente</label>
+        <input type="text" id="inicioBuscarCliente" placeholder="Nombre, N° de cliente, dirección o teléfono..." autocomplete="off">
+        <div id="inicioBuscarResultados"></div>
+        <div id="inicioFichaCliente"></div>
+      </div>
     </div>
 
     <div id="panelServicios">
@@ -1114,6 +1234,35 @@
 // contraseña del panel (ver lib/sesion.js). Vive solo mientras esta
 // pestaña esté abierta — ya no hay ninguna clave fija en el código.
 let SERVICIOS_API_TOKEN = "";
+// ---------- Carteles propios (en lugar de los del navegador) ----------
+function cartelAdmin(mensaje, opciones = {}) {
+  return new Promise((resolver) => {
+    const capa = document.createElement("div");
+    capa.className = "cartel-admin-capa";
+    capa.innerHTML = `<div class="cartel-admin" role="dialog" aria-modal="true">
+      <p class="cartel-admin-texto"></p>
+      <div class="cartel-admin-botones">
+        ${opciones.confirmar ? '<button type="button" class="btn-secondary-admin cartel-no">Cancelar</button>' : ""}
+        <button type="button" class="cartel-si ${opciones.peligro ? "peligro" : ""}">${opciones.confirmar ? (opciones.aceptar || "Sí, seguir") : "Entendido"}</button>
+      </div></div>`;
+    capa.querySelector(".cartel-admin-texto").textContent = String(mensaje ?? "");
+    const cerrar = (v) => { capa.remove(); document.removeEventListener("keydown", tecla); resolver(v); };
+    const tecla = (e) => { if (e.key === "Escape") cerrar(false); if (e.key === "Enter") cerrar(true); };
+    capa.querySelector(".cartel-si").addEventListener("click", () => cerrar(true));
+    const no = capa.querySelector(".cartel-no");
+    if (no) no.addEventListener("click", () => cerrar(false));
+    capa.addEventListener("click", (e) => { if (e.target === capa) cerrar(!opciones.confirmar); });
+    document.addEventListener("keydown", tecla);
+    document.body.appendChild(capa);
+    capa.querySelector(".cartel-si").focus();
+  });
+}
+function confirmarAdmin(mensaje) {
+  const peligro = /borrar|eliminar|vaciar|dar de baja|papelera|se pierde/i.test(String(mensaje));
+  return cartelAdmin(mensaje, { confirmar: true, peligro, aceptar: peligro ? "Sí, hacerlo" : "Sí, seguir" });
+}
+window.alert = (mensaje) => { cartelAdmin(mensaje); };
+
 const fetchOriginalAdmin = window.fetch.bind(window);
 window.fetch = async (...args) => {
   const r = await fetchOriginalAdmin(...args);
@@ -1121,9 +1270,13 @@ window.fetch = async (...args) => {
     const url = String((args[0] && args[0].url) || args[0] || "");
     if (r.status === 401 && url.includes("/api/") && SERVICIOS_API_TOKEN) {
       SERVICIOS_API_TOKEN = "";
-      alert("La sesión del panel venció. Volvé a entrar con la contraseña.");
+      try { sessionStorage.removeItem("admin_pase"); sessionStorage.setItem("admin_aviso", "La sesión del panel venció. Volvé a entrar con la contraseña."); } catch (e) { /* nada */ }
       location.reload();
     }
+    // Guardado bien -> esa pestaña ya no tiene cambios pendientes.
+    const metodo = String((args[1] && args[1].method) || "GET").toUpperCase();
+    const col = (url.match(/coleccion=([a-z_-]+)/) || [])[1];
+    if (r.ok && metodo === "POST" && col && typeof PANEL_DE_COLECCION !== "undefined" && PANEL_DE_COLECCION[col]) marcarPanelLimpio(PANEL_DE_COLECCION[col]);
   } catch (e) { /* nada */ }
   return r;
 };
@@ -1245,21 +1398,59 @@ const panelEmergencia = document.getElementById("panelEmergencia");
 let emergenciaCargadaUnaVezAdmin = false;
 let planosCargadosUnaVezAdmin = false;
 
+// ---------- Cambios sin guardar ----------
+// Las pestañas que se guardan con "Guardar cambios" se recargan frescas
+// cada vez que se entra (antes algunas cargaban UNA sola vez y, si se
+// dejaban abiertas, mostraban y guardaban datos viejos). Si quedó algo
+// editado sin guardar, no se recarga: se avisa y se puede descartar.
+const PANELES_CON_GUARDAR = ["panelTecnicos", "panelMateriales", "panelClientes", "panelConsultas", "panelGuardias", "panelCredenciales", "panelVehiculos", "panelHerramientas"];
+const panelesConCambios = new Set();
+function marcarPanelLimpio(id) {
+  panelesConCambios.delete(id);
+  const aviso = document.getElementById("avisoCambios-" + id);
+  if (aviso) aviso.remove();
+}
+["input", "change"].forEach((ev) => document.addEventListener(ev, (e) => {
+  const panel = e.target.closest && e.target.closest("[id^='panel']");
+  if (!panel || !PANELES_CON_GUARDAR.includes(panel.id)) return;
+  if (e.target.type === "file" || e.target.closest(".sin-cambios")) return;
+  panelesConCambios.add(panel.id);
+}, true));
+function recargarSiNoHayCambios(panel, cargar, siempre) {
+  if (siempre) siempre();
+  if (!panelesConCambios.has(panel.id)) { cargar(); return; }
+  if (document.getElementById("avisoCambios-" + panel.id)) return;
+  const aviso = document.createElement("div");
+  aviso.id = "avisoCambios-" + panel.id;
+  aviso.className = "aviso-cambios";
+  aviso.innerHTML = '<span>Tenés cambios sin guardar en esta pestaña — se muestran como los dejaste. Guardalos, o descartalos para ver lo último.</span><button type="button" class="btn-secondary-admin">Descartar y recargar</button>';
+  aviso.querySelector("button").addEventListener("click", () => { marcarPanelLimpio(panel.id); cargar(); });
+  panel.prepend(aviso);
+}
+window.addEventListener("beforeunload", (e) => {
+  if (panelesConCambios.size === 0) return;
+  e.preventDefault();
+  e.returnValue = "";
+});
+// Al guardar bien una colección, su pestaña queda sin cambios pendientes.
+const PANEL_DE_COLECCION = { tecnicos: "panelTecnicos", materiales: "panelMateriales", clientes: "panelClientes", "consultas-categorias": "panelConsultas", guardias: "panelGuardias", credenciales: "panelCredenciales", vehiculos: "panelVehiculos", herramientas: "panelHerramientas" };
+
 const TABS = [
+  { btn: document.getElementById("tabInicioBtn"), panel: document.getElementById("panelInicio"), onShow: () => cargarInicioAdmin() },
   { btn: tabServiciosBtn, panel: panelServicios },
   { btn: tabCronogramaBtn, panel: panelCronograma },
-  { btn: tabTecnicosBtn, panel: panelTecnicos, onShow: () => { if (!tecnicosCargadosUnaVez) { tecnicosCargadosUnaVez = true; cargarTecnicosAdmin(); } } },
-  { btn: tabMaterialesBtn, panel: panelMateriales, onShow: () => cargarMaterialesAdmin() },
-  { btn: tabClientesBtn, panel: panelClientes, onShow: () => { if (!clientesCargadosUnaVez) { clientesCargadosUnaVez = true; cargarClientesAdmin(); } } },
-  { btn: tabConsultasBtn, panel: panelConsultas, onShow: () => { if (!consultasCatCargadasUnaVez) { consultasCatCargadasUnaVez = true; cargarConsultasCatAdmin(); } cargarCategoriasManualesAdmin(); cargarDatosEquipoAdmin(); } },
-  { btn: tabGuardiasBtn, panel: panelGuardias, onShow: () => { if (!guardiasCargadasUnaVez) { guardiasCargadasUnaVez = true; cargarGuardiasAdmin(); } cargarEstadoAvisoGuardia(); cargarGuardiaHistorialAdmin(); } },
-  { btn: tabCredencialesBtn, panel: panelCredenciales, onShow: () => cargarCredencialesAdmin() },
-  { btn: tabVehiculosBtn, panel: panelVehiculos, onShow: () => { if (!vehiculosCargadosUnaVez) { vehiculosCargadosUnaVez = true; cargarVehiculosAdmin(); } } },
+  { btn: tabTecnicosBtn, panel: panelTecnicos, onShow: () => recargarSiNoHayCambios(panelTecnicos, cargarTecnicosAdmin) },
+  { btn: tabMaterialesBtn, panel: panelMateriales, onShow: () => recargarSiNoHayCambios(panelMateriales, cargarMaterialesAdmin) },
+  { btn: tabClientesBtn, panel: panelClientes, onShow: () => recargarSiNoHayCambios(panelClientes, cargarClientesAdmin) },
+  { btn: tabConsultasBtn, panel: panelConsultas, onShow: () => { recargarSiNoHayCambios(panelConsultas, cargarConsultasCatAdmin); cargarCategoriasManualesAdmin(); cargarDatosEquipoAdmin(); } },
+  { btn: tabGuardiasBtn, panel: panelGuardias, onShow: () => { recargarSiNoHayCambios(panelGuardias, cargarGuardiasAdmin); cargarEstadoAvisoGuardia(); cargarGuardiaHistorialAdmin(); } },
+  { btn: tabCredencialesBtn, panel: panelCredenciales, onShow: () => recargarSiNoHayCambios(panelCredenciales, cargarCredencialesAdmin) },
+  { btn: tabVehiculosBtn, panel: panelVehiculos, onShow: () => recargarSiNoHayCambios(panelVehiculos, cargarVehiculosAdmin, cargarEstadoVehiculosAdmin) },
   { btn: tabSimsBtn, panel: panelSims, onShow: () => cargarSimsAdmin() },
-  { btn: tabHerramientasBtn, panel: panelHerramientas, onShow: () => { if (!herramientasCargadasUnaVez) { herramientasCargadasUnaVez = true; cargarHerramientasAdmin(); } } },
+  { btn: tabHerramientasBtn, panel: panelHerramientas, onShow: () => recargarSiNoHayCambios(panelHerramientas, cargarHerramientasAdmin) },
   { btn: tabSimsInstaladasBtn, panel: panelSimsInstaladas, onShow: () => cargarSimsInstaladasAdmin() },
   { btn: tabSimsControlBtn, panel: panelSimsControl, onShow: () => cargarControlSims() },
-  { btn: tabPlanosBtn, panel: panelPlanos, onShow: () => { consultarEstadoSincronizacionPlanos(); if (!planosCargadosUnaVezAdmin) { planosCargadosUnaVezAdmin = true; cargarPlanosAdmin(); } } },
+  { btn: tabPlanosBtn, panel: panelPlanos, onShow: () => { consultarEstadoSincronizacionPlanos(); cargarPlanosAdmin(); } },
   { btn: tabInstalacionesBtn, panel: panelInstalaciones, onShow: () => cargarInstalacionesAdmin() },
   { btn: tabEncuestasBtn, panel: panelEncuestas, onShow: () => cargarEncuestasAdmin() },
   { btn: tabComodatosBtn, panel: panelComodatos, onShow: () => cargarComodatosAdmin() },
@@ -1270,7 +1461,7 @@ const TABS = [
   { btn: tabCoordinacionBtn, panel: panelCoordinacion, onShow: () => cargarCoordinacionAdmin() },
   { btn: tabSemaforoBtn, panel: panelSemaforo, onShow: () => cargarSemaforoVisitas() },
   { btn: tabClavesClienteBtn, panel: panelClavesCliente, onShow: () => cargarClavesClienteAdmin() },
-  { btn: tabEmergenciaBtn, panel: panelEmergencia, onShow: () => { if (!emergenciaCargadaUnaVezAdmin) { emergenciaCargadaUnaVezAdmin = true; cargarEmergenciasAdmin(); } } },
+  { btn: tabEmergenciaBtn, panel: panelEmergencia, onShow: () => cargarEmergenciasAdmin() },
 ];
 
 TABS.forEach(({ btn, panel, onShow }) => {
@@ -1282,6 +1473,164 @@ TABS.forEach(({ btn, panel, onShow }) => {
     if (onShow) onShow();
   });
 });
+// ---------- Menú agrupado ----------
+const GRUPOS_MENU = [
+  ["", ["tabInicioBtn"]],
+  ["Día a día", ["tabServiciosBtn", "tabCronogramaBtn", "tabCoordinacionBtn", "tabEmergenciaBtn", "tabSeguimientosBtn", "tabSemaforoBtn", "tabNotasBtn"]],
+  ["Administración", ["tabRendicionesBtn", "tabComodatosBtn", "tabInstalacionesBtn", "tabEncuestasBtn"]],
+  ["SIMs", ["tabSimsBtn", "tabSimsInstaladasBtn", "tabSimsControlBtn"]],
+  ["Flota y herramientas", ["tabVehiculosBtn", "tabHerramientasBtn"]],
+  ["Clientes", ["tabClientesBtn", "tabClavesClienteBtn", "tabPlanosBtn"]],
+  ["Equipo y configuración", ["tabTecnicosBtn", "tabCredencialesBtn", "tabGuardiasBtn", "tabMaterialesBtn", "tabConsultasBtn", "tabErroresBtn"]],
+];
+(function armarMenuAgrupado() {
+  const tabs = document.querySelector("#mainCard > .tabs");
+  const usados = new Set();
+  GRUPOS_MENU.forEach(([titulo, ids]) => {
+    const grupo = document.createElement("div");
+    grupo.className = "menu-grupo";
+    if (titulo) grupo.innerHTML = `<p class="menu-grupo-tit">${titulo}</p>`;
+    ids.forEach((id) => { const b = document.getElementById(id); if (b) { grupo.appendChild(b); usados.add(id); } });
+    tabs.appendChild(grupo);
+  });
+  // Cualquier pestaña nueva que no esté en la lista va al último grupo.
+  tabs.querySelectorAll(":scope > .tab-btn").forEach((b) => { if (!usados.has(b.id)) tabs.lastElementChild.appendChild(b); });
+})();
+const navMovilTitulo = document.getElementById("navMovilTitulo");
+document.getElementById("navMovilBtn").addEventListener("click", () => mainCard.classList.add("menu-abierto"));
+document.getElementById("menuMovilCerrarBtn").addEventListener("click", () => mainCard.classList.remove("menu-abierto"));
+TABS.forEach(({ btn }) => btn.addEventListener("click", () => {
+  mainCard.classList.remove("menu-abierto");
+  navMovilTitulo.textContent = btn.textContent.replace(/\d+\s*$/, "").trim();
+  if (window.innerWidth < 900) window.scrollTo({ top: 0 });
+}));
+document.getElementById("salirPanelBtn").addEventListener("click", salirDelPanel);
+function irAPestana(id) { const b = document.getElementById(id); if (b) b.click(); }
+
+// ---------- Inicio: lo que hay para hacer ----------
+function abrirInicioAdmin() {
+  document.getElementById("salirPanelBtn").classList.remove("hidden");
+  irAPestana("tabInicioBtn");
+}
+async function cargarInicioAdmin() {
+  const hoy = new Date();
+  const t = hoy.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
+  document.getElementById("inicioFecha").textContent = t.charAt(0).toUpperCase() + t.slice(1) + ".";
+  const st = document.getElementById("inicioStatus");
+  const cont = document.getElementById("inicioPendientes");
+  st.className = "status";
+  st.textContent = "Revisando...";
+  const h = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+  const leer = (url) => fetch(url, { headers: h, cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  const [emerg, rend, pend, sims, vehs, vehHist, errores, partes] = await Promise.all([
+    leer("/api/datos?coleccion=servicios_emergencia"),
+    leer("/api/recurso-uso?recurso=rendicion"),
+    leer("/api/recurso-uso?recurso=sim&pendientes=1&todas=1"),
+    leer("/api/datos?coleccion=sims"),
+    leer("/api/datos?coleccion=vehiculos"),
+    leer("/api/recurso-uso?recurso=vehiculo"),
+    leer("/api/datos?coleccion=errores_app"),
+    leer("/api/historial"),
+  ]);
+  const arr = (x) => (Array.isArray(x) ? x : []);
+  const hoyISO = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
+  const hace7 = new Date(hoy.getTime() - 7 * 864e5).toISOString().slice(0, 10);
+  const tarjetas = [];
+  const agregar = (n, titulo, detalle, pestana, nivel, siempre) => { if (n > 0 || siempre) tarjetas.push({ n, titulo, detalle, pestana, nivel: n > 0 ? nivel : "ok" }); };
+
+  const emergSin = arr(emerg).filter((e) => !e.revisado);
+  agregar(emergSin.length, "Emergencias sin revisar", emergSin.slice(0, 2).map((e) => e.cliente || "sin cliente").join(" · "), "tabEmergenciaBtn", "urgente", true);
+  const rendPend = arr(rend).filter((r) => r.estado === "pendiente");
+  const totalRend = rendPend.reduce((a, r) => a + (Number(r.monto) || 0), 0);
+  agregar(rendPend.length, "Rendiciones por aprobar", rendPend.length ? `$ ${totalRend.toLocaleString("es-AR")} en total` : "", "tabRendicionesBtn", "atencion", true);
+  const vehAlertas = [];
+  arr(vehs).forEach((v) => { try { (calcularAlertasVehiculoAdmin(v, hoy) || []).forEach((a) => vehAlertas.push(`${v.nombre}: ${a.mensaje || a.texto || ""}`)); } catch (e) { /* nada */ } });
+  const sinDevolver = arr(vehHist).filter((x) => x.tecnico && !x.hora_devolucion && x.accion !== "evento" && x.fecha && x.fecha < hoyISO);
+  agregar(sinDevolver.length, "Vehículos sin devolver", sinDevolver.map((x) => `${x.vehiculo} (${x.tecnico})`).join(" · "), "tabVehiculosBtn", "urgente");
+  agregar(vehAlertas.length, "Vencimientos de vehículos", vehAlertas.slice(0, 2).join(" · "), "tabVehiculosBtn", "atencion");
+  agregar(arr(pend).length, "SIMs por aceptar", arr(pend).slice(0, 2).map((p) => `${p.numero} → ${p.tecnico_destino}`).join(" · "), "tabSimsBtn", "atencion");
+  const simsProb = arr(sims).filter((s) => s.ubicacion_tipo !== "cliente" && s.estado_fisico && s.estado_fisico !== "Disponible");
+  agregar(simsProb.length, "SIMs con problema", "Defectuosas o extraviadas para reclamar o dar de baja", "tabSimsControlBtn", "atencion");
+  const sinPasar = arr(partes).filter((p) => !p.pasado_sistema_offline);
+  agregar(sinPasar.length, "Partes sin pasar al sistema", "Se marcan desde Historial en la app", "", "atencion");
+  const erroresSemana = arr(errores).filter((e) => String(e.fecha || "").slice(0, 10) >= hace7);
+  agregar(erroresSemana.length, "Errores de la app (7 días)", erroresSemana.slice(0, 1).map((e) => String(e.mensaje || "").slice(0, 60)).join(""), "tabErroresBtn", "atencion");
+
+  tarjetas.sort((a, b) => ({ urgente: 0, atencion: 1, ok: 2 }[a.nivel] - { urgente: 0, atencion: 1, ok: 2 }[b.nivel]));
+  const conAlgo = tarjetas.filter((x) => x.n > 0).length;
+  st.className = conAlgo ? "status" : "status ok";
+  st.textContent = conAlgo ? "" : "Nada pendiente por ahora.";
+  cont.innerHTML = tarjetas.map((x, i) => `<button type="button" class="inicio-tarjeta ${x.nivel}" data-i="${i}" ${x.pestana ? "" : 'style="cursor:default;"'}>
+      <span class="it-num">${x.n}</span><span class="it-tit">${escapeHtmlAdmin(x.titulo)}</span>${x.detalle ? `<span class="it-det">${escapeHtmlAdmin(x.detalle)}</span>` : ""}</button>`).join("");
+  cont.querySelectorAll(".inicio-tarjeta").forEach((b) => b.addEventListener("click", () => { const x = tarjetas[Number(b.dataset.i)]; if (x.pestana) irAPestana(x.pestana); }));
+}
+
+// ---------- Buscador general de cliente ----------
+let fichaDatosAdmin = null; // se carga una vez por búsqueda nueva
+const inicioBuscarCliente = document.getElementById("inicioBuscarCliente");
+async function datosParaFichaAdmin() {
+  if (fichaDatosAdmin && Date.now() - fichaDatosAdmin.cuando < 5 * 60 * 1000) return fichaDatosAdmin;
+  const h = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+  const leer = (url) => fetch(url, { headers: h, cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).catch(() => []);
+  const [clientes, partes, inst, claves, comodatos, planos, emerg] = await Promise.all([
+    leer("/api/datos?coleccion=clientes"), leer("/api/historial"), leer("/api/datos?coleccion=sims_instaladas"),
+    leer("/api/historial?tipo=claves_cliente"), leer("/api/historial?tipo=comodatos"), leer("/api/planos"), leer("/api/datos?coleccion=servicios_emergencia"),
+  ]);
+  const arr = (x) => (Array.isArray(x) ? x : []);
+  fichaDatosAdmin = { cuando: Date.now(), clientes: arr(clientes), partes: arr(partes), inst: arr(inst), claves: arr(claves), comodatos: arr(comodatos), planos: arr(planos), emerg: arr(emerg) };
+  return fichaDatosAdmin;
+}
+let buscarClienteTimer = null;
+inicioBuscarCliente.addEventListener("input", () => {
+  clearTimeout(buscarClienteTimer);
+  buscarClienteTimer = setTimeout(buscarClienteInicio, 200);
+});
+async function buscarClienteInicio() {
+  const q = normalizeText(inicioBuscarCliente.value.trim());
+  const res = document.getElementById("inicioBuscarResultados");
+  document.getElementById("inicioFichaCliente").innerHTML = "";
+  if (q.length < 3) { res.innerHTML = ""; return; }
+  res.innerHTML = '<p class="status">Buscando...</p>';
+  const d = await datosParaFichaAdmin();
+  if (normalizeText(inicioBuscarCliente.value.trim()) !== q) return;
+  const palabras = q.split(/\s+/);
+  const encontrados = d.clientes.filter((c) => {
+    const texto = normalizeText([c.nombre, c.numero_cliente, c.direccion, c.localidad, c.telefono, c.numero_abonado].join(" "));
+    return palabras.every((p) => texto.includes(p));
+  }).slice(0, 8);
+  res.innerHTML = encontrados.length ? encontrados.map((c, i) => `<button type="button" class="ib-item" data-i="${i}"><b>${escapeHtmlAdmin(c.nombre || "")}</b> <span>· Cliente ${escapeHtmlAdmin(c.numero_cliente || "?")} · ${escapeHtmlAdmin([c.direccion, c.localidad].filter(Boolean).join(", "))}</span></button>`).join("")
+    : '<p class="status">No hay ningún cliente con eso en la base.</p>';
+  res.querySelectorAll(".ib-item").forEach((b) => b.addEventListener("click", () => { res.innerHTML = ""; mostrarFichaClienteAdmin(encontrados[Number(b.dataset.i)]); }));
+}
+function mostrarFichaClienteAdmin(c) {
+  const d = fichaDatosAdmin;
+  const num = String(c.numero_cliente || "");
+  const nom = normalizeText(c.nombre || "");
+  const esDelCliente = (numero, nombre) => (num && String(numero || "") === num) || (!!nom && normalizeText(nombre || "") === nom);
+  const partes = d.partes.filter((p) => esDelCliente(p.numero_cliente, p.cliente)).sort((a, b) => String(b.fecha || "").localeCompare(String(a.fecha || "")));
+  const sims = d.inst.filter((s) => esDelCliente(s.numero_cliente, s.cliente));
+  const claves = d.claves.filter((k) => esDelCliente(k.numero_cliente, k.cliente));
+  const comodatos = d.comodatos.filter((k) => normalizeText(k.comodatario || "").includes(nom) || (c.direccion && normalizeText(k.direccion || "").includes(normalizeText(c.direccion))));
+  const planos = d.planos.filter((p) => (num && String(p.nombre || "").includes(num)) || (nom && normalizeText(p.nombre || "").includes(nom)));
+  const emerg = d.emerg.filter((e) => nom && normalizeText(e.cliente || "") === nom);
+  const sec = (titulo, items, vacio) => `<div class="fa-sec"><h4>${titulo} (${items.length})</h4>${items.length ? `<ul>${items.join("")}</ul>` : `<p class="fa-vacio">${vacio}</p>`}</div>`;
+  const totalClaves = claves.reduce((a, k) => a + (Array.isArray(k.claves) ? k.claves.length : 0), 0);
+  document.getElementById("inicioFichaCliente").innerHTML = `<div class="ficha-adm">
+    <h3>${escapeHtmlAdmin(c.nombre || "")}</h3>
+    <div class="fa-sub">Cliente N° ${escapeHtmlAdmin(num || "?")}${c.numero_abonado ? ` · Abonado ${escapeHtmlAdmin(c.numero_abonado)}` : ""} · ${escapeHtmlAdmin([c.direccion, c.localidad].filter(Boolean).join(", "))}${c.telefono ? ` · Tel. ${escapeHtmlAdmin(c.telefono)}` : ""}</div>
+    ${sec("Últimas visitas", partes.slice(0, 8).map((p) => `<li><b>${fechaAR(p.fecha)}</b> — ${escapeHtmlAdmin(p.tecnico || "")}: ${escapeHtmlAdmin(String(p.tarea || p.observaciones || "").slice(0, 120))}${p.numero_servicio ? ` <span style="color:#6B7680;">(N° ${escapeHtmlAdmin(p.numero_servicio)})</span>` : ""}</li>`), "Sin partes registrados.")}
+    ${sec("SIMs instaladas", sims.map((s) => `<li><button type="button" class="sim-num-link" data-ficha="${escapeHtmlAdmin(s.numero)}">${escapeHtmlAdmin(s.numero)}</button> · ${escapeHtmlAdmin(s.empresa || "")} · ${escapeHtmlAdmin(s.estado_linea || "Activo")}${s.fecha_activacion ? ` · desde ${fechaAR(s.fecha_activacion)}` : ""}</li>`), "No tiene SIMs instaladas.")}
+    <div class="fa-sec"><h4>Claves (${totalClaves})</h4>${totalClaves ? `<button type="button" class="btn-secondary-admin fa-ver-claves" style="width:auto; padding:6px 12px;">Mostrar claves</button><ul class="fa-claves">${claves.flatMap((k) => (k.claves || []).map((x) => `<li><b>${escapeHtmlAdmin(x.titulo || "")}</b>${x.usuario ? ` — Usuario: ${escapeHtmlAdmin(x.usuario)}` : ""}${x.clave ? ` · Clave: ${escapeHtmlAdmin(x.clave)}` : ""}${x.codigo ? ` · Código: ${escapeHtmlAdmin(x.codigo)}` : ""}</li>`)).join("")}</ul>` : '<p class="fa-vacio">No hay claves guardadas.</p>'}</div>
+    ${sec("Comodatos", comodatos.map((k) => `<li>${fechaAR(k.fecha || k.creado_en)} — ${escapeHtmlAdmin(k.comodatario || "")} · ${escapeHtmlAdmin(k.tecnico || "")}</li>`), "Sin comodatos.")}
+    ${sec("Planos", planos.map((p) => `<li>${escapeHtmlAdmin(p.nombre || "")}</li>`), "Sin planos cargados.")}
+    ${sec("Emergencias", emerg.map((e) => `<li>${fechaAR(e.fecha_carga || e.fecha_deseada)} — ${escapeHtmlAdmin(String(e.tarea || "").slice(0, 100))}${e.revisado ? "" : " <b style='color:#B3261E;'>(sin revisar)</b>"}</li>`), "Sin emergencias.")}
+  </div>`;
+  const cont = document.getElementById("inicioFichaCliente");
+  const bc = cont.querySelector(".fa-ver-claves");
+  if (bc) bc.addEventListener("click", () => { const ul = cont.querySelector(".fa-claves"); ul.classList.toggle("visible"); bc.textContent = ul.classList.contains("visible") ? "Ocultar claves" : "Mostrar claves"; });
+  cont.querySelectorAll("[data-ficha]").forEach((b) => b.addEventListener("click", () => abrirFichaLineaSim(b.dataset.ficha)));
+}
+
 
 const PERMISOS_TECNICO = [
   { clave: "dash_general", etiqueta: "Dashboard general" },
@@ -1473,13 +1822,10 @@ pwBtn.addEventListener("click", async () => {
     const data = await res.json();
     if (res.ok && data.ok) {
       SERVICIOS_API_TOKEN = data.sesion || "";
-      loginCard.classList.add("hidden");
-      mainCard.classList.remove("hidden");
-      cargarConfigAdmin();
-      // Se carga sin esperar a que entren a la pestaña, para que el
-      // numerito de "sin revisar" ya se vea apenas abren admin.html.
-      emergenciaCargadaUnaVezAdmin = true;
-      cargarEmergenciasAdmin();
+      // La sesión dura mientras esta pestaña del navegador esté abierta
+      // (sobrevive a F5); al cerrar la pestaña hay que volver a entrar.
+      try { if (data.sesion) sessionStorage.setItem("admin_pase", data.sesion); } catch (e) { /* nada */ }
+      entrarAlPanel();
     } else if (data.bloqueado) {
       pwError.textContent = `Demasiados intentos fallidos — probá de nuevo en ${data.minutos_restantes} minuto(s).`;
     } else {
@@ -1492,6 +1838,35 @@ pwBtn.addEventListener("click", async () => {
   }
 });
 pw.addEventListener("keydown", (e) => { if (e.key === "Enter") pwBtn.click(); });
+function entrarAlPanel() {
+  loginCard.classList.add("hidden");
+  mainCard.classList.remove("hidden");
+  cargarConfigAdmin();
+  // Se carga sin esperar a que entren a la pestaña, para que el
+  // numerito de "sin revisar" ya se vea apenas abren admin.html.
+  emergenciaCargadaUnaVezAdmin = true;
+  cargarEmergenciasAdmin();
+  if (typeof abrirInicioAdmin === "function") abrirInicioAdmin();
+}
+// Al recargar (F5) con la sesión todavía vigente, entra directo.
+try { const av = sessionStorage.getItem("admin_aviso"); if (av) { sessionStorage.removeItem("admin_aviso"); document.getElementById("pwError").textContent = av; } } catch (e) { /* nada */ }
+(async () => {
+  let pase = "";
+  try { pase = sessionStorage.getItem("admin_pase") || ""; } catch (e) { pase = ""; }
+  if (!pase) return;
+  SERVICIOS_API_TOKEN = pase;
+  try {
+    const r = await fetch("/api/recurso-uso?recurso=sim&pendientes=1&todas=1", { headers: { Authorization: "Bearer " + pase }, cache: "no-store" });
+    if (r.ok) entrarAlPanel();
+  } catch (e) { /* sin conexión: queda el login */ }
+})();
+async function salirDelPanel() {
+  if (panelesConCambios.size && !await confirmarAdmin("Tenés cambios sin guardar. ¿Salir igual?")) return;
+  panelesConCambios.clear();
+  try { sessionStorage.removeItem("admin_pase"); } catch (e) { /* nada */ }
+  SERVICIOS_API_TOKEN = "";
+  location.reload();
+}
 
 // ---------- Configuración general (umbrales de servicio estancado) ----------
 const diasAtencionInput = document.getElementById("diasAtencionInput");
@@ -1820,13 +2195,13 @@ borrarTodosClientesBtn.addEventListener("click", async () => {
     borrarClientesStatus.textContent = "No hay ningún cliente cargado todavía.";
     return;
   }
-  const confirmar1 = window.confirm(
+  const confirmar1 = await confirmarAdmin(
     `Esto borra los ${cantidad} clientes cargados (número, nombre, dirección, teléfono, etc.) de forma PERMANENTE — no se puede deshacer.\n\n` +
     "No afecta los planos en Drive ni las SIMs en sí, solo esta base de referencia.\n\n" +
     "¿Confirmás que querés borrar toda la base de Clientes?"
   );
   if (!confirmar1) return;
-  const confirmar2 = window.confirm("Última confirmación: se van a borrar TODOS los clientes ahora mismo. ¿Seguro?");
+  const confirmar2 = await confirmarAdmin("Última confirmación: se van a borrar TODOS los clientes ahora mismo. ¿Seguro?");
   if (!confirmar2) return;
 
   borrarTodosClientesBtn.disabled = true;
@@ -2142,7 +2517,7 @@ async function listarManualesAdmin() {
         <button type="button" class="btn-secondary-admin manual-borrar-btn" data-id="${escapeHtmlAdmin(m.id)}" data-nombre="${escapeHtmlAdmin(m.nombre)}" style="width:auto; padding:6px 12px;">Borrar</button>
       </div>`).join("");
     manualesAdminLista.querySelectorAll(".manual-borrar-btn").forEach((b) => b.addEventListener("click", async () => {
-      if (!confirm(`¿Mandar a la papelera de Drive "${b.dataset.nombre}"?`)) return;
+      if (!await confirmarAdmin(`¿Mandar a la papelera de Drive "${b.dataset.nombre}"?`)) return;
       b.disabled = true;
       try {
         const r = await fetch("/api/consultas", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ accion: "borrar_manual", categoria: cat, archivo: b.dataset.id }) });
@@ -2214,7 +2589,7 @@ function renderDatosEquipoAdmin() {
     </div>`;
   }).join("");
   cont.querySelectorAll(".dato-equipo-borrar").forEach((b) => b.addEventListener("click", async () => {
-    if (!confirm("¿Borrar este dato para todo el equipo?")) return;
+    if (!await confirmarAdmin("¿Borrar este dato para todo el equipo?")) return;
     b.disabled = true;
     try {
       const r = await fetch("/api/datos?coleccion=datos_equipo", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ accion: "borrar", id: b.dataset.id, admin: true, autor: "Oficina" }) });
@@ -2470,7 +2845,7 @@ async function cargarEstadoAvisoGuardia() {
 
 avisarGuardiaAhoraBtn.addEventListener("click", async () => {
   const yaEstabaHecho = guardiaAvisoEstado.className === "status ok";
-  if (yaEstabaHecho && !confirm("El aviso de esta semana ya se había realizado — ¿mandarlo de nuevo igual?")) {
+  if (yaEstabaHecho && !await confirmarAdmin("El aviso de esta semana ya se había realizado — ¿mandarlo de nuevo igual?")) {
     return;
   }
   avisarGuardiaAhoraBtn.disabled = true;
@@ -2714,6 +3089,7 @@ function renderFilaUmbral(umbralesContainer, umbral) {
 function renderFilaVehiculo(vehiculo) {
   const fila = document.createElement("div");
   fila.className = "card vehiculo-fila";
+  fila.dataset.base = JSON.stringify({ nombre: vehiculo.nombre || "", km_actual: Number(vehiculo.km_actual) || 0 });
   fila.innerHTML = `
     <div class="field-row" style="align-items:flex-end;">
       <div style="flex:1;">
@@ -2867,7 +3243,7 @@ async function forzarDevolucionVehiculo(vehiculo, tecnico) {
     alert("Tenés que poner un kilometraje válido.");
     return;
   }
-  const ok = confirm(`¿Confirmás que "${vehiculo}" queda devuelto (estaba a nombre de ${tecnico})?`);
+  const ok = await confirmarAdmin(`¿Confirmás que "${vehiculo}" queda devuelto (estaba a nombre de ${tecnico})?`);
   if (!ok) return;
   try {
     const res = await fetch("/api/recurso-uso", {
@@ -2910,6 +3286,7 @@ guardarVehiculosBtn.addEventListener("click", async () => {
       nombre: fila.querySelector(".vehiculo-nombre").value.trim(),
       km_actual: Number(fila.querySelector(".vehiculo-km-actual").value) || 0,
       umbrales,
+      _base: fila.dataset.base || "",
     };
   }).filter((v) => v.nombre);
 
@@ -2922,6 +3299,25 @@ guardarVehiculosBtn.addEventListener("click", async () => {
   guardarVehiculosBtn.disabled = true;
   guardarVehiculosStatus.className = "status";
   guardarVehiculosStatus.textContent = "Guardando...";
+  // Los km los actualizan los técnicos desde la app. Si acá no se tocó el
+  // campo de kilometraje, se usa el valor ACTUAL del servidor (no el que
+  // había al abrir la pestaña), así no se pisa una devolución reciente.
+  let kmRespetados = 0;
+  try {
+    const rAct = await fetch("/api/datos?coleccion=vehiculos", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+    const actuales = rAct.ok ? await rAct.json() : [];
+    const porNombre = new Map((Array.isArray(actuales) ? actuales : []).map((v) => [v.nombre, v]));
+    lista.forEach((v) => {
+      let base = null;
+      try { base = JSON.parse(v._base || "null"); } catch (e) { base = null; }
+      const srv = base && porNombre.get(base.nombre);
+      if (srv && Number(base.km_actual || 0) === Number(v.km_actual || 0) && Number(srv.km_actual || 0) !== Number(v.km_actual || 0)) {
+        v.km_actual = Number(srv.km_actual) || 0;
+        kmRespetados++;
+      }
+    });
+  } catch (e) { /* si no se puede leer, se guarda lo de la pantalla */ }
+  lista.forEach((v) => { delete v._base; });
   try {
     const res = await fetch("/api/datos?coleccion=vehiculos", {
       method: "POST",
@@ -2934,7 +3330,10 @@ guardarVehiculosBtn.addEventListener("click", async () => {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error desconocido");
     guardarVehiculosStatus.className = "status ok";
-    guardarVehiculosStatus.textContent = "Listo — la configuración de vehículos ya está disponible en la app.";
+    guardarVehiculosStatus.textContent = "Listo — la configuración de vehículos ya está disponible en la app."
+      + (kmRespetados ? ` Se mantuvo el kilometraje que cargaron los técnicos mientras tanto en ${kmRespetados} vehículo(s).` : "");
+    marcarPanelLimpio("panelVehiculos");
+    cargarVehiculosAdmin();
   } catch (err) {
     guardarVehiculosStatus.className = "status err";
     guardarVehiculosStatus.textContent = "No se pudo guardar: " + err.message;
@@ -3107,7 +3506,7 @@ function pintarPendientesSims() {
 
 async function cancelarTransferenciaSim(id) {
   const p = simsPendientes.find((x) => x.id === id);
-  if (!p || !confirm(`¿Cancelar la transferencia de ${p.numero} a ${p.tecnico_destino}? La SIM queda con ${p.tecnico_origen}.`)) return;
+  if (!p || !await confirmarAdmin(`¿Cancelar la transferencia de ${p.numero} a ${p.tecnico_destino}? La SIM queda con ${p.tecnico_origen}.`)) return;
   try {
     await accionSimAdmin({ accion: "cancelar_transferencia", id_transferencia: id, tecnico: "Oficina" });
     avisoSims(`Transferencia de ${p.numero} cancelada.`, "ok");
@@ -3251,7 +3650,7 @@ function abrirPanelFilaSim(fila, s, tipo) {
         const m = q(".x-motivo").value, det = q(".x-detalle").value.trim();
         const motivo = m === "otro" ? det : [m, det].filter(Boolean).join(" — ");
         if (!motivo) { alert("Escribí el motivo."); boton.disabled = false; return; }
-        if (!confirm(`¿Dar de baja ${s.numero} (${quienTiene(s)})?\nMotivo: ${motivo}`)) { boton.disabled = false; return; }
+        if (!await confirmarAdmin(`¿Dar de baja ${s.numero} (${quienTiene(s)})?\nMotivo: ${motivo}`)) { boton.disabled = false; return; }
         await accionSimAdmin({ accion: "dar_de_baja", numero: s.numero, tecnico: "Oficina", motivo });
         avisoSims(`${s.numero} dada de baja.`, "ok");
       } else {
@@ -3302,13 +3701,13 @@ async function aplicarLoteSims(texto, armarPedido) {
 document.getElementById("simsLoteTransferir").addEventListener("change", async (e) => {
   const destino = e.target.value;
   e.target.value = "";
-  if (!destino || !confirm(`¿Transferir ${simsSeleccionadas.size} SIM(s) a ${destino}?${destino !== "Oficina" ? "\nLe llegan como pendientes y las tiene que aceptar en la app." : ""}`)) return;
+  if (!destino || !await confirmarAdmin(`¿Transferir ${simsSeleccionadas.size} SIM(s) a ${destino}?${destino !== "Oficina" ? "\nLe llegan como pendientes y las tiene que aceptar en la app." : ""}`)) return;
   await aplicarLoteSims(`Transferir a ${destino}`, (s) => (quienTiene(s) === destino || pendienteDe(s.numero) ? null : { accion: "transferir", numero: s.numero, tecnico: quienTiene(s), tecnico_nuevo: destino }));
 });
 document.getElementById("simsLoteEstado").addEventListener("change", async (e) => {
   const estado = e.target.value;
   e.target.value = "";
-  if (!estado || !confirm(`¿Marcar ${simsSeleccionadas.size} SIM(s) como ${estado.toLowerCase()}?`)) return;
+  if (!estado || !await confirmarAdmin(`¿Marcar ${simsSeleccionadas.size} SIM(s) como ${estado.toLowerCase()}?`)) return;
   await aplicarLoteSims(`Marcar ${estado.toLowerCase()}`, (s) => ({ accion: "marcar_estado_fisico", numero: s.numero, tecnico: quienTiene(s), estado_fisico: estado }));
 });
 document.getElementById("simsLoteBajaBtn").addEventListener("click", async () => {
@@ -3734,6 +4133,7 @@ function renderFilaHerramienta(h) {
   ).join("");
   const fila = document.createElement("div");
   fila.className = "card herramienta-fila";
+  fila.dataset.base = JSON.stringify({ nombre: item.nombre || "", estado: item.estado || "libre", tecnico_actual: item.tecnico_actual || "", cliente: item.cliente || "" });
   fila.innerHTML = `
     <div class="field-row" style="align-items:flex-end;">
       <div style="flex:1;">
@@ -3831,6 +4231,7 @@ guardarHerramientasBtn.addEventListener("click", async () => {
     estado: fila.querySelector(".herramienta-estado").value,
     tecnico_actual: fila.querySelector(".herramienta-tecnico").value,
     cliente: fila.querySelector(".herramienta-cliente").value.trim(),
+    _base: fila.dataset.base || "",
   })).filter((h) => h.nombre);
 
   if (lista.length === 0) {
@@ -3842,6 +4243,26 @@ guardarHerramientasBtn.addEventListener("click", async () => {
   guardarHerramientasBtn.disabled = true;
   guardarHerramientasStatus.className = "status";
   guardarHerramientasStatus.textContent = "Guardando...";
+  // Quién tiene cada herramienta lo actualizan los técnicos desde la app.
+  // Si acá no se tocó estado/técnico/cliente, se usa lo ACTUAL del servidor.
+  let respetadas = 0;
+  try {
+    const rAct = await fetch("/api/datos?coleccion=herramientas", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+    const actuales = rAct.ok ? await rAct.json() : [];
+    const porNombre = new Map((Array.isArray(actuales) ? actuales : []).map((h) => [h.nombre, h]));
+    lista.forEach((h) => {
+      let base = null;
+      try { base = JSON.parse(h._base || "null"); } catch (e) { base = null; }
+      const srv = base && porNombre.get(base.nombre);
+      if (!srv) return;
+      const tocado = ["estado", "tecnico_actual", "cliente"].some((k) => String(h[k] || "") !== String(base[k] || ""));
+      if (!tocado && ["estado", "tecnico_actual", "cliente"].some((k) => String(h[k] || "") !== String(srv[k] || ""))) {
+        h.estado = srv.estado; h.tecnico_actual = srv.tecnico_actual || ""; h.cliente = srv.cliente || "";
+        respetadas++;
+      }
+    });
+  } catch (e) { /* si no se puede leer, se guarda lo de la pantalla */ }
+  lista.forEach((h) => { delete h._base; });
   try {
     const res = await fetch("/api/datos?coleccion=herramientas", {
       method: "POST",
@@ -3851,7 +4272,10 @@ guardarHerramientasBtn.addEventListener("click", async () => {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error desconocido");
     guardarHerramientasStatus.className = "status ok";
-    guardarHerramientasStatus.textContent = "Listo — la lista de herramientas ya está disponible en la app.";
+    guardarHerramientasStatus.textContent = "Listo — la lista de herramientas ya está disponible en la app."
+      + (respetadas ? ` Se mantuvo quién la tiene en ${respetadas} herramienta(s) que se movieron desde la app mientras tanto.` : "");
+    marcarPanelLimpio("panelHerramientas");
+    cargarHerramientasAdmin();
   } catch (err) {
     guardarHerramientasStatus.className = "status err";
     guardarHerramientasStatus.textContent = "No se pudo guardar: " + err.message;
@@ -3995,7 +4419,7 @@ function abrirPanelInstalada(tr, s, tipo) {
         simsInstaladasStatus.textContent = `${s.numero} corregida.`;
       } else {
         const destino = extra.querySelector(".x-destino").value;
-        if (!confirm(`¿Retirar ${s.numero} de ${s.cliente || "el cliente"} y devolverla al stock de ${destino}?`)) { boton.disabled = false; return; }
+        if (!await confirmarAdmin(`¿Retirar ${s.numero} de ${s.cliente || "el cliente"} y devolverla al stock de ${destino}?`)) { boton.disabled = false; return; }
         await accionSimAdmin({ accion: "retirar_de_registro", numero: s.numero, tecnico: destino });
         simsInstaladasStatus.textContent = `${s.numero} retirada — ahora está en el stock de ${destino}.`;
       }
@@ -4496,7 +4920,7 @@ function renderErroresAdmin() {
 document.getElementById("erroresBuscarInput").addEventListener("input", renderErroresAdmin);
 document.getElementById("erroresRecargarBtn").addEventListener("click", cargarErroresAdmin);
 document.getElementById("erroresLimpiarBtn").addEventListener("click", async () => {
-  if (!confirm("¿Vaciar todo el registro de errores?")) return;
+  if (!await confirmarAdmin("¿Vaciar todo el registro de errores?")) return;
   try {
     const res = await fetch("/api/datos?coleccion=errores_app", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ accion: "limpiar" }) });
     if (!res.ok) throw new Error("HTTP " + res.status);
@@ -4610,7 +5034,7 @@ function renderTotalesRendiciones() {
   rendicionesTotalesLista.querySelectorAll(".rend-pagar-todo").forEach((btn) => {
     btn.addEventListener("click", async () => {
       const datos = porTecnico[btn.dataset.tecnico];
-      if (!confirm(`¿Marcar como pagadas las ${datos.ids.length} rendiciones pendientes de ${btn.dataset.tecnico} por ${pesosAdmin(datos.total)}?`)) return;
+      if (!await confirmarAdmin(`¿Marcar como pagadas las ${datos.ids.length} rendiciones pendientes de ${btn.dataset.tecnico} por ${pesosAdmin(datos.total)}?`)) return;
       btn.disabled = true;
       let fallidas = 0;
       for (let i = 0; i < datos.ids.length; i++) {
@@ -5555,7 +5979,7 @@ async function cambiarIgnorado(numero, ignorar) {
   const clave = canonNumCliente(numero);
   const fila = semaforoFilas.find((f) => canonNumCliente(f.numero) === clave);
   if (!fila) return;
-  if (ignorar && !confirm(`¿Ignorar a "${fila.nombre}"? Deja de aparecer en el semáforo (lo podés ver y restaurar desde "Ignorados").`)) return;
+  if (ignorar && !await confirmarAdmin(`¿Ignorar a "${fila.nombre}"? Deja de aparecer en el semáforo (lo podés ver y restaurar desde "Ignorados").`)) return;
   try {
     const res = await fetch("/api/datos?coleccion=visitas_historicas", {
       method: "POST",
@@ -5696,7 +6120,7 @@ semaforoImportBtn.addEventListener("click", async () => {
   const r = calcularImportActual();
   if (!r || r.porCliente.size === 0) return;
   const filas = [...r.porCliente.entries()].map(([numero_cliente, v]) => ({ numero_cliente, fecha: v.fecha, estado: v.estado }));
-  if (!confirm(`Se van a cargar ${filas.length} cliente(s) (${filas.filter((f) => f.fecha).length} con fecha de última visita, ${filas.filter((f) => f.estado).length} con estado). Si ya tenían una fecha más reciente, se conserva esa. ¿Seguimos?`)) return;
+  if (!await confirmarAdmin(`Se van a cargar ${filas.length} cliente(s) (${filas.filter((f) => f.fecha).length} con fecha de última visita, ${filas.filter((f) => f.estado).length} con estado). Si ya tenían una fecha más reciente, se conserva esa. ¿Seguimos?`)) return;
   semaforoImportBtn.disabled = true;
   try {
     const TROZO = 400;
@@ -6012,7 +6436,7 @@ async function borrarInstalacionAdmin(id, cliente, estado) {
       return;
     }
   } else {
-    const confirmar = confirm(`¿Borrar la instalación "${cliente}"? Se pierde todo — días marcados, zonas, canales y fotos. Esto no se puede deshacer.`);
+    const confirmar = await confirmarAdmin(`¿Borrar la instalación "${cliente}"? Se pierde todo — días marcados, zonas, canales y fotos. Esto no se puede deshacer.`);
     if (!confirmar) return;
   }
   try {
@@ -6161,7 +6585,7 @@ async function cambiarRevisadoEmergencia(id, nuevoValor) {
 }
 
 async function borrarEmergencia(id) {
-  if (!confirm("¿Borrar este servicio de emergencia de la lista?")) return;
+  if (!await confirmarAdmin("¿Borrar este servicio de emergencia de la lista?")) return;
   try {
     const listaNueva = emergenciasCacheAdmin.filter((e) => e.id !== id);
     await guardarListaEmergencias(listaNueva);
