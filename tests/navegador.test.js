@@ -1481,10 +1481,12 @@ test("Seguridad: la app manda el pase personal que le dio el login y, si el serv
   assert.strictEqual(await page.evaluate(() => localStorage.getItem("sat_api_sesion")), "s1.PASE.FIRMA");
   // El servidor deja de aceptarlo (venció o se cambió la clave): vuelve al login
   rechazar = true;
+  await page.evaluate(() => { showScreen("historial"); document.getElementById("parteDetalleModalOverlay").classList.remove("hidden"); });
   await page.evaluate(() => fetch("/api/historial", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN } }));
   await page.waitForTimeout(300);
   assert.strictEqual(await page.evaluate(() => screens.login.dataset.active), "true");
   assert.match(await page.locator("#loginError").textContent(), /volvé a entrar/);
+  assert.strictEqual(await page.locator("#parteDetalleModalOverlay").isVisible(), false, "el cartel abierto no tapa el login");
   assert.strictEqual(await page.evaluate(() => localStorage.getItem("sat_api_sesion")), null);
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();

@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.145.0";
+const APP_VERSION = "3.145.1";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -216,6 +216,8 @@ function sesionVencida() {
     avisoSesionVencidaMostrado = true;
     return;
   }
+  // Se cierran los carteles abiertos (ej.: detalle del parte) para que se vea el login.
+  document.querySelectorAll('[id$="ModalOverlay"], .modal-overlay').forEach((el) => el.classList.add("hidden"));
   if (screens.login.dataset.active === "true") return;
   guardarPaseApi("");
   borrarSesion();
