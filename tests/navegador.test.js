@@ -1905,3 +1905,56 @@ test("Horas del servidor: se guardan en UTC y se muestran en hora de Argentina (
   assert.strictEqual(await page.evaluate(() => fechaDelServidor("2026-10-26 20:57:00").getHours()), 17);
   await ctx.close();
 });
+
+test("Admin Clientes: se puede cargar un cliente a mano (obligatorios, aviso si el N° ya existe) y editarlo después", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  let clientes = [{ numero_cliente: "1203", nombre: "PANADERIA SUR", direccion: "Mitre 100", localidad: "Funes", telefono: "341 555", numero_abonado: "4821" }];
+  const posts = [];
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  await page.route("**/api/**", (route) => {
+    const req = route.request(); const u = req.url();
+    if (u.includes("coleccion=clientes") && req.method() === "POST") { clientes = JSON.parse(req.postData()); posts.push(u); return route.fulfill({ status: 200, contentType: "application/json", body: '{"ok":true}' }); }
+    if (u.includes("coleccion=clientes")) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(clientes) });
+    route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+  });
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { document.getElementById("mainCard").classList.remove("hidden"); document.getElementById("panelClientes").classList.remove("hidden"); });
+  // Faltan obligatorios
+  await page.fill("#cliManNombre", "KIOSCO NORTE");
+  await page.click("#cliManGuardarBtn");
+  assert.match(await page.textContent("#cliManStatus"), /Falta completar: N° de cliente, N° de abonado, Dirección, Teléfono/);
+  assert.strictEqual(posts.length, 0);
+  // Completo: se agrega sin tocar a los demás
+  await page.fill("#cliManNumero", "1500");
+  await page.fill("#cliManAbonado", "5100");
+  await page.fill("#cliManDireccion", "Belgrano 5");
+  await page.fill("#cliManTelefono", "341 444 2222");
+  await page.click("#cliManGuardarBtn");
+  await page.waitForTimeout(400);
+  assert.match(await page.textContent("#cliManStatus"), /se agregó el cliente 1500/);
+  assert.deepStrictEqual(clientes.map((c) => c.numero_cliente), ["1203", "1500"]);
+  assert.strictEqual(clientes[1].nombre, "KIOSCO NORTE");
+  assert.match(decodeURIComponent(posts[0]), /cambio=Agregó un cliente a mano&detalle_cambio=1500 — KIOSCO NORTE/);
+  // Mismo N° que uno existente: pregunta antes de pisar
+  await page.fill("#cliManNumero", "1203"); await page.fill("#cliManAbonado", "9999"); await page.fill("#cliManNombre", "OTRO");
+  await page.fill("#cliManDireccion", "X 1"); await page.fill("#cliManTelefono", "1");
+  await page.click("#cliManGuardarBtn");
+  await page.waitForSelector(".cartel-admin");
+  assert.match(await page.textContent(".cartel-admin"), /Ya existe el cliente N° 1203: "PANADERIA SUR"/);
+  await page.click(".cartel-admin .cartel-no");
+  await page.waitForTimeout(200);
+  assert.strictEqual(clientes.find((c) => c.numero_cliente === "1203").nombre, "PANADERIA SUR", "no lo pisó");
+  // Editar desde el buscador
+  await page.click("#cliManLimpiarBtn");
+  await page.fill("#clientesBuscarAdmin", "1500");
+  await page.click(".cli-editar-btn");
+  assert.strictEqual(await page.inputValue("#cliManNombre"), "KIOSCO NORTE");
+  await page.fill("#cliManTelefono", "341 999 0000");
+  await page.click("#cliManGuardarBtn");
+  await page.waitForTimeout(400);
+  assert.strictEqual(clientes.find((c) => c.numero_cliente === "1500").telefono, "341 999 0000");
+  assert.strictEqual(clientes.length, 2);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

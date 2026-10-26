@@ -475,6 +475,10 @@ th .ayuda-btn { width: 18px; height: 18px; min-width: 18px; font-size: 11px; mar
 .aud-det { color: var(--ink-2, #6B6862); font-size: 12.5px; margin-top: 2px; }
 .aud-fila.acceso .aud-sec { background: #E8F1FB; color: #1D4F86; }
 @media (max-width: 640px) { .aud-fila { grid-template-columns: 44px 1fr; } .aud-fila .aud-cuerpo { grid-column: 1 / -1; } }
+.cli-manual-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+.cli-manual-grid .cli-manual-ancho { grid-column: 1 / -1; }
+@media (max-width: 560px) { .cli-manual-grid { grid-template-columns: 1fr; } }
+input.campo-falta { border-color: #C0392B !important; box-shadow: 0 0 0 3px rgba(192,57,43,0.15) !important; }
 .ayuda-linea { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 13px; font-weight: 600; color: var(--ink-2, #4A4A4A); }
 .ayuda-pop-gif { display: block; width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--border); background: var(--paper); min-height: 120px; max-height: 56vh; object-fit: contain; }
 .ayuda-pop ul { margin: 14px 0 4px; padding-left: 22px; }
@@ -835,6 +839,24 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
         </p>
         <input type="file" id="clientesExcelFile" accept=".xlsx,.xls">
         <p class="status" id="clientesImportStatus"></p>
+      </div>
+
+      <div class="card cli-manual" id="clienteManualCard">
+        <h3 style="margin:0 0 4px;">Agregar un cliente a mano</h3>
+        <p class="subtitle" style="margin:0 0 12px;">Para un cliente nuevo que todavía no está en el Excel (por ejemplo, una instalación en curso), así el instalador ya puede cargarle la SIM y los datos. Poné el nombre <b>tal cual figura en el sistema de oficina</b>. Cuando subas el Excel definitivo, si trae este mismo N° de cliente, lo pisa con lo del Excel.</p>
+        <div class="cli-manual-grid">
+          <div><label for="cliManNumero">N° de cliente *</label><input type="text" id="cliManNumero" inputmode="numeric" autocomplete="off" placeholder="Ej: 12345"></div>
+          <div><label for="cliManAbonado">N° de abonado *</label><input type="text" id="cliManAbonado" autocomplete="off" placeholder="Ej: 4821"></div>
+          <div class="cli-manual-ancho"><label for="cliManNombre">Nombre (como en el sistema de oficina) *</label><input type="text" id="cliManNombre" autocomplete="off" placeholder="Ej: PANADERIA SUR SRL"></div>
+          <div class="cli-manual-ancho"><label for="cliManDireccion">Dirección *</label><input type="text" id="cliManDireccion" autocomplete="off" placeholder="Calle y número"></div>
+          <div><label for="cliManLocalidad">Localidad</label><input type="text" id="cliManLocalidad" autocomplete="off" placeholder="Ej: Rosario"></div>
+          <div><label for="cliManTelefono">Teléfono *</label><input type="text" id="cliManTelefono" inputmode="tel" autocomplete="off" placeholder="Ej: 341 555 1234"></div>
+        </div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+          <button type="button" id="cliManGuardarBtn" style="width:auto; padding:11px 22px;">Agregar cliente</button>
+          <button type="button" id="cliManLimpiarBtn" class="btn-secondary-admin" style="width:auto;">Limpiar</button>
+        </div>
+        <p class="status" id="cliManStatus"></p>
       </div>
 
       <div class="card">
@@ -2517,11 +2539,96 @@ function dibujarResultadosClientesAdmin() {
     const fila = document.createElement("div");
     fila.className = "card";
     fila.style.marginBottom = "8px";
-    fila.innerHTML = `<b>${c.numero_cliente || "?"}</b> — ${c.nombre || ""}<br><span style="font-size:12px; color:#6B7680;">${c.direccion || ""}${c.localidad ? ", " + c.localidad : ""}${c.numero_abonado ? " · Abonado: " + c.numero_abonado : ""}</span>`;
+    fila.style.display = "flex"; fila.style.alignItems = "center"; fila.style.gap = "10px";
+    fila.innerHTML = `<div style="flex:1; min-width:0;"><b>${escapeHtmlAdmin(c.numero_cliente || "?")}</b> — ${escapeHtmlAdmin(c.nombre || "")}<br><span style="font-size:12px; color:#6B7680;">${escapeHtmlAdmin(c.direccion || "")}${c.localidad ? ", " + escapeHtmlAdmin(c.localidad) : ""}${c.numero_abonado ? " · Abonado: " + escapeHtmlAdmin(c.numero_abonado) : ""}${c.telefono ? " · Tel. " + escapeHtmlAdmin(c.telefono) : ""}</span></div>
+      <button type="button" class="btn-secondary-admin cli-editar-btn" style="width:auto; padding:6px 12px;">Editar</button>`;
+    fila.querySelector(".cli-editar-btn").addEventListener("click", () => cargarClienteEnFormularioManual(c));
     clientesAdminResultados.appendChild(fila);
   });
 }
 clientesBuscarAdmin.addEventListener("input", dibujarResultadosClientesAdmin);
+
+// ---------- Cliente cargado a mano ----------
+// Se suma al listado con los mismos campos que trae el Excel. Se guarda
+// igual que la importación (se lee lo que hay, se agrega/actualiza por N°
+// de cliente y se guarda todo), así que nunca borra a nadie.
+const CAMPOS_CLIENTE_MANUAL = [
+  ["numero_cliente", "cliManNumero", "N° de cliente", true],
+  ["numero_abonado", "cliManAbonado", "N° de abonado", true],
+  ["nombre", "cliManNombre", "Nombre", true],
+  ["direccion", "cliManDireccion", "Dirección", true],
+  ["localidad", "cliManLocalidad", "Localidad", false],
+  ["telefono", "cliManTelefono", "Teléfono", true],
+];
+const cliManStatus = document.getElementById("cliManStatus");
+const cliManGuardarBtn = document.getElementById("cliManGuardarBtn");
+function cargarClienteEnFormularioManual(c) {
+  CAMPOS_CLIENTE_MANUAL.forEach(([campo, id]) => { document.getElementById(id).value = c[campo] || ""; });
+  cliManGuardarBtn.textContent = "Guardar cambios del cliente";
+  cliManStatus.className = "status";
+  cliManStatus.textContent = `Editando el cliente ${c.numero_cliente}. Cambiá lo que haga falta y guardá.`;
+  document.getElementById("clienteManualCard").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+function limpiarFormularioClienteManual() {
+  CAMPOS_CLIENTE_MANUAL.forEach(([, id]) => { const el = document.getElementById(id); el.value = ""; el.classList.remove("campo-falta"); });
+  cliManGuardarBtn.textContent = "Agregar cliente";
+}
+document.getElementById("cliManLimpiarBtn").addEventListener("click", () => { limpiarFormularioClienteManual(); cliManStatus.textContent = ""; });
+CAMPOS_CLIENTE_MANUAL.forEach(([, id]) => document.getElementById(id).addEventListener("input", (e) => e.target.classList.remove("campo-falta")));
+cliManGuardarBtn.addEventListener("click", async () => {
+  const nuevo = {};
+  const faltan = [];
+  CAMPOS_CLIENTE_MANUAL.forEach(([campo, id, etiqueta, obligatorio]) => {
+    const el = document.getElementById(id);
+    nuevo[campo] = el.value.replace(/\s+/g, " ").trim();
+    el.classList.toggle("campo-falta", obligatorio && !nuevo[campo]);
+    if (obligatorio && !nuevo[campo]) faltan.push(etiqueta);
+  });
+  cliManStatus.className = "status err";
+  if (faltan.length) { cliManStatus.textContent = "Falta completar: " + faltan.join(", ") + "."; return; }
+  if (!/^\d+$/.test(nuevo.numero_cliente)) { cliManStatus.textContent = "El N° de cliente tiene que ser solo números, igual que en el sistema de oficina."; document.getElementById("cliManNumero").classList.add("campo-falta"); return; }
+  cliManGuardarBtn.disabled = true;
+  cliManStatus.className = "status";
+  cliManStatus.textContent = "Guardando...";
+  try {
+    const r = await fetch("/api/datos?coleccion=clientes", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+    const existentes = await r.json();
+    if (!r.ok || !Array.isArray(existentes)) throw new Error((existentes && existentes.error) || "No se pudo leer el listado");
+    const mismoNumero = existentes.find((c) => String(c.numero_cliente) === nuevo.numero_cliente);
+    const otroConAbonado = existentes.find((c) => String(c.numero_cliente) !== nuevo.numero_cliente && String(c.numero_abonado || "").trim() === nuevo.numero_abonado);
+    if (mismoNumero && cliManGuardarBtn.textContent.startsWith("Agregar")) {
+      const ok = await confirmarAdmin(`Ya existe el cliente N° ${nuevo.numero_cliente}: "${mismoNumero.nombre || ""}" (${mismoNumero.direccion || "sin dirección"}).\n\n¿Lo reemplazo con los datos que cargaste?`);
+      if (!ok) { cliManStatus.textContent = "No se guardó nada."; return; }
+    }
+    if (otroConAbonado) {
+      const ok = await confirmarAdmin(`Ojo: el N° de abonado ${nuevo.numero_abonado} ya lo tiene el cliente ${otroConAbonado.numero_cliente} ("${otroConAbonado.nombre || ""}").\n\n¿Guardar igual?`);
+      if (!ok) { cliManStatus.textContent = "No se guardó nada."; return; }
+    }
+    const registro = new Map(existentes.map((c) => [String(c.numero_cliente), c]));
+    registro.set(nuevo.numero_cliente, { ...(mismoNumero || {}), ...nuevo });
+    const listaFinal = [...registro.values()];
+    const cambio = mismoNumero ? "Editó un cliente a mano" : "Agregó un cliente a mano";
+    const res = await fetch(`/api/datos?coleccion=clientes&cambio=${encodeURIComponent(cambio)}&detalle_cambio=${encodeURIComponent(nuevo.numero_cliente + " — " + nuevo.nombre)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify(listaFinal),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.ok === false) throw new Error(data.error || "Error desconocido");
+    clientesCacheAdmin = listaFinal;
+    fichaDatosAdmin = null; // el buscador del Inicio lo vuelve a leer
+    limpiarFormularioClienteManual();
+    cliManStatus.className = "status ok";
+    cliManStatus.textContent = `Listo — ${mismoNumero ? "se actualizó" : "se agregó"} el cliente ${nuevo.numero_cliente} (${nuevo.nombre}). Ya lo ven los técnicos al buscar clientes en la app.`;
+    clientesBuscarAdmin.value = nuevo.numero_cliente;
+    dibujarResultadosClientesAdmin();
+  } catch (err) {
+    cliManStatus.className = "status err";
+    cliManStatus.textContent = "No se pudo guardar: " + err.message;
+  } finally {
+    cliManGuardarBtn.disabled = false;
+  }
+});
 
 const borrarTodosClientesBtn = document.getElementById("borrarTodosClientesBtn");
 const borrarClientesStatus = document.getElementById("borrarClientesStatus");
