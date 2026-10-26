@@ -3157,3 +3157,94 @@ html[data-inicio="nuevo"] #screen-sign #clearSignBtn { padding: 8px 14px; border
 html[data-inicio="nuevo"] #screen-ficha-cliente .review-eyebrow::before { display: none !important; }
 html[data-inicio="nuevo"] #screen-ficha-cliente .review-eyebrow { padding: 0 !important; margin: 6px 0 14px !important; }
 html[data-inicio="nuevo"] #screen-ficha-cliente .dash-subtitulo { font-family: var(--f-titulo) !important; font-weight: 700 !important; font-size: 17px !important; letter-spacing: 0 !important; text-transform: none !important; color: var(--sat-texto) !important; }
+
+/* ---------- Vehículos (skin nuevo + ayudas comunes) ---------- */
+.veh-km-ayuda { margin: 6px 0 0; font-size: 13px; color: #6B7680; min-height: 0; }
+.veh-km-ayuda:empty { display: none; }
+.veh-km-ayuda.ok { color: #2E7D32; }
+.veh-km-ayuda.alerta { color: #C0392B; font-weight: 600; }
+html[data-theme="night"] .veh-km-ayuda { color: #9AA3A9; }
+html[data-theme="night"] .veh-km-ayuda.ok { color: #6FCF8E; }
+html[data-theme="night"] .veh-km-ayuda.alerta { color: #FF8A80; }
+.status-aviso.status-error { margin-bottom: 12px; color: #A9332A !important; background: rgba(192,57,43,0.12) !important; border: 1px solid #C0392B; }
+html[data-theme="night"] .status-aviso.status-error { color: #FF8A80 !important; }
+.veh-rendir { margin: 4px 0 16px; padding: 12px; border-radius: 8px; border: 1px dashed #B87F00; background: rgba(255,192,51,0.08); }
+.veh-rendir-check { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.veh-rendir-check input { margin-top: 3px; width: 18px; height: 18px; flex-shrink: 0; }
+.veh-rendir-check span { display: flex; flex-direction: column; gap: 2px; }
+.veh-rendir-check small { font-size: 12.5px; opacity: 0.8; line-height: 1.35; }
+.veh-rendir-botones { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 8px; }
+.veh-rendir-botones .btn { flex: 1; min-width: 140px; }
+.veh-ticket-preview { display: flex; flex-wrap: wrap; gap: 8px; }
+.veh-ticket-preview:empty { display: none; }
+.veh-ticket-foto { position: relative; display: block; }
+.veh-ticket-foto img { width: 70px; height: 70px; object-fit: cover; border-radius: 8px; display: block; }
+.veh-ticket-foto button { position: absolute; top: -6px; right: -6px; width: 20px; height: 20px; border-radius: 50%; border: none; background: #C0392B; color: #fff; font-size: 13px; line-height: 1; cursor: pointer; }
+.rend-aviso-vehiculo { display: flex; flex-direction: column; gap: 8px; margin: -4px 0 14px; padding: 10px 12px; border-radius: 8px; background: rgba(255,192,51,0.1); border: 1px solid rgba(184,127,0,0.5); font-size: 13.5px; line-height: 1.4; }
+.rend-aviso-vehiculo .btn { align-self: flex-start; }
+
+/* Lista de vehículos como tarjetas */
+html[data-inicio="nuevo"] #screen-vehiculos .panel-tiles.veh-lista { display: flex; flex-direction: column; gap: 10px; }
+html[data-inicio="nuevo"] .veh-card { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; padding: 14px; border-radius: 6px; cursor: pointer;
+  background: var(--sat-sup); border: 1px solid var(--sat-borde); border-left: 4px solid #3FAE6E; color: var(--sat-texto); font-family: var(--f-texto); }
+html[data-inicio="nuevo"] .veh-card:active { transform: scale(0.985); }
+html[data-inicio="nuevo"] .veh-card.en-uso { border-left-color: #8C877E; }
+html[data-inicio="nuevo"] .veh-card.mio { border-left-color: var(--sat-am); border-color: var(--sat-am); box-shadow: 0 0 0 1px var(--sat-am) inset; }
+html[data-inicio="nuevo"] .veh-card.vencida { border-left-color: #E5533D; }
+html[data-inicio="nuevo"] .veh-card-ico { width: 44px; height: 44px; flex-shrink: 0; display: grid; place-items: center; border-radius: 6px; background: var(--sat-sup2); }
+html[data-inicio="nuevo"] .veh-card-ico svg { width: 26px; height: 26px; stroke: #5FD08A; }
+html[data-inicio="nuevo"] .veh-card.en-uso .veh-card-ico svg { stroke: var(--sat-tenue); }
+html[data-inicio="nuevo"] .veh-card.mio .veh-card-ico { background: var(--sat-am); }
+html[data-inicio="nuevo"] .veh-card.mio .veh-card-ico svg { stroke: var(--sat-tinta); }
+html[data-inicio="nuevo"] .veh-card.vencida .veh-card-ico svg { stroke: #E5533D; }
+html[data-inicio="nuevo"] .veh-card.mio.vencida .veh-card-ico { background: #E5533D; }
+html[data-inicio="nuevo"] .veh-card.mio.vencida .veh-card-ico svg { stroke: #fff; }
+html[data-inicio="nuevo"] .veh-card-cuerpo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+html[data-inicio="nuevo"] .veh-card-nombre { font-family: var(--f-titulo); font-weight: 700; font-size: 18px; line-height: 1.15; }
+html[data-inicio="nuevo"] .veh-card-estado { font-size: 14px; font-weight: 600; color: #5FD08A; }
+html[data-inicio="nuevo"] .veh-card.en-uso .veh-card-estado { color: var(--sat-tenue); }
+html[data-inicio="nuevo"] .veh-card.mio .veh-card-estado { color: var(--sat-am); }
+html[data-inicio="nuevo"] .veh-card.vencida .veh-card-estado { color: #FF7A66; }
+html[data-inicio="nuevo"] .veh-card-meta { font-size: 13px; color: var(--sat-tenue); font-variant-numeric: tabular-nums; }
+html[data-inicio="nuevo"] .veh-card-alertas { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+html[data-inicio="nuevo"] .veh-chip { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 3px; }
+html[data-inicio="nuevo"] .veh-chip.atencion { background: rgba(245,166,35,0.16); color: #FFD98E; }
+html[data-inicio="nuevo"] .veh-chip.urgente { background: rgba(229,83,61,0.18); color: #FF8A80; }
+html[data-inicio="nuevo"] .veh-card-flecha { font-size: 26px; color: var(--sat-tenue); line-height: 1; }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) .veh-card-ico svg,
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) .veh-card-estado { stroke: #23803F; color: #23803F; }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) .veh-card.en-uso .veh-card-ico svg { stroke: var(--sat-tenue); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) .veh-card.en-uso .veh-card-estado { color: var(--sat-tenue); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) .veh-card.mio .veh-card-estado { color: #8A5E00; }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) .veh-card.mio .veh-card-ico svg { stroke: var(--sat-tinta); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) .veh-card.vencida .veh-card-estado { color: #B23A27; }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) .veh-chip.atencion { color: #7A4E00; }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) .veh-chip.urgente { color: #A9332A; }
+
+/* Ficha del vehículo: tarjeta de estado y dos acciones */
+html[data-inicio="nuevo"] .veh-estado { margin: 0 0 16px; padding: 14px 16px; border-radius: 6px; background: var(--sat-sup); border: 1px solid var(--sat-borde); color: var(--sat-texto); }
+html[data-inicio="nuevo"] .veh-estado-tit { font-family: var(--f-titulo); font-weight: 700; font-size: 22px; line-height: 1.1; display: flex; align-items: center; gap: 8px; }
+html[data-inicio="nuevo"] .veh-estado-tit::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+html[data-inicio="nuevo"] .veh-estado-tit.libre { color: #5FD08A; }
+html[data-inicio="nuevo"] .veh-estado-tit.mio { color: var(--sat-am); }
+html[data-inicio="nuevo"] .veh-estado-tit.otro { color: var(--sat-tenue); }
+html[data-inicio="nuevo"] .veh-estado-tit.vencida { color: #FF7A66; }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) .veh-estado-tit.libre { color: #23803F; }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) .veh-estado-tit.mio { color: #8A5E00; }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) .veh-estado-tit.vencida { color: #B23A27; }
+html[data-inicio="nuevo"] .veh-estado-sub { margin-top: 4px; font-size: 14.5px; color: var(--sat-tenue); }
+html[data-inicio="nuevo"] .veh-estado-acciones { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+html[data-inicio="nuevo"] .veh-accion { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 8px; border-radius: 6px; cursor: pointer;
+  background: var(--sat-sup2); border: 1px solid var(--sat-borde); color: var(--sat-texto); font-family: var(--f-titulo); font-weight: 700; font-size: 16px; }
+html[data-inicio="nuevo"] .veh-accion svg { width: 26px; height: 26px; stroke: currentColor; }
+html[data-inicio="nuevo"] .veh-accion.activo { background: var(--sat-am); border-color: var(--sat-am); color: var(--sat-tinta); }
+html[data-inicio="nuevo"] #screen-vehiculo-detalle #vehiculoDetalleStatus { margin: -6px 0 12px; font-variant-numeric: tabular-nums; }
+html[data-inicio="nuevo"] #screen-vehiculo-detalle:is([data-modo="mio"], [data-modo="mio-devolver"], [data-modo="mio-evento"], [data-modo="otro"]) #vehiculoEnUsoInfo { display: none; }
+html[data-inicio="nuevo"] #screen-vehiculo-detalle[data-modo="mio"] :is(#vehiculoDevolverWrap, #vehiculoEventoSinDevolverWrap) { display: none; }
+html[data-inicio="nuevo"] #screen-vehiculo-detalle[data-modo="mio-devolver"] #vehiculoEventoSinDevolverWrap { display: none; }
+html[data-inicio="nuevo"] #screen-vehiculo-detalle[data-modo="mio-evento"] #vehiculoDevolverWrap { display: none; }
+html[data-inicio="nuevo"] #screen-vehiculo-detalle[data-modo="mio-evento"] #vehiculoEventoSinDevolverWrap { margin-top: 0 !important; }
+html[data-inicio="nuevo"] #screen-vehiculo-detalle[data-modo="mio-evento"] #vehiculoEventoSinDevolverWrap > .dash-subtitulo { display: none; }
+html[data-inicio="nuevo"] #screen-vehiculo-detalle #vehiculoTomarBtn,
+html[data-inicio="nuevo"] #screen-vehiculo-detalle #vehiculoDevolverBtn { width: 100%; }
+html[data-inicio="nuevo"] #screen-vehiculo-detalle #vehiculoRegistrarEventoBtn { width: 100%; }

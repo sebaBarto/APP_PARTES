@@ -1273,3 +1273,59 @@ test("Skin nuevo: ficha del cliente desde el buscador del inicio, avisos en tecl
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Vehículos: control de km, toma sin devolver de ayer, tarjetas y combustible que se rinde solo", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const posts = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(); const u = req.url();
+    const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (req.method() === "POST") { posts.push({ u, body: JSON.parse(req.postData() || "{}") }); return json({ ok: true, id: "x" }); }
+    const d = (n) => { const x = new Date(); x.setDate(x.getDate() - n); return x.getFullYear() + "-" + String(x.getMonth() + 1).padStart(2, "0") + "-" + String(x.getDate()).padStart(2, "0"); };
+    if (u.includes("coleccion=vehiculos")) return json([{ nombre: "Kangoo", km_actual: 1000, umbrales: [] }, { nombre: "Fiorino", km_actual: 5000, umbrales: [] }]);
+    if (u.includes("recurso=vehiculo")) return json([
+      { vehiculo: "Kangoo", tecnico: "Juan Pérez", fecha: d(2), hora_toma: "08:00", hora_devolucion: "17:00", km_devolucion: "84210" },
+      { vehiculo: "Fiorino", tecnico: "Juan Pérez", fecha: d(1), hora_toma: "09:15" },
+    ]);
+    json([]);
+  });
+  await page.goto(base + "/");
+  await page.evaluate(() => localStorage.setItem("ajustes_app", JSON.stringify({ estiloInicio: "nuevo", avisoFelicitacion: false })));
+  await page.reload();
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { tecnicoLogueado = "Juan Pérez"; showScreen("vehiculos"); return renderVehiculosPicker(); });
+  const tarjetas = await page.locator(".veh-card").allTextContents();
+  assert.match(tarjetas[0], /Fiorino[\s\S]*Lo tenés vos desde ayer a las 09:15[\s\S]*sin devolver/, "la que tiene el técnico va primero y marca que es de ayer");
+  assert.match(tarjetas[1], /Kangoo[\s\S]*Libre[\s\S]*84\.210 km[\s\S]*Último uso: Juan Pérez/);
+  // Ficha de un vehículo propio: tarjeta de estado y dos acciones
+  await page.click(".veh-card.mio");
+  await page.waitForTimeout(300);
+  assert.match(await page.locator("#vehiculoEstadoCard").textContent(), /Sin devolver[\s\S]*Devolver[\s\S]*Cargar evento/);
+  assert.strictEqual(await page.locator("#vehiculoKmDevolucion").isVisible(), false, "el formulario aparece al elegir la acción");
+  await page.click("[data-ir-modo=mio-devolver]");
+  await page.fill("#vehiculoKmDevolucion", "4900");
+  assert.match(await page.locator("#vehiculoKmAyuda").textContent(), /menor que el último registrado \(5\.000 km\)/);
+  page.once("dialog", (dlg) => dlg.dismiss());
+  await page.click("#vehiculoDevolverBtn");
+  assert.strictEqual(posts.length, 0, "un km menor sin confirmar no se manda");
+  await page.fill("#vehiculoKmDevolucion", "5120");
+  assert.match(await page.locator("#vehiculoKmAyuda").textContent(), /Recorriste 120 km/);
+  // Cargar combustible: se registra el evento y se crea la rendición
+  await page.click("[data-ir-modo=mio-evento]");
+  assert.strictEqual(await page.locator("#vehiculoKmDevolucion").isVisible(), false);
+  await page.selectOption("#vehiculoTipoEventoSelect", "Carga de combustible");
+  await page.fill("#vehiculoEventoKm", "5080");
+  await page.fill("#vehiculoEventoMonto", "45000");
+  assert.strictEqual(await page.locator("#vehiculoRendirWrap").isVisible(), true);
+  await page.click("#vehiculoRegistrarEventoBtn");
+  assert.strictEqual(posts.length, 0, "sin foto del ticket no se manda");
+  await page.check("#vehiculoSinTicket");
+  await page.click("#vehiculoRegistrarEventoBtn");
+  await page.waitForTimeout(500);
+  const evento = posts.find((p) => p.body.accion === "evento");
+  const rend = posts.find((p) => p.u.includes("recurso=rendicion"));
+  assert.ok(evento && evento.body.km === "5080" && evento.body.monto === "45000" && /Rendido/.test(evento.body.detalle));
+  assert.ok(rend && rend.body.categoria === "Combustible" && rend.body.monto === "45000" && /Fiorino \(5\.080 km\)/.test(rend.body.detalle) && /sin ticket/.test(rend.body.detalle));
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

@@ -776,6 +776,8 @@
 
       <div id="vehiculoAlertasWrap" class="vehiculo-alertas-wrap hidden"></div>
 
+      <div id="vehiculoEstadoCard" class="veh-estado solo-nuevo-bloque" hidden></div>
+
       <div id="vehiculoTomarWrap" class="hidden">
         <div class="field-group">
           <label class="field-label" for="vehiculoHoraToma">Hora en que lo tomás</label>
@@ -793,7 +795,8 @@
         </div>
         <div class="field-group">
           <label class="field-label" for="vehiculoKmDevolucion">Kilómetros con los que lo devolvés</label>
-          <input class="field-input field-mono" id="vehiculoKmDevolucion" type="number" min="0">
+          <input class="field-input field-mono" id="vehiculoKmDevolucion" type="number" min="0" inputmode="numeric">
+          <p class="veh-km-ayuda" id="vehiculoKmAyuda"></p>
         </div>
         <div class="field-group">
           <label class="field-label" for="vehiculoEvento">¿Hubo algún evento particular?</label>
@@ -827,11 +830,25 @@
         </div>
         <div class="field-group">
           <label class="field-label" for="vehiculoEventoKm">Kilometraje actual del vehículo</label>
-          <input class="field-input field-mono" id="vehiculoEventoKm" type="number" min="0">
+          <input class="field-input field-mono" id="vehiculoEventoKm" type="number" min="0" inputmode="numeric">
+          <p class="veh-km-ayuda" id="vehiculoEventoKmAyuda"></p>
         </div>
         <div class="field-group">
           <label class="field-label" for="vehiculoEventoMonto">Monto del ticket (opcional)</label>
-          <input class="field-input field-mono" id="vehiculoEventoMonto" type="number" min="0" placeholder="$">
+          <input class="field-input field-mono" id="vehiculoEventoMonto" type="text" inputmode="decimal" placeholder="$ 0" autocomplete="off">
+        </div>
+        <div id="vehiculoRendirWrap" class="veh-rendir hidden">
+          <label class="veh-rendir-check"><input type="checkbox" id="vehiculoRendirCheck" checked> <span><b>Lo pagué yo: rendir este ticket</b><small>Se crea sola la rendición, no hace falta cargarla de nuevo en Rendir ticket. Destildalo si se pagó con la tarjeta de la empresa.</small></span></label>
+          <div id="vehiculoRendirFotosWrap">
+            <div class="veh-rendir-botones">
+              <button type="button" class="btn btn-secondary btn-small" id="vehiculoTicketCamaraBtn">📷 Sacar foto del ticket</button>
+              <button type="button" class="btn btn-secondary btn-small" id="vehiculoTicketGaleriaBtn">Elegir de la galería</button>
+            </div>
+            <input type="file" id="vehiculoTicketCamaraInput" accept="image/*" capture="environment" hidden>
+            <input type="file" id="vehiculoTicketGaleriaInput" accept="image/*" multiple hidden>
+            <div id="vehiculoTicketPreview" class="veh-ticket-preview"></div>
+            <label class="rend-sin-ticket"><input type="checkbox" id="vehiculoSinTicket"> No me dieron ticket</label>
+          </div>
         </div>
         <div class="field-group">
           <label class="field-label" for="vehiculoEventoDetalleTexto">Detalle (opcional)</label>
@@ -1514,6 +1531,10 @@
           <option value="Envíos">Envíos / Correo</option>
           <option value="Otro">Otro</option>
         </select>
+      </div>
+      <div id="rendAvisoVehiculo" class="rend-aviso-vehiculo hidden">
+        <span>¿Es la carga de un vehículo de la empresa? Cargala desde <b>Vehículos → Cargar evento</b>: se rinde sola y queda registrada con los kilómetros.</span>
+        <button type="button" class="btn btn-secondary btn-small" id="rendIrVehiculosBtn">Ir a Vehículos</button>
       </div>
 
       <div class="field-group">
