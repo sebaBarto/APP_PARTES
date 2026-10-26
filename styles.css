@@ -2606,7 +2606,8 @@ html[data-inicio="nuevo"] :is(#screen-rendicion, #screen-comodato-form, #screen-
 }
 /* Rendiciones: franja y pastilla según estado */
 html[data-inicio="nuevo"] #screen-rendicion .rend-card { border-left: 5px solid #FFC033; }
-html[data-inicio="nuevo"] #screen-rendicion .rend-card[data-estado="pagado"] { border-left-color: var(--st-ok); }
+html[data-inicio="nuevo"] #screen-rendicion .rend-card[data-estado="pagado"],
+html[data-inicio="nuevo"] #screen-rendicion .rend-card[data-estado="pagado_app"] { border-left-color: var(--st-ok); }
 html[data-inicio="nuevo"] #screen-rendicion .rend-card[data-estado="rechazado"] { border-left-color: var(--rojo, #FF6B5E); }
 html[data-inicio="nuevo"] #screen-rendicion .rend-monto { font-family: 'Barlow Semi Condensed', 'Barlow', sans-serif; font-weight: 700; font-size: 17px; color: var(--t-fg); }
 html[data-inicio="nuevo"] #screen-rendicion .historial-card-badges { margin-top: 8px; font-weight: 600; font-size: 14px; }

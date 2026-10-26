@@ -645,15 +645,16 @@ test("Rendición: foto obligatoria (salvo estacionamiento o 'sin ticket'), monto
 
 test("Admin rendiciones: totales pendientes por técnico, pagar todo, miniaturas y filtro por mes", async () => {
   const { ctx, page, erroresPagina } = await nuevaPagina();
-  const pagados = [];
+  const pagados = [], cuerpos = [];
   await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
   await page.route("**/api/recurso-uso**", (route) => {
     const req = route.request();
-    if (req.method() === "POST") { pagados.push(JSON.parse(req.postData()).id); return route.fulfill({ status: 200, contentType: "application/json", body: "{}" }); }
+    if (req.method() === "POST") { cuerpos.push(JSON.parse(req.postData())); pagados.push(JSON.parse(req.postData()).id); return route.fulfill({ status: 200, contentType: "application/json", body: "{}" }); }
     route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([
       { id: "a", tecnico: "Juan", categoria: "Combustible", monto: 1000, fecha: "2026-10-02", estado: "pendiente", foto_ref: JSON.stringify(["https://x/f1.jpg"]) },
       { id: "b", tecnico: "Juan", categoria: "Peaje", monto: 500, fecha: "2026-10-03", estado: "pendiente" },
       { id: "c", tecnico: "Luis", categoria: "Otro", monto: 300, fecha: "2026-09-10", estado: "pendiente" },
+      { id: "d", tecnico: "Luis", categoria: "Combustible", monto: 9000, fecha: "2026-09-11", estado: "pagado_app" },
     ]) });
   });
   await page.goto(base + "/admin.html");
@@ -664,6 +665,16 @@ test("Admin rendiciones: totales pendientes por técnico, pagar todo, miniaturas
   assert.match(filas[0], /Juan[\s\S]*\$1\.500/);
   assert.match(filas[1], /Luis[\s\S]*\$300/);
   assert.strictEqual(await page.locator("#rendicionesAdminLista img").count(), 1, "miniatura de la foto");
+  // "Pagado con APP": no suma a lo pendiente, tiene su filtro y su tilde
+  assert.match(await page.locator("#rendicionesAdminLista").textContent(), /Pagado con APP \(sin reintegro\)/);
+  assert.strictEqual(await page.locator('.rendicion-check-pagado[data-modo="pagado_app"][data-id="d"]').isChecked(), true);
+  await page.selectOption("#rendicionesAdminFiltroEstado", "pagado_app");
+  assert.match(await page.locator("#rendicionesAdminStatus").textContent(), /^1 de 4/);
+  await page.selectOption("#rendicionesAdminFiltroEstado", "");
+  await page.check('.rendicion-check-pagado[data-modo="pagado_app"][data-id="c"]');
+  await page.waitForTimeout(300);
+  assert.deepStrictEqual(cuerpos.pop(), { accion: "pagado_app", id: "c" });
+  pagados.length = 0;
   await page.fill("#rendicionesAdminMes", "2026-10");
   assert.strictEqual(await page.locator("#rendicionesTotalesLista > div").count(), 1, "el mes filtra");
   await page.click("#rendicionesTotalesLista .rend-pagar-todo");
@@ -1108,7 +1119,7 @@ test("Admin SIMs: los signos de ayuda muestran un cartel con GIF y consejos al p
   await page.waitForTimeout(300);
   await page.evaluate(() => { document.getElementById("mainCard").classList.remove("hidden"); document.getElementById("panelSims").classList.remove("hidden"); return cargarSimsAdmin(); });
   const claves = await page.$$eval(".ayuda-btn", (bs) => bs.map((b) => b.dataset.ayuda));
-  for (const c of ["resumen", "alta", "excel", "pendientes", "fila", "ficha", "lote", "instaladas", "tablero", "conciliacion"]) assert.ok(claves.includes(c), "falta ayuda " + c);
+  for (const c of ["resumen", "alta", "excel", "pendientes", "fila", "ficha", "lote", "instaladas", "tablero", "conciliacion", "tec_resumen", "tec_permisos", "rend_resumen", "rend_estados", "rend_pagar_todo", "rend_excel"]) assert.ok(claves.includes(c), "falta ayuda " + c);
   await page.hover('.ayuda-btn[data-ayuda="alta"]');
   await page.waitForSelector(".ayuda-pop:not(.hidden)");
   assert.match(await page.textContent(".ayuda-pop"), /Cargar SIMs nuevas/);

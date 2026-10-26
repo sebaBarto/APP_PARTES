@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.151.0";
+const APP_VERSION = "3.152.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -2252,7 +2252,7 @@ async function actualizarAvisosInicio(forzar) {
   if (Array.isArray(rends)) {
     let vistas = [];
     try { vistas = JSON.parse(localStorage.getItem("rendiciones_vistas") || "[]"); } catch (e) { vistas = []; }
-    const novedades = rends.filter((r) => r.tecnico === yo && (r.estado === "rechazado" || r.estado === "pagado") && !vistas.includes(`${r.id}:${r.estado}`));
+    const novedades = rends.filter((r) => r.tecnico === yo && (r.estado === "rechazado" || r.estado === "pagado" || r.estado === "pagado_app") && !vistas.includes(`${r.id}:${r.estado}`));
     ponerBadge("rendicionAvisoBadge", novedades.length);
   }
   if (inst && typeof inst === "object") ponerBadge("instalacionAvisoBadge", inst.abierta ? 1 : 0, "Abierta");
@@ -2261,7 +2261,7 @@ async function actualizarAvisosInicio(forzar) {
 document.getElementById("tileRendicionBtn").addEventListener("click", () => {
   setTimeout(() => {
     try {
-      const vistas = (rendicionesCache || []).filter((r) => r.estado === "rechazado" || r.estado === "pagado").map((r) => `${r.id}:${r.estado}`);
+      const vistas = (rendicionesCache || []).filter((r) => r.estado === "rechazado" || r.estado === "pagado" || r.estado === "pagado_app").map((r) => `${r.id}:${r.estado}`);
       const previas = JSON.parse(localStorage.getItem("rendiciones_vistas") || "[]");
       localStorage.setItem("rendiciones_vistas", JSON.stringify([...new Set([...previas, ...vistas])].slice(-300)));
       ponerBadge("rendicionAvisoBadge", 0);
@@ -8702,7 +8702,7 @@ function renderMisRendiciones() {
   const enCola = obtenerColaEnvios().filter((i) => i.tipo === "rendicion" && i.cuerpo && i.cuerpo.tecnico === tecnicoLogueado).length;
   rendResumen.classList.toggle("hidden", !(pendientes.length || enCola));
   rendResumen.innerHTML = `${pendientes.length ? `Te deben <b>${formatoPesos(deuda)}</b> · ${pendientes.length} pendiente${pendientes.length === 1 ? "" : "s"}` : ""}${enCola ? `${pendientes.length ? "<br>" : ""}${enCola} sin enviar todavía (sin señal)` : ""}`;
-  const etiquetaEstado = { pendiente: "🟠 Pendiente", pagado: "✅ Pagado", rechazado: "❌ Rechazado" };
+  const etiquetaEstado = { pendiente: "🟠 Pendiente", pagado: "✅ Pagado", pagado_app: "📱 Pagado con APP (sin reintegro)", rechazado: "❌ Rechazado" };
   const ordenadas = [...rendicionesCache].sort((a, b) => (b.creado_en || "").localeCompare(a.creado_en || ""));
   rendMisLista.innerHTML = ordenadas.map((r) => {
     let fechaTexto = r.fecha || "";

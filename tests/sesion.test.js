@@ -129,3 +129,29 @@ test("Credenciales: guardar reemplaza la lista (no la vuelve a agregar) y si fal
     global.fetch = fetchViejo;
   }
 });
+
+test("Rendiciones: 'Pagado con APP' se guarda como pagado con su marca y se lee como estado propio", async () => {
+  const recursoUso = require(path.join(raiz, "api/recurso-uso.js"));
+  const fetchViejo = global.fetch;
+  const enviados = [];
+  global.fetch = async (url, op = {}) => {
+    if (op.method === "POST") { enviados.push(JSON.parse(op.body)); return { ok: true, status: 200, json: async () => ({ ok: true }) }; }
+    return { ok: true, status: 200, json: async () => [
+      { id: "1", estado: "pagado", pagado_por: "Pagado con APP" },
+      { id: "2", estado: "pagado", pagado_por: "Admin" },
+      { id: "3", estado: "pendiente" },
+    ] };
+  };
+  try {
+    const pase = crearSesion({ nombre: "Oficina", rol: "admin" });
+    const r1 = resFalso();
+    await recursoUso(pedido("POST", { recurso: "rendicion" }, { accion: "pagado_app", id: "3" }, pase), r1);
+    assert.strictEqual(r1.statusCode, 200);
+    assert.deepStrictEqual(enviados[0], { accion: "marcar_pagado", id: "3", pagado: true, pagado_por: "Pagado con APP" });
+    const r2 = resFalso();
+    await recursoUso(pedido("GET", { recurso: "rendicion" }, undefined, pase), r2);
+    assert.deepStrictEqual(r2.cuerpo.map((x) => x.estado), ["pagado_app", "pagado", "pendiente"]);
+  } finally {
+    global.fetch = fetchViejo;
+  }
+});

@@ -304,18 +304,32 @@ async function postSeguimientoNuevo(headersBackendNuevo, body, res) {
 // foto opcional del ticket) para que la oficina lo revise y marque
 // como pagado.
 // ============================================================
+// "Pagado con APP": el técnico pagó con el crédito de la APP que fondea la
+// empresa, así que rinde el ticket pero no hay que devolverle plata. En la
+// base queda como "pagado" con pagado_por = MARCA_PAGADO_APP (no hace falta
+// tocar el backend) y acá se lo muestra como un estado propio: "pagado_app".
+const MARCA_PAGADO_APP = "Pagado con APP";
+function estadoRendicionVisible(r) {
+  return r && r.estado === "pagado" && r.pagado_por === MARCA_PAGADO_APP ? { ...r, estado: "pagado_app" } : r;
+}
+
 async function getRendicionesNuevo(headersBackendNuevo, res) {
   res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
   try {
     const r = await fetch(`${process.env.BACKEND_NUEVO_URL}/api/rendiciones`, { headers: headersBackendNuevo });
     const data = await r.json();
-    res.status(r.status).json(Array.isArray(data) ? data : []);
+    res.status(r.status).json(Array.isArray(data) ? data.map(estadoRendicionVisible) : []);
   } catch (err) {
     res.status(500).json({ error: "Error interno al leer las rendiciones" });
   }
 }
 
-async function postRendicionNuevo(headersBackendNuevo, body, res) {
+async function postRendicionNuevo(headersBackendNuevo, bodyOriginal, res) {
+  const esPagadoApp = bodyOriginal.accion === "pagado_app";
+  const body = esPagadoApp
+    ? { accion: "marcar_pagado", id: bodyOriginal.id, pagado: true, pagado_por: MARCA_PAGADO_APP }
+    : bodyOriginal;
+  if (esPagadoApp && !body.id) { res.status(400).json({ error: "Falta el id de la rendición" }); return; }
   const r = await fetch(`${process.env.BACKEND_NUEVO_URL}/api/rendiciones`, {
     method: "POST",
     headers: { ...headersBackendNuevo, "Content-Type": "application/json" },
@@ -377,7 +391,13 @@ async function postRendicionNuevo(headersBackendNuevo, body, res) {
     try {
       const { enviarASeleccionados } = require("../lib/push-sender");
       const montoTexto = data.monto ? `$${data.monto}` : "tu rendición";
-      if (body.accion === "marcar_pagado" && body.pagado) {
+      if (esPagadoApp) {
+        await enviarASeleccionados([data.tecnico], {
+          titulo: "🧾 Rendición aprobada",
+          cuerpo: `Tu ticket de ${montoTexto} (${data.categoria || "gasto"}) quedó rendido: se pagó con el crédito de la APP, no hay reintegro.`,
+          url: "/",
+        });
+      } else if (body.accion === "marcar_pagado" && body.pagado) {
         await enviarASeleccionados([data.tecnico], {
           titulo: "✅ Rendición pagada",
           cuerpo: `Te pagaron ${montoTexto} (${data.categoria || "gasto"}).`,
