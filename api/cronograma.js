@@ -107,7 +107,7 @@ async function guardarRespaldoGitHub(ghHeaders, apiUrl, datos) {
   });
 }
 
-module.exports = async (req, res) => {
+module.exports = require("../lib/auditoria").conAuditoria("cronograma", async (req, res) => {
   const authHeader = req.headers["authorization"] || "";
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();
   if (!require("../lib/sesion").autorizar(req)) {
@@ -170,4 +170,4 @@ module.exports = async (req, res) => {
 
   res.setHeader("Allow", "GET, POST");
   res.status(405).json({ error: "Método no permitido" });
-};
+});

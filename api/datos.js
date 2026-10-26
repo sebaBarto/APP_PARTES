@@ -45,6 +45,61 @@ async function verificarPasswordAdmin(intento) {
   return !!process.env.ADMIN_PASSWORD && intento === process.env.ADMIN_PASSWORD;
 }
 
+// Lista de técnicos tal como está guardada (con claves y permisos). Solo
+// para usar del lado del servidor: nunca se devuelve así al navegador.
+async function leerTecnicosGuardados() {
+  const { GITHUB_DATA_TOKEN, GITHUB_DATA_REPO } = process.env;
+  if (!GITHUB_DATA_TOKEN || !GITHUB_DATA_REPO) throw new Error("Faltan variables de entorno");
+  const url = `https://api.github.com/repos/${GITHUB_DATA_REPO}/contents/tecnicos.json`;
+  const r = await fetch(url, { headers: { Authorization: `Bearer ${GITHUB_DATA_TOKEN}`, Accept: "application/vnd.github+json" } });
+  if (!r.ok) return [];
+  const data = await r.json();
+  const lista = JSON.parse(Buffer.from(data.content, "base64").toString("utf-8"));
+  return Array.isArray(lista) ? lista : [];
+}
+
+// ¿La clave es la de ese técnico? (la misma verificación que el login de la app)
+async function verificarClaveTecnico(nombre, password) {
+  if (typeof nombre !== "string" || !nombre || typeof password !== "string" || !password) return false;
+  const { BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN } = process.env;
+  // 1) Primero contra el backend nuevo (hash real, PBKDF2) — es lo que pasa
+  // siempre después de la primera vez que cada técnico entra.
+  if (BACKEND_NUEVO_URL && BACKEND_NUEVO_TOKEN) {
+    try {
+      const rNuevo = await fetch(`${BACKEND_NUEVO_URL}/api/tecnicos/verificar`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${BACKEND_NUEVO_TOKEN}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre, password }),
+      });
+      if (rNuevo.status === 200) {
+        const dataNuevo = await rNuevo.json();
+        if (dataNuevo.ok) return true;
+      }
+      // 401 (no coincide o todavía no está ahí) -> sigue al paso 2.
+    } catch (errNuevo) { /* si el backend nuevo no responde, se sigue con el respaldo */ }
+  }
+  // 2) Respaldo: la lista guardada (texto plano) — cubre a quien cambió la
+  // clave después de la migración o es nuevo y no tiene hash todavía.
+  const tecnicos = await leerTecnicosGuardados();
+  const encontrado = tecnicos.find((t) => t.nombre === nombre);
+  const ok = !!encontrado && encontrado.password === password;
+  // 3) Si coincidió acá, de paso se guarda el hash en el backend nuevo.
+  if (ok && BACKEND_NUEVO_URL && BACKEND_NUEVO_TOKEN) {
+    fetch(`${BACKEND_NUEVO_URL}/api/tecnicos`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${BACKEND_NUEVO_TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify([{ nombre, password, permisos: encontrado.permisos || {} }]),
+    }).catch(() => {});
+  }
+  return ok;
+}
+
+// ¿Tiene tildado el permiso "Panel de Administración"?
+async function tienePermisoAdmin(nombre) {
+  const t = (await leerTecnicosGuardados()).find((x) => x.nombre === nombre);
+  return !!(t && t.permisos && t.permisos.admin);
+}
+
 const COLECCIONES = {
   config: {
     path: "config.json",
@@ -77,6 +132,8 @@ const COLECCIONES = {
   // Sección cooperativa de Manuales: datos que aportan los técnicos
   // (APNs, códigos, trucos), con quién lo cargó, cuándo y quién lo editó.
   datos_equipo: { path: "datos-equipo.json", default: [] },
+  // Registro de cambios del panel de administración (lo escribe lib/auditoria.js).
+  auditoria: { path: "auditoria.json", default: [] },
 };
 
 // Traduce cada colección que ya se cortó al backend nuevo — algunas
@@ -362,7 +419,7 @@ async function manejarColeccionCortada(nombreColeccion, metodo, body, backendUrl
   return { status: 405, data: { error: "Método no permitido" } };
 }
 
-module.exports = async (req, res) => {
+module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, res) => {
   // Formulario público de "pedir servicio" — pensado para un cliente
   // que escribe fuera de horario y no tiene ni necesita ningún login.
   // Por eso va ANTES del control de token de acá abajo, como única
@@ -466,12 +523,19 @@ module.exports = async (req, res) => {
     res.json = (data) => {
       if (data && data.ok === true && res.statusCode === 200) {
         const sesion = accionPedida === "verificar_admin"
-          ? crearSesion({ nombre: "", rol: "admin" })
+          ? crearSesion({ nombre: data.nombre || "Clave general", rol: "admin" })
           : crearSesion({ nombre: String(cuerpoAccion.nombre || ""), rol: "tecnico" });
         return jsonOriginal({ ...data, sesion });
       }
       return jsonOriginal(data);
     };
+  }
+  // El registro de cambios solo lo ve la oficina, y nadie lo escribe a mano.
+  if (req.query && req.query.coleccion === "auditoria") {
+    if (req.method !== "GET" || !autorizacion || autorizacion.rol !== "admin") {
+      res.status(403).json({ error: "El registro de cambios solo se puede consultar desde el panel de administración" });
+      return;
+    }
   }
   // La lista de técnicos (contraseñas y permisos) solo la cambia la oficina.
   if (req.query && req.query.coleccion === "tecnicos" && ["POST", "PUT", "DELETE"].includes(req.method) && !accionPedida && autorizacion.rol !== "admin") {
@@ -554,7 +618,19 @@ module.exports = async (req, res) => {
         }
       }
 
-      const ok = await verificarPasswordAdmin(bodyAccion.password);
+      // Con usuario: la clave de esa persona y que tenga el permiso
+      // "Panel de Administración". Sin usuario: la clave general (respaldo).
+      const nombreAdmin = typeof bodyAccion.nombre === "string" ? bodyAccion.nombre.trim() : "";
+      let ok = false, sinPermiso = false;
+      if (nombreAdmin) {
+        const claveOk = await verificarClaveTecnico(nombreAdmin, bodyAccion.password, req);
+        if (claveOk) {
+          sinPermiso = !(await tienePermisoAdmin(nombreAdmin));
+          ok = !sinPermiso;
+        }
+      } else {
+        ok = await verificarPasswordAdmin(bodyAccion.password);
+      }
 
       if (BACKEND_NUEVO_URL && BACKEND_NUEVO_TOKEN) {
         try {
@@ -574,7 +650,17 @@ module.exports = async (req, res) => {
         }
       }
 
-      res.status(200).json({ ok });
+      if (ok) {
+        // La entrada al panel también queda en el registro de cambios.
+        try {
+          const { registrar, entradaBase } = require("../lib/auditoria");
+          await Promise.race([
+            registrar({ ...entradaBase(req, nombreAdmin || "Clave general"), seccion: "Acceso", accion: "Entró al panel", detalle: nombreAdmin ? "" : "Con la clave general" }),
+            new Promise((r) => setTimeout(r, 3000)),
+          ]);
+        } catch (e) { /* no se le niega la entrada por esto */ }
+      }
+      res.status(200).json(sinPermiso ? { ok: false, sin_permiso: true } : { ok, nombre: ok ? (nombreAdmin || "Clave general") : undefined });
       return;
     }
     if (bodyAccion && bodyAccion.accion === "verificar_login") {
@@ -616,66 +702,12 @@ module.exports = async (req, res) => {
         } catch (err) { /* sin el chequeo de bloqueo se sigue igual */ }
       }
 
-      // 1) Primero se intenta contra el backend nuevo (hash real,
-      // PBKDF2) — es lo que va a pasar siempre después de la primera
-      // vez que cada técnico entre tras este cambio.
-      if (BACKEND_NUEVO_URL && BACKEND_NUEVO_TOKEN) {
-        try {
-          const rNuevo = await fetch(`${BACKEND_NUEVO_URL}/api/tecnicos/verificar`, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${BACKEND_NUEVO_TOKEN}`, "Content-Type": "application/json" },
-            body: JSON.stringify({ nombre, password }),
-          });
-          if (rNuevo.status === 200) {
-            const dataNuevo = await rNuevo.json();
-            if (dataNuevo.ok) {
-              await responderLogin(true);
-              return;
-            }
-          }
-          // rNuevo.status === 401 (no coincide, o el técnico no
-          // existe ahí todavía) -> sigue de largo al paso 2, no se
-          // corta acá.
-        } catch (errNuevo) {
-          // si el backend nuevo no responde, no se bloquea el login
-          // — se sigue con el sistema viejo como respaldo.
-        }
-      }
-
-      // 2) Si no coincidió con el backend nuevo, se prueba contra el
-      // sistema viejo (texto plano) — cubre a cualquiera que haya
-      // cambiado su contraseña después de la migración original, o
-      // que sea nuevo y todavía no tenga hash guardado allá.
       if (!GITHUB_DATA_TOKEN || !GITHUB_DATA_REPO) {
         res.status(500).json({ error: "Faltan variables de entorno por configurar en Vercel" });
         return;
       }
       try {
-        const url = `https://api.github.com/repos/${GITHUB_DATA_REPO}/contents/${COLECCIONES.tecnicos.path}`;
-        const r = await fetch(url, {
-          headers: { Authorization: `Bearer ${GITHUB_DATA_TOKEN}`, Accept: "application/vnd.github+json" },
-        });
-        let tecnicos = [];
-        if (r.ok) {
-          const data = await r.json();
-          tecnicos = JSON.parse(Buffer.from(data.content, "base64").toString("utf-8"));
-        }
-        const encontrado = (Array.isArray(tecnicos) ? tecnicos : []).find((t) => t.nombre === nombre);
-        const ok = !!encontrado && encontrado.password === password;
-
-        // 3) Si coincidió acá, de paso se guarda el hash correcto en
-        // el backend nuevo — así la próxima vez ya entra directo por
-        // el paso 1, sin pasar más por acá. Si esto falla, no importa
-        // — el login ya funcionó, se reintenta la próxima vez.
-        if (ok && BACKEND_NUEVO_URL && BACKEND_NUEVO_TOKEN) {
-          fetch(`${BACKEND_NUEVO_URL}/api/tecnicos`, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${BACKEND_NUEVO_TOKEN}`, "Content-Type": "application/json" },
-            body: JSON.stringify([{ nombre, password, permisos: encontrado.permisos || {} }]),
-          }).catch(() => {});
-        }
-
-        await responderLogin(ok);
+        await responderLogin(await verificarClaveTecnico(nombre, password));
       } catch (err) {
         res.status(500).json({ error: "Error interno al verificar" });
       }
@@ -1011,4 +1043,4 @@ module.exports = async (req, res) => {
 
   res.setHeader("Allow", "GET, POST");
   res.status(405).json({ error: "Método no permitido" });
-};
+});

@@ -225,7 +225,7 @@ async function mandarMailResumenInstalacion(instalacionId, backendUrl, headersBa
   }
 }
 
-module.exports = async (req, res) => {
+module.exports = require("../lib/auditoria").conAuditoria("historial", async (req, res) => {
   // Encuesta de satisfacción — se llama desde un link dentro del
   // mail que recibe el cliente, así que NO puede pedir el token de
   // acceso (el cliente no lo tiene, ni debería). Por eso se maneja
@@ -650,4 +650,4 @@ module.exports = async (req, res) => {
 
   res.setHeader("Allow", "GET, POST");
   res.status(405).json({ error: "Método no permitido" });
-};
+});

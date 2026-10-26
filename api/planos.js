@@ -16,7 +16,7 @@
 // Variables de entorno:
 //   SERVICIOS_API_TOKEN, BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN
 
-module.exports = async (req, res) => {
+module.exports = require("../lib/auditoria").conAuditoria("planos", async (req, res) => {
   const authHeader = req.headers["authorization"] || "";
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();
   if (!require("../lib/sesion").autorizar(req)) {
@@ -75,4 +75,4 @@ module.exports = async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: "Error interno al hablar con el backend nuevo", detail: String(err.message || err) });
   }
-};
+});

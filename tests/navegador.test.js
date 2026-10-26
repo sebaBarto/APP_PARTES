@@ -1680,12 +1680,19 @@ test("Admin: portada con pendientes, buscador de cliente, menú agrupado, sesió
   let vehiculosServidor = [{ nombre: "Kangoo", km_actual: 84000, umbrales: [] }];
   let herramientasServidor = [{ nombre: "Escalera 6m", tipo: "escalera", estado: "libre", tecnico_actual: "", cliente: "" }];
   const guardados = {};
+  let loginPedido = null;
   await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
   await page.route("**/api/**", (route) => {
     const req = route.request(); const u = req.url();
     const json = (o, s = 200) => route.fulfill({ status: s, contentType: "application/json", body: JSON.stringify(o) });
     const body = req.postData() || "";
-    if (body.includes("verificar_admin")) return json({ ok: true, sesion: "s1.ADMIN.F" });
+    if (body.includes("verificar_admin")) { loginPedido = JSON.parse(body); return json(loginPedido.password === "mala" ? { ok: false } : { ok: true, sesion: "s1.ADMIN.F", nombre: loginPedido.nombre }); }
+    if (u.includes("coleccion=auditoria")) return json([
+      { fecha: new Date().toISOString(), quien: "Juan", seccion: "Rendiciones", accion: "Marcó como pagado", detalle: "Id: 7" },
+      { fecha: new Date().toISOString(), quien: "Juan", seccion: "Acceso", accion: "Entró al panel", detalle: "" },
+      { fecha: "2026-10-01T12:00:00Z", quien: "Marta", seccion: "Técnicos", accion: "Guardó la lista", detalle: "4 elementos" },
+    ]);
+    if (u.includes("tipo=instalaciones")) return json([{ id: 9, cliente: "Escuela 45", tecnico: "Luis", fecha: ayer, estado: "abierta" }, { id: 8, cliente: "Vieja", tecnico: "Juan", fecha: "2026-01-01", estado: "cerrada" }]);
     if (req.method() === "POST" && u.includes("coleccion=")) { guardados[u.match(/coleccion=([a-z_-]+)/)[1]] = JSON.parse(body); return json({ ok: true }); }
     if (u.includes("coleccion=servicios_emergencia")) return json([{ id: 1, cliente: "Kiosco Norte", revisado: 0 }, { id: 2, cliente: "Otro", revisado: 1 }]);
     if (u.includes("recurso=rendicion")) return json([{ id: 1, estado: "pendiente", monto: 1500, tecnico: "Juan" }]);
@@ -1703,9 +1710,20 @@ test("Admin: portada con pendientes, buscador de cliente, menú agrupado, sesió
   });
   await page.goto(base + "/admin.html");
   await page.waitForTimeout(300);
+  // Se entra con usuario y clave propios
+  await page.fill("#pw", "x");
+  await page.click("#pwBtn");
+  assert.match(await page.textContent("#pwError"), /Elegí tu usuario/);
+  await page.selectOption("#loginUsuario", "Juan");
+  await page.fill("#pw", "mala");
+  await page.click("#pwBtn");
+  await page.waitForTimeout(300);
+  assert.match(await page.textContent("#pwError"), /Usuario o clave incorrectos/);
   await page.fill("#pw", "x");
   await page.click("#pwBtn");
   await page.waitForTimeout(800);
+  assert.deepStrictEqual({ n: loginPedido.nombre, a: loginPedido.accion }, { n: "Juan", a: "verificar_admin" });
+  assert.match(await page.textContent("#adminUsuario"), /Juan/);
   // Portada
   assert.strictEqual(await page.locator("#panelInicio").isVisible(), true, "entra a Inicio");
   const tarjetas = await page.locator(".inicio-tarjeta").allTextContents();
@@ -1713,6 +1731,7 @@ test("Admin: portada con pendientes, buscador de cliente, menú agrupado, sesió
   assert.ok(tarjetas.some((x) => /Vehículos sin devolver[\s\S]*Kangoo \(Juan\)/.test(x)));
   assert.ok(tarjetas.some((x) => /Rendiciones por aprobar[\s\S]*1\.500/.test(x)));
   assert.ok(tarjetas.some((x) => /Partes sin pasar al sistema/.test(x)));
+  assert.ok(tarjetas.some((x) => /^1\s*Instalaciones abiertas[\s\S]*Escuela 45 \(Luis, hace 1 día\)/.test(x.trim())), "instalaciones abiertas con cliente y técnico");
   assert.ok(tarjetas.some((x) => /^1\s*Clientes activos en rojo[\s\S]*Ferretería Oeste/.test(x.trim())), "cuenta solo los activos en rojo");
   assert.strictEqual(await page.locator("#emergenciasBadge").textContent(), "1");
   // Menú agrupado
@@ -1735,6 +1754,14 @@ test("Admin: portada con pendientes, buscador de cliente, menú agrupado, sesió
   await page.reload();
   await page.waitForTimeout(800);
   assert.strictEqual(await page.locator("#mainCard").isVisible(), true, "sigue adentro después de recargar");
+  assert.match(await page.textContent("#adminUsuario"), /Juan/, "sigue mostrando quién entró");
+  // Registro de cambios
+  await page.evaluate(() => irAPestana("tabAuditoriaBtn"));
+  await page.waitForTimeout(400);
+  assert.match(await page.textContent("#audStatus"), /3 de 3/);
+  await page.selectOption("#audQuien", "Marta");
+  assert.match(await page.textContent("#audLista"), /Técnicos[\s\S]*Guardó la lista[\s\S]*4 elementos/);
+  assert.doesNotMatch(await page.textContent("#audLista"), /Rendiciones/);
   // Vehículos: un cambio de umbral no pisa los km que cargó un técnico mientras tanto
   await page.click("#tabVehiculosBtn");
   await page.waitForTimeout(500);

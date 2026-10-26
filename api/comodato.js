@@ -34,7 +34,7 @@ const CAMPOS_OBLIGATORIOS = [
   "aclaracion_comodatario", "cargo_comodatario", "dni_comodatario",
 ];
 
-module.exports = async (req, res) => {
+module.exports = require("../lib/auditoria").conAuditoria("comodato", async (req, res) => {
   const authHeader = req.headers["authorization"] || "";
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();
   if (!require("../lib/sesion").autorizar(req)) {
@@ -185,4 +185,4 @@ module.exports = async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: "No se pudo generar o enviar el comodato", detail: String(err.message || err) });
   }
-};
+});

@@ -71,7 +71,7 @@ async function leerDesdeDrive() {
   return servicios;
 }
 
-module.exports = async (req, res) => {
+module.exports = require("../lib/auditoria").conAuditoria("servicios", async (req, res) => {
   const authHeader = req.headers["authorization"] || "";
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();
 
@@ -193,4 +193,4 @@ module.exports = async (req, res) => {
 
   res.setHeader("Allow", "GET, POST");
   res.status(405).json({ error: "Método no permitido" });
-};
+});

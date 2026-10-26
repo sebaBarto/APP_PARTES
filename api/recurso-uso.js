@@ -492,7 +492,7 @@ async function postPresenciaNuevo(headersBackendNuevo, body, res) {
 // ============================================================
 // Handler principal
 // ============================================================
-module.exports = async (req, res) => {
+module.exports = require("../lib/auditoria").conAuditoria("recurso-uso", async (req, res) => {
   let body = req.body;
   if (typeof body === "string") {
     try { body = JSON.parse(body); } catch (err) { body = {}; }
@@ -511,9 +511,15 @@ module.exports = async (req, res) => {
   if (!esSeguimientoPublico) {
     const authHeader = req.headers["authorization"] || "";
     const token = authHeader.replace(/^Bearer\s+/i, "").trim();
-    if (!require("../lib/sesion").autorizar(req)) {
+    const quienPide = require("../lib/sesion").autorizar(req);
+    if (!quienPide) {
       res.status(401).json({ error: "No autorizado" });
       return;
+    }
+    // En la oficina ahora cada uno entra con su usuario: el pago de una
+    // rendición queda a nombre de quien lo marcó (antes decía "Admin").
+    if (recurso === "rendicion" && body && body.accion === "marcar_pagado" && quienPide.rol === "admin" && quienPide.nombre && (!body.pagado_por || body.pagado_por === "Admin")) {
+      body.pagado_por = quienPide.nombre;
     }
   }
 
@@ -557,4 +563,4 @@ module.exports = async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: "Error interno al registrar el movimiento", detail: String(err.message || err) });
   }
-};
+});

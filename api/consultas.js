@@ -123,7 +123,7 @@ async function manejarAdminManuales(req, res, body, ghHeaders, apiUrl) {
   res.status(200).json({ ok: true, url_subida: r.headers.get("location") });
 }
 
-module.exports = async (req, res) => {
+module.exports = require("../lib/auditoria").conAuditoria("consultas", async (req, res) => {
   const authHeader = req.headers["authorization"] || "";
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();
   if (!require("../lib/sesion").autorizar(req)) {
@@ -299,4 +299,4 @@ module.exports = async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: "Error interno al procesar la consulta", detail: String(err.message || err) });
   }
-};
+});

@@ -155,3 +155,65 @@ test("Rendiciones: 'Pagado con APP' se guarda como pagado con su marca y se lee 
     global.fetch = fetchViejo;
   }
 });
+
+test("Admin con usuario propio: entra solo quien tiene el permiso, el pase lleva su nombre y los cambios quedan en el registro", async () => {
+  const recursoUso = require(path.join(raiz, "api/recurso-uso.js"));
+  const fetchViejo = global.fetch;
+  let log = null; // contenido de auditoria.json
+  const alBackend = [];
+  global.fetch = async (url, op = {}) => {
+    const u = String(url);
+    if (u.includes("/api/admin-login/")) return new Response(JSON.stringify({ bloqueado: false }));
+    if (u.includes("/api/tecnicos/verificar")) {
+      const b = JSON.parse(op.body);
+      return new Response(JSON.stringify({ ok: b.password === "bien" }), { status: b.password === "bien" ? 200 : 401 });
+    }
+    if (u.includes("auditoria.json")) {
+      if (op.method === "PUT") { log = JSON.parse(Buffer.from(JSON.parse(op.body).content, "base64").toString("utf-8")); return new Response("{}", { status: 200 }); }
+      return log ? new Response(JSON.stringify({ sha: "x", content: Buffer.from(JSON.stringify(log)).toString("base64") })) : new Response("{}", { status: 404 });
+    }
+    if (u.includes("tecnicos.json")) return new Response(JSON.stringify({ content: Buffer.from(JSON.stringify([
+      { nombre: "Marta Díaz", password: "", permisos: { admin: true } }, { nombre: "Juan Pérez", password: "", permisos: {} },
+    ])).toString("base64") }));
+    if (u.includes("/api/rendiciones")) { alBackend.push(JSON.parse(op.body || "{}")); return new Response(JSON.stringify({ ok: true, tecnico: "" })); }
+    return new Response("[]");
+  };
+  try {
+    let r = resFalso();
+    await datos(pedido("POST", { coleccion: "tecnicos" }, { accion: "verificar_admin", nombre: "Juan Pérez", password: "bien" }), r);
+    assert.deepStrictEqual(r.cuerpo, { ok: false, sin_permiso: true }, "sin el permiso no entra aunque la clave esté bien");
+
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "tecnicos" }, { accion: "verificar_admin", nombre: "Marta Díaz", password: "mal" }), r);
+    assert.strictEqual(r.cuerpo.ok, false);
+
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "tecnicos" }, { accion: "verificar_admin", nombre: "Marta Díaz", password: "bien" }), r);
+    assert.strictEqual(r.cuerpo.ok, true);
+    assert.strictEqual(r.cuerpo.nombre, "Marta Díaz");
+    const s = leerSesion(r.cuerpo.sesion);
+    assert.deepStrictEqual({ n: s.nombre, r: s.rol }, { n: "Marta Díaz", r: "admin" });
+    assert.deepStrictEqual({ q: log[0].quien, a: log[0].accion }, { q: "Marta Díaz", a: "Entró al panel" });
+
+    // Un cambio desde el admin queda anotado con su nombre (y el pago a su nombre)
+    r = resFalso();
+    await recursoUso(pedido("POST", { recurso: "rendicion" }, { accion: "marcar_pagado", id: "R1", pagado: true, pagado_por: "Admin" }, crearSesion({ nombre: "Marta Díaz", rol: "admin" })), r);
+    assert.strictEqual(r.statusCode, 200);
+    assert.strictEqual(alBackend[0].pagado_por, "Marta Díaz");
+    assert.deepStrictEqual({ q: log[0].quien, s: log[0].seccion, a: log[0].accion }, { q: "Marta Díaz", s: "Rendiciones", a: "Marcó como pagado" });
+    assert.strictEqual(log.length, 2);
+
+    // Lo que hace un técnico desde la app no se anota acá, y el registro solo lo ve la oficina
+    r = resFalso();
+    await recursoUso(pedido("POST", { recurso: "rendicion" }, { accion: "crear", tecnico: "Juan Pérez", monto: 10 }, crearSesion({ nombre: "Juan Pérez", rol: "tecnico" })), r);
+    assert.strictEqual(log.length, 2);
+    r = resFalso();
+    await datos(pedido("GET", { coleccion: "auditoria" }, null, crearSesion({ nombre: "Juan Pérez", rol: "tecnico" })), r);
+    assert.strictEqual(r.statusCode, 403);
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "auditoria" }, [], crearSesion({ nombre: "Marta Díaz", rol: "admin" })), r);
+    assert.strictEqual(r.statusCode, 403, "nadie lo escribe a mano");
+  } finally {
+    global.fetch = fetchViejo;
+  }
+});
