@@ -239,7 +239,7 @@ Definidos en `admin.html` (`PERMISOS_TECNICO`), leídos en `app.js` vía
 ### En Vercel (Project Settings → Environment Variables)
 | Variable | Para qué |
 |---|---|
-| `SERVICIOS_API_TOKEN` | Token que usan la app y `admin.html` para autenticarse contra las funciones de Vercel |
+| `SERVICIOS_API_TOKEN` | Clave del servidor: SOLO para procesos internos (mails internos, script de planos). Desde la v3.145.0 la app y `admin.html` ya no la tienen: usan un pase personal firmado que entrega el login (`lib/sesion.js`, vence a los 30 días, deriva su firma de esta clave). Para cambiarla: `herramientas/cambiar-clave-servidor.bat` y comprobar con `herramientas/verificar-clave.bat` |
 | `BACKEND_NUEVO_URL` | `https://sat-backend.gsigalovsky.workers.dev` |
 | `BACKEND_NUEVO_TOKEN` | Token para que Vercel se autentique contra el backend nuevo |
 | `ADMIN_PASSWORD` | Contraseña del login general de oficina |
