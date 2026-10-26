@@ -1491,3 +1491,21 @@ test("Seguridad: la app manda el pase personal que le dio el login y, si el serv
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Skin nuevo: el esqueleto de carga se va cuando el estado se oculta (detalle del parte)", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route("**/api/**", (route) => {
+    const u = route.request().url();
+    const body = u.includes("tipo=parte") ? { id: "p1", numero_servicio: "4100", cliente: "Panadería Sur" } : [];
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+  });
+  await page.goto(base + "/");
+  await page.evaluate(() => localStorage.setItem("ajustes_app", JSON.stringify({ estiloInicio: "nuevo", avisoFelicitacion: false })));
+  await page.reload();
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { tecnicoLogueado = "Juan Pérez"; return abrirParteDetalleModal("p1"); });
+  await page.waitForTimeout(300);
+  assert.strictEqual(await page.locator("#parteDetalleModalOverlay .esqueleto-lista").count(), 0);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

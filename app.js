@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.145.1";
+const APP_VERSION = "3.145.2";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -1417,7 +1417,8 @@ function actualizarResumenDelDia() {
   const CARGANDO = /^(Cargando|Buscando servicios|Buscando cronograma)/;
   function sincronizar(el) {
     if (!el || !el.matches || !el.matches(SEL) || /^dash/.test(el.id)) return;
-    const quiere = document.documentElement.getAttribute("data-inicio") === "nuevo" && CARGANDO.test((el.textContent || "").trim());
+    // Si el texto de estado se oculta (ya cargó) aunque siga diciendo "Cargando...", el esqueleto se va.
+    const quiere = document.documentElement.getAttribute("data-inicio") === "nuevo" && !el.classList.contains("hidden") && CARGANDO.test((el.textContent || "").trim());
     const sig = el.nextElementSibling;
     const esq = sig && sig.classList.contains("esqueleto-lista") ? sig : null;
     if (quiere && !esq) {
@@ -1437,7 +1438,7 @@ function actualizarResumenDelDia() {
     }
   });
   const iniciar = () => {
-    obs.observe(document.body, { subtree: true, childList: true, characterData: true });
+    obs.observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["class"] });
     document.querySelectorAll(SEL).forEach(sincronizar);
   };
   if (document.body) iniciar(); else document.addEventListener("DOMContentLoaded", iniciar);
