@@ -7,6 +7,15 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>Cargar servicios pendientes</title>
+<script>
+  // Tema del panel (Día · Noche · Automático). Se aplica antes de dibujar, sin parpadeo.
+  (function () {
+    var t = "dia";
+    try { t = localStorage.getItem("admin_tema") || "dia"; } catch (e) {}
+    var noche = t === "noche" || (t === "auto" && window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches);
+    if (noche) document.documentElement.setAttribute("data-tema", "noche");
+  })();
+</script>
 <style>
   /* Tipografías SAT (las mismas de la app, guardadas en vendor/fonts) */
   @font-face { font-family: 'Barlow'; font-weight: 400; font-display: swap; src: url('vendor/fonts/barlow-latin-400-normal.woff2') format('woff2'); }
@@ -85,7 +94,7 @@
   .admin-header-eyebrow {
     font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: 0.1em;
     text-transform: uppercase; color: var(--amber); margin: 0 0 2px;
-    background: var(--ink); display: inline-block; padding: 2px 8px; border-radius: var(--r-pill);
+    background: var(--osc); display: inline-block; padding: 2px 8px; border-radius: var(--r-pill);
   }
   .admin-header-title {
     font-family: 'Barlow Semi Condensed', 'Barlow', sans-serif; font-size: 21px; font-weight: 700;
@@ -116,7 +125,7 @@
   }
 
   button {
-    width: 100%; padding: 13px; border: none; border-radius: var(--r-pill); background: var(--ink);
+    width: 100%; padding: 13px; border: none; border-radius: var(--r-pill); background: var(--osc);
     color: var(--amber); font-family: 'Barlow Semi Condensed', 'Barlow', sans-serif; font-weight: 600; font-size: 14px;
     cursor: pointer; box-shadow: var(--shadow-amber);
     transition: transform 140ms var(--ease), box-shadow 220ms var(--ease), opacity 140ms var(--ease);
@@ -181,7 +190,7 @@
   .tab-icon { display: flex; }
   .tab-icon svg { width: 20px; height: 20px; stroke: currentColor; }
   .tab-btn:active { transform: scale(0.96); }
-  .tab-btn.active { background: var(--ink); color: var(--amber); border-color: var(--ink); box-shadow: var(--shadow-amber); }
+  .tab-btn.active { background: var(--osc); color: var(--amber); border-color: var(--osc); box-shadow: var(--shadow-amber); }
 
   /* Mismo color por sección que ya tiene su tile equivalente en la
      app del técnico — para que ambas pantallas se sientan del mismo
@@ -239,7 +248,7 @@
   .sims-tabla input, .sims-tabla select { width: 100%; min-width: 90px; padding: 6px; font-size: 13px; margin-bottom: 0; }
   .sims-tabla .sim-transferir-celda { display: flex; gap: 4px; align-items: center; }
   .sims-tabla .sim-transferir-celda select { min-width: 130px; }
-  .sims-tabla .btn-transferir-fila { width: auto; padding: 7px 12px; font-size: 12px; background: var(--ink); color: var(--amber); border-radius: var(--r-pill); }
+  .sims-tabla .btn-transferir-fila { width: auto; padding: 7px 12px; font-size: 12px; background: var(--osc); color: var(--amber); border-radius: var(--r-pill); }
   .sims-tabla .btn-quitar-fila { width: auto; padding: 7px 10px; background: #FFFFFF; color: var(--danger); border: 1.5px solid var(--border); box-shadow: none; border-radius: var(--r-sm); }
   .sim-asignado-a { font-weight: 600; }
   .sim-asignado-a.oficina { color: #B5772A; }
@@ -260,7 +269,7 @@
 .sims-resumen { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
 .sims-chip { display: inline-flex; align-items: baseline; gap: 6px; padding: 7px 12px; border-radius: 999px; border: 1.5px solid var(--border); background: #fff; cursor: pointer; font-size: 13px; width: auto; box-shadow: none; color: var(--ink); }
 .sims-chip b { font-size: 16px; }
-.sims-chip.activo { border-color: var(--ink); background: var(--ink); color: var(--amber); }
+.sims-chip.activo { border-color: var(--osc); background: var(--osc); color: var(--amber); }
 .sims-chip.alerta b { color: #B3261E; }
 .sims-chip.pend b { color: #B5772A; }
 .sims-botonera { gap: 8px; flex-wrap: wrap; }
@@ -269,7 +278,7 @@
 .sims-filtros select { flex: 0 1 200px; margin: 0; }
 .sims-filtro-fecha { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; margin: 0; }
 .sims-filtro-fecha input { width: auto; margin: 0; }
-.sims-lote-bar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 12px; margin-bottom: 10px; border-radius: var(--r-md); background: var(--ink); color: #fff; }
+.sims-lote-bar { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 12px; margin-bottom: 10px; border-radius: var(--r-md); background: var(--osc); color: #fff; }
 .sims-lote-bar select { width: auto; margin: 0; }
 .sims-lote-bar b { color: var(--amber); margin-right: 6px; }
 .sims-lote-bar .btn-secondary-admin { color: #fff; border-color: rgba(255,255,255,0.6); padding: 8px 14px; }
@@ -299,7 +308,7 @@
 .tabs .tab-btn { width: 100%; flex-direction: row; justify-content: flex-start; align-items: center; gap: 10px; padding: 8px 10px; margin: 1px 0;
   font-size: 13.5px; font-weight: 600; text-align: left; color: var(--ink); background: transparent; border: 0; border-radius: 8px; box-shadow: none; }
 .tabs .tab-btn:hover { background: var(--paper); }
-.tabs .tab-btn.active { background: var(--ink); color: var(--amber); box-shadow: none; }
+.tabs .tab-btn.active { background: var(--osc); color: var(--amber); box-shadow: none; }
 .tabs .tab-btn:active { transform: none; }
 .tabs .tab-icon svg { width: 18px; height: 18px; }
 .tabs .tab-badge { position: static; margin-left: auto; box-shadow: none; }
@@ -321,8 +330,8 @@
   .menu-movil-cab { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px 8px; font-size: 17px; }
   .menu-movil-cab button { width: 40px; height: 40px; padding: 0; border-radius: 50%; font-size: 24px; background: var(--paper); color: var(--ink); box-shadow: none; }
   .tabs .tab-btn { padding: 11px 10px; font-size: 15px; }
-  .nav-movil { display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 50; margin: 0 -4px 16px; padding: 8px 10px; border-radius: var(--r-md); background: var(--ink); color: #fff; }
-  .nav-movil button { width: auto; padding: 8px 14px; font-size: 14px; background: var(--amber); color: var(--ink); box-shadow: none; }
+  .nav-movil { display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 50; margin: 0 -4px 16px; padding: 8px 10px; border-radius: var(--r-md); background: var(--osc); color: #fff; }
+  .nav-movil button { width: auto; padding: 8px 14px; font-size: 14px; background: var(--amber); color: var(--osc); box-shadow: none; }
   .nav-movil span { font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .btn-salir { padding: 6px 12px; font-size: 12px; }
   .admin-header { padding-right: 64px; }
@@ -362,7 +371,7 @@
 .ficha-adm .fa-claves.visible { display: block; }
 
 /* ---------- Identidad SAT y legibilidad (v3.148) ---------- */
-:root { --ink: #191816; --amber: #FFC033; --paper: #F1F0EC; --border: #D6D3CB; --steel: #5E5A52;
+:root { --ink: #191816; --osc: #191816; --amber: #FFC033; --paper: #F1F0EC; --border: #D6D3CB; --steel: #5E5A52;
   --shadow-amber: 0 6px 16px -8px rgba(255,192,51,0.55); }
 body { background: #ECEBE7; }
 h1 { font-size: 22px; font-weight: 700; }
@@ -401,7 +410,7 @@ input[type="file"]::file-selector-button { margin-right: 10px; padding: 7px 14px
 /* Guardar: cuando hay cambios queda fijo abajo de la pantalla */
 [id^="guardar"][id$="Btn"] { min-width: 180px; }
 [id^="guardar"][id$="Btn"].pendiente-guardar { position: sticky; bottom: 14px; z-index: 40; display: block; margin-left: auto; padding: 13px 26px;
-  background: var(--amber); color: var(--ink); box-shadow: 0 10px 24px -8px rgba(13,12,13,0.45); }
+  background: var(--amber); color: var(--osc); box-shadow: 0 10px 24px -8px rgba(13,12,13,0.45); }
 [id^="guardar"][id$="Btn"].pendiente-guardar::before { content: "● "; }
 /* Técnicos */
 .tecnico-fila.card { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-bottom: 12px; }
@@ -417,7 +426,7 @@ input[type="file"]::file-selector-button { margin-right: 10px; padding: 7px 14px
 .guardia-linea { align-items: flex-end; gap: 10px; flex-wrap: wrap; }
 .guardia-botones { display: flex; gap: 6px; margin-bottom: 12px; flex: 0 0 auto !important; }
 #guardiasFilas { counter-reset: guardia; }
-.guardia-fila .guardia-orden { counter-increment: guardia; flex: 0 0 auto !important; width: 30px; height: 30px; margin-bottom: 16px; border-radius: 50%; background: var(--ink); color: var(--amber); display: grid; place-items: center; font-weight: 800; font-size: 13px; }
+.guardia-fila .guardia-orden { counter-increment: guardia; flex: 0 0 auto !important; width: 30px; height: 30px; margin-bottom: 16px; border-radius: 50%; background: var(--osc); color: var(--amber); display: grid; place-items: center; font-weight: 800; font-size: 13px; }
 .guardia-fila .guardia-orden::before { content: counter(guardia); }
 .guardia-fila.card { padding: 12px 16px 2px; margin-bottom: 10px; }
 /* Credenciales */
@@ -444,8 +453,8 @@ input[type="file"]::file-selector-button { margin-right: 10px; padding: 7px 14px
 
 /* ---------- Ayudas "?" ---------- */
 .ayuda-btn { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; min-width: 22px; padding: 0; margin-left: 8px; vertical-align: middle;
-  border-radius: 50%; border: 1.5px solid var(--ink); background: var(--amber); color: var(--ink); font-size: 13px; font-weight: 800; line-height: 1; box-shadow: none; cursor: help; }
-.ayuda-btn:hover, .ayuda-btn[aria-expanded="true"] { background: var(--ink); color: var(--amber); }
+  border-radius: 50%; border: 1.5px solid var(--osc); background: var(--amber); color: var(--osc); font-size: 13px; font-weight: 800; line-height: 1; box-shadow: none; cursor: help; }
+.ayuda-btn:hover, .ayuda-btn[aria-expanded="true"] { background: var(--osc); color: var(--amber); }
 th .ayuda-btn { width: 18px; height: 18px; min-width: 18px; font-size: 11px; margin-left: 6px; }
 .ayuda-pop { position: absolute; z-index: 15000; background: #fff; border-radius: 16px; padding: 18px 22px 14px; border: 1px solid var(--border); border-top: 5px solid var(--amber);
   box-shadow: 0 22px 50px -18px rgba(13,12,13,0.45); font-size: 15.5px; line-height: 1.5; color: var(--ink); }
@@ -470,6 +479,81 @@ th .ayuda-btn { width: 18px; height: 18px; min-width: 18px; font-size: 11px; mar
 .ayuda-pop-gif { display: block; width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--border); background: var(--paper); min-height: 120px; max-height: 56vh; object-fit: contain; }
 .ayuda-pop ul { margin: 14px 0 4px; padding-left: 22px; }
 .ayuda-pop li { margin: 6px 0; }
+
+/* ---------- Tema noche (Día · Noche · Automático, botón arriba a la derecha) ---------- */
+.admin-header-der { position: absolute; right: 0; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 8px; }
+.admin-header-der .btn-salir, .admin-header-der .admin-usuario { position: static; transform: none; }
+.tema-switch { display: inline-flex; padding: 3px; gap: 2px; border-radius: 999px; background: var(--paper); border: 1px solid var(--border); }
+.tema-switch button { width: auto; padding: 5px 10px; border-radius: 999px; background: transparent; color: var(--steel); box-shadow: none; font-family: inherit; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; gap: 5px; }
+.tema-switch button svg { width: 15px; height: 15px; }
+.tema-switch button.activo { background: var(--osc); color: var(--amber); }
+@media (max-width: 899px) {
+  .admin-header { padding-right: 0; flex-wrap: wrap; }
+  .admin-header-der { position: static; transform: none; margin-left: auto; }
+  .tema-switch button span { display: none; }
+  .tema-switch button { padding: 6px 8px; }
+}
+@media (max-width: 640px) { .admin-header-der .admin-usuario { display: none; } }
+
+html[data-tema="noche"] { color-scheme: dark;
+  --ink: #ECE9E2; --osc: #2B2924; --paper: #25231F; --border: #3B3832; --steel: #A9A397; --ink-2: #A9A397;
+  --shadow-card: 0 1px 2px rgba(0,0,0,0.5), 0 10px 24px -12px rgba(0,0,0,0.7);
+  --shadow-card-hover: 0 2px 4px rgba(0,0,0,0.5), 0 16px 30px -12px rgba(0,0,0,0.8);
+  --shadow-amber: none; }
+html[data-tema="noche"] body { background: #11110F; }
+html[data-tema="noche"] ::placeholder { color: #7D786E; }
+html[data-tema="noche"] :is(.card, .tabs, .cartel-admin, .ayuda-pop, .sims-ficha, .inicio-tarjeta, .sims-chip, .btn-icono, .btn-quitar-tecnico, .rendicion-rechazar-btn, .tab-btn:not(.active)),
+html[data-tema="noche"] .sims-tabla .btn-quitar-fila,
+html[data-tema="noche"] :is(input[type="password"], input[type="file"], input[type="text"], input[type="number"], input[type="date"], input[type="month"], input[type="email"], input[type="search"], input[type="tel"], select, textarea) {
+  background: #1B1A17 !important; color: var(--ink); border-color: var(--border); }
+html[data-tema="noche"] .tabs .tab-btn:not(.active) { background: transparent !important; }
+html[data-tema="noche"] .tabs .tab-btn:not(.active):hover { background: var(--paper) !important; }
+html[data-tema="noche"] input[type="file"]::file-selector-button { background: #25231F; color: var(--ink); border-color: var(--border); }
+html[data-tema="noche"] :is(.tab-btn.active, .tabs .tab-btn.active, .sims-chip.activo, .tema-switch button.activo, .guardia-fila .guardia-orden) { background: var(--amber) !important; color: #141311 !important; border-color: var(--amber) !important; }
+html[data-tema="noche"] .tab-btn.active .tab-icon, html[data-tema="noche"] .tabs .tab-btn.active .tab-icon { color: #141311 !important; }
+html[data-tema="noche"] .admin-header-eyebrow { background: #000; }
+html[data-tema="noche"] .admin-header-logo { filter: drop-shadow(0 0 1px rgba(255,192,51,0.6)); }
+html[data-tema="noche"] label { color: #C9C4B8; }
+html[data-tema="noche"] :is(th, .sims-tabla th) { color: #B5AFA2; background: #23211D; }
+html[data-tema="noche"] :is(th, td) { border-bottom-color: #2F2D28; }
+html[data-tema="noche"] .sims-tabla tbody tr:nth-child(even) td { background: #1F1E1B; }
+html[data-tema="noche"] .sims-tabla tr.sim-seleccionada td { background: #3A3016; }
+html[data-tema="noche"] .sims-tabla td.sim-extra { background: #23211D; }
+html[data-tema="noche"] tbody tr:hover { background: rgba(255,192,51,0.06); }
+html[data-tema="noche"] button:disabled { background: #2E2C27; color: #6F6A60; }
+html[data-tema="noche"] .btn-secondary-admin:active { background: rgba(255,255,255,0.08); }
+html[data-tema="noche"] .menu-grupo + .menu-grupo { border-top-color: #2F2D28; }
+html[data-tema="noche"] .permisos-det { border-top-color: #2F2D28; }
+html[data-tema="noche"] .tab-badge { box-shadow: 0 0 0 2px #1B1A17; }
+html[data-tema="noche"] .aviso-cambios { background: #33290F; border-color: #6B5418; }
+html[data-tema="noche"] .sims-lote-bar, html[data-tema="noche"] .nav-movil { background: #2B2924; }
+html[data-tema="noche"] .cartel-admin-capa, html[data-tema="noche"] .sims-ficha-overlay { background: rgba(0,0,0,0.65); }
+/* Estados con color: fondos oscuros teñidos y texto más claro */
+html[data-tema="noche"] :is(.badge-estado-sim.activa, .cred-vig.ok) { background: #18321F; color: #7FD39A; }
+html[data-tema="noche"] :is(.badge-estado-sim.inactiva, .cred-vig.vencida, .sim-badge-fisico-admin) { background: #3A1C18; color: #FF9D8F; }
+html[data-tema="noche"] :is(.sim-pend-badge, .cred-vig.pronto) { background: #3A2E0E; color: #FFC960; }
+html[data-tema="noche"] .aud-fila.acceso .aud-sec { background: #16283D; color: #8DBCF0; }
+html[data-tema="noche"] .inicio-tarjeta.urgente .it-num { color: #FF8A7A; }
+html[data-tema="noche"] .inicio-tarjeta.atencion .it-num { color: #FFC960; }
+html[data-tema="noche"] .inicio-tarjeta.ok .it-num { color: #7FD39A; }
+html[data-tema="noche"] :is(.sims-chip.alerta b, .sims-vista .err, .btn-quitar-tecnico, .rendicion-rechazar-btn) { color: #FF8A7A !important; }
+html[data-tema="noche"] :is(.sims-chip.pend b, .sim-asignado-a.oficina) { color: #FFC960; }
+html[data-tema="noche"] :is(.sim-ok-badge, .sim-instalar-cliente-info.ok, .sim-asignado-a.cliente) { color: #7FD39A; }
+html[data-tema="noche"] .sim-instalar-cliente-info { color: var(--steel); }
+html[data-tema="noche"] .btn-quitar-tecnico, html[data-tema="noche"] .rendicion-rechazar-btn { border-color: #5A2C26 !important; }
+html[data-tema="noche"] .btn-quitar-tecnico:hover { background: #3A1C18 !important; }
+/* Estilos puestos directamente en el HTML que arma cada pantalla */
+html[data-tema="noche"] [style*="color:#6B7680"], html[data-tema="noche"] [style*="color: #6B7680"], html[data-tema="noche"] [style*="color:#8A9089"], html[data-tema="noche"] [style*="color: #8A9089"] { color: var(--steel) !important; }
+html[data-tema="noche"] [style*="color:#101820"], html[data-tema="noche"] [style*="color: #101820"] { color: var(--ink) !important; }
+html[data-tema="noche"] [style*="#EEE"], html[data-tema="noche"] [style*="#DDD"], html[data-tema="noche"] [style*="#E2E5DD"] { border-color: #2F2D28 !important; }
+html[data-tema="noche"] [style*="background:#F4F5F0"], html[data-tema="noche"] [style*="background: #F4F5F0"] { background: var(--paper) !important; }
+html[data-tema="noche"] [style*="background:#E1F0E4"], html[data-tema="noche"] [style*="background: #E1F0E4"] { background: #18321F !important; color: #7FD39A !important; }
+html[data-tema="noche"] [style*="background:#FBE8DC"], html[data-tema="noche"] [style*="background: #FBE8DC"] { background: #3A2516 !important; color: #FFB27A !important; }
+html[data-tema="noche"] [style*="color:#B5541A"], html[data-tema="noche"] [style*="color: #B5541A"], html[data-tema="noche"] [style*="color:#B5772A"] { color: #FFB27A !important; }
+html[data-tema="noche"] [style*="color:#1F6B34"], html[data-tema="noche"] [style*="color: #1F6B34"] { color: #7FD39A !important; }
+html[data-tema="noche"] [style*="color:#C0392B"], html[data-tema="noche"] [style*="color: #C0392B"], html[data-tema="noche"] [style*="color:#B3261E"], html[data-tema="noche"] [style*="color: #B3261E"] { color: #FF8A7A !important; }
+html[data-tema="noche"] [style*="color:#4A6FA5"] { color: #8DB0E0 !important; }
+html[data-tema="noche"] img[src*="/api/foto"], html[data-tema="noche"] .cred-foto-preview { background: #fff; }
 </style>
 </head>
 <body>
@@ -482,8 +566,15 @@ th .ayuda-btn { width: 18px; height: 18px; min-width: 18px; font-size: 11px; mar
       <p class="admin-header-eyebrow">Servicio Técnico SAT</p>
       <h1 class="admin-header-title">Panel de administración</h1>
     </div>
-    <span class="admin-usuario hidden" id="adminUsuario"></span>
-    <button type="button" class="btn-salir hidden" id="salirPanelBtn">Salir</button>
+    <div class="admin-header-der">
+      <div class="tema-switch" role="group" aria-label="Tema">
+        <button type="button" data-tema="dia" title="Día"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><span>Día</span></button>
+        <button type="button" data-tema="noche" title="Noche"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg><span>Noche</span></button>
+        <button type="button" data-tema="auto" title="Automático (según el sistema)"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v18" /><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/></svg><span>Auto</span></button>
+      </div>
+      <span class="admin-usuario hidden" id="adminUsuario"></span>
+      <button type="button" class="btn-salir hidden" id="salirPanelBtn">Salir</button>
+    </div>
   </div>
 
   <div id="loginCard" class="card login-card">
@@ -5416,6 +5507,26 @@ function renderSeguimientosAdmin() {
     `;
   }).join("");
 }
+
+// ---------- Tema Día · Noche · Automático ----------
+function temaAdminElegido() { try { return localStorage.getItem("admin_tema") || "dia"; } catch (e) { return "dia"; } }
+function aplicarTemaAdmin() {
+  const t = temaAdminElegido();
+  const noche = t === "noche" || (t === "auto" && window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches);
+  document.documentElement.toggleAttribute("data-tema", noche);
+  if (noche) document.documentElement.setAttribute("data-tema", "noche");
+  document.querySelectorAll(".tema-switch button").forEach((b) => { b.classList.toggle("activo", b.dataset.tema === t); b.setAttribute("aria-pressed", b.dataset.tema === t ? "true" : "false"); });
+}
+document.querySelectorAll(".tema-switch button").forEach((b) => b.addEventListener("click", () => {
+  try { localStorage.setItem("admin_tema", b.dataset.tema); } catch (e) { /* nada */ }
+  aplicarTemaAdmin();
+}));
+if (window.matchMedia) {
+  const mq = matchMedia("(prefers-color-scheme: dark)");
+  const alCambiar = () => { if (temaAdminElegido() === "auto") aplicarTemaAdmin(); };
+  if (mq.addEventListener) mq.addEventListener("change", alCambiar); else if (mq.addListener) mq.addListener(alCambiar);
+}
+aplicarTemaAdmin();
 
 // ---------- Registro de cambios (quién hizo qué) ----------
 let auditoriaCache = [];
