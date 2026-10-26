@@ -1644,6 +1644,28 @@ test("Skin nuevo: detalle del parte con encabezado, acciones, secciones, claves 
   assert.strictEqual(await page.locator(".pd-lightbox").count(), 1);
   await page.click(".pd-lightbox");
   assert.strictEqual(await page.locator(".pd-lightbox").count(), 0);
+  // Compartir manda una imagen JPG liviana con el diseño SAT
+  await page.evaluate(() => {
+    window.__compartido = null;
+    navigator.canShare = (d) => !!(d && d.files);
+    navigator.share = async (d) => {
+      const f = d.files[0];
+      const bm = await createImageBitmap(f);
+      const r = new FileReader();
+      const b64 = await new Promise((ok) => { r.onload = () => ok(r.result); r.readAsDataURL(f); });
+      window.__compartido = { nombre: f.name, tipo: f.type, tam: f.size, ancho: bm.width, alto: bm.height, texto: d.text, b64 };
+    };
+  });
+  await page.click("#pdCompartirBtn");
+  await page.waitForFunction(() => window.__compartido, null, { timeout: 8000 });
+  const comp = await page.evaluate(() => window.__compartido);
+  assert.strictEqual(comp.nombre, "Parte-SAT-4100.jpg");
+  assert.strictEqual(comp.tipo, "image/jpeg");
+  assert.strictEqual(comp.ancho, 1080);
+  assert.ok(comp.alto > 1200, "tiene todo el contenido: " + comp.alto);
+  assert.ok(comp.tam < 400 * 1024, "liviana: " + comp.tam);
+  assert.match(comp.texto, /N° 4100 — Panadería Sur/);
+  if (process.env.GUARDAR_IMAGEN_PARTE) require("fs").writeFileSync(process.env.GUARDAR_IMAGEN_PARTE, Buffer.from(comp.b64.split(",")[1], "base64"));
   await page.click("#pdFichaBtn");
   await page.waitForTimeout(300);
   assert.strictEqual(await page.evaluate(() => screens.fichaCliente.dataset.active), "true");

@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.152.0";
+const APP_VERSION = "3.153.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -6556,6 +6556,207 @@ function renderHistorialReciente() {
 }
 
 // Foto o firma en grande (toca para cerrar).
+// ---------- Imagen del parte para compartir (diseño SAT) ----------
+// Arma un JPG liviano (1080 px de ancho) con logo, datos del servicio y
+// la firma del cliente. Se dibuja en un canvas: no necesita librerías y
+// funciona sin conexión si la firma ya estaba en caché.
+function cargarImagenParaCanvas(url) {
+  return new Promise((resolve) => {
+    if (!url) return resolve(null);
+    // Las firmas guardadas con otro dominio (versiones viejas) se piden al
+    // dominio actual, así el canvas no queda "contaminado" y se puede exportar.
+    const m = String(url).match(/\/api\/foto\?id=[^&#\s]+/);
+    const src = m ? m[0] : url;
+    const img = new Image();
+    if (!m && /^https?:/i.test(src)) img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+async function generarImagenParte(p, d) {
+  try {
+    await Promise.all([
+      "700 italic 44px 'Barlow Semi Condensed'", "700 60px 'Barlow Semi Condensed'", "600 20px 'Barlow Semi Condensed'",
+      "400 28px Barlow", "500 28px Barlow", "600 28px Barlow",
+    ].map((f) => document.fonts.load(f)));
+  } catch (e) { /* si no carga, usa la letra del sistema */ }
+  const [logo, firma] = await Promise.all([cargarImagenParaCanvas("icons/logo.png"), cargarImagenParaCanvas(p.firma_img_ref)]);
+  const W = 1080, M = 64, ANCHO = W - M * 2;
+  const C = { tinta: "#0D0C0D", gris: "#6B6862", linea: "#E6E2D8", papel: "#F3F0E8", amarillo: "#FFC033", verde: "#1F7A45", naranja: "#B5541A" };
+  const F = {
+    titulo: "700 italic 44px 'Barlow Semi Condensed', sans-serif",
+    numero: "700 60px 'Barlow Semi Condensed', sans-serif",
+    etiqueta: "600 20px 'Barlow Semi Condensed', sans-serif",
+    pill: "700 20px 'Barlow Semi Condensed', sans-serif",
+    texto: "400 28px Barlow, sans-serif",
+    fuerte: "600 30px Barlow, sans-serif",
+    cliente: "700 40px 'Barlow Semi Condensed', sans-serif",
+    chico: "400 22px Barlow, sans-serif",
+  };
+  // Corta un texto en renglones que entren en "ancho" (respeta los saltos de línea).
+  const renglones = (ctx, texto, fuente, ancho) => {
+    ctx.font = fuente;
+    const out = [];
+    String(texto || "").split(/\n/).forEach((parrafo) => {
+      const palabras = parrafo.trim().split(/\s+/).filter(Boolean);
+      if (!palabras.length) return;
+      let linea = "";
+      palabras.forEach((pal) => {
+        const prueba = linea ? linea + " " + pal : pal;
+        if (ctx.measureText(prueba).width > ancho && linea) { out.push(linea); linea = pal; } else linea = prueba;
+      });
+      if (linea) out.push(linea);
+    });
+    return out;
+  };
+  const listaMateriales = (txt) => String(txt || "").split(/\n|,(?![^(]*\))/).map((x) => x.trim()).filter(Boolean).map((x) => "•  " + x);
+
+  // Se dibuja dos veces: la primera solo mide el alto total.
+  const dibujar = (ctx, real) => {
+    const pintar = (fn) => { if (real) fn(); };
+    let y = 0;
+    // Encabezado
+    const altoCab = 196;
+    pintar(() => { ctx.fillStyle = C.papel; ctx.fillRect(0, 0, W, altoCab); });
+    const altoLogo = 84, anchoLogo = logo ? Math.round(altoLogo * logo.width / logo.height) : 0;
+    pintar(() => { if (logo) ctx.drawImage(logo, M - 10, 54, anchoLogo, altoLogo); });
+    const xTxt = M + anchoLogo + 18;
+    pintar(() => {
+      ctx.font = F.pill;
+      const txtPill = "SERVICIO TÉCNICO SAT";
+      if ("letterSpacing" in ctx) ctx.letterSpacing = "1.5px";
+      const wp = ctx.measureText(txtPill).width + 30;
+      ctx.fillStyle = C.tinta;
+      ctx.beginPath(); ctx.roundRect ? ctx.roundRect(xTxt, 56, wp, 32, 16) : ctx.rect(xTxt, 56, wp, 32); ctx.fill();
+      ctx.fillStyle = C.amarillo; ctx.textBaseline = "middle"; ctx.fillText(txtPill, xTxt + 15, 73);
+      if ("letterSpacing" in ctx) ctx.letterSpacing = "0px";
+      ctx.fillStyle = C.tinta; ctx.font = F.titulo; ctx.textBaseline = "alphabetic"; ctx.fillText("Informe de servicio", xTxt, 136);
+    });
+    y = altoCab;
+    pintar(() => { ctx.fillStyle = C.amarillo; ctx.fillRect(0, y, W, 10); });
+    y += 10 + 54;
+
+    // N° de servicio, tipo y fecha
+    pintar(() => { ctx.fillStyle = C.gris; ctx.font = F.etiqueta; ctx.textBaseline = "alphabetic"; ctx.fillText("SERVICIO N°", M, y); });
+    y += 58;
+    pintar(() => {
+      ctx.fillStyle = C.tinta; ctx.font = F.numero; ctx.fillText(String(p.numero_servicio || p.id || "—"), M, y);
+      if (p.tipo_servicio) {
+        ctx.font = F.pill; const t = String(p.tipo_servicio).toUpperCase(); const w = ctx.measureText(t).width + 32;
+        ctx.fillStyle = C.amarillo; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(W - M - w, y - 40, w, 40, 20) : ctx.rect(W - M - w, y - 40, w, 40); ctx.fill();
+        ctx.fillStyle = C.tinta; ctx.textBaseline = "middle"; ctx.fillText(t, W - M - w + 16, y - 20); ctx.textBaseline = "alphabetic";
+      }
+    });
+    y += 44;
+    const meta = [d.fechaTexto, d.horarioTexto].filter(Boolean).join("   ·   ");
+    if (meta) { pintar(() => { ctx.fillStyle = C.gris; ctx.font = F.texto; ctx.fillText(meta, M, y); }); y += 30; }
+    y += 34;
+    pintar(() => { ctx.fillStyle = C.linea; ctx.fillRect(M, y, ANCHO, 2); });
+    y += 2;
+
+    const bloque = (titulo, lineasTexto, fuente = F.texto, color = C.tinta, alto = 40) => {
+      if (!lineasTexto.length) return;
+      y += 46;
+      pintar(() => { ctx.fillStyle = C.gris; ctx.font = F.etiqueta; if ("letterSpacing" in ctx) ctx.letterSpacing = "2px"; ctx.fillText(titulo.toUpperCase(), M, y); if ("letterSpacing" in ctx) ctx.letterSpacing = "0px"; });
+      y += 12;
+      lineasTexto.forEach((l) => { y += alto; pintar(() => { ctx.fillStyle = color; ctx.font = fuente; ctx.fillText(l, M, y); }); });
+      y += 6;
+    };
+    // Cliente
+    bloque("Cliente", renglones(ctx, p.cliente || "Sin cliente", F.cliente, ANCHO), F.cliente, C.tinta, 46);
+    const datosCliente = [p.numero_cliente ? `Cliente N° ${p.numero_cliente}` : "", d.direccionCompleta].filter(Boolean).join("  ·  ");
+    renglones(ctx, datosCliente, F.texto, ANCHO).forEach((l) => { y += 38; pintar(() => { ctx.fillStyle = C.gris; ctx.font = F.texto; ctx.fillText(l, M, y); }); });
+    y += 8;
+    if (d.tecnicos) bloque(d.tecnicos.includes(" y ") ? "Técnicos" : "Técnico", renglones(ctx, d.tecnicos, F.fuerte, ANCHO), F.fuerte);
+    bloque("Trabajo realizado", renglones(ctx, p.tarea, F.texto, ANCHO));
+    bloque("Observaciones", renglones(ctx, p.observaciones, F.texto, ANCHO));
+    bloque("Materiales instalados", listaMateriales(p.materiales).flatMap((l) => renglones(ctx, l, F.texto, ANCHO)), F.texto, C.verde);
+    bloque("Materiales retirados", listaMateriales(p.materiales_otros).flatMap((l) => renglones(ctx, l, F.texto, ANCHO)), F.texto, C.naranja);
+
+    // Total
+    if (d.costoFinalTexto) {
+      y += 40;
+      const alto = 96;
+      pintar(() => {
+        ctx.fillStyle = C.papel; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(M, y, ANCHO, alto, 18) : ctx.rect(M, y, ANCHO, alto); ctx.fill();
+        ctx.fillStyle = C.amarillo; ctx.fillRect(M, y, 8, alto);
+        ctx.fillStyle = C.gris; ctx.font = F.etiqueta; ctx.textBaseline = "middle";
+        ctx.fillText(p.forma_pago ? `TOTAL · ${String(p.forma_pago).toUpperCase()}` : "TOTAL", M + 32, y + alto / 2);
+        ctx.fillStyle = C.tinta; ctx.font = F.numero; ctx.textAlign = "right";
+        const n = Number(String(d.costoFinalTexto).replace(/[^\d.]/g, ""));
+        ctx.fillText(isNaN(n) || !n ? d.costoFinalTexto : "$" + n.toLocaleString("es-AR", { maximumFractionDigits: 2 }), W - M - 28, y + alto / 2 + 2);
+        ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+      });
+      y += alto;
+    }
+
+    // Firma
+    const hayFirma = firma || p.firma_aclaracion || p.firma_cargo || p.cliente_email;
+    if (hayFirma) {
+      y += 50;
+      pintar(() => { ctx.fillStyle = C.linea; ctx.fillRect(M, y, ANCHO, 2); });
+      y += 48;
+      pintar(() => { ctx.fillStyle = C.gris; ctx.font = F.etiqueta; if ("letterSpacing" in ctx) ctx.letterSpacing = "2px"; ctx.fillText("CONFORMIDAD DEL CLIENTE", M, y); if ("letterSpacing" in ctx) ctx.letterSpacing = "0px"; });
+      y += 20;
+      if (firma) {
+        const maxW = 560, maxH = 220;
+        const k = Math.min(maxW / firma.width, maxH / firma.height, 2);
+        const fw = Math.round(firma.width * k), fh = Math.round(firma.height * k);
+        pintar(() => {
+          ctx.drawImage(firma, M, y, fw, fh);
+          ctx.fillStyle = C.tinta; ctx.fillRect(M, y + fh + 8, Math.max(fw, 360), 2);
+        });
+        y += fh + 10;
+      }
+      if (p.firma_aclaracion) { y += 42; pintar(() => { ctx.fillStyle = C.tinta; ctx.font = F.fuerte; ctx.fillText(p.firma_aclaracion, M, y); }); }
+      if (p.firma_cargo) { y += 36; pintar(() => { ctx.fillStyle = C.gris; ctx.font = F.texto; ctx.fillText(p.firma_cargo, M, y); }); }
+      if (p.cliente_email) { y += 36; pintar(() => { ctx.fillStyle = C.gris; ctx.font = F.texto; ctx.fillText(p.cliente_email, M, y); }); }
+    }
+
+    // Pie
+    y += 64;
+    const altoPie = 92;
+    pintar(() => {
+      ctx.fillStyle = C.tinta; ctx.fillRect(0, y, W, altoPie);
+      ctx.fillStyle = C.amarillo; ctx.fillRect(0, y, W, 6);
+      ctx.textBaseline = "middle"; ctx.font = F.pill; ctx.fillStyle = C.amarillo;
+      ctx.fillText("ALARMAS SAT · SERVICIO TÉCNICO", M, y + altoPie / 2 + 3);
+      ctx.font = F.chico; ctx.fillStyle = "#FFFFFF"; ctx.textAlign = "right"; ctx.fillText("www.sat365.com.ar", W - M, y + altoPie / 2 + 3);
+      ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+    });
+    y += altoPie;
+    return y;
+  };
+  const medir = document.createElement("canvas").getContext("2d");
+  const alto = Math.ceil(dibujar(medir, false));
+  const canvas = document.createElement("canvas");
+  canvas.width = W; canvas.height = alto;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#FFFFFF"; ctx.fillRect(0, 0, W, alto);
+  dibujar(ctx, true);
+  return new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/jpeg", 0.82));
+}
+async function compartirParteComoImagen(p, d, imagenPromesa) {
+  const nombre = `Parte-SAT-${String(p.numero_servicio || p.id || "servicio").replace(/[^\w-]/g, "")}.jpg`;
+  const texto = `Informe de servicio SAT N° ${p.numero_servicio || p.id || ""} — ${p.cliente || ""}`;
+  let blob = null;
+  try { blob = await imagenPromesa; } catch (e) { blob = null; }
+  if (blob) {
+    const archivo = new File([blob], nombre, { type: "image/jpeg" });
+    try {
+      if (navigator.canShare && navigator.canShare({ files: [archivo] })) { await navigator.share({ files: [archivo], title: texto, text: texto }); return "imagen"; }
+    } catch (e) { if (e && e.name === "AbortError") return "cancelado"; }
+    // Sin "compartir archivos" (ej. compu): se descarga la imagen.
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = nombre;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    return "descargada";
+  }
+  return "sin-imagen";
+}
+
 function ampliarImagenParte(src) {
   const caja = document.createElement("div");
   caja.className = "pd-lightbox";
@@ -6695,7 +6896,18 @@ async function abrirParteDetalleModal(idParte) {
           .find((c) => (p.numero_cliente && String(c.numero_cliente) === String(p.numero_cliente)) || normalizeText(c.nombre || "") === normalizeText(p.cliente || ""));
         abrirFichaCliente(base || { nombre: p.cliente, direccion: p.direccion, localidad: p.localidad, numero_cliente: p.numero_cliente, telefono: p.telefono });
       });
+      // La imagen se arma apenas se abre el detalle, así al tocar Compartir
+      // sale al instante (algunos celulares no dejan compartir si se demora).
+      const datosImagen = { fechaTexto, horarioTexto: p.hora_entrada || p.hora_salida ? horarioTexto : "", tecnicos, direccionCompleta, costoFinalTexto };
+      let imagenParte = null;
+      const pedirImagenParte = () => (imagenParte = imagenParte || generarImagenParte(p, datosImagen).catch(() => null));
+      setTimeout(pedirImagenParte, 300);
       q("pdCompartirBtn").addEventListener("click", async () => {
+        const btn = q("pdCompartirBtn");
+        btn.classList.add("pd-accion-cargando");
+        const r = await compartirParteComoImagen(p, datosImagen, pedirImagenParte());
+        btn.classList.remove("pd-accion-cargando");
+        if (r !== "sin-imagen") return;
         const texto = [
           `Parte N° ${p.numero_servicio || p.id || ""} — ${p.cliente || ""}`,
           [fechaTexto, horarioTexto].filter(Boolean).join(" · "),
