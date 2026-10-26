@@ -476,7 +476,10 @@ async function chequearRecordatorioDevolverVehiculo(ghHeaders, headersBackendNue
   const historialVehiculos = await fetchBackendArray("/api/vehiculos/historial", headersBackendNuevo);
   const destinatarios = [...new Set(
     (historialVehiculos || [])
-      .filter((h) => h.tecnico && enCalle.has(h.tecnico) && !h.hora_devolucion && !h.accion)
+      // Mismo criterio que la app: un registro abierto que no sea un "evento"
+      // (carga de nafta, service...). Antes pedía que no tuviera ninguna
+      // acción, y si la base guarda la toma como accion "tomar" no avisaba a nadie.
+      .filter((h) => h.tecnico && enCalle.has(h.tecnico) && !h.hora_devolucion && h.accion !== "evento")
       .map((h) => h.tecnico)
   )];
   if (destinatarios.length === 0) {
@@ -498,6 +501,9 @@ async function chequearRecordatorioDevolverVehiculo(ghHeaders, headersBackendNue
 async function chequearRecordatorioTecnicosEnCalle(ghHeaders, headersBackendNuevo, estado, ahora) {
   const diaSemana = ahora.getDay(); // 0 = domingo ... 6 = sábado
   if (diaSemana === 0 || diaSemana === 6) return null;
+  // Es el aviso de la mañana: si la corrida de la mañana falló, que no salga
+  // "tomá el vehículo" en la de la tarde.
+  if (ahora.getHours() >= 13) return null;
 
   const hoyStr = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, "0")}-${String(ahora.getDate()).padStart(2, "0")}`;
   if (estado.ultimo_dia_recordatorio_tecnicos === hoyStr) return null;
@@ -518,7 +524,7 @@ async function chequearRecordatorioTecnicosEnCalle(ghHeaders, headersBackendNuev
   const historialVehiculos = await fetchBackendArray("/api/vehiculos/historial", headersBackendNuevo);
   const tienenVehiculoTomado = new Set(
     (historialVehiculos || [])
-      .filter((h) => h.tecnico && !h.hora_devolucion && !h.accion) // registro "tomar" todavía abierto
+      .filter((h) => h.tecnico && !h.hora_devolucion && h.accion !== "evento") // registro "tomar" todavía abierto
       .map((h) => h.tecnico)
   );
   const herramientas = await fetchBackendArray("/api/herramientas", headersBackendNuevo);
