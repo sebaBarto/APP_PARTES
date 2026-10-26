@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.142.0";
+const APP_VERSION = "3.143.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -2221,6 +2221,26 @@ function actualizarPillConexion() {
 window.addEventListener("online", actualizarPillConexion);
 window.addEventListener("offline", actualizarPillConexion);
 setInterval(actualizarPillConexion, 15000);
+
+// Botón/gesto "atrás" de Android: no hace nada (para que no se cierre
+// la app sin querer). Se deja siempre una entrada "de más" en el
+// historial del navegador; cuando el sistema la consume, se vuelve a
+// poner. Chrome ignora las entradas agregadas sin un toque del usuario,
+// así que se re-arma en el siguiente toque.
+(function bloquearAtrasAndroid() {
+  let armado = false;
+  const armar = () => {
+    if (armado) return;
+    try { history.pushState({ satTrampa: Date.now() }, ""); armado = true; } catch (e) { /* nada */ }
+  };
+  window.addEventListener("popstate", () => {
+    // Se repone ya (por si Chrome la respeta) y se vuelve a poner con el próximo toque.
+    try { history.pushState({ satTrampa: Date.now() }, ""); } catch (e) { /* nada */ }
+    armado = false;
+  });
+  ["pointerdown", "keydown"].forEach((ev) => document.addEventListener(ev, armar, { capture: true, passive: true }));
+  armar();
+})();
 
 // Deslizar hacia abajo para actualizar (en el celular, reemplaza los botones "Actualizar")
 const ACCION_REFRESCO = {

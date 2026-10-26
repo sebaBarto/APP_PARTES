@@ -1388,3 +1388,20 @@ test("Vehículos sin señal: tomar con revisión queda en la cola, se ve en el i
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("El botón atrás de Android no cierra la app ni cambia de pantalla", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route("**/api/**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+  await page.goto(base + "/");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { window.__sigueViva = true; showScreen("ajustes"); });
+  for (let i = 0; i < 3; i++) {
+    await page.mouse.click(5, 300);
+    await page.goBack({ timeout: 2000 }).catch(() => null);
+    await page.waitForTimeout(150);
+  }
+  assert.strictEqual(await page.evaluate(() => window.__sigueViva === true), true, "la página no se descargó");
+  assert.strictEqual(await page.evaluate(() => screens.ajustes.dataset.active), "true", "no cambia de pantalla");
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
