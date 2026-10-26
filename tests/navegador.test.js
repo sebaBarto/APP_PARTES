@@ -1890,3 +1890,18 @@ test("Firma: «Nadie firma» deja cerrar el parte sin firma ni aclaración y que
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Horas del servidor: se guardan en UTC y se muestran en hora de Argentina (una nota de las 17:57 no dice 20:57)", async () => {
+  const ctx = await browser.newContext({ serviceWorkers: "block", timezoneId: "America/Argentina/Buenos_Aires", locale: "es-AR" });
+  const page = await ctx.newPage();
+  await page.route("**/api/**", (r) => r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+  await page.goto(base + "/");
+  const r = await page.evaluate(() => {
+    const d = fechaDelServidor("2026-10-26 20:57:00");
+    return { h: d.getHours(), m: d.getMinutes(), iso: fechaDelServidor("2026-10-26T20:57:00.000Z").getHours(), dia: diaLocalDelServidor("2026-10-27 01:30:00") };
+  });
+  assert.deepStrictEqual(r, { h: 17, m: 57, iso: 17, dia: "2026-10-26" });
+  await page.goto(base + "/admin.html");
+  assert.strictEqual(await page.evaluate(() => fechaDelServidor("2026-10-26 20:57:00").getHours()), 17);
+  await ctx.close();
+});

@@ -4436,7 +4436,22 @@ ponerAyudasSims();
 let controlSims = { stock: [], instaladas: [], historial: [] };
 const EMPRESAS_SIM = ["Claro", "Movistar", "Personal"];
 function soloDigitosLinea(n) { return digitosLineaAR(n); }
-function fechaAR(iso) { return iso ? String(iso).slice(0, 10).split("-").reverse().join("/") : ""; }
+// La base de datos guarda las horas en UTC sin aclararlo ("2026-10-26 20:57:00").
+// Leídas tal cual, el navegador las tomaba como hora local y se veían 3 horas
+// adelantadas. Acá se interpretan como UTC (las que ya traen zona, quedan igual).
+function fechaDelServidor(v) {
+  if (v === null || v === undefined || v === "") return null;
+  let s = String(v).trim();
+  if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(s)) s = s.replace(" ", "T") + "Z";
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+function diaLocalDelServidor(v) {
+  const d = fechaDelServidor(v);
+  if (!d) return String(v || "").slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function fechaAR(iso) { return iso ? (/\d{2}:\d{2}/.test(String(iso)) ? diaLocalDelServidor(iso) : String(iso).slice(0, 10)).split("-").reverse().join("/") : ""; }
 function ultimoMovimientoPorNumero(historial) {
   const m = new Map();
   historial.forEach((h) => {
@@ -5118,7 +5133,7 @@ const instalacionesAdminDetalleContenido = document.getElementById("instalacione
 let planosCacheAdmin = [];
 
 function formatoHaceCuanto(fechaIso) {
-  const diffMs = Date.now() - new Date(fechaIso).getTime();
+  const diffMs = Date.now() - (fechaDelServidor(fechaIso) || new Date(fechaIso)).getTime();
   const minutos = Math.round(diffMs / 60000);
   if (minutos < 1) return "hace un momento";
   if (minutos < 60) return `hace ${minutos} minuto(s)`;
@@ -5146,7 +5161,7 @@ async function consultarEstadoSincronizacionPlanos() {
       return;
     }
     const haceCuanto = formatoHaceCuanto(data.ultima_corrida);
-    const avisoDemora = (Date.now() - new Date(data.ultima_corrida).getTime()) > 3 * 60 * 60 * 1000;
+    const avisoDemora = (Date.now() - (fechaDelServidor(data.ultima_corrida) || new Date(0)).getTime()) > 3 * 60 * 60 * 1000;
     planosSyncStatus.className = avisoDemora ? "status err" : "status ok";
     planosSyncStatus.textContent = avisoDemora
       ? `⚠ La última sincronización fue ${haceCuanto} — revisá que la PC esté prendida y conectada.`
@@ -5266,7 +5281,7 @@ async function cargarEncuestasAdmin() {
 
     const emojis = { 1: "😞", 2: "🙁", 3: "😐", 4: "🙂", 5: "😄" };
     encuestasLista.innerHTML = encuestas.map((e) => {
-      const fecha = e.creado_en ? e.creado_en.slice(0, 10) : "";
+      const fecha = e.creado_en ? diaLocalDelServidor(e.creado_en) : "";
       return `
         <div style="padding:10px 0; border-bottom:1px solid #EEE; display:flex; align-items:center; gap:10px;">
           <span style="font-size:24px;">${emojis[e.puntaje] || "❓"}</span>
@@ -5326,7 +5341,7 @@ function renderComodatosAdmin() {
   const ordenados = [...filtrados].sort((a, b) => (b.creado_en || "").localeCompare(a.creado_en || ""));
 
   comodatosLista.innerHTML = ordenados.map((c) => {
-    const fecha = c.creado_en ? new Date(c.creado_en).toLocaleString("es-AR") : "";
+    const fecha = fechaDelServidor(c.creado_en) ? fechaDelServidor(c.creado_en).toLocaleString("es-AR", { hour12: false }) : "";
     return `
       <div style="padding:12px 0; border-bottom:1px solid #EEE;">
         <div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px;">
@@ -5400,7 +5415,7 @@ function renderNotasAdmin() {
   notasAdminStatus.textContent = `${filtradas.length} de ${notas.length} nota(s).`;
 
   notasAdminLista.innerHTML = filtradas.map((n) => {
-    const fecha = n.creado_en ? new Date(n.creado_en).toLocaleString("es-AR") : "";
+    const fecha = fechaDelServidor(n.creado_en) ? fechaDelServidor(n.creado_en).toLocaleString("es-AR", { hour12: false }) : "";
     return `
       <div style="padding:12px 0; border-bottom:1px solid #EEE;">
         <div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px;">
@@ -5513,7 +5528,7 @@ function renderSeguimientosAdmin() {
   const etiquetaEstado = { en_camino: "🟠 En camino", llegado: "✅ Llegó", vencido: "⏱ Venció sin marcar llegada", cancelado: "❌ Cancelado por el técnico" };
 
   seguimientosAdminLista.innerHTML = ordenados.map((s) => {
-    const fecha = s.creado_en ? new Date(s.creado_en).toLocaleString("es-AR") : "";
+    const fecha = fechaDelServidor(s.creado_en) ? fechaDelServidor(s.creado_en).toLocaleString("es-AR", { hour12: false }) : "";
     const tuvoUbicacion = s.lat_actual != null && s.lng_actual != null;
     return `
       <div style="padding:12px 0; border-bottom:1px solid #EEE;">
@@ -5947,7 +5962,7 @@ function calcularPrioridadCoordinacion(servicio) {
     const encuestaMala = coordinacionEncuestasCache.find((e) => {
       if (!e.cliente || Number(e.puntaje) > 2) return false;
       if (normalizeTextAdmin(e.cliente) !== nombreCliente) return false;
-      const fecha = e.fecha_parte ? new Date(e.fecha_parte) : (e.creado_en ? new Date(e.creado_en) : null);
+      const fecha = e.fecha_parte ? new Date(e.fecha_parte) : (e.creado_en ? fechaDelServidor(e.creado_en) : null);
       if (!fecha || isNaN(fecha)) return true; // sin fecha clara, se cuenta igual
       const diasDesdeEncuesta = Math.floor((Date.now() - fecha.getTime()) / 86400000);
       return diasDesdeEncuesta <= 60;
@@ -6437,7 +6452,7 @@ function armarFilasSemaforo({ clientes, partes, instalaciones, presencias, histo
     visitas.push({ clave, fecha, fuente });
   };
   arr(partes).forEach((p) => agregar(p, p.fecha, "parte"));
-  arr(instalaciones).forEach((i) => agregar(i, i.fecha || i.fecha_inicio || i.creado_en, "instalación"));
+  arr(instalaciones).forEach((i) => agregar(i, i.fecha || i.fecha_inicio || (i.creado_en ? diaLocalDelServidor(i.creado_en) : ""), "instalación"));
   arr(presencias).forEach((p) => agregar(p, p.fecha_llegada || p.fecha, "presencia en obra"));
   arr(historicas).forEach((hst) => {
     const clave = canonNumCliente(hst.numero_cliente);

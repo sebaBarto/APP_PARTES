@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.0.0";
+const APP_VERSION = "4.0.1";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -267,6 +267,22 @@ window.addEventListener("unhandledrejection", (ev) => {
 // endpoint (/api/enviar-mail.js), que sale por SMTP directo desde la
 // casilla propia de la empresa — reemplaza a EmailJS, que tenía un
 // límite mensual de envíos.
+// La base de datos guarda las horas en UTC sin aclararlo ("2026-10-26 20:57:00").
+// Leídas tal cual, el navegador las tomaba como hora local y se veían 3 horas
+// adelantadas. Acá se interpretan como UTC (las que ya traen zona, quedan igual).
+function fechaDelServidor(v) {
+  if (v === null || v === undefined || v === "") return null;
+  let s = String(v).trim();
+  if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(s)) s = s.replace(" ", "T") + "Z";
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+function diaLocalDelServidor(v) {
+  const d = fechaDelServidor(v);
+  if (!d) return String(v || "").slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 async function enviarMail(tipo, datos) {
   const res = await fetch("/api/enviar-mail", {
     method: "POST",
@@ -1703,7 +1719,7 @@ cerrarSesionBtn.addEventListener("click", () => {
 
 // ---------- Listado de servicios pendientes ----------
 function formatSyncTime(date) {
-  return "Actualizado " + date.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+  return "Actualizado " + date.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false });
 }
 
 // Neutraliza HTML/JS antes de insertar texto (cliente, dirección,
@@ -7736,7 +7752,7 @@ function renderNotas() {
     const limite = Date.now() - 3 * 24 * 60 * 60 * 1000;
     items = items.filter((n) => {
       const yaLeida = notaTabActiva === "recibidas" ? !!n.leido : n.destinatarios.every((d) => d.leido);
-      const esVieja = n.creado_en && new Date(n.creado_en).getTime() < limite;
+      const esVieja = n.creado_en && fechaDelServidor(n.creado_en) && fechaDelServidor(n.creado_en).getTime() < limite;
       return !(yaLeida && esVieja);
     });
   }
@@ -7757,7 +7773,7 @@ function renderNotas() {
   notasStatus.textContent = `${items.length} nota(s).`;
 
   items.forEach((n) => {
-    const fecha = n.creado_en ? new Date(n.creado_en).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
+    const fecha = fechaDelServidor(n.creado_en) ? fechaDelServidor(n.creado_en).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }) : "";
     const noLeida = notaTabActiva === "recibidas" && !n.leido;
     const card = document.createElement("div");
     card.className = "historial-card" + (n.urgente ? " nota-card-urgente" : "") + (noLeida ? " nota-card-no-leida" : "");
