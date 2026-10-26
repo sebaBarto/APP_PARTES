@@ -15,12 +15,19 @@
 (function () {
   try {
     var a = JSON.parse(localStorage.getItem("ajustes_app") || "{}");
+    // Versión 4.0: el skin nuevo pasa a ser el de todos (una sola vez; después
+    // cada uno puede volver al clásico desde Ajustes y queda así).
+    if (!localStorage.getItem("skin_v4_aplicado")) {
+      a.estiloInicio = "nuevo";
+      localStorage.setItem("ajustes_app", JSON.stringify(a));
+      localStorage.setItem("skin_v4_aplicado", "1");
+    }
     var t = a.tema || "clasico";
     if (t === "auto") t = (window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches) ? "night" : "day";
     var esc = { chico: 0.88, grande: 1.2 }[a.tamano];
     if (esc) document.documentElement.style.setProperty("--escala", esc);
     if (a.botonesGrandes) document.documentElement.setAttribute("data-botones", "grandes");
-    document.documentElement.setAttribute("data-inicio", a.estiloInicio === "nuevo" ? "nuevo" : "clasico");
+    document.documentElement.setAttribute("data-inicio", a.estiloInicio === "clasico" ? "clasico" : "nuevo");
     if (t === "night" || t === "day" || t === "contraste") {
       document.documentElement.setAttribute("data-theme", t);
       var m = document.querySelector('meta[name="theme-color"]');

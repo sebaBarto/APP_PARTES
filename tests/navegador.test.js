@@ -107,17 +107,19 @@ test("cada opción de Forma de pago se puede elegir con un toque", async () => {
   await ctx.close();
 });
 
-test("el estilo del inicio (Nuevo/Clásico) se elige en Ajustes y se recuerda", async () => {
+test("el estilo del inicio: el nuevo es el de por defecto (4.0), el clásico se elige en Ajustes y se recuerda", async () => {
   const { ctx, page } = await nuevaPagina();
   await page.goto(base + "/");
   await page.waitForTimeout(400);
   const estilo = () => page.evaluate(() => document.documentElement.getAttribute("data-inicio"));
-  assert.strictEqual(await estilo(), "clasico", "por defecto debe ser el clásico");
+  assert.strictEqual(await estilo(), "nuevo", "desde la 4.0 el nuevo es el de por defecto");
   await page.evaluate(() => { showScreen("ajustes"); renderAjustes(); });
-  await page.evaluate(() => document.querySelector('#ajusteEstiloInicio [data-estilo="nuevo"]').click());
-  assert.strictEqual(await estilo(), "nuevo");
+  await page.evaluate(() => document.querySelector('#ajusteEstiloInicio [data-estilo="clasico"]').click());
+  assert.strictEqual(await estilo(), "clasico");
   await page.reload();
   await page.waitForTimeout(400);
+  assert.strictEqual(await estilo(), "clasico", "quien vuelve al clásico, queda en el clásico");
+  await page.evaluate(() => document.querySelector('#ajusteEstiloInicio [data-estilo="nuevo"]') && (showScreen("ajustes"), renderAjustes(), document.querySelector('#ajusteEstiloInicio [data-estilo="nuevo"]').click()));
   assert.strictEqual(await estilo(), "nuevo");
   await ctx.close();
 });
@@ -128,6 +130,9 @@ test("el skin nuevo se aplica también en los submenús, y el clásico no los to
   await page.waitForTimeout(400);
   // ancho del ícono de la primera tecla del submenú: 52px en clásico, 36px en nuevo
   const ancho = (pantalla, id) => page.evaluate(([n, sel]) => { showScreen(n); return getComputedStyle(document.querySelector(sel + " .panel-tile-icon-badge")).width; }, [pantalla, id]);
+  await page.evaluate(() => { localStorage.setItem("ajustes_app", JSON.stringify({ estiloInicio: "clasico" })); });
+  await page.reload();
+  await page.waitForTimeout(400);
   assert.strictEqual(await ancho("dashboardsMenu", "#screen-dashboards-menu"), "52px");
   await page.evaluate(() => { localStorage.setItem("ajustes_app", JSON.stringify({ estiloInicio: "nuevo" })); });
   await page.reload();
@@ -179,7 +184,7 @@ async function paginaConEstilo(estilo) {
   const page = await ctx.newPage();
   const erroresPagina = [];
   page.on("pageerror", (e) => erroresPagina.push(e.message));
-  await page.addInitScript((e) => localStorage.setItem("ajustes_app", JSON.stringify({ estiloInicio: e })), estilo);
+  await page.addInitScript((e) => { localStorage.setItem("ajustes_app", JSON.stringify({ estiloInicio: e })); localStorage.setItem("skin_v4_aplicado", "1"); }, estilo);
   await page.route("**/api/**", (r) => r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
   await page.goto(base + "/");
   await page.waitForTimeout(500);
