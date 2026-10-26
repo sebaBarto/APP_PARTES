@@ -1661,7 +1661,8 @@ test("Admin: portada con pendientes, buscador de cliente, menú agrupado, sesió
     if (u.includes("coleccion=vehiculos")) return json(vehiculosServidor);
     if (u.includes("coleccion=herramientas")) return json(herramientasServidor);
     if (u.includes("coleccion=tecnicos")) return json([{ nombre: "Juan" }]);
-    if (u.includes("coleccion=clientes")) return json([{ nombre: "Panadería Sur", numero_cliente: "1203", direccion: "Mitre 100", localidad: "Funes" }]);
+    if (u.includes("coleccion=clientes")) return json([{ nombre: "Panadería Sur", numero_cliente: "1203", direccion: "Mitre 100", localidad: "Funes" }, { nombre: "Ferretería Oeste", numero_cliente: "1300" }, { nombre: "Bar Cerrado", numero_cliente: "1400" }]);
+    if (u.includes("coleccion=visitas_historicas")) return json([{ numero_cliente: "1203", ultima_visita: "2026-09-01", estado: "Activo" }, { numero_cliente: "1300", ultima_visita: "2024-03-01", estado: "Activo" }, { numero_cliente: "1400", ultima_visita: "2023-01-01", estado: "Baja" }]);
     if (u.includes("coleccion=sims_instaladas")) return json([{ numero: "3415550009", cliente: "Panadería Sur", numero_cliente: "1203", empresa: "Claro" }]);
     if (u.includes("tipo=claves_cliente")) return json([{ numero_cliente: "1203", cliente: "Panadería Sur", claves: [{ titulo: "Alarma", clave: "5555" }] }]);
     if (u.includes("/api/historial") && !u.includes("tipo=")) return json([{ cliente: "Panadería Sur", numero_cliente: "1203", fecha: "2026-10-01", tecnico: "Juan", tarea: "Cambio de batería", pasado_sistema_offline: 0 }]);
@@ -1679,6 +1680,7 @@ test("Admin: portada con pendientes, buscador de cliente, menú agrupado, sesió
   assert.ok(tarjetas.some((x) => /Vehículos sin devolver[\s\S]*Kangoo \(Juan\)/.test(x)));
   assert.ok(tarjetas.some((x) => /Rendiciones por aprobar[\s\S]*1\.500/.test(x)));
   assert.ok(tarjetas.some((x) => /Partes sin pasar al sistema/.test(x)));
+  assert.ok(tarjetas.some((x) => /^1\s*Clientes activos en rojo[\s\S]*Ferretería Oeste/.test(x.trim())), "cuenta solo los activos en rojo");
   assert.strictEqual(await page.locator("#emergenciasBadge").textContent(), "1");
   // Menú agrupado
   assert.deepStrictEqual((await page.locator(".menu-grupo-tit").allTextContents()).slice(0, 3), ["Día a día", "Administración", "SIMs"]);
@@ -1689,6 +1691,13 @@ test("Admin: portada con pendientes, buscador de cliente, menú agrupado, sesió
   const ficha = await page.locator(".ficha-adm").textContent();
   assert.match(ficha, /Panadería Sur[\s\S]*Cambio de batería[\s\S]*3415550009/);
   assert.strictEqual(await page.locator(".fa-claves").isVisible(), false, "claves ocultas");
+  // La tarjeta de clientes en rojo abre el Semáforo filtrado en rojo y activos
+  await page.locator(".inicio-tarjeta", { hasText: "Clientes activos en rojo" }).click();
+  await page.waitForTimeout(800);
+  assert.strictEqual(await page.locator("#panelSemaforo").isVisible(), true);
+  assert.strictEqual(await page.inputValue("#semaforoFiltroAbonado"), "activo");
+  assert.match(await page.locator("#semaforoLista").textContent(), /Ferretería Oeste/);
+  assert.doesNotMatch(await page.locator("#semaforoLista").textContent(), /Bar Cerrado/);
   // Sesión que sobrevive al F5
   await page.reload();
   await page.waitForTimeout(800);

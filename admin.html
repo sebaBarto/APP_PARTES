@@ -1610,7 +1610,7 @@ async function cargarInicioAdmin() {
   st.textContent = "Revisando...";
   const h = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
   const leer = (url) => fetch(url, { headers: h, cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-  const [emerg, rend, pend, sims, vehs, vehHist, errores, partes] = await Promise.all([
+  const [emerg, rend, pend, sims, vehs, vehHist, errores, partes, clientes, instalaciones, presencias, historicas, simsInst] = await Promise.all([
     leer("/api/datos?coleccion=servicios_emergencia"),
     leer("/api/recurso-uso?recurso=rendicion"),
     leer("/api/recurso-uso?recurso=sim&pendientes=1&todas=1"),
@@ -1619,6 +1619,11 @@ async function cargarInicioAdmin() {
     leer("/api/recurso-uso?recurso=vehiculo"),
     leer("/api/datos?coleccion=errores_app"),
     leer("/api/historial"),
+    leer("/api/datos?coleccion=clientes"),
+    leer("/api/historial?tipo=instalaciones"),
+    leer("/api/recurso-uso?recurso=presencia&historial=1"),
+    leer("/api/datos?coleccion=visitas_historicas"),
+    leer("/api/datos?coleccion=sims_instaladas"),
   ]);
   const arr = (x) => (Array.isArray(x) ? x : []);
   const hoyISO = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
@@ -1639,6 +1644,17 @@ async function cargarInicioAdmin() {
   agregar(arr(pend).length, "SIMs por aceptar", arr(pend).slice(0, 2).map((p) => `${p.numero} → ${p.tecnico_destino}`).join(" · "), "tabSimsBtn", "atencion");
   const simsProb = arr(sims).filter((s) => s.ubicacion_tipo !== "cliente" && s.estado_fisico && s.estado_fisico !== "Disponible");
   agregar(simsProb.length, "SIMs con problema", "Defectuosas o extraviadas para reclamar o dar de baja", "tabSimsControlBtn", "atencion");
+  // Clientes activos con el semáforo en rojo (mismo cálculo que la pantalla Semáforo visitas).
+  if (arr(clientes).length) {
+    try {
+      const sem = armarFilasSemaforo({ clientes, partes, instalaciones, presencias, historicas, sims: simsInst });
+      const conEstado = sem.fuenteAbonado !== "ninguna";
+      const rojos = sem.filas.filter((f) => !f.ignorado && f.estado === "rojo" && (!conEstado || f.abonado === "activo"));
+      const det = rojos.slice(0, 2).map((f) => f.nombre + (f.sinVisita ? " (sin visitas)" : f.dias != null ? ` (hace ${f.dias >= 730 ? Math.floor(f.dias / 365) + " años" : Math.floor(f.dias / 30) + " meses"})` : "")).join(" · ");
+      inicioSemaforoAbonado = conEstado ? "activo" : "";
+      agregar(rojos.length, conEstado ? "Clientes activos en rojo" : "Clientes en rojo", det || `Más de ${SEMAFORO_DIAS_ROJO} días sin visita`, "tabSemaforoBtn", "atencion", true);
+    } catch (e) { /* si falla, el resto del Inicio sigue */ }
+  }
   const sinPasar = arr(partes).filter((p) => !p.pasado_sistema_offline);
   agregar(sinPasar.length, "Partes sin pasar al sistema", "Se marcan desde Historial en la app", "", "atencion");
   const erroresSemana = arr(errores).filter((e) => String(e.fecha || "").slice(0, 10) >= hace7);
@@ -1650,8 +1666,13 @@ async function cargarInicioAdmin() {
   st.textContent = conAlgo ? "" : "Nada pendiente por ahora.";
   cont.innerHTML = tarjetas.map((x, i) => `<button type="button" class="inicio-tarjeta ${x.nivel}" data-i="${i}" ${x.pestana ? "" : 'style="cursor:default;"'}>
       <span class="it-num">${x.n}</span><span class="it-tit">${escapeHtmlAdmin(x.titulo)}</span>${x.detalle ? `<span class="it-det">${escapeHtmlAdmin(x.detalle)}</span>` : ""}</button>`).join("");
-  cont.querySelectorAll(".inicio-tarjeta").forEach((b) => b.addEventListener("click", () => { const x = tarjetas[Number(b.dataset.i)]; if (x.pestana) irAPestana(x.pestana); }));
+  cont.querySelectorAll(".inicio-tarjeta").forEach((b) => b.addEventListener("click", () => {
+    const x = tarjetas[Number(b.dataset.i)];
+    if (x.pestana === "tabSemaforoBtn") { semaforoFiltro = "rojo"; semaforoAbonadoPedido = inicioSemaforoAbonado; }
+    if (x.pestana) irAPestana(x.pestana);
+  }));
 }
+let inicioSemaforoAbonado = "";
 
 // ---------- Buscador general de cliente ----------
 let fichaDatosAdmin = null; // se carga una vez por búsqueda nueva
@@ -6030,6 +6051,7 @@ let semaforoClientes = [];
 let semaforoFilas = [];
 let semaforoHayHistorial = false;
 let semaforoFiltro = "rojo";
+let semaforoAbonadoPedido = ""; // lo pide el Inicio al tocar la tarjeta de clientes en rojo
 let semaforoFuenteAbonado = "ninguna"; // de dónde sale el estado de abonado: "oficina" (columna Estado importada) | "sims" | "ninguna"
 let semaforoImportCrudo = null;
 const SEMAFORO_MAX_RENDER = 300;
@@ -6054,6 +6076,71 @@ function hoyLocalISO() {
 semaforoBuscar.addEventListener("input", renderSemaforo);
 semaforoFiltroAbonado.addEventListener("change", renderSemaforo);
 semaforoActualizarBtn.addEventListener("click", () => cargarSemaforoVisitas());
+
+// Arma las filas del semáforo (lo usan la pantalla Semáforo y el Inicio).
+function armarFilasSemaforo({ clientes, partes, instalaciones, presencias, historicas, sims }) {
+  const arr = (x) => (Array.isArray(x) ? x : []);
+  clientes = arr(clientes);
+  const indice = construirIndiceNombres(clientes);
+  const visitas = [];
+  let desdeApp = "";
+  const agregar = (obj, fechaCruda, fuente) => {
+    const fecha = fechaAISO(fechaCruda);
+    if (!fecha) return;
+    if (!desdeApp || fecha < desdeApp) desdeApp = fecha;
+    const clave = canonNumCliente(obj.numero_cliente) || resolverNumeroPorNombre(indice, obj.cliente, obj.direccion);
+    if (!clave) return;
+    visitas.push({ clave, fecha, fuente });
+  };
+  arr(partes).forEach((p) => agregar(p, p.fecha, "parte"));
+  arr(instalaciones).forEach((i) => agregar(i, i.fecha || i.fecha_inicio || i.creado_en, "instalación"));
+  arr(presencias).forEach((p) => agregar(p, p.fecha_llegada || p.fecha, "presencia en obra"));
+  arr(historicas).forEach((hst) => {
+    const clave = canonNumCliente(hst.numero_cliente);
+    const fecha = fechaAISO(hst.ultima_visita);
+    if (clave && fecha) visitas.push({ clave, fecha, fuente: "historial importado" });
+  });
+
+  const ultimas = ultimaVisitaPorCliente(visitas);
+  const ignorados = new Set(arr(historicas).filter((h) => Number(h.ignorado) === 1).map((h) => canonNumCliente(h.numero_cliente)));
+  const hayHistorial = arr(historicas).some((h) => h.ultima_visita || h.estado);
+  // Estado de abonado. Si el archivo importado del sistema de oficina trae la
+  // columna "Estado", se usa ESE (es el dato real); si no, se usa como
+  // aproximación el estado de la línea de la SIM instalada; y si no hay
+  // ninguno de los dos, se oculta el filtro en vez de marcar a todos igual.
+  const estadosOficina = estadoOficinaPorCliente(arr(historicas));
+  const estadoAbonado = estadoAbonadoPorCliente(clientes, arr(sims));
+  const fuenteAbonado = estadosOficina.size > 0 ? "oficina" : (arr(sims).length > 0 ? "sims" : "ninguna");
+  const abonadoDe = (c) => {
+    const clave = canonNumCliente(c.numero_cliente);
+    if (fuenteAbonado === "oficina") {
+      const eo = estadosOficina.get(clave);
+      return eo ? { abonado: eo.activo ? "activo" : "inactivo", texto: eo.estado } : { abonado: "sin_linea", texto: "" };
+    }
+    return { abonado: estadoAbonado.get(clave) || "sin_linea", texto: "" };
+  };
+  const hoy = new Date();
+  const rank = { rojo: 0, amarillo: 1, verde: 2, sin_dato: 3 };
+
+  const filas = clientes.map((c) => {
+    const u = ultimas.get(canonNumCliente(c.numero_cliente));
+    const cls = clasificarSemaforo(u ? u.fecha : "", hayHistorial, hoy);
+    return {
+      numero: c.numero_cliente || "", nombre: c.nombre || "", direccion: c.direccion || "",
+      localidad: c.localidad || "", telefono: c.telefono || "",
+      ultima: u ? u.fecha : "", fuente: u ? u.fuente : "",
+      estado: cls.estado, dias: cls.dias, sinVisita: cls.sinVisita,
+      abonado: abonadoDe(c).abonado, estadoOficina: abonadoDe(c).texto,
+      ignorado: ignorados.has(canonNumCliente(c.numero_cliente)),
+    };
+  }).sort((a, b) => {
+    if (rank[a.estado] !== rank[b.estado]) return rank[a.estado] - rank[b.estado];
+    if (a.sinVisita !== b.sinVisita) return a.sinVisita ? -1 : 1;
+    if ((b.dias ?? -1) !== (a.dias ?? -1)) return (b.dias ?? -1) - (a.dias ?? -1);
+    return a.nombre.localeCompare(b.nombre, "es");
+  });
+  return { filas, hayHistorial, fuenteAbonado, desdeApp };
+}
 
 async function cargarSemaforoVisitas() {
   semaforoStatus.className = "status";
@@ -6081,65 +6168,12 @@ async function cargarSemaforoVisitas() {
 
     // Todas las visitas conocidas, cada una atribuida a un cliente por
     // número (lo normal) o, en partes viejos que no lo traen, por nombre.
-    const indice = construirIndiceNombres(semaforoClientes);
-    const visitas = [];
-    let desdeApp = "";
-    const agregar = (obj, fechaCruda, fuente) => {
-      const fecha = fechaAISO(fechaCruda);
-      if (!fecha) return;
-      if (!desdeApp || fecha < desdeApp) desdeApp = fecha;
-      const clave = canonNumCliente(obj.numero_cliente) || resolverNumeroPorNombre(indice, obj.cliente, obj.direccion);
-      if (!clave) return;
-      visitas.push({ clave, fecha, fuente });
-    };
-    arr(partes).forEach((p) => agregar(p, p.fecha, "parte"));
-    arr(instalaciones).forEach((i) => agregar(i, i.fecha || i.fecha_inicio || i.creado_en, "instalación"));
-    arr(presencias).forEach((p) => agregar(p, p.fecha_llegada || p.fecha, "presencia en obra"));
-    arr(historicas).forEach((hst) => {
-      const clave = canonNumCliente(hst.numero_cliente);
-      const fecha = fechaAISO(hst.ultima_visita);
-      if (clave && fecha) visitas.push({ clave, fecha, fuente: "historial importado" });
-    });
-
-    const ultimas = ultimaVisitaPorCliente(visitas);
-    const ignorados = new Set(arr(historicas).filter((h) => Number(h.ignorado) === 1).map((h) => canonNumCliente(h.numero_cliente)));
-    semaforoHayHistorial = arr(historicas).some((h) => h.ultima_visita || h.estado);
-    // Estado de abonado. Si el archivo importado del sistema de oficina trae la
-    // columna "Estado", se usa ESE (es el dato real); si no, se usa como
-    // aproximación el estado de la línea de la SIM instalada; y si no hay
-    // ninguno de los dos, se oculta el filtro en vez de marcar a todos igual.
-    const estadosOficina = estadoOficinaPorCliente(arr(historicas));
-    const estadoAbonado = estadoAbonadoPorCliente(semaforoClientes, arr(sims));
-    semaforoFuenteAbonado = estadosOficina.size > 0 ? "oficina" : (arr(sims).length > 0 ? "sims" : "ninguna");
+    const armado = armarFilasSemaforo({ clientes: semaforoClientes, partes, instalaciones, presencias, historicas, sims });
+    semaforoFilas = armado.filas;
+    semaforoHayHistorial = armado.hayHistorial;
+    semaforoFuenteAbonado = armado.fuenteAbonado;
+    const desdeApp = armado.desdeApp;
     configurarFiltroAbonado();
-    const abonadoDe = (c) => {
-      const clave = canonNumCliente(c.numero_cliente);
-      if (semaforoFuenteAbonado === "oficina") {
-        const eo = estadosOficina.get(clave);
-        return eo ? { abonado: eo.activo ? "activo" : "inactivo", texto: eo.estado } : { abonado: "sin_linea", texto: "" };
-      }
-      return { abonado: estadoAbonado.get(clave) || "sin_linea", texto: "" };
-    };
-    const hoy = new Date();
-    const rank = { rojo: 0, amarillo: 1, verde: 2, sin_dato: 3 };
-
-    semaforoFilas = semaforoClientes.map((c) => {
-      const u = ultimas.get(canonNumCliente(c.numero_cliente));
-      const cls = clasificarSemaforo(u ? u.fecha : "", semaforoHayHistorial, hoy);
-      return {
-        numero: c.numero_cliente || "", nombre: c.nombre || "", direccion: c.direccion || "",
-        localidad: c.localidad || "", telefono: c.telefono || "",
-        ultima: u ? u.fecha : "", fuente: u ? u.fuente : "",
-        estado: cls.estado, dias: cls.dias, sinVisita: cls.sinVisita,
-        abonado: abonadoDe(c).abonado, estadoOficina: abonadoDe(c).texto,
-        ignorado: ignorados.has(canonNumCliente(c.numero_cliente)),
-      };
-    }).sort((a, b) => {
-      if (rank[a.estado] !== rank[b.estado]) return rank[a.estado] - rank[b.estado];
-      if (a.sinVisita !== b.sinVisita) return a.sinVisita ? -1 : 1;
-      if ((b.dias ?? -1) !== (a.dias ?? -1)) return (b.dias ?? -1) - (a.dias ?? -1);
-      return a.nombre.localeCompare(b.nombre, "es");
-    });
 
     semaforoFuentes.textContent = `Al ${fechaISOaLocal(hoyLocalISO())} · Considera ${arr(partes).length} parte(s), ${arr(instalaciones).length} instalación(es), ${arr(presencias).length} presencia(s) en obra y el historial importado (${arr(historicas).filter((h) => h.ultima_visita || h.estado).length} cliente(s)). Visitas registradas en la app desde ${desdeApp ? fechaISOaLocal(desdeApp) : "—"}.`;
 
@@ -6164,7 +6198,8 @@ function configurarFiltroAbonado() {
     semaforoFiltroAbonado.classList.add("hidden"); semaforoAbonadoNota.classList.add("hidden");
     return;
   }
-  const previo = semaforoFiltroAbonado.value;
+  const previo = semaforoAbonadoPedido || semaforoFiltroAbonado.value;
+  semaforoAbonadoPedido = "";
   const esOficina = semaforoFuenteAbonado === "oficina";
   const opciones = esOficina
     ? [["todos", "Abonado: todos"], ["activo", "Solo clientes ACTIVOS"], ["inactivo", "No activos (baja, suspendido, etc.)"], ["sin_linea", "Sin dato de estado"]]
