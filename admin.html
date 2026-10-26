@@ -554,6 +554,30 @@ html[data-tema="noche"] [style*="color:#1F6B34"], html[data-tema="noche"] [style
 html[data-tema="noche"] [style*="color:#C0392B"], html[data-tema="noche"] [style*="color: #C0392B"], html[data-tema="noche"] [style*="color:#B3261E"], html[data-tema="noche"] [style*="color: #B3261E"] { color: #FF8A7A !important; }
 html[data-tema="noche"] [style*="color:#4A6FA5"] { color: #8DB0E0 !important; }
 html[data-tema="noche"] img[src*="/api/foto"], html[data-tema="noche"] .cred-foto-preview { background: #fff; }
+/* Noche: lo que hay que ver de un vistazo, con color */
+:where(html[data-tema="noche"]) button { background: var(--amber); color: #141311; }
+html[data-tema="noche"] :is(.btn-secondary, .btn-ghost):not(.btn-secondary-admin) { background: transparent !important; color: #FFC033 !important; border: 1.5px solid rgba(255,192,51,0.55) !important; box-shadow: none !important; }
+html[data-tema="noche"] :is(.btn-secondary, .btn-ghost):not(.btn-secondary-admin):hover { background: rgba(255,192,51,0.10) !important; }
+html[data-tema="noche"] .btn-secondary-admin { background: transparent; color: var(--ink); border-color: #6A655B; }
+html[data-tema="noche"] .btn-secondary-admin:hover { border-color: #FFC033; color: #FFC033; }
+html[data-tema="noche"] :is(.borrar-emergencia-btn, .manual-borrar-btn, .dato-equipo-borrar, #erroresLimpiarBtn) { color: #FF8A7A !important; border-color: #6B2F28 !important; background: transparent !important; }
+html[data-tema="noche"] .sims-lote-bar .btn-secondary-admin { color: #fff; border-color: rgba(255,255,255,0.45); }
+html[data-tema="noche"] .sims-lote-bar #simsLoteBajaBtn { color: #FFB4A8; border-color: #FFB4A8; }
+html[data-tema="noche"] .password-toggle-btn, html[data-tema="noche"] .login-alterna, html[data-tema="noche"] .sim-num-link, html[data-tema="noche"] .ayuda-pop-cerrar, html[data-tema="noche"] .sims-ficha-cerrar { background: transparent; }
+html[data-tema="noche"] .ayuda-pop-cerrar { background: var(--paper) !important; color: var(--ink) !important; }
+html[data-tema="noche"] .password-toggle-btn { color: var(--steel); }
+html[data-tema="noche"] :is(.pendiente-guardar, .nav-movil button) { background: var(--amber) !important; color: #141311 !important; }
+html[data-tema="noche"] a { color: #8DBCF0; }
+html[data-tema="noche"] :is(input[type="checkbox"], input[type="radio"]) { accent-color: #FFC033; }
+html[data-tema="noche"] h1 { color: #F6F3EC; }
+html[data-tema="noche"] .card h3, html[data-tema="noche"] .card > h2 { color: #F6F3EC; }
+html[data-tema="noche"] .menu-grupo-tit { color: #8C877C; }
+/* Fondos claros que vienen puestos en el HTML de cada pantalla */
+html[data-tema="noche"] :is([style*="background:#fff"], [style*="background: #fff"], [style*="background:#FFF"], [style*="background: #FFF"]) { background: #1B1A17 !important; color: var(--ink) !important; border-color: var(--border) !important; }
+html[data-tema="noche"] :is([style*="background:#FDECEA"], [style*="background: #FDECEA"]) { background: #3A1C18 !important; color: #FF9D8F !important; }
+html[data-tema="noche"] :is([style*="background:#FFF6E0"], [style*="background: #FFF6E0"], [style*="background:#FFF1D6"], [style*="background: #FFF1D6"]) { background: #3A2E0E !important; color: #FFC960 !important; }
+html[data-tema="noche"] :is([style*="color:#F5A623"], [style*="color: #F5A623"]) { color: #FFC033 !important; }
+html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: #101820"]) { background: var(--amber) !important; color: #141311 !important; border-color: var(--amber) !important; }
 </style>
 </head>
 <body>
