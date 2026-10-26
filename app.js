@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.157.0";
+const APP_VERSION = "3.158.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -1162,6 +1162,9 @@ function intentarRestaurarSesion() {
         return false;
       }
       entrarComoTecnico(guardada.tecnico || "");
+      // Al abrir la app con la sesión guardada se piden los permisos al
+      // servidor: si en el admin le habilitaron algo nuevo, aparece ya.
+      actualizarPermisosDesdeServidor();
       return true;
     }
   } catch (err) {
@@ -1197,7 +1200,7 @@ async function attemptLogin() {
       if (data.sesion) guardarPaseApi(data.sesion);
       avisoSesionVencidaMostrado = false;
       entrarComoTecnico(usuarioElegido === "__general__" ? "" : usuarioElegido);
-      cargarTecnicos().then(() => { try { actualizarAccesoSeccionesPanel(); aplicarMosaicos(); } catch (e) { /* nada */ } });
+      actualizarPermisosDesdeServidor();
     } else if (data.bloqueado) {
       loginError.textContent = `Demasiados intentos fallidos — probá de nuevo en ${data.minutos_restantes} minuto(s).`;
       loginPassword.value = "";
@@ -1553,6 +1556,30 @@ function controlarFaltantesParte(pantalla) {
 // tile de "Dashboards" en sí se oculta solo si no tiene acceso a
 // NINGUNO de los 4 dashboards — si tiene al menos uno, entra al
 // submenú y ahí ve solo los que le corresponden.
+// Vuelve a mostrar u ocultar TODO lo que depende de los permisos (botones,
+// mosaicos, Administración, dashboard financiero, credencial...).
+function refrescarAccesosPorPermisos() {
+  if (!screens.home || !document.body) return;
+  [actualizarAccesoDashboardFinanciero, actualizarAccesoCredencial, actualizarAccesoExcelDashboards, actualizarAccesoSeccionesPanel, aplicarMosaicos]
+    .forEach((fn) => { try { fn(); } catch (e) { /* nada */ } });
+}
+// Trae los permisos actualizados del servidor y los aplica. Antes, después
+// de entrar solo se refrescaba una parte (faltaba el botón de Administración
+// y el dashboard financiero), y con la sesión guardada no se refrescaba
+// nada: había que cerrar sesión y volver a entrar para ver un permiso nuevo.
+let permisosUltimaActualizacion = 0;
+function actualizarPermisosDesdeServidor() {
+  permisosUltimaActualizacion = Date.now();
+  return cargarTecnicos().then(() => { if (tecnicoLogueado !== null) refrescarAccesosPorPermisos(); }).catch(() => {});
+}
+// Al volver a la app (después de un rato), se vuelven a pedir.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible" || !SERVICIOS_API_TOKEN) return;
+  if (Date.now() - permisosUltimaActualizacion < 60 * 1000) return;
+  try { if (!JSON.parse(localStorage.getItem("sesion_sat") || "null")) return; } catch (e) { return; }
+  actualizarPermisosDesdeServidor();
+});
+
 function actualizarAccesoSeccionesPanel() {
   const permisos = permisosDelTecnico(tecnicoLogueado);
   tileDashboardsBtn.classList.toggle("hidden", !(permisos.dash_general || permisos.dash_financiero || permisos.dash_vehiculos || permisos.dash_herramientas || permisos.dash_sims || permisos.dash_stock));
@@ -1638,7 +1665,7 @@ loginHuellaBtn.addEventListener("click", async () => {
     avisoSesionVencidaMostrado = false;
 
     entrarComoTecnico(nombre);
-    cargarTecnicos().then(() => { try { actualizarAccesoSeccionesPanel(); aplicarMosaicos(); } catch (e) { /* nada */ } });
+    actualizarPermisosDesdeServidor();
   } catch (err) {
     // Si el técnico cancela el pedido de huella (por ejemplo, tocó
     // "Cancelar" en el diálogo del celular), no se muestra como un

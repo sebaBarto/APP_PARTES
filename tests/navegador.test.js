@@ -1789,3 +1789,34 @@ test("Admin: portada con pendientes, buscador de cliente, menú agrupado, sesió
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Permisos: un permiso nuevo (ej. Administración) aparece sin cerrar sesión, al abrir la app y al volver a ella", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  let permisosServidor = { admin: false, vehiculos: true };
+  await page.route("**/api/**", (route) => {
+    const u = route.request().url();
+    if (u.includes("coleccion=tecnicos") && route.request().method() === "GET") {
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{ nombre: "Juan Pérez", permisos: permisosServidor }]) });
+    }
+    route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+  });
+  await page.goto(base + "/");
+  // Sesión guardada de antes, con los permisos viejos en el celular (sin Administración)
+  await page.evaluate(() => {
+    localStorage.setItem("sat_api_sesion", "s1.PASE.F");
+    localStorage.setItem("sesion_sat", JSON.stringify({ tecnico: "Juan Pérez", expira: Date.now() + 3600e3 }));
+    localStorage.setItem("tecnicos_permisos_cache", JSON.stringify({ "Juan Pérez": { admin: false, vehiculos: true } }));
+  });
+  permisosServidor = { admin: true, vehiculos: true };
+  await page.reload();
+  await page.waitForTimeout(900);
+  assert.strictEqual(await page.evaluate(() => tecnicoLogueado), "Juan Pérez");
+  assert.strictEqual(await page.evaluate(() => abrirAdminBtn.classList.contains("hidden")), false, "aparece al abrir la app");
+  // En el admin se lo sacan y la persona vuelve a la app un rato después
+  permisosServidor = { admin: false, vehiculos: true };
+  await page.evaluate(() => { permisosUltimaActualizacion = 0; document.dispatchEvent(new Event("visibilitychange")); });
+  await page.waitForTimeout(600);
+  assert.strictEqual(await page.evaluate(() => abrirAdminBtn.classList.contains("hidden")), true, "se oculta al volver a la app");
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
