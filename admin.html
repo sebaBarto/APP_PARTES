@@ -444,13 +444,13 @@ input[type="file"]::file-selector-button { margin-right: 10px; padding: 7px 14px
   border-radius: 50%; border: 1.5px solid var(--ink); background: var(--amber); color: var(--ink); font-size: 13px; font-weight: 800; line-height: 1; box-shadow: none; cursor: help; }
 .ayuda-btn:hover, .ayuda-btn[aria-expanded="true"] { background: var(--ink); color: var(--amber); }
 th .ayuda-btn { width: 18px; height: 18px; min-width: 18px; font-size: 11px; margin-left: 6px; }
-.ayuda-pop { position: absolute; z-index: 15000; background: #fff; border-radius: 14px; padding: 14px 16px 10px; border: 1px solid var(--border); border-top: 4px solid var(--amber);
-  box-shadow: 0 22px 50px -18px rgba(13,12,13,0.45); font-size: 13.5px; line-height: 1.45; color: var(--ink); }
-.ayuda-pop-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; font-size: 15px; }
-.ayuda-pop-cerrar { width: 30px; height: 30px; padding: 0; border-radius: 50%; background: var(--paper); color: var(--ink); font-size: 18px; box-shadow: none; }
-.ayuda-pop-gif { display: block; width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--border); background: var(--paper); min-height: 120px; }
-.ayuda-pop ul { margin: 10px 0 2px; padding-left: 18px; }
-.ayuda-pop li { margin: 4px 0; }
+.ayuda-pop { position: absolute; z-index: 15000; background: #fff; border-radius: 16px; padding: 18px 22px 14px; border: 1px solid var(--border); border-top: 5px solid var(--amber);
+  box-shadow: 0 22px 50px -18px rgba(13,12,13,0.45); font-size: 15.5px; line-height: 1.5; color: var(--ink); }
+.ayuda-pop-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; font-size: 19px; }
+.ayuda-pop-cerrar { width: 36px; height: 36px; padding: 0; border-radius: 50%; background: var(--paper); color: var(--ink); font-size: 22px; box-shadow: none; }
+.ayuda-pop-gif { display: block; width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--border); background: var(--paper); min-height: 120px; max-height: 56vh; object-fit: contain; }
+.ayuda-pop ul { margin: 14px 0 4px; padding-left: 22px; }
+.ayuda-pop li { margin: 6px 0; }
 </style>
 </head>
 <body>
@@ -4093,16 +4093,33 @@ function mostrarAyuda(boton, fijar) {
     <ul>${a.texto.map((x) => `<li>${escapeHtmlAdmin(x)}</li>`).join("")}</ul>`;
   ayudaPop.querySelector(".ayuda-pop-cerrar").addEventListener("click", ocultarAyuda);
   ayudaPop.classList.remove("hidden");
+  const gif = ayudaPop.querySelector(".ayuda-pop-gif");
+  if (gif && !gif.complete) gif.addEventListener("load", () => { if (ayudaAbierta === boton) ubicarAyuda(boton); }, { once: true });
+  ubicarAyuda(boton);
+  boton.setAttribute("aria-expanded", "true");
+}
+function ubicarAyuda(boton) {
   // Se ubica debajo del "?" (o arriba si no entra), sin salirse de la pantalla.
   const r = boton.getBoundingClientRect();
-  const ancho = Math.min(520, window.innerWidth - 24);
+  const ancho = Math.min(780, window.innerWidth - 24);
   ayudaPop.style.width = ancho + "px";
   const izq = Math.max(12, Math.min(r.left + r.width / 2 - ancho / 2, window.innerWidth - ancho - 12));
   ayudaPop.style.left = izq + window.scrollX + "px";
-  const alto = ayudaPop.offsetHeight || 420;
-  const abajo = r.bottom + 8 + alto < window.innerHeight || r.top < alto + 16;
-  ayudaPop.style.top = (abajo ? r.bottom + 8 : r.top - alto - 8) + window.scrollY + "px";
-  boton.setAttribute("aria-expanded", "true");
+  // Debajo del "?" si entra; si no, arriba. Si no entra en ninguno de los dos lados, va del
+  // lado con más lugar y el GIF se achica un poco, así nunca tapa el "?" ni se corta.
+  const gif = ayudaPop.querySelector(".ayuda-pop-gif");
+  if (gif) gif.style.maxHeight = "";
+  let alto = ayudaPop.offsetHeight || 420;
+  const lugarAbajo = window.innerHeight - r.bottom - 20, lugarArriba = r.top - 20;
+  const vaAbajo = alto <= lugarAbajo || (alto > lugarArriba && lugarAbajo >= lugarArriba);
+  const lugar = vaAbajo ? lugarAbajo : lugarArriba;
+  if (alto > lugar && gif && gif.offsetHeight) {
+    gif.style.maxHeight = Math.max(160, gif.offsetHeight - (alto - lugar)) + "px";
+    alto = ayudaPop.offsetHeight;
+  }
+  let arriba = vaAbajo ? r.bottom + 8 : r.top - alto - 8;
+  arriba = Math.max(12, Math.min(arriba, window.innerHeight - alto - 12));
+  ayudaPop.style.top = arriba + window.scrollY + "px";
 }
 function ocultarAyuda() {
   ayudaPop.classList.add("hidden");
@@ -4123,9 +4140,10 @@ function ponerAyudasSims() {
     b.setAttribute("aria-label", "Ayuda: " + AYUDAS_SIMS[clave].titulo);
     b.setAttribute("aria-expanded", "false");
     if (donde === "after") el.after(b); else el.appendChild(b);
-    b.addEventListener("mouseenter", () => { if (!ayudaFijada) mostrarAyuda(b, false); });
-    b.addEventListener("mouseleave", () => { if (!ayudaFijada) ayudaTimer = setTimeout(ocultarAyuda, 250); });
-    b.addEventListener("focus", () => { if (!ayudaFijada) mostrarAyuda(b, false); });
+    // Solo el mouse abre al pasar por arriba; con el dedo se abre al tocar (y queda fijo).
+    b.addEventListener("pointerenter", (e) => { if (e.pointerType === "mouse" && !ayudaFijada) mostrarAyuda(b, false); });
+    b.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse" && !ayudaFijada) ayudaTimer = setTimeout(ocultarAyuda, 250); });
+    b.addEventListener("focus", () => { if (!ayudaFijada && b.matches(":focus-visible")) mostrarAyuda(b, false); });
     b.addEventListener("click", (e) => { e.stopPropagation(); if (ayudaAbierta === b && ayudaFijada) ocultarAyuda(); else mostrarAyuda(b, true); });
   });
 }
