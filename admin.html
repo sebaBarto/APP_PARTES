@@ -438,6 +438,19 @@ input[type="file"]::file-selector-button { margin-right: 10px; padding: 7px 14px
 /* Tablas y listas */
 .sims-tabla tbody tr:nth-child(even) td { background: #FBFAF8; }
 .subtitle { font-size: 13.5px; }
+
+/* ---------- Ayudas "?" ---------- */
+.ayuda-btn { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; min-width: 22px; padding: 0; margin-left: 8px; vertical-align: middle;
+  border-radius: 50%; border: 1.5px solid var(--ink); background: var(--amber); color: var(--ink); font-size: 13px; font-weight: 800; line-height: 1; box-shadow: none; cursor: help; }
+.ayuda-btn:hover, .ayuda-btn[aria-expanded="true"] { background: var(--ink); color: var(--amber); }
+th .ayuda-btn { width: 18px; height: 18px; min-width: 18px; font-size: 11px; margin-left: 6px; }
+.ayuda-pop { position: absolute; z-index: 15000; background: #fff; border-radius: 14px; padding: 14px 16px 10px; border: 1px solid var(--border); border-top: 4px solid var(--amber);
+  box-shadow: 0 22px 50px -18px rgba(13,12,13,0.45); font-size: 13.5px; line-height: 1.45; color: var(--ink); }
+.ayuda-pop-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; font-size: 15px; }
+.ayuda-pop-cerrar { width: 30px; height: 30px; padding: 0; border-radius: 50%; background: var(--paper); color: var(--ink); font-size: 18px; box-shadow: none; }
+.ayuda-pop-gif { display: block; width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--border); background: var(--paper); min-height: 120px; }
+.ayuda-pop ul { margin: 10px 0 2px; padding-left: 18px; }
+.ayuda-pop li { margin: 4px 0; }
 </style>
 </head>
 <body>
@@ -4006,6 +4019,122 @@ async function abrirFichaLineaSim(numero) {
     capa.querySelector(".sims-ficha-cuerpo").innerHTML = `<p class="status err">No se pudo cargar: ${escapeHtmlAdmin(err.message)}</p>`;
   }
 }
+
+
+// ---------- Ayudas "?" de las pestañas de SIMs (GIF + consejos) ----------
+const AYUDAS_SIMS = {
+  resumen: { titulo: "Resumen y filtros", gif: "assets/ayuda/sims-resumen.gif", texto: [
+    "Arriba ves cuántas SIMs disponibles tiene cada uno. Tocá un nombre para ver solo las suyas; tocalo de nuevo para volver a ver todas.",
+    "\"Pendientes de aceptar\" y \"Con problema\" filtran esos casos de un toque.",
+    "El buscador entiende el número escrito de cualquier forma: con o sin 0, 15, espacios o guiones." ] },
+  alta: { titulo: "Cargar SIMs nuevas", gif: "assets/ayuda/sims-alta.gif", texto: [
+    "Pegá los números (uno por renglón; se pueden copiar de una columna de Excel), elegí empresa, formato y para quién son.",
+    "Tocá \"Revisar\": te muestra cuáles se cargan, cuáles ya existen (aunque estén escritas distinto) y cuáles tienen error. Recién ahí tocás \"Cargar\".",
+    "Si son para un técnico, le llegan como transferencia y las tiene que aceptar en la app." ] },
+  excel: { titulo: "Excel de SIMs", gif: "assets/ayuda/sims-excel.gif", texto: [
+    "\"Descargar Excel\" baja todo el stock, con quién la tiene y si hay transferencias pendientes.",
+    "Al subir un Excel no se aplica nada de golpe: primero ves qué SIMs se agregan, qué se corrige y cuáles cambian de dueño, y confirmás con \"Aplicar cambios\".",
+    "Columnas: NUMERO DE LINEA, EMPRESA PROVEEDORA, Tipo y ASIGNADO A (un técnico u Oficina). Las que están instaladas en un cliente no se tocan." ] },
+  fila: { titulo: "Acciones de cada SIM", gif: "assets/ayuda/sims-fila.gif", texto: [
+    "En \"Acción\" elegís qué hacer con esa SIM y se guarda en el momento: transferir, instalar en un cliente, marcar defectuosa o extraviada, corregir empresa o formato, o dar de baja.",
+    "Transferir a un técnico queda pendiente hasta que la acepte en la app. A Oficina es inmediato.",
+    "Dar de baja pide el motivo y queda en el historial de la línea." ] },
+  lote: { titulo: "Varias a la vez", gif: "assets/ayuda/sims-lote.gif", texto: [
+    "Tildá las SIMs (o la casilla de arriba para todas las que se ven con el filtro) y usá la barra negra: transferir, marcar o dar de baja juntas.",
+    "Ideal para repartir un lote que llegó de la empresa o para devolver todo lo de un técnico a Oficina.",
+    "Antes de hacer nada te pide confirmación, y al final te dice cuántas salieron bien." ] },
+  pendientes: { titulo: "Transferencias pendientes", gif: "assets/ayuda/sims-pendientes.gif", texto: [
+    "Son las SIMs que se mandaron a un técnico y todavía no las aceptó. Mientras tanto siguen a nombre de quien las mandó y no se pueden usar.",
+    "Si se mandó por error o el técnico no la recibió, tocá \"Cancelar\": vuelve a quedar con quien la tenía." ] },
+  ficha: { titulo: "Historial de una línea", gif: "assets/ayuda/sims-ficha.gif", texto: [
+    "Tocá cualquier número subrayado para ver dónde está ahora y todo lo que le pasó: alta, transferencias, instalación, retiro, baja.",
+    "Sirve para responder rápido \"¿quién tenía esta SIM?\" o \"¿cuándo se instaló?\"." ] },
+  instaladas: { titulo: "SIMs instaladas", gif: "assets/ayuda/sims-instaladas.gif", texto: [
+    "Filtrá por empresa, estado, quién la instaló o fecha de activación. Los botones de arriba filtran de un toque.",
+    "Tocá \"Activa\"/\"Inactiva\" para cambiar el estado de esa línea sola.",
+    "En \"Acción\" podés corregir los datos (cliente, dirección, abonado) o retirarla y devolverla al stock de quien elijas.",
+    "\"Excel de lo filtrado\" baja exactamente lo que estás viendo." ] },
+  control: { titulo: "Buscar una línea", gif: "assets/ayuda/sims-control.gif", texto: [
+    "Escribí los últimos dígitos de la línea: aparece dónde está y todos sus movimientos.",
+    "Si dice \"No figura ni en stock ni instalada\", se dio de baja o nunca se cargó." ] },
+  tablero: { titulo: "Stock por técnico", texto: [
+    "Cuántas SIMs disponibles tiene cada uno por empresa (sin contar defectuosas ni extraviadas).",
+    "En rojo, los que quedaron por debajo del mínimo que pongas: conviene reponerles antes de que se queden sin." ] },
+  problemas: { titulo: "SIMs con problemas", texto: [
+    "Las marcadas como defectuosas o extraviadas, con quién la tiene y desde cuándo.",
+    "Usá el Excel para reclamarlas a la empresa; después dalas de baja desde la pestaña SIMs." ] },
+  dormidas: { titulo: "SIMs dormidas", texto: [
+    "SIMs en mano de un técnico que no tuvieron ningún movimiento en los días que elijas.",
+    "Suelen ser las que se perdieron o se instalaron sin registrarlas en un parte: preguntale al técnico." ] },
+  conciliacion: { titulo: "Conciliación con la empresa", texto: [
+    "Subí la planilla de líneas que te pasa Claro, Movistar o Personal: se compara contra lo instalado y el stock.",
+    "Te muestra líneas que la empresa factura y SAT no tiene registradas, y al revés: instaladas en SAT que la empresa ya no tiene activas." ] },
+};
+const LUGARES_AYUDA_SIMS = [
+  ["#panelSims > h1", "resumen"], ["#simsAltaBtn", "alta", "after"], ["#elegirExcelSimsBtn", "excel", "after"],
+  ["#simsPendientesCard > h3", "pendientes"], ["#simsTabla thead th:nth-child(7)", "fila"], ["#simsLoteLimpiarBtn", "lote", "after"],
+  ["#simsTabla thead th:nth-child(2)", "ficha"], ["#panelSimsInstaladas > h1", "instaladas"],
+  ["#panelSimsControl h3", "tablero", "", 0], ["#panelSimsControl h3", "problemas", "", 1], ["#panelSimsControl h3", "dormidas", "", 2],
+  ["#panelSimsControl h3", "control", "", 3], ["#panelSimsControl h3", "conciliacion", "", 4],
+];
+const ayudaPop = document.createElement("div");
+ayudaPop.className = "ayuda-pop hidden";
+ayudaPop.setAttribute("role", "dialog");
+document.body.appendChild(ayudaPop);
+let ayudaAbierta = null, ayudaFijada = false, ayudaTimer = null;
+function mostrarAyuda(boton, fijar) {
+  const a = AYUDAS_SIMS[boton.dataset.ayuda];
+  if (!a) return;
+  clearTimeout(ayudaTimer);
+  ayudaAbierta = boton;
+  ayudaFijada = !!fijar;
+  ayudaPop.innerHTML = `<div class="ayuda-pop-cab"><b>${escapeHtmlAdmin(a.titulo)}</b><button type="button" class="ayuda-pop-cerrar" aria-label="Cerrar">×</button></div>
+    ${a.gif ? `<img src="${a.gif}" alt="Ejemplo animado: ${escapeHtmlAdmin(a.titulo)}" class="ayuda-pop-gif">` : ""}
+    <ul>${a.texto.map((x) => `<li>${escapeHtmlAdmin(x)}</li>`).join("")}</ul>`;
+  ayudaPop.querySelector(".ayuda-pop-cerrar").addEventListener("click", ocultarAyuda);
+  ayudaPop.classList.remove("hidden");
+  // Se ubica debajo del "?" (o arriba si no entra), sin salirse de la pantalla.
+  const r = boton.getBoundingClientRect();
+  const ancho = Math.min(520, window.innerWidth - 24);
+  ayudaPop.style.width = ancho + "px";
+  const izq = Math.max(12, Math.min(r.left + r.width / 2 - ancho / 2, window.innerWidth - ancho - 12));
+  ayudaPop.style.left = izq + window.scrollX + "px";
+  const alto = ayudaPop.offsetHeight || 420;
+  const abajo = r.bottom + 8 + alto < window.innerHeight || r.top < alto + 16;
+  ayudaPop.style.top = (abajo ? r.bottom + 8 : r.top - alto - 8) + window.scrollY + "px";
+  boton.setAttribute("aria-expanded", "true");
+}
+function ocultarAyuda() {
+  ayudaPop.classList.add("hidden");
+  if (ayudaAbierta) ayudaAbierta.setAttribute("aria-expanded", "false");
+  ayudaAbierta = null; ayudaFijada = false;
+}
+function ponerAyudasSims() {
+  LUGARES_AYUDA_SIMS.forEach(([sel, clave, donde, indice]) => {
+    const lista = document.querySelectorAll(sel);
+    const el = lista[indice || 0];
+    if (!el || document.querySelector(`.ayuda-btn[data-ayuda="${clave}"]`)) return;
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "ayuda-btn";
+    b.dataset.ayuda = clave;
+    b.textContent = "?";
+    b.title = "";
+    b.setAttribute("aria-label", "Ayuda: " + AYUDAS_SIMS[clave].titulo);
+    b.setAttribute("aria-expanded", "false");
+    if (donde === "after") el.after(b); else el.appendChild(b);
+    b.addEventListener("mouseenter", () => { if (!ayudaFijada) mostrarAyuda(b, false); });
+    b.addEventListener("mouseleave", () => { if (!ayudaFijada) ayudaTimer = setTimeout(ocultarAyuda, 250); });
+    b.addEventListener("focus", () => { if (!ayudaFijada) mostrarAyuda(b, false); });
+    b.addEventListener("click", (e) => { e.stopPropagation(); if (ayudaAbierta === b && ayudaFijada) ocultarAyuda(); else mostrarAyuda(b, true); });
+  });
+}
+ayudaPop.addEventListener("mouseenter", () => clearTimeout(ayudaTimer));
+ayudaPop.addEventListener("mouseleave", () => { if (!ayudaFijada) ayudaTimer = setTimeout(ocultarAyuda, 250); });
+document.addEventListener("click", (e) => { if (ayudaAbierta && !ayudaPop.contains(e.target) && !e.target.closest(".ayuda-btn")) ocultarAyuda(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && ayudaAbierta) ocultarAyuda(); });
+// El cartel está anclado al documento, así que acompaña el scroll de la página sin cerrarse.
+ponerAyudasSims();
 
 // ---------- Control de SIMs (tablero, problemas, dormidas, historial, conciliación) ----------
 let controlSims = { stock: [], instaladas: [], historial: [] };

@@ -1100,6 +1100,32 @@ test("Admin SIMs: stock con resumen y filtros, acciones por fila y en lote, pend
   await ctx.close();
 });
 
+test("Admin SIMs: los signos de ayuda muestran un cartel con GIF y consejos al pasar el mouse y al tocarlos", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  await page.route("**/api/**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { document.getElementById("mainCard").classList.remove("hidden"); document.getElementById("panelSims").classList.remove("hidden"); return cargarSimsAdmin(); });
+  const claves = await page.$$eval(".ayuda-btn", (bs) => bs.map((b) => b.dataset.ayuda));
+  for (const c of ["resumen", "alta", "excel", "pendientes", "fila", "ficha", "lote", "instaladas", "tablero", "conciliacion"]) assert.ok(claves.includes(c), "falta ayuda " + c);
+  await page.hover('.ayuda-btn[data-ayuda="alta"]');
+  await page.waitForSelector(".ayuda-pop:not(.hidden)");
+  assert.match(await page.textContent(".ayuda-pop"), /Cargar SIMs nuevas/);
+  assert.match(await page.getAttribute(".ayuda-pop img", "src"), /sims-alta\.gif/);
+  // Tocar lo deja fijo; Escape lo cierra
+  await page.mouse.move(5, 5);
+  await page.waitForSelector(".ayuda-pop.hidden", { state: "attached" });
+  await page.click('.ayuda-btn[data-ayuda="excel"]');
+  await page.mouse.move(5, 5);
+  await page.waitForTimeout(400);
+  assert.equal(await page.isVisible(".ayuda-pop"), true);
+  await page.keyboard.press("Escape");
+  assert.equal(await page.isVisible(".ayuda-pop"), false);
+  assert.deepEqual(erroresPagina, []);
+  await ctx.close();
+});
+
 test("SIMs: un parte que quedó en la cola sin señal registra igual la SIM instalada al enviarse; sin señal se puede elegir la SIM", async () => {
   const { ctx, page, erroresPagina } = await nuevaPagina();
   const accionesSim = [];
