@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.139.0";
+const APP_VERSION = "3.140.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -277,6 +277,7 @@ const screens = {
   comodatoFirma: document.getElementById("screen-comodato-firma"),
   rendicion: document.getElementById("screen-rendicion"),
   ajustes: document.getElementById("screen-ajustes"),
+  fichaCliente: document.getElementById("screen-ficha-cliente"),
   form: document.getElementById("screen-form"),
   claves: document.getElementById("screen-claves"),
   sign: document.getElementById("screen-sign"),
@@ -870,9 +871,11 @@ function showScreen(name) {
   if (btnAjustes) btnAjustes.classList.toggle("hidden", name === "login");
   try { actualizarWakeLockPantalla(name); } catch (e) { /* los ajustes todavía no cargaron */ }
   if (name === "home") { try { actualizarProximoService(); } catch (e) { /* aún no cargó */ } }
+  if (name === "home") { try { document.getElementById("homeBuscarWrap").hidden = !esSkinNuevo(); actualizarAvisosInicio(); } catch (e) { /* aún no cargó */ } }
   try { controlarFaltantesParte(name); } catch (e) { /* aún no cargó */ }
   try { actualizarBarraSuperior(name); } catch (e) { /* aún no cargó */ }
   if (name === "form") { try { pasoParteElegido = null; } catch (e) { /* aún no cargó */ } }
+  if (name === "sign") { try { pintarResumenFirma(); } catch (e) { /* aún no cargó */ } }
   if (name === "form") { try { sincronizarChipsElegidos(); refrescarAtajosMateriales(); cargarHistorialMateriales(); } catch (e) { /* aún no cargó */ } }
 }
 
@@ -913,7 +916,7 @@ function actualizarBarraSuperior(name) {
     const otros = Array.from(bar.querySelectorAll("button, a")).filter((b) => b !== volver && !b.classList.contains("hidden") && getComputedStyle(b).display !== "none");
     if (otros.length === 0) bar.classList.add("solo-volver");
   }
-  const nombresCortos = { consultas: "Manuales", dashboard: "Dashboard", dashboardFinanciero: "Financiero", dashboardVehiculos: "Vehículos", dashboardHerramientas: "Herramientas", dashboardSims: "SIMs", simDetalle: "Ficha de la SIM", simRegistro: "SIMs instaladas" };
+  const nombresCortos = { consultas: "Manuales", dashboard: "Dashboard", dashboardFinanciero: "Financiero", dashboardVehiculos: "Vehículos", dashboardHerramientas: "Herramientas", dashboardSims: "SIMs", simDetalle: "Ficha de la SIM", fichaCliente: "Ficha del cliente", sign: "Firma del cliente", simRegistro: "SIMs instaladas" };
   if (seccion) seccion.textContent = name === "home" ? "Servicio técnico" : (nombresCortos[name] || nombreDePantalla(pantalla) || "Servicio técnico");
   document.querySelector(".topbar")?.classList.toggle("en-seccion", name !== "home" && name !== "login");
 }
@@ -925,6 +928,7 @@ document.getElementById("topbarVolverBtn").addEventListener("click", () => {
 function setStatus(text, mode) {
   statusPill.textContent = text;
   statusPill.className = "topbar-status" + (mode ? " " + mode : "");
+  if (mode !== "busy") { try { actualizarPillConexion(); } catch (e) { /* aún no cargó */ } }
 }
 
 // El "LISTO" de arriba no era clickeable — ahora sirve para consultar
@@ -2024,6 +2028,278 @@ manualReportBtn.addEventListener("click", () => {
   cargarOpcionesSimInstalar();
   showScreen("form");
 });
+
+
+// ======================================================================
+// Ficha del cliente (skin nuevo): todo lo que sabemos de un cliente en
+// una sola pantalla — pendientes, últimas visitas, claves, SIM, plano.
+// ======================================================================
+const homeBuscarCliente = document.getElementById("homeBuscarCliente");
+const homeBuscarResultados = document.getElementById("homeBuscarResultados");
+let fichaClienteActual = null;
+
+function candidatosFicha() {
+  // Clientes de la base + los que aparecen en pendientes (por si todavía no están en la base)
+  const mapa = new Map();
+  (clientesGeneralCache || []).forEach((c) => { if (c.nombre) mapa.set("c:" + (c.numero_cliente || c.nombre), { ...c }); });
+  (serviciosCache || []).forEach((sv) => {
+    if (!sv.cliente) return;
+    const ya = [...mapa.values()].some((c) => normalizeText(c.nombre) === normalizeText(sv.cliente));
+    if (!ya) mapa.set("s:" + sv.cliente, { nombre: sv.cliente, direccion: sv.direccion, localidad: sv.localidad, telefono: sv.telefono });
+  });
+  return [...mapa.values()];
+}
+function buscarClientesFicha(texto) {
+  const t = normalizeText(texto);
+  if (t.length < 2) return [];
+  const num = texto.replace(/\D/g, "");
+  return candidatosFicha().filter((c) =>
+    normalizeText(`${c.nombre} ${c.direccion || ""} ${c.localidad || ""}`).includes(t) ||
+    (num.length >= 2 && String(c.numero_cliente || "").replace(/\D/g, "").includes(num))
+  ).slice(0, 8);
+}
+homeBuscarCliente.addEventListener("focus", () => { cargarClientesGeneral(); });
+homeBuscarCliente.addEventListener("input", () => {
+  const lista = buscarClientesFicha(homeBuscarCliente.value);
+  homeBuscarResultados.innerHTML = !homeBuscarCliente.value.trim() ? "" : lista.length
+    ? lista.map((c, i) => `<button type="button" class="home-buscar-item" data-i="${i}"><b>${escapeHtml(c.nombre)}</b><span>${escapeHtml([c.direccion, c.localidad].filter(Boolean).join(", "))}${c.numero_cliente ? " · N° " + escapeHtml(c.numero_cliente) : ""}</span></button>`).join("")
+    : '<p class="list-status">No encontramos ese cliente.</p>';
+  homeBuscarResultados.querySelectorAll(".home-buscar-item").forEach((b) => b.addEventListener("click", () => abrirFichaCliente(lista[Number(b.dataset.i)])));
+});
+document.getElementById("volverDeFichaBtn").addEventListener("click", () => showScreen("home"));
+
+function mismoCliente(c, nombre, numero) {
+  if (c.numero_cliente && numero && normalizarNumeroCliente(String(c.numero_cliente)) === normalizarNumeroCliente(String(numero))) return true;
+  return !!nombre && normalizeText(nombre) === normalizeText(c.nombre);
+}
+function clavesDeParte(h) {
+  let c = h.claves;
+  if (typeof c === "string") { try { c = JSON.parse(c); } catch (e) { c = []; } }
+  return Array.isArray(c) ? c : [];
+}
+
+async function abrirFichaCliente(c) {
+  fichaClienteActual = c;
+  homeBuscarCliente.value = "";
+  homeBuscarResultados.innerHTML = "";
+  showScreen("fichaCliente");
+  document.getElementById("fichaNombre").textContent = c.nombre;
+  const nombreEl = document.getElementById("fichaNombre");
+  nombreEl.style.textTransform = "none";
+  document.getElementById("fichaSub").textContent = [[c.direccion, c.localidad].filter(Boolean).join(", "), c.numero_cliente ? "Cliente N° " + c.numero_cliente : "", c.numero_abonado ? "Abonado " + c.numero_abonado : ""].filter(Boolean).join(" · ");
+  const seccion = document.getElementById("topbarSeccion");
+  if (seccion) seccion.textContent = "Ficha del cliente";
+
+  // Acciones
+  const tel = String(c.telefono || "").trim();
+  const q = encodeURIComponent([c.direccion, c.localidad, "Argentina"].filter(Boolean).join(", "));
+  const urlMapa = leerAjustes().appMapas === "waze" ? `https://waze.com/ul?q=${q}&navigate=yes` : `https://www.google.com/maps/dir/?api=1&destination=${q}`;
+  document.getElementById("fichaAcciones").innerHTML = `
+    <button type="button" class="btn btn-primary" id="fichaParteBtn">Cargar parte</button>
+    <div class="ficha-acciones-fila">
+      ${tel ? `<a class="btn btn-secondary" href="tel:${escapeHtml(tel.replace(/[^\d+]/g, ""))}">Llamar</a>` : ""}
+      ${c.direccion ? `<a class="btn btn-secondary" href="${urlMapa}" target="_blank" rel="noopener">Cómo llegar</a>` : ""}
+    </div>`;
+  document.getElementById("fichaParteBtn").addEventListener("click", () => {
+    const pend = (serviciosCache || []).find((sv) => mismoCliente(c, sv.cliente, sv.numero_cliente));
+    if (pend) { seleccionarServicio(pend); return; }
+    manualReportBtn.click();
+    document.getElementById("f_cliente").value = c.nombre || "";
+    document.getElementById("f_direccion").value = c.direccion || "";
+    const loc = document.getElementById("f_localidad"); if (loc) loc.value = c.localidad || "";
+    currentNumeroCliente = c.numero_cliente || "";
+    document.getElementById("f_cliente").dispatchEvent(new Event("input", { bubbles: true }));
+  });
+
+  const cont = document.getElementById("fichaSecciones");
+  cont.innerHTML = '<p class="list-status">Juntando la información del cliente...</p>';
+  // Lo que ya está en memoria se muestra enseguida; lo demás se trae.
+  try { if (!historialCache.length) await precargarHistorialParaVisitas(); } catch (e) { /* sin señal */ }
+  if (fichaClienteActual !== c) return;
+  const pendientes = (serviciosCache || []).filter((sv) => mismoCliente(c, sv.cliente, sv.numero_cliente));
+  const visitas = historialCache.filter((h) => mismoCliente(c, h.cliente, h.numero_cliente))
+    .sort((a, b) => `${b.fecha || ""} ${b.hora_entrada || ""}`.localeCompare(`${a.fecha || ""} ${a.hora_entrada || ""}`));
+  const claves = [];
+  visitas.forEach((h) => clavesDeParte(h).forEach((k) => {
+    if (!claves.some((x) => x.titulo === k.titulo && x.usuario === k.usuario && x.clave === k.clave)) claves.push({ ...k, fecha: h.fecha });
+  }));
+  const fecha = (f) => (f ? f.split("-").reverse().join("/") : "");
+  const bloques = [];
+  bloques.push(`<div class="ficha-bloque"><p class="dash-subtitulo">Pendientes</p>${pendientes.length ? pendientes.map((sv) => `<button type="button" class="ficha-pend" data-num="${escapeHtml(sv.numero_servicio || "")}"><b>N° ${escapeHtml(sv.numero_servicio || "")}</b> ${escapeHtml(sv.tarea || "")}</button>`).join("") : '<p class="list-status">No tiene servicios pendientes.</p>'}</div>`);
+  bloques.push(`<div class="ficha-bloque"><p class="dash-subtitulo">Últimas visitas${visitas.length ? ` <span class="ficha-cuenta">(${visitas.length})</span>` : ""}</p>${visitas.length ? visitas.slice(0, 5).map((h) => `<div class="ficha-visita"><div class="ficha-visita-top"><b>${fecha(h.fecha)}</b> · ${escapeHtml(h.tecnico || "")}${h.es_instalacion ? ' · <span class="ficha-tag">Instalación</span>' : ""}</div>${h.tarea ? `<div class="ficha-visita-tarea">${escapeHtml(h.tarea)}</div>` : ""}${h.observaciones ? `<div class="ficha-visita-obs">${escapeHtml(h.observaciones)}</div>` : ""}${h.materiales ? `<div class="ficha-visita-obs">Materiales: ${escapeHtml(h.materiales)}</div>` : ""}</div>`).join("") : '<p class="list-status">Sin visitas registradas en la app.</p>'}</div>`);
+  bloques.push(`<div class="ficha-bloque"><p class="dash-subtitulo">Claves y códigos</p>${claves.length ? `<button type="button" class="btn btn-ghost btn-small" id="fichaVerClavesBtn">Mostrar ${claves.length} clave${claves.length === 1 ? "" : "s"} guardada${claves.length === 1 ? "" : "s"}</button><div id="fichaClaves" hidden>${claves.map((k) => `<div class="ficha-clave"><b>${escapeHtml(k.titulo || "Clave")}</b>${k.usuario ? `<span>Usuario: <code>${escapeHtml(k.usuario)}</code></span>` : ""}${k.clave ? `<span>Clave: <code>${escapeHtml(k.clave)}</code></span>` : ""}${k.codigo ? `<span>Código: <code>${escapeHtml(k.codigo)}</code></span>` : ""}<small>del ${fecha(k.fecha)}</small></div>`).join("")}</div>` : '<p class="list-status">No hay claves cargadas en los partes.</p>'}</div>`);
+  bloques.push(`<div class="ficha-bloque" id="fichaSimBloque"><p class="dash-subtitulo">SIM instalada</p><p class="list-status">Buscando...</p></div>`);
+  bloques.push(`<div class="ficha-bloque" id="fichaPlanoBloque"><p class="dash-subtitulo">Plano</p><p class="list-status">Buscando...</p></div>`);
+  cont.innerHTML = bloques.join("");
+  const verClaves = document.getElementById("fichaVerClavesBtn");
+  if (verClaves) verClaves.addEventListener("click", () => { document.getElementById("fichaClaves").hidden = false; verClaves.remove(); });
+  cont.querySelectorAll(".ficha-pend").forEach((b) => b.addEventListener("click", () => {
+    const sv = pendientes.find((x) => String(x.numero_servicio || "") === b.dataset.num);
+    if (sv) seleccionarServicio(sv);
+  }));
+
+  // SIM instalada (registro de instaladas)
+  (async () => {
+    const bloque = document.getElementById("fichaSimBloque");
+    try {
+      if (!simsRegistroCache) await cargarSimsRegistro();
+      if (fichaClienteActual !== c || !bloque) return;
+      const sims = (simsRegistroCache || []).filter((x) => mismoCliente(c, x.cliente, x.numero_cliente));
+      bloque.innerHTML = `<p class="dash-subtitulo">SIM instalada</p>${sims.length ? sims.map((x) => `<div class="ficha-sim"><span class="sim-card-dot" style="background:${COLORES_COMPANIA_SIM[x.empresa] || "#8A9089"};"></span><b>${escapeHtml(x.numero)}</b> · ${escapeHtml(x.empresa || "")}${x.estado_linea ? ` · ${escapeHtml(x.estado_linea)}` : ""}${x.fecha_activacion ? `<small> desde ${escapeHtml(x.fecha_activacion)}</small>` : ""}</div>`).join("") : '<p class="list-status">No tiene una SIM registrada.</p>'}`;
+    } catch (e) { if (bloque) bloque.innerHTML = '<p class="dash-subtitulo">SIM instalada</p><p class="list-status">No se pudo consultar.</p>'; }
+  })();
+  // Plano
+  (async () => {
+    const bloque = document.getElementById("fichaPlanoBloque");
+    try {
+      await cargarPlanos();
+      if (fichaClienteActual !== c || !bloque) return;
+      const planos = (planosCache || []).filter((p) => (c.numero_cliente && p.numero_cliente && normalizarNumeroCliente(p.numero_cliente) === normalizarNumeroCliente(String(c.numero_cliente))) || (p.nombre_cliente && normalizeText(p.nombre_cliente) === normalizeText(c.nombre)))
+        .sort((a, b) => a.indice_plano - b.indice_plano);
+      bloque.innerHTML = `<p class="dash-subtitulo">Plano</p>${planos.length ? `<div class="ficha-planos">${planos.map((p, i) => `<button type="button" class="btn btn-secondary btn-small" data-nombre="${escapeHtml(p.nombre)}">${planos.length > 1 ? "Plano " + (i + 1) : "Ver plano"}</button>`).join("")}</div>` : '<p class="list-status">No tiene plano cargado.</p>'}`;
+      bloque.querySelectorAll("button[data-nombre]").forEach((b) => b.addEventListener("click", () => abrirPlano(b.dataset.nombre, b)));
+    } catch (e) { if (bloque) bloque.innerHTML = '<p class="dash-subtitulo">Plano</p><p class="list-status">No se pudo consultar.</p>'; }
+  })();
+}
+
+
+// ======================================================================
+// Skin nuevo: avisos en las teclas del inicio, estado de conexión en la
+// barra, deslizar para actualizar e inicio más simple.
+// ======================================================================
+let avisosInicioUltimo = 0;
+function ponerBadge(id, n, texto) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const mostrar = esSkinNuevo() && n > 0;
+  el.classList.toggle("hidden", !mostrar);
+  if (mostrar) el.textContent = texto || String(n);
+}
+async function actualizarAvisosInicio(forzar) {
+  if (!esSkinNuevo() || !tecnicoLogueado) { ["simsAvisoBadge", "rendicionAvisoBadge", "instalacionAvisoBadge"].forEach((id) => ponerBadge(id, 0)); return; }
+  if (!forzar && Date.now() - avisosInicioUltimo < 120000) return;
+  avisosInicioUltimo = Date.now();
+  const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+  const yo = tecnicoLogueado;
+  const pedir = (url) => fetch(url, { headers, cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  const [pend, rends, inst] = await Promise.all([
+    pedir(`/api/recurso-uso?recurso=sim&pendientes=1&tecnico=${encodeURIComponent(yo)}`),
+    pedir("/api/recurso-uso?recurso=rendicion"),
+    pedir(`/api/historial?tipo=instalacion_abierta&tecnico=${encodeURIComponent(yo)}`),
+  ]);
+  if (yo !== tecnicoLogueado) return;
+  if (Array.isArray(pend)) ponerBadge("simsAvisoBadge", pend.length);
+  if (Array.isArray(rends)) {
+    let vistas = [];
+    try { vistas = JSON.parse(localStorage.getItem("rendiciones_vistas") || "[]"); } catch (e) { vistas = []; }
+    const novedades = rends.filter((r) => r.tecnico === yo && (r.estado === "rechazado" || r.estado === "pagado") && !vistas.includes(`${r.id}:${r.estado}`));
+    ponerBadge("rendicionAvisoBadge", novedades.length);
+  }
+  if (inst && typeof inst === "object") ponerBadge("instalacionAvisoBadge", inst.abierta ? 1 : 0, "Abierta");
+}
+// Al entrar a Rendir ticket, lo pagado/rechazado queda como visto.
+document.getElementById("tileRendicionBtn").addEventListener("click", () => {
+  setTimeout(() => {
+    try {
+      const vistas = (rendicionesCache || []).filter((r) => r.estado === "rechazado" || r.estado === "pagado").map((r) => `${r.id}:${r.estado}`);
+      const previas = JSON.parse(localStorage.getItem("rendiciones_vistas") || "[]");
+      localStorage.setItem("rendiciones_vistas", JSON.stringify([...new Set([...previas, ...vistas])].slice(-300)));
+      ponerBadge("rendicionAvisoBadge", 0);
+    } catch (e) { /* nada */ }
+  }, 2500);
+});
+
+// Estado de conexión en la barra (en vez de "LISTO" fijo)
+function actualizarPillConexion() {
+  if (!esSkinNuevo() || statusPill.classList.contains("busy")) return;
+  const cola = typeof obtenerColaEnvios === "function" ? obtenerColaEnvios().length : 0;
+  const sinSenal = navigator.onLine === false;
+  statusPill.classList.toggle("sin-senal", sinSenal);
+  statusPill.classList.toggle("por-enviar", !sinSenal && cola > 0);
+  statusPill.textContent = sinSenal ? (cola ? `Sin señal · ${cola} por enviar` : "Sin señal") : (cola ? `${cola} por enviar` : "Conectado");
+}
+window.addEventListener("online", actualizarPillConexion);
+window.addEventListener("offline", actualizarPillConexion);
+setInterval(actualizarPillConexion, 15000);
+
+// Deslizar hacia abajo para actualizar (en el celular, reemplaza los botones "Actualizar")
+const ACCION_REFRESCO = {
+  home: () => { precargarCronogramaParaSugerencias().then(() => actualizarProximoService()); fetchServicios(); actualizarAvisosInicio(true); },
+  notas: () => fetchNotas(),
+  sims: () => { renderSimsLista(); cargarTransferenciasPendientes(); cargarTransferenciasMandadas(); },
+};
+function instalarDeslizarParaActualizar() {
+  Object.entries(screens).forEach(([nombre, pantalla]) => {
+    const scroll = pantalla && pantalla.querySelector(".review-scroll");
+    if (!scroll) return;
+    const boton = scroll.querySelector('button[id^="refresh"][id$="Btn"]');
+    const accion = ACCION_REFRESCO[nombre] || (boton ? () => boton.click() : null);
+    if (!accion) return;
+    const ind = document.createElement("div");
+    ind.className = "ptr-indicador";
+    ind.innerHTML = '<span class="ptr-flecha">↓</span><span class="ptr-texto">Deslizá para actualizar</span>';
+    scroll.prepend(ind);
+    let y0 = null, dy = 0;
+    scroll.addEventListener("touchstart", (e) => { if (!esSkinNuevo() || scroll.scrollTop > 0) { y0 = null; return; } y0 = e.touches[0].clientY; dy = 0; }, { passive: true });
+    scroll.addEventListener("touchmove", (e) => {
+      if (y0 === null) return;
+      dy = Math.max(0, e.touches[0].clientY - y0);
+      const alto = Math.min(70, dy * 0.5);
+      ind.style.height = alto + "px";
+      ind.classList.toggle("listo", dy > 120);
+      ind.querySelector(".ptr-texto").textContent = dy > 120 ? "Soltá para actualizar" : "Deslizá para actualizar";
+    }, { passive: true });
+    scroll.addEventListener("touchend", () => {
+      if (y0 === null) return;
+      const disparar = dy > 120;
+      y0 = null;
+      if (disparar) {
+        ind.classList.add("cargando");
+        ind.querySelector(".ptr-texto").textContent = "Actualizando...";
+        try { accion(); } catch (e) { /* nada */ }
+        setTimeout(() => { ind.style.height = "0"; ind.classList.remove("cargando", "listo"); }, 900);
+      } else {
+        ind.style.height = "0";
+      }
+    });
+  });
+}
+instalarDeslizarParaActualizar();
+try { actualizarPillConexion(); } catch (e) { /* nada */ }
+
+document.getElementById("ajusteOrdenAutoBtn").addEventListener("click", () => {
+  const aj = leerAjustes();
+  aj.mosaicos = { orden: [], ocultos: (aj.mosaicos && aj.mosaicos.ocultos) || [] };
+  guardarAjustes(aj);
+  aplicarMosaicos();
+  renderAjustes();
+  try { renderMosaicosAjustes(); } catch (e) { /* nada */ }
+  showToast("Listo: las teclas se ordenan solas según el uso.");
+});
+document.getElementById("ajusteNotifBtn").addEventListener("click", async () => {
+  try { await activarNotificacionesFlow(false); } catch (e) { /* se avisa adentro */ }
+  verificarEstadoNotificaciones();
+});
+// Firma (skin nuevo): lo que el cliente está firmando, a la vista.
+function pintarResumenFirma() {
+  const el = document.getElementById("signResumen");
+  if (!el) return;
+  el.hidden = !esSkinNuevo();
+  if (el.hidden) return;
+  const v = (id) => ((document.getElementById(id) || {}).value || "").trim();
+  const costo = v("f_costo_final") || v("f_importe");
+  let forma = "";
+  try { forma = getFormaPago(); } catch (e) { /* nada */ }
+  const tarea = v("f_tarea");
+  el.innerHTML = `<b>${escapeHtml(v("f_cliente") || "Cliente")}</b>${v("f_direccion") ? `<span>${escapeHtml(v("f_direccion"))}</span>` : ""}${tarea ? `<span class="sr-tarea">${escapeHtml(tarea.length > 140 ? tarea.slice(0, 140) + "…" : tarea)}</span>` : ""}${costo ? `<span class="sr-monto">Total: ${escapeHtml(costo)}${forma ? " · " + escapeHtml(forma) : ""}</span>` : ""}`;
+}
+// Inicio: las teclas se ordenan solas por uso (si no se ordenaron a mano)
+function leerUsoMosaicos() { try { return JSON.parse(localStorage.getItem("uso_mosaicos") || "{}") || {}; } catch (e) { return {}; } }
+mosaicosDelInicio().forEach((el) => el.addEventListener("click", () => {
+  const uso = leerUsoMosaicos();
+  uso[el.id] = (uso[el.id] || 0) + 1;
+  try { localStorage.setItem("uso_mosaicos", JSON.stringify(uso)); } catch (e) { /* nada */ }
+}));
 
 // ---------- Cronograma semanal ----------
 let cronogramaCache = [];
@@ -4240,6 +4516,7 @@ function actualizarBadgeColaEnvios() {
   } else {
     colaEnviosBanner.classList.add("hidden");
   }
+  try { actualizarPillConexion(); } catch (e) { /* aún no cargó */ }
 }
 
 let procesandoColaEnvios = false;
@@ -7025,6 +7302,16 @@ let pantallaAntesDeAjustes = "home";
 
 function renderAjustes() {
   const aj = leerAjustes();
+  try {
+    const nuevo = document.documentElement.dataset.inicio === "nuevo";
+    const manual = Array.isArray((aj.mosaicos || {}).orden) && aj.mosaicos.orden.length > 0;
+    const wrapOrden = document.getElementById("ajusteOrdenAuto");
+    wrapOrden.hidden = !nuevo;
+    document.getElementById("ajusteOrdenAutoTexto").textContent = manual ? "Las teclas del inicio tienen un orden armado a mano." : "Las teclas del inicio se ordenan solas según cuánto las usás.";
+    document.getElementById("ajusteOrdenAutoBtn").classList.toggle("hidden", !manual);
+    document.getElementById("ajusteNotifWrap").hidden = !nuevo;
+    verificarEstadoNotificaciones();
+  } catch (e) { /* aún no cargó */ }
   document.querySelectorAll("#ajusteTemas .ajuste-tema-chip").forEach((chip) => {
     chip.classList.toggle("active", chip.dataset.tema === aj.tema);
   });
@@ -7332,7 +7619,15 @@ function mosaicosDelInicio() {
 }
 function aplicarMosaicos() {
   const m = leerAjustes().mosaicos || {};
-  const orden = Array.isArray(m.orden) ? m.orden : [];
+  let orden = Array.isArray(m.orden) ? m.orden : [];
+  if (!orden.length && document.documentElement.dataset.inicio === "nuevo") {
+    // Sin orden manual: Servicios Técnicos primero y el resto por cuánto se usa.
+    let uso = {};
+    try { uso = JSON.parse(localStorage.getItem("uso_mosaicos") || "{}") || {}; } catch (e) { uso = {}; }
+    const todos = mosaicosDelInicio();
+    orden = todos.map((el, i) => ({ id: el.id, i, n: el.id === "tileServiciosBtn" ? Infinity : (uso[el.id] || 0) }))
+      .sort((a, b) => b.n - a.n || a.i - b.i).map((x) => x.id);
+  }
   const ocultos = new Set(Array.isArray(m.ocultos) ? m.ocultos : []);
   mosaicosDelInicio().forEach((el, i) => {
     const idx = orden.indexOf(el.id);
@@ -10754,6 +11049,14 @@ async function verificarEstadoNotificaciones() {
   try {
     const registro = await navigator.serviceWorker.ready;
     const suscripcion = await registro.pushManager.getSubscription();
+    try {
+      const nuevoSkin = document.documentElement.dataset.inicio === "nuevo";
+      const resuelto = !!suscripcion || Notification.permission === "denied";
+      activarNotificacionesBtn.classList.toggle("oculto-nuevo", nuevoSkin && resuelto);
+      const t = document.getElementById("ajusteNotifTexto"), b = document.getElementById("ajusteNotifBtn");
+      if (t) t.textContent = suscripcion ? "Activadas en este celular." : Notification.permission === "denied" ? "Bloqueadas: hay que habilitarlas desde los permisos del navegador." : "Desactivadas.";
+      if (b) b.classList.toggle("hidden", !!suscripcion || Notification.permission === "denied");
+    } catch (e) { /* nada */ }
     activarNotificacionesBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15" style="vertical-align:-2px; margin-right:4px;"><path d="M12 3a5 5 0 0 0-5 5c0 6-3 8-3 8h16s-3-2-3-8a5 5 0 0 0-5-5z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg>${suscripcion ? "Notificaciones activadas" : "Activar notificaciones"}`;
     // Notificaciones activadas por defecto: si nunca se le preguntó
     // a este navegador (Notification.permission === "default", ni

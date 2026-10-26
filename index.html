@@ -102,6 +102,11 @@
       </header>
       <p class="hint-eyebrow review-eyebrow home-eyebrow-clasico">PANEL PRINCIPAL</p>
 
+      <div class="solo-nuevo-bloque home-buscar" id="homeBuscarWrap" hidden>
+        <input class="field-input" id="homeBuscarCliente" type="search" placeholder="Buscar cliente: nombre, dirección o N°..." autocomplete="off" aria-label="Buscar cliente">
+        <div id="homeBuscarResultados" class="home-buscar-resultados"></div>
+      </div>
+
       <div class="proximo-service hidden" id="proximoServiceCard">
         <button type="button" class="proximo-service-main" id="proximoServiceMain">
           <span class="proximo-service-titulo">Próximo service</span>
@@ -198,6 +203,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h6l4 4v12a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><rect x="9.5" y="10" width="5" height="5.5" rx="1"/></svg>
           </span>
           <span class="panel-tile-label">SIMs</span>
+          <span class="panel-tile-count hidden" id="simsAvisoBadge">0</span>
         </button>
         <button type="button" class="panel-tile panel-tile-grid tile-herramientas" id="tileHerramientasBtn">
           <span class="panel-tile-icon-badge">
@@ -210,6 +216,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 18v3"/><circle cx="8" cy="9" r="1"/><circle cx="12" cy="9" r="1"/><circle cx="16" cy="9" r="1"/><circle cx="8" cy="13" r="1"/><circle cx="12" cy="13" r="1"/></svg>
           </span>
           <span class="panel-tile-label">Instalación</span>
+          <span class="panel-tile-count panel-tile-count-texto hidden" id="instalacionAvisoBadge">Abierta</span>
         </button>
         <button type="button" class="panel-tile panel-tile-grid tile-comodato" id="tileComodatoBtn">
           <span class="panel-tile-icon-badge">
@@ -222,6 +229,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h12v19l-3-2-3 2-3-2-3 2V2z"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="11" x2="15" y2="11"/><line x1="9" y1="15" x2="12" y2="15"/></svg>
           </span>
           <span class="panel-tile-label">Rendir ticket</span>
+          <span class="panel-tile-count hidden" id="rendicionAvisoBadge">0</span>
         </button>
         <button type="button" class="panel-tile panel-tile-grid tile-planos" id="tilePlanosBtn">
           <span class="panel-tile-icon-badge">
@@ -244,6 +252,19 @@
       </div>
 
       <button type="button" class="btn btn-ghost btn-small" id="cerrarSesionBtn" style="margin-top:18px;">Cerrar sesión</button>
+    </div>
+  </section>
+
+  <!-- FICHA DEL CLIENTE (skin nuevo) -->
+  <section class="screen" id="screen-ficha-cliente">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow" id="fichaNombre">CLIENTE</p>
+      <p class="ficha-sub" id="fichaSub"></p>
+      <div class="ficha-acciones" id="fichaAcciones"></div>
+      <div id="fichaSecciones"></div>
+    </div>
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDeFichaBtn" type="button">Volver</button>
     </div>
   </section>
 
@@ -1386,7 +1407,19 @@
       </div>
       <p class="ajuste-nota" style="margin:0 0 10px;">Nuevo: teclas oscuras y Servicios Técnicos destacado. Clásico: tarjetas blancas con íconos de colores.</p>
       <p class="ajuste-nota" style="margin:0 0 8px;">Ordená los mosaicos con las flechas y ocultá los que no uses con el ojo.</p>
+      <div class="solo-nuevo-bloque ajuste-orden-auto" id="ajusteOrdenAuto" hidden>
+        <span id="ajusteOrdenAutoTexto"></span>
+        <button type="button" class="btn btn-ghost btn-small" id="ajusteOrdenAutoBtn">Volver al orden automático</button>
+      </div>
       <div id="ajusteMosaicos"></div>
+
+      <div class="solo-nuevo-bloque" id="ajusteNotifWrap" hidden>
+        <p class="ajuste-seccion">Notificaciones</p>
+        <div class="ajuste-orden-auto">
+          <span id="ajusteNotifTexto">Consultando...</span>
+          <button type="button" class="btn btn-ghost btn-small" id="ajusteNotifBtn">Activar</button>
+        </div>
+      </div>
 
       <p class="ajuste-seccion">App de mapas</p>
       <div class="ajuste-tamanos" id="ajusteMapas" style="grid-template-columns:repeat(2,1fr);">
@@ -2352,13 +2385,15 @@
   <!-- STEP 2: SIGNATURE -->
   <section class="screen" id="screen-sign">
     <div class="sign-header">
-      <p class="hint-eyebrow">PASO 02 · CONFORMIDAD DEL CLIENTE</p>
+      <p class="hint-eyebrow"><span class="solo-clasico">PASO 02 · CONFORMIDAD DEL CLIENTE</span><span class="solo-nuevo">Firma del cliente</span></p>
       <p class="hint-text">El cliente firma para confirmar el servicio realizado</p>
     </div>
+    <div class="solo-nuevo-bloque sign-resumen" id="signResumen" hidden></div>
     <div class="sign-pad-wrap">
       <canvas id="signCanvas"></canvas>
       <span class="sign-line-hint">Firma</span>
     </div>
+    <div class="sign-campos">
     <div class="field-group" style="margin-top:14px;">
       <label class="field-label" for="signAclaracion">Aclaración (obligatorio)</label>
       <input class="field-input" id="signAclaracion" type="text" placeholder="Nombre y apellido de quien firma" autocomplete="off">
@@ -2366,6 +2401,7 @@
     <div class="field-group">
       <label class="field-label" for="signCargo">Cargo (opcional)</label>
       <input class="field-input" id="signCargo" type="text" placeholder="Ej: Encargado, Propietario..." autocomplete="off">
+    </div>
     </div>
     <div class="sign-actions">
       <button class="link-btn" id="clearSignBtn" type="button">Limpiar firma</button>

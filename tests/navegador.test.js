@@ -1223,3 +1223,53 @@ test("Dashboards de vehículos, herramientas y SIMs (skin nuevo): cifra principa
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Skin nuevo: ficha del cliente desde el buscador del inicio, avisos en teclas, estado de conexión, firma con resumen y orden automático", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route("**/api/**", (route) => {
+    const u = route.request().url();
+    const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("pendientes=1")) return json([{ id: 1 }, { id: 2 }]);
+    if (u.includes("recurso=rendicion")) return json([{ id: 5, tecnico: "Juan Pérez", estado: "rechazado" }, { id: 6, tecnico: "Juan Pérez", estado: "pendiente" }]);
+    if (u.includes("instalacion_abierta")) return json({ abierta: { id: 9 } });
+    if (u.includes("coleccion=sims_instaladas")) return json([{ numero: "341 555-0101", empresa: "Claro", cliente: "Panadería Sur", numero_cliente: "1203" }]);
+    if (u.includes("/api/planos")) return json([{ nombre: "CLI_1203" }]);
+    if (u.includes("coleccion=clientes")) return json([{ nombre: "Panadería Sur", direccion: "Mitre 100", numero_cliente: "1203", telefono: "341" }]);
+    if (u.includes("/api/historial")) return json([{ cliente: "Panadería Sur", numero_cliente: "1203", fecha: "2026-10-10", tecnico: "Luis", tarea: "Cambio de batería", claves: [{ titulo: "Alarma", usuario: "inst", clave: "5555" }] }]);
+    json([]);
+  });
+  await page.goto(base + "/");
+  await page.evaluate(() => { localStorage.setItem("ajustes_app", JSON.stringify({ estiloInicio: "nuevo", avisoFelicitacion: false })); localStorage.removeItem("uso_mosaicos"); });
+  await page.reload();
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { tecnicoLogueado = "Juan Pérez"; serviciosCache = [{ numero_servicio: "4100", cliente: "Panadería Sur", numero_cliente: "1203", tarea: "Sirena" }]; document.getElementById("tileInstaladorBtn").classList.remove("hidden"); showScreen("home"); return actualizarAvisosInicio(true); });
+  assert.strictEqual(await page.locator("#simsAvisoBadge").textContent(), "2", "SIMs por aceptar");
+  assert.strictEqual(await page.locator("#rendicionAvisoBadge").textContent(), "1", "rendición rechazada sin ver");
+  assert.strictEqual(await page.locator("#instalacionAvisoBadge").isVisible(), true);
+  // Estado de conexión
+  await page.evaluate(() => { localStorage.setItem("cola_envios_pendientes", JSON.stringify([{ tipo: "parte" }])); actualizarPillConexion(); });
+  assert.strictEqual(await page.locator("#statusPill").textContent(), "1 por enviar");
+  await page.evaluate(() => localStorage.removeItem("cola_envios_pendientes"));
+  // Buscador y ficha
+  await page.fill("#homeBuscarCliente", "panad");
+  await page.waitForTimeout(300);
+  await page.click(".home-buscar-item");
+  await page.waitForTimeout(800);
+  assert.strictEqual(await page.evaluate(() => screens.fichaCliente.dataset.active), "true");
+  const ficha = await page.locator("#fichaSecciones").textContent();
+  assert.match(ficha, /N° 4100[\s\S]*Cambio de batería[\s\S]*Mostrar 1 clave[\s\S]*341 555-0101[\s\S]*Ver plano/);
+  assert.strictEqual(await page.locator("#fichaClaves").isVisible(), false, "las claves se muestran solo si se tocan");
+  await page.click("#fichaVerClavesBtn");
+  assert.match(await page.locator("#fichaClaves").textContent(), /5555/);
+  await page.click("#fichaParteBtn");
+  assert.strictEqual(await page.evaluate(() => screens.form.dataset.active), "true", "cargar parte abre el servicio pendiente");
+  // Firma con resumen
+  await page.evaluate(() => { document.getElementById("f_tarea").value = "Cambio de sirena"; showScreen("sign"); });
+  assert.match(await page.locator("#signResumen").textContent(), /Panadería Sur[\s\S]*Cambio de sirena/);
+  // Orden automático por uso
+  await page.evaluate(() => { localStorage.setItem("uso_mosaicos", JSON.stringify({ tileSimsBtn: 9, tileNotasBtn: 3 })); aplicarMosaicos(); });
+  const orden = await page.evaluate(() => ["tileServiciosBtn", "tileSimsBtn", "tileNotasBtn", "verConsultasBtn"].map((id) => Number(document.getElementById(id).style.order)));
+  assert.ok(orden[0] < orden[1] && orden[1] < orden[2] && orden[2] < orden[3], "Servicios primero, después lo más usado");
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
