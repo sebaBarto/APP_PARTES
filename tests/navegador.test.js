@@ -1452,3 +1452,40 @@ test("Historial (skin nuevo): búsqueda en todas las fechas y por tarea, agrupad
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Seguridad: la app manda el pase personal que le dio el login y, si el servidor lo rechaza, pide entrar de nuevo", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const authVistos = [];
+  let rechazar = false;
+  await page.route("**/api/**", (route) => {
+    const req = route.request();
+    const body = req.postData() || "";
+    const json = (o, s = 200) => route.fulfill({ status: s, contentType: "application/json", body: JSON.stringify(o) });
+    if (body.includes("verificar_login")) return json({ ok: true, sesion: "s1.PASE.FIRMA" });
+    if (req.url().includes("coleccion=tecnicos") && req.method() === "GET") return json([{ nombre: "Juan Pérez" }]);
+    authVistos.push(req.headers()["authorization"] || "");
+    if (rechazar) return json({ error: "No autorizado" }, 401);
+    json([]);
+  });
+  await page.goto(base + "/");
+  await page.waitForTimeout(400);
+  assert.strictEqual(await page.evaluate(() => SERVICIOS_API_TOKEN), "", "sin entrar no hay ninguna clave");
+  await page.evaluate(() => { loginTecnicoSelect.innerHTML = '<option value="Juan Pérez">Juan Pérez</option>'; loginTecnicoSelect.value = "Juan Pérez"; });
+  await page.fill("#loginPassword", "1234");
+  authVistos.length = 0;
+  await page.evaluate(() => attemptLogin());
+  await page.waitForTimeout(600);
+  assert.strictEqual(await page.evaluate(() => screens.home.dataset.active), "true");
+  const sinPase = authVistos.filter((a) => a !== "Bearer s1.PASE.FIRMA");
+  assert.ok(authVistos.length > 0 && sinPase.length === 0, "todos los pedidos llevan el pase personal: " + JSON.stringify(sinPase));
+  assert.strictEqual(await page.evaluate(() => localStorage.getItem("sat_api_sesion")), "s1.PASE.FIRMA");
+  // El servidor deja de aceptarlo (venció o se cambió la clave): vuelve al login
+  rechazar = true;
+  await page.evaluate(() => fetch("/api/historial", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN } }));
+  await page.waitForTimeout(300);
+  assert.strictEqual(await page.evaluate(() => screens.login.dataset.active), "true");
+  assert.match(await page.locator("#loginError").textContent(), /volvé a entrar/);
+  assert.strictEqual(await page.evaluate(() => localStorage.getItem("sat_api_sesion")), null);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

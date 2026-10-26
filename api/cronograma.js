@@ -110,7 +110,7 @@ async function guardarRespaldoGitHub(ghHeaders, apiUrl, datos) {
 module.exports = async (req, res) => {
   const authHeader = req.headers["authorization"] || "";
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();
-  if (!process.env.SERVICIOS_API_TOKEN || token !== process.env.SERVICIOS_API_TOKEN) {
+  if (!require("../lib/sesion").autorizar(req)) {
     res.status(401).json({ error: "No autorizado" });
     return;
   }

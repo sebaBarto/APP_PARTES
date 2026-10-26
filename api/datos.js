@@ -412,10 +412,53 @@ module.exports = async (req, res) => {
     return;
   }
 
-  const authHeader = req.headers["authorization"] || "";
-  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
-  if (!process.env.SERVICIOS_API_TOKEN || token !== process.env.SERVICIOS_API_TOKEN) {
-    res.status(401).json({ error: "No autorizado" });
+  // ---------- Quién pide (sesión personal firmada, ver lib/sesion.js) ----------
+  const { autorizar, crearSesion } = require("../lib/sesion");
+  const autorizacion = autorizar(req);
+  let cuerpoAccion = null;
+  if (req.method === "POST") {
+    cuerpoAccion = req.body;
+    if (typeof cuerpoAccion === "string") {
+      try { cuerpoAccion = JSON.parse(cuerpoAccion); } catch (err) { cuerpoAccion = null; }
+    }
+  }
+  const accionPedida = cuerpoAccion && !Array.isArray(cuerpoAccion) ? cuerpoAccion.accion : "";
+  // Lo único que se puede pedir SIN estar logueado: entrar (contraseña o
+  // huella) y lo mínimo que muestra la pantalla de login.
+  const ACCIONES_SIN_LOGIN = ["verificar_login", "verificar_admin", "webauthn_tiene_credencial", "webauthn_login_opciones", "webauthn_login_verificar"];
+  const accionSinLogin = ACCIONES_SIN_LOGIN.includes(accionPedida);
+  const lecturaSinLogin = req.method === "GET" && ["tecnicos", "config"].includes(req.query && req.query.coleccion);
+  if (!autorizacion && !accionSinLogin && !lecturaSinLogin) {
+    res.status(401).json({ error: "No autorizado", sesion_vencida: true });
+    return;
+  }
+  const jsonOriginal = res.json.bind(res);
+  if (!autorizacion && lecturaSinLogin) {
+    // Sin login: de la lista de técnicos solo los nombres (para el
+    // desplegable), y de la configuración solo lo que usa el login.
+    res.json = (data) => {
+      if (Array.isArray(data)) return jsonOriginal(data.filter((t) => t && t.nombre).map((t) => ({ nombre: t.nombre })));
+      if (data && typeof data === "object" && !data.error) {
+        return jsonOriginal({ app_version_actual: data.app_version_actual, dias_atencion: data.dias_atencion, dias_urgente: data.dias_urgente });
+      }
+      return jsonOriginal(data);
+    };
+  }
+  // Al entrar bien, la respuesta lleva el pase personal ("sesion").
+  if (accionPedida === "verificar_admin" || accionPedida === "verificar_login" || accionPedida === "webauthn_login_verificar") {
+    res.json = (data) => {
+      if (data && data.ok === true && res.statusCode === 200) {
+        const sesion = accionPedida === "verificar_admin"
+          ? crearSesion({ nombre: "", rol: "admin" })
+          : crearSesion({ nombre: String(cuerpoAccion.nombre || ""), rol: "tecnico" });
+        return jsonOriginal({ ...data, sesion });
+      }
+      return jsonOriginal(data);
+    };
+  }
+  // La lista de técnicos (contraseñas y permisos) solo la cambia la oficina.
+  if (req.query && req.query.coleccion === "tecnicos" && ["POST", "PUT", "DELETE"].includes(req.method) && !accionPedida && autorizacion.rol !== "admin") {
+    res.status(403).json({ error: "Solo la oficina puede modificar los técnicos" });
     return;
   }
 
@@ -521,6 +564,40 @@ module.exports = async (req, res) => {
       const { BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN, GITHUB_DATA_TOKEN, GITHUB_DATA_REPO } = process.env;
       const nombre = bodyAccion.nombre;
       const password = bodyAccion.password;
+      // Mismo bloqueo por intentos fallidos que el login de oficina: ahora
+      // la contraseña es la única puerta, así que no se puede probar sin límite.
+      const ipLogin = (req.headers["x-forwarded-for"] || req.headers["x-real-ip"] || "desconocida").toString().split(",")[0].trim();
+      const registrarIntento = async (exito) => {
+        if (!BACKEND_NUEVO_URL || !BACKEND_NUEVO_TOKEN) return null;
+        try {
+          const r = await fetch(`${BACKEND_NUEVO_URL}/api/admin-login/registrar`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${BACKEND_NUEVO_TOKEN}`, "Content-Type": "application/json" },
+            body: JSON.stringify({ ip: "tec:" + ipLogin, exito }),
+          });
+          return await r.json();
+        } catch (e) { return null; }
+      };
+      const responderLogin = async (ok) => {
+        const registro = await registrarIntento(ok);
+        if (!ok && registro && registro.bloqueado) {
+          res.status(200).json({ ok: false, bloqueado: true, minutos_restantes: registro.minutos_restantes });
+          return;
+        }
+        res.status(200).json({ ok });
+      };
+      if (BACKEND_NUEVO_URL && BACKEND_NUEVO_TOKEN) {
+        try {
+          const rEstado = await fetch(`${BACKEND_NUEVO_URL}/api/admin-login/estado?ip=${encodeURIComponent("tec:" + ipLogin)}`, {
+            headers: { Authorization: `Bearer ${BACKEND_NUEVO_TOKEN}` },
+          });
+          const estado = await rEstado.json();
+          if (estado.bloqueado) {
+            res.status(200).json({ ok: false, bloqueado: true, minutos_restantes: estado.minutos_restantes });
+            return;
+          }
+        } catch (err) { /* sin el chequeo de bloqueo se sigue igual */ }
+      }
 
       // 1) Primero se intenta contra el backend nuevo (hash real,
       // PBKDF2) — es lo que va a pasar siempre después de la primera
@@ -535,7 +612,7 @@ module.exports = async (req, res) => {
           if (rNuevo.status === 200) {
             const dataNuevo = await rNuevo.json();
             if (dataNuevo.ok) {
-              res.status(200).json({ ok: true });
+              await responderLogin(true);
               return;
             }
           }
@@ -581,7 +658,7 @@ module.exports = async (req, res) => {
           }).catch(() => {});
         }
 
-        res.status(200).json({ ok });
+        await responderLogin(ok);
       } catch (err) {
         res.status(500).json({ error: "Error interno al verificar" });
       }

@@ -157,10 +157,10 @@ para filtrar por cliente, dirección, N° de servicio o tarea.
    - Guardalo, lo vas a necesitar en el paso 4.
 
 3. **Elegir una clave secreta larga** (por ejemplo, generada con un
-   gestor de contraseñas) y pegarla en dos lugares:
-   - `app.js` → constante `SERVICIOS_API_TOKEN`
-   - `admin.html` → constante `SERVICIOS_API_TOKEN` (¡la misma!)
-   - También poné una contraseña propia en `admin.html` → `ADMIN_PASSWORD`
+   gestor de contraseñas). **Nunca va en el código de la app ni de
+   admin.html**: vive solo como variable de entorno del servidor. La app
+   y el panel usan un pase personal que les da el login (ver
+   `lib/sesion.js` y `herramientas/cambiar-clave-servidor.ps1`).
 
 4. **Cargar las variables de entorno en Vercel** (Project Settings →
    Environment Variables):
@@ -1102,7 +1102,7 @@ backend nuevo quedaron guardadas distinto:
 número de versión en `app.js` **ya no alcanza por sí solo** — ahora hay que actualizarlo
 también ahí. Después de cada despliegue con una versión nueva, correr:
 ```powershell
-Invoke-RestMethod -Uri "https://sat-backend.gsigalovsky.workers.dev/api/config" -Method Post -Headers @{Authorization="Bearer 54455ad29a4eb28e48ca915e3510ff95ceb682523fa74b32"; "Content-Type"="application/json"} -Body '{"dias_atencion":3,"dias_urgente":7,"app_version_actual":"3.38.0","felicitacion_semanal_activa":true}'
+Invoke-RestMethod -Uri "https://sat-backend.gsigalovsky.workers.dev/api/config" -Method Post -Headers @{Authorization="Bearer <SERVICIOS_API_TOKEN>"; "Content-Type"="application/json"} -Body '{"dias_atencion":3,"dias_urgente":7,"app_version_actual":"3.38.0","felicitacion_semanal_activa":true}'
 ```
 
 Probado con todo simulado: los seis casos (agrupar/desagrupar materiales, traducir

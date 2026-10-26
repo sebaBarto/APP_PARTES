@@ -1045,8 +1045,23 @@
 <script src="sims-utils.js"></script>
 <script>
 // ==== CONFIGURACIÓN ====
-// Misma clave secreta que SERVICIOS_API_TOKEN en app.js y en Vercel.
-const SERVICIOS_API_TOKEN = "54455ad29a4eb28e48ca915e3510ff95ceb682523fa74b32";
+// Pase de la sesión de oficina: lo entrega el servidor al entrar con la
+// contraseña del panel (ver lib/sesion.js). Vive solo mientras esta
+// pestaña esté abierta — ya no hay ninguna clave fija en el código.
+let SERVICIOS_API_TOKEN = "";
+const fetchOriginalAdmin = window.fetch.bind(window);
+window.fetch = async (...args) => {
+  const r = await fetchOriginalAdmin(...args);
+  try {
+    const url = String((args[0] && args[0].url) || args[0] || "");
+    if (r.status === 401 && url.includes("/api/") && SERVICIOS_API_TOKEN) {
+      SERVICIOS_API_TOKEN = "";
+      alert("La sesión del panel venció. Volvé a entrar con la contraseña.");
+      location.reload();
+    }
+  } catch (e) { /* nada */ }
+  return r;
+};
 // La contraseña del panel ya NO vive acá — se verifica contra el
 // servidor (variable de entorno ADMIN_PASSWORD en Vercel), nunca
 // comparando en el código del navegador.
@@ -1392,6 +1407,7 @@ pwBtn.addEventListener("click", async () => {
     });
     const data = await res.json();
     if (res.ok && data.ok) {
+      SERVICIOS_API_TOKEN = data.sesion || "";
       loginCard.classList.add("hidden");
       mainCard.classList.remove("hidden");
       cargarConfigAdmin();

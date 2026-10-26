@@ -19,8 +19,8 @@ modificado a la app — sin que tengas que entrar a `admin.html` y subirlos a ma
    - `carpeta_planos`: la ruta completa de la carpeta en tu PC donde guardás los planos (podés
      tener subcarpetas adentro, también las vigila).
    - `url_app`: la dirección web de tu app (la misma que usás para entrar desde el navegador).
-   - `token`: el mismo valor que la constante `SERVICIOS_API_TOKEN` en `app.js` del proyecto
-     principal.
+   - `token`: la clave del servidor (variable `SERVICIOS_API_TOKEN` de Vercel). Ya no está en
+     `app.js`; el script `herramientas/cambiar-clave-servidor.bat` la completa solo.
    - `comando_libreoffice`: normalmente `soffice` alcanza si LibreOffice quedó en el PATH del
      sistema. Si en Windows no lo encuentra, poné la ruta completa, por ejemplo:
      `C:\\Program Files\\LibreOffice\\program\\soffice.exe`

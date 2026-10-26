@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "3.144.0";
+const APP_VERSION = "3.145.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -183,10 +183,46 @@ const TECNICOS_PASSWORDS_RESPALDO = {
 // mismo dominio que la app (caso normal).
 const SERVICIOS_URL = "/api/servicios";
 
-// Clave secreta compartida entre esta app, admin.html y la función
-// serverless (ver variable de entorno SERVICIOS_API_TOKEN en Vercel).
-// Cambiala antes de publicar — que sea larga y difícil de adivinar.
-const SERVICIOS_API_TOKEN = "54455ad29a4eb28e48ca915e3510ff95ceb682523fa74b32";
+// Pase personal de la sesión: lo entrega el servidor al entrar con la
+// contraseña o la huella (ver lib/sesion.js), y se manda en cada pedido.
+// Ya NO hay ninguna clave fija escrita en el código de la app.
+let SERVICIOS_API_TOKEN = (() => { try { return localStorage.getItem("sat_api_sesion") || ""; } catch (e) { return ""; } })();
+function guardarPaseApi(pase) {
+  SERVICIOS_API_TOKEN = pase || "";
+  try {
+    if (pase) localStorage.setItem("sat_api_sesion", pase);
+    else localStorage.removeItem("sat_api_sesion");
+  } catch (e) { /* sin almacenamiento: dura mientras la app esté abierta */ }
+}
+// Si el servidor dice que el pase no vale (venció, o se cambió la clave
+// del servidor), se pide entrar de nuevo. Lo que esté en la cola de
+// envíos queda guardado y sale solo después de volver a entrar.
+let avisoSesionVencidaMostrado = false;
+const fetchOriginalSat = window.fetch.bind(window);
+window.fetch = async (...args) => {
+  const r = await fetchOriginalSat(...args);
+  try {
+    const url = String((args[0] && args[0].url) || args[0] || "");
+    if (r.status === 401 && url.includes("/api/") && !url.includes("/api/foto?id=")) sesionVencida();
+  } catch (e) { /* nada */ }
+  return r;
+};
+function sesionVencida() {
+  if (typeof tecnicoLogueado === "undefined") return;
+  const enTrabajo = typeof PANTALLAS_DE_TRABAJO !== "undefined" && Object.entries(screens).some(([n, s]) => s.dataset.active === "true" && PANTALLAS_DE_TRABAJO.includes(n));
+  if (enTrabajo) {
+    // No se le corta lo que está haciendo: se avisa y lo que mande queda en la cola.
+    if (!avisoSesionVencidaMostrado) showToast("Tu sesión venció: lo que envíes queda guardado. Al terminar, cerrá sesión y volvé a entrar.");
+    avisoSesionVencidaMostrado = true;
+    return;
+  }
+  if (screens.login.dataset.active === "true") return;
+  guardarPaseApi("");
+  borrarSesion();
+  tecnicoLogueado = "";
+  showScreen("login");
+  loginError.textContent = "Por seguridad, volvé a entrar con tu contraseña.";
+}
 // =======================================================
 
 // ===== Registro de errores de la app =====
@@ -979,9 +1015,14 @@ async function cargarTecnicos() {
         if (t.permisos) mapaPermisos[t.nombre] = t.permisos;
       });
       tecnicosPasswords = mapa;
-      tecnicosPermisos = mapaPermisos;
       localStorage.setItem("tecnicos_cache", JSON.stringify(mapa));
-      localStorage.setItem("tecnicos_permisos_cache", JSON.stringify(mapaPermisos));
+      // Sin login el servidor manda solo los nombres: ahí no se pisan los permisos guardados.
+      if (Object.keys(mapaPermisos).length > 0) {
+        tecnicosPermisos = mapaPermisos;
+        localStorage.setItem("tecnicos_permisos_cache", JSON.stringify(mapaPermisos));
+      } else {
+        try { tecnicosPermisos = JSON.parse(localStorage.getItem("tecnicos_permisos_cache") || "{}") || {}; } catch (e) { /* nada */ }
+      }
     }
   } catch (err) {
     const cacheado = localStorage.getItem("tecnicos_cache");
@@ -1074,6 +1115,7 @@ function guardarSesion(tecnico) {
 }
 
 function borrarSesion() {
+  guardarPaseApi("");
   localStorage.removeItem("sesion_sat");
   localStorage.removeItem("tecnico_logueado"); // clave vieja, ya no se usa
 }
@@ -1111,6 +1153,12 @@ function intentarRestaurarSesion() {
   try {
     const guardada = JSON.parse(localStorage.getItem("sesion_sat") || "null");
     if (guardada && typeof guardada.expira === "number" && guardada.expira > Date.now()) {
+      if (!SERVICIOS_API_TOKEN) {
+        // Sesión de antes del cambio de seguridad (sin pase personal): hay que volver a entrar una vez.
+        borrarSesion();
+        setTimeout(() => { try { loginError.textContent = "Por seguridad, volvé a entrar con tu contraseña (es una sola vez)."; } catch (e) { /* nada */ } }, 0);
+        return false;
+      }
       entrarComoTecnico(guardada.tecnico || "");
       return true;
     }
@@ -1144,7 +1192,13 @@ async function attemptLogin() {
     });
     const data = await res.json();
     if (res.ok && data.ok) {
+      if (data.sesion) guardarPaseApi(data.sesion);
+      avisoSesionVencidaMostrado = false;
       entrarComoTecnico(usuarioElegido === "__general__" ? "" : usuarioElegido);
+      cargarTecnicos().then(() => { try { actualizarAccesoSeccionesPanel(); aplicarMosaicos(); } catch (e) { /* nada */ } });
+    } else if (data.bloqueado) {
+      loginError.textContent = `Demasiados intentos fallidos — probá de nuevo en ${data.minutos_restantes} minuto(s).`;
+      loginPassword.value = "";
     } else {
       loginError.textContent = "Contraseña incorrecta.";
       loginPassword.value = "";
@@ -1577,8 +1631,11 @@ loginHuellaBtn.addEventListener("click", async () => {
     });
     const dataVer = await resVer.json();
     if (!resVer.ok || !dataVer.ok) throw new Error(dataVer.error || "No se pudo verificar");
+    if (dataVer.sesion) guardarPaseApi(dataVer.sesion);
+    avisoSesionVencidaMostrado = false;
 
     entrarComoTecnico(nombre);
+    cargarTecnicos().then(() => { try { actualizarAccesoSeccionesPanel(); aplicarMosaicos(); } catch (e) { /* nada */ } });
   } catch (err) {
     // Si el técnico cancela el pedido de huella (por ejemplo, tocó
     // "Cancelar" en el diálogo del celular), no se muestra como un
@@ -7901,6 +7958,7 @@ async function desbloquearConHuella(silencioso) {
     const resVer = await fetch("/api/datos?coleccion=tecnicos", { method: "POST", headers, body: JSON.stringify({ accion: "webauthn_login_verificar", nombre, respuesta }) });
     const dataVer = await resVer.json();
     if (!resVer.ok || !dataVer.ok) throw new Error(dataVer.error || "No se pudo verificar");
+    if (dataVer.sesion) guardarPaseApi(dataVer.sesion);
     bloqueoOverlay.classList.add("hidden");
   } catch (err) {
     if (!silencioso && err.name !== "NotAllowedError") bloqueoError.textContent = "No se pudo desbloquear. Probá de nuevo.";
@@ -8435,7 +8493,7 @@ async function postRendicion(cuerpo) {
   try { data = await res.json(); } catch (e) { /* sin cuerpo */ }
   if (!res.ok || !data.ok) {
     const err = new Error(data.error || "Error desconocido");
-    err.delServidor = res.status >= 400 && res.status < 500;
+    err.delServidor = res.status >= 400 && res.status < 500 && res.status !== 401;
     throw err;
   }
   return data;
@@ -10134,7 +10192,7 @@ async function postAccionVehiculo(cuerpo) {
   try { data = await res.json(); } catch (e) { /* sin cuerpo */ }
   if (!res.ok) {
     const err = new Error(data.error || "HTTP " + res.status);
-    err.delServidor = res.status >= 400 && res.status < 500;
+    err.delServidor = res.status >= 400 && res.status < 500 && res.status !== 401;
     throw err;
   }
   return data;
