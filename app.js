@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.13.3";
+const APP_VERSION = "4.13.4";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -2649,7 +2649,15 @@ cronoTecnicoFiltro.addEventListener("change", renderCronogramaTareas);
 //     mismo cliente hecho entre 1 día antes y 3 días después de la fecha agendada.
 function clienteEnTexto(cliente, textoNorm) {
   const palabras = normalizeText(cliente || "").split(/\s+/).filter((w) => w.length > 2);
-  return palabras.length > 0 && palabras.every((w) => textoNorm.includes(w));
+  return palabras.length > 0 && palabras.every((w) => textoNorm.includes(w)) && numerosDelNombreEnTexto(cliente, textoNorm);
+}
+// Clientes con varias unidades o sucursales ("Lara Silvano Unidad 20",
+// "... Unidad 25", "Librería Ladder 12"): además de las palabras, los
+// números del nombre tienen que estar en el texto como número entero
+// ("20" no vale por "205" ni por "2"). Sin esto se tomaba otra unidad.
+function numerosDelNombreEnTexto(cliente, textoNorm) {
+  const nums = normalizeText(cliente || "").match(/\d+/g) || [];
+  return nums.every((n) => new RegExp(`(^|\\D)0*${n.replace(/^0+(?=\d)/, "")}(\\D|$)`).test(textoNorm));
 }
 function diasEntreISO(a, b) {
   const x = Date.parse(a), y = Date.parse(b);
@@ -2717,7 +2725,7 @@ function encontrarServicioPorTarea(textoTarea) {
     if (!s.cliente) return false;
     const palabras = normalizeText(s.cliente).split(/\s+/).filter((p) => p.length > 2); // ignora "de", "la", etc.
     if (palabras.length === 0) return false;
-    return palabras.every((palabra) => norm.includes(palabra));
+    return palabras.every((palabra) => norm.includes(palabra)) && numerosDelNombreEnTexto(s.cliente, norm);
   });
   // Si hay más de una coincidencia (nombres parecidos), se prefiere
   // la que matchea más "de cerca" — la de nombre más largo/específico.
@@ -3027,7 +3035,7 @@ fClienteInput.addEventListener("input", async () => {
     <div class="cliente-sugerencia-item${esAmbiguo ? " cliente-sugerencia-ambiguo" : ""}" data-idx="${idx}">
       <div class="cliente-sugerencia-nombre">${escapeHtml(c.nombre)}</div>
       ${c.direccion ? `<div class="cliente-sugerencia-direccion">${escapeHtml(c.direccion)}</div>` : ""}
-      ${c.numero_abonado ? `<div class="cliente-sugerencia-abonado">Abonado: ${escapeHtml(c.numero_abonado)}</div>` : ""}
+      ${c.numero_abonado || c.numero_cliente ? `<div class="cliente-sugerencia-abonado">${c.numero_cliente ? "Cliente N° " + escapeHtml(c.numero_cliente) : ""}${c.numero_cliente && c.numero_abonado ? " · " : ""}${c.numero_abonado ? "Abonado: " + escapeHtml(c.numero_abonado) : ""}</div>` : ""}
     </div>
   `;
   }).join("");

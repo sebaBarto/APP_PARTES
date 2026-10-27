@@ -2707,3 +2707,25 @@ test("Index viejo con app.js nuevo: si falta una pantalla no se rompe la navegac
   assert.ok(!erroresPagina.some((m) => /reading 'dataset'/.test(m)), "showScreen ya no falla por la pantalla que falta");
   await ctx.close();
 });
+
+test("Clientes con varias unidades (Lara Silvano Unidad 20/25/27): la tarea del cronograma se vincula a la unidad correcta", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.goto(base + "/");
+  const r = await page.evaluate(() => {
+    serviciosCache = [
+      { numero_servicio: "9001", cliente: "Lara Silvano Unidad 25 Don Mateo", direccion: "Calle A 25" },
+      { numero_servicio: "9002", cliente: "Lara Silvano Unidad 20 Don Mateo", direccion: "Calle A 20" },
+      { numero_servicio: "9003", cliente: "Lara Silvano Unidad 27 Don Mateo", direccion: "Calle A 27" },
+      { numero_servicio: "9004", cliente: "Libreria Ladder 1", direccion: "Sucursal 1" },
+    ];
+    return {
+      u20: (encontrarServicioPorTarea("Service: Lara Silvano Unidad 20 Don Mateo - revisar sensor") || {}).numero_servicio,
+      u27: (encontrarServicioPorTarea("Lara Silvano - Don Mateo unidad 27") || {}).numero_servicio,
+      ladder12: (encontrarServicioPorTarea("Libreria Ladder 12 - cambio de bateria") || {}).numero_servicio || null,
+      enTexto: clienteEnTexto("Lara Silvano Unidad 20", normalizeText("lara silvano unidad 205")),
+    };
+  });
+  assert.deepStrictEqual(r, { u20: "9002", u27: "9003", ladder12: null, enTexto: false });
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
