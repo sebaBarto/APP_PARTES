@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.6.1";
+const APP_VERSION = "4.7.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -14857,7 +14857,7 @@ function cqHandles(el) {
   if (el.t === "rect") { h(el.x, el.y, "0"); h(el.x + el.w, el.y, "1"); h(el.x + el.w, el.y + el.h, "2"); h(el.x, el.y + el.h, "3"); }
   else if (el.t === "linea") { h(el.x1, el.y1, "a"); h(el.x2, el.y2, "b"); }
   else if (el.t === "simbolo") {
-    const dist = (((CROQUIS_SIMBOLOS[el.tipo] || {}).r || 34) + 14) * (el.esc || 1), ang = ((el.rot || 0) - 90) * Math.PI / 180;
+    const dist = (croquisRadio(el) + 14) * (el.esc || 1), ang = ((el.rot || 0) - 90) * Math.PI / 180;
     const hx = el.x + Math.cos(ang) * dist, hy = el.y + Math.sin(ang) * dist;
     out.unshift(`<line x1="${el.x}" y1="${el.y}" x2="${hx}" y2="${hy}" class="cq-rot-linea" stroke-width="${1.5 / cq.vista.s}"/>`);
     h(hx, hy, "rot", " cq-rot");
@@ -14865,7 +14865,19 @@ function cqHandles(el) {
   return out.join("");
 }
 function cqCajaSel(el) {
-  if (el.t === "simbolo") { const r = ((CROQUIS_SIMBOLOS[el.tipo] || {}).r || 30) * (el.esc || 1); return { x: el.x - r, y: el.y - r, w: r * 2, h: r * 2 }; }
+  if (el.t === "simbolo") {
+    const def = CROQUIS_SIMBOLOS[el.tipo] || {};
+    if (def.ir) {
+      // Caja que abarca el cuadrado y la captación (en coordenadas del plano).
+      const { alc, ang, doble } = croquisIRParams(el, def), tot = doble ? ang * 2 : ang, pts = [[0, 0], [18, 0], [0, 18], [18, 18]];
+      for (let g = CROQUIS_IR_BIS - tot / 2; g <= CROQUIS_IR_BIS + tot / 2 + 0.1; g += Math.max(5, tot / 8)) pts.push([Math.cos(g * Math.PI / 180) * alc, Math.sin(g * Math.PI / 180) * alc]);
+      const w = pts.map((p) => croquisLocalAMundo(el, p[0], p[1]));
+      const xs = w.map((p) => p[0]), ys = w.map((p) => p[1]);
+      return { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+    }
+    const r = croquisRadio(el) * (el.esc || 1);
+    return { x: el.x - r, y: el.y - r, w: r * 2, h: r * 2 };
+  }
   return croquisCaja({ elementos: [el] });
 }
 function cqRender() {
@@ -14904,15 +14916,15 @@ const CQ_AYUDAS = {
 function cqElegirHerr(h) {
   cq.herr = h;
   if (h === "simbolos") cq.paleta = "equipo";
-  if (h === "objetos") cq.paleta = "obra";
-  const botonPaleta = cq.paleta === "obra" ? "objetos" : "simbolos";
+  if (h === "objetos") cq.paleta = cq.subObjetos || "obra";
+  const botonPaleta = cq.paleta === "obra" || cq.paleta === "mueble" ? "objetos" : "simbolos";
   document.querySelectorAll("#cqHerr button").forEach((b) => b.classList.toggle("activo", b.dataset.herr === h || (h === "simbolo" && b.dataset.herr === botonPaleta)));
   if (h === "rect") cq.paleta = "forma";
   const conPaleta = h === "simbolos" || h === "objetos" || h === "simbolo" || h === "rect";
   cqEl("cqSimbolos").classList.toggle("hidden", !conPaleta);
   if (conPaleta) cqRenderPaleta();
   if (h !== "mover") cq.sel = null;
-  cqEl("cqAyuda").textContent = h === "simbolos" ? "Elegí un equipo de la lista." : h === "objetos" ? "Elegí puerta, ventana, portón, escalera, columna, piscina o planta." : (CQ_AYUDAS[h] || "");
+  cqEl("cqAyuda").textContent = h === "simbolos" ? "Elegí un equipo de la lista." : h === "objetos" ? (cq.paleta === "mueble" ? "Elegí un mueble (es solo de referencia)." : "Elegí puerta, ventana, portón, escalera, columna, piscina o planta.") : (CQ_AYUDAS[h] || "");
   cqRender();
 }
 document.querySelectorAll("#cqHerr button").forEach((b) => b.addEventListener("click", () => cqElegirHerr(b.dataset.herr)));
@@ -14923,13 +14935,21 @@ function cqRenderPaleta() {
     caja.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { cq.forma = b.dataset.forma; cqRenderPaleta(); }));
     return;
   }
-  caja.innerHTML = Object.entries(CROQUIS_SIMBOLOS).filter(([, s]) => s.cat === (cq.paleta || "equipo")).map(([k, s]) => {
+  const pestanas = cq.paleta === "obra" || cq.paleta === "mueble"
+    ? `<div class="cq-pal-tabs"><button type="button" data-sub="obra" class="${cq.paleta === "obra" ? "activo" : ""}">Obra</button><button type="button" data-sub="mueble" class="${cq.paleta === "mueble" ? "activo" : ""}">Muebles</button></div>` : "";
+  caja.innerHTML = pestanas + Object.entries(CROQUIS_SIMBOLOS).filter(([, s]) => s.cat === (cq.paleta || "equipo")).map(([k, s]) => {
     const r = Math.max(28, s.r + 4);
     return `<button type="button" data-simbolo="${k}" class="${cq.simboloElegido === k && cq.herr === "simbolo" ? "activo" : ""}"><svg viewBox="${s.vb || `${-r} ${-r} ${r * 2} ${r * 2}`}">${croquisSimboloSvg(k)}</svg><span>${s.nombre}</span></button>`;
   }).join("");
-  caja.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+  caja.querySelectorAll("[data-simbolo]").forEach((b) => b.addEventListener("click", () => {
     cq.simboloElegido = b.dataset.simbolo;
     cqElegirHerr("simbolo");
+  }));
+  caja.querySelectorAll("[data-sub]").forEach((b) => b.addEventListener("click", () => {
+    cq.subObjetos = cq.paleta = b.dataset.sub;
+    cqEl("cqAyuda").textContent = cq.paleta === "mueble" ? "Elegí un mueble (es solo de referencia)." : "Elegí puerta, ventana, portón, escalera, columna, piscina o planta.";
+    cqRenderPaleta();
+    caja.scrollLeft = 0;
   }));
 }
 cq.paleta = "equipo";
@@ -14954,6 +14974,7 @@ function cqRenderProps() {
     html += `<span class="cq-props-tit">${escapeHtml(def.nombre || "")}</span>` + b("rot-", "↺ 15°", "Rotar a la izquierda") + b("rot+", "↻ 15°", "Rotar a la derecha") + b("rot90", "↻ 90°");
     if (def.espejable) html += b("espejo", "⇋", "Abrir para el otro lado");
     html += b("esc-", "−", "Achicar") + b("esc+", "+", "Agrandar");
+    if (def.cat === "equipo") html += b("etq", el.etq ? "# " + escapeHtml(String(el.etq)).slice(0, 8) : "# Zona", "Número de zona o de dispositivo (vacío = no se muestra)") + b("inal", "📶", "Inalámbrico", el.inal);
   }
   if (el.t === "rect") {
     html += `<span class="cq-props-tit">${escapeHtml(cqNombreElemento(el))}</span>` + b("nombre", el.nombre ? "✎ " + escapeHtml(el.nombre).slice(0, 14) : "✎ Nombre", "Nombre del ambiente");
@@ -14963,13 +14984,19 @@ function cqRenderProps() {
   if (el.t === "linea") html += `<span class="cq-props-tit">Pared</span>`;
   if (el.t === "cable") html += `<span class="cq-props-tit">Cableado</span>` + b("cnombre", el.nombre ? "✎ " + escapeHtml(el.nombre).slice(0, 14) : "✎ Nombre", "Nombre para la leyenda (ej. Sirena, Cámaras)");
   html += b("bloq", "🔒", "Bloquear: queda fijo y podés seguir trabajando encima") + b("dup", "⧉", "Duplicar") + b("borrar", "🗑", "Borrar");
-  // Segunda fila: trazo y color
+  // Segunda fila: captación (infrarrojos), trazo y color
   let fila2 = "";
+  if (el.t === "simbolo" && def.ir) {
+    const pr = croquisIRParams(el, def);
+    fila2 += `<span class="cq-props-tit">Alcance</span>` + b("alc-", "−", "Menos alcance") + b("alc+", "+", "Más alcance") +
+      `<span class="cq-props-tit">Ángulo ${pr.doble ? pr.ang * 2 : pr.ang}°</span>` + b("ang-", "−", "Ángulo más cerrado") + b("ang+", "+", "Ángulo más abierto") +
+      b("doble", "Doble lente", "Dos lentes: captación doble (ej. 2 × 90° = 180°)", pr.doble) + b("video", "👁 Video", "Con videoverificación", pr.video);
+  }
   if (el.t === "cable" || el.t === "linea" || el.t === "rect") {
     const actual = el.trazo || (el.t === "cable" ? "guiones" : "continuo");
     fila2 += Object.entries(CROQUIS_TRAZOS).map(([k, t]) => `<button type="button" class="cq-trazo${k === actual ? " activo" : ""}" data-trazo="${k}" title="${t.nombre}" aria-label="Trazo ${t.nombre}"><svg viewBox="0 0 40 10"><line x1="3" y1="5" x2="37" y2="5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"${t.dash ? ` stroke-dasharray="${t.dash.split(" ").map((n) => Number(n) * 0.7).join(" ")}"` : ""}/></svg></button>`).join("");
   }
-  if (["cable", "linea", "rect", "texto", "tabla"].includes(el.t) || (el.t === "simbolo" && def.cat === "equipo")) {
+  if (["cable", "linea", "rect", "texto", "tabla", "simbolo"].includes(el.t)) {
     const actual = el.color || (el.t === "cable" ? CROQUIS_COLOR_CABLE : el.t === "simbolo" ? def.color : "#1C1E21");
     fila2 += (fila2 ? '<span class="cq-sep"></span>' : "") + CROQUIS_COLORES.map((c) => `<button type="button" class="cq-color${c.toLowerCase() === String(actual).toLowerCase() ? " activo" : ""}" data-color="${c}" style="--c:${c}" aria-label="Color ${c}"></button>`).join("");
   }
@@ -14999,6 +15026,14 @@ function cqAccion(acc) {
   const el = cq.elementos.find((e) => e.id === cq.sel);
   if (!el) return;
   if (acc === "texto") { cqEditorTexto(el); return; }
+  if (acc === "etq") {
+    const nuevo = prompt("Número de zona o de dispositivo (ej. 5, Z12, D23). Dejalo vacío para que no se muestre:", el.etq || "");
+    if (nuevo === null) return;
+    cqMemoria();
+    if (nuevo.trim()) el.etq = nuevo.trim().slice(0, 12); else delete el.etq;
+    cqRender(); cqGuardarBorrador();
+    return;
+  }
   if (acc === "nombre" || acc === "cnombre") {
     const actual = acc === "texto" ? el.texto : el.nombre || "";
     const nuevo = prompt(acc === "nombre" ? "Nombre del ambiente (ej. Cocina, Dormitorio 1):" : acc === "cnombre" ? "Nombre de este cableado para la leyenda (ej. Sirena, Sensores, Cámaras):" : "Texto:", actual);
@@ -15013,6 +15048,15 @@ function cqAccion(acc) {
     if (acc === "rot90") el.rot = ((el.rot || 0) + 90) % 360;
     if (acc === "espejo") el.esp = !el.esp;
     if (acc === "ori") el.ori = ((el.ori || 0) + 1) % 4;
+    const defIr = el.t === "simbolo" && CROQUIS_SIMBOLOS[el.tipo] && CROQUIS_SIMBOLOS[el.tipo].ir ? CROQUIS_SIMBOLOS[el.tipo] : null;
+    if (defIr && /^(alc|ang)[+-]$/.test(acc)) {
+      const pr = croquisIRParams(el, defIr);
+      if (acc === "alc+") el.alc = Math.min(400, pr.alc + 10);
+      if (acc === "alc-") el.alc = Math.max(30, pr.alc - 10);
+      if (acc === "ang+") el.ang = Math.min(180, pr.ang + 5);
+      if (acc === "ang-") el.ang = Math.max(10, pr.ang - 5);
+    }
+    if (acc === "inal" || acc === "doble" || acc === "video") { if (el[acc]) delete el[acc]; else el[acc] = true; }
     if (acc === "bloq") { if (el.bloq) delete el.bloq; else el.bloq = true; }
     if (acc === "esc-") el.esc = Math.max(0.5, Math.round(((el.esc || 1) - 0.25) * 100) / 100);
     if (acc === "esc+") el.esc = Math.min(3, Math.round(((el.esc || 1) + 0.25) * 100) / 100);

@@ -20,25 +20,62 @@ const CROQUIS_GRILLA = 20;
 const CROQUIS_FUENTE = 'font-family="Arial, Helvetica, sans-serif" font-weight="700"';
 const CROQUIS_SIMBOLOS = {
   central: {
-    nombre: "Central", cat: "equipo", color: "#C0392B", r: 26,
-    dib: (c) => `<rect x="-21" y="-15" width="42" height="30" rx="3" fill="#FFFFFF" stroke="${c}" stroke-width="2.6"/><rect x="-16" y="-10" width="32" height="20" rx="1.5" fill="none" stroke="${c}" stroke-width="1"/><text x="0" y="6" text-anchor="middle" ${CROQUIS_FUENTE} font-size="16" fill="${c}">C</text>`,
+    nombre: "Central", cat: "equipo", color: "#F2C94C", r: 30,
+    dib: (c) => `<rect x="-24" y="-15" width="48" height="30" fill="${c}" stroke="#1C1E21" stroke-width="2.6"/><line x1="-24" y1="-15" x2="24" y2="15" stroke="#1C1E21" stroke-width="2"/>`,
+  },
+  hub: {
+    nombre: "Hub (Ajax)", cat: "equipo", color: "#D9D9D9", r: 22,
+    dib: (c) => `<rect x="-16" y="-16" width="32" height="32" rx="8" fill="${c}" stroke="#1C1E21" stroke-width="2.6"/>`,
+  },
+  repetidor: {
+    nombre: "Repetidor ReX", cat: "equipo", color: "#D9D9D9", r: 22,
+    dib: (c) => `<rect x="-16" y="-16" width="32" height="32" rx="8" fill="${c}" stroke="#1C1E21" stroke-width="2.6"/><text x="0" y="4.5" text-anchor="middle" ${CROQUIS_FUENTE} font-size="12" fill="#1C1E21">ReX</text>`,
   },
   teclado: {
-    nombre: "Teclado", cat: "equipo", color: "#2E86DE", r: 22,
-    dib: (c) => `<rect x="-17" y="-13" width="34" height="26" rx="3" fill="#FFFFFF" stroke="${c}" stroke-width="2.6"/><rect x="-12" y="-9" width="24" height="6" rx="1" fill="${c}" opacity="0.35"/>` +
-      [-8, 0, 8].map((x) => [1, 7].map((y) => `<rect x="${x - 2.5}" y="${y - 2}" width="5" height="4" rx="0.8" fill="${c}"/>`).join("")).join(""),
+    nombre: "Teclado", cat: "equipo", color: "#D9D9D9", r: 22,
+    dib: (c) => `<rect x="-18" y="-6" width="36" height="12" fill="${c}" stroke="#1C1E21" stroke-width="2.4"/>`,
+  },
+  sirena_ext: {
+    nombre: "Sirena exterior", cat: "equipo", color: "#D9D9D9", r: 26,
+    dib: (c) => croquisSirena(c, 1),
+  },
+  sirena_int: {
+    nombre: "Sirena interior", cat: "equipo", color: "#D9D9D9", r: 17,
+    dib: (c) => croquisSirena(c, 0.62),
   },
   magnetico: {
     nombre: "Magnético", cat: "equipo", color: "#2E9E4F", r: 12,
     dib: (c) => `<circle cx="0" cy="0" r="8" fill="${c}" stroke="#FFFFFF" stroke-width="2"/><circle cx="0" cy="0" r="9.5" fill="none" stroke="${c}" stroke-width="1.2"/>`,
   },
+  // Infrarrojos: cuadrado con la captación saliendo de un vértice. Se
+  // puede cambiar alcance (alc), ángulo (ang), doble lente y video.
   infrarrojo: {
-    nombre: "Infrarrojo", cat: "equipo", color: "#E8741E", r: 30,
-    dib: (c) => `<path d="M0 10 L-19 -12 A 29 29 0 0 1 19 -12 Z" fill="${c}" fill-opacity="0.22" stroke="${c}" stroke-width="2" stroke-linejoin="round"/><path d="M-11 -3 A 17 17 0 0 1 11 -3" fill="none" stroke="${c}" stroke-width="1.4"/><circle cx="0" cy="10" r="5.5" fill="#FFFFFF" stroke="${c}" stroke-width="2.4"/><text x="0" y="24" text-anchor="middle" ${CROQUIS_FUENTE} font-size="8.5" fill="${c}">IR</text>`,
+    nombre: "Infrarrojo", cat: "equipo", color: "#E00000", ir: true, alc: 70, ang: 90, vb: "-84 -84 110 110",
+    dib: (c, el) => croquisIR(c, el, CROQUIS_SIMBOLOS.infrarrojo),
   },
   infrarrojo_ext: {
-    nombre: "Infrarrojo exterior", cat: "equipo", color: "#7B4B94", r: 34,
-    dib: (c) => `<path d="M0 10 L-22 -14 A 33 33 0 0 1 22 -14 Z" fill="${c}" fill-opacity="0.2" stroke="${c}" stroke-width="2" stroke-linejoin="round"/><path d="M-14 -5 A 21 21 0 0 1 14 -5" fill="none" stroke="${c}" stroke-width="1.4"/><path d="M-7 3 A 11 11 0 0 1 7 3" fill="none" stroke="${c}" stroke-width="1.4"/><rect x="-6" y="5" width="12" height="11" rx="2" fill="#FFFFFF" stroke="${c}" stroke-width="2.4"/><text x="0" y="26" text-anchor="middle" ${CROQUIS_FUENTE} font-size="8.5" fill="${c}">EXT</text>`,
+    nombre: "Infrarrojo exterior", cat: "equipo", color: "#7B4B94", ir: true, alc: 70, ang: 90, vb: "-84 -84 110 110",
+    dib: (c, el) => croquisIR(c, el, CROQUIS_SIMBOLOS.infrarrojo_ext),
+  },
+  infrarrojo_cortina: {
+    nombre: "Infrarrojo cortina", cat: "equipo", color: "#7B4B94", ir: true, alc: 150, ang: 25, vb: "-120 -120 146 146",
+    dib: (c, el) => croquisIR(c, el, CROQUIS_SIMBOLOS.infrarrojo_cortina),
+  },
+  humo: {
+    nombre: "Detector de humo", cat: "equipo", color: "#1C1E21", r: 16,
+    dib: (c) => `<circle cx="0" cy="0" r="12" fill="#FFFFFF" fill-opacity="0.001" stroke="${c}" stroke-width="2.6"/>`,
+  },
+  gas: {
+    nombre: "Detector de gas", cat: "equipo", color: "#1C1E21", r: 16,
+    dib: (c) => `<circle cx="0" cy="0" r="12" fill="#FFFFFF" fill-opacity="0.001" stroke="${c}" stroke-width="2.6"/><text x="0" y="3.2" text-anchor="middle" ${CROQUIS_FUENTE} font-size="8.5" fill="${c}">Gas</text>`,
+  },
+  pulsador_incendio: {
+    nombre: "Pulsador de incendio", cat: "equipo", color: "#E00000", r: 16,
+    dib: (c) => `<rect x="-11" y="-11" width="22" height="22" rx="2" fill="${c}" stroke="#1C1E21" stroke-width="2"/><circle cx="0" cy="0" r="5.5" fill="#FFFFFF" stroke="#1C1E21" stroke-width="1"/>`,
+  },
+  pulsador_asalto: {
+    nombre: "Pulsador de asalto", cat: "equipo", color: "#1B5FA8", r: 16,
+    dib: (c) => `<rect x="-11" y="-11" width="22" height="22" rx="2" fill="${c}" stroke="#1C1E21" stroke-width="2"/><circle cx="0" cy="-3" r="4.5" fill="#FFFFFF" stroke="#1C1E21" stroke-width="1"/><text x="0" y="8.5" text-anchor="middle" ${CROQUIS_FUENTE} font-size="5.5" fill="#FFFFFF">SOS</text>`,
   },
   dvr: {
     nombre: "DVR / NVR", cat: "equipo", color: "#1C1E21", r: 28,
@@ -51,6 +88,10 @@ const CROQUIS_SIMBOLOS = {
   camara_analoga: {
     nombre: "Cámara analógica", cat: "equipo", color: "#8A5A00", r: 32,
     dib: (c) => `<path d="M0 0 L-20 -26 L20 -26 Z" fill="${c}" fill-opacity="0.16" stroke="${c}" stroke-width="1.2" stroke-dasharray="3 2"/><path d="M-12 8 A 12 12 0 0 1 12 8 Z" fill="#FFFFFF" stroke="${c}" stroke-width="2.4" stroke-linejoin="round"/><circle cx="0" cy="2" r="3.8" fill="${c}"/><text x="0" y="19" text-anchor="middle" ${CROQUIS_FUENTE} font-size="7.5" fill="${c}">AN</text>`,
+  },
+  monitor: {
+    nombre: "Monitor", cat: "equipo", color: "#1C1E21", r: 22,
+    dib: (c) => `<rect x="-17" y="-13" width="34" height="22" rx="2" fill="#D6E4F0" stroke="${c}" stroke-width="2.4"/><path d="M-3 9 L-5 15 M3 9 L5 15 M-9 15.5 L9 15.5" stroke="${c}" stroke-width="2.2" stroke-linecap="round"/>`,
   },
   // ---- Objetos de obra (centrados sobre la pared cuando son aberturas) ----
   puerta: {
@@ -85,31 +126,31 @@ const CROQUIS_SIMBOLOS = {
   },
   escalera_recta: {
     nombre: "Escalera recta", cat: "obra", color: "#1C1E21", r: 72, espejable: true,
-    dib: (c, e) => `<rect x="-20" y="-60" width="40" height="120" fill="#FFFFFF" stroke="${c}" stroke-width="2"/>` + croquisEscalones(c, "h", -20, 20, -50, 50) + croquisFlecha(c, [[0, 54], [0, -54]], false, e),
+    dib: (c, el) => `<rect x="-20" y="-60" width="40" height="120" fill="#FFFFFF" stroke="${c}" stroke-width="2"/>` + croquisEscalones(c, "h", -20, 20, -50, 50) + croquisFlecha(c, [[0, 54], [0, -54]], false, !!(el && el.esp)),
   },
   escalera_l_izq: {
     nombre: "Escalera con descanso (izq.)", cat: "obra", color: "#1C1E21", r: 96, espejable: true,
-    dib: (c, e) => croquisEscaleraL(c, -1, e),
+    dib: (c, el) => croquisEscaleraL(c, -1, !!(el && el.esp)),
   },
   escalera_l_der: {
     nombre: "Escalera con descanso (der.)", cat: "obra", color: "#1C1E21", r: 96, espejable: true,
-    dib: (c, e) => croquisEscaleraL(c, 1, e),
+    dib: (c, el) => croquisEscaleraL(c, 1, !!(el && el.esp)),
   },
   escalera_u: {
     nombre: "Escalera en U", cat: "obra", color: "#1C1E21", r: 86, espejable: true,
-    dib: (c, e) => `<g transform="translate(0 -10)"><rect x="-46" y="-60" width="92" height="40" fill="#FFFFFF" stroke="${c}" stroke-width="2"/><rect x="-46" y="-20" width="40" height="100" fill="#FFFFFF" stroke="${c}" stroke-width="2"/><rect x="6" y="-20" width="40" height="100" fill="#FFFFFF" stroke="${c}" stroke-width="2"/>` +
-      croquisEscalones(c, "h", -46, -6, -10, 70) + croquisEscalones(c, "h", 6, 46, -10, 70) + croquisFlecha(c, [[-26, 74], [-26, -40], [26, -40], [26, 72]], false, e) + `</g>`,
+    dib: (c, el) => `<g transform="translate(0 -10)"><rect x="-46" y="-60" width="92" height="40" fill="#FFFFFF" stroke="${c}" stroke-width="2"/><rect x="-46" y="-20" width="40" height="100" fill="#FFFFFF" stroke="${c}" stroke-width="2"/><rect x="6" y="-20" width="40" height="100" fill="#FFFFFF" stroke="${c}" stroke-width="2"/>` +
+      croquisEscalones(c, "h", -46, -6, -10, 70) + croquisEscalones(c, "h", 6, 46, -10, 70) + croquisFlecha(c, [[-26, 74], [-26, -40], [26, -40], [26, 72]], false, !!(el && el.esp)) + `</g>`,
   },
   escalera_caracol: {
     nombre: "Escalera caracol", cat: "obra", color: "#1C1E21", r: 48, espejable: true,
-    dib: (c, e) => {
+    dib: (c, el) => {
       let out = `<circle cx="0" cy="0" r="42" fill="#FFFFFF" stroke="${c}" stroke-width="2"/>`;
       for (let i = 0; i < 12; i++) { const a = (i * 30 + 90) * Math.PI / 180; out += `<line x1="${(Math.cos(a) * 6).toFixed(1)}" y1="${(Math.sin(a) * 6).toFixed(1)}" x2="${(Math.cos(a) * 42).toFixed(1)}" y2="${(Math.sin(a) * 42).toFixed(1)}" stroke="${c}" stroke-width="1"/>`; }
       out += `<circle cx="0" cy="0" r="6" fill="${c}"/>`;
       // Flecha en arco: sube girando en sentido horario desde abajo
       const pts = [];
       for (let g = 90; g >= -200; g -= 10) { const a = g * Math.PI / 180; pts.push([+(Math.cos(a) * 26).toFixed(1), +(Math.sin(a) * 26).toFixed(1)]); }
-      return out + croquisFlecha(c, pts, true, e);
+      return out + croquisFlecha(c, pts, true, !!(el && el.esp));
     },
   },
   piscina: {
@@ -120,6 +161,61 @@ const CROQUIS_SIMBOLOS = {
   planta: {
     nombre: "Planta", cat: "obra", color: "#2E9E4F", r: 18,
     dib: (c) => [0, 60, 120, 180, 240, 300].map((a) => { const r = a * Math.PI / 180; return `<circle cx="${(Math.cos(r) * 8).toFixed(1)}" cy="${(Math.sin(r) * 8).toFixed(1)}" r="7" fill="${c}" fill-opacity="0.35" stroke="${c}" stroke-width="1.2"/>`; }).join("") + `<circle cx="0" cy="0" r="4" fill="${c}"/>`,
+  },
+  // ---- Muebles (de referencia) ----
+  sillon: { nombre: "Sillón", cat: "mueble", color: "#5B5F66", r: 44, dib: (c) => croquisSillon(c, 80) },
+  sillon_1: { nombre: "Sillón individual", cat: "mueble", color: "#5B5F66", r: 22, dib: (c) => croquisSillon(c, 34) },
+  silla: { nombre: "Silla", cat: "mueble", color: "#5B5F66", r: 12, dib: (c) => croquisSilla(c, 0, 0, 0) },
+  mesa_rect: {
+    nombre: "Mesa con sillas", cat: "mueble", color: "#5B5F66", r: 46,
+    dib: (c) => [[-14, -27, 0], [14, -27, 0], [-14, 27, 180], [14, 27, 180], [-39, 0, 270], [39, 0, 90]].map(([x, y, g]) => croquisSilla(c, x, y, g)).join("") + `<rect x="-30" y="-18" width="60" height="36" rx="2" fill="#FFFFFF" stroke="${c}" stroke-width="1.8"/>`,
+  },
+  mesa_redonda: {
+    nombre: "Mesa redonda", cat: "mueble", color: "#5B5F66", r: 40,
+    dib: (c) => [0, 90, 180, 270].map((g) => { const a = (g - 90) * Math.PI / 180; return croquisSilla(c, +(Math.cos(a) * 31).toFixed(1), +(Math.sin(a) * 31).toFixed(1), g); }).join("") + `<circle cx="0" cy="0" r="22" fill="#FFFFFF" stroke="${c}" stroke-width="1.8"/>`,
+  },
+  cama_doble: { nombre: "Cama doble", cat: "mueble", color: "#5B5F66", r: 46, dib: (c) => croquisCama(c, 64) },
+  cama_simple: { nombre: "Cama simple", cat: "mueble", color: "#5B5F66", r: 42, dib: (c) => croquisCama(c, 36) },
+  ropero: {
+    nombre: "Placard", cat: "mueble", color: "#5B5F66", r: 32,
+    dib: (c) => `<rect x="-30" y="-11" width="60" height="22" fill="#FFFFFF" stroke="${c}" stroke-width="1.8"/><line x1="0" y1="-11" x2="0" y2="11" stroke="${c}" stroke-width="1"/><path d="M-30 11 L-15 -11 L0 11 L15 -11 L30 11" fill="none" stroke="${c}" stroke-width="0.8"/>`,
+  },
+  escritorio: {
+    nombre: "Escritorio", cat: "mueble", color: "#5B5F66", r: 32,
+    dib: (c) => croquisSilla(c, 0, 22, 180) + `<rect x="-28" y="-14" width="56" height="28" fill="#FFFFFF" stroke="${c}" stroke-width="1.8"/>`,
+  },
+  tv: { nombre: "TV", cat: "mueble", color: "#5B5F66", r: 24, dib: (c) => `<rect x="-22" y="-3" width="44" height="6" rx="1" fill="${c}"/><line x1="-14" y1="6" x2="14" y2="6" stroke="${c}" stroke-width="1.2" stroke-dasharray="2 2"/>` },
+  ducha: {
+    nombre: "Ducha", cat: "mueble", color: "#5B5F66", r: 26,
+    dib: (c) => `<rect x="-18" y="-18" width="36" height="36" fill="#FFFFFF" stroke="${c}" stroke-width="1.8"/><path d="M-18 -18 L18 18 M18 -18 L-18 18" stroke="${c}" stroke-width="0.8"/><circle cx="0" cy="0" r="3.5" fill="#FFFFFF" stroke="${c}" stroke-width="1.2"/>`,
+  },
+  banera: {
+    nombre: "Bañera", cat: "mueble", color: "#5B5F66", r: 38,
+    dib: (c) => `<rect x="-35" y="-16" width="70" height="32" rx="3" fill="#FFFFFF" stroke="${c}" stroke-width="1.8"/><rect x="-30" y="-11" width="60" height="22" rx="10" fill="none" stroke="${c}" stroke-width="1.2"/><circle cx="22" cy="0" r="2.5" fill="none" stroke="${c}" stroke-width="1"/>`,
+  },
+  inodoro: {
+    nombre: "Inodoro", cat: "mueble", color: "#5B5F66", r: 18,
+    dib: (c) => `<rect x="-11" y="-17" width="22" height="8" rx="1.5" fill="#FFFFFF" stroke="${c}" stroke-width="1.6"/><ellipse cx="0" cy="3" rx="9" ry="12" fill="#FFFFFF" stroke="${c}" stroke-width="1.6"/><ellipse cx="0" cy="4" rx="5" ry="7" fill="none" stroke="${c}" stroke-width="0.8"/>`,
+  },
+  lavatorio: {
+    nombre: "Lavatorio", cat: "mueble", color: "#5B5F66", r: 16,
+    dib: (c) => `<rect x="-13" y="-10" width="26" height="20" rx="2" fill="#FFFFFF" stroke="${c}" stroke-width="1.6"/><ellipse cx="0" cy="1.5" rx="9" ry="6" fill="none" stroke="${c}" stroke-width="1.2"/><circle cx="0" cy="-7" r="1.3" fill="${c}"/>`,
+  },
+  mesada: {
+    nombre: "Mesada con bacha", cat: "mueble", color: "#5B5F66", r: 42,
+    dib: (c) => `<rect x="-40" y="-12" width="80" height="24" fill="#FFFFFF" stroke="${c}" stroke-width="1.8"/><rect x="-6" y="-8" width="14" height="16" rx="2" fill="none" stroke="${c}" stroke-width="1.2"/><rect x="10" y="-8" width="14" height="16" rx="2" fill="none" stroke="${c}" stroke-width="1.2"/><circle cx="9" cy="-10" r="1.3" fill="${c}"/>`,
+  },
+  anafe: {
+    nombre: "Cocina / anafe", cat: "mueble", color: "#5B5F66", r: 20,
+    dib: (c) => `<rect x="-14" y="-14" width="28" height="28" rx="2" fill="#FFFFFF" stroke="${c}" stroke-width="1.8"/>` + [[-6, -6], [6, -6], [-6, 6], [6, 6]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="4.2" fill="none" stroke="${c}" stroke-width="1.2"/>`).join(""),
+  },
+  heladera: {
+    nombre: "Heladera", cat: "mueble", color: "#5B5F66", r: 20,
+    dib: (c) => `<rect x="-14" y="-15" width="28" height="30" rx="2" fill="#FFFFFF" stroke="${c}" stroke-width="1.8"/><text x="0" y="5" text-anchor="middle" ${CROQUIS_FUENTE} font-size="13" fill="${c}">H</text>`,
+  },
+  lavarropas: {
+    nombre: "Lavarropas", cat: "mueble", color: "#5B5F66", r: 20,
+    dib: (c) => `<rect x="-14" y="-14" width="28" height="28" rx="2" fill="#FFFFFF" stroke="${c}" stroke-width="1.8"/><circle cx="0" cy="1" r="8" fill="none" stroke="${c}" stroke-width="1.4"/>`,
   },
 };
 // Escalones: líneas cada 10 unidades. "h": líneas horizontales entre x0-x1,
@@ -150,6 +246,56 @@ function croquisEscaleraL(c, lado, espejado) {
   for (let x = 30; x <= 90; x += 10) out += `<line x1="${xs(x)}" y1="-60" x2="${xs(x)}" y2="-20" stroke="${c}" stroke-width="1"/>`;
   out += croquisFlecha(c, [[0, 74], [0, -40], [xs(94), -40]], false, espejado);
   return `<g transform="translate(${-40 * lado} -10)">${out}</g>`;
+}
+// ---- Dibujos auxiliares de equipos y muebles ----
+function croquisSirena(c, k) {
+  const g = (v) => +(v * k).toFixed(2);
+  return `<rect x="${g(-20)}" y="${g(-20)}" width="${g(40)}" height="${g(18)}" rx="${g(1.5)}" fill="${c}" stroke="#1C1E21" stroke-width="${2.6 * Math.max(0.75, k)}"/><path d="M0 ${g(-2)} L${g(21)} ${g(20)} L${g(-21)} ${g(20)} Z" fill="${c}" stroke="#1C1E21" stroke-width="${2.6 * Math.max(0.75, k)}" stroke-linejoin="round"/>`;
+}
+// Infrarrojo: el vértice de captación es el punto 0,0 (el que se apoya en
+// la esquina); el cuadrado queda abajo a la derecha y la captación sale
+// hacia arriba a la izquierda (bisectriz a -135°).
+const CROQUIS_IR_BIS = -135;
+function croquisIRParams(el, def) {
+  return { alc: Math.max(20, Number(el && el.alc) || def.alc), ang: Math.max(5, Number(el && el.ang) || def.ang), doble: !!(el && el.doble), video: !!(el && el.video) };
+}
+function croquisIR(c, el, def) {
+  const { alc, ang, doble, video } = croquisIRParams(el, def);
+  const total = Math.min(359, doble ? ang * 2 : ang);
+  const pt = (g) => { const a = g * Math.PI / 180; return `${(Math.cos(a) * alc).toFixed(1)} ${(Math.sin(a) * alc).toFixed(1)}`; };
+  let out = `<path d="M0 0 L${pt(CROQUIS_IR_BIS - total / 2)} A${alc} ${alc} 0 ${total > 180 ? 1 : 0} 1 ${pt(CROQUIS_IR_BIS + total / 2)} Z" fill="#8E949A" fill-opacity="0.13" stroke="#1C1E21" stroke-width="1.6" stroke-dasharray="4 3" stroke-linejoin="round"/>`;
+  if (doble) out += `<line x1="0" y1="0" x2="${pt(CROQUIS_IR_BIS).split(" ")[0]}" y2="${pt(CROQUIS_IR_BIS).split(" ")[1]}" stroke="#1C1E21" stroke-width="1" stroke-dasharray="3 3"/>`;
+  out += `<rect x="0" y="0" width="18" height="18" fill="${c}" stroke="#1C1E21" stroke-width="2.2"/>`;
+  if (video) out += `<path d="M2.2 9 Q9 2.6 15.8 9 Q9 15.4 2.2 9 Z" fill="#FFFFFF" stroke="#1C1E21" stroke-width="1"/><circle cx="9" cy="9" r="2.4" fill="#1C1E21"/>`;
+  return out;
+}
+function croquisSilla(c, x, y, g) {
+  return `<g transform="translate(${x} ${y}) rotate(${g})"><rect x="-7" y="-6" width="14" height="13" rx="2" fill="#FFFFFF" stroke="${c}" stroke-width="1.4"/><rect x="-7" y="-6" width="14" height="3.5" rx="1" fill="${c}" fill-opacity="0.45"/></g>`;
+}
+function croquisSillon(c, w) {
+  const x = -w / 2, n = w > 50 ? 3 : 1, ap = 8;
+  let out = `<rect x="${x}" y="-17" width="${w}" height="34" rx="4" fill="#FFFFFF" stroke="${c}" stroke-width="1.8"/><rect x="${x}" y="-17" width="${w}" height="9" rx="3" fill="${c}" fill-opacity="0.18" stroke="${c}" stroke-width="1.2"/><rect x="${x}" y="-8" width="${ap}" height="25" rx="2" fill="${c}" fill-opacity="0.18" stroke="${c}" stroke-width="1.2"/><rect x="${-x - ap}" y="-8" width="${ap}" height="25" rx="2" fill="${c}" fill-opacity="0.18" stroke="${c}" stroke-width="1.2"/>`;
+  const ancho = (w - 2 * ap) / n;
+  for (let i = 1; i < n; i++) out += `<line x1="${(x + ap + ancho * i).toFixed(1)}" y1="-8" x2="${(x + ap + ancho * i).toFixed(1)}" y2="17" stroke="${c}" stroke-width="1"/>`;
+  return out;
+}
+function croquisCama(c, w) {
+  const x = -w / 2, almohadas = w > 50 ? 2 : 1, aw = (w - 6 - (almohadas - 1) * 4) / almohadas;
+  let out = `<rect x="${x}" y="-40" width="${w}" height="80" rx="2" fill="#FFFFFF" stroke="${c}" stroke-width="1.8"/>`;
+  for (let i = 0; i < almohadas; i++) out += `<rect x="${(x + 3 + i * (aw + 4)).toFixed(1)}" y="-36" width="${aw.toFixed(1)}" height="12" rx="3" fill="none" stroke="${c}" stroke-width="1.2"/>`;
+  out += `<path d="M${x} -18 L${-x} -18 M${x} -18 L${x + 14} -8" fill="none" stroke="${c}" stroke-width="1.2"/>`;
+  return out;
+}
+// Radio aproximado de un símbolo puesto (para la caja de selección).
+function croquisRadio(el) {
+  const def = CROQUIS_SIMBOLOS[el.tipo] || {};
+  if (def.ir) return croquisIRParams(el, def).alc + 20;
+  return def.r || 34;
+}
+// Punto local del símbolo -> coordenadas del plano.
+function croquisLocalAMundo(el, lx, ly) {
+  const esc = el.esc || 1, a = (el.rot || 0) * Math.PI / 180, x = (el.esp ? -lx : lx) * esc, y = ly * esc;
+  return [el.x + x * Math.cos(a) - y * Math.sin(a), el.y + x * Math.sin(a) + y * Math.cos(a)];
 }
 // Formas de las habitaciones.
 const CROQUIS_FORMAS = {
@@ -191,7 +337,7 @@ function croquisTspans(texto, x, y, tam) {
 Object.values(CROQUIS_SIMBOLOS).forEach((s) => Object.defineProperty(s, "svg", { get() { return s.dib(s.color); } }));
 const CROQUIS_COLOR_CABLE = "#D6336C";
 // Colores para cables y equipos.
-const CROQUIS_COLORES = ["#D6336C", "#C0392B", "#E8741E", "#D4A017", "#2E9E4F", "#17809B", "#2E86DE", "#7B4B94", "#8A5A00", "#5B5F66", "#1C1E21"];
+const CROQUIS_COLORES = ["#E00000", "#D6336C", "#C0392B", "#E8741E", "#F2C94C", "#D4A017", "#2E9E4F", "#17809B", "#2E86DE", "#1B5FA8", "#7B4B94", "#8A5A00", "#D9D9D9", "#5B5F66", "#1C1E21"];
 // Tipos de trazo para cables y paredes.
 const CROQUIS_TRAZOS = {
   continuo: { nombre: "Continuo", dash: "" },
@@ -203,9 +349,9 @@ function croquisDash(trazo, porDefecto) {
   const t = CROQUIS_TRAZOS[trazo || porDefecto];
   return t && t.dash ? ` stroke-dasharray="${t.dash}"` : "";
 }
-function croquisSimboloSvg(tipo, color) {
+function croquisSimboloSvg(tipo, color, el) {
   const s = CROQUIS_SIMBOLOS[tipo];
-  return s ? s.dib(color || s.color) : "";
+  return s ? s.dib(color || s.color, el) : "";
 }
 
 function croquisEsc(s) {
@@ -292,7 +438,23 @@ function croquisSvgElemento(el, attrs) {
     const s = CROQUIS_SIMBOLOS[el.tipo];
     if (!s) return "";
     const esc = el.esc || 1;
-    return `<g ${a} transform="translate(${el.x} ${el.y}) rotate(${el.rot || 0}) scale(${el.esp ? -esc : esc} ${esc})">${s.dib(el.color || s.color, !!el.esp)}</g>`;
+    const cuerpo = `<g transform="translate(${el.x} ${el.y}) rotate(${el.rot || 0}) scale(${el.esp ? -esc : esc} ${esc})">${s.dib(el.color || s.color, el)}</g>`;
+    let extra = "";
+    // Número de zona / dispositivo: en el infrarrojo va dentro de la
+    // captación; en el resto, abajo del equipo. Siempre se lee derecho.
+    const etq = String(el.etq || "").trim();
+    if (etq) {
+      let p;
+      if (s.ir) { const { alc } = croquisIRParams(el, s), b = CROQUIS_IR_BIS * Math.PI / 180, d = Math.min(alc * 0.58, alc - 14); p = croquisLocalAMundo(el, Math.cos(b) * d, Math.sin(b) * d); }
+      else p = [el.x, el.y + (s.r || 20) * 0.75 * esc + 12];
+      extra += `<text x="${p[0].toFixed(1)}" y="${(p[1] + 5).toFixed(1)}" text-anchor="middle" ${CROQUIS_FUENTE} font-size="${(s.ir ? 15 : 12) * Math.min(1.4, Math.max(0.8, esc))}" fill="#1C1E21" stroke="#FFFFFF" stroke-width="3" paint-order="stroke">${croquisEsc(etq)}</text>`;
+    }
+    if (el.inal) {
+      // Inalámbrico: ondas arriba a la derecha.
+      const p = s.ir ? croquisLocalAMundo(el, 24, -2) : [el.x + (s.r || 20) * 0.8 * esc, el.y - (s.r || 20) * 0.75 * esc];
+      extra += `<g transform="translate(${p[0].toFixed(1)} ${p[1].toFixed(1)})" fill="none" stroke="#1B5FA8" stroke-width="1.6" stroke-linecap="round"><circle cx="0" cy="4" r="1.4" fill="#1B5FA8" stroke="none"/><path d="M-3.5 0.5 A5 5 0 0 1 3.5 0.5"/><path d="M-6.5 -2.5 A9 9 0 0 1 6.5 -2.5"/></g>`;
+    }
+    return `<g ${a}>${cuerpo}${extra}</g>`;
   }
   return "";
 }
@@ -307,7 +469,7 @@ function croquisCaja(dibujo) {
     else if (el.t === "cable") (el.pts || []).forEach((p) => sumar(p[0], p[1]));
     else if (el.t === "texto") { const tam = el.tam || 16, ls = String(el.texto || "").split("\n"); const w = Math.max(...ls.map((l) => l.length)) * tam * 0.6; sumar(el.x, el.y - tam); sumar(el.x + w, el.y + 4 + (ls.length - 1) * tam * 1.25); }
     else if (el.t === "tabla") { const m = croquisTablaMedidas(el); sumar(el.x, el.y); sumar(el.x + m.W, el.y + m.H); }
-    else if (el.t === "simbolo") { const r = ((CROQUIS_SIMBOLOS[el.tipo] || {}).r || 34) * (el.esc || 1); sumar(el.x - r, el.y - r); sumar(el.x + r, el.y + r); }
+    else if (el.t === "simbolo") { const r = croquisRadio(el) * (el.esc || 1); sumar(el.x - r, el.y - r); sumar(el.x + r, el.y + r + (el.etq ? 14 : 0)); }
   });
   if (!isFinite(x0)) return { x: 0, y: 0, w: 400, h: 300 };
   return { x: x0, y: y0, w: Math.max(40, x1 - x0), h: Math.max(40, y1 - y0) };
@@ -361,7 +523,9 @@ function croquisSvgDocumento(dibujo, opciones) {
     const x = x0 + 30 + (i % porFila) * COL, y = c.y + c.h + m + 22 + Math.floor(i / porFila) * FILA;
     const icono = it.tipo === "cable"
       ? `<path d="M${x - 16} ${y} q8 -9 16 0 t16 0" fill="none" stroke="${it.color}" stroke-width="2.6"${croquisDash(it.trazo, "guiones")} stroke-linecap="round"/>`
-      : `<g transform="translate(${x} ${y}) scale(0.62)">${croquisSimboloSvg(it.tipo, it.color)}</g>`;
+      : CROQUIS_SIMBOLOS[it.tipo].ir
+        ? `<g transform="translate(${x + 2} ${y + 2}) scale(0.62)">${croquisSimboloSvg(it.tipo, it.color, { alc: 24, ang: Math.max(25, CROQUIS_SIMBOLOS[it.tipo].ang) })}</g>`
+        : `<g transform="translate(${x} ${y}) scale(${Math.min(0.62, 14 / (CROQUIS_SIMBOLOS[it.tipo].r || 20))})">${croquisSimboloSvg(it.tipo, it.color)}</g>`;
     return `${icono}<text x="${x + 24}" y="${y + 5}" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#1C1E21">${croquisEsc(it.nombre)}</text>`;
   }).join("");
   return `<?xml version="1.0" encoding="UTF-8"?>

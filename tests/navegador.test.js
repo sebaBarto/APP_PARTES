@@ -2155,11 +2155,11 @@ test("Croquis: cables con color y trazo, equipos de color, cámaras/DVR y objeto
   await page.click('[data-herr="objetos"]');
   await page.click('[data-simbolo="piscina"]');
   await clic(200, 300);
-  assert.strictEqual(await page.locator(".cq-color").count(), 0, "los objetos de obra no se pintan");
+  assert.ok(await page.locator(".cq-color").count() > 0, "a todo se le puede cambiar el color");
   // Equipos: DVR y cámaras; un magnético pintado de naranja
   await page.click('[data-herr="simbolos"]');
   const equipos = await page.$$eval("#cqSimbolos [data-simbolo]", (bs) => bs.map((b) => b.dataset.simbolo));
-  assert.deepStrictEqual(equipos, ["central", "teclado", "magnetico", "infrarrojo", "infrarrojo_ext", "dvr", "camara_ip", "camara_analoga"]);
+  assert.deepStrictEqual(equipos, ["central", "hub", "repetidor", "teclado", "sirena_ext", "sirena_int", "magnetico", "infrarrojo", "infrarrojo_ext", "infrarrojo_cortina", "humo", "gas", "pulsador_incendio", "pulsador_asalto", "dvr", "camara_ip", "camara_analoga", "monitor"]);
   for (const [tipo, x, y] of [["dvr", 60, 200], ["camara_ip", 300, 80], ["camara_analoga", 300, 200], ["magnetico", 160, 100]]) {
     await page.click('[data-herr="simbolos"]');
     await page.click(`[data-simbolo="${tipo}"]`);
@@ -2289,6 +2289,54 @@ test("Croquis: círculo y triángulos, color y trazo de la habitación, bloquear
   assert.match(svg, /<tspan[^>]*>Llave de luz<\/tspan><tspan[^>]*>en garage<\/tspan>/);
   assert.match(svg, /stroke="#2E86DE" stroke-width="3.5" stroke-dasharray="9 5"/);
   assert.doesNotMatch(svg, /bloq/);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Croquis: infrarrojo con número, alcance, ángulo, doble lente, video e inalámbrico; muebles aparte de la obra", async () => {
+  const ctx = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 844 } });
+  const page = await ctx.newPage();
+  const erroresPagina = [];
+  page.on("pageerror", (e) => erroresPagina.push(e.message));
+  await page.addInitScript(() => { localStorage.setItem("ajustes_app", JSON.stringify({ estiloInicio: "nuevo" })); localStorage.setItem("skin_v4_aplicado", "1"); });
+  await page.route("**/api/**", (r) => r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+  await page.goto(base + "/");
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); cqAbrirEditor({}); });
+  await page.waitForTimeout(200);
+  const caja = await page.locator("#cqSvg").boundingBox();
+  await page.click('[data-herr="simbolos"]');
+  await page.click('[data-simbolo="infrarrojo"]');
+  await page.mouse.click(caja.x + 250, caja.y + 250);
+  await page.evaluate(() => { window.prompt = () => "D23"; });
+  await page.click('[data-acc="etq"]');
+  for (const acc of ["alc+", "alc+", "ang-", "doble", "video", "inal"]) await page.click(`[data-acc="${acc}"]`);
+  let ir = await page.evaluate(() => cq.elementos[0]);
+  assert.deepStrictEqual([ir.etq, ir.alc, ir.ang, ir.doble, ir.video, ir.inal], ["D23", 90, 85, true, true, true]);
+  assert.match(await page.textContent("#cqProps"), /Ángulo 170°/);
+  let svg = await page.evaluate(() => croquisSvgElemento(cq.elementos[0]));
+  assert.match(svg, />D23</);
+  assert.match(svg, /fill="#E00000"/, "cuadrado rojo");
+  assert.match(svg, /A90 90 0 0 1/, "captación de 90 de alcance");
+  assert.match(svg, /Q9 2.6 15.8 9/, "ojito de video");
+  // Vaciar el número lo esconde
+  await page.evaluate(() => { window.prompt = () => ""; });
+  await page.click('[data-acc="etq"]');
+  ir = await page.evaluate(() => cq.elementos[0]);
+  assert.strictEqual(ir.etq, undefined);
+  // La cortina arranca angosta y larga
+  const cortina = await page.evaluate(() => croquisIRParams({}, CROQUIS_SIMBOLOS.infrarrojo_cortina));
+  assert.deepStrictEqual([cortina.ang, cortina.alc], [25, 150]);
+  // Muebles: pestaña aparte dentro de Objetos
+  await page.click('[data-herr="objetos"]');
+  await page.click('[data-sub="mueble"]');
+  const muebles = await page.$$eval("#cqSimbolos [data-simbolo]", (bs) => bs.map((b) => b.dataset.simbolo));
+  for (const k of ["sillon", "mesa_rect", "silla", "cama_doble", "ducha", "banera", "inodoro"]) assert.ok(muebles.includes(k), k);
+  assert.ok(!muebles.includes("puerta"));
+  await page.click('[data-simbolo="cama_doble"]');
+  await page.mouse.click(caja.x + 100, caja.y + 120);
+  const leyenda = await page.evaluate(() => croquisTiposUsados(cqDibujo()).map((i) => i.nombre));
+  assert.deepStrictEqual(leyenda, ["Infrarrojo"], "los muebles no van en la leyenda");
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });

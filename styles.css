@@ -3528,3 +3528,8 @@ html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#s
 .cq-check { display: flex; gap: 8px; align-items: center; font-size: 13px; margin: 8px 0; }
 .cq-tabla-grilla { display: grid; gap: 4px; overflow-x: auto; max-height: 40vh; overflow-y: auto; }
 .cq-tabla-grilla .field-input { min-width: 0; padding: 8px; font-size: 14px; }
+
+.cq-pal-tabs { display: flex; flex-direction: column; gap: 4px; flex: 0 0 auto; }
+.cq-pal-tabs button { flex: 1; min-width: 64px; padding: 4px 8px; border-radius: 9px; border: 1.5px solid #DCE3EA; background: #fff; color: #1B2733; font-size: 12px; font-weight: 600; }
+.cq-pal-tabs button.activo { background: #1B5FA8; border-color: #1B5FA8; color: #fff; }
+.cq-simbolos .cq-pal-tabs button svg { display: none; }
