@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.13.0";
+const APP_VERSION = "4.13.1";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -14715,12 +14715,13 @@ async function peGenerarPdf(datos) {
   let logoSat = null, logoCemara = null;
   try { logoSat = await doc.embedJpg(await bytes("assets/presupuesto/logo-sat.jpg")); } catch (e) { /* sin logo */ }
   try { logoCemara = await doc.embedJpg(await bytes("assets/presupuesto/logo-cemara.jpg")); } catch (e) { /* sin logo */ }
-  let logoAjax = null;
-  try { logoAjax = await doc.embedPng(await bytes("assets/presupuesto/logo-ajax.png")); } catch (e) { /* sin logo */ }
   // Según los artículos: equipos AJAX y comunicador CityMesh (EXODUS).
   const tieneArticulo = (re) => datos.items.some((it) => re.test(normalizeText(`${it.d || ""} ${it.c || ""}`)));
   const hayAjax = tieneArticulo(/\bajax\b/);
   const hayCityMesh = tieneArticulo(/city\s*-?\s*mesh/);
+  // El logo de AJAX va en el encabezado solo si hay artículos AJAX.
+  let logoAjax = null;
+  if (hayAjax) { try { logoAjax = await doc.embedPng(await bytes("assets/presupuesto/logo-ajax.png")); } catch (e) { /* sin logo */ } }
   const A4 = [595.28, 841.89];
   const X = 86, ANCHO = A4[0] - X - 70, ABAJO = 70;
   const negro = rgb(0, 0, 0), gris = rgb(0.85, 0.85, 0.85), grisOsc = rgb(0.35, 0.35, 0.35), amarillo = rgb(1, 0.753, 0.2);

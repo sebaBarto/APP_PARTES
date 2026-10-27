@@ -2657,8 +2657,15 @@ test("Presupuesto express: logo AJAX en el encabezado, servicios del monitoreo y
   await page.click('.pe-modo-btn[data-modo="nuevo"]');
   await page.fill("#peNombre", "Cliente Ajax");
   // Primero solo con el hub AJAX y como ampliación: sin servicios ni folleto
-  await page.fill("#peArtBuscar", "ajax"); await page.click(".pe-art");
+  // Sin artículos AJAX no va el logo
+  await page.fill("#peArtBuscar", "citymesh"); await page.click(".pe-art");
   await page.fill("#peManoObra", "0");
+  await page.click('[data-tipo="ampliacion"]');
+  await page.click("#peGenerarBtn");
+  await page.waitForFunction(() => window.__pdf, null, { timeout: 15000 });
+  assert.ok(!pedidosAssets.includes("logo-ajax.png"), "sin AJAX no hay logo AJAX");
+  await page.evaluate(() => { window.__pdf = null; peEstado.items = []; peRenderItems(); });
+  await page.fill("#peArtBuscar", "ajax"); await page.click(".pe-art");
   await page.click('[data-tipo="ampliacion"]');
   await page.click("#peGenerarBtn");
   await page.waitForFunction(() => window.__pdf, null, { timeout: 15000 });
