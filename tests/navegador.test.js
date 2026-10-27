@@ -2686,3 +2686,24 @@ test("Presupuesto express: logo AJAX en el encabezado, servicios del monitoreo y
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Index viejo con app.js nuevo: si falta una pantalla no se rompe la navegación y recarga una sola vez", async () => {
+  const ctx = await browser.newContext({ serviceWorkers: "block" });
+  const page = await ctx.newPage();
+  const erroresPagina = [];
+  page.on("pageerror", (e) => erroresPagina.push(e.message));
+  // Simula un index.html de una versión anterior: sin la pantalla de croquis
+  await page.addInitScript(() => {
+    new MutationObserver(() => { const s = document.getElementById("screen-croquis"); if (s) s.remove(); }).observe(document, { childList: true, subtree: true });
+  });
+  await page.route("**/api/**", (r) => r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+  let cargas = 0;
+  page.on("load", () => { cargas += 1; });
+  await page.goto(base + "/");
+  await page.waitForTimeout(1500);
+  assert.strictEqual(cargas, 2, "recargó una vez para traer el index nuevo");
+  await page.evaluate(() => { showScreen("cronograma"); showScreen("home"); });
+  assert.strictEqual(await page.evaluate(() => screens.home.dataset.active), "true");
+  assert.ok(!erroresPagina.some((m) => /reading 'dataset'/.test(m)), "showScreen ya no falla por la pantalla que falta");
+  await ctx.close();
+});

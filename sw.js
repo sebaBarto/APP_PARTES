@@ -1,6 +1,6 @@
 // Versión del caché: subir este número cada vez que se publican cambios
 // importantes fuerza a los celulares a descartar la copia vieja.
-const CACHE_NAME = "parte-tecnico-v162";
+const CACHE_NAME = "parte-tecnico-v163";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -53,7 +53,9 @@ const VENDOR_FILES = [
 
 self.addEventListener("install", (event) => {
   event.waitUntil(Promise.all([
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)),
+    // "reload": siempre del servidor, nunca de la caché del navegador
+    // (si no, podía quedar guardado un index.html viejo con un app.js nuevo).
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL.map((u) => new Request(u, { cache: "reload" })))),
     // Cada archivo por separado: si alguno falla, no se cae toda la instalación
     caches.open(VENDOR_CACHE).then(async (cache) => {
       for (const f of VENDOR_FILES) {

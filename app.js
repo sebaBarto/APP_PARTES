@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.13.1";
+const APP_VERSION = "4.13.2";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -341,6 +341,22 @@ const screens = {
   sending: document.getElementById("screen-sending"),
   done: document.getElementById("screen-done"),
 };
+// Si falta alguna pantalla, el index.html quedó viejo (de una versión anterior
+// guardada en el celular) y no coincide con este app.js. Se sacan las que
+// faltan para que nada se rompa y se recarga una vez para traer el index nuevo.
+(() => {
+  const faltan = Object.keys(screens).filter((k) => !screens[k]);
+  if (!faltan.length) return;
+  faltan.forEach((k) => { delete screens[k]; });
+  let yaRecargo = false;
+  try { yaRecargo = sessionStorage.getItem("recarga_index_viejo") === "1"; sessionStorage.setItem("recarga_index_viejo", "1"); } catch (e) { yaRecargo = true; }
+  if (!yaRecargo && navigator.onLine !== false) {
+    const recargar = () => location.reload();
+    if (navigator.serviceWorker && navigator.serviceWorker.getRegistration) {
+      navigator.serviceWorker.getRegistration().then((r) => (r ? r.update() : null)).catch(() => null).finally(() => setTimeout(recargar, 300));
+    } else setTimeout(recargar, 300);
+  }
+})();
 const statusPill = document.getElementById("statusPill");
 const toastEl = document.getElementById("toast");
 const loginBtn = document.getElementById("loginBtn");
@@ -935,7 +951,7 @@ let fotoMimeType = null;
 
 function showScreen(name) {
   Object.entries(screens).forEach(([key, el]) => {
-    el.dataset.active = key === name ? "true" : "false";
+    if (el) el.dataset.active = key === name ? "true" : "false";
   });
   // La tuerquita de Ajustes solo se ve con sesión iniciada (no en el login)
   const btnAjustes = document.getElementById("ajustesBtn");
