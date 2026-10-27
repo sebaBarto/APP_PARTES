@@ -449,6 +449,11 @@ function croquisSvgElemento(el, attrs) {
       else p = [el.x, el.y + (s.r || 20) * 0.75 * esc + 12];
       extra += `<text x="${p[0].toFixed(1)}" y="${(p[1] + 5).toFixed(1)}" text-anchor="middle" ${CROQUIS_FUENTE} font-size="${(s.ir ? 15 : 12) * Math.min(1.4, Math.max(0.8, esc))}" fill="#1C1E21" stroke="#FFFFFF" stroke-width="3" paint-order="stroke">${croquisEsc(etq)}</text>`;
     }
+    if (el.inst) {
+      // A instalar: aro naranja punteado alrededor del equipo.
+      const c = s.ir ? croquisLocalAMundo(el, 9, 9) : [el.x, el.y], rr = (s.ir ? 15 : (s.r || 20) * 0.8 + 5) * esc;
+      extra = `<circle cx="${c[0].toFixed(1)}" cy="${c[1].toFixed(1)}" r="${rr.toFixed(1)}" fill="#E8741E" fill-opacity="0.1" stroke="#E8741E" stroke-width="2.2" stroke-dasharray="5 3"/>` + extra;
+    }
     if (el.inal) {
       // Inalámbrico: ondas arriba a la derecha.
       const p = s.ir ? croquisLocalAMundo(el, 24, -2) : [el.x + (s.r || 20) * 0.8 * esc, el.y - (s.r || 20) * 0.75 * esc];
@@ -480,11 +485,11 @@ function croquisTiposUsados(dibujo) {
   const els = dibujo.elementos || [];
   const out = [], vistos = new Set();
   Object.keys(CROQUIS_SIMBOLOS).filter((k) => CROQUIS_SIMBOLOS[k].cat === "equipo").forEach((k) => {
-    els.filter((e) => e.t === "simbolo" && e.tipo === k).forEach((e) => {
-      const color = e.color || CROQUIS_SIMBOLOS[k].color, clave = k + color;
+    els.filter((e) => e.t === "simbolo" && e.tipo === k).sort((a, b) => !!a.inst - !!b.inst).forEach((e) => {
+      const color = e.color || CROQUIS_SIMBOLOS[k].color, clave = k + color + (e.inst ? "+" : "");
       if (vistos.has(clave)) return;
       vistos.add(clave);
-      out.push({ tipo: k, color, nombre: CROQUIS_SIMBOLOS[k].nombre });
+      out.push({ tipo: k, color, inst: !!e.inst, nombre: CROQUIS_SIMBOLOS[k].nombre + (e.inst ? " (a instalar)" : "") });
     });
   });
   const cables = [];
@@ -526,7 +531,8 @@ function croquisSvgDocumento(dibujo, opciones) {
       : CROQUIS_SIMBOLOS[it.tipo].ir
         ? `<g transform="translate(${x + 2} ${y + 2}) scale(0.62)">${croquisSimboloSvg(it.tipo, it.color, { alc: 24, ang: Math.max(25, CROQUIS_SIMBOLOS[it.tipo].ang) })}</g>`
         : `<g transform="translate(${x} ${y}) scale(${Math.min(0.62, 14 / (CROQUIS_SIMBOLOS[it.tipo].r || 20))})">${croquisSimboloSvg(it.tipo, it.color)}</g>`;
-    return `${icono}<text x="${x + 24}" y="${y + 5}" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#1C1E21">${croquisEsc(it.nombre)}</text>`;
+    const aro = it.inst ? `<circle cx="${x}" cy="${y}" r="11" fill="none" stroke="#E8741E" stroke-width="1.8" stroke-dasharray="4 2.5"/>` : "";
+    return `${aro}${icono}<text x="${x + 24}" y="${y + 5}" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#1C1E21">${croquisEsc(it.nombre)}</text>`;
   }).join("");
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="${x0} ${c.y - m} ${W} ${H}" width="${Math.round(W)}" height="${Math.round(H)}">
@@ -614,6 +620,12 @@ function croquisDescargar(blob, nombre) {
 const CROQUIS_DIRECCIONES = { derecha: 0, "abajo-derecha": 45, abajo: 90, "abajo-izquierda": 135, izquierda: 180, "arriba-izquierda": 225, arriba: 270, "arriba-derecha": 315 };
 const CROQUIS_ANCHO_ABERTURA = { puerta: 40, ventana: 44, corrediza: 60, porton_corredizo: 100, porton_batiente: 100 };
 function croquisDesdeIA(r, W, H) {
+  const res = croquisDesdeIACompleto(r, W, H);
+  return res.elementos;
+}
+// Igual, pero devuelve además dónde queda la foto (ya girada) en el plano,
+// para mostrarla de fondo y calcar encima: { elementos, rotacion, marco }.
+function croquisDesdeIACompleto(r, W, H) {
   r = r && typeof r === "object" ? r : {};
   const rot = [0, 90, 180, 270].includes(Number(r.rotacion)) ? Number(r.rotacion) : 0;
   const num = (v) => { const n = Number(v); return isFinite(n) ? Math.max(-50, Math.min(1050, n)) : 0; };
@@ -633,10 +645,10 @@ function croquisDesdeIA(r, W, H) {
   lista("equipos").forEach((e) => {
     if (!CROQUIS_SIMBOLOS[e.tipo] || CROQUIS_SIMBOLOS[e.tipo].cat !== "equipo") return;
     const dir = CROQUIS_DIRECCIONES[String(e.apunta || "").toLowerCase().trim()];
-    crudo.push({ t: "equipo", tipo: e.tipo, a: pt(e.x, e.y), dir: dir === undefined ? null : (dir + rot) % 360, numero: String(e.numero == null ? "" : e.numero).trim().slice(0, 12) });
+    crudo.push({ t: "equipo", tipo: e.tipo, a: pt(e.x, e.y), dir: dir === undefined ? null : (dir + rot) % 360, numero: String(e.numero == null ? "" : e.numero).trim().slice(0, 12), agregar: e.agregar === true || e.agregar === "true" });
   });
   lista("textos").forEach((t) => { const s = String(t.texto || "").trim(); if (s) crudo.push({ t: "texto", a: pt(t.x, t.y), texto: s.slice(0, 120) }); });
-  if (!crudo.length) return [];
+  if (!crudo.length) return { elementos: [], rotacion: rot, marco: null };
   // Escala: el plano entra en unos 600 de ancho o alto (las habitaciones
   // quedan de ~200, a tono con el tamaño de los símbolos).
   const xs = [], ys = [];
@@ -671,17 +683,71 @@ function croquisDesdeIA(r, W, H) {
       else if (c.dir !== null && /^camara/.test(c.tipo)) rotEq = c.dir - 270;
       const el = { id: id(), t: "simbolo", tipo: c.tipo, x: p[0], y: p[1], rot: ((Math.round(rotEq / 15) * 15) % 360 + 360) % 360, esc: 1 };
       if (c.numero) el.etq = c.numero;
+      if (c.agregar) el.inst = true;
       out.push(el);
     } else if (c.t === "texto") {
       const p = m(c.a);
       out.push({ id: id(), t: "texto", x: p[0], y: p[1], texto: c.texto, tam: 14 });
     }
   });
+  croquisOrdenar(out);
   const notas = String(r.notas || "").replace(/\r/g, "").trim();
   if (notas) {
     const caja = croquisCaja({ elementos: out });
     // Las notas escritas fuera del plano van en un cuadro de texto debajo.
     out.push({ id: id(), t: "tabla", x: snap(caja.x), y: snap(caja.y + caja.h + 50), celdas: [[notas.slice(0, 600)]], tam: 13 });
   }
-  return out;
+  const Wr = rot === 90 || rot === 270 ? H : W, Hr = rot === 90 || rot === 270 ? W : H;
+  return { elementos: out, rotacion: rot, marco: { x: Math.round(-x0 * k), y: Math.round(-y0 * k), w: Math.round(Wr * k), h: Math.round(Hr * k) } };
+}
+
+// ---------- Ordenar un dibujo a mano alzada ----------
+// Junta los bordes casi alineados (habitaciones y paredes que tendrían que
+// coincidir) y apoya puertas, ventanas y portones sobre la pared más cercana.
+const CROQUIS_ABERTURAS = ["puerta", "ventana", "corrediza", "porton_corredizo", "porton_batiente"];
+function croquisOrdenar(elementos, tolerancia) {
+  const tol = tolerancia || 16;
+  const agrupar = (valores) => {
+    const orden = [...new Set(valores)].sort((a, b) => a - b), mapa = new Map();
+    let grupo = [];
+    const cerrar = () => { if (!grupo.length) return; const m = Math.round(grupo.reduce((a, b) => a + b, 0) / grupo.length / 10) * 10; grupo.forEach((v) => mapa.set(v, m)); grupo = []; };
+    orden.forEach((v) => { if (grupo.length && v - grupo[0] > tol) cerrar(); grupo.push(v); });
+    cerrar();
+    return (v) => (mapa.has(v) ? mapa.get(v) : v);
+  };
+  const xs = [], ys = [];
+  elementos.forEach((e) => {
+    if (e.t === "rect" && !e.forma) { xs.push(e.x, e.x + e.w); ys.push(e.y, e.y + e.h); }
+    if (e.t === "linea") { if (e.x1 === e.x2) xs.push(e.x1); else if (e.y1 === e.y2) ys.push(e.y1); }
+  });
+  const fx = agrupar(xs), fy = agrupar(ys);
+  elementos.forEach((e) => {
+    if (e.t === "rect" && !e.forma) { const a = fx(e.x), b = fx(e.x + e.w), c = fy(e.y), d = fy(e.y + e.h); e.x = a; e.w = Math.max(20, b - a); e.y = c; e.h = Math.max(20, d - c); }
+    if (e.t === "linea") {
+      if (e.x1 === e.x2) { e.x1 = e.x2 = fx(e.x1); } else if (e.y1 === e.y2) { e.y1 = e.y2 = fy(e.y1); }
+    }
+  });
+  // Tramos de pared (bordes de habitaciones y paredes sueltas)
+  const tramos = [];
+  elementos.forEach((e) => {
+    if (e.t === "rect" && !e.forma) tramos.push([e.x, e.y, e.x + e.w, e.y], [e.x, e.y + e.h, e.x + e.w, e.y + e.h], [e.x, e.y, e.x, e.y + e.h], [e.x + e.w, e.y, e.x + e.w, e.y + e.h]);
+    if (e.t === "linea") tramos.push([e.x1, e.y1, e.x2, e.y2]);
+  });
+  elementos.forEach((e) => {
+    if (e.t !== "simbolo" || !CROQUIS_ABERTURAS.includes(e.tipo)) return;
+    let mejor = null;
+    tramos.forEach(([x1, y1, x2, y2]) => {
+      const dx = x2 - x1, dy = y2 - y1, l2 = dx * dx + dy * dy;
+      if (!l2) return;
+      const t = Math.max(0, Math.min(1, ((e.x - x1) * dx + (e.y - y1) * dy) / l2));
+      const px = x1 + t * dx, py = y1 + t * dy, d = Math.hypot(e.x - px, e.y - py);
+      if (!mejor || d < mejor.d) mejor = { d, px, py, horizontal: Math.abs(dx) >= Math.abs(dy) };
+    });
+    if (!mejor || mejor.d > tol * 2.5) return;
+    e.x = Math.round(mejor.px / 10) * 10;
+    e.y = Math.round(mejor.py / 10) * 10;
+    const quiere = mejor.horizontal ? [0, 180] : [90, 270];
+    if (!quiere.includes(((e.rot || 0) % 360 + 360) % 360)) e.rot = quiere[0];
+  });
+  return elementos;
 }

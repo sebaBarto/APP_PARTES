@@ -2395,3 +2395,71 @@ test("Croquis desde foto: la foto se achica, va a la IA y lo interpretado (girad
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Croquis desde foto: queda la foto de fondo, el dibujo se ordena solo y los equipos «a agregar» pasan al presupuesto express", async () => {
+  const ctx = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 844 } });
+  const page = await ctx.newPage();
+  const erroresPagina = [];
+  page.on("pageerror", (e) => erroresPagina.push(e.message));
+  await page.addInitScript(() => { localStorage.setItem("ajustes_app", JSON.stringify({ estiloInicio: "nuevo" })); localStorage.setItem("skin_v4_aplicado", "1"); });
+  const resultado = {
+    rotacion: 0,
+    // Dos habitaciones que deberían compartir pared, dibujadas desparejas
+    habitaciones: [{ x1: 100, y1: 100, x2: 500, y2: 600, nombre: "Living" }, { x1: 508, y1: 106, x2: 900, y2: 595, nombre: "Cocina" }],
+    aberturas: [{ tipo: "puerta", x1: 200, y1: 615, x2: 260, y2: 615 }],
+    equipos: [{ tipo: "humo", x: 300, y: 300, agregar: true }, { tipo: "humo", x: 700, y: 300, agregar: true }, { tipo: "central", x: 800, y: 500 }],
+  };
+  const fotos = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    const j = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("coleccion=croquis") && req.method() === "POST") return j({ ok: true, resultado });
+    if (u.includes("/api/foto") && req.method() === "POST") { fotos.push(JSON.parse(req.postData())); return j({ ok: true, id: "fondo1" }); }
+    if (u.includes("lista_precios")) return j({ items: [{ c: "DH1", d: "DETECTOR DE HUMO CONVENCIONAL", p: 20000, m: "ARS" }] });
+    j([]);
+  });
+  await page.goto(base + "/");
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); localStorage.removeItem("presupuesto_express_borrador"); window.confirm = () => true; cqAbrirLista(); });
+  const png = await page.evaluate(async () => {
+    const cv = document.createElement("canvas"); cv.width = 1000; cv.height = 1000;
+    const c = cv.getContext("2d"); c.fillStyle = "#fff"; c.fillRect(0, 0, 1000, 1000);
+    const b = await new Promise((ok) => cv.toBlob(ok, "image/png"));
+    return Array.from(new Uint8Array(await b.arrayBuffer()));
+  });
+  const [selector] = await Promise.all([page.waitForEvent("filechooser"), page.click("#cqDesdeFotoBtn")]);
+  await selector.setFiles({ name: "boceto.png", mimeType: "image/png", buffer: Buffer.from(png) });
+  await page.waitForFunction(() => cq.fondo && cq.fondo.id === "fondo1", null, { timeout: 10000 });
+  // Foto de fondo: subida, visible y guardada con el croquis (sin la copia local)
+  assert.strictEqual(fotos.length, 1);
+  assert.strictEqual(await page.locator("#cqSvg image.cq-foto-fondo").count(), 1);
+  assert.match(fotos[0].base64.slice(0, 4), /^\/9j\//, "sube el JPEG");
+  await page.click("#cqFondoBtn");
+  assert.strictEqual(await page.locator("#cqSvg image.cq-foto-fondo").count(), 0, "se oculta");
+  const dib = await page.evaluate(() => cqDibujo());
+  assert.deepStrictEqual(Object.keys(dib.fondo).sort(), ["h", "id", "w", "x", "y"]);
+  assert.deepStrictEqual([dib.fondo.x, dib.fondo.y, dib.fondo.w], [-75, -75, 750]);
+  // Ordenado: comparten la pared y la puerta queda sobre la pared de abajo
+  const [living, cocina] = dib.elementos.filter((e) => e.t === "rect");
+  assert.strictEqual(living.x + living.w, cocina.x, "pared compartida");
+  assert.strictEqual(living.y, cocina.y);
+  assert.strictEqual(living.y + living.h, cocina.y + cocina.h);
+  const puerta = dib.elementos.find((e) => e.tipo === "puerta");
+  assert.strictEqual(puerta.y, living.y + living.h, "puerta sobre la pared");
+  // A instalar: marcados, en la leyenda aparte
+  assert.strictEqual(dib.elementos.filter((e) => e.inst).length, 2);
+  assert.deepStrictEqual(await page.evaluate(() => croquisTiposUsados(cqDibujo()).map((i) => i.nombre)), ["Central", "Detector de humo (a instalar)"]);
+  // Pasar a presupuesto: 2 detectores, se elige el artículo y entra con cantidad 2
+  await page.evaluate(() => { cq.cliente = "Tell Cecilia"; cq.titulo = "Casa"; });
+  await page.click("#cqMenuBtn");
+  await page.click('[data-m="presu"]');
+  await page.waitForTimeout(400);
+  assert.match(await page.textContent("#peDelCroquis"), /2 ×\s*Detector de humo/);
+  assert.strictEqual(await page.inputValue("#peNombre"), "Tell Cecilia");
+  await page.click("[data-elegir='0']");
+  await page.click(".pe-art");
+  assert.deepStrictEqual(await page.evaluate(() => peEstado.items.map((i) => [i.c, i.cant])), [["DH1", 2]]);
+  assert.match(await page.textContent("#peDelCroquis"), /Agregado/);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

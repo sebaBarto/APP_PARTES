@@ -301,7 +301,7 @@ Interpretá el dibujo y devolvé SOLO un JSON con esta forma:
   "habitaciones": [{"x1":0,"y1":0,"x2":0,"y2":0,"nombre":""}],
   "paredes": [{"x1":0,"y1":0,"x2":0,"y2":0}],
   "aberturas": [{"tipo":"puerta","x1":0,"y1":0,"x2":0,"y2":0}],
-  "equipos": [{"tipo":"central","x":0,"y":0,"numero":"","apunta":""}],
+  "equipos": [{"tipo":"central","x":0,"y":0,"numero":"","apunta":"","agregar":false}],
   "textos": [{"x":0,"y":0,"texto":""}],
   "notas": ""
 }
@@ -313,6 +313,7 @@ Reglas:
 - "aberturas": van sobre una pared, x1,y1-x2,y2 es el tramo que ocupan. tipo: "puerta" (rectángulo angosto o arco sobre la pared), "ventana" (rectángulo doble angosto y corto), "corrediza" (rectángulo doble largo), "porton_corredizo", "porton_batiente".
 - "equipos" (tipo exacto de esta lista): "central" (cuadrado con "CA" o "C" o "Central"), "teclado" (cuadrado con "T"), "hub", "repetidor" ("ReX"), "sirena_ext" / "sirena_int" (rectángulo con un triángulo abajo, o "S"), "magnetico" (cuadradito relleno o "M" junto a una puerta o ventana), "infrarrojo" (triángulo con rayitas "ııı" o "!!!" que indican hacia dónde capta; "infrarrojo_ext" si dice exterior), "humo" (círculo con "DH" o "humo"), "gas" ("DG" o "gas"), "pulsador_incendio", "pulsador_asalto", "camara_ip", "camara_analoga", "dvr", "monitor".
   "numero": el número de zona o dispositivo escrito al lado (ej. "3"); vacío si no hay.
+  "agregar": true si el equipo está marcado como a agregar o a instalar (dice "AGREGAR", "nuevo", "a instalar", "presupuestar" o tiene una flecha con eso). En ese caso no pongas ese "AGREGAR" en "textos".
   "apunta" (solo infrarrojos y cámaras): hacia dónde mira, según la foto sin rotar: "arriba", "abajo", "izquierda", "derecha", "arriba-izquierda", "arriba-derecha", "abajo-izquierda" o "abajo-derecha". Las rayitas del infrarrojo están del lado hacia donde capta.
   "x","y": el centro del símbolo.
 - "textos": anotaciones cortas dentro del plano que no sean nombres de ambientes ni números de zona (ej. "AGREGAR", un modelo de equipo, "gabinete apertura puerta").

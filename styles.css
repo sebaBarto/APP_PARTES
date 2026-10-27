@@ -3538,3 +3538,12 @@ html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#s
 .cq-cargando .cq-datos { border-radius: 18px; max-width: 320px; align-items: center; text-align: center; margin: 0 16px; }
 .cq-spinner { width: 38px; height: 38px; border-radius: 50%; border: 4px solid rgba(128,128,128,.25); border-top-color: #1B5FA8; animation: cqGira 0.9s linear infinite; margin: 6px auto 8px; }
 @keyframes cqGira { to { transform: rotate(360deg); } }
+
+.pe-del-croquis { border: 1.5px dashed #E8741E; border-radius: 12px; padding: 10px 12px; margin-bottom: 12px; background: rgba(232,116,30,.07); }
+.pe-del-croquis-tit { margin: 0 0 6px; font-weight: 700; font-size: 13px; color: #C25E12; }
+.pe-del-croquis-fila { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid rgba(128,128,128,.18); flex-wrap: wrap; }
+.pe-del-croquis-fila > span:first-child { flex: 1; min-width: 140px; }
+.pe-del-croquis-fila.activo { background: rgba(232,116,30,.12); border-radius: 8px; padding: 6px; }
+.pe-del-croquis-fila.hecho { opacity: .6; }
+.pe-del-croquis-ok { color: #2E9E4F; font-weight: 700; font-size: 13px; }
+#cqFondoBtn.activo { background: #1B5FA8; color: #fff; border-color: #1B5FA8; }

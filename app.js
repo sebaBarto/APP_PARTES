@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.8.0";
+const APP_VERSION = "4.9.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -14405,10 +14405,52 @@ function peRenderRevision() {
   if (c) c.addEventListener("click", () => { peEstado.revisionDe = ""; peGuardarBorrador(); peRenderRevision(); });
 }
 
+// Equipos que vienen marcados "a instalar" en un croquis: cada uno se
+// asocia a un artículo de la lista con su cantidad.
+function peRenderDelCroquis() {
+  const box = pe("peDelCroquis");
+  const lineas = Array.isArray(peEstado.delCroquis) ? peEstado.delCroquis : [];
+  box.classList.toggle("hidden", !lineas.length);
+  if (!lineas.length) { box.innerHTML = ""; return; }
+  box.innerHTML = `<p class="pe-del-croquis-tit">Equipos a instalar del croquis</p>` + lineas.map((l, i) => `<div class="pe-del-croquis-fila${l.hecho ? " hecho" : ""}${peEstado.delCroquisActivo === i ? " activo" : ""}">
+      <span><b>${l.cant} ×</b> ${escapeHtml(l.nombre)}</span>
+      ${l.hecho ? '<span class="pe-del-croquis-ok">✓ Agregado</span>' : `<button type="button" class="btn btn-secondary btn-small" data-elegir="${i}">Elegir artículo</button><button type="button" class="link-btn" data-amano="${i}">a mano</button>`}
+    </div>`).join("") + `<button type="button" class="link-btn" id="peDelCroquisCerrar">Listo, ocultar</button>`;
+  box.querySelectorAll("[data-elegir]").forEach((b) => b.addEventListener("click", () => {
+    const l = lineas[Number(b.dataset.elegir)];
+    peEstado.delCroquisActivo = Number(b.dataset.elegir);
+    pe("peArtBuscar").value = l.busca || l.nombre;
+    peRenderArticulos();
+    peRenderDelCroquis();
+    pe("peArtBuscar").focus();
+    pe("peArtBuscar").scrollIntoView({ block: "center", behavior: "smooth" });
+  }));
+  box.querySelectorAll("[data-amano]").forEach((b) => b.addEventListener("click", () => {
+    const l = lineas[Number(b.dataset.amano)];
+    peEstado.delCroquisActivo = Number(b.dataset.amano);
+    pe("peManualWrap").classList.remove("hidden");
+    pe("peManualDesc").value = l.nombre;
+    pe("peManualCant").value = String(l.cant);
+    pe("peManualPrecio").focus();
+    peRenderDelCroquis();
+  }));
+  const cerrar = pe("peDelCroquisCerrar");
+  if (cerrar) cerrar.addEventListener("click", () => { peEstado.delCroquis = []; peEstado.delCroquisActivo = null; peGuardarBorrador(); peRenderDelCroquis(); });
+}
+function peMarcarDelCroquis() {
+  const i = peEstado.delCroquisActivo;
+  if (i === null || i === undefined || !peEstado.delCroquis || !peEstado.delCroquis[i]) return 0;
+  const cant = peEstado.delCroquis[i].cant;
+  peEstado.delCroquis[i].hecho = true;
+  peEstado.delCroquisActivo = null;
+  peRenderDelCroquis();
+  return cant;
+}
 function peAbrir() {
   peEstado = peLeerBorrador();
   peUltimoPdf = null;
   peVolcarFormulario();
+  peRenderDelCroquis();
   showScreen("presupuesto");
   cargarClientesGeneral();
   peCargarLista();
@@ -14489,9 +14531,10 @@ function peRenderArticulos() {
     : `<p class="pe-vacio">${peLista.items.length ? "No encontré artículos con eso." : "No hay lista de precios cargada."} Podés agregarlo a mano abajo.</p>`;
   cont.querySelectorAll(".pe-art").forEach((b) => b.addEventListener("click", () => {
     const a = lista[Number(b.dataset.i)];
+    const cant = peMarcarDelCroquis() || 1;
     const ya = peEstado.items.find((x) => !x.manual && x.d === a.d && x.c === a.c);
-    if (ya) ya.cant += 1;
-    else peEstado.items.push({ c: a.c || "", d: a.d, p: a.p, m: a.m, cant: 1 });
+    if (ya) ya.cant += cant;
+    else peEstado.items.push({ c: a.c || "", d: a.d, p: a.p, m: a.m, cant });
     pe("peArtBuscar").value = "";
     cont.innerHTML = "";
     peRenderItems();
@@ -14507,6 +14550,7 @@ pe("peManualAgregarBtn").addEventListener("click", () => {
   const cant = Math.max(1, Math.round(peNumero(pe("peManualCant").value) || 1));
   if (!d) { showToast("Escribí la descripción del artículo."); pe("peManualDesc").focus(); return; }
   if (!(p >= 0)) { showToast("Poné el precio unitario en pesos."); pe("peManualPrecio").focus(); return; }
+  peMarcarDelCroquis();
   peEstado.items.push({ c: "", d, p, m: "ARS", cant, manual: true });
   pe("peManualDesc").value = ""; pe("peManualPrecio").value = ""; pe("peManualCant").value = "1";
   pe("peManualWrap").classList.add("hidden");
@@ -14836,9 +14880,14 @@ const cqEl = (id) => document.getElementById(id);
 const cqSvg = cqEl("cqSvg");
 function cqId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 function cqSnap(v) { return Math.round(v / (CROQUIS_GRILLA / 2)) * (CROQUIS_GRILLA / 2); }
-function cqDibujo() { return { v: 1, elementos: cq.elementos }; }
+function cqDibujo() {
+  const d = { v: 1, elementos: cq.elementos };
+  // La foto de fondo se guarda solo cuando ya se subió (tiene id).
+  if (cq.fondo && cq.fondo.id) d.fondo = { id: cq.fondo.id, x: cq.fondo.x, y: cq.fondo.y, w: cq.fondo.w, h: cq.fondo.h };
+  return d;
+}
 function cqGuardarBorrador() {
-  try { localStorage.setItem(CQ_BORRADOR, JSON.stringify({ id: cq.id, titulo: cq.titulo, cliente: cq.cliente, numero_cliente: cq.numero_cliente, direccion: cq.direccion, autor: cq.autor, elementos: cq.elementos, cambios: cq.cambios })); } catch (e) { /* nada */ }
+  try { localStorage.setItem(CQ_BORRADOR, JSON.stringify({ id: cq.id, titulo: cq.titulo, cliente: cq.cliente, numero_cliente: cq.numero_cliente, direccion: cq.direccion, autor: cq.autor, elementos: cq.elementos, fondo: cqDibujo().fondo || null, cambios: cq.cambios })); } catch (e) { /* nada */ }
 }
 function cqMemoria() { cq.pasado.push(JSON.stringify(cq.elementos)); if (cq.pasado.length > 80) cq.pasado.shift(); cq.futuro = []; cq.cambios = true; }
 function cqDeshacer() { if (!cq.pasado.length) return; cq.futuro.push(JSON.stringify(cq.elementos)); cq.elementos = JSON.parse(cq.pasado.pop()); cq.sel = null; cq.cambios = true; cqRender(); cqGuardarBorrador(); }
@@ -14896,10 +14945,13 @@ function cqRender() {
   cqSvg.innerHTML = `<defs><pattern id="cqGrilla" width="${paso}" height="${paso}" patternUnits="userSpaceOnUse"><path d="M ${paso} 0 L 0 0 0 ${paso}" fill="none" stroke="#C9D3DC" stroke-width="${0.8 / Math.max(1, v.s * 0.8)}"/></pattern>
     <pattern id="cqGrilla5" width="${paso * 5}" height="${paso * 5}" patternUnits="userSpaceOnUse"><rect width="${paso * 5}" height="${paso * 5}" fill="url(#cqGrilla)"/><path d="M ${paso * 5} 0 L 0 0 0 ${paso * 5}" fill="none" stroke="#AFBBC6" stroke-width="${1.2 / Math.max(1, v.s * 0.8)}"/></pattern></defs>
     <rect x="${v.x - 5000}" y="${v.y - 5000}" width="${w / v.s + 10000}" height="${h / v.s + 10000}" fill="url(#cqGrilla5)" data-fondo="1"/>
+    ${cq.fondo && cq.verFondo ? `<image href="${cq.fondo.local || "/api/foto?id=" + encodeURIComponent(cq.fondo.id)}" x="${cq.fondo.x}" y="${cq.fondo.y}" width="${cq.fondo.w}" height="${cq.fondo.h}" opacity="0.38" preserveAspectRatio="none" pointer-events="none" class="cq-foto-fondo"/>` : ""}
     ${orden.map((el) => croquisSvgElemento(el, `data-id="${el.id}" class="cq-elem${el.id === cq.sel ? " cq-elegido" : ""}"`)).join("")}
     <g id="cqTemporal"></g>
     ${selHtml}`;
   cqRenderProps();
+  cqEl("cqFondoBtn").classList.toggle("hidden", !cq.fondo);
+  cqEl("cqFondoBtn").classList.toggle("activo", !!(cq.fondo && cq.verFondo));
   cqEl("cqDeshacerBtn").disabled = !cq.pasado.length;
   cqEl("cqRehacerBtn").disabled = !cq.futuro.length;
   cqEl("cqTitulo").textContent = cq.titulo || "Croquis nuevo";
@@ -14974,7 +15026,7 @@ function cqRenderProps() {
     html += `<span class="cq-props-tit">${escapeHtml(def.nombre || "")}</span>` + b("rot-", "↺ 15°", "Rotar a la izquierda") + b("rot+", "↻ 15°", "Rotar a la derecha") + b("rot90", "↻ 90°");
     if (def.espejable) html += b("espejo", "⇋", "Abrir para el otro lado");
     html += b("esc-", "−", "Achicar") + b("esc+", "+", "Agrandar");
-    if (def.cat === "equipo") html += b("etq", el.etq ? "# " + escapeHtml(String(el.etq)).slice(0, 8) : "# Zona", "Número de zona o de dispositivo (vacío = no se muestra)") + b("inal", "📶", "Inalámbrico", el.inal);
+    if (def.cat === "equipo") html += b("etq", el.etq ? "# " + escapeHtml(String(el.etq)).slice(0, 8) : "# Zona", "Número de zona o de dispositivo (vacío = no se muestra)") + b("inal", "📶", "Inalámbrico", el.inal) + b("inst", "🆕 A instalar", "Marcar como equipo a instalar (va al presupuesto)", el.inst);
   }
   if (el.t === "rect") {
     html += `<span class="cq-props-tit">${escapeHtml(cqNombreElemento(el))}</span>` + b("nombre", el.nombre ? "✎ " + escapeHtml(el.nombre).slice(0, 14) : "✎ Nombre", "Nombre del ambiente");
@@ -15056,7 +15108,7 @@ function cqAccion(acc) {
       if (acc === "ang+") el.ang = Math.min(180, pr.ang + 5);
       if (acc === "ang-") el.ang = Math.max(10, pr.ang - 5);
     }
-    if (acc === "inal" || acc === "doble" || acc === "video") { if (el[acc]) delete el[acc]; else el[acc] = true; }
+    if (acc === "inal" || acc === "doble" || acc === "video" || acc === "inst") { if (el[acc]) delete el[acc]; else el[acc] = true; }
     if (acc === "bloq") { if (el.bloq) delete el.bloq; else el.bloq = true; }
     if (acc === "esc-") el.esc = Math.max(0.5, Math.round(((el.esc || 1) - 0.25) * 100) / 100);
     if (acc === "esc+") el.esc = Math.min(3, Math.round(((el.esc || 1) + 0.25) * 100) / 100);
@@ -15282,6 +15334,7 @@ cqSvg.addEventListener("wheel", (e) => { e.preventDefault(); cqZoomEn(e.clientX,
 cqEl("cqZoomMas").addEventListener("click", () => { const r = cqSvg.getBoundingClientRect(); cqZoomEn(r.left + r.width / 2, r.top + r.height / 2, 1.25); });
 cqEl("cqZoomMenos").addEventListener("click", () => { const r = cqSvg.getBoundingClientRect(); cqZoomEn(r.left + r.width / 2, r.top + r.height / 2, 1 / 1.25); });
 cqEl("cqCentrar").addEventListener("click", cqVerTodo);
+cqEl("cqFondoBtn").addEventListener("click", () => { cq.verFondo = !cq.verFondo; cqRender(); });
 function cqVerTodo() {
   const { w, h } = cqTamLienzo();
   if (!cq.elementos.length) { cq.vista = { x: -20, y: -20, s: 1 }; cqRender(); return; }
@@ -15471,6 +15524,8 @@ cqEl("cqMenuBtn").addEventListener("click", () => {
     <button type="button" class="btn btn-secondary" data-m="png">Imagen (PNG)</button>
     <button type="button" class="btn btn-secondary" data-m="svg">Archivo editable (SVG, se abre en Visio)</button>
     <button type="button" class="btn btn-secondary" data-m="foto">📷 Agregar desde la foto de un boceto</button>
+    ${cq.elementos.some((e) => e.inst) && permisosDelTecnico(tecnicoLogueado).presupuesto_express ? `<button type="button" class="btn btn-secondary" data-m="presu">🧾 Pasar los equipos a instalar a un presupuesto</button>` : ""}
+    ${cq.fondo ? `<button type="button" class="btn btn-secondary" data-m="sinfondo">Quitar la foto de fondo</button>` : ""}
     <button type="button" class="btn btn-secondary" data-m="datos">Cambiar cliente y título</button>
     <button type="button" class="btn btn-secondary" data-m="bloq">${cq.elementos.length && cq.elementos.every((e) => e.bloq) ? "🔓 Desbloquear todo" : "🔒 Bloquear todo lo dibujado"}</button>
     <button type="button" class="link-btn" data-m="cerrar">Cerrar</button>
@@ -15485,6 +15540,8 @@ cqEl("cqMenuBtn").addEventListener("click", () => {
     if (m === "pdf" || m === "png" || m === "svg") cqExportar(m);
     if (m === "datos") cqPedirDatos();
     if (m === "foto") { cqFotoDestino = "editor"; cqEl("cqFotoInput").click(); }
+    if (m === "presu") cqPasarAPresupuesto();
+    if (m === "sinfondo" && confirm("¿Quitar la foto del boceto de fondo? (el dibujo no se toca)")) { cq.fondo = null; cq.cambios = true; cqGuardarBorrador(); cqRender(); }
     if (m === "bloq" && cq.elementos.length) {
       cqMemoria();
       const todos = cq.elementos.every((x) => x.bloq);
@@ -15503,7 +15560,7 @@ cqEl("volverDeCroquisBtn").addEventListener("click", async () => {
 
 // ---------- Lista ----------
 function cqAbrirEditor(datos) {
-  Object.assign(cq, { id: "", titulo: "", cliente: "", numero_cliente: "", direccion: "", autor: "", actualizado: "", elementos: [], sel: null, pasado: [], futuro: [], cambios: false }, datos || {});
+  Object.assign(cq, { id: "", titulo: "", cliente: "", numero_cliente: "", direccion: "", autor: "", actualizado: "", elementos: [], fondo: null, verFondo: true, sel: null, pasado: [], futuro: [], cambios: false }, datos || {});
   showScreen("croquis");
   cqElegirHerr(cq.elementos.length ? "mover" : "rect");
   requestAnimationFrame(cqVerTodo);
@@ -15544,7 +15601,7 @@ function cqRenderLista() {
   };
   cqEl("cqLista").querySelectorAll("[data-borrador]").forEach((b) => b.addEventListener("click", () => cqAbrirEditor({ ...borrador, cambios: true })));
   cqEl("cqLista").querySelectorAll("[data-abrir]").forEach((b) => b.addEventListener("click", async () => {
-    try { const d = await traer(lista[Number(b.dataset.abrir)]); cqAbrirEditor({ id: d.id, titulo: d.titulo, cliente: d.cliente, numero_cliente: d.numero_cliente, direccion: d.direccion, autor: d.autor, actualizado: d.actualizado, elementos: (d.dibujo && d.dibujo.elementos) || [] }); }
+    try { const d = await traer(lista[Number(b.dataset.abrir)]); cqAbrirEditor({ id: d.id, titulo: d.titulo, cliente: d.cliente, numero_cliente: d.numero_cliente, direccion: d.direccion, autor: d.autor, actualizado: d.actualizado, elementos: (d.dibujo && d.dibujo.elementos) || [], fondo: (d.dibujo && d.dibujo.fondo) || null }); }
     catch (err) { showToast("No se pudo abrir: " + err.message); }
   }));
   cqEl("cqLista").querySelectorAll("[data-pdf]").forEach((b) => b.addEventListener("click", async () => {
@@ -15581,6 +15638,37 @@ cqEl("cqNuevoBtn").addEventListener("click", () => {
 });
 cqEl("tileCroquisBtn").addEventListener("click", cqAbrirLista);
 
+// ---------- Equipos "a instalar" -> Presupuesto express ----------
+const CQ_BUSQUEDA_PRESU = {
+  central: "central", hub: "hub", repetidor: "rex", teclado: "teclado", sirena_ext: "sirena exterior", sirena_int: "sirena interior",
+  magnetico: "magnetico", infrarrojo: "infrarrojo", infrarrojo_ext: "infrarrojo exterior", infrarrojo_cortina: "cortina", humo: "detector humo",
+  gas: "detector gas", pulsador_incendio: "pulsador incendio", pulsador_asalto: "pulsador asalto", dvr: "dvr", camara_ip: "camara ip",
+  camara_analoga: "camara", monitor: "monitor",
+};
+function cqPasarAPresupuesto() {
+  const cuenta = {};
+  cq.elementos.filter((e) => e.t === "simbolo" && e.inst).forEach((e) => { cuenta[e.tipo] = (cuenta[e.tipo] || 0) + 1; });
+  const lineas = Object.entries(cuenta).map(([tipo, cant]) => ({ tipo, cant, nombre: (CROQUIS_SIMBOLOS[tipo] || {}).nombre || tipo, busca: CQ_BUSQUEDA_PRESU[tipo] || "", hecho: false }));
+  if (!lineas.length) { showToast("No hay equipos marcados como «a instalar»."); return; }
+  const previo = peLeerBorrador();
+  if ((previo.items.length || previo.cliente.nombre) && !confirm("Ya tenés un presupuesto a medio armar. ¿Empezar uno nuevo con los equipos del croquis? (el otro se pierde)")) return;
+  const estado = peNuevoEstado();
+  const enLista = (clientesGeneralCache || []).find((c) => cq.numero_cliente && String(c.numero_cliente) === String(cq.numero_cliente));
+  if (enLista) {
+    estado.cliente = { nombre: enLista.nombre || "", numero_cliente: String(enLista.numero_cliente || ""), telefono: enLista.telefono || "", direccion: [enLista.direccion, enLista.localidad].filter(Boolean).join(", "), razon_social: "", cuit: "" };
+    estado.clienteElegido = true;
+  } else if (cq.cliente) {
+    estado.modo = "nuevo";
+    estado.cliente = { ...estado.cliente, nombre: cq.cliente, numero_cliente: cq.numero_cliente || "", direccion: cq.direccion || "" };
+  }
+  estado.titulo = cq.titulo ? "Ampliación - " + cq.titulo : "Ampliación del sistema de alarma";
+  estado.delCroquis = lineas;
+  try { localStorage.setItem(PE_BORRADOR, JSON.stringify(estado)); } catch (e) { /* nada */ }
+  cqGuardarBorrador();
+  peAbrir();
+  showToast("Elegí en la lista de precios el artículo de cada equipo del croquis.");
+}
+
 // ---------- Desde la foto de un boceto en papel ----------
 // La foto se achica en el celular, el servidor se la pasa a la IA y lo que
 // interpreta se carga como un croquis editable.
@@ -15615,13 +15703,15 @@ async function cqDesdeFoto(archivo) {
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok || !d.ok) throw new Error(d.error || "HTTP " + r.status);
-    let nuevos = croquisDesdeIA(d.resultado, foto.w, foto.h);
+    const interpretado = croquisDesdeIACompleto(d.resultado, foto.w, foto.h);
+    let nuevos = interpretado.elementos;
     if (!nuevos.length) throw new Error("No se reconoció ningún dibujo en la foto. Probá sacarla más de frente, con buena luz y que la hoja ocupe toda la foto.");
     capa.remove();
+    let dx = 0, dy = 0;
     if (cqFotoDestino === "editor" && cq.elementos.length) {
       // Se agrega al lado de lo que ya está dibujado
       const ya = croquisCaja(cqDibujo()), nu = croquisCaja({ elementos: nuevos });
-      const dx = Math.round((ya.x + ya.w + 80 - nu.x) / 10) * 10, dy = Math.round((ya.y - nu.y) / 10) * 10;
+      dx = Math.round((ya.x + ya.w + 80 - nu.x) / 10) * 10; dy = Math.round((ya.y - nu.y) / 10) * 10;
       nuevos = nuevos.map((e) => {
         const c = { ...e };
         if ("x" in c) { c.x += dx; c.y += dy; }
@@ -15637,10 +15727,45 @@ async function cqDesdeFoto(archivo) {
       cqGuardarBorrador();
     }
     showToast(`Listo: ${nuevos.length} elementos. Revisá y corregí lo que haga falta.`);
+    // La foto (enderezada) queda de fondo para calcar encima. Se ve al
+    // instante y se sube en segundo plano para que quede guardada.
+    if (interpretado.marco && (!cq.fondo || cqFotoDestino !== "editor")) cqPonerFondo(foto, interpretado, dx, dy);
   } catch (err) {
     capa.remove();
     showToast("No se pudo armar el croquis: " + err.message);
   }
+}
+async function cqPonerFondo(foto, interpretado, dx, dy) {
+  try {
+    const girada = await cqGirarFoto(foto.base64, interpretado.rotacion);
+    const m = interpretado.marco;
+    cq.fondo = { id: "", local: "data:image/jpeg;base64," + girada, x: m.x + dx, y: m.y + dy, w: m.w, h: m.h };
+    cq.verFondo = true;
+    cqRender();
+    const r = await fetch("/api/foto", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ base64: girada, tipo: "imagen" }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.id) throw new Error(d.error || "HTTP " + r.status);
+    // Se sigue mostrando la copia local (ya está cargada); al guardar va el id.
+    if (cq.fondo && cq.fondo.local && !cq.fondo.id) { cq.fondo = { ...cq.fondo, id: d.id }; cqGuardarBorrador(); }
+  } catch (err) {
+    // Sin la foto subida igual se puede trabajar; no se guarda de fondo.
+    if (cq.fondo && cq.fondo.local && !cq.fondo.id) { cq.fondo = null; cqRender(); }
+  }
+}
+function cqGirarFoto(base64, grados) {
+  return new Promise((ok, mal) => {
+    if (!grados) { ok(base64); return; }
+    const img = new Image();
+    img.onload = () => {
+      const cv = document.createElement("canvas"), de = grados === 90 || grados === 270;
+      cv.width = de ? img.height : img.width; cv.height = de ? img.width : img.height;
+      const c = cv.getContext("2d");
+      c.translate(cv.width / 2, cv.height / 2); c.rotate(grados * Math.PI / 180); c.drawImage(img, -img.width / 2, -img.height / 2);
+      ok(cv.toDataURL("image/jpeg", 0.8).split(",")[1]);
+    };
+    img.onerror = () => mal(new Error("No se pudo girar la foto"));
+    img.src = "data:image/jpeg;base64," + base64;
+  });
 }
 cqEl("cqFotoInput").addEventListener("change", (e) => {
   const f = e.target.files && e.target.files[0];
