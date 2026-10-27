@@ -2074,9 +2074,10 @@ test("Croquis: habitaciones, pared, equipos rotados, cableado y texto; se guarda
   await page.click('[data-acc="rot+"]');
   await page.click('[data-herr="cable"]');
   await arrastrar([60, 60], [200, 170]);
-  await page.evaluate(() => { window.prompt = () => "Cocina"; });
   await page.click('[data-herr="texto"]');
   await page.mouse.click(caja.x + 120, caja.y + 120);
+  await page.fill("#cqTxt", "Cocina");
+  await page.click('[data-r="si"]');
   const els = await page.evaluate(() => cq.elementos);
   assert.deepStrictEqual(els.map((e) => e.t), ["rect", "linea", "simbolo", "cable", "texto"]);
   assert.deepStrictEqual([els[0].w, els[0].h], [200, 180]);
@@ -2147,7 +2148,7 @@ test("Croquis: cables con color y trazo, equipos de color, cámaras/DVR y objeto
   // Objetos de obra: la paleta muestra solo esos
   await page.click('[data-herr="objetos"]');
   const objetos = await page.$$eval("#cqSimbolos [data-simbolo]", (bs) => bs.map((b) => b.dataset.simbolo));
-  assert.deepStrictEqual(objetos, ["puerta", "ventana", "corrediza", "columna", "piscina", "planta"]);
+  assert.deepStrictEqual(objetos, ["puerta", "ventana", "corrediza", "columna", "columna_redonda", "porton_batiente", "porton_corredizo", "piscina", "planta"]);
   await page.click('[data-simbolo="puerta"]');
   await clic(100, 100);
   await page.click('[data-acc="espejo"]');
@@ -2198,6 +2199,96 @@ test("Croquis: cables con color y trazo, equipos de color, cámaras/DVR y objeto
   // Leyenda: equipos y cables, sin objetos de obra
   const leyenda = await page.evaluate(() => croquisTiposUsados(cqDibujo()).map((i) => i.nombre));
   assert.deepStrictEqual(leyenda, ["Magnético", "DVR / NVR", "Cámara IP", "Cámara analógica", "Cámaras"]);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Croquis: círculo y triángulos, color y trazo de la habitación, bloquear, tabla y cuadro de texto, portones", async () => {
+  const ctx = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 844 } });
+  const page = await ctx.newPage();
+  const erroresPagina = [];
+  page.on("pageerror", (e) => erroresPagina.push(e.message));
+  await page.addInitScript(() => { localStorage.setItem("ajustes_app", JSON.stringify({ estiloInicio: "nuevo" })); localStorage.setItem("skin_v4_aplicado", "1"); });
+  await page.route("**/api/**", (r) => r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+  await page.goto(base + "/");
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); window.confirm = () => true; cqAbrirEditor({}); });
+  await page.waitForTimeout(200);
+  const caja = await page.locator("#cqSvg").boundingBox();
+  const clic = (x, y) => page.mouse.click(caja.x + x, caja.y + y);
+  const arrastrar = async (a, b) => { await page.mouse.move(caja.x + a[0], caja.y + a[1]); await page.mouse.down(); for (let i = 1; i <= 8; i++) await page.mouse.move(caja.x + a[0] + (b[0] - a[0]) * i / 8, caja.y + a[1] + (b[1] - a[1]) * i / 8); await page.mouse.up(); };
+  // Formas
+  await page.click('[data-herr="rect"]');
+  assert.deepStrictEqual(await page.$$eval("#cqSimbolos [data-forma]", (bs) => bs.map((b) => b.dataset.forma)), ["rect", "elipse", "triangulo", "triangulo_rect"]);
+  await arrastrar([20, 20], [340, 340]);
+  await page.click('[data-forma="elipse"]');
+  await arrastrar([60, 60], [158, 152]); // casi redondo: queda círculo
+  await page.click('[data-forma="triangulo"]');
+  await arrastrar([200, 60], [300, 160]);
+  let els = await page.evaluate(() => cq.elementos);
+  assert.deepStrictEqual(els.map((e) => e.forma || "rect"), ["rect", "elipse", "triangulo"]);
+  assert.strictEqual(els[1].w, els[1].h, "círculo parejo");
+  // La habitación: color, trazo y bloqueo
+  await page.click('[data-herr="mover"]');
+  await clic(60, 300);
+  await page.click('.cq-color[data-color="#2E86DE"]');
+  await page.click('[data-trazo="guiones"]');
+  await page.click('[data-acc="bloq"]');
+  els = await page.evaluate(() => cq.elementos);
+  assert.deepStrictEqual([els[0].color, els[0].trazo, els[0].bloq], ["#2E86DE", "guiones", true]);
+  assert.match(await page.textContent("#cqProps"), /bloqueado/);
+  // Arrastrar sobre lo bloqueado no lo mueve (desplaza la vista)
+  const vista = await page.evaluate(() => ({ ...cq.vista }));
+  const x0 = await page.evaluate(() => cq.elementos[0].x);
+  await arrastrar([60, 300], [100, 330]);
+  assert.strictEqual(await page.evaluate(() => cq.elementos[0].x), x0);
+  // Volver a la vista y mover el triángulo, que está encima de la habitación bloqueada
+  await page.evaluate((v) => { cq.vista = v; cqRender(); }, vista);
+  const tx = await page.evaluate(() => cq.elementos[2].x);
+  await arrastrar([270, 140], [290, 140]);
+  assert.strictEqual(await page.evaluate(() => cq.elementos[2].x), tx + 20);
+  await page.click('[data-acc="ori"]');
+  assert.strictEqual(await page.evaluate(() => cq.elementos[2].ori), 1);
+  // Tabla de 3x2 y cuadro de texto
+  await page.click('[data-herr="texto"]');
+  await clic(80, 420);
+  await page.click('[data-modo="tabla"]');
+  await page.fill("#cqCols", "2");
+  await page.fill("#cqFilas", "3");
+  await page.fill('#cqGrillaTabla [data-f="0"][data-c="0"]', "Zona");
+  await page.fill('#cqGrillaTabla [data-f="0"][data-c="1"]', "Equipo");
+  await page.fill('#cqGrillaTabla [data-f="2"][data-c="1"]', "Infrarrojo");
+  await page.click('[data-r="si"]');
+  await page.click('[data-herr="texto"]');
+  await clic(250, 420);
+  await page.click('[data-modo="cuadro"]');
+  await page.fill("#cqTxt", "Llave de luz\nen garage");
+  await page.click('[data-r="si"]');
+  els = await page.evaluate(() => cq.elementos);
+  const tablas = els.filter((e) => e.t === "tabla");
+  assert.deepStrictEqual(tablas[0].celdas, [["Zona", "Equipo"], ["", ""], ["", "Infrarrojo"]]);
+  assert.strictEqual(tablas[0].enc, true);
+  assert.deepStrictEqual(tablas[1].celdas, [["Llave de luz\nen garage"]]);
+  // Portones y columna redonda en Objetos
+  await page.click('[data-herr="objetos"]');
+  const objetos = await page.$$eval("#cqSimbolos [data-simbolo]", (bs) => bs.map((b) => b.dataset.simbolo));
+  for (const k of ["columna", "columna_redonda", "porton_batiente", "porton_corredizo"]) assert.ok(objetos.includes(k), k);
+  await page.click('[data-simbolo="porton_batiente"]');
+  await clic(180, 20);
+  // Bloquear todo desde el menú y desbloquear todo
+  await page.click("#cqMenuBtn");
+  await page.click('[data-m="bloq"]');
+  assert.ok(await page.evaluate(() => cq.elementos.every((e) => e.bloq)));
+  await page.click("#cqMenuBtn");
+  assert.match(await page.textContent('[data-m="bloq"]'), /Desbloquear todo/);
+  await page.click('[data-m="bloq"]');
+  assert.ok(await page.evaluate(() => cq.elementos.every((e) => !e.bloq)));
+  const svg = await page.evaluate(() => croquisSvgDocumento(cqDibujo()));
+  assert.match(svg, /<ellipse /);
+  assert.match(svg, />Zona</);
+  assert.match(svg, /<tspan[^>]*>Llave de luz<\/tspan><tspan[^>]*>en garage<\/tspan>/);
+  assert.match(svg, /stroke="#2E86DE" stroke-width="3.5" stroke-dasharray="9 5"/);
+  assert.doesNotMatch(svg, /bloq/);
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });

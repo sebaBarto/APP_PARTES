@@ -3517,3 +3517,14 @@ html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#s
 .cq-item-btns { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 .cq-item-btns .cq-borrar { color: #C0392B; }
 .cq-borrador { border-left: 4px solid #E8A33D; }
+
+#cqSvg .cq-sel-caja.cq-sel-bloq { stroke: #8A96A3; }
+.cq-seg { display: flex; gap: 4px; background: rgba(128,128,128,.14); padding: 4px; border-radius: 12px; margin-bottom: 8px; }
+.cq-seg button { flex: 1; border: 0; background: none; color: inherit; padding: 8px 4px; border-radius: 9px; font-size: 13px; font-weight: 600; }
+.cq-seg button.activo { background: var(--surface, #fff); box-shadow: 0 1px 3px rgba(0,0,0,.15); color: #1B5FA8; }
+.cq-texto-ed textarea { width: 100%; resize: vertical; font: inherit; }
+.cq-tabla-dims { display: flex; gap: 10px; }
+.cq-tabla-dims label { flex: 1; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
+.cq-check { display: flex; gap: 8px; align-items: center; font-size: 13px; margin: 8px 0; }
+.cq-tabla-grilla { display: grid; gap: 4px; overflow-x: auto; max-height: 40vh; overflow-y: auto; }
+.cq-tabla-grilla .field-input { min-width: 0; padding: 8px; font-size: 14px; }

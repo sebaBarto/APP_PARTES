@@ -6,7 +6,10 @@
 //   rect    { x, y, w, h, nombre }       habitación
 //   linea   { x1, y1, x2, y2, trazo?, color? }   pared / tabique
 //   cable   { pts: [[x,y], ...], color?, trazo?, nombre? }  cableado (curva suave)
-//   texto   { x, y, texto, tam }
+//   texto   { x, y, texto, tam }              (puede tener varias líneas)
+//   tabla   { x, y, celdas: [[..]], tam, enc, color? }  cuadro de texto o tabla
+//   rect.forma: rect | elipse | triangulo | triangulo_rect (ori 0-3); color?, trazo?
+//   bloq: true en cualquier elemento = bloqueado en el editor
 //   simbolo { tipo, x, y, rot, esc, color?, esp? }  equipos y objetos de obra
 
 const CROQUIS_GRILLA = 20;
@@ -66,6 +69,20 @@ const CROQUIS_SIMBOLOS = {
     nombre: "Columna", cat: "obra", color: "#1C1E21", r: 12,
     dib: (c) => `<rect x="-8" y="-8" width="16" height="16" fill="${c}"/><path d="M-8 -8 L8 8 M8 -8 L-8 8" stroke="#FFFFFF" stroke-width="1" opacity="0.6"/>`,
   },
+  columna_redonda: {
+    nombre: "Columna redonda", cat: "obra", color: "#1C1E21", r: 12,
+    dib: (c) => `<circle cx="0" cy="0" r="8.5" fill="${c}"/><circle cx="0" cy="0" r="4" fill="none" stroke="#FFFFFF" stroke-width="1" opacity="0.6"/>`,
+  },
+  porton_batiente: {
+    nombre: "Portón de 2 hojas", cat: "obra", color: "#1C1E21", r: 56,
+    dib: (c) => `<rect x="-50" y="-4.5" width="100" height="9" fill="#FFFFFF"/><rect x="-54" y="-5" width="6" height="10" fill="${c}"/><rect x="48" y="-5" width="6" height="10" fill="${c}"/><line x1="-48" y1="0" x2="-48" y2="-48" stroke="${c}" stroke-width="3"/><line x1="48" y1="0" x2="48" y2="-48" stroke="${c}" stroke-width="3"/><path d="M-48 -48 A 48 48 0 0 1 0 0 A 48 48 0 0 1 48 -48" fill="none" stroke="${c}" stroke-width="1.2" stroke-dasharray="4 3"/>`,
+  },
+  porton_corredizo: {
+    nombre: "Portón corredizo", cat: "obra", color: "#1C1E21", r: 100, espejable: true, vb: "-60 -60 215 120",
+    dib: (c) => `<rect x="-50" y="-4.5" width="100" height="9" fill="#FFFFFF"/><rect x="-54" y="-5" width="6" height="10" fill="${c}"/><rect x="48" y="-5" width="6" height="10" fill="${c}"/><rect x="-48" y="-11" width="96" height="6" fill="#FFFFFF" stroke="${c}" stroke-width="2"/>` +
+      [-36, -20, -4, 12, 28].map((x) => `<line x1="${x}" y1="-11" x2="${x + 8}" y2="-5" stroke="${c}" stroke-width="1"/>`).join("") +
+      `<line x1="54" y1="-8" x2="148" y2="-8" stroke="${c}" stroke-width="1.4" stroke-dasharray="5 4"/><path d="M60 -17 L84 -17 M78 -21 L84 -17 L78 -13" fill="none" stroke="${c}" stroke-width="1.4"/>`,
+  },
   piscina: {
     nombre: "Piscina", cat: "obra", color: "#2E86DE", r: 50,
     dib: (c) => `<rect x="-45" y="-26" width="90" height="52" rx="10" fill="#D6ECFA" stroke="${c}" stroke-width="2.4"/><rect x="-38" y="-19" width="76" height="38" rx="6" fill="none" stroke="${c}" stroke-width="0.8" opacity="0.6"/>` +
@@ -76,6 +93,42 @@ const CROQUIS_SIMBOLOS = {
     dib: (c) => [0, 60, 120, 180, 240, 300].map((a) => { const r = a * Math.PI / 180; return `<circle cx="${(Math.cos(r) * 8).toFixed(1)}" cy="${(Math.sin(r) * 8).toFixed(1)}" r="7" fill="${c}" fill-opacity="0.35" stroke="${c}" stroke-width="1.2"/>`; }).join("") + `<circle cx="0" cy="0" r="4" fill="${c}"/>`,
   },
 };
+// Formas de las habitaciones.
+const CROQUIS_FORMAS = {
+  rect: { nombre: "Rectángulo", icono: '<rect x="4" y="6" width="24" height="18" fill="none" stroke="currentColor" stroke-width="2.6"/>' },
+  elipse: { nombre: "Círculo / óvalo", icono: '<ellipse cx="16" cy="15" rx="12" ry="10" fill="none" stroke="currentColor" stroke-width="2.6"/>' },
+  triangulo: { nombre: "Triángulo", icono: '<path d="M16 4 L28 26 L4 26 Z" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/>' },
+  triangulo_rect: { nombre: "Triángulo rectángulo", icono: '<path d="M5 4 L5 26 L28 26 Z" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/>' },
+};
+// Vértices de un triángulo dentro de su caja, según hacia dónde apunte (ori 0-3).
+function croquisTriangulo(forma, x, y, w, h, ori) {
+  const o = ((ori || 0) % 4 + 4) % 4;
+  if (forma === "triangulo") return [
+    [[x + w / 2, y], [x + w, y + h], [x, y + h]],
+    [[x + w, y + h / 2], [x, y + h], [x, y]],
+    [[x + w / 2, y + h], [x, y], [x + w, y]],
+    [[x, y + h / 2], [x + w, y], [x + w, y + h]],
+  ][o];
+  return [
+    [[x, y], [x, y + h], [x + w, y + h]],
+    [[x, y], [x + w, y], [x, y + h]],
+    [[x, y], [x + w, y], [x + w, y + h]],
+    [[x + w, y], [x + w, y + h], [x, y + h]],
+  ][o];
+}
+// Medidas de una tabla / cuadro de texto (se ajusta solo al contenido).
+function croquisTablaMedidas(el) {
+  const tam = el.tam || 14, celdas = el.celdas && el.celdas.length ? el.celdas : [[""]];
+  const nc = Math.max(...celdas.map((f) => f.length));
+  const lineas = (v) => String(v == null ? "" : v).split("\n");
+  const cols = [], filas = [];
+  for (let j = 0; j < nc; j++) cols.push(Math.max(30, ...celdas.map((f) => Math.max(...lineas(f[j]).map((l) => l.length)) * tam * 0.56 + 14)));
+  celdas.forEach((f) => filas.push(Math.max(...f.map((v) => lineas(v).length), 1) * tam * 1.25 + 10));
+  return { cols, filas, W: cols.reduce((a, b) => a + b, 0), H: filas.reduce((a, b) => a + b, 0), nc, celdas, tam };
+}
+function croquisTspans(texto, x, y, tam) {
+  return String(texto == null ? "" : texto).split("\n").map((l, i) => `<tspan x="${x}" y="${(y + i * tam * 1.25).toFixed(1)}">${croquisEsc(l)}</tspan>`).join("");
+}
 // Compatibilidad: CROQUIS_SIMBOLOS[k].svg da el dibujo con su color de siempre.
 Object.values(CROQUIS_SIMBOLOS).forEach((s) => Object.defineProperty(s, "svg", { get() { return s.dib(s.color); } }));
 const CROQUIS_COLOR_CABLE = "#D6336C";
@@ -135,8 +188,18 @@ function croquisSvgElemento(el, attrs) {
   const a = attrs || "";
   if (el.t === "rect") {
     const x = Math.min(el.x, el.x + el.w), y = Math.min(el.y, el.y + el.h), w = Math.abs(el.w), h = Math.abs(el.h);
-    const etiqueta = el.nombre ? `<text x="${x + w / 2}" y="${y + h / 2 + 5}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" fill="#5B5F66" letter-spacing="0.5">${croquisEsc(el.nombre)}</text>` : "";
-    return `<g ${a}><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#FFFFFF" fill-opacity="0.001" stroke="#1C1E21" stroke-width="5" stroke-linejoin="miter"/>${etiqueta}</g>`;
+    const forma = el.forma || "rect";
+    let cx = x + w / 2, cy = y + h / 2, figura;
+    const t = el.trazo && el.trazo !== "continuo";
+    const estilo = `fill="#FFFFFF" fill-opacity="0.001" stroke="${el.color || "#1C1E21"}" stroke-width="${t ? 3.5 : 5}"${croquisDash(el.trazo, "continuo")} stroke-linejoin="miter"${el.trazo === "puntos" ? ' stroke-linecap="round"' : ""}`;
+    if (forma === "elipse") figura = `<ellipse cx="${cx}" cy="${cy}" rx="${w / 2}" ry="${h / 2}" ${estilo}/>`;
+    else if (forma === "triangulo" || forma === "triangulo_rect") {
+      const p = croquisTriangulo(forma, x, y, w, h, el.ori);
+      cx = (p[0][0] + p[1][0] + p[2][0]) / 3; cy = (p[0][1] + p[1][1] + p[2][1]) / 3;
+      figura = `<path d="M${p.map((q) => q.join(" ")).join(" L")} Z" ${estilo}/>`;
+    } else figura = `<rect x="${x}" y="${y}" width="${w}" height="${h}" ${estilo}/>`;
+    const etiqueta = el.nombre ? `<text x="${cx}" y="${cy + 5}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" fill="#5B5F66" letter-spacing="0.5">${croquisEsc(el.nombre)}</text>` : "";
+    return `<g ${a}>${figura}${etiqueta}</g>`;
   }
   if (el.t === "linea") {
     const t = el.trazo && el.trazo !== "continuo";
@@ -147,7 +210,26 @@ function croquisSvgElemento(el, attrs) {
     const d = croquisPathSuave(el.pts);
     return `<g ${a}>${a ? `<path d="${d}" fill="none" stroke="#000" stroke-opacity="0" stroke-width="14"/>` : ""}<path d="${d}" fill="none" stroke="${el.color || CROQUIS_COLOR_CABLE}" stroke-width="${el.trazo === "puntos" ? 3.4 : 2.6}"${croquisDash(el.trazo, "guiones")} stroke-linecap="round" stroke-linejoin="round"/></g>`;
   }
-  if (el.t === "texto") return `<g ${a}><text x="${el.x}" y="${el.y}" font-family="Arial, Helvetica, sans-serif" font-size="${el.tam || 16}" font-weight="700" fill="#1C1E21">${croquisEsc(el.texto)}</text></g>`;
+  if (el.t === "texto") return `<g ${a}><text x="${el.x}" y="${el.y}" font-family="Arial, Helvetica, sans-serif" font-size="${el.tam || 16}" font-weight="700" fill="${el.color || "#1C1E21"}">${croquisTspans(el.texto, el.x, el.y, el.tam || 16)}</text></g>`;
+  if (el.t === "tabla") {
+    // Cuadro de texto (1 celda) o tabla de filas x columnas.
+    const m = croquisTablaMedidas(el), col = el.color || "#1C1E21";
+    let out = `<rect x="${el.x}" y="${el.y}" width="${m.W}" height="${m.H}" fill="#FFFFFF" stroke="${col}" stroke-width="1.6"/>`;
+    if (el.enc && m.celdas.length > 1) out += `<rect x="${el.x}" y="${el.y}" width="${m.W}" height="${m.filas[0]}" fill="${col}" fill-opacity="0.12"/>`;
+    let yy = el.y;
+    m.celdas.forEach((f, i) => {
+      let xx = el.x;
+      for (let j = 0; j < m.nc; j++) {
+        const v = f[j];
+        if (v) out += `<text font-family="Arial, Helvetica, sans-serif" font-size="${m.tam}" font-weight="${el.enc && i === 0 && m.celdas.length > 1 ? 700 : 400}" fill="#1C1E21">${croquisTspans(v, xx + 7, yy + 5 + m.tam, m.tam)}</text>`;
+        if (j > 0) out += `<line x1="${xx}" y1="${el.y}" x2="${xx}" y2="${el.y + m.H}" stroke="${col}" stroke-width="1"/>`.repeat(i === 0 ? 1 : 0);
+        xx += m.cols[j];
+      }
+      if (i > 0) out += `<line x1="${el.x}" y1="${yy}" x2="${el.x + m.W}" y2="${yy}" stroke="${col}" stroke-width="1"/>`;
+      yy += m.filas[i];
+    });
+    return `<g ${a}>${out}</g>`;
+  }
   if (el.t === "simbolo") {
     const s = CROQUIS_SIMBOLOS[el.tipo];
     if (!s) return "";
@@ -165,7 +247,8 @@ function croquisCaja(dibujo) {
     if (el.t === "rect") { sumar(el.x, el.y); sumar(el.x + el.w, el.y + el.h); }
     else if (el.t === "linea") { sumar(el.x1, el.y1); sumar(el.x2, el.y2); }
     else if (el.t === "cable") (el.pts || []).forEach((p) => sumar(p[0], p[1]));
-    else if (el.t === "texto") { const w = String(el.texto || "").length * (el.tam || 16) * 0.6; sumar(el.x, el.y - (el.tam || 16)); sumar(el.x + w, el.y + 4); }
+    else if (el.t === "texto") { const tam = el.tam || 16, ls = String(el.texto || "").split("\n"); const w = Math.max(...ls.map((l) => l.length)) * tam * 0.6; sumar(el.x, el.y - tam); sumar(el.x + w, el.y + 4 + (ls.length - 1) * tam * 1.25); }
+    else if (el.t === "tabla") { const m = croquisTablaMedidas(el); sumar(el.x, el.y); sumar(el.x + m.W, el.y + m.H); }
     else if (el.t === "simbolo") { const r = ((CROQUIS_SIMBOLOS[el.tipo] || {}).r || 34) * (el.esc || 1); sumar(el.x - r, el.y - r); sumar(el.x + r, el.y + r); }
   });
   if (!isFinite(x0)) return { x: 0, y: 0, w: 400, h: 300 };
@@ -229,7 +312,7 @@ function croquisSvgDocumento(dibujo, opciones) {
 ${(dibujo.elementos || []).filter((e) => e.t === "rect").map((e) => croquisSvgElemento(e)).join("\n")}
 ${(dibujo.elementos || []).filter((e) => e.t === "linea").map((e) => croquisSvgElemento(e)).join("\n")}
 ${(dibujo.elementos || []).filter((e) => e.t === "cable").map((e) => croquisSvgElemento(e)).join("\n")}
-${(dibujo.elementos || []).filter((e) => e.t === "simbolo" || e.t === "texto").map((e) => croquisSvgElemento(e)).join("\n")}
+${(dibujo.elementos || []).filter((e) => e.t === "simbolo" || e.t === "texto" || e.t === "tabla").map((e) => croquisSvgElemento(e)).join("\n")}
 ${usados.length ? `<line x1="${x0 + 10}" y1="${c.y + c.h + m - 2}" x2="${x0 + W - 10}" y2="${c.y + c.h + m - 2}" stroke="#C9CCD1" stroke-width="1"/>` : ""}
 ${ley}
 </svg>`;

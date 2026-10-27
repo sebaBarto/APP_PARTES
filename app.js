@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.5.0";
+const APP_VERSION = "4.6.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -14852,6 +14852,7 @@ function cqAMundo(cx, cy) {
 }
 function cqHandles(el) {
   const r = 9 / cq.vista.s, out = [];
+  if (el.bloq) return "";
   const h = (x, y, n, extra) => out.push(`<circle class="cq-handle${extra || ""}" data-handle="${n}" cx="${x}" cy="${y}" r="${r}" />`);
   if (el.t === "rect") { h(el.x, el.y, "0"); h(el.x + el.w, el.y, "1"); h(el.x + el.w, el.y + el.h, "2"); h(el.x, el.y + el.h, "3"); }
   else if (el.t === "linea") { h(el.x1, el.y1, "a"); h(el.x2, el.y2, "b"); }
@@ -14872,13 +14873,13 @@ function cqRender() {
   const v = cq.vista;
   cqSvg.setAttribute("viewBox", `${v.x} ${v.y} ${w / v.s} ${h / v.s}`);
   const paso = CROQUIS_GRILLA;
-  const capas = ["rect", "linea", "cable", "simbolo", "texto"];
+  const capas = ["rect", "linea", "cable", "simbolo", "texto", "tabla"];
   const orden = [...cq.elementos].sort((a, b) => capas.indexOf(a.t) - capas.indexOf(b.t));
   let selHtml = "";
   const elSel = cq.elementos.find((e) => e.id === cq.sel);
   if (elSel) {
     const c = cqCajaSel(elSel), m = 6 / v.s;
-    selHtml = `<rect class="cq-sel-caja" x="${c.x - m}" y="${c.y - m}" width="${c.w + 2 * m}" height="${c.h + 2 * m}" stroke-width="${1.5 / v.s}" stroke-dasharray="${5 / v.s} ${4 / v.s}"/>` + cqHandles(elSel);
+    selHtml = `<rect class="cq-sel-caja${elSel.bloq ? " cq-sel-bloq" : ""}" x="${c.x - m}" y="${c.y - m}" width="${c.w + 2 * m}" height="${c.h + 2 * m}" stroke-width="${1.5 / v.s}" stroke-dasharray="${5 / v.s} ${4 / v.s}"/>` + cqHandles(elSel);
   }
   cqSvg.innerHTML = `<defs><pattern id="cqGrilla" width="${paso}" height="${paso}" patternUnits="userSpaceOnUse"><path d="M ${paso} 0 L 0 0 0 ${paso}" fill="none" stroke="#C9D3DC" stroke-width="${0.8 / Math.max(1, v.s * 0.8)}"/></pattern>
     <pattern id="cqGrilla5" width="${paso * 5}" height="${paso * 5}" patternUnits="userSpaceOnUse"><rect width="${paso * 5}" height="${paso * 5}" fill="url(#cqGrilla)"/><path d="M ${paso * 5} 0 L 0 0 0 ${paso * 5}" fill="none" stroke="#AFBBC6" stroke-width="${1.2 / Math.max(1, v.s * 0.8)}"/></pattern></defs>
@@ -14894,10 +14895,10 @@ function cqRender() {
 }
 const CQ_AYUDAS = {
   mover: "Tocá un elemento para elegirlo y arrastralo. Con dos dedos movés y hacés zoom.",
-  rect: "Arrastrá para dibujar una habitación.",
+  rect: "Elegí la forma y arrastrá para dibujarla.",
   linea: "Arrastrá para trazar una pared (se endereza sola).",
   cable: "Dibujá el cableado con el dedo.",
-  texto: "Tocá donde va el texto.",
+  texto: "Tocá donde va el texto, el cuadro o la tabla.",
   simbolo: "Tocá en el plano dónde va. Las aberturas se apoyan sobre la pared.",
 };
 function cqElegirHerr(h) {
@@ -14906,19 +14907,25 @@ function cqElegirHerr(h) {
   if (h === "objetos") cq.paleta = "obra";
   const botonPaleta = cq.paleta === "obra" ? "objetos" : "simbolos";
   document.querySelectorAll("#cqHerr button").forEach((b) => b.classList.toggle("activo", b.dataset.herr === h || (h === "simbolo" && b.dataset.herr === botonPaleta)));
-  const conPaleta = h === "simbolos" || h === "objetos" || h === "simbolo";
+  if (h === "rect") cq.paleta = "forma";
+  const conPaleta = h === "simbolos" || h === "objetos" || h === "simbolo" || h === "rect";
   cqEl("cqSimbolos").classList.toggle("hidden", !conPaleta);
   if (conPaleta) cqRenderPaleta();
   if (h !== "mover") cq.sel = null;
-  cqEl("cqAyuda").textContent = h === "simbolos" ? "Elegí un equipo de la lista." : h === "objetos" ? "Elegí puerta, ventana, corrediza, columna, piscina o planta." : (CQ_AYUDAS[h] || "");
+  cqEl("cqAyuda").textContent = h === "simbolos" ? "Elegí un equipo de la lista." : h === "objetos" ? "Elegí puerta, ventana, portón, columna, piscina o planta." : (CQ_AYUDAS[h] || "");
   cqRender();
 }
 document.querySelectorAll("#cqHerr button").forEach((b) => b.addEventListener("click", () => cqElegirHerr(b.dataset.herr)));
 function cqRenderPaleta() {
   const caja = cqEl("cqSimbolos");
+  if (cq.paleta === "forma") {
+    caja.innerHTML = Object.entries(CROQUIS_FORMAS).map(([k, f]) => `<button type="button" data-forma="${k}" class="${(cq.forma || "rect") === k ? "activo" : ""}"><svg viewBox="0 0 32 30">${f.icono}</svg><span>${f.nombre}</span></button>`).join("");
+    caja.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { cq.forma = b.dataset.forma; cqRenderPaleta(); }));
+    return;
+  }
   caja.innerHTML = Object.entries(CROQUIS_SIMBOLOS).filter(([, s]) => s.cat === (cq.paleta || "equipo")).map(([k, s]) => {
     const r = Math.max(28, s.r + 4);
-    return `<button type="button" data-simbolo="${k}" class="${cq.simboloElegido === k && cq.herr === "simbolo" ? "activo" : ""}"><svg viewBox="${-r} ${-r} ${r * 2} ${r * 2}">${croquisSimboloSvg(k)}</svg><span>${s.nombre}</span></button>`;
+    return `<button type="button" data-simbolo="${k}" class="${cq.simboloElegido === k && cq.herr === "simbolo" ? "activo" : ""}"><svg viewBox="${s.vb || `${-r} ${-r} ${r * 2} ${r * 2}`}">${croquisSimboloSvg(k)}</svg><span>${s.nombre}</span></button>`;
   }).join("");
   caja.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
     cq.simboloElegido = b.dataset.simbolo;
@@ -14933,6 +14940,13 @@ function cqRenderProps() {
   const el = cq.elementos.find((e) => e.id === cq.sel);
   box.classList.toggle("hidden", !el);
   if (!el) { box.innerHTML = ""; return; }
+  const bb = (acc, txt, titulo, activo) => `<button type="button" data-acc="${acc}" title="${titulo || txt}"${activo ? ' class="activo"' : ""}>${txt}</button>`;
+  if (el.bloq) {
+    // Bloqueado: no se mueve ni se edita hasta desbloquearlo.
+    box.innerHTML = `<div class="cq-props-fila"><span class="cq-props-tit">🔒 ${escapeHtml(cqNombreElemento(el))} bloqueado</span>${bb("bloq", "🔓 Desbloquear", "Desbloquear para moverlo o editarlo")}</div>`;
+    box.querySelectorAll("[data-acc]").forEach((x) => x.addEventListener("click", () => cqAccion(x.dataset.acc)));
+    return;
+  }
   const b = (acc, txt, titulo, activo) => `<button type="button" data-acc="${acc}" title="${titulo || txt}"${activo ? ' class="activo"' : ""}>${txt}</button>`;
   const def = el.t === "simbolo" ? CROQUIS_SIMBOLOS[el.tipo] || {} : {};
   let html = "";
@@ -14941,19 +14955,22 @@ function cqRenderProps() {
     if (def.espejable) html += b("espejo", "⇋", "Abrir para el otro lado");
     html += b("esc-", "−", "Achicar") + b("esc+", "+", "Agrandar");
   }
-  if (el.t === "rect") html += `<span class="cq-props-tit">Habitación</span>` + b("nombre", el.nombre ? "✎ " + escapeHtml(el.nombre).slice(0, 14) : "✎ Nombre", "Nombre del ambiente");
-  if (el.t === "texto") html += `<span class="cq-props-tit">Texto</span>` + b("texto", "✎ Editar") + b("tam-", "A−", "Más chico") + b("tam+", "A+", "Más grande");
+  if (el.t === "rect") {
+    html += `<span class="cq-props-tit">${escapeHtml(cqNombreElemento(el))}</span>` + b("nombre", el.nombre ? "✎ " + escapeHtml(el.nombre).slice(0, 14) : "✎ Nombre", "Nombre del ambiente");
+    if (el.forma === "triangulo" || el.forma === "triangulo_rect") html += b("ori", "↻ 90°", "Girar el triángulo");
+  }
+  if (el.t === "texto" || el.t === "tabla") html += `<span class="cq-props-tit">${escapeHtml(cqNombreElemento(el))}</span>` + b("texto", "✎ Editar") + b("tam-", "A−", "Más chico") + b("tam+", "A+", "Más grande");
   if (el.t === "linea") html += `<span class="cq-props-tit">Pared</span>`;
   if (el.t === "cable") html += `<span class="cq-props-tit">Cableado</span>` + b("cnombre", el.nombre ? "✎ " + escapeHtml(el.nombre).slice(0, 14) : "✎ Nombre", "Nombre para la leyenda (ej. Sirena, Cámaras)");
-  html += b("dup", "⧉", "Duplicar") + b("borrar", "🗑", "Borrar");
+  html += b("bloq", "🔒", "Bloquear: queda fijo y podés seguir trabajando encima") + b("dup", "⧉", "Duplicar") + b("borrar", "🗑", "Borrar");
   // Segunda fila: trazo y color
   let fila2 = "";
-  if (el.t === "cable" || el.t === "linea") {
+  if (el.t === "cable" || el.t === "linea" || el.t === "rect") {
     const actual = el.trazo || (el.t === "cable" ? "guiones" : "continuo");
     fila2 += Object.entries(CROQUIS_TRAZOS).map(([k, t]) => `<button type="button" class="cq-trazo${k === actual ? " activo" : ""}" data-trazo="${k}" title="${t.nombre}" aria-label="Trazo ${t.nombre}"><svg viewBox="0 0 40 10"><line x1="3" y1="5" x2="37" y2="5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"${t.dash ? ` stroke-dasharray="${t.dash.split(" ").map((n) => Number(n) * 0.7).join(" ")}"` : ""}/></svg></button>`).join("");
   }
-  if (el.t === "cable" || el.t === "linea" || (el.t === "simbolo" && def.cat === "equipo")) {
-    const actual = el.color || (el.t === "cable" ? CROQUIS_COLOR_CABLE : el.t === "linea" ? "#1C1E21" : def.color);
+  if (["cable", "linea", "rect", "texto", "tabla"].includes(el.t) || (el.t === "simbolo" && def.cat === "equipo")) {
+    const actual = el.color || (el.t === "cable" ? CROQUIS_COLOR_CABLE : el.t === "simbolo" ? def.color : "#1C1E21");
     fila2 += (fila2 ? '<span class="cq-sep"></span>' : "") + CROQUIS_COLORES.map((c) => `<button type="button" class="cq-color${c.toLowerCase() === String(actual).toLowerCase() ? " activo" : ""}" data-color="${c}" style="--c:${c}" aria-label="Color ${c}"></button>`).join("");
   }
   box.innerHTML = `<div class="cq-props-fila">${html}</div>${fila2 ? `<div class="cq-props-fila cq-props-fila2">${fila2}</div>` : ""}`;
@@ -14972,10 +14989,17 @@ function cqRenderProps() {
     cqRender(); cqGuardarBorrador();
   }));
 }
+function cqNombreElemento(el) {
+  if (el.t === "rect") return { elipse: "Círculo", triangulo: "Triángulo", triangulo_rect: "Triángulo" }[el.forma] || "Habitación";
+  if (el.t === "simbolo") return (CROQUIS_SIMBOLOS[el.tipo] || {}).nombre || "Equipo";
+  if (el.t === "tabla") return el.celdas && (el.celdas.length > 1 || el.celdas[0].length > 1) ? "Tabla" : "Cuadro de texto";
+  return { linea: "Pared", cable: "Cableado", texto: "Texto" }[el.t] || "";
+}
 function cqAccion(acc) {
   const el = cq.elementos.find((e) => e.id === cq.sel);
   if (!el) return;
-  if (acc === "nombre" || acc === "texto" || acc === "cnombre") {
+  if (acc === "texto") { cqEditorTexto(el); return; }
+  if (acc === "nombre" || acc === "cnombre") {
     const actual = acc === "texto" ? el.texto : el.nombre || "";
     const nuevo = prompt(acc === "nombre" ? "Nombre del ambiente (ej. Cocina, Dormitorio 1):" : acc === "cnombre" ? "Nombre de este cableado para la leyenda (ej. Sirena, Sensores, Cámaras):" : "Texto:", actual);
     if (nuevo === null) return;
@@ -14988,16 +15012,19 @@ function cqAccion(acc) {
     if (acc === "rot+") el.rot = ((el.rot || 0) + 15) % 360;
     if (acc === "rot90") el.rot = ((el.rot || 0) + 90) % 360;
     if (acc === "espejo") el.esp = !el.esp;
+    if (acc === "ori") el.ori = ((el.ori || 0) + 1) % 4;
+    if (acc === "bloq") { if (el.bloq) delete el.bloq; else el.bloq = true; }
     if (acc === "esc-") el.esc = Math.max(0.5, Math.round(((el.esc || 1) - 0.25) * 100) / 100);
     if (acc === "esc+") el.esc = Math.min(3, Math.round(((el.esc || 1) + 0.25) * 100) / 100);
-    if (acc === "tam-") el.tam = Math.max(10, (el.tam || 16) - 2);
-    if (acc === "tam+") el.tam = Math.min(48, (el.tam || 16) + 2);
+    if (acc === "tam-") el.tam = Math.max(8, (el.tam || (el.t === "tabla" ? 14 : 16)) - 2);
+    if (acc === "tam+") el.tam = Math.min(48, (el.tam || (el.t === "tabla" ? 14 : 16)) + 2);
     if (acc === "borrar") { cq.elementos = cq.elementos.filter((e) => e !== el); cq.sel = null; }
     if (acc === "dup") {
       const copia = JSON.parse(JSON.stringify(el));
       copia.id = cqId();
       const d = CROQUIS_GRILLA;
-      if (copia.t === "rect" || copia.t === "texto" || copia.t === "simbolo") { copia.x += d; copia.y += d; }
+      delete copia.bloq;
+      if (copia.t === "rect" || copia.t === "texto" || copia.t === "simbolo" || copia.t === "tabla") { copia.x += d; copia.y += d; }
       if (copia.t === "linea") { copia.x1 += d; copia.y1 += d; copia.x2 += d; copia.y2 += d; }
       if (copia.t === "cable") copia.pts = copia.pts.map((p) => [p[0] + d, p[1] + d]);
       cq.elementos.push(copia);
@@ -15036,9 +15063,21 @@ cqSvg.addEventListener("pointerdown", (e) => {
   const destino = e.target.closest && e.target.closest("[data-handle], [data-id]");
   if (cq.herr === "mover") {
     if (destino && destino.dataset.handle) { cqGesto = { tipo: "handle", h: destino.dataset.handle, inicio: [mx, my], movido: false }; return; }
-    if (destino && destino.dataset.id) {
-      cq.sel = destino.dataset.id;
+    // Lo bloqueado no se agarra: se elige lo que haya encima o debajo sin bloquear.
+    const bajo = [];
+    (document.elementsFromPoint ? document.elementsFromPoint(e.clientX, e.clientY) : [e.target]).forEach((n) => {
+      const g = n.closest && n.closest("[data-id]");
+      if (g && !bajo.includes(g.dataset.id)) bajo.push(g.dataset.id);
+    });
+    const libre = bajo.find((id) => { const x = cq.elementos.find((q) => q.id === id); return x && !x.bloq; });
+    if (libre || bajo.length) {
+      cq.sel = libre || bajo[0];
       const el = cq.elementos.find((x) => x.id === cq.sel);
+      if (!el || el.bloq) {
+        cqRender();
+        cqGesto = { tipo: "pan", inicio: { x: e.clientX, y: e.clientY }, vista: { ...cq.vista } };
+        return;
+      }
       cqGesto = { tipo: "mover", inicio: [mx, my], original: JSON.parse(JSON.stringify(el)), movido: false };
       cqRender();
       return;
@@ -15049,9 +15088,8 @@ cqSvg.addEventListener("pointerdown", (e) => {
     return;
   }
   if (cq.herr === "texto") {
-    const t = prompt("Texto (ej. Living, Cocina, Garage):", "");
-    if (t && t.trim()) { cqMemoria(); const el = { id: cqId(), t: "texto", x: cqSnap(mx), y: cqSnap(my), texto: t.trim().slice(0, 80), tam: 16 }; cq.elementos.push(el); cq.sel = el.id; cqElegirHerr("mover"); cqGuardarBorrador(); }
     cqPunteros.delete(e.pointerId);
+    cqEditorTexto(null, [cqSnap(mx), cqSnap(my)]);
     return;
   }
   if (cq.herr === "simbolo" && cq.simboloElegido) {
@@ -15095,7 +15133,7 @@ cqSvg.addEventListener("pointermove", (e) => {
     if (!cqGesto.movido && !cqGesto.yaMemorizado) cqMemoria();
     cqGesto.movido = true;
     const o = cqGesto.original, sx = cqSnap(dx), sy = cqSnap(dy);
-    if (el.t === "rect" || el.t === "texto") { el.x = o.x + sx; el.y = o.y + sy; }
+    if (el.t === "rect" || el.t === "texto" || el.t === "tabla") { el.x = o.x + sx; el.y = o.y + sy; }
     if (el.t === "simbolo") { el.x = cqSnap(o.x + dx); el.y = cqSnap(o.y + dy); }
     if (el.t === "linea") { el.x1 = o.x1 + sx; el.y1 = o.y1 + sy; el.x2 = o.x2 + sx; el.y2 = o.y2 + sy; }
     if (el.t === "cable") el.pts = o.pts.map((p) => [p[0] + dx, p[1] + dy]);
@@ -15131,8 +15169,9 @@ cqSvg.addEventListener("pointermove", (e) => {
     const [x0, y0] = cqGesto.inicio;
     if (cq.herr === "rect") {
       const px = cqSnap(mx), py = cqSnap(my);
-      tmp.innerHTML = croquisSvgElemento({ t: "rect", x: x0, y: y0, w: px - x0, h: py - y0 });
-      cqGesto.fin = [px, py];
+      const fin = cqFinForma(x0, y0, px, py);
+      tmp.innerHTML = croquisSvgElemento({ t: "rect", forma: cq.forma || "rect", x: Math.min(x0, fin[0]), y: Math.min(y0, fin[1]), w: Math.abs(fin[0] - x0), h: Math.abs(fin[1] - y0) });
+      cqGesto.fin = fin;
     } else if (cq.herr === "linea") {
       const p = cqEnderezar([x0, y0], [cqSnap(mx), cqSnap(my)]);
       tmp.innerHTML = croquisSvgElemento({ t: "linea", x1: x0, y1: y0, x2: p[0], y2: p[1] });
@@ -15144,6 +15183,16 @@ cqSvg.addEventListener("pointermove", (e) => {
     }
   }
 });
+// Círculo: si el óvalo es casi redondo, queda redondo.
+function cqFinForma(x0, y0, px, py) {
+  if (cq.forma !== "elipse") return [px, py];
+  const w = px - x0, h = py - y0;
+  if (Math.abs(Math.abs(w) - Math.abs(h)) <= Math.max(Math.abs(w), Math.abs(h)) * 0.15) {
+    const l = Math.max(Math.abs(w), Math.abs(h));
+    return [x0 + Math.sign(w || 1) * l, y0 + Math.sign(h || 1) * l];
+  }
+  return [px, py];
+}
 // Paredes derechas: si el ángulo está cerca de horizontal, vertical o 45°, se ajusta.
 function cqEnderezar(a, b) {
   const dx = b[0] - a[0], dy = b[1] - a[1];
@@ -15162,7 +15211,10 @@ function cqTerminarGesto(e) {
     let nuevo = null;
     if (cq.herr === "rect" && cqGesto.fin) {
       const w = cqGesto.fin[0] - x0, h = cqGesto.fin[1] - y0;
-      if (Math.abs(w) >= CROQUIS_GRILLA && Math.abs(h) >= CROQUIS_GRILLA) nuevo = { t: "rect", x: Math.min(x0, x0 + w), y: Math.min(y0, y0 + h), w: Math.abs(w), h: Math.abs(h), nombre: "" };
+      if (Math.abs(w) >= CROQUIS_GRILLA && Math.abs(h) >= CROQUIS_GRILLA) {
+        nuevo = { t: "rect", x: Math.min(x0, x0 + w), y: Math.min(y0, y0 + h), w: Math.abs(w), h: Math.abs(h), nombre: "" };
+        if (cq.forma && cq.forma !== "rect") nuevo.forma = cq.forma;
+      }
     }
     if (cq.herr === "linea" && cqGesto.fin && Math.hypot(cqGesto.fin[0] - x0, cqGesto.fin[1] - y0) >= CROQUIS_GRILLA / 2) nuevo = { t: "linea", x1: x0, y1: y0, x2: cqGesto.fin[0], y2: cqGesto.fin[1] };
     if (cq.herr === "cable" && cqGesto.pts.length >= 2) {
@@ -15249,6 +15301,80 @@ function cqPedirDatos() {
 }
 cqEl("cqTituloBtn").addEventListener("click", cqPedirDatos);
 
+// ---------- Texto, cuadro de texto y tabla ----------
+function cqEditorTexto(el, pos) {
+  const esTabla = el && el.t === "tabla" && (el.celdas.length > 1 || el.celdas[0].length > 1);
+  let modo = el ? (el.t === "texto" ? "texto" : esTabla ? "tabla" : "cuadro") : "texto";
+  let celdas = el && el.t === "tabla" ? el.celdas.map((f) => [...f]) : [["", ""], ["", ""]];
+  if (!esTabla && el && el.t === "tabla") celdas = [["Ambiente", "Equipo"], ["", ""]];
+  if (!el) celdas = [["", ""], ["", ""], ["", ""]];
+  const capa = document.createElement("div");
+  capa.className = "cq-datos-capa";
+  capa.innerHTML = `<div class="cq-datos cq-texto-ed">
+    <h3>${el ? "Editar" : "Agregar"} texto</h3>
+    <div class="cq-seg" role="tablist">${[["texto", "Texto"], ["cuadro", "Cuadro de texto"], ["tabla", "Tabla"]].map(([k, n]) => `<button type="button" data-modo="${k}">${n}</button>`).join("")}</div>
+    <div data-panel="texto"><textarea class="field-input" id="cqTxt" rows="3" placeholder="Escribí el texto (Enter = otra línea)"></textarea></div>
+    <div data-panel="tabla">
+      <div class="cq-tabla-dims"><label>Filas <input class="field-input" id="cqFilas" type="number" min="1" max="15" inputmode="numeric"></label><label>Columnas <input class="field-input" id="cqCols" type="number" min="1" max="8" inputmode="numeric"></label></div>
+      <label class="cq-check"><input type="checkbox" id="cqEnc"> Primera fila en negrita (encabezado)</label>
+      <div class="cq-tabla-grilla" id="cqGrillaTabla"></div>
+    </div>
+    <div class="cq-datos-btns"><button type="button" class="btn btn-secondary" data-r="no">Cancelar</button><button type="button" class="btn btn-primary" data-r="si">Listo</button></div>
+  </div>`;
+  document.body.appendChild(capa);
+  const q = (s) => capa.querySelector(s);
+  q("#cqTxt").value = el ? (el.t === "texto" ? el.texto : (!esTabla ? el.celdas[0][0] : "")) : "";
+  q("#cqEnc").checked = el && el.t === "tabla" ? !!el.enc : true;
+  const leerGrilla = () => capa.querySelectorAll("#cqGrillaTabla [data-f]").forEach((i) => { celdas[+i.dataset.f][+i.dataset.c] = i.value; });
+  const pintarGrilla = () => {
+    const nc = Math.max(...celdas.map((f) => f.length));
+    q("#cqFilas").value = celdas.length; q("#cqCols").value = nc;
+    const g = q("#cqGrillaTabla");
+    g.style.gridTemplateColumns = `repeat(${nc}, minmax(90px, 1fr))`;
+    g.innerHTML = celdas.map((f, i) => Array.from({ length: nc }, (_, j) => `<input class="field-input" data-f="${i}" data-c="${j}" value="${escapeHtml(f[j] || "")}" placeholder="${i === 0 && q("#cqEnc").checked ? "Título" : ""}">`).join("")).join("");
+  };
+  const redimensionar = () => {
+    leerGrilla();
+    const nf = Math.max(1, Math.min(15, parseInt(q("#cqFilas").value, 10) || 0)), nc = Math.max(1, Math.min(8, parseInt(q("#cqCols").value, 10) || 0));
+    // Si no cambió el tamaño no se redibuja (así no se pierde lo que se está escribiendo).
+    if (!q("#cqFilas").value || !q("#cqCols").value || (nf === celdas.length && nc === Math.max(...celdas.map((f) => f.length)))) return;
+    celdas = Array.from({ length: nf }, (_, i) => Array.from({ length: nc }, (_, j) => (celdas[i] && celdas[i][j]) || ""));
+    pintarGrilla();
+  };
+  ["#cqFilas", "#cqCols"].forEach((id) => { q(id).addEventListener("input", redimensionar); q(id).addEventListener("change", redimensionar); });
+  q("#cqEnc").addEventListener("change", () => { leerGrilla(); pintarGrilla(); });
+  const elegir = (m) => {
+    modo = m;
+    capa.querySelectorAll("[data-modo]").forEach((b) => b.classList.toggle("activo", b.dataset.modo === m));
+    q('[data-panel="texto"]').hidden = m === "tabla";
+    q('[data-panel="tabla"]').hidden = m !== "tabla";
+    if (m === "tabla") pintarGrilla();
+  };
+  capa.querySelectorAll("[data-modo]").forEach((b) => b.addEventListener("click", () => elegir(b.dataset.modo)));
+  elegir(modo);
+  capa.querySelectorAll("[data-r]").forEach((b) => b.addEventListener("click", () => {
+    if (b.dataset.r === "si") {
+      if (modo === "tabla") leerGrilla();
+      const texto = q("#cqTxt").value.replace(/\r/g, "").replace(/\s+$/, "").slice(0, 400);
+      const vacio = modo === "tabla" ? celdas.every((f) => f.every((v) => !String(v).trim())) : !texto.trim();
+      if (vacio) { showToast("Escribí algo primero."); return; }
+      cqMemoria();
+      const x = el ? el.x : pos[0], y = el ? el.y : pos[1];
+      const base = { id: el ? el.id : cqId(), x, y };
+      if (el && el.color) base.color = el.color;
+      let nuevo;
+      if (modo === "texto") nuevo = { ...base, t: "texto", texto, tam: el && el.t === "texto" ? el.tam || 16 : 16 };
+      else nuevo = { ...base, t: "tabla", celdas: modo === "tabla" ? celdas.map((f) => f.map((v) => String(v).slice(0, 120))) : [[texto]], enc: modo === "tabla" && q("#cqEnc").checked, tam: el && el.t === "tabla" ? el.tam || 14 : 14 };
+      if (el) cq.elementos[cq.elementos.indexOf(el)] = nuevo; else cq.elementos.push(nuevo);
+      cq.sel = nuevo.id;
+      cqElegirHerr("mover");
+      cqGuardarBorrador();
+    }
+    capa.remove();
+  }));
+  setTimeout(() => { if (modo !== "tabla") q("#cqTxt").focus(); }, 50);
+}
+
 // ---------- Guardar y descargar ----------
 async function cqGuardar() {
   if (!cq.elementos.length) { showToast("El croquis está vacío."); return false; }
@@ -15301,6 +15427,7 @@ cqEl("cqMenuBtn").addEventListener("click", () => {
     <button type="button" class="btn btn-secondary" data-m="png">Imagen (PNG)</button>
     <button type="button" class="btn btn-secondary" data-m="svg">Archivo editable (SVG, se abre en Visio)</button>
     <button type="button" class="btn btn-secondary" data-m="datos">Cambiar cliente y título</button>
+    <button type="button" class="btn btn-secondary" data-m="bloq">${cq.elementos.length && cq.elementos.every((e) => e.bloq) ? "🔓 Desbloquear todo" : "🔒 Bloquear todo lo dibujado"}</button>
     <button type="button" class="link-btn" data-m="cerrar">Cerrar</button>
   </div>`;
   document.body.appendChild(capa);
@@ -15312,6 +15439,13 @@ cqEl("cqMenuBtn").addEventListener("click", () => {
     if (m === "guardar") cqGuardar();
     if (m === "pdf" || m === "png" || m === "svg") cqExportar(m);
     if (m === "datos") cqPedirDatos();
+    if (m === "bloq" && cq.elementos.length) {
+      cqMemoria();
+      const todos = cq.elementos.every((x) => x.bloq);
+      cq.elementos.forEach((x) => { if (todos) delete x.bloq; else x.bloq = true; });
+      showToast(todos ? "Todo desbloqueado." : "Todo bloqueado: lo nuevo que agregues se puede mover.");
+      cqRender(); cqGuardarBorrador();
+    }
   });
 });
 cqEl("volverDeCroquisBtn").addEventListener("click", async () => {
