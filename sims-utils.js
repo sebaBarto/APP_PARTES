@@ -55,7 +55,16 @@ function buscarSimExistenteEnCliente(nombreCliente, numeroCliente, simsCache, nu
 
   const normCliente = normalizeText(nombreCliente);
   if (!normCliente) return { tipo: "ninguna" };
+  // Sucursales con el mismo nombre ("Librería Ladder 1", "... 12"): los
+  // números del nombre tienen que coincidir. Antes las palabras de menos
+  // de 3 letras se ignoraban (incluido el "12"), y la línea de la
+  // sucursal 3 aparecía como si fuera de la 12.
+  const numerosDe = (t) => (normalizeText(t).match(/\d+/g) || []).map((n) => n.replace(/^0+(?=\d)/, "")).sort().join(",");
+  const numerosCliente = numerosDe(nombreCliente);
   const porNombre = candidatas.find((s) => {
+    // Si los dos tienen número de cliente y son distintos, es otro cliente seguro.
+    if (numeroLimpio && s.numero_cliente && limpiarNumeroClienteParaComparar(s.numero_cliente) !== numeroLimpio) return false;
+    if (numerosDe(s.cliente) !== numerosCliente) return false;
     const palabrasBase = normalizeText(s.cliente).split(/\s+/).filter((p) => p.length > 2);
     const palabrasTecnico = normCliente.split(/\s+/).filter((p) => p.length > 2);
     if (palabrasBase.length === 0 || palabrasTecnico.length === 0) return false;

@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.13.2";
+const APP_VERSION = "4.13.3";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -3009,9 +3009,13 @@ fClienteInput.addEventListener("input", async () => {
     return;
   }
   const clave = normalizeText(texto);
+  // Primero el nombre exacto, después los que empiezan igual (así
+  // "Librería Ladder 12" no queda tapado por las otras sucursales).
+  const puntaje = (c) => { const n = normalizeText(c.nombre || ""); return n === clave ? 0 : n.startsWith(clave) ? 1 : n.includes(clave) ? 2 : 3; };
   const coincidencias = clientesGeneralCache
-    .filter((c) => (c.nombre && normalizeText(c.nombre).includes(clave)) || (c.direccion && normalizeText(c.direccion).includes(clave)))
-    .slice(0, 6);
+    .filter((c) => (c.nombre && normalizeText(c.nombre).includes(clave)) || (c.direccion && normalizeText(c.direccion).includes(clave)) || (c.numero_cliente && String(c.numero_cliente) === texto))
+    .sort((a, b) => puntaje(a) - puntaje(b) || String(a.nombre || "").localeCompare(String(b.nombre || ""), "es", { numeric: true }))
+    .slice(0, 12);
 
   if (coincidencias.length === 0) {
     clienteSugerenciasWrap.classList.add("hidden");
@@ -13428,9 +13432,13 @@ simClienteInput.addEventListener("input", () => {
     return;
   }
   const clave = normalizeText(texto);
+  // Primero el nombre exacto, después los que empiezan igual (así
+  // "Librería Ladder 12" no queda tapado por las otras sucursales).
+  const puntaje = (c) => { const n = normalizeText(c.nombre || ""); return n === clave ? 0 : n.startsWith(clave) ? 1 : n.includes(clave) ? 2 : 3; };
   const coincidencias = clientesGeneralCache
-    .filter((c) => (c.nombre && normalizeText(c.nombre).includes(clave)) || (c.direccion && normalizeText(c.direccion).includes(clave)))
-    .slice(0, 6);
+    .filter((c) => (c.nombre && normalizeText(c.nombre).includes(clave)) || (c.direccion && normalizeText(c.direccion).includes(clave)) || (c.numero_cliente && String(c.numero_cliente) === texto))
+    .sort((a, b) => puntaje(a) - puntaje(b) || String(a.nombre || "").localeCompare(String(b.nombre || ""), "es", { numeric: true }))
+    .slice(0, 12);
 
   if (coincidencias.length === 0) {
     simClienteSugerenciasWrap.classList.add("hidden");
@@ -13442,7 +13450,7 @@ simClienteInput.addEventListener("input", () => {
     <div class="cliente-sugerencia-item${esAmbiguo ? " cliente-sugerencia-ambiguo" : ""}" data-idx="${idx}">
       <div class="cliente-sugerencia-nombre">${escapeHtml(c.nombre)}</div>
       ${c.direccion ? `<div class="cliente-sugerencia-direccion">${escapeHtml(c.direccion)}</div>` : ""}
-      ${c.numero_abonado ? `<div class="cliente-sugerencia-abonado">Abonado: ${escapeHtml(c.numero_abonado)}</div>` : ""}
+      ${c.numero_abonado || c.numero_cliente ? `<div class="cliente-sugerencia-abonado">${c.numero_cliente ? "Cliente N° " + escapeHtml(c.numero_cliente) : ""}${c.numero_cliente && c.numero_abonado ? " · " : ""}${c.numero_abonado ? "Abonado: " + escapeHtml(c.numero_abonado) : ""}</div>` : ""}
     </div>
   `;
   }).join("");
@@ -13923,9 +13931,13 @@ emergClienteInput.addEventListener("input", () => {
     return;
   }
   const clave = normalizeText(texto);
+  // Primero el nombre exacto, después los que empiezan igual (así
+  // "Librería Ladder 12" no queda tapado por las otras sucursales).
+  const puntaje = (c) => { const n = normalizeText(c.nombre || ""); return n === clave ? 0 : n.startsWith(clave) ? 1 : n.includes(clave) ? 2 : 3; };
   const coincidencias = clientesGeneralCache
-    .filter((c) => (c.nombre && normalizeText(c.nombre).includes(clave)) || (c.direccion && normalizeText(c.direccion).includes(clave)))
-    .slice(0, 6);
+    .filter((c) => (c.nombre && normalizeText(c.nombre).includes(clave)) || (c.direccion && normalizeText(c.direccion).includes(clave)) || (c.numero_cliente && String(c.numero_cliente) === texto))
+    .sort((a, b) => puntaje(a) - puntaje(b) || String(a.nombre || "").localeCompare(String(b.nombre || ""), "es", { numeric: true }))
+    .slice(0, 12);
 
   if (coincidencias.length === 0) {
     emergClienteSugerenciasWrap.classList.add("hidden");

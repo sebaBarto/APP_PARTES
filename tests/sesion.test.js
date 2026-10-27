@@ -377,3 +377,19 @@ test("Croquis desde foto: el servidor le pasa la foto a la IA con el pedido de J
     if (claveVieja === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = claveVieja;
   }
 });
+
+test("SIMs: sucursales con el mismo nombre (Librería Ladder 1…12) no se confunden al buscar si el cliente ya tiene línea", () => {
+  const vm = require("vm");
+  const ctx = {};
+  vm.runInNewContext(require("fs").readFileSync(require("path").join(__dirname, "..", "sims-utils.js"), "utf8"), ctx);
+  const sims = [
+    { numero: "111", estado: "uso", cliente: "Libreria Ladder 3", numero_cliente: "503", empresa: "Claro" },
+    { numero: "222", estado: "uso", cliente: "Libreria Ladder 1", empresa: "Personal" },
+  ];
+  // La 12 no tiene línea: ni la de la 3 (otro N° de cliente) ni la de la 1 (otro número en el nombre)
+  assert.strictEqual(ctx.buscarSimExistenteEnCliente("Librería Ladder 12", "512", sims, null).tipo, "ninguna");
+  assert.strictEqual(ctx.buscarSimExistenteEnCliente("Librería Ladder 12", "", sims, null).tipo, "ninguna");
+  // La 3 sí, confirmada por N° de cliente; la 1, parecida por nombre (sin N° guardado)
+  assert.strictEqual(ctx.buscarSimExistenteEnCliente("Librería Ladder 3", "503", sims, null).tipo, "confirmada");
+  assert.strictEqual(ctx.buscarSimExistenteEnCliente("Librería Ladder 1", "501", sims, null).sim.numero, "222");
+});
