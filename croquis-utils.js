@@ -607,3 +607,81 @@ function croquisDescargar(blob, nombre) {
   a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
+
+// ---------- Croquis desde la interpretación de la IA ----------
+// r: JSON que devolvió la IA (coordenadas 0-1000 sobre la foto sin rotar);
+// W, H: tamaño de la foto en píxeles. Devuelve la lista de elementos.
+const CROQUIS_DIRECCIONES = { derecha: 0, "abajo-derecha": 45, abajo: 90, "abajo-izquierda": 135, izquierda: 180, "arriba-izquierda": 225, arriba: 270, "arriba-derecha": 315 };
+const CROQUIS_ANCHO_ABERTURA = { puerta: 40, ventana: 44, corrediza: 60, porton_corredizo: 100, porton_batiente: 100 };
+function croquisDesdeIA(r, W, H) {
+  r = r && typeof r === "object" ? r : {};
+  const rot = [0, 90, 180, 270].includes(Number(r.rotacion)) ? Number(r.rotacion) : 0;
+  const num = (v) => { const n = Number(v); return isFinite(n) ? Math.max(-50, Math.min(1050, n)) : 0; };
+  // 0-1000 -> píxeles -> girado para que los textos se lean derechos
+  const pt = (x, y) => {
+    const px = num(x) * W / 1000, py = num(y) * H / 1000;
+    if (rot === 90) return [H - py, px];
+    if (rot === 180) return [W - px, H - py];
+    if (rot === 270) return [py, W - px];
+    return [px, py];
+  };
+  const lista = (k) => (Array.isArray(r[k]) ? r[k] : []).filter((x) => x && typeof x === "object").slice(0, 200);
+  const crudo = [];
+  lista("habitaciones").forEach((h) => { const a = pt(h.x1, h.y1), b = pt(h.x2, h.y2); crudo.push({ t: "rect", a, b, nombre: String(h.nombre || "").trim().slice(0, 40) }); });
+  lista("paredes").forEach((p) => crudo.push({ t: "linea", a: pt(p.x1, p.y1), b: pt(p.x2, p.y2) }));
+  lista("aberturas").forEach((p) => { if (CROQUIS_ANCHO_ABERTURA[p.tipo]) crudo.push({ t: "abertura", tipo: p.tipo, a: pt(p.x1, p.y1), b: pt(p.x2, p.y2) }); });
+  lista("equipos").forEach((e) => {
+    if (!CROQUIS_SIMBOLOS[e.tipo] || CROQUIS_SIMBOLOS[e.tipo].cat !== "equipo") return;
+    const dir = CROQUIS_DIRECCIONES[String(e.apunta || "").toLowerCase().trim()];
+    crudo.push({ t: "equipo", tipo: e.tipo, a: pt(e.x, e.y), dir: dir === undefined ? null : (dir + rot) % 360, numero: String(e.numero == null ? "" : e.numero).trim().slice(0, 12) });
+  });
+  lista("textos").forEach((t) => { const s = String(t.texto || "").trim(); if (s) crudo.push({ t: "texto", a: pt(t.x, t.y), texto: s.slice(0, 120) }); });
+  if (!crudo.length) return [];
+  // Escala: el plano entra en unos 600 de ancho o alto (las habitaciones
+  // quedan de ~200, a tono con el tamaño de los símbolos).
+  const xs = [], ys = [];
+  crudo.forEach((c) => [c.a, c.b].filter(Boolean).forEach((p) => { xs.push(p[0]); ys.push(p[1]); }));
+  const x0 = Math.min(...xs), y0 = Math.min(...ys), lado = Math.max(1, Math.max(...xs) - x0, Math.max(...ys) - y0);
+  const k = 600 / lado;
+  const snap = (v) => Math.round(v / 10) * 10;
+  const m = (p) => [snap((p[0] - x0) * k), snap((p[1] - y0) * k)];
+  const out = [];
+  let n = 0;
+  const id = () => "ia" + Date.now().toString(36) + (n++).toString(36);
+  crudo.forEach((c) => {
+    if (c.t === "rect") {
+      const a = m(c.a), b = m(c.b), w = Math.abs(b[0] - a[0]), h = Math.abs(b[1] - a[1]);
+      if (w >= 20 && h >= 20) out.push({ id: id(), t: "rect", x: Math.min(a[0], b[0]), y: Math.min(a[1], b[1]), w, h, nombre: c.nombre });
+    } else if (c.t === "linea") {
+      let a = m(c.a), b = m(c.b);
+      // Enderezar si es casi horizontal o vertical
+      if (Math.abs(a[1] - b[1]) < Math.abs(a[0] - b[0]) * 0.15) b = [b[0], a[1]];
+      else if (Math.abs(a[0] - b[0]) < Math.abs(a[1] - b[1]) * 0.15) b = [a[0], b[1]];
+      if (Math.hypot(b[0] - a[0], b[1] - a[1]) >= 10) out.push({ id: id(), t: "linea", x1: a[0], y1: a[1], x2: b[0], y2: b[1] });
+    } else if (c.t === "abertura") {
+      const a = m(c.a), b = m(c.b), largo = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const ang = Math.round(Math.atan2(b[1] - a[1], b[0] - a[0]) * 180 / Math.PI / 90) * 90;
+      const esc = Math.max(0.5, Math.min(3, Math.round((largo / CROQUIS_ANCHO_ABERTURA[c.tipo]) * 4) / 4 || 1));
+      out.push({ id: id(), t: "simbolo", tipo: c.tipo, x: snap((a[0] + b[0]) / 2), y: snap((a[1] + b[1]) / 2), rot: (ang + 360) % 360, esc });
+    } else if (c.t === "equipo") {
+      const p = m(c.a), def = CROQUIS_SIMBOLOS[c.tipo];
+      let rotEq = 0;
+      // El infrarrojo mira (bisectriz) a -135°; las cámaras miran para arriba.
+      if (c.dir !== null && def.ir) rotEq = c.dir - (360 + CROQUIS_IR_BIS);
+      else if (c.dir !== null && /^camara/.test(c.tipo)) rotEq = c.dir - 270;
+      const el = { id: id(), t: "simbolo", tipo: c.tipo, x: p[0], y: p[1], rot: ((Math.round(rotEq / 15) * 15) % 360 + 360) % 360, esc: 1 };
+      if (c.numero) el.etq = c.numero;
+      out.push(el);
+    } else if (c.t === "texto") {
+      const p = m(c.a);
+      out.push({ id: id(), t: "texto", x: p[0], y: p[1], texto: c.texto, tam: 14 });
+    }
+  });
+  const notas = String(r.notas || "").replace(/\r/g, "").trim();
+  if (notas) {
+    const caja = croquisCaja({ elementos: out });
+    // Las notas escritas fuera del plano van en un cuadro de texto debajo.
+    out.push({ id: id(), t: "tabla", x: snap(caja.x), y: snap(caja.y + caja.h + 50), celdas: [[notas.slice(0, 600)]], tam: 13 });
+  }
+  return out;
+}

@@ -341,3 +341,38 @@ test("Croquis: solo con permiso; se guardan con un índice, se reabren, y los bo
     global.fetch = fetchViejo;
   }
 });
+
+test("Croquis desde foto: el servidor le pasa la foto a la IA con el pedido de JSON y devuelve lo que interpretó", async () => {
+  const fetchViejo = global.fetch;
+  const claveVieja = process.env.GEMINI_API_KEY;
+  process.env.GEMINI_API_KEY = "clave-de-prueba";
+  let alGemini = null;
+  global.fetch = async (url, op = {}) => {
+    const u = String(url);
+    if (u.includes("generativelanguage")) {
+      alGemini = JSON.parse(op.body);
+      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: '```json\n{"rotacion":90,"habitaciones":[{"x1":1,"y1":2,"x2":3,"y2":4}]}\n```' }] } }] }));
+    }
+    const ruta = (u.match(/contents\/([^?]+)/) || [])[1];
+    if (ruta === "tecnicos.json") return new Response(JSON.stringify({ content: Buffer.from(JSON.stringify([{ nombre: "Juan", permisos: { croquis: true } }, { nombre: "Luis", permisos: {} }])).toString("base64"), encoding: "base64", sha: "t" }));
+    return new Response("{}", { status: 404 });
+  };
+  try {
+    const foto = "A".repeat(5000);
+    let r = resFalso();
+    await datos(pedido("POST", { coleccion: "croquis" }, { accion: "interpretar", imagen: foto }, crearSesion({ nombre: "Luis", rol: "tecnico" })), r);
+    assert.strictEqual(r.statusCode, 403, "sin permiso no");
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "croquis" }, { accion: "interpretar", imagen: "data:image/jpeg;base64," + foto, mime: "image/jpeg" }, crearSesion({ nombre: "Juan", rol: "tecnico" })), r);
+    assert.deepStrictEqual(r.cuerpo, { ok: true, resultado: { rotacion: 90, habitaciones: [{ x1: 1, y1: 2, x2: 3, y2: 4 }] } });
+    assert.strictEqual(alGemini.contents[0].parts[0].inline_data.data, foto, "sin el encabezado data:");
+    assert.match(alGemini.contents[0].parts[1].text, /infrarrojo/);
+    assert.strictEqual(alGemini.generationConfig.responseMimeType, "application/json");
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "croquis" }, { accion: "interpretar", imagen: "" }, crearSesion({ nombre: "Juan", rol: "tecnico" })), r);
+    assert.strictEqual(r.statusCode, 400);
+  } finally {
+    global.fetch = fetchViejo;
+    if (claveVieja === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = claveVieja;
+  }
+});

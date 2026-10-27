@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.7.0";
+const APP_VERSION = "4.8.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -15470,6 +15470,7 @@ cqEl("cqMenuBtn").addEventListener("click", () => {
     <button type="button" class="btn btn-secondary" data-m="pdf">Compartir / descargar PDF</button>
     <button type="button" class="btn btn-secondary" data-m="png">Imagen (PNG)</button>
     <button type="button" class="btn btn-secondary" data-m="svg">Archivo editable (SVG, se abre en Visio)</button>
+    <button type="button" class="btn btn-secondary" data-m="foto">📷 Agregar desde la foto de un boceto</button>
     <button type="button" class="btn btn-secondary" data-m="datos">Cambiar cliente y título</button>
     <button type="button" class="btn btn-secondary" data-m="bloq">${cq.elementos.length && cq.elementos.every((e) => e.bloq) ? "🔓 Desbloquear todo" : "🔒 Bloquear todo lo dibujado"}</button>
     <button type="button" class="link-btn" data-m="cerrar">Cerrar</button>
@@ -15483,6 +15484,7 @@ cqEl("cqMenuBtn").addEventListener("click", () => {
     if (m === "guardar") cqGuardar();
     if (m === "pdf" || m === "png" || m === "svg") cqExportar(m);
     if (m === "datos") cqPedirDatos();
+    if (m === "foto") { cqFotoDestino = "editor"; cqEl("cqFotoInput").click(); }
     if (m === "bloq" && cq.elementos.length) {
       cqMemoria();
       const todos = cq.elementos.every((x) => x.bloq);
@@ -15578,4 +15580,78 @@ cqEl("cqNuevoBtn").addEventListener("click", () => {
   cqAbrirEditor({});
 });
 cqEl("tileCroquisBtn").addEventListener("click", cqAbrirLista);
+
+// ---------- Desde la foto de un boceto en papel ----------
+// La foto se achica en el celular, el servidor se la pasa a la IA y lo que
+// interpreta se carga como un croquis editable.
+let cqFotoDestino = "nuevo";
+function cqAchicarFoto(archivo, lado) {
+  return new Promise((ok, mal) => {
+    const url = URL.createObjectURL(archivo);
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, lado / Math.max(img.naturalWidth, img.naturalHeight));
+      const cv = document.createElement("canvas");
+      cv.width = Math.round(img.naturalWidth * k); cv.height = Math.round(img.naturalHeight * k);
+      cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+      URL.revokeObjectURL(url);
+      ok({ base64: cv.toDataURL("image/jpeg", 0.82).split(",")[1], w: cv.width, h: cv.height });
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); mal(new Error("No se pudo leer la foto")); };
+    img.src = url;
+  });
+}
+async function cqDesdeFoto(archivo) {
+  const capa = document.createElement("div");
+  capa.className = "cq-datos-capa cq-cargando";
+  capa.innerHTML = `<div class="cq-datos"><div class="cq-spinner"></div><h3>Interpretando el boceto…</h3><p class="pe-nota">La IA está mirando la foto. Tarda unos segundos.</p></div>`;
+  document.body.appendChild(capa);
+  try {
+    const foto = await cqAchicarFoto(archivo, 1600);
+    const r = await fetch("/api/datos?coleccion=croquis", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({ accion: "interpretar", imagen: foto.base64, mime: "image/jpeg" }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || "HTTP " + r.status);
+    let nuevos = croquisDesdeIA(d.resultado, foto.w, foto.h);
+    if (!nuevos.length) throw new Error("No se reconoció ningún dibujo en la foto. Probá sacarla más de frente, con buena luz y que la hoja ocupe toda la foto.");
+    capa.remove();
+    if (cqFotoDestino === "editor" && cq.elementos.length) {
+      // Se agrega al lado de lo que ya está dibujado
+      const ya = croquisCaja(cqDibujo()), nu = croquisCaja({ elementos: nuevos });
+      const dx = Math.round((ya.x + ya.w + 80 - nu.x) / 10) * 10, dy = Math.round((ya.y - nu.y) / 10) * 10;
+      nuevos = nuevos.map((e) => {
+        const c = { ...e };
+        if ("x" in c) { c.x += dx; c.y += dy; }
+        if (c.t === "linea") { c.x1 += dx; c.x2 += dx; c.y1 += dy; c.y2 += dy; }
+        return c;
+      });
+      cqMemoria();
+      cq.elementos.push(...nuevos);
+      cqGuardarBorrador();
+      cqVerTodo();
+    } else {
+      cqAbrirEditor({ elementos: nuevos, cambios: true });
+      cqGuardarBorrador();
+    }
+    showToast(`Listo: ${nuevos.length} elementos. Revisá y corregí lo que haga falta.`);
+  } catch (err) {
+    capa.remove();
+    showToast("No se pudo armar el croquis: " + err.message);
+  }
+}
+cqEl("cqFotoInput").addEventListener("change", (e) => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if (f) cqDesdeFoto(f);
+});
+cqEl("cqDesdeFotoBtn").addEventListener("click", () => {
+  let borrador = null;
+  try { borrador = JSON.parse(localStorage.getItem(CQ_BORRADOR) || "null"); } catch (e) { borrador = null; }
+  if (borrador && borrador.cambios && borrador.elementos && borrador.elementos.length && !confirm("Hay un croquis sin guardar en este celular. ¿Empezar uno nuevo desde la foto igual? (el anterior se pierde)")) return;
+  cqFotoDestino = "nuevo";
+  cqEl("cqFotoInput").click();
+});
 cqEl("volverDeCroquisListaBtn").addEventListener("click", () => showScreen("home"));

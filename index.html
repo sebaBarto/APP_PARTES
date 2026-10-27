@@ -1723,7 +1723,9 @@
     <div class="review-scroll">
       <p class="hint-eyebrow review-eyebrow">CROQUIS</p>
       <p class="pe-nota" style="margin-top:0;">Bocetos rápidos de planos hechos desde el celular: habitaciones, paredes, cableado y los equipos (central, teclado, magnéticos, infrarrojos).</p>
-      <button type="button" class="btn btn-primary" id="cqNuevoBtn" style="width:100%; margin-bottom:14px;">+ Nuevo croquis</button>
+      <button type="button" class="btn btn-primary" id="cqNuevoBtn" style="width:100%; margin-bottom:8px;">+ Nuevo croquis</button>
+      <button type="button" class="btn btn-secondary" id="cqDesdeFotoBtn" style="width:100%; margin-bottom:14px;">📷 Desde la foto de un boceto en papel</button>
+      <input type="file" id="cqFotoInput" accept="image/*" hidden>
       <input class="field-input" type="search" id="cqListaBuscar" placeholder="Buscar por cliente, título o dirección" autocomplete="off">
       <p class="list-status" id="cqListaEstado">Cargando...</p>
       <div id="cqLista" class="historial-list"></div>

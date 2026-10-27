@@ -2340,3 +2340,58 @@ test("Croquis: infrarrojo con número, alcance, ángulo, doble lente, video e in
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Croquis desde foto: la foto se achica, va a la IA y lo interpretado (girado para leerse derecho) queda como croquis editable", async () => {
+  const ctx = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 844 } });
+  const page = await ctx.newPage();
+  const erroresPagina = [];
+  page.on("pageerror", (e) => erroresPagina.push(e.message));
+  await page.addInitScript(() => { localStorage.setItem("ajustes_app", JSON.stringify({ estiloInicio: "nuevo" })); localStorage.setItem("skin_v4_aplicado", "1"); });
+  const resultado = {
+    rotacion: 270,
+    habitaciones: [{ x1: 100, y1: 100, x2: 900, y2: 900, nombre: "" }, { x1: 100, y1: 100, x2: 500, y2: 500, nombre: "Oficina" }],
+    aberturas: [{ tipo: "puerta", x1: 100, y1: 300, x2: 100, y2: 380 }],
+    equipos: [{ tipo: "central", x: 800, y: 850 }, { tipo: "infrarrojo", x: 150, y: 150, numero: "3", apunta: "abajo" }, { tipo: "nada", x: 1, y: 1 }],
+    textos: [{ x: 300, y: 700, texto: "AGREGAR" }],
+    notas: "Presupuestar:\n4 detectores de humo",
+  };
+  let pedido = null;
+  await page.route("**/api/**", (route) => {
+    const req = route.request();
+    if (req.url().includes("coleccion=croquis") && req.method() === "POST") { pedido = JSON.parse(req.postData()); return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, resultado }) }); }
+    route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+  });
+  await page.goto(base + "/");
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); cqAbrirLista(); });
+  await page.waitForTimeout(200);
+  // Una "foto" de 2000x1000 generada en el momento
+  const png = await page.evaluate(async () => {
+    const cv = document.createElement("canvas"); cv.width = 2000; cv.height = 1000;
+    const c = cv.getContext("2d"); c.fillStyle = "#fff"; c.fillRect(0, 0, 2000, 1000); c.strokeRect(100, 100, 1800, 800);
+    const b = await new Promise((ok) => cv.toBlob(ok, "image/png"));
+    return Array.from(new Uint8Array(await b.arrayBuffer()));
+  });
+  const [selector] = await Promise.all([page.waitForEvent("filechooser"), page.click("#cqDesdeFotoBtn")]);
+  await selector.setFiles({ name: "boceto.png", mimeType: "image/png", buffer: Buffer.from(png) });
+  await page.waitForFunction(() => screens.croquis.dataset.active === "true", null, { timeout: 10000 });
+  assert.strictEqual(pedido.accion, "interpretar");
+  assert.strictEqual(pedido.mime, "image/jpeg");
+  const dims = await page.evaluate((b64) => new Promise((ok) => { const i = new Image(); i.onload = () => ok([i.width, i.height]); i.src = "data:image/jpeg;base64," + b64; }), pedido.imagen);
+  assert.deepStrictEqual(dims, [1600, 800], "se achica a 1600 de lado");
+  const els = await page.evaluate(() => cq.elementos);
+  assert.deepStrictEqual(els.map((e) => e.t + (e.tipo ? ":" + e.tipo : "")), ["rect", "rect", "simbolo:puerta", "simbolo:central", "simbolo:infrarrojo", "texto", "tabla"]);
+  // Girada 270°: la foto apaisada queda parada (más alta que ancha)
+  const casa = els[0];
+  assert.ok(casa.h > casa.w, "la hoja girada queda vertical");
+  assert.strictEqual(els.find((e) => e.nombre === "Oficina").x, casa.x, "la oficina (arriba a la izquierda en la foto) queda abajo a la izquierda");
+  assert.strictEqual(els[2].rot, 0, "la puerta de la pared izquierda (vertical) queda horizontal");
+  const ir = els.find((e) => e.tipo === "infrarrojo");
+  assert.strictEqual(ir.etq, "3");
+  assert.strictEqual(ir.rot, 135, "miraba para abajo en la foto: girada, mira a la derecha");
+  assert.deepStrictEqual(els.at(-1).celdas, [["Presupuestar:\n4 detectores de humo"]]);
+  assert.match(await page.textContent("#toast"), /7 elementos/);
+  assert.ok(await page.evaluate(() => cq.cambios));
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

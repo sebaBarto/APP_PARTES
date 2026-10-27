@@ -290,6 +290,61 @@ async function manejarPresupuestoExpress(req, res, autorizacion, body) {
 // índice chico (croquis-index.json) para listarlos sin bajar todo.
 // ============================================================
 const RUTA_CROQUIS_INDICE = "croquis-index.json";
+// ---------- Croquis desde la foto de un boceto en papel ----------
+// La IA (Gemini, la misma clave que usa Manuales) mira la foto y devuelve
+// lo que entiende en un JSON simple; la app lo convierte en un croquis
+// editable (croquisDesdeIA en croquis-utils.js).
+const PROMPT_BOCETO_CROQUIS = `Sos un asistente de una empresa argentina de alarmas (SAT). Te paso la foto de un boceto hecho a mano alzada por un técnico: es la planta de un domicilio o local, con los equipos de alarma marcados.
+Interpretá el dibujo y devolvé SOLO un JSON con esta forma:
+{
+  "rotacion": 0,
+  "habitaciones": [{"x1":0,"y1":0,"x2":0,"y2":0,"nombre":""}],
+  "paredes": [{"x1":0,"y1":0,"x2":0,"y2":0}],
+  "aberturas": [{"tipo":"puerta","x1":0,"y1":0,"x2":0,"y2":0}],
+  "equipos": [{"tipo":"central","x":0,"y":0,"numero":"","apunta":""}],
+  "textos": [{"x":0,"y":0,"texto":""}],
+  "notas": ""
+}
+Coordenadas: x de 0 a 1000 a lo ancho de la foto (0 = borde izquierdo) e y de 0 a 1000 a lo alto (0 = borde de arriba), tal como se ve la foto, sin rotarla.
+"rotacion": cuántos grados hay que girar la foto en sentido horario para que los textos del dibujo se lean derechos (0, 90, 180 o 270). Si la hoja está de costado, no es 0.
+Reglas:
+- "habitaciones": cada ambiente rectangular (esquinas opuestas). El contorno exterior de la casa también es una habitación. Si tiene nombre escrito adentro (Cocina, Oficina, etc.) ponelo en "nombre" y no lo repitas en textos.
+- "paredes": líneas sueltas que dividen ambientes y no forman un rectángulo cerrado.
+- "aberturas": van sobre una pared, x1,y1-x2,y2 es el tramo que ocupan. tipo: "puerta" (rectángulo angosto o arco sobre la pared), "ventana" (rectángulo doble angosto y corto), "corrediza" (rectángulo doble largo), "porton_corredizo", "porton_batiente".
+- "equipos" (tipo exacto de esta lista): "central" (cuadrado con "CA" o "C" o "Central"), "teclado" (cuadrado con "T"), "hub", "repetidor" ("ReX"), "sirena_ext" / "sirena_int" (rectángulo con un triángulo abajo, o "S"), "magnetico" (cuadradito relleno o "M" junto a una puerta o ventana), "infrarrojo" (triángulo con rayitas "ııı" o "!!!" que indican hacia dónde capta; "infrarrojo_ext" si dice exterior), "humo" (círculo con "DH" o "humo"), "gas" ("DG" o "gas"), "pulsador_incendio", "pulsador_asalto", "camara_ip", "camara_analoga", "dvr", "monitor".
+  "numero": el número de zona o dispositivo escrito al lado (ej. "3"); vacío si no hay.
+  "apunta" (solo infrarrojos y cámaras): hacia dónde mira, según la foto sin rotar: "arriba", "abajo", "izquierda", "derecha", "arriba-izquierda", "arriba-derecha", "abajo-izquierda" o "abajo-derecha". Las rayitas del infrarrojo están del lado hacia donde capta.
+  "x","y": el centro del símbolo.
+- "textos": anotaciones cortas dentro del plano que no sean nombres de ambientes ni números de zona (ej. "AGREGAR", un modelo de equipo, "gabinete apertura puerta").
+- "notas": todo lo escrito fuera del plano (listas, "presupuestar", observaciones), en líneas separadas con \\n.
+No inventes cosas que no estén dibujadas. Si dudás qué equipo es, usá el más parecido y agregá un texto al lado con lo que dice.`;
+async function interpretarBocetoCroquis(b, res) {
+  const { GEMINI_API_KEY } = process.env;
+  if (!GEMINI_API_KEY) { res.status(500).json({ error: "Falta configurar GEMINI_API_KEY en Vercel" }); return; }
+  const imagen = String(b.imagen || "").replace(/^data:[^,]*,/, "");
+  const mime = /^image\/(jpeg|png|webp)$/.test(b.mime) ? b.mime : "image/jpeg";
+  if (imagen.length < 1000) { res.status(400).json({ error: "Falta la foto del boceto" }); return; }
+  if (imagen.length > 4000000) { res.status(400).json({ error: "La foto es demasiado grande" }); return; }
+  const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts: [{ inline_data: { mime_type: mime, data: imagen } }, { text: PROMPT_BOCETO_CROQUIS }] }],
+      generationConfig: { responseMimeType: "application/json", temperature: 0.2 },
+    }),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    if (r.status === 429) { res.status(429).json({ error: "Se alcanzó el límite de consultas a la IA por ahora. Probá de nuevo en unos minutos." }); return; }
+    res.status(502).json({ error: "No se pudo consultar la IA", detail: d.error || d });
+    return;
+  }
+  const texto = ((d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts) || []).map((p) => p.text || "").join("");
+  let resultado = null;
+  try { resultado = JSON.parse(texto.replace(/^```(json)?/i, "").replace(/```\s*$/, "").trim()); } catch (e) { resultado = null; }
+  if (!resultado || typeof resultado !== "object") { res.status(502).json({ error: "La IA no pudo interpretar el boceto. Probá con una foto más de frente y con buena luz." }); return; }
+  res.status(200).json({ ok: true, resultado });
+}
 async function manejarCroquis(req, res, autorizacion, body) {
   const { GITHUB_DATA_TOKEN, GITHUB_DATA_REPO } = process.env;
   if (!GITHUB_DATA_TOKEN || !GITHUB_DATA_REPO) { res.status(500).json({ error: "Faltan variables de entorno por configurar en Vercel" }); return; }
@@ -318,6 +373,7 @@ async function manejarCroquis(req, res, autorizacion, body) {
     }
     if (req.method !== "POST") { res.status(405).json({ error: "Método no permitido" }); return; }
     const b = body && typeof body === "object" ? body : {};
+    if (b.accion === "interpretar") { await interpretarBocetoCroquis(b, res); return; }
     if (b.accion === "guardar") {
       const id = b.id && idValido(b.id) ? b.id : (Date.now().toString(36) + require("crypto").randomBytes(4).toString("hex"));
       const dibujo = b.dibujo && typeof b.dibujo === "object" ? b.dibujo : null;
