@@ -10,6 +10,9 @@
 //   tabla   { x, y, celdas: [[..]], tam, enc, color? }  cuadro de texto o tabla
 //   rect.forma: rect | elipse | triangulo | triangulo_rect (ori 0-3); color?, trazo?
 //   bloq: true en cualquier elemento = bloqueado en el editor
+//   grupo: id compartido = elementos soldados (se mueven juntos)
+//   linea.c: [x, y] punto de control = pared curva
+// Varias páginas: { v: 2, elementos (de la 1ª), paginas: [{ nombre, elementos, fondo }] }
 //   simbolo { tipo, x, y, rot, esc, color?, esp? }  equipos y objetos de obra
 
 const CROQUIS_GRILLA = 20;
@@ -152,6 +155,12 @@ const CROQUIS_SIMBOLOS = {
       for (let g = 90; g >= -200; g -= 10) { const a = g * Math.PI / 180; pts.push([+(Math.cos(a) * 26).toFixed(1), +(Math.sin(a) * 26).toFixed(1)]); }
       return out + croquisFlecha(c, pts, true, !!(el && el.esp));
     },
+  },
+  logo_sat: {
+    nombre: "Logo SAT", cat: "obra", color: "#1C1E21", r: 40, sinColor: true,
+    dib: () => CROQUIS_LOGO
+      ? `<image href="${CROQUIS_LOGO}" x="-35" y="-31" width="70" height="62" preserveAspectRatio="xMidYMid meet"/>`
+      : `<rect x="-35" y="-20" width="70" height="40" rx="6" fill="#F2C94C" stroke="#1C1E21" stroke-width="2"/><text x="0" y="8" text-anchor="middle" ${CROQUIS_FUENTE} font-size="22" fill="#1C1E21">SAT</text>`,
   },
   piscina: {
     nombre: "Piscina", cat: "obra", color: "#2E86DE", r: 50,
@@ -297,6 +306,26 @@ function croquisLocalAMundo(el, lx, ly) {
   const esc = el.esc || 1, a = (el.rot || 0) * Math.PI / 180, x = (el.esp ? -lx : lx) * esc, y = ly * esc;
   return [el.x + x * Math.cos(a) - y * Math.sin(a), el.y + x * Math.sin(a) + y * Math.cos(a)];
 }
+// Punto medio de una pared curva (sobre la curva): sirve de manija.
+function croquisMedioCurva(el) {
+  return [0.25 * el.x1 + 0.5 * el.c[0] + 0.25 * el.x2, 0.25 * el.y1 + 0.5 * el.c[1] + 0.25 * el.y2];
+}
+// Logo de SAT como objeto del plano: se carga una vez como data URI para
+// que también salga en el PNG/PDF y en el SVG descargado.
+let CROQUIS_LOGO = null, croquisLogoPromesa = null;
+function croquisCargarLogo() {
+  if (croquisLogoPromesa) return croquisLogoPromesa;
+  if (typeof fetch !== "function" || typeof FileReader === "undefined") return Promise.resolve(null);
+  croquisLogoPromesa = fetch("assets/presupuesto/logo-sat.jpg").then((r) => (r.ok ? r.blob() : null)).then((b) => new Promise((ok) => {
+    if (!b) { ok(null); return; }
+    const fr = new FileReader();
+    // Siempre como JPEG (algunos servidores lo mandan sin tipo y la imagen no se dibuja).
+    fr.onload = () => { CROQUIS_LOGO = String(fr.result).replace(/^data:[^;,]*/, "data:image/jpeg"); ok(CROQUIS_LOGO); };
+    fr.onerror = () => ok(null);
+    fr.readAsDataURL(b);
+  })).catch(() => null);
+  return croquisLogoPromesa;
+}
 // Formas de las habitaciones.
 const CROQUIS_FORMAS = {
   rect: { nombre: "Rectángulo", icono: '<rect x="4" y="6" width="24" height="18" fill="none" stroke="currentColor" stroke-width="2.6"/>' },
@@ -407,7 +436,10 @@ function croquisSvgElemento(el, attrs) {
   }
   if (el.t === "linea") {
     const t = el.trazo && el.trazo !== "continuo";
-    return `<g ${a}><line x1="${el.x1}" y1="${el.y1}" x2="${el.x2}" y2="${el.y2}" stroke="${el.color || "#1C1E21"}" stroke-width="${t ? 3.5 : 5}"${croquisDash(el.trazo, "continuo")} stroke-linecap="${el.trazo === "puntos" ? "round" : (t ? "butt" : "square")}"/></g>`;
+    const estilo = `stroke="${el.color || "#1C1E21"}" stroke-width="${t ? 3.5 : 5}"${croquisDash(el.trazo, "continuo")} stroke-linecap="${el.trazo === "puntos" ? "round" : (t ? "butt" : "square")}"`;
+    // Pared curva: curva cuadrática con punto de control el.c
+    if (Array.isArray(el.c)) return `<g ${a}>${a ? `<path d="M${el.x1} ${el.y1} Q${el.c[0]} ${el.c[1]} ${el.x2} ${el.y2}" fill="none" stroke="#000" stroke-opacity="0" stroke-width="14"/>` : ""}<path d="M${el.x1} ${el.y1} Q${el.c[0]} ${el.c[1]} ${el.x2} ${el.y2}" fill="none" ${estilo}/></g>`;
+    return `<g ${a}>${a ? `<line x1="${el.x1}" y1="${el.y1}" x2="${el.x2}" y2="${el.y2}" stroke="#000" stroke-opacity="0" stroke-width="14"/>` : ""}<line x1="${el.x1}" y1="${el.y1}" x2="${el.x2}" y2="${el.y2}" ${estilo}/></g>`;
   }
   if (el.t === "cable") {
     // Trazo invisible más ancho para que sea fácil tocarlo con el dedo.
@@ -470,7 +502,7 @@ function croquisCaja(dibujo) {
   const sumar = (x, y) => { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); };
   (dibujo.elementos || []).forEach((el) => {
     if (el.t === "rect") { sumar(el.x, el.y); sumar(el.x + el.w, el.y + el.h); }
-    else if (el.t === "linea") { sumar(el.x1, el.y1); sumar(el.x2, el.y2); }
+    else if (el.t === "linea") { sumar(el.x1, el.y1); sumar(el.x2, el.y2); if (Array.isArray(el.c)) { const m = croquisMedioCurva(el); sumar(m[0], m[1]); } }
     else if (el.t === "cable") (el.pts || []).forEach((p) => sumar(p[0], p[1]));
     else if (el.t === "texto") { const tam = el.tam || 16, ls = String(el.texto || "").split("\n"); const w = Math.max(...ls.map((l) => l.length)) * tam * 0.6; sumar(el.x, el.y - tam); sumar(el.x + w, el.y + 4 + (ls.length - 1) * tam * 1.25); }
     else if (el.t === "tabla") { const m = croquisTablaMedidas(el); sumar(el.x, el.y); sumar(el.x + m.W, el.y + m.H); }
@@ -546,7 +578,8 @@ ${ley}
 </svg>`;
 }
 // PNG (Blob) a partir del SVG. ancho: px del lado más largo.
-function croquisPng(dibujo, ancho) {
+async function croquisPng(dibujo, ancho) {
+  if ((dibujo.elementos || []).some((e) => e.tipo === "logo_sat")) await croquisCargarLogo();
   return new Promise((ok, mal) => {
     const svg = croquisSvgDocumento(dibujo);
     const img = new Image();
@@ -575,33 +608,43 @@ function croquisCargarPdfLib() {
 }
 function croquisTextoPdf(s) { return String(s == null ? "" : s).replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[–—]/g, "-").replace(/[^\x20-\x7E\xA0-\xFF]/g, ""); }
 // PDF A4 apaisado con rótulo (logo SAT, título, cliente, dirección, fecha, autor).
+// Páginas de un croquis: los nuevos tienen dibujo.paginas; los viejos, una sola.
+function croquisPaginas(dibujo) {
+  const d = dibujo || {};
+  if (Array.isArray(d.paginas) && d.paginas.length) return d.paginas.map((p, i) => ({ nombre: p.nombre || `Página ${i + 1}`, elementos: Array.isArray(p.elementos) ? p.elementos : [] }));
+  return [{ nombre: "", elementos: Array.isArray(d.elementos) ? d.elementos : [] }];
+}
+// PDF A4 apaisado con rótulo (logo SAT, título, cliente, dirección, fecha,
+// autor). Una hoja por cada página del croquis.
 async function croquisPdf(c) {
   const { PDFDocument, StandardFonts, rgb } = await croquisCargarPdfLib();
   const doc = await PDFDocument.create();
   doc.setTitle(`Croquis - ${c.titulo || ""}`);
   const fN = await doc.embedFont(StandardFonts.Helvetica), fB = await doc.embedFont(StandardFonts.HelveticaBold);
-  const pag = doc.addPage([841.89, 595.28]);
   const W = 841.89, H = 595.28, M = 28;
   let logo = null;
   try { logo = await doc.embedJpg(new Uint8Array(await (await fetch("assets/presupuesto/logo-sat.jpg")).arrayBuffer())); } catch (e) { /* sin logo */ }
-  const png = await doc.embedPng(new Uint8Array(await (await croquisPng(c.dibujo, 2400)).arrayBuffer()));
-  // Marco
-  pag.drawRectangle({ x: M, y: M, width: W - 2 * M, height: H - 2 * M, borderColor: rgb(0.11, 0.12, 0.13), borderWidth: 1.2 });
-  // Rótulo abajo
-  const altoRot = 58;
-  pag.drawLine({ start: { x: M, y: M + altoRot }, end: { x: W - M, y: M + altoRot }, thickness: 1.2, color: rgb(0.11, 0.12, 0.13) });
-  if (logo) { const h = 44, w = h * logo.width / logo.height; pag.drawImage(logo, { x: M + 8, y: M + 7, width: w, height: h }); }
-  const t = (s, x, y, tam, f, col) => pag.drawText(croquisTextoPdf(s), { x, y, size: tam, font: f, color: col || rgb(0.11, 0.12, 0.13) });
-  t(`CROQUIS - ${c.titulo || ""}`, M + 70, M + 38, 13, fB);
-  t([c.cliente, c.numero_cliente ? `Cliente N° ${c.numero_cliente}` : "", c.direccion].filter(Boolean).join("  ·  "), M + 70, M + 20, 10, fN);
-  const fecha = c.actualizado ? new Date(c.actualizado) : new Date();
-  const derecha = [`Fecha: ${String(fecha.getDate()).padStart(2, "0")}-${String(fecha.getMonth() + 1).padStart(2, "0")}-${fecha.getFullYear()}`, `Hecho por: ${c.autor || ""}`];
-  derecha.forEach((s, i) => { const w = fN.widthOfTextAtSize(croquisTextoPdf(s), 9.5); t(s, W - M - 10 - w, M + 36 - i * 15, 9.5, fN); });
-  t("Boceto orientativo, sin escala", W - M - 10 - fN.widthOfTextAtSize("Boceto orientativo, sin escala", 8), M + 6, 8, fN, rgb(0.45, 0.45, 0.45));
-  // Dibujo, centrado en el área libre
-  const ax = M + 14, ay = M + altoRot + 14, aw = W - 2 * M - 28, ah = H - 2 * M - altoRot - 28;
-  const k = Math.min(aw / png.width, ah / png.height);
-  pag.drawImage(png, { x: ax + (aw - png.width * k) / 2, y: ay + (ah - png.height * k) / 2, width: png.width * k, height: png.height * k });
+  const paginas = croquisPaginas(c.dibujo).filter((p, i, todas) => p.elementos.length || todas.length === 1);
+  for (let i = 0; i < paginas.length; i++) {
+    const p = paginas[i];
+    const pag = doc.addPage([W, H]);
+    const png = await doc.embedPng(new Uint8Array(await (await croquisPng({ elementos: p.elementos }, 2400)).arrayBuffer()));
+    pag.drawRectangle({ x: M, y: M, width: W - 2 * M, height: H - 2 * M, borderColor: rgb(0.11, 0.12, 0.13), borderWidth: 1.2 });
+    const altoRot = 58;
+    pag.drawLine({ start: { x: M, y: M + altoRot }, end: { x: W - M, y: M + altoRot }, thickness: 1.2, color: rgb(0.11, 0.12, 0.13) });
+    if (logo) { const h = 44, w = h * logo.width / logo.height; pag.drawImage(logo, { x: M + 8, y: M + 7, width: w, height: h }); }
+    const t = (s, x, y, tam, f, col) => pag.drawText(croquisTextoPdf(s), { x, y, size: tam, font: f, color: col || rgb(0.11, 0.12, 0.13) });
+    t(`CROQUIS - ${c.titulo || ""}${paginas.length > 1 && p.nombre ? "  ·  " + p.nombre : ""}`, M + 70, M + 38, 13, fB);
+    t([c.cliente, c.numero_cliente ? `Cliente N° ${c.numero_cliente}` : "", c.direccion].filter(Boolean).join("  ·  "), M + 70, M + 20, 10, fN);
+    const fecha = c.actualizado ? new Date(c.actualizado) : new Date();
+    const derecha = [`Fecha: ${String(fecha.getDate()).padStart(2, "0")}-${String(fecha.getMonth() + 1).padStart(2, "0")}-${fecha.getFullYear()}`, `Hecho por: ${c.autor || ""}`];
+    derecha.forEach((s, j) => { const w = fN.widthOfTextAtSize(croquisTextoPdf(s), 9.5); t(s, W - M - 10 - w, M + 36 - j * 15, 9.5, fN); });
+    const pie = (paginas.length > 1 ? `Hoja ${i + 1} de ${paginas.length}  ·  ` : "") + "Boceto orientativo, sin escala";
+    t(pie, W - M - 10 - fN.widthOfTextAtSize(pie, 8), M + 6, 8, fN, rgb(0.45, 0.45, 0.45));
+    const ax = M + 14, ay = M + altoRot + 14, aw = W - 2 * M - 28, ah = H - 2 * M - altoRot - 28;
+    const k = Math.min(aw / png.width, ah / png.height);
+    pag.drawImage(png, { x: ax + (aw - png.width * k) / 2, y: ay + (ah - png.height * k) / 2, width: png.width * k, height: png.height * k });
+  }
   return await doc.save();
 }
 function croquisNombreArchivo(c, ext) {
@@ -718,12 +761,12 @@ function croquisOrdenar(elementos, tolerancia) {
   const xs = [], ys = [];
   elementos.forEach((e) => {
     if (e.t === "rect" && !e.forma) { xs.push(e.x, e.x + e.w); ys.push(e.y, e.y + e.h); }
-    if (e.t === "linea") { if (e.x1 === e.x2) xs.push(e.x1); else if (e.y1 === e.y2) ys.push(e.y1); }
+    if (e.t === "linea" && !e.c) { if (e.x1 === e.x2) xs.push(e.x1); else if (e.y1 === e.y2) ys.push(e.y1); }
   });
   const fx = agrupar(xs), fy = agrupar(ys);
   elementos.forEach((e) => {
     if (e.t === "rect" && !e.forma) { const a = fx(e.x), b = fx(e.x + e.w), c = fy(e.y), d = fy(e.y + e.h); e.x = a; e.w = Math.max(20, b - a); e.y = c; e.h = Math.max(20, d - c); }
-    if (e.t === "linea") {
+    if (e.t === "linea" && !e.c) {
       if (e.x1 === e.x2) { e.x1 = e.x2 = fx(e.x1); } else if (e.y1 === e.y2) { e.y1 = e.y2 = fy(e.y1); }
     }
   });
@@ -731,7 +774,7 @@ function croquisOrdenar(elementos, tolerancia) {
   const tramos = [];
   elementos.forEach((e) => {
     if (e.t === "rect" && !e.forma) tramos.push([e.x, e.y, e.x + e.w, e.y], [e.x, e.y + e.h, e.x + e.w, e.y + e.h], [e.x, e.y, e.x, e.y + e.h], [e.x + e.w, e.y, e.x + e.w, e.y + e.h]);
-    if (e.t === "linea") tramos.push([e.x1, e.y1, e.x2, e.y2]);
+    if (e.t === "linea" && !e.c) tramos.push([e.x1, e.y1, e.x2, e.y2]);
   });
   elementos.forEach((e) => {
     if (e.t !== "simbolo" || !CROQUIS_ABERTURAS.includes(e.tipo)) return;
@@ -751,3 +794,5 @@ function croquisOrdenar(elementos, tolerancia) {
   });
   return elementos;
 }
+
+croquisCargarLogo();

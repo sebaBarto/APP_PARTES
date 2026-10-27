@@ -3547,3 +3547,33 @@ html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#s
 .pe-del-croquis-fila.hecho { opacity: .6; }
 .pe-del-croquis-ok { color: #2E9E4F; font-weight: 700; font-size: 13px; }
 #cqFondoBtn.activo { background: #1B5FA8; color: #fff; border-color: #1B5FA8; }
+
+/* Croquis: íconos, páginas, pared continua, selección múltiple, fotos */
+.cq-ic { width: 18px; height: 18px; flex: 0 0 auto; vertical-align: -3px; }
+.cq-props button { display: inline-flex; align-items: center; gap: 4px; }
+.cq-props .cq-props-tit .cq-ic { width: 14px; height: 14px; }
+.cq-zoom button { display: grid; place-items: center; }
+.cq-zoom button .cq-ic { width: 20px; height: 20px; }
+#cqMultiBtn.activo { background: #1B5FA8; color: #fff; border-color: #1B5FA8; }
+#cqSvg .cq-sel-caja.cq-sel-multi { stroke: #1B5FA8; opacity: 0.7; }
+.cq-paginas { position: absolute; left: 8px; top: 8px; right: 62px; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.cq-paginas button { flex: 0 0 auto; height: 32px; padding: 0 10px; border-radius: 9px; border: 1px solid #DCE3EA; background: rgba(255,255,255,.95); color: #1B2733; font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.cq-paginas button.activo { background: #1B5FA8; border-color: #1B5FA8; color: #fff; }
+.cq-paginas.cq-paginas-una button.activo { background: rgba(255,255,255,.95); color: #1B2733; border-color: #DCE3EA; }
+.cq-paginas button .cq-ic { width: 16px; height: 16px; }
+.cq-cadena { position: absolute; left: 50%; transform: translateX(-50%); bottom: 40px; display: flex; align-items: center; gap: 6px; background: #1B2733; color: #fff; padding: 6px 6px 6px 12px; border-radius: 12px; font-size: 12.5px; box-shadow: 0 3px 12px rgba(0,0,0,.25); white-space: nowrap; }
+.cq-cadena button { border: 0; border-radius: 8px; padding: 7px 10px; background: rgba(255,255,255,.14); color: #fff; font-weight: 600; font-size: 12.5px; }
+.cq-cadena button.activo { background: #fff; color: #1B2733; }
+.cq-foto-tit { margin: 0 0 6px; font-size: 13px; font-weight: 600; opacity: .8; }
+.cq-foto-btns { display: flex; gap: 8px; margin-bottom: 14px; }
+.cq-foto-btns .btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.cq-menu .btn { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.cq-menu-fila { display: flex; gap: 8px; }
+.cq-menu-fila .btn { flex: 1; }
+.cq-borrador .historial-card-cliente .cq-ic { width: 15px; height: 15px; }
+/* Hojas del croquis: siempre claras y legibles, con cualquier tema */
+.cq-datos { background: #FFFFFF; color: #1B2733; }
+.cq-datos .btn-secondary { color: #1B2733 !important; background: #FFFFFF !important; border: 1.5px solid #C9D3DC !important; }
+.cq-datos .btn-secondary.cq-borrar { color: #C0392B !important; }
+.cq-datos .link-btn { color: #1B5FA8; }
+.cq-datos .pe-nota { color: #5B6B7B; }

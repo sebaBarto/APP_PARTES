@@ -1725,8 +1725,13 @@
       <p class="hint-eyebrow review-eyebrow">CROQUIS</p>
       <p class="pe-nota" style="margin-top:0;">Bocetos rápidos de planos hechos desde el celular: habitaciones, paredes, cableado y los equipos (central, teclado, magnéticos, infrarrojos).</p>
       <button type="button" class="btn btn-primary" id="cqNuevoBtn" style="width:100%; margin-bottom:8px;">+ Nuevo croquis</button>
-      <button type="button" class="btn btn-secondary" id="cqDesdeFotoBtn" style="width:100%; margin-bottom:14px;">📷 Desde la foto de un boceto en papel</button>
+      <p class="cq-foto-tit">Desde la foto de un boceto en papel</p>
+      <div class="cq-foto-btns">
+        <button type="button" class="btn btn-secondary" id="cqDesdeFotoBtn"><svg class="cq-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m4 19 6-6 4 4 3-3 4 4"/></svg> Galería</button>
+        <button type="button" class="btn btn-secondary" id="cqDesdeCamaraBtn"><svg class="cq-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg> Sacar foto</button>
+      </div>
       <input type="file" id="cqFotoInput" accept="image/*" hidden>
+      <input type="file" id="cqCamaraInput" accept="image/*" capture="environment" hidden>
       <input class="field-input" type="search" id="cqListaBuscar" placeholder="Buscar por cliente, título o dirección" autocomplete="off">
       <p class="list-status" id="cqListaEstado">Cargando...</p>
       <div id="cqLista" class="historial-list"></div>
@@ -1748,7 +1753,9 @@
     </div>
     <div class="cq-lienzo" id="cqLienzo">
       <svg id="cqSvg" xmlns="http://www.w3.org/2000/svg"></svg>
-      <div class="cq-zoom"><button type="button" id="cqZoomMas" aria-label="Acercar">+</button><button type="button" id="cqZoomMenos" aria-label="Alejar">−</button><button type="button" id="cqCentrar" aria-label="Ver todo">⤢</button><button type="button" id="cqFondoBtn" class="hidden" aria-label="Mostrar u ocultar la foto del boceto" title="Foto del boceto de fondo">🖼</button></div>
+      <div class="cq-zoom"><button type="button" id="cqZoomMas" aria-label="Acercar">+</button><button type="button" id="cqZoomMenos" aria-label="Alejar">−</button><button type="button" id="cqCentrar" aria-label="Ver todo">⤢</button><button type="button" id="cqMultiBtn" aria-label="Elegir varios" title="Elegir varios (para moverlos juntos o soldarlos)"><svg class="cq-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="13" height="13" rx="1.5" stroke-dasharray="3 2"/><path d="m13 13 7 3-3 1-1 3z" fill="currentColor"/></svg></button><button type="button" id="cqFondoBtn" class="hidden" aria-label="Mostrar u ocultar la foto del boceto" title="Foto del boceto de fondo"><svg class="cq-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" stroke-dasharray="3 2"/><path d="m5 18 5-5 3 3 2-2 4 4"/></svg></button></div>
+      <div class="cq-paginas" id="cqPaginas"></div>
+      <div class="cq-cadena hidden" id="cqCadena"><span>Tocá dónde sigue la pared</span><button type="button" id="cqCadenaCerrar">Cerrar</button><button type="button" id="cqCadenaTerminar" class="activo">Terminar</button></div>
       <p class="cq-ayuda" id="cqAyuda"></p>
     </div>
     <div class="cq-props hidden" id="cqProps"></div>

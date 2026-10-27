@@ -391,7 +391,8 @@ async function manejarCroquis(req, res, autorizacion, body) {
       };
       const r1 = await escribirArchivoDatos(ruta, registro, previo.sha, `Croquis ${registro.titulo} — ${autorizacion.nombre || "admin"}`);
       if (!r1.ok) { res.status(502).json({ error: "No se pudo guardar el croquis" }); return; }
-      const resumen = { ...registro, elementos: dibujo.elementos.length };
+      const paginas = Array.isArray(dibujo.paginas) ? dibujo.paginas : null;
+      const resumen = { ...registro, elementos: paginas ? paginas.reduce((n, p) => n + ((p && Array.isArray(p.elementos)) ? p.elementos.length : 0), 0) : dibujo.elementos.length, paginas: paginas ? paginas.length : 1 };
       delete resumen.dibujo;
       for (let intento = 0; intento < 4; intento++) {
         const { data, sha } = await leerArchivoDatos(RUTA_CROQUIS_INDICE, []);

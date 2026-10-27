@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.9.0";
+const APP_VERSION = "4.10.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -14874,24 +14874,76 @@ const cq = {
   id: "", titulo: "", cliente: "", numero_cliente: "", direccion: "", autor: "",
   elementos: [], sel: null, herr: "mover", simboloElegido: "",
   vista: { x: -40, y: -40, s: 1 }, pasado: [], futuro: [], cambios: false,
+  paginas: [], pagina: 0, multi: [], modoMulti: false, cadena: null,
 };
+// Íconos del editor (mismo trazo que el resto de la app, sin emojis).
+const CQ_IC_TRAZOS = {
+  camara: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
+  galeria: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m4 19 6-6 4 4 3-3 4 4"/>',
+  fondo: '<rect x="3" y="4" width="18" height="16" rx="2" stroke-dasharray="3 2"/><path d="m5 18 5-5 3 3 2-2 4 4"/>',
+  candado: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  abierto: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/>',
+  borrar: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
+  duplicar: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V4H4v12h4"/>',
+  lapiz: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13 7 4 4"/>',
+  wifi: '<path d="M5 10a10 10 0 0 1 14 0M8 13.5a5.5 5.5 0 0 1 8 0"/><circle cx="12" cy="17.5" r="1.3" fill="currentColor"/>',
+  nuevo: '<circle cx="12" cy="12" r="8.5"/><path d="M12 8v8M8 12h8"/>',
+  ojo: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
+  presupuesto: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/>',
+  rotIzq: '<path d="M4 4v5h5"/><path d="M5 9a8 8 0 1 1-1 5"/>',
+  rotDer: '<path d="M20 4v5h-5"/><path d="M19 9a8 8 0 1 0 1 5"/>',
+  espejo: '<path d="M12 3v18" stroke-dasharray="2 2"/><path d="M9 7 4 12l5 5zM15 7l5 5-5 5z"/>',
+  multi: '<rect x="3" y="3" width="13" height="13" rx="1.5" stroke-dasharray="3 2"/><path d="m13 13 7 3-3 1-1 3z" fill="currentColor"/>',
+  agrupar: '<rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/><path d="M11 7h3a3 3 0 0 1 3 3v3"/>',
+  desagrupar: '<rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/><path d="M14 6h2M18 10v1M6 14v2M10 18h1" />',
+  curva: '<path d="M4 18C6 8 18 8 20 18"/><circle cx="12" cy="10.5" r="1.8" fill="currentColor"/>',
+  recta: '<path d="M4 18 20 6"/>',
+  check: '<path d="m5 12 4.5 4.5L19 7"/>',
+  cerrarForma: '<path d="M5 18 9 6l8 3-1 9z"/><circle cx="5" cy="18" r="1.6" fill="currentColor"/>',
+  pagina: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/>',
+  mas: '<path d="M12 5v14M5 12h14"/>',
+  zona: '<path d="M9 4 7 20M17 4l-2 16M4 9h16M3 15h16"/>',
+};
+function cqIc(n) { return `<svg class="cq-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${CQ_IC_TRAZOS[n] || ""}</svg>`; }
 let cqIndice = [];
 const cqEl = (id) => document.getElementById(id);
 const cqSvg = cqEl("cqSvg");
 function cqId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 function cqSnap(v) { return Math.round(v / (CROQUIS_GRILLA / 2)) * (CROQUIS_GRILLA / 2); }
+// La foto de fondo se guarda solo cuando ya se subió (tiene id).
+function cqFondoLimpio(f) { return f && f.id ? { id: f.id, x: f.x, y: f.y, w: f.w, h: f.h } : null; }
+// Dibujo de la página actual (lo que se ve en el editor).
 function cqDibujo() {
   const d = { v: 1, elementos: cq.elementos };
-  // La foto de fondo se guarda solo cuando ya se subió (tiene id).
-  if (cq.fondo && cq.fondo.id) d.fondo = { id: cq.fondo.id, x: cq.fondo.x, y: cq.fondo.y, w: cq.fondo.w, h: cq.fondo.h };
+  const f = cqFondoLimpio(cq.fondo);
+  if (f) d.fondo = f;
   return d;
 }
+// La página actual vuelve a su lugar en la lista de páginas.
+function cqSyncPagina() {
+  if (!Array.isArray(cq.paginas) || !cq.paginas.length) cq.paginas = [{ nombre: "Página 1", elementos: cq.elementos, fondo: cq.fondo }];
+  const p = cq.paginas[cq.pagina] || (cq.paginas[cq.pagina] = { nombre: `Página ${cq.pagina + 1}` });
+  p.elementos = cq.elementos;
+  p.fondo = cq.fondo || null;
+}
+// Todo el croquis (todas las páginas), para guardar y para el PDF.
+function cqDibujoCompleto() {
+  cqSyncPagina();
+  const paginas = cq.paginas.map((p, i) => { const x = { nombre: p.nombre || `Página ${i + 1}`, elementos: p.elementos || [] }; const f = cqFondoLimpio(p.fondo); if (f) x.fondo = f; return x; });
+  const d = { v: 2, elementos: paginas[0].elementos, paginas };
+  if (paginas[0].fondo) d.fondo = paginas[0].fondo;
+  return d;
+}
+function cqTodosLosElementos() { cqSyncPagina(); return cq.paginas.flatMap((p) => p.elementos || []); }
 function cqGuardarBorrador() {
-  try { localStorage.setItem(CQ_BORRADOR, JSON.stringify({ id: cq.id, titulo: cq.titulo, cliente: cq.cliente, numero_cliente: cq.numero_cliente, direccion: cq.direccion, autor: cq.autor, elementos: cq.elementos, fondo: cqDibujo().fondo || null, cambios: cq.cambios })); } catch (e) { /* nada */ }
+  try {
+    const d = cqDibujoCompleto();
+    localStorage.setItem(CQ_BORRADOR, JSON.stringify({ id: cq.id, titulo: cq.titulo, cliente: cq.cliente, numero_cliente: cq.numero_cliente, direccion: cq.direccion, autor: cq.autor, elementos: d.elementos, fondo: d.fondo || null, paginas: d.paginas, cambios: cq.cambios }));
+  } catch (e) { /* nada */ }
 }
 function cqMemoria() { cq.pasado.push(JSON.stringify(cq.elementos)); if (cq.pasado.length > 80) cq.pasado.shift(); cq.futuro = []; cq.cambios = true; }
-function cqDeshacer() { if (!cq.pasado.length) return; cq.futuro.push(JSON.stringify(cq.elementos)); cq.elementos = JSON.parse(cq.pasado.pop()); cq.sel = null; cq.cambios = true; cqRender(); cqGuardarBorrador(); }
-function cqRehacer() { if (!cq.futuro.length) return; cq.pasado.push(JSON.stringify(cq.elementos)); cq.elementos = JSON.parse(cq.futuro.pop()); cq.sel = null; cq.cambios = true; cqRender(); cqGuardarBorrador(); }
+function cqDeshacer() { if (!cq.pasado.length) return; cq.futuro.push(JSON.stringify(cq.elementos)); cq.elementos = JSON.parse(cq.pasado.pop()); cq.sel = null; cq.multi = []; cq.cambios = true; cqRender(); cqGuardarBorrador(); }
+function cqRehacer() { if (!cq.futuro.length) return; cq.pasado.push(JSON.stringify(cq.elementos)); cq.elementos = JSON.parse(cq.futuro.pop()); cq.sel = null; cq.multi = []; cq.cambios = true; cqRender(); cqGuardarBorrador(); }
 
 // ---------- Dibujo ----------
 function cqTamLienzo() { const r = cqSvg.getBoundingClientRect(); return { w: r.width || 360, h: r.height || 480 }; }
@@ -14904,7 +14956,10 @@ function cqHandles(el) {
   if (el.bloq) return "";
   const h = (x, y, n, extra) => out.push(`<circle class="cq-handle${extra || ""}" data-handle="${n}" cx="${x}" cy="${y}" r="${r}" />`);
   if (el.t === "rect") { h(el.x, el.y, "0"); h(el.x + el.w, el.y, "1"); h(el.x + el.w, el.y + el.h, "2"); h(el.x, el.y + el.h, "3"); }
-  else if (el.t === "linea") { h(el.x1, el.y1, "a"); h(el.x2, el.y2, "b"); }
+  else if (el.t === "linea") {
+    h(el.x1, el.y1, "a"); h(el.x2, el.y2, "b");
+    if (Array.isArray(el.c)) { const m = croquisMedioCurva(el); h(m[0], m[1], "c", " cq-rot"); }
+  }
   else if (el.t === "simbolo") {
     const dist = (croquisRadio(el) + 14) * (el.esc || 1), ang = ((el.rot || 0) - 90) * Math.PI / 180;
     const hx = el.x + Math.cos(ang) * dist, hy = el.y + Math.sin(ang) * dist;
@@ -14937,6 +14992,13 @@ function cqRender() {
   const capas = ["rect", "linea", "cable", "simbolo", "texto", "tabla"];
   const orden = [...cq.elementos].sort((a, b) => capas.indexOf(a.t) - capas.indexOf(b.t));
   let selHtml = "";
+  cq.multi = cq.multi.filter((id) => cq.elementos.some((e) => e.id === id));
+  if (cq.multi.length) {
+    const cajas = cq.multi.map((id) => cqCajaSel(cq.elementos.find((e) => e.id === id)));
+    cajas.forEach((c) => { selHtml += `<rect class="cq-sel-caja cq-sel-multi" x="${c.x - 3 / v.s}" y="${c.y - 3 / v.s}" width="${c.w + 6 / v.s}" height="${c.h + 6 / v.s}" stroke-width="${1.2 / v.s}" stroke-dasharray="${3 / v.s} ${3 / v.s}"/>`; });
+    const x0 = Math.min(...cajas.map((c) => c.x)), y0 = Math.min(...cajas.map((c) => c.y)), x1 = Math.max(...cajas.map((c) => c.x + c.w)), y1 = Math.max(...cajas.map((c) => c.y + c.h)), m = 9 / v.s;
+    selHtml += `<rect class="cq-sel-caja" x="${x0 - m}" y="${y0 - m}" width="${x1 - x0 + 2 * m}" height="${y1 - y0 + 2 * m}" stroke-width="${1.8 / v.s}" stroke-dasharray="${6 / v.s} ${4 / v.s}"/>`;
+  }
   const elSel = cq.elementos.find((e) => e.id === cq.sel);
   if (elSel) {
     const c = cqCajaSel(elSel), m = 6 / v.s;
@@ -14947,9 +15009,14 @@ function cqRender() {
     <rect x="${v.x - 5000}" y="${v.y - 5000}" width="${w / v.s + 10000}" height="${h / v.s + 10000}" fill="url(#cqGrilla5)" data-fondo="1"/>
     ${cq.fondo && cq.verFondo ? `<image href="${cq.fondo.local || "/api/foto?id=" + encodeURIComponent(cq.fondo.id)}" x="${cq.fondo.x}" y="${cq.fondo.y}" width="${cq.fondo.w}" height="${cq.fondo.h}" opacity="0.38" preserveAspectRatio="none" pointer-events="none" class="cq-foto-fondo"/>` : ""}
     ${orden.map((el) => croquisSvgElemento(el, `data-id="${el.id}" class="cq-elem${el.id === cq.sel ? " cq-elegido" : ""}"`)).join("")}
+    ${cq.cadena && cq.herr === "linea" ? `<circle cx="${cq.cadena.ultimo[0]}" cy="${cq.cadena.ultimo[1]}" r="${7 / v.s}" fill="#1B5FA8" fill-opacity="0.85" stroke="#fff" stroke-width="${2 / v.s}" pointer-events="none"/>` : ""}
     <g id="cqTemporal"></g>
     ${selHtml}`;
+  cqSyncPagina();
   cqRenderProps();
+  cqRenderPaginas();
+  cqEl("cqCadena").classList.toggle("hidden", !(cq.cadena && cq.herr === "linea"));
+  cqEl("cqMultiBtn").classList.toggle("activo", cq.modoMulti);
   cqEl("cqFondoBtn").classList.toggle("hidden", !cq.fondo);
   cqEl("cqFondoBtn").classList.toggle("activo", !!(cq.fondo && cq.verFondo));
   cqEl("cqDeshacerBtn").disabled = !cq.pasado.length;
@@ -14960,12 +15027,14 @@ function cqRender() {
 const CQ_AYUDAS = {
   mover: "Tocá un elemento para elegirlo y arrastralo. Con dos dedos movés y hacés zoom.",
   rect: "Elegí la forma y arrastrá para dibujarla.",
-  linea: "Arrastrá para trazar una pared (se endereza sola).",
+  linea: "Arrastrá para trazar una pared. Después tocá dónde sigue para hacer los quiebres.",
   cable: "Dibujá el cableado con el dedo.",
   texto: "Tocá donde va el texto, el cuadro o la tabla.",
   simbolo: "Tocá en el plano dónde va. Las aberturas se apoyan sobre la pared.",
 };
 function cqElegirHerr(h) {
+  if (h !== "linea") cq.cadena = null;
+  if (h !== "mover") { cq.modoMulti = false; cq.multi = []; }
   cq.herr = h;
   if (h === "simbolos") cq.paleta = "equipo";
   if (h === "objetos") cq.paleta = cq.subObjetos || "obra";
@@ -15009,13 +15078,14 @@ cq.paleta = "equipo";
 // ---------- Propiedades del elemento elegido ----------
 function cqRenderProps() {
   const box = cqEl("cqProps");
+  if (cq.multi.length) { cqRenderPropsMulti(box); return; }
   const el = cq.elementos.find((e) => e.id === cq.sel);
   box.classList.toggle("hidden", !el);
   if (!el) { box.innerHTML = ""; return; }
   const bb = (acc, txt, titulo, activo) => `<button type="button" data-acc="${acc}" title="${titulo || txt}"${activo ? ' class="activo"' : ""}>${txt}</button>`;
   if (el.bloq) {
     // Bloqueado: no se mueve ni se edita hasta desbloquearlo.
-    box.innerHTML = `<div class="cq-props-fila"><span class="cq-props-tit">🔒 ${escapeHtml(cqNombreElemento(el))} bloqueado</span>${bb("bloq", "🔓 Desbloquear", "Desbloquear para moverlo o editarlo")}</div>`;
+    box.innerHTML = `<div class="cq-props-fila"><span class="cq-props-tit">${cqIc("candado")} ${escapeHtml(cqNombreElemento(el))} bloqueado</span>${bb("bloq", cqIc("abierto") + " Desbloquear", "Desbloquear para moverlo o editarlo")}</div>`;
     box.querySelectorAll("[data-acc]").forEach((x) => x.addEventListener("click", () => cqAccion(x.dataset.acc)));
     return;
   }
@@ -15023,32 +15093,32 @@ function cqRenderProps() {
   const def = el.t === "simbolo" ? CROQUIS_SIMBOLOS[el.tipo] || {} : {};
   let html = "";
   if (el.t === "simbolo") {
-    html += `<span class="cq-props-tit">${escapeHtml(def.nombre || "")}</span>` + b("rot-", "↺ 15°", "Rotar a la izquierda") + b("rot+", "↻ 15°", "Rotar a la derecha") + b("rot90", "↻ 90°");
-    if (def.espejable) html += b("espejo", "⇋", "Abrir para el otro lado");
+    html += `<span class="cq-props-tit">${escapeHtml(def.nombre || "")}</span>` + b("rot-", cqIc("rotIzq") + "15°", "Rotar a la izquierda") + b("rot+", cqIc("rotDer") + "15°", "Rotar a la derecha") + b("rot90", cqIc("rotDer") + "90°", "Rotar 90°");
+    if (def.espejable) html += b("espejo", cqIc("espejo"), "Abrir para el otro lado");
     html += b("esc-", "−", "Achicar") + b("esc+", "+", "Agrandar");
-    if (def.cat === "equipo") html += b("etq", el.etq ? "# " + escapeHtml(String(el.etq)).slice(0, 8) : "# Zona", "Número de zona o de dispositivo (vacío = no se muestra)") + b("inal", "📶", "Inalámbrico", el.inal) + b("inst", "🆕 A instalar", "Marcar como equipo a instalar (va al presupuesto)", el.inst);
+    if (def.cat === "equipo") html += b("etq", cqIc("zona") + (el.etq ? escapeHtml(String(el.etq)).slice(0, 8) : "Zona"), "Número de zona o de dispositivo (vacío = no se muestra)") + b("inal", cqIc("wifi"), "Inalámbrico", el.inal) + b("inst", cqIc("nuevo") + "A instalar", "Marcar como equipo a instalar (va al presupuesto)", el.inst);
   }
   if (el.t === "rect") {
-    html += `<span class="cq-props-tit">${escapeHtml(cqNombreElemento(el))}</span>` + b("nombre", el.nombre ? "✎ " + escapeHtml(el.nombre).slice(0, 14) : "✎ Nombre", "Nombre del ambiente");
-    if (el.forma === "triangulo" || el.forma === "triangulo_rect") html += b("ori", "↻ 90°", "Girar el triángulo");
+    html += `<span class="cq-props-tit">${escapeHtml(cqNombreElemento(el))}</span>` + b("nombre", cqIc("lapiz") + (el.nombre ? escapeHtml(el.nombre).slice(0, 14) : "Nombre"), "Nombre del ambiente");
+    if (el.forma === "triangulo" || el.forma === "triangulo_rect") html += b("ori", cqIc("rotDer") + "90°", "Girar el triángulo");
   }
-  if (el.t === "texto" || el.t === "tabla") html += `<span class="cq-props-tit">${escapeHtml(cqNombreElemento(el))}</span>` + b("texto", "✎ Editar") + b("tam-", "A−", "Más chico") + b("tam+", "A+", "Más grande");
-  if (el.t === "linea") html += `<span class="cq-props-tit">Pared</span>`;
-  if (el.t === "cable") html += `<span class="cq-props-tit">Cableado</span>` + b("cnombre", el.nombre ? "✎ " + escapeHtml(el.nombre).slice(0, 14) : "✎ Nombre", "Nombre para la leyenda (ej. Sirena, Cámaras)");
-  html += b("bloq", "🔒", "Bloquear: queda fijo y podés seguir trabajando encima") + b("dup", "⧉", "Duplicar") + b("borrar", "🗑", "Borrar");
+  if (el.t === "texto" || el.t === "tabla") html += `<span class="cq-props-tit">${escapeHtml(cqNombreElemento(el))}</span>` + b("texto", cqIc("lapiz") + "Editar") + b("tam-", "A−", "Más chico") + b("tam+", "A+", "Más grande");
+  if (el.t === "linea") html += `<span class="cq-props-tit">Pared</span>` + (Array.isArray(el.c) ? b("recta", cqIc("recta") + "Recta", "Volver a pared recta") : b("curvar", cqIc("curva") + "Curvar", "Hacerla curva: después arrastrá el punto del medio"));
+  if (el.t === "cable") html += `<span class="cq-props-tit">Cableado</span>` + b("cnombre", cqIc("lapiz") + (el.nombre ? escapeHtml(el.nombre).slice(0, 14) : "Nombre"), "Nombre para la leyenda (ej. Sirena, Cámaras)");
+  html += b("bloq", cqIc("candado"), "Bloquear: queda fijo y podés seguir trabajando encima") + b("dup", cqIc("duplicar"), "Duplicar") + b("borrar", cqIc("borrar"), "Borrar");
   // Segunda fila: captación (infrarrojos), trazo y color
   let fila2 = "";
   if (el.t === "simbolo" && def.ir) {
     const pr = croquisIRParams(el, def);
     fila2 += `<span class="cq-props-tit">Alcance</span>` + b("alc-", "−", "Menos alcance") + b("alc+", "+", "Más alcance") +
       `<span class="cq-props-tit">Ángulo ${pr.doble ? pr.ang * 2 : pr.ang}°</span>` + b("ang-", "−", "Ángulo más cerrado") + b("ang+", "+", "Ángulo más abierto") +
-      b("doble", "Doble lente", "Dos lentes: captación doble (ej. 2 × 90° = 180°)", pr.doble) + b("video", "👁 Video", "Con videoverificación", pr.video);
+      b("doble", "Doble lente", "Dos lentes: captación doble (ej. 2 × 90° = 180°)", pr.doble) + b("video", cqIc("ojo") + "Video", "Con videoverificación", pr.video);
   }
   if (el.t === "cable" || el.t === "linea" || el.t === "rect") {
     const actual = el.trazo || (el.t === "cable" ? "guiones" : "continuo");
     fila2 += Object.entries(CROQUIS_TRAZOS).map(([k, t]) => `<button type="button" class="cq-trazo${k === actual ? " activo" : ""}" data-trazo="${k}" title="${t.nombre}" aria-label="Trazo ${t.nombre}"><svg viewBox="0 0 40 10"><line x1="3" y1="5" x2="37" y2="5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"${t.dash ? ` stroke-dasharray="${t.dash.split(" ").map((n) => Number(n) * 0.7).join(" ")}"` : ""}/></svg></button>`).join("");
   }
-  if (["cable", "linea", "rect", "texto", "tabla", "simbolo"].includes(el.t)) {
+  if (["cable", "linea", "rect", "texto", "tabla", "simbolo"].includes(el.t) && !def.sinColor) {
     const actual = el.color || (el.t === "cable" ? CROQUIS_COLOR_CABLE : el.t === "simbolo" ? def.color : "#1C1E21");
     fila2 += (fila2 ? '<span class="cq-sep"></span>' : "") + CROQUIS_COLORES.map((c) => `<button type="button" class="cq-color${c.toLowerCase() === String(actual).toLowerCase() ? " activo" : ""}" data-color="${c}" style="--c:${c}" aria-label="Color ${c}"></button>`).join("");
   }
@@ -15067,6 +15137,59 @@ function cqRenderProps() {
     if (el.t === "cable") cq.ultimoCable = { color: el.color, trazo: el.trazo };
     cqRender(); cqGuardarBorrador();
   }));
+}
+// Varios elegidos: soldar (agrupar), separar, bloquear, duplicar, borrar.
+function cqRenderPropsMulti(box) {
+  const els = cq.multi.map((id) => cq.elementos.find((e) => e.id === id)).filter(Boolean);
+  const grupos = new Set(els.map((e) => e.grupo || ""));
+  const todosJuntos = grupos.size === 1 && !grupos.has("");
+  const algunGrupo = els.some((e) => e.grupo);
+  const b = (acc, txt, titulo) => `<button type="button" data-macc="${acc}" title="${titulo || ""}">${txt}</button>`;
+  box.classList.remove("hidden");
+  box.innerHTML = `<div class="cq-props-fila"><span class="cq-props-tit">${els.length} elegidos${todosJuntos ? " · soldados" : ""}</span>` +
+    (todosJuntos ? "" : b("agrupar", cqIc("agrupar") + "Soldar", "Soldar: quedan unidos y se mueven juntos")) +
+    (algunGrupo ? b("desagrupar", cqIc("desagrupar") + "Separar", "Separar: cada uno vuelve a moverse solo") : "") +
+    b("bloq", cqIc("candado"), "Bloquear todos") + b("dup", cqIc("duplicar"), "Duplicar todos") + b("borrar", cqIc("borrar"), "Borrar todos") +
+    b("ninguno", cqIc("check") + "Listo", "Dejar de elegir") + `</div>`;
+  box.querySelectorAll("[data-macc]").forEach((x) => x.addEventListener("click", () => cqAccionMulti(x.dataset.macc)));
+}
+function cqAccionMulti(acc) {
+  const els = cq.multi.map((id) => cq.elementos.find((e) => e.id === id)).filter(Boolean);
+  if (acc === "ninguno") { cq.multi = []; cqRender(); return; }
+  if (acc === "borrar" && !confirm(`¿Borrar los ${els.length} elementos elegidos?`)) return;
+  cqMemoria();
+  if (acc === "agrupar") { const g = "g" + cqId(); els.forEach((e) => { e.grupo = g; }); showToast("Soldados: se mueven juntos."); }
+  if (acc === "desagrupar") { els.forEach((e) => { delete e.grupo; }); showToast("Separados."); }
+  if (acc === "bloq") { els.forEach((e) => { e.bloq = true; }); cq.multi = []; }
+  if (acc === "borrar") { const ids = new Set(cq.multi); cq.elementos = cq.elementos.filter((e) => !ids.has(e.id)); cq.multi = []; }
+  if (acc === "dup") {
+    const nuevosGrupos = {}, nuevos = [];
+    els.forEach((e) => {
+      const c = JSON.parse(JSON.stringify(e));
+      c.id = cqId() + nuevos.length;
+      delete c.bloq;
+      if (c.grupo) c.grupo = nuevosGrupos[c.grupo] || (nuevosGrupos[c.grupo] = "g" + cqId() + nuevos.length);
+      if (c.cadena) c.cadena = nuevosGrupos[c.cadena] || (nuevosGrupos[c.cadena] = "c" + cqId() + nuevos.length);
+      cqMoverElemento(c, e, CROQUIS_GRILLA * 2, CROQUIS_GRILLA * 2);
+      nuevos.push(c);
+    });
+    cq.elementos.push(...nuevos);
+    cq.multi = nuevos.map((e) => e.id);
+  }
+  cqRender();
+  cqGuardarBorrador();
+}
+// Mueve un elemento desde su estado original "o" (copia) en dx, dy.
+function cqMoverElemento(el, o, dx, dy) {
+  if ("x" in o && el.t !== "linea" && el.t !== "cable") { el.x = o.x + dx; el.y = o.y + dy; }
+  if (el.t === "linea") { el.x1 = o.x1 + dx; el.y1 = o.y1 + dy; el.x2 = o.x2 + dx; el.y2 = o.y2 + dy; if (Array.isArray(o.c)) el.c = [o.c[0] + dx, o.c[1] + dy]; }
+  if (el.t === "cable") el.pts = o.pts.map((p) => [p[0] + dx, p[1] + dy]);
+}
+// Los soldados con este elemento (incluido).
+function cqDelGrupo(el) {
+  if (!el || !el.grupo) return [el];
+  const g = cq.elementos.filter((e) => e.grupo === el.grupo && !e.bloq);
+  return g.length ? g : [el];
 }
 function cqNombreElemento(el) {
   if (el.t === "rect") return { elipse: "Círculo", triangulo: "Triángulo", triangulo_rect: "Triángulo" }[el.forma] || "Habitación";
@@ -15099,6 +15222,8 @@ function cqAccion(acc) {
     if (acc === "rot+") el.rot = ((el.rot || 0) + 15) % 360;
     if (acc === "rot90") el.rot = ((el.rot || 0) + 90) % 360;
     if (acc === "espejo") el.esp = !el.esp;
+    if (acc === "curvar") { const mx = (el.x1 + el.x2) / 2, my = (el.y1 + el.y2) / 2, l = Math.hypot(el.x2 - el.x1, el.y2 - el.y1) || 1; el.c = [mx - (el.y2 - el.y1) / l * l * 0.35, my + (el.x2 - el.x1) / l * l * 0.35]; }
+    if (acc === "recta") delete el.c;
     if (acc === "ori") el.ori = ((el.ori || 0) + 1) % 4;
     const defIr = el.t === "simbolo" && CROQUIS_SIMBOLOS[el.tipo] && CROQUIS_SIMBOLOS[el.tipo].ir ? CROQUIS_SIMBOLOS[el.tipo] : null;
     if (defIr && /^(alc|ang)[+-]$/.test(acc)) {
@@ -15121,7 +15246,9 @@ function cqAccion(acc) {
       const d = CROQUIS_GRILLA;
       delete copia.bloq;
       if (copia.t === "rect" || copia.t === "texto" || copia.t === "simbolo" || copia.t === "tabla") { copia.x += d; copia.y += d; }
-      if (copia.t === "linea") { copia.x1 += d; copia.y1 += d; copia.x2 += d; copia.y2 += d; }
+      if (copia.t === "linea") { copia.x1 += d; copia.y1 += d; copia.x2 += d; copia.y2 += d; if (Array.isArray(copia.c)) copia.c = [copia.c[0] + d, copia.c[1] + d]; }
+      delete copia.grupo;
+      delete copia.cadena;
       if (copia.t === "cable") copia.pts = copia.pts.map((p) => [p[0] + d, p[1] + d]);
       cq.elementos.push(copia);
       cq.sel = copia.id;
@@ -15158,7 +15285,21 @@ cqSvg.addEventListener("pointerdown", (e) => {
   const [mx, my] = cqAMundo(e.clientX, e.clientY);
   const destino = e.target.closest && e.target.closest("[data-handle], [data-id]");
   if (cq.herr === "mover") {
-    if (destino && destino.dataset.handle) { cqGesto = { tipo: "handle", h: destino.dataset.handle, inicio: [mx, my], movido: false }; return; }
+    if (destino && destino.dataset.handle) {
+      const elH = cq.elementos.find((x) => x.id === cq.sel);
+      // Paredes unidas: al mover un extremo se mueve también el de la pared pegada.
+      const conectados = [];
+      if (elH && elH.t === "linea" && (destino.dataset.handle === "a" || destino.dataset.handle === "b")) {
+        const px = destino.dataset.handle === "a" ? elH.x1 : elH.x2, py = destino.dataset.handle === "a" ? elH.y1 : elH.y2;
+        cq.elementos.forEach((o) => {
+          if (o === elH || o.t !== "linea" || o.bloq) return;
+          if (o.x1 === px && o.y1 === py) conectados.push([o, 1]);
+          if (o.x2 === px && o.y2 === py) conectados.push([o, 2]);
+        });
+      }
+      cqGesto = { tipo: "handle", h: destino.dataset.handle, inicio: [mx, my], movido: false, conectados };
+      return;
+    }
     // Lo bloqueado no se agarra: se elige lo que haya encima o debajo sin bloquear.
     const bajo = [];
     (document.elementsFromPoint ? document.elementsFromPoint(e.clientX, e.clientY) : [e.target]).forEach((n) => {
@@ -15166,12 +15307,38 @@ cqSvg.addEventListener("pointerdown", (e) => {
       if (g && !bajo.includes(g.dataset.id)) bajo.push(g.dataset.id);
     });
     const libre = bajo.find((id) => { const x = cq.elementos.find((q) => q.id === id); return x && !x.bloq; });
+    const libreEl = libre ? cq.elementos.find((x) => x.id === libre) : null;
+    // Selección de varios: modo "elegir varios", soldados, o algo ya elegido en grupo.
+    const grupoDe = libreEl ? cqDelGrupo(libreEl) : [];
+    if (libreEl && (cq.modoMulti || grupoDe.length > 1 || cq.multi.includes(libreEl.id))) {
+      const ids = grupoDe.map((x) => x.id);
+      const yaEstaba = ids.every((id) => cq.multi.includes(id));
+      if (cq.modoMulti) { if (!yaEstaba) cq.multi = [...new Set([...cq.multi, ...ids])]; }
+      else if (!yaEstaba) cq.multi = ids;
+      cq.sel = null;
+      const originales = new Map(cq.multi.map((id) => { const x = cq.elementos.find((q) => q.id === id); return [id, JSON.parse(JSON.stringify(x))]; }));
+      cqGesto = { tipo: "moverMulti", inicio: [mx, my], originales, movido: false, yaEstaba, ids };
+      cqRender();
+      return;
+    }
+    if (cq.modoMulti) {
+      cqGesto = { tipo: "lazo", inicio: [mx, my], fin: [mx, my] };
+      return;
+    }
+    cq.multi = [];
     if (libre || bajo.length) {
       cq.sel = libre || bajo[0];
       const el = cq.elementos.find((x) => x.id === cq.sel);
       if (!el || el.bloq) {
         cqRender();
         cqGesto = { tipo: "pan", inicio: { x: e.clientX, y: e.clientY }, vista: { ...cq.vista } };
+        return;
+      }
+      if (el.t === "linea" && el.cadena) {
+        // Un tramo de una pared continua: se elige ese tramo, pero se mueve toda la pared.
+        const tramos = cq.elementos.filter((x) => x.t === "linea" && x.cadena === el.cadena && !x.bloq);
+        cqGesto = { tipo: "moverMulti", inicio: [mx, my], originales: new Map(tramos.map((x) => [x.id, JSON.parse(JSON.stringify(x))])), movido: false };
+        cqRender();
         return;
       }
       cqGesto = { tipo: "mover", inicio: [mx, my], original: JSON.parse(JSON.stringify(el)), movido: false };
@@ -15198,6 +15365,13 @@ cqSvg.addEventListener("pointerdown", (e) => {
     cqGesto = { tipo: "mover", inicio: [mx, my], original: JSON.parse(JSON.stringify(el)), movido: false, yaMemorizado: true };
     return;
   }
+  if (cq.herr === "linea" && cq.cadena) {
+    // Pared continua: el tramo nuevo arranca donde terminó el anterior.
+    const ini = cq.cadena.ultimo;
+    cqGesto = { tipo: "crear", inicio: ini, pts: [[mx, my]], fin: cqEnderezar(ini, [cqSnap(mx), cqSnap(my)]) };
+    cqEl("cqTemporal").innerHTML = croquisSvgElemento({ t: "linea", x1: ini[0], y1: ini[1], x2: cqGesto.fin[0], y2: cqGesto.fin[1] });
+    return;
+  }
   if (cq.herr === "rect" || cq.herr === "linea" || cq.herr === "cable") {
     cqGesto = { tipo: "crear", inicio: [cqSnap(mx), cqSnap(my)], pts: [[mx, my]] };
   }
@@ -15222,6 +15396,22 @@ cqSvg.addEventListener("pointermove", (e) => {
     cqRender();
     return;
   }
+  if (cqGesto.tipo === "moverMulti") {
+    const dx = mx - cqGesto.inicio[0], dy = my - cqGesto.inicio[1];
+    if (!cqGesto.movido && Math.hypot(dx, dy) * cq.vista.s < 4) return;
+    if (!cqGesto.movido) cqMemoria();
+    cqGesto.movido = true;
+    const sx = cqSnap(dx), sy = cqSnap(dy);
+    cqGesto.originales.forEach((o, id) => { const x = cq.elementos.find((q) => q.id === id); if (x) cqMoverElemento(x, o, sx, sy); });
+    cqRender();
+    return;
+  }
+  if (cqGesto.tipo === "lazo") {
+    cqGesto.fin = [mx, my];
+    const [a, b] = [cqGesto.inicio, cqGesto.fin];
+    cqEl("cqTemporal").innerHTML = `<rect x="${Math.min(a[0], b[0])}" y="${Math.min(a[1], b[1])}" width="${Math.abs(b[0] - a[0])}" height="${Math.abs(b[1] - a[1])}" fill="#1B5FA8" fill-opacity="0.08" stroke="#1B5FA8" stroke-width="${1.5 / cq.vista.s}" stroke-dasharray="${5 / cq.vista.s} ${4 / cq.vista.s}"/>`;
+    return;
+  }
   const el = cq.elementos.find((x) => x.id === cq.sel);
   if (cqGesto.tipo === "mover" && el) {
     const dx = mx - cqGesto.inicio[0], dy = my - cqGesto.inicio[1];
@@ -15231,7 +15421,7 @@ cqSvg.addEventListener("pointermove", (e) => {
     const o = cqGesto.original, sx = cqSnap(dx), sy = cqSnap(dy);
     if (el.t === "rect" || el.t === "texto" || el.t === "tabla") { el.x = o.x + sx; el.y = o.y + sy; }
     if (el.t === "simbolo") { el.x = cqSnap(o.x + dx); el.y = cqSnap(o.y + dy); }
-    if (el.t === "linea") { el.x1 = o.x1 + sx; el.y1 = o.y1 + sy; el.x2 = o.x2 + sx; el.y2 = o.y2 + sy; }
+    if (el.t === "linea") { el.x1 = o.x1 + sx; el.y1 = o.y1 + sy; el.x2 = o.x2 + sx; el.y2 = o.y2 + sy; if (Array.isArray(o.c)) el.c = [o.c[0] + sx, o.c[1] + sy]; }
     if (el.t === "cable") el.pts = o.pts.map((p) => [p[0] + dx, p[1] + dy]);
     cqRender();
     return;
@@ -15247,10 +15437,14 @@ cqSvg.addEventListener("pointermove", (e) => {
       if (h === "2") { el.w = px - el.x; el.h = py - el.y; }
       if (h === "3") { el.x = px; el.w = x2 - px; el.h = py - el.y; }
     }
-    if (el.t === "linea") {
+    if (el.t === "linea" && h === "c") {
+      // Arrastrando el punto del medio se cambia cuánto se curva.
+      el.c = [Math.round(2 * mx - 0.5 * (el.x1 + el.x2)), Math.round(2 * my - 0.5 * (el.y1 + el.y2))];
+    } else if (el.t === "linea") {
       const fijo = h === "a" ? [el.x2, el.y2] : [el.x1, el.y1];
-      const p = cqEnderezar(fijo, [cqSnap(mx), cqSnap(my)]);
+      const p = Array.isArray(el.c) ? [cqSnap(mx), cqSnap(my)] : cqEnderezar(fijo, [cqSnap(mx), cqSnap(my)]);
       if (h === "a") { el.x1 = p[0]; el.y1 = p[1]; } else { el.x2 = p[0]; el.y2 = p[1]; }
+      (cqGesto.conectados || []).forEach(([o, cual]) => { if (cual === 1) { o.x1 = p[0]; o.y1 = p[1]; } else { o.x2 = p[0]; o.y2 = p[1]; } });
     }
     if (el.t === "simbolo" && h === "rot") {
       let ang = Math.atan2(my - el.y, mx - el.x) * 180 / Math.PI + 90;
@@ -15312,7 +15506,13 @@ function cqTerminarGesto(e) {
         if (cq.forma && cq.forma !== "rect") nuevo.forma = cq.forma;
       }
     }
-    if (cq.herr === "linea" && cqGesto.fin && Math.hypot(cqGesto.fin[0] - x0, cqGesto.fin[1] - y0) >= CROQUIS_GRILLA / 2) nuevo = { t: "linea", x1: x0, y1: y0, x2: cqGesto.fin[0], y2: cqGesto.fin[1] };
+    if (cq.herr === "linea" && cqGesto.fin && Math.hypot(cqGesto.fin[0] - x0, cqGesto.fin[1] - y0) >= CROQUIS_GRILLA / 2) {
+      nuevo = { t: "linea", x1: x0, y1: y0, x2: cqGesto.fin[0], y2: cqGesto.fin[1] };
+      // Queda una pared en curso: los tramos siguientes salen de este punto y quedan soldados.
+      if (!cq.cadena) cq.cadena = { grupo: "g" + cqId(), inicio: [x0, y0], ultimo: cqGesto.fin };
+      else cq.cadena.ultimo = cqGesto.fin;
+      nuevo.cadena = cq.cadena.grupo;
+    }
     if (cq.herr === "cable" && cqGesto.pts.length >= 2) {
       const pts = croquisSimplificar(cqGesto.pts, 2.5 / cq.vista.s).map((p) => [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10]);
       if (pts.length >= 2 && Math.hypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]) > 6) {
@@ -15322,8 +15522,27 @@ function cqTerminarGesto(e) {
       }
     }
     if (nuevo) { cqMemoria(); nuevo.id = cqId(); cq.elementos.push(nuevo); cqGuardarBorrador(); }
-  } else if ((cqGesto.tipo === "mover" || cqGesto.tipo === "handle") && cqGesto.movido) {
+  } else if ((cqGesto.tipo === "mover" || cqGesto.tipo === "handle" || cqGesto.tipo === "moverMulti") && cqGesto.movido) {
     cqGuardarBorrador();
+  } else if (cqGesto.tipo === "moverMulti" && !cqGesto.movido && cqGesto.yaEstaba && cq.modoMulti) {
+    // Tocar algo ya elegido lo saca de la selección.
+    cq.multi = cq.multi.filter((id) => !cqGesto.ids.includes(id));
+  } else if (cqGesto.tipo === "lazo") {
+    cqEl("cqTemporal").innerHTML = "";
+    const [a, b] = [cqGesto.inicio, cqGesto.fin];
+    const x0 = Math.min(a[0], b[0]), y0 = Math.min(a[1], b[1]), x1 = Math.max(a[0], b[0]), y1 = Math.max(a[1], b[1]);
+    if ((x1 - x0) * cq.vista.s < 8 && (y1 - y0) * cq.vista.s < 8) cq.multi = [];
+    else {
+      // Equipos y objetos: alcanza con que el centro quede adentro; lo demás, entero.
+      const dentro = cq.elementos.filter((e) => {
+        if (e.bloq) return false;
+        if (e.t === "simbolo") return e.x >= x0 && e.x <= x1 && e.y >= y0 && e.y <= y1;
+        const c = cqCajaSel(e); return c.x >= x0 && c.y >= y0 && c.x + c.w <= x1 && c.y + c.h <= y1;
+      });
+      const ids = new Set(cq.multi);
+      dentro.forEach((e) => cqDelGrupo(e).forEach((x) => ids.add(x.id)));
+      cq.multi = [...ids];
+    }
   }
   cqGesto = null;
   cqRender();
@@ -15335,6 +15554,26 @@ cqEl("cqZoomMas").addEventListener("click", () => { const r = cqSvg.getBoundingC
 cqEl("cqZoomMenos").addEventListener("click", () => { const r = cqSvg.getBoundingClientRect(); cqZoomEn(r.left + r.width / 2, r.top + r.height / 2, 1 / 1.25); });
 cqEl("cqCentrar").addEventListener("click", cqVerTodo);
 cqEl("cqFondoBtn").addEventListener("click", () => { cq.verFondo = !cq.verFondo; cqRender(); });
+cqEl("cqMultiBtn").addEventListener("click", () => {
+  const activar = !cq.modoMulti;
+  if (cq.herr !== "mover") cqElegirHerr("mover");
+  cq.modoMulti = activar;
+  if (!activar) cq.multi = [];
+  else if (cq.sel) { const el = cq.elementos.find((e) => e.id === cq.sel); cq.multi = el && !el.bloq ? cqDelGrupo(el).map((x) => x.id) : []; cq.sel = null; }
+  cqEl("cqAyuda").textContent = activar ? "Elegir varios: tocá cada elemento o arrastrá un recuadro sobre el plano. Después arrastrá cualquiera para mover todos juntos." : CQ_AYUDAS.mover;
+  cqRender();
+});
+cqEl("cqCadenaTerminar").addEventListener("click", () => { cq.cadena = null; cqRender(); });
+cqEl("cqCadenaCerrar").addEventListener("click", () => {
+  const c = cq.cadena;
+  if (c && (c.ultimo[0] !== c.inicio[0] || c.ultimo[1] !== c.inicio[1])) {
+    cqMemoria();
+    cq.elementos.push({ id: cqId(), t: "linea", x1: c.ultimo[0], y1: c.ultimo[1], x2: c.inicio[0], y2: c.inicio[1], cadena: c.grupo });
+    cqGuardarBorrador();
+  }
+  cq.cadena = null;
+  cqRender();
+});
 function cqVerTodo() {
   const { w, h } = cqTamLienzo();
   if (!cq.elementos.length) { cq.vista = { x: -20, y: -20, s: 1 }; cqRender(); return; }
@@ -15346,6 +15585,66 @@ function cqVerTodo() {
 cqEl("cqDeshacerBtn").addEventListener("click", cqDeshacer);
 cqEl("cqRehacerBtn").addEventListener("click", cqRehacer);
 window.addEventListener("resize", () => { if (screens.croquis && screens.croquis.dataset.active === "true") cqRender(); });
+
+// ---------- Páginas ----------
+function cqIrPagina(i) {
+  cqSyncPagina();
+  if (!cq.paginas[i]) return;
+  cq.pagina = i;
+  cq.elementos = cq.paginas[i].elementos || (cq.paginas[i].elementos = []);
+  cq.fondo = cq.paginas[i].fondo || null;
+  cq.sel = null; cq.multi = []; cq.cadena = null; cq.pasado = []; cq.futuro = [];
+  cqVerTodo();
+}
+function cqNuevaPagina(nombre) {
+  cqSyncPagina();
+  cq.paginas.push({ nombre: nombre || `Página ${cq.paginas.length + 1}`, elementos: [], fondo: null });
+  cq.cambios = true;
+  cqIrPagina(cq.paginas.length - 1);
+}
+function cqRenderPaginas() {
+  const box = cqEl("cqPaginas");
+  const n = cq.paginas.length;
+  box.innerHTML = cq.paginas.map((p, i) => `<button type="button" data-pag="${i}" class="${i === cq.pagina ? "activo" : ""}" title="${i === cq.pagina ? "Opciones de la página" : "Ir a esta página"}">${escapeHtml(p.nombre || `Página ${i + 1}`)}</button>`).join("") +
+    `<button type="button" data-pag="nueva" title="Agregar una página" aria-label="Agregar una página">${cqIc("mas")}</button>`;
+  // Con una sola página no se muestra (se agregan desde el menú).
+  box.classList.toggle("hidden", n <= 1);
+  box.querySelectorAll("[data-pag]").forEach((b) => b.addEventListener("click", () => {
+    if (b.dataset.pag === "nueva") { cqNuevaPagina(); cqGuardarBorrador(); showToast("Página nueva. Volvés a las otras desde arriba."); return; }
+    const i = Number(b.dataset.pag);
+    if (i !== cq.pagina) { cqIrPagina(i); return; }
+    cqOpcionesPagina();
+  }));
+}
+function cqOpcionesPagina() {
+  const p = cq.paginas[cq.pagina];
+  const capa = document.createElement("div");
+  capa.className = "cq-datos-capa";
+  capa.innerHTML = `<div class="cq-datos cq-menu">
+    <h3>${escapeHtml(p.nombre || "Página")}</h3>
+    <button type="button" class="btn btn-secondary" data-p="nombre">${cqIc("lapiz")} Cambiar el nombre (ej. Planta alta)</button>
+    <button type="button" class="btn btn-secondary" data-p="nueva">${cqIc("mas")} Agregar otra página</button>
+    ${cq.paginas.length > 1 ? `<button type="button" class="btn btn-secondary cq-borrar" data-p="borrar">${cqIc("borrar")} Borrar esta página</button>` : ""}
+    <button type="button" class="link-btn" data-p="cerrar">Cerrar</button>
+  </div>`;
+  document.body.appendChild(capa);
+  capa.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-p]");
+    if (!b && e.target !== capa) return;
+    const acc = b ? b.dataset.p : "cerrar";
+    capa.remove();
+    if (acc === "nombre") { const nuevo = prompt("Nombre de la página:", p.nombre || ""); if (nuevo !== null && nuevo.trim()) { p.nombre = nuevo.trim().slice(0, 40); cq.cambios = true; cqGuardarBorrador(); cqRender(); } }
+    if (acc === "nueva") { cqNuevaPagina(); cqGuardarBorrador(); }
+    if (acc === "borrar" && confirm(`¿Borrar la página "${p.nombre}" con todo lo que tiene?`)) {
+      cq.paginas.splice(cq.pagina, 1);
+      cq.pagina = Math.max(0, cq.pagina - 1);
+      cq.elementos = cq.paginas[cq.pagina].elementos; cq.fondo = cq.paginas[cq.pagina].fondo || null;
+      cq.cambios = true;
+      cqIrPagina(cq.pagina);
+      cqGuardarBorrador();
+    }
+  });
+}
 
 // ---------- Datos: cliente y título ----------
 function cqPedirDatos() {
@@ -15474,13 +15773,13 @@ function cqEditorTexto(el, pos) {
 
 // ---------- Guardar y descargar ----------
 async function cqGuardar() {
-  if (!cq.elementos.length) { showToast("El croquis está vacío."); return false; }
+  if (!cqTodosLosElementos().length) { showToast("El croquis está vacío."); return false; }
   if (!cq.cliente && !cq.titulo) { const ok = await cqPedirDatos(); if (!ok) return false; }
   try {
     const r = await fetch("/api/datos?coleccion=croquis", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-      body: JSON.stringify({ accion: "guardar", id: cq.id || undefined, titulo: cq.titulo, cliente: cq.cliente, numero_cliente: cq.numero_cliente, direccion: cq.direccion, dibujo: cqDibujo() }),
+      body: JSON.stringify({ accion: "guardar", id: cq.id || undefined, titulo: cq.titulo, cliente: cq.cliente, numero_cliente: cq.numero_cliente, direccion: cq.direccion, dibujo: cqDibujoCompleto() }),
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok || !d.ok) throw new Error(d.error || "HTTP " + r.status);
@@ -15497,16 +15796,18 @@ async function cqGuardar() {
     return false;
   }
 }
-function cqDatosExport() { return { titulo: cq.titulo, cliente: cq.cliente, numero_cliente: cq.numero_cliente, direccion: cq.direccion, autor: cq.autor || tecnicoLogueado || "", actualizado: cq.actualizado || new Date().toISOString(), dibujo: cqDibujo() }; }
+function cqDatosExport() { return { titulo: cq.titulo, cliente: cq.cliente, numero_cliente: cq.numero_cliente, direccion: cq.direccion, autor: cq.autor || tecnicoLogueado || "", actualizado: cq.actualizado || new Date().toISOString(), dibujo: cqDibujoCompleto() }; }
 async function cqExportar(formato) {
-  if (!cq.elementos.length) { showToast("El croquis está vacío."); return; }
+  // El PDF lleva todas las páginas; la imagen y el SVG, la página que se está viendo.
+  if (formato === "pdf" ? !cqTodosLosElementos().length : !cq.elementos.length) { showToast(formato === "pdf" ? "El croquis está vacío." : "Esta página está vacía."); return; }
   const c = cqDatosExport();
+  const pagina = cq.paginas.length > 1 ? cq.paginas[cq.pagina].nombre || `Página ${cq.pagina + 1}` : "";
   try {
     let blob, ext;
     if (formato === "pdf") { blob = new Blob([await croquisPdf(c)], { type: "application/pdf" }); ext = "pdf"; }
-    if (formato === "png") { blob = await croquisPng(c.dibujo, 2400); ext = "png"; }
-    if (formato === "svg") { blob = new Blob([croquisSvgDocumento(c.dibujo)], { type: "image/svg+xml" }); ext = "svg"; }
-    const nombre = croquisNombreArchivo(c, ext);
+    if (formato === "png") { blob = await croquisPng(cqDibujo(), 2400); ext = "png"; }
+    if (formato === "svg") { await croquisCargarLogo(); blob = new Blob([croquisSvgDocumento(cqDibujo())], { type: "image/svg+xml" }); ext = "svg"; }
+    const nombre = croquisNombreArchivo(formato !== "pdf" && pagina ? { ...c, titulo: `${c.titulo || "croquis"} ${pagina}` } : c, ext);
     const archivo = new File([blob], nombre, { type: blob.type });
     if (formato !== "svg" && navigator.canShare && navigator.canShare({ files: [archivo] })) {
       try { await navigator.share({ files: [archivo], title: "Croquis " + (c.titulo || c.cliente || "") }); return; } catch (e) { if (e && e.name === "AbortError") return; }
@@ -15523,11 +15824,12 @@ cqEl("cqMenuBtn").addEventListener("click", () => {
     <button type="button" class="btn btn-secondary" data-m="pdf">Compartir / descargar PDF</button>
     <button type="button" class="btn btn-secondary" data-m="png">Imagen (PNG)</button>
     <button type="button" class="btn btn-secondary" data-m="svg">Archivo editable (SVG, se abre en Visio)</button>
-    <button type="button" class="btn btn-secondary" data-m="foto">📷 Agregar desde la foto de un boceto</button>
-    ${cq.elementos.some((e) => e.inst) && permisosDelTecnico(tecnicoLogueado).presupuesto_express ? `<button type="button" class="btn btn-secondary" data-m="presu">🧾 Pasar los equipos a instalar a un presupuesto</button>` : ""}
+    <div class="cq-menu-fila"><button type="button" class="btn btn-secondary" data-m="foto">${cqIc("galeria")} Boceto desde galería</button><button type="button" class="btn btn-secondary" data-m="camara">${cqIc("camara")} Sacar foto</button></div>
+    <button type="button" class="btn btn-secondary" data-m="pagina">${cqIc("pagina")} Agregar una página</button>
+    ${cqTodosLosElementos().some((e) => e.inst) && permisosDelTecnico(tecnicoLogueado).presupuesto_express ? `<button type="button" class="btn btn-secondary" data-m="presu">${cqIc("presupuesto")} Pasar los equipos a instalar a un presupuesto</button>` : ""}
     ${cq.fondo ? `<button type="button" class="btn btn-secondary" data-m="sinfondo">Quitar la foto de fondo</button>` : ""}
     <button type="button" class="btn btn-secondary" data-m="datos">Cambiar cliente y título</button>
-    <button type="button" class="btn btn-secondary" data-m="bloq">${cq.elementos.length && cq.elementos.every((e) => e.bloq) ? "🔓 Desbloquear todo" : "🔒 Bloquear todo lo dibujado"}</button>
+    <button type="button" class="btn btn-secondary" data-m="bloq">${cq.elementos.length && cq.elementos.every((e) => e.bloq) ? cqIc("abierto") + " Desbloquear todo" : cqIc("candado") + " Bloquear todo lo dibujado"}</button>
     <button type="button" class="link-btn" data-m="cerrar">Cerrar</button>
   </div>`;
   document.body.appendChild(capa);
@@ -15540,6 +15842,8 @@ cqEl("cqMenuBtn").addEventListener("click", () => {
     if (m === "pdf" || m === "png" || m === "svg") cqExportar(m);
     if (m === "datos") cqPedirDatos();
     if (m === "foto") { cqFotoDestino = "editor"; cqEl("cqFotoInput").click(); }
+    if (m === "camara") { cqFotoDestino = "editor"; cqEl("cqCamaraInput").click(); }
+    if (m === "pagina") { cqNuevaPagina(); cqGuardarBorrador(); }
     if (m === "presu") cqPasarAPresupuesto();
     if (m === "sinfondo" && confirm("¿Quitar la foto del boceto de fondo? (el dibujo no se toca)")) { cq.fondo = null; cq.cambios = true; cqGuardarBorrador(); cqRender(); }
     if (m === "bloq" && cq.elementos.length) {
@@ -15552,7 +15856,7 @@ cqEl("cqMenuBtn").addEventListener("click", () => {
   });
 });
 cqEl("volverDeCroquisBtn").addEventListener("click", async () => {
-  if (cq.cambios && cq.elementos.length) {
+  if (cq.cambios && cqTodosLosElementos().length) {
     if (confirm("Tenés cambios sin guardar en el servidor. ¿Guardarlos antes de salir?")) { const ok = await cqGuardar(); if (!ok) return; }
   }
   cqAbrirLista();
@@ -15560,7 +15864,13 @@ cqEl("volverDeCroquisBtn").addEventListener("click", async () => {
 
 // ---------- Lista ----------
 function cqAbrirEditor(datos) {
-  Object.assign(cq, { id: "", titulo: "", cliente: "", numero_cliente: "", direccion: "", autor: "", actualizado: "", elementos: [], fondo: null, verFondo: true, sel: null, pasado: [], futuro: [], cambios: false }, datos || {});
+  Object.assign(cq, { id: "", titulo: "", cliente: "", numero_cliente: "", direccion: "", autor: "", actualizado: "", elementos: [], fondo: null, paginas: null, pagina: 0, verFondo: true, sel: null, multi: [], modoMulti: false, cadena: null, pasado: [], futuro: [], cambios: false }, datos || {});
+  // Páginas: los croquis viejos tienen una sola.
+  if (!Array.isArray(cq.paginas) || !cq.paginas.length) cq.paginas = [{ nombre: "Página 1", elementos: cq.elementos || [], fondo: cq.fondo || null }];
+  cq.paginas = cq.paginas.map((p, i) => ({ nombre: p.nombre || `Página ${i + 1}`, elementos: Array.isArray(p.elementos) ? p.elementos : [], fondo: p.fondo || null }));
+  cq.pagina = 0;
+  cq.elementos = cq.paginas[0].elementos;
+  cq.fondo = cq.paginas[0].fondo;
   showScreen("croquis");
   cqElegirHerr(cq.elementos.length ? "mover" : "rect");
   requestAnimationFrame(cqVerTodo);
@@ -15586,7 +15896,7 @@ function cqRenderLista() {
   const lista = cqIndice.filter((c) => { const t = normalizeText([c.titulo, c.cliente, c.numero_cliente, c.direccion, c.autor].join(" ")); return pal.every((w) => t.includes(w)); });
   const yo = tecnicoLogueado;
   const htmlBorrador = borrador && borrador.cambios && borrador.elementos && borrador.elementos.length
-    ? `<div class="historial-card cq-item cq-borrador"><div class="historial-card-cliente">✏️ Sin guardar: ${escapeHtml(borrador.titulo || borrador.cliente || "croquis nuevo")}</div><div class="historial-card-direccion">Quedó en este celular</div><div class="cq-item-btns"><button type="button" class="btn btn-primary btn-small" data-borrador="1">Seguir</button></div></div>` : "";
+    ? `<div class="historial-card cq-item cq-borrador"><div class="historial-card-cliente">${cqIc("lapiz")} Sin guardar: ${escapeHtml(borrador.titulo || borrador.cliente || "croquis nuevo")}</div><div class="historial-card-direccion">Quedó en este celular</div><div class="cq-item-btns"><button type="button" class="btn btn-primary btn-small" data-borrador="1">Seguir</button></div></div>` : "";
   cqEl("cqLista").innerHTML = htmlBorrador + (lista.length ? lista.map((c, i) => `<div class="historial-card cq-item">
       <div class="historial-card-cliente">${escapeHtml(c.titulo || "Croquis")}</div>
       <div class="historial-card-direccion">${escapeHtml(c.cliente || "Sin cliente")}${c.numero_cliente ? " · N° " + escapeHtml(c.numero_cliente) : ""}${c.direccion ? " · " + escapeHtml(c.direccion) : ""}</div>
@@ -15601,7 +15911,7 @@ function cqRenderLista() {
   };
   cqEl("cqLista").querySelectorAll("[data-borrador]").forEach((b) => b.addEventListener("click", () => cqAbrirEditor({ ...borrador, cambios: true })));
   cqEl("cqLista").querySelectorAll("[data-abrir]").forEach((b) => b.addEventListener("click", async () => {
-    try { const d = await traer(lista[Number(b.dataset.abrir)]); cqAbrirEditor({ id: d.id, titulo: d.titulo, cliente: d.cliente, numero_cliente: d.numero_cliente, direccion: d.direccion, autor: d.autor, actualizado: d.actualizado, elementos: (d.dibujo && d.dibujo.elementos) || [], fondo: (d.dibujo && d.dibujo.fondo) || null }); }
+    try { const d = await traer(lista[Number(b.dataset.abrir)]); cqAbrirEditor({ id: d.id, titulo: d.titulo, cliente: d.cliente, numero_cliente: d.numero_cliente, direccion: d.direccion, autor: d.autor, actualizado: d.actualizado, elementos: (d.dibujo && d.dibujo.elementos) || [], fondo: (d.dibujo && d.dibujo.fondo) || null, paginas: (d.dibujo && d.dibujo.paginas) || null }); }
     catch (err) { showToast("No se pudo abrir: " + err.message); }
   }));
   cqEl("cqLista").querySelectorAll("[data-pdf]").forEach((b) => b.addEventListener("click", async () => {
@@ -15647,7 +15957,7 @@ const CQ_BUSQUEDA_PRESU = {
 };
 function cqPasarAPresupuesto() {
   const cuenta = {};
-  cq.elementos.filter((e) => e.t === "simbolo" && e.inst).forEach((e) => { cuenta[e.tipo] = (cuenta[e.tipo] || 0) + 1; });
+  cqTodosLosElementos().filter((e) => e.t === "simbolo" && e.inst).forEach((e) => { cuenta[e.tipo] = (cuenta[e.tipo] || 0) + 1; });
   const lineas = Object.entries(cuenta).map(([tipo, cant]) => ({ tipo, cant, nombre: (CROQUIS_SIMBOLOS[tipo] || {}).nombre || tipo, busca: CQ_BUSQUEDA_PRESU[tipo] || "", hecho: false }));
   if (!lineas.length) { showToast("No hay equipos marcados como «a instalar»."); return; }
   const previo = peLeerBorrador();
@@ -15707,17 +16017,10 @@ async function cqDesdeFoto(archivo) {
     let nuevos = interpretado.elementos;
     if (!nuevos.length) throw new Error("No se reconoció ningún dibujo en la foto. Probá sacarla más de frente, con buena luz y que la hoja ocupe toda la foto.");
     capa.remove();
-    let dx = 0, dy = 0;
-    if (cqFotoDestino === "editor" && cq.elementos.length) {
-      // Se agrega al lado de lo que ya está dibujado
-      const ya = croquisCaja(cqDibujo()), nu = croquisCaja({ elementos: nuevos });
-      dx = Math.round((ya.x + ya.w + 80 - nu.x) / 10) * 10; dy = Math.round((ya.y - nu.y) / 10) * 10;
-      nuevos = nuevos.map((e) => {
-        const c = { ...e };
-        if ("x" in c) { c.x += dx; c.y += dy; }
-        if (c.t === "linea") { c.x1 += dx; c.x2 += dx; c.y1 += dy; c.y2 += dy; }
-        return c;
-      });
+    const dx = 0, dy = 0;
+    if (cqFotoDestino === "editor") {
+      // Desde el editor: si la página ya tiene dibujo, el boceto va en una página nueva.
+      if (cq.elementos.length || cq.fondo) cqNuevaPagina();
       cqMemoria();
       cq.elementos.push(...nuevos);
       cqGuardarBorrador();
@@ -15729,7 +16032,7 @@ async function cqDesdeFoto(archivo) {
     showToast(`Listo: ${nuevos.length} elementos. Revisá y corregí lo que haga falta.`);
     // La foto (enderezada) queda de fondo para calcar encima. Se ve al
     // instante y se sube en segundo plano para que quede guardada.
-    if (interpretado.marco && (!cq.fondo || cqFotoDestino !== "editor")) cqPonerFondo(foto, interpretado, dx, dy);
+    if (interpretado.marco) cqPonerFondo(foto, interpretado, dx, dy);
   } catch (err) {
     capa.remove();
     showToast("No se pudo armar el croquis: " + err.message);
@@ -15767,16 +16070,18 @@ function cqGirarFoto(base64, grados) {
     img.src = "data:image/jpeg;base64," + base64;
   });
 }
-cqEl("cqFotoInput").addEventListener("change", (e) => {
+["cqFotoInput", "cqCamaraInput"].forEach((id) => cqEl(id).addEventListener("change", (e) => {
   const f = e.target.files && e.target.files[0];
   e.target.value = "";
   if (f) cqDesdeFoto(f);
-});
-cqEl("cqDesdeFotoBtn").addEventListener("click", () => {
+}));
+function cqFotoNueva(inputId) {
   let borrador = null;
   try { borrador = JSON.parse(localStorage.getItem(CQ_BORRADOR) || "null"); } catch (e) { borrador = null; }
   if (borrador && borrador.cambios && borrador.elementos && borrador.elementos.length && !confirm("Hay un croquis sin guardar en este celular. ¿Empezar uno nuevo desde la foto igual? (el anterior se pierde)")) return;
   cqFotoDestino = "nuevo";
-  cqEl("cqFotoInput").click();
-});
+  cqEl(inputId).click();
+}
+cqEl("cqDesdeFotoBtn").addEventListener("click", () => cqFotoNueva("cqFotoInput"));
+cqEl("cqDesdeCamaraBtn").addEventListener("click", () => cqFotoNueva("cqCamaraInput"));
 cqEl("volverDeCroquisListaBtn").addEventListener("click", () => showScreen("home"));

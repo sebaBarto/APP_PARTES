@@ -2148,7 +2148,7 @@ test("Croquis: cables con color y trazo, equipos de color, cámaras/DVR y objeto
   // Objetos de obra: la paleta muestra solo esos
   await page.click('[data-herr="objetos"]');
   const objetos = await page.$$eval("#cqSimbolos [data-simbolo]", (bs) => bs.map((b) => b.dataset.simbolo));
-  assert.deepStrictEqual(objetos, ["puerta", "ventana", "corrediza", "columna", "columna_redonda", "porton_batiente", "porton_corredizo", "escalera_recta", "escalera_l_izq", "escalera_l_der", "escalera_u", "escalera_caracol", "piscina", "planta"]);
+  assert.deepStrictEqual(objetos, ["puerta", "ventana", "corrediza", "columna", "columna_redonda", "porton_batiente", "porton_corredizo", "escalera_recta", "escalera_l_izq", "escalera_l_der", "escalera_u", "escalera_caracol", "logo_sat", "piscina", "planta"]);
   await page.click('[data-simbolo="puerta"]');
   await clic(100, 100);
   await page.click('[data-acc="espejo"]');
@@ -2460,6 +2460,104 @@ test("Croquis desde foto: queda la foto de fondo, el dibujo se ordena solo y los
   await page.click(".pe-art");
   assert.deepStrictEqual(await page.evaluate(() => peEstado.items.map((i) => [i.c, i.cant])), [["DH1", 2]]);
   assert.match(await page.textContent("#peDelCroquis"), /Agregado/);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Croquis: pared continua con quiebres y curva, elegir varios y soldarlos, varias páginas (PDF de 2 hojas) y logo SAT", async () => {
+  const ctx = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 844 } });
+  const page = await ctx.newPage();
+  const erroresPagina = [];
+  page.on("pageerror", (e) => erroresPagina.push(e.message));
+  await page.addInitScript(() => { localStorage.setItem("ajustes_app", JSON.stringify({ estiloInicio: "nuevo" })); localStorage.setItem("skin_v4_aplicado", "1"); });
+  const guardados = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request();
+    if (req.url().includes("coleccion=croquis") && req.method() === "POST") { guardados.push(JSON.parse(req.postData())); return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, id: "cqmulti01", actualizado: "2026-10-27T03:00:00Z" }) }); }
+    route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+  });
+  await page.goto(base + "/");
+  await page.waitForTimeout(400);
+  await page.evaluate(() => {
+    tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); window.confirm = () => true;
+    window.__archivos = []; navigator.canShare = () => true;
+    navigator.share = async (d) => { const f = d.files[0]; window.__archivos.push({ nombre: f.name, bytes: Array.from(new Uint8Array(await f.arrayBuffer())) }); };
+    cqAbrirEditor({ titulo: "Casa", cliente: "Tell" });
+  });
+  await page.waitForTimeout(200);
+  const caja = await page.locator("#cqSvg").boundingBox();
+  const clic = (x, y) => page.mouse.click(caja.x + x, caja.y + y);
+  const arrastrar = async (a, b) => { await page.mouse.move(caja.x + a[0], caja.y + a[1]); await page.mouse.down(); for (let i = 1; i <= 8; i++) await page.mouse.move(caja.x + a[0] + (b[0] - a[0]) * i / 8, caja.y + a[1] + (b[1] - a[1]) * i / 8); await page.mouse.up(); };
+  // Pared continua: un arrastre y después toques en cada quiebre
+  await page.click('[data-herr="linea"]');
+  await arrastrar([40, 60], [300, 60]);
+  assert.strictEqual(await page.isVisible("#cqCadena"), true, "aparece la barra de pared en curso");
+  await clic(300, 260);
+  await clic(40, 262);
+  await page.click("#cqCadenaCerrar");
+  let lineas = await page.evaluate(() => cq.elementos.filter((e) => e.t === "linea"));
+  assert.strictEqual(lineas.length, 4);
+  assert.strictEqual(new Set(lineas.map((l) => l.cadena)).size, 1, "todos los tramos son la misma pared");
+  for (let i = 0; i < 3; i++) assert.deepStrictEqual([lineas[i].x2, lineas[i].y2], [lineas[i + 1].x1, lineas[i + 1].y1], "tramos pegados");
+  assert.deepStrictEqual([lineas[3].x2, lineas[3].y2], [lineas[0].x1, lineas[0].y1], "cerrada");
+  assert.strictEqual(lineas[2].y1, lineas[2].y2, "el tramo casi horizontal se enderezó");
+  assert.strictEqual(await page.isVisible("#cqCadena"), false);
+  // Curvar un tramo y mover toda la pared arrastrando ese tramo
+  await page.click('[data-herr="mover"]');
+  await clic(300, 160);
+  await page.click('[data-acc="curvar"]');
+  lineas = await page.evaluate(() => cq.elementos.filter((e) => e.t === "linea"));
+  assert.ok(Array.isArray(lineas[1].c), "tramo curvo");
+  const antes = lineas.map((l) => l.x1);
+  await arrastrar([40, 160], [80, 160]);
+  lineas = await page.evaluate(() => cq.elementos.filter((e) => e.t === "linea"));
+  assert.deepStrictEqual(lineas.map((l) => l.x1), antes.map((x) => x + 40), "se movió toda la pared junta");
+  // Equipos: elegir varios con un recuadro, soldarlos y moverlos juntos
+  for (const [tipo, x, y] of [["central", 120, 120], ["teclado", 180, 120]]) {
+    await page.click('[data-herr="simbolos"]');
+    await page.click(`[data-simbolo="${tipo}"]`);
+    await clic(x, y);
+  }
+  await page.click('[data-herr="mover"]');
+  await page.click("#cqMultiBtn");
+  await arrastrar([235, 98], [92, 150]); // recuadro empezando en un lugar vacío
+  assert.strictEqual(await page.evaluate(() => cq.multi.length), 2);
+  assert.deepStrictEqual(await page.evaluate(() => cq.multi.map((id) => cq.elementos.find((e) => e.id === id).tipo).sort()), ["central", "teclado"]);
+  await page.click('[data-macc="agrupar"]');
+  await page.click('[data-macc="ninguno"]');
+  await page.click("#cqMultiBtn");
+  const pos0 = await page.evaluate(() => cq.elementos.filter((e) => e.t === "simbolo").map((e) => [e.x, e.y]));
+  await arrastrar([120, 120], [140, 160]);
+  const pos1 = await page.evaluate(() => cq.elementos.filter((e) => e.t === "simbolo").map((e) => [e.x, e.y]));
+  assert.deepStrictEqual(pos1, pos0.map(([x, y]) => [x + 20, y + 40]), "soldados: se mueven juntos");
+  // Página 2 con el logo de SAT
+  assert.strictEqual(await page.isVisible("#cqPaginas"), false, "con una sola página no hay barra de páginas");
+  await page.click("#cqMenuBtn");
+  await page.click('[data-m="pagina"]');
+  assert.strictEqual(await page.evaluate(() => cq.elementos.length), 0, "página nueva vacía");
+  assert.strictEqual(await page.isVisible("#cqPaginas"), true);
+  await page.click('[data-herr="objetos"]');
+  await page.click('[data-sub="obra"]');
+  await page.click('[data-simbolo="logo_sat"]');
+  await clic(180, 200);
+  assert.match(await page.evaluate(() => croquisSvgElemento(cq.elementos[0])), /<image href="data:image\/jpeg;base64,/);
+  await page.click('[data-pag="0"]');
+  assert.strictEqual(await page.evaluate(() => cq.elementos.filter((e) => e.t === "linea").length), 4, "volver a la página 1");
+  // Guardar: van las dos páginas
+  await page.click("#cqMenuBtn");
+  await page.click('[data-m="guardar"]');
+  await page.waitForTimeout(300);
+  assert.deepStrictEqual(guardados[0].dibujo.paginas.map((p) => [p.nombre, p.elementos.length]), [["Página 1", 6], ["Página 2", 1]]);
+  assert.strictEqual(guardados[0].dibujo.elementos.length, 6);
+  // PDF de 2 hojas
+  await page.click("#cqMenuBtn");
+  await page.click('[data-m="pdf"]');
+  await page.waitForFunction(() => window.__archivos.length === 1, null, { timeout: 20000 });
+  const hojas = await page.evaluate(async () => (await PDFLib.PDFDocument.load(new Uint8Array(window.__archivos[0].bytes))).getPageCount());
+  assert.strictEqual(hojas, 2, "una hoja por página");
+  // Fotos: galería y cámara por separado
+  assert.strictEqual(await page.getAttribute("#cqCamaraInput", "capture"), "environment");
+  assert.strictEqual(await page.getAttribute("#cqFotoInput", "capture"), null);
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
