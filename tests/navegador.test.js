@@ -2324,10 +2324,13 @@ test("Croquis: infrarrojo con número, alcance, ángulo, doble lente, video e in
   await page.mouse.click(caja.x + 250, caja.y + 250);
   await page.evaluate(() => { window.prompt = () => "D23"; });
   await page.click('[data-acc="etq"]');
-  for (const acc of ["alc+", "alc+", "ang-", "doble", "video", "inal"]) await page.click(`[data-acc="${acc}"]`);
+  // Alcance y ángulo con los deslizadores
+  await page.$eval('[data-sl="alc"]', (i) => { i.value = "90"; i.dispatchEvent(new Event("input", { bubbles: true })); i.dispatchEvent(new Event("change", { bubbles: true })); });
+  await page.$eval('[data-sl="ang"]', (i) => { i.value = "85"; i.dispatchEvent(new Event("input", { bubbles: true })); i.dispatchEvent(new Event("change", { bubbles: true })); });
+  for (const acc of ["doble", "video", "inal"]) await page.click(`[data-acc="${acc}"]`);
   let ir = await page.evaluate(() => cq.elementos[0]);
   assert.deepStrictEqual([ir.etq, ir.alc, ir.ang, ir.doble, ir.video, ir.inal], ["D23", 90, 85, true, true, true]);
-  assert.match(await page.textContent("#cqProps"), /Ángulo 170°/);
+  assert.match(await page.textContent("#cqProps"), /Ángulo\s*170°/);
   let svg = await page.evaluate(() => croquisSvgElemento(cq.elementos[0]));
   assert.match(svg, />D23</);
   assert.match(svg, /fill="#E00000"/, "cuadrado rojo");
@@ -2726,6 +2729,60 @@ test("Clientes con varias unidades (Lara Silvano Unidad 20/25/27): la tarea del 
     };
   });
   assert.deepStrictEqual(r, { u20: "9002", u27: "9003", ladder12: null, enTexto: false });
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Croquis: flechas para mover fino (y más rápido dejando apretado), deslizador de tamaño, medidas en metros e imán a pared y esquina", async () => {
+  const ctx = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 844 } });
+  const page = await ctx.newPage();
+  const erroresPagina = [];
+  page.on("pageerror", (e) => erroresPagina.push(e.message));
+  await page.addInitScript(() => { localStorage.setItem("ajustes_app", JSON.stringify({ estiloInicio: "nuevo" })); localStorage.setItem("skin_v4_aplicado", "1"); });
+  await page.route("**/api/**", (r) => r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+  await page.goto(base + "/");
+  await page.waitForTimeout(400);
+  await page.evaluate(() => {
+    tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador");
+    cqAbrirEditor({ elementos: [{ id: "r1", t: "rect", x: 0, y: 0, w: 200, h: 160 }, { id: "c1", t: "simbolo", tipo: "central", x: 100, y: 80, rot: 0, esc: 1 }] });
+    cqElegirHerr("mover");
+  });
+  await page.waitForTimeout(200);
+  assert.strictEqual(await page.isVisible("#cqPad"), false, "sin nada elegido no hay flechas");
+  await page.evaluate(() => { cq.sel = "c1"; cqRender(); });
+  assert.strictEqual(await page.isVisible("#cqPad"), true);
+  // Un toque = 1 unidad
+  await page.click('#cqPad [data-dir="der"]');
+  await page.click('#cqPad [data-dir="abajo"]');
+  assert.deepStrictEqual(await page.evaluate(() => { const c = cq.elementos.find((e) => e.id === "c1"); return [c.x, c.y]; }), [101, 81]);
+  // Dejando apretado se sigue moviendo
+  const b = await page.locator('#cqPad [data-dir="izq"]').boundingBox();
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+  await page.mouse.down(); await page.waitForTimeout(900); await page.mouse.up();
+  const x = await page.evaluate(() => cq.elementos.find((e) => e.id === "c1").x);
+  assert.ok(x < 90, "se movió varias veces: " + x);
+  // Deshacer vuelve atrás lo de las flechas
+  await page.click("#cqDeshacerBtn");
+  assert.strictEqual(await page.evaluate(() => cq.elementos.find((e) => e.id === "c1").x), 101);
+  // Deslizador de tamaño
+  await page.evaluate(() => { cq.sel = "c1"; cqRender(); });
+  await page.$eval('[data-sl="esc"]', (i) => { i.value = "1.6"; i.dispatchEvent(new Event("input", { bubbles: true })); i.dispatchEvent(new Event("change", { bubbles: true })); });
+  assert.strictEqual(await page.evaluate(() => cq.elementos.find((e) => e.id === "c1").esc), 1.6);
+  assert.match(await page.textContent('[data-sl-val="esc"]'), /160%/);
+  // Medidas de la habitación en metros
+  await page.evaluate(() => { cq.sel = "r1"; cqRender(); window.prompt = () => "4,5 x 3"; });
+  assert.match(await page.textContent("#cqProps"), /5 × 4 m/);
+  await page.click('[data-acc="medidas"]');
+  assert.deepStrictEqual(await page.evaluate(() => { const r = cq.elementos.find((e) => e.id === "r1"); return [r.w, r.h]; }), [180, 120]);
+  // Imán: una puerta soltada cerca de la pared queda apoyada; el infrarrojo, en la esquina
+  const r = await page.evaluate(() => {
+    const puerta = { id: "p1", t: "simbolo", tipo: "puerta", x: 90, y: 112, rot: 90, esc: 1 };
+    const ir = { id: "i1", t: "simbolo", tipo: "infrarrojo", x: 172, y: 110, rot: 0, esc: 1 };
+    const els = [cq.elementos.find((e) => e.id === "r1"), puerta, ir];
+    croquisApoyarEnPared(puerta, els, 22); croquisApoyarEnEsquina(ir, els, 18);
+    return [puerta.y, puerta.rot, ir.x, ir.y];
+  });
+  assert.deepStrictEqual(r, [120, 0, 180, 120]);
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });

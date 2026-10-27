@@ -3606,3 +3606,24 @@ html[data-inicio="nuevo"] #screen-presupuesto .pe-ajuste-btn.activo { background
 #screen-presupuesto .pe-orden button { width: 28px; height: 22px; border-radius: 6px; border: 0; background: rgba(127,127,127,0.18); color: inherit; padding: 0; display: grid; place-items: center; cursor: pointer; }
 #screen-presupuesto .pe-orden button svg { width: 16px; height: 16px; }
 #screen-presupuesto .pe-orden button:disabled { opacity: .25; cursor: default; }
+
+/* Croquis: flechas para mover fino y deslizadores */
+.cq-pad { position: absolute; left: 10px; bottom: 34px; width: 132px; height: 132px; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); gap: 2px; padding: 4px; border-radius: 50%; background: rgba(27,39,51,.82); box-shadow: 0 3px 12px rgba(0,0,0,.25); touch-action: none; user-select: none; -webkit-user-select: none; }
+.cq-pad button { border: 0; background: rgba(255,255,255,.12); color: #fff; border-radius: 10px; display: grid; place-items: center; padding: 0; touch-action: none; }
+.cq-pad button:active { background: #1B5FA8; }
+.cq-pad button svg { width: 24px; height: 24px; }
+.cq-pad .cq-pad-arriba { grid-column: 2; grid-row: 1; }
+.cq-pad .cq-pad-izq { grid-column: 1; grid-row: 2; }
+.cq-pad .cq-pad-c { grid-column: 2; grid-row: 2; border-radius: 50%; background: rgba(255,255,255,.06); }
+.cq-pad .cq-pad-c svg { width: 20px; height: 20px; }
+.cq-pad .cq-pad-c.activo { color: #FFC033; }
+.cq-pad .cq-pad-der { grid-column: 3; grid-row: 2; }
+.cq-pad .cq-pad-abajo { grid-column: 2; grid-row: 3; }
+.cq-props-sliders { display: flex; flex-direction: column; gap: 4px; }
+.cq-slider { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: #1B5FA8; }
+.cq-slider span { width: 56px; flex-shrink: 0; }
+.cq-slider input[type=range] { flex: 1; min-width: 0; height: 30px; accent-color: #1B5FA8; }
+.cq-slider b { width: 48px; text-align: right; color: #1B2733; font-size: 12.5px; }
+.cq-props button { flex: 0 0 auto; }
+.cq-pad { left: auto; right: 10px; width: 124px; height: 124px; }
+.cq-pad { bottom: 46px; }

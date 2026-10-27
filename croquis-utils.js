@@ -579,7 +579,51 @@ ${ley}
 }
 // PNG (Blob) a partir del SVG. ancho: px del lado más largo.
 async function croquisPng(dibujo, ancho) {
-  if ((dibujo.elementos || []).some((e) => e.tipo === "logo_sat")) await croquisCargarLogo();
+  if ((dibujo.elementos || []).some((e) => e.tipo === "logo_sat")) await // Tramos de pared: bordes de habitaciones rectangulares y paredes rectas.
+function croquisTramosPared(elementos, excluir) {
+  const tramos = [];
+  elementos.forEach((e) => {
+    if (e === excluir) return;
+    if (e.t === "rect" && !e.forma) tramos.push([e.x, e.y, e.x + e.w, e.y], [e.x, e.y + e.h, e.x + e.w, e.y + e.h], [e.x, e.y, e.x, e.y + e.h], [e.x + e.w, e.y, e.x + e.w, e.y + e.h]);
+    if (e.t === "linea" && !e.c) tramos.push([e.x1, e.y1, e.x2, e.y2]);
+  });
+  return tramos;
+}
+// "Imán": una puerta, ventana o portón cerca de una pared se apoya
+// encima de ella y toma su dirección. Devuelve true si se movió.
+function croquisApoyarEnPared(e, elementos, distancia) {
+  let mejor = null;
+  croquisTramosPared(elementos, e).forEach(([x1, y1, x2, y2]) => {
+    const dx = x2 - x1, dy = y2 - y1, l2 = dx * dx + dy * dy;
+    if (!l2) return;
+    const t = Math.max(0, Math.min(1, ((e.x - x1) * dx + (e.y - y1) * dy) / l2));
+    const px = x1 + t * dx, py = y1 + t * dy, d = Math.hypot(e.x - px, e.y - py);
+    if (!mejor || d < mejor.d) mejor = { d, px, py, horizontal: Math.abs(dx) >= Math.abs(dy) };
+  });
+  if (!mejor || mejor.d > distancia) return false;
+  if (mejor.horizontal) e.y = Math.round(mejor.py); else e.x = Math.round(mejor.px);
+  const quiere = mejor.horizontal ? [0, 180] : [90, 270];
+  if (!quiere.includes(((e.rot || 0) % 360 + 360) % 360)) e.rot = quiere[0];
+  return true;
+}
+// "Imán" de esquinas: el vértice de un sensor (infrarrojo) cerca de una
+// esquina de habitación o de pared se apoya justo en la esquina.
+function croquisApoyarEnEsquina(e, elementos, distancia) {
+  let mejor = null;
+  const prueba = (x, y) => { const d = Math.hypot(e.x - x, e.y - y); if (d <= distancia && (!mejor || d < mejor.d)) mejor = { d, x, y }; };
+  elementos.forEach((o) => {
+    if (o === e) return;
+    if (o.t === "rect" && !o.forma) { prueba(o.x, o.y); prueba(o.x + o.w, o.y); prueba(o.x, o.y + o.h); prueba(o.x + o.w, o.y + o.h); }
+    if (o.t === "linea") { prueba(o.x1, o.y1); prueba(o.x2, o.y2); }
+  });
+  if (!mejor) return false;
+  e.x = mejor.x; e.y = mejor.y;
+  return true;
+}
+// Medidas: la grilla es de 20 unidades = 50 cm (1 m = 40 unidades).
+const CROQUIS_POR_METRO = 40;
+
+croquisCargarLogo();
   return new Promise((ok, mal) => {
     const svg = croquisSvgDocumento(dibujo);
     const img = new Image();
@@ -770,29 +814,52 @@ function croquisOrdenar(elementos, tolerancia) {
       if (e.x1 === e.x2) { e.x1 = e.x2 = fx(e.x1); } else if (e.y1 === e.y2) { e.y1 = e.y2 = fy(e.y1); }
     }
   });
-  // Tramos de pared (bordes de habitaciones y paredes sueltas)
+  elementos.forEach((e) => { if (e.t === "simbolo" && CROQUIS_ABERTURAS.includes(e.tipo)) croquisApoyarEnPared(e, elementos, tol * 2.5); });
+  return elementos;
+}
+
+// Tramos de pared: bordes de habitaciones rectangulares y paredes rectas.
+function croquisTramosPared(elementos, excluir) {
   const tramos = [];
   elementos.forEach((e) => {
+    if (e === excluir) return;
     if (e.t === "rect" && !e.forma) tramos.push([e.x, e.y, e.x + e.w, e.y], [e.x, e.y + e.h, e.x + e.w, e.y + e.h], [e.x, e.y, e.x, e.y + e.h], [e.x + e.w, e.y, e.x + e.w, e.y + e.h]);
     if (e.t === "linea" && !e.c) tramos.push([e.x1, e.y1, e.x2, e.y2]);
   });
-  elementos.forEach((e) => {
-    if (e.t !== "simbolo" || !CROQUIS_ABERTURAS.includes(e.tipo)) return;
-    let mejor = null;
-    tramos.forEach(([x1, y1, x2, y2]) => {
-      const dx = x2 - x1, dy = y2 - y1, l2 = dx * dx + dy * dy;
-      if (!l2) return;
-      const t = Math.max(0, Math.min(1, ((e.x - x1) * dx + (e.y - y1) * dy) / l2));
-      const px = x1 + t * dx, py = y1 + t * dy, d = Math.hypot(e.x - px, e.y - py);
-      if (!mejor || d < mejor.d) mejor = { d, px, py, horizontal: Math.abs(dx) >= Math.abs(dy) };
-    });
-    if (!mejor || mejor.d > tol * 2.5) return;
-    e.x = Math.round(mejor.px / 10) * 10;
-    e.y = Math.round(mejor.py / 10) * 10;
-    const quiere = mejor.horizontal ? [0, 180] : [90, 270];
-    if (!quiere.includes(((e.rot || 0) % 360 + 360) % 360)) e.rot = quiere[0];
-  });
-  return elementos;
+  return tramos;
 }
+// "Imán": una puerta, ventana o portón cerca de una pared se apoya
+// encima de ella y toma su dirección. Devuelve true si se movió.
+function croquisApoyarEnPared(e, elementos, distancia) {
+  let mejor = null;
+  croquisTramosPared(elementos, e).forEach(([x1, y1, x2, y2]) => {
+    const dx = x2 - x1, dy = y2 - y1, l2 = dx * dx + dy * dy;
+    if (!l2) return;
+    const t = Math.max(0, Math.min(1, ((e.x - x1) * dx + (e.y - y1) * dy) / l2));
+    const px = x1 + t * dx, py = y1 + t * dy, d = Math.hypot(e.x - px, e.y - py);
+    if (!mejor || d < mejor.d) mejor = { d, px, py, horizontal: Math.abs(dx) >= Math.abs(dy) };
+  });
+  if (!mejor || mejor.d > distancia) return false;
+  if (mejor.horizontal) e.y = Math.round(mejor.py); else e.x = Math.round(mejor.px);
+  const quiere = mejor.horizontal ? [0, 180] : [90, 270];
+  if (!quiere.includes(((e.rot || 0) % 360 + 360) % 360)) e.rot = quiere[0];
+  return true;
+}
+// "Imán" de esquinas: el vértice de un sensor (infrarrojo) cerca de una
+// esquina de habitación o de pared se apoya justo en la esquina.
+function croquisApoyarEnEsquina(e, elementos, distancia) {
+  let mejor = null;
+  const prueba = (x, y) => { const d = Math.hypot(e.x - x, e.y - y); if (d <= distancia && (!mejor || d < mejor.d)) mejor = { d, x, y }; };
+  elementos.forEach((o) => {
+    if (o === e) return;
+    if (o.t === "rect" && !o.forma) { prueba(o.x, o.y); prueba(o.x + o.w, o.y); prueba(o.x, o.y + o.h); prueba(o.x + o.w, o.y + o.h); }
+    if (o.t === "linea") { prueba(o.x1, o.y1); prueba(o.x2, o.y2); }
+  });
+  if (!mejor) return false;
+  e.x = mejor.x; e.y = mejor.y;
+  return true;
+}
+// Medidas: la grilla es de 20 unidades = 50 cm (1 m = 40 unidades).
+const CROQUIS_POR_METRO = 40;
 
 croquisCargarLogo();
