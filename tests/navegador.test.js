@@ -2148,7 +2148,7 @@ test("Croquis: cables con color y trazo, equipos de color, cámaras/DVR y objeto
   // Objetos de obra: la paleta muestra solo esos
   await page.click('[data-herr="objetos"]');
   const objetos = await page.$$eval("#cqSimbolos [data-simbolo]", (bs) => bs.map((b) => b.dataset.simbolo));
-  assert.deepStrictEqual(objetos, ["puerta", "ventana", "corrediza", "columna", "columna_redonda", "porton_batiente", "porton_corredizo", "piscina", "planta"]);
+  assert.deepStrictEqual(objetos, ["puerta", "ventana", "corrediza", "columna", "columna_redonda", "porton_batiente", "porton_corredizo", "escalera_recta", "escalera_l_izq", "escalera_l_der", "escalera_u", "escalera_caracol", "piscina", "planta"]);
   await page.click('[data-simbolo="puerta"]');
   await clic(100, 100);
   await page.click('[data-acc="espejo"]');

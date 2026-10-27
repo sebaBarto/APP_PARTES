@@ -83,6 +83,35 @@ const CROQUIS_SIMBOLOS = {
       [-36, -20, -4, 12, 28].map((x) => `<line x1="${x}" y1="-11" x2="${x + 8}" y2="-5" stroke="${c}" stroke-width="1"/>`).join("") +
       `<line x1="54" y1="-8" x2="148" y2="-8" stroke="${c}" stroke-width="1.4" stroke-dasharray="5 4"/><path d="M60 -17 L84 -17 M78 -21 L84 -17 L78 -13" fill="none" stroke="${c}" stroke-width="1.4"/>`,
   },
+  escalera_recta: {
+    nombre: "Escalera recta", cat: "obra", color: "#1C1E21", r: 72, espejable: true,
+    dib: (c, e) => `<rect x="-20" y="-60" width="40" height="120" fill="#FFFFFF" stroke="${c}" stroke-width="2"/>` + croquisEscalones(c, "h", -20, 20, -50, 50) + croquisFlecha(c, [[0, 54], [0, -54]], false, e),
+  },
+  escalera_l_izq: {
+    nombre: "Escalera con descanso (izq.)", cat: "obra", color: "#1C1E21", r: 96, espejable: true,
+    dib: (c, e) => croquisEscaleraL(c, -1, e),
+  },
+  escalera_l_der: {
+    nombre: "Escalera con descanso (der.)", cat: "obra", color: "#1C1E21", r: 96, espejable: true,
+    dib: (c, e) => croquisEscaleraL(c, 1, e),
+  },
+  escalera_u: {
+    nombre: "Escalera en U", cat: "obra", color: "#1C1E21", r: 86, espejable: true,
+    dib: (c, e) => `<g transform="translate(0 -10)"><rect x="-46" y="-60" width="92" height="40" fill="#FFFFFF" stroke="${c}" stroke-width="2"/><rect x="-46" y="-20" width="40" height="100" fill="#FFFFFF" stroke="${c}" stroke-width="2"/><rect x="6" y="-20" width="40" height="100" fill="#FFFFFF" stroke="${c}" stroke-width="2"/>` +
+      croquisEscalones(c, "h", -46, -6, -10, 70) + croquisEscalones(c, "h", 6, 46, -10, 70) + croquisFlecha(c, [[-26, 74], [-26, -40], [26, -40], [26, 72]], false, e) + `</g>`,
+  },
+  escalera_caracol: {
+    nombre: "Escalera caracol", cat: "obra", color: "#1C1E21", r: 48, espejable: true,
+    dib: (c, e) => {
+      let out = `<circle cx="0" cy="0" r="42" fill="#FFFFFF" stroke="${c}" stroke-width="2"/>`;
+      for (let i = 0; i < 12; i++) { const a = (i * 30 + 90) * Math.PI / 180; out += `<line x1="${(Math.cos(a) * 6).toFixed(1)}" y1="${(Math.sin(a) * 6).toFixed(1)}" x2="${(Math.cos(a) * 42).toFixed(1)}" y2="${(Math.sin(a) * 42).toFixed(1)}" stroke="${c}" stroke-width="1"/>`; }
+      out += `<circle cx="0" cy="0" r="6" fill="${c}"/>`;
+      // Flecha en arco: sube girando en sentido horario desde abajo
+      const pts = [];
+      for (let g = 90; g >= -200; g -= 10) { const a = g * Math.PI / 180; pts.push([+(Math.cos(a) * 26).toFixed(1), +(Math.sin(a) * 26).toFixed(1)]); }
+      return out + croquisFlecha(c, pts, true, e);
+    },
+  },
   piscina: {
     nombre: "Piscina", cat: "obra", color: "#2E86DE", r: 50,
     dib: (c) => `<rect x="-45" y="-26" width="90" height="52" rx="10" fill="#D6ECFA" stroke="${c}" stroke-width="2.4"/><rect x="-38" y="-19" width="76" height="38" rx="6" fill="none" stroke="${c}" stroke-width="0.8" opacity="0.6"/>` +
@@ -93,6 +122,35 @@ const CROQUIS_SIMBOLOS = {
     dib: (c) => [0, 60, 120, 180, 240, 300].map((a) => { const r = a * Math.PI / 180; return `<circle cx="${(Math.cos(r) * 8).toFixed(1)}" cy="${(Math.sin(r) * 8).toFixed(1)}" r="7" fill="${c}" fill-opacity="0.35" stroke="${c}" stroke-width="1.2"/>`; }).join("") + `<circle cx="0" cy="0" r="4" fill="${c}"/>`,
   },
 };
+// Escalones: líneas cada 10 unidades. "h": líneas horizontales entre x0-x1,
+// de y0 a y1; "v": verticales entre y0-y1, de x0 a x1.
+function croquisEscalones(c, dir, a0, a1, b0, b1) {
+  let out = "";
+  const desde = Math.min(b0, b1), hasta = Math.max(b0, b1);
+  for (let b = desde; b <= hasta + 0.01; b += 10) {
+    out += dir === "h" ? `<line x1="${a0}" y1="${b}" x2="${a1}" y2="${b}" stroke="${c}" stroke-width="1"/>` : `<line x1="${b}" y1="${a0}" x2="${b}" y2="${a1}" stroke="${c}" stroke-width="1"/>`;
+  }
+  return out;
+}
+// Flecha de subida: arranca con un puntito y "SUBE", termina en punta.
+function croquisFlecha(c, pts, curva, espejado) {
+  const d = curva ? croquisPathSuave(pts) : "M" + pts.map((p) => p.join(" ")).join(" L");
+  const [a, b] = [pts[pts.length - 2], pts[pts.length - 1]];
+  const ang = Math.atan2(b[1] - a[1], b[0] - a[0]), L = 7;
+  const p1 = [b[0] - L * Math.cos(ang - 0.45), b[1] - L * Math.sin(ang - 0.45)], p2 = [b[0] - L * Math.cos(ang + 0.45), b[1] - L * Math.sin(ang + 0.45)];
+  const ini = pts[0];
+  return `<path d="${d}" fill="none" stroke="${c}" stroke-width="1.4"/><path d="M${p1[0].toFixed(1)} ${p1[1].toFixed(1)} L${b[0]} ${b[1]} L${p2[0].toFixed(1)} ${p2[1].toFixed(1)}" fill="none" stroke="${c}" stroke-width="1.4" stroke-linejoin="round"/><circle cx="${ini[0]}" cy="${ini[1]}" r="2.4" fill="${c}"/><text ${espejado ? `transform="translate(${ini[0]} 0) scale(-1 1) translate(${-ini[0]} 0)" ` : ""}x="${ini[0] + 5}" y="${ini[1] + 3}" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="7" fill="${c}">SUBE</text>`;
+}
+// Escalera con descanso y giro (lado: -1 izquierda, 1 derecha), centrada.
+function croquisEscaleraL(c, lado, espejado) {
+  const xs = (x) => x * lado;
+  const r = (x, y, w, h) => `<rect x="${Math.min(xs(x), xs(x + w))}" y="${y}" width="${w}" height="${h}" fill="#FFFFFF" stroke="${c}" stroke-width="2"/>`;
+  let out = r(-20, -20, 40, 100) + r(-20, -60, 40, 40) + r(20, -60, 80, 40);
+  out += croquisEscalones(c, "h", -20, 20, -10, 70);
+  for (let x = 30; x <= 90; x += 10) out += `<line x1="${xs(x)}" y1="-60" x2="${xs(x)}" y2="-20" stroke="${c}" stroke-width="1"/>`;
+  out += croquisFlecha(c, [[0, 74], [0, -40], [xs(94), -40]], false, espejado);
+  return `<g transform="translate(${-40 * lado} -10)">${out}</g>`;
+}
 // Formas de las habitaciones.
 const CROQUIS_FORMAS = {
   rect: { nombre: "Rectángulo", icono: '<rect x="4" y="6" width="24" height="18" fill="none" stroke="currentColor" stroke-width="2.6"/>' },
@@ -234,7 +292,7 @@ function croquisSvgElemento(el, attrs) {
     const s = CROQUIS_SIMBOLOS[el.tipo];
     if (!s) return "";
     const esc = el.esc || 1;
-    return `<g ${a} transform="translate(${el.x} ${el.y}) rotate(${el.rot || 0}) scale(${el.esp ? -esc : esc} ${esc})">${s.dib(el.color || s.color)}</g>`;
+    return `<g ${a} transform="translate(${el.x} ${el.y}) rotate(${el.rot || 0}) scale(${el.esp ? -esc : esc} ${esc})">${s.dib(el.color || s.color, !!el.esp)}</g>`;
   }
   return "";
 }
