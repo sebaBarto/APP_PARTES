@@ -263,6 +263,12 @@
           </span>
           <span class="panel-tile-label">Presupuesto express</span>
         </button>
+        <button type="button" class="panel-tile panel-tile-grid tile-croquis hidden" id="tileCroquisBtn">
+          <span class="panel-tile-icon-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18v16H3z"/><path d="M3 12h7v8"/><path d="M14 4v6h7"/><path d="M13 16c1.5-2 3.5-2 5 0"/></svg>
+          </span>
+          <span class="panel-tile-label">Croquis</span>
+        </button>
         <a href="admin.html" target="_blank" rel="noopener" class="panel-tile panel-tile-grid tile-admin hidden" id="abrirAdminBtn">
           <span class="panel-tile-icon-badge">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>
@@ -1712,6 +1718,48 @@
     </div>
   </section>
 
+  <!-- CROQUIS: lista -->
+  <section class="screen" id="screen-croquis-lista">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">CROQUIS</p>
+      <p class="pe-nota" style="margin-top:0;">Bocetos rápidos de planos hechos desde el celular: habitaciones, paredes, cableado y los equipos (central, teclado, magnéticos, infrarrojos).</p>
+      <button type="button" class="btn btn-primary" id="cqNuevoBtn" style="width:100%; margin-bottom:14px;">+ Nuevo croquis</button>
+      <input class="field-input" type="search" id="cqListaBuscar" placeholder="Buscar por cliente, título o dirección" autocomplete="off">
+      <p class="list-status" id="cqListaEstado">Cargando...</p>
+      <div id="cqLista" class="historial-list"></div>
+    </div>
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDeCroquisListaBtn" type="button">Volver</button>
+    </div>
+  </section>
+
+  <!-- CROQUIS: editor -->
+  <section class="screen" id="screen-croquis">
+    <p class="hint-eyebrow review-eyebrow cq-oculto">CROQUIS</p>
+    <div class="cq-cab">
+      <button type="button" class="link-btn" id="volverDeCroquisBtn">‹ Volver</button>
+      <button type="button" class="cq-titulo" id="cqTituloBtn"><b id="cqTitulo">Croquis nuevo</b><span id="cqSubtitulo">Tocá para poner cliente y título</span></button>
+      <button type="button" class="cq-ico" id="cqDeshacerBtn" title="Deshacer" aria-label="Deshacer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg></button>
+      <button type="button" class="cq-ico" id="cqRehacerBtn" title="Rehacer" aria-label="Rehacer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></svg></button>
+      <button type="button" class="cq-ico" id="cqMenuBtn" title="Guardar y descargar" aria-label="Guardar y descargar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h11l3 3v15H5z"/><path d="M8 3v6h8V3"/><path d="M8 21v-6h8v6"/></svg></button>
+    </div>
+    <div class="cq-lienzo" id="cqLienzo">
+      <svg id="cqSvg" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="cq-zoom"><button type="button" id="cqZoomMas" aria-label="Acercar">+</button><button type="button" id="cqZoomMenos" aria-label="Alejar">−</button><button type="button" id="cqCentrar" aria-label="Ver todo">⤢</button></div>
+      <p class="cq-ayuda" id="cqAyuda"></p>
+    </div>
+    <div class="cq-props hidden" id="cqProps"></div>
+    <div class="cq-simbolos hidden" id="cqSimbolos"></div>
+    <div class="cq-herr" id="cqHerr">
+      <button type="button" data-herr="mover" class="activo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m4 4 7 17 2.5-7.5L21 11z"/></svg><span>Mover</span></button>
+      <button type="button" data-herr="rect"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="4" y="5" width="16" height="14"/></svg><span>Habitación</span></button>
+      <button type="button" data-herr="linea"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="square"><path d="M4 20 20 4"/></svg><span>Pared</span></button>
+      <button type="button" data-herr="cable"><svg viewBox="0 0 24 24" fill="none" stroke="#D6336C" stroke-width="2.2" stroke-dasharray="4 3" stroke-linecap="round"><path d="M3 17c4-10 8 4 12-4s4-6 6-6"/></svg><span>Cable</span></button>
+      <button type="button" data-herr="texto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></svg><span>Texto</span></button>
+      <button type="button" data-herr="simbolos"><svg viewBox="0 0 24 24" fill="none" stroke="#E8741E" stroke-width="2" stroke-linejoin="round"><path d="M12 15 4 5a12 12 0 0 1 16 0z" fill="#E8741E" fill-opacity="0.25"/><circle cx="12" cy="16.5" r="2.6" fill="#fff"/></svg><span>Equipos</span></button>
+    </div>
+  </section>
+
   <!-- CREDENCIAL DIGITAL -->
   <section class="screen" id="screen-credencial">
     <div class="review-scroll">
@@ -2630,6 +2678,7 @@
 </div>
 
 <script src="sims-utils.js"></script>
+<script src="croquis-utils.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

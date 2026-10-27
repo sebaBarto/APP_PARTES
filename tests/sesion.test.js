@@ -280,3 +280,64 @@ test("Presupuesto express: la lista de precios la carga solo la oficina y los n�
     global.fetch = fetchViejo;
   }
 });
+
+test("Croquis: solo con permiso; se guardan con un índice, se reabren, y los borra el autor o la oficina", async () => {
+  const fetchViejo = global.fetch;
+  const archivos = {};
+  global.fetch = async (url, op = {}) => {
+    const u = String(url);
+    const ruta = (u.match(/contents\/([^?]+)/) || [])[1];
+    if (ruta === "tecnicos.json") return new Response(JSON.stringify({ content: Buffer.from(JSON.stringify([{ nombre: "Juan", permisos: { croquis: true } }, { nombre: "Ana", permisos: { croquis: true } }, { nombre: "Luis", permisos: {} }])).toString("base64"), encoding: "base64", sha: "t" }));
+    if (ruta) {
+      if (op.method === "PUT") { archivos[ruta] = JSON.parse(Buffer.from(JSON.parse(op.body).content, "base64").toString("utf-8")); return new Response("{}", { status: 200 }); }
+      if (op.method === "DELETE") { delete archivos[ruta]; return new Response("{}", { status: 200 }); }
+      if (!archivos[ruta]) return new Response("{}", { status: 404 });
+      return new Response(JSON.stringify({ sha: "s", encoding: "base64", content: Buffer.from(JSON.stringify(archivos[ruta])).toString("base64") }));
+    }
+    return new Response("[]");
+  };
+  try {
+    const admin = crearSesion({ nombre: "Oficina", rol: "admin" });
+    const juan = crearSesion({ nombre: "Juan", rol: "tecnico" });
+    const ana = crearSesion({ nombre: "Ana", rol: "tecnico" });
+    const luis = crearSesion({ nombre: "Luis", rol: "tecnico" });
+    const dibujo = { v: 1, elementos: [{ id: "a1", t: "rect", x: 0, y: 0, w: 100, h: 80 }, { id: "a2", t: "simbolo", tipo: "central", x: 20, y: 20, rot: 0, esc: 1 }] };
+    let r = resFalso();
+    await datos(pedido("POST", { coleccion: "croquis" }, { accion: "guardar", titulo: "PB", cliente: "Tell", dibujo }, luis), r);
+    assert.strictEqual(r.statusCode, 403, "sin permiso no guarda");
+    r = resFalso();
+    await datos(pedido("GET", { coleccion: "croquis" }, null, luis), r);
+    assert.strictEqual(r.statusCode, 403, "sin permiso no ve la lista");
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "croquis" }, { accion: "guardar", titulo: "PB", cliente: "Tell", numero_cliente: "60", dibujo }, juan), r);
+    assert.ok(r.cuerpo.ok && /^[a-z0-9]{6,32}$/.test(r.cuerpo.id));
+    const id = r.cuerpo.id;
+    // Se vuelve a guardar el mismo: no se duplica en el índice y conserva el autor
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "croquis" }, { accion: "guardar", id, titulo: "Planta baja", cliente: "Tell", dibujo: { v: 1, elementos: [...dibujo.elementos, { id: "a3", t: "texto", x: 5, y: 5, texto: "Cocina" }] } }, ana), r);
+    assert.strictEqual(r.cuerpo.id, id);
+    r = resFalso();
+    await datos(pedido("GET", { coleccion: "croquis" }, null, ana), r);
+    assert.strictEqual(r.cuerpo.length, 1);
+    assert.strictEqual(r.cuerpo[0].titulo, "Planta baja");
+    assert.strictEqual(r.cuerpo[0].autor, "Juan");
+    assert.strictEqual(r.cuerpo[0].elementos, 3);
+    assert.ok(!r.cuerpo[0].dibujo, "el índice no trae los trazos");
+    r = resFalso();
+    await datos(pedido("GET", { coleccion: "croquis", id }, null, juan), r);
+    assert.strictEqual(r.cuerpo.dibujo.elementos.length, 3);
+    // Ana no es la autora: no lo puede borrar; la oficina sí
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "croquis" }, { accion: "borrar", id }, ana), r);
+    assert.strictEqual(r.statusCode, 403);
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "croquis" }, { accion: "borrar", id }, admin), r);
+    assert.ok(r.cuerpo.ok);
+    assert.ok(!archivos[`croquis/${id}.json`]);
+    r = resFalso();
+    await datos(pedido("GET", { coleccion: "croquis" }, null, juan), r);
+    assert.deepStrictEqual(r.cuerpo, []);
+  } finally {
+    global.fetch = fetchViejo;
+  }
+});

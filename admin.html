@@ -1265,6 +1265,18 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
         <p class="status" id="planosAdminStatus"></p>
         <div id="planosAdminResultados"></div>
       </div>
+
+      <div class="card sin-cambios" style="margin-top:16px;" id="croquisAdminCard">
+        <label>Croquis hechos con la APP</label>
+        <p class="subtitle" style="margin:0 0 10px;">
+          Bocetos dibujados desde el celular por los usuarios con el permiso "Croquis". Son aparte
+          de los planos oficiales de arriba: estos se pueden descargar (PDF, imagen o SVG, que se
+          abre y edita en Visio) y borrar.
+        </p>
+        <input type="text" id="croquisAdminBuscar" placeholder="Buscar por cliente, título, dirección o autor" autocomplete="off" style="margin-bottom:10px;">
+        <p class="status" id="croquisAdminEstado"></p>
+        <div id="croquisAdminLista"></div>
+      </div>
     </div>
 
     <div id="panelInstalaciones" class="hidden">
@@ -1551,6 +1563,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
 </div>
 
 <script src="sims-utils.js"></script>
+<script src="croquis-utils.js"></script>
 <script>
 // ==== CONFIGURACIÓN ====
 // Pase de la sesión de oficina: lo entrega el servidor al entrar con la
@@ -1793,7 +1806,7 @@ const TABS = [
   { btn: tabHerramientasBtn, panel: panelHerramientas, onShow: () => recargarSiNoHayCambios(panelHerramientas, cargarHerramientasAdmin) },
   { btn: tabSimsInstaladasBtn, panel: panelSimsInstaladas, onShow: () => cargarSimsInstaladasAdmin() },
   { btn: tabSimsControlBtn, panel: panelSimsControl, onShow: () => cargarControlSims() },
-  { btn: tabPlanosBtn, panel: panelPlanos, onShow: () => { consultarEstadoSincronizacionPlanos(); cargarPlanosAdmin(); } },
+  { btn: tabPlanosBtn, panel: panelPlanos, onShow: () => { consultarEstadoSincronizacionPlanos(); cargarPlanosAdmin(); cargarCroquisAdmin(); } },
   { btn: tabInstalacionesBtn, panel: panelInstalaciones, onShow: () => cargarInstalacionesAdmin() },
   { btn: tabEncuestasBtn, panel: panelEncuestas, onShow: () => cargarEncuestasAdmin() },
   { btn: tabComodatosBtn, panel: panelComodatos, onShow: () => cargarComodatosAdmin() },
@@ -2021,6 +2034,7 @@ const PERMISOS_TECNICO = [
   { clave: "comodato", etiqueta: "Sección Comodato" },
   { clave: "agendar_emergencia", etiqueta: "Agendar servicios de emergencia (fuera de horario)" },
   { clave: "presupuesto_express", etiqueta: "Presupuesto express (armar y enviar presupuestos rápidos)" },
+  { clave: "croquis", etiqueta: "Croquis (dibujar bocetos de planos desde el celular)" },
   { clave: "admin", etiqueta: "Panel de Administración" },
 ];
 
@@ -8118,6 +8132,58 @@ cronoUploadBtn.addEventListener("click", async () => {
     cronoUploadBtn.disabled = false;
   }
 });
+
+// ---------- Croquis hechos con la APP ----------
+let croquisAdminIndice = [];
+async function cargarCroquisAdmin() {
+  const est = document.getElementById("croquisAdminEstado");
+  est.textContent = "Cargando...";
+  try {
+    const r = await fetch("/api/datos?coleccion=croquis", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "HTTP " + r.status);
+    croquisAdminIndice = Array.isArray(d) ? d : [];
+    est.textContent = croquisAdminIndice.length ? "" : "Todavía no hay croquis.";
+  } catch (err) { est.textContent = "No se pudo cargar: " + err.message; }
+  renderCroquisAdmin();
+}
+function renderCroquisAdmin() {
+  const caja = document.getElementById("croquisAdminLista");
+  const pal = normalizeText(document.getElementById("croquisAdminBuscar").value.trim()).split(/\s+/).filter(Boolean);
+  const lista = croquisAdminIndice.filter((c) => { const t = normalizeText([c.titulo, c.cliente, c.numero_cliente, c.direccion, c.autor].join(" ")); return pal.every((w) => t.includes(w)); });
+  caja.innerHTML = lista.map((c, i) => {
+    const f = fechaDelServidor(c.actualizado);
+    return `<div class="croquis-admin-fila" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(128,128,128,.25);">
+      <div style="min-width:200px;flex:1;"><b>${escapeHtmlAdmin(c.titulo || "Croquis")}</b><br><span style="font-size:13px;opacity:.8;">${escapeHtmlAdmin(c.cliente || "Sin cliente")}${c.numero_cliente ? " · N° " + escapeHtmlAdmin(c.numero_cliente) : ""}${c.direccion ? " · " + escapeHtmlAdmin(c.direccion) : ""}</span><br><span style="font-size:12px;opacity:.65;">${escapeHtmlAdmin(c.autor || "")}${f ? " · " + f.toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : ""} · ${Number(c.elementos) || 0} elementos</span></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;"><button type="button" class="btn-secondary" data-cq="pdf" data-i="${i}">PDF</button><button type="button" class="btn-secondary" data-cq="png" data-i="${i}">Imagen</button><button type="button" class="btn-secondary" data-cq="svg" data-i="${i}" title="Se abre y edita en Visio">SVG (Visio)</button><button type="button" class="btn-secondary" data-cq="borrar" data-i="${i}" style="color:#C0392B;">Borrar</button></div>
+    </div>`;
+  }).join("") || (croquisAdminIndice.length ? '<p class="status">Ninguno coincide.</p>' : "");
+  caja.querySelectorAll("[data-cq]").forEach((b) => b.addEventListener("click", async () => {
+    const c = lista[Number(b.dataset.i)], acc = b.dataset.cq;
+    try {
+      if (acc === "borrar") {
+        if (!confirm(`¿Borrar el croquis "${c.titulo || c.cliente}"? No se puede deshacer.`)) return;
+        const r = await fetch("/api/datos?coleccion=croquis", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ accion: "borrar", id: c.id }) });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.error || "HTTP " + r.status);
+        croquisAdminIndice = croquisAdminIndice.filter((x) => x.id !== c.id);
+        renderCroquisAdmin();
+        return;
+      }
+      b.disabled = true;
+      const r = await fetch(`/api/datos?coleccion=croquis&id=${encodeURIComponent(c.id)}`, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "HTTP " + r.status);
+      let blob;
+      if (acc === "pdf") blob = new Blob([await croquisPdf(d)], { type: "application/pdf" });
+      if (acc === "png") blob = await croquisPng(d.dibujo, 2400);
+      if (acc === "svg") blob = new Blob([croquisSvgDocumento(d.dibujo)], { type: "image/svg+xml" });
+      croquisDescargar(blob, croquisNombreArchivo(d, acc));
+    } catch (err) { alert("No se pudo: " + err.message); }
+    finally { b.disabled = false; }
+  }));
+}
+document.getElementById("croquisAdminBuscar").addEventListener("input", renderCroquisAdmin);
 </script>
 </body>
 </html>

@@ -2026,3 +2026,106 @@ test("Presupuesto express: cliente del listado, artículos (en pesos y en dólar
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Croquis: habitaciones, pared, equipos rotados, cableado y texto; se guarda ligado al cliente y se descarga en PDF/PNG/SVG", async () => {
+  const ctx = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 844 } });
+  const page = await ctx.newPage();
+  const erroresPagina = [];
+  page.on("pageerror", (e) => erroresPagina.push(e.message));
+  await page.addInitScript(() => { localStorage.setItem("ajustes_app", JSON.stringify({ estiloInicio: "nuevo" })); localStorage.setItem("skin_v4_aplicado", "1"); });
+  const guardados = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(); const u = req.url();
+    const j = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("coleccion=croquis")) {
+      if (req.method() === "POST") { const b = JSON.parse(req.postData()); guardados.push(b); return j({ ok: true, id: "cq0001abc", actualizado: "2026-10-26T15:00:00.000Z" }); }
+      if (u.includes("id=cq0001abc")) return j({ ...guardados[guardados.length - 1], id: "cq0001abc", autor: "Juan", actualizado: "2026-10-26T15:00:00.000Z" });
+      return j(guardados.length ? [{ id: "cq0001abc", titulo: guardados[0].titulo, cliente: guardados[0].cliente, numero_cliente: guardados[0].numero_cliente, autor: "", actualizado: "2026-10-26T15:00:00.000Z", elementos: 3 }] : []);
+    }
+    if (u.includes("coleccion=clientes")) return j([{ nombre: "Tell Cecilia", numero_cliente: "60", direccion: "Albarracín 8122" }]);
+    j([]);
+  });
+  await page.goto(base + "/");
+  await page.waitForTimeout(400);
+  await page.evaluate(() => {
+    tecnicoLogueado = ""; actualizarAccesoSeccionesPanel();
+    window.__archivos = [];
+    navigator.canShare = () => true;
+    navigator.share = async (d) => { const f = d.files[0]; window.__archivos.push({ nombre: f.name, tipo: f.type, inicio: new TextDecoder().decode((await f.arrayBuffer()).slice(0, 5)) }); };
+    window.confirm = () => true;
+    localStorage.removeItem("croquis_borrador");
+  });
+  assert.strictEqual(await page.evaluate(() => document.getElementById("tileCroquisBtn").classList.contains("hidden")), false, "con permiso se ve el mosaico");
+  await page.evaluate(() => document.getElementById("tileCroquisBtn").click());
+  await page.waitForTimeout(300);
+  assert.match(await page.textContent("#cqLista"), /Todavía no hay croquis/);
+  await page.click("#cqNuevoBtn");
+  await page.waitForTimeout(300);
+  const caja = await page.locator("#cqSvg").boundingBox();
+  const arrastrar = async (a, b) => { await page.mouse.move(caja.x + a[0], caja.y + a[1]); await page.mouse.down(); for (let i = 1; i <= 8; i++) await page.mouse.move(caja.x + a[0] + (b[0] - a[0]) * i / 8, caja.y + a[1] + (b[1] - a[1]) * i / 8); await page.mouse.up(); };
+  // Arranca con la herramienta Habitación
+  await arrastrar([40, 40], [240, 220]);
+  await page.click('[data-herr="linea"]');
+  await arrastrar([240, 40], [243, 220]); // casi vertical: se endereza
+  await page.click('[data-herr="simbolos"]');
+  await page.click('[data-simbolo="infrarrojo"]');
+  await page.mouse.click(caja.x + 200, caja.y + 180);
+  await page.click('[data-acc="rot90"]');
+  await page.click('[data-acc="rot+"]');
+  await page.click('[data-herr="cable"]');
+  await arrastrar([60, 60], [200, 170]);
+  await page.evaluate(() => { window.prompt = () => "Cocina"; });
+  await page.click('[data-herr="texto"]');
+  await page.mouse.click(caja.x + 120, caja.y + 120);
+  const els = await page.evaluate(() => cq.elementos);
+  assert.deepStrictEqual(els.map((e) => e.t), ["rect", "linea", "simbolo", "cable", "texto"]);
+  assert.deepStrictEqual([els[0].w, els[0].h], [200, 180]);
+  assert.strictEqual(els[1].x1, els[1].x2, "la pared quedó vertical");
+  assert.strictEqual(els[2].rot, 105);
+  assert.ok(els[3].pts.length >= 2);
+  // Deshacer y rehacer
+  await page.click("#cqDeshacerBtn");
+  assert.strictEqual(await page.evaluate(() => cq.elementos.length), 4);
+  await page.click("#cqRehacerBtn");
+  assert.strictEqual(await page.evaluate(() => cq.elementos.length), 5);
+  // Guardar: pide cliente y título (del listado)
+  await page.click("#cqMenuBtn");
+  await page.click('[data-m="guardar"]');
+  await page.fill("#cqDatoBuscar", "tell");
+  await page.waitForTimeout(200);
+  await page.click(".cq-datos .pe-res");
+  await page.fill("#cqDatoTitulo", "Planta baja");
+  await page.click('[data-r="si"]');
+  await page.waitForTimeout(300);
+  assert.strictEqual(guardados.length, 1);
+  assert.strictEqual(guardados[0].accion, "guardar");
+  assert.strictEqual(guardados[0].cliente, "Tell Cecilia");
+  assert.strictEqual(guardados[0].numero_cliente, "60");
+  assert.strictEqual(guardados[0].dibujo.elementos.length, 5);
+  assert.match(await page.textContent("#cqSubtitulo"), /Tell Cecilia · N° 60/);
+  // Descargas
+  await page.click("#cqMenuBtn");
+  await page.click('[data-m="pdf"]');
+  await page.waitForFunction(() => window.__archivos.length === 1, null, { timeout: 15000 });
+  await page.click("#cqMenuBtn");
+  await page.click('[data-m="png"]');
+  await page.waitForFunction(() => window.__archivos.length === 2, null, { timeout: 15000 });
+  const archivos = await page.evaluate(() => window.__archivos);
+  assert.deepStrictEqual(archivos.map((a) => [a.nombre, a.inicio.slice(0, 4)]), [["Croquis_Planta_baja_cli60.pdf", "%PDF"], ["Croquis_Planta_baja_cli60.png", "�PNG"]]);
+  const [descarga] = await Promise.all([page.waitForEvent("download"), (async () => { await page.click("#cqMenuBtn"); await page.click('[data-m="svg"]'); })()]);
+  assert.strictEqual(descarga.suggestedFilename(), "Croquis_Planta_baja_cli60.svg");
+  const svg = require("fs").readFileSync(await descarga.path(), "utf8");
+  assert.match(svg, /<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg"/);
+  assert.match(svg, /Infrarrojo/);
+  assert.match(svg, /Cocina/);
+  // Volver a la lista: aparece y se puede reabrir
+  await page.click("#volverDeCroquisBtn");
+  await page.waitForTimeout(300);
+  assert.match(await page.textContent("#cqLista"), /Planta baja/);
+  await page.click("[data-abrir]");
+  await page.waitForTimeout(300);
+  assert.strictEqual(await page.evaluate(() => cq.elementos.length), 5);
+  assert.strictEqual(await page.evaluate(() => cq.id), "cq0001abc");
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

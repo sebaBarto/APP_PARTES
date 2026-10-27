@@ -284,6 +284,93 @@ async function manejarPresupuestoExpress(req, res, autorizacion, body) {
   }
 }
 
+// ============================================================
+// CROQUIS: bocetos de planos hechos desde el celular. Un archivo por
+// croquis (croquis/<id>.json, con los trazos para seguir editándolo) y un
+// índice chico (croquis-index.json) para listarlos sin bajar todo.
+// ============================================================
+const RUTA_CROQUIS_INDICE = "croquis-index.json";
+async function manejarCroquis(req, res, autorizacion, body) {
+  const { GITHUB_DATA_TOKEN, GITHUB_DATA_REPO } = process.env;
+  if (!GITHUB_DATA_TOKEN || !GITHUB_DATA_REPO) { res.status(500).json({ error: "Faltan variables de entorno por configurar en Vercel" }); return; }
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+  const esAdmin = autorizacion.rol === "admin";
+  let puede = esAdmin;
+  if (!puede) {
+    const t = (await leerTecnicosGuardados()).find((x) => x.nombre === autorizacion.nombre);
+    puede = !!(t && t.permisos && t.permisos.croquis);
+  }
+  if (!puede) { res.status(403).json({ error: "No tenés habilitados los croquis" }); return; }
+  const txt = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
+  const idValido = (id) => /^[a-z0-9]{6,32}$/.test(String(id || ""));
+  try {
+    if (req.method === "GET") {
+      if (req.query.id) {
+        if (!idValido(req.query.id)) { res.status(400).json({ error: "Id inválido" }); return; }
+        const { data } = await leerArchivoDatos(`croquis/${req.query.id}.json`, null);
+        if (!data) { res.status(404).json({ error: "Ese croquis ya no existe" }); return; }
+        res.status(200).json(data);
+        return;
+      }
+      const { data } = await leerArchivoDatos(RUTA_CROQUIS_INDICE, []);
+      res.status(200).json(Array.isArray(data) ? data : []);
+      return;
+    }
+    if (req.method !== "POST") { res.status(405).json({ error: "Método no permitido" }); return; }
+    const b = body && typeof body === "object" ? body : {};
+    if (b.accion === "guardar") {
+      const id = b.id && idValido(b.id) ? b.id : (Date.now().toString(36) + require("crypto").randomBytes(4).toString("hex"));
+      const dibujo = b.dibujo && typeof b.dibujo === "object" ? b.dibujo : null;
+      if (!dibujo || !Array.isArray(dibujo.elementos)) { res.status(400).json({ error: "El croquis está vacío" }); return; }
+      if (JSON.stringify(dibujo).length > 900000) { res.status(400).json({ error: "El croquis es demasiado grande" }); return; }
+      const ruta = `croquis/${id}.json`;
+      const previo = await leerArchivoDatos(ruta, null);
+      // Lo puede seguir editando cualquiera habilitado; queda registrado quién lo creó y quién lo cambió.
+      const ahora = new Date().toISOString();
+      const registro = {
+        id, titulo: txt(b.titulo, 120) || "Croquis", cliente: txt(b.cliente, 150), numero_cliente: txt(b.numero_cliente, 30), direccion: txt(b.direccion, 200),
+        autor: (previo.data && previo.data.autor) || autorizacion.nombre || "Oficina", creado: (previo.data && previo.data.creado) || ahora,
+        actualizado: ahora, actualizado_por: autorizacion.nombre || "Oficina", dibujo,
+      };
+      const r1 = await escribirArchivoDatos(ruta, registro, previo.sha, `Croquis ${registro.titulo} — ${autorizacion.nombre || "admin"}`);
+      if (!r1.ok) { res.status(502).json({ error: "No se pudo guardar el croquis" }); return; }
+      const resumen = { ...registro, elementos: dibujo.elementos.length };
+      delete resumen.dibujo;
+      for (let intento = 0; intento < 4; intento++) {
+        const { data, sha } = await leerArchivoDatos(RUTA_CROQUIS_INDICE, []);
+        const lista = (Array.isArray(data) ? data : []).filter((x) => x.id !== id);
+        lista.unshift(resumen);
+        const r2 = await escribirArchivoDatos(RUTA_CROQUIS_INDICE, lista.slice(0, 5000), sha, `Índice de croquis — ${registro.titulo}`);
+        if (r2.ok) { res.status(200).json({ ok: true, id, actualizado: ahora }); return; }
+        if (r2.status !== 409 && r2.status !== 422) break;
+      }
+      res.status(200).json({ ok: true, id, actualizado: ahora, aviso: "Se guardó, pero puede tardar en aparecer en la lista" });
+      return;
+    }
+    if (b.accion === "borrar") {
+      if (!idValido(b.id)) { res.status(400).json({ error: "Id inválido" }); return; }
+      const ruta = `croquis/${b.id}.json`;
+      const previo = await leerArchivoDatos(ruta, null);
+      if (previo.data && !esAdmin && previo.data.autor !== autorizacion.nombre) { res.status(403).json({ error: "Solo lo puede borrar quien lo hizo, o la oficina" }); return; }
+      if (previo.sha) {
+        await fetch(urlGithubDatos(ruta), { method: "DELETE", headers: headersGithubDatos({ "Content-Type": "application/json" }), body: JSON.stringify({ message: `Borra croquis ${b.id}`, sha: previo.sha }) });
+      }
+      for (let intento = 0; intento < 4; intento++) {
+        const { data, sha } = await leerArchivoDatos(RUTA_CROQUIS_INDICE, []);
+        const lista = (Array.isArray(data) ? data : []).filter((x) => x.id !== b.id);
+        const r2 = await escribirArchivoDatos(RUTA_CROQUIS_INDICE, lista, sha, `Índice de croquis — borra ${b.id}`);
+        if (r2.ok) { res.status(200).json({ ok: true }); return; }
+        if (r2.status !== 409 && r2.status !== 422) break;
+      }
+      res.status(502).json({ error: "No se pudo actualizar la lista de croquis" });
+      return;
+    }
+    res.status(400).json({ error: "Acción inválida" });
+  } catch (err) {
+    res.status(500).json({ error: "Error interno: " + String(err.message || err) });
+  }
+}
+
 const COLECCIONES = {
   config: {
     path: "config.json",
@@ -716,6 +803,11 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
   }
   // El registro de cambios solo lo ve la oficina, y nadie lo escribe a mano.
   // ---------- Presupuesto express: lista de precios y numeración ----------
+  if (req.query && req.query.coleccion === "croquis") {
+    if (!autorizacion) { res.status(401).json({ error: "No autorizado", sesion_vencida: true }); return; }
+    await manejarCroquis(req, res, autorizacion, cuerpoAccion);
+    return;
+  }
   if (req.query && (req.query.coleccion === "lista_precios" || req.query.coleccion === "presupuestos_express")) {
     if (!autorizacion) { res.status(401).json({ error: "No autorizado", sesion_vencida: true }); return; }
     await manejarPresupuestoExpress(req, res, autorizacion, cuerpoAccion);
