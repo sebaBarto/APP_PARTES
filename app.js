@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.12.0";
+const APP_VERSION = "4.13.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -14306,6 +14306,18 @@ const PE_TIPOS = {
   monitoreado: { nombre: "Sistema monitoreado", titulo: "Sistema de Alarma Monitoreado", abono: "Abono mensual de monitoreo" },
   automonitoreo: { nombre: "Sistema con automonitoreo", titulo: "Sistema de Alarma con Automonitoreo", abono: "Abono mensual de automonitoreo" },
 };
+const PE_SERVICIOS_MONITOREO = [
+  "Reportes vía GPRS 4G + INTERNET",
+  "APP Para control total de panel a distancia.",
+  "Recepción de reportes de asalto, robo, emergencias y fallas.",
+  "Llamado al domicilio monitoreado para la verificación del evento.",
+  "Aviso a las entidades pertinentes (policia, bomberos, ambulancia).",
+  "Llamado de notificación al listado designado por el abonado.",
+  "Notificación por falta de energía eléctrica y batería baja.",
+  "Control diario del enlace de su sistema de seguridad con la estación de monitoreo.",
+  "Aplicación para ver todos los eventos del panel.",
+  "Servicio Técnico 24hs con personal propio.",
+];
 function peLlevaAbono() { return !!(PE_TIPOS[peEstado.tipo] && PE_TIPOS[peEstado.tipo].abono); }
 function peRenderTipo() {
   document.querySelectorAll(".pe-tipo-btn").forEach((b) => { const si = b.dataset.tipo === peEstado.tipo; b.classList.toggle("activo", si); b.setAttribute("aria-checked", si ? "true" : "false"); });
@@ -14703,6 +14715,12 @@ async function peGenerarPdf(datos) {
   let logoSat = null, logoCemara = null;
   try { logoSat = await doc.embedJpg(await bytes("assets/presupuesto/logo-sat.jpg")); } catch (e) { /* sin logo */ }
   try { logoCemara = await doc.embedJpg(await bytes("assets/presupuesto/logo-cemara.jpg")); } catch (e) { /* sin logo */ }
+  let logoAjax = null;
+  try { logoAjax = await doc.embedPng(await bytes("assets/presupuesto/logo-ajax.png")); } catch (e) { /* sin logo */ }
+  // Según los artículos: equipos AJAX y comunicador CityMesh (EXODUS).
+  const tieneArticulo = (re) => datos.items.some((it) => re.test(normalizeText(`${it.d || ""} ${it.c || ""}`)));
+  const hayAjax = tieneArticulo(/\bajax\b/);
+  const hayCityMesh = tieneArticulo(/city\s*-?\s*mesh/);
   const A4 = [595.28, 841.89];
   const X = 86, ANCHO = A4[0] - X - 70, ABAJO = 70;
   const negro = rgb(0, 0, 0), gris = rgb(0.85, 0.85, 0.85), grisOsc = rgb(0.35, 0.35, 0.35), amarillo = rgb(1, 0.753, 0.2);
@@ -14728,6 +14746,7 @@ async function peGenerarPdf(datos) {
   // Encabezado: logos
   if (logoSat) { const h = 66, w = h * logoSat.width / logoSat.height; pag.drawImage(logoSat, { x: 38, y: y - h, width: w, height: h }); }
   if (logoCemara) { const h = 54, w = h * logoCemara.width / logoCemara.height; pag.drawImage(logoCemara, { x: A4[0] - 38 - w, y: y - h - 4, width: w, height: h }); }
+  if (logoAjax) { const h = 38, w = h * logoAjax.width / logoAjax.height; pag.drawImage(logoAjax, { x: (A4[0] - w) / 2, y: y - 33 - h / 2, width: w, height: h }); }
   y -= 96;
   // Título: "Presupuesto" ... “Título”
   texto("Presupuesto", X, 12.5, fB); subrayar(X, ancho("Presupuesto", 12.5, fB), 12.5);
@@ -14826,11 +14845,48 @@ async function peGenerarPdf(datos) {
   const fin = datos.mo_iva || (conAbono && datos.abono_iva) ? "PRECIOS CON IVA INCLUIDO, SALVO DONDE DICE + IVA" : "PRECIO FINAL - IVA INCLUIDO";
   texto(fin, X + (ANCHO - ancho(fin, 10.5, fB)) / 2, 10.5, fB);
   y -= 14;
+  // Sistema monitoreado: lo que incluye el servicio.
+  if (datos.tipo === "monitoreado") {
+    const servicios = PE_SERVICIOS_MONITOREO.map((l) => partir(l, 9.5, fN, ANCHO - 20));
+    asegurar(40 + servicios.reduce((n, ls) => n + ls.length * 12.5 + 2, 0));
+    y -= 14;
+    const tit = "SERVICIOS INCLUIDOS CON MONITOREO";
+    texto(tit, X, 10.5, fB); subrayar(X, ancho(tit, 10.5, fB), 10.5);
+    y -= 18;
+    servicios.forEach((ls) => {
+      texto("§", X + 6, 9.5, fB);
+      ls.forEach((l) => { texto(l, X + 20, 9.5, fN); y -= 12.5; });
+      y -= 2;
+    });
+    y -= 4;
+  }
+  // Equipos AJAX: se ofrecen los demás detectores de la línea.
+  if (hayAjax) {
+    const nota = partir("Consultar por detectores de humo, Monóxido, vibración, inundación, pulsadores de asalto, etc", 10, fB, ANCHO);
+    asegurar(nota.length * 13 + 26);
+    y -= 10;
+    nota.forEach((l) => { texto(l, X, 10, fB); y -= 13; });
+    y -= 2;
+    pag.drawLine({ start: { x: X, y }, end: { x: X + ANCHO, y }, thickness: 0.8, color: negro, dashArray: [3, 2] });
+    y -= 8;
+  }
+  asegurar(80);
   pag.drawLine({ start: { x: X + 10, y }, end: { x: X + ANCHO - 10, y }, thickness: 0.6, color: negro });
   y -= 22;
   ["SAT - de Alfredo Thiesing", "Bv. Avellaneda 408 - Tel/Fax: 4377578 - WhatsApp: 341-3782085 - e-mail:", "thiesing@sat365.com.ar", "2000 Rosario - Santa Fe - Argentina"].forEach((l) => {
     texto(l, X + (ANCHO - ancho(l, 10, fB)) / 2, 10, fB); y -= 13;
   });
+  // Monitoreado con CityMesh: va el folleto de EXODUS al final (en una hoja propia si no entra).
+  if (datos.tipo === "monitoreado" && hayCityMesh) {
+    try {
+      const folleto = await doc.embedJpg(await bytes("assets/presupuesto/exodus-citymesh.jpg"));
+      const maxW = A4[0] - 2 * 50;
+      let w = maxW, h = w * folleto.height / folleto.width;
+      y -= 16;
+      if (y - h < 40) { nuevaPagina(); y = A4[1] - 40; const maxH = A4[1] - 80; if (h > maxH) { h = maxH; w = h * folleto.width / folleto.height; } }
+      pag.drawImage(folleto, { x: (A4[0] - w) / 2, y: y - h, width: w, height: h });
+    } catch (e) { /* sin folleto */ }
+  }
   return await doc.save();
 }
 

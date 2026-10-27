@@ -2631,3 +2631,51 @@ test("Presupuesto express: número redondo (redondear/truncar editable), mano de
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Presupuesto express: logo AJAX en el encabezado, servicios del monitoreo y folleto EXODUS si lleva CityMesh", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const lista = { items: [{ c: "HUB2", d: "HUB 2 PLUS AJAX", p: 300000, m: "ARS" }, { c: "CM", d: "COMUNICADOR CITYMESH 4G", p: 150000, m: "ARS" }] };
+  const pedidos = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(); const u = req.url();
+    const j = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("lista_precios")) return j(lista);
+    if (u.includes("presupuestos_express")) { pedidos.push(1); return j({ ok: true, numero: "E-0009" }); }
+    if (u.includes("/api/foto")) return j({ ok: true, id: "pdf9" });
+    j([]);
+  });
+  const pedidosAssets = [];
+  page.on("request", (r) => { if (/assets\/presupuesto\//.test(r.url())) pedidosAssets.push(r.url().split("/").pop()); });
+  await page.goto(base + "/");
+  await page.evaluate(() => {
+    tecnicoLogueado = ""; localStorage.removeItem("presupuesto_express_borrador");
+    window.__pdf = null; navigator.canShare = () => true;
+    navigator.share = async (d) => { window.__pdf = Array.from(new Uint8Array(await d.files[0].arrayBuffer())); };
+    peAbrir();
+  });
+  await page.waitForTimeout(400);
+  await page.click('.pe-modo-btn[data-modo="nuevo"]');
+  await page.fill("#peNombre", "Cliente Ajax");
+  // Primero solo con el hub AJAX y como ampliación: sin servicios ni folleto
+  await page.fill("#peArtBuscar", "ajax"); await page.click(".pe-art");
+  await page.fill("#peManoObra", "0");
+  await page.click('[data-tipo="ampliacion"]');
+  await page.click("#peGenerarBtn");
+  await page.waitForFunction(() => window.__pdf, null, { timeout: 15000 });
+  const hojas1 = await page.evaluate(async () => (await PDFLib.PDFDocument.load(new Uint8Array(window.__pdf))).getPageCount());
+  assert.ok(pedidosAssets.includes("logo-ajax.png"), "logo AJAX en el encabezado");
+  assert.ok(!pedidosAssets.includes("exodus-citymesh.jpg"));
+  // Monitoreado con CityMesh: suma el folleto EXODUS
+  await page.evaluate(() => { window.__pdf = null; });
+  await page.fill("#peArtBuscar", "citymesh"); await page.click(".pe-art");
+  await page.click('[data-tipo="monitoreado"]');
+  await page.fill("#peAbono", "30000");
+  await page.click("#peGenerarBtn");
+  await page.waitForFunction(() => window.__pdf, null, { timeout: 15000 });
+  assert.ok(pedidosAssets.includes("exodus-citymesh.jpg"), "folleto EXODUS");
+  const hojas2 = await page.evaluate(async () => (await PDFLib.PDFDocument.load(new Uint8Array(window.__pdf))).getPageCount());
+  assert.ok(hojas2 > hojas1, "el folleto agrega hoja");
+  assert.ok(await page.evaluate(() => PE_SERVICIOS_MONITOREO.length === 10));
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
