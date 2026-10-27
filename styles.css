@@ -3588,3 +3588,21 @@ html[data-inicio="nuevo"] #screen-presupuesto .pe-tipo-btn.activo { border-color
 #screen-presupuesto .pe-tipos.campo-falta { outline: 2px solid #E5484D; outline-offset: 3px; }
 #screen-presupuesto .pe-abono-linea { border-top: 1px dashed rgba(127,127,127,.45); margin-top: 6px; padding-top: 8px; }
 #screen-presupuesto .pe-abono-linea { font-weight: 600; }
+
+/* Presupuesto express: + IVA, número redondo y orden de materiales */
+#screen-presupuesto .pe-con-iva { display: flex; gap: 8px; align-items: stretch; }
+#screen-presupuesto .pe-con-iva .field-input { flex: 1; min-width: 0; }
+#screen-presupuesto .pe-iva-chip { display: inline-flex; align-items: center; gap: 6px; padding: 0 12px; border-radius: 12px; border: 1.5px solid rgba(127,127,127,0.45); font-weight: 700; font-size: 13.5px; white-space: nowrap; cursor: pointer; }
+#screen-presupuesto .pe-iva-chip:has(input:checked) { border-color: #F5A623; background: rgba(245,166,35,.14); }
+#screen-presupuesto .pe-iva-tag { font-size: 11px; font-weight: 700; opacity: .85; }
+#screen-presupuesto .pe-ajuste { padding: 12px 14px; border-radius: 14px; border: 1.5px dashed rgba(127,127,127,0.45); margin-bottom: 10px; }
+#screen-presupuesto .pe-ajuste-modos { display: flex; gap: 6px; margin-top: 6px; }
+#screen-presupuesto .pe-ajuste-btn { flex: 1; padding: 8px 6px; border-radius: 999px; border: 1.5px solid rgba(127,127,127,0.45); background: transparent; color: inherit; font-weight: 700; font-size: 13px; cursor: pointer; }
+#screen-presupuesto .pe-ajuste-btn.activo { background: #F5A623; border-color: #F5A623; color: #101820; }
+html[data-inicio="nuevo"] #screen-presupuesto .pe-ajuste-btn.activo { background: #FFC033; border-color: #FFC033; }
+#screen-presupuesto .pe-ajuste-paso { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 13px; }
+#screen-presupuesto .pe-ajuste-paso .field-input { flex: 1; min-width: 0; }
+#screen-presupuesto .pe-orden { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
+#screen-presupuesto .pe-orden button { width: 28px; height: 22px; border-radius: 6px; border: 0; background: rgba(127,127,127,0.18); color: inherit; padding: 0; display: grid; place-items: center; cursor: pointer; }
+#screen-presupuesto .pe-orden button svg { width: 16px; height: 16px; }
+#screen-presupuesto .pe-orden button:disabled { opacity: .25; cursor: default; }

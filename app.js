@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.11.0";
+const APP_VERSION = "4.12.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -14297,7 +14297,7 @@ let peEstado = null;
 let peUltimoPdf = null; // { blob, nombre, numero }
 const pe = (id) => document.getElementById(id);
 function peNuevoEstado() {
-  return { modo: "listado", cliente: { nombre: "", numero_cliente: "", telefono: "", direccion: "", razon_social: "", cuit: "" }, clienteElegido: false, titulo: "", items: [], mano_obra: "", forma_pago: "Contado Efectivo", tipo: "", abono: "", revisionDe: "" };
+  return { modo: "listado", cliente: { nombre: "", numero_cliente: "", telefono: "", direccion: "", razon_social: "", cuit: "" }, clienteElegido: false, titulo: "", items: [], mano_obra: "", forma_pago: "Contado Efectivo", tipo: "", abono: "", mo_iva: false, abono_iva: false, ajuste: { modo: "ninguno", paso: "1.000" }, revisionDe: "" };
 }
 // Tipo de trabajo: ampliación de un cliente ya monitoreado, o un sistema
 // nuevo monitoreado / con automonitoreo (estos dos llevan abono mensual).
@@ -14474,6 +14474,8 @@ function peVolcarFormulario() {
   pe("peDireccion").value = c.direccion; pe("peRazonSocial").value = c.razon_social; pe("peCuit").value = c.cuit;
   pe("peTitulo").value = peEstado.titulo; pe("peManoObra").value = peEstado.mano_obra; pe("peFormaPago").value = peEstado.forma_pago;
   peRenderTipo();
+  pe("peManoObraIva").checked = !!peEstado.mo_iva; pe("peAbonoIva").checked = !!peEstado.abono_iva;
+  if (!peEstado.ajuste) peEstado.ajuste = { modo: "ninguno", paso: "1.000" };
   pe("peClienteBuscar").value = ""; pe("peClienteResultados").innerHTML = ""; pe("peArtBuscar").value = ""; pe("peArtResultados").innerHTML = "";
   pe("peManualWrap").classList.add("hidden");
   peRenderModo();
@@ -14592,25 +14594,73 @@ function peRenderItems() {
     return `<div class="pe-item">
       <div class="pe-cant"><button type="button" data-menos="${i}" aria-label="Menos">−</button><input type="text" inputmode="numeric" data-cant="${i}" value="${it.cant}"><button type="button" data-mas="${i}" aria-label="Más">+</button></div>
       <div class="pe-item-desc">${escapeHtml(it.d)}${it.manual ? ' <small class="pe-tag">a mano</small>' : ""}<small>${isNaN(sub) ? "Falta la cotización del dólar" : pePesos(pePrecioEnPesos(it)) + " c/u · " + pePesos(sub)}</small></div>
+      <div class="pe-orden"><button type="button" data-subir="${i}" aria-label="Subir" title="Subir" ${i === 0 ? "disabled" : ""}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg></button><button type="button" data-bajar="${i}" aria-label="Bajar" title="Bajar" ${i === peEstado.items.length - 1 ? "disabled" : ""}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></button></div>
       <button type="button" class="pe-quitar" data-quitar="${i}" aria-label="Quitar">✕</button></div>`;
   }).join("") : '<p class="pe-vacio">Todavía no agregaste materiales.</p>';
   cont.querySelectorAll("[data-menos]").forEach((b) => b.addEventListener("click", () => { const it = peEstado.items[b.dataset.menos]; it.cant = Math.max(1, it.cant - 1); peRenderItems(); peGuardarBorrador(); }));
   cont.querySelectorAll("[data-mas]").forEach((b) => b.addEventListener("click", () => { peEstado.items[b.dataset.mas].cant += 1; peRenderItems(); peGuardarBorrador(); }));
   cont.querySelectorAll("[data-cant]").forEach((inp) => inp.addEventListener("change", () => { peEstado.items[inp.dataset.cant].cant = Math.max(1, Math.round(peNumero(inp.value) || 1)); peRenderItems(); peGuardarBorrador(); }));
   cont.querySelectorAll("[data-quitar]").forEach((b) => b.addEventListener("click", () => { peEstado.items.splice(Number(b.dataset.quitar), 1); peRenderItems(); peGuardarBorrador(); }));
+  // Orden de los materiales (como salen en el PDF)
+  const mover = (i, d) => { const j = i + d; if (j < 0 || j >= peEstado.items.length) return; const it = peEstado.items.splice(i, 1)[0]; peEstado.items.splice(j, 0, it); peRenderItems(); peGuardarBorrador(); };
+  cont.querySelectorAll("[data-subir]").forEach((b) => b.addEventListener("click", () => mover(Number(b.dataset.subir), -1)));
+  cont.querySelectorAll("[data-bajar]").forEach((b) => b.addEventListener("click", () => mover(Number(b.dataset.bajar), 1)));
   peRenderTotales();
 }
 function peCalcular() {
   let materiales = 0, faltaCotiz = false, hayUsd = false;
   peEstado.items.forEach((it) => { const s = peSubtotal(it); if (it.m === "USD") hayUsd = true; if (isNaN(s)) faltaCotiz = true; else materiales += s; });
   const mo = peNumero(peEstado.mano_obra);
-  return { materiales: Math.round(materiales), mano_obra: isNaN(mo) ? 0 : Math.round(mo), total: Math.round(materiales + (isNaN(mo) ? 0 : mo)), faltaCotiz, hayUsd };
+  const t = { materiales: Math.round(materiales), mano_obra: isNaN(mo) ? 0 : Math.round(mo), total: Math.round(materiales + (isNaN(mo) ? 0 : mo)), faltaCotiz, hayUsd };
+  // Número redondo: redondear o truncar el total a múltiplos de "paso".
+  // La diferencia se suma (o resta) a la mano de obra para que las cuentas
+  // del presupuesto cierren; si no hay mano de obra, va en su propia línea.
+  const aj = peEstado.ajuste || { modo: "ninguno" };
+  const paso = Math.round(peNumero(aj.paso));
+  t.ajuste = 0; t.ajusteEnMO = false; t.paso = paso > 0 ? paso : 0;
+  if (aj.modo !== "ninguno" && t.paso > 0 && t.total > 0) {
+    const final = aj.modo === "truncar" ? Math.floor(t.total / t.paso) * t.paso : Math.round(t.total / t.paso) * t.paso;
+    t.ajuste = final - t.total;
+    t.ajusteEnMO = t.mano_obra > 0 && t.mano_obra + t.ajuste >= 0;
+  }
+  t.total_original = t.total;
+  t.mano_obra_original = t.mano_obra;
+  t.total = t.total + t.ajuste;
+  if (t.ajusteEnMO) t.mano_obra += t.ajuste;
+  return t;
 }
+function peRenderAjuste(t) {
+  const aj = peEstado.ajuste || { modo: "ninguno", paso: "1.000" };
+  document.querySelectorAll(".pe-ajuste-btn").forEach((b) => { const si = b.dataset.ajuste === aj.modo; b.classList.toggle("activo", si); b.setAttribute("aria-checked", si ? "true" : "false"); });
+  pe("peAjustePasoWrap").classList.toggle("hidden", aj.modo === "ninguno");
+  if (document.activeElement !== pe("peAjustePaso")) pe("peAjustePaso").value = aj.paso || "";
+  const nota = pe("peAjusteNota");
+  const mostrar = aj.modo !== "ninguno" && t.total_original > 0;
+  nota.classList.toggle("hidden", !mostrar);
+  if (mostrar) {
+    nota.textContent = !t.paso ? "Poné de a cuánto redondear (ej. 1.000)."
+      : t.ajuste === 0 ? `El total ya es redondo: ${pePesos(t.total)}.`
+      : `${pePesos(t.total_original)} → ${pePesos(t.total)} (${t.ajuste > 0 ? "+" : "−"}${pePesos(Math.abs(t.ajuste))}${t.ajusteEnMO ? ", ajustado en la mano de obra" : ""}).`;
+  }
+}
+document.querySelectorAll(".pe-ajuste-btn").forEach((b) => b.addEventListener("click", () => {
+  peEstado.ajuste = { ...(peEstado.ajuste || { paso: "1.000" }), modo: b.dataset.ajuste };
+  if (!peEstado.ajuste.paso) peEstado.ajuste.paso = "1.000";
+  peRenderTotales();
+  peGuardarBorrador();
+}));
+pe("peAjustePaso").addEventListener("input", () => { peEstado.ajuste = { ...(peEstado.ajuste || { modo: "redondear" }), paso: pe("peAjustePaso").value }; peRenderTotales(); peGuardarBorrador(); });
+pe("peManoObraIva").addEventListener("change", () => { peEstado.mo_iva = pe("peManoObraIva").checked; peRenderTotales(); peGuardarBorrador(); });
+pe("peAbonoIva").addEventListener("change", () => { peEstado.abono_iva = pe("peAbonoIva").checked; peRenderTotales(); peGuardarBorrador(); });
 function peRenderTotales() {
   const t = peCalcular();
   const abono = peNumero(peEstado.abono);
-  pe("peTotales").innerHTML = `<div><span>Total materiales</span><b>${pePesos(t.materiales)}</b></div><div><span>Mano de obra</span><b>${pePesos(t.mano_obra)}</b></div><div class="pe-total"><span>Total</span><b>${pePesos(t.total)}</b></div>` +
-    (peLlevaAbono() && abono > 0 ? `<div class="pe-abono-linea"><span>${escapeHtml(PE_TIPOS[peEstado.tipo].abono)}</span><b>${pePesos(abono)} / mes</b></div>` : "");
+  const iva = (si) => (si ? ' <small class="pe-iva-tag">+ IVA</small>' : "");
+  pe("peTotales").innerHTML = `<div><span>Total materiales</span><b>${pePesos(t.materiales)}</b></div><div><span>Mano de obra</span><b>${pePesos(t.mano_obra)}${iva(peEstado.mo_iva)}</b></div>` +
+    (t.ajuste && !t.ajusteEnMO ? `<div><span>Ajuste por redondeo</span><b>${t.ajuste > 0 ? "+" : "−"}${pePesos(Math.abs(t.ajuste))}</b></div>` : "") +
+    `<div class="pe-total"><span>Total</span><b>${pePesos(t.total)}${peEstado.mo_iva ? ' <small class="pe-iva-tag">+ IVA de la M.O.</small>' : ""}</b></div>` +
+    (peLlevaAbono() && abono > 0 ? `<div class="pe-abono-linea"><span>${escapeHtml(PE_TIPOS[peEstado.tipo].abono)}</span><b>${pePesos(abono)}${iva(peEstado.abono_iva)} / mes</b></div>` : "");
+  peRenderAjuste(t);
   pe("peNotaCotiz").textContent = t.faltaCotiz ? "Hay artículos en dólares y no hay cotización cargada: pedile a la oficina que la cargue en el admin." : (t.hayUsd ? `Los artículos en dólares se calculan a ${pePesos(peLista.cotizacion_usd)} por dólar. Precios con IVA incluido.` : "Precios con IVA incluido.");
 }
 pe("tilePresupuestoBtn").addEventListener("click", peAbrir);
@@ -14744,21 +14794,25 @@ async function peGenerarPdf(datos) {
   }
   // Totales (recuadro gris como el modelo)
   y -= 6;
-  const lineasTot = [["Total Materiales:", pePesos(datos.total_materiales) + ".-"], ["Total Mano de Obra:", pePesos(datos.mano_obra) + ".-"], ["TOTAL:", pePesos(datos.total) + ".-"]];
-  const altoCaja = 70;
+  const lineasTot = [["Total Materiales:", pePesos(datos.total_materiales) + ".-"], ["Total Mano de Obra:", pePesos(datos.mano_obra) + ".-" + (datos.mo_iva ? " + IVA" : "")]];
+  if (datos.ajuste_linea) lineasTot.push(["Ajuste por redondeo:", (datos.ajuste_linea > 0 ? "+" : "-") + pePesos(Math.abs(datos.ajuste_linea)) + ".-"]);
+  lineasTot.push(["TOTAL:", pePesos(datos.total) + ".-" + (datos.mo_iva ? " (+ IVA de la mano de obra)" : "")]);
+  const altoCaja = 28 + lineasTot.length * 21;
+  const anchoCajaTot = Math.max(262, ...lineasTot.map(([et, val], i) => { const tam = i === lineasTot.length - 1 ? 11.5 : 10.5; return ancho(et, tam, fB) + ancho(val, tam, fB) + 24; }));
   const conAbono = datos.abono > 0 && PE_TIPOS[datos.tipo] && PE_TIPOS[datos.tipo].abono;
   asegurar(altoCaja + 175 + (conAbono ? 52 : 0)); // totales + abono + pago + garantía + validez + pie: todo junto en la misma hoja
-  pag.drawRectangle({ x: X - 8, y: y - altoCaja + 12, width: 262, height: altoCaja, color: gris, borderColor: grisOsc, borderWidth: 0.8 });
+  pag.drawRectangle({ x: X - 8, y: y - altoCaja + 12, width: Math.min(ANCHO + 16, anchoCajaTot), height: altoCaja, color: gris, borderColor: grisOsc, borderWidth: 0.8 });
   lineasTot.forEach(([et, val], i) => {
-    const tam = i === 2 ? 11.5 : 10.5;
+    const ultima = i === lineasTot.length - 1;
+    const tam = ultima ? 11.5 : 10.5;
     texto(et, X, tam, fB); subrayar(X, ancho(et, tam, fB), tam);
     texto(val, X + ancho(et, tam, fB) + 6, tam, fB);
-    y -= i === 1 ? 22 : 21;
+    y -= i === lineasTot.length - 2 ? 22 : 21;
   });
   y -= 14;
   if (conAbono) {
     // Abono mensual: aparte del total, en su propio recuadro.
-    const et = PE_TIPOS[datos.tipo].abono + ":", val = pePesos(datos.abono) + ".- por mes";
+    const et = PE_TIPOS[datos.tipo].abono + ":", val = pePesos(datos.abono) + ".-" + (datos.abono_iva ? " + IVA" : "") + " por mes";
     const anchoCaja = Math.max(262, ancho(et, 10.5, fB) + ancho(val, 10.5, fB) + 30);
     pag.drawRectangle({ x: X - 8, y: y - 9, width: anchoCaja, height: 26, color: amarillo, borderColor: grisOsc, borderWidth: 0.8 });
     texto(et, X, 10.5, fB); subrayar(X, ancho(et, 10.5, fB), 10.5);
@@ -14769,7 +14823,7 @@ async function peGenerarPdf(datos) {
   pie("Forma de Pago:", datos.forma_pago);
   pie("Garantía:", "12 meses");
   pie("Validez:", "3 días");
-  const fin = "PRECIO FINAL - IVA INCLUIDO";
+  const fin = datos.mo_iva || (conAbono && datos.abono_iva) ? "PRECIOS CON IVA INCLUIDO, SALVO DONDE DICE + IVA" : "PRECIO FINAL - IVA INCLUIDO";
   texto(fin, X + (ANCHO - ancho(fin, 10.5, fB)) / 2, 10.5, fB);
   y -= 14;
   pag.drawLine({ start: { x: X + 10, y }, end: { x: X + ANCHO - 10, y }, thickness: 0.6, color: negro });
@@ -14802,7 +14856,7 @@ pe("peGenerarBtn").addEventListener("click", async () => {
     const r = await fetch("/api/datos?coleccion=presupuestos_express", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-      body: JSON.stringify({ accion: peEstado.revisionDe ? "revision" : "nuevo", base: peEstado.revisionDe || undefined, cliente: c.nombre, numero_cliente: c.numero_cliente, titulo: peEstado.titulo, total_materiales: t.materiales, mano_obra: t.mano_obra, total: t.total, forma_pago: peEstado.forma_pago, tipo: peEstado.tipo, abono, cotizacion_usd: t.hayUsd ? peLista.cotizacion_usd : null, articulos: peEstado.items.length }),
+      body: JSON.stringify({ accion: peEstado.revisionDe ? "revision" : "nuevo", base: peEstado.revisionDe || undefined, cliente: c.nombre, numero_cliente: c.numero_cliente, titulo: peEstado.titulo, total_materiales: t.materiales, mano_obra: t.mano_obra, total: t.total, forma_pago: peEstado.forma_pago, tipo: peEstado.tipo, abono, mo_iva: !!peEstado.mo_iva, abono_iva: !!(abono && peEstado.abono_iva), ajuste: t.ajuste || 0, cotizacion_usd: t.hayUsd ? peLista.cotizacion_usd : null, articulos: peEstado.items.length }),
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok || !d.numero) throw new Error(d.error || "No se pudo sacar el número de presupuesto (¿hay señal?)");
@@ -14812,11 +14866,12 @@ pe("peGenerarBtn").addEventListener("click", async () => {
       titulo: peEstado.titulo.trim(), cliente: { ...c }, items: peEstado.items.map((it) => ({ c: it.c || "", d: it.d, cant: it.cant, manual: !!it.manual })),
       vence: (() => { const v = new Date(hoy.getTime() + 3 * 864e5); return `${String(v.getDate()).padStart(2, "0")}-${String(v.getMonth() + 1).padStart(2, "0")}-${v.getFullYear()}`; })(),
       total_materiales: t.materiales, mano_obra: t.mano_obra, total: t.total, forma_pago: peEstado.forma_pago,
-      tipo: peEstado.tipo, abono,
+      tipo: peEstado.tipo, abono, mo_iva: !!peEstado.mo_iva, abono_iva: !!peEstado.abono_iva,
+      ajuste_linea: t.ajuste && !t.ajusteEnMO ? t.ajuste : 0,
     };
     const pdf = await peGenerarPdf(datos);
     const nombreArchivo = `Presupuesto_${d.numero}_${(c.nombre || "cliente").replace(/[^\wÁÉÍÓÚÑáéíóúñ]+/g, "_").slice(0, 40)}.pdf`;
-    peUltimoPdf = { blob: new Blob([pdf], { type: "application/pdf" }), nombre: nombreArchivo, numero: d.numero, total: t.total, cliente: c.nombre, telefono: c.telefono, titulo: peEstado.titulo.trim(), vence: datos.vence, link: "", abono, tipo: peEstado.tipo };
+    peUltimoPdf = { blob: new Blob([pdf], { type: "application/pdf" }), nombre: nombreArchivo, numero: d.numero, total: t.total, cliente: c.nombre, telefono: c.telefono, titulo: peEstado.titulo.trim(), vence: datos.vence, link: "", abono, tipo: peEstado.tipo, mo_iva: !!peEstado.mo_iva, abono_iva: !!peEstado.abono_iva };
     peGuardarHecho(d.numero, t.total);
     peEstado.revisionDe = "";
     peGuardarBorrador();
@@ -14899,7 +14954,7 @@ async function peEnviarWhatsappCliente() {
   const btn = pe("peWhatsappClienteBtn");
   if (!peUltimoPdf.link && peUltimoPdf.copia) { btn.textContent = "Preparando el link..."; try { await peUltimoPdf.copia; } catch (e) { /* nada */ } btn.textContent = "Enviar al WhatsApp del cliente"; }
   const nombre = String(peUltimoPdf.cliente || "").split(/[-,]/)[0].trim();
-  const texto = `Hola${nombre ? " " + nombre : ""}! Te enviamos el presupuesto ${peUltimoPdf.numero} de SAT${peUltimoPdf.titulo ? ` (${peUltimoPdf.titulo})` : ""}.\nTotal: ${pePesos(peUltimoPdf.total)} (precio final, IVA incluido).${peUltimoPdf.abono > 0 && PE_TIPOS[peUltimoPdf.tipo] ? `\n${PE_TIPOS[peUltimoPdf.tipo].abono}: ${pePesos(peUltimoPdf.abono)} por mes.` : ""} Válido hasta el ${peUltimoPdf.vence}.` + (peUltimoPdf.link ? `\nPodés verlo acá: ${peUltimoPdf.link}` : "\nTe paso el PDF a continuación.") + "\nCualquier consulta, a disposición.";
+  const texto = `Hola${nombre ? " " + nombre : ""}! Te enviamos el presupuesto ${peUltimoPdf.numero} de SAT${peUltimoPdf.titulo ? ` (${peUltimoPdf.titulo})` : ""}.\nTotal: ${pePesos(peUltimoPdf.total)} ${peUltimoPdf.mo_iva ? "(la mano de obra es + IVA)" : "(precio final, IVA incluido)"}.${peUltimoPdf.abono > 0 && PE_TIPOS[peUltimoPdf.tipo] ? `\n${PE_TIPOS[peUltimoPdf.tipo].abono}: ${pePesos(peUltimoPdf.abono)}${peUltimoPdf.abono_iva ? " + IVA" : ""} por mes.` : ""} Válido hasta el ${peUltimoPdf.vence}.` + (peUltimoPdf.link ? `\nPodés verlo acá: ${peUltimoPdf.link}` : "\nTe paso el PDF a continuación.") + "\nCualquier consulta, a disposición.";
   window.open(`https://wa.me/${numero}?text=${encodeURIComponent(texto)}`, "_blank", "noopener");
   if (!peUltimoPdf.link) showToast("No se pudo subir el PDF: mandalo con «Compartir el PDF».");
 }

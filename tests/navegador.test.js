@@ -2575,3 +2575,59 @@ test("Croquis: pared continua con quiebres y curva, elegir varios y soldarlos, v
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Presupuesto express: número redondo (redondear/truncar editable), mano de obra y abono + IVA, y orden de los materiales", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const lista = { cotizacion_usd: 1000, items: [{ c: "A1", d: "CENTRAL", p: 123456, m: "ARS" }, { c: "B2", d: "TECLADO", p: 45678, m: "ARS" }] };
+  const pedidos = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(); const u = req.url();
+    const j = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("lista_precios")) return j(lista);
+    if (u.includes("presupuestos_express")) { const b = JSON.parse(req.postData() || "{}"); if (b.accion !== "adjuntar_pdf") pedidos.push(b); return j({ ok: true, numero: "E-0007" }); }
+    if (u.includes("/api/foto")) return j({ ok: true, id: "pdf7" });
+    j([]);
+  });
+  await page.goto(base + "/");
+  await page.evaluate(() => {
+    tecnicoLogueado = ""; localStorage.removeItem("presupuesto_express_borrador");
+    window.__pdf = null; navigator.canShare = () => true;
+    navigator.share = async (d) => { window.__pdf = Array.from(new Uint8Array(await d.files[0].arrayBuffer())); };
+    peAbrir();
+  });
+  await page.waitForTimeout(400);
+  await page.click('.pe-modo-btn[data-modo="nuevo"]');
+  await page.fill("#peNombre", "Cliente Prueba");
+  for (const q of ["central", "teclado"]) { await page.fill("#peArtBuscar", q); await page.click(".pe-art"); }
+  // Orden: bajar la central, subir no se puede en el primero
+  assert.strictEqual(await page.isDisabled("[data-subir='0']"), true);
+  await page.click("[data-bajar='0']");
+  assert.deepStrictEqual(await page.evaluate(() => peEstado.items.map((i) => i.c)), ["B2", "A1"]);
+  await page.fill("#peManoObra", "100.000");
+  await page.check("#peManoObraIva");
+  await page.click('[data-tipo="automonitoreo"]');
+  await page.fill("#peAbono", "15.000");
+  await page.check("#peAbonoIva");
+  // Total sin ajuste: 123.456 + 45.678 + 100.000 = 269.134
+  assert.match(await page.textContent("#peTotales"), /Total\$269\.134/);
+  await page.click('[data-ajuste="truncar"]');
+  assert.match(await page.textContent("#peTotales"), /Total\$269\.000/);
+  assert.match(await page.textContent("#peAjusteNota"), /\$269\.134 → \$269\.000/);
+  await page.click('[data-ajuste="redondear"]');
+  await page.fill("#peAjustePaso", "10.000");
+  assert.match(await page.textContent("#peTotales"), /Mano de obra\$100\.866\s*\+ IVA/);
+  assert.match(await page.textContent("#peTotales"), /Total\$270\.000/);
+  assert.match(await page.textContent("#peTotales"), /\$15\.000\s*\+ IVA \/ mes/);
+  await page.click("#peGenerarBtn");
+  await page.waitForFunction(() => window.__pdf, null, { timeout: 15000 });
+  const p = pedidos[0];
+  assert.deepStrictEqual([p.total, p.mano_obra, p.total_materiales, p.ajuste, p.mo_iva, p.abono_iva, p.abono], [270000, 100866, 169134, 866, true, true, 15000]);
+  // El PDF lleva las leyendas + IVA y el orden elegido
+  const texto = await page.evaluate(async (bytes) => {
+    const doc = await PDFLib.PDFDocument.load(new Uint8Array(bytes));
+    return doc.getPageCount();
+  }, await page.evaluate(() => window.__pdf));
+  assert.ok(texto >= 1);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

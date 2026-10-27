@@ -1678,7 +1678,7 @@
           </div>
         </div>
         <div class="field-group hidden" id="peAbonoWrap"><label class="field-label" for="peAbono">Abono mensual *</label>
-          <input class="field-input" type="text" inputmode="decimal" id="peAbono" placeholder="$ 0" autocomplete="off">
+          <div class="pe-con-iva"><input class="field-input" type="text" inputmode="decimal" id="peAbono" placeholder="$ 0" autocomplete="off"><label class="pe-iva-chip"><input type="checkbox" id="peAbonoIva"> + IVA</label></div>
           <p class="pe-nota" style="margin:4px 0 0;">Se informa en el presupuesto aparte del total (es un pago por mes).</p></div>
       </div>
 
@@ -1703,7 +1703,8 @@
       <div class="pe-bloque">
         <h3 class="pe-tit"><span>4</span> Mano de obra y pago</h3>
         <div class="field-group"><label class="field-label" for="peManoObra">Costo de mano de obra *</label>
-          <input class="field-input" type="text" inputmode="decimal" id="peManoObra" placeholder="$ 0" autocomplete="off"></div>
+          <div class="pe-con-iva"><input class="field-input" type="text" inputmode="decimal" id="peManoObra" placeholder="$ 0" autocomplete="off"><label class="pe-iva-chip"><input type="checkbox" id="peManoObraIva"> + IVA</label></div>
+          <p class="pe-nota" style="margin:4px 0 0;">Tildá «+ IVA» si el importe es sin IVA: en el presupuesto sale con la leyenda «+ IVA».</p></div>
         <div class="field-group"><label class="field-label" for="peFormaPago">Forma de pago</label>
           <select class="field-input" id="peFormaPago">
             <option>Contado Efectivo</option>
@@ -1712,6 +1713,18 @@
           </select></div>
       </div>
 
+      <div class="pe-ajuste" id="peAjuste">
+        <span class="field-label">Número redondo para el cliente</span>
+        <div class="pe-ajuste-modos" role="radiogroup">
+          <button type="button" class="pe-ajuste-btn" data-ajuste="ninguno" role="radio">Sin ajuste</button>
+          <button type="button" class="pe-ajuste-btn" data-ajuste="redondear" role="radio">Redondear</button>
+          <button type="button" class="pe-ajuste-btn" data-ajuste="truncar" role="radio">Truncar</button>
+        </div>
+        <div class="pe-ajuste-paso hidden" id="peAjustePasoWrap"><label for="peAjustePaso">a múltiplos de $</label>
+          <input class="field-input" type="text" inputmode="numeric" id="peAjustePaso" list="peAjustePasos" autocomplete="off">
+          <datalist id="peAjustePasos"><option value="100"><option value="1.000"><option value="5.000"><option value="10.000"><option value="50.000"><option value="100.000"></datalist></div>
+        <p class="pe-nota hidden" id="peAjusteNota" style="margin:6px 0 0;"></p>
+      </div>
       <div class="pe-totales" id="peTotales"></div>
       <p class="pe-nota" id="peNotaCotiz"></p>
       <button type="button" class="btn btn-primary" id="peGenerarBtn" style="width:100%; margin-top:6px;">Generar PDF y compartir</button>

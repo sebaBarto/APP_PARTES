@@ -249,6 +249,7 @@ async function manejarPresupuestoExpress(req, res, autorizacion, body) {
           total_materiales: numeroArgentino(b.total_materiales) || 0, mano_obra: numeroArgentino(b.mano_obra) || 0,
           total: numeroArgentino(b.total) || 0, forma_pago: txt(b.forma_pago, 80), cotizacion_usd: numeroArgentino(b.cotizacion_usd) || null,
           tipo: ["ampliacion", "monitoreado", "automonitoreo"].includes(b.tipo) ? b.tipo : "", abono: numeroArgentino(b.abono) || null,
+          mo_iva: b.mo_iva === true, abono_iva: b.abono_iva === true, ajuste: Number(b.ajuste) || 0,
           articulos: Math.max(0, Math.min(1000, Number(b.articulos) || 0)),
         });
         reg.presupuestos = reg.presupuestos.slice(0, 3000);
@@ -266,6 +267,7 @@ async function manejarPresupuestoExpress(req, res, autorizacion, body) {
           total_materiales: numeroArgentino(b.total_materiales) || 0, mano_obra: numeroArgentino(b.mano_obra) || 0,
           total: numeroArgentino(b.total) || 0, forma_pago: txt(b.forma_pago, 80), cotizacion_usd: numeroArgentino(b.cotizacion_usd) || null,
           tipo: ["ampliacion", "monitoreado", "automonitoreo"].includes(b.tipo) ? b.tipo : "", abono: numeroArgentino(b.abono) || null,
+          mo_iva: b.mo_iva === true, abono_iva: b.abono_iva === true, ajuste: Number(b.ajuste) || 0,
           articulos: Math.max(0, Math.min(1000, Number(b.articulos) || 0)),
         });
         reg.presupuestos = reg.presupuestos.slice(0, 3000);
