@@ -3577,3 +3577,14 @@ html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#s
 .cq-datos .btn-secondary.cq-borrar { color: #C0392B !important; }
 .cq-datos .link-btn { color: #1B5FA8; }
 .cq-datos .pe-nota { color: #5B6B7B; }
+
+/* Presupuesto express: tipo de trabajo y abono */
+#screen-presupuesto .pe-tipos { display: grid; grid-template-columns: 1fr; gap: 8px; border-radius: 12px; }
+#screen-presupuesto .pe-tipo-btn { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; padding: 10px 14px; border-radius: 12px; border: 1.5px solid rgba(127,127,127,0.45); background: transparent; color: inherit; cursor: pointer; }
+#screen-presupuesto .pe-tipo-btn b { font-size: 14px; }
+#screen-presupuesto .pe-tipo-btn span { font-size: 12px; opacity: .75; }
+#screen-presupuesto .pe-tipo-btn.activo { border-color: #F5A623; background: rgba(245,166,35,.14); box-shadow: inset 0 0 0 1px #F5A623; }
+html[data-inicio="nuevo"] #screen-presupuesto .pe-tipo-btn.activo { border-color: #FFC033; background: rgba(255,192,51,.14); box-shadow: inset 0 0 0 1px #FFC033; }
+#screen-presupuesto .pe-tipos.campo-falta { outline: 2px solid #E5484D; outline-offset: 3px; }
+#screen-presupuesto .pe-abono-linea { border-top: 1px dashed rgba(127,127,127,.45); margin-top: 6px; padding-top: 8px; }
+#screen-presupuesto .pe-abono-linea { font-weight: 600; }

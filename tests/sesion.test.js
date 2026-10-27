@@ -255,9 +255,10 @@ test("Presupuesto express: la lista de precios la carga solo la oficina y los n√
     await datos(pedido("POST", { coleccion: "presupuestos_express" }, { accion: "nuevo", cliente: "Tell", total: 100 }, juan), r);
     assert.strictEqual(r.cuerpo.numero, "E-0001");
     r = resFalso();
-    await datos(pedido("POST", { coleccion: "presupuestos_express" }, { accion: "nuevo", cliente: "Otro", total: 5 }, admin), r);
+    await datos(pedido("POST", { coleccion: "presupuestos_express" }, { accion: "nuevo", cliente: "Otro", total: 5, tipo: "automonitoreo", abono: "12.000" }, admin), r);
     assert.strictEqual(r.cuerpo.numero, "E-0002");
     assert.deepStrictEqual(archivos["presupuestos-express.json"].presupuestos.map((p) => [p.numero, p.emitido_por]), [["E-0002", "Oficina"], ["E-0001", "Juan"]]);
+    assert.deepStrictEqual([archivos["presupuestos-express.json"].presupuestos[0].tipo, archivos["presupuestos-express.json"].presupuestos[0].abono], ["automonitoreo", 12000]);
     // Correcciones: E-0001-R1, E-0001-R2 (aunque se pida desde una revisi√≥n)
     r = resFalso();
     await datos(pedido("POST", { coleccion: "presupuestos_express" }, { accion: "revision", base: "E-0001", cliente: "Tell", total: 90 }, juan), r);

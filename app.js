@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.10.0";
+const APP_VERSION = "4.11.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -14297,7 +14297,20 @@ let peEstado = null;
 let peUltimoPdf = null; // { blob, nombre, numero }
 const pe = (id) => document.getElementById(id);
 function peNuevoEstado() {
-  return { modo: "listado", cliente: { nombre: "", numero_cliente: "", telefono: "", direccion: "", razon_social: "", cuit: "" }, clienteElegido: false, titulo: "", items: [], mano_obra: "", forma_pago: "Contado Efectivo", revisionDe: "" };
+  return { modo: "listado", cliente: { nombre: "", numero_cliente: "", telefono: "", direccion: "", razon_social: "", cuit: "" }, clienteElegido: false, titulo: "", items: [], mano_obra: "", forma_pago: "Contado Efectivo", tipo: "", abono: "", revisionDe: "" };
+}
+// Tipo de trabajo: ampliación de un cliente ya monitoreado, o un sistema
+// nuevo monitoreado / con automonitoreo (estos dos llevan abono mensual).
+const PE_TIPOS = {
+  ampliacion: { nombre: "Ampliación (cliente ya monitoreado)", titulo: "Ampliación de Sistema de Alarma", abono: false },
+  monitoreado: { nombre: "Sistema monitoreado", titulo: "Sistema de Alarma Monitoreado", abono: "Abono mensual de monitoreo" },
+  automonitoreo: { nombre: "Sistema con automonitoreo", titulo: "Sistema de Alarma con Automonitoreo", abono: "Abono mensual de automonitoreo" },
+};
+function peLlevaAbono() { return !!(PE_TIPOS[peEstado.tipo] && PE_TIPOS[peEstado.tipo].abono); }
+function peRenderTipo() {
+  document.querySelectorAll(".pe-tipo-btn").forEach((b) => { const si = b.dataset.tipo === peEstado.tipo; b.classList.toggle("activo", si); b.setAttribute("aria-checked", si ? "true" : "false"); });
+  pe("peAbonoWrap").classList.toggle("hidden", !peLlevaAbono());
+  pe("peAbono").value = peEstado.abono || "";
 }
 function peGuardarBorrador() { try { localStorage.setItem(PE_BORRADOR, JSON.stringify(peEstado)); } catch (e) { /* nada */ } }
 function peLeerBorrador() {
@@ -14460,6 +14473,7 @@ function peVolcarFormulario() {
   pe("peNombre").value = c.nombre; pe("peNumCliente").value = c.numero_cliente; pe("peTelefono").value = c.telefono;
   pe("peDireccion").value = c.direccion; pe("peRazonSocial").value = c.razon_social; pe("peCuit").value = c.cuit;
   pe("peTitulo").value = peEstado.titulo; pe("peManoObra").value = peEstado.mano_obra; pe("peFormaPago").value = peEstado.forma_pago;
+  peRenderTipo();
   pe("peClienteBuscar").value = ""; pe("peClienteResultados").innerHTML = ""; pe("peArtBuscar").value = ""; pe("peArtResultados").innerHTML = "";
   pe("peManualWrap").classList.add("hidden");
   peRenderModo();
@@ -14509,6 +14523,19 @@ pe("peClienteBuscar").addEventListener("input", () => {
 pe("peTitulo").addEventListener("input", () => { peEstado.titulo = pe("peTitulo").value; peGuardarBorrador(); });
 pe("peManoObra").addEventListener("input", () => { peEstado.mano_obra = pe("peManoObra").value; pe("peManoObra").classList.remove("campo-falta"); peRenderTotales(); peGuardarBorrador(); });
 pe("peFormaPago").addEventListener("change", () => { peEstado.forma_pago = pe("peFormaPago").value; peGuardarBorrador(); });
+document.querySelectorAll(".pe-tipo-btn").forEach((b) => b.addEventListener("click", () => {
+  const anterior = PE_TIPOS[peEstado.tipo];
+  peEstado.tipo = b.dataset.tipo;
+  pe("peTipos").classList.remove("campo-falta");
+  // Si el título estaba vacío o era el sugerido del tipo anterior, se pone el del tipo nuevo.
+  const tit = peEstado.titulo.trim();
+  if (!tit || (anterior && tit === anterior.titulo)) { peEstado.titulo = PE_TIPOS[peEstado.tipo].titulo; pe("peTitulo").value = peEstado.titulo; }
+  peRenderTipo();
+  peRenderTotales();
+  peGuardarBorrador();
+  if (peLlevaAbono() && !String(peEstado.abono).trim()) pe("peAbono").focus();
+}));
+pe("peAbono").addEventListener("input", () => { peEstado.abono = pe("peAbono").value; pe("peAbono").classList.remove("campo-falta"); peRenderTotales(); peGuardarBorrador(); });
 
 function peRenderArticulos() {
   const q = normalizeText(pe("peArtBuscar").value.trim());
@@ -14581,7 +14608,9 @@ function peCalcular() {
 }
 function peRenderTotales() {
   const t = peCalcular();
-  pe("peTotales").innerHTML = `<div><span>Total materiales</span><b>${pePesos(t.materiales)}</b></div><div><span>Mano de obra</span><b>${pePesos(t.mano_obra)}</b></div><div class="pe-total"><span>Total</span><b>${pePesos(t.total)}</b></div>`;
+  const abono = peNumero(peEstado.abono);
+  pe("peTotales").innerHTML = `<div><span>Total materiales</span><b>${pePesos(t.materiales)}</b></div><div><span>Mano de obra</span><b>${pePesos(t.mano_obra)}</b></div><div class="pe-total"><span>Total</span><b>${pePesos(t.total)}</b></div>` +
+    (peLlevaAbono() && abono > 0 ? `<div class="pe-abono-linea"><span>${escapeHtml(PE_TIPOS[peEstado.tipo].abono)}</span><b>${pePesos(abono)} / mes</b></div>` : "");
   pe("peNotaCotiz").textContent = t.faltaCotiz ? "Hay artículos en dólares y no hay cotización cargada: pedile a la oficina que la cargue en el admin." : (t.hayUsd ? `Los artículos en dólares se calculan a ${pePesos(peLista.cotizacion_usd)} por dólar. Precios con IVA incluido.` : "Precios con IVA incluido.");
 }
 pe("tilePresupuestoBtn").addEventListener("click", peAbrir);
@@ -14677,6 +14706,7 @@ async function peGenerarPdf(datos) {
   filaDato("Teléfono:", datos.cliente.telefono);
   filaDato("Razón Social:", datos.cliente.razon_social);
   filaDato("CUIT:", datos.cliente.cuit);
+  if (PE_TIPOS[datos.tipo]) filaDato("Tipo de trabajo:", PE_TIPOS[datos.tipo].nombre);
   // Materiales
   y -= 18;
   if (datos.items.length) {
@@ -14716,7 +14746,8 @@ async function peGenerarPdf(datos) {
   y -= 6;
   const lineasTot = [["Total Materiales:", pePesos(datos.total_materiales) + ".-"], ["Total Mano de Obra:", pePesos(datos.mano_obra) + ".-"], ["TOTAL:", pePesos(datos.total) + ".-"]];
   const altoCaja = 70;
-  asegurar(altoCaja + 175); // totales + pago + garantía + validez + pie: todo junto en la misma hoja
+  const conAbono = datos.abono > 0 && PE_TIPOS[datos.tipo] && PE_TIPOS[datos.tipo].abono;
+  asegurar(altoCaja + 175 + (conAbono ? 52 : 0)); // totales + abono + pago + garantía + validez + pie: todo junto en la misma hoja
   pag.drawRectangle({ x: X - 8, y: y - altoCaja + 12, width: 262, height: altoCaja, color: gris, borderColor: grisOsc, borderWidth: 0.8 });
   lineasTot.forEach(([et, val], i) => {
     const tam = i === 2 ? 11.5 : 10.5;
@@ -14725,6 +14756,15 @@ async function peGenerarPdf(datos) {
     y -= i === 1 ? 22 : 21;
   });
   y -= 14;
+  if (conAbono) {
+    // Abono mensual: aparte del total, en su propio recuadro.
+    const et = PE_TIPOS[datos.tipo].abono + ":", val = pePesos(datos.abono) + ".- por mes";
+    const anchoCaja = Math.max(262, ancho(et, 10.5, fB) + ancho(val, 10.5, fB) + 30);
+    pag.drawRectangle({ x: X - 8, y: y - 9, width: anchoCaja, height: 26, color: amarillo, borderColor: grisOsc, borderWidth: 0.8 });
+    texto(et, X, 10.5, fB); subrayar(X, ancho(et, 10.5, fB), 10.5);
+    texto(val, X + ancho(et, 10.5, fB) + 6, 10.5, fB);
+    y -= 38;
+  }
   const pie = (et, val) => { texto(et, X, 10.5, fB); subrayar(X, ancho(et, 10.5, fB), 10.5); texto(val, X + ancho(et, 10.5, fB) + 6, 10.5, fB); y -= 21; };
   pie("Forma de Pago:", datos.forma_pago);
   pie("Garantía:", "12 meses");
@@ -14746,8 +14786,11 @@ pe("peGenerarBtn").addEventListener("click", async () => {
     if (peEstado.modo === "listado" && !peEstado.clienteElegido) { showToast("Elegí el cliente del listado, o tocá «Cliente nuevo»."); pe("peClienteBuscar").focus(); return; }
     pe("peNombre").classList.add("campo-falta"); showToast("Falta el nombre del cliente."); pe("peNombre").focus(); return;
   }
+  if (!PE_TIPOS[peEstado.tipo]) { pe("peTipos").classList.add("campo-falta"); showToast("Elegí si es una ampliación, un sistema monitoreado o con automonitoreo."); pe("peTipos").scrollIntoView({ block: "center", behavior: "smooth" }); return; }
+  if (peLlevaAbono() && !(peNumero(peEstado.abono) > 0)) { pe("peAbono").classList.add("campo-falta"); showToast("Poné el costo mensual del abono."); pe("peAbono").focus(); return; }
   if (String(peEstado.mano_obra).trim() === "" || isNaN(peNumero(peEstado.mano_obra))) { pe("peManoObra").classList.add("campo-falta"); showToast("Poné el costo de la mano de obra (si no lleva, poné 0)."); pe("peManoObra").focus(); return; }
   const t = peCalcular();
+  const abono = peLlevaAbono() ? Math.round(peNumero(peEstado.abono)) : null;
   if (t.faltaCotiz) { showToast("Hay artículos en dólares sin cotización cargada."); return; }
   if (!peEstado.items.length && !t.mano_obra) { showToast("Agregá algún material o la mano de obra."); return; }
   const btn = pe("peGenerarBtn");
@@ -14759,7 +14802,7 @@ pe("peGenerarBtn").addEventListener("click", async () => {
     const r = await fetch("/api/datos?coleccion=presupuestos_express", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-      body: JSON.stringify({ accion: peEstado.revisionDe ? "revision" : "nuevo", base: peEstado.revisionDe || undefined, cliente: c.nombre, numero_cliente: c.numero_cliente, titulo: peEstado.titulo, total_materiales: t.materiales, mano_obra: t.mano_obra, total: t.total, forma_pago: peEstado.forma_pago, cotizacion_usd: t.hayUsd ? peLista.cotizacion_usd : null, articulos: peEstado.items.length }),
+      body: JSON.stringify({ accion: peEstado.revisionDe ? "revision" : "nuevo", base: peEstado.revisionDe || undefined, cliente: c.nombre, numero_cliente: c.numero_cliente, titulo: peEstado.titulo, total_materiales: t.materiales, mano_obra: t.mano_obra, total: t.total, forma_pago: peEstado.forma_pago, tipo: peEstado.tipo, abono, cotizacion_usd: t.hayUsd ? peLista.cotizacion_usd : null, articulos: peEstado.items.length }),
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok || !d.numero) throw new Error(d.error || "No se pudo sacar el número de presupuesto (¿hay señal?)");
@@ -14769,10 +14812,11 @@ pe("peGenerarBtn").addEventListener("click", async () => {
       titulo: peEstado.titulo.trim(), cliente: { ...c }, items: peEstado.items.map((it) => ({ c: it.c || "", d: it.d, cant: it.cant, manual: !!it.manual })),
       vence: (() => { const v = new Date(hoy.getTime() + 3 * 864e5); return `${String(v.getDate()).padStart(2, "0")}-${String(v.getMonth() + 1).padStart(2, "0")}-${v.getFullYear()}`; })(),
       total_materiales: t.materiales, mano_obra: t.mano_obra, total: t.total, forma_pago: peEstado.forma_pago,
+      tipo: peEstado.tipo, abono,
     };
     const pdf = await peGenerarPdf(datos);
     const nombreArchivo = `Presupuesto_${d.numero}_${(c.nombre || "cliente").replace(/[^\wÁÉÍÓÚÑáéíóúñ]+/g, "_").slice(0, 40)}.pdf`;
-    peUltimoPdf = { blob: new Blob([pdf], { type: "application/pdf" }), nombre: nombreArchivo, numero: d.numero, total: t.total, cliente: c.nombre, telefono: c.telefono, titulo: peEstado.titulo.trim(), vence: datos.vence, link: "" };
+    peUltimoPdf = { blob: new Blob([pdf], { type: "application/pdf" }), nombre: nombreArchivo, numero: d.numero, total: t.total, cliente: c.nombre, telefono: c.telefono, titulo: peEstado.titulo.trim(), vence: datos.vence, link: "", abono, tipo: peEstado.tipo };
     peGuardarHecho(d.numero, t.total);
     peEstado.revisionDe = "";
     peGuardarBorrador();
@@ -14855,7 +14899,7 @@ async function peEnviarWhatsappCliente() {
   const btn = pe("peWhatsappClienteBtn");
   if (!peUltimoPdf.link && peUltimoPdf.copia) { btn.textContent = "Preparando el link..."; try { await peUltimoPdf.copia; } catch (e) { /* nada */ } btn.textContent = "Enviar al WhatsApp del cliente"; }
   const nombre = String(peUltimoPdf.cliente || "").split(/[-,]/)[0].trim();
-  const texto = `Hola${nombre ? " " + nombre : ""}! Te enviamos el presupuesto ${peUltimoPdf.numero} de SAT${peUltimoPdf.titulo ? ` (${peUltimoPdf.titulo})` : ""}.\nTotal: ${pePesos(peUltimoPdf.total)} (precio final, IVA incluido). Válido hasta el ${peUltimoPdf.vence}.` + (peUltimoPdf.link ? `\nPodés verlo acá: ${peUltimoPdf.link}` : "\nTe paso el PDF a continuación.") + "\nCualquier consulta, a disposición.";
+  const texto = `Hola${nombre ? " " + nombre : ""}! Te enviamos el presupuesto ${peUltimoPdf.numero} de SAT${peUltimoPdf.titulo ? ` (${peUltimoPdf.titulo})` : ""}.\nTotal: ${pePesos(peUltimoPdf.total)} (precio final, IVA incluido).${peUltimoPdf.abono > 0 && PE_TIPOS[peUltimoPdf.tipo] ? `\n${PE_TIPOS[peUltimoPdf.tipo].abono}: ${pePesos(peUltimoPdf.abono)} por mes.` : ""} Válido hasta el ${peUltimoPdf.vence}.` + (peUltimoPdf.link ? `\nPodés verlo acá: ${peUltimoPdf.link}` : "\nTe paso el PDF a continuación.") + "\nCualquier consulta, a disposición.";
   window.open(`https://wa.me/${numero}?text=${encodeURIComponent(texto)}`, "_blank", "noopener");
   if (!peUltimoPdf.link) showToast("No se pudo subir el PDF: mandalo con «Compartir el PDF».");
 }

@@ -2002,18 +2002,32 @@ test("Presupuesto express: cliente del listado, artículos (en pesos y en dólar
   await page.fill("#peManoObra", "50.000");
   await page.selectOption("#peFormaPago", "A convenir");
   assert.match(await page.textContent("#peTotales"), /Total\$190\.000/);
+  // Falta decir qué es (ampliación, monitoreado o automonitoreo)
+  await page.click("#peGenerarBtn");
+  assert.strictEqual(pedidos.length, 0, "pide el tipo de trabajo");
+  assert.strictEqual(await page.isVisible("#peAbonoWrap"), false);
+  await page.click('[data-tipo="ampliacion"]');
+  assert.strictEqual(await page.isVisible("#peAbonoWrap"), false, "la ampliación no lleva abono");
+  await page.click('[data-tipo="monitoreado"]');
+  assert.strictEqual(await page.isVisible("#peAbonoWrap"), true);
+  assert.strictEqual(await page.inputValue("#peTitulo"), "Sistema de Alarma Monitoreado", "título sugerido");
+  // Monitoreado sin abono no deja generar
+  await page.click("#peGenerarBtn");
+  assert.strictEqual(pedidos.length, 0, "pide el abono");
+  await page.fill("#peAbono", "38.500");
+  assert.match(await page.textContent("#peTotales"), /Abono mensual de monitoreo\$38\.500 \/ mes/);
   await page.click("#peGenerarBtn");
   await page.waitForFunction(() => window.__compartido, null, { timeout: 15000 });
   const c = await page.evaluate(() => window.__compartido);
   assert.deepStrictEqual(c, { nombre: "Presupuesto_E-0001_Tell_Cecilia.pdf", tipo: "application/pdf", inicio: "%PDF-" });
-  assert.deepStrictEqual({ total: pedidos[0].total, mo: pedidos[0].mano_obra, fp: pedidos[0].forma_pago, cot: pedidos[0].cotizacion_usd }, { total: 190000, mo: 50000, fp: "A convenir", cot: 1000 });
+  assert.deepStrictEqual({ total: pedidos[0].total, mo: pedidos[0].mano_obra, fp: pedidos[0].forma_pago, cot: pedidos[0].cotizacion_usd, tipo: pedidos[0].tipo, abono: pedidos[0].abono }, { total: 190000, mo: 50000, fp: "A convenir", cot: 1000, tipo: "monitoreado", abono: 38500 });
   assert.match(await page.textContent("#peResultado"), /Presupuesto E-0001 listo/);
   // Al WhatsApp del cliente: chat con su número (Rosario) y el link al PDF
   await page.evaluate(() => { window.prompt = (m, d) => d; window.__wa = ""; window.open = (u) => { window.__wa = u; }; });
   await page.click("#peWhatsappClienteBtn");
   await page.waitForFunction(() => window.__wa);
   const wa = decodeURIComponent(await page.evaluate(() => window.__wa));
-  assert.match(wa, /^https:\/\/wa\.me\/5493414519509\?text=Hola Tell Cecilia! Te enviamos el presupuesto E-0001[\s\S]*\$190\.000[\s\S]*api\/foto\?id=pdf1&tipo=pdf/);
+  assert.match(wa, /^https:\/\/wa\.me\/5493414519509\?text=Hola Tell Cecilia! Te enviamos el presupuesto E-0001[\s\S]*\$190\.000[\s\S]*Abono mensual de monitoreo: \$38\.500 por mes[\s\S]*api\/foto\?id=pdf1&tipo=pdf/);
   // Corregir: sale como revisión del mismo número
   await page.evaluate(() => { window.confirm = () => true; window.__compartido = null; });
   await page.click("[data-corregir]");

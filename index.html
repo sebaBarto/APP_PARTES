@@ -1668,8 +1668,18 @@
         <h3 class="pe-tit"><span>2</span> Trabajo</h3>
         <div class="field-group"><label class="field-label" for="peTitulo">Título del presupuesto</label>
           <input class="field-input" id="peTitulo" type="text" list="peTitulosLista" placeholder="Ej: Sistema de Alarma Monitoreado" autocomplete="off">
-          <datalist id="peTitulosLista"><option value="Sistema de Alarma Monitoreado"><option value="Ampliación de Sistema de Alarma"><option value="Sistema de Cámaras de Seguridad"><option value="Reparación de Sistema de Alarma"><option value="Control de Acceso"></datalist>
+          <datalist id="peTitulosLista"><option value="Sistema de Alarma Monitoreado"><option value="Sistema de Alarma con Automonitoreo"><option value="Ampliación de Sistema de Alarma"><option value="Sistema de Cámaras de Seguridad"><option value="Reparación de Sistema de Alarma"><option value="Control de Acceso"></datalist>
         </div>
+        <div class="field-group"><span class="field-label" id="peTipoLabel">¿Qué es? *</span>
+          <div class="pe-tipos" id="peTipos" role="radiogroup" aria-labelledby="peTipoLabel">
+            <button type="button" class="pe-tipo-btn" data-tipo="ampliacion" role="radio"><b>Ampliación</b><span>Cliente ya monitoreado</span></button>
+            <button type="button" class="pe-tipo-btn" data-tipo="monitoreado" role="radio"><b>Sistema monitoreado</b><span>Con abono de monitoreo</span></button>
+            <button type="button" class="pe-tipo-btn" data-tipo="automonitoreo" role="radio"><b>Automonitoreo</b><span>Con abono mensual</span></button>
+          </div>
+        </div>
+        <div class="field-group hidden" id="peAbonoWrap"><label class="field-label" for="peAbono">Abono mensual *</label>
+          <input class="field-input" type="text" inputmode="decimal" id="peAbono" placeholder="$ 0" autocomplete="off">
+          <p class="pe-nota" style="margin:4px 0 0;">Se informa en el presupuesto aparte del total (es un pago por mes).</p></div>
       </div>
 
       <div class="pe-bloque">
