@@ -2129,3 +2129,75 @@ test("Croquis: habitaciones, pared, equipos rotados, cableado y texto; se guarda
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Croquis: cables con color y trazo, equipos de color, cámaras/DVR y objetos de obra (puerta espejada, ventana, piscina) en el SVG y la leyenda", async () => {
+  const ctx = await browser.newContext({ serviceWorkers: "block", viewport: { width: 390, height: 844 } });
+  const page = await ctx.newPage();
+  const erroresPagina = [];
+  page.on("pageerror", (e) => erroresPagina.push(e.message));
+  await page.addInitScript(() => { localStorage.setItem("ajustes_app", JSON.stringify({ estiloInicio: "nuevo" })); localStorage.setItem("skin_v4_aplicado", "1"); });
+  await page.route("**/api/**", (r) => r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+  await page.goto(base + "/");
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); cqAbrirEditor({}); });
+  await page.waitForTimeout(200);
+  const caja = await page.locator("#cqSvg").boundingBox();
+  const clic = (x, y) => page.mouse.click(caja.x + x, caja.y + y);
+  const arrastrar = async (a, b) => { await page.mouse.move(caja.x + a[0], caja.y + a[1]); await page.mouse.down(); for (let i = 1; i <= 8; i++) await page.mouse.move(caja.x + a[0] + (b[0] - a[0]) * i / 8, caja.y + a[1] + (b[1] - a[1]) * i / 8); await page.mouse.up(); };
+  // Objetos de obra: la paleta muestra solo esos
+  await page.click('[data-herr="objetos"]');
+  const objetos = await page.$$eval("#cqSimbolos [data-simbolo]", (bs) => bs.map((b) => b.dataset.simbolo));
+  assert.deepStrictEqual(objetos, ["puerta", "ventana", "corrediza", "columna", "piscina", "planta"]);
+  await page.click('[data-simbolo="puerta"]');
+  await clic(100, 100);
+  await page.click('[data-acc="espejo"]');
+  await page.click('[data-herr="objetos"]');
+  await page.click('[data-simbolo="piscina"]');
+  await clic(200, 300);
+  assert.strictEqual(await page.locator(".cq-color").count(), 0, "los objetos de obra no se pintan");
+  // Equipos: DVR y cámaras; un magnético pintado de naranja
+  await page.click('[data-herr="simbolos"]');
+  const equipos = await page.$$eval("#cqSimbolos [data-simbolo]", (bs) => bs.map((b) => b.dataset.simbolo));
+  assert.deepStrictEqual(equipos, ["central", "teclado", "magnetico", "infrarrojo", "infrarrojo_ext", "dvr", "camara_ip", "camara_analoga"]);
+  for (const [tipo, x, y] of [["dvr", 60, 200], ["camara_ip", 300, 80], ["camara_analoga", 300, 200], ["magnetico", 160, 100]]) {
+    await page.click('[data-herr="simbolos"]');
+    await page.click(`[data-simbolo="${tipo}"]`);
+    await clic(x, y);
+  }
+  await page.click('.cq-color[data-color="#E8741E"]');
+  // Cable: color azul y trazo continuo, con nombre para la leyenda; el siguiente sale igual
+  await page.click('[data-herr="cable"]');
+  await arrastrar([60, 200], [300, 80]);
+  await page.click('[data-herr="mover"]');
+  await page.evaluate(() => { cq.sel = cq.elementos.find((e) => e.t === "cable").id; cqRender(); });
+  await page.click('.cq-color[data-color="#2E86DE"]');
+  await page.click('[data-trazo="continuo"]');
+  await page.evaluate(() => { window.prompt = () => "Cámaras"; });
+  await page.click('[data-acc="cnombre"]');
+  await page.click('[data-herr="cable"]');
+  await arrastrar([60, 220], [300, 220]);
+  const els = await page.evaluate(() => cq.elementos);
+  const porTipo = (t) => els.find((e) => e.tipo === t);
+  assert.strictEqual(porTipo("puerta").esp, true);
+  assert.strictEqual(porTipo("magnetico").color, "#E8741E");
+  const cables = els.filter((e) => e.t === "cable");
+  assert.deepStrictEqual(cables.map((c) => [c.color, c.trazo, c.nombre || ""]), [["#2E86DE", "continuo", "Cámaras"], ["#2E86DE", "continuo", ""]]);
+  // Una pared de guiones (medianera)
+  await page.click('[data-herr="linea"]');
+  await arrastrar([40, 400], [340, 400]);
+  await page.click('[data-herr="mover"]');
+  await page.evaluate(() => { cq.sel = cq.elementos.find((e) => e.t === "linea").id; cqRender(); });
+  await page.click('[data-trazo="guiones"]');
+  const svg = await page.evaluate(() => croquisSvgDocumento(cqDibujo()));
+  assert.match(svg, /scale\(-1 1\)/, "puerta espejada");
+  assert.match(svg, /fill="#D6ECFA"/, "piscina");
+  assert.match(svg, />DVR</);
+  assert.match(svg, /<circle cx="0" cy="0" r="8" fill="#E8741E"/, "magnético naranja (circulito)");
+  assert.match(svg, /stroke="#2E86DE" stroke-width="2.6" stroke-linecap/, "cable azul continuo");
+  assert.match(svg, /stroke-width="3.5" stroke-dasharray="9 5"/, "pared en guiones");
+  // Leyenda: equipos y cables, sin objetos de obra
+  const leyenda = await page.evaluate(() => croquisTiposUsados(cqDibujo()).map((i) => i.nombre));
+  assert.deepStrictEqual(leyenda, ["Magnético", "DVR / NVR", "Cámara IP", "Cámara analógica", "Cámaras"]);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

@@ -4,37 +4,98 @@
 // Un croquis es { v: 1, elementos: [...] } en coordenadas de "mundo"
 // (la grilla es de 20 unidades). Tipos de elemento:
 //   rect    { x, y, w, h, nombre }       habitación
-//   linea   { x1, y1, x2, y2 }           pared / tabique
-//   cable   { pts: [[x,y], ...] }        cableado (curva suave)
+//   linea   { x1, y1, x2, y2, trazo?, color? }   pared / tabique
+//   cable   { pts: [[x,y], ...], color?, trazo?, nombre? }  cableado (curva suave)
 //   texto   { x, y, texto, tam }
-//   simbolo { tipo, x, y, rot, esc }     central, teclado, magnético, IR...
+//   simbolo { tipo, x, y, rot, esc, color?, esp? }  equipos y objetos de obra
 
 const CROQUIS_GRILLA = 20;
 
+// Cada símbolo se dibuja centrado en 0,0 con dib(color). "cat" separa los
+// equipos (van en la leyenda y se pueden pintar de otro color) de los
+// objetos de obra (puertas, ventanas, piscina...). "r": radio aproximado.
+const CROQUIS_FUENTE = 'font-family="Arial, Helvetica, sans-serif" font-weight="700"';
 const CROQUIS_SIMBOLOS = {
   central: {
-    nombre: "Central", color: "#C0392B",
-    svg: '<rect x="-21" y="-15" width="42" height="30" rx="3" fill="#FFFFFF" stroke="#C0392B" stroke-width="2.6"/><rect x="-16" y="-10" width="32" height="20" rx="1.5" fill="none" stroke="#C0392B" stroke-width="1"/><text x="0" y="6" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="16" fill="#C0392B">C</text>',
+    nombre: "Central", cat: "equipo", color: "#C0392B", r: 26,
+    dib: (c) => `<rect x="-21" y="-15" width="42" height="30" rx="3" fill="#FFFFFF" stroke="${c}" stroke-width="2.6"/><rect x="-16" y="-10" width="32" height="20" rx="1.5" fill="none" stroke="${c}" stroke-width="1"/><text x="0" y="6" text-anchor="middle" ${CROQUIS_FUENTE} font-size="16" fill="${c}">C</text>`,
   },
   teclado: {
-    nombre: "Teclado", color: "#2E86DE",
-    svg: '<rect x="-17" y="-13" width="34" height="26" rx="3" fill="#FFFFFF" stroke="#2E86DE" stroke-width="2.6"/><rect x="-12" y="-9" width="24" height="6" rx="1" fill="#2E86DE" opacity="0.35"/>' +
-      [-8, 0, 8].map((x) => [1, 7].map((y) => `<rect x="${x - 2.5}" y="${y - 2}" width="5" height="4" rx="0.8" fill="#2E86DE"/>`).join("")).join(""),
+    nombre: "Teclado", cat: "equipo", color: "#2E86DE", r: 22,
+    dib: (c) => `<rect x="-17" y="-13" width="34" height="26" rx="3" fill="#FFFFFF" stroke="${c}" stroke-width="2.6"/><rect x="-12" y="-9" width="24" height="6" rx="1" fill="${c}" opacity="0.35"/>` +
+      [-8, 0, 8].map((x) => [1, 7].map((y) => `<rect x="${x - 2.5}" y="${y - 2}" width="5" height="4" rx="0.8" fill="${c}"/>`).join("")).join(""),
   },
   magnetico: {
-    nombre: "Magnético", color: "#4E8A0E",
-    svg: '<rect x="-15" y="-6" width="13" height="12" rx="1.5" fill="#FFFFFF" stroke="#4E8A0E" stroke-width="2.4"/><rect x="2" y="-6" width="13" height="12" rx="1.5" fill="#4E8A0E" stroke="#4E8A0E" stroke-width="2.4"/><text x="0" y="-10" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="9" fill="#4E8A0E">M</text>',
+    nombre: "Magnético", cat: "equipo", color: "#2E9E4F", r: 12,
+    dib: (c) => `<circle cx="0" cy="0" r="8" fill="${c}" stroke="#FFFFFF" stroke-width="2"/><circle cx="0" cy="0" r="9.5" fill="none" stroke="${c}" stroke-width="1.2"/>`,
   },
   infrarrojo: {
-    nombre: "Infrarrojo", color: "#E8741E",
-    svg: '<path d="M0 10 L-19 -12 A 29 29 0 0 1 19 -12 Z" fill="#E8741E" fill-opacity="0.22" stroke="#E8741E" stroke-width="2" stroke-linejoin="round"/><path d="M-11 -3 A 17 17 0 0 1 11 -3" fill="none" stroke="#E8741E" stroke-width="1.4"/><circle cx="0" cy="10" r="5.5" fill="#FFFFFF" stroke="#E8741E" stroke-width="2.4"/><text x="0" y="24" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="8.5" fill="#E8741E">IR</text>',
+    nombre: "Infrarrojo", cat: "equipo", color: "#E8741E", r: 30,
+    dib: (c) => `<path d="M0 10 L-19 -12 A 29 29 0 0 1 19 -12 Z" fill="${c}" fill-opacity="0.22" stroke="${c}" stroke-width="2" stroke-linejoin="round"/><path d="M-11 -3 A 17 17 0 0 1 11 -3" fill="none" stroke="${c}" stroke-width="1.4"/><circle cx="0" cy="10" r="5.5" fill="#FFFFFF" stroke="${c}" stroke-width="2.4"/><text x="0" y="24" text-anchor="middle" ${CROQUIS_FUENTE} font-size="8.5" fill="${c}">IR</text>`,
   },
   infrarrojo_ext: {
-    nombre: "Infrarrojo exterior", color: "#7B4B94",
-    svg: '<path d="M0 10 L-22 -14 A 33 33 0 0 1 22 -14 Z" fill="#7B4B94" fill-opacity="0.2" stroke="#7B4B94" stroke-width="2" stroke-linejoin="round"/><path d="M-14 -5 A 21 21 0 0 1 14 -5" fill="none" stroke="#7B4B94" stroke-width="1.4"/><path d="M-7 3 A 11 11 0 0 1 7 3" fill="none" stroke="#7B4B94" stroke-width="1.4"/><rect x="-6" y="5" width="12" height="11" rx="2" fill="#FFFFFF" stroke="#7B4B94" stroke-width="2.4"/><text x="0" y="26" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="8.5" fill="#7B4B94">EXT</text>',
+    nombre: "Infrarrojo exterior", cat: "equipo", color: "#7B4B94", r: 34,
+    dib: (c) => `<path d="M0 10 L-22 -14 A 33 33 0 0 1 22 -14 Z" fill="${c}" fill-opacity="0.2" stroke="${c}" stroke-width="2" stroke-linejoin="round"/><path d="M-14 -5 A 21 21 0 0 1 14 -5" fill="none" stroke="${c}" stroke-width="1.4"/><path d="M-7 3 A 11 11 0 0 1 7 3" fill="none" stroke="${c}" stroke-width="1.4"/><rect x="-6" y="5" width="12" height="11" rx="2" fill="#FFFFFF" stroke="${c}" stroke-width="2.4"/><text x="0" y="26" text-anchor="middle" ${CROQUIS_FUENTE} font-size="8.5" fill="${c}">EXT</text>`,
+  },
+  dvr: {
+    nombre: "DVR / NVR", cat: "equipo", color: "#1C1E21", r: 28,
+    dib: (c) => `<rect x="-24" y="-12" width="48" height="24" rx="3" fill="#FFFFFF" stroke="${c}" stroke-width="2.6"/><text x="-4" y="5" text-anchor="middle" ${CROQUIS_FUENTE} font-size="12" fill="${c}">DVR</text><circle cx="15" cy="-3" r="2" fill="#2E9E4F"/><circle cx="15" cy="4" r="2" fill="${c}" opacity="0.5"/>`,
+  },
+  camara_ip: {
+    nombre: "Cámara IP", cat: "equipo", color: "#17809B", r: 32,
+    dib: (c) => `<path d="M0 2 L-20 -26 L20 -26 Z" fill="${c}" fill-opacity="0.16" stroke="${c}" stroke-width="1.2" stroke-dasharray="3 2"/><rect x="-7" y="-4" width="14" height="20" rx="3" fill="#FFFFFF" stroke="${c}" stroke-width="2.4"/><circle cx="0" cy="-4" r="4.5" fill="${c}"/><text x="0" y="12" text-anchor="middle" ${CROQUIS_FUENTE} font-size="7.5" fill="${c}">IP</text>`,
+  },
+  camara_analoga: {
+    nombre: "Cámara analógica", cat: "equipo", color: "#8A5A00", r: 32,
+    dib: (c) => `<path d="M0 0 L-20 -26 L20 -26 Z" fill="${c}" fill-opacity="0.16" stroke="${c}" stroke-width="1.2" stroke-dasharray="3 2"/><path d="M-12 8 A 12 12 0 0 1 12 8 Z" fill="#FFFFFF" stroke="${c}" stroke-width="2.4" stroke-linejoin="round"/><circle cx="0" cy="2" r="3.8" fill="${c}"/><text x="0" y="19" text-anchor="middle" ${CROQUIS_FUENTE} font-size="7.5" fill="${c}">AN</text>`,
+  },
+  // ---- Objetos de obra (centrados sobre la pared cuando son aberturas) ----
+  puerta: {
+    nombre: "Puerta", cat: "obra", color: "#1C1E21", r: 40, espejable: true,
+    dib: (c) => `<rect x="-20" y="-4.5" width="40" height="9" fill="#FFFFFF"/><line x1="-20" y1="-6" x2="-20" y2="6" stroke="${c}" stroke-width="2.5"/><line x1="20" y1="-6" x2="20" y2="6" stroke="${c}" stroke-width="2.5"/><path d="M-20 0 L-20 -40" stroke="${c}" stroke-width="2.6"/><path d="M-20 -40 A 40 40 0 0 1 20 0" fill="none" stroke="${c}" stroke-width="1.2" stroke-dasharray="4 3"/>`,
+  },
+  ventana: {
+    nombre: "Ventana", cat: "obra", color: "#1C1E21", r: 26,
+    dib: (c) => `<rect x="-22" y="-4.5" width="44" height="9" fill="#FFFFFF" stroke="${c}" stroke-width="1.6"/><line x1="-22" y1="0" x2="22" y2="0" stroke="${c}" stroke-width="1.2"/><line x1="0" y1="-4.5" x2="0" y2="4.5" stroke="${c}" stroke-width="1"/>`,
+  },
+  corrediza: {
+    nombre: "Abertura corrediza", cat: "obra", color: "#1C1E21", r: 34, espejable: true,
+    dib: (c) => `<rect x="-30" y="-5" width="60" height="10" fill="#FFFFFF"/><line x1="-30" y1="-6" x2="-30" y2="6" stroke="${c}" stroke-width="2.5"/><line x1="30" y1="-6" x2="30" y2="6" stroke="${c}" stroke-width="2.5"/><line x1="-30" y1="-2" x2="4" y2="-2" stroke="${c}" stroke-width="2.4"/><line x1="-4" y1="2.5" x2="30" y2="2.5" stroke="${c}" stroke-width="2.4"/><path d="M-12 -9 L0 -9 M-4 -12 L0 -9 L-4 -6" fill="none" stroke="${c}" stroke-width="1.2"/>`,
+  },
+  columna: {
+    nombre: "Columna", cat: "obra", color: "#1C1E21", r: 12,
+    dib: (c) => `<rect x="-8" y="-8" width="16" height="16" fill="${c}"/><path d="M-8 -8 L8 8 M8 -8 L-8 8" stroke="#FFFFFF" stroke-width="1" opacity="0.6"/>`,
+  },
+  piscina: {
+    nombre: "Piscina", cat: "obra", color: "#2E86DE", r: 50,
+    dib: (c) => `<rect x="-45" y="-26" width="90" height="52" rx="10" fill="#D6ECFA" stroke="${c}" stroke-width="2.4"/><rect x="-38" y="-19" width="76" height="38" rx="6" fill="none" stroke="${c}" stroke-width="0.8" opacity="0.6"/>` +
+      [-8, 6].map((y) => `<path d="M-24 ${y} q6 -5 12 0 t12 0 t12 0 t12 0" fill="none" stroke="${c}" stroke-width="1.3" opacity="0.8"/>`).join(""),
+  },
+  planta: {
+    nombre: "Planta", cat: "obra", color: "#2E9E4F", r: 18,
+    dib: (c) => [0, 60, 120, 180, 240, 300].map((a) => { const r = a * Math.PI / 180; return `<circle cx="${(Math.cos(r) * 8).toFixed(1)}" cy="${(Math.sin(r) * 8).toFixed(1)}" r="7" fill="${c}" fill-opacity="0.35" stroke="${c}" stroke-width="1.2"/>`; }).join("") + `<circle cx="0" cy="0" r="4" fill="${c}"/>`,
   },
 };
+// Compatibilidad: CROQUIS_SIMBOLOS[k].svg da el dibujo con su color de siempre.
+Object.values(CROQUIS_SIMBOLOS).forEach((s) => Object.defineProperty(s, "svg", { get() { return s.dib(s.color); } }));
 const CROQUIS_COLOR_CABLE = "#D6336C";
+// Colores para cables y equipos.
+const CROQUIS_COLORES = ["#D6336C", "#C0392B", "#E8741E", "#D4A017", "#2E9E4F", "#17809B", "#2E86DE", "#7B4B94", "#8A5A00", "#5B5F66", "#1C1E21"];
+// Tipos de trazo para cables y paredes.
+const CROQUIS_TRAZOS = {
+  continuo: { nombre: "Continuo", dash: "" },
+  guiones: { nombre: "Guiones", dash: "9 5" },
+  puntos: { nombre: "Puntos", dash: "0.1 6" },
+  guion_punto: { nombre: "Guión y punto", dash: "12 5 0.1 5" },
+};
+function croquisDash(trazo, porDefecto) {
+  const t = CROQUIS_TRAZOS[trazo || porDefecto];
+  return t && t.dash ? ` stroke-dasharray="${t.dash}"` : "";
+}
+function croquisSimboloSvg(tipo, color) {
+  const s = CROQUIS_SIMBOLOS[tipo];
+  return s ? s.dib(color || s.color) : "";
+}
 
 function croquisEsc(s) {
   return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -77,13 +138,21 @@ function croquisSvgElemento(el, attrs) {
     const etiqueta = el.nombre ? `<text x="${x + w / 2}" y="${y + h / 2 + 5}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" fill="#5B5F66" letter-spacing="0.5">${croquisEsc(el.nombre)}</text>` : "";
     return `<g ${a}><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#FFFFFF" fill-opacity="0.001" stroke="#1C1E21" stroke-width="5" stroke-linejoin="miter"/>${etiqueta}</g>`;
   }
-  if (el.t === "linea") return `<g ${a}><line x1="${el.x1}" y1="${el.y1}" x2="${el.x2}" y2="${el.y2}" stroke="#1C1E21" stroke-width="5" stroke-linecap="square"/></g>`;
-  if (el.t === "cable") return `<g ${a}><path d="${croquisPathSuave(el.pts)}" fill="none" stroke="${CROQUIS_COLOR_CABLE}" stroke-width="2.6" stroke-dasharray="9 5" stroke-linecap="round" stroke-linejoin="round"/></g>`;
+  if (el.t === "linea") {
+    const t = el.trazo && el.trazo !== "continuo";
+    return `<g ${a}><line x1="${el.x1}" y1="${el.y1}" x2="${el.x2}" y2="${el.y2}" stroke="${el.color || "#1C1E21"}" stroke-width="${t ? 3.5 : 5}"${croquisDash(el.trazo, "continuo")} stroke-linecap="${el.trazo === "puntos" ? "round" : (t ? "butt" : "square")}"/></g>`;
+  }
+  if (el.t === "cable") {
+    // Trazo invisible más ancho para que sea fácil tocarlo con el dedo.
+    const d = croquisPathSuave(el.pts);
+    return `<g ${a}>${a ? `<path d="${d}" fill="none" stroke="#000" stroke-opacity="0" stroke-width="14"/>` : ""}<path d="${d}" fill="none" stroke="${el.color || CROQUIS_COLOR_CABLE}" stroke-width="${el.trazo === "puntos" ? 3.4 : 2.6}"${croquisDash(el.trazo, "guiones")} stroke-linecap="round" stroke-linejoin="round"/></g>`;
+  }
   if (el.t === "texto") return `<g ${a}><text x="${el.x}" y="${el.y}" font-family="Arial, Helvetica, sans-serif" font-size="${el.tam || 16}" font-weight="700" fill="#1C1E21">${croquisEsc(el.texto)}</text></g>`;
   if (el.t === "simbolo") {
     const s = CROQUIS_SIMBOLOS[el.tipo];
     if (!s) return "";
-    return `<g ${a} transform="translate(${el.x} ${el.y}) rotate(${el.rot || 0}) scale(${el.esc || 1})">${s.svg}</g>`;
+    const esc = el.esc || 1;
+    return `<g ${a} transform="translate(${el.x} ${el.y}) rotate(${el.rot || 0}) scale(${el.esp ? -esc : esc} ${esc})">${s.dib(el.color || s.color)}</g>`;
   }
   return "";
 }
@@ -97,15 +166,39 @@ function croquisCaja(dibujo) {
     else if (el.t === "linea") { sumar(el.x1, el.y1); sumar(el.x2, el.y2); }
     else if (el.t === "cable") (el.pts || []).forEach((p) => sumar(p[0], p[1]));
     else if (el.t === "texto") { const w = String(el.texto || "").length * (el.tam || 16) * 0.6; sumar(el.x, el.y - (el.tam || 16)); sumar(el.x + w, el.y + 4); }
-    else if (el.t === "simbolo") { const r = 34 * (el.esc || 1); sumar(el.x - r, el.y - r); sumar(el.x + r, el.y + r); }
+    else if (el.t === "simbolo") { const r = ((CROQUIS_SIMBOLOS[el.tipo] || {}).r || 34) * (el.esc || 1); sumar(el.x - r, el.y - r); sumar(el.x + r, el.y + r); }
   });
   if (!isFinite(x0)) return { x: 0, y: 0, w: 400, h: 300 };
   return { x: x0, y: y0, w: Math.max(40, x1 - x0), h: Math.max(40, y1 - y0) };
 }
+// Ítems de la leyenda: cada equipo usado (por tipo y color) y cada
+// cableado distinto (por color, trazo y nombre). Los objetos de obra no van.
 function croquisTiposUsados(dibujo) {
-  const t = new Set((dibujo.elementos || []).filter((e) => e.t === "simbolo").map((e) => e.tipo));
-  const out = Object.keys(CROQUIS_SIMBOLOS).filter((k) => t.has(k));
-  if ((dibujo.elementos || []).some((e) => e.t === "cable")) out.push("cable");
+  const els = dibujo.elementos || [];
+  const out = [], vistos = new Set();
+  Object.keys(CROQUIS_SIMBOLOS).filter((k) => CROQUIS_SIMBOLOS[k].cat === "equipo").forEach((k) => {
+    els.filter((e) => e.t === "simbolo" && e.tipo === k).forEach((e) => {
+      const color = e.color || CROQUIS_SIMBOLOS[k].color, clave = k + color;
+      if (vistos.has(clave)) return;
+      vistos.add(clave);
+      out.push({ tipo: k, color, nombre: CROQUIS_SIMBOLOS[k].nombre });
+    });
+  });
+  const cables = [];
+  const todos = els.filter((e) => e.t === "cable");
+  const conNombre = (color, trazo) => todos.some((e) => (e.nombre || "").trim() && (e.color || CROQUIS_COLOR_CABLE) === color && (e.trazo || "guiones") === trazo);
+  todos.forEach((e) => {
+    const color = e.color || CROQUIS_COLOR_CABLE, trazo = e.trazo || "guiones", nombre = (e.nombre || "").trim();
+    // Un tramo sin nombre igual (color y trazo) a uno con nombre es el mismo cableado.
+    if (!nombre && conNombre(color, trazo)) return;
+    const clave = color + trazo + nombre;
+    if (vistos.has(clave)) return;
+    vistos.add(clave);
+    cables.push({ tipo: "cable", color, trazo, nombre });
+  });
+  const sinNombre = cables.filter((c) => !c.nombre);
+  sinNombre.forEach((c, i) => { c.nombre = sinNombre.length > 1 ? `Cableado ${i + 1}` : "Cableado"; });
+  out.push(...cables);
   return out;
 }
 // Documento SVG independiente (para descargar / abrir en Visio o Inkscape).
@@ -116,19 +209,19 @@ function croquisSvgDocumento(dibujo, opciones) {
   const usados = o.leyenda === false ? [] : croquisTiposUsados(dibujo);
   // Leyenda en filas: entran tantos ítems por fila como permita el ancho
   // del dibujo (mínimo 2 columnas de 150).
-  const COL = 150, FILA = 30;
+  const COL = 170, FILA = 30;
   const anchoMin = Math.max(c.w + m * 2, Math.min(usados.length, 2) * COL + 40);
   const porFila = Math.max(1, Math.floor((anchoMin - 40) / COL));
   const filas = Math.ceil(usados.length / porFila);
   const altoLey = usados.length ? 18 + filas * FILA : 0;
   const W = anchoMin, H = c.h + m * 2 + altoLey;
   const x0 = c.x - m - (W - (c.w + m * 2)) / 2;
-  const ley = usados.map((k, i) => {
+  const ley = usados.map((it, i) => {
     const x = x0 + 30 + (i % porFila) * COL, y = c.y + c.h + m + 22 + Math.floor(i / porFila) * FILA;
-    const icono = k === "cable"
-      ? `<path d="M${x - 14} ${y} q7 -8 14 0 t14 0" fill="none" stroke="${CROQUIS_COLOR_CABLE}" stroke-width="2.4" stroke-dasharray="6 4"/>`
-      : `<g transform="translate(${x} ${y}) scale(0.7)">${CROQUIS_SIMBOLOS[k].svg}</g>`;
-    return `${icono}<text x="${x + 24}" y="${y + 5}" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#1C1E21">${k === "cable" ? "Cableado" : CROQUIS_SIMBOLOS[k].nombre}</text>`;
+    const icono = it.tipo === "cable"
+      ? `<path d="M${x - 16} ${y} q8 -9 16 0 t16 0" fill="none" stroke="${it.color}" stroke-width="2.6"${croquisDash(it.trazo, "guiones")} stroke-linecap="round"/>`
+      : `<g transform="translate(${x} ${y}) scale(0.62)">${croquisSimboloSvg(it.tipo, it.color)}</g>`;
+    return `${icono}<text x="${x + 24}" y="${y + 5}" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#1C1E21">${croquisEsc(it.nombre)}</text>`;
   }).join("");
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="${x0} ${c.y - m} ${W} ${H}" width="${Math.round(W)}" height="${Math.round(H)}">

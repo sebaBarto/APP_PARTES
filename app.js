@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.4.0";
+const APP_VERSION = "4.5.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -14856,7 +14856,7 @@ function cqHandles(el) {
   if (el.t === "rect") { h(el.x, el.y, "0"); h(el.x + el.w, el.y, "1"); h(el.x + el.w, el.y + el.h, "2"); h(el.x, el.y + el.h, "3"); }
   else if (el.t === "linea") { h(el.x1, el.y1, "a"); h(el.x2, el.y2, "b"); }
   else if (el.t === "simbolo") {
-    const dist = 46 * (el.esc || 1), ang = ((el.rot || 0) - 90) * Math.PI / 180;
+    const dist = (((CROQUIS_SIMBOLOS[el.tipo] || {}).r || 34) + 14) * (el.esc || 1), ang = ((el.rot || 0) - 90) * Math.PI / 180;
     const hx = el.x + Math.cos(ang) * dist, hy = el.y + Math.sin(ang) * dist;
     out.unshift(`<line x1="${el.x}" y1="${el.y}" x2="${hx}" y2="${hy}" class="cq-rot-linea" stroke-width="${1.5 / cq.vista.s}"/>`);
     h(hx, hy, "rot", " cq-rot");
@@ -14864,7 +14864,7 @@ function cqHandles(el) {
   return out.join("");
 }
 function cqCajaSel(el) {
-  if (el.t === "simbolo") { const r = 30 * (el.esc || 1); return { x: el.x - r, y: el.y - r, w: r * 2, h: r * 2 }; }
+  if (el.t === "simbolo") { const r = ((CROQUIS_SIMBOLOS[el.tipo] || {}).r || 30) * (el.esc || 1); return { x: el.x - r, y: el.y - r, w: r * 2, h: r * 2 }; }
   return croquisCaja({ elementos: [el] });
 }
 function cqRender() {
@@ -14898,23 +14898,34 @@ const CQ_AYUDAS = {
   linea: "Arrastrá para trazar una pared (se endereza sola).",
   cable: "Dibujá el cableado con el dedo.",
   texto: "Tocá donde va el texto.",
-  simbolo: "Tocá en el plano dónde va el equipo.",
+  simbolo: "Tocá en el plano dónde va. Las aberturas se apoyan sobre la pared.",
 };
 function cqElegirHerr(h) {
   cq.herr = h;
-  document.querySelectorAll("#cqHerr button").forEach((b) => b.classList.toggle("activo", b.dataset.herr === h || (h === "simbolo" && b.dataset.herr === "simbolos")));
-  cqEl("cqSimbolos").classList.toggle("hidden", !(h === "simbolos" || h === "simbolo"));
+  if (h === "simbolos") cq.paleta = "equipo";
+  if (h === "objetos") cq.paleta = "obra";
+  const botonPaleta = cq.paleta === "obra" ? "objetos" : "simbolos";
+  document.querySelectorAll("#cqHerr button").forEach((b) => b.classList.toggle("activo", b.dataset.herr === h || (h === "simbolo" && b.dataset.herr === botonPaleta)));
+  const conPaleta = h === "simbolos" || h === "objetos" || h === "simbolo";
+  cqEl("cqSimbolos").classList.toggle("hidden", !conPaleta);
+  if (conPaleta) cqRenderPaleta();
   if (h !== "mover") cq.sel = null;
-  cqEl("cqAyuda").textContent = h === "simbolos" ? "Elegí un equipo de la lista." : (CQ_AYUDAS[h] || "");
+  cqEl("cqAyuda").textContent = h === "simbolos" ? "Elegí un equipo de la lista." : h === "objetos" ? "Elegí puerta, ventana, corrediza, columna, piscina o planta." : (CQ_AYUDAS[h] || "");
   cqRender();
 }
 document.querySelectorAll("#cqHerr button").forEach((b) => b.addEventListener("click", () => cqElegirHerr(b.dataset.herr)));
-cqEl("cqSimbolos").innerHTML = Object.entries(CROQUIS_SIMBOLOS).map(([k, s]) => `<button type="button" data-simbolo="${k}"><svg viewBox="-28 -28 56 56">${s.svg}</svg><span>${s.nombre}</span></button>`).join("");
-cqEl("cqSimbolos").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
-  cq.simboloElegido = b.dataset.simbolo;
-  cqEl("cqSimbolos").querySelectorAll("button").forEach((x) => x.classList.toggle("activo", x === b));
-  cqElegirHerr("simbolo");
-}));
+function cqRenderPaleta() {
+  const caja = cqEl("cqSimbolos");
+  caja.innerHTML = Object.entries(CROQUIS_SIMBOLOS).filter(([, s]) => s.cat === (cq.paleta || "equipo")).map(([k, s]) => {
+    const r = Math.max(28, s.r + 4);
+    return `<button type="button" data-simbolo="${k}" class="${cq.simboloElegido === k && cq.herr === "simbolo" ? "activo" : ""}"><svg viewBox="${-r} ${-r} ${r * 2} ${r * 2}">${croquisSimboloSvg(k)}</svg><span>${s.nombre}</span></button>`;
+  }).join("");
+  caja.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+    cq.simboloElegido = b.dataset.simbolo;
+    cqElegirHerr("simbolo");
+  }));
+}
+cq.paleta = "equipo";
 
 // ---------- Propiedades del elemento elegido ----------
 function cqRenderProps() {
@@ -14922,32 +14933,61 @@ function cqRenderProps() {
   const el = cq.elementos.find((e) => e.id === cq.sel);
   box.classList.toggle("hidden", !el);
   if (!el) { box.innerHTML = ""; return; }
-  const b = (acc, txt, titulo) => `<button type="button" data-acc="${acc}" title="${titulo || txt}">${txt}</button>`;
+  const b = (acc, txt, titulo, activo) => `<button type="button" data-acc="${acc}" title="${titulo || txt}"${activo ? ' class="activo"' : ""}>${txt}</button>`;
+  const def = el.t === "simbolo" ? CROQUIS_SIMBOLOS[el.tipo] || {} : {};
   let html = "";
-  if (el.t === "simbolo") html += `<span class="cq-props-tit">${escapeHtml(CROQUIS_SIMBOLOS[el.tipo].nombre)}</span>` + b("rot-", "↺ 15°", "Rotar a la izquierda") + b("rot+", "↻ 15°", "Rotar a la derecha") + b("rot90", "↻ 90°") + b("esc-", "−", "Achicar") + b("esc+", "+", "Agrandar");
+  if (el.t === "simbolo") {
+    html += `<span class="cq-props-tit">${escapeHtml(def.nombre || "")}</span>` + b("rot-", "↺ 15°", "Rotar a la izquierda") + b("rot+", "↻ 15°", "Rotar a la derecha") + b("rot90", "↻ 90°");
+    if (def.espejable) html += b("espejo", "⇋", "Abrir para el otro lado");
+    html += b("esc-", "−", "Achicar") + b("esc+", "+", "Agrandar");
+  }
   if (el.t === "rect") html += `<span class="cq-props-tit">Habitación</span>` + b("nombre", el.nombre ? "✎ " + escapeHtml(el.nombre).slice(0, 14) : "✎ Nombre", "Nombre del ambiente");
   if (el.t === "texto") html += `<span class="cq-props-tit">Texto</span>` + b("texto", "✎ Editar") + b("tam-", "A−", "Más chico") + b("tam+", "A+", "Más grande");
   if (el.t === "linea") html += `<span class="cq-props-tit">Pared</span>`;
-  if (el.t === "cable") html += `<span class="cq-props-tit">Cableado</span>`;
+  if (el.t === "cable") html += `<span class="cq-props-tit">Cableado</span>` + b("cnombre", el.nombre ? "✎ " + escapeHtml(el.nombre).slice(0, 14) : "✎ Nombre", "Nombre para la leyenda (ej. Sirena, Cámaras)");
   html += b("dup", "⧉", "Duplicar") + b("borrar", "🗑", "Borrar");
-  box.innerHTML = html;
-  box.querySelectorAll("button").forEach((x) => x.addEventListener("click", () => cqAccion(x.dataset.acc)));
+  // Segunda fila: trazo y color
+  let fila2 = "";
+  if (el.t === "cable" || el.t === "linea") {
+    const actual = el.trazo || (el.t === "cable" ? "guiones" : "continuo");
+    fila2 += Object.entries(CROQUIS_TRAZOS).map(([k, t]) => `<button type="button" class="cq-trazo${k === actual ? " activo" : ""}" data-trazo="${k}" title="${t.nombre}" aria-label="Trazo ${t.nombre}"><svg viewBox="0 0 40 10"><line x1="3" y1="5" x2="37" y2="5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"${t.dash ? ` stroke-dasharray="${t.dash.split(" ").map((n) => Number(n) * 0.7).join(" ")}"` : ""}/></svg></button>`).join("");
+  }
+  if (el.t === "cable" || el.t === "linea" || (el.t === "simbolo" && def.cat === "equipo")) {
+    const actual = el.color || (el.t === "cable" ? CROQUIS_COLOR_CABLE : el.t === "linea" ? "#1C1E21" : def.color);
+    fila2 += (fila2 ? '<span class="cq-sep"></span>' : "") + CROQUIS_COLORES.map((c) => `<button type="button" class="cq-color${c.toLowerCase() === String(actual).toLowerCase() ? " activo" : ""}" data-color="${c}" style="--c:${c}" aria-label="Color ${c}"></button>`).join("");
+  }
+  box.innerHTML = `<div class="cq-props-fila">${html}</div>${fila2 ? `<div class="cq-props-fila cq-props-fila2">${fila2}</div>` : ""}`;
+  box.querySelectorAll("[data-acc]").forEach((x) => x.addEventListener("click", () => cqAccion(x.dataset.acc)));
+  box.querySelectorAll("[data-trazo]").forEach((x) => x.addEventListener("click", () => {
+    cqMemoria();
+    el.trazo = x.dataset.trazo;
+    if (el.t === "cable") cq.ultimoCable = { color: el.color, trazo: el.trazo };
+    cqRender(); cqGuardarBorrador();
+  }));
+  box.querySelectorAll("[data-color]").forEach((x) => x.addEventListener("click", () => {
+    cqMemoria();
+    el.color = x.dataset.color;
+    // Lo próximo que se dibuje sale con este mismo color
+    if (el.t === "cable") cq.ultimoCable = { color: el.color, trazo: el.trazo };
+    cqRender(); cqGuardarBorrador();
+  }));
 }
 function cqAccion(acc) {
   const el = cq.elementos.find((e) => e.id === cq.sel);
   if (!el) return;
-  if (acc === "nombre" || acc === "texto") {
-    const actual = acc === "nombre" ? el.nombre || "" : el.texto;
-    const nuevo = prompt(acc === "nombre" ? "Nombre del ambiente (ej. Cocina, Dormitorio 1):" : "Texto:", actual);
+  if (acc === "nombre" || acc === "texto" || acc === "cnombre") {
+    const actual = acc === "texto" ? el.texto : el.nombre || "";
+    const nuevo = prompt(acc === "nombre" ? "Nombre del ambiente (ej. Cocina, Dormitorio 1):" : acc === "cnombre" ? "Nombre de este cableado para la leyenda (ej. Sirena, Sensores, Cámaras):" : "Texto:", actual);
     if (nuevo === null) return;
     cqMemoria();
-    if (acc === "nombre") el.nombre = nuevo.trim().slice(0, 40);
+    if (acc === "nombre" || acc === "cnombre") el.nombre = nuevo.trim().slice(0, 40);
     else { if (!nuevo.trim()) { cq.elementos = cq.elementos.filter((e) => e !== el); cq.sel = null; } else el.texto = nuevo.trim().slice(0, 80); }
   } else {
     cqMemoria();
     if (acc === "rot-") el.rot = ((el.rot || 0) - 15 + 360) % 360;
     if (acc === "rot+") el.rot = ((el.rot || 0) + 15) % 360;
     if (acc === "rot90") el.rot = ((el.rot || 0) + 90) % 360;
+    if (acc === "espejo") el.esp = !el.esp;
     if (acc === "esc-") el.esc = Math.max(0.5, Math.round(((el.esc || 1) - 0.25) * 100) / 100);
     if (acc === "esc+") el.esc = Math.min(3, Math.round(((el.esc || 1) + 0.25) * 100) / 100);
     if (acc === "tam-") el.tam = Math.max(10, (el.tam || 16) - 2);
@@ -15127,7 +15167,11 @@ function cqTerminarGesto(e) {
     if (cq.herr === "linea" && cqGesto.fin && Math.hypot(cqGesto.fin[0] - x0, cqGesto.fin[1] - y0) >= CROQUIS_GRILLA / 2) nuevo = { t: "linea", x1: x0, y1: y0, x2: cqGesto.fin[0], y2: cqGesto.fin[1] };
     if (cq.herr === "cable" && cqGesto.pts.length >= 2) {
       const pts = croquisSimplificar(cqGesto.pts, 2.5 / cq.vista.s).map((p) => [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10]);
-      if (pts.length >= 2 && Math.hypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]) > 6) nuevo = { t: "cable", pts };
+      if (pts.length >= 2 && Math.hypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]) > 6) {
+        nuevo = { t: "cable", pts };
+        if (cq.ultimoCable && cq.ultimoCable.color) nuevo.color = cq.ultimoCable.color;
+        if (cq.ultimoCable && cq.ultimoCable.trazo) nuevo.trazo = cq.ultimoCable.trazo;
+      }
     }
     if (nuevo) { cqMemoria(); nuevo.id = cqId(); cq.elementos.push(nuevo); cqGuardarBorrador(); }
   } else if ((cqGesto.tipo === "mover" || cqGesto.tipo === "handle") && cqGesto.movido) {
