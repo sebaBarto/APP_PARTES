@@ -15,6 +15,8 @@
 // Varias páginas: { v: 2, elementos (de la 1ª), paginas: [{ nombre, elementos, fondo }] }
 //   simbolo { tipo, x, y, rot, esc, color?, esp? }  equipos y objetos de obra
 
+// Tiene que ser igual a APP_VERSION de app.js (si no, la app recarga).
+const CROQUIS_UTILS_VERSION = "4.15.0";
 const CROQUIS_GRILLA = 20;
 
 // Cada símbolo se dibuja centrado en 0,0 con dib(color). "cat" separa los
@@ -96,6 +98,70 @@ const CROQUIS_SIMBOLOS = {
     nombre: "Monitor", cat: "equipo", color: "#1C1E21", r: 22,
     dib: (c) => `<rect x="-17" y="-13" width="34" height="22" rx="2" fill="#D6E4F0" stroke="${c}" stroke-width="2.4"/><path d="M-3 9 L-5 15 M3 9 L5 15 M-9 15.5 L9 15.5" stroke="${c}" stroke-width="2.2" stroke-linecap="round"/>`,
   },
+  rotura_vidrio: {
+    nombre: "Rotura de vidrio", cat: "equipo", color: "#17809B", r: 16,
+    dib: (c) => `<circle cx="0" cy="0" r="11" fill="#FFFFFF" stroke="${c}" stroke-width="2.4"/><path d="M-6 -4 L-1 0 L-4 5 M-1 0 L5 -3 M1 1 L4 6" fill="none" stroke="${c}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>`,
+  },
+  vibracion: {
+    nombre: "Sensor de vibración", cat: "equipo", color: "#8A5A00", r: 16,
+    dib: (c) => `<rect x="-11" y="-8" width="22" height="16" rx="2" fill="#FFFFFF" stroke="${c}" stroke-width="2.4"/><path d="M-7 0 q2 -5 4 0 t4 0 t4 0" fill="none" stroke="${c}" stroke-width="1.6"/>`,
+  },
+  inundacion: {
+    nombre: "Detector de inundación", cat: "equipo", color: "#2E86DE", r: 16,
+    dib: (c) => `<path d="M0 -12 C5 -4 9 0 9 4 A9 9 0 0 1 -9 4 C-9 0 -5 -4 0 -12 Z" fill="${c}" fill-opacity="0.2" stroke="${c}" stroke-width="2.2"/><path d="M-5 5 q2.5 -2 5 0 t5 0" fill="none" stroke="${c}" stroke-width="1.3"/>`,
+  },
+  detector_360: {
+    nombre: "Detector de techo 360°", cat: "equipo", color: "#E00000", r: 40,
+    dib: (c) => `<circle cx="0" cy="0" r="36" fill="#8E949A" fill-opacity="0.12" stroke="#1C1E21" stroke-width="1.4" stroke-dasharray="4 3"/><circle cx="0" cy="0" r="9" fill="${c}" stroke="#1C1E21" stroke-width="2"/><text x="0" y="3" text-anchor="middle" ${CROQUIS_FUENTE} font-size="6.5" fill="#FFFFFF">360</text>`,
+  },
+  barrera: {
+    nombre: "Barrera infrarroja", cat: "equipo", color: "#E00000", r: 64,
+    dib: (c) => `<line x1="-54" y1="0" x2="54" y2="0" stroke="${c}" stroke-width="1.6" stroke-dasharray="6 4"/><rect x="-62" y="-7" width="10" height="14" rx="2" fill="${c}" stroke="#1C1E21" stroke-width="1.6"/><rect x="52" y="-7" width="10" height="14" rx="2" fill="${c}" stroke="#1C1E21" stroke-width="1.6"/>`,
+  },
+  sirena_flash: {
+    nombre: "Sirena con flash", cat: "equipo", color: "#D9D9D9", r: 22,
+    dib: (c) => croquisSirena(c, 0.62) + `<path d="M-17 -16 l-5 -4 M17 -16 l5 -4 M0 -18 v-6" stroke="#E8741E" stroke-width="2" stroke-linecap="round"/>`,
+  },
+  comunicador: {
+    nombre: "Comunicador GPRS / 4G", cat: "equipo", color: "#D9D9D9", r: 20,
+    dib: (c) => `<rect x="-13" y="-9" width="26" height="18" rx="2" fill="${c}" stroke="#1C1E21" stroke-width="2.2"/><path d="M8 -9 V-17" stroke="#1C1E21" stroke-width="2"/><circle cx="8" cy="-18" r="1.8" fill="#1C1E21"/><text x="-1" y="4" text-anchor="middle" ${CROQUIS_FUENTE} font-size="8" fill="#1C1E21">4G</text>`,
+  },
+  control_remoto: {
+    nombre: "Control remoto", cat: "equipo", color: "#1C1E21", r: 14,
+    dib: (c) => `<rect x="-6" y="-11" width="12" height="22" rx="4" fill="#FFFFFF" stroke="${c}" stroke-width="2"/><circle cx="0" cy="-5" r="1.8" fill="${c}"/><circle cx="0" cy="0" r="1.8" fill="${c}"/><circle cx="0" cy="5" r="1.8" fill="${c}"/>`,
+  },
+  lector_acceso: {
+    nombre: "Lector de acceso", cat: "equipo", color: "#1B5FA8", r: 16,
+    dib: (c) => `<rect x="-9" y="-12" width="18" height="24" rx="3" fill="#FFFFFF" stroke="${c}" stroke-width="2.2"/><path d="M-4 3 a4 4 0 0 1 8 0 M-5.5 1 a6 6 0 0 1 11 0 M-2 5 a2 2 0 0 1 4 0" fill="none" stroke="${c}" stroke-width="1.2"/>`,
+  },
+  cerradura: {
+    nombre: "Cerradura eléctrica", cat: "equipo", color: "#1B5FA8", r: 14,
+    dib: (c) => `<rect x="-8" y="-3" width="16" height="12" rx="2" fill="${c}"/><path d="M-5 -3 v-3 a5 5 0 0 1 10 0 v3" fill="none" stroke="${c}" stroke-width="2.2"/>`,
+  },
+  boton_salida: {
+    nombre: "Botón de salida", cat: "equipo", color: "#2E9E4F", r: 14,
+    dib: (c) => `<rect x="-9" y="-9" width="18" height="18" rx="2" fill="#FFFFFF" stroke="#1C1E21" stroke-width="1.8"/><circle cx="0" cy="0" r="5.5" fill="${c}"/>`,
+  },
+  videoportero: {
+    nombre: "Videoportero", cat: "equipo", color: "#1C1E21", r: 16,
+    dib: (c) => `<rect x="-9" y="-12" width="18" height="24" rx="2" fill="#FFFFFF" stroke="${c}" stroke-width="2"/><rect x="-6" y="-9" width="12" height="9" fill="#D6E4F0" stroke="${c}" stroke-width="1"/><circle cx="0" cy="6" r="2.5" fill="${c}"/>`,
+  },
+  energizador: {
+    nombre: "Energizador (cerco eléctrico)", cat: "equipo", color: "#F2C94C", r: 18,
+    dib: (c) => `<rect x="-12" y="-10" width="24" height="20" rx="2" fill="${c}" stroke="#1C1E21" stroke-width="2.2"/><path d="M1 -7 L-4 1 H1 L-1 7 L5 -1 H0 Z" fill="#1C1E21"/>`,
+  },
+  camara_domo: {
+    nombre: "Cámara domo", cat: "equipo", color: "#17809B", r: 16,
+    dib: (c) => `<circle cx="0" cy="0" r="11" fill="#FFFFFF" stroke="${c}" stroke-width="2.4"/><circle cx="0" cy="0" r="5" fill="${c}" fill-opacity="0.3" stroke="${c}" stroke-width="1.2"/><circle cx="0" cy="0" r="2" fill="${c}"/>`,
+  },
+  switch_red: {
+    nombre: "Switch / router", cat: "equipo", color: "#1C1E21", r: 20,
+    dib: (c) => `<rect x="-15" y="-7" width="30" height="14" rx="2" fill="#FFFFFF" stroke="${c}" stroke-width="2"/>` + [-10, -5, 0, 5].map((x) => `<rect x="${x - 1.5}" y="-2" width="3.5" height="4" fill="${c}"/>`).join("") + `<circle cx="11" cy="0" r="1.5" fill="#2E9E4F"/>`,
+  },
+  caja_paso: {
+    nombre: "Caja de paso", cat: "equipo", color: "#5B5F66", r: 10,
+    dib: (c) => `<rect x="-6" y="-6" width="12" height="12" fill="#FFFFFF" stroke="${c}" stroke-width="1.8"/><path d="M-6 -6 L6 6 M6 -6 L-6 6" stroke="${c}" stroke-width="1"/>`,
+  },
   // ---- Objetos de obra (centrados sobre la pared cuando son aberturas) ----
   puerta: {
     nombre: "Puerta", cat: "obra", color: "#1C1E21", r: 40, espejable: true,
@@ -162,6 +228,30 @@ const CROQUIS_SIMBOLOS = {
       ? `<image href="${CROQUIS_LOGO}" x="-35" y="-31" width="70" height="62" preserveAspectRatio="xMidYMid meet"/>`
       : `<rect x="-35" y="-20" width="70" height="40" rx="6" fill="#F2C94C" stroke="#1C1E21" stroke-width="2"/><text x="0" y="8" text-anchor="middle" ${CROQUIS_FUENTE} font-size="22" fill="#1C1E21">SAT</text>`,
   },
+  reja: {
+    nombre: "Reja", cat: "obra", color: "#1C1E21", r: 54,
+    dib: (c) => `<line x1="-50" y1="0" x2="50" y2="0" stroke="${c}" stroke-width="2"/>` + Array.from({ length: 11 }, (_, i) => `<line x1="${-50 + i * 10}" y1="-5" x2="${-50 + i * 10}" y2="5" stroke="${c}" stroke-width="1.6"/>`).join(""),
+  },
+  arbol: {
+    nombre: "Árbol", cat: "obra", color: "#2E9E4F", r: 26,
+    dib: (c) => `<circle cx="0" cy="0" r="22" fill="${c}" fill-opacity="0.18" stroke="${c}" stroke-width="1.6" stroke-dasharray="5 3"/><path d="M0 -14 V14 M-12 -6 L0 2 L12 -6 M-9 8 L0 2" fill="none" stroke="${c}" stroke-width="1.4"/><circle cx="0" cy="0" r="3" fill="${c}"/>`,
+  },
+  auto: {
+    nombre: "Auto (cochera)", cat: "obra", color: "#5B5F66", r: 48,
+    dib: (c) => `<rect x="-20" y="-44" width="40" height="88" rx="12" fill="#FFFFFF" stroke="${c}" stroke-width="2"/><path d="M-16 -22 Q0 -30 16 -22 L14 -12 H-14 Z M-14 18 H14 L16 26 Q0 32 -16 26 Z" fill="${c}" fill-opacity="0.25" stroke="${c}" stroke-width="1.2"/>`,
+  },
+  tablero: {
+    nombre: "Tablero eléctrico", cat: "obra", color: "#1C1E21", r: 16,
+    dib: (c) => `<rect x="-11" y="-11" width="22" height="22" rx="1.5" fill="#FFFFFF" stroke="${c}" stroke-width="2"/><path d="M2 -7 L-4 1 H1 L-2 7 L5 -1 H0 Z" fill="#E8741E"/>`,
+  },
+  medidor: {
+    nombre: "Medidor (luz / gas)", cat: "obra", color: "#1C1E21", r: 16,
+    dib: (c) => `<rect x="-11" y="-11" width="22" height="22" rx="2" fill="#FFFFFF" stroke="${c}" stroke-width="2"/><circle cx="0" cy="-1" r="6" fill="none" stroke="${c}" stroke-width="1.4"/><path d="M0 -1 L3 -4" stroke="${c}" stroke-width="1.4"/>`,
+  },
+  rampa: {
+    nombre: "Rampa", cat: "obra", color: "#1C1E21", r: 40,
+    dib: (c) => `<rect x="-20" y="-36" width="40" height="72" fill="#FFFFFF" stroke="${c}" stroke-width="2"/><path d="M0 28 V-26 M-6 -18 L0 -26 L6 -18" fill="none" stroke="${c}" stroke-width="1.4"/><text x="5" y="30" ${CROQUIS_FUENTE} font-size="7" fill="${c}">SUBE</text>`,
+  },
   piscina: {
     nombre: "Piscina", cat: "obra", color: "#2E86DE", r: 50,
     dib: (c) => `<rect x="-45" y="-26" width="90" height="52" rx="10" fill="#D6ECFA" stroke="${c}" stroke-width="2.4"/><rect x="-38" y="-19" width="76" height="38" rx="6" fill="none" stroke="${c}" stroke-width="0.8" opacity="0.6"/>` +
@@ -222,6 +312,14 @@ const CROQUIS_SIMBOLOS = {
     nombre: "Heladera", cat: "mueble", color: "#5B5F66", r: 20,
     dib: (c) => `<rect x="-14" y="-15" width="28" height="30" rx="2" fill="#FFFFFF" stroke="${c}" stroke-width="1.8"/><text x="0" y="5" text-anchor="middle" ${CROQUIS_FUENTE} font-size="13" fill="${c}">H</text>`,
   },
+  mesa_luz: { nombre: "Mesa de luz", cat: "mueble", color: "#5B5F66", r: 10, dib: (c) => `<rect x="-7" y="-7" width="14" height="14" rx="1.5" fill="#FFFFFF" stroke="${c}" stroke-width="1.6"/><circle cx="0" cy="0" r="3" fill="none" stroke="${c}" stroke-width="1"/>` },
+  mesa_ratona: { nombre: "Mesa ratona", cat: "mueble", color: "#5B5F66", r: 22, dib: (c) => `<rect x="-20" y="-11" width="40" height="22" rx="3" fill="#FFFFFF" stroke="${c}" stroke-width="1.6"/>` },
+  rack_tv: { nombre: "Mueble de TV", cat: "mueble", color: "#5B5F66", r: 32, dib: (c) => `<rect x="-30" y="-8" width="60" height="16" fill="#FFFFFF" stroke="${c}" stroke-width="1.6"/><rect x="-22" y="-12" width="44" height="4" rx="1" fill="${c}"/>` },
+  pileta_lavadero: { nombre: "Pileta de lavadero", cat: "mueble", color: "#5B5F66", r: 16, dib: (c) => `<rect x="-14" y="-12" width="28" height="24" rx="2" fill="#FFFFFF" stroke="${c}" stroke-width="1.6"/><rect x="-10" y="-6" width="20" height="14" rx="3" fill="none" stroke="${c}" stroke-width="1.2"/><circle cx="0" cy="-9" r="1.3" fill="${c}"/>` },
+  termotanque: { nombre: "Termotanque / calefón", cat: "mueble", color: "#5B5F66", r: 14, dib: (c) => `<circle cx="0" cy="0" r="12" fill="#FFFFFF" stroke="${c}" stroke-width="1.8"/><text x="0" y="4" text-anchor="middle" ${CROQUIS_FUENTE} font-size="11" fill="${c}">T</text>` },
+  aire_split: { nombre: "Aire acondicionado", cat: "mueble", color: "#5B5F66", r: 24, dib: (c) => `<rect x="-22" y="-6" width="44" height="12" rx="3" fill="#FFFFFF" stroke="${c}" stroke-width="1.6"/><path d="M-16 1 H16 M-16 3.5 H16" stroke="${c}" stroke-width="0.8"/><text x="0" y="-9" text-anchor="middle" ${CROQUIS_FUENTE} font-size="7" fill="${c}">AA</text>` },
+  estufa: { nombre: "Estufa / hogar", cat: "mueble", color: "#5B5F66", r: 18, dib: (c) => `<rect x="-16" y="-9" width="32" height="18" rx="2" fill="#FFFFFF" stroke="${c}" stroke-width="1.8"/><path d="M0 5 C-5 1 -2 -3 0 -6 C2 -3 5 1 0 5 Z" fill="#E8741E" fill-opacity="0.6" stroke="#E8741E" stroke-width="1"/>` },
+  parrilla: { nombre: "Parrilla", cat: "mueble", color: "#5B5F66", r: 26, dib: (c) => `<rect x="-24" y="-14" width="48" height="28" rx="2" fill="#FFFFFF" stroke="${c}" stroke-width="1.8"/>` + [-16, -8, 0, 8, 16].map((x) => `<line x1="${x}" y1="-10" x2="${x}" y2="10" stroke="${c}" stroke-width="1"/>`).join("") },
   lavarropas: {
     nombre: "Lavarropas", cat: "mueble", color: "#5B5F66", r: 20,
     dib: (c) => `<rect x="-14" y="-14" width="28" height="28" rx="2" fill="#FFFFFF" stroke="${c}" stroke-width="1.8"/><circle cx="0" cy="1" r="8" fill="none" stroke="${c}" stroke-width="1.4"/>`,
@@ -441,6 +539,16 @@ function croquisSvgElemento(el, attrs) {
     if (Array.isArray(el.c)) return `<g ${a}>${a ? `<path d="M${el.x1} ${el.y1} Q${el.c[0]} ${el.c[1]} ${el.x2} ${el.y2}" fill="none" stroke="#000" stroke-opacity="0" stroke-width="14"/>` : ""}<path d="M${el.x1} ${el.y1} Q${el.c[0]} ${el.c[1]} ${el.x2} ${el.y2}" fill="none" ${estilo}/></g>`;
     return `<g ${a}>${a ? `<line x1="${el.x1}" y1="${el.y1}" x2="${el.x2}" y2="${el.y2}" stroke="#000" stroke-opacity="0" stroke-width="14"/>` : ""}<line x1="${el.x1}" y1="${el.y1}" x2="${el.x2}" y2="${el.y2}" ${estilo}/></g>`;
   }
+  if (el.t === "cota") {
+    // Cota: línea de medida con marcas en las puntas y el largo en metros.
+    const dx = el.x2 - el.x1, dy = el.y2 - el.y1, l = Math.hypot(dx, dy) || 1, nx = -dy / l * 6, ny = dx / l * 6;
+    let ang = Math.atan2(dy, dx) * 180 / Math.PI;
+    if (ang > 90 || ang < -90) ang += 180;
+    // El texto va un poco por encima de la línea (del lado de arriba al leerlo).
+    const r = ang * Math.PI / 180, mx = (el.x1 + el.x2) / 2 + Math.sin(r) * 7, my = (el.y1 + el.y2) / 2 - Math.cos(r) * 7;
+    const col = el.color || "#1B5FA8";
+    return `<g ${a}>${a ? `<line x1="${el.x1}" y1="${el.y1}" x2="${el.x2}" y2="${el.y2}" stroke="#000" stroke-opacity="0" stroke-width="14"/>` : ""}<line x1="${el.x1}" y1="${el.y1}" x2="${el.x2}" y2="${el.y2}" stroke="${col}" stroke-width="1.4"/><line x1="${el.x1 - nx}" y1="${el.y1 - ny}" x2="${el.x1 + nx}" y2="${el.y1 + ny}" stroke="${col}" stroke-width="1.4"/><line x1="${el.x2 - nx}" y1="${el.y2 - ny}" x2="${el.x2 + nx}" y2="${el.y2 + ny}" stroke="${col}" stroke-width="1.4"/><text x="${mx.toFixed(1)}" y="${my.toFixed(1)}" transform="rotate(${ang.toFixed(1)} ${mx.toFixed(1)} ${my.toFixed(1)})" text-anchor="middle" ${CROQUIS_FUENTE} font-size="${el.tam || 12}" fill="${col}" stroke="#FFFFFF" stroke-width="3" paint-order="stroke">${croquisMetros(l)}</text></g>`;
+  }
   if (el.t === "cable") {
     // Trazo invisible más ancho para que sea fácil tocarlo con el dedo.
     const d = croquisPathSuave(el.pts);
@@ -503,6 +611,7 @@ function croquisCaja(dibujo) {
   (dibujo.elementos || []).forEach((el) => {
     if (el.t === "rect") { sumar(el.x, el.y); sumar(el.x + el.w, el.y + el.h); }
     else if (el.t === "linea") { sumar(el.x1, el.y1); sumar(el.x2, el.y2); if (Array.isArray(el.c)) { const m = croquisMedioCurva(el); sumar(m[0], m[1]); } }
+    else if (el.t === "cota") { sumar(Math.min(el.x1, el.x2) - 12, Math.min(el.y1, el.y2) - 12); sumar(Math.max(el.x1, el.x2) + 12, Math.max(el.y1, el.y2) + 12); }
     else if (el.t === "cable") (el.pts || []).forEach((p) => sumar(p[0], p[1]));
     else if (el.t === "texto") { const tam = el.tam || 16, ls = String(el.texto || "").split("\n"); const w = Math.max(...ls.map((l) => l.length)) * tam * 0.6; sumar(el.x, el.y - tam); sumar(el.x + w, el.y + 4 + (ls.length - 1) * tam * 1.25); }
     else if (el.t === "tabla") { const m = croquisTablaMedidas(el); sumar(el.x, el.y); sumar(el.x + m.W, el.y + m.H); }
@@ -569,61 +678,15 @@ function croquisSvgDocumento(dibujo, opciones) {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="${x0} ${c.y - m} ${W} ${H}" width="${Math.round(W)}" height="${Math.round(H)}">
 <rect x="${x0}" y="${c.y - m}" width="${W}" height="${H}" fill="#FFFFFF"/>
-${(dibujo.elementos || []).filter((e) => e.t === "rect").map((e) => croquisSvgElemento(e)).join("\n")}
-${(dibujo.elementos || []).filter((e) => e.t === "linea").map((e) => croquisSvgElemento(e)).join("\n")}
-${(dibujo.elementos || []).filter((e) => e.t === "cable").map((e) => croquisSvgElemento(e)).join("\n")}
-${(dibujo.elementos || []).filter((e) => e.t === "simbolo" || e.t === "texto" || e.t === "tabla").map((e) => croquisSvgElemento(e)).join("\n")}
+${croquisOrdenCapas(dibujo.elementos || []).map((e) => croquisSvgElemento(e)).join("\n")}
+${dibujo.medidas ? croquisSvgMedidas(dibujo.elementos || []) : ""}
 ${usados.length ? `<line x1="${x0 + 10}" y1="${c.y + c.h + m - 2}" x2="${x0 + W - 10}" y2="${c.y + c.h + m - 2}" stroke="#C9CCD1" stroke-width="1"/>` : ""}
 ${ley}
 </svg>`;
 }
 // PNG (Blob) a partir del SVG. ancho: px del lado más largo.
 async function croquisPng(dibujo, ancho) {
-  if ((dibujo.elementos || []).some((e) => e.tipo === "logo_sat")) await // Tramos de pared: bordes de habitaciones rectangulares y paredes rectas.
-function croquisTramosPared(elementos, excluir) {
-  const tramos = [];
-  elementos.forEach((e) => {
-    if (e === excluir) return;
-    if (e.t === "rect" && !e.forma) tramos.push([e.x, e.y, e.x + e.w, e.y], [e.x, e.y + e.h, e.x + e.w, e.y + e.h], [e.x, e.y, e.x, e.y + e.h], [e.x + e.w, e.y, e.x + e.w, e.y + e.h]);
-    if (e.t === "linea" && !e.c) tramos.push([e.x1, e.y1, e.x2, e.y2]);
-  });
-  return tramos;
-}
-// "Imán": una puerta, ventana o portón cerca de una pared se apoya
-// encima de ella y toma su dirección. Devuelve true si se movió.
-function croquisApoyarEnPared(e, elementos, distancia) {
-  let mejor = null;
-  croquisTramosPared(elementos, e).forEach(([x1, y1, x2, y2]) => {
-    const dx = x2 - x1, dy = y2 - y1, l2 = dx * dx + dy * dy;
-    if (!l2) return;
-    const t = Math.max(0, Math.min(1, ((e.x - x1) * dx + (e.y - y1) * dy) / l2));
-    const px = x1 + t * dx, py = y1 + t * dy, d = Math.hypot(e.x - px, e.y - py);
-    if (!mejor || d < mejor.d) mejor = { d, px, py, horizontal: Math.abs(dx) >= Math.abs(dy) };
-  });
-  if (!mejor || mejor.d > distancia) return false;
-  if (mejor.horizontal) e.y = Math.round(mejor.py); else e.x = Math.round(mejor.px);
-  const quiere = mejor.horizontal ? [0, 180] : [90, 270];
-  if (!quiere.includes(((e.rot || 0) % 360 + 360) % 360)) e.rot = quiere[0];
-  return true;
-}
-// "Imán" de esquinas: el vértice de un sensor (infrarrojo) cerca de una
-// esquina de habitación o de pared se apoya justo en la esquina.
-function croquisApoyarEnEsquina(e, elementos, distancia) {
-  let mejor = null;
-  const prueba = (x, y) => { const d = Math.hypot(e.x - x, e.y - y); if (d <= distancia && (!mejor || d < mejor.d)) mejor = { d, x, y }; };
-  elementos.forEach((o) => {
-    if (o === e) return;
-    if (o.t === "rect" && !o.forma) { prueba(o.x, o.y); prueba(o.x + o.w, o.y); prueba(o.x, o.y + o.h); prueba(o.x + o.w, o.y + o.h); }
-    if (o.t === "linea") { prueba(o.x1, o.y1); prueba(o.x2, o.y2); }
-  });
-  if (!mejor) return false;
-  e.x = mejor.x; e.y = mejor.y;
-  return true;
-}
-// Medidas: la grilla es de 20 unidades = 50 cm (1 m = 40 unidades).
-const CROQUIS_POR_METRO = 40;
-
-croquisCargarLogo();
+  if ((dibujo.elementos || []).some((e) => e.tipo === "logo_sat")) await croquisCargarLogo();
   return new Promise((ok, mal) => {
     const svg = croquisSvgDocumento(dibujo);
     const img = new Image();
@@ -672,7 +735,7 @@ async function croquisPdf(c) {
   for (let i = 0; i < paginas.length; i++) {
     const p = paginas[i];
     const pag = doc.addPage([W, H]);
-    const png = await doc.embedPng(new Uint8Array(await (await croquisPng({ elementos: p.elementos }, 2400)).arrayBuffer()));
+    const png = await doc.embedPng(new Uint8Array(await (await croquisPng({ elementos: p.elementos, medidas: !!(c.dibujo && c.dibujo.medidas) }, 2400)).arrayBuffer()));
     pag.drawRectangle({ x: M, y: M, width: W - 2 * M, height: H - 2 * M, borderColor: rgb(0.11, 0.12, 0.13), borderWidth: 1.2 });
     const altoRot = 58;
     pag.drawLine({ start: { x: M, y: M + altoRot }, end: { x: W - M, y: M + altoRot }, thickness: 1.2, color: rgb(0.11, 0.12, 0.13) });
@@ -861,5 +924,42 @@ function croquisApoyarEnEsquina(e, elementos, distancia) {
 }
 // Medidas: la grilla es de 20 unidades = 50 cm (1 m = 40 unidades).
 const CROQUIS_POR_METRO = 40;
+function croquisMetros(unidades) { return (Math.abs(unidades) / CROQUIS_POR_METRO).toLocaleString("es-AR", { maximumFractionDigits: 2 }) + " m"; }
+
+// ---------- Capas ----------
+// Cada elemento pertenece a una capa (para verla u ocultarla y bloquearla
+// toda junta) y tiene un orden: el.z. Si no tiene z, se usa el de su tipo
+// (las habitaciones abajo, los equipos y textos arriba).
+const CROQUIS_CAPAS = {
+  plano: { nombre: "Plano (habitaciones, paredes, aberturas)", z: 0 },
+  muebles: { nombre: "Muebles", z: 15 },
+  cableado: { nombre: "Cableado", z: 25 },
+  equipos: { nombre: "Equipos de seguridad", z: 30 },
+  textos: { nombre: "Textos, tablas y medidas", z: 40 },
+};
+function croquisCapaDe(el) {
+  if (el.t === "rect" || el.t === "linea") return "plano";
+  if (el.t === "cable") return "cableado";
+  if (el.t === "texto" || el.t === "tabla" || el.t === "cota") return "textos";
+  const cat = (CROQUIS_SIMBOLOS[el.tipo] || {}).cat;
+  return cat === "equipo" ? "equipos" : cat === "mueble" ? "muebles" : "plano";
+}
+function croquisZ(el) {
+  if (typeof el.z === "number") return el.z;
+  const base = CROQUIS_CAPAS[croquisCapaDe(el)].z;
+  return el.t === "linea" ? base + 5 : (el.t === "simbolo" && croquisCapaDe(el) === "plano" ? base + 8 : base);
+}
+// Orden de dibujo: de atrás para adelante (a igual orden, el que se agregó antes queda atrás).
+function croquisOrdenCapas(elementos) {
+  return elementos.map((e, i) => [e, i]).sort((a, b) => croquisZ(a[0]) - croquisZ(b[0]) || a[1] - b[1]).map((x) => x[0]);
+}
+// Medidas de las habitaciones rectangulares (arriba y a la izquierda, por dentro).
+function croquisSvgMedidas(elementos) {
+  return elementos.filter((e) => e.t === "rect" && !e.forma && Math.abs(e.w) >= 40 && Math.abs(e.h) >= 40).map((e) => {
+    const x = Math.min(e.x, e.x + e.w), y = Math.min(e.y, e.y + e.h), w = Math.abs(e.w), h = Math.abs(e.h);
+    const st = `${CROQUIS_FUENTE} font-size="10.5" fill="#1B5FA8" stroke="#FFFFFF" stroke-width="2.5" paint-order="stroke"`;
+    return `<g pointer-events="none"><text x="${x + w / 2}" y="${y + 16}" text-anchor="middle" ${st}>${croquisMetros(w)}</text><text x="${x + 14}" y="${y + h / 2}" text-anchor="middle" transform="rotate(-90 ${x + 14} ${y + h / 2})" ${st}>${croquisMetros(h)}</text></g>`;
+  }).join("");
+}
 
 croquisCargarLogo();

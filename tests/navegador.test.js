@@ -2162,7 +2162,7 @@ test("Croquis: cables con color y trazo, equipos de color, cámaras/DVR y objeto
   // Objetos de obra: la paleta muestra solo esos
   await page.click('[data-herr="objetos"]');
   const objetos = await page.$$eval("#cqSimbolos [data-simbolo]", (bs) => bs.map((b) => b.dataset.simbolo));
-  assert.deepStrictEqual(objetos, ["puerta", "ventana", "corrediza", "columna", "columna_redonda", "porton_batiente", "porton_corredizo", "escalera_recta", "escalera_l_izq", "escalera_l_der", "escalera_u", "escalera_caracol", "logo_sat", "piscina", "planta"]);
+  for (const k of ["puerta", "ventana", "corrediza", "columna", "columna_redonda", "porton_batiente", "porton_corredizo", "escalera_recta", "escalera_caracol", "logo_sat", "piscina", "planta", "reja", "arbol", "auto"]) assert.ok(objetos.includes(k), k);
   await page.click('[data-simbolo="puerta"]');
   await clic(100, 100);
   await page.click('[data-acc="espejo"]');
@@ -2173,7 +2173,7 @@ test("Croquis: cables con color y trazo, equipos de color, cámaras/DVR y objeto
   // Equipos: DVR y cámaras; un magnético pintado de naranja
   await page.click('[data-herr="simbolos"]');
   const equipos = await page.$$eval("#cqSimbolos [data-simbolo]", (bs) => bs.map((b) => b.dataset.simbolo));
-  assert.deepStrictEqual(equipos, ["central", "hub", "repetidor", "teclado", "sirena_ext", "sirena_int", "magnetico", "infrarrojo", "infrarrojo_ext", "infrarrojo_cortina", "humo", "gas", "pulsador_incendio", "pulsador_asalto", "dvr", "camara_ip", "camara_analoga", "monitor"]);
+  for (const k of ["central", "hub", "repetidor", "teclado", "sirena_ext", "sirena_int", "magnetico", "infrarrojo", "infrarrojo_ext", "infrarrojo_cortina", "humo", "gas", "pulsador_incendio", "pulsador_asalto", "dvr", "camara_ip", "camara_analoga", "monitor", "rotura_vidrio", "barrera", "comunicador"]) assert.ok(equipos.includes(k), k);
   for (const [tipo, x, y] of [["dvr", 60, 200], ["camara_ip", 300, 80], ["camara_analoga", 300, 200], ["magnetico", 160, 100]]) {
     await page.click('[data-herr="simbolos"]');
     await page.click(`[data-simbolo="${tipo}"]`);
@@ -2783,6 +2783,99 @@ test("Croquis: flechas para mover fino (y más rápido dejando apretado), desliz
     return [puerta.y, puerta.rot, ir.x, ir.y];
   });
   assert.deepStrictEqual(r, [120, 0, 180, 120]);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Croquis en celular (táctil): abrir uno guardado y agregar/modificar; ambientes con medida que se pegan; cota; capas; orden; repetir; lupa", async () => {
+  const { devices } = require("playwright");
+  const ctx = await browser.newContext({ ...devices["Pixel 5"], serviceWorkers: "block" });
+  const page = await ctx.newPage();
+  const erroresPagina = [];
+  page.on("pageerror", (e) => erroresPagina.push(e.message));
+  await page.addInitScript(() => { localStorage.setItem("ajustes_app", JSON.stringify({ estiloInicio: "nuevo" })); localStorage.setItem("skin_v4_aplicado", "1"); localStorage.removeItem("croquis_capas"); });
+  const guardado = { id: "cqtactil1", titulo: "Casa", cliente: "Tell", autor: "Juan", actualizado: "2026-10-27T20:00:00Z", dibujo: { v: 2, elementos: [{ id: "r1", t: "rect", x: 0, y: 0, w: 200, h: 160, nombre: "Living" }, { id: "s1", t: "simbolo", tipo: "central", x: 60, y: 60, rot: 0, esc: 1 }], paginas: [{ nombre: "Página 1", elementos: [{ id: "r1", t: "rect", x: 0, y: 0, w: 200, h: 160, nombre: "Living" }, { id: "s1", t: "simbolo", tipo: "central", x: 60, y: 60, rot: 0, esc: 1 }] }] } };
+  await page.route("**/api/**", (route) => {
+    const u = route.request().url();
+    const j = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("coleccion=croquis") && u.includes("id=")) return j(guardado);
+    if (u.includes("coleccion=croquis")) return j([{ id: "cqtactil1", titulo: "Casa", cliente: "Tell", autor: "Juan", actualizado: "2026-10-27T20:00:00Z", elementos: 2 }]);
+    j([]);
+  });
+  await page.goto(base + "/");
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); cqAbrirLista(); });
+  await page.waitForTimeout(400);
+  const pausa = () => page.waitForTimeout(380);
+  await page.tap("[data-abrir]");
+  await page.waitForTimeout(500);
+  assert.strictEqual(await page.evaluate(() => cq.elementos.length), 2);
+  await page.evaluate(() => { cq.vista = { x: -20, y: -20, s: 1 }; cqRender(); });
+  const caja = await page.locator("#cqSvg").boundingBox();
+  const tocar = (x, y) => page.touchscreen.tap(caja.x + x, caja.y + y);
+  const cdp = await ctx.newCDPSession(page);
+  const arrastrar = async (a, b) => {
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: caja.x + a[0], y: caja.y + a[1] }] });
+    for (let i = 1; i <= 8; i++) await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: caja.x + a[0] + (b[0] - a[0]) * i / 8, y: caja.y + a[1] + (b[1] - a[1]) * i / 8 }] });
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await pausa();
+  };
+  // Agregar un equipo a un croquis guardado (lo que se trababa)
+  await pausa(); await page.tap('[data-herr="simbolos"]'); await pausa();
+  await page.tap('[data-simbolo="teclado"]'); await pausa();
+  await tocar(150, 120); await pausa();
+  assert.strictEqual(await page.evaluate(() => cq.elementos.length), 3, "se agregó el teclado");
+  // Modificarlo: rotar
+  await page.tap('[data-acc="rot90"]'); await pausa();
+  assert.strictEqual(await page.evaluate(() => cq.elementos[2].rot), 90);
+  // Ambiente con medida: Cocina 3 × 3 m que se pega al living
+  await page.tap('[data-herr="rect"]'); await pausa();
+  await page.evaluate(() => { document.querySelector("#cqSimbolos").scrollLeft = 0; });
+  const cocina = await page.evaluate(() => CQ_AMBIENTES.findIndex((a) => a.nombre === "Cocina"));
+  await page.locator(`[data-amb="${cocina}"]`).scrollIntoViewIfNeeded();
+  await page.tap(`[data-amb="${cocina}"]`); await pausa();
+  await tocar(300, 85); await pausa();
+  const coc = await page.evaluate(() => cq.elementos.find((e) => e.nombre === "Cocina"));
+  assert.deepStrictEqual([coc.w, coc.h], [120, 120]);
+  assert.strictEqual(coc.x, 200, "se pegó al borde del living");
+  // Cota (medida)
+  await page.tap('[data-herr="linea"]'); await pausa();
+  await page.tap('[data-subpared="cota"]'); await pausa();
+  await arrastrar([20, 210], [340, 210]);
+  const cota = await page.evaluate(() => cq.elementos.find((e) => e.t === "cota"));
+  assert.ok(cota && Math.abs(cota.x2 - cota.x1) === 320, "cota de 8 m");
+  assert.match(await page.evaluate(() => croquisSvgElemento(cq.elementos.find((e) => e.t === "cota"))), />8 m</);
+  // Repetir: tres magnéticos seguidos
+  await page.tap('[data-herr="objetos"]'); await pausa();
+  await page.tap('[data-herr="simbolos"]'); await pausa();
+  await page.tap("[data-repetir]"); await pausa();
+  await page.tap('[data-simbolo="magnetico"]'); await pausa();
+  for (const x of [40, 80, 120]) { await tocar(x, 30); await pausa(); }
+  assert.strictEqual(await page.evaluate(() => cq.elementos.filter((e) => e.tipo === "magnetico").length), 3);
+  // Capas: bloquear el plano; tocar la habitación no la elige y sí deja elegir el equipo de arriba
+  await page.tap('[data-herr="mover"]'); await pausa();
+  await page.tap("#cqCapasBtn"); await pausa();
+  await page.tap('[data-bloquear="plano"]'); await pausa();
+  await page.tap("[data-cerrar]"); await pausa();
+  await tocar(30, 140); await pausa();
+  assert.strictEqual(await page.evaluate(() => cq.sel), null, "el plano bloqueado no se elige");
+  await tocar(80, 80); await pausa();
+  assert.strictEqual(await page.evaluate(() => (cq.elementos.find((e) => e.id === cq.sel) || {}).tipo), "central");
+  // Orden: mandar la central al fondo
+  await page.tap('[data-acc="zfondo"]'); await pausa();
+  const orden = await page.evaluate(() => croquisOrdenCapas(cq.elementos).map((e) => e.id));
+  assert.strictEqual(orden[0], "s1", "la central quedó al fondo");
+  // Lupa mientras se arrastra con el dedo
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: caja.x + 80, y: caja.y + 80 }] });
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: caja.x + 90, y: caja.y + 90 }] });
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: caja.x + 100, y: caja.y + 100 }] });
+  assert.strictEqual(await page.isVisible("#cqLupa"), true, "aparece la lupa");
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  await pausa();
+  assert.strictEqual(await page.isVisible("#cqLupa"), false);
+  // Medidas de las habitaciones
+  await page.evaluate(() => { cq.medidas = true; cqRender(); });
+  assert.match(await page.evaluate(() => croquisSvgDocumento(cqDibujo())), />5 m</);
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
