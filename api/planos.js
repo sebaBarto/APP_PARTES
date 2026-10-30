@@ -12,6 +12,9 @@
 // GET  /api/planos                 -> lista los nombres de archivo disponibles
 // GET  /api/planos?nombre=XXXX     -> devuelve ese PDF puntual
 // GET  /api/planos?estado=1        -> estado de la última sincronización automática
+// POST /api/planos {accion:"subir_plano_app", carpeta, nombre, tipo, base64}
+//                                  -> guarda el PDF/SVG de un plano hecho con la APP
+//                                     (lo baja el sincronizador a la carpeta del cliente)
 //
 // Variables de entorno:
 //   SERVICIOS_API_TOKEN, BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN
@@ -31,8 +34,27 @@ module.exports = require("../lib/auditoria").conAuditoria("planos", async (req, 
   }
   const headersBackendNuevo = { Authorization: `Bearer ${BACKEND_NUEVO_TOKEN}` };
 
+  // POST: la APP manda el PDF / SVG del plano de una instalación para que
+  // el sincronizador de la oficina lo baje a la carpeta de Planos.
+  if (req.method === "POST") {
+    let body = req.body;
+    try { if (typeof body === "string") body = JSON.parse(body); } catch (e) { body = null; }
+    if (!body || body.accion !== "subir_plano_app") { res.status(400).json({ error: "Acción inválida" }); return; }
+    try {
+      const r = await fetch(`${BACKEND_NUEVO_URL}/api/planos/app`, {
+        method: "POST",
+        headers: { ...headersBackendNuevo, "Content-Type": "application/json" },
+        body: JSON.stringify({ carpeta: body.carpeta, nombre: body.nombre, tipo: body.tipo, base64: body.base64 }),
+      });
+      const data = await r.json().catch(() => ({ error: "El backend no respondió bien (¿falta publicar la actualización de planos.js?)" }));
+      res.status(r.status).json(data);
+    } catch (err) {
+      res.status(502).json({ error: "No se pudo mandar el plano al backend" });
+    }
+    return;
+  }
   if (req.method !== "GET") {
-    res.setHeader("Allow", "GET");
+    res.setHeader("Allow", "GET, POST");
     res.status(405).json({ error: "Método no permitido" });
     return;
   }

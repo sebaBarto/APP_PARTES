@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.17.2";
+const APP_VERSION = "4.18.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -10513,7 +10513,11 @@ document.getElementById("instPlanoCroquisBtn").addEventListener("click", async (
   try { visio = await instPlanosVisioDelCliente(); } finally { boton.disabled = false; }
   const mios = instPlanoDeEsta().filter((c) => !c.cerrado);
   // Planos/croquis del mismo cliente hechos antes (por la oficina o en otra visita).
-  const delCliente = instPlanoIndice.filter((c) => String(c.instalacion || "") !== String(instalacionActivaId));
+  // El plano de la última instalación cerrada va primero: una ampliación arranca desde ahí.
+  const tiempo = (c) => { const f = fechaDelServidor(c.cerrado_en || c.actualizado); return f ? f.getTime() : 0; };
+  const delCliente = instPlanoIndice.filter((c) => String(c.instalacion || "") !== String(instalacionActivaId))
+    .sort((a, b) => (!!b.cerrado - !!a.cerrado) || (tiempo(b) - tiempo(a)));
+  const ultimo = delCliente.find((c) => c.cerrado);
   if (!mios.length && !visio.length && !delCliente.length) { instPlanoNuevo(); return; }
   const capa = document.createElement("div");
   capa.className = "cq-datos-capa";
@@ -10521,7 +10525,9 @@ document.getElementById("instPlanoCroquisBtn").addEventListener("click", async (
     <h3>Plano de la instalación</h3>
     ${mios.map((c, i) => `<button type="button" class="btn btn-primary" data-seguir="${i}">${cqIc("lapiz")} Seguir «${escapeHtml(c.titulo || "Croquis")}»</button>`).join("")}
     ${delCliente.length || visio.length ? '<p class="pe-nota" style="margin:6px 0 2px;">Dibujar encima del plano de la casa:</p>' : ""}
-    ${delCliente.map((c, i) => `<button type="button" class="btn btn-secondary" data-copiar="${i}">${cqIc("plano")} ${escapeHtml(c.titulo || "Croquis")}${c.base ? " (plano de la oficina)" : ""}</button>`).join("")}
+    ${delCliente.map((c, i) => c === ultimo
+      ? `<button type="button" class="btn ${mios.length ? "btn-secondary" : "btn-primary"} cq-plano-opcion" data-copiar="${i}">${cqIc("plano")}<span><b>Ampliar el plano de la última instalación</b><small>${escapeHtml(c.titulo || "Plano")}${tiempo(c) ? " · " + new Date(tiempo(c)).toLocaleDateString("es-AR") : ""} · lo anterior se ve atenuado</small></span></button>`
+      : `<button type="button" class="btn btn-secondary" data-copiar="${i}">${cqIc("plano")} ${escapeHtml(c.titulo || "Croquis")}${c.base ? " (plano de la oficina)" : c.cerrado ? " (instalación anterior)" : ""}</button>`).join("")}
     ${visio.map((p, i) => `<button type="button" class="btn btn-secondary" data-visio="${i}">${cqIc("plano")} Plano de Visio del cliente${visio.length > 1 ? " " + (i + 1) : ""}</button>`).join("")}
     <button type="button" class="btn btn-secondary" data-blanco="1">${cqIc("nuevo")} Croquis en blanco</button>
     <button type="button" class="link-btn" data-cerrar="1">Cancelar</button>
@@ -10539,9 +10545,11 @@ document.getElementById("instPlanoCroquisBtn").addEventListener("click", async (
       try {
         const c = delCliente[Number(b.dataset.copiar)];
         const d = await instPlanoTraer(c.id);
-        const pags = croquisPaginas(d.dibujo).map((p) => ({ nombre: p.nombre || "Página 1", elementos: JSON.parse(JSON.stringify(p.elementos || [])), fondo: p.fondo ? { ...p.fondo } : null }));
-        instPlanoNuevo(pags, "Instalación - " + (c.titulo || "Plano"));
-        showToast("Dibujá encima lo que instalaste: el plano original queda como estaba.");
+        // Lo que ya estaba (de otra instalación) queda atenuado y bloqueado.
+        const hayAntes = croquisPaginas(d.dibujo).some((p) => (p.elementos || []).length);
+        const pags = croquisPaginas(d.dibujo).map((p) => ({ nombre: p.nombre || "Página 1", elementos: croquisMarcarComoAntes(p.elementos), fondo: p.fondo ? { ...p.fondo } : null }));
+        instPlanoNuevo(pags, c.cerrado ? "Ampliación - " + String(c.titulo || "Plano").replace(/^(Ampliación|Instalación) - /, "") : "Instalación - " + (c.titulo || "Plano"));
+        showToast(hayAntes ? "Lo que ya estaba instalado se ve atenuado. Dibujá lo nuevo encima; si algo de antes lo cambiaste, tocalo y «Es nuevo»." : "Dibujá encima lo que instalaste: el plano original queda como estaba.");
       } catch (err) { showToast("No se pudo abrir: " + err.message); }
       return;
     }
@@ -10641,6 +10649,9 @@ async function instPlanosPdf(planos) {
       const r = await fetch("/api/foto", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ base64: bytesABase64(bytes), tipo: "pdf" }) });
       const res = await r.json().catch(() => ({}));
       if (r.ok && res.id) out.push({ id: res.id, nombre: (c.titulo || "Plano") + (planos.length > 1 ? " " + (out.length + 1) : "") });
+      // Y a la carpeta de Planos de la oficina (PDF + SVG para Visio).
+      try { await croquisMandarACarpetaVisio({ ...d, cerrado_en: new Date().toISOString() }, SERVICIOS_API_TOKEN, bytes); }
+      catch (errVisio) { console.error("[plano] no se pudo mandar a la carpeta de Visio", errVisio); try { registrarErrorApp("Plano a carpeta Visio: " + errVisio.message, "croquis"); } catch (e) { /* nada */ } }
     } catch (err) { console.error("[plano] no se pudo armar el PDF", err); }
   }
   return out;
@@ -15679,13 +15690,13 @@ function cqRenderProps() {
   }
   if (el.bloq) {
     // Bloqueado: no se mueve ni se edita hasta desbloquearlo.
-    box.innerHTML = `<div class="cq-props-fila"><span class="cq-props-tit">${cqIc("candado")} ${escapeHtml(cqNombreElemento(el))} bloqueado</span>${bb("bloq", cqIc("abierto") + " Desbloquear", "Desbloquear para moverlo o editarlo")}</div>`;
+    box.innerHTML = `<div class="cq-props-fila"><span class="cq-props-tit">${cqIc("candado")} ${escapeHtml(cqNombreElemento(el))} ${el.prev ? "(instalado antes)" : "bloqueado"}</span>${bb("bloq", cqIc("abierto") + " Desbloquear", "Desbloquear para moverlo o editarlo")}${el.prev ? bb("prev", cqIc("nuevo") + " Es nuevo", "Marcarlo como instalado en esta visita") : ""}</div>`;
     box.querySelectorAll("[data-acc]").forEach((x) => x.addEventListener("click", () => cqAccion(x.dataset.acc)));
     return;
   }
   const b = (acc, txt, titulo, activo) => `<button type="button" data-acc="${acc}" title="${titulo || txt}"${activo ? ' class="activo"' : ""}>${txt}</button>`;
   const def = el.t === "simbolo" ? CROQUIS_SIMBOLOS[el.tipo] || {} : {};
-  let html = "";
+  let html = el.prev ? b("prev", cqIc("nuevo") + "Es nuevo", "Está atenuado porque se instaló antes: tocá si es de esta visita") : "";
   if (el.t === "simbolo") {
     html += `<span class="cq-props-tit">${escapeHtml(def.nombre || "")}</span>` + b("rot-", cqIc("rotIzq") + "15°", "Rotar a la izquierda") + b("rot+", cqIc("rotDer") + "15°", "Rotar a la derecha") + b("rot90", cqIc("rotDer") + "90°", "Rotar 90°");
     if (def.espejable) html += b("espejo", cqIc("espejo"), "Abrir para el otro lado");
@@ -15874,6 +15885,7 @@ function cqAccion(acc) {
     }
     if (acc === "inal" || acc === "doble" || acc === "video" || acc === "inst") { if (el[acc]) delete el[acc]; else el[acc] = true; }
     if (acc === "bloq") { if (el.bloq) delete el.bloq; else el.bloq = true; }
+    if (acc === "prev") { if (el.prev) { delete el.prev; delete el.bloq; } else el.prev = true; }
     if (/^z/.test(acc)) cqCambiarOrden([el], acc);
     if (acc === "esc-") el.esc = Math.max(0.5, Math.round(((el.esc || 1) - 0.25) * 100) / 100);
     if (acc === "esc+") el.esc = Math.min(3, Math.round(((el.esc || 1) + 0.25) * 100) / 100);

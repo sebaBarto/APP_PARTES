@@ -16,7 +16,7 @@
 //   simbolo { tipo, x, y, rot, esc, color?, esp? }  equipos y objetos de obra
 
 // Tiene que ser igual a APP_VERSION de app.js (si no, la app recarga).
-const CROQUIS_UTILS_VERSION = "4.17.2";
+const CROQUIS_UTILS_VERSION = "4.18.0";
 const CROQUIS_GRILLA = 20;
 
 // Cada símbolo se dibuja centrado en 0,0 con dib(color). "cat" separa los
@@ -515,7 +515,19 @@ function croquisSimplificar(pts, tol) {
 }
 
 // SVG de un elemento (sin interacción). attrs: atributos extra (data-id, etc.).
+// Lo instalado en visitas anteriores (plano ampliado) se ve atenuado:
+// así en cada ampliación se distingue qué se agregó.
+const CROQUIS_OPACIDAD_ANTES = 0.38;
 function croquisSvgElemento(el, attrs) {
+  const svg = croquisSvgElementoBase(el, attrs);
+  return el && el.prev && svg ? `<g opacity="${CROQUIS_OPACIDAD_ANTES}" class="cq-antes">${svg}</g>` : svg;
+}
+// Copia de los elementos de un plano anterior, marcados como "de antes"
+// (atenuados y bloqueados para no moverlos sin querer).
+function croquisMarcarComoAntes(elementos) {
+  return (elementos || []).map((e) => { const x = JSON.parse(JSON.stringify(e)); x.prev = true; x.bloq = true; delete x.inst; return x; });
+}
+function croquisSvgElementoBase(el, attrs) {
   const a = attrs || "";
   if (el.t === "rect") {
     const x = Math.min(el.x, el.x + el.w), y = Math.min(el.y, el.y + el.h), w = Math.abs(el.w), h = Math.abs(el.h);
@@ -650,6 +662,7 @@ function croquisTiposUsados(dibujo) {
   const sinNombre = cables.filter((c) => !c.nombre);
   sinNombre.forEach((c, i) => { c.nombre = sinNombre.length > 1 ? `Cableado ${i + 1}` : "Cableado"; });
   out.push(...cables);
+  if (els.some((e) => e.prev) && els.some((e) => !e.prev && (e.t === "simbolo" || e.t === "cable"))) out.push({ tipo: "antes", nombre: "Atenuado: instalado en visitas anteriores" });
   return out;
 }
 // Documento SVG independiente (para descargar / abrir en Visio o Inkscape).
@@ -669,7 +682,9 @@ function croquisSvgDocumento(dibujo, opciones) {
   const x0 = c.x - m - (W - (c.w + m * 2)) / 2;
   const ley = usados.map((it, i) => {
     const x = x0 + 30 + (i % porFila) * COL, y = c.y + c.h + m + 22 + Math.floor(i / porFila) * FILA;
-    const icono = it.tipo === "cable"
+    const icono = it.tipo === "antes"
+      ? `<rect x="${x - 10}" y="${y - 8}" width="20" height="16" rx="3" fill="#5B5F66" opacity="${CROQUIS_OPACIDAD_ANTES}"/>`
+      : it.tipo === "cable"
       ? `<path d="M${x - 16} ${y} q8 -9 16 0 t16 0" fill="none" stroke="${it.color}" stroke-width="2.6"${croquisDash(it.trazo, "guiones")} stroke-linecap="round"/>`
       : CROQUIS_SIMBOLOS[it.tipo].ir
         ? `<g transform="translate(${x + 2} ${y + 2}) scale(0.62)">${croquisSimboloSvg(it.tipo, it.color, { alc: 24, ang: Math.max(25, CROQUIS_SIMBOLOS[it.tipo].ang) })}</g>`
@@ -898,6 +913,36 @@ async function croquisPdf(c, opciones) {
     pag.drawImage(png, { x: ax + (aw - png.width * k) / 2, y: ay + (ah - png.height * k) / 2, width: png.width * k, height: png.height * k });
   }
   return await doc.save();
+}
+// ---------- A la carpeta de Planos de la oficina (para Visio) ----------
+// Sube el PDF y un SVG por página; el sincronizador de la PC de la oficina
+// los baja a CLI_XXXXXXXX/Planos de la APP. pdfBytes: si ya se armó.
+function croquisBytesABase64(bytes) { let bin = ""; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(bin); }
+function croquisCarpetaCliente(numeroCliente) {
+  const n = String(numeroCliente || "").replace(/\.0+$/, "").replace(/\D/g, "");
+  return n && Number(n) > 0 ? "CLI_" + n.padStart(8, "0") : "SIN_NUMERO";
+}
+async function croquisMandarACarpetaVisio(c, token, pdfBytes) {
+  const fecha = new Date(c.cerrado_en || c.actualizado || Date.now());
+  const dia = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, "0")}-${String(fecha.getDate()).padStart(2, "0")}`;
+  const base = [dia, c.instalacion ? `Inst ${c.instalacion}` : "", c.titulo || "Plano"].filter(Boolean).join(" - ");
+  const carpeta = croquisCarpetaCliente(c.numero_cliente);
+  const subir = async (nombre, tipo, base64) => {
+    const r = await fetch("/api/planos", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: JSON.stringify({ accion: "subir_plano_app", carpeta, nombre, tipo, base64 }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || "HTTP " + r.status);
+  };
+  let bytes = pdfBytes;
+  if (!bytes) { bytes = await croquisPdf(c, { ancho: 1800 }); if (bytes.length > 3200000) bytes = await croquisPdf(c, { ancho: 1200 }); }
+  await subir(base, "pdf", croquisBytesABase64(bytes));
+  await croquisCargarLogo();
+  const paginas = croquisPaginas(c.dibujo).filter((p) => p.elementos.length || (p.fondo && p.fondo.base));
+  for (let i = 0; i < paginas.length; i++) {
+    const p = paginas[i];
+    const svg = croquisSvgDocumento(await croquisPrepararFondos({ elementos: p.elementos, fondo: p.fondo && p.fondo.base ? p.fondo : null, medidas: !!(c.dibujo && c.dibujo.medidas) }));
+    await subir(base + (paginas.length > 1 ? ` - Hoja ${i + 1}` : ""), "svg", croquisBytesABase64(new TextEncoder().encode(svg)));
+  }
+  return { carpeta, archivos: 1 + paginas.length };
 }
 function croquisNombreArchivo(c, ext) {
   return `Croquis_${String(c.titulo || "sin_titulo").replace(/[^\wÁÉÍÓÚÑáéíóúñ]+/g, "_").slice(0, 40)}${c.numero_cliente ? "_cli" + c.numero_cliente : ""}.${ext}`;

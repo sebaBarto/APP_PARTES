@@ -8301,7 +8301,7 @@ function renderCroquisAdmin() {
     const f = fechaDelServidor(c.actualizado);
     return `<div class="croquis-admin-fila" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(128,128,128,.25);">
       <div style="min-width:200px;flex:1;"><b>${escapeHtmlAdmin(c.titulo || "Croquis")}</b>${c.cerrado ? ' <span style="font-size:11px;background:#FFF4E5;color:#8A4B00;border-radius:8px;padding:1px 6px;">Instalación cerrada</span>' : c.instalacion ? ' <span style="font-size:11px;background:#E8F0FA;color:#1B5FA8;border-radius:8px;padding:1px 6px;">Instalación ' + escapeHtmlAdmin(c.instalacion) + '</span>' : ""}${c.base ? ' <span style="font-size:11px;background:#EAF6EE;color:#22783D;border-radius:8px;padding:1px 6px;">Sobre plano</span>' : ""}<br><span style="font-size:13px;opacity:.8;">${escapeHtmlAdmin(c.cliente || "Sin cliente")}${c.numero_cliente ? " · N° " + escapeHtmlAdmin(c.numero_cliente) : ""}${c.direccion ? " · " + escapeHtmlAdmin(c.direccion) : ""}</span><br><span style="font-size:12px;opacity:.65;">${escapeHtmlAdmin(c.autor || "")}${f ? " · " + f.toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : ""} · ${Number(c.elementos) || 0} elementos</span></div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;"><button type="button" class="btn-secondary" data-cq="pdf" data-i="${i}">PDF</button><button type="button" class="btn-secondary" data-cq="png" data-i="${i}">Imagen</button><button type="button" class="btn-secondary" data-cq="svg" data-i="${i}" title="Se abre y edita en Visio">SVG (Visio)</button><button type="button" class="btn-secondary" data-cq="plano" data-i="${i}" title="Reemplaza el plano de la casa (si el PDF tiene varias hojas, una por página); lo dibujado encima queda">Cambiar plano</button><button type="button" class="btn-secondary" data-cq="borrar" data-i="${i}" style="color:#C0392B;">Borrar</button></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;"><button type="button" class="btn-secondary" data-cq="pdf" data-i="${i}">PDF</button><button type="button" class="btn-secondary" data-cq="png" data-i="${i}">Imagen</button><button type="button" class="btn-secondary" data-cq="svg" data-i="${i}" title="Se abre y edita en Visio">SVG (Visio)</button><button type="button" class="btn-secondary" data-cq="visio" data-i="${i}" title="Lo deja en la carpeta Planos de la oficina (CLI_XXXXXXXX/Planos de la APP) en la próxima sincronización">A carpeta Visio</button><button type="button" class="btn-secondary" data-cq="plano" data-i="${i}" title="Reemplaza el plano de la casa (si el PDF tiene varias hojas, una por página); lo dibujado encima queda">Cambiar plano</button><button type="button" class="btn-secondary" data-cq="borrar" data-i="${i}" style="color:#C0392B;">Borrar</button></div>
     </div>`;
   }).join("") || (croquisAdminIndice.length ? '<p class="status">Ninguno coincide.</p>' : "");
   caja.querySelectorAll("[data-cq]").forEach((b) => b.addEventListener("click", async () => {
@@ -8322,6 +8322,11 @@ function renderCroquisAdmin() {
       const r = await fetch(`/api/datos?coleccion=croquis&id=${encodeURIComponent(c.id)}`, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "HTTP " + r.status);
+      if (acc === "visio") {
+        const r2 = await croquisMandarACarpetaVisio(d, SERVICIOS_API_TOKEN);
+        alert(`Listo: en la próxima sincronización (cada 1 hora) aparece en la carpeta Planos, dentro de ${r2.carpeta === "SIN_NUMERO" ? "«_Planos de la APP sin N° de cliente»" : r2.carpeta + "\\Planos de la APP"}.`);
+        return;
+      }
       if (acc === "plano") {
         const dib = d.dibujo || {};
         const paginas = Array.isArray(dib.paginas) && dib.paginas.length ? dib.paginas : [{ nombre: "Página 1", elementos: dib.elementos || [], fondo: dib.fondo || null }];

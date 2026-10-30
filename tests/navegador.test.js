@@ -3182,3 +3182,66 @@ test("Admin: el detalle de una instalación muestra su plano y la configuración
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Ampliación sobre el último plano (lo anterior atenuado) y al cerrar el plano va a la carpeta de Visio (PDF + SVG)", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const posts = [];
+  const anterior = { id: "viejo0001", instalacion: "3", cerrado: true, cerrado_en: "2026-05-10T15:00:00Z", titulo: "Plano de la instalación", cliente: "Lara Silvano", numero_cliente: "55", autor: "Luis", dibujo: { v: 2, elementos: [], paginas: [{ nombre: "Página 1", elementos: [{ id: "c1", t: "simbolo", tipo: "central", x: 100, y: 100 }, { id: "k1", t: "cable", pts: [[100, 100], [200, 100]] }] }] } };
+  const guardados = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    const json = (o, st) => route.fulfill({ status: st || 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (req.method() === "POST") {
+      const b = JSON.parse(req.postData() || "{}");
+      posts.push({ u, ...b });
+      if (u.includes("/api/foto")) return json({ id: "abcdef0123456789" });
+      if (u.includes("/api/planos")) return json({ ok: true });
+      if (u.includes("coleccion=croquis") && b.accion === "guardar") { const id = b.id || "nuevo" + posts.length + "x"; const i = guardados.findIndex((g) => g.id === id); const reg = { ...b, id, autor: "Juan Pérez" }; if (i >= 0) guardados[i] = reg; else guardados.push(reg); return json({ ok: true, id }); }
+      return json({ ok: true });
+    }
+    if (u.includes("tipo=instalacion_abierta")) return json({ abierta: { id: 7, cliente: "Lara Silvano", numero_cliente: "55", direccion: "Mitre 100" } });
+    if (u.includes("tipo=instalacion&id=7")) return json({ id: 7, cliente: "Lara Silvano", zonas: [], canales: [], fotos: [] });
+    if (u.includes("recurso=presencia")) return json({ activa: null });
+    if (u.includes("coleccion=croquis&id=viejo0001")) return json(anterior);
+    const m = /coleccion=croquis&id=([a-z0-9]+)/.exec(u);
+    if (m) return json(guardados.find((g) => g.id === m[1]));
+    if (u.includes("coleccion=croquis")) return json([{ id: "base00001", titulo: "Planta baja", cliente: "Lara Silvano", numero_cliente: "55", base: true, autor: "Oficina", actualizado: "2026-01-01T00:00:00Z" }, { ...anterior, dibujo: undefined, elementos: 2 }, ...guardados.map(({ dibujo, ...x }) => ({ ...x, elementos: 1 }))]);
+    return json([]);
+  });
+  await page.goto(base + "/");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { tecnicoLogueado = "Juan Pérez"; localStorage.removeItem("croquis_borrador"); showScreen("instalacion"); return verificarInstalacionAbierta(); });
+  await page.waitForTimeout(400);
+  await page.click("#instPlanoCroquisBtn");
+  await page.waitForSelector(".cq-plano-opcion");
+  const primero = await page.locator(".cq-menu button").first().textContent();
+  assert.match(primero, /Ampliar el plano de la última instalación/, "lo primero que ofrece es ampliar el último plano");
+  await page.click(".cq-plano-opcion");
+  await page.waitForFunction(() => screens.croquis.dataset.active === "true");
+  const els = await page.evaluate(() => cq.elementos.map((e) => [e.id, !!e.prev, !!e.bloq]));
+  assert.deepStrictEqual(els, [["c1", true, true], ["k1", true, true]], "lo anterior queda marcado y bloqueado");
+  assert.match(await page.evaluate(() => cq.titulo), /^Ampliación - Plano de la instalación$/);
+  assert.strictEqual(await page.locator('#cqSvg g.cq-antes').count(), 2, "se ve atenuado");
+  // Se agrega un sensor nuevo y se guarda
+  await page.evaluate(() => { cq.elementos.push({ id: "n1", t: "simbolo", tipo: "infrarrojo", x: 300, y: 100 }); cq.cambios = true; return cqGuardar(); });
+  const svg = await page.evaluate(() => croquisSvgDocumento(cqDibujo()));
+  assert.match(svg, /Atenuado: instalado en visitas anteriores/, "la leyenda explica lo atenuado");
+  // Tocar un equipo de antes y marcarlo como nuevo
+  await page.evaluate(() => { cq.sel = "c1"; cqRender(); });
+  await page.click('#cqProps [data-acc="prev"]');
+  assert.deepStrictEqual(await page.evaluate(() => { const e = cq.elementos.find((x) => x.id === "c1"); return [!!e.prev, !!e.bloq]; }), [false, false]);
+  await page.evaluate(() => cqGuardar());
+  await page.click("#volverDeCroquisBtn");
+  await page.waitForFunction(() => screens.instalacion.dataset.active === "true");
+  await page.waitForFunction(() => document.querySelectorAll("#instPlanoLista .cq-item").length === 1);
+  // Al cerrar: PDF para el mail y PDF + SVG a la carpeta de Visio del cliente
+  await page.click("#instalacionGuardarYCerrarBtn");
+  await page.waitForFunction(() => document.getElementById("instalacionGuardarYCerrarBtn").textContent.includes("Guardar y cerrar"), null, { timeout: 20000 });
+  const visio = posts.filter((p) => p.u.includes("/api/planos"));
+  assert.deepStrictEqual(visio.map((p) => [p.accion, p.carpeta, p.tipo]), [["subir_plano_app", "CLI_00000055", "pdf"], ["subir_plano_app", "CLI_00000055", "svg"]]);
+  assert.match(visio[0].nombre, /^\d{4}-\d{2}-\d{2} - Inst 7 - Ampliación - Plano de la instalación$/);
+  assert.match(Buffer.from(visio[1].base64, "base64").toString(), /<svg[\s\S]*cq-antes/, "el SVG lleva lo de antes atenuado");
+  assert.ok(posts.some((p) => p.accion === "cerrar_instalacion" && p.u.includes("/api/historial") && p.planos_pdf.length === 1));
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
