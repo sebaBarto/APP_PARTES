@@ -296,6 +296,10 @@
 .sims-vista ul { margin: 0; padding-left: 18px; max-height: 180px; overflow: auto; }
 .sims-vista .err { color: #B3261E; }
 .sims-ficha-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(16,24,32,0.55); display: flex; align-items: flex-start; justify-content: center; padding: 30px 14px; overflow-y: auto; }
+.sims-ficha-corregir { margin-top: 12px; border: 1px solid #E3E1DA; border-radius: 10px; padding: 8px 12px; }
+.sims-ficha-corregir summary { cursor: pointer; font-weight: 700; padding: 4px 0; }
+.sims-ficha-corregir .field-row { flex-wrap: wrap; gap: 8px; }
+.sims-ficha-corregir .field-row > div { flex: 1 1 140px; }
 .sims-ficha { background: #fff; border-radius: var(--r-lg); padding: 18px 20px; max-width: 560px; width: 100%; position: relative; }
 .sims-ficha-cerrar { position: absolute; top: 10px; right: 10px; width: 36px !important; height: 36px; padding: 0 !important; border-radius: 50% !important; background: var(--paper) !important; color: var(--ink) !important; box-shadow: none !important; font-size: 20px; }
 .badge-estado-sim.activa { background: #E1F0E4; color: #1F6B34; }
@@ -1123,6 +1127,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
         <b id="simsLoteCuenta"></b>
         <select id="simsLoteTransferir"><option value="">Transferir a...</option></select>
         <select id="simsLoteEstado"><option value="">Marcar como...</option><option>Disponible</option><option>Defectuosa</option><option>Extraviada</option></select>
+        <select id="simsLoteEmpresa"><option value="">Cambiar empresa a...</option><option>Movistar</option><option>Personal</option><option>Claro</option></select>
         <button type="button" class="btn-secondary-admin" id="simsLoteBajaBtn" style="width:auto;">Dar de baja</button>
         <button type="button" class="btn-secondary-admin" id="simsLoteLimpiarBtn" style="width:auto;">Deseleccionar</button>
       </div>
@@ -4586,6 +4591,12 @@ document.getElementById("simsLoteEstado").addEventListener("change", async (e) =
   if (!estado || !await confirmarAdmin(`¿Marcar ${simsSeleccionadas.size} SIM(s) como ${estado.toLowerCase()}?`)) return;
   await aplicarLoteSims(`Marcar ${estado.toLowerCase()}`, (s) => ({ accion: "marcar_estado_fisico", numero: s.numero, tecnico: quienTiene(s), estado_fisico: estado }));
 });
+document.getElementById("simsLoteEmpresa").addEventListener("change", async (e) => {
+  const empresa = e.target.value;
+  e.target.value = "";
+  if (!empresa || !await confirmarAdmin(`¿Pasar ${simsSeleccionadas.size} SIM(s) a ${empresa}?${empresa !== "Movistar" ? "\n(Las de " + empresa + " quedan en formato Estándar.)" : ""}`)) return;
+  await aplicarLoteSims(`Cambiar a ${empresa}`, (s) => (s.empresa === empresa ? null : { accion: "editar_stock", numero: s.numero, tecnico: "Oficina", empresa, tipo: empresa === "Movistar" ? (s.tipo || "Estándar") : "Estándar" }));
+});
 document.getElementById("simsLoteBajaBtn").addEventListener("click", async () => {
   const motivo = (prompt(`Motivo para dar de baja ${simsSeleccionadas.size} SIM(s):`, "Devuelta a la empresa") || "").trim();
   if (!motivo) return;
@@ -4755,7 +4766,25 @@ async function abrirFichaLineaSim(numero) {
   document.body.appendChild(capa);
   try {
     await asegurarDatosControlSims();
-    capa.querySelector(".sims-ficha-cuerpo").innerHTML = htmlFichaLineaSim(numero);
+    const pintar = () => {
+      const cuerpo = capa.querySelector(".sims-ficha-cuerpo");
+      cuerpo.innerHTML = htmlFichaLineaSim(numero) + htmlCorregirSimFicha(numero);
+      const caja = cuerpo.querySelector(".sims-ficha-corregir");
+      if (!caja) return;
+      const emp = caja.querySelector('[data-campo="empresa"]'), tipo = caja.querySelector('[data-campo="tipo"]');
+      const ajustarTipo = () => { if (tipo) { tipo.disabled = emp.value !== "Movistar"; if (tipo.disabled) tipo.value = "Estándar"; } };
+      emp.addEventListener("change", ajustarTipo); ajustarTipo();
+      caja.querySelector(".x-guardar-ficha").addEventListener("click", () => guardarCorreccionSimFicha(caja, async () => {
+        await asegurarDatosControlSims();
+        pintar();
+        const nueva = capa.querySelector(".sims-ficha-corregir");
+        if (nueva) { nueva.open = true; const e2 = nueva.querySelector(".x-estado-ficha"); e2.className = "status ok x-estado-ficha"; e2.textContent = "Corregida. Quedó en el historial de la línea."; }
+        // Las pestañas abiertas se actualizan con el dato nuevo.
+        if (!document.getElementById("panelSims").classList.contains("hidden")) cargarSimsAdmin(true);
+        if (!document.getElementById("panelSimsInstaladas").classList.contains("hidden")) cargarSimsInstaladasAdmin();
+      }));
+    };
+    pintar();
   } catch (err) {
     capa.querySelector(".sims-ficha-cuerpo").innerHTML = `<p class="status err">No se pudo cargar: ${escapeHtmlAdmin(err.message)}</p>`;
   }
@@ -4789,7 +4818,8 @@ const AYUDAS_SIMS = {
     "Si se mandó por error o el técnico no la recibió, tocá \"Cancelar\": vuelve a quedar con quien la tenía." ] },
   ficha: { titulo: "Historial de una línea", gif: "assets/ayuda/sims-ficha.gif", texto: [
     "Tocá cualquier número subrayado para ver dónde está ahora y todo lo que le pasó: alta, transferencias, instalación, retiro, baja.",
-    "Sirve para responder rápido \"¿quién tenía esta SIM?\" o \"¿cuándo se instaló?\"." ] },
+    "Sirve para responder rápido \"¿quién tenía esta SIM?\" o \"¿cuándo se instaló?\".",
+    "Abajo, en \"Corregir datos de esta línea\", se arregla un error de carga (por ejemplo, la empresa) sin importar en qué pestaña estés. La corrección queda en el historial." ] },
   instaladas: { titulo: "SIMs instaladas", gif: "assets/ayuda/sims-instaladas.gif", texto: [
     "Filtrá por empresa, estado, quién la instaló o fecha de activación. Los botones de arriba filtran de un toque.",
     "Tocá \"Activa\"/\"Inactiva\" para cambiar el estado de esa línea sola.",
@@ -5088,6 +5118,57 @@ const ETIQUETA_ACCION_SIM_ADMIN = {
   alta: "Alta en el stock", baja: "Dada de baja", editar: "Corrección de datos", editar_instalada: "Datos de la instalación corregidos",
 };
 // Detalle de UNA línea: dónde está ahora y todos sus movimientos.
+const EMPRESAS_SIM_ADMIN = ["Movistar", "Personal", "Claro"];
+const NOMBRES_CAMPOS_SIM = { empresa: "Empresa", cliente: "Cliente", direccion: "Dirección", numero_abonado: "Abonado", numero_cliente: "N° de cliente", estado_linea: "Estado", fecha_activacion: "Activación" };
+function textoCamposSimAntes(t) { return String(t || "").replace(/\b(empresa|cliente|direccion|numero_abonado|numero_cliente|estado_linea|fecha_activacion):/g, (m, k) => NOMBRES_CAMPOS_SIM[k] + ":"); }
+// Corregir los datos de una línea desde su ficha (sirve desde cualquier
+// pestaña: stock, instaladas, control o transferencias).
+function htmlCorregirSimFicha(num) {
+  const k = soloDigitosLinea(num);
+  const enStock = controlSims.stock.find((x) => soloDigitosLinea(x.numero) === k && x.ubicacion_tipo !== "cliente");
+  const inst = controlSims.instaladas.find((x) => soloDigitosLinea(x.numero) === k);
+  if (!enStock && !inst) return "";
+  const s = inst || enStock;
+  const empresas = EMPRESAS_SIM_ADMIN.map((e) => `<option ${e === s.empresa ? "selected" : ""}>${e}</option>`).join("");
+  const campo = (c, et, tipo) => `<div><label>${et}</label><input type="${tipo || "text"}" data-campo="${c}" value="${escapeHtmlAdmin(tipo === "date" ? String(s[c] || "").slice(0, 10) : s[c] || "")}"></div>`;
+  const cuerpo = inst
+    ? `<div class="field-row"><div><label>Empresa</label><select data-campo="empresa">${empresas}</select></div>${campo("cliente", "Cliente")}${campo("numero_cliente", "N° de cliente")}</div>
+       <div class="field-row">${campo("direccion", "Dirección")}${campo("numero_abonado", "N° de abonado")}${campo("fecha_activacion", "Activación", "date")}
+       <div><label>Estado</label><select data-campo="estado_linea"><option ${(s.estado_linea || "Activo") === "Activo" ? "selected" : ""}>Activo</option><option ${s.estado_linea === "Inactivo" ? "selected" : ""}>Inactivo</option></select></div></div>`
+    : `<div class="field-row"><div><label>Empresa</label><select data-campo="empresa">${empresas}</select></div>
+       <div><label>Formato</label><select data-campo="tipo"><option ${s.tipo !== "Mini" ? "selected" : ""}>Estándar</option><option ${s.tipo === "Mini" ? "selected" : ""}>Mini</option></select></div></div>
+       <p class="subtitle" style="margin:4px 0 0;">Claro y Personal vienen solo en formato Estándar.</p>`;
+  return `<details class="sims-ficha-corregir" data-donde="${inst ? "instalada" : "stock"}" data-numero="${escapeHtmlAdmin(s.numero)}"><summary><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg>Corregir datos de esta línea</summary>${cuerpo}
+    <div class="field-row" style="margin-top:8px;"><button type="button" class="x-guardar-ficha" style="width:auto;">Guardar corrección</button></div>
+    <p class="status x-estado-ficha" style="margin:4px 0 0;"></p></details>`;
+}
+async function guardarCorreccionSimFicha(caja, alTerminar) {
+  const donde = caja.dataset.donde, numero = caja.dataset.numero;
+  const k = soloDigitosLinea(numero);
+  const s = donde === "instalada" ? controlSims.instaladas.find((x) => soloDigitosLinea(x.numero) === k) : controlSims.stock.find((x) => soloDigitosLinea(x.numero) === k && x.ubicacion_tipo !== "cliente");
+  const est = caja.querySelector(".x-estado-ficha"), boton = caja.querySelector(".x-guardar-ficha");
+  const valores = {};
+  caja.querySelectorAll("[data-campo]").forEach((el) => { valores[el.dataset.campo] = el.value.trim(); });
+  boton.disabled = true;
+  try {
+    if (donde === "instalada") {
+      const campos = {};
+      Object.entries(valores).forEach(([c, v]) => { const antes = c === "fecha_activacion" ? String(s[c] || "").slice(0, 10) : String(s[c] || (c === "estado_linea" ? "Activo" : "")); if (v !== antes) campos[c] = v; });
+      if (!Object.keys(campos).length) { est.textContent = "No cambiaste nada."; return; }
+      await accionSimAdmin({ accion: "editar_instalada", numero: s.numero, tecnico: "Oficina", campos });
+    } else {
+      const tipo = valores.empresa === "Movistar" ? valores.tipo : "Estándar";
+      if (valores.empresa === s.empresa && tipo === (s.tipo || "Estándar")) { est.textContent = "No cambiaste nada."; return; }
+      await accionSimAdmin({ accion: "editar_stock", numero: s.numero, tecnico: "Oficina", empresa: valores.empresa, tipo });
+    }
+    est.className = "status ok x-estado-ficha";
+    est.textContent = "Corregida.";
+    await alTerminar();
+  } catch (err) {
+    est.className = "status err x-estado-ficha";
+    est.textContent = "No se pudo: " + err.message;
+  } finally { boton.disabled = false; }
+}
 function htmlFichaLineaSim(num) {
   const k = soloDigitosLinea(num);
   const enStock = controlSims.stock.find((x) => soloDigitosLinea(x.numero) === k && x.ubicacion_tipo !== "cliente");
@@ -5105,7 +5186,7 @@ function htmlFichaLineaSim(num) {
     else if (h.accion === "transferencia_aceptada" || h.accion === "transferencia_rechazada") det = `la mandó ${h.tecnico_nuevo || "?"}`;
     else if (h.accion === "baja") det = `motivo: ${h.cliente || "?"}${h.cliente_anterior ? ` (la tenía ${h.cliente_anterior})` : ""}`;
     else if (h.accion === "editar") det = h.cliente || "";
-    else if (h.accion === "editar_instalada") det = `antes: ${h.cliente_anterior || ""}`;
+    else if (h.accion === "editar_instalada") det = `antes: ${textoCamposSimAntes(h.cliente_anterior)}`;
     else if (h.accion === "retirar_de_registro") det = `de ${h.cliente_anterior || "?"}`;
     else if (h.cliente) det = `${h.cliente}${h.numero_servicio ? " · servicio " + h.numero_servicio : ""}`;
     return `<li><b>${fechaAR(h.fecha)} ${escapeHtmlAdmin(h.hora || "")}</b> — ${escapeHtmlAdmin(que)}${det ? ": " + escapeHtmlAdmin(det) : ""} <span style="color:#6B7680;">(${escapeHtmlAdmin(h.tecnico || "")})</span></li>`;
@@ -5447,7 +5528,7 @@ function filaSimInstalada(s) {
     <td>${fechaAR(s.fecha_activacion)}</td>
     <td>${escapeHtmlAdmin(s.tecnico_instalador || "")}</td>
     <td><button type="button" class="badge-estado-sim ${activa ? "activa" : "inactiva"}" title="Tocar para cambiar">${activa ? "Activa" : "Inactiva"}</button></td>
-    <td><select class="sim-accion-select"><option value="">Elegir...</option><option value="editar">Corregir datos</option><option value="retirar">Retirar y devolver al stock</option></select></td>`;
+    <td><select class="sim-accion-select"><option value="">Elegir...</option><option value="editar">Corregir datos (empresa, cliente...)</option><option value="retirar">Retirar y devolver al stock</option></select></td>`;
   tr.querySelector(".sim-num-link").addEventListener("click", () => abrirFichaLineaSim(s.numero));
   tr.querySelector(".badge-estado-sim").addEventListener("click", () => cambiarEstadoSimInstalada(s.numero, activa ? "Inactivo" : "Activo"));
   tr.querySelector(".sim-accion-select").addEventListener("change", (e) => {
@@ -5465,7 +5546,7 @@ function abrirPanelInstalada(tr, s, tipo) {
   extra.className = "sim-fila-extra";
   const campo = (k, et, tipoInput = "text") => `<div><label>${et}</label><input type="${tipoInput}" class="x-${k}" value="${escapeHtmlAdmin(tipoInput === "date" ? String(s[k] || "").slice(0, 10) : s[k] || "")}"></div>`;
   extra.innerHTML = `<td colspan="9" class="sim-extra">${tipo === "editar"
-    ? `<div class="field-row">${campo("cliente", "Cliente")}${campo("numero_cliente", "N° de cliente")}${campo("direccion", "Dirección")}${campo("numero_abonado", "N° de abonado")}${campo("fecha_activacion", "Activación", "date")}
+    ? `<div class="field-row"><div><label>Empresa</label><select class="x-empresa">${EMPRESAS_SIM_ADMIN.map((e) => `<option ${e === s.empresa ? "selected" : ""}>${e}</option>`).join("")}</select></div>${campo("cliente", "Cliente")}${campo("numero_cliente", "N° de cliente")}${campo("direccion", "Dirección")}${campo("numero_abonado", "N° de abonado")}${campo("fecha_activacion", "Activación", "date")}
         <button type="button" class="x-ok" style="width:auto;">Guardar</button><button type="button" class="btn-secondary-admin x-cancel" style="width:auto;">Cancelar</button></div>`
     : `<div class="field-row"><div><label>Devolver al stock de</label><select class="x-destino">${destinosSims().reverse().map((n) => `<option>${escapeHtmlAdmin(n)}</option>`).join("")}</select></div>
         <button type="button" class="x-ok" style="width:auto;">Retirar</button><button type="button" class="btn-secondary-admin x-cancel" style="width:auto;">Cancelar</button></div>
@@ -5478,7 +5559,7 @@ function abrirPanelInstalada(tr, s, tipo) {
     try {
       if (tipo === "editar") {
         const campos = {};
-        ["cliente", "numero_cliente", "direccion", "numero_abonado", "fecha_activacion"].forEach((k) => {
+        ["empresa", "cliente", "numero_cliente", "direccion", "numero_abonado", "fecha_activacion"].forEach((k) => {
           const v = extra.querySelector(".x-" + k).value.trim();
           if (v !== String(k === "fecha_activacion" ? String(s[k] || "").slice(0, 10) : s[k] || "")) campos[k] = v;
         });

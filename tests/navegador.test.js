@@ -1126,6 +1126,43 @@ test("Admin SIMs: stock con resumen y filtros, acciones por fila y en lote, pend
   await page.click(".cartel-admin .cartel-si");
   await page.waitForTimeout(300);
   assert.ok(acciones.some((a) => a.accion === "retirar_de_registro" && a.numero === "3415550009" && a.tecnico === "Oficina"));
+
+  // Instalada cargada con la empresa equivocada: se corrige desde "Corregir datos"
+  await page.locator("#simsInstaladasTablaBody tr", { hasText: "Farmacia Central" }).locator(".sim-accion-select").selectOption("editar");
+  await page.selectOption(".sim-extra .x-empresa", "Personal");
+  await page.click(".sim-extra .x-ok");
+  await page.waitForTimeout(300);
+  assert.deepStrictEqual(acciones.filter((a) => a.accion === "editar_instalada" && a.campos.empresa).map((a) => [a.numero, a.campos]), [["3415550010", { empresa: "Personal" }]], "solo manda lo que cambió");
+
+  // Desde la ficha de la línea (cualquier pestaña): instalada y en stock
+  await page.locator("#simsInstaladasTablaBody .sim-num-link", { hasText: "3415550010" }).click();
+  await page.waitForSelector(".sims-ficha-corregir");
+  await page.click(".sims-ficha-corregir summary");
+  await page.selectOption('.sims-ficha-corregir [data-campo="empresa"]', "Claro");
+  await page.fill('.sims-ficha-corregir [data-campo="numero_abonado"]', "4455");
+  await page.click(".x-guardar-ficha");
+  await page.waitForFunction(() => /Corregida/.test(document.querySelector(".x-estado-ficha").textContent));
+  const ultima = acciones.filter((a) => a.accion === "editar_instalada").pop();
+  assert.deepStrictEqual(ultima.campos, { empresa: "Claro", numero_abonado: "4455" });
+  await page.click(".sims-ficha-cerrar");
+  await page.evaluate(() => abrirFichaLineaSim("3415550002"));
+  await page.waitForSelector(".sims-ficha-corregir");
+  await page.click(".sims-ficha-corregir summary");
+  await page.selectOption('.sims-ficha-corregir [data-campo="empresa"]', "Personal");
+  assert.strictEqual(await page.locator('.sims-ficha-corregir [data-campo="tipo"]').isDisabled(), true, "Personal solo viene en Estándar");
+  await page.click(".x-guardar-ficha");
+  await page.waitForFunction(() => /Corregida/.test(document.querySelector(".x-estado-ficha").textContent));
+  assert.ok(acciones.some((a) => a.accion === "editar_stock" && a.numero === "3415550002" && a.empresa === "Personal" && a.tipo === "Estándar"));
+  await page.click(".sims-ficha-cerrar");
+
+  // En lote: cambiar la empresa de varias del stock
+  await page.evaluate(() => { document.getElementById("panelSimsInstaladas").classList.add("hidden"); document.getElementById("panelSims").classList.remove("hidden"); return cargarSimsAdmin(true); });
+  await page.locator("#simsTablaBody .sim-fila-tabla", { hasText: "0001" }).locator(".sim-sel").check();
+  await page.locator("#simsTablaBody .sim-fila-tabla", { hasText: "0004" }).locator(".sim-sel").check();
+  await page.selectOption("#simsLoteEmpresa", "Movistar");
+  await page.click(".cartel-admin .cartel-si");
+  await page.waitForTimeout(400);
+  assert.deepStrictEqual(acciones.filter((a) => a.accion === "editar_stock" && a.empresa === "Movistar").map((a) => a.numero).sort(), ["341 555-0001", "3415550004"]);
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
