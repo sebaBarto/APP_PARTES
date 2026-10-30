@@ -297,6 +297,7 @@
 .sims-vista .err { color: #B3261E; }
 .sims-ficha-overlay { position: fixed; inset: 0; z-index: 9999; background: rgba(16,24,32,0.55); display: flex; align-items: flex-start; justify-content: center; padding: 30px 14px; overflow-y: auto; }
 .sims-ficha-corregir { margin-top: 12px; border: 1px solid #E3E1DA; border-radius: 10px; padding: 8px 12px; }
+.sims-ficha-numero { margin-top: 12px; padding-top: 10px; border-top: 1px dashed #D5D2C8; }
 .sims-ficha-corregir summary { cursor: pointer; font-weight: 700; padding: 4px 0; }
 .sims-ficha-corregir .field-row { flex-wrap: wrap; gap: 8px; }
 .sims-ficha-corregir .field-row > div { flex: 1 1 140px; }
@@ -4759,7 +4760,7 @@ async function asegurarDatosControlSims() {
 async function abrirFichaLineaSim(numero) {
   const capa = document.createElement("div");
   capa.className = "sims-ficha-overlay";
-  capa.innerHTML = `<div class="sims-ficha"><button type="button" class="sims-ficha-cerrar" aria-label="Cerrar">×</button><h3 style="margin:0 40px 8px 0;">Línea ${escapeHtmlAdmin(numero)}</h3><div class="sims-ficha-cuerpo"><p class="status">Cargando historial...</p></div></div>`;
+  capa.innerHTML = `<div class="sims-ficha"><button type="button" class="sims-ficha-cerrar" aria-label="Cerrar">×</button><h3 style="margin:0 40px 8px 0;">Línea <span class="x-titulo-numero">${escapeHtmlAdmin(numero)}</span></h3><div class="sims-ficha-cuerpo"><p class="status">Cargando historial...</p></div></div>`;
   const cerrar = () => capa.remove();
   capa.addEventListener("click", (e) => { if (e.target === capa) cerrar(); });
   capa.querySelector(".sims-ficha-cerrar").addEventListener("click", cerrar);
@@ -4774,14 +4775,20 @@ async function abrirFichaLineaSim(numero) {
       const emp = caja.querySelector('[data-campo="empresa"]'), tipo = caja.querySelector('[data-campo="tipo"]');
       const ajustarTipo = () => { if (tipo) { tipo.disabled = emp.value !== "Movistar"; if (tipo.disabled) tipo.value = "Estándar"; } };
       emp.addEventListener("change", ajustarTipo); ajustarTipo();
-      caja.querySelector(".x-guardar-ficha").addEventListener("click", () => guardarCorreccionSimFicha(caja, async () => {
+      const despues = async (texto) => {
         await asegurarDatosControlSims();
         pintar();
         const nueva = capa.querySelector(".sims-ficha-corregir");
-        if (nueva) { nueva.open = true; const e2 = nueva.querySelector(".x-estado-ficha"); e2.className = "status ok x-estado-ficha"; e2.textContent = "Corregida. Quedó en el historial de la línea."; }
+        if (nueva) { nueva.open = true; const e2 = nueva.querySelector(".x-estado-ficha"); e2.className = "status ok x-estado-ficha"; e2.textContent = texto; }
         // Las pestañas abiertas se actualizan con el dato nuevo.
         if (!document.getElementById("panelSims").classList.contains("hidden")) cargarSimsAdmin(true);
         if (!document.getElementById("panelSimsInstaladas").classList.contains("hidden")) cargarSimsInstaladasAdmin();
+      };
+      caja.querySelector(".x-guardar-ficha").addEventListener("click", () => guardarCorreccionSimFicha(caja, () => despues("Corregida. Quedó en el historial de la línea.")));
+      caja.querySelector(".x-corregir-numero").addEventListener("click", () => corregirNumeroSimFicha(caja, async (nuevo) => {
+        numero = nuevo;
+        capa.querySelector(".x-titulo-numero").textContent = nuevo;
+        await despues(`Número corregido: ahora es ${nuevo}. El historial de antes quedó unido.`);
       }));
     };
     pintar();
@@ -4819,7 +4826,7 @@ const AYUDAS_SIMS = {
   ficha: { titulo: "Historial de una línea", gif: "assets/ayuda/sims-ficha.gif", texto: [
     "Tocá cualquier número subrayado para ver dónde está ahora y todo lo que le pasó: alta, transferencias, instalación, retiro, baja.",
     "Sirve para responder rápido \"¿quién tenía esta SIM?\" o \"¿cuándo se instaló?\".",
-    "Abajo, en \"Corregir datos de esta línea\", se arregla un error de carga (por ejemplo, la empresa) sin importar en qué pestaña estés. La corrección queda en el historial." ] },
+    "Abajo, en \"Corregir datos de esta línea\", se arregla un error de carga (empresa, formato, cliente o el mismo número de línea) sin importar en qué pestaña estés. La corrección queda en el historial, con el nombre de quien la hizo." ] },
   instaladas: { titulo: "SIMs instaladas", gif: "assets/ayuda/sims-instaladas.gif", texto: [
     "Filtrá por empresa, estado, quién la instaló o fecha de activación. Los botones de arriba filtran de un toque.",
     "Tocá \"Activa\"/\"Inactiva\" para cambiar el estado de esa línea sola.",
@@ -5115,12 +5122,12 @@ const ETIQUETA_ACCION_SIM_ADMIN = {
   transferencia_cancelada: "Transferencia cancelada", aceptar_transferencia: "Transferencia aceptada", rechazar_transferencia: "Transferencia rechazada",
   retirar_de_registro: "Retirada de un cliente", marcar_estado_fisico: "Cambio de estado", marcar_defectuosa: "Marcada defectuosa",
   marcar_extraviada: "Marcada extraviada", marcar_disponible: "Marcada disponible", revertir: "Revertida",
-  alta: "Alta en el stock", baja: "Dada de baja", editar: "Corrección de datos", editar_instalada: "Datos de la instalación corregidos",
+  alta: "Alta en el stock", baja: "Dada de baja", editar: "Corrección de datos", editar_instalada: "Datos de la instalación corregidos", corregir_numero: "Número corregido",
 };
 // Detalle de UNA línea: dónde está ahora y todos sus movimientos.
 const EMPRESAS_SIM_ADMIN = ["Movistar", "Personal", "Claro"];
-const NOMBRES_CAMPOS_SIM = { empresa: "Empresa", cliente: "Cliente", direccion: "Dirección", numero_abonado: "Abonado", numero_cliente: "N° de cliente", estado_linea: "Estado", fecha_activacion: "Activación" };
-function textoCamposSimAntes(t) { return String(t || "").replace(/\b(empresa|cliente|direccion|numero_abonado|numero_cliente|estado_linea|fecha_activacion):/g, (m, k) => NOMBRES_CAMPOS_SIM[k] + ":"); }
+const NOMBRES_CAMPOS_SIM = { tipo: "Formato", empresa: "Empresa", cliente: "Cliente", direccion: "Dirección", numero_abonado: "Abonado", numero_cliente: "N° de cliente", estado_linea: "Estado", fecha_activacion: "Activación" };
+function textoCamposSimAntes(t) { return String(t || "").replace(/\b(tipo|empresa|cliente|direccion|numero_abonado|numero_cliente|estado_linea|fecha_activacion):/g, (m, k) => NOMBRES_CAMPOS_SIM[k] + ":"); }
 // Corregir los datos de una línea desde su ficha (sirve desde cualquier
 // pestaña: stock, instaladas, control o transferencias).
 function htmlCorregirSimFicha(num) {
@@ -5131,16 +5138,20 @@ function htmlCorregirSimFicha(num) {
   const s = inst || enStock;
   const empresas = EMPRESAS_SIM_ADMIN.map((e) => `<option ${e === s.empresa ? "selected" : ""}>${e}</option>`).join("");
   const campo = (c, et, tipo) => `<div><label>${et}</label><input type="${tipo || "text"}" data-campo="${c}" value="${escapeHtmlAdmin(tipo === "date" ? String(s[c] || "").slice(0, 10) : s[c] || "")}"></div>`;
+  const formato = `<div><label>Formato</label><select data-campo="tipo"><option ${s.tipo !== "Mini" ? "selected" : ""}>Estándar</option><option ${s.tipo === "Mini" ? "selected" : ""}>Mini</option></select></div>`;
   const cuerpo = inst
-    ? `<div class="field-row"><div><label>Empresa</label><select data-campo="empresa">${empresas}</select></div>${campo("cliente", "Cliente")}${campo("numero_cliente", "N° de cliente")}</div>
+    ? `<div class="field-row"><div><label>Empresa</label><select data-campo="empresa">${empresas}</select></div>${"tipo" in inst ? formato : ""}${campo("cliente", "Cliente")}${campo("numero_cliente", "N° de cliente")}</div>
        <div class="field-row">${campo("direccion", "Dirección")}${campo("numero_abonado", "N° de abonado")}${campo("fecha_activacion", "Activación", "date")}
        <div><label>Estado</label><select data-campo="estado_linea"><option ${(s.estado_linea || "Activo") === "Activo" ? "selected" : ""}>Activo</option><option ${s.estado_linea === "Inactivo" ? "selected" : ""}>Inactivo</option></select></div></div>`
     : `<div class="field-row"><div><label>Empresa</label><select data-campo="empresa">${empresas}</select></div>
-       <div><label>Formato</label><select data-campo="tipo"><option ${s.tipo !== "Mini" ? "selected" : ""}>Estándar</option><option ${s.tipo === "Mini" ? "selected" : ""}>Mini</option></select></div></div>
+       ${formato}</div>
        <p class="subtitle" style="margin:4px 0 0;">Claro y Personal vienen solo en formato Estándar.</p>`;
+  const numero = `<div class="sims-ficha-numero"><div class="field-row"><div><label>Número de línea (si se cargó mal)</label><input type="text" inputmode="numeric" class="x-numero-nuevo" value="${escapeHtmlAdmin(s.numero)}"></div>
+       <button type="button" class="btn-secondary-admin x-corregir-numero" style="width:auto; align-self:flex-end;">Corregir número</button></div>
+       <p class="subtitle" style="margin:4px 0 0;">Se cambia en todos lados y la línea conserva todo su historial.</p></div>`;
   return `<details class="sims-ficha-corregir" data-donde="${inst ? "instalada" : "stock"}" data-numero="${escapeHtmlAdmin(s.numero)}"><summary><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px;"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg>Corregir datos de esta línea</summary>${cuerpo}
     <div class="field-row" style="margin-top:8px;"><button type="button" class="x-guardar-ficha" style="width:auto;">Guardar corrección</button></div>
-    <p class="status x-estado-ficha" style="margin:4px 0 0;"></p></details>`;
+    <p class="status x-estado-ficha" style="margin:4px 0 0;"></p>${numero}</details>`;
 }
 async function guardarCorreccionSimFicha(caja, alTerminar) {
   const donde = caja.dataset.donde, numero = caja.dataset.numero;
@@ -5153,7 +5164,8 @@ async function guardarCorreccionSimFicha(caja, alTerminar) {
   try {
     if (donde === "instalada") {
       const campos = {};
-      Object.entries(valores).forEach(([c, v]) => { const antes = c === "fecha_activacion" ? String(s[c] || "").slice(0, 10) : String(s[c] || (c === "estado_linea" ? "Activo" : "")); if (v !== antes) campos[c] = v; });
+      if ("tipo" in valores && valores.empresa !== "Movistar") valores.tipo = "Estándar";
+      Object.entries(valores).forEach(([c, v]) => { const antes = c === "fecha_activacion" ? String(s[c] || "").slice(0, 10) : String(s[c] || (c === "estado_linea" ? "Activo" : c === "tipo" ? "Estándar" : "")); if (v !== antes) campos[c] = v; });
       if (!Object.keys(campos).length) { est.textContent = "No cambiaste nada."; return; }
       await accionSimAdmin({ accion: "editar_instalada", numero: s.numero, tecnico: "Oficina", campos });
     } else {
@@ -5167,6 +5179,25 @@ async function guardarCorreccionSimFicha(caja, alTerminar) {
   } catch (err) {
     est.className = "status err x-estado-ficha";
     est.textContent = "No se pudo: " + err.message;
+  } finally { boton.disabled = false; }
+}
+function mensajeErrorSim(err) {
+  return /Acción desconocida/.test(err.message || "") ? "Falta publicar la actualización del backend (sims.js con «corregir_numero»)." : err.message;
+}
+async function corregirNumeroSimFicha(caja, alTerminar) {
+  const viejo = caja.dataset.numero;
+  const nuevo = caja.querySelector(".x-numero-nuevo").value.trim();
+  const est = caja.querySelector(".x-estado-ficha"), boton = caja.querySelector(".x-corregir-numero");
+  if (!nuevo || soloDigitosLinea(nuevo) === soloDigitosLinea(viejo)) { est.className = "status x-estado-ficha"; est.textContent = "Escribí el número correcto."; return; }
+  if (soloDigitosLinea(nuevo).length < 8) { est.className = "status err x-estado-ficha"; est.textContent = "El número está incompleto."; return; }
+  if (!await confirmarAdmin(`¿Cambiar el número ${viejo} por ${nuevo}?\nSe corrige en todos lados y conserva su historial.`)) return;
+  boton.disabled = true;
+  try {
+    const r = await accionSimAdmin({ accion: "corregir_numero", numero: viejo, numero_nuevo: nuevo, tecnico: "Oficina" });
+    await alTerminar(r.numero || soloDigitosLinea(nuevo));
+  } catch (err) {
+    est.className = "status err x-estado-ficha";
+    est.textContent = "No se pudo: " + mensajeErrorSim(err);
   } finally { boton.disabled = false; }
 }
 function htmlFichaLineaSim(num) {
@@ -5187,6 +5218,7 @@ function htmlFichaLineaSim(num) {
     else if (h.accion === "baja") det = `motivo: ${h.cliente || "?"}${h.cliente_anterior ? ` (la tenía ${h.cliente_anterior})` : ""}`;
     else if (h.accion === "editar") det = h.cliente || "";
     else if (h.accion === "editar_instalada") det = `antes: ${textoCamposSimAntes(h.cliente_anterior)}`;
+    else if (h.accion === "corregir_numero") det = `antes era ${h.cliente_anterior || "?"}`;
     else if (h.accion === "retirar_de_registro") det = `de ${h.cliente_anterior || "?"}`;
     else if (h.cliente) det = `${h.cliente}${h.numero_servicio ? " · servicio " + h.numero_servicio : ""}`;
     return `<li><b>${fechaAR(h.fecha)} ${escapeHtmlAdmin(h.hora || "")}</b> — ${escapeHtmlAdmin(que)}${det ? ": " + escapeHtmlAdmin(det) : ""} <span style="color:#6B7680;">(${escapeHtmlAdmin(h.tecnico || "")})</span></li>`;

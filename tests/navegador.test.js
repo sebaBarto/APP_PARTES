@@ -1039,6 +1039,7 @@ test("Admin SIMs: stock con resumen y filtros, acciones por fila y en lote, pend
       const b = JSON.parse(req.postData() || "{}");
       acciones.push(b);
       if (b.accion === "transferir") return json({ ok: true, pendiente: b.tecnico_nuevo !== "Oficina" });
+      if (b.accion === "corregir_numero") { sims.find((x) => x.numero === b.numero).numero = "3415550222"; return json({ ok: true, numero: "3415550222" }); }
       if (b.accion === "alta_lote") return json({ ok: true, agregadas: b.sims.map((s) => ({ numero: s.numero })), repetidas: [], invalidas: [] });
       return json({ ok: true, migradas: 0 });
     }
@@ -1153,6 +1154,13 @@ test("Admin SIMs: stock con resumen y filtros, acciones por fila y en lote, pend
   await page.click(".x-guardar-ficha");
   await page.waitForFunction(() => /Corregida/.test(document.querySelector(".x-estado-ficha").textContent));
   assert.ok(acciones.some((a) => a.accion === "editar_stock" && a.numero === "3415550002" && a.empresa === "Personal" && a.tipo === "Estándar"));
+  // Número mal cargado: se corrige desde la misma ficha
+  await page.fill(".x-numero-nuevo", "0341 15 555-0222");
+  await page.click(".x-corregir-numero");
+  await page.click(".cartel-admin .cartel-si");
+  await page.waitForFunction(() => /Número corregido/.test(document.querySelector(".x-estado-ficha").textContent));
+  assert.ok(acciones.some((a) => a.accion === "corregir_numero" && a.numero === "3415550002" && a.numero_nuevo === "0341 15 555-0222"));
+  assert.strictEqual(await page.textContent(".x-titulo-numero"), "3415550222");
   await page.click(".sims-ficha-cerrar");
 
   // En lote: cambiar la empresa de varias del stock

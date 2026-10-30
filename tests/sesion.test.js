@@ -451,3 +451,20 @@ test("Planos de instalación: cualquier técnico de la instalación los guarda; 
     assert.strictEqual(archivos.get(`croquis/${id}.json`).instalacion, "7");
   } finally { global.fetch = fetchViejo; }
 });
+
+test("SIMs: las correcciones de la oficina quedan con el nombre de quien las hizo, y un técnico no las puede hacer", async () => {
+  const fetchViejo = global.fetch;
+  const enviados = [];
+  global.fetch = async (url, op) => { if (String(url).includes("/api/sims/accion")) enviados.push(JSON.parse(op.body)); return new Response(JSON.stringify({ ok: true })); };
+  try {
+    const recurso = require(path.join(raiz, "api/recurso-uso.js"));
+    const admin = crearSesion({ nombre: "Brenda Thiesing", rol: "admin" }), general = crearSesion({ nombre: "Clave general", rol: "admin" }), tec = crearSesion({ nombre: "Juan", rol: "tecnico" });
+    const llamar = async (body, token) => { const res = resFalso(); await recurso(pedido("POST", {}, { recurso: "sim", ...body }, token), res); return res; };
+    await llamar({ accion: "corregir_numero", numero: "3415550001", numero_nuevo: "3415550002", tecnico: "Cualquiera" }, admin);
+    assert.strictEqual(enviados[0].tecnico, "Oficina (Brenda Thiesing)", "sale del pase, no de lo que mande la página");
+    await llamar({ accion: "editar_instalada", numero: "1", campos: { empresa: "Personal" } }, general);
+    assert.strictEqual(enviados[1].tecnico, "Oficina");
+    assert.strictEqual((await llamar({ accion: "corregir_numero", numero: "1", numero_nuevo: "2" }, tec)).statusCode, 403);
+    assert.strictEqual(enviados.length, 2);
+  } finally { global.fetch = fetchViejo; }
+});

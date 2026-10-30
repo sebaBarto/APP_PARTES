@@ -36,7 +36,7 @@ async function getSimNuevo(headersBackendNuevo, res, query) {
 }
 
 // Acciones que solo puede hacer la oficina (sesión del panel admin).
-const ACCIONES_SIM_OFICINA = ["alta_lote", "editar_stock", "dar_de_baja", "cancelar_transferencia", "editar_instalada"];
+const ACCIONES_SIM_OFICINA = ["alta_lote", "editar_stock", "dar_de_baja", "cancelar_transferencia", "editar_instalada", "corregir_numero"];
 async function postSimNuevo(headersBackendNuevo, body, res, req) {
   if (body && ACCIONES_SIM_OFICINA.includes(body.accion)) {
     const quien = require("../lib/sesion").autorizar(req);
@@ -44,6 +44,10 @@ async function postSimNuevo(headersBackendNuevo, body, res, req) {
       res.status(403).json({ error: "Esta acción solo se puede hacer desde el panel de la oficina" });
       return;
     }
+    // En el historial de la línea queda quién de la oficina lo hizo
+    // (sale del pase de la sesión, no de lo que mande la página).
+    const nombre = String(quien.nombre || "").trim();
+    body.tecnico = nombre && nombre !== "Clave general" ? `Oficina (${nombre})` : "Oficina";
   }
   const r = await fetch(`${process.env.BACKEND_NUEVO_URL}/api/sims/accion`, {
     method: "POST",
