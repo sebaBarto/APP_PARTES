@@ -1296,6 +1296,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
             <input type="text" id="croquisBaseTitulo" placeholder="Título (ej: Planta baja)" autocomplete="off" style="flex:1;min-width:150px;">
             <input type="number" id="croquisBaseAncho" placeholder="Ancho real (m)" min="1" step="0.1" style="width:130px;" title="Cuántos metros mide de ancho el plano, de borde a borde (opcional: así queda en escala)">
             <input type="file" id="croquisBaseArchivo" accept="application/pdf,.pdf,image/png,image/jpeg,.svg,image/svg+xml">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;width:100%;"><input type="checkbox" id="croquisBaseEditable" checked style="width:auto;"> Si es un PDF dibujado (de Visio), pasarlo a croquis editable: paredes, puertas y equipos con su número de zona (el original queda tenue de fondo)</label>
             <button type="button" id="croquisBaseSubir">Subir plano</button>
           </div>
           <p class="status" id="croquisBaseEstado"></p>
@@ -8428,6 +8429,31 @@ document.getElementById("croquisBaseSubir").addEventListener("click", async () =
   btn.disabled = true;
   est.textContent = "Convirtiendo y subiendo el plano...";
   try {
+    const datosCliente = { cliente: cli ? cli.nombre : (m ? m[1] : textoCliente), numero_cliente: cli ? String(cli.numero_cliente || "") : (m ? m[2] : ""), direccion: cli ? [cli.direccion, cli.localidad].filter(Boolean).join(", ") : "" };
+    // PDF dibujado -> croquis editable (si se pidió y se puede).
+    if (document.getElementById("croquisBaseEditable").checked && /\.pdf$/i.test(archivo.name || "")) {
+      const bytes = new Uint8Array(await archivo.arrayBuffer());
+      let ed = null;
+      try { ed = await croquisPdfAEditable(bytes, CROQUIS_MAX_HOJAS); } catch (e) { ed = null; }
+      if (ed) {
+        est.textContent = "Es un dibujo: pasándolo a croquis editable...";
+        const imgsEd = await croquisPdfAImagenes(bytes.slice(), 2000, ed.paginas.length);
+        const paginas = [];
+        for (const p of ed.paginas) {
+          const img = imgsEd[p.hoja - 1];
+          let fondo = null;
+          if (img) { const f = await croquisSubirPlanoBase(img, SERVICIOS_API_TOKEN); fondo = { id: f.id, x: p.marco.x, y: p.marco.y, w: p.marco.w, h: p.marco.h }; }
+          paginas.push({ nombre: p.nombre, elementos: p.elementos, fondo });
+        }
+        const tituloEd = document.getElementById("croquisBaseTitulo").value.trim() || ed.titulo || "Plano de la casa";
+        await guardarCroquisAdmin({ titulo: tituloEd.slice(0, 120), ...datosCliente, dibujo: { v: 2, elementos: paginas[0].elementos, paginas, ...(paginas[0].fondo ? { fondo: paginas[0].fondo } : {}) } });
+        const r = ed.resumen;
+        est.textContent = `Listo: "${tituloEd}" quedó como croquis editable — ${r.paredes} paredes, ${r.puertas} puertas y ${r.equipos} equipos${paginas.length > 1 ? `, en ${paginas.length} hojas` : ""}. Conviene abrirlo una vez en la APP y revisarlo.`;
+        ["croquisBaseArchivo", "croquisBaseTitulo", "croquisBaseAncho", "croquisBaseCliente"].forEach((id) => { document.getElementById(id).value = ""; });
+        cargarCroquisAdmin();
+        return;
+      }
+    }
     const imgs = await croquisArchivoAImagenes(archivo, 2400, CROQUIS_MAX_HOJAS);
     const fondos = await croquisSubirPlanosBase(imgs, SERVICIOS_API_TOKEN);
     const ancho = Number(String(document.getElementById("croquisBaseAncho").value || "").replace(",", "."));

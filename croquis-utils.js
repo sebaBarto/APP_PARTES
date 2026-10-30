@@ -16,7 +16,7 @@
 //   simbolo { tipo, x, y, rot, esc, color?, esp? }  equipos y objetos de obra
 
 // Tiene que ser igual a APP_VERSION de app.js (si no, la app recarga).
-const CROQUIS_UTILS_VERSION = "4.18.0";
+const CROQUIS_UTILS_VERSION = "4.19.0";
 const CROQUIS_GRILLA = 20;
 
 // Cada símbolo se dibuja centrado en 0,0 con dib(color). "cat" separa los
@@ -796,6 +796,324 @@ function croquisImagenAJpeg(url, lado, esSvg) {
 // Archivo (PDF, SVG, PNG, JPG) -> JPEG {base64, w, h}. Del PDF se usa la
 // primera hoja. lado: px del lado más largo.
 async function croquisArchivoAImagen(archivo, lado) { return (await croquisArchivoAImagenes(archivo, lado, 1))[0]; }
+// ---------- Plano en PDF de Visio -> croquis editable ----------
+// Un PDF exportado de Visio guarda el dibujo como líneas (no como foto).
+// Se leen las líneas, rellenos y textos de la primera hoja y se pasan a
+// elementos del croquis: paredes, puertas, equipos (con su número de
+// zona) y textos. Sigue los símbolos que usa SAT en Visio:
+//   cuadradito rojo (+ líneas punteadas) = infrarrojo; círculo verde =
+//   magnético; círculo blanco = detector de humo; rectángulo rojo con
+//   "DRV" = rotura de vidrio; rectángulo gris + triángulo = sirena;
+//   rectángulo gris con diagonal = central (o teclado si es angosto).
+// Lo que no se reconoce como equipo y es una línea, queda como pared.
+async function croquisLeerPdfVectorial(datos, pagina) {
+  const pdfjs = await croquisCargarPdfJs();
+  const doc = await pdfjs.getDocument({ data: datos }).promise;
+  try {
+    const pag = await doc.getPage(pagina || 1);
+    const vp = pag.getViewport({ scale: 1 });
+    const ops = await pag.getOperatorList();
+    const tc = await pag.getTextContent();
+    return croquisPrimitivasPdf(pdfjs.OPS, ops, tc, vp);
+  } finally { try { doc.destroy(); } catch (e) { /* nada */ } }
+}
+// Recorre los operadores de dibujo del PDF y arma primitivas en
+// coordenadas de la hoja (puntos, y hacia abajo).
+function croquisPrimitivasPdf(OPS, ops, tc, vp) {
+  const mul = (m, n) => [m[0] * n[0] + m[2] * n[1], m[1] * n[0] + m[3] * n[1], m[0] * n[2] + m[2] * n[3], m[1] * n[2] + m[3] * n[3], m[0] * n[4] + m[2] * n[5] + m[4], m[1] * n[4] + m[3] * n[5] + m[5]];
+  const ap = (m, x, y) => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]];
+  const V = vp.transform;
+  let st = { ctm: [1, 0, 0, 1, 0, 0], lw: 1, dash: false, stroke: [0, 0, 0], fill: [0, 0, 0] };
+  const pila = [];
+  let actual = []; // subcaminos [[x,y]...]; cada uno con .cerrado y .curvo
+  const prims = [];
+  const color = (a) => (Array.isArray(a) ? a : a && typeof a === "object" ? [a[0], a[1], a[2]] : typeof a === "string" && /^#[0-9a-f]{6}$/i.test(a) ? [1, 3, 5].map((i) => parseInt(a.substr(i, 2), 16)) : [0, 0, 0]);
+  const pt = (x, y) => { const p = ap(st.ctm, x, y); return ap(V, p[0], p[1]); };
+  const escalaLw = () => Math.sqrt(Math.abs(st.ctm[0] * st.ctm[3] - st.ctm[1] * st.ctm[2])) || 1;
+  const pintar = (rellena, traza) => {
+    if (actual.length) prims.push({ sub: actual, rellena, traza, fill: rellena ? st.fill.slice() : null, stroke: traza ? st.stroke.slice() : null, dash: st.dash, lw: st.lw * escalaLw() });
+    actual = [];
+  };
+  for (let i = 0; i < ops.fnArray.length; i++) {
+    const f = ops.fnArray[i], a = ops.argsArray[i];
+    if (f === OPS.save) pila.push({ ...st, ctm: st.ctm.slice(), stroke: st.stroke.slice(), fill: st.fill.slice() });
+    else if (f === OPS.restore) { if (pila.length) st = pila.pop(); }
+    else if (f === OPS.transform) st.ctm = mul(st.ctm, a);
+    else if (f === OPS.setLineWidth) st.lw = a[0];
+    else if (f === OPS.setDash) st.dash = Array.isArray(a[0]) && a[0].length > 0;
+    else if (f === OPS.setStrokeRGBColor) st.stroke = color(a);
+    else if (f === OPS.setFillRGBColor) st.fill = color(a);
+    else if (f === OPS.setStrokeGray) st.stroke = [a[0] * 255, a[0] * 255, a[0] * 255];
+    else if (f === OPS.setFillGray) st.fill = [a[0] * 255, a[0] * 255, a[0] * 255];
+    else if (f === OPS.constructPath) {
+      const [codigos, coords] = a;
+      let j = 0, sub = null;
+      for (const c of codigos) {
+        if (c === OPS.moveTo) { sub = [pt(coords[j], coords[j + 1])]; actual.push(sub); j += 2; }
+        else if (c === OPS.lineTo) { if (!sub) { sub = []; actual.push(sub); } sub.push(pt(coords[j], coords[j + 1])); j += 2; }
+        else if (c === OPS.curveTo) { if (sub) { sub.curvo = true; sub.push(pt(coords[j + 4], coords[j + 5])); } j += 6; }
+        else if (c === OPS.curveTo2 || c === OPS.curveTo3) { if (sub) { sub.curvo = true; sub.push(pt(coords[j + 2], coords[j + 3])); } j += 4; }
+        else if (c === OPS.closePath) { if (sub) sub.cerrado = true; }
+        else if (c === OPS.rectangle) {
+          const x = coords[j], y = coords[j + 1], w = coords[j + 2], h = coords[j + 3];
+          sub = [pt(x, y), pt(x + w, y), pt(x + w, y + h), pt(x, y + h)]; sub.cerrado = true; sub.rect = true; actual.push(sub); j += 4;
+        }
+      }
+    }
+    else if (f === OPS.stroke || f === OPS.closeStroke) pintar(false, true);
+    else if (f === OPS.fill || f === OPS.eoFill) pintar(true, false);
+    else if (f === OPS.fillStroke || f === OPS.eoFillStroke || f === OPS.closeFillStroke || f === OPS.closeEOFillStroke) pintar(true, true);
+    else if (f === OPS.endPath || f === OPS.clip || f === OPS.eoClip) { if (f === OPS.endPath) actual = []; }
+  }
+  const textos = (tc.items || []).filter((t) => String(t.str || "").trim()).map((t) => {
+    const p = ap(V, t.transform[4], t.transform[5]);
+    const alto = Math.hypot(t.transform[2], t.transform[3]) || 10;
+    const w = t.width || alto * 0.6 * String(t.str).length;
+    return { s: String(t.str).trim(), x: p[0] + w / 2, y: p[1] - alto * 0.35, x0: p[0], x1: p[0] + w, alto };
+  });
+  return { prims, textos, ancho: vp.width, alto: vp.height };
+}
+// Primitivas -> elementos del croquis.
+function croquisDesdeVectores(datos) {
+  const { prims, textos, ancho, alto } = datos;
+  const caja = (pts) => { const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]); return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) }; };
+  const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  const esRojo = (c) => c && c[0] > 180 && c[1] < 90 && c[2] < 90;
+  const esVerde = (c) => c && c[1] > 120 && c[0] < 90 && c[1] > c[2];
+  const esBlanco = (c) => c && c[0] > 235 && c[1] > 235 && c[2] > 235;
+  const esGris = (c) => c && Math.abs(c[0] - c[1]) < 12 && Math.abs(c[1] - c[2]) < 12 && c[0] > 185 && c[0] < 235;
+  // Formas rellenas (cada subcamino es una figura).
+  const figuras = [];
+  prims.filter((p) => p.rellena).forEach((p) => p.sub.forEach((s0) => {
+    // El punto final que vuelve al inicio no cuenta (un triángulo tiene 3 puntos).
+    const s = s0.length > 2 && dist(s0[0], s0[s0.length - 1]) < 0.5 ? Object.assign(s0.slice(0, -1), { curvo: s0.curvo }) : s0;
+    if (s.length >= 2) { const b = caja(s); figuras.push({ ...b, w: b.x1 - b.x0, h: b.y1 - b.y0, cx: (b.x0 + b.x1) / 2, cy: (b.y0 + b.y1) / 2, fill: p.fill, curvo: !!s.curvo, n: s.length, pts: s, usado: false }); } }));
+  // Trazos: segmentos sueltos (las figuras rellenas con borde no cuentan).
+  const segs = [];
+  prims.filter((p) => p.traza && !p.rellena).forEach((p, ip) => p.sub.forEach((s, is) => {
+    if (s.curvo) return;
+    const pts = s.cerrado && !s.rect ? [...s, s[0]] : s.rect ? [...s, s[0]] : s;
+    for (let k = 1; k < pts.length; k++) if (dist(pts[k - 1], pts[k]) > 0.8) segs.push({ a: pts[k - 1], b: pts[k], dash: p.dash, camino: ip + ":" + is, idx: k - 1, usado: false });
+  }));
+  // Se descarta el marco de la hoja (rectángulo casi del tamaño de la hoja).
+  const marco = (sg) => (Math.abs(sg.a[0] - sg.b[0]) > ancho * 0.9 || Math.abs(sg.a[1] - sg.b[1]) > alto * 0.9) && (Math.min(sg.a[0], sg.b[0]) < 15 || Math.min(sg.a[1], sg.b[1]) < 15 || Math.max(sg.a[0], sg.b[0]) > ancho - 15 || Math.max(sg.a[1], sg.b[1]) > alto - 15);
+  segs.forEach((sg) => { if (marco(sg)) sg.usado = true; });
+  const ortogonal = (sg) => Math.abs(sg.a[0] - sg.b[0]) < 0.6 || Math.abs(sg.a[1] - sg.b[1]) < 0.6;
+  const largo = (sg) => dist(sg.a, sg.b);
+  const equipos = [];
+  // Título: el texto más grande (con su subrayado, que no es una pared).
+  let titulo = "";
+  const grandes = textos.filter((t) => !/^\d{1,4}$/.test(t.s)).sort((a, b) => b.alto - a.alto);
+  if (grandes.length && grandes[0].alto >= 10) {
+    const fila = grandes.filter((t) => Math.abs(t.y - grandes[0].y) < grandes[0].alto * 0.6 && Math.abs(t.alto - grandes[0].alto) < 1).sort((a, b) => a.x - b.x);
+    titulo = fila.map((t) => t.s).join(" ").replace(/\s+/g, " ").trim();
+    fila.forEach((t) => { t.usado = true; t.titulo = true; });
+    const tx0 = Math.min(...fila.map((t) => t.x0)), tx1 = Math.max(...fila.map((t) => t.x1)), ty = Math.max(...fila.map((t) => t.y));
+    segs.forEach((sg) => { if (Math.abs(sg.a[1] - sg.b[1]) < 0.6 && sg.a[1] > ty && sg.a[1] - ty < grandes[0].alto && Math.min(sg.a[0], sg.b[0]) > tx0 - 15 && Math.max(sg.a[0], sg.b[0]) < tx1 + 15) sg.usado = true; });
+  }
+  // El borde de una figura rellena dibujado aparte tampoco es pared.
+  figuras.forEach((f) => {
+    if (f.curvo) return;
+    const enVertice = (p) => f.pts.some((q) => dist(p, q) < 1);
+    segs.forEach((sg) => {
+      if (sg.usado || !enVertice(sg.a) || !enVertice(sg.b)) return;
+      sg.usado = true;
+      if (f.n === 4 && !ortogonal(sg)) f.diag = true; // rectángulo con diagonal (central)
+    });
+    if (f.n !== 4) return;
+    segs.forEach((sg) => {
+      if (sg.usado) return;
+      const sobre = (p) => (Math.abs(p[0] - f.x0) < 1 || Math.abs(p[0] - f.x1) < 1) && p[1] > f.y0 - 1 && p[1] < f.y1 + 1 || (Math.abs(p[1] - f.y0) < 1 || Math.abs(p[1] - f.y1) < 1) && p[0] > f.x0 - 1 && p[0] < f.x1 + 1;
+      if (sobre(sg.a) && sobre(sg.b) && ortogonal(sg) && (Math.abs(sg.a[0] - sg.b[0]) < 0.6 ? Math.abs(sg.a[0] - f.x0) < 1 || Math.abs(sg.a[0] - f.x1) < 1 : Math.abs(sg.a[1] - f.y0) < 1 || Math.abs(sg.a[1] - f.y1) < 1)) sg.usado = true;
+    });
+  });
+  // 1) Puertas: diagonal a ~45° + segmento perpendicular a la pared, del mismo camino.
+  const puertas = [];
+  const porCamino = {};
+  segs.forEach((sg) => { if (!sg.dash && !sg.usado) (porCamino[sg.camino] = porCamino[sg.camino] || []).push(sg); });
+  Object.values(porCamino).forEach((lista) => {
+    if (lista.length !== 2) return;
+    const [s1, s2] = lista;
+    const diag = !ortogonal(s1) && ortogonal(s2) ? s1 : !ortogonal(s2) && ortogonal(s1) ? s2 : null;
+    if (!diag) return;
+    const hoja = diag === s1 ? s2 : s1;
+    const L = largo(hoja);
+    if (L < 8 || L > 80 || Math.abs(largo(diag) - L * Math.SQRT2) > L * 0.25) return;
+    // B: punta de la hoja (común a los dos); C: bisagra; A: el otro extremo de la abertura.
+    const comun = [hoja.a, hoja.b].find((p) => dist(p, diag.a) < 0.8 || dist(p, diag.b) < 0.8);
+    if (!comun) return;
+    const B = comun, C = dist(hoja.a, B) < 0.8 ? hoja.b : hoja.a, A = dist(diag.a, B) < 0.8 ? diag.b : diag.a;
+    s1.usado = s2.usado = true;
+    puertas.push({ A, B, C, ancho: dist(A, C) });
+  });
+  // 2) Escala: las puertas de Visio miden ~0,80 m (32 unidades del croquis).
+  const anchos = puertas.map((p) => p.ancho).sort((a, b) => a - b);
+  const k = anchos.length ? 32 / anchos[Math.floor(anchos.length / 2)] : 1.5;
+  // 3) Equipos por color y forma.
+  const textoEn = (f, re) => textos.find((t) => t.x1 >= f.x0 - 1 && t.x0 <= f.x1 + 1 && t.y >= f.y0 - 2 && t.y <= f.y1 + 2 && re.test(t.s));
+  const dentroEdificio = (() => { const ss = segs.filter((s) => !s.usado && !s.dash); if (!ss.length) return () => true; const b = caja(ss.flatMap((s) => [s.a, s.b])); return (x, y) => x >= b.x0 - 1 && x <= b.x1 + 1 && y >= b.y0 - 1 && y <= b.y1 + 1; })();
+  figuras.forEach((f) => {
+    if (f.usado) return;
+    const tam = Math.max(f.w, f.h);
+    if (esRojo(f.fill) && !f.curvo) {
+      const drv = textoEn(f, /^(DRV|RV|VIDRIO|ROT)/i);
+      if (drv) { drv.usado = true; f.usado = true; equipos.push({ tipo: "rotura_vidrio", x: f.cx, y: f.cy, rot: f.h > f.w * 1.3 ? 90 : 0, f }); return; }
+      if (tam < 14) { f.usado = true; equipos.push({ tipo: "infrarrojo", x: f.cx, y: f.cy, f, ir: true }); }
+      return;
+    }
+    if (esVerde(f.fill) && f.curvo && tam < 16) { f.usado = true; equipos.push({ tipo: "magnetico", x: f.cx, y: f.cy, f }); return; }
+    if (esBlanco(f.fill) && f.curvo && tam > 6 && tam < 24) { f.usado = true; equipos.push({ tipo: "humo", x: f.cx, y: f.cy, f }); return; }
+  });
+  // Sirenas: rectángulo gris + triángulo gris pegado.
+  figuras.filter((f) => !f.usado && esGris(f.fill) && f.n === 3).forEach((tri) => {
+    const rect = figuras.find((r) => !r.usado && r !== tri && esGris(r.fill) && r.n === 4 && Math.max(r.x0, tri.x0) <= Math.min(r.x1, tri.x1) + 1.5 && Math.max(r.y0, tri.y0) <= Math.min(r.y1, tri.y1) + 1.5);
+    if (!rect) return;
+    tri.usado = rect.usado = true;
+    const ang = Math.atan2(tri.cy - rect.cy, tri.cx - rect.cx) * 180 / Math.PI - 90;
+    const cx = (Math.min(rect.x0, tri.x0) + Math.max(rect.x1, tri.x1)) / 2, cy = (Math.min(rect.y0, tri.y0) + Math.max(rect.y1, tri.y1)) / 2;
+    equipos.push({ tipo: dentroEdificio(cx, cy) ? "sirena_int" : "sirena_ext", x: cx, y: cy, rot: ((Math.round(ang / 90) * 90) % 360 + 360) % 360, f: { x0: Math.min(rect.x0, tri.x0), y0: Math.min(rect.y0, tri.y0), x1: Math.max(rect.x1, tri.x1), y1: Math.max(rect.y1, tri.y1) } });
+  });
+  // Central / teclado: rectángulo gris (con o sin diagonal adentro).
+  figuras.filter((f) => !f.usado && esGris(f.fill) && f.n === 4 && Math.max(f.w, f.h) < 40).forEach((f) => {
+    const diag = segs.find((s) => !s.usado && !ortogonal(s) && ((dist(s.a, [f.x0, f.y0]) < 1.5 && dist(s.b, [f.x1, f.y1]) < 1.5) || (dist(s.b, [f.x0, f.y0]) < 1.5 && dist(s.a, [f.x1, f.y1]) < 1.5) || (dist(s.a, [f.x0, f.y1]) < 1.5 && dist(s.b, [f.x1, f.y0]) < 1.5) || (dist(s.b, [f.x0, f.y1]) < 1.5 && dist(s.a, [f.x1, f.y0]) < 1.5)));
+    const proporcion = Math.max(f.w, f.h) / Math.max(0.1, Math.min(f.w, f.h));
+    if (diag) diag.usado = true;
+    f.usado = true;
+    const tipo = proporcion >= 2 ? "teclado" : diag || f.diag ? "central" : "teclado";
+    equipos.push({ tipo, x: f.cx, y: f.cy, rot: tipo === "teclado" && f.h > f.w ? 90 : 0, f });
+  });
+  // Otras figuras rellenas rectangulares (muebles, tableros...): quedan como rectángulo.
+  const otras = figuras.filter((f) => !f.usado && !f.curvo && f.n === 4 && f.w > 3 && f.h > 3 && f.w < ancho * 0.8 && !esBlanco(f.fill));
+  otras.forEach((f) => { f.usado = true; });
+  // Infrarrojos: la captación sale de la esquina del cuadradito (líneas punteadas).
+  const punteados = {};
+  segs.filter((s) => s.dash && !s.usado).forEach((s) => { (punteados[s.camino] = punteados[s.camino] || []).push(s); });
+  const caminosP = Object.values(punteados);
+  equipos.filter((e) => e.ir).forEach((e) => {
+    const f = e.f, esquinas = [[f.x0, f.y0], [f.x1, f.y0], [f.x1, f.y1], [f.x0, f.y1]];
+    let mejor = null;
+    caminosP.forEach((lista) => {
+      if (lista.length !== 2 || lista[0].usado) return;
+      const v = [lista[0].a, lista[0].b].find((p) => dist(p, lista[1].a) < 0.8 || dist(p, lista[1].b) < 0.8);
+      if (!v) return;
+      const d = Math.min(...esquinas.map((q) => dist(q, v)), dist([f.cx, f.cy], v));
+      if (d < 6 && (!mejor || d < mejor.d)) mejor = { d, v, lista };
+    });
+    if (!mejor) { e.rot = 0; return; }
+    mejor.lista.forEach((s) => { s.usado = true; });
+    const dirs = mejor.lista.map((s) => { const o = dist(s.a, mejor.v) < 0.8 ? s.b : s.a; return Math.atan2(o[1] - mejor.v[1], o[0] - mejor.v[0]); });
+    let d1 = dirs[0], d2 = dirs[1];
+    let dif = d2 - d1; while (dif > Math.PI) dif -= 2 * Math.PI; while (dif < -Math.PI) dif += 2 * Math.PI;
+    const bis = d1 + dif / 2;
+    const angulo = Math.abs(dif) * 180 / Math.PI;
+    e.x = mejor.v[0]; e.y = mejor.v[1];
+    e.rot = Math.round(((bis * 180 / Math.PI - CROQUIS_IR_BIS) % 360 + 360) % 360 / 5) * 5 % 360;
+    e.ang = Math.round(Math.max(15, Math.min(180, angulo)) / 5) * 5;
+    e.alc = Math.round(Math.max(40, Math.min(300, Math.max(...mejor.lista.map(largo)) * k)) / 5) * 5;
+  });
+  // 4) Números de zona: al equipo más cercano.
+  const libres = textos.filter((t) => !t.usado);
+  libres.filter((t) => !t.usado && /^\d{1,4}$/.test(t.s)).forEach((t) => {
+    let mejor = null;
+    equipos.forEach((e) => {
+      if (e.etq) return;
+      const f = e.f || { x0: e.x, x1: e.x, y0: e.y, y1: e.y };
+      const dx = Math.max(f.x0 - t.x, 0, t.x - f.x1), dy = Math.max(f.y0 - t.y, 0, t.y - f.y1);
+      // Los números de zona son de los sensores: sirena, teclado y central van después.
+      const d = Math.hypot(dx, dy) + (/^(sirena|teclado|central)/.test(e.tipo) ? 8 : 0);
+      if (d < 22 && (!mejor || d < mejor.d)) mejor = { d, e };
+    });
+    if (mejor) { mejor.e.etq = t.s; t.usado = true; }
+  });
+  // 5) Paredes: el resto de las líneas (punteadas sueltas = cableado).
+  const xs = [], ys = [];
+  segs.filter((s) => !s.usado).forEach((s) => { xs.push(s.a[0], s.b[0]); ys.push(s.a[1], s.b[1]); });
+  equipos.forEach((e) => { xs.push(e.x); ys.push(e.y); });
+  otras.forEach((f) => { xs.push(f.x0); ys.push(f.y0); });
+  const ox = xs.length ? Math.min(...xs) - 20 : 0, oy = ys.length ? Math.min(...ys) - 40 : 0;
+  const m = (p) => [Math.round((p[0] - ox) * k * 2) / 2, Math.round((p[1] - oy) * k * 2) / 2];
+  const out = [];
+  let n = 0;
+  const id = () => "pv" + Date.now().toString(36) + (n++).toString(36);
+  segs.filter((s) => !s.usado && !s.dash).forEach((s) => {
+    let a = m(s.a), b = m(s.b);
+    if (Math.abs(a[0] - b[0]) < 1.5) b = [a[0], b[1]]; else if (Math.abs(a[1] - b[1]) < 1.5) b = [b[0], a[1]];
+    if (Math.hypot(b[0] - a[0], b[1] - a[1]) >= 2) out.push({ id: id(), t: "linea", x1: a[0], y1: a[1], x2: b[0], y2: b[1] });
+  });
+  // Paredes que siguen en línea recta se unen en una sola.
+  for (let i = 0; i < out.length; i++) {
+    for (let j = i + 1; j < out.length; j++) {
+      const p = out[i], q = out[j];
+      const hor = p.y1 === p.y2 && q.y1 === q.y2 && p.y1 === q.y1, ver = p.x1 === p.x2 && q.x1 === q.x2 && p.x1 === q.x1;
+      if (!hor && !ver) continue;
+      const [p0, p1] = hor ? [Math.min(p.x1, p.x2), Math.max(p.x1, p.x2)] : [Math.min(p.y1, p.y2), Math.max(p.y1, p.y2)];
+      const [q0, q1] = hor ? [Math.min(q.x1, q.x2), Math.max(q.x1, q.x2)] : [Math.min(q.y1, q.y2), Math.max(q.y1, q.y2)];
+      if (q0 > p1 + 0.5 || p0 > q1 + 0.5) continue;
+      const a0 = Math.min(p0, q0), a1 = Math.max(p1, q1);
+      if (hor) { p.x1 = a0; p.x2 = a1; } else { p.y1 = a0; p.y2 = a1; }
+      out.splice(j, 1); j = i;
+    }
+  }
+  otras.forEach((f) => {
+    const a = m([f.x0, f.y0]), b = m([f.x1, f.y1]);
+    out.push({ id: id(), t: "rect", x: a[0], y: a[1], w: b[0] - a[0], h: b[1] - a[1], color: "#5B5F66" });
+  });
+  caminosP.forEach((lista) => {
+    if (lista.every((s) => s.usado)) return;
+    const pts = [m(lista[0].a), ...lista.map((s) => m(s.b))];
+    out.push({ id: id(), t: "cable", pts });
+  });
+  puertas.forEach((p) => {
+    const A = m(p.A), B = m(p.B), C = m(p.C);
+    const u = [A[0] - C[0], A[1] - C[1]], v = [B[0] - C[0], B[1] - C[1]];
+    const L = Math.hypot(u[0], u[1]) || 1;
+    let rot = Math.atan2(u[1], u[0]), esp = false;
+    if (v[0] * Math.sin(rot) - v[1] * Math.cos(rot) < 0) { esp = true; rot += Math.PI; }
+    const el = { id: id(), t: "simbolo", tipo: "puerta", x: (A[0] + C[0]) / 2, y: (A[1] + C[1]) / 2, rot: Math.round(((rot * 180 / Math.PI) % 360 + 360) % 360) % 360, esc: Math.round(L / 40 * 100) / 100 };
+    if (esp) el.esp = true;
+    out.push(el);
+  });
+  equipos.forEach((e) => {
+    const p = m([e.x, e.y]);
+    const el = { id: id(), t: "simbolo", tipo: e.tipo, x: p[0], y: p[1], rot: e.rot || 0, esc: 0.8 };
+    if (e.ang !== undefined && e.ang !== CROQUIS_SIMBOLOS.infrarrojo.ang) el.ang = e.ang;
+    if (e.alc !== undefined) el.alc = e.alc;
+    if (e.etq) el.etq = e.etq;
+    out.push(el);
+  });
+  textos.filter((t) => !t.usado).forEach((t) => {
+    const p = m([t.x, t.y]);
+    out.push({ id: id(), t: "texto", x: p[0], y: p[1] + 5, texto: t.s.slice(0, 120), tam: Math.max(10, Math.min(28, Math.round(t.alto * k * 0.9))) });
+  });
+  return {
+    elementos: out, titulo, escala: k, puertas: puertas.length,
+    equipos: equipos.length, paredes: out.filter((e) => e.t === "linea").length,
+    // Dónde queda la hoja entera en el croquis (para poner la imagen de fondo).
+    marco: { x: Math.round(-ox * k), y: Math.round(-oy * k), w: Math.round(ancho * k), h: Math.round(alto * k) },
+  };
+}
+// Todas las hojas (hasta "max") de un PDF -> páginas de croquis editables.
+// Devuelve null si el PDF no es un dibujo (por ejemplo, un plano escaneado).
+async function croquisPdfAEditable(bytes, max) {
+  const pdfjs = await croquisCargarPdfJs();
+  const doc = await pdfjs.getDocument({ data: bytes.slice() }).promise;
+  try {
+    const total = doc.numPages, paginas = [];
+    let titulo = "", resumen = { paredes: 0, puertas: 0, equipos: 0 };
+    for (let n = 1; n <= Math.min(total, max || CROQUIS_MAX_HOJAS); n++) {
+      const pag = await doc.getPage(n);
+      const datos = croquisPrimitivasPdf(pdfjs.OPS, await pag.getOperatorList(), await pag.getTextContent(), pag.getViewport({ scale: 1 }));
+      if (!croquisEsVectorial(datos)) { if (n === 1) return null; continue; }
+      const r = croquisDesdeVectores(datos);
+      if (!titulo && r.titulo) titulo = r.titulo;
+      ["paredes", "puertas", "equipos"].forEach((k) => { resumen[k] += r[k]; });
+      paginas.push({ nombre: total > 1 ? `Hoja ${n}` : "Página 1", elementos: r.elementos, marco: r.marco, hoja: n });
+    }
+    return paginas.length ? { paginas, titulo, total, resumen } : null;
+  } finally { try { doc.destroy(); } catch (e) { /* nada */ } }
+}
+// ¿El PDF es un dibujo (de Visio, AutoCAD...) o una foto escaneada?
+function croquisEsVectorial(datos) { return datos && datos.prims && datos.prims.filter((p) => p.traza).length >= 12; }
 // Igual, pero de un PDF trae cada hoja (planta baja, planta alta...) por separado.
 async function croquisArchivoAImagenes(archivo, lado, max) {
   const L = lado || 2400;

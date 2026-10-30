@@ -3245,3 +3245,74 @@ test("Ampliación sobre el último plano (lo anterior atenuado) y al cerrar el p
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Plano en PDF dibujado (estilo Visio de SAT) -> croquis editable: paredes, puerta, equipos con zona y título", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const fotos = {};
+  let nFoto = 0;
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (req.method() === "POST" && u.includes("/api/foto")) { const id = "f" + nFoto++; fotos[id] = JSON.parse(req.postData()).base64; return json({ id }); }
+    if (u.includes("/api/foto")) return route.fulfill({ status: 200, contentType: "image/jpeg", body: Buffer.from(fotos[new URL(u).searchParams.get("id")] || "", "base64") });
+    json([]);
+  });
+  await page.goto(base + "/");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); cqAbrirLista(); });
+  // Un plano chico dibujado como lo exporta Visio (coordenadas con y hacia abajo vía SVG path)
+  const pdf = await page.evaluate(async () => {
+    const { PDFDocument, rgb, StandardFonts } = await croquisCargarPdfLib();
+    const d = await PDFDocument.create(); const p = d.addPage([600, 420]); const H = 420;
+    const font = await d.embedFont(StandardFonts.HelveticaBold);
+    const negro = rgb(0, 0, 0), op = { x: 0, y: H, borderColor: negro, borderWidth: 0.75 };
+    // Paredes: un rectángulo de 400x250 con una pared interna cortada por una puerta
+    p.drawSvgPath("M 100 100 L 500 100 L 500 350 L 100 350 Z", op);
+    p.drawSvgPath("M 300 100 L 300 200", op);
+    p.drawSvgPath("M 300 223.6 L 300 350", op);
+    // Puerta (hoja abierta + diagonal), de 23,6 de ancho, como en Visio
+    p.drawSvgPath("M 300 200 L 276.4 223.6 L 300 223.6", op);
+    // Infrarrojo: cuadradito rojo + captación punteada en L desde su esquina
+    p.drawSvgPath("M 492 106 L 497.5 106 L 497.5 111.5 L 492 111.5 Z", { x: 0, y: H, color: rgb(1, 0, 0), borderColor: negro, borderWidth: 0.75 });
+    p.drawSvgPath("M 452 111.5 L 492 111.5 L 492 145", { ...op, borderDashArray: [0.75, 1.5] });
+    p.drawText("7", { x: 482, y: H - 122, size: 10, font });
+    // Magnético (círculo verde), humo (círculo blanco), central (gris con diagonal), sirena (gris + triángulo)
+    p.drawCircle({ x: 200, y: H - 100, size: 4, color: rgb(0, 0.69, 0.31), borderColor: negro, borderWidth: 0.75 });
+    p.drawText("1", { x: 196, y: H - 92, size: 10, font });
+    p.drawCircle({ x: 200, y: H - 250, size: 6.4, color: rgb(1, 1, 1), borderColor: negro, borderWidth: 0.75 });
+    p.drawSvgPath("M 420 320 L 441 320 L 441 334 L 420 334 Z", { x: 0, y: H, color: rgb(0.85, 0.85, 0.85), borderColor: negro, borderWidth: 0.75 });
+    p.drawSvgPath("M 420 334 L 441 320", op);
+    p.drawSvgPath("M 140 140 L 157.5 140 L 157.5 148.3 L 140 148.3 Z", { x: 0, y: H, color: rgb(0.85, 0.85, 0.85), borderColor: negro, borderWidth: 0.75 });
+    p.drawSvgPath("M 148.2 148.3 L 140 159.8 L 158.4 159.8 Z", { x: 0, y: H, color: rgb(0.85, 0.85, 0.85), borderColor: negro, borderWidth: 0.75 });
+    // Título subrayado
+    p.drawText("CASA DE PRUEBA", { x: 230, y: H - 60, size: 14, font });
+    p.drawSvgPath("M 228 64 L 362 64", { ...op, borderWidth: 1.5 });
+    return Array.from(await d.save());
+  });
+  const [selector] = await Promise.all([page.waitForEvent("filechooser"), page.click("#cqDesdePlanoBtn")]);
+  await selector.setFiles({ name: "casa.pdf", mimeType: "application/pdf", buffer: Buffer.from(pdf) });
+  await page.waitForSelector('[data-r="editable"]', { timeout: 15000 });
+  await page.click('[data-r="editable"]');
+  await page.waitForFunction(() => screens.croquis.dataset.active === "true", null, { timeout: 20000 });
+  const r = await page.evaluate(() => ({
+    titulo: cq.titulo,
+    paredes: cq.elementos.filter((e) => e.t === "linea").map((e) => [e.x1, e.y1, e.x2, e.y2]),
+    simbolos: cq.elementos.filter((e) => e.t === "simbolo").map((e) => ({ tipo: e.tipo, etq: e.etq || "", rot: e.rot, esp: !!e.esp })),
+    textos: cq.elementos.filter((e) => e.t === "texto").map((e) => e.texto),
+    fondo: cq.fondo && !cq.fondo.base && !!cq.fondo.id,
+  }));
+  assert.strictEqual(r.titulo, "CASA DE PRUEBA");
+  assert.deepStrictEqual(r.textos, [], "el título y los números no quedan sueltos");
+  assert.strictEqual(r.paredes.length, 6, "4 del contorno + 2 tramos de la pared interna (el subrayado del título no es pared)");
+  const tipos = r.simbolos.map((s) => s.tipo).sort();
+  assert.deepStrictEqual(tipos, ["central", "humo", "infrarrojo", "magnetico", "puerta", "sirena_int"]);
+  const ir = r.simbolos.find((s) => s.tipo === "infrarrojo");
+  assert.deepStrictEqual([ir.etq, ir.rot], ["7", 270], "el infrarrojo mira hacia la habitación (abajo a la izquierda) y lleva su zona");
+  assert.strictEqual(r.simbolos.find((s) => s.tipo === "magnetico").etq, "1");
+  assert.ok(r.fondo, "el original queda tenue de fondo para comparar");
+  // La puerta se abre hacia el lado correcto: la hoja queda a la izquierda de la pared
+  const puerta = await page.evaluate(() => { const e = cq.elementos.find((x) => x.tipo === "puerta"); return croquisLocalAMundo(e, -20, -40)[0] < e.x; });
+  assert.ok(puerta);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.18.0";
+const APP_VERSION = "4.19.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -10560,10 +10560,10 @@ document.getElementById("instPlanoCroquisBtn").addEventListener("click", async (
         const r = await fetch(`/api/planos?nombre=${encodeURIComponent(p.nombre)}`, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN } });
         if (!r.ok) throw new Error("No se pudo traer el plano");
         const blob = await r.blob();
-        const fondos = await cqPrepararPlanosBase(new File([blob], p.nombre + ".pdf", { type: "application/pdf" }));
+        const plano = await cqPrepararPlano(new File([blob], p.nombre + ".pdf", { type: "application/pdf" }));
         carga.remove();
-        instPlanoNuevo(croquisPaginasDesdeFondos(fondos), "Plano de la instalación");
-        showToast("Plano del cliente de base: dibujá encima lo que instalaste.");
+        instPlanoNuevo(plano.paginas, "Plano de la instalación");
+        cqAvisoPlanoEditable(plano, "Plano del cliente de base: dibujá encima lo que instalaste.");
       } catch (err) { carga.remove(); showToast("No se pudo usar el plano: " + err.message); }
     }
   });
@@ -14630,12 +14630,12 @@ function renderResultadosPlanos() {
       try {
         const r = await fetch(`/api/planos?nombre=${encodeURIComponent(btn.dataset.croquis)}`, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN } });
         if (!r.ok) throw new Error("No se pudo traer el plano");
-        const fondos = await cqPrepararPlanosBase(new File([await r.blob()], btn.dataset.croquis + ".pdf", { type: "application/pdf" }));
+        const plano = await cqPrepararPlano(new File([await r.blob()], btn.dataset.croquis + ".pdf", { type: "application/pdf" }));
         carga.remove();
         const cli = (clientesGeneralCache || []).find((c) => primero.numero_cliente && normalizarNumeroCliente(c.numero_cliente) === normalizarNumeroCliente(primero.numero_cliente));
-        cqAbrirEditor({ titulo: "Plano", cliente: primero.nombre_cliente || "", numero_cliente: primero.numero_cliente ? normalizarNumeroCliente(primero.numero_cliente) : "", direccion: cli ? [cli.direccion, cli.localidad].filter(Boolean).join(", ") : "", paginas: croquisPaginasDesdeFondos(fondos), cambios: true });
+        cqAbrirEditor({ titulo: "Plano", cliente: primero.nombre_cliente || "", numero_cliente: primero.numero_cliente ? normalizarNumeroCliente(primero.numero_cliente) : "", direccion: cli ? [cli.direccion, cli.localidad].filter(Boolean).join(", ") : "", paginas: plano.paginas, cambios: true });
         cqGuardarBorrador();
-        showToast("Plano de base listo: dibujá encima y guardalo.");
+        cqAvisoPlanoEditable(plano, "Plano de base listo: dibujá encima y guardalo.");
       } catch (err) { carga.remove(); showToast("No se pudo usar el plano: " + err.message); }
     }));
     planosResultados.appendChild(card);
@@ -16762,6 +16762,53 @@ function cqCapaCargando(texto, nota) {
   document.body.appendChild(capa);
   return capa;
 }
+// Un PDF dibujado (de Visio) se puede pasar a croquis editable: paredes,
+// puertas y equipos de verdad, en vez de una imagen. Se pregunta.
+function cqPreguntarEditable() {
+  return new Promise((ok) => {
+    const capa = document.createElement("div");
+    capa.className = "cq-datos-capa";
+    capa.innerHTML = `<div class="cq-datos cq-menu">
+      <h3>Este PDF es un dibujo</h3>
+      <p class="pe-nota">Se puede pasar a croquis editable: paredes, puertas y equipos con su número de zona, que después se mueven y se corrigen. El plano original queda tenue de fondo para comparar.</p>
+      <button type="button" class="btn btn-primary" data-r="editable">${cqIc("lapiz")} Pasar a croquis editable</button>
+      <button type="button" class="btn btn-secondary" data-r="imagen">${cqIc("galeria")} Usarlo como imagen de fondo</button>
+    </div>`;
+    document.body.appendChild(capa);
+    capa.querySelectorAll("[data-r]").forEach((b) => b.addEventListener("click", () => { capa.remove(); ok(b.dataset.r === "editable"); }));
+  });
+}
+// Archivo -> páginas del croquis. Si es un PDF dibujado y se elige
+// "editable", las páginas traen los elementos y la hoja original de fondo
+// (tenue, se puede ocultar); si no, el plano entra como imagen de base.
+async function cqPrepararPlano(archivo) {
+  const esPdf = /pdf$/i.test(archivo.type || "") || /\.pdf$/i.test(archivo.name || "");
+  if (esPdf) {
+    let editable = null;
+    const bytes = new Uint8Array(await archivo.arrayBuffer());
+    try { editable = await croquisPdfAEditable(bytes, CROQUIS_MAX_HOJAS); } catch (e) { editable = null; }
+    if (editable && await cqPreguntarEditable()) {
+      const imgs = await croquisPdfAImagenes(bytes.slice(), 2000, editable.paginas.length);
+      const paginas = [];
+      for (const p of editable.paginas) {
+        const img = imgs[p.hoja - 1];
+        let fondo = null;
+        if (img) {
+          try { const f = await croquisSubirPlanoBase(img, SERVICIOS_API_TOKEN); fondo = { id: f.id, x: p.marco.x, y: p.marco.y, w: p.marco.w, h: p.marco.h }; } catch (e) { fondo = null; }
+        }
+        paginas.push({ nombre: p.nombre, elementos: p.elementos, fondo });
+      }
+      if (editable.total > CROQUIS_MAX_HOJAS) showToast(`El PDF tiene ${editable.total} hojas: se usaron las primeras ${CROQUIS_MAX_HOJAS}.`);
+      return { paginas, titulo: editable.titulo, editable: true, resumen: editable.resumen };
+    }
+  }
+  return { paginas: croquisPaginasDesdeFondos(await cqPrepararPlanosBase(archivo)), titulo: "", editable: false };
+}
+function cqAvisoPlanoEditable(r, siNo) {
+  if (!r.editable) { showToast(siNo); return; }
+  const s = r.resumen || {};
+  showToast(`Listo: ${s.paredes || 0} paredes, ${s.puertas || 0} puertas y ${s.equipos || 0} equipos. Revisalo: el original queda tenue de fondo (se oculta con el botón de la foto).`);
+}
 // Archivo o PDF -> imágenes subidas -> un fondo de plano base por hoja.
 async function cqPrepararPlanosBase(archivo) {
   const imgs = await croquisArchivoAImagenes(archivo, 2400, CROQUIS_MAX_HOJAS);
@@ -16774,19 +16821,24 @@ async function cqPrepararPlanosBase(archivo) {
 async function cqPonerPlanoBase(archivo) {
   const capa = cqCapaCargando("Preparando el plano…", "Se convierte en imagen y se sube. Tarda unos segundos.");
   try {
-    const fondos = await cqPrepararPlanosBase(archivo);
+    const r = await cqPrepararPlano(archivo);
     capa.remove();
     cqMemoria();
     const actual = cq.pagina;
-    cq.fondo = fondos[0];
+    // Si la página ya tiene dibujo y llegan elementos, van en páginas nuevas.
+    const primeraNueva = r.editable && cq.elementos.length;
+    if (primeraNueva) cqNuevaPagina(r.paginas[0].nombre);
+    if (r.editable) cq.elementos.push(...r.paginas[0].elementos);
+    cq.fondo = r.paginas[0].fondo;
     cq.verFondo = true;
     cq.cambios = true;
+    if (r.editable && !cq.titulo && r.titulo) cq.titulo = r.titulo.slice(0, 120);
     // Las otras hojas del PDF (planta alta, etc.) van en páginas nuevas.
-    fondos.slice(1).forEach((f, i) => { cqNuevaPagina(`Hoja ${i + 2}`); cq.fondo = f; });
-    if (fondos.length > 1) cqIrPagina(actual);
+    r.paginas.slice(1).forEach((p) => { cqNuevaPagina(p.nombre); cq.elementos.push(...p.elementos); cq.fondo = p.fondo; });
+    cqIrPagina(primeraNueva ? cq.paginas.length - r.paginas.length : actual);
     cqGuardarBorrador();
     cqVerTodo();
-    showToast("Plano puesto de base. Ya podés dibujar encima los equipos y el cableado.");
+    cqAvisoPlanoEditable(r, "Plano puesto de base. Ya podés dibujar encima los equipos y el cableado.");
   } catch (err) {
     capa.remove();
     showToast("No se pudo usar ese archivo: " + err.message);
@@ -16903,11 +16955,11 @@ cqEl("cqDesdePlanoBtn").addEventListener("click", async () => {
   if (borrador && borrador.cambios && borrador.elementos && borrador.elementos.length && !confirm("Hay un croquis sin guardar en este celular. ¿Empezar uno nuevo igual? (el anterior se pierde)")) return;
   const capa = cqCapaCargando("Preparando el plano…", "Se convierte en imagen y se sube. Tarda unos segundos.");
   try {
-    const fondos = await cqPrepararPlanosBase(archivo);
+    const r = await cqPrepararPlano(archivo);
     capa.remove();
-    cqAbrirEditor({ titulo: String(archivo.name || "").replace(/\.[a-z0-9]+$/i, "").slice(0, 120), paginas: croquisPaginasDesdeFondos(fondos), cambios: true });
+    cqAbrirEditor({ titulo: (r.titulo || String(archivo.name || "").replace(/\.[a-z0-9]+$/i, "")).slice(0, 120), paginas: r.paginas, cambios: true });
     cqGuardarBorrador();
-    showToast("Plano listo de base: elegí el cliente y dibujá encima.");
+    cqAvisoPlanoEditable(r, "Plano listo de base: elegí el cliente y dibujá encima.");
     cqPedirDatos();
   } catch (err) {
     capa.remove();
