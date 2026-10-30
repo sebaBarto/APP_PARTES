@@ -16,7 +16,7 @@
 //   simbolo { tipo, x, y, rot, esc, color?, esp? }  equipos y objetos de obra
 
 // Tiene que ser igual a APP_VERSION de app.js (si no, la app recarga).
-const CROQUIS_UTILS_VERSION = "4.15.0";
+const CROQUIS_UTILS_VERSION = "4.16.0";
 const CROQUIS_GRILLA = 20;
 
 // Cada símbolo se dibuja centrado en 0,0 con dib(color). "cat" separa los
@@ -617,6 +617,8 @@ function croquisCaja(dibujo) {
     else if (el.t === "tabla") { const m = croquisTablaMedidas(el); sumar(el.x, el.y); sumar(el.x + m.W, el.y + m.H); }
     else if (el.t === "simbolo") { const r = croquisRadio(el) * (el.esc || 1); sumar(el.x - r, el.y - r); sumar(el.x + r, el.y + r + (el.etq ? 14 : 0)); }
   });
+  const fb = dibujo.fondo;
+  if (fb && fb.base && fb.w > 0 && fb.h > 0) { sumar(fb.x, fb.y); sumar(fb.x + fb.w, fb.y + fb.h); }
   if (!isFinite(x0)) return { x: 0, y: 0, w: 400, h: 300 };
   return { x: x0, y: y0, w: Math.max(40, x1 - x0), h: Math.max(40, y1 - y0) };
 }
@@ -676,17 +678,134 @@ function croquisSvgDocumento(dibujo, opciones) {
     return `${aro}${icono}<text x="${x + 24}" y="${y + 5}" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#1C1E21">${croquisEsc(it.nombre)}</text>`;
   }).join("");
   return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x0} ${c.y - m} ${W} ${H}" width="${Math.round(W)}" height="${Math.round(H)}">
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="${x0} ${c.y - m} ${W} ${H}" width="${Math.round(W)}" height="${Math.round(H)}">
 <rect x="${x0}" y="${c.y - m}" width="${W}" height="${H}" fill="#FFFFFF"/>
+${croquisSvgPlanoBase(dibujo.fondo)}
 ${croquisOrdenCapas(dibujo.elementos || []).map((e) => croquisSvgElemento(e)).join("\n")}
 ${dibujo.medidas ? croquisSvgMedidas(dibujo.elementos || []) : ""}
 ${usados.length ? `<line x1="${x0 + 10}" y1="${c.y + c.h + m - 2}" x2="${x0 + W - 10}" y2="${c.y + c.h + m - 2}" stroke="#C9CCD1" stroke-width="1"/>` : ""}
 ${ley}
 </svg>`;
 }
+// ---------- Plano base (el diseño de la casa hecho en Visio u otro programa) ----------
+// Es una imagen fija debajo del dibujo: se ve entera (no como el boceto
+// de fondo, que es tenue y solo sirve para calcar) y sale en el PDF, la
+// imagen y el SVG.
+function croquisSvgPlanoBase(f) {
+  if (!f || !f.base || !(f.w > 0) || !(f.h > 0)) return "";
+  const href = f.local || (f.id ? "/api/foto?id=" + encodeURIComponent(f.id) : "");
+  if (!href) return "";
+  return `<image href="${href}" xlink:href="${href}" x="${f.x}" y="${f.y}" width="${f.w}" height="${f.h}" preserveAspectRatio="none"/>`;
+}
+const croquisFondosCache = {};
+function croquisBlobADataUri(blob) {
+  return new Promise((ok, mal) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = () => mal(new Error("No se pudo leer el plano")); fr.readAsDataURL(blob); });
+}
+async function croquisFondoListo(f) {
+  if (!f || !f.base || f.local || !f.id) return f;
+  if (!croquisFondosCache[f.id]) {
+    croquisFondosCache[f.id] = fetch("/api/foto?id=" + encodeURIComponent(f.id)).then((r) => { if (!r.ok) throw new Error("No se pudo traer el plano base"); return r.blob(); })
+      .then((b) => croquisBlobADataUri(b.type && b.type.startsWith("image/") ? b : new Blob([b], { type: "image/jpeg" })))
+      .catch((e) => { delete croquisFondosCache[f.id]; throw e; });
+  }
+  return { ...f, local: await croquisFondosCache[f.id] };
+}
+// Copia del dibujo con el plano base (de cada página) listo para meterlo
+// adentro de la imagen: el PNG y el PDF no pueden ir a buscarlo afuera.
+async function croquisPrepararFondos(dibujo) {
+  const d = { ...(dibujo || {}) };
+  if (d.fondo) d.fondo = await croquisFondoListo(d.fondo);
+  if (Array.isArray(d.paginas)) d.paginas = await Promise.all(d.paginas.map(async (p) => (p && p.fondo ? { ...p, fondo: await croquisFondoListo(p.fondo) } : p)));
+  return d;
+}
+function croquisCargarPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  return new Promise((ok, mal) => {
+    const sc = document.createElement("script");
+    sc.src = "vendor/pdfjs/pdf.min.js";
+    sc.onload = () => {
+      if (!window.pdfjsLib) { mal(new Error("No cargó el lector de PDF")); return; }
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = "vendor/pdfjs/pdf.worker.min.js";
+      ok(window.pdfjsLib);
+    };
+    sc.onerror = () => mal(new Error("No se pudo cargar el lector de PDF (¿sin señal?)"));
+    document.head.appendChild(sc);
+  });
+}
+function croquisCanvasAJpeg(cv) {
+  // Fondo blanco: los PNG/SVG transparentes quedarían negros en JPEG.
+  return { base64: cv.toDataURL("image/jpeg", 0.85).split(",")[1], w: cv.width, h: cv.height };
+}
+async function croquisPdfAImagen(datos, lado) {
+  const pdfjs = await croquisCargarPdfJs();
+  const doc = await pdfjs.getDocument({ data: datos }).promise;
+  const pag = await doc.getPage(1);
+  const v1 = pag.getViewport({ scale: 1 });
+  const k = Math.min(4, lado / Math.max(v1.width, v1.height));
+  const v = pag.getViewport({ scale: k });
+  const cv = document.createElement("canvas");
+  cv.width = Math.round(v.width); cv.height = Math.round(v.height);
+  const ctx = cv.getContext("2d");
+  ctx.fillStyle = "#FFFFFF"; ctx.fillRect(0, 0, cv.width, cv.height);
+  await pag.render({ canvasContext: ctx, viewport: v }).promise;
+  const paginas = doc.numPages;
+  try { doc.destroy(); } catch (e) { /* nada */ }
+  return { ...croquisCanvasAJpeg(cv), paginas };
+}
+function croquisImagenAJpeg(url, lado, esSvg) {
+  return new Promise((ok, mal) => {
+    const img = new Image();
+    img.onload = () => {
+      let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+      if (!w || !h) { w = 1600; h = 1200; } // SVG sin tamaño
+      const k = esSvg ? lado / Math.max(w, h) : Math.min(1, lado / Math.max(w, h));
+      const cv = document.createElement("canvas");
+      cv.width = Math.max(1, Math.round(w * k)); cv.height = Math.max(1, Math.round(h * k));
+      const ctx = cv.getContext("2d");
+      ctx.fillStyle = "#FFFFFF"; ctx.fillRect(0, 0, cv.width, cv.height);
+      ctx.drawImage(img, 0, 0, cv.width, cv.height);
+      ok(croquisCanvasAJpeg(cv));
+    };
+    img.onerror = () => mal(new Error(esSvg ? "No se pudo leer el SVG (probá exportarlo como PDF o PNG)" : "No se pudo leer la imagen"));
+    img.src = url;
+  });
+}
+// Archivo (PDF, SVG, PNG, JPG) -> JPEG {base64, w, h}. Del PDF se usa la
+// primera hoja. lado: px del lado más largo.
+async function croquisArchivoAImagen(archivo, lado) {
+  const L = lado || 2400;
+  const nombre = String(archivo.name || "").toLowerCase(), tipo = String(archivo.type || "").toLowerCase();
+  if (tipo === "application/pdf" || nombre.endsWith(".pdf")) return croquisPdfAImagen(new Uint8Array(await archivo.arrayBuffer()), L);
+  if (/\.(vsdx?|vsdm|vss|vst)$/.test(nombre)) throw new Error("Visio no se puede leer directo: en Visio usá Archivo → Exportar como PDF (o PNG/SVG) y subí ese archivo.");
+  const esSvg = tipo === "image/svg+xml" || nombre.endsWith(".svg");
+  if (!esSvg && !tipo.startsWith("image/") && !/\.(png|jpe?g|webp|gif|bmp)$/.test(nombre)) throw new Error("Ese tipo de archivo no sirve: subí un PDF, SVG, PNG o JPG.");
+  const url = URL.createObjectURL(esSvg ? new Blob([await archivo.text()], { type: "image/svg+xml" }) : archivo);
+  try { return await croquisImagenAJpeg(url, L, esSvg); } finally { URL.revokeObjectURL(url); }
+}
+// Ubicación del plano base en el dibujo: por defecto 20 m de ancho
+// (después se ajusta la escala con la medida real de una pared).
+function croquisFondoBase(id, w, h, anchoMundo) {
+  const W = anchoMundo || 20 * CROQUIS_POR_METRO;
+  return { id, x: 0, y: 0, w: W, h: Math.round(W * h / w), base: true };
+}
+// Sube la imagen del plano y devuelve el fondo listo para el croquis.
+async function croquisSubirPlanoBase(imagen, token) {
+  const r = await fetch("/api/foto", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: JSON.stringify({ base64: imagen.base64, tipo: "imagen" }) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || !d.id) throw new Error(d.error || "No se pudo subir el plano (HTTP " + r.status + ")");
+  const f = croquisFondoBase(d.id, imagen.w, imagen.h);
+  croquisFondosCache[d.id] = Promise.resolve("data:image/jpeg;base64," + imagen.base64);
+  return f;
+}
+function croquisTieneBase(dibujo) {
+  const d = dibujo || {};
+  return !!((d.fondo && d.fondo.base) || (Array.isArray(d.paginas) && d.paginas.some((p) => p && p.fondo && p.fondo.base)));
+}
+
 // PNG (Blob) a partir del SVG. ancho: px del lado más largo.
 async function croquisPng(dibujo, ancho) {
   if ((dibujo.elementos || []).some((e) => e.tipo === "logo_sat")) await croquisCargarLogo();
+  if (dibujo.fondo && dibujo.fondo.base && !dibujo.fondo.local) dibujo = { ...dibujo, fondo: await croquisFondoListo(dibujo.fondo) };
   return new Promise((ok, mal) => {
     const svg = croquisSvgDocumento(dibujo);
     const img = new Image();
@@ -718,8 +837,8 @@ function croquisTextoPdf(s) { return String(s == null ? "" : s).replace(/[‘’
 // Páginas de un croquis: los nuevos tienen dibujo.paginas; los viejos, una sola.
 function croquisPaginas(dibujo) {
   const d = dibujo || {};
-  if (Array.isArray(d.paginas) && d.paginas.length) return d.paginas.map((p, i) => ({ nombre: p.nombre || `Página ${i + 1}`, elementos: Array.isArray(p.elementos) ? p.elementos : [] }));
-  return [{ nombre: "", elementos: Array.isArray(d.elementos) ? d.elementos : [] }];
+  if (Array.isArray(d.paginas) && d.paginas.length) return d.paginas.map((p, i) => ({ nombre: p.nombre || `Página ${i + 1}`, elementos: Array.isArray(p.elementos) ? p.elementos : [], fondo: p.fondo || null }));
+  return [{ nombre: "", elementos: Array.isArray(d.elementos) ? d.elementos : [], fondo: d.fondo || null }];
 }
 // PDF A4 apaisado con rótulo (logo SAT, título, cliente, dirección, fecha,
 // autor). Una hoja por cada página del croquis.
@@ -731,11 +850,11 @@ async function croquisPdf(c) {
   const W = 841.89, H = 595.28, M = 28;
   let logo = null;
   try { logo = await doc.embedJpg(new Uint8Array(await (await fetch("assets/presupuesto/logo-sat.jpg")).arrayBuffer())); } catch (e) { /* sin logo */ }
-  const paginas = croquisPaginas(c.dibujo).filter((p, i, todas) => p.elementos.length || todas.length === 1);
+  const paginas = croquisPaginas(c.dibujo).filter((p, i, todas) => p.elementos.length || (p.fondo && p.fondo.base) || todas.length === 1);
   for (let i = 0; i < paginas.length; i++) {
     const p = paginas[i];
     const pag = doc.addPage([W, H]);
-    const png = await doc.embedPng(new Uint8Array(await (await croquisPng({ elementos: p.elementos, medidas: !!(c.dibujo && c.dibujo.medidas) }, 2400)).arrayBuffer()));
+    const png = await doc.embedPng(new Uint8Array(await (await croquisPng({ elementos: p.elementos, fondo: p.fondo && p.fondo.base ? p.fondo : null, medidas: !!(c.dibujo && c.dibujo.medidas) }, 2400)).arrayBuffer()));
     pag.drawRectangle({ x: M, y: M, width: W - 2 * M, height: H - 2 * M, borderColor: rgb(0.11, 0.12, 0.13), borderWidth: 1.2 });
     const altoRot = 58;
     pag.drawLine({ start: { x: M, y: M + altoRot }, end: { x: W - M, y: M + altoRot }, thickness: 1.2, color: rgb(0.11, 0.12, 0.13) });
@@ -746,7 +865,7 @@ async function croquisPdf(c) {
     const fecha = c.actualizado ? new Date(c.actualizado) : new Date();
     const derecha = [`Fecha: ${String(fecha.getDate()).padStart(2, "0")}-${String(fecha.getMonth() + 1).padStart(2, "0")}-${fecha.getFullYear()}`, `Hecho por: ${c.autor || ""}`];
     derecha.forEach((s, j) => { const w = fN.widthOfTextAtSize(croquisTextoPdf(s), 9.5); t(s, W - M - 10 - w, M + 36 - j * 15, 9.5, fN); });
-    const pie = (paginas.length > 1 ? `Hoja ${i + 1} de ${paginas.length}  ·  ` : "") + "Boceto orientativo, sin escala";
+    const pie = (paginas.length > 1 ? `Hoja ${i + 1} de ${paginas.length}  ·  ` : "") + (p.fondo && p.fondo.base ? "Sobre el plano de la vivienda" : "Boceto orientativo, sin escala");
     t(pie, W - M - 10 - fN.widthOfTextAtSize(pie, 8), M + 6, 8, fN, rgb(0.45, 0.45, 0.45));
     const ax = M + 14, ay = M + altoRot + 14, aw = W - 2 * M - 28, ah = H - 2 * M - altoRot - 28;
     const k = Math.min(aw / png.width, ah / png.height);

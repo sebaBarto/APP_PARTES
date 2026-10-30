@@ -1269,10 +1269,23 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
       <div class="card sin-cambios" style="margin-top:16px;" id="croquisAdminCard">
         <label>Croquis hechos con la APP</label>
         <p class="subtitle" style="margin:0 0 10px;">
-          Bocetos dibujados desde el celular por los usuarios con el permiso "Croquis". Son aparte
-          de los planos oficiales de arriba: estos se pueden descargar (PDF, imagen o SVG, que se
-          abre y edita en Visio) y borrar.
+          Bocetos dibujados desde el celular por los usuarios con el permiso "Croquis" y los planos
+          de instalación. Se pueden descargar (PDF, imagen o SVG, que se abre y edita en Visio) y
+          borrar. Los de una instalación cerrada quedan como registro: el técnico ya no los puede cambiar.
         </p>
+        <div id="croquisBaseBox" style="border:1px dashed rgba(128,128,128,.45);border-radius:10px;padding:12px;margin-bottom:14px;">
+          <b>Subir el plano de la casa a un cliente</b>
+          <p class="subtitle" style="margin:4px 0 10px;">Exportá el dibujo de Visio como <b>PDF</b> (o PNG / SVG) y subilo acá. Le queda al técnico de base en la APP para dibujar encima lo instalado y el cableado. Para cambiar el diseño: bajalo en SVG, modificalo en Visio y usá «Cambiar plano» en el croquis.</p>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+            <input type="text" id="croquisBaseCliente" list="croquisBaseClientes" placeholder="Cliente (buscá por nombre o N°)" autocomplete="off" style="flex:2;min-width:220px;">
+            <datalist id="croquisBaseClientes"></datalist>
+            <input type="text" id="croquisBaseTitulo" placeholder="Título (ej: Planta baja)" autocomplete="off" style="flex:1;min-width:150px;">
+            <input type="number" id="croquisBaseAncho" placeholder="Ancho real (m)" min="1" step="0.1" style="width:130px;" title="Cuántos metros mide de ancho el plano, de borde a borde (opcional: así queda en escala)">
+            <input type="file" id="croquisBaseArchivo" accept="application/pdf,.pdf,image/png,image/jpeg,.svg,image/svg+xml">
+            <button type="button" id="croquisBaseSubir">Subir plano</button>
+          </div>
+          <p class="status" id="croquisBaseEstado"></p>
+        </div>
         <input type="text" id="croquisAdminBuscar" placeholder="Buscar por cliente, título, dirección o autor" autocomplete="off" style="margin-bottom:10px;">
         <p class="status" id="croquisAdminEstado"></p>
         <div id="croquisAdminLista"></div>
@@ -8154,8 +8167,8 @@ function renderCroquisAdmin() {
   caja.innerHTML = lista.map((c, i) => {
     const f = fechaDelServidor(c.actualizado);
     return `<div class="croquis-admin-fila" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(128,128,128,.25);">
-      <div style="min-width:200px;flex:1;"><b>${escapeHtmlAdmin(c.titulo || "Croquis")}</b><br><span style="font-size:13px;opacity:.8;">${escapeHtmlAdmin(c.cliente || "Sin cliente")}${c.numero_cliente ? " · N° " + escapeHtmlAdmin(c.numero_cliente) : ""}${c.direccion ? " · " + escapeHtmlAdmin(c.direccion) : ""}</span><br><span style="font-size:12px;opacity:.65;">${escapeHtmlAdmin(c.autor || "")}${f ? " · " + f.toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : ""} · ${Number(c.elementos) || 0} elementos</span></div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;"><button type="button" class="btn-secondary" data-cq="pdf" data-i="${i}">PDF</button><button type="button" class="btn-secondary" data-cq="png" data-i="${i}">Imagen</button><button type="button" class="btn-secondary" data-cq="svg" data-i="${i}" title="Se abre y edita en Visio">SVG (Visio)</button><button type="button" class="btn-secondary" data-cq="borrar" data-i="${i}" style="color:#C0392B;">Borrar</button></div>
+      <div style="min-width:200px;flex:1;"><b>${escapeHtmlAdmin(c.titulo || "Croquis")}</b>${c.cerrado ? ' <span style="font-size:11px;background:#FFF4E5;color:#8A4B00;border-radius:8px;padding:1px 6px;">Instalación cerrada</span>' : c.instalacion ? ' <span style="font-size:11px;background:#E8F0FA;color:#1B5FA8;border-radius:8px;padding:1px 6px;">Instalación ' + escapeHtmlAdmin(c.instalacion) + '</span>' : ""}${c.base ? ' <span style="font-size:11px;background:#EAF6EE;color:#22783D;border-radius:8px;padding:1px 6px;">Sobre plano</span>' : ""}<br><span style="font-size:13px;opacity:.8;">${escapeHtmlAdmin(c.cliente || "Sin cliente")}${c.numero_cliente ? " · N° " + escapeHtmlAdmin(c.numero_cliente) : ""}${c.direccion ? " · " + escapeHtmlAdmin(c.direccion) : ""}</span><br><span style="font-size:12px;opacity:.65;">${escapeHtmlAdmin(c.autor || "")}${f ? " · " + f.toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : ""} · ${Number(c.elementos) || 0} elementos</span></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;"><button type="button" class="btn-secondary" data-cq="pdf" data-i="${i}">PDF</button><button type="button" class="btn-secondary" data-cq="png" data-i="${i}">Imagen</button><button type="button" class="btn-secondary" data-cq="svg" data-i="${i}" title="Se abre y edita en Visio">SVG (Visio)</button><button type="button" class="btn-secondary" data-cq="plano" data-i="${i}" title="Reemplaza el plano de la casa (página 1); lo dibujado encima queda">Cambiar plano</button><button type="button" class="btn-secondary" data-cq="borrar" data-i="${i}" style="color:#C0392B;">Borrar</button></div>
     </div>`;
   }).join("") || (croquisAdminIndice.length ? '<p class="status">Ninguno coincide.</p>' : "");
   caja.querySelectorAll("[data-cq]").forEach((b) => b.addEventListener("click", async () => {
@@ -8170,20 +8183,97 @@ function renderCroquisAdmin() {
         renderCroquisAdmin();
         return;
       }
+      let archivoPlano = null;
+      if (acc === "plano") { archivoPlano = await elegirArchivoCroquisBase(); if (!archivoPlano) return; }
       b.disabled = true;
       const r = await fetch(`/api/datos?coleccion=croquis&id=${encodeURIComponent(c.id)}`, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "HTTP " + r.status);
+      if (acc === "plano") {
+        const dib = d.dibujo || {};
+        const paginas = Array.isArray(dib.paginas) && dib.paginas.length ? dib.paginas : [{ nombre: "Página 1", elementos: dib.elementos || [], fondo: dib.fondo || null }];
+        const viejo = paginas[0].fondo && paginas[0].fondo.base ? paginas[0].fondo : null;
+        const img = await croquisArchivoAImagen(archivoPlano, 2400);
+        const nuevo = await croquisSubirPlanoBase(img, SERVICIOS_API_TOKEN);
+        // Mismo ancho que el anterior, así lo dibujado encima sigue en su lugar.
+        const fondo = viejo ? { ...nuevo, x: viejo.x, y: viejo.y, w: viejo.w, h: Math.round(viejo.w * img.h / img.w) } : nuevo;
+        paginas[0] = { ...paginas[0], fondo };
+        const dibujo = { ...dib, v: 2, paginas, elementos: paginas[0].elementos || [], fondo };
+        await guardarCroquisAdmin({ id: d.id, instalacion: d.instalacion, titulo: d.titulo, cliente: d.cliente, numero_cliente: d.numero_cliente, direccion: d.direccion, dibujo });
+        alert("Plano cambiado.");
+        cargarCroquisAdmin();
+        return;
+      }
       let blob;
       if (acc === "pdf") blob = new Blob([await croquisPdf(d)], { type: "application/pdf" });
       if (acc === "png") blob = await croquisPng(d.dibujo, 2400);
-      if (acc === "svg") blob = new Blob([croquisSvgDocumento(d.dibujo)], { type: "image/svg+xml" });
+      if (acc === "svg") { await croquisCargarLogo(); blob = new Blob([croquisSvgDocumento(await croquisPrepararFondos(d.dibujo))], { type: "image/svg+xml" }); }
       croquisDescargar(blob, croquisNombreArchivo(d, acc));
     } catch (err) { alert("No se pudo: " + err.message); }
     finally { b.disabled = false; }
   }));
 }
 document.getElementById("croquisAdminBuscar").addEventListener("input", renderCroquisAdmin);
+// ---------- Plano de la casa (de Visio) para un cliente ----------
+function elegirArchivoCroquisBase() {
+  return new Promise((ok) => {
+    const inp = document.createElement("input");
+    inp.type = "file"; inp.accept = "application/pdf,.pdf,image/png,image/jpeg,.svg,image/svg+xml"; inp.style.display = "none";
+    inp.addEventListener("change", () => { ok(inp.files && inp.files[0] ? inp.files[0] : null); inp.remove(); });
+    document.body.appendChild(inp);
+    inp.click();
+  });
+}
+async function guardarCroquisAdmin(datos) {
+  const r = await fetch("/api/datos?coleccion=croquis", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ accion: "guardar", ...datos }) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || !d.ok) throw new Error(d.error || "HTTP " + r.status);
+  return d;
+}
+let croquisBaseClientesLista = null;
+async function cargarClientesCroquisBase() {
+  if (croquisBaseClientesLista) return croquisBaseClientesLista;
+  try {
+    const r = await fetch("/api/datos?coleccion=clientes", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+    const d = await r.json();
+    croquisBaseClientesLista = Array.isArray(d) ? d : [];
+  } catch (e) { croquisBaseClientesLista = []; }
+  const vistos = new Set();
+  document.getElementById("croquisBaseClientes").innerHTML = croquisBaseClientesLista
+    .filter((c) => c.nombre && !vistos.has(c.numero_cliente + c.nombre) && vistos.add(c.numero_cliente + c.nombre))
+    .map((c) => `<option value="${escapeHtmlAdmin(c.nombre + (c.numero_cliente ? " — N° " + c.numero_cliente : ""))}"></option>`).join("");
+  return croquisBaseClientesLista;
+}
+document.getElementById("croquisBaseCliente").addEventListener("focus", cargarClientesCroquisBase);
+document.getElementById("croquisBaseSubir").addEventListener("click", async () => {
+  const est = document.getElementById("croquisBaseEstado"), btn = document.getElementById("croquisBaseSubir");
+  const archivo = document.getElementById("croquisBaseArchivo").files[0];
+  const textoCliente = document.getElementById("croquisBaseCliente").value.trim();
+  if (!archivo) { est.textContent = "Elegí el archivo del plano (PDF, PNG, JPG o SVG)."; return; }
+  if (!textoCliente) { est.textContent = "Elegí el cliente."; return; }
+  const lista = await cargarClientesCroquisBase();
+  const m = /^(.*?)\s+—\s+N°\s+(\S+)$/.exec(textoCliente);
+  const cli = lista.find((c) => m ? String(c.numero_cliente) === m[2] && c.nombre === m[1] : normalizeText(c.nombre || "") === normalizeText(textoCliente) || String(c.numero_cliente || "") === textoCliente);
+  btn.disabled = true;
+  est.textContent = "Convirtiendo y subiendo el plano...";
+  try {
+    const img = await croquisArchivoAImagen(archivo, 2400);
+    const fondo = await croquisSubirPlanoBase(img, SERVICIOS_API_TOKEN);
+    const ancho = Number(String(document.getElementById("croquisBaseAncho").value || "").replace(",", "."));
+    if (ancho > 0.5 && ancho < 1000) { const k = ancho * CROQUIS_POR_METRO / fondo.w; fondo.w = Math.round(fondo.w * k); fondo.h = Math.round(fondo.h * k); }
+    const titulo = document.getElementById("croquisBaseTitulo").value.trim() || "Plano de la casa";
+    await guardarCroquisAdmin({
+      titulo, cliente: cli ? cli.nombre : (m ? m[1] : textoCliente), numero_cliente: cli ? String(cli.numero_cliente || "") : (m ? m[2] : ""),
+      direccion: cli ? [cli.direccion, cli.localidad].filter(Boolean).join(", ") : "",
+      dibujo: { v: 2, elementos: [], paginas: [{ nombre: "Página 1", elementos: [], fondo }], fondo },
+    });
+    est.textContent = `Listo: "${titulo}" quedó cargado${img.paginas > 1 ? " (del PDF se usó la primera hoja)" : ""}. Los técnicos lo ven al hacer el plano de la instalación de este cliente.`;
+    ["croquisBaseArchivo", "croquisBaseTitulo", "croquisBaseAncho", "croquisBaseCliente"].forEach((id) => { document.getElementById(id).value = ""; });
+    cargarCroquisAdmin();
+  } catch (err) {
+    est.textContent = "No se pudo: " + err.message;
+  } finally { btn.disabled = false; }
+});
 </script>
 </body>
 </html>

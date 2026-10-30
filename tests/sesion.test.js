@@ -393,3 +393,61 @@ test("SIMs: sucursales con el mismo nombre (Librería Ladder 1…12) no se confu
   assert.strictEqual(ctx.buscarSimExistenteEnCliente("Librería Ladder 3", "503", sims, null).tipo, "confirmada");
   assert.strictEqual(ctx.buscarSimExistenteEnCliente("Librería Ladder 1", "501", sims, null).sim.numero, "222");
 });
+
+test("Planos de instalación: cualquier técnico de la instalación los guarda; cerrada la instalación quedan de solo lectura (salvo la oficina)", async () => {
+  const fetchViejo = global.fetch;
+  const archivos = new Map([["tecnicos.json", [{ nombre: "Ana", permisos: {} }, { nombre: "Beto", permisos: { croquis: true } }]]]);
+  const estados = { 7: "abierta" };
+  let sha = 1;
+  global.fetch = async (url, op) => {
+    const u = String(url), metodo = (op && op.method) || "GET";
+    const mInst = /backend\.prueba\/api\/instalaciones\/(\d+)$/.exec(u);
+    if (mInst) return new Response(JSON.stringify({ id: Number(mInst[1]), estado: estados[mInst[1]] || "abierta" }));
+    const m = /contents\/(.+)$/.exec(u);
+    if (m) {
+      const ruta = decodeURIComponent(m[1]);
+      if (metodo === "PUT") { archivos.set(ruta, JSON.parse(Buffer.from(JSON.parse(op.body).content, "base64").toString())); return new Response("{}", { status: 200 }); }
+      if (metodo === "DELETE") { archivos.delete(ruta); return new Response("{}", { status: 200 }); }
+      if (!archivos.has(ruta)) return new Response("{}", { status: 404 });
+      return new Response(JSON.stringify({ sha: "s" + sha++, encoding: "base64", content: Buffer.from(JSON.stringify(archivos.get(ruta))).toString("base64") }));
+    }
+    return new Response("{}", { status: 200 });
+  };
+  try {
+    const ana = crearSesion({ nombre: "Ana", rol: "tecnico" }), beto = crearSesion({ nombre: "Beto", rol: "tecnico" }), admin = crearSesion({ nombre: "", rol: "admin" });
+    const llamar = async (metodo, query, body, token) => { const res = resFalso(); await datos(pedido(metodo, { coleccion: "croquis", ...query }, body, token), res); return res; };
+    const dibujo = { v: 2, elementos: [], paginas: [{ nombre: "Página 1", elementos: [], fondo: { id: "abc123", x: 0, y: 0, w: 800, h: 600, base: true } }] };
+    // Ana no tiene el permiso de croquis: sin instalación no puede, con instalación sí.
+    assert.strictEqual((await llamar("POST", {}, { accion: "guardar", titulo: "x", dibujo }, ana)).statusCode, 403);
+    const g = await llamar("POST", {}, { accion: "guardar", instalacion: "7", titulo: "Plano", cliente: "Lara", dibujo }, ana);
+    assert.strictEqual(g.statusCode, 200, JSON.stringify(g.cuerpo));
+    const id = g.cuerpo.id;
+    const indice = archivos.get("croquis-index.json");
+    assert.strictEqual(indice[0].instalacion, "7");
+    assert.strictEqual(indice[0].base, true, "el índice marca que va sobre un plano");
+    // Ana solo ve los de su instalación o su cliente
+    await llamar("POST", {}, { accion: "guardar", titulo: "Otro", cliente: "Otro cliente", dibujo: { v: 1, elementos: [{ t: "texto", x: 0, y: 0, texto: "a" }] } }, beto);
+    const lista = (await llamar("GET", { instalacion: "7", cliente: "lara" }, null, ana)).cuerpo;
+    assert.deepStrictEqual(lista.map((c) => c.titulo), ["Plano"]);
+    assert.strictEqual((await llamar("GET", {}, null, beto)).cuerpo.length, 2);
+    // No se puede cerrar el plano de una instalación que sigue abierta
+    assert.strictEqual((await llamar("POST", {}, { accion: "cerrar_instalacion", instalacion_id: "7" }, ana)).statusCode, 409);
+    // Se cierra la instalación: aunque no se haya marcado, ya no se puede guardar ni borrar
+    estados[7] = "cerrada";
+    const r1 = await llamar("POST", {}, { accion: "guardar", id, instalacion: "7", titulo: "Plano", dibujo }, ana);
+    assert.strictEqual(r1.statusCode, 403);
+    assert.strictEqual(r1.cuerpo.cerrado, true);
+    assert.strictEqual((await llamar("GET", { id }, null, ana)).cuerpo.cerrado, true, "al abrirlo avisa que está cerrado");
+    const c = await llamar("POST", {}, { accion: "cerrar_instalacion", instalacion_id: "7" }, ana);
+    assert.deepStrictEqual(c.cuerpo, { ok: true, cerrados: 1 });
+    assert.strictEqual(archivos.get(`croquis/${id}.json`).cerrado, true);
+    assert.strictEqual(archivos.get("croquis-index.json").find((x) => x.id === id).cerrado, true);
+    assert.strictEqual((await llamar("POST", {}, { accion: "borrar", id }, ana)).statusCode, 403, "la autora tampoco lo puede borrar");
+    assert.strictEqual((await llamar("POST", {}, { accion: "guardar", id, titulo: "Plano", dibujo }, beto)).statusCode, 403, "ni otro con permiso de croquis");
+    // La oficina sí (por ejemplo, para cambiar el plano), y sigue marcado como cerrado
+    const ra = await llamar("POST", {}, { accion: "guardar", id, titulo: "Plano corregido", dibujo }, admin);
+    assert.strictEqual(ra.statusCode, 200);
+    assert.strictEqual(archivos.get(`croquis/${id}.json`).cerrado, true);
+    assert.strictEqual(archivos.get(`croquis/${id}.json`).instalacion, "7");
+  } finally { global.fetch = fetchViejo; }
+});

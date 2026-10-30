@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.15.0";
+const APP_VERSION = "4.16.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -9688,6 +9688,7 @@ function renderHistorialPresencia() {
 // ---------- Instalación (zonas, canales, fotos — de varios días) ----------
 let instalacionActivaId = null;
 let instalacionActivaEstado = null; // 'abierta' | 'cerrada'
+let instalacionActivaDatos = null; // cliente, N° y dirección (para el plano)
 let instZonasAgregadas = [];
 let instCanalesAgregadas = [];
 const instalacionActivaBtn = document.getElementById("instMarcarLlegadaBtn");
@@ -9719,6 +9720,8 @@ function resetearPantallaInstalacion() {
   renderInstCanales();
   instFotosGrid.innerHTML = "";
   instFotosStatus.textContent = "";
+  instalacionActivaDatos = null;
+  try { instPlanoIndice = []; instPlanoLista.innerHTML = ""; instPlanoEstado.textContent = ""; } catch (e) { /* aún no cargó */ }
   ["instZonasEstado", "instCanalesEstado", "instDiasResumen"].forEach((id) => { const el = document.getElementById(id); if (el) el.textContent = ""; });
 }
 
@@ -9781,6 +9784,7 @@ async function verificarInstalacionAbierta() {
 
 function mostrarInstalacionAbierta(inst) {
   instalacionActivaId = inst.id;
+  instalacionActivaDatos = { cliente: inst.cliente || "", numero_cliente: inst.numero_cliente ? String(inst.numero_cliente) : "", direccion: inst.direccion || "" };
   instalacionActivaEstado = "abierta";
   instalacionClienteInput.value = inst.cliente; // lo necesita el botón de marcar entrada
   instalacionDireccionInput.value = inst.direccion || "";
@@ -9791,6 +9795,7 @@ function mostrarInstalacionAbierta(inst) {
   instalacionDetalleWrap.classList.remove("hidden");
   actualizarEstadoDiaInstalacion();
   cargarDetalleInstalacion();
+  instPlanoCargar();
 }
 
 // Trae lo que ya se guardó (zonas, canales, fotos) para seguir cargando
@@ -10323,6 +10328,11 @@ instalacionGuardarYCerrarBtn.addEventListener("click", async () => {
       throw new Error(data.error || "No se pudo cerrar");
     }
     showToast("Instalación cerrada correctamente.");
+    // Sus planos quedan como registro (el servidor igual lo controla solo).
+    try {
+      await fetch("/api/datos?coleccion=croquis", { method: "POST", headers, body: JSON.stringify({ accion: "cerrar_instalacion", instalacion_id: String(instalacionActivaId) }) });
+    } catch (e) { /* lo frena igual el servidor al querer guardar */ }
+    try { const b = JSON.parse(localStorage.getItem(CQ_BORRADOR) || "null"); if (b && String(b.instalacion || "") === String(instalacionActivaId)) localStorage.removeItem(CQ_BORRADOR); } catch (e) { /* nada */ }
     resetearPantallaInstalacion();
     showScreen("home");
   } catch (err) {
@@ -10330,6 +10340,153 @@ instalacionGuardarYCerrarBtn.addEventListener("click", async () => {
   } finally {
     instalacionGuardarYCerrarBtn.disabled = false;
     instalacionGuardarYCerrarBtn.textContent = "✔ Guardar y cerrar instalación";
+  }
+});
+
+// ---------- Plano de la instalación (croquis o foto del plano) ----------
+// Queda atado a la instalación; al cerrarla ya no se puede cambiar.
+const instPlanoLista = document.getElementById("instPlanoLista");
+const instPlanoEstado = document.getElementById("instPlanoEstado");
+let instPlanoIndice = [];
+function instPlanoNum(v) { return String(v == null ? "" : v).replace(/\D/g, "").replace(/^0+/, ""); }
+async function instPlanoCargar() {
+  if (!instalacionActivaId || !instPlanoLista) return;
+  const id = String(instalacionActivaId), dat = instalacionActivaDatos || {};
+  try {
+    const r = await fetch(`/api/datos?coleccion=croquis&instalacion=${encodeURIComponent(id)}&numero_cliente=${encodeURIComponent(dat.numero_cliente || "")}&cliente=${encodeURIComponent(dat.cliente || "")}`, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "HTTP " + r.status);
+    if (String(instalacionActivaId) !== id) return;
+    instPlanoIndice = Array.isArray(d) ? d : [];
+    instPlanoRender();
+  } catch (err) {
+    instPlanoEstado.textContent = "No se pudieron cargar los planos: " + err.message;
+  }
+}
+function instPlanoDeEsta() { return instPlanoIndice.filter((c) => String(c.instalacion || "") === String(instalacionActivaId)); }
+function instPlanoRender() {
+  const mios = instPlanoDeEsta();
+  instPlanoEstado.textContent = mios.length ? "" : "Todavía no hay plano de esta instalación.";
+  instPlanoLista.innerHTML = mios.map((c, i) => `<div class="historial-card cq-item">
+      <div class="historial-card-cliente">${escapeHtml(c.titulo || "Croquis")}${c.base ? ' <span class="cq-etiqueta cq-etiqueta-base">Sobre plano</span>' : ""}</div>
+      <div class="historial-card-horario">${escapeHtml(c.autor || "")}${c.elementos ? " · " + c.elementos + " elementos" : ""}</div>
+      <div class="cq-item-btns"><button type="button" class="btn btn-primary btn-small" data-abrir="${i}">Abrir</button>${!tecnicoLogueado || c.autor === tecnicoLogueado ? `<button type="button" class="btn btn-secondary btn-small cq-borrar" data-borrar="${i}">Borrar</button>` : ""}</div>
+    </div>`).join("");
+  instPlanoLista.querySelectorAll("[data-abrir]").forEach((b) => b.addEventListener("click", () => instPlanoAbrir(mios[Number(b.dataset.abrir)].id)));
+  instPlanoLista.querySelectorAll("[data-borrar]").forEach((b) => b.addEventListener("click", async () => {
+    const c = mios[Number(b.dataset.borrar)];
+    if (!confirm(`¿Borrar "${c.titulo || "el plano"}" de esta instalación?`)) return;
+    try {
+      const r = await fetch("/api/datos?coleccion=croquis", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ accion: "borrar", id: c.id }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "HTTP " + r.status);
+      instPlanoIndice = instPlanoIndice.filter((x) => x.id !== c.id);
+      instPlanoRender();
+    } catch (err) { showToast("No se pudo borrar: " + err.message); }
+  }));
+}
+async function instPlanoTraer(id) {
+  const r = await fetch(`/api/datos?coleccion=croquis&id=${encodeURIComponent(id)}`, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error || "HTTP " + r.status);
+  return d;
+}
+async function instPlanoAbrir(id) {
+  try {
+    const d = await instPlanoTraer(id);
+    const dib = d.dibujo || {};
+    cqAbrirEditor({ id: d.id, instalacion: d.instalacion || String(instalacionActivaId), soloLectura: !!d.cerrado, volverA: "instalacion", titulo: d.titulo, cliente: d.cliente, numero_cliente: d.numero_cliente, direccion: d.direccion, autor: d.autor, actualizado: d.actualizado, elementos: dib.elementos || [], fondo: dib.fondo || null, paginas: dib.paginas || null, medidas: !!dib.medidas });
+  } catch (err) { showToast("No se pudo abrir: " + err.message); }
+}
+function instPlanoNuevo(paginas, titulo) {
+  const dat = instalacionActivaDatos || {};
+  cqAbrirEditor({ instalacion: String(instalacionActivaId), volverA: "instalacion", titulo: titulo || "Plano de la instalación", cliente: dat.cliente || instalacionClienteInput.value.trim(), numero_cliente: dat.numero_cliente || "", direccion: dat.direccion || instalacionDireccionInput.value.trim(), paginas: paginas || null, cambios: true });
+  cqGuardarBorrador();
+}
+// Planos de Visio que la oficina ya tiene sincronizados para este cliente.
+async function instPlanosVisioDelCliente() {
+  const num = instPlanoNum((instalacionActivaDatos || {}).numero_cliente);
+  if (!num) return [];
+  try { await cargarPlanos(); } catch (e) { return []; }
+  return (planosCache || []).filter((p) => p.numero_cliente && instPlanoNum(p.numero_cliente) === num).sort((a, b) => a.indice_plano - b.indice_plano);
+}
+document.getElementById("instPlanoCroquisBtn").addEventListener("click", async () => {
+  if (!instalacionActivaId) return;
+  const boton = document.getElementById("instPlanoCroquisBtn");
+  boton.disabled = true;
+  let visio = [];
+  try { visio = await instPlanosVisioDelCliente(); } finally { boton.disabled = false; }
+  const mios = instPlanoDeEsta().filter((c) => !c.cerrado);
+  // Planos/croquis del mismo cliente hechos antes (por la oficina o en otra visita).
+  const delCliente = instPlanoIndice.filter((c) => String(c.instalacion || "") !== String(instalacionActivaId));
+  if (!mios.length && !visio.length && !delCliente.length) { instPlanoNuevo(); return; }
+  const capa = document.createElement("div");
+  capa.className = "cq-datos-capa";
+  capa.innerHTML = `<div class="cq-datos cq-menu">
+    <h3>Plano de la instalación</h3>
+    ${mios.map((c, i) => `<button type="button" class="btn btn-primary" data-seguir="${i}">${cqIc("lapiz")} Seguir «${escapeHtml(c.titulo || "Croquis")}»</button>`).join("")}
+    ${delCliente.length || visio.length ? '<p class="pe-nota" style="margin:6px 0 2px;">Dibujar encima del plano de la casa:</p>' : ""}
+    ${delCliente.map((c, i) => `<button type="button" class="btn btn-secondary" data-copiar="${i}">${cqIc("plano")} ${escapeHtml(c.titulo || "Croquis")}${c.base ? " (plano de la oficina)" : ""}</button>`).join("")}
+    ${visio.map((p, i) => `<button type="button" class="btn btn-secondary" data-visio="${i}">${cqIc("plano")} Plano de Visio del cliente${visio.length > 1 ? " " + (i + 1) : ""}</button>`).join("")}
+    <button type="button" class="btn btn-secondary" data-blanco="1">${cqIc("nuevo")} Croquis en blanco</button>
+    <button type="button" class="link-btn" data-cerrar="1">Cancelar</button>
+  </div>`;
+  document.body.appendChild(capa);
+  capa.addEventListener("click", async (e) => {
+    const b = e.target.closest("button");
+    if (!b && e.target !== capa) return;
+    capa.remove();
+    if (!b || b.dataset.cerrar) return;
+    if (b.dataset.blanco) { instPlanoNuevo(); return; }
+    if (b.dataset.seguir) { instPlanoAbrir(mios[Number(b.dataset.seguir)].id); return; }
+    if (b.dataset.copiar) {
+      // Se dibuja sobre una copia: el plano original del cliente queda limpio para la próxima.
+      try {
+        const c = delCliente[Number(b.dataset.copiar)];
+        const d = await instPlanoTraer(c.id);
+        const pags = croquisPaginas(d.dibujo).map((p) => ({ nombre: p.nombre || "Página 1", elementos: JSON.parse(JSON.stringify(p.elementos || [])), fondo: p.fondo ? { ...p.fondo } : null }));
+        instPlanoNuevo(pags, "Instalación - " + (c.titulo || "Plano"));
+        showToast("Dibujá encima lo que instalaste: el plano original queda como estaba.");
+      } catch (err) { showToast("No se pudo abrir: " + err.message); }
+      return;
+    }
+    if (b.dataset.visio) {
+      const p = visio[Number(b.dataset.visio)];
+      const carga = cqCapaCargando("Preparando el plano…", "Se trae el PDF del cliente y se pone de base.");
+      try {
+        const r = await fetch(`/api/planos?nombre=${encodeURIComponent(p.nombre)}`, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN } });
+        if (!r.ok) throw new Error("No se pudo traer el plano");
+        const blob = await r.blob();
+        const fondo = await cqPrepararPlanoBase(new File([blob], p.nombre + ".pdf", { type: "application/pdf" }));
+        carga.remove();
+        instPlanoNuevo([{ nombre: "Página 1", elementos: [], fondo }], "Plano de la instalación");
+        showToast("Plano del cliente de base: dibujá encima lo que instalaste.");
+      } catch (err) { carga.remove(); showToast("No se pudo usar el plano: " + err.message); }
+    }
+  });
+});
+document.getElementById("instPlanoFotoBtn").addEventListener("click", () => { if (instalacionActivaId) document.getElementById("instPlanoArchivoInput").click(); });
+document.getElementById("instPlanoArchivoInput").addEventListener("change", async (e) => {
+  const archivo = e.target.files && e.target.files[0];
+  e.target.value = "";
+  if (!archivo || !instalacionActivaId) return;
+  const id = String(instalacionActivaId), dat = instalacionActivaDatos || {};
+  instPlanoEstado.textContent = "Subiendo el plano...";
+  try {
+    const img = await croquisArchivoAImagen(archivo, 2000);
+    const fondo = await croquisSubirPlanoBase(img, SERVICIOS_API_TOKEN);
+    const r = await fetch("/api/datos?coleccion=croquis", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({ accion: "guardar", instalacion: id, titulo: "Foto del plano", cliente: dat.cliente || instalacionClienteInput.value.trim(), numero_cliente: dat.numero_cliente || "", direccion: dat.direccion || "", dibujo: { v: 2, elementos: [], paginas: [{ nombre: "Foto del plano", elementos: [], fondo }], fondo } }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) throw new Error(d.error || "HTTP " + r.status);
+    instPlanoEstado.textContent = "";
+    showToast("Plano guardado en la instalación. Si querés, abrilo para marcar encima lo instalado.");
+    instPlanoCargar();
+  } catch (err) {
+    instPlanoEstado.textContent = "No se pudo subir: " + err.message;
   }
 });
 
@@ -14285,7 +14442,8 @@ function renderResultadosPlanos() {
     const subtitulo = primero.nombre_cliente ? `N° de cliente ${escapeHtml(primero.numero_cliente)}` : "PDF";
     const botones = planosDelCliente.map((p, i) =>
       `<button type="button" class="btn-small btn-secondary btn-secondary-en-card" style="width:auto;" data-nombre="${escapeHtml(p.nombre)}">${planosDelCliente.length > 1 ? `Plano ${i + 1}` : "Ver"}</button>`
-    ).join(" ");
+    ).join(" ") + (permisosDelTecnico(tecnicoLogueado).croquis
+      ? planosDelCliente.map((p, i) => ` <button type="button" class="btn-small btn-secondary btn-secondary-en-card" style="width:auto;" data-croquis="${escapeHtml(p.nombre)}" title="Abrir un croquis con este plano de base para dibujar encima">Croquis${planosDelCliente.length > 1 ? " " + (i + 1) : ""}</button>`).join("") : "");
     card.innerHTML = `
       <div style="flex:1;">
         <div class="sim-card-numero">${escapeHtml(tituloPrincipal)}</div>
@@ -14299,6 +14457,20 @@ function renderResultadosPlanos() {
         abrirPlano(btn.dataset.nombre, btn);
       });
     });
+    card.querySelectorAll("button[data-croquis]").forEach((btn) => btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const carga = cqCapaCargando("Preparando el plano…", "Se pone de base para dibujar encima.");
+      try {
+        const r = await fetch(`/api/planos?nombre=${encodeURIComponent(btn.dataset.croquis)}`, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN } });
+        if (!r.ok) throw new Error("No se pudo traer el plano");
+        const fondo = await cqPrepararPlanoBase(new File([await r.blob()], btn.dataset.croquis + ".pdf", { type: "application/pdf" }));
+        carga.remove();
+        const cli = (clientesGeneralCache || []).find((c) => primero.numero_cliente && normalizarNumeroCliente(c.numero_cliente) === normalizarNumeroCliente(primero.numero_cliente));
+        cqAbrirEditor({ titulo: "Plano", cliente: primero.nombre_cliente || "", numero_cliente: primero.numero_cliente ? normalizarNumeroCliente(primero.numero_cliente) : "", direccion: cli ? [cli.direccion, cli.localidad].filter(Boolean).join(", ") : "", paginas: [{ nombre: "Página 1", elementos: [], fondo }], cambios: true });
+        cqGuardarBorrador();
+        showToast("Plano de base listo: dibujá encima y guardalo.");
+      } catch (err) { carga.remove(); showToast("No se pudo usar el plano: " + err.message); }
+    }));
     planosResultados.appendChild(card);
   });
 }
@@ -15079,6 +15251,7 @@ const cq = {
 // Íconos del editor (mismo trazo que el resto de la app, sin emojis).
 const CQ_IC_TRAZOS = {
   camara: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
+  plano: '<path d="M3 4h18v16H3z"/><path d="M3 11h8v9M11 4v4M15 11h6"/>',
   galeria: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m4 19 6-6 4 4 3-3 4 4"/>',
   fondo: '<rect x="3" y="4" width="18" height="16" rx="2" stroke-dasharray="3 2"/><path d="m5 18 5-5 3 3 2-2 4 4"/>',
   candado: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
@@ -15120,7 +15293,7 @@ function cqCapa(k) { return cq.capas[k] || (cq.capas[k] = { ver: true, bloq: fal
 function cqGuardarCapas() { try { localStorage.setItem(CQ_CAPAS_KEY, JSON.stringify(cq.capas)); } catch (e) { /* nada */ } }
 function cqVisible(el) { return cqCapa(croquisCapaDe(el)).ver !== false; }
 // Bloqueado: por el candado del elemento o porque su capa está bloqueada u oculta.
-function cqBloq(el) { const c = cqCapa(croquisCapaDe(el)); return !!(el.bloq || c.bloq || c.ver === false); }
+function cqBloq(el) { if (cq.soloLectura) return true; const c = cqCapa(croquisCapaDe(el)); return !!(el.bloq || c.bloq || c.ver === false); }
 function cqIc(n) { return `<svg class="cq-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${CQ_IC_TRAZOS[n] || ""}</svg>`; }
 let cqIndice = [];
 const cqEl = (id) => document.getElementById(id);
@@ -15128,7 +15301,8 @@ const cqSvg = cqEl("cqSvg");
 function cqId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 function cqSnap(v) { return Math.round(v / (CROQUIS_GRILLA / 2)) * (CROQUIS_GRILLA / 2); }
 // La foto de fondo se guarda solo cuando ya se subió (tiene id).
-function cqFondoLimpio(f) { return f && f.id ? { id: f.id, x: f.x, y: f.y, w: f.w, h: f.h } : null; }
+function cqFondoLimpio(f) { return f && f.id ? (f.base ? { id: f.id, x: f.x, y: f.y, w: f.w, h: f.h, base: true } : { id: f.id, x: f.x, y: f.y, w: f.w, h: f.h }) : null; }
+function cqHayBase() { cqSyncPagina(); return cq.paginas.some((p) => p && p.fondo && p.fondo.base); }
 // Dibujo de la página actual (lo que se ve en el editor).
 function cqDibujo() {
   const d = { v: 1, elementos: cq.elementos };
@@ -15157,7 +15331,7 @@ function cqTodosLosElementos() { cqSyncPagina(); return cq.paginas.flatMap((p) =
 function cqGuardarBorrador() {
   try {
     const d = cqDibujoCompleto();
-    localStorage.setItem(CQ_BORRADOR, JSON.stringify({ id: cq.id, titulo: cq.titulo, cliente: cq.cliente, numero_cliente: cq.numero_cliente, direccion: cq.direccion, autor: cq.autor, elementos: d.elementos, fondo: d.fondo || null, paginas: d.paginas, medidas: !!cq.medidas, cambios: cq.cambios }));
+    localStorage.setItem(CQ_BORRADOR, JSON.stringify({ id: cq.id, instalacion: cq.instalacion || "", titulo: cq.titulo, cliente: cq.cliente, numero_cliente: cq.numero_cliente, direccion: cq.direccion, autor: cq.autor, elementos: d.elementos, fondo: d.fondo || null, paginas: d.paginas, medidas: !!cq.medidas, cambios: cq.cambios }));
   } catch (e) { /* nada */ }
 }
 function cqMemoria() { cq.pasado.push(JSON.stringify(cq.elementos)); if (cq.pasado.length > 80) cq.pasado.shift(); cq.futuro = []; cq.cambios = true; }
@@ -15226,7 +15400,7 @@ function cqRender(opciones) {
   cqSvg.innerHTML = `<defs><pattern id="cqGrilla" width="${paso}" height="${paso}" patternUnits="userSpaceOnUse"><path d="M ${paso} 0 L 0 0 0 ${paso}" fill="none" stroke="#C9D3DC" stroke-width="${0.8 / Math.max(1, v.s * 0.8)}"/></pattern>
     <pattern id="cqGrilla5" width="${paso * 5}" height="${paso * 5}" patternUnits="userSpaceOnUse"><rect width="${paso * 5}" height="${paso * 5}" fill="url(#cqGrilla)"/><path d="M ${paso * 5} 0 L 0 0 0 ${paso * 5}" fill="none" stroke="#AFBBC6" stroke-width="${1.2 / Math.max(1, v.s * 0.8)}"/></pattern></defs>
     <rect x="${v.x - 5000}" y="${v.y - 5000}" width="${w / v.s + 10000}" height="${h / v.s + 10000}" fill="url(#cqGrilla5)" data-fondo="1"/>
-    ${cq.fondo && cq.verFondo ? `<image href="${cq.fondo.local || "/api/foto?id=" + encodeURIComponent(cq.fondo.id)}" x="${cq.fondo.x}" y="${cq.fondo.y}" width="${cq.fondo.w}" height="${cq.fondo.h}" opacity="0.38" preserveAspectRatio="none" pointer-events="none" class="cq-foto-fondo"/>` : ""}
+    ${cq.fondo && cq.verFondo ? `<image href="${cq.fondo.local || "/api/foto?id=" + encodeURIComponent(cq.fondo.id)}" x="${cq.fondo.x}" y="${cq.fondo.y}" width="${cq.fondo.w}" height="${cq.fondo.h}" opacity="${cq.fondo.base ? 1 : 0.38}" preserveAspectRatio="none" pointer-events="none" class="cq-foto-fondo${cq.fondo.base ? " cq-plano-base" : ""}"/>` : ""}
     <g id="cqContenido">
     ${orden.map((el) => { try { return croquisSvgElemento(el, `data-id="${el.id}" class="cq-elem${el.id === cq.sel ? " cq-elegido" : ""}"`); } catch (e) { return ""; } }).join("")}
     ${cq.medidas ? croquisSvgMedidas(orden) : ""}
@@ -15950,7 +16124,7 @@ cqEl("cqCadenaCerrar").addEventListener("click", () => {
 });
 function cqVerTodo() {
   const { w, h } = cqTamLienzo();
-  if (!cq.elementos.length) { cq.vista = { x: -20, y: -20, s: 1 }; cqRender(); return; }
+  if (!cq.elementos.length && !(cq.fondo && cq.fondo.base)) { cq.vista = { x: -20, y: -20, s: 1 }; cqRender(); return; }
   const c = croquisCaja(cqDibujo()), m = 40;
   const s = Math.max(0.25, Math.min(3, Math.min(w / (c.w + 2 * m), h / (c.h + 2 * m))));
   cq.vista = { s, x: c.x + c.w / 2 - w / s / 2, y: c.y + c.h / 2 - h / s / 2 };
@@ -16184,7 +16358,7 @@ function cqPedirDatos() {
     setTimeout(() => q(cq.cliente ? "cqDatoTitulo" : "cqDatoBuscar").focus(), 50);
   });
 }
-cqEl("cqTituloBtn").addEventListener("click", cqPedirDatos);
+cqEl("cqTituloBtn").addEventListener("click", () => { if (!cq.soloLectura) cqPedirDatos(); });
 
 // ---------- Texto, cuadro de texto y tabla ----------
 function cqEditorTexto(el, pos) {
@@ -16262,15 +16436,24 @@ function cqEditorTexto(el, pos) {
 
 // ---------- Guardar y descargar ----------
 async function cqGuardar() {
-  if (!cqTodosLosElementos().length) { showToast("El croquis está vacío."); return false; }
+  if (cq.soloLectura) { showToast("Este plano es de una instalación cerrada: no se puede modificar."); return false; }
+  if (!cqTodosLosElementos().length && !cqHayBase()) { showToast("El croquis está vacío."); return false; }
   if (!cq.cliente && !cq.titulo) { const ok = await cqPedirDatos(); if (!ok) return false; }
   try {
     const r = await fetch("/api/datos?coleccion=croquis", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-      body: JSON.stringify({ accion: "guardar", id: cq.id || undefined, titulo: cq.titulo, cliente: cq.cliente, numero_cliente: cq.numero_cliente, direccion: cq.direccion, dibujo: cqDibujoCompleto() }),
+      body: JSON.stringify({ accion: "guardar", id: cq.id || undefined, instalacion: cq.instalacion || undefined, titulo: cq.titulo, cliente: cq.cliente, numero_cliente: cq.numero_cliente, direccion: cq.direccion, dibujo: cqDibujoCompleto() }),
     });
     const d = await r.json().catch(() => ({}));
+    if (r.status === 403 && d.cerrado) {
+      // La instalación se cerró mientras tanto: queda como registro.
+      cq.cambios = false;
+      try { localStorage.removeItem(CQ_BORRADOR); } catch (e) { /* nada */ }
+      cqModoLectura(true);
+      showToast(d.error);
+      return false;
+    }
     if (!r.ok || !d.ok) throw new Error(d.error || "HTTP " + r.status);
     cq.id = d.id;
     cq.actualizado = d.actualizado;
@@ -16288,14 +16471,14 @@ async function cqGuardar() {
 function cqDatosExport() { return { titulo: cq.titulo, cliente: cq.cliente, numero_cliente: cq.numero_cliente, direccion: cq.direccion, autor: cq.autor || tecnicoLogueado || "", actualizado: cq.actualizado || new Date().toISOString(), dibujo: cqDibujoCompleto() }; }
 async function cqExportar(formato) {
   // El PDF lleva todas las páginas; la imagen y el SVG, la página que se está viendo.
-  if (formato === "pdf" ? !cqTodosLosElementos().length : !cq.elementos.length) { showToast(formato === "pdf" ? "El croquis está vacío." : "Esta página está vacía."); return; }
+  if (formato === "pdf" ? !cqTodosLosElementos().length && !cqHayBase() : !cq.elementos.length && !(cq.fondo && cq.fondo.base)) { showToast(formato === "pdf" ? "El croquis está vacío." : "Esta página está vacía."); return; }
   const c = cqDatosExport();
   const pagina = cq.paginas.length > 1 ? cq.paginas[cq.pagina].nombre || `Página ${cq.pagina + 1}` : "";
   try {
     let blob, ext;
     if (formato === "pdf") { blob = new Blob([await croquisPdf(c)], { type: "application/pdf" }); ext = "pdf"; }
     if (formato === "png") { blob = await croquisPng(cqDibujo(), 2400); ext = "png"; }
-    if (formato === "svg") { await croquisCargarLogo(); blob = new Blob([croquisSvgDocumento(cqDibujo())], { type: "image/svg+xml" }); ext = "svg"; }
+    if (formato === "svg") { await croquisCargarLogo(); blob = new Blob([croquisSvgDocumento(await croquisPrepararFondos(cqDibujo()))], { type: "image/svg+xml" }); ext = "svg"; }
     const nombre = croquisNombreArchivo(formato !== "pdf" && pagina ? { ...c, titulo: `${c.titulo || "croquis"} ${pagina}` } : c, ext);
     const archivo = new File([blob], nombre, { type: blob.type });
     if (formato !== "svg" && navigator.canShare && navigator.canShare({ files: [archivo] })) {
@@ -16305,6 +16488,7 @@ async function cqExportar(formato) {
   } catch (err) { showToast("No se pudo generar el archivo: " + err.message); }
 }
 cqEl("cqMenuBtn").addEventListener("click", () => {
+  if (cq.soloLectura) { cqMenuLectura(); return; }
   const capa = document.createElement("div");
   capa.className = "cq-datos-capa";
   capa.innerHTML = `<div class="cq-datos cq-menu">
@@ -16316,7 +16500,9 @@ cqEl("cqMenuBtn").addEventListener("click", () => {
     <div class="cq-menu-fila"><button type="button" class="btn btn-secondary" data-m="foto">${cqIc("galeria")} Boceto desde galería</button><button type="button" class="btn btn-secondary" data-m="camara">${cqIc("camara")} Sacar foto</button></div>
     <button type="button" class="btn btn-secondary" data-m="pagina">${cqIc("pagina")} Agregar una página</button>
     ${cqTodosLosElementos().some((e) => e.inst) && permisosDelTecnico(tecnicoLogueado).presupuesto_express ? `<button type="button" class="btn btn-secondary" data-m="presu">${cqIc("presupuesto")} Pasar los equipos a instalar a un presupuesto</button>` : ""}
-    ${cq.fondo ? `<button type="button" class="btn btn-secondary" data-m="sinfondo">Quitar la foto de fondo</button>` : ""}
+    <button type="button" class="btn btn-secondary" data-m="base">${cqIc("plano")} ${cq.fondo && cq.fondo.base ? "Cambiar el plano de la casa" : "Poner el plano de la casa (PDF, imagen o SVG)"}</button>
+    ${cq.fondo && cq.fondo.base ? `<button type="button" class="btn btn-secondary" data-m="escala">${cqIc("regla")} Escala del plano (ancho real en metros)</button>` : ""}
+    ${cq.fondo ? `<button type="button" class="btn btn-secondary" data-m="sinfondo">${cq.fondo.base ? "Quitar el plano de la casa" : "Quitar la foto de fondo"}</button>` : ""}
     <button type="button" class="btn btn-secondary" data-m="datos">Cambiar cliente y título</button>
     <button type="button" class="btn btn-secondary" data-m="bloq">${cq.elementos.length && cq.elementos.every((e) => e.bloq) ? cqIc("abierto") + " Desbloquear todo" : cqIc("candado") + " Bloquear todo lo dibujado"}</button>
     <button type="button" class="link-btn" data-m="cerrar">Cerrar</button>
@@ -16334,7 +16520,9 @@ cqEl("cqMenuBtn").addEventListener("click", () => {
     if (m === "camara") { cqFotoDestino = "editor"; cqEl("cqCamaraInput").click(); }
     if (m === "pagina") { cqNuevaPagina(); cqGuardarBorrador(); }
     if (m === "presu") cqPasarAPresupuesto();
-    if (m === "sinfondo" && confirm("¿Quitar la foto del boceto de fondo? (el dibujo no se toca)")) { cq.fondo = null; cq.cambios = true; cqGuardarBorrador(); cqRender(); }
+    if (m === "base") cqElegirArchivo("image/*,application/pdf,.pdf,.svg").then((f) => f && cqPonerPlanoBase(f));
+    if (m === "escala") cqEscalaPlano();
+    if (m === "sinfondo" && confirm(cq.fondo && cq.fondo.base ? "¿Quitar el plano de la casa? (lo dibujado encima no se toca)" : "¿Quitar la foto del boceto de fondo? (el dibujo no se toca)")) { cq.fondo = null; cq.cambios = true; cqGuardarBorrador(); cqRender(); }
     if (m === "bloq" && cq.elementos.length) {
       cqMemoria();
       const todos = cq.elementos.every((x) => x.bloq);
@@ -16345,15 +16533,110 @@ cqEl("cqMenuBtn").addEventListener("click", () => {
   });
 });
 cqEl("volverDeCroquisBtn").addEventListener("click", async () => {
-  if (cq.cambios && cqTodosLosElementos().length) {
+  if (!cq.soloLectura && cq.cambios && (cqTodosLosElementos().length || cqHayBase())) {
     if (confirm("Tenés cambios sin guardar en el servidor. ¿Guardarlos antes de salir?")) { const ok = await cqGuardar(); if (!ok) return; }
   }
+  if (cq.volverA === "instalacion") { showScreen("instalacion"); instPlanoCargar(); return; }
   cqAbrirLista();
 });
+// ---------- Solo lectura (plano de una instalación ya cerrada) ----------
+function cqModoLectura(si) {
+  cq.soloLectura = !!si;
+  if (si) { cq.sel = null; cq.multi = []; cq.modoMulti = false; cq.cadena = null; cq.herr = "mover"; cqEl("cqSimbolos").classList.add("hidden"); }
+  screens.croquis.classList.toggle("cq-solo-lectura", !!si);
+  cqEl("cqAyuda").textContent = si ? "Instalación cerrada: el plano quedó como registro. Se puede mirar y descargar, no modificar." : (CQ_AYUDAS[cq.herr] || "");
+  cqRender();
+}
+function cqMenuLectura() {
+  const capa = document.createElement("div");
+  capa.className = "cq-datos-capa";
+  const puedeCopiar = permisosDelTecnico(tecnicoLogueado).croquis;
+  capa.innerHTML = `<div class="cq-datos cq-menu">
+    <h3>${escapeHtml(cq.titulo || cq.cliente || "Croquis")}</h3>
+    <p class="pe-nota">${cqIc("candado")} La instalación ya se cerró: este plano quedó como registro y no se puede modificar.</p>
+    <button type="button" class="btn btn-primary" data-m="pdf">Compartir / descargar PDF</button>
+    <button type="button" class="btn btn-secondary" data-m="png">Imagen (PNG)</button>
+    <button type="button" class="btn btn-secondary" data-m="svg">Archivo editable (SVG, se abre en Visio)</button>
+    ${puedeCopiar ? `<button type="button" class="btn btn-secondary" data-m="copia">Hacer una copia nueva para seguir dibujando</button>` : ""}
+    <button type="button" class="link-btn" data-m="cerrar">Cerrar</button>
+  </div>`;
+  document.body.appendChild(capa);
+  capa.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-m]");
+    if (!b && e.target !== capa) return;
+    const m = b ? b.dataset.m : "cerrar";
+    capa.remove();
+    if (m === "pdf" || m === "png" || m === "svg") cqExportar(m);
+    if (m === "copia") {
+      const d = cqDibujoCompleto();
+      const copia = JSON.parse(JSON.stringify({ titulo: (cq.titulo || "Croquis") + " (copia)", cliente: cq.cliente, numero_cliente: cq.numero_cliente, direccion: cq.direccion, paginas: d.paginas, medidas: !!d.medidas }));
+      cqAbrirEditor({ ...copia, cambios: true });
+      cqGuardarBorrador();
+      showToast("Copia nueva: el plano original queda como estaba.");
+    }
+  });
+}
+// ---------- Plano de la casa de base (hecho en Visio u otro programa) ----------
+function cqElegirArchivo(accept) {
+  return new Promise((ok) => {
+    const inp = document.createElement("input");
+    inp.type = "file"; inp.accept = accept; inp.style.display = "none";
+    inp.addEventListener("change", () => { ok(inp.files && inp.files[0] ? inp.files[0] : null); inp.remove(); });
+    document.body.appendChild(inp);
+    inp.click();
+  });
+}
+function cqCapaCargando(texto, nota) {
+  const capa = document.createElement("div");
+  capa.className = "cq-datos-capa cq-cargando";
+  capa.innerHTML = `<div class="cq-datos"><div class="cq-spinner"></div><h3>${escapeHtml(texto)}</h3>${nota ? `<p class="pe-nota">${escapeHtml(nota)}</p>` : ""}</div>`;
+  document.body.appendChild(capa);
+  return capa;
+}
+// Archivo o PDF -> imagen subida -> fondo del plano base.
+async function cqPrepararPlanoBase(archivo) {
+  const img = await croquisArchivoAImagen(archivo, 2400);
+  const fondo = await croquisSubirPlanoBase(img, SERVICIOS_API_TOKEN);
+  if (img.paginas > 1) showToast(`El PDF tiene ${img.paginas} hojas: se usó la primera.`);
+  return fondo;
+}
+async function cqPonerPlanoBase(archivo) {
+  const capa = cqCapaCargando("Preparando el plano…", "Se convierte en imagen y se sube. Tarda unos segundos.");
+  try {
+    const fondo = await cqPrepararPlanoBase(archivo);
+    capa.remove();
+    cqMemoria();
+    // Si la página ya tenía un plano, lo dibujado se acomoda al nuevo tamaño.
+    cq.fondo = fondo;
+    cq.verFondo = true;
+    cq.cambios = true;
+    cqGuardarBorrador();
+    cqVerTodo();
+    showToast("Plano puesto de base. Ya podés dibujar encima los equipos y el cableado.");
+  } catch (err) {
+    capa.remove();
+    showToast("No se pudo usar ese archivo: " + err.message);
+  }
+}
+function cqEscalaPlano() {
+  const f = cq.fondo;
+  if (!f || !f.base) return;
+  const actual = (f.w / CROQUIS_POR_METRO).toLocaleString("es-AR", { maximumFractionDigits: 2 });
+  const r = prompt(`¿Cuántos metros mide de ancho todo el plano (de borde a borde de la hoja)? Ahora: ${actual} m.\nAsí las medidas y los ambientes quedan en escala. Conviene hacerlo antes de dibujar encima.`, actual);
+  if (r == null) return;
+  const m = Number(String(r).replace(",", "."));
+  if (!(m > 0.5 && m < 1000)) { showToast("Poné un número de metros válido."); return; }
+  cqMemoria();
+  const k = (m * CROQUIS_POR_METRO) / f.w;
+  cq.fondo = { ...f, w: Math.round(f.w * k), h: Math.round(f.h * k) };
+  cq.cambios = true;
+  cqGuardarBorrador();
+  cqVerTodo();
+}
 
 // ---------- Lista ----------
 function cqAbrirEditor(datos) {
-  Object.assign(cq, { id: "", titulo: "", cliente: "", numero_cliente: "", direccion: "", autor: "", actualizado: "", elementos: [], fondo: null, paginas: null, pagina: 0, medidas: false, plantilla: null, verFondo: true, sel: null, multi: [], modoMulti: false, cadena: null, pasado: [], futuro: [], cambios: false }, datos || {});
+  Object.assign(cq, { id: "", instalacion: "", soloLectura: false, volverA: "", titulo: "", cliente: "", numero_cliente: "", direccion: "", autor: "", actualizado: "", elementos: [], fondo: null, paginas: null, pagina: 0, medidas: false, plantilla: null, verFondo: true, sel: null, multi: [], modoMulti: false, cadena: null, pasado: [], futuro: [], cambios: false }, datos || {});
   // Páginas: los croquis viejos tienen una sola.
   if (!Array.isArray(cq.paginas) || !cq.paginas.length) cq.paginas = [{ nombre: "Página 1", elementos: cq.elementos || [], fondo: cq.fondo || null }];
   cq.paginas = cq.paginas.map((p, i) => ({ nombre: p.nombre || `Página ${i + 1}`, elementos: Array.isArray(p.elementos) ? p.elementos : [], fondo: p.fondo || null }));
@@ -16361,7 +16644,9 @@ function cqAbrirEditor(datos) {
   cq.elementos = cq.paginas[0].elementos;
   cq.fondo = cq.paginas[0].fondo;
   showScreen("croquis");
-  cqElegirHerr(cq.elementos.length ? "mover" : "rect");
+  screens.croquis.classList.toggle("cq-solo-lectura", !!cq.soloLectura);
+  cqElegirHerr(cq.elementos.length || cq.soloLectura || (cq.fondo && cq.fondo.base) ? "mover" : "rect");
+  if (cq.soloLectura) cqModoLectura(true);
   requestAnimationFrame(cqVerTodo);
 }
 async function cqCargarLista() {
@@ -16387,10 +16672,10 @@ function cqRenderLista() {
   const htmlBorrador = borrador && borrador.cambios && borrador.elementos && borrador.elementos.length
     ? `<div class="historial-card cq-item cq-borrador"><div class="historial-card-cliente">${cqIc("lapiz")} Sin guardar: ${escapeHtml(borrador.titulo || borrador.cliente || "croquis nuevo")}</div><div class="historial-card-direccion">Quedó en este celular</div><div class="cq-item-btns"><button type="button" class="btn btn-primary btn-small" data-borrador="1">Seguir</button></div></div>` : "";
   cqEl("cqLista").innerHTML = htmlBorrador + (lista.length ? lista.map((c, i) => `<div class="historial-card cq-item">
-      <div class="historial-card-cliente">${escapeHtml(c.titulo || "Croquis")}</div>
+      <div class="historial-card-cliente">${escapeHtml(c.titulo || "Croquis")}${c.cerrado ? ` <span class="cq-etiqueta cq-etiqueta-cerrado">${cqIc("candado")} Instalación cerrada</span>` : c.instalacion ? ' <span class="cq-etiqueta">Instalación</span>' : ""}${c.base ? ' <span class="cq-etiqueta cq-etiqueta-base">Sobre plano</span>' : ""}</div>
       <div class="historial-card-direccion">${escapeHtml(c.cliente || "Sin cliente")}${c.numero_cliente ? " · N° " + escapeHtml(c.numero_cliente) : ""}${c.direccion ? " · " + escapeHtml(c.direccion) : ""}</div>
       <div class="historial-card-horario">${escapeHtml(c.autor || "")} · ${fechaDelServidor(c.actualizado) ? fechaDelServidor(c.actualizado).toLocaleDateString("es-AR") : ""}</div>
-      <div class="cq-item-btns"><button type="button" class="btn btn-primary btn-small" data-abrir="${i}">Abrir</button><button type="button" class="btn btn-secondary btn-small" data-pdf="${i}">PDF</button>${!yo || c.autor === yo ? `<button type="button" class="btn btn-secondary btn-small cq-borrar" data-borrar="${i}">Borrar</button>` : ""}</div>
+      <div class="cq-item-btns"><button type="button" class="btn btn-primary btn-small" data-abrir="${i}">Abrir</button><button type="button" class="btn btn-secondary btn-small" data-pdf="${i}">PDF</button>${(!yo || c.autor === yo) && !c.cerrado ? `<button type="button" class="btn btn-secondary btn-small cq-borrar" data-borrar="${i}">Borrar</button>` : ""}</div>
     </div>`).join("") : (cqIndice.length ? '<p class="pe-vacio">Ningún croquis con eso.</p>' : '<p class="pe-vacio">Todavía no hay croquis guardados.</p>'));
   const traer = async (c) => {
     const r = await fetch(`/api/datos?coleccion=croquis&id=${encodeURIComponent(c.id)}`, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
@@ -16400,7 +16685,7 @@ function cqRenderLista() {
   };
   cqEl("cqLista").querySelectorAll("[data-borrador]").forEach((b) => b.addEventListener("click", () => cqAbrirEditor({ ...borrador, cambios: true })));
   cqEl("cqLista").querySelectorAll("[data-abrir]").forEach((b) => b.addEventListener("click", async () => {
-    try { const d = await traer(lista[Number(b.dataset.abrir)]); cqAbrirEditor({ id: d.id, titulo: d.titulo, cliente: d.cliente, numero_cliente: d.numero_cliente, direccion: d.direccion, autor: d.autor, actualizado: d.actualizado, elementos: (d.dibujo && d.dibujo.elementos) || [], fondo: (d.dibujo && d.dibujo.fondo) || null, paginas: (d.dibujo && d.dibujo.paginas) || null, medidas: !!(d.dibujo && d.dibujo.medidas) }); }
+    try { const d = await traer(lista[Number(b.dataset.abrir)]); cqAbrirEditor({ id: d.id, instalacion: d.instalacion || "", soloLectura: !!d.cerrado, titulo: d.titulo, cliente: d.cliente, numero_cliente: d.numero_cliente, direccion: d.direccion, autor: d.autor, actualizado: d.actualizado, elementos: (d.dibujo && d.dibujo.elementos) || [], fondo: (d.dibujo && d.dibujo.fondo) || null, paginas: (d.dibujo && d.dibujo.paginas) || null, medidas: !!(d.dibujo && d.dibujo.medidas) }); }
     catch (err) { showToast("No se pudo abrir: " + err.message); }
   }));
   cqEl("cqLista").querySelectorAll("[data-pdf]").forEach((b) => b.addEventListener("click", async () => {
@@ -16436,6 +16721,25 @@ cqEl("cqNuevoBtn").addEventListener("click", () => {
   cqAbrirEditor({});
 });
 cqEl("tileCroquisBtn").addEventListener("click", cqAbrirLista);
+cqEl("cqDesdePlanoBtn").addEventListener("click", async () => {
+  const archivo = await cqElegirArchivo("image/*,application/pdf,.pdf,.svg");
+  if (!archivo) return;
+  let borrador = null;
+  try { borrador = JSON.parse(localStorage.getItem(CQ_BORRADOR) || "null"); } catch (e) { borrador = null; }
+  if (borrador && borrador.cambios && borrador.elementos && borrador.elementos.length && !confirm("Hay un croquis sin guardar en este celular. ¿Empezar uno nuevo igual? (el anterior se pierde)")) return;
+  const capa = cqCapaCargando("Preparando el plano…", "Se convierte en imagen y se sube. Tarda unos segundos.");
+  try {
+    const fondo = await cqPrepararPlanoBase(archivo);
+    capa.remove();
+    cqAbrirEditor({ titulo: String(archivo.name || "").replace(/\.[a-z0-9]+$/i, "").slice(0, 120), paginas: [{ nombre: "Página 1", elementos: [], fondo }], cambios: true });
+    cqGuardarBorrador();
+    showToast("Plano listo de base: elegí el cliente y dibujá encima.");
+    cqPedirDatos();
+  } catch (err) {
+    capa.remove();
+    showToast("No se pudo usar ese archivo: " + err.message);
+  }
+});
 
 // ---------- Equipos "a instalar" -> Presupuesto express ----------
 const CQ_BUSQUEDA_PRESU = {
@@ -16498,7 +16802,7 @@ async function cqDesdeFoto(archivo) {
     const r = await fetch("/api/datos?coleccion=croquis", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-      body: JSON.stringify({ accion: "interpretar", imagen: foto.base64, mime: "image/jpeg" }),
+      body: JSON.stringify({ accion: "interpretar", imagen: foto.base64, mime: "image/jpeg", instalacion: cq.instalacion || undefined }),
     });
     const d = await r.json().catch(() => ({}));
     if (!r.ok || !d.ok) throw new Error(d.error || "HTTP " + r.status);

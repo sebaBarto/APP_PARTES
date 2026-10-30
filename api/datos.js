@@ -350,6 +350,19 @@ async function interpretarBocetoCroquis(b, res) {
   if (!resultado || typeof resultado !== "object") { res.status(502).json({ error: "La IA no pudo interpretar el boceto. Probá con una foto más de frente y con buena luz." }); return; }
   res.status(200).json({ ok: true, resultado });
 }
+// Estado de una instalación en el backend ('abierta' | 'cerrada'), o null si
+// no se pudo saber (sin backend o sin señal: en ese caso no se bloquea).
+async function estadoInstalacion(id) {
+  const { BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN } = process.env;
+  if (!id || !BACKEND_NUEVO_URL || !BACKEND_NUEVO_TOKEN) return null;
+  try {
+    const r = await fetch(`${BACKEND_NUEVO_URL}/api/instalaciones/${encodeURIComponent(id)}`, { headers: { Authorization: `Bearer ${BACKEND_NUEVO_TOKEN}` } });
+    if (!r.ok) return null;
+    const d = await r.json();
+    return d && d.estado ? String(d.estado) : null;
+  } catch (e) { return null; }
+}
+const MENSAJE_CROQUIS_CERRADO = "La instalación ya se cerró: este plano quedó como registro y no se puede modificar. Si hace falta cambiarlo, pedíselo a la oficina.";
 async function manejarCroquis(req, res, autorizacion, body) {
   const { GITHUB_DATA_TOKEN, GITHUB_DATA_REPO } = process.env;
   if (!GITHUB_DATA_TOKEN || !GITHUB_DATA_REPO) { res.status(500).json({ error: "Faltan variables de entorno por configurar en Vercel" }); return; }
@@ -360,7 +373,12 @@ async function manejarCroquis(req, res, autorizacion, body) {
     const t = (await leerTecnicosGuardados()).find((x) => x.nombre === autorizacion.nombre);
     puede = !!(t && t.permisos && t.permisos.croquis);
   }
-  if (!puede) { res.status(403).json({ error: "No tenés habilitados los croquis" }); return; }
+  const b = body && typeof body === "object" ? body : {};
+  const instValida = (v) => /^\d{1,15}$/.test(String(v == null ? "" : v).trim());
+  // El plano de una instalación lo puede hacer cualquier técnico que esté
+  // en la instalación, aunque no tenga el permiso de croquis en general.
+  const deInstalacion = req.method === "GET" ? !!(req.query.id || instValida(req.query.instalacion)) : (instValida(b.instalacion) || instValida(b.instalacion_id) || b.accion === "borrar");
+  if (!puede && !deInstalacion) { res.status(403).json({ error: "No tenés habilitados los croquis" }); return; }
   const txt = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
   const idValido = (id) => /^[a-z0-9]{6,32}$/.test(String(id || ""));
   try {
@@ -369,16 +387,50 @@ async function manejarCroquis(req, res, autorizacion, body) {
         if (!idValido(req.query.id)) { res.status(400).json({ error: "Id inválido" }); return; }
         const { data } = await leerArchivoDatos(`croquis/${req.query.id}.json`, null);
         if (!data) { res.status(404).json({ error: "Ese croquis ya no existe" }); return; }
+        // Si la instalación ya se cerró (aunque no se haya marcado acá), se avisa.
+        if (data.instalacion && !data.cerrado && (await estadoInstalacion(data.instalacion)) === "cerrada") data.cerrado = true;
         res.status(200).json(data);
         return;
       }
       const { data } = await leerArchivoDatos(RUTA_CROQUIS_INDICE, []);
-      res.status(200).json(Array.isArray(data) ? data : []);
+      let lista = Array.isArray(data) ? data : [];
+      // Sin el permiso general: solo los de esa instalación y los del mismo cliente.
+      if (!puede) {
+        const inst = String(req.query.instalacion || "").trim();
+        const num = String(req.query.numero_cliente || "").replace(/\D/g, "").replace(/^0+/, "");
+        const norm = (v) => String(v || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+        const cli = norm(req.query.cliente);
+        lista = lista.filter((c) => String(c.instalacion || "") === inst || (num && String(c.numero_cliente || "").replace(/\D/g, "").replace(/^0+/, "") === num) || (cli && norm(c.cliente) === cli));
+      }
+      res.status(200).json(lista);
       return;
     }
     if (req.method !== "POST") { res.status(405).json({ error: "Método no permitido" }); return; }
-    const b = body && typeof body === "object" ? body : {};
     if (b.accion === "interpretar") { await interpretarBocetoCroquis(b, res); return; }
+    if (b.accion === "cerrar_instalacion") {
+      // Al cerrar la instalación, sus planos quedan como registro (solo lectura).
+      if (!instValida(b.instalacion_id)) { res.status(400).json({ error: "Falta instalacion_id" }); return; }
+      const inst = String(b.instalacion_id).trim();
+      if (!esAdmin && (await estadoInstalacion(inst)) === "abierta") { res.status(409).json({ error: "La instalación sigue abierta" }); return; }
+      const ahora = new Date().toISOString();
+      const { data: indice } = await leerArchivoDatos(RUTA_CROQUIS_INDICE, []);
+      const ids = (Array.isArray(indice) ? indice : []).filter((c) => String(c.instalacion || "") === inst && !c.cerrado).map((c) => c.id);
+      for (const id of ids) {
+        const ruta = `croquis/${id}.json`;
+        const previo = await leerArchivoDatos(ruta, null);
+        if (previo.data && !previo.data.cerrado) await escribirArchivoDatos(ruta, { ...previo.data, cerrado: true, cerrado_en: ahora }, previo.sha, `Croquis ${id}: instalación ${inst} cerrada`);
+      }
+      if (ids.length) {
+        for (let intento = 0; intento < 4; intento++) {
+          const { data, sha } = await leerArchivoDatos(RUTA_CROQUIS_INDICE, []);
+          const lista = (Array.isArray(data) ? data : []).map((c) => (ids.includes(c.id) ? { ...c, cerrado: true, cerrado_en: ahora } : c));
+          const r2 = await escribirArchivoDatos(RUTA_CROQUIS_INDICE, lista, sha, `Índice de croquis — instalación ${inst} cerrada`);
+          if (r2.ok || (r2.status !== 409 && r2.status !== 422)) break;
+        }
+      }
+      res.status(200).json({ ok: true, cerrados: ids.length });
+      return;
+    }
     if (b.accion === "guardar") {
       const id = b.id && idValido(b.id) ? b.id : (Date.now().toString(36) + require("crypto").randomBytes(4).toString("hex"));
       const dibujo = b.dibujo && typeof b.dibujo === "object" ? b.dibujo : null;
@@ -386,17 +438,26 @@ async function manejarCroquis(req, res, autorizacion, body) {
       if (JSON.stringify(dibujo).length > 900000) { res.status(400).json({ error: "El croquis es demasiado grande" }); return; }
       const ruta = `croquis/${id}.json`;
       const previo = await leerArchivoDatos(ruta, null);
+      const ant = previo.data || null;
+      const instalacion = instValida(b.instalacion) ? String(b.instalacion).trim() : (ant && ant.instalacion) || "";
+      if (!puede && !instalacion) { res.status(403).json({ error: "No tenés habilitados los croquis" }); return; }
+      if (!puede && ant && ant.instalacion && ant.instalacion !== instalacion) { res.status(403).json({ error: "Ese croquis es de otra instalación" }); return; }
+      // Una vez cerrada la instalación, su plano ya no se toca (salvo la oficina).
+      if (!esAdmin && ((ant && ant.cerrado) || (instalacion && (await estadoInstalacion(instalacion)) === "cerrada"))) { res.status(403).json({ error: MENSAJE_CROQUIS_CERRADO, cerrado: true }); return; }
       // Lo puede seguir editando cualquiera habilitado; queda registrado quién lo creó y quién lo cambió.
       const ahora = new Date().toISOString();
       const registro = {
         id, titulo: txt(b.titulo, 120) || "Croquis", cliente: txt(b.cliente, 150), numero_cliente: txt(b.numero_cliente, 30), direccion: txt(b.direccion, 200),
-        autor: (previo.data && previo.data.autor) || autorizacion.nombre || "Oficina", creado: (previo.data && previo.data.creado) || ahora,
+        autor: (ant && ant.autor) || autorizacion.nombre || "Oficina", creado: (ant && ant.creado) || ahora,
         actualizado: ahora, actualizado_por: autorizacion.nombre || "Oficina", dibujo,
       };
+      if (instalacion) registro.instalacion = instalacion;
+      if (ant && ant.cerrado) { registro.cerrado = true; registro.cerrado_en = ant.cerrado_en; }
       const r1 = await escribirArchivoDatos(ruta, registro, previo.sha, `Croquis ${registro.titulo} — ${autorizacion.nombre || "admin"}`);
       if (!r1.ok) { res.status(502).json({ error: "No se pudo guardar el croquis" }); return; }
       const paginas = Array.isArray(dibujo.paginas) ? dibujo.paginas : null;
-      const resumen = { ...registro, elementos: paginas ? paginas.reduce((n, p) => n + ((p && Array.isArray(p.elementos)) ? p.elementos.length : 0), 0) : dibujo.elementos.length, paginas: paginas ? paginas.length : 1 };
+      const conBase = !!((dibujo.fondo && dibujo.fondo.base) || (paginas && paginas.some((p) => p && p.fondo && p.fondo.base)));
+      const resumen = { ...registro, elementos: paginas ? paginas.reduce((n, p) => n + ((p && Array.isArray(p.elementos)) ? p.elementos.length : 0), 0) : dibujo.elementos.length, paginas: paginas ? paginas.length : 1, base: conBase };
       delete resumen.dibujo;
       for (let intento = 0; intento < 4; intento++) {
         const { data, sha } = await leerArchivoDatos(RUTA_CROQUIS_INDICE, []);
@@ -414,6 +475,8 @@ async function manejarCroquis(req, res, autorizacion, body) {
       const ruta = `croquis/${b.id}.json`;
       const previo = await leerArchivoDatos(ruta, null);
       if (previo.data && !esAdmin && previo.data.autor !== autorizacion.nombre) { res.status(403).json({ error: "Solo lo puede borrar quien lo hizo, o la oficina" }); return; }
+      if (previo.data && !esAdmin && (previo.data.cerrado || (previo.data.instalacion && (await estadoInstalacion(previo.data.instalacion)) === "cerrada"))) { res.status(403).json({ error: MENSAJE_CROQUIS_CERRADO, cerrado: true }); return; }
+      if (previo.data && !puede && !previo.data.instalacion) { res.status(403).json({ error: "No tenés habilitados los croquis" }); return; }
       if (previo.sha) {
         await fetch(urlGithubDatos(ruta), { method: "DELETE", headers: headersGithubDatos({ "Content-Type": "application/json" }), body: JSON.stringify({ message: `Borra croquis ${b.id}`, sha: previo.sha }) });
       }

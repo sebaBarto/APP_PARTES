@@ -3653,3 +3653,23 @@ html[data-inicio="nuevo"] #screen-presupuesto .pe-ajuste-btn.activo { background
 .cq-lupa-cruz::after { top: 10px; left: 0; height: 2px; width: 22px; }
 
 .cq-pal-buscar { flex: 0 0 104px; align-self: center; height: 40px; border-radius: 10px; border: 1.5px solid #C9D3DC; padding: 0 10px; font-size: 14px; background: #fff; color: #1B2733; }
+
+/* Plano de la casa de base y planos de instalación cerrada (solo lectura) */
+#screen-croquis.cq-solo-lectura .cq-herr,
+#screen-croquis.cq-solo-lectura .cq-props,
+#screen-croquis.cq-solo-lectura .cq-simbolos,
+#screen-croquis.cq-solo-lectura .cq-pad,
+#screen-croquis.cq-solo-lectura #cqMultiBtn,
+#screen-croquis.cq-solo-lectura #cqDeshacerBtn,
+#screen-croquis.cq-solo-lectura #cqRehacerBtn { display: none !important; }
+#screen-croquis.cq-solo-lectura .cq-ayuda { display: block; background: #FFF4E5; color: #8A4B00; }
+.cq-etiqueta { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 10px; background: #E8F0FA; color: #1B5FA8; vertical-align: middle; white-space: nowrap; }
+.cq-etiqueta .cq-ic { width: 12px; height: 12px; }
+.cq-etiqueta-cerrado { background: #FFF4E5; color: #8A4B00; }
+.cq-etiqueta-base { background: #EAF6EE; color: #22783D; }
+.inst-plano-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.inst-plano-btns .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 14px; padding-left: 8px; padding-right: 8px; }
+.inst-plano-btns .cq-ic { width: 18px; height: 18px; flex: none; }
+#instPlanoLista .cq-item { margin-top: 10px; }
+#cqDesdePlanoBtn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+#cqDesdePlanoBtn .cq-ic { width: 18px; height: 18px; }
