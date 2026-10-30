@@ -16,7 +16,7 @@
 //   simbolo { tipo, x, y, rot, esc, color?, esp? }  equipos y objetos de obra
 
 // Tiene que ser igual a APP_VERSION de app.js (si no, la app recarga).
-const CROQUIS_UTILS_VERSION = "4.16.0";
+const CROQUIS_UTILS_VERSION = "4.17.0";
 const CROQUIS_GRILLA = 20;
 
 // Cada símbolo se dibuja centrado en 0,0 con dib(color). "cat" separa los
@@ -736,22 +736,30 @@ function croquisCanvasAJpeg(cv) {
   // Fondo blanco: los PNG/SVG transparentes quedarían negros en JPEG.
   return { base64: cv.toDataURL("image/jpeg", 0.85).split(",")[1], w: cv.width, h: cv.height };
 }
-async function croquisPdfAImagen(datos, lado) {
+const CROQUIS_MAX_HOJAS = 8;
+// Hojas de un PDF -> imágenes JPEG (una por hoja, hasta "max").
+async function croquisPdfAImagenes(datos, lado, max) {
   const pdfjs = await croquisCargarPdfJs();
   const doc = await pdfjs.getDocument({ data: datos }).promise;
-  const pag = await doc.getPage(1);
-  const v1 = pag.getViewport({ scale: 1 });
-  const k = Math.min(4, lado / Math.max(v1.width, v1.height));
-  const v = pag.getViewport({ scale: k });
-  const cv = document.createElement("canvas");
-  cv.width = Math.round(v.width); cv.height = Math.round(v.height);
-  const ctx = cv.getContext("2d");
-  ctx.fillStyle = "#FFFFFF"; ctx.fillRect(0, 0, cv.width, cv.height);
-  await pag.render({ canvasContext: ctx, viewport: v }).promise;
-  const paginas = doc.numPages;
-  try { doc.destroy(); } catch (e) { /* nada */ }
-  return { ...croquisCanvasAJpeg(cv), paginas };
+  const total = doc.numPages, out = [];
+  try {
+    for (let n = 1; n <= Math.min(total, max || 1); n++) {
+      const pag = await doc.getPage(n);
+      const v1 = pag.getViewport({ scale: 1 });
+      const k = Math.min(4, lado / Math.max(v1.width, v1.height));
+      const v = pag.getViewport({ scale: k });
+      const cv = document.createElement("canvas");
+      cv.width = Math.round(v.width); cv.height = Math.round(v.height);
+      const ctx = cv.getContext("2d");
+      ctx.fillStyle = "#FFFFFF"; ctx.fillRect(0, 0, cv.width, cv.height);
+      await pag.render({ canvasContext: ctx, viewport: v }).promise;
+      out.push({ ...croquisCanvasAJpeg(cv), paginas: total });
+      cv.width = cv.height = 0;
+    }
+  } finally { try { doc.destroy(); } catch (e) { /* nada */ } }
+  return out;
 }
+async function croquisPdfAImagen(datos, lado) { return (await croquisPdfAImagenes(datos, lado, 1))[0]; }
 function croquisImagenAJpeg(url, lado, esSvg) {
   return new Promise((ok, mal) => {
     const img = new Image();
@@ -772,10 +780,15 @@ function croquisImagenAJpeg(url, lado, esSvg) {
 }
 // Archivo (PDF, SVG, PNG, JPG) -> JPEG {base64, w, h}. Del PDF se usa la
 // primera hoja. lado: px del lado más largo.
-async function croquisArchivoAImagen(archivo, lado) {
+async function croquisArchivoAImagen(archivo, lado) { return (await croquisArchivoAImagenes(archivo, lado, 1))[0]; }
+// Igual, pero de un PDF trae cada hoja (planta baja, planta alta...) por separado.
+async function croquisArchivoAImagenes(archivo, lado, max) {
   const L = lado || 2400;
   const nombre = String(archivo.name || "").toLowerCase(), tipo = String(archivo.type || "").toLowerCase();
-  if (tipo === "application/pdf" || nombre.endsWith(".pdf")) return croquisPdfAImagen(new Uint8Array(await archivo.arrayBuffer()), L);
+  if (tipo === "application/pdf" || nombre.endsWith(".pdf")) return croquisPdfAImagenes(new Uint8Array(await archivo.arrayBuffer()), L, max || CROQUIS_MAX_HOJAS);
+  return [await croquisUnaImagen(archivo, L, nombre, tipo)];
+}
+async function croquisUnaImagen(archivo, L, nombre, tipo) {
   if (/\.(vsdx?|vsdm|vss|vst)$/.test(nombre)) throw new Error("Visio no se puede leer directo: en Visio usá Archivo → Exportar como PDF (o PNG/SVG) y subí ese archivo.");
   const esSvg = tipo === "image/svg+xml" || nombre.endsWith(".svg");
   if (!esSvg && !tipo.startsWith("image/") && !/\.(png|jpe?g|webp|gif|bmp)$/.test(nombre)) throw new Error("Ese tipo de archivo no sirve: subí un PDF, SVG, PNG o JPG.");
@@ -797,13 +810,23 @@ async function croquisSubirPlanoBase(imagen, token) {
   croquisFondosCache[d.id] = Promise.resolve("data:image/jpeg;base64," + imagen.base64);
   return f;
 }
+// Una página de croquis por cada hoja del plano.
+function croquisPaginasDesdeFondos(fondos) {
+  return fondos.map((fondo, i) => ({ nombre: fondos.length > 1 ? `Hoja ${i + 1}` : "Página 1", elementos: [], fondo }));
+}
+async function croquisSubirPlanosBase(imagenes, token) {
+  const out = [];
+  for (const img of imagenes) out.push(await croquisSubirPlanoBase(img, token));
+  return out;
+}
 function croquisTieneBase(dibujo) {
   const d = dibujo || {};
   return !!((d.fondo && d.fondo.base) || (Array.isArray(d.paginas) && d.paginas.some((p) => p && p.fondo && p.fondo.base)));
 }
 
-// PNG (Blob) a partir del SVG. ancho: px del lado más largo.
-async function croquisPng(dibujo, ancho) {
+// PNG (Blob) a partir del SVG. ancho: px del lado más largo. tipo:
+// "image/jpeg" para los que llevan el plano de la casa (pesa mucho menos).
+async function croquisPng(dibujo, ancho, tipo) {
   if ((dibujo.elementos || []).some((e) => e.tipo === "logo_sat")) await croquisCargarLogo();
   if (dibujo.fondo && dibujo.fondo.base && !dibujo.fondo.local) dibujo = { ...dibujo, fondo: await croquisFondoListo(dibujo.fondo) };
   return new Promise((ok, mal) => {
@@ -816,7 +839,7 @@ async function croquisPng(dibujo, ancho) {
       const ctx = cv.getContext("2d");
       ctx.fillStyle = "#FFFFFF"; ctx.fillRect(0, 0, cv.width, cv.height);
       ctx.drawImage(img, 0, 0, cv.width, cv.height);
-      cv.toBlob((b) => (b ? ok(b) : mal(new Error("No se pudo armar la imagen"))), "image/png");
+      cv.toBlob((b) => (b ? ok(b) : mal(new Error("No se pudo armar la imagen"))), tipo || "image/png", tipo === "image/jpeg" ? 0.85 : undefined);
     };
     img.onerror = () => mal(new Error("No se pudo dibujar el croquis"));
     img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
@@ -842,7 +865,8 @@ function croquisPaginas(dibujo) {
 }
 // PDF A4 apaisado con rótulo (logo SAT, título, cliente, dirección, fecha,
 // autor). Una hoja por cada página del croquis.
-async function croquisPdf(c) {
+async function croquisPdf(c, opciones) {
+  const anchoImg = (opciones && opciones.ancho) || 2400;
   const { PDFDocument, StandardFonts, rgb } = await croquisCargarPdfLib();
   const doc = await PDFDocument.create();
   doc.setTitle(`Croquis - ${c.titulo || ""}`);
@@ -854,7 +878,9 @@ async function croquisPdf(c) {
   for (let i = 0; i < paginas.length; i++) {
     const p = paginas[i];
     const pag = doc.addPage([W, H]);
-    const png = await doc.embedPng(new Uint8Array(await (await croquisPng({ elementos: p.elementos, fondo: p.fondo && p.fondo.base ? p.fondo : null, medidas: !!(c.dibujo && c.dibujo.medidas) }, 2400)).arrayBuffer()));
+    const conBase = !!(p.fondo && p.fondo.base);
+    const bytesImg = new Uint8Array(await (await croquisPng({ elementos: p.elementos, fondo: conBase ? p.fondo : null, medidas: !!(c.dibujo && c.dibujo.medidas) }, anchoImg, conBase ? "image/jpeg" : "image/png")).arrayBuffer());
+    const png = conBase ? await doc.embedJpg(bytesImg) : await doc.embedPng(bytesImg);
     pag.drawRectangle({ x: M, y: M, width: W - 2 * M, height: H - 2 * M, borderColor: rgb(0.11, 0.12, 0.13), borderWidth: 1.2 });
     const altoRot = 58;
     pag.drawLine({ start: { x: M, y: M + altoRot }, end: { x: W - M, y: M + altoRot }, thickness: 1.2, color: rgb(0.11, 0.12, 0.13) });

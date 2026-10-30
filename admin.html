@@ -714,6 +714,14 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
         <input type="checkbox" id="felicitacionSemanalCheck" checked>
         <span>Mandar cada viernes (17-18hs) una notificación felicitando al técnico con mejor desempeño de la semana</span>
       </label>
+      <label class="permiso-check" style="margin:14px 0;">
+        <input type="checkbox" id="planoObligatorioCheck">
+        <span>Exigir el plano (croquis o foto) para cerrar una instalación. Si está apagado, la APP solo avisa y deja cerrar igual.</span>
+      </label>
+      <label class="permiso-check" style="margin:14px 0;">
+        <input type="checkbox" id="planoMailClienteCheck">
+        <span>Mandarle también al cliente el PDF del plano en el mail de instalación terminada (a la oficina siempre le llega).</span>
+      </label>
       <button id="guardarConfigBtn" type="button" class="btn-secondary-admin">Guardar umbrales</button>
       <p class="status" id="configStatus"></p>
     </div>
@@ -2324,6 +2332,9 @@ const diasUrgenteInput = document.getElementById("diasUrgenteInput");
 const guardarConfigBtn = document.getElementById("guardarConfigBtn");
 const configStatus = document.getElementById("configStatus");
 const felicitacionSemanalCheck = document.getElementById("felicitacionSemanalCheck");
+const planoObligatorioCheck = document.getElementById("planoObligatorioCheck");
+const planoMailClienteCheck = document.getElementById("planoMailClienteCheck");
+let configCargadaAdmin = {}; // al guardar se conserva lo que esta pantalla no muestra
 
 async function cargarConfigAdmin() {
   try {
@@ -2336,6 +2347,9 @@ async function cargarConfigAdmin() {
     diasAtencionInput.value = data.dias_atencion ?? 3;
     diasUrgenteInput.value = data.dias_urgente ?? 7;
     felicitacionSemanalCheck.checked = data.felicitacion_semanal_activa !== false;
+    planoObligatorioCheck.checked = !!data.plano_instalacion_obligatorio;
+    planoMailClienteCheck.checked = !!data.plano_mail_cliente;
+    configCargadaAdmin = data && typeof data === "object" ? data : {};
   } catch (err) {
     diasAtencionInput.value = 3;
     diasUrgenteInput.value = 7;
@@ -2363,9 +2377,12 @@ guardarConfigBtn.addEventListener("click", async () => {
         Authorization: "Bearer " + SERVICIOS_API_TOKEN,
       },
       body: JSON.stringify({
+        ...configCargadaAdmin,
         dias_atencion: diasAtencion,
         dias_urgente: diasUrgente,
         felicitacion_semanal_activa: felicitacionSemanalCheck.checked,
+        plano_instalacion_obligatorio: planoObligatorioCheck.checked,
+        plano_mail_cliente: planoMailClienteCheck.checked,
       }),
     });
     const data = await res.json();
@@ -7563,12 +7580,15 @@ async function mostrarDetalleInstalacionAdmin(id) {
       <h3>Canales de cámaras</h3>
       <ul>${canalesHtml}</ul>
       ${inst.observaciones ? `<h3>Observaciones</h3><p style="background:#F4F5F0; border-radius:8px; padding:12px 14px;">${escapeHtmlAdmin(inst.observaciones)}</p>` : ""}
+      <h3>Plano de la instalación</h3>
+      <div id="instalacionPlanosAdmin">Cargando...</div>
       <h3>Fotos</h3>
       <div style="display:flex; flex-wrap:wrap;">${fotosHtml}</div>
       <button type="button" id="instalacionBorrarBtn" style="margin-top:16px; background:#C0392B; color:#fff; border:none; padding:10px 16px; border-radius:8px; cursor:pointer; font-weight:600;">🗑 Borrar esta instalación</button>
     `;
 
     document.getElementById("instalacionBorrarBtn").addEventListener("click", () => borrarInstalacionAdmin(id, inst.cliente, inst.estado));
+    planosDeInstalacionAdmin(id, document.getElementById("instalacionPlanosAdmin"));
     // Las fotos piden el pase de la sesión (un <img src> común no lo manda).
     instalacionesAdminDetalleContenido.querySelectorAll("img.inst-foto-pase").forEach(async (img) => {
       try {
@@ -8168,7 +8188,7 @@ function renderCroquisAdmin() {
     const f = fechaDelServidor(c.actualizado);
     return `<div class="croquis-admin-fila" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(128,128,128,.25);">
       <div style="min-width:200px;flex:1;"><b>${escapeHtmlAdmin(c.titulo || "Croquis")}</b>${c.cerrado ? ' <span style="font-size:11px;background:#FFF4E5;color:#8A4B00;border-radius:8px;padding:1px 6px;">Instalación cerrada</span>' : c.instalacion ? ' <span style="font-size:11px;background:#E8F0FA;color:#1B5FA8;border-radius:8px;padding:1px 6px;">Instalación ' + escapeHtmlAdmin(c.instalacion) + '</span>' : ""}${c.base ? ' <span style="font-size:11px;background:#EAF6EE;color:#22783D;border-radius:8px;padding:1px 6px;">Sobre plano</span>' : ""}<br><span style="font-size:13px;opacity:.8;">${escapeHtmlAdmin(c.cliente || "Sin cliente")}${c.numero_cliente ? " · N° " + escapeHtmlAdmin(c.numero_cliente) : ""}${c.direccion ? " · " + escapeHtmlAdmin(c.direccion) : ""}</span><br><span style="font-size:12px;opacity:.65;">${escapeHtmlAdmin(c.autor || "")}${f ? " · " + f.toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : ""} · ${Number(c.elementos) || 0} elementos</span></div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;"><button type="button" class="btn-secondary" data-cq="pdf" data-i="${i}">PDF</button><button type="button" class="btn-secondary" data-cq="png" data-i="${i}">Imagen</button><button type="button" class="btn-secondary" data-cq="svg" data-i="${i}" title="Se abre y edita en Visio">SVG (Visio)</button><button type="button" class="btn-secondary" data-cq="plano" data-i="${i}" title="Reemplaza el plano de la casa (página 1); lo dibujado encima queda">Cambiar plano</button><button type="button" class="btn-secondary" data-cq="borrar" data-i="${i}" style="color:#C0392B;">Borrar</button></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;"><button type="button" class="btn-secondary" data-cq="pdf" data-i="${i}">PDF</button><button type="button" class="btn-secondary" data-cq="png" data-i="${i}">Imagen</button><button type="button" class="btn-secondary" data-cq="svg" data-i="${i}" title="Se abre y edita en Visio">SVG (Visio)</button><button type="button" class="btn-secondary" data-cq="plano" data-i="${i}" title="Reemplaza el plano de la casa (si el PDF tiene varias hojas, una por página); lo dibujado encima queda">Cambiar plano</button><button type="button" class="btn-secondary" data-cq="borrar" data-i="${i}" style="color:#C0392B;">Borrar</button></div>
     </div>`;
   }).join("") || (croquisAdminIndice.length ? '<p class="status">Ninguno coincide.</p>' : "");
   caja.querySelectorAll("[data-cq]").forEach((b) => b.addEventListener("click", async () => {
@@ -8192,13 +8212,17 @@ function renderCroquisAdmin() {
       if (acc === "plano") {
         const dib = d.dibujo || {};
         const paginas = Array.isArray(dib.paginas) && dib.paginas.length ? dib.paginas : [{ nombre: "Página 1", elementos: dib.elementos || [], fondo: dib.fondo || null }];
-        const viejo = paginas[0].fondo && paginas[0].fondo.base ? paginas[0].fondo : null;
-        const img = await croquisArchivoAImagen(archivoPlano, 2400);
-        const nuevo = await croquisSubirPlanoBase(img, SERVICIOS_API_TOKEN);
-        // Mismo ancho que el anterior, así lo dibujado encima sigue en su lugar.
-        const fondo = viejo ? { ...nuevo, x: viejo.x, y: viejo.y, w: viejo.w, h: Math.round(viejo.w * img.h / img.w) } : nuevo;
-        paginas[0] = { ...paginas[0], fondo };
-        const dibujo = { ...dib, v: 2, paginas, elementos: paginas[0].elementos || [], fondo };
+        const imgs = await croquisArchivoAImagenes(archivoPlano, 2400, CROQUIS_MAX_HOJAS);
+        const nuevos = await croquisSubirPlanosBase(imgs, SERVICIOS_API_TOKEN);
+        // Hoja por hoja: mismo ancho que el plano anterior de esa página, así
+        // lo dibujado encima sigue en su lugar. Las hojas de más, páginas nuevas.
+        nuevos.forEach((nuevo, i) => {
+          const img = imgs[i];
+          if (!paginas[i]) paginas[i] = { nombre: `Hoja ${i + 1}`, elementos: [] };
+          const viejo = paginas[i].fondo && paginas[i].fondo.base ? paginas[i].fondo : null;
+          paginas[i] = { ...paginas[i], fondo: viejo ? { ...nuevo, x: viejo.x, y: viejo.y, w: viejo.w, h: Math.round(viejo.w * img.h / img.w) } : nuevo };
+        });
+        const dibujo = { ...dib, v: 2, paginas, elementos: paginas[0].elementos || [], fondo: paginas[0].fondo };
         await guardarCroquisAdmin({ id: d.id, instalacion: d.instalacion, titulo: d.titulo, cliente: d.cliente, numero_cliente: d.numero_cliente, direccion: d.direccion, dibujo });
         alert("Plano cambiado.");
         cargarCroquisAdmin();
@@ -8214,6 +8238,35 @@ function renderCroquisAdmin() {
   }));
 }
 document.getElementById("croquisAdminBuscar").addEventListener("input", renderCroquisAdmin);
+async function descargarCroquisAdmin(id, acc) {
+  const r = await fetch(`/api/datos?coleccion=croquis&id=${encodeURIComponent(id)}`, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error || "HTTP " + r.status);
+  let blob;
+  if (acc === "pdf") blob = new Blob([await croquisPdf(d)], { type: "application/pdf" });
+  if (acc === "png") blob = await croquisPng(await croquisPrepararFondos(d.dibujo), 2400);
+  if (acc === "svg") { await croquisCargarLogo(); blob = new Blob([croquisSvgDocumento(await croquisPrepararFondos(d.dibujo))], { type: "image/svg+xml" }); }
+  if (acc === "ver") { window.open(URL.createObjectURL(new Blob([await croquisPdf(d)], { type: "application/pdf" })), "_blank"); return; }
+  croquisDescargar(blob, croquisNombreArchivo(d, acc));
+}
+// Planos de una instalación, dentro de su detalle (pestaña Instalaciones).
+async function planosDeInstalacionAdmin(id, caja) {
+  try {
+    const r = await fetch(`/api/datos?coleccion=croquis&instalacion=${encodeURIComponent(id)}`, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "HTTP " + r.status);
+    const lista = (Array.isArray(d) ? d : []).filter((c) => String(c.instalacion || "") === String(id));
+    if (!lista.length) { caja.innerHTML = "<p style='color:#6B7680;'>Sin plano cargado.</p>"; return; }
+    caja.innerHTML = lista.map((c, i) => `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(128,128,128,.25);">
+      <div><b>${escapeHtmlAdmin(c.titulo || "Croquis")}</b>${c.cerrado ? ' <span style="font-size:11px;background:#FFF4E5;color:#8A4B00;border-radius:8px;padding:1px 6px;">Cerrado</span>' : ""}<br><span style="font-size:12px;opacity:.7;">${escapeHtmlAdmin(c.autor || "")} · ${Number(c.elementos) || 0} elementos${c.paginas > 1 ? " · " + c.paginas + " páginas" : ""}</span></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;"><button type="button" class="btn-secondary" data-pi="ver" data-i="${i}">Ver</button><button type="button" class="btn-secondary" data-pi="pdf" data-i="${i}">PDF</button><button type="button" class="btn-secondary" data-pi="png" data-i="${i}">Imagen</button><button type="button" class="btn-secondary" data-pi="svg" data-i="${i}" title="Se abre y edita en Visio">SVG (Visio)</button></div>
+    </div>`).join("");
+    caja.querySelectorAll("[data-pi]").forEach((b) => b.addEventListener("click", async () => {
+      b.disabled = true;
+      try { await descargarCroquisAdmin(lista[Number(b.dataset.i)].id, b.dataset.pi); } catch (err) { alert("No se pudo: " + err.message); } finally { b.disabled = false; }
+    }));
+  } catch (err) { caja.innerHTML = `<p style="color:#C0392B;">No se pudo cargar el plano: ${escapeHtmlAdmin(err.message)}</p>`; }
+}
 // ---------- Plano de la casa (de Visio) para un cliente ----------
 function elegirArchivoCroquisBase() {
   return new Promise((ok) => {
@@ -8257,17 +8310,18 @@ document.getElementById("croquisBaseSubir").addEventListener("click", async () =
   btn.disabled = true;
   est.textContent = "Convirtiendo y subiendo el plano...";
   try {
-    const img = await croquisArchivoAImagen(archivo, 2400);
-    const fondo = await croquisSubirPlanoBase(img, SERVICIOS_API_TOKEN);
+    const imgs = await croquisArchivoAImagenes(archivo, 2400, CROQUIS_MAX_HOJAS);
+    const fondos = await croquisSubirPlanosBase(imgs, SERVICIOS_API_TOKEN);
     const ancho = Number(String(document.getElementById("croquisBaseAncho").value || "").replace(",", "."));
-    if (ancho > 0.5 && ancho < 1000) { const k = ancho * CROQUIS_POR_METRO / fondo.w; fondo.w = Math.round(fondo.w * k); fondo.h = Math.round(fondo.h * k); }
+    if (ancho > 0.5 && ancho < 1000) fondos.forEach((fondo) => { const k = ancho * CROQUIS_POR_METRO / fondo.w; fondo.w = Math.round(fondo.w * k); fondo.h = Math.round(fondo.h * k); });
+    const img = imgs[0];
     const titulo = document.getElementById("croquisBaseTitulo").value.trim() || "Plano de la casa";
     await guardarCroquisAdmin({
       titulo, cliente: cli ? cli.nombre : (m ? m[1] : textoCliente), numero_cliente: cli ? String(cli.numero_cliente || "") : (m ? m[2] : ""),
       direccion: cli ? [cli.direccion, cli.localidad].filter(Boolean).join(", ") : "",
-      dibujo: { v: 2, elementos: [], paginas: [{ nombre: "Página 1", elementos: [], fondo }], fondo },
+      dibujo: { v: 2, elementos: [], paginas: croquisPaginasDesdeFondos(fondos), fondo: fondos[0] },
     });
-    est.textContent = `Listo: "${titulo}" quedó cargado${img.paginas > 1 ? " (del PDF se usó la primera hoja)" : ""}. Los técnicos lo ven al hacer el plano de la instalación de este cliente.`;
+    est.textContent = `Listo: "${titulo}" quedó cargado${fondos.length > 1 ? ` con ${fondos.length} hojas (una página por hoja)` : ""}${img.paginas > fondos.length ? ` (el PDF tenía ${img.paginas}; se usaron las primeras ${fondos.length})` : ""}. Los técnicos lo ven al hacer el plano de la instalación de este cliente.`;
     ["croquisBaseArchivo", "croquisBaseTitulo", "croquisBaseAncho", "croquisBaseCliente"].forEach((id) => { document.getElementById(id).value = ""; });
     cargarCroquisAdmin();
   } catch (err) {

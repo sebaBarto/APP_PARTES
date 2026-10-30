@@ -2886,6 +2886,7 @@ test("Plano de la instalación: sobre el plano de la casa (copia), foto del plan
   const jpg = Buffer.from("/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=", "base64");
   const fondo = { id: "planocasa1", x: 0, y: 0, w: 800, h: 600, base: true };
   let cerradoServidor = false;
+  const guardadosCq = [];
   await page.route("**/api/**", (route) => {
     const req = route.request(), u = req.url();
     const json = (o, st) => route.fulfill({ status: st || 200, contentType: "application/json", body: JSON.stringify(o) });
@@ -2894,7 +2895,7 @@ test("Plano de la instalación: sobre el plano de la casa (copia), foto del plan
       posts.push({ u, ...b });
       if (u.includes("/api/foto")) return json({ id: "subida" + posts.length });
       if (u.includes("coleccion=croquis") && b.accion === "guardar" && cerradoServidor) return json({ error: "La instalación ya se cerró: este plano quedó como registro", cerrado: true }, 403);
-      if (u.includes("coleccion=croquis") && b.accion === "guardar") return json({ ok: true, id: "nuevo" + posts.length, actualizado: new Date().toISOString() });
+      if (u.includes("coleccion=croquis") && b.accion === "guardar") { const id = "nuevo" + posts.length; guardadosCq.push({ ...b, id }); return json({ ok: true, id, actualizado: new Date().toISOString() }); }
       return json({ ok: true });
     }
     if (u.includes("/api/foto")) return route.fulfill({ status: 200, contentType: "image/jpeg", body: jpg });
@@ -2903,7 +2904,9 @@ test("Plano de la instalación: sobre el plano de la casa (copia), foto del plan
     if (u.includes("recurso=presencia")) return json({ activa: null });
     if (u.includes("coleccion=croquis&id=casa00001")) return json({ id: "casa00001", titulo: "Planta baja", cliente: "Lara Silvano", numero_cliente: "55", autor: "Oficina", dibujo: { v: 2, elementos: [], paginas: [{ nombre: "Página 1", elementos: [], fondo }], fondo } });
     if (u.includes("coleccion=croquis&id=inst00001")) return json({ id: "inst00001", instalacion: "7", cerrado: true, titulo: "Plano de la instalación", cliente: "Lara Silvano", autor: "Juan Pérez", dibujo: { v: 2, elementos: [{ id: "s1", t: "simbolo", tipo: "central", x: 100, y: 100 }], paginas: [{ nombre: "Página 1", elementos: [{ id: "s1", t: "simbolo", tipo: "central", x: 100, y: 100 }], fondo }] } });
-    if (u.includes("coleccion=croquis")) return json([{ id: "casa00001", titulo: "Planta baja", cliente: "Lara Silvano", numero_cliente: "55", autor: "Oficina", base: true, elementos: 0 }]);
+    const mGuardado = /coleccion=croquis&id=(nuevo\d+)/.exec(u);
+    if (mGuardado) { const g = guardadosCq.find((x) => x.id === mGuardado[1]); return json({ ...g, autor: "Juan Pérez" }); }
+    if (u.includes("coleccion=croquis")) return json([{ id: "casa00001", titulo: "Planta baja", cliente: "Lara Silvano", numero_cliente: "55", autor: "Oficina", base: true, elementos: 0 }, ...guardadosCq.map(({ dibujo, ...x }) => ({ ...x, autor: "Juan Pérez", elementos: dibujo.paginas[0].elementos.length }))]);
     if (u.includes("/api/planos")) return json([]);
     return json([]);
   });
@@ -2948,9 +2951,17 @@ test("Plano de la instalación: sobre el plano de la casa (copia), foto del plan
   assert.strictEqual(g2.dibujo.paginas[0].fondo.base, true);
   assert.strictEqual(g2.dibujo.paginas[0].elementos.length, 0, "se guarda aunque no tenga nada dibujado");
 
-  // Al cerrar la instalación se avisa para dejar sus planos como registro
+  // Al cerrar la instalación: el PDF de cada plano va al mail, y los planos quedan como registro
+  await page.waitForFunction(() => document.querySelectorAll("#instPlanoLista .cq-item").length === 2);
   await page.click("#instalacionGuardarYCerrarBtn");
-  await page.waitForTimeout(600);
+  await page.waitForFunction(() => document.getElementById("instalacionGuardarYCerrarBtn").textContent.includes("Guardar y cerrar"), null, { timeout: 20000 });
+  await page.waitForTimeout(300);
+  const cierreInst = posts.find((p) => p.accion === "cerrar_instalacion" && p.u.includes("/api/historial"));
+  assert.ok(cierreInst, "se cerró");
+  assert.strictEqual(cierreInst.planos_pdf.length, 2, "un PDF por plano para el mail");
+  const pdfsSubidos = posts.filter((p) => p.u.includes("/api/foto") && p.tipo === "pdf");
+  assert.strictEqual(pdfsSubidos.length, 2);
+  assert.ok(Buffer.from(pdfsSubidos[0].base64, "base64").slice(0, 5).toString() === "%PDF-");
   const cierre = posts.find((p) => p.accion === "cerrar_instalacion" && p.u.includes("coleccion=croquis"));
   assert.ok(cierre, "manda cerrar los planos");
   assert.strictEqual(cierre.instalacion_id, "7");
@@ -3018,10 +3029,111 @@ test("Croquis sobre un plano en PDF (exportado de Visio): se convierte en imagen
   assert.strictEqual(posts[0].dibujo.paginas[0].fondo.base, true);
   // El PDF del croquis lleva el plano
   const paginas = await page.evaluate(async () => { const bytes = await croquisPdf(cqDatosExport()); const d = await PDFLib.PDFDocument.load(bytes); return d.getPageCount(); });
-  assert.strictEqual(paginas, 1);
+  assert.strictEqual(paginas, 2, "una hoja de PDF por cada hoja del plano");
+  assert.deepStrictEqual(await page.evaluate(() => cq.paginas.map((p) => p.nombre)), ["Hoja 1", "Hoja 2"]);
   // Un archivo de Visio sin exportar se explica
   const err = await page.evaluate(async () => { try { await croquisArchivoAImagen(new File(["x"], "casa.vsdx")); return ""; } catch (e) { return e.message; } });
   assert.match(err, /Exportar como PDF/);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Plano: PDF de varias hojas, foto sin señal que se sube sola, plano obligatorio para cerrar y verlo desde el servicio", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const posts = [];
+  let sinSenal = false, obligatorio = true;
+  const guardados = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    const json = (o, st) => route.fulfill({ status: st || 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (req.method() === "POST") {
+      if (sinSenal && (u.includes("/api/foto") || u.includes("coleccion=croquis"))) return route.abort("internetdisconnected");
+      const b = JSON.parse(req.postData() || "{}");
+      posts.push({ u, ...b });
+      if (u.includes("/api/foto")) return json({ id: "f" + posts.length });
+      if (u.includes("coleccion=croquis") && b.accion === "guardar") { const id = "g" + posts.length + "aaaaaa"; guardados.push({ ...b, id, cerrado: true, cerrado_en: new Date().toISOString(), autor: "Juan Pérez" }); return json({ ok: true, id }); }
+      return json({ ok: true });
+    }
+    if (u.includes("coleccion=config")) return json({ plano_instalacion_obligatorio: obligatorio });
+    if (u.includes("tipo=instalacion_abierta")) return json({ abierta: { id: 9, cliente: "Ladder 3", numero_cliente: "77", direccion: "Calle 1" } });
+    if (u.includes("tipo=instalacion&id=9")) return json({ id: 9, cliente: "Ladder 3", zonas: [], canales: [], fotos: [] });
+    if (u.includes("recurso=presencia")) return json({ activa: null });
+    const mId = /coleccion=croquis&id=([a-z0-9]+)/.exec(u);
+    if (mId) return json(guardados.find((g) => g.id === mId[1]));
+    if (u.includes("coleccion=croquis")) return json(guardados.filter((g) => u.includes("instalacion=9") ? String(g.instalacion) === "9" : true).map(({ dibujo, ...x }) => ({ ...x, elementos: 0 })));
+    return json([]);
+  });
+  await page.goto(base + "/");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { SERVICIOS_API_TOKEN = "x"; tecnicoLogueado = "Juan Pérez"; localStorage.removeItem("planos_instalacion_pendientes"); return cargarConfig(); });
+  assert.strictEqual(await page.evaluate(() => PLANO_INSTALACION_OBLIGATORIO), true);
+  await page.evaluate(() => { showScreen("instalacion"); return verificarInstalacionAbierta(); });
+  await page.waitForTimeout(400);
+  // Obligatorio y sin plano: no deja cerrar
+  await page.click("#instalacionGuardarYCerrarBtn");
+  await page.waitForTimeout(600);
+  assert.ok(!posts.some((p) => p.accion === "cerrar_instalacion"), "no cerró sin plano");
+  // PDF de 2 hojas sin señal: queda en el celular
+  const pdf = await page.evaluate(async () => {
+    const { PDFDocument, rgb } = await croquisCargarPdfLib();
+    const d = await PDFDocument.create();
+    for (let i = 0; i < 2; i++) d.addPage([600, 400]).drawRectangle({ x: 20, y: 20, width: 560, height: 360, borderColor: rgb(0, 0, 0), borderWidth: 3 });
+    return Array.from(await d.save());
+  });
+  sinSenal = true;
+  await page.setInputFiles("#instPlanoArchivoInput", { name: "plano.pdf", mimeType: "application/pdf", buffer: Buffer.from(pdf) });
+  await page.waitForFunction(() => planosPendientesLeer().length === 1, null, { timeout: 10000 });
+  assert.strictEqual(await page.evaluate(() => planosPendientesLeer()[0].imagenes.length), 2, "las dos hojas");
+  assert.match(await page.textContent("#instPlanoLista"), /Sin subir/);
+  // Vuelve la señal: se sube solo, con una página por hoja
+  sinSenal = false;
+  await page.evaluate(() => window.dispatchEvent(new Event("online")));
+  await page.waitForFunction(() => planosPendientesLeer().length === 0, null, { timeout: 10000 });
+  const g = posts.find((p) => p.accion === "guardar");
+  assert.deepStrictEqual(g.dibujo.paginas.map((p) => p.nombre), ["Hoja 1", "Hoja 2"]);
+  assert.strictEqual(g.instalacion, "9");
+  // Desde un servicio del mismo cliente: el botón del plano ofrece el de la instalación
+  await page.evaluate(() => { showScreen("form"); numeroClienteActivo = "77"; verPlanoClienteBtn.classList.remove("hidden"); });
+  await page.click("#verPlanoClienteBtn");
+  await page.waitForSelector(".cq-plano-opcion");
+  assert.match(await page.textContent(".cq-plano-opcion"), /Foto del plano.*Instalación cerrada/s);
+  assert.strictEqual(await page.locator('[data-visio]').count(), 1, "y sigue estando el de Visio");
+  await page.click(".cq-plano-opcion");
+  await page.waitForFunction(() => screens.croquis.dataset.active === "true");
+  assert.deepStrictEqual(await page.evaluate(() => [cq.soloLectura, cq.paginas.length, cq.volverA]), [true, 2, "form"]);
+  await page.click("#volverDeCroquisBtn");
+  await page.waitForFunction(() => screens.form.dataset.active === "true");
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Admin: el detalle de una instalación muestra su plano y la configuración guarda el plano obligatorio sin perder lo demás", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const posts = [];
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (req.method() === "POST") { posts.push({ u, ...JSON.parse(req.postData() || "{}") }); return json({ ok: true }); }
+    if (u.includes("coleccion=config")) return json({ dias_atencion: 3, dias_urgente: 7, app_version_actual: "4.17.0", felicitacion_semanal_activa: true });
+    if (u.includes("tipo=instalacion&id=7")) return json({ id: 7, cliente: "Lara", estado: "cerrada", zonas: [], canales: [], fotos: [], dias: [] });
+    if (u.includes("coleccion=croquis&instalacion=7")) return json([{ id: "inst00001", instalacion: "7", cerrado: true, titulo: "Plano de la instalación", autor: "Juan", elementos: 5 }]);
+    if (u.includes("coleccion=croquis&id=inst00001")) return json({ id: "inst00001", titulo: "Plano de la instalación", dibujo: { v: 2, elementos: [{ id: "a", t: "simbolo", tipo: "central", x: 0, y: 0 }], paginas: [{ nombre: "Página 1", elementos: [{ id: "a", t: "simbolo", tipo: "central", x: 0, y: 0 }] }] } });
+    json([]);
+  });
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { document.getElementById("mainCard").classList.remove("hidden"); document.getElementById("panelInstalaciones").classList.remove("hidden"); return mostrarDetalleInstalacionAdmin(7); });
+  await page.waitForFunction(() => /Plano de la instalación/.test(document.getElementById("instalacionPlanosAdmin").textContent));
+  const [descarga] = await Promise.all([page.waitForEvent("download"), page.click('#instalacionPlanosAdmin [data-pi="pdf"]')]);
+  assert.ok(descarga, "se descarga el PDF del plano");
+  await page.evaluate(() => cargarConfigAdmin());
+  await page.evaluate(() => { document.getElementById("planoObligatorioCheck").checked = true; document.getElementById("guardarConfigBtn").click(); });
+  await page.waitForTimeout(300);
+  const cfg = posts.find((p) => p.u.includes("coleccion=config"));
+  assert.strictEqual(cfg.plano_instalacion_obligatorio, true);
+  assert.strictEqual(cfg.plano_mail_cliente, false);
+  assert.strictEqual(cfg.app_version_actual, "4.17.0", "no se pierde lo que la pantalla no muestra");
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });

@@ -3673,3 +3673,7 @@ html[data-inicio="nuevo"] #screen-presupuesto .pe-ajuste-btn.activo { background
 #instPlanoLista .cq-item { margin-top: 10px; }
 #cqDesdePlanoBtn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 #cqDesdePlanoBtn .cq-ic { width: 18px; height: 18px; }
+.cq-menu .cq-plano-opcion { display: flex; align-items: center; gap: 10px; text-align: left; justify-content: flex-start; }
+.cq-menu .cq-plano-opcion .cq-ic { width: 20px; height: 20px; flex: none; }
+.cq-menu .cq-plano-opcion span { display: flex; flex-direction: column; min-width: 0; }
+.cq-menu .cq-plano-opcion small { font-size: 12px; font-weight: 500; opacity: .8; }

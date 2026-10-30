@@ -51,7 +51,14 @@ module.exports = async (req, res) => {
         return;
       }
       const data = await r.json();
-      const buffer = Buffer.from(data.content, "base64");
+      let buffer;
+      if (data.content && data.encoding === "base64") buffer = Buffer.from(data.content, "base64");
+      else {
+        // Más de 1 MB: GitHub no manda el contenido en el JSON, hay que pedirlo crudo.
+        const rRaw = await fetch(apiUrl, { headers: { ...ghHeaders, Accept: "application/vnd.github.raw" } });
+        if (!rRaw.ok) { res.status(404).send("No se encontró el archivo"); return; }
+        buffer = Buffer.from(await rRaw.arrayBuffer());
+      }
       res.setHeader("Content-Type", contentType);
       res.setHeader("Cache-Control", "private, max-age=3600");
       res.status(200).send(buffer);

@@ -377,7 +377,9 @@ async function manejarCroquis(req, res, autorizacion, body) {
   const instValida = (v) => /^\d{1,15}$/.test(String(v == null ? "" : v).trim());
   // El plano de una instalación lo puede hacer cualquier técnico que esté
   // en la instalación, aunque no tenga el permiso de croquis en general.
-  const deInstalacion = req.method === "GET" ? !!(req.query.id || instValida(req.query.instalacion)) : (instValida(b.instalacion) || instValida(b.instalacion_id) || b.accion === "borrar");
+  // Y cualquier técnico puede ver los planos de un cliente (para el servicio técnico).
+  const porCliente = req.method === "GET" && !!(String(req.query.numero_cliente || "").replace(/\D/g, "") || String(req.query.cliente || "").trim());
+  const deInstalacion = req.method === "GET" ? !!(req.query.id || instValida(req.query.instalacion) || porCliente) : (instValida(b.instalacion) || instValida(b.instalacion_id) || b.accion === "borrar");
   if (!puede && !deInstalacion) { res.status(403).json({ error: "No tenés habilitados los croquis" }); return; }
   const txt = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
   const idValido = (id) => /^[a-z0-9]{6,32}$/.test(String(id || ""));
@@ -394,8 +396,9 @@ async function manejarCroquis(req, res, autorizacion, body) {
       }
       const { data } = await leerArchivoDatos(RUTA_CROQUIS_INDICE, []);
       let lista = Array.isArray(data) ? data : [];
-      // Sin el permiso general: solo los de esa instalación y los del mismo cliente.
-      if (!puede) {
+      // Pedido de una instalación o un cliente puntual (o sin el permiso general):
+      // solo los de esa instalación y los del mismo cliente.
+      if (!puede || porCliente || instValida(req.query.instalacion)) {
         const inst = String(req.query.instalacion || "").trim();
         const num = String(req.query.numero_cliente || "").replace(/\D/g, "").replace(/^0+/, "");
         const norm = (v) => String(v || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();

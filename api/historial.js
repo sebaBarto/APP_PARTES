@@ -128,7 +128,38 @@ function mapearDesdeBackendNuevo(p) {
   };
 }
 
-async function mandarMailResumenInstalacion(instalacionId, backendUrl, headersBackendNuevo) {
+// PDFs del plano de la instalación (los arma la APP al cerrar y los sube
+// a documentos/<id>.pdf del repo de datos).
+async function leerPlanosPdf(planos) {
+  const { GITHUB_DATA_TOKEN, GITHUB_DATA_REPO } = process.env;
+  const out = [];
+  if (!GITHUB_DATA_TOKEN || !GITHUB_DATA_REPO || !Array.isArray(planos)) return out;
+  for (const p of planos.slice(0, 6)) {
+    const id = String((p && p.id) || "");
+    if (!/^[a-f0-9]{16}$/.test(id)) continue;
+    try {
+      const r = await fetch(`https://api.github.com/repos/${GITHUB_DATA_REPO}/contents/documentos/${id}.pdf`, { headers: { Authorization: `Bearer ${GITHUB_DATA_TOKEN}`, Accept: "application/vnd.github.raw" } });
+      if (!r.ok) continue;
+      const nombre = String((p && p.nombre) || "Plano").replace(/[^\wÁÉÍÓÚÑáéíóúñ .-]+/g, "_").slice(0, 60) || "Plano";
+      out.push({ filename: `${nombre}.pdf`, content: Buffer.from(await r.arrayBuffer()), contentType: "application/pdf" });
+    } catch (e) {
+      console.error("No se pudo adjuntar el plano " + id, e);
+    }
+  }
+  return out;
+}
+// ¿La oficina quiere que el cliente también reciba el plano? (config.json)
+async function planoAlClienteActivo() {
+  const { GITHUB_DATA_TOKEN, GITHUB_DATA_REPO } = process.env;
+  if (!GITHUB_DATA_TOKEN || !GITHUB_DATA_REPO) return false;
+  try {
+    const r = await fetch(`https://api.github.com/repos/${GITHUB_DATA_REPO}/contents/config.json`, { headers: { Authorization: `Bearer ${GITHUB_DATA_TOKEN}`, Accept: "application/vnd.github.raw" } });
+    if (!r.ok) return false;
+    return !!(await r.json()).plano_mail_cliente;
+  } catch (e) { return false; }
+}
+
+async function mandarMailResumenInstalacion(instalacionId, backendUrl, headersBackendNuevo, planos) {
   const r = await fetch(`${backendUrl}/api/instalaciones/${encodeURIComponent(instalacionId)}`, { headers: headersBackendNuevo });
   if (!r.ok) throw new Error("No se pudo leer el detalle de la instalación para el mail");
   const inst = await r.json();
@@ -162,6 +193,8 @@ async function mandarMailResumenInstalacion(instalacionId, backendUrl, headersBa
       console.error(`No se pudo adjuntar la foto ${nombre}:`, errFoto);
     }
   }
+  const adjuntosPlano = await leerPlanosPdf(planos);
+  adjuntos.unshift(...adjuntosPlano);
 
   const html = `
     <div style="font-family: Arial, Helvetica, sans-serif; color:#101820;">
@@ -177,6 +210,8 @@ async function mandarMailResumenInstalacion(instalacionId, backendUrl, headersBa
       <h3>Canales de cámaras</h3>
       <ul>${canalesHtml}</ul>
       ${inst.observaciones ? `<h3>Observaciones</h3><p style="background:#F4F5F0; border-radius:8px; padding:12px 14px;">${escapeHtmlMail(inst.observaciones)}</p>` : ""}
+      <h3>Plano de la instalación</h3>
+      <p>${adjuntosPlano.length ? `${adjuntosPlano.length === 1 ? "Va adjunto" : adjuntosPlano.length + " planos adjuntos"} en PDF (${adjuntosPlano.map((a) => escapeHtmlMail(a.filename)).join(", ")}).` : "Sin plano cargado."}</p>
       <h3>Fotos</h3>
       <p>${(inst.fotos || []).length > 0 ? `${inst.fotos.length} foto(s) adjunta(s) a este mail.` : "Sin fotos cargadas."}</p>
     </div>
@@ -198,6 +233,7 @@ async function mandarMailResumenInstalacion(instalacionId, backendUrl, headersBa
   // que es lo que importa de verdad.
   const emailValido = typeof inst.cliente_email === "string" && /^[^\s@<>\r\n]+@[^\s@<>\r\n]+\.[^\s@<>\r\n]+$/.test(inst.cliente_email.trim());
   if (emailValido) {
+    const planoCliente = adjuntosPlano.length > 0 && (await planoAlClienteActivo());
     try {
       const htmlCliente = `
         <div style="font-family: Arial, Helvetica, sans-serif; color:#101820;">
@@ -211,6 +247,7 @@ async function mandarMailResumenInstalacion(instalacionId, backendUrl, headersBa
           <ul>${zonasHtml}</ul>
           <h3>Canales de cámaras</h3>
           <ul>${canalesHtml}</ul>
+          ${planoCliente ? "<p>Te adjuntamos el plano de la instalación en PDF.</p>" : ""}
           <p style="color:#6B7680; margin-top:20px;">Cualquier consulta, contactanos a través de www.sat365.com.ar.</p>
         </div>
       `;
@@ -219,6 +256,7 @@ async function mandarMailResumenInstalacion(instalacionId, backendUrl, headersBa
         to: inst.cliente_email.trim(),
         subject: `Tu instalación quedó completa — ${inst.cliente}`,
         html: htmlCliente,
+        attachments: planoCliente ? adjuntosPlano : [],
       });
     } catch (errCliente) {
       console.error("No se pudo mandar la copia al cliente del resumen de instalación:", errCliente);
@@ -554,7 +592,7 @@ module.exports = require("../lib/auditoria").conAuditoria("historial", async (re
         // mail falla, no se le muestra error al técnico — el cierre
         // en sí ya fue exitoso, eso es lo importante para él.
         try {
-          await mandarMailResumenInstalacion(body.instalacion_id, BACKEND_NUEVO_URL, headersBackendNuevo);
+          await mandarMailResumenInstalacion(body.instalacion_id, BACKEND_NUEVO_URL, headersBackendNuevo, body.planos_pdf);
         } catch (errMail) {
           console.error("No se pudo mandar el mail de resumen de instalación:", errMail);
         }

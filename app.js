@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.16.0";
+const APP_VERSION = "4.17.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -1864,6 +1864,7 @@ function fechaLocalISO(d) {
 
 let DIAS_ATENCION = 3;
 let DIAS_URGENTE = 7;
+let PLANO_INSTALACION_OBLIGATORIO = false; // la oficina puede exigir el plano para cerrar una instalación
 
 async function cargarConfig() {
   try {
@@ -1874,7 +1875,8 @@ async function cargarConfig() {
     if (data.dias_atencion) DIAS_ATENCION = data.dias_atencion;
     if (data.dias_urgente) DIAS_URGENTE = data.dias_urgente;
     if (data.sims_stock_minimo) SIMS_STOCK_MINIMO = Number(data.sims_stock_minimo) || SIMS_STOCK_MINIMO;
-    localStorage.setItem("config_cache", JSON.stringify({ dias_atencion: DIAS_ATENCION, dias_urgente: DIAS_URGENTE }));
+    PLANO_INSTALACION_OBLIGATORIO = !!data.plano_instalacion_obligatorio;
+    localStorage.setItem("config_cache", JSON.stringify({ dias_atencion: DIAS_ATENCION, dias_urgente: DIAS_URGENTE, plano_instalacion_obligatorio: PLANO_INSTALACION_OBLIGATORIO }));
     if (data.app_version_actual) verificarVersionDisponible(data.app_version_actual);
   } catch (err) {
     const cacheado = localStorage.getItem("config_cache");
@@ -1883,6 +1885,7 @@ async function cargarConfig() {
         const c = JSON.parse(cacheado);
         if (c.dias_atencion) DIAS_ATENCION = c.dias_atencion;
         if (c.dias_urgente) DIAS_URGENTE = c.dias_urgente;
+        PLANO_INSTALACION_OBLIGATORIO = !!c.plano_instalacion_obligatorio;
       } catch (e) { /* usa el respaldo de arranque */ }
     }
   }
@@ -2117,22 +2120,66 @@ function actualizarCobradorInfo(cobrador) {
   cobradorInfo.textContent = "Cobrador: " + (nombre || "Sin cobrador asignado");
 }
 
+// Plano del cliente: el de Visio (PDF) y los planos de las instalaciones
+// hechas con la APP (dónde quedó cada equipo y por dónde va el cableado).
+async function abrirPlanoVisioCliente(numero) {
+  // Las carpetas de planos usan el número de cliente con 8 dígitos
+  // y ceros a la izquierda (CLI_00001374) — el número que trae el
+  // servicio pendiente puede venir sin ese relleno (ej: "1374"), así
+  // que hay que armarlo igual antes de buscar, si no nunca matchea.
+  const numeroConCeros = numero.trim().replace(/\.0+$/, "").replace(/\D/g, "").padStart(8, "0");
+  const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+  const res = await fetch(`/api/planos?nombre=${encodeURIComponent("CLI_" + numeroConCeros)}`, { headers });
+  if (!res.ok) throw new Error(res.status === 404 ? "Todavía no hay un plano subido para este cliente" : "No se pudo abrir el plano");
+  const blob = await res.blob();
+  window.open(URL.createObjectURL(blob), "_blank");
+}
+async function croquisDelCliente(numero) {
+  const num = String(numero || "").replace(/\D/g, "").replace(/^0+/, "");
+  if (!num) return [];
+  try {
+    const r = await fetch(`/api/datos?coleccion=croquis&numero_cliente=${encodeURIComponent(num)}`, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+    const d = await r.json();
+    if (!r.ok || !Array.isArray(d)) return [];
+    // Primero los de instalaciones cerradas (lo que quedó instalado), lo más nuevo arriba.
+    const t = (c) => fechaDelServidor(c.cerrado_en || c.actualizado) ? fechaDelServidor(c.cerrado_en || c.actualizado).getTime() : 0;
+    return d.sort((a, b) => (!!b.cerrado - !!a.cerrado) || (t(b) - t(a)));
+  } catch (e) { return []; }
+}
+async function abrirCroquisSoloVer(id, volverA) {
+  const r = await fetch(`/api/datos?coleccion=croquis&id=${encodeURIComponent(id)}`, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error || "HTTP " + r.status);
+  const dib = d.dibujo || {};
+  cqAbrirEditor({ id: d.id, instalacion: d.instalacion || "", soloLectura: true, soloVer: !d.cerrado, volverA, titulo: d.titulo, cliente: d.cliente, numero_cliente: d.numero_cliente, direccion: d.direccion, autor: d.autor, actualizado: d.actualizado, elementos: dib.elementos || [], fondo: dib.fondo || null, paginas: dib.paginas || null, medidas: !!dib.medidas });
+}
 verPlanoClienteBtn.addEventListener("click", async () => {
   if (!numeroClienteActivo) return;
   const iconoOriginal = verPlanoClienteBtn.innerHTML;
   verPlanoClienteBtn.disabled = true;
   try {
-    // Las carpetas de planos usan el número de cliente con 8 dígitos
-    // y ceros a la izquierda (CLI_00001374) — el número que trae el
-    // servicio pendiente puede venir sin ese relleno (ej: "1374"), así
-    // que hay que armarlo igual antes de buscar, si no nunca matchea.
-    const numeroConCeros = numeroClienteActivo.trim().replace(/\.0+$/, "").replace(/\D/g, "").padStart(8, "0");
-    const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
-    const res = await fetch(`/api/planos?nombre=${encodeURIComponent("CLI_" + numeroConCeros)}`, { headers });
-    if (!res.ok) throw new Error(res.status === 404 ? "Todavía no hay un plano subido para este cliente" : "No se pudo abrir el plano");
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    window.open(url, "_blank");
+    const croquis = await croquisDelCliente(numeroClienteActivo);
+    if (!croquis.length) { await abrirPlanoVisioCliente(numeroClienteActivo); return; }
+    const capa = document.createElement("div");
+    capa.className = "cq-datos-capa";
+    const fecha = (c) => { const f = fechaDelServidor(c.cerrado_en || c.actualizado); return f ? f.toLocaleDateString("es-AR") : ""; };
+    capa.innerHTML = `<div class="cq-datos cq-menu">
+      <h3>Planos del cliente</h3>
+      ${croquis.slice(0, 8).map((c, i) => `<button type="button" class="btn ${i === 0 ? "btn-primary" : "btn-secondary"} cq-plano-opcion" data-cq="${i}">${cqIc(c.cerrado ? "candado" : "plano")}<span><b>${escapeHtml(c.titulo || "Croquis")}</b><small>${c.cerrado ? "Instalación cerrada" : c.instalacion ? "Instalación en curso" : "Croquis"}${fecha(c) ? " · " + fecha(c) : ""}${c.autor ? " · " + escapeHtml(c.autor) : ""}</small></span></button>`).join("")}
+      <button type="button" class="btn btn-secondary" data-visio="1">${cqIc("plano")} Plano de Visio (PDF)</button>
+      <button type="button" class="link-btn" data-cerrar="1">Cerrar</button>
+    </div>`;
+    document.body.appendChild(capa);
+    capa.addEventListener("click", async (e) => {
+      const b = e.target.closest("button");
+      if (!b && e.target !== capa) return;
+      capa.remove();
+      if (!b || b.dataset.cerrar) return;
+      try {
+        if (b.dataset.visio) await abrirPlanoVisioCliente(numeroClienteActivo);
+        else await abrirCroquisSoloVer(croquis[Number(b.dataset.cq)].id, "form");
+      } catch (err) { showToast(err.message); }
+    });
   } catch (err) {
     showToast(err.message);
   } finally {
@@ -10310,7 +10357,35 @@ instalacionGuardarYCerrarBtn.addEventListener("click", async () => {
     if (!(await guardarItemsInstalacion("zona")) || !(await guardarItemsInstalacion("canal"))) {
       throw new Error("no se pudieron guardar las zonas o los canales (¿sin señal?)");
     }
-    const res = await fetch("/api/historial", { method: "POST", headers, body: JSON.stringify({ accion: "cerrar_instalacion", instalacion_id: instalacionActivaId, observaciones: instObservacionesInput.value.trim() }) });
+    // ---- El plano: después de cerrar ya no se puede agregar ni cambiar.
+    const idInst = String(instalacionActivaId);
+    const irAlPlano = () => document.getElementById("instPlanoCard").scrollIntoView({ behavior: "smooth", block: "start" });
+    if (planosPendientesDe(idInst).length) await planosPendientesSubir();
+    await instPlanoCargar();
+    if (planosPendientesDe(idInst).length) {
+      if (!confirm("Hay un plano de esta instalación que todavía no se subió (sin señal). Si cerrás ahora, ese plano se pierde.\n\n¿Cerrar igual?")) { irAlPlano(); return; }
+      planosPendientesDe(idInst).forEach((p) => planosPendientesQuitar(p.uid));
+    }
+    let borradorInst = null;
+    try { borradorInst = JSON.parse(localStorage.getItem(CQ_BORRADOR) || "null"); } catch (e) { borradorInst = null; }
+    if (borradorInst && borradorInst.cambios && String(borradorInst.instalacion || "") === idInst) {
+      if (!confirm("El croquis de esta instalación tiene cambios sin guardar en el servidor. Si cerrás ahora, esos cambios se pierden.\n\n¿Cerrar igual? (Cancelar para abrirlo y guardarlo)")) {
+        cqAbrirEditor({ ...borradorInst, volverA: "instalacion" });
+        return;
+      }
+    }
+    const planos = instPlanoDeEsta();
+    if (!planos.length) {
+      if (PLANO_INSTALACION_OBLIGATORIO) { showToast("Para cerrar la instalación falta el plano: hacé el croquis o subí una foto del plano."); irAlPlano(); return; }
+      if (!confirm("No cargaste el plano de la instalación (croquis o foto).\n\n¿Cerrar igual sin plano?")) { irAlPlano(); return; }
+    }
+    let planosPdf = [];
+    if (planos.length) {
+      instalacionGuardarYCerrarBtn.textContent = "Preparando el plano...";
+      planosPdf = await instPlanosPdf(planos);
+      instalacionGuardarYCerrarBtn.textContent = "Guardando...";
+    }
+    const res = await fetch("/api/historial", { method: "POST", headers, body: JSON.stringify({ accion: "cerrar_instalacion", instalacion_id: instalacionActivaId, observaciones: instObservacionesInput.value.trim(), planos_pdf: planosPdf }) });
     const data = await res.json();
     if (!res.ok || !data.ok) {
       // Si el motivo es que falta marcar una salida, se manda de
@@ -10359,20 +10434,40 @@ async function instPlanoCargar() {
     if (String(instalacionActivaId) !== id) return;
     instPlanoIndice = Array.isArray(d) ? d : [];
     instPlanoRender();
+    if (planosPendientesDe(id).length && navigator.onLine !== false) planosPendientesSubir();
+    return true;
   } catch (err) {
+    instPlanoRender();
     instPlanoEstado.textContent = "No se pudieron cargar los planos: " + err.message;
+    return false;
   }
 }
 function instPlanoDeEsta() { return instPlanoIndice.filter((c) => String(c.instalacion || "") === String(instalacionActivaId)); }
 function instPlanoRender() {
   const mios = instPlanoDeEsta();
-  instPlanoEstado.textContent = mios.length ? "" : "Todavía no hay plano de esta instalación.";
-  instPlanoLista.innerHTML = mios.map((c, i) => `<div class="historial-card cq-item">
+  const pend = instalacionActivaId ? planosPendientesDe(instalacionActivaId) : [];
+  instPlanoEstado.textContent = mios.length || pend.length ? "" : "Todavía no hay plano de esta instalación.";
+  instPlanoLista.innerHTML = pend.map((p) => `<div class="historial-card cq-item cq-borrador">
+      <div class="historial-card-cliente">${escapeHtml(p.titulo || "Foto del plano")} <span class="cq-etiqueta cq-etiqueta-cerrado">Sin subir</span></div>
+      <div class="historial-card-horario">Quedó en el celular por falta de señal: se sube sola cuando vuelva.</div>
+      <div class="cq-item-btns"><button type="button" class="btn btn-primary btn-small" data-reintentar="${escapeHtml(p.uid)}">Subir ahora</button><button type="button" class="btn btn-secondary btn-small cq-borrar" data-descartar="${escapeHtml(p.uid)}">Descartar</button></div>
+    </div>`).join("") + mios.map((c, i) => `<div class="historial-card cq-item">
       <div class="historial-card-cliente">${escapeHtml(c.titulo || "Croquis")}${c.base ? ' <span class="cq-etiqueta cq-etiqueta-base">Sobre plano</span>' : ""}</div>
       <div class="historial-card-horario">${escapeHtml(c.autor || "")}${c.elementos ? " · " + c.elementos + " elementos" : ""}</div>
       <div class="cq-item-btns"><button type="button" class="btn btn-primary btn-small" data-abrir="${i}">Abrir</button>${!tecnicoLogueado || c.autor === tecnicoLogueado ? `<button type="button" class="btn btn-secondary btn-small cq-borrar" data-borrar="${i}">Borrar</button>` : ""}</div>
     </div>`).join("");
   instPlanoLista.querySelectorAll("[data-abrir]").forEach((b) => b.addEventListener("click", () => instPlanoAbrir(mios[Number(b.dataset.abrir)].id)));
+  instPlanoLista.querySelectorAll("[data-reintentar]").forEach((b) => b.addEventListener("click", async () => {
+    b.disabled = true; b.textContent = "Subiendo...";
+    const n = await planosPendientesSubir();
+    if (!n) showToast("Todavía no se pudo subir: revisá la señal.");
+    instPlanoRender();
+  }));
+  instPlanoLista.querySelectorAll("[data-descartar]").forEach((b) => b.addEventListener("click", () => {
+    if (!confirm("¿Descartar este plano? No se sube y se borra del celular.")) return;
+    planosPendientesQuitar(b.dataset.descartar);
+    instPlanoRender();
+  }));
   instPlanoLista.querySelectorAll("[data-borrar]").forEach((b) => b.addEventListener("click", async () => {
     const c = mios[Number(b.dataset.borrar)];
     if (!confirm(`¿Borrar "${c.titulo || "el plano"}" de esta instalación?`)) return;
@@ -10457,38 +10552,99 @@ document.getElementById("instPlanoCroquisBtn").addEventListener("click", async (
         const r = await fetch(`/api/planos?nombre=${encodeURIComponent(p.nombre)}`, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN } });
         if (!r.ok) throw new Error("No se pudo traer el plano");
         const blob = await r.blob();
-        const fondo = await cqPrepararPlanoBase(new File([blob], p.nombre + ".pdf", { type: "application/pdf" }));
+        const fondos = await cqPrepararPlanosBase(new File([blob], p.nombre + ".pdf", { type: "application/pdf" }));
         carga.remove();
-        instPlanoNuevo([{ nombre: "Página 1", elementos: [], fondo }], "Plano de la instalación");
+        instPlanoNuevo(croquisPaginasDesdeFondos(fondos), "Plano de la instalación");
         showToast("Plano del cliente de base: dibujá encima lo que instalaste.");
       } catch (err) { carga.remove(); showToast("No se pudo usar el plano: " + err.message); }
     }
   });
 });
 document.getElementById("instPlanoFotoBtn").addEventListener("click", () => { if (instalacionActivaId) document.getElementById("instPlanoArchivoInput").click(); });
+// Sin señal, la foto del plano queda guardada en el celular y se sube sola
+// cuando vuelve la señal (antes de cerrar la instalación se reintenta).
+const PLANOS_PENDIENTES = "planos_instalacion_pendientes";
+function planosPendientesLeer() { try { const l = JSON.parse(localStorage.getItem(PLANOS_PENDIENTES) || "[]"); return Array.isArray(l) ? l : []; } catch (e) { return []; } }
+function planosPendientesGuardar(lista) { localStorage.setItem(PLANOS_PENDIENTES, JSON.stringify(lista)); }
+function planosPendientesDe(inst) { return planosPendientesLeer().filter((p) => String(p.instalacion) === String(inst)); }
+function planosPendientesQuitar(uid) { try { planosPendientesGuardar(planosPendientesLeer().filter((p) => p.uid !== uid)); } catch (e) { /* nada */ } }
+// Sube un plano (imágenes ya achicadas) como croquis de la instalación.
+async function instPlanoSubirImagenes(p) {
+  const fondos = await croquisSubirPlanosBase(p.imagenes, SERVICIOS_API_TOKEN);
+  const paginas = croquisPaginasDesdeFondos(fondos);
+  if (paginas.length === 1) paginas[0].nombre = "Foto del plano";
+  const r = await fetch("/api/datos?coleccion=croquis", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+    body: JSON.stringify({ accion: "guardar", instalacion: String(p.instalacion), titulo: p.titulo || "Foto del plano", cliente: p.cliente || "", numero_cliente: p.numero_cliente || "", direccion: p.direccion || "", dibujo: { v: 2, elementos: [], paginas, fondo: fondos[0] } }),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (r.status === 403 && d.cerrado) { const e = new Error(d.error); e.definitivo = true; throw e; }
+  if (!r.ok || !d.ok) throw new Error(d.error || "HTTP " + r.status);
+  return d;
+}
+let planosPendientesSubiendo = null;
+function planosPendientesSubir() {
+  if (planosPendientesSubiendo) return planosPendientesSubiendo;
+  planosPendientesSubiendo = (async () => {
+    let subidos = 0;
+    for (const p of planosPendientesLeer()) {
+      try { await instPlanoSubirImagenes(p); planosPendientesQuitar(p.uid); subidos++; }
+      catch (err) { if (err.definitivo) { planosPendientesQuitar(p.uid); showToast("Un plano guardado sin señal no se pudo subir: " + err.message); } }
+    }
+    if (subidos) { showToast(subidos === 1 ? "Se subió el plano que había quedado sin señal." : `Se subieron ${subidos} planos que habían quedado sin señal.`); if (instalacionActivaId) instPlanoCargar(); }
+    return subidos;
+  })().finally(() => { planosPendientesSubiendo = null; });
+  return planosPendientesSubiendo;
+}
+window.addEventListener("online", () => { if (planosPendientesLeer().length) planosPendientesSubir(); });
+setTimeout(() => { try { if (planosPendientesLeer().length && navigator.onLine !== false && SERVICIOS_API_TOKEN) planosPendientesSubir(); } catch (e) { /* nada */ } }, 4000);
+function esErrorDeRed(err) { return navigator.onLine === false || (err && (err.name === "TypeError" || /Failed to fetch|NetworkError|Load failed|network/i.test(err.message || ""))); }
 document.getElementById("instPlanoArchivoInput").addEventListener("change", async (e) => {
   const archivo = e.target.files && e.target.files[0];
   e.target.value = "";
   if (!archivo || !instalacionActivaId) return;
-  const id = String(instalacionActivaId), dat = instalacionActivaDatos || {};
-  instPlanoEstado.textContent = "Subiendo el plano...";
+  const dat = instalacionActivaDatos || {};
+  instPlanoEstado.textContent = "Preparando el plano...";
+  let pendiente = null;
   try {
-    const img = await croquisArchivoAImagen(archivo, 2000);
-    const fondo = await croquisSubirPlanoBase(img, SERVICIOS_API_TOKEN);
-    const r = await fetch("/api/datos?coleccion=croquis", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-      body: JSON.stringify({ accion: "guardar", instalacion: id, titulo: "Foto del plano", cliente: dat.cliente || instalacionClienteInput.value.trim(), numero_cliente: dat.numero_cliente || "", direccion: dat.direccion || "", dibujo: { v: 2, elementos: [], paginas: [{ nombre: "Foto del plano", elementos: [], fondo }], fondo } }),
-    });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok || !d.ok) throw new Error(d.error || "HTTP " + r.status);
+    const imagenes = (await croquisArchivoAImagenes(archivo, 2000, CROQUIS_MAX_HOJAS)).map(({ base64, w, h }) => ({ base64, w, h }));
+    pendiente = { uid: cqId(), instalacion: String(instalacionActivaId), titulo: "Foto del plano", cliente: dat.cliente || instalacionClienteInput.value.trim(), numero_cliente: dat.numero_cliente || "", direccion: dat.direccion || "", imagenes, creado: new Date().toISOString() };
+    instPlanoEstado.textContent = "Subiendo el plano...";
+    await instPlanoSubirImagenes(pendiente);
     instPlanoEstado.textContent = "";
-    showToast("Plano guardado en la instalación. Si querés, abrilo para marcar encima lo instalado.");
+    showToast(imagenes.length > 1 ? `Plano guardado en la instalación (${imagenes.length} hojas).` : "Plano guardado en la instalación. Si querés, abrilo para marcar encima lo instalado.");
     instPlanoCargar();
   } catch (err) {
+    if (pendiente && esErrorDeRed(err)) {
+      try {
+        planosPendientesGuardar([...planosPendientesLeer(), pendiente]);
+        instPlanoEstado.textContent = "";
+        showToast("Sin señal: el plano quedó guardado en el celular y se sube solo cuando vuelva la señal.");
+        instPlanoRender();
+      } catch (e2) { instPlanoEstado.textContent = "Sin señal y no hay lugar en el celular para guardarlo. Probá de nuevo con señal."; }
+      return;
+    }
     instPlanoEstado.textContent = "No se pudo subir: " + err.message;
   }
 });
+
+// PDF de cada plano de la instalación, para adjuntarlo al mail de cierre.
+function bytesABase64(bytes) { let bin = ""; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(bin); }
+async function instPlanosPdf(planos) {
+  const out = [];
+  for (const c of planos.slice(0, 6)) {
+    try {
+      const d = await instPlanoTraer(c.id);
+      let bytes = await croquisPdf(d, { ancho: 1800 });
+      if (bytes.length > 3200000) bytes = await croquisPdf(d, { ancho: 1200 });
+      const r = await fetch("/api/foto", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ base64: bytesABase64(bytes), tipo: "pdf" }) });
+      const res = await r.json().catch(() => ({}));
+      if (r.ok && res.id) out.push({ id: res.id, nombre: (c.titulo || "Plano") + (planos.length > 1 ? " " + (out.length + 1) : "") });
+    } catch (err) { console.error("[plano] no se pudo armar el PDF", err); }
+  }
+  return out;
+}
 
 // ---------- Credencial digital del técnico ----------
 const webauthnEstadoTexto = document.getElementById("webauthnEstadoTexto");
@@ -14463,10 +14619,10 @@ function renderResultadosPlanos() {
       try {
         const r = await fetch(`/api/planos?nombre=${encodeURIComponent(btn.dataset.croquis)}`, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN } });
         if (!r.ok) throw new Error("No se pudo traer el plano");
-        const fondo = await cqPrepararPlanoBase(new File([await r.blob()], btn.dataset.croquis + ".pdf", { type: "application/pdf" }));
+        const fondos = await cqPrepararPlanosBase(new File([await r.blob()], btn.dataset.croquis + ".pdf", { type: "application/pdf" }));
         carga.remove();
         const cli = (clientesGeneralCache || []).find((c) => primero.numero_cliente && normalizarNumeroCliente(c.numero_cliente) === normalizarNumeroCliente(primero.numero_cliente));
-        cqAbrirEditor({ titulo: "Plano", cliente: primero.nombre_cliente || "", numero_cliente: primero.numero_cliente ? normalizarNumeroCliente(primero.numero_cliente) : "", direccion: cli ? [cli.direccion, cli.localidad].filter(Boolean).join(", ") : "", paginas: [{ nombre: "Página 1", elementos: [], fondo }], cambios: true });
+        cqAbrirEditor({ titulo: "Plano", cliente: primero.nombre_cliente || "", numero_cliente: primero.numero_cliente ? normalizarNumeroCliente(primero.numero_cliente) : "", direccion: cli ? [cli.direccion, cli.localidad].filter(Boolean).join(", ") : "", paginas: croquisPaginasDesdeFondos(fondos), cambios: true });
         cqGuardarBorrador();
         showToast("Plano de base listo: dibujá encima y guardalo.");
       } catch (err) { carga.remove(); showToast("No se pudo usar el plano: " + err.message); }
@@ -16537,6 +16693,7 @@ cqEl("volverDeCroquisBtn").addEventListener("click", async () => {
     if (confirm("Tenés cambios sin guardar en el servidor. ¿Guardarlos antes de salir?")) { const ok = await cqGuardar(); if (!ok) return; }
   }
   if (cq.volverA === "instalacion") { showScreen("instalacion"); instPlanoCargar(); return; }
+  if (cq.volverA && screens[cq.volverA]) { showScreen(cq.volverA); return; }
   cqAbrirLista();
 });
 // ---------- Solo lectura (plano de una instalación ya cerrada) ----------
@@ -16544,7 +16701,7 @@ function cqModoLectura(si) {
   cq.soloLectura = !!si;
   if (si) { cq.sel = null; cq.multi = []; cq.modoMulti = false; cq.cadena = null; cq.herr = "mover"; cqEl("cqSimbolos").classList.add("hidden"); }
   screens.croquis.classList.toggle("cq-solo-lectura", !!si);
-  cqEl("cqAyuda").textContent = si ? "Instalación cerrada: el plano quedó como registro. Se puede mirar y descargar, no modificar." : (CQ_AYUDAS[cq.herr] || "");
+  cqEl("cqAyuda").textContent = si ? (cq.soloVer ? "Solo para mirar: con dos dedos movés y hacés zoom. Desde el menú lo descargás." : "Instalación cerrada: el plano quedó como registro. Se puede mirar y descargar, no modificar.") : (CQ_AYUDAS[cq.herr] || "");
   cqRender();
 }
 function cqMenuLectura() {
@@ -16553,7 +16710,7 @@ function cqMenuLectura() {
   const puedeCopiar = permisosDelTecnico(tecnicoLogueado).croquis;
   capa.innerHTML = `<div class="cq-datos cq-menu">
     <h3>${escapeHtml(cq.titulo || cq.cliente || "Croquis")}</h3>
-    <p class="pe-nota">${cqIc("candado")} La instalación ya se cerró: este plano quedó como registro y no se puede modificar.</p>
+    <p class="pe-nota">${cq.soloVer ? "Abierto solo para mirar." : `${cqIc("candado")} La instalación ya se cerró: este plano quedó como registro y no se puede modificar.`}</p>
     <button type="button" class="btn btn-primary" data-m="pdf">Compartir / descargar PDF</button>
     <button type="button" class="btn btn-secondary" data-m="png">Imagen (PNG)</button>
     <button type="button" class="btn btn-secondary" data-m="svg">Archivo editable (SVG, se abre en Visio)</button>
@@ -16593,23 +16750,28 @@ function cqCapaCargando(texto, nota) {
   document.body.appendChild(capa);
   return capa;
 }
-// Archivo o PDF -> imagen subida -> fondo del plano base.
-async function cqPrepararPlanoBase(archivo) {
-  const img = await croquisArchivoAImagen(archivo, 2400);
-  const fondo = await croquisSubirPlanoBase(img, SERVICIOS_API_TOKEN);
-  if (img.paginas > 1) showToast(`El PDF tiene ${img.paginas} hojas: se usó la primera.`);
-  return fondo;
+// Archivo o PDF -> imágenes subidas -> un fondo de plano base por hoja.
+async function cqPrepararPlanosBase(archivo) {
+  const imgs = await croquisArchivoAImagenes(archivo, 2400, CROQUIS_MAX_HOJAS);
+  const fondos = await croquisSubirPlanosBase(imgs, SERVICIOS_API_TOKEN);
+  const total = imgs[0] && imgs[0].paginas;
+  if (total > CROQUIS_MAX_HOJAS) showToast(`El PDF tiene ${total} hojas: se usaron las primeras ${CROQUIS_MAX_HOJAS}.`);
+  else if (fondos.length > 1) showToast(`El PDF tiene ${fondos.length} hojas: quedó una página por hoja.`);
+  return fondos;
 }
 async function cqPonerPlanoBase(archivo) {
   const capa = cqCapaCargando("Preparando el plano…", "Se convierte en imagen y se sube. Tarda unos segundos.");
   try {
-    const fondo = await cqPrepararPlanoBase(archivo);
+    const fondos = await cqPrepararPlanosBase(archivo);
     capa.remove();
     cqMemoria();
-    // Si la página ya tenía un plano, lo dibujado se acomoda al nuevo tamaño.
-    cq.fondo = fondo;
+    const actual = cq.pagina;
+    cq.fondo = fondos[0];
     cq.verFondo = true;
     cq.cambios = true;
+    // Las otras hojas del PDF (planta alta, etc.) van en páginas nuevas.
+    fondos.slice(1).forEach((f, i) => { cqNuevaPagina(`Hoja ${i + 2}`); cq.fondo = f; });
+    if (fondos.length > 1) cqIrPagina(actual);
     cqGuardarBorrador();
     cqVerTodo();
     showToast("Plano puesto de base. Ya podés dibujar encima los equipos y el cableado.");
@@ -16636,7 +16798,7 @@ function cqEscalaPlano() {
 
 // ---------- Lista ----------
 function cqAbrirEditor(datos) {
-  Object.assign(cq, { id: "", instalacion: "", soloLectura: false, volverA: "", titulo: "", cliente: "", numero_cliente: "", direccion: "", autor: "", actualizado: "", elementos: [], fondo: null, paginas: null, pagina: 0, medidas: false, plantilla: null, verFondo: true, sel: null, multi: [], modoMulti: false, cadena: null, pasado: [], futuro: [], cambios: false }, datos || {});
+  Object.assign(cq, { id: "", instalacion: "", soloLectura: false, soloVer: false, volverA: "", titulo: "", cliente: "", numero_cliente: "", direccion: "", autor: "", actualizado: "", elementos: [], fondo: null, paginas: null, pagina: 0, medidas: false, plantilla: null, verFondo: true, sel: null, multi: [], modoMulti: false, cadena: null, pasado: [], futuro: [], cambios: false }, datos || {});
   // Páginas: los croquis viejos tienen una sola.
   if (!Array.isArray(cq.paginas) || !cq.paginas.length) cq.paginas = [{ nombre: "Página 1", elementos: cq.elementos || [], fondo: cq.fondo || null }];
   cq.paginas = cq.paginas.map((p, i) => ({ nombre: p.nombre || `Página ${i + 1}`, elementos: Array.isArray(p.elementos) ? p.elementos : [], fondo: p.fondo || null }));
@@ -16729,9 +16891,9 @@ cqEl("cqDesdePlanoBtn").addEventListener("click", async () => {
   if (borrador && borrador.cambios && borrador.elementos && borrador.elementos.length && !confirm("Hay un croquis sin guardar en este celular. ¿Empezar uno nuevo igual? (el anterior se pierde)")) return;
   const capa = cqCapaCargando("Preparando el plano…", "Se convierte en imagen y se sube. Tarda unos segundos.");
   try {
-    const fondo = await cqPrepararPlanoBase(archivo);
+    const fondos = await cqPrepararPlanosBase(archivo);
     capa.remove();
-    cqAbrirEditor({ titulo: String(archivo.name || "").replace(/\.[a-z0-9]+$/i, "").slice(0, 120), paginas: [{ nombre: "Página 1", elementos: [], fondo }], cambios: true });
+    cqAbrirEditor({ titulo: String(archivo.name || "").replace(/\.[a-z0-9]+$/i, "").slice(0, 120), paginas: croquisPaginasDesdeFondos(fondos), cambios: true });
     cqGuardarBorrador();
     showToast("Plano listo de base: elegí el cliente y dibujá encima.");
     cqPedirDatos();
