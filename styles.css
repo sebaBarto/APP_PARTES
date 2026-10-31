@@ -3677,3 +3677,18 @@ html[data-inicio="nuevo"] #screen-presupuesto .pe-ajuste-btn.activo { background
 .cq-menu .cq-plano-opcion .cq-ic { width: 20px; height: 20px; flex: none; }
 .cq-menu .cq-plano-opcion span { display: flex; flex-direction: column; min-width: 0; }
 .cq-menu .cq-plano-opcion small { font-size: 12px; font-weight: 500; opacity: .8; }
+
+/* Datos del equipo: fotos y cambios */
+.equipo-fotos-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.equipo-fotos-btns .btn { display: inline-flex; align-items: center; gap: 6px; width: auto; }
+.equipo-fotos-btns .cq-ic { width: 18px; height: 18px; }
+.equipo-fotos { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; margin-top: 8px; }
+.equipo-fotos img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 10px; background: #E6E4DE; cursor: zoom-in; display: block; }
+.equipo-foto-item { position: relative; }
+.equipo-foto-item button { position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; border-radius: 50%; border: 0; background: rgba(0,0,0,.65); color: #fff; font-size: 13px; line-height: 26px; padding: 0; cursor: pointer; }
+.equipo-foto-subiendo { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; aspect-ratio: 1; border-radius: 10px; background: rgba(128,128,128,.12); font-size: 12px; }
+.equipo-foto-subiendo .cq-spinner { width: 24px; height: 24px; }
+.equipo-contenido a { color: #2E86DE; word-break: break-all; }
+.equipo-cambios { max-height: 80vh; overflow-y: auto; text-align: left; }
+.equipo-cambio { border-top: 1px solid rgba(128,128,128,.25); padding: 8px 0; }
+.equipo-cambio summary { cursor: pointer; font-weight: 600; margin: 4px 0; }

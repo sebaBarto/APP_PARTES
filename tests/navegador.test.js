@@ -3414,3 +3414,58 @@ test("Conciliación de SIMs: elige sola la columna del número, separa cada caso
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Datos del equipo: fotos desde la galería o la cámara, links tocables y ver/volver a una versión anterior", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  let datos = [{ id: "d1", titulo: "Reset Ajax", contenido: "Manual: https://ajax.systems/es/support y mantener 10 s.", categoria: "Configuraciones", autor: "Luis", fecha: "2026-10-20T15:00:00Z", ediciones: [{ autor: "Juan Pérez", fecha: "2026-10-25T15:00:00Z", antes: { titulo: "Reset Ajax", contenido: "Mantener 30 s el botón.", categoria: "Configuraciones", fotos: [] } }], fotos: [] }];
+  const posts = [];
+  let nFoto = 0;
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("/api/foto") && req.method() === "POST") { posts.push({ u, ...JSON.parse(req.postData()) }); return json({ ok: true, id: String(++nFoto).padStart(16, "a") }); }
+    if (u.includes("/api/foto")) return route.fulfill({ status: 200, contentType: "image/png", body: Buffer.from("89504e470d0a1a0a", "hex") });
+    if (u.includes("coleccion=datos_equipo") && req.method() === "POST") {
+      const b = JSON.parse(req.postData());
+      posts.push({ u, ...b });
+      if (b.accion === "crear") datos = [{ id: "d2", titulo: b.titulo, contenido: b.contenido, categoria: b.categoria, fotos: b.fotos, autor: "Juan Pérez", fecha: "2026-10-31T15:00:00Z", ediciones: [] }, ...datos];
+      if (b.accion === "restaurar") { const d = datos.find((x) => x.id === b.id); Object.assign(d, d.ediciones[b.edicion].antes); }
+      return json({ ok: true, lista: datos });
+    }
+    if (u.includes("coleccion=datos_equipo")) return json(datos);
+    json([]);
+  });
+  await page.goto(base + "/");
+  await page.evaluate(() => { tecnicoLogueado = "Juan Pérez"; localStorage.removeItem("datos_equipo_cache"); verConsultasBtn.click(); cambiarTabManuales("equipo"); });
+  await page.waitForSelector(".equipo-card");
+  assert.strictEqual(await page.getAttribute(".equipo-card .equipo-contenido a", "href"), "https://ajax.systems/es/support", "el link se puede tocar");
+  // Nuevo dato con 2 fotos de la galería
+  await page.click("#equipoNuevoBtn");
+  await page.fill("#equipoFormTituloInput", "Bornera central Paradox");
+  await page.fill("#equipoFormContenido", "Así va el cableado de la sirena.");
+  const png = await page.evaluate(() => { const c = document.createElement("canvas"); c.width = 3000; c.height = 2000; c.getContext("2d").fillRect(0, 0, 900, 900); return c.toDataURL("image/png").split(",")[1]; });
+  await page.setInputFiles("#equipoFotoGaleria", [{ name: "a.png", mimeType: "image/png", buffer: Buffer.from(png, "base64") }, { name: "b.png", mimeType: "image/png", buffer: Buffer.from(png, "base64") }]);
+  await page.waitForFunction(() => equipoFormFotos.length === 2 && !equipoSubiendo);
+  assert.strictEqual(await page.locator("#equipoFormFotos img").count(), 2);
+  const dims = await page.evaluate((b64) => new Promise((ok) => { const i = new Image(); i.onload = () => ok(Math.max(i.width, i.height)); i.src = b64; }), posts[0].base64);
+  assert.strictEqual(dims, 1600, "se achica antes de subir");
+  await page.click("#equipoFormFotos button[data-i='0']");
+  assert.strictEqual(await page.locator("#equipoFormFotos img").count(), 1, "se puede quitar una");
+  assert.strictEqual(await page.getAttribute("#equipoFotoCamara", "capture"), "environment");
+  await page.click("#equipoGuardarBtn");
+  await page.waitForTimeout(300);
+  const crear = posts.find((p) => p.accion === "crear");
+  assert.deepStrictEqual(crear.fotos, ["aaaaaaaaaaaaaaa2"]);
+  assert.strictEqual(await page.locator(".equipo-card").first().locator(".eq-foto").count(), 1, "la foto se ve en la tarjeta");
+  // Ver cambios y volver a la versión anterior
+  await page.locator(".equipo-card", { hasText: "Reset Ajax" }).locator(".eq-historial").click();
+  assert.match(await page.textContent(".equipo-cambios"), /Juan Pérez lo cambió el 25\/10\/2026/);
+  page.once("dialog", (d) => d.accept());
+  await page.click(".equipo-cambios summary");
+  await page.click(".equipo-cambios [data-restaurar]");
+  await page.waitForTimeout(300);
+  assert.ok(posts.some((p) => p.accion === "restaurar" && p.id === "d1" && p.edicion === 0));
+  assert.match(await page.locator(".equipo-card", { hasText: "Reset Ajax" }).textContent(), /Mantener 30 s/);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

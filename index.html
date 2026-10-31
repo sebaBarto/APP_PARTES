@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#101820">
-<meta name="app-version" content="4.19.1">
+<meta name="app-version" content="4.20.0">
 <meta name="description" content="Digitalizador de partes técnicos de servicio">
 <title>Servicio Técnico SAT</title>
 <link rel="manifest" href="manifest.json">
@@ -2185,6 +2185,16 @@
           <div class="field-group">
             <label class="field-label" for="equipoFormContenido">El dato</label>
             <textarea class="field-input field-textarea" id="equipoFormContenido" maxlength="6000" rows="6" placeholder="Ej: APN: igprs.claro.com.ar — Usuario: clarogprs — Clave: clarogprs999"></textarea>
+          </div>
+          <div class="field-group">
+            <label class="field-label">Fotos o imágenes (opcional, hasta 8)</label>
+            <div class="equipo-fotos-btns">
+              <button type="button" class="btn btn-secondary btn-small" id="equipoFotoGaleriaBtn"><svg class="cq-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m4 19 6-6 4 4 3-3 4 4"/></svg> Galería</button>
+              <button type="button" class="btn btn-secondary btn-small" id="equipoFotoCamaraBtn"><svg class="cq-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg> Sacar foto</button>
+            </div>
+            <input type="file" id="equipoFotoGaleria" accept="image/*" multiple class="hidden">
+            <input type="file" id="equipoFotoCamara" accept="image/*" capture="environment" class="hidden">
+            <div id="equipoFormFotos" class="equipo-fotos"></div>
           </div>
           <input type="hidden" id="equipoFormOrigen">
           <button type="button" class="btn btn-primary" id="equipoGuardarBtn">Guardar para el equipo</button>

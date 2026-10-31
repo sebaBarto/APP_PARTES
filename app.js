@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.19.1";
+const APP_VERSION = "4.20.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -6159,17 +6159,22 @@ function renderDatosEquipo() {
     card.innerHTML = `
       <div class="equipo-card-top"><span class="equipo-cat">${escapeHtml(d.categoria || "General")}</span>${d.origen === "ia" ? '<span class="equipo-ia">Respuesta de la IA revisada</span>' : ""}</div>
       <p class="equipo-titulo">${escapeHtml(d.titulo)}</p>
-      <div class="equipo-contenido consulta-respuesta-texto">${formatearRespuestaIA(d.contenido)}</div>
+      <div class="equipo-contenido consulta-respuesta-texto">${linkificarEquipo(formatearRespuestaIA(d.contenido))}</div>
+      ${(d.fotos || []).length ? `<div class="equipo-fotos">${d.fotos.map((f) => `<img src="/api/foto?id=${encodeURIComponent(f)}" alt="Imagen del dato" loading="lazy" class="eq-foto" role="button" tabindex="0">`).join("")}</div>` : ""}
       <p class="equipo-meta">Aportó <b>${escapeHtml(d.autor || "")}</b> el ${fechaCortaAR(d.fecha)}${ult ? ` · Editado por <b>${escapeHtml(ult.autor)}</b> el ${fechaCortaAR(ult.fecha)}${d.ediciones.length > 1 ? ` (${d.ediciones.length} ediciones)` : ""}` : ""}</p>
       <div class="equipo-acciones">
         <button type="button" class="btn btn-ghost btn-small eq-copiar">Copiar</button>
         <button type="button" class="btn btn-ghost btn-small eq-editar">Editar / agregar</button>
+        ${(d.ediciones || []).some((e) => e.antes) ? '<button type="button" class="btn btn-ghost btn-small eq-historial">Cambios</button>' : ""}
         ${propio ? '<button type="button" class="btn btn-ghost btn-small eq-borrar">Borrar</button>' : ""}
       </div>`;
     card.querySelector(".eq-copiar").addEventListener("click", async () => {
       try { await navigator.clipboard.writeText(`${d.titulo}\n${d.contenido}`); showToast("Copiado."); } catch (e) { showToast("No se pudo copiar."); }
     });
     card.querySelector(".eq-editar").addEventListener("click", () => abrirFormEquipo(d));
+    card.querySelectorAll(".eq-foto").forEach((img) => img.addEventListener("click", () => ampliarImagenParte(img.src)));
+    const hist = card.querySelector(".eq-historial");
+    if (hist) hist.addEventListener("click", () => verCambiosEquipo(d));
     const borrar = card.querySelector(".eq-borrar");
     if (borrar) borrar.addEventListener("click", async () => {
       if (!confirm(`¿Borrar "${d.titulo}" para todo el equipo?`)) return;
@@ -6181,6 +6186,68 @@ function renderDatosEquipo() {
 document.getElementById("equipoBuscar").addEventListener("input", renderDatosEquipo);
 document.getElementById("equipoFiltroCat").addEventListener("change", renderDatosEquipo);
 
+// Links que se pegan en un dato (manual, video) quedan tocables.
+function linkificarEquipo(html) {
+  return html.replace(/(^|[\s>(])((?:https?:\/\/|www\.)[^\s<]+[^\s<.,;:)!?])/g, (m, pre, url) => `${pre}<a href="${url.startsWith("www.") ? "https://" + url : url}" target="_blank" rel="noopener">${url}</a>`);
+}
+// ---- Fotos del dato (galería o cámara) ----
+let equipoFormFotos = [];
+let equipoSubiendo = 0;
+function renderEquipoFormFotos() {
+  const caja = document.getElementById("equipoFormFotos");
+  caja.innerHTML = equipoFormFotos.map((f, i) => `<div class="equipo-foto-item"><img src="/api/foto?id=${encodeURIComponent(f)}" alt=""><button type="button" data-i="${i}" aria-label="Quitar la foto">✕</button></div>`).join("")
+    + (equipoSubiendo ? `<div class="equipo-foto-item equipo-foto-subiendo"><div class="cq-spinner"></div><span>Subiendo ${equipoSubiendo}…</span></div>` : "");
+  caja.querySelectorAll("button[data-i]").forEach((b) => b.addEventListener("click", () => { equipoFormFotos.splice(Number(b.dataset.i), 1); renderEquipoFormFotos(); }));
+  ["equipoFotoGaleriaBtn", "equipoFotoCamaraBtn"].forEach((id) => { document.getElementById(id).disabled = equipoFormFotos.length + equipoSubiendo >= 8; });
+}
+async function subirFotosEquipo(archivos) {
+  const lugar = 8 - equipoFormFotos.length - equipoSubiendo;
+  const lista = Array.from(archivos || []).filter((f) => /^image\//.test(f.type || "") || /\.(jpe?g|png|webp|heic|gif)$/i.test(f.name || "")).slice(0, Math.max(0, lugar));
+  if (archivos && archivos.length > lista.length) showToast(lugar <= 0 ? "Ya hay 8 fotos: es el máximo." : `Se suben ${lista.length}: el máximo es 8 por dato.`);
+  let fallidas = 0;
+  equipoSubiendo += lista.length;
+  renderEquipoFormFotos();
+  for (const archivo of lista) {
+    try {
+      const base64 = await comprimirImagen(archivo, 1600, 0.78);
+      const r = await fetch("/api/foto", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ base64, tipo: "imagen" }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.id) throw new Error(d.error || "HTTP " + r.status);
+      equipoFormFotos.push(d.id);
+    } catch (err) { fallidas++; }
+    equipoSubiendo--;
+    renderEquipoFormFotos();
+  }
+  if (fallidas) showToast(fallidas === lista.length ? "No se pudieron subir las fotos. Revisá la señal." : `${fallidas} foto(s) no se pudieron subir.`);
+}
+document.getElementById("equipoFotoGaleriaBtn").addEventListener("click", () => document.getElementById("equipoFotoGaleria").click());
+document.getElementById("equipoFotoCamaraBtn").addEventListener("click", () => document.getElementById("equipoFotoCamara").click());
+["equipoFotoGaleria", "equipoFotoCamara"].forEach((id) => document.getElementById(id).addEventListener("change", (e) => { const f = e.target.files; subirFotosEquipo(f).finally(() => { e.target.value = ""; }); }));
+// ---- Cambios de un dato (quién cambió qué) y volver a una versión anterior ----
+function verCambiosEquipo(d) {
+  const eds = (d.ediciones || []).map((e, i) => ({ ...e, i })).reverse();
+  const capa = document.createElement("div");
+  capa.className = "cq-datos-capa";
+  capa.innerHTML = `<div class="cq-datos cq-menu equipo-cambios">
+    <h3>Cambios de «${escapeHtml(d.titulo)}»</h3>
+    <p class="pe-nota">Cada vez que alguien lo cambia, se guarda cómo estaba antes. Si se borró algo por error, se puede volver.</p>
+    ${eds.map((e) => `<div class="equipo-cambio">
+      <p class="equipo-meta"><b>${escapeHtml(e.autor || "")}</b> ${e.accion === "restaurar" ? "volvió a una versión anterior" : "lo cambió"} el ${fechaCortaAR(e.fecha)}</p>
+      ${e.antes ? `<details><summary>Cómo estaba antes</summary><p class="equipo-titulo">${escapeHtml(e.antes.titulo || "")}</p><div class="consulta-respuesta-texto">${formatearRespuestaIA(e.antes.contenido || "")}</div>${(e.antes.fotos || []).length ? `<p class="equipo-meta">${e.antes.fotos.length} foto(s)</p>` : ""}<button type="button" class="btn btn-secondary btn-small" data-restaurar="${e.i}">Volver a esta versión</button></details>` : ""}
+    </div>`).join("")}
+    <button type="button" class="link-btn" data-cerrar="1">Cerrar</button>
+  </div>`;
+  document.body.appendChild(capa);
+  capa.addEventListener("click", async (ev) => {
+    const b = ev.target.closest("button");
+    if (ev.target === capa || (b && b.dataset.cerrar)) { capa.remove(); return; }
+    if (b && b.dataset.restaurar !== undefined) {
+      if (!confirm("¿Volver a como estaba? (lo de ahora también queda guardado en los cambios)")) return;
+      capa.remove();
+      await guardarDatoEquipo({ accion: "restaurar", id: d.id, edicion: Number(b.dataset.restaurar) }, "Listo: volvió a la versión anterior.");
+    }
+  });
+}
 function abrirFormEquipo(d) {
   poblarCategoriasEquipo();
   const editando = !!(d && d.id);
@@ -6189,6 +6256,8 @@ function abrirFormEquipo(d) {
   document.getElementById("equipoFormTituloInput").value = (d && d.titulo) || "";
   document.getElementById("equipoFormContenido").value = (d && d.contenido) || "";
   document.getElementById("equipoFormOrigen").value = (d && d.origen) || "";
+  equipoFormFotos = d && Array.isArray(d.fotos) ? d.fotos.slice() : [];
+  renderEquipoFormFotos();
   const cats = categoriasEquipo();
   const sel = document.getElementById("equipoFormCategoria");
   sel.value = d && d.categoria && cats.includes(d.categoria) ? d.categoria : (document.getElementById("equipoFiltroCat").value || "General");
@@ -6235,10 +6304,11 @@ document.getElementById("equipoGuardarBtn").addEventListener("click", async () =
   const titulo = document.getElementById("equipoFormTituloInput").value.trim();
   const contenido = document.getElementById("equipoFormContenido").value.trim();
   if (!titulo || !contenido) { showToast("Completá el título y el dato."); return; }
+  if (equipoSubiendo) { showToast("Esperá a que terminen de subir las fotos."); return; }
   const btn = document.getElementById("equipoGuardarBtn");
   btn.disabled = true;
   const ok = await guardarDatoEquipo({
-    accion: id ? "editar" : "crear", id: id || undefined, titulo, contenido,
+    accion: id ? "editar" : "crear", id: id || undefined, titulo, contenido, fotos: equipoFormFotos.slice(),
     categoria: document.getElementById("equipoFormCategoria").value,
     origen: document.getElementById("equipoFormOrigen").value || undefined,
   }, id ? "Cambios guardados para todo el equipo." : "Guardado: ya lo ve todo el equipo.");

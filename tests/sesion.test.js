@@ -468,3 +468,42 @@ test("SIMs: las correcciones de la oficina quedan con el nombre de quien las hiz
     assert.strictEqual(enviados.length, 2);
   } finally { global.fetch = fetchViejo; }
 });
+
+test("Datos del equipo: el autor sale de la sesión, solo el autor o la oficina borran, cada edición guarda la versión anterior y se puede volver", async () => {
+  const fetchViejo = global.fetch;
+  let archivo = [];
+  const grande = { usar: false };
+  global.fetch = async (url, op) => {
+    const u = String(url), metodo = (op && op.method) || "GET";
+    if (u.includes("datos-equipo.json")) {
+      if (metodo === "PUT") { archivo = JSON.parse(Buffer.from(JSON.parse(op.body).content, "base64").toString()); return new Response("{}", { status: 200 }); }
+      const raw = op && op.headers && op.headers.Accept === "application/vnd.github.raw";
+      if (raw) return new Response(JSON.stringify(archivo));
+      // Pasado 1 MB, GitHub no manda el contenido en el JSON
+      return new Response(JSON.stringify(grande.usar ? { sha: "s", encoding: "none", content: "" } : { sha: "s", encoding: "base64", content: Buffer.from(JSON.stringify(archivo)).toString("base64") }));
+    }
+    return new Response("{}", { status: 200 });
+  };
+  try {
+    const juan = crearSesion({ nombre: "Juan", rol: "tecnico" }), luis = crearSesion({ nombre: "Luis", rol: "tecnico" }), ofi = crearSesion({ nombre: "Brenda", rol: "admin" });
+    const llamar = async (body, token) => { const res = resFalso(); await datos(pedido("POST", { coleccion: "datos_equipo" }, body, token), res); return res; };
+    let r = await llamar({ accion: "crear", titulo: "APN Claro", contenido: "igprs.claro.com.ar", autor: "Inventado", fotos: ["abcdef0123456789", "../malo"] }, juan);
+    assert.strictEqual(r.statusCode, 200);
+    const id = archivo[0].id;
+    assert.strictEqual(archivo[0].autor, "Juan", "el autor es el de la sesión, no el que manda la página");
+    assert.deepStrictEqual(archivo[0].fotos, ["abcdef0123456789"]);
+    grande.usar = true; // de acá en más el archivo "pesa" más de 1 MB
+    r = await llamar({ accion: "editar", id, titulo: "APN Claro", contenido: "BORRADO", autor: "Juan" }, luis);
+    assert.strictEqual(r.statusCode, 200, "se puede guardar aunque el archivo pese más de 1 MB");
+    assert.strictEqual(archivo[0].ediciones[0].autor, "Luis");
+    assert.strictEqual(archivo[0].ediciones[0].antes.contenido, "igprs.claro.com.ar", "queda cómo estaba antes");
+    assert.strictEqual((await llamar({ accion: "borrar", id, autor: "Juan", admin: true }, luis)).statusCode, 403, "ni haciéndose pasar por el autor ni diciendo que es admin");
+    r = await llamar({ accion: "restaurar", id, edicion: 0 }, juan);
+    assert.strictEqual(archivo[0].contenido, "igprs.claro.com.ar", "volvió a la versión anterior");
+    assert.strictEqual(archivo[0].ediciones[1].accion, "restaurar");
+    const resGet = resFalso(); await datos(pedido("GET", { coleccion: "datos_equipo" }, null, juan), resGet);
+    assert.strictEqual(resGet.cuerpo[0].contenido, "igprs.claro.com.ar", "también se lee pasado 1 MB");
+    assert.strictEqual((await llamar({ accion: "borrar", id }, ofi)).statusCode, 200, "la oficina sí puede borrar");
+    assert.strictEqual(archivo.length, 0);
+  } finally { global.fetch = fetchViejo; }
+});

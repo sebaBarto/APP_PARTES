@@ -143,6 +143,15 @@ async function escribirArchivoDatos(ruta, data, sha, mensaje) {
   });
   return r;
 }
+// Contenido de un archivo del repo de datos. Pasado 1 MB, GitHub no lo manda
+// dentro del JSON: hay que pedirlo crudo (antes, esas colecciones dejaban de
+// poder leerse y guardarse).
+async function textoDeArchivoGithub(meta, url, headers) {
+  if (meta && meta.content && meta.encoding !== "none") return Buffer.from(meta.content, "base64").toString("utf-8");
+  const r = await fetch(url, { headers: { ...headers, Accept: "application/vnd.github.raw" } });
+  if (!r.ok) throw new Error("No se pudo leer el archivo");
+  return await r.text();
+}
 function numeroArgentino(v) {
   if (typeof v === "number") return isFinite(v) ? v : NaN;
   let t = String(v == null ? "" : v).replace(/[^\d.,-]/g, "");
@@ -1220,7 +1229,7 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
         return;
       }
       const data = await r.json();
-      const content = JSON.parse(Buffer.from(data.content, "base64").toString("utf-8"));
+      const content = JSON.parse(await textoDeArchivoGithub(data, apiUrl, ghHeaders));
       let resultado = coleccion.mergeConDefault ? { ...coleccion.default, ...content } : content;
       if (nombreColeccion === "tecnicos" && Array.isArray(resultado)) {
         resultado = resultado.map((t) => {
@@ -1250,7 +1259,7 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
       if (existing.ok) {
         const existingData = await existing.json();
         sha = existingData.sha;
-        contenidoExistente = JSON.parse(Buffer.from(existingData.content, "base64").toString("utf-8"));
+        contenidoExistente = JSON.parse(await textoDeArchivoGithub(existingData, apiUrl, ghHeaders));
       }
 
       // Las suscripciones push se agregan (sin duplicar por endpoint),
@@ -1337,7 +1346,14 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
         const txt = (v, max) => String(v == null ? "" : v).trim().slice(0, max);
         const ahoraIso = new Date().toISOString();
         const accion = body && body.accion;
-        const autor = txt(body && body.autor, 60) || "Sin nombre";
+        // Quién es sale del pase de la sesión (no de lo que mande la página).
+        const esOficina = !!(autorizacion && autorizacion.rol === "admin");
+        const nombreSesion = autorizacion && autorizacion.tipo === "sesion" ? String(autorizacion.nombre || "").trim() : "";
+        const autor = esOficina ? (nombreSesion && nombreSesion !== "Clave general" ? `Oficina (${nombreSesion})` : "Oficina") : (nombreSesion || txt(body && body.autor, 60) || "Sin nombre");
+        const fotosDe = (v) => (Array.isArray(v) ? v : []).map(String).filter((x) => /^[a-f0-9]{16}$/.test(x)).slice(0, 8);
+        // Cada edición guarda cómo estaba antes, para poder volver atrás.
+        const foto = (d) => ({ titulo: d.titulo, contenido: d.contenido, categoria: d.categoria, fotos: d.fotos || [] });
+        const conVersiones = (ediciones) => ediciones.slice(-30).map((e, k, arr) => (k < arr.length - 10 && e.antes ? { autor: e.autor, fecha: e.fecha, accion: e.accion } : e));
         if (accion === "crear") {
           const titulo = txt(body.titulo, 150);
           const contenido = txt(body.contenido, 6000);
@@ -1346,7 +1362,7 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
           lista.unshift({
             id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
             titulo, contenido, categoria: txt(body.categoria, 60) || "General",
-            origen: body.origen === "ia" ? "ia" : "tecnico",
+            origen: body.origen === "ia" ? "ia" : "tecnico", fotos: fotosDe(body.fotos),
             autor, fecha: ahoraIso, ediciones: [],
           });
         } else if (accion === "editar") {
@@ -1356,15 +1372,22 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
           const contenido = txt(body.contenido, 6000);
           if (!titulo || !contenido) { res.status(400).json({ error: "Falta el título o el contenido" }); return; }
           const previo = lista[i];
-          lista[i] = {
-            ...previo, titulo, contenido, categoria: txt(body.categoria, 60) || previo.categoria || "General",
-            ediciones: [...(previo.ediciones || []), { autor, fecha: ahoraIso }].slice(-30),
-          };
+          const nuevo = { ...previo, titulo, contenido, categoria: txt(body.categoria, 60) || previo.categoria || "General", fotos: body.fotos !== undefined ? fotosDe(body.fotos) : previo.fotos || [] };
+          if (JSON.stringify(foto(nuevo)) === JSON.stringify(foto(previo))) { res.status(200).json({ ok: true, lista, sinCambios: true }); return; }
+          nuevo.ediciones = conVersiones([...(previo.ediciones || []), { autor, fecha: ahoraIso, antes: foto(previo) }]);
+          lista[i] = nuevo;
+        } else if (accion === "restaurar") {
+          const i = lista.findIndex((d) => d.id === body.id);
+          if (i === -1) { res.status(404).json({ error: "Ese dato ya no existe" }); return; }
+          const previo = lista[i];
+          const ed = (previo.ediciones || [])[Number(body.edicion)];
+          if (!ed || !ed.antes) { res.status(404).json({ error: "Esa versión ya no está guardada" }); return; }
+          lista[i] = { ...previo, ...ed.antes, ediciones: conVersiones([...(previo.ediciones || []), { autor, fecha: ahoraIso, accion: "restaurar", antes: foto(previo) }]) };
         } else if (accion === "borrar") {
           const i = lista.findIndex((d) => d.id === body.id);
           if (i === -1) { res.status(404).json({ error: "Ese dato ya no existe" }); return; }
           // Lo puede borrar quien lo cargó, o la oficina desde el panel admin.
-          if (!body.admin && lista[i].autor !== autor) { res.status(403).json({ error: "Solo lo puede borrar quien lo cargó, o la oficina" }); return; }
+          if (!esOficina && lista[i].autor !== autor) { res.status(403).json({ error: "Solo lo puede borrar quien lo cargó, o la oficina" }); return; }
           lista.splice(i, 1);
         } else {
           res.status(400).json({ error: "Acción inválida" });

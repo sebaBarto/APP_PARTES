@@ -3446,6 +3446,7 @@ function renderDatosEquipoAdmin() {
     return `<div style="padding:10px 0; border-bottom:1px solid #EEE;">
       <b>${escapeHtmlAdmin(d.titulo)}</b> <span style="font-size:12px; color:#6B7680;">· ${escapeHtmlAdmin(d.categoria || "")}</span>
       <div style="white-space:pre-line; font-size:13px; margin:4px 0;">${escapeHtmlAdmin(d.contenido)}</div>
+      ${(d.fotos || []).length ? `<div style="display:flex; flex-wrap:wrap; gap:6px; margin:4px 0;">${d.fotos.map((f) => `<a href="/api/foto?id=${encodeURIComponent(f)}" target="_blank" rel="noopener"><img src="/api/foto?id=${encodeURIComponent(f)}" alt="" loading="lazy" style="width:72px; height:72px; object-fit:cover; border-radius:8px; background:#E6E4DE;"></a>`).join("")}</div>` : ""}
       <div style="font-size:12px; color:#6B7680;">Aportó ${escapeHtmlAdmin(d.autor || "")} el ${f(d.fecha)}${ult ? ` · editado por ${escapeHtmlAdmin(ult.autor)} el ${f(ult.fecha)}` : ""}</div>
       <button type="button" class="btn-secondary-admin dato-equipo-borrar" data-id="${escapeHtmlAdmin(d.id)}" style="width:auto; padding:6px 12px; margin-top:6px;">Borrar</button>
     </div>`;
