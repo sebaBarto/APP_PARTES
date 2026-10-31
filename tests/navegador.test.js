@@ -1280,9 +1280,9 @@ test("Admin Control de SIMs: tablero con stock bajo, problemas, dormidas, histor
   assert.match(await page.locator("#simsControlLineaResultado").textContent(), /Instalada en Kiosco Norte[\s\S]*Instalada en cliente/);
   const r = await page.evaluate(() => {
     const c = conciliarSims([{ "Nro Línea": "54 9 341 555-0010", Estado: "Activa" }, { "Nro Línea": "3415559999", Estado: "Activa" }, { "Nro Línea": "3415550001", Estado: "Activa" }, { "Nro Línea": "3415558888", Estado: "Baja" }], "Claro");
-    return { sin: c.sinRegistrar, stock: c.enStock.map((x) => x.numero), no: c.noEnPlanilla.map((x) => x.numero), ok: c.coinciden.length, total: c.totalPlanilla };
+    return { sin: c.sinRegistrar.map((x) => x.n), stock: c.enStock.map((x) => x.x.numero), no: c.noEnPlanilla.map((x) => x.x.numero), ok: c.coinciden.length, total: c.totalPlanilla, activas: c.activas };
   });
-  assert.deepStrictEqual(r, { sin: ["3415559999"], stock: ["341 555-0001"], no: ["3415550011"], ok: 1, total: 3 });
+  assert.deepStrictEqual(r, { sin: ["3415559999"], stock: ["341 555-0001"], no: ["3415550011"], ok: 1, total: 4, activas: 3 });
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
@@ -3313,6 +3313,104 @@ test("Plano en PDF dibujado (estilo Visio de SAT) -> croquis editable: paredes, 
   // La puerta se abre hacia el lado correcto: la hoja queda a la izquierda de la pared
   const puerta = await page.evaluate(() => { const e = cq.elementos.find((x) => x.tipo === "puerta"); return croquisLocalAMundo(e, -20, -40)[0] < e.x; });
   assert.ok(puerta);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Conciliación de SIMs: elige sola la columna del número, separa cada caso (empresa distinta, cobradas con problema o inactivas, baja en la empresa) y se resuelve desde ahí", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: route.request().url().includes("xlsx.full.min.js") ? require("fs").readFileSync(require("path").join(__dirname, "..", "vendor", "xlsx.full.min.js"), "utf8") : "" }));
+  const stock = [
+    { numero: "3415550001", empresa: "Claro", tecnico_actual: "Juan", ubicacion_tipo: "tecnico", estado_fisico: "Disponible" },
+    { numero: "3415550002", empresa: "Claro", tecnico_actual: "Juan", ubicacion_tipo: "tecnico", estado_fisico: "Extraviada" },
+    { numero: "3415550003", empresa: "Movistar", tecnico_actual: "Oficina", ubicacion_tipo: "oficina", estado_fisico: "Disponible" },
+  ];
+  const instaladas = [
+    { numero: "3415550010", empresa: "Claro", cliente: "Kiosco Norte", estado_linea: "Activo" },
+    { numero: "3415550011", empresa: "Claro", cliente: "Panadería Sur", estado_linea: "Inactivo" },
+    { numero: "3415550012", empresa: "Claro", cliente: "Farmacia", estado_linea: "Activo" },
+    { numero: "3415550013", empresa: "Claro", cliente: "Ferretería", estado_linea: "Activo" },
+    { numero: "3415550014", empresa: "Personal", cliente: "Lara", estado_linea: "Activo" },
+  ];
+  const historial = [{ fecha: "2026-09-01", hora: "10:00", numero: "3415550099", accion: "baja", tecnico: "Oficina", cliente: "Rota / no funciona" }];
+  const acciones = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (req.method() === "POST") {
+      const b = JSON.parse(req.postData() || "{}");
+      acciones.push(b);
+      if (b.accion === "alta_lote") return json({ ok: true, agregadas: [{ numero: b.sims[0].numero }], repetidas: [], invalidas: [] });
+      return json({ ok: true });
+    }
+    if (u.includes("coleccion=sims_instaladas")) return json(instaladas);
+    if (u.includes("coleccion=sims")) return json(stock);
+    if (u.includes("coleccion=clientes")) return json([{ nombre: "Kiosco Este", numero_cliente: "88", direccion: "Mitre 1" }]);
+    if (u.includes("recurso=sim")) return json(historial);
+    json([]);
+  });
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { document.getElementById("mainCard").classList.remove("hidden"); document.getElementById("panelSimsControl").classList.remove("hidden"); return cargarControlSims(); });
+  // Planilla de Claro: "N° de cliente" va antes que la línea (antes agarraba esa columna), y tiene dos hojas
+  const xlsx = await page.evaluate(() => {
+    const h1 = [
+      { "N° de cliente": 9001, "Línea": "0341 15 555-0010", "Estado": "Activa" },
+      { "N° de cliente": 9001, "Línea": "3415550011", "Estado": "Activa" },
+      { "N° de cliente": 9001, "Línea": "3415550012", "Estado": "Suspendida" },
+      { "N° de cliente": 9001, "Línea": "3415550001", "Estado": "Activa" },
+      { "N° de cliente": 9001, "Línea": "3415550002", "Estado": "Activa" },
+    ];
+    const h2 = [
+      { "N° de cliente": 9002, "Línea": "3415550003", "Estado": "Activa" },
+      { "N° de cliente": 9002, "Línea": "3415550014", "Estado": "Activa" },
+      { "N° de cliente": 9002, "Línea": "3415550099", "Estado": "Activa" },
+      { "N° de cliente": 9002, "Línea": "3415550098", "Estado": "Activa" },
+    ];
+    const lb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(lb, XLSX.utils.json_to_sheet(h1), "Hoja1");
+    XLSX.utils.book_append_sheet(lb, XLSX.utils.json_to_sheet(h2), "Hoja2");
+    return Array.from(new Uint8Array(XLSX.write(lb, { type: "array", bookType: "xlsx" })));
+  });
+  await page.setInputFiles("#simsConcArchivo", { name: "lineas CLARO octubre.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer: Buffer.from(xlsx) });
+  await page.waitForSelector(".conc-bloque");
+  assert.strictEqual(await page.inputValue("#simsConcEmpresa"), "Claro", "la empresa sale del nombre del archivo");
+  assert.strictEqual(await page.inputValue("#concColNum"), "Línea");
+  const r = await page.evaluate(() => Object.fromEntries(["coinciden", "sinRegistrar", "problemaPagando", "inactivaPagando", "empresaDistinta", "enStock", "bajaEnEmpresa", "noEnPlanilla"].map((k) => [k, ultimaConciliacion[k].map((x) => (typeof x === "string" ? x : x.n))])));
+  assert.deepStrictEqual(r, {
+    coinciden: ["3415550010"], sinRegistrar: ["3415550099", "3415550098"], problemaPagando: ["3415550002"], inactivaPagando: ["3415550011"],
+    empresaDistinta: ["3415550003", "3415550014"], enStock: ["3415550001"], bajaEnEmpresa: ["3415550012"], noEnPlanilla: ["3415550013"],
+  });
+  assert.match(await page.textContent('.conc-bloque[data-k="sinRegistrar"]'), /Dada de baja en SAT el 01\/09\/2026[\s\S]*pedir la baja a la empresa[\s\S]*Nunca se registró en SAT/);
+  // Resolver: corregir empresa de las dos en lote
+  await page.check('.conc-todas[data-k="empresaDistinta"]');
+  await page.click('.conc-lote-btn[data-k="empresaDistinta"][data-a="empresa"]');
+  await page.click(".cartel-admin .cartel-si");
+  await page.waitForFunction(() => /2 de 2 resueltas/.test(document.getElementById("simsConcStatus").textContent));
+  assert.deepStrictEqual(acciones.filter((a) => /editar/.test(a.accion)).map((a) => [a.accion, a.numero, a.empresa || a.campos.empresa]), [["editar_stock", "3415550003", "Claro"], ["editar_instalada", "3415550014", "Claro"]]);
+  // Marcar inactiva la que la empresa suspendió
+  await page.click('.conc-acc[data-k="bajaEnEmpresa"][data-a="inactiva"]');
+  await page.click(".cartel-admin .cartel-si");
+  await page.waitForTimeout(300);
+  assert.ok(acciones.some((a) => a.accion === "editar_instalada" && a.numero === "3415550012" && a.campos.estado_linea === "Inactivo"));
+  // Instalar una sin registrar en un cliente: se carga al stock y se instala
+  await page.click('.conc-acc[data-k="sinRegistrar"][data-a="instalar"] >> nth=1');
+  await page.fill(".sim-extra .x-cliente", "Kiosco Este");
+  await page.dispatchEvent(".sim-extra .x-cliente", "input");
+  await page.click(".sim-extra .x-ok");
+  await page.waitForFunction(() => /instalada en Kiosco Este/.test(document.getElementById("simsConcStatus").textContent));
+  const alta = acciones.find((a) => a.accion === "alta_lote");
+  assert.deepStrictEqual(alta.sims.map((s) => [s.numero, s.empresa]), [["3415550098", "Claro"]]);
+  const usar = acciones.find((a) => a.accion === "usar");
+  assert.deepStrictEqual([usar.numero, usar.cliente, usar.numero_cliente, usar.tecnico], ["3415550098", "Kiosco Este", "88", "Oficina"]);
+  // Dar de baja la extraviada que se sigue cobrando
+  page.once("dialog", (d) => d.accept("Extraviada: baja pedida a Claro"));
+  await page.click('.conc-acc[data-k="problemaPagando"][data-a="baja"]');
+  await page.waitForTimeout(300);
+  assert.ok(acciones.some((a) => a.accion === "dar_de_baja" && a.numero === "3415550002" && /Extraviada/.test(a.motivo)));
+  // Si la columna elegida no era la buena, se cambia y se recalcula
+  await page.selectOption("#concColEstado", "");
+  assert.strictEqual(await page.evaluate(() => ultimaConciliacion.bajaEnEmpresa.length), 0, "sin columna de estado, todas cuentan como activas");
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
