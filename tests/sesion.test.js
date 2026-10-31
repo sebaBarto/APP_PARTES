@@ -507,3 +507,34 @@ test("Datos del equipo: el autor sale de la sesión, solo el autor o la oficina 
     assert.strictEqual(archivo.length, 0);
   } finally { global.fetch = fetchViejo; }
 });
+
+test("Datos del equipo: un dato nuevo se avisa por notificación al resto del equipo (no a quien lo cargó); editar no avisa", async () => {
+  const fetchViejo = global.fetch;
+  let archivo = [];
+  global.fetch = async (url, op) => {
+    const u = String(url), metodo = (op && op.method) || "GET";
+    if (u.includes("datos-equipo.json")) {
+      if (metodo === "PUT") { archivo = JSON.parse(Buffer.from(JSON.parse(op.body).content, "base64").toString()); return new Response("{}", { status: 200 }); }
+      return new Response(JSON.stringify({ sha: "s", encoding: "base64", content: Buffer.from(JSON.stringify(archivo)).toString("base64") }));
+    }
+    return new Response("{}", { status: 200 });
+  };
+  const rutaPush = require.resolve(path.join(raiz, "lib/push-sender.js"));
+  const viejo = require.cache[rutaPush];
+  const avisos = [];
+  require.cache[rutaPush] = { id: rutaPush, filename: rutaPush, loaded: true, exports: { enviarATodos: async (a) => { avisos.push(a); return { enviados: 3 }; }, enviarASeleccionados: async () => ({}) } };
+  try {
+    const juan = crearSesion({ nombre: "Juan", rol: "tecnico" });
+    const llamar = async (body) => { const res = resFalso(); await datos(pedido("POST", { coleccion: "datos_equipo" }, body, juan), res); return res; };
+    await llamar({ accion: "crear", titulo: "Código instalador DSC", contenido: "5555", fotos: ["abcdef0123456789"] });
+    assert.strictEqual(avisos.length, 1);
+    assert.strictEqual(avisos[0].excluir, "Juan", "a quien lo cargó no le llega");
+    assert.match(avisos[0].cuerpo, /^Juan: Código instalador DSC \(con fotos\)$/);
+    assert.strictEqual(avisos[0].url, `/?ir=dato-equipo&id=${encodeURIComponent(archivo[0].id)}`, "la notificación abre ese dato");
+    await llamar({ accion: "editar", id: archivo[0].id, titulo: "Código instalador DSC", contenido: "5555 o 1234" });
+    assert.strictEqual(avisos.length, 1, "las ediciones no avisan");
+  } finally {
+    global.fetch = fetchViejo;
+    if (viejo) require.cache[rutaPush] = viejo; else delete require.cache[rutaPush];
+  }
+});

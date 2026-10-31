@@ -3692,3 +3692,4 @@ html[data-inicio="nuevo"] #screen-presupuesto .pe-ajuste-btn.activo { background
 .equipo-cambios { max-height: 80vh; overflow-y: auto; text-align: left; }
 .equipo-cambio { border-top: 1px solid rgba(128,128,128,.25); padding: 8px 0; }
 .equipo-cambio summary { cursor: pointer; font-weight: 600; margin: 4px 0; }
+.equipo-card-nuevo { outline: 3px solid #F2C94C; outline-offset: 2px; transition: outline-color .6s; }

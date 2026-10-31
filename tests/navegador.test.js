@@ -3469,3 +3469,20 @@ test("Datos del equipo: fotos desde la galería o la cámara, links tocables y v
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Datos del equipo: la notificación de un dato nuevo abre Manuales en ese dato, resaltado", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const datos = [{ id: "otro", titulo: "Otro", contenido: "x", autor: "Luis", fecha: "2026-10-20T15:00:00Z", ediciones: [] }, { id: "d9", titulo: "Código instalador DSC", contenido: "5555", autor: "Luis", fecha: "2026-10-31T15:00:00Z", ediciones: [] }];
+  await page.route("**/api/**", (route) => {
+    const u = route.request().url();
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(u.includes("coleccion=datos_equipo") ? datos : []) });
+  });
+  await page.goto(base + "/?ir=dato-equipo&id=d9");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { tecnicoLogueado = "Juan Pérez"; showScreen("home"); });
+  await page.waitForSelector('.equipo-card[data-id="d9"].equipo-card-nuevo', { timeout: 5000 });
+  assert.strictEqual(await page.locator("#manTabEquipo").isVisible(), true);
+  assert.strictEqual(await page.evaluate(() => location.search), "", "el link no queda en la barra");
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

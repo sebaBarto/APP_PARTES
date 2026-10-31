@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.20.0";
+const APP_VERSION = "4.20.1";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -6080,6 +6080,14 @@ document.getElementById("consultaCompartirBtn").addEventListener("click", () => 
 
 // ---------- Datos del equipo (sección cooperativa de Manuales) ----------
 let datosEquipoCache = [];
+// Abre Manuales > Datos del equipo y resalta un dato (desde la notificación).
+async function abrirDatoEquipo(id) {
+  verConsultasBtn.click();
+  cambiarTabManuales("equipo");
+  await cargarDatosEquipo();
+  const card = id && equipoLista.querySelector(`.equipo-card[data-id="${CSS.escape(id)}"]`);
+  if (card) { card.classList.add("equipo-card-nuevo"); card.scrollIntoView({ behavior: "smooth", block: "center" }); setTimeout(() => card.classList.remove("equipo-card-nuevo"), 4000); }
+}
 const CATEGORIAS_EQUIPO_FIJAS = ["General", "APN y líneas", "Códigos y claves de fábrica", "Configuraciones"];
 const equipoLista = document.getElementById("equipoLista");
 const equipoStatus = document.getElementById("equipoStatus");
@@ -6154,6 +6162,7 @@ function renderDatosEquipo() {
   lista.forEach((d) => {
     const card = document.createElement("div");
     card.className = "equipo-card";
+    card.dataset.id = d.id;
     const ult = (d.ediciones || [])[(d.ediciones || []).length - 1];
     const propio = tecnicoLogueado && d.autor === tecnicoLogueado;
     card.innerHTML = `
@@ -11255,15 +11264,23 @@ async function irADevolverVehiculo(nombre) {
   if (screens.vehiculoDetalle.dataset.modo === "mio") ponerModoVehiculo("mio-devolver");
 }
 // La notificación de las 15 h ("acordate de devolver") abre directo la devolución.
+let busquedaInicialApp = "";
 let irPendienteVehiculo = (() => {
   try {
+    busquedaInicialApp = location.search;
     const ir = new URLSearchParams(location.search).get("ir");
     if (ir) history.replaceState(null, "", location.pathname);
     return ir === "devolver-vehiculo";
   } catch (e) { return false; }
 })();
+// La notificación de un dato nuevo del equipo abre ese dato.
+let irPendienteDato = (() => {
+  try { const p = new URLSearchParams(busquedaInicialApp); return p.get("ir") === "dato-equipo" ? p.get("id") || "" : null; } catch (e) { return null; }
+})();
 function consumirIrPendiente() {
-  if (!irPendienteVehiculo || !tecnicoLogueado || screens.home.dataset.active !== "true") return;
+  if (!tecnicoLogueado || screens.home.dataset.active !== "true") return;
+  if (irPendienteDato !== null) { const id = irPendienteDato; irPendienteDato = null; abrirDatoEquipo(id); return; }
+  if (!irPendienteVehiculo) return;
   irPendienteVehiculo = false;
   irADevolverVehiculo();
 }
@@ -11271,6 +11288,9 @@ if (navigator.serviceWorker) {
   navigator.serviceWorker.addEventListener("message", (e) => {
     const d = e.data || {};
     if (d.tipo === "abrir-url" && String(d.url || "").includes("ir=devolver-vehiculo") && tecnicoLogueado) irADevolverVehiculo();
+    if (d.tipo === "abrir-url" && String(d.url || "").includes("ir=dato-equipo") && tecnicoLogueado) {
+      try { abrirDatoEquipo(new URL(d.url, location.href).searchParams.get("id") || ""); } catch (err) { /* nada */ }
+    }
   });
 }
 setTimeout(consumirIrPendiente, 1500);

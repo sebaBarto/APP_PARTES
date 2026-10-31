@@ -1464,6 +1464,23 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
       }
 
       if (nombreColeccion === "datos_equipo") {
+        // Dato nuevo: se le avisa al resto del equipo (no a quien lo cargó).
+        // Se espera antes de responder (en Vercel, lo de después puede no correr).
+        if (body && body.accion === "crear" && contenidoAGuardar[0]) {
+          const nuevo = contenidoAGuardar[0];
+          try {
+            const { enviarATodos } = require("../lib/push-sender");
+            await Promise.race([
+              enviarATodos({
+                titulo: "📘 Nuevo dato del equipo",
+                cuerpo: `${String(nuevo.autor || "Alguien").replace(/^Oficina \((.+)\)$/, "$1 (oficina)")}: ${nuevo.titulo}${(nuevo.fotos || []).length ? " (con fotos)" : ""}`.slice(0, 160),
+                url: `/?ir=dato-equipo&id=${encodeURIComponent(nuevo.id)}`,
+                excluir: nuevo.autor,
+              }),
+              new Promise((ok) => setTimeout(ok, 5000)),
+            ]);
+          } catch (errPush) { /* si falla el aviso, el dato igual quedó guardado */ }
+        }
         res.status(200).json({ ok: true, lista: contenidoAGuardar });
         return;
       }
