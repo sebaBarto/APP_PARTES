@@ -16,7 +16,7 @@
 //   simbolo { tipo, x, y, rot, esc, color?, esp? }  equipos y objetos de obra
 
 // Tiene que ser igual a APP_VERSION de app.js (si no, la app recarga).
-const CROQUIS_UTILS_VERSION = "4.28.0";
+const CROQUIS_UTILS_VERSION = "4.28.1";
 const CROQUIS_GRILLA = 20;
 
 // Cada símbolo se dibuja centrado en 0,0 con dib(color). "cat" separa los
@@ -959,6 +959,11 @@ function croquisDesdeVectores(datos) {
   // 2) Escala: las puertas de Visio miden ~0,80 m (32 unidades del croquis).
   const anchos = puertas.map((p) => p.ancho).sort((a, b) => a - b);
   const k = anchos.length ? 32 / anchos[Math.floor(anchos.length / 2)] : 1.5;
+  // 2b) Escaleras: muchos escalones (líneas paralelas iguales, parejas) seguidos.
+  // Dos tramos uno al lado del otro = escalera en U (con su descanso); uno
+  // solo = escalera recta. Todo lo que está adentro (contorno, flechas, la X
+  // del descanso) deja de ser pared.
+  const escaleras = croquisEscalerasEnVectores(segs, figuras, textos, k);
   // 3) Equipos por color y forma.
   const textoEn = (f, re) => textos.find((t) => t.x1 >= f.x0 - 1 && t.x0 <= f.x1 + 1 && t.y >= f.y0 - 2 && t.y <= f.y1 + 2 && re.test(t.s));
   const dentroEdificio = (() => { const ss = segs.filter((s) => !s.usado && !s.dash); if (!ss.length) return () => true; const b = caja(ss.flatMap((s) => [s.a, s.b])); return (x, y) => x >= b.x0 - 1 && x <= b.x1 + 1 && y >= b.y0 - 1 && y <= b.y1 + 1; })();
@@ -1073,6 +1078,11 @@ function croquisDesdeVectores(datos) {
     const pts = [m(lista[0].a), ...lista.map((s) => m(s.b))];
     out.push({ id: id(), t: "cable", pts });
   });
+  escaleras.forEach((e) => {
+    const c = m([e.cx, e.cy]);
+    const el = { id: id(), t: "simbolo", tipo: e.tipo, x: c[0], y: c[1], rot: e.rot, esc: Math.round(e.ancho * k / (e.tipo === "escalera_u" ? 92 : 40) * 100) / 100 };
+    out.push(el);
+  });
   puertas.forEach((p) => {
     const A = m(p.A), B = m(p.B), C = m(p.C);
     const u = [A[0] - C[0], A[1] - C[1]], v = [B[0] - C[0], B[1] - C[1]];
@@ -1096,11 +1106,128 @@ function croquisDesdeVectores(datos) {
     out.push({ id: id(), t: "texto", x: p[0], y: p[1] + 5, texto: t.s.slice(0, 120), tam: Math.max(10, Math.min(28, Math.round(t.alto * k * 0.9))) });
   });
   return {
-    elementos: out, titulo, escala: k, puertas: puertas.length,
+    elementos: out, titulo, escala: k, puertas: puertas.length, escaleras: escaleras.length,
     equipos: equipos.length, paredes: out.filter((e) => e.t === "linea").length,
     // Dónde queda la hoja entera en el croquis (para poner la imagen de fondo).
     marco: { x: Math.round(-ox * k), y: Math.round(-oy * k), w: Math.round(ancho * k), h: Math.round(alto * k) },
   };
+}
+// Escaleras en un plano vectorial (unidades del PDF; k = unidades del croquis
+// por unidad del PDF, 40 unidades = 1 m). Marca como usado lo que es escalera.
+function croquisEscalerasEnVectores(segs, figuras, textos, k) {
+  const M2P = 40 / k; // 1 metro en unidades del PDF
+  const libres = segs.filter((s) => !s.usado && !s.dash);
+  const tramos = [];
+  ["h", "v"].forEach((o) => {
+    // Escalones posibles: líneas rectas de 0,6 a 1,6 m.
+    const ls = libres.filter((s) => (o === "h" ? Math.abs(s.a[1] - s.b[1]) < 0.6 : Math.abs(s.a[0] - s.b[0]) < 0.6)).map((s) => {
+      const p0 = o === "h" ? Math.min(s.a[0], s.b[0]) : Math.min(s.a[1], s.b[1]), p1 = o === "h" ? Math.max(s.a[0], s.b[0]) : Math.max(s.a[1], s.b[1]);
+      return { s, p0, p1, q: o === "h" ? s.a[1] : s.a[0], L: p1 - p0 };
+    }).filter((x) => x.L >= 0.6 * M2P && x.L <= 1.7 * M2P);
+    // Agrupar por los extremos (mismo ancho y en el mismo lugar).
+    const grupos = [];
+    ls.forEach((x) => {
+      const g = grupos.find((g0) => Math.abs(g0.p0 - x.p0) < 0.12 * M2P && Math.abs(g0.p1 - x.p1) < 0.12 * M2P);
+      if (g) g.items.push(x); else grupos.push({ p0: x.p0, p1: x.p1, items: [x] });
+    });
+    grupos.forEach((g) => {
+      // Líneas casi encimadas (escalón dibujado como rectángulo finito) cuentan como una.
+      const orden = g.items.sort((a, b) => a.q - b.q);
+      const unicos = [];
+      orden.forEach((x) => { const u = unicos[unicos.length - 1]; if (u && x.q - u.q < 0.06 * M2P) u.extra.push(x); else unicos.push({ ...x, extra: [] }); });
+      // Corridas con paso parejo de huella (18 a 42 cm).
+      let run = [unicos[0]];
+      const cerrar = () => {
+        if (run.length >= 5) {
+          const pasos = run.slice(1).map((x, i) => x.q - run[i].q), med = pasos.slice().sort((a, b) => a - b)[Math.floor(pasos.length / 2)];
+          if (pasos.every((d) => Math.abs(d - med) < med * 0.35)) tramos.push({ o, a0: Math.min(...run.map((x) => x.p0)), a1: Math.max(...run.map((x) => x.p1)), b0: run[0].q, b1: run[run.length - 1].q, paso: med, items: run });
+        }
+      };
+      for (let i = 1; i < unicos.length; i++) {
+        const d = unicos[i].q - unicos[i - 1].q;
+        if (d >= 0.18 * M2P && d <= 0.42 * M2P && (run.length < 2 || Math.abs(d - (run[run.length - 1].q - run[run.length - 2].q)) < 0.35 * d)) run.push(unicos[i]);
+        else { cerrar(); run = [unicos[i]]; }
+      }
+      if (unicos.length) cerrar();
+    });
+  });
+  const res = [];
+  const usados = new Set();
+  const cajaDe = (o, a0, a1, b0, b1) => (o === "h" ? { x0: a0, x1: a1, y0: b0, y1: b1 } : { x0: b0, x1: b1, y0: a0, y1: a1 });
+  const dentro = (c, p, m) => p[0] >= c.x0 - m && p[0] <= c.x1 + m && p[1] >= c.y0 - m && p[1] <= c.y1 + m;
+  const cuenta = (c) => segs.filter((s) => !s.usado && dentro(c, s.a, 0.02 * M2P) && dentro(c, s.b, 0.02 * M2P)).length;
+  tramos.forEach((t, i) => {
+    if (usados.has(i)) return;
+    // ¿Otro tramo al lado, paralelo y a la par? -> en U.
+    const j = tramos.findIndex((u, jj) => jj !== i && !usados.has(jj) && u.o === t.o &&
+      Math.min(t.b1, u.b1) - Math.max(t.b0, u.b0) > 0.5 * Math.min(t.b1 - t.b0, u.b1 - u.b0) &&
+      Math.max(t.a0, u.a0) - Math.min(t.a1, u.a1) < 0.45 * M2P && Math.abs((t.a1 - t.a0) - (u.a1 - u.a0)) < 0.3 * M2P);
+    usados.add(i);
+    let a0 = t.a0, a1 = t.a1, b0 = t.b0, b1 = t.b1, tipo = "escalera_recta";
+    const items = [...t.items];
+    if (j >= 0) {
+      usados.add(j);
+      const u = tramos[j];
+      a0 = Math.min(t.a0, u.a0); a1 = Math.max(t.a1, u.a1); b0 = Math.min(t.b0, u.b0); b1 = Math.max(t.b1, u.b1);
+      items.push(...u.items); tipo = "escalera_u";
+    }
+    // El descanso (en U): del lado donde el contorno queda más lejos del último
+    // escalón (del otro lado, el borde está a un escalón).
+    let dir = 1;
+    if (tipo === "escalera_u") {
+      const lejos = Math.max(1.0 * M2P, a1 - a0) + 0.4 * M2P;
+      const paralelas = segs.filter((s) => !s.dash && (t.o === "h" ? Math.abs(s.a[1] - s.b[1]) < 0.6 : Math.abs(s.a[0] - s.b[0]) < 0.6)).map((s) => {
+        const p0 = t.o === "h" ? Math.min(s.a[0], s.b[0]) : Math.min(s.a[1], s.b[1]), p1 = t.o === "h" ? Math.max(s.a[0], s.b[0]) : Math.max(s.a[1], s.b[1]);
+        return { q: t.o === "h" ? s.a[1] : s.a[0], cubre: Math.min(p1, a1) - Math.max(p0, a0), largo: p1 - p0 };
+      }).filter((x) => x.cubre > 0.5 * (a1 - a0) && x.largo < (a1 - a0) + 0.3 * M2P); // del contorno, no una pared larga
+      const ladoA = paralelas.filter((x) => x.q < b0 - t.paso * 0.5 && x.q >= b0 - lejos).map((x) => b0 - x.q);
+      const ladoB = paralelas.filter((x) => x.q > b1 + t.paso * 0.5 && x.q <= b1 + lejos).map((x) => x.q - b1);
+      const dA = ladoA.length ? Math.max(...ladoA) : 0, dB = ladoB.length ? Math.max(...ladoB) : 0;
+      if (dA || dB) dir = dB >= dA ? 1 : -1;
+      else {
+        const prof = Math.max(0.8 * M2P, a1 - a0) / 2 + 0.1 * M2P;
+        dir = cuenta(cajaDe(t.o, a0, a1, b1 + t.paso * 0.3, b1 + prof)) >= cuenta(cajaDe(t.o, a0, a1, b0 - prof, b0 - t.paso * 0.3)) ? 1 : -1;
+      }
+      const d = dir > 0 ? dB : dA;
+      const lim = d > t.paso * 1.5 ? (dir > 0 ? b1 + d : b0 - d) : (dir > 0 ? b1 + (a1 - a0) / 2 : b0 - (a1 - a0) / 2);
+      if (dir > 0) b1 = lim; else b0 = lim;
+      // Del otro lado, el último escalón: el borde está a un escalón más.
+      if (dir > 0) b0 -= t.paso * 1.1; else b1 += t.paso * 1.1;
+    } else {
+      b0 -= t.paso / 2; b1 += t.paso / 2;
+      // El contorno (líneas a lo largo, en los bordes) puede seguir un poco más.
+      const largas = segs.filter((s) => !s.dash && (t.o === "h" ? Math.abs(s.a[0] - s.b[0]) < 0.6 : Math.abs(s.a[1] - s.b[1]) < 0.6)).map((s) => ({
+        q: t.o === "h" ? s.a[0] : s.a[1], p0: t.o === "h" ? Math.min(s.a[1], s.b[1]) : Math.min(s.a[0], s.b[0]), p1: t.o === "h" ? Math.max(s.a[1], s.b[1]) : Math.max(s.a[0], s.b[0]),
+      })).filter((x) => (Math.abs(x.q - a0) < 0.05 * M2P || Math.abs(x.q - a1) < 0.05 * M2P) && x.p1 > b0 && x.p0 < b1 && x.p0 > b0 - 1.0 * M2P && x.p1 < b1 + 1.0 * M2P);
+      if (largas.length) { b0 = Math.min(b0, ...largas.map((x) => x.p0)); b1 = Math.max(b1, ...largas.map((x) => x.p1)); }
+    }
+    const c = cajaDe(t.o, a0, a1, b0, b1);
+    // Todo lo que queda adentro es parte de la escalera.
+    const m = 0.03 * M2P;
+    segs.forEach((s) => { if (!s.usado && !s.dash && dentro(c, s.a, m) && dentro(c, s.b, m)) s.usado = true; });
+    items.forEach((x) => { x.s.usado = true; x.extra.forEach((y) => { y.s.usado = true; }); });
+    // Las puntas de flecha (negras); los equipos de color quedan.
+    figuras.forEach((f) => { if (!f.usado && f.fill && Math.max(f.fill[0], f.fill[1], f.fill[2]) < 90 && f.x0 >= c.x0 - m && f.x1 <= c.x1 + m && f.y0 >= c.y0 - m && f.y1 <= c.y1 + m) f.usado = true; });
+    (textos || []).forEach((tx) => { if (!tx.usado && dentro(c, [tx.x, tx.y], m)) tx.usado = true; });
+    // Giro del símbolo: su "-y" local apunta hacia el descanso (en U) o hacia donde sube (recta).
+    const d = t.o === "h" ? [0, dir] : [dir, 0];
+    const rot = Math.round(((Math.atan2(d[0], -d[1]) * 180 / Math.PI) % 360 + 360) % 360);
+    res.push({ tipo, cx: (c.x0 + c.x1) / 2, cy: (c.y0 + c.y1) / 2, ancho: a1 - a0, rot });
+  });
+  return res;
+}
+// Lo mismo sobre un croquis ya convertido (escalones que quedaron como
+// paredes): devuelve los elementos nuevos y cuántas escaleras encontró.
+function croquisReconocerEscaleras(elementos) {
+  const els = elementos || [];
+  const segs = els.filter((e) => e.t === "linea" && !Array.isArray(e.c) && !croquisEsCerco(e)).map((e) => ({ a: [e.x1, e.y1], b: [e.x2, e.y2], dash: e.trazo && e.trazo !== "continuo", usado: false, el: e }));
+  const textos = els.filter((e) => e.t === "texto").map((e) => ({ x: e.x, y: e.y - 5, s: e.texto, el: e }));
+  const esc = croquisEscalerasEnVectores(segs, [], textos, 1);
+  if (!esc.length) return { elementos: els, escaleras: 0 };
+  const fuera = new Set([...segs.filter((x) => x.usado).map((x) => x.el), ...textos.filter((x) => x.usado).map((x) => x.el)]);
+  const nuevos = els.filter((e) => !fuera.has(e));
+  esc.forEach((e, i) => nuevos.push({ id: "esc" + Date.now().toString(36) + i, t: "simbolo", tipo: e.tipo, x: Math.round(e.cx), y: Math.round(e.cy), rot: e.rot, esc: Math.round(e.ancho / (e.tipo === "escalera_u" ? 92 : 40) * 100) / 100 }));
+  return { elementos: nuevos, escaleras: esc.length };
 }
 // Todas las hojas (hasta "max") de un PDF -> páginas de croquis editables.
 // Devuelve null si el PDF no es un dibujo (por ejemplo, un plano escaneado).

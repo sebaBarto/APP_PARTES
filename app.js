@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.28.0";
+const APP_VERSION = "4.28.1";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -16894,6 +16894,7 @@ cqEl("cqMenuBtn").addEventListener("click", () => {
     <button type="button" class="btn btn-secondary" data-m="svg">Archivo editable (SVG, se abre en Visio)</button>
     <div class="cq-menu-fila"><button type="button" class="btn btn-secondary" data-m="foto">${cqIc("galeria")} Boceto desde galería</button><button type="button" class="btn btn-secondary" data-m="camara">${cqIc("camara")} Sacar foto</button></div>
     <button type="button" class="btn btn-secondary" data-m="pagina">${cqIc("pagina")} Agregar una página</button>
+    <button type="button" class="btn btn-secondary" data-m="escaleras">${cqIc("plano")} Reconocer escaleras dibujadas como líneas</button>
     <button type="button" class="btn btn-secondary" data-m="propuesta">${cqIc("cubo")} Hacer otra propuesta (copia para comparar)</button>
     ${cqTodosLosElementos().some((e) => e.inst) && permisosDelTecnico(tecnicoLogueado).presupuesto_express ? `<button type="button" class="btn btn-secondary" data-m="presu">${cqIc("presupuesto")} Pasar los equipos a instalar a un presupuesto</button>` : ""}
     <button type="button" class="btn btn-secondary" data-m="base">${cqIc("plano")} ${cq.fondo && cq.fondo.base ? "Cambiar el plano de la casa" : "Poner el plano de la casa (PDF, imagen o SVG)"}</button>
@@ -16911,6 +16912,11 @@ cqEl("cqMenuBtn").addEventListener("click", () => {
     capa.remove();
     if (m === "guardar") cqGuardar();
     if (m === "ver3d") cqVer3D();
+    if (m === "escaleras") {
+      const r = croquisReconocerEscaleras(cq.elementos);
+      if (!r.escaleras) { showToast("No encontré escaleras dibujadas con líneas en esta página."); }
+      else { cqMemoria(); cq.elementos = r.elementos; cq.sel = null; cq.multi = []; cqSyncPagina(); cqGuardarBorrador(); cqRender(); showToast(r.escaleras === 1 ? "Encontré 1 escalera y la pasé a escalera de verdad (con Deshacer volvés atrás)." : `Encontré ${r.escaleras} escaleras y las pasé a escaleras de verdad (con Deshacer volvés atrás).`); }
+    }
     if (m === "propuesta") { if (cq.cambios && confirm("¿Guardar este plano antes de hacer la copia?")) await cqGuardar(); cqOtraPropuesta(); }
     if (m === "pdf" || m === "png" || m === "svg") cqExportar(m);
     if (m === "datos") cqPedirDatos();

@@ -4076,3 +4076,57 @@ test("Editar en 3D más fácil: arrastrar desde la tira, sello, mover arrastrand
     await ctx.close();
   } finally { await nav.close(); }
 });
+
+test("Plano de Visio a editable: reconoce la escalera en U (dos tramos y el descanso) y la recta, y no quedan como paredes", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  page.on("console", (m) => { if (process.env.DEPURAR && m.text().startsWith("ESC")) console.log(m.text()); });
+  await page.goto(base + "/");
+  await page.waitForTimeout(300);
+  const r = await page.evaluate(async () => {
+    const { PDFDocument, rgb } = await croquisCargarPdfLib();
+    const d = await PDFDocument.create(); const p = d.addPage([700, 500]); const H = 500;
+    const negro = rgb(0, 0, 0), op = { x: 0, y: H, borderColor: negro, borderWidth: 0.75 };
+    const linea = (x1, y1, x2, y2) => p.drawSvgPath(`M ${x1} ${y1} L ${x2} ${y2}`, op);
+    // Casa 400 x 300 y una puerta (de 23,6: da la escala, 1 m ≈ 29,5)
+    p.drawSvgPath("M 100 100 L 500 100 L 500 400 L 100 400 Z", op);
+    linea(300, 100, 300, 200); linea(300, 223.6, 300, 400);
+    p.drawSvgPath("M 300 200 L 276.4 223.6 L 300 223.6", op);
+    // Escalera en U contra la pared derecha: dos tramos de 1 m (29,5) x 2,6 m, 9 escalones; descanso arriba de 1 m con la X
+    const X0 = 441, X1 = 500, YD = 240, Y0 = 270, Y1 = 346;
+    p.drawSvgPath(`M ${X0} ${YD} L ${X1} ${YD} L ${X1} ${Y1} L ${X0} ${Y1} Z`, op); // contorno
+    linea((X0 + X1) / 2, Y0, (X0 + X1) / 2, Y1); // separación de los tramos
+    linea(X0, Y0, X1, Y0); // borde del descanso
+    for (let i = 1; i <= 9; i++) { const y = Y0 + i * 7.6; linea(X0, y, (X0 + X1) / 2, y); linea((X0 + X1) / 2, y, X1, y); }
+    linea(X0, YD, X1, Y0); linea(X1, YD, X0, Y0); // X del descanso
+    p.drawSvgPath(`M ${X0 + 14} ${Y1 - 4} L ${X0 + 14} ${YD + 15} L ${X1 - 14} ${YD + 15} L ${X1 - 14} ${Y1 - 10}`, op); // flecha
+    p.drawSvgPath(`M ${X1 - 17} ${Y1 - 12} L ${X1 - 11} ${Y1 - 12} L ${X1 - 14} ${Y1 - 6} Z`, { x: 0, y: H, color: negro });
+    // Escalera recta (escalones como rectángulos finitos), en el otro ambiente
+    for (let i = 0; i < 12; i++) { const x = 130 + i * 8.5; p.drawSvgPath(`M ${x} 300 L ${x + 0.6} 300 L ${x + 0.6} 330 L ${x} 330 Z`, op); }
+    p.drawSvgPath("M 128 300 L 226 300 L 226 330 L 128 330 Z", op);
+    // Un infrarrojo dentro de la casa (no lo tiene que tocar)
+    p.drawSvgPath("M 492 106 L 497.5 106 L 497.5 111.5 L 492 111.5 Z", { x: 0, y: H, color: rgb(1, 0, 0), borderColor: negro, borderWidth: 0.75 });
+    const bytes = await d.save();
+    const res = await croquisPdfAEditable(bytes, 1);
+    const els = res.paginas[0].elementos;
+    return {
+      escaleras: els.filter((e) => /^escalera/.test(e.tipo)).map((e) => ({ tipo: e.tipo, rot: e.rot, esc: e.esc, x: e.x, y: e.y })),
+      paredes: els.filter((e) => e.t === "linea").length,
+      ir: els.filter((e) => e.tipo === "infrarrojo").length,
+      puertas: els.filter((e) => e.tipo === "puerta").length,
+      lista: els.filter((e) => e.t === "linea").map((e) => [e.x1, e.y1, e.x2, e.y2].map(Math.round).join(",")),
+      paredEsc: els.filter((e) => e.t === "linea" && Math.abs(e.x1 - e.x2) < 1 && Math.abs(e.y1 - e.y2) > 0 && Math.abs(e.y1 - e.y2) < 20).length,
+    };
+  });
+  const tipos = r.escaleras.map((e) => e.tipo).sort();
+  assert.deepStrictEqual(tipos, ["escalera_recta", "escalera_u"], JSON.stringify(r));
+  const u = r.escaleras.find((e) => e.tipo === "escalera_u");
+  assert.strictEqual(u.rot, 0, "el descanso queda arriba (hacia -y)");
+  assert.ok(Math.abs(u.esc - 0.87) < 0.12, "ancho de los dos tramos (~2 m): " + u.esc);
+  const rec = r.escaleras.find((e) => e.tipo === "escalera_recta");
+  assert.ok(rec.rot === 90 || rec.rot === 270, "la recta sube a lo largo (horizontal): " + rec.rot);
+  assert.strictEqual(r.paredes, 6, "solo las paredes de la casa (los escalones no son paredes): " + r.lista.join(" | "));
+  assert.strictEqual(r.ir, 1);
+  assert.strictEqual(r.puertas, 1);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

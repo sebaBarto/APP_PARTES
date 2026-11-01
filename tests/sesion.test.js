@@ -695,3 +695,32 @@ test("Vista 3D: el análisis ve qué parte de la casa cubre cada sensor, qué ab
   assert.strictEqual(c.porcentaje, 100);
   assert.strictEqual(ctx.C3.analizar([{ id: "x", t: "simbolo", tipo: "central", x: 0, y: 0 }]), null, "sin paredes no hay análisis");
 });
+
+test("Croquis ya convertido: las escaleras que quedaron como líneas se reconocen y pasan a escalera (U y recta)", () => {
+  const vm = require("vm");
+  const ctx = { window: {}, document: { createElement: () => ({ getContext: () => null }) }, console };
+  ctx.window = ctx;
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(raiz, "croquis-utils.js"), "utf8") + "\n;this.rec=croquisReconocerEscaleras;", ctx);
+  let n = 0;
+  const L = (x1, y1, x2, y2) => ({ id: "l" + n++, t: "linea", x1, y1, x2, y2 });
+  const casa = [L(0, 0, 600, 0), L(600, 0, 600, 400), L(600, 400, 0, 400), L(0, 400, 0, 0)];
+  // U: dos tramos de 40 de ancho (x 520..600), escalones cada 11 de y=170 a 270, descanso arriba (y 130..170) con la X
+  const u = [L(520, 130, 600, 130), L(520, 130, 520, 280), L(520, 280, 600, 280), L(560, 170, 560, 280), L(520, 170, 600, 170), L(520, 130, 600, 170), L(600, 130, 520, 170)];
+  for (let i = 1; i <= 9; i++) { const y = 170 + i * 11; u.push(L(520, y, 560, y), L(560, y, 600, y)); }
+  // Recta horizontal: escalones verticales cada 11, de 40 de largo
+  const r = [L(40, 300, 190, 300), L(40, 340, 190, 340)];
+  for (let i = 0; i < 12; i++) r.push(L(50 + i * 11, 300, 50 + i * 11, 340));
+  const texto = { id: "t", t: "texto", x: 560, y: 250, texto: "SUBE" };
+  const res = ctx.rec([...casa, ...u, ...r, texto, { id: "s", t: "simbolo", tipo: "infrarrojo", x: 10, y: 10 }]);
+  assert.strictEqual(res.escaleras, 2);
+  const tipos = res.elementos.filter((e) => /^escalera/.test(e.tipo)).map((e) => e.tipo).sort();
+  assert.deepStrictEqual(tipos, ["escalera_recta", "escalera_u"]);
+  const eu = res.elementos.find((e) => e.tipo === "escalera_u");
+  assert.strictEqual(eu.rot, 0, "descanso hacia arriba");
+  assert.ok(Math.abs(eu.esc - 80 / 92) < 0.05);
+  assert.deepStrictEqual(res.elementos.filter((e) => e.t === "linea").map((e) => e.id).sort(), casa.map((e) => e.id).sort(), "quedan solo las paredes de la casa");
+  assert.ok(!res.elementos.some((e) => e.id === "t"), "el SUBE de adentro se va");
+  assert.ok(res.elementos.some((e) => e.id === "s"), "el sensor queda");
+  assert.strictEqual(ctx.rec(casa).escaleras, 0, "una casa sin escalera no cambia");
+});
