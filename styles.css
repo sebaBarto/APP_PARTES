@@ -3714,3 +3714,18 @@ html .app .equipo-acciones .btn.eq-util.activo, .equipo-acciones .eq-util.activo
 /* Croquis: tipo de línea (pared o cerco) */
 .cq-tipo-linea { border: 1px solid var(--border, #C9CED4); background: var(--surface, #fff); color: inherit; border-radius: 8px; padding: 6px 8px; font: 600 12.5px inherit; font-family: inherit; white-space: nowrap; }
 .cq-tipo-linea.activo { background: #F2C94C; color: #1C1E21; border-color: #D4A017; }
+/* Propuestas 3D enviadas (seguimiento) */
+.cq-badge { display: inline-block; min-width: 20px; padding: 1px 6px; margin-left: 6px; border-radius: 10px; background: #C0392B; color: #fff; font-size: 12px; font-weight: 700; }
+.cq-propuestas .cq-datos { max-height: 92vh; }
+.cq-prop-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+.cq-prop-tabs button { border: 1px solid var(--border, #C9CED4); background: var(--surface, #fff); color: inherit; border-radius: 16px; padding: 6px 10px; font: 600 13px inherit; font-family: inherit; }
+.cq-prop-tabs button.activo { background: #F2C94C; color: #1C1E21; border-color: #D4A017; }
+.cq-prop { border: 1px solid var(--border, #C9CED4); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 3px; }
+.cq-prop small { color: var(--text-muted, #5B6B7B); }
+.cq-prop-cab { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.cq-prop-estado { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: #E6E6E6; color: #1C1E21; }
+.cq-prop-estado.ganada { background: #2E9E4F; color: #fff; }
+.cq-prop-estado.perdida { background: #8E949A; color: #fff; }
+.cq-prop-aviso { margin: 4px 0 0; padding: 6px 8px; border-radius: 8px; background: #FFF4D6; color: #6B4E00; font-weight: 600; font-size: 13.5px; }
+.cq-prop-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; align-items: center; }
+.cq-prop-btns a.btn { text-decoration: none; }

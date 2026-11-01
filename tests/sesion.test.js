@@ -724,3 +724,53 @@ test("Croquis ya convertido: las escaleras que quedaron como líneas se reconoce
   assert.ok(res.elementos.some((e) => e.id === "s"), "el sensor queda");
   assert.strictEqual(ctx.rec(casa).escaleras, 0, "una casa sin escalera no cambia");
 });
+
+test("Seguimiento de propuestas 3D: a quién llamar, y solo quien la mandó (o la oficina) la marca ganada/perdida", async () => {
+  const { seguimientoPropuesta } = require(path.join(raiz, "lib/propuestas3d.js"));
+  const ahora = Date.parse("2026-11-10T12:00:00Z"), dia = 864e5, iso = (ms) => new Date(ms).toISOString();
+  assert.strictEqual(seguimientoPropuesta({ fecha: iso(ahora - dia), aperturas: 3, ultima: iso(ahora - 3600e3), llamadas: [{ telefono: "11 1" }] }, ahora).regla, "llamar");
+  assert.strictEqual(seguimientoPropuesta({ fecha: iso(ahora - dia), aperturas: 3, ultima: iso(ahora - 3600e3), llamadas: [{ telefono: "11 1" }], llamada_atendida: true }, ahora).regla, "caliente");
+  assert.strictEqual(seguimientoPropuesta({ fecha: iso(ahora - 3 * dia), aperturas: 0 }, ahora).regla, "sin_abrir");
+  assert.strictEqual(seguimientoPropuesta({ fecha: iso(ahora - dia), aperturas: 0 }, ahora), null, "recién mandada: todavía no");
+  assert.strictEqual(seguimientoPropuesta({ fecha: iso(ahora - 9 * dia), aperturas: 1, ultima: iso(ahora - 6 * dia) }, ahora).regla, "enfriando");
+  assert.strictEqual(seguimientoPropuesta({ fecha: iso(ahora - 3 * dia), aperturas: 0, estado: "ganada" }, ahora), null, "cerrada: nada");
+
+  const fetchViejo = global.fetch;
+  const archivos = { "vistas3d/indice.json": [{ id: "a".repeat(16), por: "Luis", cliente: "Vilches", fecha: iso(Date.now() - 3 * dia), aperturas: 0 }, { id: "b".repeat(16), por: "Ana", cliente: "Pérez", fecha: iso(Date.now()), aperturas: 0 }] };
+  global.fetch = async (url, op = {}) => {
+    const ruta = (String(url).match(/contents\/([^?]+)/) || [])[1];
+    const r = ruta && decodeURIComponent(ruta);
+    if (r === "tecnicos.json") return new Response(JSON.stringify({ content: Buffer.from("[]").toString("base64"), encoding: "base64", sha: "t" }));
+    if (r) {
+      if (op.method === "PUT") { archivos[r] = JSON.parse(Buffer.from(JSON.parse(op.body).content, "base64").toString("utf-8")); return new Response("{}", { status: 200 }); }
+      if (!archivos[r]) return new Response("{}", { status: 404 });
+      return new Response(JSON.stringify({ sha: "s", encoding: "base64", content: Buffer.from(JSON.stringify(archivos[r])).toString("base64") }));
+    }
+    return new Response("[]");
+  };
+  try {
+    const luis = crearSesion({ nombre: "Luis", rol: "tecnico" }), admin = crearSesion({ nombre: "Oficina", rol: "admin" });
+    let r = resFalso();
+    await datos(pedido("GET", { coleccion: "croquis", vistas3d: "1", todas: "1" }, null, luis), r);
+    assert.deepStrictEqual(r.cuerpo.map((v) => v.cliente), ["Vilches"], "cada uno ve las suyas");
+    assert.strictEqual(r.cuerpo[0].seguimiento.regla, "sin_abrir");
+    r = resFalso();
+    await datos(pedido("GET", { coleccion: "croquis", vistas3d: "1", todas: "1" }, null, admin), r);
+    assert.strictEqual(r.cuerpo.length, 2, "la oficina ve todas");
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "croquis" }, { accion: "vista3d_estado", id: "b".repeat(16), estado: "ganada" }, luis), r);
+    assert.strictEqual(r.statusCode, 403, "no es suya");
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "croquis" }, { accion: "vista3d_estado", id: "a".repeat(16), estado: "ganada" }, luis), r);
+    assert.strictEqual(r.statusCode, 200);
+    assert.strictEqual(archivos["vistas3d/indice.json"][0].estado, "ganada");
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "croquis" }, { accion: "vista3d_estado", id: "a".repeat(16), estado: "" }, luis), r);
+    assert.ok(!archivos["vistas3d/indice.json"][0].estado, "reabierta");
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "croquis" }, { accion: "vista3d_estado", id: "a".repeat(16), estado: "regalada" }, luis), r);
+    assert.strictEqual(r.statusCode, 400);
+  } finally {
+    global.fetch = fetchViejo;
+  }
+});

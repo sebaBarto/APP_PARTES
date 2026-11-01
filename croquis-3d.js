@@ -1218,6 +1218,9 @@ const CROQUIS_3D_ESTILO = `
 .v3-acciones button.v3-primario{background:#1C1E21;color:#fff;border-color:#1C1E21}
 .v3-link{display:block;margin:10px auto 0;background:none;border:0;color:var(--tenue);font:600 14px inherit;font-family:inherit;text-decoration:underline;cursor:pointer}
 @media (max-width:480px){.v3-barra,.v3-props{gap:4px}.v3-barra button,.v3-props button{padding:9px 9px;font-size:13px}}
+.v3-puntos{display:flex;gap:6px;justify-content:center;margin:0 0 8px}.v3-puntos i{width:8px;height:8px;border-radius:50%;background:var(--bd)}.v3-puntos i.on{background:var(--ac);width:20px;border-radius:4px}
+.v3-presentando .v3-barra,.v3-presentando .v3-props,.v3-presentando .v3-tira{display:none}
+.v3-hoja .v3-paso-texto{font-size:15px}
 .v3-tira{display:flex;gap:6px;overflow-x:auto;max-width:100%;padding:2px;scrollbar-width:none}
 .v3-tira button{flex:none;display:flex;flex-direction:column;align-items:center;gap:1px;width:68px;padding:5px 2px 4px;border-radius:12px;border:1px solid var(--bd);background:var(--sup);color:var(--fg);box-shadow:0 2px 8px rgba(0,0,0,.15);font:600 10px inherit;font-family:inherit;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
 .v3-tira button svg{width:26px;height:26px;pointer-events:none}.v3-tira button span{pointer-events:none;line-height:1.1;text-align:center}
@@ -1233,6 +1236,31 @@ const CROQUIS_3D_LEYENDA = {
   rotura_vidrio: ["Detector de rotura de vidrio", "#17809B"], pulsador_asalto: ["Botón de pánico", "#E8741E"], pulsador_incendio: ["Pulsador de incendio", "#E00000"],
   camara_ip: ["Cámara", "#F4F4F4"], camara_analoga: ["Cámara", "#F4F4F4"], camara_domo: ["Cámara domo", "#F4F4F4"], dvr: ["Grabador de cámaras", "#2B2F33"], detector_360: ["Detector de techo 360°", "#FFFFFF"],
 };
+// Qué hace cada equipo, en palabras simples (para el cliente).
+const CROQUIS_3D_EXPLICA = {
+  infrarrojo: "Detecta el movimiento de una persona en el ambiente y le avisa a la central.",
+  infrarrojo_ext: "Detecta movimiento afuera (patio, cochera, frente) antes de que alguien llegue a la casa.",
+  infrarrojo_cortina: "Forma una cortina invisible frente a una abertura: detecta si alguien la cruza.",
+  detector_360: "Va en el techo y detecta movimiento alrededor, en todas las direcciones.",
+  magnetico: "Avisa apenas se abre la puerta o la ventana, aunque la alarma esté activada solo en el perímetro.",
+  rotura_vidrio: "Detecta el sonido de un vidrio que se rompe y avisa al instante.",
+  humo: "Detecta humo de un principio de incendio y hace sonar la alarma aunque no estés.",
+  gas: "Detecta pérdidas de gas y avisa antes de que sea peligroso.",
+  central: "Es el cerebro del sistema: recibe los avisos de los sensores, hace sonar las sirenas y avisa al monitoreo.",
+  hub: "Central inalámbrica: recibe los avisos de los sensores sin cables y avisa al monitoreo.",
+  repetidor: "Extiende el alcance de la señal inalámbrica a los sensores más lejanos.",
+  teclado: "Desde acá se activa y desactiva la alarma con tu clave.",
+  sirena_int: "Suena fuerte adentro para asustar al intruso.",
+  sirena_ext: "Suena afuera y alerta a los vecinos: muchas veces el intruso se va apenas la escucha.",
+  sirena_flash: "Suena y destella afuera para que se vea desde lejos dónde está la alarma.",
+  pulsador_asalto: "Botón de pánico: con un toque pedís ayuda en una emergencia.",
+  pulsador_incendio: "Para dar aviso manual de un incendio.",
+  camara_ip: "Graba y te deja ver en vivo desde el celular lo que pasa en esa zona.",
+  camara_analoga: "Graba lo que pasa en esa zona para poder verlo después.",
+  camara_domo: "Cámara de techo que vigila todo el ambiente.",
+  dvr: "Guarda las grabaciones de las cámaras.",
+};
+const ALCANCE_TXT = { infrarrojo: "11", infrarrojo_ext: "12", infrarrojo_cortina: "10" };
 // Equipos que se pueden agregar tocando en el 3D (en este orden).
 const CROQUIS_3D_PALETA = ["infrarrojo", "infrarrojo_ext", "infrarrojo_cortina", "magnetico", "humo", "rotura_vidrio", "detector_360", "sirena_int", "sirena_ext", "teclado", "central", "pulsador_asalto", "camara_ip", "camara_domo"];
 const CROQUIS_3D_CON_ZONA = ["infrarrojo", "infrarrojo_ext", "infrarrojo_cortina", "magnetico", "humo", "gas", "rotura_vidrio", "detector_360", "pulsador_asalto", "pulsador_incendio"];
@@ -1294,12 +1322,15 @@ function iniciarVisor3D(datos, opciones) {
     const actual = pisos.find((x) => x.i === pag);
     if (!actual) return {};
     const abajoDe = (n) => { const b = pisos.find((x) => x.nivel === n - 1); return b ? paginas[b.i].elementos : []; };
-    if (todo) return { altura: altura(actual.nivel), suelo: actual.nivel === min, todaLaCasa: true, niveles: pisos.filter((x) => x.i !== pag).map((x) => ({ elementos: paginas[x.i].elementos, altura: altura(x.nivel), suelo: x.nivel === min, abajo: abajoDe(x.nivel), modo: "completo" })) };
+    if (todo) return { altura: altura(actual.nivel), suelo: actual.nivel === min, todaLaCasa: true, niveles: pisos.filter((x) => x.i !== pag).map((x) => ({ elementos: filtro(paginas[x.i].elementos), altura: altura(x.nivel), suelo: x.nivel === min, abajo: abajoDe(x.nivel), modo: "completo" })) };
     // Un piso solo: los de abajo como referencia (transparentes); los de arriba no se ven.
     return { altura: altura(actual.nivel), suelo: actual.nivel === min, abajo: abajoDe(actual.nivel), niveles: pisos.filter((x) => x.nivel < actual.nivel).map((x) => ({ elementos: paginas[x.i].elementos, altura: altura(x.nivel), suelo: x.nivel === min, abajo: abajoDe(x.nivel), modo: "fantasma" })) };
   };
   const pila = [];
   let sello = null, propuesta = null, vistaEd = "planta";
+  // "Sin alarma": la casa como está hoy (sin los equipos nuevos), para comparar.
+  let sinAlarma = false, presentando = null;
+  const filtro = (els) => (sinAlarma ? els.filter((e) => !(e.t === "simbolo" && CROQUIS_SIMBOLOS[e.tipo] && CROQUIS_SIMBOLOS[e.tipo].cat === "equipo" && !e.prev)) : els);
   // % cubierto de cada propuesta (de todas sus plantas juntas).
   const cobertura = (pr) => {
     let suma = 0, n = 0, abiertas = 0;
@@ -1320,7 +1351,7 @@ function iniciarVisor3D(datos, opciones) {
       orden.map((i) => `<button type="button" data-pag="${i}" class="${!todo && i === pag ? "on" : ""}">${nombre(paginas[i], i)}</button>`).join("");
   };
   const pintarLeyenda = () => {
-    const todos = paginas.flatMap((p) => p.elementos);
+    const todos = paginas.flatMap((p) => filtro(p.elementos));
     const cuenta = {};
     todos.filter((e) => e.t === "simbolo" && CROQUIS_3D_LEYENDA[e.tipo] && !e.prev).forEach((e) => {
       const k = CROQUIS_3D_LEYENDA[e.tipo][0];
@@ -1330,8 +1361,8 @@ function iniciarVisor3D(datos, opciones) {
     const an = visor && visor.analisis;
     const abiertas = an ? an.aberturasSinProteger.length : 0;
     const abierto = ley.open;
-    ley.innerHTML = `<summary>Qué se instala</summary>
-      ${todo && cobertura(propuestas[prop]) ? `<p class="v3-cubre">Cubre el ${cobertura(propuestas[prop]).pct}% de la casa</p>` : an && an.porcentaje != null ? `<p class="v3-cubre">Cubre el ${an.porcentaje}% de ${paginas.length > 1 ? "esta planta" : "la casa"}</p>` : ""}
+    ley.innerHTML = `<summary>${sinAlarma ? "Así está hoy" : "Qué se instala"}</summary>
+      ${sinAlarma ? `<p class="v3-cubre">${an && an.porcentaje ? `Hoy los sensores cubren el ${an.porcentaje}%` : "Hoy ningún sensor cubre la casa"}</p>` : todo && cobertura(propuestas[prop]) ? `<p class="v3-cubre">Cubre el ${cobertura(propuestas[prop]).pct}% de la casa</p>` : an && an.porcentaje != null ? `<p class="v3-cubre">Cubre el ${an.porcentaje}% de ${paginas.length > 1 ? "esta planta" : "la casa"}</p>` : ""}
       ${abiertas ? `<p class="v3-mal">${abiertas === 1 ? "1 abertura que da afuera no tiene sensor" : abiertas + " aberturas que dan afuera no tienen sensor"}</p>` : ""}
       <ul>${Object.entries(cuenta).map(([k, v]) => `<li><i style="background:${v.color}"></i>${v.n} × ${esc(k)}</li>`).join("")}
       <li><i style="background:rgba(224,0,0,.35)"></i>Zona que cubre cada sensor</li>
@@ -1345,7 +1376,7 @@ function iniciarVisor3D(datos, opciones) {
     if (visor && visor.enCamara) { barra.innerHTML = `<button type="button" data-a="salircam" class="v3-fuerte">Salir de la cámara</button>`; return; }
     barra.innerHTML = editando
       ? `<button type="button" data-a="deshacer" ${pila.length ? "" : "disabled"}>Deshacer</button><button type="button" data-a="completar" class="v3-fuerte">Completar la protección</button><button type="button" data-a="debiles" class="${debiles ? "on" : ""}">Puntos débiles</button><button type="button" data-a="vistaed">${vistaEd === "planta" ? "Ver en 3D" : "Ver de arriba"}</button><button type="button" data-a="listo" class="on">Listo</button>`
-      : `<button type="button" data-a="cobertura" class="${v.cobertura === false ? "" : "on"}">Coberturas</button><button type="button" data-a="debiles" class="${debiles ? "on" : ""}">Puntos débiles</button><button type="button" data-a="simular">${visor && visor.simulando ? "Parar" : "Simular intruso"}</button><button type="button" data-a="vista">Vista ▾</button>${ed ? `<button type="button" data-a="editar">Editar</button>` : ""}${o.llamar ? `<button type="button" data-a="llamar" class="v3-fuerte">Quiero que me llamen</button>` : ""}${(o.extras || []).map((x, i) => `<button type="button" data-extra="${i}">${esc(x.texto)}</button>`).join("")}${o.botonCerrar ? `<button type="button" data-a="cerrar">Cerrar</button>` : ""}`;
+      : `<button type="button" data-a="antes" class="${sinAlarma ? "on" : ""}">${sinAlarma ? "Ver con SAT" : "Ver sin alarma"}</button><button type="button" data-a="simular">${visor && visor.simulando ? "Parar" : "Simular intruso"}</button><button type="button" data-a="vista">Vista ▾</button>${ed ? `<button type="button" data-a="editar">Editar</button>` : ""}${o.llamar ? `<button type="button" data-a="llamar" class="v3-fuerte">Quiero que me llamen</button>` : ""}${(o.extras || []).map((x, i) => `<button type="button" data-extra="${i}">${esc(x.texto)}</button>`).join("")}${o.botonCerrar ? `<button type="button" data-a="cerrar">Cerrar</button>` : ""}`;
   };
   const decir = (t, alarma, segundos) => {
     clearTimeout(avisoTimer);
@@ -1357,7 +1388,7 @@ function iniciarVisor3D(datos, opciones) {
     const v = visor ? visor.vista : {};
     const cam = mantenerCamara && visor && !visor.enCamara ? visor.estadoCamara() : null;
     if (visor) visor.destruir();
-    visor = Croquis3D.crear(lienzo, paginas[pag].elementos, { paraCaptura: o.paraCaptura, paredesBajas: v.paredesBajas, cobertura: v.cobertura, debiles, camaraInicial: cam, alTocar: tocar, editable: () => editando, alArrastrar: arrastre, ...opcionesPisos() });
+    visor = Croquis3D.crear(lienzo, filtro(paginas[pag].elementos), { paraCaptura: o.paraCaptura, paredesBajas: v.paredesBajas, cobertura: v.cobertura, debiles: debiles || (sinAlarma && !presentando), camaraInicial: cam, alTocar: tocar, editable: () => editando, alArrastrar: arrastre, ...opcionesPisos() });
     if (sel) visor.marcar(sel.id);
   };
   const cerrarHoja = () => { hoja.classList.add("hidden"); hoja.innerHTML = ""; hoja.onclick = null; sel = null; if (visor) visor.marcar(null); };
@@ -1530,9 +1561,8 @@ function iniciarVisor3D(datos, opciones) {
     if (visor.enCamara) return;
     if (iProp != null && propuesta) { propuesta.lista.splice(iProp, 1); visor.mostrarPropuestas(propuesta.lista); hojaPropuesta(); return; }
     if (!editando) {
-      if (!equipo) return;
-      if (esCamara(equipo)) { verCamara(equipo); return; }
-      decir(nombreDe(equipo.tipo) + zonaDe(equipo) + (equipo.prev ? " · ya instalado" : equipo.inst ? " · a instalar" : ""), false, 3);
+      if (!equipo || presentando) return;
+      hojaQueHace(equipo);
       return;
     }
     if (moviendo) {
@@ -1581,14 +1611,96 @@ function iniciarVisor3D(datos, opciones) {
   // ---- Vista ▾ ----
   function hojaVista() {
     const v = visor.vista;
-    hoja.innerHTML = `<b>Vista</b><div class="v3-acciones"><button type="button" data-h="paredes" class="${v.paredesBajas ? "on" : ""}">Ver adentro (paredes bajas)</button><button type="button" data-h="arriba">Desde arriba</button><button type="button" data-h="inicio">Vista inicial</button></div><button type="button" class="v3-link" data-h="cerrar">Cerrar</button>`;
+    hoja.innerHTML = `<b>Vista</b><div class="v3-acciones"><button type="button" data-h="cobertura" class="${v.cobertura === false ? "" : "on"}">Coberturas</button><button type="button" data-h="debiles" class="${debiles ? "on" : ""}">Puntos débiles</button><button type="button" data-h="paredes" class="${v.paredesBajas ? "on" : ""}">Ver adentro</button><button type="button" data-h="arriba">Desde arriba</button><button type="button" data-h="inicio">Vista inicial</button>${o.presentacion ? `<button type="button" data-h="presentacion">Ver la presentación</button>` : ""}</div><button type="button" class="v3-link" data-h="cerrar">Cerrar</button>`;
     hoja.classList.remove("hidden");
     hoja.onclick = (ev) => {
       const b = ev.target.closest("button"); if (!b) return;
       const h = b.dataset.h;
+      if (h === "debiles") { debiles = !debiles; visor.alternar("debiles"); b.classList.toggle("on", debiles); return; }
+      if (h === "cobertura") { b.classList.toggle("on", visor.alternar("cobertura").cobertura); return; }
+      if (h === "presentacion") { cerrarHoja(); presentar(); return; }
       if (h !== "cerrar") visor.alternar(h);
       cerrarHoja();
     };
+  }
+  // ---- Qué hace cada equipo (al tocarlo) ----
+  const dondeEsta = (e) => {
+    const els = paginas[pag].elementos;
+    const hab = els.find((r) => r.t === "rect" && r.nombre && e.x >= Math.min(r.x, r.x + r.w) && e.x <= Math.max(r.x, r.x + r.w) && e.y >= Math.min(r.y, r.y + r.h) && e.y <= Math.max(r.y, r.y + r.h));
+    if (hab) return hab.nombre;
+    let mejor = null;
+    els.filter((t) => t.t === "texto" && t.texto && !/^\s*\d+\s*$/.test(t.texto) && String(t.texto).length < 30).forEach((t) => { const d = Math.hypot(t.x - e.x, t.y - e.y); if (d < 110 && (!mejor || d < mejor.d)) mejor = { d, t: t.texto }; });
+    return mejor ? mejor.t.trim() : "";
+  };
+  function hojaQueHace(e) {
+    const def = CROQUIS_SIMBOLOS[e.tipo] || {};
+    let texto = CROQUIS_3D_EXPLICA[e.tipo] || "Forma parte del sistema de seguridad.";
+    if (def.ir) { const { ang, doble } = croquisIRParams(e, def); texto += ` Cubre hasta ${ALCANCE_TXT[e.tipo] || "11"} m, en un ángulo de ${doble ? ang * 2 : ang}°.`; }
+    const lugar = dondeEsta(e);
+    hoja.innerHTML = `<b>${esc(nombreDe(e.tipo))}${e.etq ? " · zona " + esc(e.etq) : ""}</b>${lugar ? `<p class="v3-nota">En ${esc(lugar.toLowerCase())}</p>` : ""}<p>${esc(texto)}</p>${e.prev ? `<p class="v3-nota">Ya está instalado.</p>` : e.inst ? `<p class="v3-nota">Se agrega con esta propuesta.</p>` : ""}
+      ${esCamara(e) ? `<div class="v3-acciones"><button type="button" data-h="vercam" class="v3-primario">Ver lo que ve</button></div>` : ""}<button type="button" class="v3-link" data-h="cerrar">Cerrar</button>`;
+    hoja.classList.remove("hidden");
+    visor.marcar(e.id);
+    hoja.onclick = (ev) => { const b = ev.target.closest("button"); if (!b) return; if (b.dataset.h === "vercam") { verCamara(e); return; } cerrarHoja(); };
+  }
+  // ---- Antes / después ----
+  function ponerSinAlarma(si) {
+    if (sinAlarma === si) return;
+    sinAlarma = si; visor.pararSimulacion && visor.pararSimulacion();
+    cerrarHoja(); armar(true); pintarLeyenda(); pintarBarra();
+    if (!presentando) {
+      const an = visor.analisis, ab = an ? an.aberturasSinProteger.length : 0;
+      decir(si ? (ab ? `Así está hoy: ${ab === 1 ? "1 abertura que da afuera queda" : ab + " aberturas que dan afuera quedan"} sin protección${an && !an.porcentaje ? " y ningún sensor cubre los ambientes" : ""}.` : "Así está hoy, sin el sistema.") : "Con SAT: así queda protegida.", si, 4);
+    }
+  }
+  // ---- Presentación guiada (la ve el cliente al abrir el link) ----
+  function presentar() {
+    if (editando) return;
+    const conteo = () => {
+      const c = {};
+      paginas.flatMap((p) => p.elementos).filter((e) => e.t === "simbolo" && CROQUIS_SIMBOLOS[e.tipo] && CROQUIS_SIMBOLOS[e.tipo].cat === "equipo" && !e.prev).forEach((e) => { const k = (CROQUIS_3D_LEYENDA[e.tipo] || [nombreDe(e.tipo)])[0]; c[k] = (c[k] || 0) + 1; });
+      return Object.entries(c).map(([k, n]) => `${n} × ${k.toLowerCase()}`);
+    };
+    const pasos = [
+      { t: "Esta es tu casa", p: () => "La armamos a partir del plano. En 4 pasos te mostramos cómo la protege el sistema de SAT.", antes: true, deb: false, vista: "inicio" },
+      { t: "Por dónde podrían entrar hoy", p: () => { const ab = visor.analisis ? visor.analisis.aberturasSinProteger.length : 0; return `${ab ? `En rojo, ${ab === 1 ? "la abertura que da afuera y no tiene ningún sensor" : "las " + ab + " aberturas que dan afuera y no tienen ningún sensor"}. ` : ""}En naranja rayado, lo que hoy nadie vigila.`; }, antes: true, deb: true, vista: "inicio" },
+      { t: "Lo que instalamos", p: () => { const an = visor.analisis, l = conteo(); return `${l.length ? l.join(", ") + ". " : ""}${an && an.porcentaje != null ? `Los sensores cubren el ${an.porcentaje}% de ${paginas.length > 1 && !todo ? "esta planta" : "la casa"}` : ""}${an && !an.aberturasSinProteger.length ? " y todas las entradas quedan protegidas." : "."}${propuestas.length > 1 ? ` Tenés ${propuestas.length} propuestas para comparar abajo.` : ""}`; }, antes: false, deb: false, vista: "inicio" },
+      { t: "Si alguien entra…", p: () => "Mirá qué pasa si alguien entra a la casa.", antes: false, deb: false, vista: "inicio", simular: true },
+      { t: "¿Lo charlamos?", p: () => `Podés girar la casa con el dedo, tocar cada equipo para ver qué hace y comparar${propuestas.length > 1 ? " las propuestas" : " cómo está hoy y cómo quedaría"}.`, antes: false, deb: false, final: true },
+    ];
+    let i = 0;
+    presentando = true;
+    pie.classList.add("v3-presentando");
+    const fin = () => { presentando = null; pie.classList.remove("v3-presentando"); cerrarHoja(); decir(""); ponerSinAlarma(false); pintarBarra(); };
+    const mostrar = () => {
+      const ps = pasos[i];
+      const cambio = ps.antes !== sinAlarma || ps.deb !== debiles;
+      sinAlarma = ps.antes; debiles = ps.deb;
+      if (cambio) { armar(true); pintarLeyenda(); }
+      if (ps.vista) visor.alternar(ps.vista);
+      decir("");
+      hoja.innerHTML = `<div class="v3-puntos">${pasos.map((x, j) => `<i class="${j === i ? "on" : ""}"></i>`).join("")}</div><b>${ps.t}</b><p class="v3-paso-texto">${ps.p()}</p>
+        <div class="v3-acciones">${i > 0 ? `<button type="button" data-h="ant">Anterior</button>` : ""}${ps.final ? (o.llamar ? `<button type="button" data-h="llamar" class="v3-primario">Quiero que me llamen</button>` : "") + `<button type="button" data-h="fin"${o.llamar ? "" : ' class="v3-primario"'}>Ver la casa por mi cuenta</button>` : `<button type="button" data-h="sig" class="v3-primario">${i === 0 ? "Empezar" : "Siguiente"}</button>`}</div>
+        ${ps.final ? "" : `<button type="button" class="v3-link" data-h="fin">Saltar</button>`}`;
+      hoja.classList.remove("hidden");
+      if (ps.simular) {
+        const txt = hoja.querySelector(".v3-paso-texto");
+        let primera = null;
+        visor.simular((ev) => {
+          if (!presentando) return;
+          if (ev.tipo === "detecta" && !primera) { primera = ev; croquis3dPitido(660, 0.5); setTimeout(() => croquis3dPitido(880, 0.5), 520); txt.textContent = `¡Lo detectó el ${enFrase(ev.equipo)} a los ${ev.segundos.toFixed(1).replace(".", ",")} segundos y sonó la alarma!`; }
+          if (ev.tipo === "fin") txt.textContent = primera ? `Lo detectó el ${enFrase(primera.equipo)} a los ${primera.segundos.toFixed(1).replace(".", ",")} segundos, sonó la alarma y el monitoreo recibe el aviso al instante.` : "Recorrió la casa sin que lo detecten: conviene reforzar algunos puntos.";
+        });
+      } else visor.pararSimulacion();
+      hoja.onclick = (ev) => {
+        const b = ev.target.closest("button"); if (!b) return;
+        if (b.dataset.h === "sig") { i = Math.min(pasos.length - 1, i + 1); mostrar(); }
+        if (b.dataset.h === "ant") { i = Math.max(0, i - 1); mostrar(); }
+        if (b.dataset.h === "fin") fin();
+        if (b.dataset.h === "llamar") { fin(); hojaLlamar(); }
+      };
+    };
+    mostrar();
   }
   // ---- Quiero que me llamen ----
   function hojaLlamar() {
@@ -1615,6 +1727,12 @@ function iniciarVisor3D(datos, opciones) {
     };
   }
   armar(false); pintarLeyenda(); pintarBarra(); pintarProps(); pintarPags();
+  // El cliente: la primera vez que abre el link arranca la presentación.
+  if (o.presentacion && o.presentacionAuto !== false) {
+    let vista = false;
+    try { vista = !!localStorage.getItem("v3-presentacion:" + (o.clave || titulo)); localStorage.setItem("v3-presentacion:" + (o.clave || titulo), "1"); } catch (e) { vista = false; }
+    if (!vista) setTimeout(() => { if (!editando) presentar(); }, 700);
+  }
   pagsEl.addEventListener("click", (ev) => {
     const b = ev.target.closest("[data-pag]"); if (!b) return;
     if (b.dataset.pag === "todo") { todo = true; pag = pisosDe()[0].i; } else { todo = false; pag = Number(b.dataset.pag); }
@@ -1639,6 +1757,8 @@ function iniciarVisor3D(datos, opciones) {
     if (a === "vista") { hojaVista(); return; }
     if (a === "llamar") { hojaLlamar(); return; }
     if (a === "debiles") { debiles = !debiles; visor.alternar("debiles"); b.classList.toggle("on", debiles); return; }
+    if (a === "antes") { ponerSinAlarma(!sinAlarma); return; }
+    if (a === "editar" && sinAlarma) { sinAlarma = false; armar(true); pintarLeyenda(); }
     if (a === "editar" && todo) { todo = false; pintarPags(); armar(false); decir("Editás la " + (paginas[pag].nombre || "planta baja").toLowerCase() + ". Para otra planta, elegila a la izquierda.", false, 4); }
     if (a === "editar") { visor.pararSimulacion(); editando = true; ley.classList.add("hidden"); if (!visor.vista.paredesBajas) visor.alternar("paredes"); vistaEd = "planta"; visor.vistaPlanta(); cerrarHoja(); pintarBarra(); pintarProps(); pintarTira(); decir(textoEdicion()); return; }
     if (a === "listo") { editando = false; moviendo = null; sello = null; limpiarPropuesta(); ley.classList.remove("hidden"); cerrarHoja(); decir(""); visor.marcar(null); pintarBarra(); pintarProps(); pintarTira(); return; }
@@ -1656,7 +1776,7 @@ function iniciarVisor3D(datos, opciones) {
     const v = visor.alternar(a);
     if (a === "cobertura") b.classList.toggle("on", v.cobertura);
   });
-  return { destruir() { visor.destruir(); raiz.innerHTML = ""; }, captura() { return visor.captura(); }, get visor() { return visor; }, get paginas() { return paginas; } };
+  return { destruir() { visor.destruir(); raiz.innerHTML = ""; }, captura() { return visor.captura(); }, get visor() { return visor; }, get paginas() { return paginas; }, presentar };
 }
 if (typeof window !== "undefined") window.iniciarVisor3D = iniciarVisor3D;
 
@@ -1679,7 +1799,7 @@ async function croquis3dHtmlIndependiente(datos) {
 <script>${seguro(utils)}<\/script>
 <script>${seguro(visor)}<\/script>
 <script>(function(){var d=${json};if(!Croquis3D.disponible()){document.body.innerHTML="<p style='font:16px system-ui;padding:30px;text-align:center'>Este navegador no puede mostrar 3D. Abrí el archivo con Chrome o Safari.</p>";return;}
-var op={};
+var op={presentacion:true,clave:d.id||d.titulo};
 if(d.id&&d.servidor){try{fetch(d.servidor+"/api/datos?publico=vista3d&id="+d.id).catch(function(){});}catch(e){}
 op.llamar=function(p){return fetch(d.servidor+"/api/datos?publico=vista3d_llamar",{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify(Object.assign({id:d.id},p))}).then(function(r){return r.json().then(function(x){if(!r.ok)throw new Error(x.error||"No se pudo enviar");return x;});},function(){throw new Error("Sin conexión: escribinos por WhatsApp.");});};}
 iniciarVisor3D(d,op);})();<\/script>

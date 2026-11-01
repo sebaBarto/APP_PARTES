@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.28.1";
+const APP_VERSION = "4.29.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -11319,6 +11319,8 @@ let irPendienteVehiculo = (() => {
     return ir === "devolver-vehiculo";
   } catch (e) { return false; }
 })();
+// El recordatorio de propuestas abre el tablero.
+let irPendientePropuestas = (() => { try { return new URLSearchParams(busquedaInicialApp).get("ir") === "propuestas"; } catch (e) { return false; } })();
 // La notificación de un dato nuevo del equipo abre ese dato.
 let irPendienteDato = (() => {
   try { const p = new URLSearchParams(busquedaInicialApp); return p.get("ir") === "dato-equipo" ? p.get("id") || "" : null; } catch (e) { return null; }
@@ -11326,6 +11328,7 @@ let irPendienteDato = (() => {
 function consumirIrPendiente() {
   if (!tecnicoLogueado || screens.home.dataset.active !== "true") return;
   if (irPendienteDato !== null) { const id = irPendienteDato; irPendienteDato = null; abrirDatoEquipo(id); return; }
+  if (irPendientePropuestas) { irPendientePropuestas = false; cqAbrirLista(); cqAbrirPropuestas(); return; }
   if (!irPendienteVehiculo) return;
   irPendienteVehiculo = false;
   irADevolverVehiculo();
@@ -11334,6 +11337,7 @@ if (navigator.serviceWorker) {
   navigator.serviceWorker.addEventListener("message", (e) => {
     const d = e.data || {};
     if (d.tipo === "abrir-url" && String(d.url || "").includes("ir=devolver-vehiculo") && tecnicoLogueado) irADevolverVehiculo();
+    if (d.tipo === "abrir-url" && String(d.url || "").includes("ir=propuestas") && tecnicoLogueado) { cqAbrirLista(); cqAbrirPropuestas(); }
     if (d.tipo === "abrir-url" && String(d.url || "").includes("ir=dato-equipo") && tecnicoLogueado) {
       try { abrirDatoEquipo(new URL(d.url, location.href).searchParams.get("id") || ""); } catch (err) { /* nada */ }
     }
@@ -17034,7 +17038,7 @@ async function cqVer3D() {
   const cerrar = () => { if (visor) visor.destruir(); capa.remove(); };
   const todos = datos.paginas.flatMap((p) => p.elementos);
   visor = iniciarVisor3D({ ...datos, empresa: "SAT Alarmas", logo: "icons/logo.png" }, {
-    contenedor: capa, botonCerrar: true, debiles: true,
+    contenedor: capa, botonCerrar: true, debiles: true, presentacion: true, presentacionAuto: false,
     alCerrar: cerrar,
     // Mandar siempre lo último (con lo que se haya cambiado en el 3D).
     extras: [{ texto: "Mandar al cliente", alHacer: () => cqMandar3D(cq3dDatos()) }],
@@ -17372,7 +17376,81 @@ function cqRenderLista() {
     } catch (err) { showToast("No se pudo borrar: " + err.message); }
   }));
 }
-function cqAbrirLista() { showScreen("croquisLista"); cqRenderLista(); cqCargarLista(); }
+function cqAbrirLista() { showScreen("croquisLista"); cqRenderLista(); cqCargarLista(); cqContarPropuestas(); }
+// ---------- Propuestas 3D enviadas: seguimiento comercial ----------
+async function cqTraerPropuestas() {
+  const r = await fetch("/api/datos?coleccion=croquis&vistas3d=1&todas=1", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN } });
+  const l = await r.json().catch(() => []);
+  if (!r.ok) throw new Error((l && l.error) || "No se pudieron traer las propuestas");
+  return Array.isArray(l) ? l : [];
+}
+async function cqContarPropuestas() {
+  const badge = document.getElementById("cqPropuestasBadge");
+  if (!badge) return;
+  try {
+    const n = (await cqTraerPropuestas()).filter((v) => v.seguimiento).length;
+    badge.textContent = n; badge.classList.toggle("hidden", !n);
+  } catch (e) { badge.classList.add("hidden"); }
+}
+document.getElementById("cqPropuestasBtn").addEventListener("click", () => cqAbrirPropuestas());
+async function cqAbrirPropuestas() {
+  const capa = document.createElement("div");
+  capa.className = "cq-datos-capa cq-propuestas";
+  capa.innerHTML = `<div class="cq-datos cq-menu"><h3>Propuestas enviadas</h3><p class="pe-nota">Cargando…</p></div>`;
+  document.body.appendChild(capa);
+  let lista = [], filtro = "seguir";
+  const fecha = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); };
+  const url = (v) => `${location.origin}/vista-3d.html?id=${v.id}`;
+  const pintar = () => {
+    const seguir = lista.filter((v) => v.seguimiento), abiertas = lista.filter((v) => !v.estado), cerradas = lista.filter((v) => v.estado);
+    const ver = filtro === "seguir" ? seguir.sort((a, b) => a.seguimiento.prioridad - b.seguimiento.prioridad) : filtro === "cerradas" ? cerradas : abiertas;
+    const ganadas = cerradas.filter((v) => v.estado === "ganada").length;
+    capa.querySelector(".cq-datos").innerHTML = `<h3>Propuestas enviadas</h3>
+      <div class="cq-prop-tabs"><button type="button" data-f="seguir" class="${filtro === "seguir" ? "activo" : ""}">Para seguir (${seguir.length})</button><button type="button" data-f="abiertas" class="${filtro === "abiertas" ? "activo" : ""}">En curso (${abiertas.length})</button><button type="button" data-f="cerradas" class="${filtro === "cerradas" ? "activo" : ""}">Cerradas (${cerradas.length})</button></div>
+      ${cerradas.length ? `<p class="pe-nota">Ganadas: ${ganadas} de ${cerradas.length} cerradas.</p>` : ""}
+      ${ver.length ? ver.map((v) => `<div class="cq-prop" data-id="${v.id}">
+        <div class="cq-prop-cab"><b>${escapeHtml(v.cliente || v.titulo || "Cliente")}</b>${v.estado ? `<span class="cq-prop-estado ${v.estado}">${v.estado === "ganada" ? "Ganada" : "Perdida"}</span>` : ""}</div>
+        <small>${escapeHtml(v.titulo || "")}${(v.propuestas || []).length > 1 ? " · " + v.propuestas.map(escapeHtml).join(" / ") : ""} · enviada ${escapeHtml(fecha(v.fecha))}${v.por && v.por !== tecnicoLogueado ? " por " + escapeHtml(v.por) : ""}</small>
+        <small>${v.aperturas ? `Abierta ${v.aperturas} ${v.aperturas === 1 ? "vez" : "veces"} · última ${escapeHtml(fecha(v.ultima))}` : "Todavía no la abrió"}</small>
+        ${v.seguimiento ? `<p class="cq-prop-aviso">${escapeHtml(v.seguimiento.texto)}</p>` : ""}
+        <div class="cq-prop-btns">
+          ${(v.llamadas || []).length ? `<a class="btn btn-primary btn-small" href="tel:${escapeHtml(String(v.llamadas[v.llamadas.length - 1].telefono).replace(/[^\d+]/g, ""))}">Llamar</a>` : ""}
+          <button type="button" class="btn btn-secondary btn-small" data-acc="wa">WhatsApp</button>
+          <button type="button" class="btn btn-secondary btn-small" data-acc="ver">Ver</button>
+          ${(v.llamadas || []).length && !v.llamada_atendida && !v.estado ? `<button type="button" class="btn btn-secondary btn-small" data-acc="llamado">Ya lo llamé</button>` : ""}
+          ${v.estado ? `<button type="button" class="link-btn" data-acc="reabrir">Reabrir</button>` : `<button type="button" class="btn btn-secondary btn-small cq-ganada" data-acc="ganada">Ganada</button><button type="button" class="btn btn-secondary btn-small" data-acc="perdida">Perdida</button>`}
+        </div></div>`).join("") : `<p class="pe-nota">${filtro === "seguir" ? "No hay ninguna para seguir ahora. Cuando un cliente mire la propuesta varias veces, no la abra o pida que lo llamen, aparece acá." : "No hay propuestas acá."}</p>`}
+      <button type="button" class="link-btn" data-acc="cerrar">Cerrar</button>`;
+  };
+  const guardar = async (v, cambios) => {
+    try {
+      const r = await fetch("/api/datos?coleccion=croquis", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ accion: "vista3d_estado", id: v.id, ...cambios }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "No se pudo guardar");
+      lista = await cqTraerPropuestas(); pintar(); cqContarPropuestas();
+    } catch (err) { showToast(err.message); }
+  };
+  capa.addEventListener("click", (e) => {
+    if (e.target === capa) { capa.remove(); return; }
+    const f = e.target.closest("[data-f]");
+    if (f) { filtro = f.dataset.f; pintar(); return; }
+    const b = e.target.closest("[data-acc]"); if (!b) return;
+    if (b.dataset.acc === "cerrar") { capa.remove(); return; }
+    const v = lista.find((x) => x.id === (b.closest("[data-id]") || {}).dataset?.id);
+    if (!v) return;
+    if (b.dataset.acc === "wa") {
+      const nombre = String(v.cliente || "").trim().split(/\s+/)[0];
+      const texto = `Hola${nombre ? " " + nombre : ""}! ¿Pudiste ver cómo quedaría tu sistema de seguridad? Te lo dejo de nuevo: ${url(v)}\nCualquier duda te llamo y lo charlamos.`;
+      window.open("https://wa.me/?text=" + encodeURIComponent(texto), "_blank", "noopener");
+    }
+    if (b.dataset.acc === "ver") window.open(url(v) + "&yo=1", "_blank", "noopener");
+    if (b.dataset.acc === "llamado") guardar(v, { llamada_atendida: true });
+    if (b.dataset.acc === "ganada") guardar(v, { estado: "ganada" });
+    if (b.dataset.acc === "perdida") guardar(v, { estado: "perdida" });
+    if (b.dataset.acc === "reabrir") guardar(v, { estado: "" });
+  });
+  try { lista = await cqTraerPropuestas(); pintar(); } catch (err) { capa.querySelector(".pe-nota").textContent = err.message; }
+}
 cqEl("cqListaBuscar").addEventListener("input", cqRenderLista);
 cqEl("cqNuevoBtn").addEventListener("click", () => {
   let borrador = null;

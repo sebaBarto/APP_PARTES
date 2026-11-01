@@ -30,13 +30,16 @@
   if (!Croquis3D.disponible()) { fallo("Este teléfono o navegador no puede mostrar 3D. Probá abrir el link en Chrome o Safari."); return; }
   const id = new URLSearchParams(location.search).get("id") || "";
   if (!/^[0-9a-f]{16}$/.test(id)) { fallo("El link está incompleto. Pedinos que te lo mandemos de nuevo."); return; }
-  fetch("/api/datos?publico=vista3d&id=" + id)
+  // Desde la app (el que la mandó la revisa): no cuenta como apertura del cliente.
+  const yo = new URLSearchParams(location.search).get("yo") === "1";
+  fetch("/api/datos?publico=vista3d&id=" + id + (yo ? "&contar=0" : ""))
     .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
     .then(({ ok, j }) => {
       if (!ok) throw new Error(j && j.error || "No se pudo abrir");
       espera.remove();
       document.title = (j.titulo || "Tu casa en 3D") + " — SAT";
       window.visor3d = iniciarVisor3D({ ...j, empresa: "SAT Alarmas", logo: "icons/logo.png" }, {
+        presentacion: true, clave: id,
         llamar: (pedido) => fetch("/api/datos?publico=vista3d_llamar", { method: "POST", headers: { "Content-Type": "text/plain" }, body: JSON.stringify({ id, ...pedido }) })
           .then((r) => r.json().then((x) => { if (!r.ok) throw new Error(x.error || "No se pudo enviar"); return x; })),
       });

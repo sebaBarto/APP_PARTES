@@ -625,6 +625,37 @@ async function chequearVehiculos(headersBackendNuevo, estado, hoy) {
   }
 }
 
+// Propuestas 3D mandadas a clientes: a quien la mandó se le avisa a quién
+// conviene llamar (la miró varias veces, no la abrió, se está enfriando).
+// Cada aviso sale una sola vez por propuesta y por motivo.
+async function chequearPropuestas3d(ghHeaders) {
+  const { seguimientoPropuesta } = require("../lib/propuestas3d");
+  const { data, sha } = await leerJSON(ghHeaders, "vistas3d/indice.json", []);
+  const lista = Array.isArray(data) ? data : [];
+  const ahora = Date.now();
+  const porVendedor = {};
+  lista.forEach((v) => {
+    const s = seguimientoPropuesta(v, ahora);
+    if (!s || s.regla === "llamar" || !v.por) return; // "llamar" ya avisó en el momento
+    v.recordado = v.recordado || {};
+    if (v.recordado[s.regla]) return;
+    v.recordado[s.regla] = new Date(ahora).toISOString();
+    (porVendedor[v.por] = porVendedor[v.por] || []).push({ v, s });
+  });
+  const nombres = Object.keys(porVendedor);
+  if (!nombres.length) return null;
+  await guardarJSON(ghHeaders, "vistas3d/indice.json", lista, sha);
+  for (const nombre of nombres) {
+    const items = porVendedor[nombre].sort((a, b) => a.s.prioridad - b.s.prioridad);
+    const primero = items[0];
+    const cuerpo = items.length === 1
+      ? `${primero.v.cliente || primero.v.titulo}: ${primero.s.texto.charAt(0).toLowerCase() + primero.s.texto.slice(1)}.`
+      : `${items.slice(0, 3).map((x) => `${x.v.cliente || x.v.titulo} (${x.s.regla === "caliente" ? "la miró " + x.v.aperturas + " veces" : x.s.regla === "sin_abrir" ? "no la abrió" : "se enfría"})`).join(", ")}${items.length > 3 ? ` y ${items.length - 3} más` : ""}.`;
+    try { await enviarASeleccionados([nombre], { titulo: items.length === 1 ? "📈 Seguí esta propuesta" : `📈 ${items.length} propuestas para seguir`, cuerpo: cuerpo.slice(0, 180), url: "/?ir=propuestas" }); } catch (e) { /* el aviso es opcional */ }
+  }
+  return nombres.map((n) => `${n}: ${porVendedor[n].length}`);
+}
+
 module.exports = async (req, res) => {
   const authHeader = req.headers["authorization"] || "";
   const esperado = `Bearer ${process.env.CRON_SECRET || ""}`;
@@ -649,11 +680,14 @@ module.exports = async (req, res) => {
     const recordadosDevolver = await chequearRecordatorioDevolverVehiculo(ghHeaders, headersBackendNuevo, estado, ahora);
     const resumenSemanal = await chequearResumenSemanal(headersBackendNuevo, estado, ahora);
     const instalacionesAvisadas = await chequearInstalacionesAbandonadas(headersBackendNuevo, estado, ahora);
+    let propuestasAvisadas = null;
+    try { propuestasAvisadas = await chequearPropuestas3d(ghHeaders); } catch (e) { propuestasAvisadas = "error: " + e.message; }
 
     await guardarJSON(ghHeaders, ESTADO_PATH, estado, shaEstado);
 
-    res.status(200).json({ ok: true, guardia_notificada: tecnicoDeGuardia || null, recordatorio_en_calle: tecnicosRecordados || null, felicitacion_semanal: ganadoresSemana || null, recordatorio_devolver: recordadosDevolver || null, resumen_semanal: resumenSemanal || null, instalaciones_avisadas: instalacionesAvisadas || null });
+    res.status(200).json({ ok: true, guardia_notificada: tecnicoDeGuardia || null, recordatorio_en_calle: tecnicosRecordados || null, felicitacion_semanal: ganadoresSemana || null, recordatorio_devolver: recordadosDevolver || null, resumen_semanal: resumenSemanal || null, instalaciones_avisadas: instalacionesAvisadas || null, propuestas_3d: propuestasAvisadas });
   } catch (err) {
     res.status(500).json({ error: "Error interno en el cron diario", detail: String(err.message || err) });
   }
 };
+module.exports.chequearPropuestas3d = chequearPropuestas3d;

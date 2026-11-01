@@ -3603,8 +3603,10 @@ test("Vista 3D: desde el croquis se ve en 3D y se le manda al cliente por link (
     assert.match(ley, /ya está instalado/);
     assert.match(await page.textContent(".v3-cab"), /Casa Pérez/);
     // Los botones cambian la vista
-    await page.click('.v3-barra [data-a="cobertura"]');
-    assert.ok(!(await page.$eval('.v3-barra [data-a="cobertura"]', (b) => b.classList.contains("on"))));
+    await page.click('.v3-barra [data-a="vista"]');
+    await page.click('.v3-hoja [data-h="cobertura"]');
+    assert.ok(!(await page.$eval('.v3-hoja [data-h="cobertura"]', (b) => b.classList.contains("on"))));
+    await page.click('.v3-hoja [data-h="cerrar"]');
     await page.click('.v3-barra [data-a="vista"]');
     await page.click('.v3-hoja [data-h="paredes"]');
     await page.click('.v3-barra [data-a="vista"]');
@@ -3661,6 +3663,7 @@ test("Vista 3D pública (vista-3d.html): abre por id sin login y avisa si el lin
       if (pedidoUrl.includes("id=0123456789abcdef")) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ titulo: "Casa Pérez", cliente: "Juan Pérez", paginas: [{ nombre: "PB", elementos: CASA_3D }, { nombre: "PA", elementos: CASA_3D.slice(0, 4) }] }) });
       route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: "Esta vista ya no está disponible" }) });
     });
+    await page.addInitScript(() => { try { localStorage.setItem("v3-presentacion:0123456789abcdef", "1"); } catch (e) { /* nada */ } });
     await page.goto(base + "/vista-3d.html?id=0123456789abcdef");
     await page.waitForSelector(".v3-lienzo canvas", { timeout: 20000 });
     assert.match(pedidoUrl, /publico=vista3d/);
@@ -3765,7 +3768,7 @@ test("Vista 3D del cliente: puntos débiles, simulación de intruso, cámara, do
     const page = await ctx.newPage();
     const errores = [];
     page.on("pageerror", (e) => errores.push(e.message));
-    await page.addInitScript(() => { window.CROQUIS_3D_VELOCIDAD = 12; });
+    await page.addInitScript(() => { window.CROQUIS_3D_VELOCIDAD = 12; try { localStorage.setItem("v3-presentacion:0123456789abcdef", "1"); } catch (e) { /* nada */ } });
     let llamada = null;
     const completa = [...CASA_B, { id: "ir2", t: "simbolo", tipo: "infrarrojo", x: 400, y: 0, rot: 270, esc: 1, etq: "2" }, { id: "cam", t: "simbolo", tipo: "camara_ip", x: 390, y: 290, rot: 315, esc: 1 }];
     await page.route("**/api/**", (route) => {
@@ -3784,9 +3787,11 @@ test("Vista 3D del cliente: puntos débiles, simulación de intruso, cámara, do
     const ley = await page.textContent(".v3-ley");
     assert.match(ley, /1 abertura que da afuera no tiene sensor/, "la ventana del ambiente sin sensor");
     // Puntos débiles: arranca apagado para el cliente y se prende
-    assert.ok(!(await page.$eval('.v3-barra [data-a="debiles"]', (b) => b.classList.contains("on"))));
-    await page.click('.v3-barra [data-a="debiles"]');
-    assert.ok(await page.$eval('.v3-barra [data-a="debiles"]', (b) => b.classList.contains("on")));
+    await page.click('.v3-barra [data-a="vista"]');
+    assert.ok(!(await page.$eval('.v3-hoja [data-h="debiles"]', (b) => b.classList.contains("on"))));
+    await page.click('.v3-hoja [data-h="debiles"]');
+    assert.ok(await page.$eval('.v3-hoja [data-h="debiles"]', (b) => b.classList.contains("on")));
+    await page.click('.v3-hoja [data-h="cerrar"]');
     // Simulación: entra por la ventana sin sensor y lo detecta el infrarrojo de la zona 1
     await page.click('.v3-barra [data-a="simular"]');
     assert.match(await page.textContent(".v3-aviso"), /entra por una ventana que no tiene sensor/);
@@ -3799,6 +3804,9 @@ test("Vista 3D del cliente: puntos débiles, simulación de intruso, cámara, do
     assert.doesNotMatch(await page.textContent(".v3-ley"), /no tiene sensor/);
     const [cx, cy] = await page.evaluate(() => window.visor3d.visor.aPantalla(390, 290, 2.6));
     await page.mouse.click(cx, cy);
+    await page.waitForSelector('.v3-hoja [data-h="vercam"]', { timeout: 5000 });
+    assert.match(await page.textContent(".v3-hoja"), /Graba y te deja ver en vivo/);
+    await page.click('.v3-hoja [data-h="vercam"]');
     await page.waitForSelector('.v3-barra [data-a="salircam"]', { timeout: 5000 });
     assert.match(await page.textContent(".v3-aviso"), /Lo que ve la cámara/);
     await page.click('.v3-barra [data-a="salircam"]');
@@ -4127,6 +4135,105 @@ test("Plano de Visio a editable: reconoce la escalera en U (dos tramos y el desc
   assert.strictEqual(r.paredes, 6, "solo las paredes de la casa (los escalones no son paredes): " + r.lista.join(" | "));
   assert.strictEqual(r.ir, 1);
   assert.strictEqual(r.puertas, 1);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Link para el cliente: la presentación guiada arranca sola (una vez), compara sin alarma / con SAT y explica qué hace cada equipo", async () => {
+  const nav = await navegador3D();
+  try {
+    const ctx = await nav.newContext({ serviceWorkers: "block", viewport: { width: 900, height: 800 } });
+    const page = await ctx.newPage();
+    const errores = [];
+    page.on("pageerror", (e) => errores.push(e.message));
+    await page.addInitScript(() => { window.CROQUIS_3D_VELOCIDAD = 14; });
+    const urls = [];
+    const casa = CASA_B.concat([{ id: "rect", t: "rect", x: 0, y: 0, w: 200, h: 300, nombre: "Living" }]);
+    await page.route("**/api/**", (route) => { urls.push(route.request().url()); route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ titulo: "Casa B", cliente: "Ana", paginas: [{ elementos: casa }] }) }); });
+    await page.goto(base + "/vista-3d.html?id=0123456789abcdef");
+    await page.waitForSelector(".v3-lienzo canvas", { timeout: 20000 });
+    // Arranca la presentación: paso 1 sin alarma, sin los botones de abajo
+    await page.waitForFunction(() => /Esta es tu casa/.test(document.querySelector(".v3-hoja").textContent), null, { timeout: 5000 });
+    assert.ok(!(await page.isVisible(".v3-barra")), "durante la presentación no se ven los botones");
+    assert.match(await page.textContent(".v3-ley"), /Así está hoy/);
+    await page.click('.v3-hoja [data-h="sig"]');
+    assert.match(await page.textContent(".v3-hoja"), /Por dónde podrían entrar hoy[\s\S]*las 2 aberturas que dan afuera y no tienen ningún sensor/);
+    await page.click('.v3-hoja [data-h="sig"]');
+    assert.match(await page.textContent(".v3-hoja"), /Lo que instalamos[\s\S]*1 × sensor de movimiento[\s\S]*Los sensores cubren el \d+%/);
+    assert.match(await page.textContent(".v3-ley"), /Qué se instala/);
+    await page.click('.v3-hoja [data-h="sig"]');
+    await page.waitForFunction(() => /Lo detectó el sensor de movimiento de la zona 1/.test(document.querySelector(".v3-hoja").textContent), null, { timeout: 30000 });
+    await page.click('.v3-hoja [data-h="sig"]');
+    assert.match(await page.textContent(".v3-hoja"), /¿Lo charlamos\?/);
+    await page.click('.v3-hoja [data-h="llamar"]');
+    assert.match(await page.textContent(".v3-hoja"), /¿Te llamamos\?/);
+    await page.click('.v3-hoja [data-h="cerrar"]');
+    assert.ok(await page.isVisible(".v3-barra"));
+    // Sin alarma / con SAT
+    await page.click('.v3-barra [data-a="antes"]');
+    assert.match(await page.textContent(".v3-aviso"), /Así está hoy: 2 aberturas que dan afuera quedan sin protección y ningún sensor cubre los ambientes/);
+    assert.match(await page.textContent('.v3-barra [data-a="antes"]'), /Ver con SAT/);
+    await page.click('.v3-barra [data-a="antes"]');
+    assert.match(await page.textContent('.v3-barra [data-a="antes"]'), /Ver sin alarma/);
+    // Tocar un equipo: qué hace y dónde está
+    const [x, y] = await page.evaluate(() => window.visor3d.visor.aPantalla(0, 0, 2.3));
+    await page.mouse.click(x, y);
+    await page.waitForFunction(() => /Detecta el movimiento/.test(document.querySelector(".v3-hoja").textContent), null, { timeout: 5000 });
+    assert.match(await page.textContent(".v3-hoja"), /zona 1[\s\S]*En living[\s\S]*Cubre hasta 11 m, en un ángulo de 90°/);
+    // Al volver a abrir, no arranca sola (se puede ver desde Vista)
+    await page.reload();
+    await page.waitForSelector(".v3-lienzo canvas", { timeout: 20000 });
+    await page.waitForTimeout(1200);
+    assert.ok(await page.isHidden(".v3-hoja"));
+    await page.click('.v3-barra [data-a="vista"]');
+    await page.click('.v3-hoja [data-h="presentacion"]');
+    assert.match(await page.textContent(".v3-hoja"), /Esta es tu casa/);
+    assert.deepStrictEqual(errores, []);
+    await ctx.close();
+  } finally { await nav.close(); }
+});
+
+test("Propuestas enviadas: el tablero muestra a quién seguir, y se marcan ganadas, perdidas o «ya lo llamé»", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const ahora = Date.now(), dia = 864e5;
+  let lista = [
+    { id: "a".repeat(16), cliente: "Vilches", titulo: "Casa Vilches", fecha: new Date(ahora - 4 * dia).toISOString(), aperturas: 3, ultima: new Date(ahora - 3600e3).toISOString(), llamadas: [], seguimiento: { regla: "caliente", prioridad: 2, texto: "La miró 3 veces: buen momento para llamarlo" }, propuestas: ["Básica", "Completa"] },
+    { id: "b".repeat(16), cliente: "Pérez", titulo: "Casa", fecha: new Date(ahora - dia).toISOString(), aperturas: 1, ultima: new Date(ahora - 3600e3).toISOString(), llamadas: [{ telefono: "11 4444-5555" }], seguimiento: { regla: "llamar", prioridad: 1, texto: "Pidió que lo llamen: 11 4444-5555" } },
+    { id: "c".repeat(16), cliente: "Gómez", titulo: "Local", fecha: new Date(ahora - dia).toISOString(), aperturas: 0, llamadas: [], seguimiento: null },
+  ];
+  const cambios = [];
+  await page.unroute("**/api/**");
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    if (u.includes("todas=1")) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(lista) });
+    if (req.method() === "POST" && u.includes("coleccion=croquis")) {
+      const b = JSON.parse(req.postData()); cambios.push(b);
+      lista = lista.map((v) => (v.id === b.id ? { ...v, ...(b.estado ? { estado: b.estado, seguimiento: null } : {}), ...(b.llamada_atendida ? { llamada_atendida: true, seguimiento: null } : {}) } : v));
+      return route.fulfill({ status: 200, contentType: "application/json", body: '{"ok":true}' });
+    }
+    route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+  });
+  await page.goto(base + "/");
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { tecnicoLogueado = "Seba"; cqAbrirLista(); window.__abierto = null; window.open = (x) => { window.__abierto = x; }; });
+  await page.waitForFunction(() => document.getElementById("cqPropuestasBadge").textContent === "2");
+  await page.click("#cqPropuestasBtn");
+  await page.waitForSelector(".cq-prop");
+  const filas = await page.$$eval(".cq-prop", (x) => x.map((d) => d.querySelector("b").textContent));
+  assert.deepStrictEqual(filas, ["Pérez", "Vilches"], "primero el que pidió que lo llamen");
+  assert.match(await page.textContent(".cq-propuestas"), /La miró 3 veces: buen momento para llamarlo/);
+  assert.ok(await page.$('.cq-prop a[href="tel:1144445555"]'));
+  // WhatsApp con el link de nuevo
+  await page.click(`[data-id="${"a".repeat(16)}"] [data-acc="wa"]`);
+  assert.match(decodeURIComponent(await page.evaluate(() => window.__abierto)), /Hola Vilches! ¿Pudiste ver[\s\S]*vista-3d\.html\?id=a{16}/);
+  // Ya lo llamé / ganada
+  await page.click(`[data-id="${"b".repeat(16)}"] [data-acc="llamado"]`);
+  await page.waitForFunction(() => document.querySelectorAll(".cq-prop").length === 1);
+  await page.click(`[data-id="${"a".repeat(16)}"] [data-acc="ganada"]`);
+  await page.waitForFunction(() => /No hay ninguna para seguir/.test(document.querySelector(".cq-propuestas").textContent));
+  assert.deepStrictEqual(cambios.map((c) => [c.accion, c.llamada_atendida || c.estado]), [["vista3d_estado", true], ["vista3d_estado", "ganada"]]);
+  await page.click('.cq-prop-tabs [data-f="cerradas"]');
+  assert.match(await page.textContent(".cq-propuestas"), /Ganadas: 1 de 1 cerradas/);
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });

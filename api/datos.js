@@ -401,7 +401,7 @@ async function manejarCroquis(req, res, autorizacion, body) {
   // en la instalación, aunque no tenga el permiso de croquis en general.
   // Y cualquier técnico puede ver los planos de un cliente (para el servicio técnico).
   const porCliente = req.method === "GET" && !!(String(req.query.numero_cliente || "").replace(/\D/g, "") || String(req.query.cliente || "").trim());
-  const deInstalacion = req.method === "GET" ? !!(req.query.id || instValida(req.query.instalacion) || porCliente || req.query.vistas3d) : (instValida(b.instalacion) || instValida(b.instalacion_id) || b.accion === "borrar" || b.accion === "compartir_3d");
+  const deInstalacion = req.method === "GET" ? !!(req.query.id || instValida(req.query.instalacion) || porCliente || req.query.vistas3d) : (instValida(b.instalacion) || instValida(b.instalacion_id) || b.accion === "borrar" || b.accion === "compartir_3d" || b.accion === "vista3d_estado");
   if (!puede && !deInstalacion) { res.status(403).json({ error: "No tenés habilitados los croquis" }); return; }
   const txt = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
   const idValido = (id) => /^[a-z0-9]{6,32}$/.test(String(id || ""));
@@ -412,6 +412,14 @@ async function manejarCroquis(req, res, autorizacion, body) {
         // los abrieron y si pidieron que los llamen.
         const { data } = await leerArchivoDatos(RUTA_VISTAS3D_INDICE, []);
         let lista = Array.isArray(data) ? data : [];
+        if (req.query.todas) {
+          // Tablero de propuestas: la oficina ve todas; cada uno, las que mandó.
+          const { seguimientoPropuesta } = require("../lib/propuestas3d");
+          const ahora = Date.now();
+          lista = lista.filter((v) => esAdmin || v.por === autorizacion.nombre).slice(0, 300).map((v) => ({ ...v, seguimiento: seguimientoPropuesta(v, ahora) }));
+          res.status(200).json(lista);
+          return;
+        }
         const cid = String(req.query.croquis_id || ""), cli = String(req.query.cliente || "").trim().toLowerCase();
         if (cid || cli) lista = lista.filter((v) => (cid && v.croquis_id === cid) || (cli && String(v.cliente || "").trim().toLowerCase() === cli));
         res.status(200).json(lista.slice(0, 50));
@@ -442,6 +450,29 @@ async function manejarCroquis(req, res, autorizacion, body) {
     }
     if (req.method !== "POST") { res.status(405).json({ error: "Método no permitido" }); return; }
     if (b.accion === "interpretar") { await interpretarBocetoCroquis(b, res); return; }
+    if (b.accion === "vista3d_estado") {
+      // Seguimiento: ganada / perdida / reabrir, y "ya lo llamé".
+      const id = String(b.id || "");
+      if (!/^[0-9a-f]{16}$/.test(id)) { res.status(400).json({ error: "Id inválido" }); return; }
+      let error = null, actualizado = null;
+      await anotarVista3d(id, (lista) => {
+        const v = lista.find((x) => x.id === id);
+        if (!v) { error = [404, "Esa propuesta ya no existe"]; return null; }
+        if (!esAdmin && v.por !== autorizacion.nombre) { error = [403, "Esa propuesta la mandó otra persona"]; return null; }
+        if (b.estado !== undefined) {
+          if (!["ganada", "perdida", ""].includes(b.estado)) { error = [400, "Estado inválido"]; return null; }
+          if (b.estado) { v.estado = b.estado; v.cerrada = new Date().toISOString(); } else { delete v.estado; delete v.cerrada; }
+        }
+        if (b.llamada_atendida !== undefined) v.llamada_atendida = !!b.llamada_atendida;
+        if (b.nota !== undefined) v.nota = txt(b.nota, 200);
+        actualizado = v;
+        return lista;
+      });
+      if (error) { res.status(error[0]).json({ error: error[1] }); return; }
+      if (!actualizado) { res.status(502).json({ error: "No se pudo guardar" }); return; }
+      res.status(200).json({ ok: true, propuesta: actualizado });
+      return;
+    }
     if (b.accion === "compartir_3d") {
       // Vista 3D para mandarle al cliente (por WhatsApp): se guarda una copia
       // del dibujo con un id al azar, sin dirección ni datos internos, y se
