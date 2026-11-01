@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Tu casa en 3D — SAT</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#101820">
+<meta property="og:title" content="Tu casa en 3D — SAT Alarmas">
+<meta property="og:description" content="Mirá cómo queda tu sistema de seguridad: dónde va cada sensor y qué zona cubre.">
+<meta property="og:image" content="https://app-partes-sat15.vercel.app/icons/logo.png">
+<link rel="icon" href="icons/icon-192.png">
+<style>
+  html, body { margin: 0; height: 100%; background: #EEF1F4; font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  @media (prefers-color-scheme: dark) { html, body { background: #14171A; color: #EEF0F2; } }
+  .v3-espera { position: fixed; inset: 0; display: flex; flex-direction: column; gap: 14px; align-items: center; justify-content: center; text-align: center; padding: 24px; font-size: 16px; }
+  .v3-espera img { width: 90px; border-radius: 12px; }
+</style>
+</head>
+<body>
+<div class="v3-espera" id="espera"><img src="icons/logo.png" alt="SAT"><span>Armando tu casa en 3D…</span></div>
+<script src="vendor/three/three.min.js"></script>
+<script src="vendor/three/OrbitControls.js"></script>
+<script src="croquis-utils.js"></script>
+<script src="croquis-3d.js"></script>
+<script>
+(function () {
+  const espera = document.getElementById("espera");
+  const fallo = (msg) => { espera.querySelector("span").textContent = msg; };
+  if (!Croquis3D.disponible()) { fallo("Este teléfono o navegador no puede mostrar 3D. Probá abrir el link en Chrome o Safari."); return; }
+  const id = new URLSearchParams(location.search).get("id") || "";
+  if (!/^[0-9a-f]{16}$/.test(id)) { fallo("El link está incompleto. Pedinos que te lo mandemos de nuevo."); return; }
+  fetch("/api/datos?publico=vista3d&id=" + id)
+    .then((r) => r.json().then((j) => ({ ok: r.ok, j })))
+    .then(({ ok, j }) => {
+      if (!ok) throw new Error(j && j.error || "No se pudo abrir");
+      espera.remove();
+      document.title = (j.titulo || "Tu casa en 3D") + " — SAT";
+      iniciarVisor3D({ ...j, empresa: "SAT Alarmas", logo: "icons/logo.png" });
+    })
+    .catch((e) => fallo(e.message || "No se pudo abrir la vista. Revisá la conexión y probá de nuevo."));
+})();
+</script>
+</body>
+</html>

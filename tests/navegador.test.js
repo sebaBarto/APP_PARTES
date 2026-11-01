@@ -3553,3 +3553,123 @@ test("Datos del equipo: «me sirvió», avisar desactualizado, favoritos y orden
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+// ---------- Vista 3D (three.js) ----------
+// WebGL por software (swiftshader): el navegador de las otras pruebas no lo trae.
+const CASA_3D = [
+  { id: "w1", t: "linea", x1: 0, y1: 0, x2: 400, y2: 0 }, { id: "w2", t: "linea", x1: 400, y1: 0, x2: 400, y2: 300 },
+  { id: "w3", t: "linea", x1: 400, y1: 300, x2: 0, y2: 300 }, { id: "w4", t: "linea", x1: 0, y1: 300, x2: 0, y2: 0 },
+  { id: "w5", t: "linea", x1: 200, y1: 0, x2: 200, y2: 300 },
+  { id: "p1", t: "simbolo", tipo: "puerta", x: 200, y: 150, rot: 90, esc: 0.8 },
+  { id: "s1", t: "simbolo", tipo: "infrarrojo", x: 20, y: 20, rot: 0, esc: 1, inst: true },
+  { id: "s2", t: "simbolo", tipo: "infrarrojo", x: 380, y: 20, rot: 90, esc: 1, prev: true },
+  { id: "s3", t: "simbolo", tipo: "central", x: 300, y: 290, rot: 0, esc: 1 },
+];
+async function navegador3D() {
+  return chromium.launch({ ...(process.env.CHROMIUM_PATH ? { executablePath: process.env.CHROMIUM_PATH } : {}), args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
+}
+
+test("Vista 3D: desde el croquis se ve en 3D y se le manda al cliente por link (sin dirección) o como archivo HTML", async () => {
+  const nav = await navegador3D();
+  try {
+    const ctx = await nav.newContext({ serviceWorkers: "block" });
+    const page = await ctx.newPage();
+    const errores = [];
+    page.on("pageerror", (e) => errores.push(e.message));
+    let pedido = null;
+    await page.route("**/api/**", (route) => {
+      const req = route.request();
+      if (req.url().includes("coleccion=croquis") && req.method() === "POST") { pedido = JSON.parse(req.postData()); return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, id: "0123456789abcdef" }) }); }
+      route.fulfill({ status: 200, contentType: "application/json", body: req.url().includes("tecnicos") ? "[]" : "[]" });
+    });
+    await page.goto(base + "/");
+    await page.waitForTimeout(400);
+    await page.evaluate((els) => {
+      tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador");
+      cqAbrirEditor({ titulo: "Casa Pérez", cliente: "Juan Pérez", direccion: "Calle Falsa 123", elementos: els });
+      window.__abierto = null; window.open = (u) => { window.__abierto = u; };
+      window.__bajado = null; croquisDescargar = (blob, nombre) => { blob.text().then((t) => { window.__bajado = { nombre, t }; }); };
+      Object.defineProperty(navigator, "share", { value: undefined, configurable: true });
+      Object.defineProperty(navigator, "canShare", { value: undefined, configurable: true });
+    }, CASA_3D);
+    await page.click("#cqMenuBtn");
+    await page.click('[data-m="ver3d"]');
+    await page.waitForSelector(".v3-capa canvas", { timeout: 20000 });
+    const ley = await page.textContent(".v3-ley");
+    assert.match(ley, /1 × Sensor de movimiento/, "cuenta solo el que no estaba instalado");
+    assert.match(ley, /Central de alarma/);
+    assert.match(ley, /aro naranja/);
+    assert.match(ley, /ya está instalado/);
+    assert.match(await page.textContent(".v3-cab"), /Casa Pérez/);
+    // Los botones cambian la vista
+    await page.click('.v3-barra [data-a="cobertura"]');
+    assert.ok(!(await page.$eval('.v3-barra [data-a="cobertura"]', (b) => b.classList.contains("on"))));
+    await page.click('.v3-barra [data-a="paredes"]');
+    await page.click('.v3-barra [data-a="arriba"]');
+    // Link
+    await page.click('.v3-barra [data-extra="0"]');
+    await page.click('[data-m="link"]');
+    await page.waitForFunction(() => window.__abierto, null, { timeout: 5000 });
+    assert.strictEqual(pedido.accion, "compartir_3d");
+    assert.ok(!JSON.stringify(pedido).includes("Falsa"), "no manda la dirección");
+    assert.strictEqual(pedido.paginas[0].elementos.length, CASA_3D.length);
+    const abierto = await page.evaluate(() => window.__abierto);
+    assert.match(decodeURIComponent(abierto), /^https:\/\/wa\.me\/\?text=Hola Juan! .*\/vista-3d\.html\?id=0123456789abcdef/s);
+    // Archivo HTML
+    await page.click('.v3-barra [data-extra="0"]');
+    await page.click('[data-m="html"]');
+    await page.waitForFunction(() => window.__bajado, null, { timeout: 10000 });
+    const bajado = await page.evaluate(() => window.__bajado);
+    assert.match(bajado.nombre, /^Casa-3D-Juan-Perez\.html$/);
+    assert.ok(bajado.t.length > 600000, "trae three.js adentro");
+    assert.ok(!bajado.t.includes("Falsa"));
+    // Cerrar libera todo
+    await page.click('.v3-barra [data-a="cerrar"]');
+    assert.strictEqual(await page.$(".v3-capa"), null);
+    assert.deepStrictEqual(errores, []);
+    // El archivo se abre solo, sin internet
+    const p2 = await ctx.newPage();
+    const errores2 = [];
+    p2.on("pageerror", (e) => errores2.push(e.message));
+    await p2.route("**/*", (r) => r.abort());
+    await p2.setContent(bajado.t, { waitUntil: "load" });
+    await p2.waitForSelector(".v3-lienzo canvas", { timeout: 20000 });
+    assert.match(await p2.textContent(".v3-cab"), /Casa Pérez/);
+    assert.match(await p2.getAttribute(".v3-cab img", "src"), /^data:image\/png;base64,/);
+    // Se dibujó algo (no quedó en blanco)
+    const pintado = await p2.evaluate(() => new Promise((ok) => requestAnimationFrame(() => { const c = document.querySelector(".v3-lienzo canvas"); const t = document.createElement("canvas"); t.width = 60; t.height = 60; const g = t.getContext("2d"); g.drawImage(c, 0, 0, 60, 60); const d = g.getImageData(0, 0, 60, 60).data; const col = new Set(); for (let i = 0; i < d.length; i += 4) col.add(d[i] >> 4 << 8 | d[i + 1] >> 4 << 4 | d[i + 2] >> 4); ok(col.size); })));
+    assert.ok(pintado > 3, "la escena tiene colores: " + pintado);
+    assert.deepStrictEqual(errores2, []);
+    await ctx.close();
+  } finally { await nav.close(); }
+});
+
+test("Vista 3D pública (vista-3d.html): abre por id sin login y avisa si el link está mal o venció", async () => {
+  const nav = await navegador3D();
+  try {
+    const ctx = await nav.newContext({ serviceWorkers: "block" });
+    const page = await ctx.newPage();
+    const errores = [];
+    page.on("pageerror", (e) => errores.push(e.message));
+    let pedidoUrl = "";
+    await page.route("**/api/**", (route) => {
+      pedidoUrl = route.request().url();
+      if (pedidoUrl.includes("id=0123456789abcdef")) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ titulo: "Casa Pérez", cliente: "Juan Pérez", paginas: [{ nombre: "PB", elementos: CASA_3D }, { nombre: "PA", elementos: CASA_3D.slice(0, 4) }] }) });
+      route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: "Esta vista ya no está disponible" }) });
+    });
+    await page.goto(base + "/vista-3d.html?id=0123456789abcdef");
+    await page.waitForSelector(".v3-lienzo canvas", { timeout: 20000 });
+    assert.match(pedidoUrl, /publico=vista3d/);
+    assert.strictEqual(await page.title(), "Casa Pérez — SAT");
+    assert.deepStrictEqual(await page.$$eval(".v3-pags button", (bs) => bs.map((b) => b.textContent)), ["PB", "PA"]);
+    await page.click('.v3-pags [data-pag="1"]');
+    assert.strictEqual(await page.$$eval(".v3-lienzo canvas", (c) => c.length), 1, "cambiar de planta no deja dos lienzos");
+    assert.strictEqual(await page.$('.v3-barra [data-a="cerrar"]'), null, "el cliente no tiene Cerrar");
+    await page.goto(base + "/vista-3d.html?id=ffffffffffffffff");
+    await page.waitForFunction(() => /ya no está disponible/.test(document.body.textContent), null, { timeout: 5000 });
+    await page.goto(base + "/vista-3d.html?id=xx");
+    await page.waitForFunction(() => /incompleto/.test(document.body.textContent), null, { timeout: 5000 });
+    assert.deepStrictEqual(errores, []);
+    await ctx.close();
+  } finally { await nav.close(); }
+});

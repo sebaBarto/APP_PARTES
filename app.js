@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.21.0";
+const APP_VERSION = "4.22.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -15556,6 +15556,8 @@ const CQ_IC_TRAZOS = {
   camara: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
   plano: '<path d="M3 4h18v16H3z"/><path d="M3 11h8v9M11 4v4M15 11h6"/>',
   galeria: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m4 19 6-6 4 4 3-3 4 4"/>',
+  cubo: '<path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z"/><path d="m4 7.5 8 4.5 8-4.5"/><path d="M12 12v9"/>',
+  compartir: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/>',
   fondo: '<rect x="3" y="4" width="18" height="16" rx="2" stroke-dasharray="3 2"/><path d="m5 18 5-5 3 3 2-2 4 4"/>',
   candado: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
   abierto: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/>',
@@ -16799,6 +16801,7 @@ cqEl("cqMenuBtn").addEventListener("click", () => {
     <h3>${escapeHtml(cq.titulo || cq.cliente || "Croquis")}</h3>
     <button type="button" class="btn btn-primary" data-m="guardar">Guardar</button>
     <button type="button" class="btn btn-secondary" data-m="pdf">Compartir / descargar PDF</button>
+    <button type="button" class="btn btn-secondary" data-m="ver3d">${cqIc("cubo")} Ver en 3D / mandar al cliente</button>
     <button type="button" class="btn btn-secondary" data-m="png">Imagen (PNG)</button>
     <button type="button" class="btn btn-secondary" data-m="svg">Archivo editable (SVG, se abre en Visio)</button>
     <div class="cq-menu-fila"><button type="button" class="btn btn-secondary" data-m="foto">${cqIc("galeria")} Boceto desde galería</button><button type="button" class="btn btn-secondary" data-m="camara">${cqIc("camara")} Sacar foto</button></div>
@@ -16818,6 +16821,7 @@ cqEl("cqMenuBtn").addEventListener("click", () => {
     const m = b ? b.dataset.m : "cerrar";
     capa.remove();
     if (m === "guardar") cqGuardar();
+    if (m === "ver3d") cqVer3D();
     if (m === "pdf" || m === "png" || m === "svg") cqExportar(m);
     if (m === "datos") cqPedirDatos();
     if (m === "foto") { cqFotoDestino = "editor"; cqEl("cqFotoInput").click(); }
@@ -16861,6 +16865,7 @@ function cqMenuLectura() {
     <p class="pe-nota">${cq.soloVer ? "Abierto solo para mirar." : `${cqIc("candado")} La instalación ya se cerró: este plano quedó como registro y no se puede modificar.`}</p>
     <button type="button" class="btn btn-primary" data-m="pdf">Compartir / descargar PDF</button>
     <button type="button" class="btn btn-secondary" data-m="png">Imagen (PNG)</button>
+    <button type="button" class="btn btn-secondary" data-m="ver3d">${cqIc("cubo")} Ver en 3D / mandar al cliente</button>
     <button type="button" class="btn btn-secondary" data-m="svg">Archivo editable (SVG, se abre en Visio)</button>
     ${puedeCopiar ? `<button type="button" class="btn btn-secondary" data-m="copia">Hacer una copia nueva para seguir dibujando</button>` : ""}
     <button type="button" class="link-btn" data-m="cerrar">Cerrar</button>
@@ -16871,6 +16876,7 @@ function cqMenuLectura() {
     if (!b && e.target !== capa) return;
     const m = b ? b.dataset.m : "cerrar";
     capa.remove();
+    if (m === "ver3d") cqVer3D();
     if (m === "pdf" || m === "png" || m === "svg") cqExportar(m);
     if (m === "copia") {
       const d = cqDibujoCompleto();
@@ -16880,6 +16886,95 @@ function cqMenuLectura() {
       showToast("Copia nueva: el plano original queda como estaba.");
     }
   });
+}
+// ---------- Vista 3D (para la venta: el cliente ve su casa con los sensores) ----------
+function cq3dDatos() {
+  const d = cqDibujoCompleto();
+  const paginas = d.paginas.map((p) => ({ nombre: d.paginas.length > 1 ? p.nombre : "", elementos: (p.elementos || []).filter((e) => e.t !== "cable" && e.t !== "cota" && e.t !== "tabla") })).filter((p) => p.elementos.length);
+  return { titulo: cq.titulo || "Tu sistema de seguridad", cliente: cq.cliente || "", paginas };
+}
+async function cqVer3D() {
+  const datos = cq3dDatos();
+  const hayEquipos = datos.paginas.some((p) => p.elementos.some((e) => e.t === "simbolo"));
+  const hayParedes = datos.paginas.some((p) => p.elementos.some((e) => e.t === "linea" || e.t === "rect"));
+  if (!hayParedes && !hayEquipos) { showToast(cqHayBase() ? "El plano de fondo es una imagen: para verlo en 3D hay que pasarlo a editable (o dibujar las paredes)." : "Dibujá las paredes y los equipos para verlo en 3D."); return; }
+  if (!Croquis3D.disponible()) { showToast("Este teléfono no puede mostrar 3D."); return; }
+  const espera = cqCapaCargando("Armando la vista 3D…");
+  try { await Croquis3D.cargar(); } catch (err) { espera.remove(); showToast(err.message); return; }
+  espera.remove();
+  const capa = document.createElement("div");
+  capa.className = "v3-capa";
+  document.body.appendChild(capa);
+  let visor = null;
+  const cerrar = () => { if (visor) visor.destruir(); capa.remove(); };
+  visor = iniciarVisor3D({ ...datos, empresa: "SAT Alarmas", logo: "icons/logo.png" }, {
+    contenedor: capa, botonCerrar: true,
+    alCerrar: cerrar,
+    extras: [{ texto: "Mandar al cliente", alHacer: () => cqMandar3D(datos) }],
+  });
+  if (!visor) { cerrar(); showToast("El plano no tiene nada para mostrar en 3D."); }
+}
+function cqMandar3D(datos) {
+  const capa = document.createElement("div");
+  capa.className = "cq-datos-capa";
+  capa.style.zIndex = "9500";
+  capa.innerHTML = `<div class="cq-datos cq-menu">
+    <h3>Mandarle la vista 3D al cliente</h3>
+    <p class="pe-nota">El cliente la abre en el celular, la gira con el dedo y ve qué cubre cada sensor. No lleva la dirección.</p>
+    <button type="button" class="btn btn-primary" data-m="link">${cqIc("compartir")} Mandar link por WhatsApp</button>
+    <button type="button" class="btn btn-secondary" data-m="html">Mandar como archivo (HTML, se abre sin internet)</button>
+    <p class="pe-nota">Recomendado el link: anda en Android y iPhone. El archivo, en iPhone hay que abrirlo con Safari (desde WhatsApp a veces no muestra el 3D).</p>
+    <button type="button" class="link-btn" data-m="cerrar">Cancelar</button>
+  </div>`;
+  document.body.appendChild(capa);
+  capa.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-m]");
+    if (!b && e.target !== capa) return;
+    const m = b ? b.dataset.m : "cerrar";
+    capa.remove();
+    if (m === "link") cqMandar3DLink(datos);
+    if (m === "html") cqMandar3DArchivo(datos);
+  });
+}
+function cq3dTexto(url) {
+  const nombre = String(cq.cliente || "").trim().split(/\s+/)[0];
+  return `Hola${nombre ? " " + nombre : ""}! Te mando cómo va a quedar tu sistema de seguridad en 3D.${url ? "\n" + url : ""}\nLo podés girar con el dedo y ver la zona que cubre cada sensor.`;
+}
+async function cqMandar3DLink(datos) {
+  if (!navigator.onLine) { showToast("Sin señal: para el link hace falta internet. Probá con el archivo."); return; }
+  const espera = cqCapaCargando("Preparando el link…");
+  espera.style.zIndex = "9600";
+  let url = "";
+  try {
+    const r = await fetch("/api/datos?coleccion=croquis", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify({ accion: "compartir_3d", titulo: datos.titulo, cliente: datos.cliente, paginas: datos.paginas }),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.id) throw new Error(d.error || "No se pudo crear el link");
+    url = `${location.origin}/vista-3d.html?id=${d.id}`;
+  } catch (err) { espera.remove(); showToast(err.message); return; }
+  espera.remove();
+  const texto = cq3dTexto(url);
+  if (navigator.share) {
+    try { await navigator.share({ title: "Tu casa en 3D", text: texto }); return; } catch (e) { if (e && e.name === "AbortError") return; }
+  }
+  window.open("https://wa.me/?text=" + encodeURIComponent(texto), "_blank", "noopener");
+}
+async function cqMandar3DArchivo(datos) {
+  const espera = cqCapaCargando("Armando el archivo…");
+  espera.style.zIndex = "9600";
+  let blob;
+  try { blob = new Blob([await croquis3dHtmlIndependiente({ ...datos, empresa: "SAT Alarmas" })], { type: "text/html" }); } catch (err) { espera.remove(); showToast(err.message); return; }
+  espera.remove();
+  const nombre = `Casa-3D-${String(datos.cliente || datos.titulo || "cliente").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "cliente"}.html`;
+  const archivo = new File([blob], nombre, { type: "text/html" });
+  if (navigator.canShare && navigator.canShare({ files: [archivo] })) {
+    try { await navigator.share({ files: [archivo], title: "Tu casa en 3D", text: cq3dTexto("") }); return; } catch (e) { if (e && e.name === "AbortError") return; }
+  }
+  croquisDescargar(blob, nombre);
+  showToast("Archivo descargado: mandalo por WhatsApp como documento.");
 }
 // ---------- Plano de la casa de base (hecho en Visio u otro programa) ----------
 function cqElegirArchivo(accept) {

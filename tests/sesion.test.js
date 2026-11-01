@@ -343,6 +343,58 @@ test("Croquis: solo con permiso; se guardan con un índice, se reabren, y los bo
   }
 });
 
+test("Vista 3D para el cliente: cualquier técnico la comparte, se guarda sin dirección ni imágenes, y se abre sin login solo con el id", async () => {
+  const fetchViejo = global.fetch;
+  const archivos = {};
+  global.fetch = async (url, op = {}) => {
+    const ruta = (String(url).match(/contents\/([^?]+)/) || [])[1];
+    const r = ruta && decodeURIComponent(ruta);
+    if (r === "tecnicos.json") return new Response(JSON.stringify({ content: Buffer.from(JSON.stringify([{ nombre: "Luis", permisos: {} }])).toString("base64"), encoding: "base64", sha: "t" }));
+    if (r) {
+      if (op.method === "PUT") { archivos[r] = JSON.parse(Buffer.from(JSON.parse(op.body).content, "base64").toString("utf-8")); return new Response("{}", { status: 200 }); }
+      if (!archivos[r]) return new Response("{}", { status: 404 });
+      return new Response(JSON.stringify({ sha: "s", encoding: "base64", content: Buffer.from(JSON.stringify(archivos[r])).toString("base64") }));
+    }
+    return new Response("[]");
+  };
+  try {
+    const luis = crearSesion({ nombre: "Luis", rol: "tecnico" });
+    const elementos = [{ id: "a", t: "linea", pts: [0, 0, 400, 0] }, { id: "b", t: "simbolo", tipo: "infrarrojo", x: 50, y: 50, inst: true }, { id: "c", t: "imagen", src: "data:xxx" }, { id: "d", t: "cable", pts: [0, 0, 10, 10] }];
+    let r = resFalso();
+    await datos(pedido("POST", { coleccion: "croquis" }, { accion: "compartir_3d", titulo: "Casa Pérez", cliente: "Juan Pérez", direccion: "Calle Falsa 123", paginas: [{ nombre: "PB", elementos }] }, luis), r);
+    assert.strictEqual(r.statusCode, 200, JSON.stringify(r.cuerpo));
+    const id = r.cuerpo.id;
+    assert.match(id, /^[0-9a-f]{16}$/);
+    const guardado = archivos[`vistas3d/${id}.json`];
+    assert.ok(guardado, "se guardó");
+    assert.ok(!JSON.stringify(guardado).includes("Falsa"), "sin dirección");
+    assert.deepStrictEqual(guardado.paginas[0].elementos.map((e) => e.t), ["linea", "simbolo"], "sin imágenes ni cables");
+    // Vacío: no
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "croquis" }, { accion: "compartir_3d", paginas: [{ elementos: [] }] }, luis), r);
+    assert.strictEqual(r.statusCode, 400);
+    // Sin sesión: no se puede crear
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "croquis" }, { accion: "compartir_3d", paginas: [{ elementos }] }), r);
+    assert.strictEqual(r.statusCode, 401);
+    // Público: se abre por id, sin login
+    r = resFalso();
+    await datos(pedido("GET", { publico: "vista3d", id }), r);
+    assert.strictEqual(r.statusCode, 200);
+    assert.strictEqual(r.cuerpo.titulo, "Casa Pérez");
+    assert.strictEqual(r.cuerpo.paginas[0].elementos.length, 2);
+    assert.ok(!("por" in r.cuerpo), "no dice quién lo mandó");
+    r = resFalso();
+    await datos(pedido("GET", { publico: "vista3d", id: "0000000000000000" }), r);
+    assert.strictEqual(r.statusCode, 404);
+    r = resFalso();
+    await datos(pedido("GET", { publico: "vista3d", id: "../tecnicos" }), r);
+    assert.strictEqual(r.statusCode, 400);
+  } finally {
+    global.fetch = fetchViejo;
+  }
+});
+
 test("Croquis desde foto: el servidor le pasa la foto a la IA con el pedido de JSON y devuelve lo que interpretó", async () => {
   const fetchViejo = global.fetch;
   const claveVieja = process.env.GEMINI_API_KEY;

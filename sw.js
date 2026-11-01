@@ -1,6 +1,6 @@
 // Versión del caché: subir este número cada vez que se publican cambios
 // importantes fuerza a los celulares a descartar la copia vieja.
-const CACHE_NAME = "parte-tecnico-v177";
+const CACHE_NAME = "parte-tecnico-v178";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -10,6 +10,7 @@ const APP_SHELL = [
   "./icons/icon.svg",
   "./sims-utils.js",
   "./croquis-utils.js",
+  "./croquis-3d.js",
 ];
 
 // Librerías de terceros guardadas dentro de la app (carpeta /vendor):

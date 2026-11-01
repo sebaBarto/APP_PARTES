@@ -388,7 +388,7 @@ async function manejarCroquis(req, res, autorizacion, body) {
   // en la instalación, aunque no tenga el permiso de croquis en general.
   // Y cualquier técnico puede ver los planos de un cliente (para el servicio técnico).
   const porCliente = req.method === "GET" && !!(String(req.query.numero_cliente || "").replace(/\D/g, "") || String(req.query.cliente || "").trim());
-  const deInstalacion = req.method === "GET" ? !!(req.query.id || instValida(req.query.instalacion) || porCliente) : (instValida(b.instalacion) || instValida(b.instalacion_id) || b.accion === "borrar");
+  const deInstalacion = req.method === "GET" ? !!(req.query.id || instValida(req.query.instalacion) || porCliente) : (instValida(b.instalacion) || instValida(b.instalacion_id) || b.accion === "borrar" || b.accion === "compartir_3d");
   if (!puede && !deInstalacion) { res.status(403).json({ error: "No tenés habilitados los croquis" }); return; }
   const txt = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
   const idValido = (id) => /^[a-z0-9]{6,32}$/.test(String(id || ""));
@@ -419,6 +419,24 @@ async function manejarCroquis(req, res, autorizacion, body) {
     }
     if (req.method !== "POST") { res.status(405).json({ error: "Método no permitido" }); return; }
     if (b.accion === "interpretar") { await interpretarBocetoCroquis(b, res); return; }
+    if (b.accion === "compartir_3d") {
+      // Vista 3D para mandarle al cliente (por WhatsApp): se guarda una copia
+      // del dibujo con un id al azar, sin dirección ni datos internos, y se
+      // ve en vista-3d.html?id=… sin login.
+      const permitidos = new Set(["linea", "rect", "simbolo", "texto", "abertura", "mueble"]);
+      const limpiar = (els) => (Array.isArray(els) ? els : []).filter((e) => e && typeof e === "object" && permitidos.has(e.t)).slice(0, 3000);
+      const paginas = (Array.isArray(b.paginas) ? b.paginas : [{ nombre: "", elementos: b.elementos }]).slice(0, 8)
+        .map((pg) => ({ nombre: txt(pg && pg.nombre, 60), elementos: limpiar(pg && pg.elementos) }))
+        .filter((pg) => pg.elementos.length);
+      if (!paginas.length) { res.status(400).json({ error: "El plano está vacío" }); return; }
+      const reg = { titulo: txt(b.titulo, 100) || "Tu sistema de seguridad", cliente: txt(b.cliente, 80), fecha: new Date().toISOString(), por: autorizacion.nombre || "admin", paginas };
+      if (JSON.stringify(reg).length > 1500000) { res.status(413).json({ error: "El plano es demasiado grande para compartir" }); return; }
+      const id = crypto.randomBytes(8).toString("hex");
+      const r = await escribirArchivoDatos(`vistas3d/${id}.json`, reg, undefined, `Vista 3D compartida — ${reg.titulo}`);
+      if (!r.ok) { res.status(502).json({ error: "No se pudo guardar la vista 3D" }); return; }
+      res.status(200).json({ ok: true, id });
+      return;
+    }
     if (b.accion === "cerrar_instalacion") {
       // Al cerrar la instalación, sus planos quedan como registro (solo lectura).
       if (!instValida(b.instalacion_id)) { res.status(400).json({ error: "Falta instalacion_id" }); return; }
@@ -835,6 +853,20 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
   // satisfacción). Guarda el pedido, y avisa a todo el equipo por
   // push — así no se pierde como pasaría con un WhatsApp fuera de
   // horario.
+  // Vista 3D que se le mandó a un cliente (link de WhatsApp): solo lectura,
+  // por un id al azar de 16 caracteres que no se puede adivinar.
+  if (req.method === "GET" && req.query && req.query.publico === "vista3d") {
+    const id = String(req.query.id || "");
+    if (!/^[0-9a-f]{16}$/.test(id)) { res.status(400).json({ error: "Link inválido" }); return; }
+    if (!process.env.GITHUB_DATA_TOKEN || !process.env.GITHUB_DATA_REPO) { res.status(500).json({ error: "Falta configuración del servidor" }); return; }
+    try {
+      const { data } = await leerArchivoDatos(`vistas3d/${id}.json`, null);
+      if (!data) { res.status(404).json({ error: "Esta vista ya no está disponible" }); return; }
+      res.setHeader("Cache-Control", "public, max-age=300");
+      res.status(200).json({ titulo: data.titulo, cliente: data.cliente, fecha: data.fecha, paginas: data.paginas });
+    } catch (e) { res.status(502).json({ error: "No se pudo abrir la vista" }); }
+    return;
+  }
   if (req.method === "POST" && req.query && req.query.publico === "solicitud_emergencia") {
     let body = req.body;
     if (typeof body === "string") { try { body = JSON.parse(body); } catch (e) { body = {}; } }
