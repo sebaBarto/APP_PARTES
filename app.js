@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.32.0";
+const APP_VERSION = "4.33.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -17488,7 +17488,8 @@ const CQ_BUSQUEDA_PRESU = {
   central: "central", hub: "hub", repetidor: "rex", teclado: "teclado", sirena_ext: "sirena exterior", sirena_int: "sirena interior",
   magnetico: "magnetico", infrarrojo: "infrarrojo", infrarrojo_ext: "infrarrojo exterior", infrarrojo_cortina: "cortina", humo: "detector humo",
   gas: "detector gas", pulsador_incendio: "pulsador incendio", pulsador_asalto: "pulsador asalto", dvr: "dvr", camara_ip: "camara ip",
-  camara_analoga: "camara", monitor: "monitor",
+  camara_analoga: "camara", monitor: "monitor", doble_tecnologia: "doble tecnologia", panico_colgante: "panico colgante",
+  fuente_ups: "fuente", sismico: "sismico", inundacion: "inundacion",
 };
 function cqPasarAPresupuesto() {
   const cuenta = {};

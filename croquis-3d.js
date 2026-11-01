@@ -38,12 +38,17 @@ const Croquis3D = (() => {
     videoportero: { h: 1.5, caja: [0.1, 0.18, 0.03], color: "#2B2F33", pared: true },
     comunicador: { h: 1.7, caja: [0.12, 0.1, 0.04], color: "#E6E6E6", pared: true },
     energizador: { h: 1.6, caja: [0.2, 0.25, 0.08], color: "#F2C94C", pared: true },
+    panico_colgante: { h: 1.0, caja: [0.035, 0.047, 0.016], color: "#FFFFFF" },
+    fuente_ups: { h: 0.5, caja: [0.25, 0.3, 0.09], color: "#BFC3C8", pared: true },
+    sismico: { h: 0.8, caja: [0.08, 0.06, 0.03], color: "#8E949A", pared: true },
+    inundacion: { h: 0.012, caja: [0.056, 0.014, 0.056], color: "#FFFFFF" },
+    vibracion: { h: 1.2, caja: [0.06, 0.04, 0.02], color: "#FFFFFF", pared: true },
   };
   const COLOR_PARED = "#E9E5DC", COLOR_PISO = "#C9C2B5";
   // Los equipos se dibujan más grandes que en la realidad para que se vean.
   const AUMENTO = 2.2;
   // Alcance real de cada sensor (m): el del croquis es solo el tamaño del dibujo.
-  const ALCANCE_REAL = { infrarrojo: 11, infrarrojo_ext: 12, infrarrojo_cortina: 10 };
+  const ALCANCE_REAL = { infrarrojo: 11, infrarrojo_ext: 12, infrarrojo_cortina: 10, doble_tecnologia: 12 };
 
   // Texto (número de zona) como cartelito que siempre mira a la cámara.
   function cartel(texto, color) {
@@ -1032,6 +1037,15 @@ const Croquis3D = (() => {
         base = 0.6;
       },
       sirena_int() {
+        if (opc.inal) {
+          // Sirena interior inalámbrica (estilo Ajax HomeSiren): chiquita, redondeada, con su LED.
+          paredAtras(-1.6);
+          const g = new THREE.Group();
+          g.add(M(caja(5.2, 5.2, 2.2, 1.6), mat(0xf6f6f4, { roughness: 0.25 })));
+          const l = led(0xff2020, 0, 1.4, 1.12, 0.22); g.add(l);
+          for (let i = 0; i < 3; i++) { const r = new THREE.Mesh(new THREE.TorusGeometry(0.6 + i * 0.4, 0.05, 6, 32), mat(0xc9ced3)); r.position.set(0, -0.6, 1.12); g.add(r); }
+          pieza.add(g); return;
+        }
         paredAtras(-3);
         const g = new THREE.Group();
         g.add(M(caja(11, 11, 5, 2), plastico));
@@ -1039,6 +1053,17 @@ const Croquis3D = (() => {
         pieza.add(g);
       },
       sirena_ext() {
+        if (opc.inal) {
+          // Sirena exterior inalámbrica (estilo Ajax StreetSiren): cuadrada redondeada, lisa, con el marco de luz.
+          paredAtras(-3);
+          const g = new THREE.Group();
+          g.add(M(caja(20, 20, 5.1, 4), mat(0xf6f6f4, { roughness: 0.25 })));
+          g.add(M(caja(15.5, 15.5, 0.6, 3), mat(0xeeeeeb, { roughness: 0.3 }), 0, 0, 2.6));
+          const marco = new THREE.Mesh(caja(17.4, 17.4, 0.3, 3.4), new THREE.MeshStandardMaterial({ color: 0xff3030, emissive: 0xff2020, emissiveIntensity: 0.6, transparent: true, opacity: 0.85 }));
+          marco.position.set(0, 0, 2.45); g.add(marco); leds.push(marco);
+          g.add(led(0x2ecc71, 0, -6.2, 2.95, 0.22));
+          pieza.add(g); return;
+        }
         paredAtras(-4);
         const g = new THREE.Group();
         g.add(M(caja(17, 24, 6.5, 2.5), mat(0xd23b34, { roughness: 0.35 })));
@@ -1050,17 +1075,110 @@ const Croquis3D = (() => {
       },
       sirena_flash() { arma.sirena_ext(); },
       teclado() {
-        paredAtras(-2.2);
+        paredAtras(-2.4);
         const g = new THREE.Group();
-        g.add(M(caja(12, 16, 3, 1.4), plastico));
-        const cv = document.createElement("canvas"); cv.width = 240; cv.height = 320;
-        const c = cv.getContext("2d"); c.fillStyle = "#F3F3F0"; c.fillRect(0, 0, 240, 320);
-        c.fillStyle = "#14281a"; c.fillRect(30, 26, 180, 52); c.fillStyle = "#7CFC9A"; c.font = "700 26px Arial"; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText("ARMADO", 120, 53);
-        "123456789*0#".split("").forEach((k, i) => { const x = 50 + (i % 3) * 70, y = 120 + Math.floor(i / 3) * 48; c.fillStyle = "#d8dbde"; c.beginPath(); c.roundRect ? c.roundRect(x - 24, y - 17, 48, 34, 8) : c.rect(x - 24, y - 17, 48, 34); c.fill(); c.fillStyle = "#2b2f33"; c.font = "700 20px Arial"; c.fillText(k, x, y + 1); });
-        const tx = new THREE.CanvasTexture(cv); tx.encoding = THREE.sRGBEncoding;
-        g.add(M(new THREE.PlaneGeometry(10.6, 14.2), new THREE.MeshStandardMaterial({ map: tx, roughness: 0.35 }), 0, 0, 1.52));
-        g.add(led(0x2ecc71, 4.2, -6.4, 1.6, 0.22)); g.add(led(0xff2020, 3.2, -6.4, 1.6, 0.22));
+        if (opc.inal) {
+          // Teclado inalámbrico táctil (estilo Ajax): plano, liso, con las teclas impresas y lector de tags.
+          g.add(M(caja(15, 10.3, 1.4, 1.6), mat(0xf6f6f4, { roughness: 0.25 })));
+          const cv = document.createElement("canvas"); cv.width = 450; cv.height = 300;
+          const c = cv.getContext("2d"); c.fillStyle = "#F6F6F4"; c.fillRect(0, 0, 450, 300);
+          c.fillStyle = "#9aa0a6"; c.font = "400 34px Arial"; c.textAlign = "center"; c.textBaseline = "middle";
+          "123456789*0C".split("").forEach((k, i) => c.fillText(k, 70 + (i % 3) * 80, 70 + Math.floor(i / 3) * 56));
+          // Armar / desarmar / modo noche.
+          c.strokeStyle = "#9aa0a6"; c.lineWidth = 4;
+          const candado = (x, y, abierto) => { c.strokeRect(x - 14, y - 4, 28, 22); c.beginPath(); c.arc(x, y - 4, 9, Math.PI, abierto ? Math.PI * 1.75 : 0); c.stroke(); };
+          candado(350, 66, false); candado(350, 128, true);
+          c.beginPath(); c.arc(350, 190, 13, Math.PI * 0.35, Math.PI * 1.65); c.arc(357, 190, 10, Math.PI * 1.4, Math.PI * 0.6, true); c.stroke();
+          c.beginPath(); [12, 20, 28].forEach((r) => { c.moveTo(395 + r * Math.cos(-0.7), 250 + r * Math.sin(-0.7)); c.arc(395, 250, r, -0.7, 0.7); }); c.stroke();
+          const tx = new THREE.CanvasTexture(cv);
+          g.add(M(new THREE.PlaneGeometry(14, 9.3), new THREE.MeshStandardMaterial({ map: tx, roughness: 0.25 }), 0, -0.2, 0.71));
+          [-1.5, -0.5, 0.5, 1.5].forEach((x, i) => g.add(led([0xff2020, 0x2ecc71, 0x2e86de, 0xffb020][i], x, 4.5, 0.72, 0.13)));
+          g.rotation.y = -0.15; pieza.add(g); base = 0.25;
+          return;
+        }
+        // Teclado cableado con pantalla LCD (estilo Paradox K32): pantalla azul, teclas de goma y teclas de función.
+        g.add(M(caja(13.5, 11.5, 2.6, 1.2), mat(0xeeeeea, { roughness: 0.35 })));
+        const lcd = new THREE.Group();
+        const cvL = document.createElement("canvas"); cvL.width = 320; cvL.height = 80;
+        const cl = cvL.getContext("2d"); cl.fillStyle = "#2b6fd6"; cl.fillRect(0, 0, 320, 80); cl.fillStyle = "#e9f2ff"; cl.font = "700 26px monospace"; cl.textBaseline = "middle"; cl.fillText("Sistema armado", 14, 24); cl.fillText("Zona 1: cerrada", 14, 58);
+        lcd.add(M(new THREE.PlaneGeometry(8.6, 2.15), new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(cvL), emissive: 0x1a3f80, emissiveIntensity: 0.35, roughness: 0.2 }), 0, 3.6, 1.32));
+        lcd.add(M(new THREE.BoxGeometry(9.4, 2.9, 0.2), oscuro, 0, 3.6, 1.2));
+        g.add(lcd);
+        // Teclas numéricas (goma gris) y columna de funciones.
+        const tecla = (txt, x, y, w, col) => {
+          const cv = document.createElement("canvas"); cv.width = 96; cv.height = 64;
+          const c = cv.getContext("2d"); c.fillStyle = col || "#cfd3d7"; c.fillRect(0, 0, 96, 64); c.fillStyle = "#2b2f33"; c.font = `700 ${txt.length > 2 ? 22 : 32}px Arial`; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(txt, 48, 34);
+          const t = M(caja(w || 1.7, 1.05, 0.5, 0.25), mat(col ? 0xb9c2cc : 0xcfd3d7, { roughness: 0.7 }), x, y, 1.35); g.add(t);
+          const cara = M(new THREE.PlaneGeometry((w || 1.7) * 0.9, 0.9), new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(cv), roughness: 0.7 }), x, y, 1.61); g.add(cara);
+        };
+        ["1", "2", "3", "4", "5", "6", "7", "8", "9", "CLEAR", "0", "ENTER"].forEach((k, i) => tecla(k, -4.3 + (i % 3) * 2.1, 1.3 - Math.floor(i / 3) * 1.4, k.length > 1 ? 1.8 : 1.7));
+        ["STAY", "SLEEP", "OFF", "BYP"].forEach((k, i) => tecla(k, 3.6, 1.3 - i * 1.4, 2.4, "#b9c2cc"));
+        g.add(led(0x2ecc71, -5.6, 3.6, 1.32, 0.18)); g.add(led(0xff2020, 5.6, 3.6, 1.32, 0.18));
+        g.rotation.y = -0.18; pieza.add(g); base = 0.25;
+      },
+      doble_tecnologia() {
+        esquina();
+        const g = new THREE.Group();
+        g.add(M(caja(6.8, 12, 5, 1.8), plastico));
+        g.add(fresnel(5.4, 4.4, 1.1, 0, 3, 1.95));
+        // Ventana de la microondas (más oscura) abajo de la lente.
+        g.add(M(caja(4.6, 2.6, 0.4, 0.6), mat(0x9aa3ad, { roughness: 0.3 }), 0, -1.2, 2.35));
+        const tx = texto("DT", 1.6, 0.8, { fondo: "#f1f1ee", color: "#5b6b7b" }); tx.position.set(0, -3.6, 2.52); g.add(tx);
+        g.add(led(0xff2020, -1.6, -4.4, 2.5, 0.22)); g.add(led(0x2ecc71, 1.6, -4.4, 2.5, 0.22));
+        g.add(Mx(new THREE.CylinderGeometry(0.8, 1, 2.2, 12), plastico, 0, 0, -3));
+        g.position.set(0, 4, -2.8); g.rotation.x = -0.18; pieza.add(g);
+      },
+      panico_colgante() {
+        // Botón colgante: cuerpo chico redondeado con el botón grande, y el cordón.
+        const g = new THREE.Group();
+        g.add(M(caja(3.5, 4.7, 1.6, 1.2), mat(0xf6f6f4, { roughness: 0.25 })));
+        const b = Mx(new THREE.CylinderGeometry(1.25, 1.3, 0.35, 32), mat(0xe8741e, { roughness: 0.3 }), 0, -0.3, 0.8); g.add(b); leds.push(b);
+        g.add(led(0x2ecc71, 0, 1.8, 0.82, 0.12));
+        const cordon = new THREE.Mesh(new THREE.TorusGeometry(4, 0.13, 8, 64), mat(0x2b2f33, { roughness: 0.8 }));
+        cordon.scale.set(0.75, 1, 1); cordon.position.set(0, 6.9, -0.2); g.add(cordon);
+        g.add(M(new THREE.TorusGeometry(0.45, 0.1, 8, 20), metal, 0, 2.75, 0));
+        paredAtras(-3);
+        anim.push((t) => { g.rotation.z = Math.sin(t * 1.5) * 0.12; });
+        pieza.add(g); girar = false;
+      },
+      fuente_ups() {
+        // Fuente con batería para cámaras y alarma: gabinete metálico con cerradura y LEDs.
+        paredAtras(-5);
+        const g = new THREE.Group();
+        g.add(M(caja(25, 30, 9, 0.8), metal));
+        g.add(Mx(new THREE.CylinderGeometry(0.9, 0.9, 0.6, 20), mat(0x8a8f96, { metalness: 0.7, roughness: 0.3 }), 9, 10, 4.6));
+        const tx = texto("12V  ·  UPS", 12, 2.4, { fondo: "#bfc3c8", color: "#2b2f33", tam: 0.6 }); tx.position.set(-3, 10, 4.52); g.add(tx);
+        [["AC", 0x2ecc71], ["BAT", 0xffb020], ["OUT", 0x2e86de]].forEach(([n, c], i) => { g.add(led(c, -8 + i * 4, -9, 4.55, 0.35)); const l = texto(n, 3, 1.2, { fondo: "#bfc3c8", color: "#2b2f33" }); l.position.set(-8 + i * 4, -10.6, 4.52); g.add(l); });
+        for (let i = 0; i < 6; i++) g.add(M(new THREE.BoxGeometry(14, 0.5, 0.3), mat(0x9aa0a6), -1, -1 + i * 1.2 - 3, 4.5));
         pieza.add(g);
+      },
+      sismico() {
+        // Caja fuerte con el sensor sísmico pegado en la puerta.
+        fondo.add(M(caja(40, 46, 34, 2), mat(0x3b4046, { roughness: 0.4, metalness: 0.5 }), 0, -6, -18));
+        fondo.add(Mx(new THREE.CylinderGeometry(4, 4, 1.5, 32), mat(0x8a8f96, { metalness: 0.8, roughness: 0.25 }), -8, -4, -0.3));
+        fondo.add(M(new THREE.BoxGeometry(1.2, 9, 1.2), mat(0x8a8f96, { metalness: 0.8, roughness: 0.25 }), 6, -4, 0));
+        const g = new THREE.Group();
+        g.add(M(caja(8, 6, 2.6, 0.8), mat(0xe9e9e6, { roughness: 0.35 })));
+        g.add(led(0xffb020, 2.8, 1.8, 1.32, 0.22));
+        const onda = new THREE.Group();
+        const pts = [[-2.6, 0], [-1.6, 0], [-1, 1.2], [0, -1.2], [0.8, 1], [1.4, 0], [2.6, 0]].map(([x, y]) => new THREE.Vector3(x, y - 0.4, 1.32));
+        onda.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0x8a5a00 })));
+        g.add(onda);
+        g.position.set(8, 10, 1.4); pieza.add(g); base = 0.3;
+      },
+      inundacion() {
+        // Va en el piso, cerca de donde puede haber agua; el charco se acerca.
+        const piso = M(new THREE.PlaneGeometry(200, 160), mat(0xd9d4cb, { roughness: 0.9 }), 0, 0, 0); piso.rotation.x = -Math.PI / 2; fondo.add(piso);
+        fondo.add(M(new THREE.PlaneGeometry(200, 60), pared, 0, 30, -12));
+        const g = new THREE.Group();
+        const cuerpo = M(caja(5.6, 5.6, 1.4, 1.4), mat(0xf6f6f4, { roughness: 0.25 }), 0, 0.7, 0); cuerpo.rotation.x = -Math.PI / 2; g.add(cuerpo);
+        g.add(led(0x2e86de, 0, 1.45, -1.8, 0.18));
+        [-1.6, 1.6].forEach((x) => g.add(M(new THREE.CylinderGeometry(0.25, 0.25, 0.3, 10), metal, x, 0.1, 2.2)));
+        pieza.add(g);
+        const charco = new THREE.Mesh(new THREE.CircleGeometry(1, 40), new THREE.MeshStandardMaterial({ color: 0x5aa9e6, transparent: true, opacity: 0.55, roughness: 0.05, metalness: 0.2 }));
+        charco.rotation.x = -Math.PI / 2; charco.position.set(3, 0.05, 5); fondo.add(charco);
+        anim.push((t) => { const f = (t * 0.35) % 1; charco.scale.setScalar(2 + f * 7); charco.material.opacity = 0.55 * (1 - f * 0.4); });
+        girar = false;
       },
       central() {
         paredAtras(-5);
@@ -1708,14 +1826,14 @@ const CROQUIS_3D_LEYENDA = {
   rotura_vidrio: ["Detector de rotura de vidrio", "#17809B"], pulsador_asalto: ["Botón de pánico", "#E8741E"], pulsador_incendio: ["Pulsador de incendio", "#E00000"],
   camara_ip: ["Cámara", "#F4F4F4"], camara_analoga: ["Cámara", "#F4F4F4"], camara_domo: ["Cámara domo", "#F4F4F4"], dvr: ["Grabador DVR / NVR", "#2B2F33"], detector_360: ["Detector de techo 360°", "#FFFFFF"],
   barrera: ["Barrera infrarroja exterior", "#E00000"], lector_acceso: ["Lectora de tag / tarjeta", "#1B5FA8"], cerradura: ["Cerradura de pestillo", "#1B5FA8"], cerradura_magnetica: ["Cerradura electromagnética", "#1B5FA8"],
-  boton_salida: ["Botón de salida", "#2E9E4F"], videoportero: ["Videoportero", "#1C1E21"], comunicador: ["Comunicador 4G", "#D9D9D9"], energizador: ["Energizador de cerco eléctrico", "#F2C94C"], vibracion: ["Sensor de vibración", "#8A5A00"], inundacion: ["Detector de inundación", "#2E86DE"],
+  boton_salida: ["Botón de salida", "#2E9E4F"], doble_tecnologia: ["Sensor de doble tecnología", "#C0392B"], panico_colgante: ["Botón de pánico colgante", "#E8741E"], fuente_ups: ["UPS / fuente con batería", "#5B5F66"], sismico: ["Sensor sísmico (caja fuerte)", "#8A5A00"], videoportero: ["Videoportero", "#1C1E21"], comunicador: ["Comunicador 4G", "#D9D9D9"], energizador: ["Energizador de cerco eléctrico", "#F2C94C"], vibracion: ["Sensor de vibración", "#8A5A00"], inundacion: ["Detector de inundación", "#2E86DE"],
 };
 // Nombre de un equipo según cómo es (inalámbrico, PIR con cámara...).
 function croquis3dNombre(e) {
   if (!e) return "";
   const base = (CROQUIS_3D_LEYENDA[e.tipo] || [(CROQUIS_SIMBOLOS[e.tipo] || {}).nombre || e.tipo])[0];
   if (e.tipo === "infrarrojo" && e.video) return "Sensor de movimiento con cámara (PIR CAM)" + (e.inal ? "" : "");
-  if (e.inal && /^(infrarrojo|magnetico|humo|sirena|teclado|rotura|pulsador|detector_360|vibracion|inundacion)/.test(e.tipo)) return base.replace(/ \(.*?\)$/, "") + " inalámbrico";
+  if (e.inal && /^(infrarrojo|magnetico|humo|sirena|teclado|rotura|pulsador|detector_360|vibracion|doble_tecnologia)/.test(e.tipo)) return base.replace(/ \(.*?\)$/, "") + (/^sirena/.test(e.tipo) ? " inalámbrica" : " inalámbrico");
   return base;
 }
 // Equipos con variantes ("tipo|marca,marca"): PIR inalámbrico, PIR CAM...
@@ -1737,7 +1855,7 @@ const CROQUIS_3D_EXPLICA = {
   central: "Es el cerebro del sistema: recibe los avisos de los sensores, hace sonar las sirenas y avisa al monitoreo.",
   hub: "Central inalámbrica: recibe los avisos de los sensores sin cables y avisa al monitoreo.",
   repetidor: "Extiende el alcance de la señal inalámbrica a los sensores más lejanos.",
-  teclado: "Desde acá se activa y desactiva la alarma con tu clave.",
+  teclado: "Desde acá se activa y desactiva la alarma con tu clave; la pantalla muestra el estado del sistema y qué zona está abierta.",
   sirena_int: "Suena fuerte adentro para asustar al intruso.",
   sirena_ext: "Suena afuera y alerta a los vecinos: muchas veces el intruso se va apenas la escucha.",
   sirena_flash: "Suena y destella afuera para que se vea desde lejos dónde está la alarma.",
@@ -1756,12 +1874,16 @@ const CROQUIS_3D_EXPLICA = {
   comunicador: "Manda los avisos de la alarma al monitoreo por la red celular, aunque se corte internet o el teléfono.",
   energizador: "Alimenta el cerco eléctrico: da una descarga disuasiva y avisa si cortan o tocan los hilos.",
   vibracion: "Detecta golpes o vibraciones en una pared, una caja fuerte o una reja, antes de que la rompan.",
-  inundacion: "Avisa si hay agua en el piso (pérdidas, lavarropas, bombas) antes de que sea un problema.",
+  inundacion: "Va en el piso: avisa apenas detecta agua (pérdidas, lavarropas, termotanque, bombas) antes de que sea un problema.",
+  doble_tecnologia: "Combina infrarrojo y microondas: solo avisa cuando las dos tecnologías detectan a la vez. Ideal para garajes, galpones o lugares con corrientes de aire, sol o calefacción, porque casi no da falsas alarmas.",
+  panico_colgante: "Se lleva colgado del cuello o en la muñeca: con un toque pedís ayuda desde cualquier lugar de la casa. Ideal para personas mayores.",
+  fuente_ups: "Mantiene funcionando las cámaras, el grabador y la alarma cuando se corta la luz.",
+  sismico: "Va pegado a la caja fuerte o al tesoro: detecta golpes, taladros y amoladoras antes de que logren abrirla.",
 };
-const ALCANCE_TXT = { infrarrojo: "11", infrarrojo_ext: "12", infrarrojo_cortina: "10" };
+const ALCANCE_TXT = { infrarrojo: "11", infrarrojo_ext: "12", infrarrojo_cortina: "10", doble_tecnologia: "12" };
 // Equipos que se pueden agregar tocando en el 3D (en este orden).
-const CROQUIS_3D_PALETA = ["infrarrojo", "infrarrojo|inal", "infrarrojo|video,inal", "infrarrojo_ext", "infrarrojo_cortina", "barrera", "magnetico", "magnetico|inal", "humo", "rotura_vidrio", "detector_360", "sirena_int", "sirena_ext", "teclado", "central", "hub", "pulsador_asalto", "camara_ip", "camara_domo", "dvr", "lector_acceso", "cerradura_magnetica", "cerradura", "boton_salida", "videoportero"];
-const CROQUIS_3D_CON_ZONA = ["barrera", "infrarrojo", "infrarrojo_ext", "infrarrojo_cortina", "magnetico", "humo", "gas", "rotura_vidrio", "detector_360", "pulsador_asalto", "pulsador_incendio"];
+const CROQUIS_3D_PALETA = ["infrarrojo", "infrarrojo|inal", "infrarrojo|video,inal", "doble_tecnologia", "infrarrojo_ext", "infrarrojo_cortina", "barrera", "magnetico", "magnetico|inal", "humo", "inundacion", "rotura_vidrio", "sismico", "detector_360", "sirena_int", "sirena_int|inal", "sirena_ext", "sirena_ext|inal", "teclado", "teclado|inal", "central", "hub", "pulsador_asalto", "panico_colgante", "fuente_ups", "camara_ip", "camara_domo", "dvr", "lector_acceso", "cerradura_magnetica", "cerradura", "boton_salida", "videoportero"];
+const CROQUIS_3D_CON_ZONA = ["barrera", "doble_tecnologia", "panico_colgante", "sismico", "inundacion", "infrarrojo", "infrarrojo_ext", "infrarrojo_cortina", "magnetico", "humo", "gas", "rotura_vidrio", "detector_360", "pulsador_asalto", "pulsador_incendio"];
 // Pitido corto (detección) — solo si el navegador lo permite.
 let croquis3dAudio = null;
 function croquis3dPitido(frec, dur) {

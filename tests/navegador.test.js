@@ -4318,3 +4318,38 @@ test("Equipos nuevos: inalámbricos, PIR CAM, barrera exterior, DVR/NVR y contro
     await ctx.close();
   } finally { await nav.close(); }
 });
+
+test("Más equipos: doble tecnología, pánico colgante, UPS, sísmico, inundación, sirenas y teclado inalámbricos (paleta, simulación y modelos 3D)", async () => {
+  const nav = await navegador3D();
+  try {
+    const ctx = await nav.newContext({ serviceWorkers: "block", viewport: { width: 900, height: 800 } });
+    const page = await ctx.newPage();
+    const errores = [];
+    page.on("pageerror", (e) => errores.push(e.message));
+    await page.route("**/api/**", (r) => r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+    await page.goto(base + "/");
+    await page.waitForTimeout(400);
+    // El sensor de doble tecnología reemplaza al infrarrojo: cubre igual y detecta en la simulación
+    const casa = CASA_B.map((e) => (e.id === "ir" ? { ...e, tipo: "doble_tecnologia" } : e));
+    await page.evaluate((els) => { tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); window.CROQUIS_3D_VELOCIDAD = 12; cqAbrirEditor({ titulo: "Casa", elementos: els }); }, casa);
+    await page.click("#cqMenuBtn");
+    await page.click('[data-m="ver3d"]');
+    await page.waitForSelector(".v3-capa canvas", { timeout: 20000 });
+    assert.match(await page.textContent(".v3-ley"), /Sensor de doble tecnología/);
+    assert.ok(await page.evaluate(() => window.__visor3d.visor.analisis.porcentaje > 0), "cubre parte de la casa");
+    await page.click('.v3-barra [data-a="editar"]');
+    await page.click('.v3-tira [data-tipo="__mas"]');
+    const items = await page.$$eval(".v3-hoja .v3-paleta button", (bs) => bs.map((b) => b.textContent.trim()));
+    for (const n of ["Sensor de doble tecnología", "Botón de pánico colgante", "UPS / fuente con batería", "Sensor sísmico (caja fuerte)", "Detector de inundación", "Sirena interior inalámbrica", "Sirena exterior inalámbrica", "Teclado inalámbrico"]) assert.ok(items.some((t) => t.startsWith(n)), n + " en: " + items.join(" | "));
+    // Cada modelo 3D se arma sin errores
+    const ok = await page.evaluate(async () => {
+      const lista = [["teclado", {}], ["teclado", { inal: true }], ["sirena_int", { inal: true }], ["sirena_ext", { inal: true }], ["doble_tecnologia", {}], ["panico_colgante", {}], ["fuente_ups", {}], ["sismico", {}], ["inundacion", {}]];
+      const n = [];
+      for (const [t, o] of lista) { const d = document.createElement("div"); d.style.cssText = "width:200px;height:150px"; document.body.appendChild(d); Croquis3D.vitrina(d, t, o); await new Promise((r) => setTimeout(r, 60)); n.push(!!d.querySelector("canvas")); d.remove(); }
+      return n;
+    });
+    assert.deepStrictEqual(ok, ok.map(() => true));
+    assert.deepStrictEqual(errores, []);
+    await ctx.close();
+  } finally { await nav.close(); }
+});

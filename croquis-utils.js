@@ -16,7 +16,7 @@
 //   simbolo { tipo, x, y, rot, esc, color?, esp? }  equipos y objetos de obra
 
 // Tiene que ser igual a APP_VERSION de app.js (si no, la app recarga).
-const CROQUIS_UTILS_VERSION = "4.32.0";
+const CROQUIS_UTILS_VERSION = "4.33.0";
 const CROQUIS_GRILLA = 20;
 
 // Cada símbolo se dibuja centrado en 0,0 con dib(color). "cat" separa los
@@ -105,6 +105,22 @@ const CROQUIS_SIMBOLOS = {
   vibracion: {
     nombre: "Sensor de vibración", cat: "equipo", color: "#8A5A00", r: 16,
     dib: (c) => `<rect x="-11" y="-8" width="22" height="16" rx="2" fill="#FFFFFF" stroke="${c}" stroke-width="2.4"/><path d="M-7 0 q2 -5 4 0 t4 0 t4 0" fill="none" stroke="${c}" stroke-width="1.6"/>`,
+  },
+  doble_tecnologia: {
+    nombre: "Sensor de doble tecnología", cat: "equipo", color: "#C0392B", ir: true, alc: 80, ang: 90, vb: "-84 -84 110 110",
+    dib: (c, el) => croquisIR(c, el, CROQUIS_SIMBOLOS.doble_tecnologia) + `<text x="9" y="12" text-anchor="middle" ${CROQUIS_FUENTE} font-size="6" fill="#FFFFFF">DT</text>`,
+  },
+  panico_colgante: {
+    nombre: "Botón de pánico colgante", cat: "equipo", color: "#E8741E", r: 14,
+    dib: (c) => `<path d="M-6 -12 Q0 -20 6 -12" fill="none" stroke="#5B5F66" stroke-width="1.6"/><rect x="-8" y="-11" width="16" height="20" rx="5" fill="#FFFFFF" stroke="#1C1E21" stroke-width="2"/><circle cx="0" cy="-1" r="5" fill="${c}"/>`,
+  },
+  fuente_ups: {
+    nombre: "UPS / fuente con batería", cat: "equipo", color: "#5B5F66", r: 18,
+    dib: (c) => `<rect x="-13" y="-10" width="26" height="20" rx="2" fill="#FFFFFF" stroke="${c}" stroke-width="2.2"/><rect x="-8" y="-4" width="12" height="8" fill="none" stroke="${c}" stroke-width="1.5"/><rect x="4" y="-2" width="2" height="4" fill="${c}"/><path d="M-4 -2 v4 M-6 0 h4" stroke="${c}" stroke-width="1.2"/>`,
+  },
+  sismico: {
+    nombre: "Sensor sísmico (caja fuerte)", cat: "equipo", color: "#8A5A00", r: 16,
+    dib: (c) => `<rect x="-11" y="-9" width="22" height="18" rx="2" fill="#FFFFFF" stroke="${c}" stroke-width="2.2"/><path d="M-8 0 l3 -5 l3 9 l3 -9 l3 9 l2 -4" fill="none" stroke="${c}" stroke-width="1.4" stroke-linejoin="round"/>`,
   },
   inundacion: {
     nombre: "Detector de inundación", cat: "equipo", color: "#2E86DE", r: 16,
