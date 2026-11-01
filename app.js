@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.23.0";
+const APP_VERSION = "4.24.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -16806,6 +16806,7 @@ cqEl("cqMenuBtn").addEventListener("click", () => {
     <button type="button" class="btn btn-secondary" data-m="svg">Archivo editable (SVG, se abre en Visio)</button>
     <div class="cq-menu-fila"><button type="button" class="btn btn-secondary" data-m="foto">${cqIc("galeria")} Boceto desde galería</button><button type="button" class="btn btn-secondary" data-m="camara">${cqIc("camara")} Sacar foto</button></div>
     <button type="button" class="btn btn-secondary" data-m="pagina">${cqIc("pagina")} Agregar una página</button>
+    <button type="button" class="btn btn-secondary" data-m="propuesta">${cqIc("cubo")} Hacer otra propuesta (copia para comparar)</button>
     ${cqTodosLosElementos().some((e) => e.inst) && permisosDelTecnico(tecnicoLogueado).presupuesto_express ? `<button type="button" class="btn btn-secondary" data-m="presu">${cqIc("presupuesto")} Pasar los equipos a instalar a un presupuesto</button>` : ""}
     <button type="button" class="btn btn-secondary" data-m="base">${cqIc("plano")} ${cq.fondo && cq.fondo.base ? "Cambiar el plano de la casa" : "Poner el plano de la casa (PDF, imagen o SVG)"}</button>
     ${cq.fondo && cq.fondo.base ? `<button type="button" class="btn btn-secondary" data-m="escala">${cqIc("regla")} Escala del plano (ancho real en metros)</button>` : ""}
@@ -16822,6 +16823,7 @@ cqEl("cqMenuBtn").addEventListener("click", () => {
     capa.remove();
     if (m === "guardar") cqGuardar();
     if (m === "ver3d") cqVer3D();
+    if (m === "propuesta") { if (cq.cambios && confirm("¿Guardar este plano antes de hacer la copia?")) await cqGuardar(); cqOtraPropuesta(); }
     if (m === "pdf" || m === "png" || m === "svg") cqExportar(m);
     if (m === "datos") cqPedirDatos();
     if (m === "foto") { cqFotoDestino = "editor"; cqEl("cqFotoInput").click(); }
@@ -16938,7 +16940,7 @@ async function cqVer3D() {
   const cerrar = () => { if (visor) visor.destruir(); capa.remove(); };
   const todos = datos.paginas.flatMap((p) => p.elementos);
   visor = iniciarVisor3D({ ...datos, empresa: "SAT Alarmas", logo: "icons/logo.png" }, {
-    contenedor: capa, botonCerrar: true,
+    contenedor: capa, botonCerrar: true, debiles: true,
     alCerrar: cerrar,
     // Mandar siempre lo último (con lo que se haya cambiado en el 3D).
     extras: [{ texto: "Mandar al cliente", alHacer: () => cqMandar3D(cq3dDatos()) }],
@@ -16948,47 +16950,116 @@ async function cqVer3D() {
   if (!visor) { cerrar(); showToast("El plano no tiene nada para mostrar en 3D."); }
   window.__visor3d = visor; // para las pruebas
 }
+// Otros croquis del mismo cliente (para mandar propuestas a comparar).
+async function cq3dOtrosDelCliente() {
+  const q = new URLSearchParams({ coleccion: "croquis" });
+  if (cq.numero_cliente) q.set("numero_cliente", cq.numero_cliente);
+  if (cq.cliente) q.set("cliente", cq.cliente);
+  if (!cq.numero_cliente && !cq.cliente) return [];
+  const r = await fetch("/api/datos?" + q, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN } });
+  const l = await r.json().catch(() => []);
+  return Array.isArray(l) ? l.filter((c) => c.id && c.id !== cq.id) : [];
+}
+async function cq3dPaginasDe(id) {
+  const r = await fetch("/api/datos?coleccion=croquis&id=" + encodeURIComponent(id), { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN } });
+  const c = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(c.error || "No se pudo abrir la otra propuesta");
+  const dib = c.dibujo || {};
+  const pp = Array.isArray(dib.paginas) && dib.paginas.length ? dib.paginas : [{ nombre: "", elementos: dib.elementos || [] }];
+  return pp.map((p) => ({ nombre: pp.length > 1 ? p.nombre || "" : "", elementos: (p.elementos || []).filter((e) => !CQ_3D_FUERA.includes(e.t)) })).filter((p) => p.elementos.length);
+}
 function cqMandar3D(datos) {
   const capa = document.createElement("div");
   capa.className = "cq-datos-capa";
   capa.style.zIndex = "9500";
   capa.innerHTML = `<div class="cq-datos cq-menu">
     <h3>Mandarle la vista 3D al cliente</h3>
-    <p class="pe-nota">El cliente la abre en el celular, la gira con el dedo y ve qué cubre cada sensor. No lleva la dirección.</p>
+    <p class="pe-nota">El cliente la abre en el celular, la gira con el dedo, ve qué cubre cada sensor y puede simular un intruso. No lleva la dirección.</p>
+    <div class="cq3d-estado pe-nota"></div>
+    <details class="cq3d-comparar"><summary>Mandar junto con otra propuesta para comparar</summary>
+      <div class="cq3d-otras pe-nota">Buscando otros planos de este cliente…</div>
+    </details>
     <button type="button" class="btn btn-primary" data-m="link">${cqIc("compartir")} Mandar link por WhatsApp</button>
     <button type="button" class="btn btn-secondary" data-m="html">Mandar como archivo (HTML, se abre sin internet)</button>
-    <p class="pe-nota">Recomendado el link: anda en Android y iPhone. El archivo, en iPhone hay que abrirlo con Safari (desde WhatsApp a veces no muestra el 3D).</p>
+    <p class="pe-nota">Recomendado el link: anda en Android y iPhone, y te avisa cuando lo abren. El archivo, en iPhone hay que abrirlo con Safari.</p>
     <button type="button" class="link-btn" data-m="cerrar">Cancelar</button>
   </div>`;
   document.body.appendChild(capa);
-  capa.addEventListener("click", (e) => {
+  // Estado de lo que ya se mandó de este plano o este cliente.
+  const q = new URLSearchParams({ coleccion: "croquis", vistas3d: "1" });
+  if (cq.id) q.set("croquis_id", cq.id); if (cq.cliente) q.set("cliente", cq.cliente);
+  fetch("/api/datos?" + q, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN } }).then((r) => r.json()).then((l) => {
+    if (!Array.isArray(l) || !l.length) return;
+    const caja = capa.querySelector(".cq3d-estado");
+    const f = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); };
+    caja.innerHTML = "<b>Ya mandados:</b><br>" + l.slice(0, 4).map((v) => `${escapeHtml(f(v.fecha))}${v.propuestas && v.propuestas.length > 1 ? " (" + v.propuestas.map(escapeHtml).join(" / ") + ")" : ""}: ${v.aperturas ? `abierto ${v.aperturas} ${v.aperturas === 1 ? "vez" : "veces"}, último ${escapeHtml(f(v.ultima))}` : "todavía no lo abrió"}${(v.llamadas || []).length ? ` · <b>pidió que lo llamen: ${escapeHtml(v.llamadas[v.llamadas.length - 1].telefono)}</b>` : ""}`).join("<br>");
+  }).catch(() => {});
+  // Otras propuestas del mismo cliente.
+  let otras = [];
+  cq3dOtrosDelCliente().then((l) => {
+    otras = l.slice(0, 12);
+    const caja = capa.querySelector(".cq3d-otras");
+    caja.innerHTML = (otras.length
+      ? `<label class="cq3d-fila">Esta: <input type="text" class="cq3d-nombre-actual" maxlength="40" value="${escapeHtml(cq.titulo || "Propuesta 1")}"></label>` +
+        otras.map((c, i) => `<label class="cq3d-fila"><input type="checkbox" data-i="${i}"> <input type="text" data-n="${i}" maxlength="40" value="${escapeHtml(c.titulo || "Propuesta " + (i + 2))}"></label>`).join("") +
+        `<span>Elegí hasta 2. El cliente las cambia con un botón y ve qué cubre cada una.</span>`
+      : "No hay otros planos guardados de este cliente.") +
+      `<br><button type="button" class="link-btn" data-m="copia">Hacer otra propuesta (copia de este plano)</button>`;
+  }).catch(() => { capa.querySelector(".cq3d-otras").textContent = "Sin conexión: no se pueden buscar otras propuestas."; });
+  capa.addEventListener("click", async (e) => {
     const b = e.target.closest("[data-m]");
     if (!b && e.target !== capa) return;
     const m = b ? b.dataset.m : "cerrar";
+    if (m !== "link" && m !== "html" && m !== "cerrar" && m !== "copia") return;
+    // Propuestas elegidas.
+    const elegidas = [...capa.querySelectorAll(".cq3d-otras input[type=checkbox]:checked")].slice(0, 2).map((x) => ({ c: otras[Number(x.dataset.i)], nombre: (capa.querySelector(`[data-n="${x.dataset.i}"]`).value || "").trim() }));
+    const nombreActual = ((capa.querySelector(".cq3d-nombre-actual") || {}).value || "").trim();
     capa.remove();
-    if (m === "link") cqMandar3DLink(datos);
-    if (m === "html") cqMandar3DArchivo(datos);
+    if (m === "copia") { document.querySelector(".v3-capa [data-a=cerrar]")?.click(); cqOtraPropuesta(); return; }
+    if (m === "cerrar") return;
+    let paquete = { titulo: datos.titulo, cliente: datos.cliente, croquis_id: cq.id || "", paginas: datos.paginas };
+    if (elegidas.length) {
+      const espera = cqCapaCargando("Juntando las propuestas…");
+      espera.style.zIndex = "9600";
+      try {
+        const extra = [];
+        for (const x of elegidas) extra.push({ nombre: x.nombre || x.c.titulo || "Otra", paginas: await cq3dPaginasDe(x.c.id) });
+        paquete.propuestas = [{ nombre: nombreActual || "Propuesta 1", paginas: datos.paginas }, ...extra.filter((p) => p.paginas.length)];
+      } catch (err) { espera.remove(); showToast(err.message); return; }
+      espera.remove();
+    }
+    if (m === "link") cqMandar3DLink(paquete);
+    if (m === "html") cqMandar3DArchivo(paquete);
   });
+}
+// Copia del plano para armar otra propuesta (p. ej. "Básica" y "Completa").
+function cqOtraPropuesta() {
+  const d = cqDibujoCompleto();
+  const copia = JSON.parse(JSON.stringify({ titulo: (cq.titulo || "Plano") + " (otra propuesta)", cliente: cq.cliente, numero_cliente: cq.numero_cliente, direccion: cq.direccion, paginas: d.paginas, medidas: !!d.medidas }));
+  cqAbrirEditor({ ...copia, cambios: true });
+  cqGuardarBorrador();
+  showToast("Copia nueva para la otra propuesta. Cambiale el título, agregá o sacá equipos y guardala.");
 }
 function cq3dTexto(url) {
   const nombre = String(cq.cliente || "").trim().split(/\s+/)[0];
-  return `Hola${nombre ? " " + nombre : ""}! Te mando cómo va a quedar tu sistema de seguridad en 3D.${url ? "\n" + url : ""}\nLo podés girar con el dedo y ver la zona que cubre cada sensor.`;
+  return `Hola${nombre ? " " + nombre : ""}! Te mando cómo va a quedar tu sistema de seguridad en 3D.${url ? "\n" + url : ""}\nLo podés girar con el dedo, ver la zona que cubre cada sensor y simular un intruso.`;
 }
-async function cqMandar3DLink(datos) {
+async function cq3dCrearLink(paquete) {
+  const r = await fetch("/api/datos?coleccion=croquis", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+    body: JSON.stringify({ accion: "compartir_3d", ...paquete }),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || !d.id) throw new Error(d.error || "No se pudo crear el link");
+  return d.id;
+}
+async function cqMandar3DLink(paquete) {
   if (!navigator.onLine) { showToast("Sin señal: para el link hace falta internet. Probá con el archivo."); return; }
   const espera = cqCapaCargando("Preparando el link…");
   espera.style.zIndex = "9600";
   let url = "";
-  try {
-    const r = await fetch("/api/datos?coleccion=croquis", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-      body: JSON.stringify({ accion: "compartir_3d", titulo: datos.titulo, cliente: datos.cliente, paginas: datos.paginas }),
-    });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok || !d.id) throw new Error(d.error || "No se pudo crear el link");
-    url = `${location.origin}/vista-3d.html?id=${d.id}`;
-  } catch (err) { espera.remove(); showToast(err.message); return; }
+  try { url = `${location.origin}/vista-3d.html?id=${await cq3dCrearLink(paquete)}`; } catch (err) { espera.remove(); showToast(err.message); return; }
   espera.remove();
   const texto = cq3dTexto(url);
   if (navigator.share) {
@@ -16996,13 +17067,18 @@ async function cqMandar3DLink(datos) {
   }
   window.open("https://wa.me/?text=" + encodeURIComponent(texto), "_blank", "noopener");
 }
-async function cqMandar3DArchivo(datos) {
+async function cqMandar3DArchivo(paquete) {
   const espera = cqCapaCargando("Armando el archivo…");
   espera.style.zIndex = "9600";
   let blob;
-  try { blob = new Blob([await croquis3dHtmlIndependiente({ ...datos, empresa: "SAT Alarmas" })], { type: "text/html" }); } catch (err) { espera.remove(); showToast(err.message); return; }
+  try {
+    // Con señal, el archivo también avisa cuando lo abren y permite "Quiero que me llamen".
+    let id = "";
+    if (navigator.onLine) { try { id = await cq3dCrearLink(paquete); } catch (e) { id = ""; } }
+    blob = new Blob([await croquis3dHtmlIndependiente({ ...paquete, empresa: "SAT Alarmas", id, servidor: id ? location.origin : "" })], { type: "text/html" });
+  } catch (err) { espera.remove(); showToast(err.message); return; }
   espera.remove();
-  const nombre = `Casa-3D-${String(datos.cliente || datos.titulo || "cliente").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "cliente"}.html`;
+  const nombre = `Casa-3D-${String(paquete.cliente || paquete.titulo || "cliente").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "cliente"}.html`;
   const archivo = new File([blob], nombre, { type: "text/html" });
   if (navigator.canShare && navigator.canShare({ files: [archivo] })) {
     try { await navigator.share({ files: [archivo], title: "Tu casa en 3D", text: cq3dTexto("") }); return; } catch (e) { if (e && e.name === "AbortError") return; }

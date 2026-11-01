@@ -372,6 +372,19 @@ async function estadoInstalacion(id) {
   } catch (e) { return null; }
 }
 const MENSAJE_CROQUIS_CERRADO = "La instalación ya se cerró: este plano quedó como registro y no se puede modificar. Si hace falta cambiarlo, pedíselo a la oficina.";
+// Índice de los links 3D mandados a clientes (aperturas y pedidos de llamada).
+const RUTA_VISTAS3D_INDICE = "vistas3d/indice.json";
+async function anotarVista3d(id, cambiar) {
+  for (let intento = 0; intento < 3; intento++) {
+    const { data, sha } = await leerArchivoDatos(RUTA_VISTAS3D_INDICE, []);
+    const lista = cambiar(Array.isArray(data) ? data : []);
+    if (!lista) return null;
+    const r = await escribirArchivoDatos(RUTA_VISTAS3D_INDICE, lista, sha, `Vista 3D ${id}`);
+    if (r.ok) return lista;
+    if (r.status !== 409 && r.status !== 422) return null;
+  }
+  return null;
+}
 async function manejarCroquis(req, res, autorizacion, body) {
   const { GITHUB_DATA_TOKEN, GITHUB_DATA_REPO } = process.env;
   if (!GITHUB_DATA_TOKEN || !GITHUB_DATA_REPO) { res.status(500).json({ error: "Faltan variables de entorno por configurar en Vercel" }); return; }
@@ -388,12 +401,22 @@ async function manejarCroquis(req, res, autorizacion, body) {
   // en la instalación, aunque no tenga el permiso de croquis en general.
   // Y cualquier técnico puede ver los planos de un cliente (para el servicio técnico).
   const porCliente = req.method === "GET" && !!(String(req.query.numero_cliente || "").replace(/\D/g, "") || String(req.query.cliente || "").trim());
-  const deInstalacion = req.method === "GET" ? !!(req.query.id || instValida(req.query.instalacion) || porCliente) : (instValida(b.instalacion) || instValida(b.instalacion_id) || b.accion === "borrar" || b.accion === "compartir_3d");
+  const deInstalacion = req.method === "GET" ? !!(req.query.id || instValida(req.query.instalacion) || porCliente || req.query.vistas3d) : (instValida(b.instalacion) || instValida(b.instalacion_id) || b.accion === "borrar" || b.accion === "compartir_3d");
   if (!puede && !deInstalacion) { res.status(403).json({ error: "No tenés habilitados los croquis" }); return; }
   const txt = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
   const idValido = (id) => /^[a-z0-9]{6,32}$/.test(String(id || ""));
   try {
     if (req.method === "GET") {
+      if (req.query.vistas3d) {
+        // Links 3D que se mandaron (de un croquis o un cliente): cuántas veces
+        // los abrieron y si pidieron que los llamen.
+        const { data } = await leerArchivoDatos(RUTA_VISTAS3D_INDICE, []);
+        let lista = Array.isArray(data) ? data : [];
+        const cid = String(req.query.croquis_id || ""), cli = String(req.query.cliente || "").trim().toLowerCase();
+        if (cid || cli) lista = lista.filter((v) => (cid && v.croquis_id === cid) || (cli && String(v.cliente || "").trim().toLowerCase() === cli));
+        res.status(200).json(lista.slice(0, 50));
+        return;
+      }
       if (req.query.id) {
         if (!idValido(req.query.id)) { res.status(400).json({ error: "Id inválido" }); return; }
         const { data } = await leerArchivoDatos(`croquis/${req.query.id}.json`, null);
@@ -422,18 +445,22 @@ async function manejarCroquis(req, res, autorizacion, body) {
     if (b.accion === "compartir_3d") {
       // Vista 3D para mandarle al cliente (por WhatsApp): se guarda una copia
       // del dibujo con un id al azar, sin dirección ni datos internos, y se
-      // ve en vista-3d.html?id=… sin login.
+      // ve en vista-3d.html?id=… sin login. Puede llevar hasta 3 propuestas
+      // para que el cliente las compare.
       const permitidos = new Set(["linea", "rect", "simbolo", "texto", "abertura", "mueble"]);
       const limpiar = (els) => (Array.isArray(els) ? els : []).filter((e) => e && typeof e === "object" && permitidos.has(e.t)).slice(0, 3000);
-      const paginas = (Array.isArray(b.paginas) ? b.paginas : [{ nombre: "", elementos: b.elementos }]).slice(0, 8)
+      const limpiarPaginas = (pp) => (Array.isArray(pp) ? pp : []).slice(0, 8)
         .map((pg) => ({ nombre: txt(pg && pg.nombre, 60), elementos: limpiar(pg && pg.elementos) }))
         .filter((pg) => pg.elementos.length);
-      if (!paginas.length) { res.status(400).json({ error: "El plano está vacío" }); return; }
-      const reg = { titulo: txt(b.titulo, 100) || "Tu sistema de seguridad", cliente: txt(b.cliente, 80), fecha: new Date().toISOString(), por: autorizacion.nombre || "admin", paginas };
+      const fuente = Array.isArray(b.propuestas) && b.propuestas.length ? b.propuestas : [{ nombre: "", paginas: Array.isArray(b.paginas) ? b.paginas : [{ nombre: "", elementos: b.elementos }] }];
+      const propuestas = fuente.slice(0, 3).map((pr) => ({ nombre: txt(pr && pr.nombre, 40), paginas: limpiarPaginas(pr && pr.paginas) })).filter((pr) => pr.paginas.length);
+      if (!propuestas.length) { res.status(400).json({ error: "El plano está vacío" }); return; }
+      const reg = { titulo: txt(b.titulo, 100) || "Tu sistema de seguridad", cliente: txt(b.cliente, 80), fecha: new Date().toISOString(), por: autorizacion.nombre || "admin", croquis_id: idValido(b.croquis_id) ? b.croquis_id : "", propuestas, paginas: propuestas[0].paginas };
       if (JSON.stringify(reg).length > 1500000) { res.status(413).json({ error: "El plano es demasiado grande para compartir" }); return; }
       const id = crypto.randomBytes(8).toString("hex");
       const r = await escribirArchivoDatos(`vistas3d/${id}.json`, reg, undefined, `Vista 3D compartida — ${reg.titulo}`);
       if (!r.ok) { res.status(502).json({ error: "No se pudo guardar la vista 3D" }); return; }
+      await anotarVista3d(id, (lista) => { lista.unshift({ id, titulo: reg.titulo, cliente: reg.cliente, por: reg.por, croquis_id: reg.croquis_id, fecha: reg.fecha, propuestas: propuestas.map((pr) => pr.nombre), aperturas: 0, llamadas: [] }); return lista.slice(0, 500); }).catch(() => {});
       res.status(200).json({ ok: true, id });
       return;
     }
@@ -855,6 +882,13 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
   // horario.
   // Vista 3D que se le mandó a un cliente (link de WhatsApp): solo lectura,
   // por un id al azar de 16 caracteres que no se puede adivinar.
+  if (req.query && (req.query.publico === "vista3d" || req.query.publico === "vista3d_llamar")) {
+    // Se puede abrir desde el archivo HTML descargado (otro origen).
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    if (req.method === "OPTIONS") { res.status(204).end(); return; }
+  }
   if (req.method === "GET" && req.query && req.query.publico === "vista3d") {
     const id = String(req.query.id || "");
     if (!/^[0-9a-f]{16}$/.test(id)) { res.status(400).json({ error: "Link inválido" }); return; }
@@ -862,9 +896,60 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
     try {
       const { data } = await leerArchivoDatos(`vistas3d/${id}.json`, null);
       if (!data) { res.status(404).json({ error: "Esta vista ya no está disponible" }); return; }
-      res.setHeader("Cache-Control", "public, max-age=300");
-      res.status(200).json({ titulo: data.titulo, cliente: data.cliente, fecha: data.fecha, paginas: data.paginas });
+      res.setHeader("Cache-Control", "no-store");
+      // Se cuenta la apertura y se le avisa a quien lo mandó (como mucho
+      // una vez cada 30 minutos, para no llenarlo de avisos).
+      if (req.query.contar !== "0") {
+        let avisar = null;
+        await anotarVista3d(id, (lista) => {
+          const v = lista.find((x) => x.id === id);
+          if (!v) return null;
+          const ahora = Date.now();
+          v.aperturas = (v.aperturas || 0) + 1;
+          v.ultima = new Date(ahora).toISOString();
+          if (!v.avisado || ahora - Date.parse(v.avisado) > 30 * 60 * 1000) { v.avisado = v.ultima; avisar = { ...v }; }
+          return lista;
+        }).catch(() => {});
+        if (avisar && avisar.por) {
+          try {
+            const { enviarASeleccionados } = require("../lib/push-sender");
+            await enviarASeleccionados([avisar.por], { titulo: "👀 Abrieron la vista 3D", cuerpo: `${avisar.cliente || avisar.titulo} abrió la vista 3D${avisar.aperturas > 1 ? ` (${avisar.aperturas} veces)` : ""}.`, url: "/" });
+          } catch (e) { /* el aviso es opcional */ }
+        }
+      }
+      const propuestas = Array.isArray(data.propuestas) && data.propuestas.length ? data.propuestas : [{ nombre: "", paginas: data.paginas || [] }];
+      res.status(200).json({ titulo: data.titulo, cliente: data.cliente, fecha: data.fecha, propuestas, paginas: propuestas[0].paginas });
     } catch (e) { res.status(502).json({ error: "No se pudo abrir la vista" }); }
+    return;
+  }
+  if (req.method === "POST" && req.query && req.query.publico === "vista3d_llamar") {
+    // El cliente pide que lo llamen desde la vista 3D.
+    let body = req.body;
+    if (typeof body === "string") { try { body = JSON.parse(body); } catch (e) { body = {}; } }
+    const id = String((body && body.id) || "");
+    const limpio = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
+    const telefono = limpio(body && body.telefono, 30), mensaje = limpio(body && body.mensaje, 300), propuesta = limpio(body && body.propuesta, 40);
+    if (!/^[0-9a-f]{16}$/.test(id)) { res.status(400).json({ error: "Link inválido" }); return; }
+    if (telefono.replace(/\D/g, "").length < 6) { res.status(400).json({ error: "Falta el teléfono" }); return; }
+    let registro = null, demasiados = false;
+    try {
+      await anotarVista3d(id, (lista) => {
+        const v = lista.find((x) => x.id === id);
+        if (!v) return null;
+        v.llamadas = Array.isArray(v.llamadas) ? v.llamadas : [];
+        if (v.llamadas.length >= 5) { demasiados = true; return null; }
+        v.llamadas.push({ telefono, mensaje, propuesta, fecha: new Date().toISOString() });
+        registro = { ...v };
+        return lista;
+      });
+    } catch (e) { registro = null; }
+    if (demasiados) { res.status(200).json({ ok: true }); return; }
+    if (!registro) { res.status(404).json({ error: "Esta vista ya no está disponible" }); return; }
+    try {
+      const { enviarASeleccionados } = require("../lib/push-sender");
+      await enviarASeleccionados([registro.por], { titulo: "📞 Un cliente quiere que lo llamen", cuerpo: `${registro.cliente || registro.titulo}: ${telefono}${propuesta ? " · le gustó «" + propuesta + "»" : ""}${mensaje ? " — " + mensaje : ""}`.slice(0, 200), url: "/", importante: true });
+    } catch (e) { /* el aviso es opcional */ }
+    res.status(200).json({ ok: true });
     return;
   }
   if (req.method === "POST" && req.query && req.query.publico === "solicitud_emergencia") {

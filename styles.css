@@ -3705,3 +3705,9 @@ html[data-inicio="nuevo"] #screen-presupuesto .pe-ajuste-btn.activo { background
 .consulta-datos-equipo .link-btn { padding: 0; font-size: inherit; text-decoration: underline; }
 html .app .equipo-aviso .btn.eq-resolver, .equipo-aviso .eq-resolver { color: #8A4B00 !important; border: 1px solid #C98A3D !important; background: transparent !important; box-shadow: none !important; }
 html .app .equipo-acciones .btn.eq-util.activo, .equipo-acciones .eq-util.activo { color: #2E9E4F !important; border-color: #2E9E4F !important; }
+/* Vista 3D: mandar al cliente con otras propuestas */
+.cq3d-estado:empty { display: none; }
+.cq3d-comparar { margin: 4px 0 6px; font-size: 14px; }
+.cq3d-comparar summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
+.cq3d-fila { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+.cq3d-fila input[type=text] { flex: 1; min-width: 0; padding: 8px; border-radius: 8px; border: 1px solid var(--border, #C9CED4); background: var(--surface, #fff); color: inherit; font: inherit; }

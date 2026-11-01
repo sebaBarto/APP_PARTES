@@ -384,6 +384,28 @@ test("Vista 3D para el cliente: cualquier técnico la comparte, se guarda sin di
     assert.strictEqual(r.cuerpo.titulo, "Casa Pérez");
     assert.strictEqual(r.cuerpo.paginas[0].elementos.length, 2);
     assert.ok(!("por" in r.cuerpo), "no dice quién lo mandó");
+    assert.strictEqual(r.headers["Access-Control-Allow-Origin"], "*", "se abre también desde el archivo HTML");
+    assert.strictEqual(r.cuerpo.propuestas.length, 1);
+    // La apertura queda contada, y el pedido de llamada también
+    assert.strictEqual(archivos["vistas3d/indice.json"][0].aperturas, 1);
+    assert.ok(archivos["vistas3d/indice.json"][0].avisado, "se le avisó a quien lo mandó");
+    r = resFalso();
+    await datos(pedido("POST", { publico: "vista3d_llamar" }, JSON.stringify({ id, telefono: "11 5555-1234", mensaje: "a la tarde", propuesta: "Completa" })), r);
+    assert.strictEqual(r.statusCode, 200);
+    assert.deepStrictEqual(archivos["vistas3d/indice.json"][0].llamadas.map((l) => [l.telefono, l.propuesta]), [["11 5555-1234", "Completa"]]);
+    r = resFalso();
+    await datos(pedido("POST", { publico: "vista3d_llamar" }, { id, telefono: "12" }), r);
+    assert.strictEqual(r.statusCode, 400, "sin teléfono válido no");
+    // Desde la app se ve el estado de los links mandados de ese cliente
+    r = resFalso();
+    await datos(pedido("GET", { coleccion: "croquis", vistas3d: "1", cliente: "juan pérez" }, null, luis), r);
+    assert.strictEqual(r.cuerpo.length, 1);
+    assert.strictEqual(r.cuerpo[0].aperturas, 1);
+    // Dos propuestas para comparar
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "croquis" }, { accion: "compartir_3d", titulo: "Casa", propuestas: [{ nombre: "Básica", paginas: [{ elementos }] }, { nombre: "Completa", paginas: [{ elementos: [...elementos, { id: "z", t: "simbolo", tipo: "humo", x: 1, y: 1 }] }] }, { nombre: "Vacía", paginas: [{ elementos: [] }] }] }, luis), r);
+    const id2 = r.cuerpo.id;
+    assert.deepStrictEqual(archivos[`vistas3d/${id2}.json`].propuestas.map((p) => [p.nombre, p.paginas[0].elementos.length]), [["Básica", 2], ["Completa", 3]]);
     r = resFalso();
     await datos(pedido("GET", { publico: "vista3d", id: "0000000000000000" }), r);
     assert.strictEqual(r.statusCode, 404);
@@ -636,4 +658,36 @@ test("Datos del equipo: «me sirvió» (una vez por persona), avisar desactualiz
     global.fetch = fetchViejo;
     if (viejo) require.cache[rutaPush] = viejo; else delete require.cache[rutaPush];
   }
+});
+
+test("Vista 3D: el análisis ve qué parte de la casa cubre cada sensor, qué abertura que da afuera no tiene sensor, y arma el recorrido del intruso", () => {
+  const vm = require("vm");
+  const ctx = { window: {}, document: { createElement: () => ({ getContext: () => null }) }, console };
+  ctx.window = ctx;
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(raiz, "croquis-utils.js"), "utf8") + "\n;" + fs.readFileSync(path.join(raiz, "croquis-3d.js"), "utf8") + "\n;this.C3=Croquis3D;", ctx);
+  const casa = [
+    { id: "w1", t: "linea", x1: 0, y1: 0, x2: 400, y2: 0 }, { id: "w2", t: "linea", x1: 400, y1: 0, x2: 400, y2: 300 },
+    { id: "w3", t: "linea", x1: 400, y1: 300, x2: 0, y2: 300 }, { id: "w4", t: "linea", x1: 0, y1: 300, x2: 0, y2: 0 },
+    { id: "w5", t: "linea", x1: 200, y1: 0, x2: 200, y2: 300 },
+    { id: "pi", t: "simbolo", tipo: "puerta", x: 200, y: 150, rot: 90, esc: 1 },
+    { id: "pe", t: "simbolo", tipo: "puerta", x: 100, y: 300, rot: 0, esc: 1 },
+    { id: "ve", t: "simbolo", tipo: "ventana", x: 300, y: 0, rot: 0, esc: 1 },
+    { id: "ir", t: "simbolo", tipo: "infrarrojo", x: 0, y: 0, rot: 180, esc: 1 },
+  ];
+  const a = ctx.C3.analizar(casa);
+  assert.ok(a.porcentaje >= 45 && a.porcentaje <= 55, "cubre el ambiente izquierdo: " + a.porcentaje);
+  const ext = a.aberturas.filter((x) => x.exterior).map((x) => [x.el.id, x.protegida]);
+  assert.deepStrictEqual(ext.sort(), [["pe", true], ["ve", false]], "la puerta interna no cuenta; la ventana del ambiente vacío no tiene sensor");
+  assert.deepStrictEqual(a.aberturasSinProteger.map((x) => x.el.id), ["ve"]);
+  const r = a.recorrido();
+  assert.strictEqual(r.entrada.el.id, "ve", "entra por lo que no tiene sensor");
+  assert.ok(r.puntos.some((p) => p[0] < 5), "pasa al otro ambiente por la puerta");
+  assert.ok(r.puntos.every((p, i) => i < 2 || (p[0] > 0 && p[0] < 10 && p[1] > 0 && p[1] < 7.5)), "adentro de la casa");
+  // Con un magnético en la ventana queda protegida; un infrarrojo del otro lado de la pared no la ve
+  const b = ctx.C3.analizar([...casa, { id: "mg", t: "simbolo", tipo: "magnetico", x: 300, y: 8, rot: 0, esc: 1 }]);
+  assert.deepStrictEqual(b.aberturasSinProteger.map((x) => x.el.id), []);
+  const c = ctx.C3.analizar([...casa, { id: "ir2", t: "simbolo", tipo: "infrarrojo", x: 400, y: 0, rot: 270, esc: 1 }]);
+  assert.strictEqual(c.porcentaje, 100);
+  assert.strictEqual(ctx.C3.analizar([{ id: "x", t: "simbolo", tipo: "central", x: 0, y: 0 }]), null, "sin paredes no hay análisis");
 });

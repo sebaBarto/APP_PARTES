@@ -3604,8 +3604,11 @@ test("Vista 3D: desde el croquis se ve en 3D y se le manda al cliente por link (
     // Los botones cambian la vista
     await page.click('.v3-barra [data-a="cobertura"]');
     assert.ok(!(await page.$eval('.v3-barra [data-a="cobertura"]', (b) => b.classList.contains("on"))));
-    await page.click('.v3-barra [data-a="paredes"]');
-    await page.click('.v3-barra [data-a="arriba"]');
+    await page.click('.v3-barra [data-a="vista"]');
+    await page.click('.v3-hoja [data-h="paredes"]');
+    await page.click('.v3-barra [data-a="vista"]');
+    await page.click('.v3-hoja [data-h="arriba"]');
+    assert.match(ley, /Cubre el \d+% de la casa/);
     // Link
     await page.click('.v3-barra [data-extra="0"]');
     await page.click('[data-m="link"]');
@@ -3738,6 +3741,120 @@ test("Vista 3D: se edita desde el 3D (agregar en la esquina con zona, mover, gir
     await page.click('[data-m="ver3d"]');
     await page.waitForSelector(".v3-capa canvas", { timeout: 20000 });
     assert.strictEqual(await page.$('.v3-barra [data-a="editar"]'), null);
+    assert.deepStrictEqual(errores, []);
+    await ctx.close();
+  } finally { await nav.close(); }
+});
+
+// Casa de dos ambientes: el de la izquierda con un infrarrojo, el de la derecha sin nada.
+const CASA_B = [
+  { id: "w1", t: "linea", x1: 0, y1: 0, x2: 400, y2: 0 }, { id: "w2", t: "linea", x1: 400, y1: 0, x2: 400, y2: 300 },
+  { id: "w3", t: "linea", x1: 400, y1: 300, x2: 0, y2: 300 }, { id: "w4", t: "linea", x1: 0, y1: 300, x2: 0, y2: 0 },
+  { id: "w5", t: "linea", x1: 200, y1: 0, x2: 200, y2: 300 },
+  { id: "pi", t: "simbolo", tipo: "puerta", x: 200, y: 150, rot: 90, esc: 1 },
+  { id: "pe", t: "simbolo", tipo: "puerta", x: 100, y: 300, rot: 0, esc: 1 },
+  { id: "ve", t: "simbolo", tipo: "ventana", x: 300, y: 0, rot: 0, esc: 1 },
+  { id: "ir", t: "simbolo", tipo: "infrarrojo", x: 0, y: 0, rot: 180, esc: 1, etq: "1" },
+];
+test("Vista 3D del cliente: puntos débiles, simulación de intruso, cámara, dos propuestas y «Quiero que me llamen»", async () => {
+  const nav = await navegador3D();
+  try {
+    const ctx = await nav.newContext({ serviceWorkers: "block", viewport: { width: 1000, height: 800 } });
+    const page = await ctx.newPage();
+    const errores = [];
+    page.on("pageerror", (e) => errores.push(e.message));
+    await page.addInitScript(() => { window.CROQUIS_3D_VELOCIDAD = 12; });
+    let llamada = null;
+    const completa = [...CASA_B, { id: "ir2", t: "simbolo", tipo: "infrarrojo", x: 400, y: 0, rot: 270, esc: 1, etq: "2" }, { id: "cam", t: "simbolo", tipo: "camara_ip", x: 390, y: 290, rot: 315, esc: 1 }];
+    await page.route("**/api/**", (route) => {
+      const req = route.request();
+      if (req.url().includes("vista3d_llamar")) { llamada = JSON.parse(req.postData()); return route.fulfill({ status: 200, contentType: "application/json", body: '{"ok":true}' }); }
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ titulo: "Casa B", cliente: "Ana", propuestas: [{ nombre: "Básica", paginas: [{ elementos: CASA_B }] }, { nombre: "Completa", paginas: [{ elementos: completa }] }] }) });
+    });
+    await page.goto(base + "/vista-3d.html?id=0123456789abcdef");
+    await page.waitForSelector(".v3-lienzo canvas", { timeout: 20000 });
+    // Dos propuestas con su porcentaje
+    const props = await page.$$eval(".v3-props button", (bs) => bs.map((b) => b.textContent.trim()));
+    assert.strictEqual(props.length, 2);
+    const pct = props.map((t) => Number((t.match(/(\d+)%/) || [])[1]));
+    assert.match(props[0], /^Básica/); assert.ok(pct[0] > 30 && pct[0] < 70, "la básica cubre la mitad: " + props[0]);
+    assert.strictEqual(pct[1], 100, "la completa cubre todo: " + props[1]);
+    const ley = await page.textContent(".v3-ley");
+    assert.match(ley, /1 abertura que da afuera no tiene sensor/, "la ventana del ambiente sin sensor");
+    // Puntos débiles: arranca apagado para el cliente y se prende
+    assert.ok(!(await page.$eval('.v3-barra [data-a="debiles"]', (b) => b.classList.contains("on"))));
+    await page.click('.v3-barra [data-a="debiles"]');
+    assert.ok(await page.$eval('.v3-barra [data-a="debiles"]', (b) => b.classList.contains("on")));
+    // Simulación: entra por la ventana sin sensor y lo detecta el infrarrojo de la zona 1
+    await page.click('.v3-barra [data-a="simular"]');
+    assert.match(await page.textContent(".v3-aviso"), /entra por una ventana que no tiene sensor/);
+    await page.waitForSelector(".v3-hoja:not(.hidden)", { timeout: 30000 });
+    const res = await page.textContent(".v3-hoja");
+    assert.match(res, /Lo detectó el sensor de movimiento de la zona 1/);
+    await page.click('.v3-hoja [data-h="cerrar"]');
+    // Otra propuesta; tocar la cámara muestra lo que ve
+    await page.click('.v3-props [data-prop="1"]');
+    assert.doesNotMatch(await page.textContent(".v3-ley"), /no tiene sensor/);
+    const [cx, cy] = await page.evaluate(() => window.visor3d.visor.aPantalla(390, 290, 2.6));
+    await page.mouse.click(cx, cy);
+    await page.waitForSelector('.v3-barra [data-a="salircam"]', { timeout: 5000 });
+    assert.match(await page.textContent(".v3-aviso"), /Lo que ve la cámara/);
+    await page.click('.v3-barra [data-a="salircam"]');
+    assert.ok(await page.$('.v3-barra [data-a="simular"]'));
+    // Quiero que me llamen
+    await page.click('.v3-barra [data-a="llamar"]');
+    await page.fill(".v3-hoja .v3-tel", "11 4444-5555");
+    await page.fill(".v3-hoja .v3-msj", "después de las 18");
+    await page.click('.v3-hoja [data-h="enviar"]');
+    await page.waitForFunction(() => /Recibimos tu pedido/.test(document.querySelector(".v3-hoja").textContent));
+    assert.deepStrictEqual(llamada, { id: "0123456789abcdef", telefono: "11 4444-5555", mensaje: "después de las 18", propuesta: "Completa" });
+    assert.deepStrictEqual(errores, []);
+    await ctx.close();
+  } finally { await nav.close(); }
+});
+
+test("Vista 3D: al mandarla se puede sumar otra propuesta del mismo cliente para comparar, y se ve si ya abrieron los links", async () => {
+  const nav = await navegador3D();
+  try {
+    const ctx = await nav.newContext({ serviceWorkers: "block" });
+    const page = await ctx.newPage();
+    const errores = [];
+    page.on("pageerror", (e) => errores.push(e.message));
+    let pedido = null;
+    await page.route("**/api/**", (route) => {
+      const req = route.request(), u = req.url();
+      const j = (x) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(x) });
+      if (u.includes("coleccion=croquis") && req.method() === "POST") { pedido = JSON.parse(req.postData()); return j({ ok: true, id: "0123456789abcdef" }); }
+      if (u.includes("vistas3d=1")) return j([{ id: "x", fecha: "2026-10-30T15:00:00Z", aperturas: 3, ultima: "2026-10-31T21:10:00Z", llamadas: [{ telefono: "11 2222-3333" }] }]);
+      if (u.includes("id=otro1")) return j({ id: "otro1", titulo: "Casa Pérez completa", dibujo: { v: 2, paginas: [{ elementos: [...CASA_B, { id: "c1", t: "cable", x1: 0, y1: 0, x2: 9, y2: 9 }] }] } });
+      if (u.includes("coleccion=croquis") && u.includes("cliente=")) return j([{ id: "actual1", titulo: "Casa Pérez" }, { id: "otro1", titulo: "Casa Pérez completa" }]);
+      j([]);
+    });
+    await page.goto(base + "/");
+    await page.waitForTimeout(400);
+    await page.evaluate((els) => {
+      tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador");
+      cqAbrirEditor({ id: "actual1", titulo: "Casa Pérez", cliente: "Juan Pérez", elementos: els });
+      window.__abierto = null; window.open = (u) => { window.__abierto = u; };
+      Object.defineProperty(navigator, "share", { value: undefined, configurable: true });
+    }, CASA_3D);
+    await page.click("#cqMenuBtn");
+    await page.click('[data-m="ver3d"]');
+    await page.waitForSelector(".v3-capa canvas", { timeout: 20000 });
+    await page.click('.v3-barra [data-extra="0"]');
+    await page.waitForFunction(() => /abierto 3 veces/.test(document.querySelector(".cq3d-estado").textContent));
+    assert.match(await page.textContent(".cq3d-estado"), /pidió que lo llamen: 11 2222-3333/);
+    await page.click(".cq3d-comparar summary");
+    await page.waitForSelector('.cq3d-otras input[type=checkbox]');
+    assert.strictEqual(await page.$$eval(".cq3d-otras input[type=checkbox]", (x) => x.length), 1, "no se ofrece el mismo plano");
+    await page.fill(".cq3d-nombre-actual", "Básica");
+    await page.check('.cq3d-otras input[type=checkbox]');
+    await page.fill('.cq3d-otras [data-n="0"]', "Completa");
+    await page.click('[data-m="link"]');
+    await page.waitForFunction(() => window.__abierto, null, { timeout: 5000 });
+    assert.deepStrictEqual(pedido.propuestas.map((p) => p.nombre), ["Básica", "Completa"]);
+    assert.strictEqual(pedido.propuestas[1].paginas[0].elementos.length, CASA_B.length, "sin cables");
+    assert.strictEqual(pedido.croquis_id, "actual1");
     assert.deepStrictEqual(errores, []);
     await ctx.close();
   } finally { await nav.close(); }
