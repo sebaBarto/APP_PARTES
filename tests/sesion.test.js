@@ -406,6 +406,16 @@ test("Vista 3D para el cliente: cualquier técnico la comparte, se guarda sin di
     await datos(pedido("POST", { coleccion: "croquis" }, { accion: "compartir_3d", titulo: "Casa", propuestas: [{ nombre: "Básica", paginas: [{ elementos }] }, { nombre: "Completa", paginas: [{ elementos: [...elementos, { id: "z", t: "simbolo", tipo: "humo", x: 1, y: 1 }] }] }, { nombre: "Vacía", paginas: [{ elementos: [] }] }] }, luis), r);
     const id2 = r.cuerpo.id;
     assert.deepStrictEqual(archivos[`vistas3d/${id2}.json`].propuestas.map((p) => [p.nombre, p.paginas[0].elementos.length]), [["Básica", 2], ["Completa", 3]]);
+    // Sin presentación guiada (un agregado a un cliente que ya tiene el sistema)
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "croquis" }, { accion: "compartir_3d", titulo: "Agregado", presentacion: false, paginas: [{ elementos }] }, luis), r);
+    const idSin = r.cuerpo.id;
+    r = resFalso();
+    await datos(pedido("GET", { publico: "vista3d", id: idSin, contar: "0" }), r);
+    assert.strictEqual(r.cuerpo.presentacion, false);
+    r = resFalso();
+    await datos(pedido("GET", { publico: "vista3d", id: id2, contar: "0" }), r);
+    assert.strictEqual(r.cuerpo.presentacion, true, "por defecto, con presentación");
     // Las plantas de la casa conservan su nivel
     r = resFalso();
     await datos(pedido("POST", { coleccion: "croquis" }, { accion: "compartir_3d", titulo: "Casa", paginas: [{ nombre: "PB", nivel: 0, elementos }, { nombre: "PA", nivel: 1, elementos }, { nombre: "X", nivel: "hack", elementos }] }, luis), r);

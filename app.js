@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.29.0";
+const APP_VERSION = "4.30.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -17074,6 +17074,8 @@ function cqMandar3D(datos) {
     <h3>Mandarle la vista 3D al cliente</h3>
     <p class="pe-nota">El cliente la abre en el celular, la gira con el dedo, ve qué cubre cada sensor y puede simular un intruso. No lleva la dirección.</p>
     <div class="cq3d-estado pe-nota"></div>
+    <label class="cq3d-fila cq3d-pres"><input type="checkbox" class="cq3d-presentacion"${cqTodosLosElementos().some((e) => e.prev) ? "" : " checked"}> Mostrarle la presentación guiada al abrir</label>
+    <p class="pe-nota" style="margin-top:-4px">${cqTodosLosElementos().some((e) => e.prev) ? "Es un agregado a un sistema que ya tiene: por eso viene sin presentación (podés activarla)." : "Para un cliente nuevo: le explica paso a paso su casa, por dónde podrían entrar y cómo la protege."}</p>
     <details class="cq3d-comparar"><summary>Mandar junto con otra propuesta para comparar</summary>
       <div class="cq3d-otras pe-nota">Buscando otros planos de este cliente…</div>
     </details>
@@ -17112,10 +17114,11 @@ function cqMandar3D(datos) {
     // Propuestas elegidas.
     const elegidas = [...capa.querySelectorAll(".cq3d-otras input[type=checkbox]:checked")].slice(0, 2).map((x) => ({ c: otras[Number(x.dataset.i)], nombre: (capa.querySelector(`[data-n="${x.dataset.i}"]`).value || "").trim() }));
     const nombreActual = ((capa.querySelector(".cq3d-nombre-actual") || {}).value || "").trim();
+    const conPresentacion = !!(capa.querySelector(".cq3d-presentacion") || {}).checked;
     capa.remove();
     if (m === "copia") { document.querySelector(".v3-capa [data-a=cerrar]")?.click(); cqOtraPropuesta(); return; }
     if (m === "cerrar") return;
-    let paquete = { titulo: datos.titulo, cliente: datos.cliente, croquis_id: cq.id || "", paginas: datos.paginas };
+    let paquete = { titulo: datos.titulo, cliente: datos.cliente, croquis_id: cq.id || "", paginas: datos.paginas, presentacion: conPresentacion };
     if (elegidas.length) {
       const espera = cqCapaCargando("Juntando las propuestas…");
       espera.style.zIndex = "9600";

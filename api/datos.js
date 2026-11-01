@@ -486,7 +486,7 @@ async function manejarCroquis(req, res, autorizacion, body) {
       const fuente = Array.isArray(b.propuestas) && b.propuestas.length ? b.propuestas : [{ nombre: "", paginas: Array.isArray(b.paginas) ? b.paginas : [{ nombre: "", elementos: b.elementos }] }];
       const propuestas = fuente.slice(0, 3).map((pr) => ({ nombre: txt(pr && pr.nombre, 40), paginas: limpiarPaginas(pr && pr.paginas) })).filter((pr) => pr.paginas.length);
       if (!propuestas.length) { res.status(400).json({ error: "El plano está vacío" }); return; }
-      const reg = { titulo: txt(b.titulo, 100) || "Tu sistema de seguridad", cliente: txt(b.cliente, 80), fecha: new Date().toISOString(), por: autorizacion.nombre || "admin", croquis_id: idValido(b.croquis_id) ? b.croquis_id : "", propuestas, paginas: propuestas[0].paginas };
+      const reg = { titulo: txt(b.titulo, 100) || "Tu sistema de seguridad", cliente: txt(b.cliente, 80), fecha: new Date().toISOString(), por: autorizacion.nombre || "admin", croquis_id: idValido(b.croquis_id) ? b.croquis_id : "", propuestas, paginas: propuestas[0].paginas, presentacion: b.presentacion !== false };
       if (JSON.stringify(reg).length > 1500000) { res.status(413).json({ error: "El plano es demasiado grande para compartir" }); return; }
       const id = crypto.randomBytes(8).toString("hex");
       const r = await escribirArchivoDatos(`vistas3d/${id}.json`, reg, undefined, `Vista 3D compartida — ${reg.titulo}`);
@@ -949,7 +949,7 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
         }
       }
       const propuestas = Array.isArray(data.propuestas) && data.propuestas.length ? data.propuestas : [{ nombre: "", paginas: data.paginas || [] }];
-      res.status(200).json({ titulo: data.titulo, cliente: data.cliente, fecha: data.fecha, propuestas, paginas: propuestas[0].paginas });
+      res.status(200).json({ titulo: data.titulo, cliente: data.cliente, fecha: data.fecha, propuestas, paginas: propuestas[0].paginas, presentacion: data.presentacion !== false });
     } catch (e) { res.status(502).json({ error: "No se pudo abrir la vista" }); }
     return;
   }

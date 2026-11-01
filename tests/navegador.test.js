@@ -3853,6 +3853,9 @@ test("Vista 3D: al mandarla se puede sumar otra propuesta del mismo cliente para
     await page.waitForSelector(".v3-capa canvas", { timeout: 20000 });
     await page.click('.v3-barra [data-extra="0"]');
     await page.waitForFunction(() => /abierto 3 veces/.test(document.querySelector(".cq3d-estado").textContent));
+    assert.ok(!(await page.isChecked(".cq3d-presentacion")), "el plano tiene equipos ya instalados (agregado): sin presentación");
+    assert.match(await page.textContent(".cq-datos"), /Es un agregado a un sistema que ya tiene/);
+    await page.check(".cq3d-presentacion");
     assert.match(await page.textContent(".cq3d-estado"), /pidió que lo llamen: 11 2222-3333/);
     await page.click(".cq3d-comparar summary");
     await page.waitForSelector('.cq3d-otras input[type=checkbox]');
@@ -3865,6 +3868,7 @@ test("Vista 3D: al mandarla se puede sumar otra propuesta del mismo cliente para
     assert.deepStrictEqual(pedido.propuestas.map((p) => p.nombre), ["Básica", "Completa"]);
     assert.strictEqual(pedido.propuestas[1].paginas[0].elementos.length, CASA_B.length, "sin cables");
     assert.strictEqual(pedido.croquis_id, "actual1");
+    assert.strictEqual(pedido.presentacion, true);
     assert.deepStrictEqual(errores, []);
     await ctx.close();
   } finally { await nav.close(); }
@@ -4179,6 +4183,7 @@ test("Link para el cliente: la presentación guiada arranca sola (una vez), comp
     const [x, y] = await page.evaluate(() => window.visor3d.visor.aPantalla(0, 0, 2.3));
     await page.mouse.click(x, y);
     await page.waitForFunction(() => /Detecta el movimiento/.test(document.querySelector(".v3-hoja").textContent), null, { timeout: 5000 });
+    assert.ok(await page.$(".v3-hoja .v3-cari svg .v3-ani-onda"), "con el dibujito animado del sensor");
     assert.match(await page.textContent(".v3-hoja"), /zona 1[\s\S]*En living[\s\S]*Cubre hasta 11 m, en un ángulo de 90°/);
     // Al volver a abrir, no arranca sola (se puede ver desde Vista)
     await page.reload();
@@ -4236,4 +4241,30 @@ test("Propuestas enviadas: el tablero muestra a quién seguir, y se marcan ganad
   assert.match(await page.textContent(".cq-propuestas"), /Ganadas: 1 de 1 cerradas/);
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
+});
+
+test("Link sin presentación guiada (agregado a un cliente que ya tiene el sistema) y el ladrón de la simulación", async () => {
+  const nav = await navegador3D();
+  try {
+    const ctx = await nav.newContext({ serviceWorkers: "block" });
+    const page = await ctx.newPage();
+    const errores = [];
+    page.on("pageerror", (e) => errores.push(e.message));
+    await page.route("**/api/**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ titulo: "Casa B", cliente: "Ana", presentacion: false, paginas: [{ elementos: CASA_B }] }) }));
+    await page.goto(base + "/vista-3d.html?id=0123456789abcdef");
+    await page.waitForSelector(".v3-lienzo canvas", { timeout: 20000 });
+    await page.waitForTimeout(1200);
+    assert.ok(await page.isHidden(".v3-hoja"), "no arranca la presentación");
+    await page.click('.v3-barra [data-a="vista"]');
+    assert.strictEqual(await page.$('.v3-hoja [data-h="presentacion"]'), null);
+    await page.click('.v3-hoja [data-h="cerrar"]');
+    // El intruso es el ladrón con traje a rayas, antifaz y bolsa, y camina (piernas y brazos)
+    const ladron = await page.evaluate(() => { const v = window.visor3d.visor; v.simular(() => {}); let fig = null; v.escena.traverse((o) => { if (o.userData && o.userData.piernas) fig = o; }); return fig ? { piernas: fig.userData.piernas.length, brazos: fig.userData.brazos.length, piezas: (() => { let n = 0; fig.traverse(() => n++); return n; })() } : null; });
+    assert.ok(ladron && ladron.piernas === 2 && ladron.brazos === 2 && ladron.piezas > 15, JSON.stringify(ladron));
+    await page.waitForTimeout(400);
+    const giro = await page.evaluate(() => { let fig = null; window.visor3d.visor.escena.traverse((o) => { if (o.userData && o.userData.piernas) fig = o; }); return fig.userData.piernas[0].rotation.z; });
+    assert.notStrictEqual(giro, 0, "camina");
+    assert.deepStrictEqual(errores, []);
+    await ctx.close();
+  } finally { await nav.close(); }
 });

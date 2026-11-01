@@ -213,6 +213,52 @@ const Croquis3D = (() => {
     }
     return { obj, cobertura, cartel: cartelZona, aro };
   }
+  // El intruso de la simulación: un ladrón de historieta (traje a rayas
+  // blancas y negras, antifaz, gorro y bolsa), mirando hacia +x.
+  function armarLadron() {
+    const g = new THREE.Group(), cuerpo = new THREE.Group();
+    g.add(cuerpo);
+    const negro = new THREE.MeshLambertMaterial({ color: 0x1c1e21 }), piel = new THREE.MeshLambertMaterial({ color: 0xf1c27d }), blanco = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const cv = document.createElement("canvas"); cv.width = 8; cv.height = 64;
+    const c = cv.getContext("2d");
+    for (let i = 0; i < 8; i++) { c.fillStyle = i % 2 ? "#FFFFFF" : "#1C1E21"; c.fillRect(0, i * 8, 8, 8); }
+    const rayas = new THREE.MeshLambertMaterial({ map: new THREE.CanvasTexture(cv) });
+    const cvB = document.createElement("canvas"); cvB.width = 8; cvB.height = 24;
+    const cb = cvB.getContext("2d");
+    for (let i = 0; i < 3; i++) { cb.fillStyle = i % 2 ? "#FFFFFF" : "#1C1E21"; cb.fillRect(0, i * 8, 8, 8); }
+    const rayasBrazo = new THREE.MeshLambertMaterial({ map: new THREE.CanvasTexture(cvB) });
+    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.22, 0.62, 18), rayas); torso.position.y = 1.12; cuerpo.add(torso);
+    const cadera = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.2, 0.14, 18), negro); cadera.position.y = 0.76; cuerpo.add(cadera);
+    const piernas = [-0.1, 0.1].map((zz) => {
+      const p = new THREE.Group(); p.position.set(0, 0.72, zz);
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.07, 0.66, 10), negro); m.position.y = -0.33; p.add(m);
+      const zap = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.07, 0.12), negro); zap.position.set(0.05, -0.68, 0); p.add(zap);
+      g.add(p); return p;
+    });
+    const brazos = [-0.26, 0.26].map((zz) => {
+      const p = new THREE.Group(); p.position.set(0, 1.38, zz);
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.055, 0.52, 10), rayasBrazo); m.position.y = -0.26; p.add(m);
+      const mano = new THREE.Mesh(new THREE.SphereGeometry(0.065, 10, 8), piel); mano.position.y = -0.55; p.add(mano);
+      cuerpo.add(p); return p;
+    });
+    const cabeza = new THREE.Mesh(new THREE.SphereGeometry(0.17, 20, 16), piel); cabeza.position.y = 1.62; cuerpo.add(cabeza);
+    const gorro = new THREE.Mesh(new THREE.SphereGeometry(0.18, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), negro); gorro.position.y = 1.66; cuerpo.add(gorro);
+    const pompon = new THREE.Mesh(new THREE.SphereGeometry(0.045, 10, 8), negro); pompon.position.y = 1.86; cuerpo.add(pompon);
+    // Antifaz: una banda negra con los ojos blancos adelante.
+    const antifaz = new THREE.Mesh(new THREE.CylinderGeometry(0.178, 0.178, 0.075, 24, 1, true), new THREE.MeshLambertMaterial({ color: 0x1c1e21, side: THREE.DoubleSide })); antifaz.position.y = 1.635; cuerpo.add(antifaz);
+    [-0.065, 0.065].forEach((zz) => {
+      const ojo = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), blanco); ojo.position.set(0.162, 1.635, zz); cuerpo.add(ojo);
+      const pupila = new THREE.Mesh(new THREE.SphereGeometry(0.016, 8, 6), negro); pupila.position.set(0.19, 1.635, zz); cuerpo.add(pupila);
+    });
+    const nariz = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), piel); nariz.position.set(0.17, 1.58, 0); cuerpo.add(nariz);
+    // Bolsa del botín, colgando en la espalda.
+    const bolsa = new THREE.Mesh(new THREE.SphereGeometry(0.2, 14, 12), new THREE.MeshLambertMaterial({ color: 0xc8a96e })); bolsa.scale.set(0.9, 1.1, 0.9); bolsa.position.set(-0.3, 1.22, 0); cuerpo.add(bolsa);
+    const nudo = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.06, 0.1, 8), new THREE.MeshLambertMaterial({ color: 0xa88a52 })); nudo.position.set(-0.3, 1.46, 0); cuerpo.add(nudo);
+    const sombra = new THREE.Mesh(new THREE.CircleGeometry(0.32, 20), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.25 })); sombra.rotation.x = -Math.PI / 2; sombra.position.y = 0.015; g.add(sombra);
+    g.scale.setScalar(1.2); // un poco más grande, para que se vea desde lejos
+    g.userData = { piernas, brazos, cuerpo };
+    return g;
+  }
   // ---- Pisos de la casa ----
   const LOSA = 0.2, ALTO_NIVEL = ALTO + LOSA; // un piso arriba del otro
   // Escaleras: escalones macizos que suben hasta el piso de arriba.
@@ -660,12 +706,7 @@ const Croquis3D = (() => {
       if (!an) return false;
       const r = an.recorrido();
       if (!r || r.puntos.length < 2) return false;
-      const figura = new THREE.Group();
-      const piel = new THREE.MeshLambertMaterial({ color: 0x2b2f33 });
-      const cuerpo = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.17, 1.2, 14), piel); cuerpo.position.y = 0.95; figura.add(cuerpo);
-      const cabeza = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 12), piel); cabeza.position.y = 1.72; figura.add(cabeza);
-      const piernas = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.12, 0.42, 12), piel); piernas.position.y = 0.21; figura.add(piernas);
-      const sombra = new THREE.Mesh(new THREE.CircleGeometry(0.3, 20), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.25 })); sombra.rotation.x = -Math.PI / 2; sombra.position.y = 0.015; figura.add(sombra);
+      const figura = armarLadron();
       mundo.add(figura);
       // Largo acumulado del recorrido, para avanzar a velocidad pareja.
       const acum = [0];
@@ -677,13 +718,20 @@ const Croquis3D = (() => {
     const VELOCIDAD = window.CROQUIS_3D_VELOCIDAD || 1.8; // m/s (más rápido en las pruebas)
     cuadro.push((t) => {
       if (!sim || sim.fin) return;
-      const seg = (t - sim.inicio) / 1000, d = seg * VELOCIDAD, { puntos } = sim.r, acum = sim.acum;
+      const seg = (t - sim.inicio) / 1000, { puntos } = sim.r, acum = sim.acum;
+      const d = sim.primera == null ? seg * VELOCIDAD : sim.primera * VELOCIDAD + (seg - sim.primera) * VELOCIDAD * 1.7;
       let i = 1; while (i < acum.length - 1 && acum[i] < d) i++;
       const f = Math.min(1, Math.max(0, (d - acum[i - 1]) / ((acum[i] - acum[i - 1]) || 1)));
       const x = puntos[i - 1][0] + (puntos[i][0] - puntos[i - 1][0]) * f, z = puntos[i - 1][1] + (puntos[i][1] - puntos[i - 1][1]) * f;
       sim.figura.position.set(x, 0, z);
       sim.figura.rotation.y = -Math.atan2(puntos[i][1] - puntos[i - 1][1], puntos[i][0] - puntos[i - 1][0]);
-      sim.figura.children[0].position.y = 0.95 + Math.abs(Math.sin(seg * 9)) * 0.04;
+      // Camina: piernas y brazos van y vienen; cuando lo detectan, levanta los brazos y corre.
+      const asustado = sim.primera != null, fase = seg * (asustado ? 15 : 9);
+      const u = sim.figura.userData;
+      u.piernas[0].rotation.z = Math.sin(fase) * 0.55; u.piernas[1].rotation.z = -Math.sin(fase) * 0.55;
+      if (asustado) { u.brazos[0].rotation.z = Math.PI * 0.85 + Math.sin(fase * 1.3) * 0.25; u.brazos[1].rotation.z = Math.PI * 0.85 - Math.sin(fase * 1.3) * 0.25; }
+      else { u.brazos[0].rotation.z = -Math.sin(fase) * 0.5; u.brazos[1].rotation.z = Math.sin(fase) * 0.5; }
+      u.cuerpo.position.y = Math.abs(Math.sin(fase)) * 0.05;
       // Quién lo detecta acá.
       const nuevos = an.detecta([x, z]).filter((e) => !sim.vistos.has(e.id));
       // Apertura: al pasar por una abertura con magnético.
@@ -1218,6 +1266,28 @@ const CROQUIS_3D_ESTILO = `
 .v3-acciones button.v3-primario{background:#1C1E21;color:#fff;border-color:#1C1E21}
 .v3-link{display:block;margin:10px auto 0;background:none;border:0;color:var(--tenue);font:600 14px inherit;font-family:inherit;text-decoration:underline;cursor:pointer}
 @media (max-width:480px){.v3-barra,.v3-props{gap:4px}.v3-barra button,.v3-props button{padding:9px 9px;font-size:13px}}
+.v3-cari{margin:-2px 0 8px}.v3-cari-svg{display:block;width:100%;max-width:300px;margin:0 auto;height:auto}
+.v3-ani-onda{animation:v3onda 1.4s ease-out infinite;opacity:0}
+@keyframes v3onda{0%{opacity:0}30%{opacity:.9}100%{opacity:0}}
+.v3-ani-led{animation:v3led 1s steps(2) infinite}
+@keyframes v3led{50%{opacity:.15}}
+.v3-ani-puerta{transform-box:fill-box;transform-origin:left center;animation:v3puerta 3s ease-in-out infinite}
+@keyframes v3puerta{0%,35%,100%{transform:perspective(200px) rotateY(0)}55%,80%{transform:perspective(200px) rotateY(-38deg)}}
+.v3-ani-humo{animation:v3humo 1.8s ease-in infinite}
+@keyframes v3humo{0%{transform:translateY(0) scale(.6);opacity:0}30%{opacity:.7}100%{transform:translateY(-70px) scale(1.3);opacity:0}}
+.v3-ani-tecla{animation:v3tecla 1.2s infinite}
+@keyframes v3tecla{0%,60%,100%{fill:#D9D9D9}70%,90%{fill:#F2C94C}}
+.v3-ani-flash{animation:v3flash .5s steps(2) infinite}
+@keyframes v3flash{50%{fill:#FFFFFF}}
+.v3-ani-grieta{stroke-dasharray:30;animation:v3grieta 2.4s ease-out infinite}
+@keyframes v3grieta{0%,20%{stroke-dashoffset:30}60%,100%{stroke-dashoffset:0}}
+.v3-ani-boton{transform-box:fill-box;transform-origin:center;animation:v3boton 1.4s ease-in-out infinite}
+@keyframes v3boton{0%,100%{transform:scale(1)}50%{transform:scale(.88)}}
+.v3-ani-cono{animation:v3cono 2.4s ease-in-out infinite}
+@keyframes v3cono{50%{opacity:.4}}
+.v3-ani-camina{animation:v3camina 3s ease-in-out infinite}
+@keyframes v3camina{0%{transform:translateX(30px);opacity:0}20%{opacity:1}80%{opacity:1}100%{transform:translateX(-14px);opacity:0}}
+@media (prefers-reduced-motion:reduce){[class*="v3-ani-"]{animation:none!important;opacity:1}}
 .v3-puntos{display:flex;gap:6px;justify-content:center;margin:0 0 8px}.v3-puntos i{width:8px;height:8px;border-radius:50%;background:var(--bd)}.v3-puntos i.on{background:var(--ac);width:20px;border-radius:4px}
 .v3-presentando .v3-barra,.v3-presentando .v3-props,.v3-presentando .v3-tira{display:none}
 .v3-hoja .v3-paso-texto{font-size:15px}
@@ -1260,6 +1330,48 @@ const CROQUIS_3D_EXPLICA = {
   camara_domo: "Cámara de techo que vigila todo el ambiente.",
   dvr: "Guarda las grabaciones de las cámaras.",
 };
+// Dibujito animado de cada equipo instalado (para el cliente, al tocarlo).
+function croquis3dCaricatura(tipo) {
+  const pared = `<rect x="0" y="0" width="200" height="120" rx="12" fill="#F4F1EA"/><path d="M0 104 H200" stroke="#D8D1C2" stroke-width="2"/>`;
+  const svg = (cuerpo) => `<svg viewBox="0 0 200 120" class="v3-cari-svg" aria-hidden="true">${pared}${cuerpo}</svg>`;
+  const ondas = (cx, cy, r0, color, desde, hasta) => [0, 1, 2].map((i) => `<path class="v3-ani-onda" style="animation-delay:${i * 0.45}s" d="M${cx + Math.cos(desde) * (r0 + i * 14)} ${cy + Math.sin(desde) * (r0 + i * 14)} A${r0 + i * 14} ${r0 + i * 14} 0 0 1 ${cx + Math.cos(hasta) * (r0 + i * 14)} ${cy + Math.sin(hasta) * (r0 + i * 14)}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round"/>`).join("");
+  const led = (x, y, c) => `<circle class="v3-ani-led" cx="${x}" cy="${y}" r="3" fill="${c || "#E00000"}"/>`;
+  const ir = (rot) => svg(`<path d="M30 0 V104 M30 104 L0 120" stroke="#D8D1C2" stroke-width="2"/>
+    <g transform="translate(32 14)"><rect x="0" y="0" width="30" height="40" rx="7" fill="#FFFFFF" stroke="#1C1E21" stroke-width="2.5"/><path d="M5 22 Q15 14 25 22 Q15 34 5 22Z" fill="#2B2F33"/>${led(24, 8)}</g>
+    ${ondas(50, 40, 22, rot || "#E00000", -0.35, 0.9)}
+    <g class="v3-ani-camina"><circle cx="160" cy="62" r="7" fill="#F1C27D"/><rect x="152" y="54" width="16" height="5" fill="#1C1E21"/><rect x="153" y="70" width="14" height="22" rx="4" fill="url(#rayas)"/><path d="M156 92 V104 M164 92 V104" stroke="#1C1E21" stroke-width="4" stroke-linecap="round"/></g>
+    <defs><pattern id="rayas" width="4" height="6" patternUnits="userSpaceOnUse"><rect width="4" height="3" fill="#1C1E21"/><rect y="3" width="4" height="3" fill="#FFFFFF"/></pattern></defs>`);
+  const mapa = {
+    infrarrojo: () => ir(),
+    infrarrojo_ext: () => ir("#7B4B94"),
+    infrarrojo_cortina: () => ir("#7B4B94"),
+    detector_360: () => svg(`<path d="M0 10 H200" stroke="#D8D1C2" stroke-width="2"/><ellipse cx="100" cy="16" rx="24" ry="8" fill="#FFFFFF" stroke="#1C1E21" stroke-width="2.5"/>${led(100, 18)}${[0, 1, 2].map((i) => `<ellipse class="v3-ani-onda" style="animation-delay:${i * 0.45}s" cx="100" cy="70" rx="${40 + i * 22}" ry="${12 + i * 6}" fill="none" stroke="#E00000" stroke-width="2.5"/>`).join("")}`),
+    magnetico: () => svg(`<rect x="60" y="14" width="80" height="90" fill="none" stroke="#B98C5A" stroke-width="6"/>
+      <g class="v3-ani-puerta"><rect x="63" y="17" width="74" height="87" fill="#C9A26F" stroke="#8C6A42" stroke-width="2"/><circle cx="128" cy="62" r="3.5" fill="#5B5F66"/><rect x="128" y="26" width="7" height="14" rx="2" fill="#FFFFFF" stroke="#1C1E21" stroke-width="1.5"/></g>
+      <rect x="140" y="26" width="9" height="14" rx="2" fill="#FFFFFF" stroke="#1C1E21" stroke-width="1.5"/>${led(144.5, 30, "#2E9E4F")}${ondas(150, 33, 10, "#2E9E4F", -0.8, 0.8)}`),
+    humo: () => svg(`<path d="M0 10 H200" stroke="#D8D1C2" stroke-width="2"/><ellipse cx="100" cy="17" rx="22" ry="8" fill="#FFFFFF" stroke="#1C1E21" stroke-width="2.5"/>${led(100, 20)}
+      ${[0, 1, 2].map((i) => `<circle class="v3-ani-humo" style="animation-delay:${i * 0.6}s" cx="${92 + i * 8}" cy="96" r="${9 + i * 2}" fill="#A6ADB4" opacity="0.6"/>`).join("")}`),
+    gas: () => mapa.humo(),
+    central: () => svg(`<rect x="62" y="16" width="76" height="80" rx="4" fill="#E8E2D2" stroke="#1C1E21" stroke-width="2.5"/><path d="M68 24 H132 M68 32 H118" stroke="#8E949A" stroke-width="2"/><rect x="72" y="44" width="56" height="34" rx="3" fill="#2E7D4F"/><path d="M78 52 H98 M78 60 H116 M78 68 H104" stroke="#A9D8B8" stroke-width="2"/>${led(126, 88, "#2E9E4F")}${led(116, 88, "#F2A900")}<path d="M100 96 V112" stroke="#5B5F66" stroke-width="3"/>`),
+    hub: () => svg(`<rect x="74" y="50" width="52" height="50" rx="12" fill="#FFFFFF" stroke="#1C1E21" stroke-width="2.5"/>${led(100, 88, "#2E9E4F")}${ondas(100, 50, 10, "#2E86DE", -2.5, -0.6)}`),
+    repetidor: () => mapa.hub(),
+    teclado: () => svg(`<rect x="70" y="14" width="60" height="84" rx="8" fill="#FFFFFF" stroke="#1C1E21" stroke-width="2.5"/><rect x="78" y="22" width="44" height="14" rx="2" fill="#2B2F33"/><text x="100" y="33" text-anchor="middle" font-family="Arial" font-size="7.5" font-weight="700" fill="#7CFC9A">ARMADO</text>
+      ${[0, 1, 2, 3].map((f) => [0, 1, 2].map((cc) => `<rect class="${f === 1 && cc === 1 ? "v3-ani-tecla" : ""}" x="${80 + cc * 14}" y="${42 + f * 13}" width="11" height="9" rx="2" fill="#D9D9D9" stroke="#8E949A"/>`).join("")).join("")}${led(122, 90, "#2E9E4F")}`),
+    sirena_int: () => svg(`<rect x="78" y="24" width="44" height="34" rx="5" fill="#E6E6E6" stroke="#1C1E21" stroke-width="2.5"/><path d="M84 40 H116" stroke="#8E949A" stroke-width="2"/>${ondas(100, 41, 30, "#E8741E", -0.6, 0.6)}${ondas(100, 41, 30, "#E8741E", 2.54, 3.74)}`),
+    sirena_ext: () => svg(`<rect x="76" y="14" width="48" height="58" rx="6" fill="#E05050" stroke="#1C1E21" stroke-width="2.5"/><rect class="v3-ani-flash" x="86" y="22" width="28" height="14" rx="4" fill="#FFD84D"/><text x="100" y="60" text-anchor="middle" font-family="Arial Black,Arial" font-weight="900" font-size="13" fill="#FFFFFF">SAT</text>${ondas(100, 44, 34, "#E05050", -0.6, 0.6)}${ondas(100, 44, 34, "#E05050", 2.54, 3.74)}`),
+    sirena_flash: () => mapa.sirena_ext(),
+    rotura_vidrio: () => svg(`<rect x="24" y="18" width="80" height="62" fill="#CFE6F2" stroke="#8E949A" stroke-width="4"/><path class="v3-ani-grieta" d="M60 46 L48 30 M60 46 L76 32 M60 46 L50 66 M60 46 L80 60" stroke="#5B6B7B" stroke-width="2"/>
+      <rect x="140" y="24" width="22" height="22" rx="4" fill="#FFFFFF" stroke="#1C1E21" stroke-width="2"/>${led(151, 35, "#17809B")}${ondas(151, 35, 16, "#17809B", 2.4, 3.9)}`),
+    pulsador_asalto: () => svg(`<rect x="76" y="28" width="48" height="48" rx="8" fill="#FFFFFF" stroke="#1C1E21" stroke-width="2.5"/><circle class="v3-ani-boton" cx="100" cy="52" r="15" fill="#E8741E" stroke="#B5541A" stroke-width="2"/><text x="100" y="56" text-anchor="middle" font-family="Arial" font-weight="700" font-size="9" fill="#FFFFFF">SOS</text>`),
+    pulsador_incendio: () => mapa.pulsador_asalto(),
+    camara_ip: () => svg(`<path d="M150 20 V40 H128" stroke="#5B5F66" stroke-width="5" fill="none"/><g transform="rotate(14 112 44)"><rect x="70" y="32" width="60" height="26" rx="8" fill="#FFFFFF" stroke="#1C1E21" stroke-width="2.5"/><circle cx="74" cy="45" r="9" fill="#2B2F33"/><circle cx="74" cy="45" r="4" fill="#5B8DB8"/></g>${led(122, 40)}
+      <path class="v3-ani-cono" d="M66 50 L10 90 L40 110 Z" fill="#2E86DE" opacity="0.25"/><text class="v3-ani-led" x="160" y="100" font-family="Arial" font-weight="700" font-size="11" fill="#E00000">● REC</text>`),
+    camara_analoga: () => mapa.camara_ip(),
+    camara_domo: () => svg(`<path d="M0 10 H200" stroke="#D8D1C2" stroke-width="2"/><path d="M76 12 H124 A24 24 0 0 1 76 12 Z" fill="#2B2F33" opacity="0.85"/><rect x="72" y="8" width="56" height="6" rx="2" fill="#FFFFFF" stroke="#1C1E21" stroke-width="2"/><circle cx="100" cy="24" r="5" fill="#5B8DB8"/>
+      <path class="v3-ani-cono" d="M100 30 L40 104 L160 104 Z" fill="#2E86DE" opacity="0.22"/><text class="v3-ani-led" x="160" y="100" font-family="Arial" font-weight="700" font-size="11" fill="#E00000">● REC</text>`),
+  };
+  return (mapa[tipo] || (() => svg(`<rect x="76" y="34" width="48" height="40" rx="6" fill="#FFFFFF" stroke="#1C1E21" stroke-width="2.5"/>${led(116, 42, "#2E9E4F")}`)))();
+}
 const ALCANCE_TXT = { infrarrojo: "11", infrarrojo_ext: "12", infrarrojo_cortina: "10" };
 // Equipos que se pueden agregar tocando en el 3D (en este orden).
 const CROQUIS_3D_PALETA = ["infrarrojo", "infrarrojo_ext", "infrarrojo_cortina", "magnetico", "humo", "rotura_vidrio", "detector_360", "sirena_int", "sirena_ext", "teclado", "central", "pulsador_asalto", "camara_ip", "camara_domo"];
@@ -1637,7 +1749,7 @@ function iniciarVisor3D(datos, opciones) {
     let texto = CROQUIS_3D_EXPLICA[e.tipo] || "Forma parte del sistema de seguridad.";
     if (def.ir) { const { ang, doble } = croquisIRParams(e, def); texto += ` Cubre hasta ${ALCANCE_TXT[e.tipo] || "11"} m, en un ángulo de ${doble ? ang * 2 : ang}°.`; }
     const lugar = dondeEsta(e);
-    hoja.innerHTML = `<b>${esc(nombreDe(e.tipo))}${e.etq ? " · zona " + esc(e.etq) : ""}</b>${lugar ? `<p class="v3-nota">En ${esc(lugar.toLowerCase())}</p>` : ""}<p>${esc(texto)}</p>${e.prev ? `<p class="v3-nota">Ya está instalado.</p>` : e.inst ? `<p class="v3-nota">Se agrega con esta propuesta.</p>` : ""}
+    hoja.innerHTML = `<div class="v3-cari">${croquis3dCaricatura(e.tipo)}</div><b>${esc(nombreDe(e.tipo))}${e.etq ? " · zona " + esc(e.etq) : ""}</b>${lugar ? `<p class="v3-nota">En ${esc(lugar.toLowerCase())}</p>` : ""}<p>${esc(texto)}</p>${e.prev ? `<p class="v3-nota">Ya está instalado.</p>` : e.inst ? `<p class="v3-nota">Se agrega con esta propuesta.</p>` : ""}
       ${esCamara(e) ? `<div class="v3-acciones"><button type="button" data-h="vercam" class="v3-primario">Ver lo que ve</button></div>` : ""}<button type="button" class="v3-link" data-h="cerrar">Cerrar</button>`;
     hoja.classList.remove("hidden");
     visor.marcar(e.id);
@@ -1799,7 +1911,7 @@ async function croquis3dHtmlIndependiente(datos) {
 <script>${seguro(utils)}<\/script>
 <script>${seguro(visor)}<\/script>
 <script>(function(){var d=${json};if(!Croquis3D.disponible()){document.body.innerHTML="<p style='font:16px system-ui;padding:30px;text-align:center'>Este navegador no puede mostrar 3D. Abrí el archivo con Chrome o Safari.</p>";return;}
-var op={presentacion:true,clave:d.id||d.titulo};
+var op={presentacion:d.presentacion!==false,clave:d.id||d.titulo};
 if(d.id&&d.servidor){try{fetch(d.servidor+"/api/datos?publico=vista3d&id="+d.id).catch(function(){});}catch(e){}
 op.llamar=function(p){return fetch(d.servidor+"/api/datos?publico=vista3d_llamar",{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify(Object.assign({id:d.id},p))}).then(function(r){return r.json().then(function(x){if(!r.ok)throw new Error(x.error||"No se pudo enviar");return x;});},function(){throw new Error("Sin conexión: escribinos por WhatsApp.");});};}
 iniciarVisor3D(d,op);})();<\/script>
