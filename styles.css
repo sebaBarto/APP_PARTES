@@ -3693,3 +3693,15 @@ html[data-inicio="nuevo"] #screen-presupuesto .pe-ajuste-btn.activo { background
 .equipo-cambio { border-top: 1px solid rgba(128,128,128,.25); padding: 8px 0; }
 .equipo-cambio summary { cursor: pointer; font-weight: 600; margin: 4px 0; }
 .equipo-card-nuevo { outline: 3px solid #F2C94C; outline-offset: 2px; transition: outline-color .6s; }
+.equipo-card-top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.equipo-fav { margin-left: auto; background: none; border: 0; padding: 4px; color: #9AA3AB; cursor: pointer; line-height: 0; }
+.equipo-fav svg { width: 22px; height: 22px; }
+.equipo-fav.activo { color: #E0A800; }
+.equipo-aviso { margin: 8px 0; padding: 8px 10px; border-radius: 10px; background: #FFF4E5; color: #8A4B00; font-size: 13px; line-height: 1.4; }
+.equipo-aviso .btn { margin-left: 6px; padding: 2px 8px; font-size: 12px; color: #8A4B00; }
+.equipo-acciones .eq-util { display: inline-flex; align-items: center; gap: 5px; }
+.equipo-acciones .eq-util .cq-ic { width: 16px; height: 16px; }
+.equipo-acciones .eq-util.activo { color: #2E9E4F; font-weight: 700; }
+.consulta-datos-equipo .link-btn { padding: 0; font-size: inherit; text-decoration: underline; }
+html .app .equipo-aviso .btn.eq-resolver, .equipo-aviso .eq-resolver { color: #8A4B00 !important; border: 1px solid #C98A3D !important; background: transparent !important; box-shadow: none !important; }
+html .app .equipo-acciones .btn.eq-util.activo, .equipo-acciones .eq-util.activo { color: #2E9E4F !important; border-color: #2E9E4F !important; }

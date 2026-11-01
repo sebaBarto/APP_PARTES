@@ -3486,3 +3486,70 @@ test("Datos del equipo: la notificación de un dato nuevo abre Manuales en ese d
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Datos del equipo: «me sirvió», avisar desactualizado, favoritos y orden; la respuesta de la IA muestra los datos del equipo que usó", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  let datos = [
+    { id: "a1", titulo: "APN Claro", contenido: "igprs.claro.com.ar", categoria: "APN y líneas", autor: "Luis", fecha: "2026-10-30T15:00:00Z", ediciones: [], utiles: [] },
+    { id: "b2", titulo: "Código DSC", contenido: "5555", categoria: "Códigos y claves de fábrica", autor: "Luis", fecha: "2026-10-01T15:00:00Z", ediciones: [], utiles: ["Ana", "Beto", "Caro"], reportes: [{ autor: "Ana", fecha: "2026-10-29T15:00:00Z", nota: "En el PC1616 es otro" }] },
+  ];
+  const posts = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("coleccion=datos_equipo") && req.method() === "POST") {
+      const b = JSON.parse(req.postData()); posts.push(b);
+      const d = datos.find((x) => x.id === b.id);
+      if (b.accion === "util") d.utiles = d.utiles.includes("Juan Pérez") ? d.utiles.filter((n) => n !== "Juan Pérez") : [...d.utiles, "Juan Pérez"];
+      if (b.accion === "desactualizado") d.reportes = [{ autor: "Juan Pérez", fecha: "2026-10-31T15:00:00Z", nota: b.nota }];
+      if (b.accion === "resolver_reporte") d.reportes = [];
+      return json({ ok: true, lista: datos });
+    }
+    if (u.includes("coleccion=datos_equipo")) return json(datos);
+    if (u.includes("coleccion=consultas-categorias")) return json([{ categoria: "Comunicadores", carpeta_drive_id: "x" }]);
+    if (u.includes("/api/consultas") && req.method() === "POST") return json({ respuesta: "El APN es igprs.claro.com.ar.\nFuente: Dato del equipo: APN Claro", manuales_usados: ["Comunicador.pdf"], datos_equipo_usados: [{ id: "a1", titulo: "APN Claro" }] });
+    if (u.includes("/api/consultas")) return json([{ id: "m1", nombre: "Comunicador.pdf" }]);
+    json([]);
+  });
+  await page.goto(base + "/");
+  await page.evaluate(() => { tecnicoLogueado = "Juan Pérez"; localStorage.removeItem("datos_equipo_cache"); localStorage.removeItem("equipo_favoritos"); verConsultasBtn.click(); cambiarTabManuales("equipo"); });
+  await page.waitForSelector('.equipo-card[data-id="b2"]');
+  assert.match(await page.textContent('.equipo-card[data-id="b2"] .equipo-aviso'), /Puede estar desactualizado[\s\S]*Ana: «En el PC1616 es otro»/);
+  // Orden: más útiles arriba
+  await page.selectOption("#equipoOrden", "utiles");
+  assert.strictEqual(await page.getAttribute(".equipo-card >> nth=0", "data-id"), "b2");
+  await page.selectOption("#equipoOrden", "nuevos");
+  // Me sirvió
+  await page.click('.equipo-card[data-id="a1"] .eq-util');
+  await page.waitForTimeout(200);
+  assert.match(await page.textContent('.equipo-card[data-id="a1"] .eq-util'), /Me sirvió \(1\)/);
+  assert.ok(await page.locator('.equipo-card[data-id="a1"] .eq-util.activo').count());
+  // Avisar desactualizado y después «ya está bien»
+  page.once("dialog", (d) => d.accept("Ahora es igprs.claro.com"));
+  await page.click('.equipo-card[data-id="a1"] .eq-desact');
+  await page.waitForTimeout(200);
+  assert.deepStrictEqual(posts.find((p) => p.accion === "desactualizado"), { accion: "desactualizado", id: "a1", nota: "Ahora es igprs.claro.com", autor: "Juan Pérez" });
+  page.once("dialog", (d) => d.accept());
+  await page.click('.equipo-card[data-id="b2"] .eq-resolver');
+  await page.waitForTimeout(200);
+  assert.strictEqual(await page.locator('.equipo-card[data-id="b2"] .equipo-aviso').count(), 0);
+  // Favoritos: filtro propio, queda en el celular
+  await page.click('.equipo-card[data-id="b2"] .equipo-fav');
+  await page.selectOption("#equipoFiltroCat", "__fav");
+  assert.deepStrictEqual(await page.$$eval(".equipo-card", (cs) => cs.map((c) => c.dataset.id)), ["b2"]);
+  assert.deepStrictEqual(await page.evaluate(() => JSON.parse(localStorage.getItem("equipo_favoritos"))), ["b2"]);
+  await page.selectOption("#equipoFiltroCat", "__desact");
+  assert.deepStrictEqual(await page.$$eval(".equipo-card", (cs) => cs.map((c) => c.dataset.id)), ["a1"], "filtro de los avisados como desactualizados");
+  // La IA muestra qué datos del equipo usó, y se abren con un toque
+  await page.click('#manTabs button[data-tab="ia"]');
+  await page.selectOption("#consultaCategoriaSelect", "Comunicadores");
+  await page.waitForTimeout(300);
+  await page.fill("#consultaPreguntaInput", "¿APN de Claro?");
+  await page.click("#preguntarBtn");
+  await page.waitForSelector("#consultaManualesUsados [data-dato]");
+  assert.match(await page.textContent("#consultaManualesUsados"), /Basado en: Comunicador\.pdf[\s\S]*Datos del equipo tenidos en cuenta: APN Claro/);
+  await page.click("#consultaManualesUsados [data-dato]");
+  await page.waitForSelector('.equipo-card[data-id="a1"].equipo-card-nuevo');
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

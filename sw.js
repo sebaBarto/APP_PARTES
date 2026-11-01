@@ -1,6 +1,6 @@
 // Versión del caché: subir este número cada vez que se publican cambios
 // importantes fuerza a los celulares a descartar la copia vieja.
-const CACHE_NAME = "parte-tecnico-v176";
+const CACHE_NAME = "parte-tecnico-v177";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -19,6 +19,8 @@ const APP_SHELL = [
 // 1,5 MB en cada actualización). Si se cambia alguna librería, subir
 // VENDOR_CACHE (vendor-v2, ...).
 const VENDOR_CACHE = "vendor-v1";
+// Fotos de los datos del equipo (aparte: no se borra al publicar versiones).
+const FOTOS_EQUIPO_CACHE = "fotos-equipo-v1";
 const VENDOR_FILES = [
   "./vendor/fonts.css",
   "./vendor/fonts/space-grotesk-latin-500-normal.woff2",
@@ -69,7 +71,10 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME && k !== VENDOR_CACHE).map((k) => caches.delete(k)))
+      // Solo se borran las copias viejas de la app. Los manuales guardados
+      // para usar sin señal y las fotos del equipo se conservan (antes se
+      // borraban en cada actualización).
+      Promise.all(keys.filter((k) => k.startsWith("parte-tecnico-") && k !== CACHE_NAME).map((k) => caches.delete(k)))
     )
   );
   self.clients.claim();
@@ -78,6 +83,20 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
+  // Fotos de los datos del equipo (?eq=1): se guardan para verlas sin señal.
+  if (url.pathname === "/api/foto" && url.searchParams.get("eq") === "1" && event.request.method === "GET") {
+    event.respondWith(
+      caches.open(FOTOS_EQUIPO_CACHE).then((cache) =>
+        fetch(event.request).then((resp) => {
+          if (resp && resp.ok) {
+            cache.put(event.request, resp.clone()).then(() => cache.keys()).then((ks) => { if (ks.length > 300) ks.slice(0, ks.length - 300).forEach((k) => cache.delete(k)); }).catch(() => {});
+          }
+          return resp;
+        }).catch(() => cache.match(event.request).then((hit) => hit || Response.error()))
+      )
+    );
+    return;
+  }
   // Los pedidos a nuestras funciones (/api/*) y a servicios externos
   // (EmailJS, etc.) nunca se cachean — siempre van directo a la red.
   if (url.pathname.startsWith("/api/") || url.origin !== self.location.origin) {

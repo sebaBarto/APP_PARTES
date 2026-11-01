@@ -1341,6 +1341,7 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
         contenidoAGuardar = mapa;
       }
 
+      let avisoDesactualizado = null;
       if (nombreColeccion === "datos_equipo") {
         const lista = Array.isArray(contenidoExistente) ? contenidoExistente.slice() : [];
         const txt = (v, max) => String(v == null ? "" : v).trim().slice(0, max);
@@ -1375,7 +1376,27 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
           const nuevo = { ...previo, titulo, contenido, categoria: txt(body.categoria, 60) || previo.categoria || "General", fotos: body.fotos !== undefined ? fotosDe(body.fotos) : previo.fotos || [] };
           if (JSON.stringify(foto(nuevo)) === JSON.stringify(foto(previo))) { res.status(200).json({ ok: true, lista, sinCambios: true }); return; }
           nuevo.ediciones = conVersiones([...(previo.ediciones || []), { autor, fecha: ahoraIso, antes: foto(previo) }]);
+          // Si alguien lo corrigió, los avisos de "desactualizado" quedan resueltos.
+          if ((nuevo.reportes || []).length) { nuevo.reportes_resueltos = [...(previo.reportes_resueltos || []), ...nuevo.reportes.map((x) => ({ ...x, resuelto_por: autor, resuelto: ahoraIso }))].slice(-10); nuevo.reportes = []; }
           lista[i] = nuevo;
+        } else if (accion === "util") {
+          // "Me sirvió": cada uno suma una vez (tocar de nuevo lo saca).
+          const i = lista.findIndex((d) => d.id === body.id);
+          if (i === -1) { res.status(404).json({ error: "Ese dato ya no existe" }); return; }
+          const utiles = (lista[i].utiles || []).filter((n) => n !== autor);
+          if (utiles.length === (lista[i].utiles || []).length) utiles.push(autor);
+          lista[i] = { ...lista[i], utiles: utiles.slice(-200) };
+        } else if (accion === "desactualizado") {
+          const i = lista.findIndex((d) => d.id === body.id);
+          if (i === -1) { res.status(404).json({ error: "Ese dato ya no existe" }); return; }
+          const nota = txt(body.nota, 300);
+          lista[i] = { ...lista[i], reportes: [...(lista[i].reportes || []).filter((x) => x.autor !== autor), { autor, fecha: ahoraIso, nota }].slice(-10) };
+          avisoDesactualizado = { dato: lista[i], autor, nota };
+        } else if (accion === "resolver_reporte") {
+          const i = lista.findIndex((d) => d.id === body.id);
+          if (i === -1) { res.status(404).json({ error: "Ese dato ya no existe" }); return; }
+          const reps = lista[i].reportes || [];
+          lista[i] = { ...lista[i], reportes: [], reportes_resueltos: [...(lista[i].reportes_resueltos || []), ...reps.map((x) => ({ ...x, resuelto_por: autor, resuelto: ahoraIso }))].slice(-10) };
         } else if (accion === "restaurar") {
           const i = lista.findIndex((d) => d.id === body.id);
           if (i === -1) { res.status(404).json({ error: "Ese dato ya no existe" }); return; }
@@ -1480,6 +1501,17 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
               new Promise((ok) => setTimeout(ok, 5000)),
             ]);
           } catch (errPush) { /* si falla el aviso, el dato igual quedó guardado */ }
+        }
+        // A quien lo cargó le avisan que puede estar desactualizado.
+        if (avisoDesactualizado && avisoDesactualizado.dato.autor && avisoDesactualizado.dato.autor !== avisoDesactualizado.autor && !/^Oficina/.test(avisoDesactualizado.dato.autor)) {
+          try {
+            const { enviarASeleccionados } = require("../lib/push-sender");
+            const a = avisoDesactualizado;
+            await Promise.race([
+              enviarASeleccionados([a.dato.autor], { titulo: "⚠️ Revisá un dato que cargaste", cuerpo: `${a.autor} avisa que «${a.dato.titulo}» puede estar desactualizado${a.nota ? ": " + a.nota : ""}`.slice(0, 180), url: `/?ir=dato-equipo&id=${encodeURIComponent(a.dato.id)}` }),
+              new Promise((ok) => setTimeout(ok, 5000)),
+            ]);
+          } catch (errPush) { /* si falla el aviso, igual quedó marcado */ }
         }
         res.status(200).json({ ok: true, lista: contenidoAGuardar });
         return;

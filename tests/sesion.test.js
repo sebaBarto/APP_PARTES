@@ -538,3 +538,50 @@ test("Datos del equipo: un dato nuevo se avisa por notificación al resto del eq
     if (viejo) require.cache[rutaPush] = viejo; else delete require.cache[rutaPush];
   }
 });
+
+test("Datos del equipo: «me sirvió» (una vez por persona), avisar desactualizado (le llega a quien lo cargó) y se resuelve al corregirlo; la IA recibe los datos que tienen que ver", async () => {
+  const fetchViejo = global.fetch;
+  let archivo = [];
+  global.fetch = async (url, op) => {
+    const u = String(url), metodo = (op && op.method) || "GET";
+    if (u.includes("datos-equipo.json")) {
+      if (metodo === "PUT") { archivo = JSON.parse(Buffer.from(JSON.parse(op.body).content, "base64").toString()); return new Response("{}", { status: 200 }); }
+      if (op && op.headers && op.headers.Accept === "application/vnd.github.raw") return new Response(JSON.stringify(archivo));
+      return new Response(JSON.stringify({ sha: "s", encoding: "base64", content: Buffer.from(JSON.stringify(archivo)).toString("base64") }));
+    }
+    return new Response("{}", { status: 200 });
+  };
+  const rutaPush = require.resolve(path.join(raiz, "lib/push-sender.js"));
+  const viejo = require.cache[rutaPush];
+  const avisos = [];
+  require.cache[rutaPush] = { id: rutaPush, filename: rutaPush, loaded: true, exports: { enviarATodos: async () => ({}), enviarASeleccionados: async (n, a) => { avisos.push({ n, ...a }); return {}; } } };
+  try {
+    const juan = crearSesion({ nombre: "Juan", rol: "tecnico" }), luis = crearSesion({ nombre: "Luis", rol: "tecnico" });
+    const llamar = async (body, t) => { const res = resFalso(); await datos(pedido("POST", { coleccion: "datos_equipo" }, body, t), res); return res; };
+    await llamar({ accion: "crear", titulo: "APN Claro comunicadores", contenido: "igprs.claro.com.ar usuario clarogprs", categoria: "APN y líneas" }, juan);
+    await llamar({ accion: "crear", titulo: "Código instalador DSC", contenido: "5555", categoria: "Códigos y claves de fábrica" }, juan);
+    const id = archivo.find((d) => d.titulo.startsWith("APN")).id;
+    await llamar({ accion: "util", id }, luis);
+    await llamar({ accion: "util", id }, juan);
+    assert.deepStrictEqual(archivo.find((d) => d.id === id).utiles, ["Luis", "Juan"]);
+    await llamar({ accion: "util", id }, luis);
+    assert.deepStrictEqual(archivo.find((d) => d.id === id).utiles, ["Juan"], "tocar de nuevo lo saca");
+    await llamar({ accion: "desactualizado", id, nota: "Claro cambió el APN" }, luis);
+    assert.strictEqual(archivo.find((d) => d.id === id).reportes[0].nota, "Claro cambió el APN");
+    assert.deepStrictEqual(avisos.map((a) => a.n), [["Juan"]], "le llega a quien lo cargó");
+    assert.match(avisos[0].cuerpo, /Luis avisa que «APN Claro comunicadores» puede estar desactualizado: Claro cambió el APN/);
+    // La IA recibe los datos que tienen que ver con la pregunta (con el aviso de desactualizado)
+    const { datosEquipoRelacionados } = require(path.join(raiz, "api/consultas.js"));
+    const rel = await datosEquipoRelacionados({}, "sat/datos-prueba", "¿Cuál es el APN de Claro para el comunicador?", "Comunicadores");
+    assert.deepStrictEqual(rel.map((d) => d.titulo), ["APN Claro comunicadores"]);
+    assert.strictEqual((await datosEquipoRelacionados({}, "sat/datos-prueba", "como se programa", "x")).length, 0, "si no tiene que ver, no se manda nada");
+    // Corregirlo resuelve el aviso
+    await llamar({ accion: "editar", id, titulo: "APN Claro comunicadores", contenido: "igprs.claro.com.ar (nuevo)", categoria: "APN y líneas" }, juan);
+    const d = archivo.find((x) => x.id === id);
+    assert.strictEqual(d.reportes.length, 0);
+    assert.strictEqual(d.reportes_resueltos[0].resuelto_por, "Juan");
+  } finally {
+    global.fetch = fetchViejo;
+    if (viejo) require.cache[rutaPush] = viejo; else delete require.cache[rutaPush];
+  }
+});

@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.20.1";
+const APP_VERSION = "4.21.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -5953,8 +5953,16 @@ function guardarConsultaReciente(item) {
 }
 function mostrarRespuestaConsulta(c) {
   consultaRespuestaTexto.innerHTML = formatearRespuestaIA(c.respuesta);
-  consultaManualesUsados.textContent = c.manuales && c.manuales.length ? `Basado en: ${c.manuales.join(", ")}` : "";
+  pintarFuentesConsulta(c);
   consultaRespuestaWrap.classList.remove("hidden");
+}
+// "Basado en": los manuales y los datos del equipo que tuvo en cuenta la IA (se tocan para abrirlos).
+function pintarFuentesConsulta(m) {
+  const manuales = m && m.manuales && m.manuales.length ? `Basado en: ${escapeHtml(m.manuales.join(", "))}` : "";
+  const datos = m && Array.isArray(m.datosEquipo) && m.datosEquipo.length
+    ? `<span class="consulta-datos-equipo">Datos del equipo tenidos en cuenta: ${m.datosEquipo.map((d) => `<button type="button" class="link-btn" data-dato="${escapeHtml(d.id)}">${escapeHtml(d.titulo)}</button>`).join(" · ")}</span>` : "";
+  consultaManualesUsados.innerHTML = [manuales, datos].filter(Boolean).join("<br>");
+  consultaManualesUsados.querySelectorAll("[data-dato]").forEach((b) => b.addEventListener("click", () => abrirDatoEquipo(b.dataset.dato)));
 }
 function renderConsultasRecientes() {
   const wrap = document.getElementById("consultaRecientesWrap");
@@ -6017,7 +6025,7 @@ function renderHiloConsulta() {
   const ultima = hiloConsulta[hiloConsulta.length - 1];
   if (!ultima) return;
   consultaRespuestaTexto.innerHTML = (hiloConsulta.length > 1 ? `<p class="hilo-preg">${escapeHtml(ultima.pregunta)}</p>` : "") + formatearRespuestaIA(ultima.respuesta);
-  consultaManualesUsados.textContent = hiloMeta && hiloMeta.manuales && hiloMeta.manuales.length ? `Basado en: ${hiloMeta.manuales.join(", ")}` : "";
+  pintarFuentesConsulta(hiloMeta);
   consultaRespuestaWrap.classList.remove("hidden");
 }
 
@@ -6048,12 +6056,13 @@ async function enviarConsulta(pregunta, esRepregunta) {
     }
     consultaStatus.textContent = "";
     const preguntaMostrada = pregunta || "(consulta con foto)";
-    if (!esRepregunta) hiloMeta = { categoria, archivo, manualNombre, manuales: data.manuales_usados || [] };
+    if (!esRepregunta) hiloMeta = { categoria, archivo, manualNombre, manuales: data.manuales_usados || [], datosEquipo: [] };
+    (data.datos_equipo_usados || []).forEach((d) => { if (d && d.id && !hiloMeta.datosEquipo.some((x) => x.id === d.id)) hiloMeta.datosEquipo.push({ id: d.id, titulo: d.titulo }); });
     hiloConsulta.push({ pregunta: preguntaMostrada, respuesta: data.respuesta });
     renderHiloConsulta();
     consultaFotoDataUrl = ""; renderFotoConsulta();
     if (esRepregunta) consultaRepreguntaInput.value = "";
-    const item = { categoria, pregunta: hiloConsulta[0].pregunta, manualNombre, respuesta: data.respuesta, manuales: hiloMeta.manuales, hilo: hiloConsulta.slice(), fecha: new Date().toISOString() };
+    const item = { categoria, pregunta: hiloConsulta[0].pregunta, manualNombre, respuesta: data.respuesta, manuales: hiloMeta.manuales, datosEquipo: hiloMeta.datosEquipo, hilo: hiloConsulta.slice(), fecha: new Date().toISOString() };
     guardarConsultaReciente(item);
     renderConsultasRecientes();
   } catch (err) {
@@ -6083,6 +6092,9 @@ let datosEquipoCache = [];
 // Abre Manuales > Datos del equipo y resalta un dato (desde la notificación).
 async function abrirDatoEquipo(id) {
   verConsultasBtn.click();
+  // Sin filtros, para que el dato se vea seguro.
+  document.getElementById("equipoBuscar").value = "";
+  document.getElementById("equipoFiltroCat").value = "";
   cambiarTabManuales("equipo");
   await cargarDatosEquipo();
   const card = id && equipoLista.querySelector(`.equipo-card[data-id="${CSS.escape(id)}"]`);
@@ -6111,12 +6123,24 @@ function categoriasEquipo() {
   datosEquipoCache.forEach((d) => d.categoria && set.add(d.categoria));
   return [...set];
 }
+// Favoritos: los datos "de cabecera" de cada uno (quedan en el celular).
+const EQUIPO_FAVORITOS = "equipo_favoritos";
+function favoritosEquipo() { try { const l = JSON.parse(localStorage.getItem(EQUIPO_FAVORITOS) || "[]"); return new Set(Array.isArray(l) ? l : []); } catch (e) { return new Set(); } }
+function alternarFavoritoEquipo(d) {
+  const f = favoritosEquipo();
+  if (f.has(d.id)) f.delete(d.id); else f.add(d.id);
+  try { localStorage.setItem(EQUIPO_FAVORITOS, JSON.stringify([...f])); } catch (e) { /* sin espacio */ }
+  // Las fotos de los favoritos se guardan para verlas sin señal.
+  if (f.has(d.id)) (d.fotos || []).forEach((id) => { fetch(urlFotoEquipo(id)).catch(() => {}); });
+  return f.has(d.id);
+}
+function urlFotoEquipo(id) { return `/api/foto?id=${encodeURIComponent(id)}&eq=1`; }
 function poblarCategoriasEquipo() {
   const cats = categoriasEquipo();
   const filtro = document.getElementById("equipoFiltroCat");
   const elegido = filtro.value;
-  filtro.innerHTML = '<option value="">Todas las categorías</option>' + cats.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
-  filtro.value = cats.includes(elegido) ? elegido : "";
+  filtro.innerHTML = '<option value="">Todas las categorías</option><option value="__fav">★ Mis favoritos</option><option value="__desact">Avisados como desactualizados</option>' + cats.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
+  filtro.value = cats.includes(elegido) || elegido === "__fav" || elegido === "__desact" ? elegido : "";
   const sel = document.getElementById("equipoFormCategoria");
   const prev = sel.value;
   sel.innerHTML = cats.map((c) => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
@@ -6151,11 +6175,15 @@ function fechaCortaAR(iso) {
 function renderDatosEquipo() {
   const term = normalizeText(document.getElementById("equipoBuscar").value || "");
   const cat = document.getElementById("equipoFiltroCat").value;
-  const lista = datosEquipoCache.filter((d) => (!cat || d.categoria === cat) && (!term || normalizeText(`${d.titulo} ${d.contenido} ${d.categoria} ${d.autor}`).includes(term)));
+  const favs = favoritosEquipo();
+  const orden = document.getElementById("equipoOrden").value;
+  const lista = datosEquipoCache.filter((d) => (!cat || (cat === "__fav" ? favs.has(d.id) : cat === "__desact" ? (d.reportes || []).length : d.categoria === cat)) && (!term || normalizeText(`${d.titulo} ${d.contenido} ${d.categoria} ${d.autor}`).includes(term)));
+  if (orden === "utiles") lista.sort((a, b) => (b.utiles || []).length - (a.utiles || []).length);
+  else if (orden === "actualizados") lista.sort((a, b) => String(((b.ediciones || []).slice(-1)[0] || {}).fecha || b.fecha).localeCompare(String(((a.ediciones || []).slice(-1)[0] || {}).fecha || a.fecha)));
   equipoLista.innerHTML = "";
   if (!lista.length) {
     if (!equipoStatus.textContent || equipoStatus.textContent === "Cargando...") {
-      equipoLista.innerHTML = `<p class="list-status">${datosEquipoCache.length ? "Nada coincide con esa búsqueda." : "Todavía no hay datos. Sé el primero en dejar uno: un APN, un código de fábrica, un truco de configuración."}</p>`;
+      equipoLista.innerHTML = `<p class="list-status">${cat === "__fav" && !favs.size ? "Todavía no marcaste favoritos: tocá la estrella de un dato para tenerlo a mano (y verlo sin señal, con sus fotos)." : datosEquipoCache.length ? "Nada coincide con esa búsqueda." : "Todavía no hay datos. Sé el primero en dejar uno: un APN, un código de fábrica, un truco de configuración."}</p>`;
     }
     return;
   }
@@ -6165,16 +6193,23 @@ function renderDatosEquipo() {
     card.dataset.id = d.id;
     const ult = (d.ediciones || [])[(d.ediciones || []).length - 1];
     const propio = tecnicoLogueado && d.autor === tecnicoLogueado;
+    const yo = tecnicoLogueado || "Oficina";
+    const utiles = d.utiles || [], meSirvio = utiles.includes(yo);
+    const reportes = d.reportes || [];
+    const esFav = favs.has(d.id);
     card.innerHTML = `
-      <div class="equipo-card-top"><span class="equipo-cat">${escapeHtml(d.categoria || "General")}</span>${d.origen === "ia" ? '<span class="equipo-ia">Respuesta de la IA revisada</span>' : ""}</div>
+      <div class="equipo-card-top"><span class="equipo-cat">${escapeHtml(d.categoria || "General")}</span>${d.origen === "ia" ? '<span class="equipo-ia">Respuesta de la IA revisada</span>' : ""}<button type="button" class="equipo-fav${esFav ? " activo" : ""}" aria-label="${esFav ? "Sacar de favoritos" : "Marcar como favorito"}" title="Favorito (lo tenés a mano y se ve sin señal)"><svg viewBox="0 0 24 24" fill="${esFav ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3 6.4 20.2l1.1-6.2L3 9.6l6.2-.9z"/></svg></button></div>
+      ${reportes.length ? `<div class="equipo-aviso"><b>Puede estar desactualizado.</b> ${reportes.map((x) => `${escapeHtml(x.autor)}${x.nota ? ": «" + escapeHtml(x.nota) + "»" : ""} (${fechaCortaAR(x.fecha)})`).join(" · ")}<button type="button" class="btn btn-ghost btn-small eq-resolver">Ya está bien</button></div>` : ""}
       <p class="equipo-titulo">${escapeHtml(d.titulo)}</p>
       <div class="equipo-contenido consulta-respuesta-texto">${linkificarEquipo(formatearRespuestaIA(d.contenido))}</div>
-      ${(d.fotos || []).length ? `<div class="equipo-fotos">${d.fotos.map((f) => `<img src="/api/foto?id=${encodeURIComponent(f)}" alt="Imagen del dato" loading="lazy" class="eq-foto" role="button" tabindex="0">`).join("")}</div>` : ""}
+      ${(d.fotos || []).length ? `<div class="equipo-fotos">${d.fotos.map((f) => `<img src="${urlFotoEquipo(f)}" alt="Imagen del dato" loading="lazy" class="eq-foto" role="button" tabindex="0">`).join("")}</div>` : ""}
       <p class="equipo-meta">Aportó <b>${escapeHtml(d.autor || "")}</b> el ${fechaCortaAR(d.fecha)}${ult ? ` · Editado por <b>${escapeHtml(ult.autor)}</b> el ${fechaCortaAR(ult.fecha)}${d.ediciones.length > 1 ? ` (${d.ediciones.length} ediciones)` : ""}` : ""}</p>
       <div class="equipo-acciones">
+        <button type="button" class="btn btn-ghost btn-small eq-util${meSirvio ? " activo" : ""}" title="${utiles.length ? escapeHtml(utiles.join(", ")) : "Marcá si te sirvió"}"><svg class="cq-ic" viewBox="0 0 24 24" fill="${meSirvio ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 11v9H4v-9z"/><path d="M7 11l4-7a2 2 0 0 1 3 2l-1 4h5.5a2 2 0 0 1 2 2.4l-1.4 6A2 2 0 0 1 17.2 20H7"/></svg> Me sirvió${utiles.length ? ` (${utiles.length})` : ""}</button>
         <button type="button" class="btn btn-ghost btn-small eq-copiar">Copiar</button>
         <button type="button" class="btn btn-ghost btn-small eq-editar">Editar / agregar</button>
         ${(d.ediciones || []).some((e) => e.antes) ? '<button type="button" class="btn btn-ghost btn-small eq-historial">Cambios</button>' : ""}
+        <button type="button" class="btn btn-ghost btn-small eq-desact">Avisar que está desactualizado</button>
         ${propio ? '<button type="button" class="btn btn-ghost btn-small eq-borrar">Borrar</button>' : ""}
       </div>`;
     card.querySelector(".eq-copiar").addEventListener("click", async () => {
@@ -6182,6 +6217,15 @@ function renderDatosEquipo() {
     });
     card.querySelector(".eq-editar").addEventListener("click", () => abrirFormEquipo(d));
     card.querySelectorAll(".eq-foto").forEach((img) => img.addEventListener("click", () => ampliarImagenParte(img.src)));
+    card.querySelector(".equipo-fav").addEventListener("click", () => { showToast(alternarFavoritoEquipo(d) ? "Agregado a tus favoritos: queda guardado para verlo sin señal." : "Sacado de favoritos."); renderDatosEquipo(); });
+    card.querySelector(".eq-util").addEventListener("click", () => guardarDatoEquipo({ accion: "util", id: d.id }, meSirvio ? "Listo." : "¡Gracias! Así los más útiles quedan arriba."));
+    card.querySelector(".eq-desact").addEventListener("click", async () => {
+      const nota = prompt("¿Qué está desactualizado o no anda? (le llega un aviso a quien lo cargó)", "");
+      if (nota === null) return;
+      await guardarDatoEquipo({ accion: "desactualizado", id: d.id, nota: nota.trim() }, "Avisado. Cuando alguien lo corrija, se saca el aviso.");
+    });
+    const resolver = card.querySelector(".eq-resolver");
+    if (resolver) resolver.addEventListener("click", async () => { if (confirm("¿Lo revisaste y está bien? Se saca el aviso de desactualizado.")) await guardarDatoEquipo({ accion: "resolver_reporte", id: d.id }, "Aviso sacado."); });
     const hist = card.querySelector(".eq-historial");
     if (hist) hist.addEventListener("click", () => verCambiosEquipo(d));
     const borrar = card.querySelector(".eq-borrar");
@@ -6194,6 +6238,8 @@ function renderDatosEquipo() {
 }
 document.getElementById("equipoBuscar").addEventListener("input", renderDatosEquipo);
 document.getElementById("equipoFiltroCat").addEventListener("change", renderDatosEquipo);
+document.getElementById("equipoOrden").addEventListener("change", () => { try { localStorage.setItem("equipo_orden", document.getElementById("equipoOrden").value); } catch (e) { /* nada */ } renderDatosEquipo(); });
+try { const o = localStorage.getItem("equipo_orden"); if (o) document.getElementById("equipoOrden").value = o; } catch (e) { /* nada */ }
 
 // Links que se pegan en un dato (manual, video) quedan tocables.
 function linkificarEquipo(html) {

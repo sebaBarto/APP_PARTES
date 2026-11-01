@@ -19,6 +19,28 @@ const CATEGORIAS_PATH = "consultas-categorias.json";
 // pedido a Gemini.
 const TOPE_BYTES_TOTAL = 12 * 1024 * 1024; // 12 MB
 
+// Datos que cargó el equipo (Manuales > Datos del equipo) que tienen que ver
+// con la pregunta: se le pasan a la IA junto con los manuales.
+const PALABRAS_VACIAS = new Set("como para que cual cuales donde cuando esta este esto estos esas eses esos hace hacer tiene tengo puedo puede sobre entre desde hasta porque pero sino solo cada todo todos todas una uno unos unas con sin por del las los les mas muy hay ese esa eso".split(" "));
+function normalizarTexto(s) { return String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
+function palabrasClave(s) { return [...new Set(normalizarTexto(s).split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !PALABRAS_VACIAS.has(w)))]; }
+async function datosEquipoRelacionados(ghHeaders, repo, pregunta, categoria) {
+  try {
+    const r = await fetch(`https://api.github.com/repos/${repo}/contents/datos-equipo.json`, { headers: { ...ghHeaders, Accept: "application/vnd.github.raw" } });
+    if (!r.ok) return [];
+    const lista = JSON.parse(await r.text());
+    const claves = palabrasClave(pregunta);
+    if (!claves.length || !Array.isArray(lista)) return [];
+    return lista.map((d) => {
+      const tit = normalizarTexto(d.titulo), cont = normalizarTexto(d.contenido);
+      let puntos = 0;
+      claves.forEach((w) => { if (tit.includes(w)) puntos += 3; else if (cont.includes(w)) puntos += 1; });
+      if (puntos && d.categoria === categoria) puntos += 2;
+      if (puntos) puntos += Math.min(3, (d.utiles || []).length * 0.5);
+      return { d, puntos };
+    }).filter((x) => x.puntos >= 3).sort((a, b) => b.puntos - a.puntos).slice(0, 6).map((x) => x.d);
+  } catch (e) { return []; }
+}
 async function leerCategorias(ghHeaders, apiUrl) {
   const r = await fetch(apiUrl, { headers: ghHeaders });
   if (r.status === 404) return [];
@@ -254,14 +276,22 @@ module.exports = require("../lib/auditoria").conAuditoria("consultas", async (re
     }
 
     const nombresManuales = archivos.filter((a) => !omitidos.includes(a.name)).map((a) => a.name).join(", ");
+    const datosEquipo = await datosEquipoRelacionados(ghHeaders, GITHUB_DATA_REPO, [pregunta, ...historial.map((t) => t.pregunta)].join(" "), categoria);
+    let textoEquipo = "";
+    datosEquipo.forEach((d, i) => {
+      const bloque = `[Dato del equipo ${i + 1}] «${d.titulo}» (cargado por ${d.autor || "el equipo"}${(d.reportes || []).length ? "; OJO: avisaron que puede estar desactualizado" : ""}):\n${String(d.contenido || "").slice(0, 1500)}\n\n`;
+      if (textoEquipo.length + bloque.length < 7000) textoEquipo += bloque;
+    });
     const promptTexto =
       `Sos un asistente técnico para instaladores de sistemas de seguridad electrónica ` +
       `(alarmas, cámaras, control de accesos) de una empresa argentina. Respondé la pregunta del técnico ` +
-      `basándote ÚNICAMENTE en el contenido de los manuales adjuntos (${nombresManuales}). ` +
-      `Si la respuesta no está en los manuales, decilo claramente en vez de inventar algo.\n` +
+      `basándote ÚNICAMENTE en el contenido de los manuales adjuntos (${nombresManuales})` +
+      (textoEquipo ? ` y en los datos prácticos que dejó el equipo técnico de SAT (abajo). Esos datos salen de la experiencia en la calle: si responden la pregunta, usalos (pueden ser más actuales que el manual) y, si contradicen al manual, mencioná las dos cosas. ` : `. `) +
+      `Si la respuesta no está ahí, decilo claramente en vez de inventar algo.\n` +
       `Formato: castellano rioplatense, concreto y breve, para leer en el celular parado frente al equipo. ` +
       `Si es un procedimiento, dalo en pasos numerados con las teclas o códigos exactos. ` +
-      `Al final agregá una línea "Fuente:" con el nombre del manual y la página o sección.\n\n` +
+      `Al final agregá una línea "Fuente:" con el nombre del manual y la página o sección${textoEquipo ? `, o "Dato del equipo: <título>" si salió de ahí` : ""}.\n\n` +
+      (textoEquipo ? `DATOS DEL EQUIPO TÉCNICO:\n${textoEquipo}` : "") +
       (imagen ? `El técnico adjuntó una foto (display, código de error, cableado o equipo): usala para entender la consulta.\n` : "") +
       `Pregunta: ${historial.length ? historial[0].pregunta : pregunta}`;
 
@@ -295,8 +325,10 @@ module.exports = require("../lib/auditoria").conAuditoria("consultas", async (re
       respuesta,
       manuales_usados: archivos.map((a) => a.name).filter((n) => !omitidos.includes(n)),
       manuales_omitidos: omitidos,
+      datos_equipo_usados: datosEquipo.map((d) => ({ id: d.id, titulo: d.titulo })),
     });
   } catch (err) {
     res.status(500).json({ error: "Error interno al procesar la consulta", detail: String(err.message || err) });
   }
 });
+module.exports.datosEquipoRelacionados = datosEquipoRelacionados;
