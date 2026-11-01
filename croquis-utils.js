@@ -16,7 +16,7 @@
 //   simbolo { tipo, x, y, rot, esc, color?, esp? }  equipos y objetos de obra
 
 // Tiene que ser igual a APP_VERSION de app.js (si no, la app recarga).
-const CROQUIS_UTILS_VERSION = "4.24.0";
+const CROQUIS_UTILS_VERSION = "4.25.0";
 const CROQUIS_GRILLA = 20;
 
 // Cada símbolo se dibuja centrado en 0,0 con dib(color). "cat" separa los
@@ -166,6 +166,11 @@ const CROQUIS_SIMBOLOS = {
   puerta: {
     nombre: "Puerta", cat: "obra", color: "#1C1E21", r: 40, espejable: true,
     dib: (c) => `<rect x="-20" y="-4.5" width="40" height="9" fill="#FFFFFF"/><line x1="-20" y1="-6" x2="-20" y2="6" stroke="${c}" stroke-width="2.5"/><line x1="20" y1="-6" x2="20" y2="6" stroke="${c}" stroke-width="2.5"/><path d="M-20 0 L-20 -40" stroke="${c}" stroke-width="2.6"/><path d="M-20 -40 A 40 40 0 0 1 20 0" fill="none" stroke="${c}" stroke-width="1.2" stroke-dasharray="4 3"/>`,
+  },
+  paso: {
+    // Vano de paso entre ambientes: el marco solo, sin puerta ni herrajes.
+    nombre: "Paso (abertura sin puerta)", cat: "obra", color: "#1C1E21", r: 26,
+    dib: (c) => `<rect x="-20" y="-4.5" width="40" height="9" fill="#FFFFFF"/><line x1="-20" y1="-6" x2="-20" y2="6" stroke="${c}" stroke-width="2.5"/><line x1="20" y1="-6" x2="20" y2="6" stroke="${c}" stroke-width="2.5"/><line x1="-18" y1="-4.5" x2="18" y2="-4.5" stroke="${c}" stroke-width="1" stroke-dasharray="3 3"/><line x1="-18" y1="4.5" x2="18" y2="4.5" stroke="${c}" stroke-width="1" stroke-dasharray="3 3"/>`,
   },
   ventana: {
     nombre: "Ventana", cat: "obra", color: "#1C1E21", r: 26,
@@ -1276,7 +1281,7 @@ function croquisDescargar(blob, nombre) {
 // r: JSON que devolvió la IA (coordenadas 0-1000 sobre la foto sin rotar);
 // W, H: tamaño de la foto en píxeles. Devuelve la lista de elementos.
 const CROQUIS_DIRECCIONES = { derecha: 0, "abajo-derecha": 45, abajo: 90, "abajo-izquierda": 135, izquierda: 180, "arriba-izquierda": 225, arriba: 270, "arriba-derecha": 315 };
-const CROQUIS_ANCHO_ABERTURA = { puerta: 40, ventana: 44, corrediza: 60, porton_corredizo: 100, porton_batiente: 100 };
+const CROQUIS_ANCHO_ABERTURA = { puerta: 40, paso: 40, ventana: 44, corrediza: 60, porton_corredizo: 100, porton_batiente: 100 };
 function croquisDesdeIA(r, W, H) {
   const res = croquisDesdeIACompleto(r, W, H);
   return res.elementos;
@@ -1362,7 +1367,7 @@ function croquisDesdeIACompleto(r, W, H) {
 // ---------- Ordenar un dibujo a mano alzada ----------
 // Junta los bordes casi alineados (habitaciones y paredes que tendrían que
 // coincidir) y apoya puertas, ventanas y portones sobre la pared más cercana.
-const CROQUIS_ABERTURAS = ["puerta", "ventana", "corrediza", "porton_corredizo", "porton_batiente"];
+const CROQUIS_ABERTURAS = ["puerta", "paso", "ventana", "corrediza", "porton_corredizo", "porton_batiente"];
 function croquisOrdenar(elementos, tolerancia) {
   const tol = tolerancia || 16;
   const agrupar = (valores) => {

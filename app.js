@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.24.0";
+const APP_VERSION = "4.25.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -15758,7 +15758,7 @@ function cqElegirHerr(h) {
   cqEl("cqSimbolos").classList.toggle("hidden", !conPaleta);
   if (conPaleta) cqRenderPaleta();
   if (h !== "mover") cq.sel = null;
-  cqEl("cqAyuda").textContent = h === "simbolos" ? "Elegí un equipo de la lista." : h === "objetos" ? (cq.paleta === "mueble" ? "Elegí un mueble (es solo de referencia)." : "Elegí puerta, ventana, portón, escalera, columna, piscina o planta.") : (CQ_AYUDAS[h] || "");
+  cqEl("cqAyuda").textContent = h === "simbolos" ? "Elegí un equipo de la lista." : h === "objetos" ? (cq.paleta === "mueble" ? "Elegí un mueble (es solo de referencia)." : "Elegí puerta, paso (abertura sin puerta), ventana, portón, escalera, columna, piscina o planta.") : (CQ_AYUDAS[h] || "");
   cqRender();
 }
 document.querySelectorAll("#cqHerr button").forEach((b) => b.addEventListener("click", () => cqElegirHerr(b.dataset.herr)));
@@ -15805,7 +15805,7 @@ function cqRenderPaleta() {
   caja.querySelector("[data-repetir]").addEventListener("click", () => { cq.repetir = !cq.repetir; showToast(cq.repetir ? "Repetir: cada toque en el plano pone otro igual. Para terminar, tocá Mover." : "Repetir apagado."); cqRenderPaleta(); });
   caja.querySelectorAll("[data-sub]").forEach((b) => b.addEventListener("click", () => {
     cq.subObjetos = cq.paleta = b.dataset.sub;
-    cqEl("cqAyuda").textContent = cq.paleta === "mueble" ? "Elegí un mueble (es solo de referencia)." : "Elegí puerta, ventana, portón, escalera, columna, piscina o planta.";
+    cqEl("cqAyuda").textContent = cq.paleta === "mueble" ? "Elegí un mueble (es solo de referencia)." : "Elegí puerta, paso (abertura sin puerta), ventana, portón, escalera, columna, piscina o planta.";
     cqRenderPaleta();
     caja.scrollLeft = 0;
   }));

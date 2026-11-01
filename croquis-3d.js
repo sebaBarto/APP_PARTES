@@ -113,6 +113,39 @@ const Croquis3D = (() => {
     return mejor;
   }
 
+  // Las aberturas son huecos en la pared: para dibujarlas se corta la pared
+  // en todas. Para lo que ven los sensores solo se corta en los pasos (vanos
+  // sin puerta): una puerta puede estar cerrada y por el vidrio no se detecta.
+  function tramosAbertura(els, todas) {
+    return els.filter((e) => e.t === "simbolo" && CROQUIS_ABERTURAS.includes(e.tipo) && (todas || e.tipo === "paso")).map((e) => {
+      const w2 = (CROQUIS_ANCHO_ABERTURA[e.tipo] || 40) / 2;
+      const a = croquisLocalAMundo(e, -w2, 0), b = croquisLocalAMundo(e, w2, 0);
+      return [[M(a[0]), M(a[1])], [M(b[0]), M(b[1])]];
+    });
+  }
+  function cortarParedes(segs, huecos) {
+    let res = segs.slice();
+    huecos.forEach(([ha, hb]) => {
+      const sig = [];
+      res.forEach(([a, b]) => {
+        const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy);
+        if (L < 1e-6) return;
+        const ux = dx / L, uy = dy / L;
+        // El hueco tiene que estar sobre esta pared (cerca y casi paralelo).
+        const dist = (p) => Math.abs((p[0] - a[0]) * uy - (p[1] - a[1]) * ux);
+        const hx = hb[0] - ha[0], hy = hb[1] - ha[1], hl = Math.hypot(hx, hy) || 1;
+        if (dist(ha) > 0.2 || dist(hb) > 0.2 || Math.abs((hx * ux + hy * uy) / hl) < 0.9) { sig.push([a, b]); return; }
+        let t1 = (ha[0] - a[0]) * ux + (ha[1] - a[1]) * uy, t2 = (hb[0] - a[0]) * ux + (hb[1] - a[1]) * uy;
+        if (t1 > t2) [t1, t2] = [t2, t1];
+        if (t2 <= 0.01 || t1 >= L - 0.01) { sig.push([a, b]); return; }
+        if (t1 > 0.01) sig.push([a, [a[0] + ux * t1, a[1] + uy * t1]]);
+        if (t2 < L - 0.01) sig.push([[a[0] + ux * t2, a[1] + uy * t2], b]);
+      });
+      res = sig;
+    });
+    return res;
+  }
+
   function crear(contenedor, elementos, opciones) {
     const o = opciones || {};
     const ancho = () => contenedor.clientWidth || 600, alto = () => contenedor.clientHeight || 400;
@@ -154,16 +187,35 @@ const Croquis3D = (() => {
         }
       }
     });
+    // Paredes cortadas en las aberturas: para dibujar (todas) y para lo que
+    // ven los sensores (solo los pasos).
+    const paredesDibujo = cortarParedes(segmentos, tramosAbertura(els, true));
+    const sinPuertas = cortarParedes(segmentos, tramosAbertura(els, false));
+    segmentos.length = 0; sinPuertas.forEach((x) => segmentos.push(x));
     const altoParedes = () => (vista.paredesBajas ? 1.1 : ALTO);
     function armarParedes() {
       grupoParedes.children.filter((c) => c.userData.pared).forEach((c) => { grupoParedes.remove(c); c.geometry.dispose(); });
-      segmentos.forEach(([a, b]) => { const m = pared(a, b, altoParedes(), COLOR_PARED); if (m) grupoParedes.add(m); });
-      // Dinteles sobre las puertas (solo con paredes altas).
-      if (!vista.paredesBajas) els.filter((e) => e.t === "simbolo" && CROQUIS_ABERTURAS.includes(e.tipo)).forEach((e) => {
+      paredesDibujo.forEach(([a, b]) => { const m = pared(a, b, altoParedes(), COLOR_PARED); if (m) grupoParedes.add(m); });
+      els.filter((e) => e.t === "simbolo" && CROQUIS_ABERTURAS.includes(e.tipo)).forEach((e) => {
         const ancho2 = (CROQUIS_ANCHO_ABERTURA[e.tipo] || 40) / 2;
         const a = croquisLocalAMundo(e, -ancho2, 0), b = croquisLocalAMundo(e, ancho2, 0);
+        const A = pt(a[0], a[1]), B = pt(b[0], b[1]);
+        // Antepecho de la ventana (debajo) y vidrio.
+        if (e.tipo === "ventana") {
+          const m = pared(A, B, Math.min(1.0, altoParedes()), COLOR_PARED); if (m) grupoParedes.add(m);
+          if (!vista.paredesBajas) { const v = pared(A, B, 1.1, "#9CC7E0", 1.0); if (v) { v.material.transparent = true; v.material.opacity = 0.35; v.scale.z = 0.3; grupoParedes.add(v); } }
+        }
+        // Marco del paso (jambas y travesaño), para que se vea que es un vano.
+        if (e.tipo === "paso") {
+          const L = Math.hypot(B[0] - A[0], B[1] - A[1]) || 1, ux = (B[0] - A[0]) / L, uz = (B[1] - A[1]) / L, g = 0.06;
+          const alto = Math.min(ALTO_PUERTA, altoParedes());
+          [[A, [A[0] + ux * g, A[1] + uz * g]], [[B[0] - ux * g, B[1] - uz * g], B]].forEach(([p, q]) => { const j = pared(p, q, alto, "#B98C5A"); if (j) { j.scale.z = 1.5; grupoParedes.add(j); } });
+          if (!vista.paredesBajas) { const t = pared(A, B, 0.06, "#B98C5A", ALTO_PUERTA - 0.06); if (t) { t.scale.z = 1.5; grupoParedes.add(t); } }
+        }
+        // Dintel sobre la abertura (solo con paredes altas).
+        if (vista.paredesBajas) return;
         const desde = e.tipo === "ventana" ? 2.1 : e.tipo.startsWith("porton") ? 2.4 : ALTO_PUERTA;
-        const m = pared(pt(a[0], a[1]), pt(b[0], b[1]), ALTO - desde, COLOR_PARED, desde);
+        const m = pared(A, B, ALTO - desde, COLOR_PARED, desde);
         if (m) grupoParedes.add(m);
       });
     }
@@ -513,6 +565,8 @@ const Croquis3D = (() => {
       const a = croquisLocalAMundo(e, -w2, 0), b = croquisLocalAMundo(e, w2, 0), c = croquisLocalAMundo(e, 0, 0), n = croquisLocalAMundo(e, 0, 40);
       return { el: e, a: [M(a[0]), M(a[1])], b: [M(b[0]), M(b[1])], c: [M(c[0]), M(c[1])], n: norm([n[0] - c[0], n[1] - c[1]]) };
     });
+    // Los sensores ven a través de los pasos (vanos sin puerta).
+    { const cortadas = cortarParedes(paredes, tramosAbertura(els, false)); paredes.length = 0; cortadas.forEach((x) => paredes.push(x)); }
     // Intersección de p-q con a-b: parámetro sobre p-q (o null).
     const corte = (p, q, a, b) => {
       const rx = q[0] - p[0], ry = q[1] - p[1], sx = b[0] - a[0], sy = b[1] - a[1];
@@ -1010,7 +1064,7 @@ function iniciarVisor3D(datos, opciones) {
     let primera = null;
     const ok = visor.simular((ev) => {
       if (ev.tipo === "entra") {
-        const por = ev.entrada ? (ev.entrada.tipo === "ventana" ? "una ventana" : ev.entrada.tipo.startsWith("porton") ? "el portón" : "una puerta") : "afuera";
+        const por = ev.entrada ? (ev.entrada.tipo === "ventana" ? "una ventana" : ev.entrada.tipo.startsWith("porton") ? "el portón" : ev.entrada.tipo === "paso" ? "una abertura" : "una puerta") : "afuera";
         decir("Un intruso entra por " + por + (ev.protegida === false ? " que no tiene sensor…" : "…"));
       }
       if (ev.tipo === "detecta") {

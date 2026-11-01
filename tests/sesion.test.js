@@ -676,7 +676,7 @@ test("Vista 3D: el análisis ve qué parte de la casa cubre cada sensor, qué ab
     { id: "ir", t: "simbolo", tipo: "infrarrojo", x: 0, y: 0, rot: 180, esc: 1 },
   ];
   const a = ctx.C3.analizar(casa);
-  assert.ok(a.porcentaje >= 45 && a.porcentaje <= 55, "cubre el ambiente izquierdo: " + a.porcentaje);
+  assert.ok(a.porcentaje >= 45 && a.porcentaje <= 62, "cubre el ambiente izquierdo (y un poco por la puerta): " + a.porcentaje);
   const ext = a.aberturas.filter((x) => x.exterior).map((x) => [x.el.id, x.protegida]);
   assert.deepStrictEqual(ext.sort(), [["pe", true], ["ve", false]], "la puerta interna no cuenta; la ventana del ambiente vacío no tiene sensor");
   assert.deepStrictEqual(a.aberturasSinProteger.map((x) => x.el.id), ["ve"]);

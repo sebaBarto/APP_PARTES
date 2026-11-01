@@ -2207,7 +2207,7 @@ test("Croquis: cables con color y trazo, equipos de color, cámaras/DVR y objeto
   // Objetos de obra: la paleta muestra solo esos
   await page.click('[data-herr="objetos"]');
   const objetos = await page.$$eval("#cqSimbolos [data-simbolo]", (bs) => bs.map((b) => b.dataset.simbolo));
-  for (const k of ["puerta", "ventana", "corrediza", "columna", "columna_redonda", "porton_batiente", "porton_corredizo", "escalera_recta", "escalera_caracol", "logo_sat", "piscina", "planta", "reja", "arbol", "auto"]) assert.ok(objetos.includes(k), k);
+  for (const k of ["puerta", "paso", "ventana", "corrediza", "columna", "columna_redonda", "porton_batiente", "porton_corredizo", "escalera_recta", "escalera_caracol", "logo_sat", "piscina", "planta", "reja", "arbol", "auto"]) assert.ok(objetos.includes(k), k);
   await page.click('[data-simbolo="puerta"]');
   await clic(100, 100);
   await page.click('[data-acc="espejo"]');
@@ -3664,6 +3664,7 @@ test("Vista 3D pública (vista-3d.html): abre por id sin login y avisa si el lin
     await page.waitForSelector(".v3-lienzo canvas", { timeout: 20000 });
     assert.match(pedidoUrl, /publico=vista3d/);
     assert.strictEqual(await page.title(), "Casa Pérez — SAT");
+    await page.waitForSelector(".v3-pags button");
     assert.deepStrictEqual(await page.$$eval(".v3-pags button", (bs) => bs.map((b) => b.textContent)), ["PB", "PA"]);
     await page.click('.v3-pags [data-pag="1"]');
     assert.strictEqual(await page.$$eval(".v3-lienzo canvas", (c) => c.length), 1, "cambiar de planta no deja dos lienzos");
@@ -3855,6 +3856,42 @@ test("Vista 3D: al mandarla se puede sumar otra propuesta del mismo cliente para
     assert.deepStrictEqual(pedido.propuestas.map((p) => p.nombre), ["Básica", "Completa"]);
     assert.strictEqual(pedido.propuestas[1].paginas[0].elementos.length, CASA_B.length, "sin cables");
     assert.strictEqual(pedido.croquis_id, "actual1");
+    assert.deepStrictEqual(errores, []);
+    await ctx.close();
+  } finally { await nav.close(); }
+});
+
+test("Paso (abertura sin puerta): se pone desde Obra, se apoya en la pared y en el 3D corta la pared con su marco", async () => {
+  const nav = await navegador3D();
+  try {
+    const ctx = await nav.newContext({ serviceWorkers: "block" });
+    const page = await ctx.newPage();
+    const errores = [];
+    page.on("pageerror", (e) => errores.push(e.message));
+    await page.route("**/api/**", (r) => r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+    await page.goto(base + "/");
+    await page.waitForTimeout(400);
+    const casa = CASA_B.filter((e) => e.id !== "pi");
+    await page.evaluate((els) => { tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); cqAbrirEditor({ titulo: "Casa", elementos: els }); }, casa);
+    // Desde Obra: aparece en la paleta
+    await page.click('[data-herr="objetos"]');
+    assert.ok(await page.$('#cqSimbolos [data-simbolo="paso"]'), "está en Obra");
+    // Se apoya solo en la pared del medio (x = 200), girado como la pared
+    const el = await page.evaluate(() => { const e = { id: "pa", t: "simbolo", tipo: "paso", x: 192, y: 150, rot: 0, esc: 1 }; cq.elementos.push(e); cqImanSimbolo(e); cqRender(); return e; });
+    assert.strictEqual(el.x, 200);
+    assert.strictEqual(((el.rot % 180) + 180) % 180, 90);
+    const svg = await page.evaluate(() => croquisSvgElemento(cq.elementos.find((e) => e.id === "pa")));
+    assert.match(svg, /stroke-dasharray/, "se dibuja el vano (sin hoja de puerta)");
+    assert.doesNotMatch(svg, / A ?40 40/, "sin el arco de la puerta");
+    // 3D: la pared del medio queda cortada en el paso y se puede pasar
+    const a = await page.evaluate(() => Croquis3D.analizar(cq.elementos));
+    const sinPaso = await page.evaluate((els) => Croquis3D.analizar(els).porcentaje, casa);
+    assert.ok(a.porcentaje > sinPaso, "el sensor ve a través del paso: " + sinPaso + " → " + a.porcentaje);
+    await page.click("#cqMenuBtn");
+    await page.click('[data-m="ver3d"]');
+    await page.waitForSelector(".v3-capa canvas", { timeout: 20000 });
+    const paredes = await page.evaluate(() => window.__visor3d.visor.resumen.paredes);
+    assert.strictEqual(paredes, 6, "la del medio partida en el paso (las puertas no se cuentan: pueden estar cerradas)");
     assert.deepStrictEqual(errores, []);
     await ctx.close();
   } finally { await nav.close(); }
