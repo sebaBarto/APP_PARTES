@@ -2596,6 +2596,7 @@ test("Croquis: pared continua con quiebres y curva, elegir varios y soldarlos, v
   assert.strictEqual(await page.isVisible("#cqPaginas"), false, "con una sola página no hay barra de páginas");
   await page.click("#cqMenuBtn");
   await page.click('[data-m="pagina"]');
+  await page.click('[data-n="otra"]');
   assert.strictEqual(await page.evaluate(() => cq.elementos.length), 0, "página nueva vacía");
   assert.strictEqual(await page.isVisible("#cqPaginas"), true);
   await page.click('[data-herr="objetos"]');
@@ -3665,7 +3666,7 @@ test("Vista 3D pública (vista-3d.html): abre por id sin login y avisa si el lin
     assert.match(pedidoUrl, /publico=vista3d/);
     assert.strictEqual(await page.title(), "Casa Pérez — SAT");
     await page.waitForSelector(".v3-pags button");
-    assert.deepStrictEqual(await page.$$eval(".v3-pags button", (bs) => bs.map((b) => b.textContent)), ["PB", "PA"]);
+    assert.deepStrictEqual(await page.$$eval(".v3-pags button", (bs) => bs.map((b) => b.textContent)), ["Toda la casa", "PA", "PB"], "PB y PA se reconocen como plantas");
     await page.click('.v3-pags [data-pag="1"]');
     assert.strictEqual(await page.$$eval(".v3-lienzo canvas", (c) => c.length), 1, "cambiar de planta no deja dos lienzos");
     assert.strictEqual(await page.$('.v3-barra [data-a="cerrar"]'), null, "el cliente no tiene Cerrar");
@@ -3949,6 +3950,55 @@ test("Cercos: reja completa, reja con tapial y tejido perimetral se trazan como 
     await page.click('[data-m="ver3d"]');
     await page.waitForSelector(".v3-capa canvas", { timeout: 20000 });
     assert.strictEqual(await page.evaluate(() => window.__visor3d.visor.resumen.paredes), 0);
+    assert.deepStrictEqual(errores, []);
+    await ctx.close();
+  } finally { await nav.close(); }
+});
+
+test("Casa de dos plantas: la página nueva puede ser la planta alta (con la de abajo de fondo) y en el 3D se ve toda la casa o cada planta", async () => {
+  const nav = await navegador3D();
+  try {
+    const ctx = await nav.newContext({ serviceWorkers: "block" });
+    const page = await ctx.newPage();
+    const errores = [];
+    page.on("pageerror", (e) => errores.push(e.message));
+    await page.route("**/api/**", (r) => r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+    await page.goto(base + "/");
+    await page.waitForTimeout(400);
+    const pb = [...CASA_B, { id: "es", t: "simbolo", tipo: "escalera_recta", x: 340, y: 200, rot: 0, esc: 1 }];
+    await page.evaluate((els) => { tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); cqAbrirEditor({ titulo: "Casa", elementos: els }); }, pb);
+    await page.click("#cqMenuBtn");
+    await page.click('[data-m="pagina"]');
+    assert.match(await page.textContent(".cq-datos"), /Planta alta \(va arriba en el 3D\)/);
+    await page.click('[data-n="arriba"]');
+    const pags = await page.evaluate(() => cq.paginas.map((p) => [p.nombre, p.nivel]));
+    assert.deepStrictEqual(pags, [["Planta baja", 0], ["Planta alta", 1]]);
+    // De fondo, la planta baja (sin poder tocarla)
+    assert.ok(await page.$("#cqSvg .cq-calco line"), "se ve el calco de la planta baja");
+    // Dibujar algo en la planta alta: paredes y un sensor
+    await page.evaluate(() => { cq.elementos.push({ id: "a1", t: "linea", x1: 0, y1: 0, x2: 400, y2: 0 }, { id: "a2", t: "linea", x1: 400, y1: 0, x2: 400, y2: 300 }, { id: "a3", t: "linea", x1: 400, y1: 300, x2: 0, y2: 300 }, { id: "a4", t: "linea", x1: 0, y1: 300, x2: 0, y2: 0 }, { id: "a5", t: "simbolo", tipo: "infrarrojo", x: 0, y: 0, rot: 180, esc: 1, etq: "9" }); cqRender(); });
+    const datos = await page.evaluate(() => cq3dDatos());
+    assert.deepStrictEqual(datos.paginas.map((p) => p.nivel), [0, 1]);
+    // Cambiar desde las opciones de la página
+    await page.evaluate(() => cqOpcionesPagina());
+    await page.selectOption("[data-p-nivel]", "2");
+    assert.strictEqual(await page.evaluate(() => cq.paginas[1].nivel), 2);
+    await page.selectOption("[data-p-nivel]", "1");
+    await page.click('[data-p="cerrar"]');
+    // 3D: "Toda la casa" con las dos plantas, y cada planta por separado
+    await page.click("#cqMenuBtn");
+    await page.click('[data-m="ver3d"]');
+    await page.waitForSelector(".v3-capa canvas", { timeout: 20000 });
+    await page.waitForSelector(".v3-pags button");
+    assert.deepStrictEqual(await page.$$eval(".v3-pags button", (bs) => bs.map((b) => b.textContent)), ["Toda la casa", "Planta alta", "Planta baja"]);
+    assert.ok(await page.$eval('.v3-pags [data-pag="todo"]', (b) => b.classList.contains("on")));
+    assert.match(await page.textContent(".v3-ley"), /Cubre el \d+% de la casa/);
+    await page.click('.v3-pags [data-pag="1"]');
+    assert.match(await page.textContent(".v3-ley"), /de esta planta/);
+    // Editar desde "Toda la casa" pasa a una planta
+    await page.click('.v3-pags [data-pag="todo"]');
+    await page.click('.v3-barra [data-a="editar"]');
+    assert.ok(!(await page.$eval('.v3-pags [data-pag="todo"]', (b) => b.classList.contains("on"))));
     assert.deepStrictEqual(errores, []);
     await ctx.close();
   } finally { await nav.close(); }

@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.26.0";
+const APP_VERSION = "4.27.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -15626,7 +15626,7 @@ function cqSyncPagina() {
 // Todo el croquis (todas las páginas), para guardar y para el PDF.
 function cqDibujoCompleto() {
   cqSyncPagina();
-  const paginas = cq.paginas.map((p, i) => { const x = { nombre: p.nombre || `Página ${i + 1}`, elementos: p.elementos || [] }; const f = cqFondoLimpio(p.fondo); if (f) x.fondo = f; return x; });
+  const paginas = cq.paginas.map((p, i) => { const x = { nombre: p.nombre || `Página ${i + 1}`, elementos: p.elementos || [] }; const f = cqFondoLimpio(p.fondo); if (f) x.fondo = f; if (typeof p.nivel === "number" || p.nivel === null) x.nivel = p.nivel; return x; });
   const d = { v: 2, elementos: paginas[0].elementos, paginas };
   if (cq.medidas) d.medidas = true;
   if (paginas[0].fondo) d.fondo = paginas[0].fondo;
@@ -15683,6 +15683,18 @@ function cqCajaSel(el) {
   }
   return croquisCaja({ elementos: [el] });
 }
+// En una planta de arriba, la de abajo se ve de fondo (gris, sin tocar) para
+// dibujar las paredes en el mismo lugar.
+function cqCalcoPisoDeAbajo() {
+  if (!Array.isArray(cq.paginas) || cq.paginas.length < 2) return "";
+  const n = croquisNivelPagina(cq.paginas[cq.pagina]);
+  if (n == null || n === 0) return "";
+  const objetivo = n > 0 ? n - 1 : n + 1;
+  const base = cq.paginas.find((p, i) => i !== cq.pagina && croquisNivelPagina(p) === objetivo);
+  if (!base) return "";
+  const els = (base.elementos || []).filter((e) => e.t === "linea" || e.t === "rect" || (e.t === "simbolo" && (CROQUIS_SIMBOLOS[e.tipo] || {}).cat === "obra"));
+  return `<g class="cq-calco" opacity="0.22" pointer-events="none">${els.map((e) => { try { return croquisSvgElemento(e); } catch (er) { return ""; } }).join("")}</g>`;
+}
 function cqRender(opciones) {
   const { w, h } = cqTamLienzo();
   const v = cq.vista;
@@ -15706,6 +15718,7 @@ function cqRender(opciones) {
     <pattern id="cqGrilla5" width="${paso * 5}" height="${paso * 5}" patternUnits="userSpaceOnUse"><rect width="${paso * 5}" height="${paso * 5}" fill="url(#cqGrilla)"/><path d="M ${paso * 5} 0 L 0 0 0 ${paso * 5}" fill="none" stroke="#AFBBC6" stroke-width="${1.2 / Math.max(1, v.s * 0.8)}"/></pattern></defs>
     <rect x="${v.x - 5000}" y="${v.y - 5000}" width="${w / v.s + 10000}" height="${h / v.s + 10000}" fill="url(#cqGrilla5)" data-fondo="1"/>
     ${cq.fondo && cq.verFondo ? `<image href="${cq.fondo.local || "/api/foto?id=" + encodeURIComponent(cq.fondo.id)}" x="${cq.fondo.x}" y="${cq.fondo.y}" width="${cq.fondo.w}" height="${cq.fondo.h}" opacity="${cq.fondo.base ? 1 : 0.38}" preserveAspectRatio="none" pointer-events="none" class="cq-foto-fondo${cq.fondo.base ? " cq-plano-base" : ""}"/>` : ""}
+    ${cqCalcoPisoDeAbajo()}
     <g id="cqContenido">
     ${orden.map((el) => { try { return croquisSvgElemento(el, `data-id="${el.id}" class="cq-elem${el.id === cq.sel ? " cq-elegido" : ""}"`); } catch (e) { return ""; } }).join("")}
     ${cq.medidas ? croquisSvgMedidas(orden) : ""}
@@ -16597,11 +16610,48 @@ function cqIrPagina(i) {
   cq.sel = null; cq.multi = []; cq.cadena = null; cq.pasado = []; cq.futuro = [];
   cqVerTodo();
 }
-function cqNuevaPagina(nombre) {
+function cqNuevaPagina(nombre, nivel) {
   cqSyncPagina();
-  cq.paginas.push({ nombre: nombre || `Página ${cq.paginas.length + 1}`, elementos: [], fondo: null });
+  const p = { nombre: nombre || `Página ${cq.paginas.length + 1}`, elementos: [], fondo: null };
+  if (nivel !== undefined) p.nivel = nivel;
+  cq.paginas.push(p);
   cq.cambios = true;
   cqIrPagina(cq.paginas.length - 1);
+}
+// Agregar página: ¿es otra planta de la casa (va arriba o abajo) o algo aparte?
+function cqPreguntarNuevaPagina() {
+  cqSyncPagina();
+  const niveles = cq.paginas.map((p) => croquisNivelPagina(p)).filter((n) => n != null);
+  const arriba = niveles.length ? Math.max(...niveles) + 1 : 1, abajo = niveles.length ? Math.min(...niveles) - 1 : -1;
+  const capa = document.createElement("div");
+  capa.className = "cq-datos-capa";
+  capa.innerHTML = `<div class="cq-datos cq-menu">
+    <h3>Agregar una página</h3>
+    <button type="button" class="btn btn-primary" data-n="arriba">${cqIc("pagina")} ${CROQUIS_NOMBRE_NIVEL[arriba] || "Piso " + arriba} (va arriba en el 3D)</button>
+    <button type="button" class="btn btn-secondary" data-n="abajo">${abajo === -1 ? "Subsuelo" : "Piso " + abajo} (va abajo en el 3D)</button>
+    <button type="button" class="btn btn-secondary" data-n="otra">Otra página (un sector aparte, no es un piso)</button>
+    <p class="pe-nota">En la planta de arriba se ve de fondo, en gris, la de abajo: así se dibuja encima, con las paredes en el mismo lugar.</p>
+    <button type="button" class="link-btn" data-n="cerrar">Cancelar</button>
+  </div>`;
+  document.body.appendChild(capa);
+  capa.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-n]");
+    if (!b && e.target !== capa) return;
+    const n = b ? b.dataset.n : "cerrar";
+    capa.remove();
+    if (n === "cerrar") return;
+    // Si la primera página todavía no es un piso, pasa a ser la planta baja.
+    if (n !== "otra" && !niveles.length) {
+      const p0 = cq.paginas[cq.pagina];
+      p0.nivel = 0;
+      if (/^p[aá]gina \d+$/i.test(p0.nombre || "")) p0.nombre = "Planta baja";
+    }
+    if (n === "arriba") cqNuevaPagina(CROQUIS_NOMBRE_NIVEL[arriba] || "Piso " + arriba, arriba);
+    if (n === "abajo") cqNuevaPagina(abajo === -1 ? "Subsuelo" : "Piso " + abajo, abajo);
+    if (n === "otra") cqNuevaPagina(undefined, null);
+    cqGuardarBorrador();
+    showToast(n === "otra" ? "Página nueva. Volvés a las otras desde arriba." : "Planta nueva: de fondo ves la de abajo para dibujar encima.");
+  });
 }
 function cqRenderPaginas() {
   const box = cqEl("cqPaginas");
@@ -16611,7 +16661,7 @@ function cqRenderPaginas() {
   // Con una sola página no se muestra (se agregan desde el menú).
   box.classList.toggle("hidden", n <= 1);
   box.querySelectorAll("[data-pag]").forEach((b) => b.addEventListener("click", () => {
-    if (b.dataset.pag === "nueva") { cqNuevaPagina(); cqGuardarBorrador(); showToast("Página nueva. Volvés a las otras desde arriba."); return; }
+    if (b.dataset.pag === "nueva") { cqPreguntarNuevaPagina(); return; }
     const i = Number(b.dataset.pag);
     if (i !== cq.pagina) { cqIrPagina(i); return; }
     cqOpcionesPagina();
@@ -16624,18 +16674,24 @@ function cqOpcionesPagina() {
   capa.innerHTML = `<div class="cq-datos cq-menu">
     <h3>${escapeHtml(p.nombre || "Página")}</h3>
     <button type="button" class="btn btn-secondary" data-p="nombre">${cqIc("lapiz")} Cambiar el nombre (ej. Planta alta)</button>
+    <label class="cq3d-fila">En el 3D es: <select data-p-nivel>${[["", "No es un piso"], ["-1", "Subsuelo"], ["0", "Planta baja"], ["1", "Planta alta"], ["2", "2º piso"], ["3", "3º piso"]].map(([v, t]) => `<option value="${v}"${String(croquisNivelPagina(p) ?? "") === v ? " selected" : ""}>${t}</option>`).join("")}</select></label>
     <button type="button" class="btn btn-secondary" data-p="nueva">${cqIc("mas")} Agregar otra página</button>
     ${cq.paginas.length > 1 ? `<button type="button" class="btn btn-secondary cq-borrar" data-p="borrar">${cqIc("borrar")} Borrar esta página</button>` : ""}
     <button type="button" class="link-btn" data-p="cerrar">Cerrar</button>
   </div>`;
   document.body.appendChild(capa);
+  capa.querySelector("[data-p-nivel]").addEventListener("change", (ev) => {
+    const v = ev.target.value;
+    p.nivel = v === "" ? null : Number(v);
+    cq.cambios = true; cqGuardarBorrador(); cqRender();
+  });
   capa.addEventListener("click", (e) => {
     const b = e.target.closest("[data-p]");
     if (!b && e.target !== capa) return;
     const acc = b ? b.dataset.p : "cerrar";
     capa.remove();
     if (acc === "nombre") { const nuevo = prompt("Nombre de la página:", p.nombre || ""); if (nuevo !== null && nuevo.trim()) { p.nombre = nuevo.trim().slice(0, 40); cq.cambios = true; cqGuardarBorrador(); cqRender(); } }
-    if (acc === "nueva") { cqNuevaPagina(); cqGuardarBorrador(); }
+    if (acc === "nueva") cqPreguntarNuevaPagina();
     if (acc === "borrar" && confirm(`¿Borrar la página "${p.nombre}" con todo lo que tiene?`)) {
       cq.paginas.splice(cq.pagina, 1);
       cq.pagina = Math.max(0, cq.pagina - 1);
@@ -16860,7 +16916,7 @@ cqEl("cqMenuBtn").addEventListener("click", () => {
     if (m === "datos") cqPedirDatos();
     if (m === "foto") { cqFotoDestino = "editor"; cqEl("cqFotoInput").click(); }
     if (m === "camara") { cqFotoDestino = "editor"; cqEl("cqCamaraInput").click(); }
-    if (m === "pagina") { cqNuevaPagina(); cqGuardarBorrador(); }
+    if (m === "pagina") cqPreguntarNuevaPagina();
     if (m === "presu") cqPasarAPresupuesto();
     if (m === "base") cqElegirArchivo("image/*,application/pdf,.pdf,.svg").then((f) => f && cqPonerPlanoBase(f));
     if (m === "escala") cqEscalaPlano();
@@ -16953,7 +17009,7 @@ function cq3dDatos() {
   cqSyncPagina();
   cq.paginas.forEach((p) => (p.elementos || []).forEach((e) => { if (!e.id) e.id = cqId(); }));
   const d = cqDibujoCompleto();
-  const paginas = JSON.parse(JSON.stringify(d.paginas.map((p, idx) => ({ idx, nombre: d.paginas.length > 1 ? p.nombre : "", elementos: (p.elementos || []).filter((e) => !CQ_3D_FUERA.includes(e.t)) })))).filter((p) => p.elementos.length);
+  const paginas = JSON.parse(JSON.stringify(d.paginas.map((p, idx) => ({ idx, nombre: d.paginas.length > 1 ? p.nombre : "", nivel: d.paginas.length > 1 ? croquisNivelPagina(p) : null, elementos: (p.elementos || []).filter((e) => !CQ_3D_FUERA.includes(e.t)) })))).filter((p) => p.elementos.length);
   return { titulo: cq.titulo || "Tu sistema de seguridad", cliente: cq.cliente || "", paginas };
 }
 async function cqVer3D() {
@@ -16998,7 +17054,7 @@ async function cq3dPaginasDe(id) {
   if (!r.ok) throw new Error(c.error || "No se pudo abrir la otra propuesta");
   const dib = c.dibujo || {};
   const pp = Array.isArray(dib.paginas) && dib.paginas.length ? dib.paginas : [{ nombre: "", elementos: dib.elementos || [] }];
-  return pp.map((p) => ({ nombre: pp.length > 1 ? p.nombre || "" : "", elementos: (p.elementos || []).filter((e) => !CQ_3D_FUERA.includes(e.t)) })).filter((p) => p.elementos.length);
+  return pp.map((p) => ({ nombre: pp.length > 1 ? p.nombre || "" : "", nivel: pp.length > 1 ? croquisNivelPagina(p) : null, elementos: (p.elementos || []).filter((e) => !CQ_3D_FUERA.includes(e.t)) })).filter((p) => p.elementos.length);
 }
 function cqMandar3D(datos) {
   const capa = document.createElement("div");

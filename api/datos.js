@@ -450,7 +450,7 @@ async function manejarCroquis(req, res, autorizacion, body) {
       const permitidos = new Set(["linea", "rect", "simbolo", "texto", "abertura", "mueble"]);
       const limpiar = (els) => (Array.isArray(els) ? els : []).filter((e) => e && typeof e === "object" && permitidos.has(e.t)).slice(0, 3000);
       const limpiarPaginas = (pp) => (Array.isArray(pp) ? pp : []).slice(0, 8)
-        .map((pg) => ({ nombre: txt(pg && pg.nombre, 60), elementos: limpiar(pg && pg.elementos) }))
+        .map((pg) => ({ nombre: txt(pg && pg.nombre, 60), elementos: limpiar(pg && pg.elementos), ...(pg && Number.isInteger(pg.nivel) && Math.abs(pg.nivel) < 10 ? { nivel: pg.nivel } : {}) }))
         .filter((pg) => pg.elementos.length);
       const fuente = Array.isArray(b.propuestas) && b.propuestas.length ? b.propuestas : [{ nombre: "", paginas: Array.isArray(b.paginas) ? b.paginas : [{ nombre: "", elementos: b.elementos }] }];
       const propuestas = fuente.slice(0, 3).map((pr) => ({ nombre: txt(pr && pr.nombre, 40), paginas: limpiarPaginas(pr && pr.paginas) })).filter((pr) => pr.paginas.length);

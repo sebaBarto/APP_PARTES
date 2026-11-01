@@ -146,6 +146,69 @@ const Croquis3D = (() => {
     return res;
   }
 
+  // ---- Pisos de la casa ----
+  const LOSA = 0.2, ALTO_NIVEL = ALTO + LOSA; // un piso arriba del otro
+  // Escaleras: escalones macizos que suben hasta el piso de arriba.
+  function armarEscaleras(els, padre) {
+    const mat = new THREE.MeshLambertMaterial({ color: "#C9B79C" });
+    els.filter((e) => e.t === "simbolo" && CROQUIS_ESCALERA_CAJA[e.tipo]).forEach((e) => {
+      const esc = e.esc || 1, rot = -((e.rot || 0) * Math.PI / 180);
+      const pasos = []; // [lx, ly, ancho (x), largo (y), alto]
+      const tramo = (x0, x1, yDesde, yHasta, n, h0, h1) => { for (let i = 0; i < n; i++) { const t = (i + 0.5) / n; pasos.push([(x0 + x1) / 2, yDesde + (yHasta - yDesde) * t, Math.abs(x1 - x0), Math.abs(yHasta - yDesde) / n, h0 + (h1 - h0) * (i + 1) / n]); } };
+      const H = ALTO_NIVEL;
+      if (e.tipo === "escalera_recta") tramo(-20, 20, 50, -50, 16, 0, H);
+      else if (e.tipo === "escalera_u") {
+        tramo(-46, -6, 60, -20, 8, 0, H * 8 / 17);
+        pasos.push([0, -50, 92, 40, H * 9 / 17]);
+        tramo(6, 46, -20, 60, 8, H * 9 / 17, H);
+      } else if (e.tipo === "escalera_l_izq" || e.tipo === "escalera_l_der") {
+        const lado = e.tipo === "escalera_l_izq" ? -1 : 1, dx = -40 * lado;
+        tramo(-20 + dx, 20 + dx, 60, -20, 8, 0, H * 8 / 17);
+        pasos.push([dx, -50, 40, 40, H * 9 / 17]);
+        for (let i = 0; i < 8; i++) { const x = (20 + i * 10 + 5) * lado + dx; pasos.push([x, -50, 10, 40, H * (10 + i) / 17]); }
+      } else if (e.tipo === "escalera_caracol") {
+        for (let i = 0; i < 14; i++) {
+          const a = (90 - i * 24) * Math.PI / 180, top = H * (i + 1) / 14;
+          const m = new THREE.Mesh(new THREE.BoxGeometry(M(36 * esc), 0.06, M(16 * esc)), mat);
+          const c = croquisLocalAMundo(e, Math.cos(a) * 24, Math.sin(a) * 24);
+          m.position.set(M(c[0]), top - 0.03, M(c[1])); m.rotation.y = rot - a; padre.add(m);
+        }
+        const c0 = croquisLocalAMundo(e, 0, 0);
+        const poste = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, H, 10), new THREE.MeshLambertMaterial({ color: "#5B5F66" }));
+        poste.position.set(M(c0[0]), H / 2, M(c0[1])); padre.add(poste);
+        return;
+      }
+      pasos.forEach(([lx, ly, w, l, h]) => {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(M(w * esc), h, M(l * esc)), mat);
+        const c = croquisLocalAMundo(e, lx, ly);
+        m.position.set(M(c[0]), h / 2, M(c[1])); m.rotation.y = rot; padre.add(m);
+      });
+    });
+  }
+  // Losa de un piso de arriba: cubre lo que ocupa ese piso, con el hueco de
+  // las escaleras que suben desde el piso de abajo.
+  function armarLosa(paredes, abajo) {
+    if (!paredes.length) return null;
+    const c = croquisCaja({ elementos: paredes });
+    const forma = new THREE.Shape();
+    const x0 = M(c.x), z0 = M(c.y), x1 = M(c.x + c.w), z1 = M(c.y + c.h);
+    // La forma se dibuja en (x, -z) y se gira para quedar acostada.
+    forma.moveTo(x0, -z0); forma.lineTo(x1, -z0); forma.lineTo(x1, -z1); forma.lineTo(x0, -z1); forma.lineTo(x0, -z0);
+    abajo.filter((e) => e && e.t === "simbolo" && CROQUIS_ESCALERA_CAJA[e.tipo]).forEach((e) => {
+      const [a, b, cc, d] = CROQUIS_ESCALERA_CAJA[e.tipo];
+      const q = [[a, b], [cc, b], [cc, d], [a, d]].map(([x, y]) => croquisLocalAMundo(e, x, y)).map(([x, y]) => [M(x), -M(y)]);
+      const hueco = new THREE.Path();
+      // Sentido contrario al contorno.
+      const area = q.reduce((s, p, i) => s + p[0] * q[(i + 1) % 4][1] - q[(i + 1) % 4][0] * p[1], 0);
+      const pts = area > 0 ? q.slice().reverse() : q;
+      hueco.moveTo(...pts[0]); pts.slice(1).forEach((p) => hueco.lineTo(...p)); hueco.lineTo(...pts[0]);
+      forma.holes.push(hueco);
+    });
+    const geo = new THREE.ExtrudeGeometry(forma, { depth: LOSA, bevelEnabled: false });
+    const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: "#D8D3C8" }));
+    m.rotation.x = -Math.PI / 2; m.position.y = -LOSA;
+    return m;
+  }
   function crear(contenedor, elementos, opciones) {
     const o = opciones || {};
     const ancho = () => contenedor.clientWidth || 600, alto = () => contenedor.clientHeight || 400;
@@ -159,211 +222,278 @@ const Croquis3D = (() => {
     escena.add(new THREE.HemisphereLight(0xffffff, 0x8a8f96, 0.85));
     const sol = new THREE.DirectionalLight(0xffffff, 0.55); sol.position.set(-12, 25, 18); escena.add(sol);
 
-    const grupoParedes = new THREE.Group(), grupoEquipos = new THREE.Group(), grupoCobertura = new THREE.Group(), grupoCarteles = new THREE.Group();
-    escena.add(grupoParedes, grupoEquipos, grupoCobertura, grupoCarteles);
-    const segmentos = []; // paredes en metros, para apoyar los equipos
     const pt = (x, y) => [M(x), M(y)];
     const els = (elementos || []).filter((e) => e && !(o.ocultarAntes && e.prev));
-    // ---- Paredes ----
-    els.forEach((e) => {
-      if (croquisEsCerco(e)) return; // los cercos van aparte
-      if (e.t === "linea") {
-        if (Array.isArray(e.c)) {
-          let prev = pt(e.x1, e.y1);
-          for (let i = 1; i <= 12; i++) {
-            const t = i / 12, u = 1 - t;
-            const p = pt(u * u * e.x1 + 2 * u * t * e.c[0] + t * t * e.x2, u * u * e.y1 + 2 * u * t * e.c[1] + t * t * e.y2);
-            segmentos.push([prev, p]); prev = p;
-          }
-        } else segmentos.push([pt(e.x1, e.y1), pt(e.x2, e.y2)]);
-      } else if (e.t === "rect" && (!e.forma || e.forma === "rect")) {
-        const w = M(Math.abs(e.w)), h = M(Math.abs(e.h)), x = M(Math.min(e.x, e.x + e.w)), z = M(Math.min(e.y, e.y + e.h));
-        if (w * h < 1.5) {
-          // Rectángulo chico (mueble, tablero): una caja de 1 m.
-          const m = new THREE.Mesh(new THREE.BoxGeometry(w, 1, h), new THREE.MeshLambertMaterial({ color: e.color || "#8E949A" }));
-          m.position.set(x + w / 2, 0.5, z + h / 2); grupoParedes.add(m);
-        } else {
-          const p = [[x, z], [x + w, z], [x + w, z + h], [x, z + h]];
-          for (let i = 0; i < 4; i++) segmentos.push([p[i], p[(i + 1) % 4]]);
-        }
-      }
-    });
-    // Paredes cortadas en las aberturas: para dibujar (todas) y para lo que
-    // ven los sensores (solo los pasos).
-    const paredesEnteras = segmentos.slice();
-    const paredesDibujo = cortarParedes(segmentos, tramosAbertura(els, true));
-    const sinPuertas = cortarParedes(segmentos, tramosAbertura(els, false));
-    segmentos.length = 0; sinPuertas.forEach((x) => segmentos.push(x));
-    const altoParedes = () => (vista.paredesBajas ? 1.1 : ALTO);
-    function armarParedes() {
-      grupoParedes.children.filter((c) => c.userData.pared).forEach((c) => { grupoParedes.remove(c); c.geometry.dispose(); });
-      paredesDibujo.forEach(([a, b]) => { const m = pared(a, b, altoParedes(), COLOR_PARED); if (m) grupoParedes.add(m); });
-      els.filter((e) => e.t === "simbolo" && CROQUIS_ABERTURAS.includes(e.tipo)).forEach((e) => {
-        const ancho2 = (CROQUIS_ANCHO_ABERTURA[e.tipo] || 40) / 2;
-        const a = croquisLocalAMundo(e, -ancho2, 0), b = croquisLocalAMundo(e, ancho2, 0);
-        const A = pt(a[0], a[1]), B = pt(b[0], b[1]);
-        // Una abertura que no está en una pared (p. ej. un portón en la reja) no lleva dintel ni antepecho.
-        const pc = paredMasCercana((A[0] + B[0]) / 2, (A[1] + B[1]) / 2, paredesEnteras);
-        if (!pc || pc.d > 0.2) return;
-        // Antepecho de la ventana (debajo) y vidrio.
-        if (e.tipo === "ventana") {
-          const m = pared(A, B, Math.min(1.0, altoParedes()), COLOR_PARED); if (m) grupoParedes.add(m);
-          if (!vista.paredesBajas) { const v = pared(A, B, 1.1, "#9CC7E0", 1.0); if (v) { v.material.transparent = true; v.material.opacity = 0.35; v.scale.z = 0.3; grupoParedes.add(v); } }
-        }
-        // Marco del paso (jambas y travesaño), para que se vea que es un vano.
-        if (e.tipo === "paso") {
-          const L = Math.hypot(B[0] - A[0], B[1] - A[1]) || 1, ux = (B[0] - A[0]) / L, uz = (B[1] - A[1]) / L, g = 0.06;
-          const alto = Math.min(ALTO_PUERTA, altoParedes());
-          [[A, [A[0] + ux * g, A[1] + uz * g]], [[B[0] - ux * g, B[1] - uz * g], B]].forEach(([p, q]) => { const j = pared(p, q, alto, "#B98C5A"); if (j) { j.scale.z = 1.5; grupoParedes.add(j); } });
-          if (!vista.paredesBajas) { const t = pared(A, B, 0.06, "#B98C5A", ALTO_PUERTA - 0.06); if (t) { t.scale.z = 1.5; grupoParedes.add(t); } }
-        }
-        // Dintel sobre la abertura (solo con paredes altas).
-        if (vista.paredesBajas) return;
-        const desde = e.tipo === "ventana" ? 2.1 : e.tipo.startsWith("porton") ? 2.4 : ALTO_PUERTA;
-        const m = pared(A, B, ALTO - desde, COLOR_PARED, desde);
-        if (m) grupoParedes.add(m);
-      });
-    }
-    // ---- Piso ----
-    const caja = croquisCaja({ elementos: els });
-    const cx = M(caja.x + caja.w / 2), cz = M(caja.y + caja.h / 2), lado = Math.max(M(caja.w), M(caja.h), 4);
-    const piso = new THREE.Mesh(new THREE.PlaneGeometry(M(caja.w) + 2, M(caja.h) + 2), new THREE.MeshLambertMaterial({ color: COLOR_PISO }));
-    piso.rotation.x = -Math.PI / 2; piso.position.set(cx, 0, cz); escena.add(piso);
-    const grilla = new THREE.GridHelper(Math.ceil(lado + 2), Math.ceil(lado + 2), 0xb5ad9f, 0xb5ad9f);
-    grilla.position.set(cx, 0.005, cz); grilla.material.transparent = true; grilla.material.opacity = 0.35; escena.add(grilla);
-
-    // ---- Cercos perimetrales (reja, reja con tapial, tejido) ----
-    const grupoCercos = new THREE.Group();
-    escena.add(grupoCercos);
-    let texTejido = null;
-    els.filter(croquisEsCerco).forEach((e) => {
-      const def = CROQUIS_CERCOS[e.cerco];
-      const color = e.cerco === "tejido" ? 0x5f6b63 : 0x2b2f33;
-      const tramos = croquisCercoPuntos(e, 8).pts.map((p) => [M(p.x), M(p.y)]);
-      const desde = def.tapial || 0, alto = def.alto - desde;
-      // Tramo a tramo (así sigue también las curvas).
-      const largoTotal = [];
-      for (let i = 1; i < tramos.length; i++) largoTotal.push([tramos[i - 1], tramos[i]]);
-      largoTotal.forEach(([a, b]) => {
-        if (def.tapial) { const t = pared(a, b, def.tapial, "#B7B1A6"); if (t) { t.scale.z = 1.6; grupoCercos.add(t); } }
-        const l = Math.hypot(b[0] - a[0], b[1] - a[1]);
-        if (l < 0.01) return;
-        const ang = -Math.atan2(b[1] - a[1], b[0] - a[0]);
-        // Caños de arriba y abajo.
-        [desde + 0.05, desde + alto - 0.03].forEach((y) => {
-          const r = new THREE.Mesh(new THREE.BoxGeometry(l, 0.04, 0.04), new THREE.MeshLambertMaterial({ color }));
-          r.position.set((a[0] + b[0]) / 2, y, (a[1] + b[1]) / 2); r.rotation.y = ang; grupoCercos.add(r);
-        });
-        if (e.cerco === "tejido") {
-          if (!texTejido) {
-            const cv = document.createElement("canvas"); cv.width = cv.height = 64;
-            const g = cv.getContext("2d"); g.strokeStyle = "rgba(70,80,74,0.9)"; g.lineWidth = 3;
-            g.beginPath(); g.moveTo(0, 0); g.lineTo(64, 64); g.moveTo(64, 0); g.lineTo(0, 64); g.stroke();
-            texTejido = new THREE.CanvasTexture(cv); texTejido.wrapS = texTejido.wrapT = THREE.RepeatWrapping;
-          }
-          const tx = texTejido.clone(); tx.needsUpdate = true; tx.repeat.set(l / 0.12, alto / 0.12);
-          const malla = new THREE.Mesh(new THREE.PlaneGeometry(l, alto), new THREE.MeshBasicMaterial({ map: tx, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
-          malla.position.set((a[0] + b[0]) / 2, desde + alto / 2, (a[1] + b[1]) / 2); malla.rotation.y = ang; grupoCercos.add(malla);
-        }
-      });
-      // Barrotes (reja) o postes (tejido), en una sola malla instanciada.
-      const sep = e.cerco === "tejido" ? 2.5 : 0.12;
-      const pts = croquisCercoPuntos(e, sep * CROQUIS_POR_METRO).pts;
-      const geo = e.cerco === "tejido" ? new THREE.CylinderGeometry(0.035, 0.035, alto + 0.1, 8) : new THREE.BoxGeometry(0.018, alto, 0.018);
-      const inst = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ color }), pts.length);
-      const mtx = new THREE.Matrix4();
-      pts.forEach((p, i) => { mtx.makeTranslation(M(p.x), desde + alto / 2, M(p.y)); inst.setMatrixAt(i, mtx); });
-      grupoCercos.add(inst);
-    });
-
-    // ---- Puertas (hoja abierta) ----
-    els.filter((e) => e.t === "simbolo" && e.tipo === "puerta").forEach((e) => {
-      const bis = croquisLocalAMundo(e, -20, 0), punta = croquisLocalAMundo(e, -20, -40);
-      const a = pt(bis[0], bis[1]), b = pt(punta[0], punta[1]);
-      const m = pared(a, b, ALTO_PUERTA - 0.02, "#B98C5A");
-      if (m) { m.scale.z = 0.35; m.userData.pared = false; grupoParedes.add(m); }
-    });
-
-    // ---- Equipos ----
-    const opac = (e) => (e.prev ? 0.35 : 1);
-    els.filter((e) => e.t === "simbolo" && CROQUIS_SIMBOLOS[e.tipo] && CROQUIS_SIMBOLOS[e.tipo].cat === "equipo").forEach((e) => {
-      const def = CROQUIS_SIMBOLOS[e.tipo];
-      const p3 = EQUIPOS[e.tipo] || { h: 1.5, caja: [0.12, 0.12, 0.06], color: e.color || def.color, pared: true };
-      const color = def.ir ? (e.color || def.color) : (p3.color || e.color || def.color);
-      const mat = new THREE.MeshLambertMaterial({ color, transparent: !!e.prev, opacity: opac(e), emissive: e.inst ? 0x553300 : 0x000000 });
-      let x, z, h = p3.h, obj;
-      if (def.ir) {
-        // El vértice de captación es la esquina donde va el sensor.
-        const ap = croquisLocalAMundo(e, 0, 0); [x, z] = pt(ap[0], ap[1]); h = ALTO_SENSOR;
-        obj = new THREE.Mesh(new THREE.BoxGeometry(0.09 * AUMENTO, 0.12 * AUMENTO, 0.07 * AUMENTO), mat);
-        obj.position.set(x, h, z);
-        const { ang, doble } = croquisIRParams(e, def);
-        const total = Math.min(359, doble ? ang * 2 : ang);
-        const arco = [];
-        const pasos = Math.max(12, Math.round(total / 3));
-        const alcance = ALCANCE_REAL[e.tipo] || 10;
-        for (let i = 0; i <= pasos; i++) {
-          const g = (CROQUIS_IR_BIS - total / 2 + total * i / pasos) * Math.PI / 180;
-          // Dirección del rayo en el plano (con el giro y espejado del equipo).
-          const w = croquisLocalAMundo(e, Math.cos(g) * 100, Math.sin(g) * 100), w0 = croquisLocalAMundo(e, 0, 0);
-          const dx = w[0] - w0[0], dz = w[1] - w0[1], n = Math.hypot(dx, dz) || 1;
-          arco.push(rayo([x, z], [dx / n, dz / n], alcance, segmentos));
-        }
-        const s = sector([x, z], h, arco, 0.02, e.tipo === "infrarrojo" ? 0xe00000 : 0x7b4b94, e.prev ? 0.05 : 0.11);
-        grupoCobertura.add(s);
-      } else {
-        [x, z] = pt(e.x, e.y);
-        if (p3.disco) {
-          obj = new THREE.Mesh(new THREE.CylinderGeometry(p3.disco * AUMENTO, p3.disco * AUMENTO, 0.05, 24), mat);
-          obj.position.set(x, h, z);
-        } else {
-          obj = new THREE.Mesh(new THREE.BoxGeometry(...p3.caja.map((v) => v * AUMENTO)), mat);
-          const pc = p3.pared ? paredMasCercana(x, z, segmentos) : null;
-          if (pc && pc.d < 0.6) {
-            // Apoyado contra la pared, del lado donde está dibujado.
-            const n = Math.hypot(pc.nx, pc.nz) || 1;
-            obj.position.set(pc.px + pc.nx / n * (ESPESOR / 2 + p3.caja[2] * AUMENTO / 2), h, pc.pz + pc.nz / n * (ESPESOR / 2 + p3.caja[2] * AUMENTO / 2));
-            obj.rotation.y = -pc.ang;
-          } else obj.position.set(x, h, z);
-        }
-        if (p3.camara) {
-          const ang = 80, alc = 15, giro = ((e.rot || 0) - 90) * Math.PI / 180, arco = [];
-          for (let i = 0; i <= 26; i++) { const g = giro - (ang / 2) * Math.PI / 180 + (ang * Math.PI / 180) * i / 26; arco.push(rayo([x, z], [Math.cos(g), Math.sin(g)], alc, segmentos)); }
-          grupoCobertura.add(sector([x, z], h, arco, 0.02, 0x2e86de, e.prev ? 0.04 : 0.08));
-        }
-      }
-      obj.userData.equipo = e;
-      grupoEquipos.add(obj);
-      const etq = String(e.etq || "").trim();
-      if (etq) {
-        const c = cartel(etq, e.inst ? "#E8741E" : color);
-        c.position.set(obj.position.x, Math.min(ALTO + 0.35, h + 0.3), obj.position.z);
-        c.material.opacity = e.prev ? 0.5 : 1;
-        c.userData.equipo = e;
-        grupoCarteles.add(c);
-      }
-      if (e.inst) {
-        // A instalar: aro naranja en el piso debajo.
-        const aro = new THREE.Mesh(new THREE.RingGeometry(0.18, 0.24, 24), new THREE.MeshBasicMaterial({ color: 0xe8741e, side: THREE.DoubleSide }));
-        aro.rotation.x = -Math.PI / 2; aro.position.set(obj.position.x, 0.02, obj.position.z); aro.userData.de = e; grupoEquipos.add(aro);
-      }
-    });
-
-    // ---- Cámara y controles ----
     const vista = { paredesBajas: !!o.paredesBajas, cobertura: o.cobertura !== false, debiles: !!o.debiles };
-    grupoCobertura.visible = vista.cobertura;
-    armarParedes();
+    const cuadro = []; // cosas que se animan en cada cuadro
+    const fantasma = (g) => g.traverse((c) => { if (c.material) { c.material.transparent = true; c.material.opacity = 0.16; c.material.depthWrite = false; c.material.needsUpdate = true; } });
+    // ---- Un piso de la casa: paredes, aberturas, cercos, equipos, coberturas
+    // y puntos débiles, dentro de "padre" (a la altura de ese piso).
+    // nv: { suelo (el de abajo: piso y grilla), abajo (elementos del piso de
+    // abajo, para el hueco de la escalera en la losa), fantasma (solo paredes,
+    // transparentes) }.
+    function construirNivel(els, padre, nv) {
+      const grupoParedes = new THREE.Group(), grupoEquipos = new THREE.Group(), grupoCobertura = new THREE.Group(), grupoCarteles = new THREE.Group();
+      padre.add(grupoParedes, grupoEquipos, grupoCobertura, grupoCarteles);
+      const segmentos = []; // paredes en metros, para apoyar los equipos
+      // ---- Paredes ----
+      els.forEach((e) => {
+        if (croquisEsCerco(e)) return; // los cercos van aparte
+        if (e.t === "linea") {
+          if (Array.isArray(e.c)) {
+            let prev = pt(e.x1, e.y1);
+            for (let i = 1; i <= 12; i++) {
+              const t = i / 12, u = 1 - t;
+              const p = pt(u * u * e.x1 + 2 * u * t * e.c[0] + t * t * e.x2, u * u * e.y1 + 2 * u * t * e.c[1] + t * t * e.y2);
+              segmentos.push([prev, p]); prev = p;
+            }
+          } else segmentos.push([pt(e.x1, e.y1), pt(e.x2, e.y2)]);
+        } else if (e.t === "rect" && (!e.forma || e.forma === "rect")) {
+          const w = M(Math.abs(e.w)), h = M(Math.abs(e.h)), x = M(Math.min(e.x, e.x + e.w)), z = M(Math.min(e.y, e.y + e.h));
+          if (w * h < 1.5) {
+            // Rectángulo chico (mueble, tablero): una caja de 1 m.
+            const m = new THREE.Mesh(new THREE.BoxGeometry(w, 1, h), new THREE.MeshLambertMaterial({ color: e.color || "#8E949A" }));
+            m.position.set(x + w / 2, 0.5, z + h / 2); grupoParedes.add(m);
+          } else {
+            const p = [[x, z], [x + w, z], [x + w, z + h], [x, z + h]];
+            for (let i = 0; i < 4; i++) segmentos.push([p[i], p[(i + 1) % 4]]);
+          }
+        }
+      });
+      // Paredes cortadas en las aberturas: para dibujar (todas) y para lo que
+      // ven los sensores (solo los pasos).
+      const paredesEnteras = segmentos.slice();
+      const paredesDibujo = cortarParedes(segmentos, tramosAbertura(els, true));
+      const sinPuertas = cortarParedes(segmentos, tramosAbertura(els, false));
+      segmentos.length = 0; sinPuertas.forEach((x) => segmentos.push(x));
+      const altoParedes = () => (vista.paredesBajas ? 1.1 : ALTO);
+      function armarParedes() {
+        grupoParedes.children.filter((c) => c.userData.pared).forEach((c) => { grupoParedes.remove(c); c.geometry.dispose(); });
+        paredesDibujo.forEach(([a, b]) => { const m = pared(a, b, altoParedes(), COLOR_PARED); if (m) grupoParedes.add(m); });
+          els.filter((e) => e.t === "simbolo" && CROQUIS_ABERTURAS.includes(e.tipo)).forEach((e) => {
+          const ancho2 = (CROQUIS_ANCHO_ABERTURA[e.tipo] || 40) / 2;
+          const a = croquisLocalAMundo(e, -ancho2, 0), b = croquisLocalAMundo(e, ancho2, 0);
+          const A = pt(a[0], a[1]), B = pt(b[0], b[1]);
+          // Una abertura que no está en una pared (p. ej. un portón en la reja) no lleva dintel ni antepecho.
+          const pc = paredMasCercana((A[0] + B[0]) / 2, (A[1] + B[1]) / 2, paredesEnteras);
+          if (!pc || pc.d > 0.2) return;
+          // Antepecho de la ventana (debajo) y vidrio.
+          if (e.tipo === "ventana") {
+            const m = pared(A, B, Math.min(1.0, altoParedes()), COLOR_PARED); if (m) grupoParedes.add(m);
+            if (!vista.paredesBajas) { const v = pared(A, B, 1.1, "#9CC7E0", 1.0); if (v) { v.material.transparent = true; v.material.opacity = 0.35; v.scale.z = 0.3; grupoParedes.add(v); } }
+          }
+          // Marco del paso (jambas y travesaño), para que se vea que es un vano.
+          if (e.tipo === "paso") {
+            const L = Math.hypot(B[0] - A[0], B[1] - A[1]) || 1, ux = (B[0] - A[0]) / L, uz = (B[1] - A[1]) / L, g = 0.06;
+            const alto = Math.min(ALTO_PUERTA, altoParedes());
+            [[A, [A[0] + ux * g, A[1] + uz * g]], [[B[0] - ux * g, B[1] - uz * g], B]].forEach(([p, q]) => { const j = pared(p, q, alto, "#B98C5A"); if (j) { j.scale.z = 1.5; grupoParedes.add(j); } });
+            if (!vista.paredesBajas) { const t = pared(A, B, 0.06, "#B98C5A", ALTO_PUERTA - 0.06); if (t) { t.scale.z = 1.5; grupoParedes.add(t); } }
+          }
+          // Dintel sobre la abertura (solo con paredes altas).
+          if (vista.paredesBajas) return;
+          const desde = e.tipo === "ventana" ? 2.1 : e.tipo.startsWith("porton") ? 2.4 : ALTO_PUERTA;
+          const m = pared(A, B, ALTO - desde, COLOR_PARED, desde);
+          if (m) grupoParedes.add(m);
+        });
+        if (nv.fantasma) fantasma(grupoParedes);
+      }
+      // ---- Piso (el de abajo de todo) o losa (los pisos de arriba) ----
+      const caja = croquisCaja({ elementos: els.length ? els : [{ t: "rect", x: 0, y: 0, w: 160, h: 160 }] });
+      if (nv.suelo) {
+        const cx = M(caja.x + caja.w / 2), cz = M(caja.y + caja.h / 2), lado = Math.max(M(caja.w), M(caja.h), 4);
+        const piso = new THREE.Mesh(new THREE.PlaneGeometry(M(caja.w) + 2, M(caja.h) + 2), new THREE.MeshLambertMaterial({ color: COLOR_PISO }));
+        piso.rotation.x = -Math.PI / 2; piso.position.set(cx, 0, cz); padre.add(piso);
+        const grilla = new THREE.GridHelper(Math.ceil(lado + 2), Math.ceil(lado + 2), 0xb5ad9f, 0xb5ad9f);
+        grilla.position.set(cx, 0.005, cz); grilla.material.transparent = true; grilla.material.opacity = 0.35; padre.add(grilla);
+      } else {
+        const losa = armarLosa(els.filter((e) => !croquisEsCerco(e) && (e.t === "linea" || e.t === "rect")), nv.abajo || []);
+        if (losa) { padre.add(losa); if (nv.fantasma) fantasma(losa); }
+      }
+      armarEscaleras(els, padre);
+
+      // ---- Cercos perimetrales (reja, reja con tapial, tejido) ----
+      const grupoCercos = new THREE.Group();
+      padre.add(grupoCercos);
+      let texTejido = null;
+      els.filter(croquisEsCerco).forEach((e) => {
+        const def = CROQUIS_CERCOS[e.cerco];
+        const color = e.cerco === "tejido" ? 0x5f6b63 : 0x2b2f33;
+        const tramos = croquisCercoPuntos(e, 8).pts.map((p) => [M(p.x), M(p.y)]);
+        const desde = def.tapial || 0, alto = def.alto - desde;
+        // Tramo a tramo (así sigue también las curvas).
+        const largoTotal = [];
+        for (let i = 1; i < tramos.length; i++) largoTotal.push([tramos[i - 1], tramos[i]]);
+        largoTotal.forEach(([a, b]) => {
+          if (def.tapial) { const t = pared(a, b, def.tapial, "#B7B1A6"); if (t) { t.scale.z = 1.6; grupoCercos.add(t); } }
+          const l = Math.hypot(b[0] - a[0], b[1] - a[1]);
+          if (l < 0.01) return;
+          const ang = -Math.atan2(b[1] - a[1], b[0] - a[0]);
+          // Caños de arriba y abajo.
+          [desde + 0.05, desde + alto - 0.03].forEach((y) => {
+            const r = new THREE.Mesh(new THREE.BoxGeometry(l, 0.04, 0.04), new THREE.MeshLambertMaterial({ color }));
+            r.position.set((a[0] + b[0]) / 2, y, (a[1] + b[1]) / 2); r.rotation.y = ang; grupoCercos.add(r);
+          });
+          if (e.cerco === "tejido") {
+            if (!texTejido) {
+              const cv = document.createElement("canvas"); cv.width = cv.height = 64;
+              const g = cv.getContext("2d"); g.strokeStyle = "rgba(70,80,74,0.9)"; g.lineWidth = 3;
+              g.beginPath(); g.moveTo(0, 0); g.lineTo(64, 64); g.moveTo(64, 0); g.lineTo(0, 64); g.stroke();
+              texTejido = new THREE.CanvasTexture(cv); texTejido.wrapS = texTejido.wrapT = THREE.RepeatWrapping;
+            }
+            const tx = texTejido.clone(); tx.needsUpdate = true; tx.repeat.set(l / 0.12, alto / 0.12);
+            const malla = new THREE.Mesh(new THREE.PlaneGeometry(l, alto), new THREE.MeshBasicMaterial({ map: tx, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
+            malla.position.set((a[0] + b[0]) / 2, desde + alto / 2, (a[1] + b[1]) / 2); malla.rotation.y = ang; grupoCercos.add(malla);
+          }
+        });
+        // Barrotes (reja) o postes (tejido), en una sola malla instanciada.
+        const sep = e.cerco === "tejido" ? 2.5 : 0.12;
+        const pts = croquisCercoPuntos(e, sep * CROQUIS_POR_METRO).pts;
+        const geo = e.cerco === "tejido" ? new THREE.CylinderGeometry(0.035, 0.035, alto + 0.1, 8) : new THREE.BoxGeometry(0.018, alto, 0.018);
+        const inst = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ color }), pts.length);
+        const mtx = new THREE.Matrix4();
+        pts.forEach((p, i) => { mtx.makeTranslation(M(p.x), desde + alto / 2, M(p.y)); inst.setMatrixAt(i, mtx); });
+        grupoCercos.add(inst);
+      });
+
+      // ---- Puertas (hoja abierta) ----
+      els.filter((e) => e.t === "simbolo" && e.tipo === "puerta").forEach((e) => {
+        const bis = croquisLocalAMundo(e, -20, 0), punta = croquisLocalAMundo(e, -20, -40);
+        const a = pt(bis[0], bis[1]), b = pt(punta[0], punta[1]);
+        const m = pared(a, b, ALTO_PUERTA - 0.02, "#B98C5A");
+        if (m) { m.scale.z = 0.35; m.userData.pared = false; grupoParedes.add(m); }
+      });
+
+      // ---- Equipos ----
+      const opac = (e) => (e.prev ? 0.35 : 1);
+      els.filter((e) => e.t === "simbolo" && CROQUIS_SIMBOLOS[e.tipo] && CROQUIS_SIMBOLOS[e.tipo].cat === "equipo").forEach((e) => {
+        const def = CROQUIS_SIMBOLOS[e.tipo];
+        const p3 = EQUIPOS[e.tipo] || { h: 1.5, caja: [0.12, 0.12, 0.06], color: e.color || def.color, pared: true };
+        const color = def.ir ? (e.color || def.color) : (p3.color || e.color || def.color);
+        const mat = new THREE.MeshLambertMaterial({ color, transparent: !!e.prev, opacity: opac(e), emissive: e.inst ? 0x553300 : 0x000000 });
+        let x, z, h = p3.h, obj;
+        if (def.ir) {
+          // El vértice de captación es la esquina donde va el sensor.
+          const ap = croquisLocalAMundo(e, 0, 0); [x, z] = pt(ap[0], ap[1]); h = ALTO_SENSOR;
+          obj = new THREE.Mesh(new THREE.BoxGeometry(0.09 * AUMENTO, 0.12 * AUMENTO, 0.07 * AUMENTO), mat);
+          obj.position.set(x, h, z);
+          const { ang, doble } = croquisIRParams(e, def);
+          const total = Math.min(359, doble ? ang * 2 : ang);
+          const arco = [];
+          const pasos = Math.max(12, Math.round(total / 3));
+          const alcance = ALCANCE_REAL[e.tipo] || 10;
+          for (let i = 0; i <= pasos; i++) {
+            const g = (CROQUIS_IR_BIS - total / 2 + total * i / pasos) * Math.PI / 180;
+            // Dirección del rayo en el plano (con el giro y espejado del equipo).
+            const w = croquisLocalAMundo(e, Math.cos(g) * 100, Math.sin(g) * 100), w0 = croquisLocalAMundo(e, 0, 0);
+            const dx = w[0] - w0[0], dz = w[1] - w0[1], n = Math.hypot(dx, dz) || 1;
+            arco.push(rayo([x, z], [dx / n, dz / n], alcance, segmentos));
+          }
+          const s = sector([x, z], h, arco, 0.02, e.tipo === "infrarrojo" ? 0xe00000 : 0x7b4b94, e.prev ? 0.05 : 0.11);
+          grupoCobertura.add(s);
+        } else {
+          [x, z] = pt(e.x, e.y);
+          if (p3.disco) {
+            obj = new THREE.Mesh(new THREE.CylinderGeometry(p3.disco * AUMENTO, p3.disco * AUMENTO, 0.05, 24), mat);
+            obj.position.set(x, h, z);
+          } else {
+            obj = new THREE.Mesh(new THREE.BoxGeometry(...p3.caja.map((v) => v * AUMENTO)), mat);
+            const pc = p3.pared ? paredMasCercana(x, z, segmentos) : null;
+            if (pc && pc.d < 0.6) {
+              // Apoyado contra la pared, del lado donde está dibujado.
+              const n = Math.hypot(pc.nx, pc.nz) || 1;
+              obj.position.set(pc.px + pc.nx / n * (ESPESOR / 2 + p3.caja[2] * AUMENTO / 2), h, pc.pz + pc.nz / n * (ESPESOR / 2 + p3.caja[2] * AUMENTO / 2));
+              obj.rotation.y = -pc.ang;
+            } else obj.position.set(x, h, z);
+          }
+          if (p3.camara) {
+            const ang = 80, alc = 15, giro = ((e.rot || 0) - 90) * Math.PI / 180, arco = [];
+            for (let i = 0; i <= 26; i++) { const g = giro - (ang / 2) * Math.PI / 180 + (ang * Math.PI / 180) * i / 26; arco.push(rayo([x, z], [Math.cos(g), Math.sin(g)], alc, segmentos)); }
+            grupoCobertura.add(sector([x, z], h, arco, 0.02, 0x2e86de, e.prev ? 0.04 : 0.08));
+          }
+        }
+        obj.userData.equipo = e;
+        grupoEquipos.add(obj);
+        const etq = String(e.etq || "").trim();
+        if (etq) {
+          const c = cartel(etq, e.inst ? "#E8741E" : color);
+          c.position.set(obj.position.x, Math.min(ALTO + 0.35, h + 0.3), obj.position.z);
+          c.material.opacity = e.prev ? 0.5 : 1;
+          c.userData.equipo = e;
+          grupoCarteles.add(c);
+        }
+        if (e.inst) {
+          // A instalar: aro naranja en el piso debajo.
+          const aro = new THREE.Mesh(new THREE.RingGeometry(0.18, 0.24, 24), new THREE.MeshBasicMaterial({ color: 0xe8741e, side: THREE.DoubleSide }));
+          aro.rotation.x = -Math.PI / 2; aro.position.set(obj.position.x, 0.02, obj.position.z); aro.userData.de = e; grupoEquipos.add(aro);
+        }
+      });
+
+      // ---- Puntos débiles: lo que no cubre ningún sensor y aberturas sin sensor ----
+      const an = nv.fantasma ? null : analizar(els);
+      const grupoDebiles = new THREE.Group();
+      padre.add(grupoDebiles);
+      if (an) {
+        const cv = document.createElement("canvas"); cv.width = cv.height = 64;
+        const g = cv.getContext("2d");
+        g.fillStyle = "rgba(255,176,32,0.35)"; g.fillRect(0, 0, 64, 64);
+        g.strokeStyle = "rgba(214,120,0,0.85)"; g.lineWidth = 7;
+        for (let k = -64; k <= 64; k += 32) { g.beginPath(); g.moveTo(k, 64); g.lineTo(k + 64, 0); g.stroke(); }
+        const tex = new THREE.CanvasTexture(cv);
+        const pos = [], uv = [], c = an.celda / 2;
+        for (let k = 0; k < an.nx * an.ny; k++) if (an.interior[k] && !an.cubierto[k]) {
+          const [x, z] = an.centro(k % an.nx, Math.floor(k / an.nx));
+          pos.push(x - c, 0.018, z - c, x + c, 0.018, z + c, x + c, 0.018, z - c, x - c, 0.018, z - c, x - c, 0.018, z + c, x + c, 0.018, z + c);
+          uv.push(0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1);
+        }
+        if (pos.length) {
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+          geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+          grupoDebiles.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthWrite: false })));
+        }
+        // Aberturas que dan afuera sin sensor: marco rojo que late y un "!".
+        an.aberturasSinProteger.forEach((ab) => {
+          const largo = Math.hypot(ab.b[0] - ab.a[0], ab.b[1] - ab.a[1]);
+          const alto = ab.el.tipo === "ventana" ? 1.1 : 2.05, desde = ab.el.tipo === "ventana" ? 1.0 : 0;
+          const m = new THREE.Mesh(new THREE.BoxGeometry(largo, alto, 0.05), new THREE.MeshBasicMaterial({ color: 0xff2d20, transparent: true, opacity: 0.55, depthWrite: false }));
+          m.position.set((ab.a[0] + ab.b[0]) / 2, desde + alto / 2, (ab.a[1] + ab.b[1]) / 2);
+          m.rotation.y = -Math.atan2(ab.b[1] - ab.a[1], ab.b[0] - ab.a[0]);
+          grupoDebiles.add(m);
+          const aviso = cartel("!", "#FF2D20"); aviso.scale.set(0.6, 0.3, 1); aviso.position.set(m.position.x, desde + alto + 0.45, m.position.z);
+          grupoDebiles.add(aviso);
+          cuadro.push((t) => { m.material.opacity = 0.3 + 0.3 * (1 + Math.sin(t / 220)) / 2; });
+        });
+      }
+  
+      if (nv.fantasma) { grupoEquipos.visible = grupoCobertura.visible = grupoCarteles.visible = grupoDebiles.visible = false; fantasma(grupoCercos); }
+      return { grupoParedes, grupoEquipos, grupoCobertura, grupoCarteles, grupoDebiles, segmentos, armarParedes, caja, an, fantasma: !!nv.fantasma };
+    }
+    // El piso activo (el que se edita, simula, etc.) y los otros pisos.
+    const altura = o.altura || 0;
+    const mundo = new THREE.Group(); mundo.position.y = altura; escena.add(mundo);
+    const extras = (o.niveles || []).map((n) => { const g = new THREE.Group(); g.position.y = n.altura || 0; escena.add(g); return construirNivel((n.elementos || []).filter(Boolean), g, { suelo: !!n.suelo, abajo: n.abajo, fantasma: n.modo === "fantasma" }); });
+    const activo = construirNivel(els, mundo, { suelo: o.suelo !== false && !altura ? true : !!o.suelo, abajo: o.abajo });
+    const { grupoParedes, grupoEquipos, grupoCobertura, grupoCarteles, grupoDebiles, segmentos, armarParedes, an } = activo;
+    const todos = [activo, ...extras];
+    // Encuadre: todo lo que se ve.
+    const cajas = todos.filter((n) => !n.fantasma || true).map((n) => n.caja);
+    const x0 = Math.min(...cajas.map((c) => c.x)), y0 = Math.min(...cajas.map((c) => c.y)), x1 = Math.max(...cajas.map((c) => c.x + c.w)), y1 = Math.max(...cajas.map((c) => c.y + c.h));
+    const cx = M((x0 + x1) / 2), cz = M((y0 + y1) / 2), lado = Math.max(M(x1 - x0), M(y1 - y0), 4);
+    const alturaMax = Math.max(altura, ...(o.niveles || []).map((n) => n.altura || 0));
+    const centroY = o.todaLaCasa ? (alturaMax + ALTO) / 2 : altura;
+    // ---- Cámara y controles ----
+    todos.forEach((n) => { if (!n.fantasma) { n.grupoCobertura.visible = vista.cobertura; n.grupoDebiles.visible = vista.debiles; } n.armarParedes(); });
     const controles = new THREE.OrbitControls(camara, renderer.domElement);
-    controles.target.set(cx, 0, cz);
+    controles.target.set(cx, centroY, cz);
     controles.maxPolarAngle = Math.PI / 2 - 0.05;
     controles.minDistance = 2; controles.maxDistance = lado * 4;
     controles.enableDamping = true;
     function vistaInicial(arriba) {
       // En el celular (pantalla angosta) se aleja para que entre la casa entera.
       const f = Math.min(2.2, Math.max(1, 0.85 / (ancho() / Math.max(1, alto()))));
-      if (arriba) camara.position.set(cx, lado * 1.75 * f, cz + 0.01);
-      else camara.position.set(cx - lado * 0.55 * f, lado * 0.85 * f, cz + lado * 0.95 * f);
-      controles.target.set(cx, 0, cz);
+      if (arriba) camara.position.set(cx, centroY + lado * 1.75 * f, cz + 0.01);
+      else camara.position.set(cx - lado * 0.55 * f, centroY + lado * 0.85 * f, cz + lado * 0.95 * f);
+      controles.target.set(cx, centroY, cz);
       controles.update();
     }
     vistaInicial(false);
@@ -371,7 +501,7 @@ const Croquis3D = (() => {
     // Toque corto (no arrastre): qué equipo o qué punto del piso se tocó.
     // Sirve para editar desde el 3D (agregar, mover, sacar equipos).
     const marca = new THREE.Mesh(new THREE.RingGeometry(0.3, 0.4, 32), new THREE.MeshBasicMaterial({ color: 0xf2c94c, side: THREE.DoubleSide, depthTest: false, transparent: true }));
-    marca.rotation.x = -Math.PI / 2; marca.renderOrder = 12; marca.visible = false; escena.add(marca);
+    marca.rotation.x = -Math.PI / 2; marca.renderOrder = 12; marca.visible = false; mundo.add(marca);
     let toque = null;
     const lienzo = renderer.domElement;
     const alBajar = (ev) => { toque = { x: ev.clientX, y: ev.clientY, t: Date.now(), n: (toque && Date.now() - toque.t < 400 ? toque.n : 0) + 1 }; };
@@ -385,56 +515,18 @@ const Croquis3D = (() => {
       ray.setFromCamera(new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1), camara);
       const golpes = ray.intersectObjects([...grupoEquipos.children, ...grupoCarteles.children], false).filter((g) => g.object.userData.equipo || g.object.userData.de);
       const piso0 = new THREE.Vector3();
-      const enPiso = ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), piso0) ? [piso0.x * CROQUIS_POR_METRO, piso0.z * CROQUIS_POR_METRO] : null;
+      const enPiso = ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -altura), piso0) ? [piso0.x * CROQUIS_POR_METRO, piso0.z * CROQUIS_POR_METRO] : null;
       const eq = golpes.length ? (golpes[0].object.userData.equipo || golpes[0].object.userData.de) : null;
       o.alTocar({ equipo: eq, punto: enPiso });
     };
     lienzo.addEventListener("pointerdown", alBajar);
     lienzo.addEventListener("pointerup", alSubir);
-    // ---- Puntos débiles: lo que no cubre ningún sensor y aberturas sin sensor ----
-    const an = analizar(els);
-    const grupoDebiles = new THREE.Group();
-    escena.add(grupoDebiles);
-    const cuadro = []; // cosas que se animan en cada cuadro
-    if (an) {
-      const cv = document.createElement("canvas"); cv.width = cv.height = 64;
-      const g = cv.getContext("2d");
-      g.fillStyle = "rgba(255,176,32,0.35)"; g.fillRect(0, 0, 64, 64);
-      g.strokeStyle = "rgba(214,120,0,0.85)"; g.lineWidth = 7;
-      for (let k = -64; k <= 64; k += 32) { g.beginPath(); g.moveTo(k, 64); g.lineTo(k + 64, 0); g.stroke(); }
-      const tex = new THREE.CanvasTexture(cv);
-      const pos = [], uv = [], c = an.celda / 2;
-      for (let k = 0; k < an.nx * an.ny; k++) if (an.interior[k] && !an.cubierto[k]) {
-        const [x, z] = an.centro(k % an.nx, Math.floor(k / an.nx));
-        pos.push(x - c, 0.018, z - c, x + c, 0.018, z + c, x + c, 0.018, z - c, x - c, 0.018, z - c, x - c, 0.018, z + c, x + c, 0.018, z + c);
-        uv.push(0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1);
-      }
-      if (pos.length) {
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-        geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
-        grupoDebiles.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthWrite: false })));
-      }
-      // Aberturas que dan afuera sin sensor: marco rojo que late y un "!".
-      an.aberturasSinProteger.forEach((ab) => {
-        const largo = Math.hypot(ab.b[0] - ab.a[0], ab.b[1] - ab.a[1]);
-        const alto = ab.el.tipo === "ventana" ? 1.1 : 2.05, desde = ab.el.tipo === "ventana" ? 1.0 : 0;
-        const m = new THREE.Mesh(new THREE.BoxGeometry(largo, alto, 0.05), new THREE.MeshBasicMaterial({ color: 0xff2d20, transparent: true, opacity: 0.55, depthWrite: false }));
-        m.position.set((ab.a[0] + ab.b[0]) / 2, desde + alto / 2, (ab.a[1] + ab.b[1]) / 2);
-        m.rotation.y = -Math.atan2(ab.b[1] - ab.a[1], ab.b[0] - ab.a[0]);
-        grupoDebiles.add(m);
-        const aviso = cartel("!", "#FF2D20"); aviso.scale.set(0.6, 0.3, 1); aviso.position.set(m.position.x, desde + alto + 0.45, m.position.z);
-        grupoDebiles.add(aviso);
-        cuadro.push((t) => { m.material.opacity = 0.3 + 0.3 * (1 + Math.sin(t / 220)) / 2; });
-      });
-    }
-    grupoDebiles.visible = vista.debiles;
     // ---- Simulación de un intruso ----
     let sim = null;
     const malla = (id) => grupoEquipos.children.find((c) => c.userData.equipo && c.userData.equipo.id === id);
     function pararSimulacion() {
       if (!sim) return;
-      escena.remove(sim.figura);
+      mundo.remove(sim.figura);
       sim.figura.traverse((c) => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
       sim.encendidos.forEach((m) => { m.material.emissive.setHex(m.userData.emisivoOriginal); });
       sim = null;
@@ -450,7 +542,7 @@ const Croquis3D = (() => {
       const cabeza = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 12), piel); cabeza.position.y = 1.72; figura.add(cabeza);
       const piernas = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.12, 0.42, 12), piel); piernas.position.y = 0.21; figura.add(piernas);
       const sombra = new THREE.Mesh(new THREE.CircleGeometry(0.3, 20), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.25 })); sombra.rotation.x = -Math.PI / 2; sombra.position.y = 0.015; figura.add(sombra);
-      escena.add(figura);
+      mundo.add(figura);
       // Largo acumulado del recorrido, para avanzar a velocidad pareja.
       const acum = [0];
       for (let i = 1; i < r.puntos.length; i++) acum.push(acum[i - 1] + Math.hypot(r.puntos[i][0] - r.puntos[i - 1][0], r.puntos[i][1] - r.puntos[i - 1][1]));
@@ -501,16 +593,16 @@ const Croquis3D = (() => {
       const e = m.userData.equipo;
       if (!enCamara) enCamara = { p: camara.position.clone(), t: controles.target.clone(), fov: camara.fov, bajas: vista.paredesBajas, cob: grupoCobertura.visible, carteles: grupoCarteles.visible, deb: grupoDebiles.visible };
       const giro = ((e.rot || 0) - 90) * Math.PI / 180, dir = [Math.cos(giro), Math.sin(giro)];
-      if (vista.paredesBajas) { vista.paredesBajas = false; armarParedes(); }
+      if (vista.paredesBajas) { vista.paredesBajas = false; todos.forEach((n) => n.armarParedes()); }
       grupoCobertura.visible = false; grupoCarteles.visible = false; grupoDebiles.visible = false; m.visible = false;
-      const h = m.position.y - 0.05;
+      const h = m.position.y + altura - 0.05;
       camara.position.set(m.position.x + dir[0] * 0.2, h, m.position.z + dir[1] * 0.2);
       // 80° de ancho; en el celular parado se limita para que no se deforme.
       const asp = ancho() / alto();
       camara.fov = Math.min(95, 2 * Math.atan(Math.tan(40 * Math.PI / 180) / asp) * 180 / Math.PI);
       camara.updateProjectionMatrix();
       controles.enabled = false;
-      controles.target.set(m.position.x + dir[0] * 5, Math.max(0.3, h - 1.9), m.position.z + dir[1] * 5);
+      controles.target.set(m.position.x + dir[0] * 5, Math.max(altura + 0.3, h - 1.9), m.position.z + dir[1] * 5);
       camara.lookAt(controles.target);
       enCamara.malla = m;
       return true;
@@ -518,7 +610,7 @@ const Croquis3D = (() => {
     function salirCamara() {
       if (!enCamara) return;
       camara.position.copy(enCamara.p); controles.target.copy(enCamara.t); camara.fov = enCamara.fov; camara.updateProjectionMatrix();
-      if (enCamara.bajas !== vista.paredesBajas) { vista.paredesBajas = enCamara.bajas; armarParedes(); }
+      if (enCamara.bajas !== vista.paredesBajas) { vista.paredesBajas = enCamara.bajas; todos.forEach((n) => n.armarParedes()); }
       grupoCobertura.visible = enCamara.cob; grupoCarteles.visible = enCamara.carteles; grupoDebiles.visible = enCamara.deb; enCamara.malla.visible = true;
       controles.enabled = true; enCamara = null; controles.update();
     }
@@ -536,9 +628,9 @@ const Croquis3D = (() => {
     return {
       vista,
       alternar(que) {
-        if (que === "cobertura") { vista.cobertura = !vista.cobertura; grupoCobertura.visible = vista.cobertura; }
-        if (que === "paredes") { vista.paredesBajas = !vista.paredesBajas; armarParedes(); }
-        if (que === "debiles") { vista.debiles = !vista.debiles; grupoDebiles.visible = vista.debiles; }
+        if (que === "cobertura") { vista.cobertura = !vista.cobertura; todos.forEach((n) => { if (!n.fantasma) n.grupoCobertura.visible = vista.cobertura; }); }
+        if (que === "paredes") { vista.paredesBajas = !vista.paredesBajas; todos.forEach((n) => n.armarParedes()); }
+        if (que === "debiles") { vista.debiles = !vista.debiles; todos.forEach((n) => { if (!n.fantasma) n.grupoDebiles.visible = vista.debiles; }); }
         if (que === "arriba" || que === "inicio") salirCamara();
         if (que === "arriba") vistaInicial(true);
         if (que === "inicio") vistaInicial(false);
@@ -552,7 +644,7 @@ const Croquis3D = (() => {
       captura() { renderer.render(escena, camara); return renderer.domElement.toDataURL("image/png"); },
       // Punto del plano (unidades del croquis, a h metros) -> lugar en la pantalla.
       aPantalla(ux, uy, h) {
-        const v = new THREE.Vector3(M(ux), h || 0, M(uy)).project(camara);
+        const v = new THREE.Vector3(M(ux), (h || 0) + altura, M(uy)).project(camara);
         const r = renderer.domElement.getBoundingClientRect();
         return [r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height];
       },
@@ -854,7 +946,7 @@ const Croquis3D = (() => {
     el.x = Math.round(px); el.y = Math.round(py);
     return el;
   }
-  return { crear, cargar, disponible, ubicar, analizar };
+  return { crear, cargar, disponible, ubicar, analizar, ALTO_NIVEL };
 })();
 
 // ---------- Visor para el cliente ----------
@@ -965,6 +1057,21 @@ function iniciarVisor3D(datos, opciones) {
     <div class="v3-pie"><div class="v3-aviso hidden"></div><div class="v3-hoja hidden"></div><div class="v3-props hidden"></div><div class="v3-barra"></div></div>`);
   const lienzo = raiz.querySelector(".v3-lienzo"), ley = raiz.querySelector(".v3-ley"), barra = raiz.querySelector(".v3-barra"), aviso = raiz.querySelector(".v3-aviso"), hoja = raiz.querySelector(".v3-hoja"), propsEl = raiz.querySelector(".v3-props"), pagsEl = raiz.querySelector(".v3-pags");
   let editando = false, sel = null, moviendo = null, visor = null, debiles = !!o.debiles, avisoTimer = null;
+  // Casa de varias plantas: las páginas que son pisos se ven una arriba de la otra.
+  const pisosDe = () => paginas.map((p, i) => ({ i, nivel: croquisNivelPagina(p) })).filter((x) => x.nivel != null).sort((a, b) => a.nivel - b.nivel);
+  let todo = pisosDe().length >= 2;
+  if (todo) pag = pisosDe()[0].i;
+  const opcionesPisos = () => {
+    const pisos = pisosDe();
+    if (pisos.length < 2) return {};
+    const min = pisos[0].nivel, altura = (n) => (n - min) * Croquis3D.ALTO_NIVEL;
+    const actual = pisos.find((x) => x.i === pag);
+    if (!actual) return {};
+    const abajoDe = (n) => { const b = pisos.find((x) => x.nivel === n - 1); return b ? paginas[b.i].elementos : []; };
+    if (todo) return { altura: altura(actual.nivel), suelo: actual.nivel === min, todaLaCasa: true, niveles: pisos.filter((x) => x.i !== pag).map((x) => ({ elementos: paginas[x.i].elementos, altura: altura(x.nivel), suelo: x.nivel === min, abajo: abajoDe(x.nivel), modo: "completo" })) };
+    // Un piso solo: los de abajo como referencia (transparentes); los de arriba no se ven.
+    return { altura: altura(actual.nivel), suelo: actual.nivel === min, abajo: abajoDe(actual.nivel), niveles: pisos.filter((x) => x.nivel < actual.nivel).map((x) => ({ elementos: paginas[x.i].elementos, altura: altura(x.nivel), suelo: x.nivel === min, abajo: abajoDe(x.nivel), modo: "fantasma" })) };
+  };
   const pila = [];
   // % cubierto de cada propuesta (de todas sus plantas juntas).
   const cobertura = (pr) => {
@@ -978,7 +1085,12 @@ function iniciarVisor3D(datos, opciones) {
   };
   const pintarPags = () => {
     pagsEl.classList.toggle("hidden", paginas.length < 2);
-    pagsEl.innerHTML = paginas.map((p, i) => `<button type="button" data-pag="${i}" class="${i === pag ? "on" : ""}">${esc(p.nombre || "Planta " + (i + 1))}</button>`).join("");
+    const pisos = pisosDe();
+    const nombre = (p, i) => esc(p.nombre || (croquisNivelPagina(p) != null ? CROQUIS_NOMBRE_NIVEL[croquisNivelPagina(p)] || "Piso" : "Planta " + (i + 1)));
+    // Con varias plantas: "Toda la casa" y los pisos de arriba hacia abajo.
+    const orden = pisos.length >= 2 ? [...pisos.slice().reverse().map((x) => x.i), ...paginas.map((p, i) => i).filter((i) => !pisos.some((x) => x.i === i))] : paginas.map((p, i) => i);
+    pagsEl.innerHTML = (pisos.length >= 2 ? `<button type="button" data-pag="todo" class="${todo ? "on" : ""}">Toda la casa</button>` : "") +
+      orden.map((i) => `<button type="button" data-pag="${i}" class="${!todo && i === pag ? "on" : ""}">${nombre(paginas[i], i)}</button>`).join("");
   };
   const pintarLeyenda = () => {
     const todos = paginas.flatMap((p) => p.elementos);
@@ -992,7 +1104,7 @@ function iniciarVisor3D(datos, opciones) {
     const abiertas = an ? an.aberturasSinProteger.length : 0;
     const abierto = ley.open;
     ley.innerHTML = `<summary>Qué se instala</summary>
-      ${an && an.porcentaje != null ? `<p class="v3-cubre">Cubre el ${an.porcentaje}% de ${paginas.length > 1 ? "esta planta" : "la casa"}</p>` : ""}
+      ${todo && cobertura(propuestas[prop]) ? `<p class="v3-cubre">Cubre el ${cobertura(propuestas[prop]).pct}% de la casa</p>` : an && an.porcentaje != null ? `<p class="v3-cubre">Cubre el ${an.porcentaje}% de ${paginas.length > 1 ? "esta planta" : "la casa"}</p>` : ""}
       ${abiertas ? `<p class="v3-mal">${abiertas === 1 ? "1 abertura que da afuera no tiene sensor" : abiertas + " aberturas que dan afuera no tienen sensor"}</p>` : ""}
       <ul>${Object.entries(cuenta).map(([k, v]) => `<li><i style="background:${v.color}"></i>${v.n} × ${esc(k)}</li>`).join("")}
       <li><i style="background:rgba(224,0,0,.35)"></i>Zona que cubre cada sensor</li>
@@ -1018,16 +1130,16 @@ function iniciarVisor3D(datos, opciones) {
     const v = visor ? visor.vista : {};
     const cam = mantenerCamara && visor && !visor.enCamara ? visor.estadoCamara() : null;
     if (visor) visor.destruir();
-    visor = Croquis3D.crear(lienzo, paginas[pag].elementos, { paraCaptura: o.paraCaptura, paredesBajas: v.paredesBajas, cobertura: v.cobertura, debiles, camaraInicial: cam, alTocar: tocar });
+    visor = Croquis3D.crear(lienzo, paginas[pag].elementos, { paraCaptura: o.paraCaptura, paredesBajas: v.paredesBajas, cobertura: v.cobertura, debiles, camaraInicial: cam, alTocar: tocar, ...opcionesPisos() });
     if (sel) visor.marcar(sel.id);
   };
   const cerrarHoja = () => { hoja.classList.add("hidden"); hoja.innerHTML = ""; hoja.onclick = null; sel = null; if (visor) visor.marcar(null); };
-  const todo = () => { armar(true); pintarLeyenda(); pintarBarra(); pintarProps(); };
+  const repintar = () => { armar(true); pintarLeyenda(); pintarBarra(); pintarProps(); };
   const cambiar = (fn) => {
     pila.push({ pag, els: JSON.stringify(paginas[pag].elementos) });
     if (pila.length > 60) pila.shift();
     fn(paginas[pag].elementos);
-    todo();
+    repintar();
     ed.alCambiar(paginas[pag].idx, JSON.parse(JSON.stringify(paginas[pag].elementos)));
   };
   const siguienteZona = () => {
@@ -1174,12 +1286,15 @@ function iniciarVisor3D(datos, opciones) {
   armar(false); pintarLeyenda(); pintarBarra(); pintarProps(); pintarPags();
   pagsEl.addEventListener("click", (ev) => {
     const b = ev.target.closest("[data-pag]"); if (!b) return;
-    pag = Number(b.dataset.pag); moviendo = null; cerrarHoja(); armar(false); pintarLeyenda(); pintarPags(); pintarBarra();
+    if (b.dataset.pag === "todo") { todo = true; pag = pisosDe()[0].i; } else { todo = false; pag = Number(b.dataset.pag); }
+    if (todo && editando) { editando = false; moviendo = null; ley.classList.remove("hidden"); }
+    moviendo = null; cerrarHoja(); armar(false); pintarLeyenda(); pintarPags(); pintarBarra();
     decir(editando ? textoEdicion() : "");
   });
   propsEl.addEventListener("click", (ev) => {
     const b = ev.target.closest("[data-prop]"); if (!b) return;
     prop = Number(b.dataset.prop); paginas = propuestas[prop].paginas; pag = Math.min(pag, paginas.length - 1);
+    if (pisosDe().length >= 2) { todo = true; pag = pisosDe()[0].i; } else todo = false;
     cerrarHoja(); decir(""); armar(true);
     pintarLeyenda(); pintarProps(); pintarPags(); pintarBarra();
   });
@@ -1193,6 +1308,7 @@ function iniciarVisor3D(datos, opciones) {
     if (a === "vista") { hojaVista(); return; }
     if (a === "llamar") { hojaLlamar(); return; }
     if (a === "debiles") { debiles = !debiles; visor.alternar("debiles"); b.classList.toggle("on", debiles); return; }
+    if (a === "editar" && todo) { todo = false; pintarPags(); armar(false); decir("Editás la " + (paginas[pag].nombre || "planta baja").toLowerCase() + ". Para otra planta, elegila a la izquierda.", false, 4); }
     if (a === "editar") { visor.pararSimulacion(); editando = true; ley.classList.add("hidden"); if (!visor.vista.paredesBajas) visor.alternar("paredes"); cerrarHoja(); pintarBarra(); pintarProps(); decir(textoEdicion()); return; }
     if (a === "listo") { editando = false; moviendo = null; ley.classList.remove("hidden"); cerrarHoja(); decir(""); pintarBarra(); pintarProps(); return; }
     if (a === "deshacer") {

@@ -16,7 +16,7 @@
 //   simbolo { tipo, x, y, rot, esc, color?, esp? }  equipos y objetos de obra
 
 // Tiene que ser igual a APP_VERSION de app.js (si no, la app recarga).
-const CROQUIS_UTILS_VERSION = "4.26.0";
+const CROQUIS_UTILS_VERSION = "4.27.0";
 const CROQUIS_GRILLA = 20;
 
 // Cada símbolo se dibuja centrado en 0,0 con dib(color). "cat" separa los
@@ -1372,6 +1372,31 @@ function croquisDesdeIACompleto(r, W, H) {
 // ---------- Ordenar un dibujo a mano alzada ----------
 // Junta los bordes casi alineados (habitaciones y paredes que tendrían que
 // coincidir) y apoya puertas, ventanas y portones sobre la pared más cercana.
+// Plantas de una casa: cada página puede ser un piso (nivel 0 = planta baja,
+// 1 = planta alta, -1 = subsuelo...). Si no se marcó, se adivina por el nombre.
+// null = no es un piso (otra cosa: un sector aparte, un detalle).
+function croquisNivelPagina(p) {
+  if (!p) return null;
+  if (typeof p.nivel === "number" && isFinite(p.nivel)) return p.nivel;
+  if (p.nivel === null || p.nivel === false) return null;
+  const n = String(p.nombre || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  if (/subsuelo|sotano/.test(n)) return -1;
+  if (/planta\s*baja|\bpb\b/.test(n)) return 0;
+  if (/segundo|2do|2º|piso\s*2|2\s*piso/.test(n)) return 2;
+  if (/tercer|3er|piso\s*3/.test(n)) return 3;
+  if (/planta\s*alta|\bpa\b|primer|1er|piso\s*1|alta/.test(n)) return 1;
+  return null;
+}
+const CROQUIS_NOMBRE_NIVEL = { "-1": "Subsuelo", 0: "Planta baja", 1: "Planta alta", 2: "2º piso", 3: "3º piso" };
+// Escaleras: dónde ocupan lugar (para el hueco en la losa de arriba), en
+// coordenadas locales del símbolo.
+const CROQUIS_ESCALERA_CAJA = {
+  escalera_recta: [-20, -60, 20, 60],
+  escalera_l_izq: [-60, -70, 60, 70],
+  escalera_l_der: [-60, -70, 60, 70],
+  escalera_u: [-46, -70, 46, 70],
+  escalera_caracol: [-42, -42, 42, 42],
+};
 // Cercos perimetrales: se dibujan con la herramienta Pared, pero no son
 // paredes de la casa (no cierran ambientes ni tapan sensores).
 const CROQUIS_CERCOS = {
