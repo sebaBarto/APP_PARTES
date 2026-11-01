@@ -3696,7 +3696,7 @@ test("Vista 3D: se edita desde el 3D (agregar en la esquina con zona, mover, gir
     await page.click('[data-m="ver3d"]');
     await page.waitForSelector(".v3-capa canvas", { timeout: 20000 });
     await page.click('.v3-barra [data-a="editar"]');
-    assert.match(await page.textContent(".v3-aviso"), /Tocá un ambiente/);
+    assert.match(await page.textContent(".v3-aviso"), /Arrastrá un equipo de abajo/);
     const tocar = async (ux, uy, h) => { const [x, y] = await page.evaluate(([a, b, c]) => document.querySelector(".v3-capa").__v.aPantalla(a, b, c), [ux, uy, h]); await page.mouse.click(x, y); };
     await page.evaluate(() => { document.querySelector(".v3-capa").__v = null; });
     await page.evaluate(() => { const c = document.querySelector(".v3-capa"); Object.defineProperty(c, "__v", { get: () => window.__visor3d.visor, configurable: true }); });
@@ -3999,6 +3999,79 @@ test("Casa de dos plantas: la página nueva puede ser la planta alta (con la de 
     await page.click('.v3-pags [data-pag="todo"]');
     await page.click('.v3-barra [data-a="editar"]');
     assert.ok(!(await page.$eval('.v3-pags [data-pag="todo"]', (b) => b.classList.contains("on"))));
+    assert.deepStrictEqual(errores, []);
+    await ctx.close();
+  } finally { await nav.close(); }
+});
+
+test("Editar en 3D más fácil: arrastrar desde la tira, sello, mover arrastrando, girar con la manija y «Completar la protección»", async () => {
+  const nav = await navegador3D();
+  try {
+    const ctx = await nav.newContext({ serviceWorkers: "block", viewport: { width: 900, height: 800 } });
+    const page = await ctx.newPage();
+    const errores = [];
+    page.on("pageerror", (e) => errores.push(e.message));
+    await page.route("**/api/**", (r) => r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+    await page.goto(base + "/");
+    await page.waitForTimeout(400);
+    await page.evaluate((els) => { tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); window.prompt = () => null; cqAbrirEditor({ titulo: "Casa", elementos: els }); }, CASA_B);
+    await page.click("#cqMenuBtn");
+    await page.click('[data-m="ver3d"]');
+    await page.waitForSelector(".v3-capa canvas", { timeout: 20000 });
+    await page.click('.v3-barra [data-a="editar"]');
+    await page.waitForSelector(".v3-tira:not(.hidden) [data-tipo=infrarrojo]");
+    const pantalla = (x, y, h) => page.evaluate(([a, b, c]) => window.__visor3d.visor.aPantalla(a, b, c), [x, y, h || 0]);
+    const arrastrar = async (de, a) => { await page.mouse.move(de[0], de[1]); await page.mouse.down(); for (let i = 1; i <= 12; i++) await page.mouse.move(de[0] + (a[0] - de[0]) * i / 12, de[1] + (a[1] - de[1]) * i / 12); await page.mouse.up(); };
+    // 1) Arrastrar un infrarrojo desde la tira al ambiente de la derecha (vacío): va a la esquina
+    const chip = await page.locator(".v3-tira [data-tipo=infrarrojo]").boundingBox();
+    const destino = await pantalla(360, 260);
+    await arrastrar([chip.x + chip.width / 2, chip.y + chip.height / 2], destino);
+    let nuevo = await page.evaluate(() => cq.elementos.filter((e) => e.tipo === "infrarrojo" && e.id !== "ir").pop());
+    assert.ok(nuevo, "se agregó");
+    assert.deepStrictEqual([nuevo.x, nuevo.y], [400, 300], "a la esquina más cercana");
+    assert.strictEqual(nuevo.etq, "2", "zona siguiente");
+    assert.match(await page.textContent(".v3-aviso"), /Cobertura: \d+% → \d+%/);
+    // 2) Mover arrastrando el sensor: a la otra esquina del mismo ambiente
+    const desde = await pantalla(400, 300, 2.3), hacia = await pantalla(380, 30);
+    await arrastrar(desde, hacia);
+    nuevo = await page.evaluate((id) => cq.elementos.find((e) => e.id === id), nuevo.id);
+    assert.deepStrictEqual([nuevo.x, nuevo.y], [400, 0], "movido a la otra esquina");
+    // 3) Girar con la manija (aparece al elegirlo)
+    const rot0 = nuevo.rot;
+    await page.evaluate((id) => window.__visor3d.visor.marcar(id), nuevo.id);
+    const ang = (rot0 - 135) * Math.PI / 180, mx = 400 + Math.cos(ang) * 52, my = 0 + Math.sin(ang) * 52;
+    const manija = await pantalla(mx, my, 0.06), giro = await pantalla(400 - 70, 10);
+    await arrastrar(manija, giro);
+    const rot1 = await page.evaluate((id) => cq.elementos.find((e) => e.id === id).rot, nuevo.id);
+    const esperado = (Math.atan2(10, -70) * 180 / Math.PI + 135 + 360) % 360;
+    assert.ok(Math.abs(rot1 - esperado) <= 3, "giró hacia donde se arrastró la manija: " + rot1 + " (esperado ~" + Math.round(esperado) + ")");
+    // 4) Sello: tocar "Apertura" y después cerca de la ventana: se pega a la ventana
+    await page.click(".v3-tira [data-tipo=magnetico]");
+    assert.match(await page.textContent(".v3-aviso"), /donde va cada sensor de apertura/i);
+    const cerca = await pantalla(310, 30);
+    await page.mouse.click(cerca[0], cerca[1]);
+    const mag = await page.evaluate(() => cq.elementos.find((e) => e.tipo === "magnetico"));
+    assert.ok(mag, "se puso el magnético");
+    assert.ok(Math.abs(mag.y - 6) <= 1 && mag.x > 300 && mag.x < 325, "pegado a la ventana, del lado de adentro: " + mag.x + "," + mag.y);
+    await page.click(".v3-tira [data-tipo=magnetico]"); // termina el sello
+    // 5) Completar la protección: saca el sensor que agregué y pide propuesta
+    await page.evaluate((id) => { const i = cq.elementos.findIndex((e) => e.id === id); cq.elementos.splice(i, 1); }, nuevo.id);
+    await page.click('.v3-barra [data-a="listo"]');
+    await page.click('.v3-barra [data-a="cerrar"]');
+    await page.click("#cqMenuBtn");
+    await page.click('[data-m="ver3d"]');
+    await page.waitForSelector(".v3-capa canvas", { timeout: 20000 });
+    await page.click('.v3-barra [data-a="editar"]');
+    await page.click('.v3-barra [data-a="completar"]');
+    await page.waitForFunction(() => /Te propongo/.test(document.querySelector(".v3-hoja").textContent), null, { timeout: 10000 });
+    assert.match(await page.textContent(".v3-hoja"), /sensor(es)? de movimiento/);
+    await page.click('.v3-hoja [data-h="todos"]');
+    const pct = await page.evaluate(() => Croquis3D.analizar(cq.elementos).porcentaje);
+    assert.ok(pct >= 90, "con la propuesta queda casi todo cubierto: " + pct);
+    // Deshacer saca todos los de la propuesta juntos
+    const n = await page.evaluate(() => cq.elementos.filter((e) => e.tipo === "infrarrojo").length);
+    await page.click('.v3-barra [data-a="deshacer"]');
+    assert.ok((await page.evaluate(() => cq.elementos.filter((e) => e.tipo === "infrarrojo").length)) < n);
     assert.deepStrictEqual(errores, []);
     await ctx.close();
   } finally { await nav.close(); }
