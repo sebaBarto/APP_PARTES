@@ -850,6 +850,261 @@ const Croquis3D = (() => {
       },
     };
   }
+  // ---- Vitrina: cada equipo en 3D, como es de verdad, montado en su lugar ----
+  // Unidades: centímetros. Se muestra en la ficha del equipo (al tocarlo).
+  function vitrina(contenedor, tipo) {
+    const W = () => contenedor.clientWidth || 300, H = () => contenedor.clientHeight || 180;
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+    renderer.setSize(W(), H());
+    renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    contenedor.appendChild(renderer.domElement);
+    const escena = new THREE.Scene();
+    const cam = new THREE.PerspectiveCamera(26, W() / H(), 1, 500);
+    // Luz de estudio: una principal con sombra, relleno suave y contraluz.
+    escena.add(new THREE.HemisphereLight(0xffffff, 0x8a9099, 0.42));
+    const clave = new THREE.DirectionalLight(0xffffff, 0.72); clave.position.set(28, 40, 38); clave.castShadow = true;
+    clave.shadow.mapSize.set(1024, 1024); Object.assign(clave.shadow.camera, { left: -30, right: 30, top: 30, bottom: -30, near: 1, far: 160 }); clave.shadow.radius = 4; clave.shadow.bias = -0.0008;
+    escena.add(clave);
+    const relleno = new THREE.DirectionalLight(0xdfe8ff, 0.22); relleno.position.set(-40, 10, 30); escena.add(relleno);
+    const contra = new THREE.DirectionalLight(0xffffff, 0.3); contra.position.set(-10, 30, -40); escena.add(contra);
+    const pieza = new THREE.Group(), fondo = new THREE.Group();
+    escena.add(fondo, pieza);
+    const mat = (color, o) => new THREE.MeshStandardMaterial({ color, roughness: 0.45, metalness: 0, ...(o || {}) });
+    const plastico = mat(0xf1f1ee, { roughness: 0.32 }), gris = mat(0x9aa0a6), oscuro = mat(0x24282c, { roughness: 0.3 });
+    const pared = mat(0xddd8cf, { roughness: 0.95 }), madera = mat(0x9c7146, { roughness: 0.7 }), metal = mat(0xbfc3c8, { roughness: 0.32, metalness: 0.55 });
+    const lente = new THREE.MeshStandardMaterial({ color: 0xbcc3ca, roughness: 0.12, metalness: 0.05, flatShading: true });
+    // Lente de Fresnel: una cúpula facetada que sobresale del frente.
+    const fresnel = (w, h, prof, x, y, z) => { const l = M(new THREE.SphereGeometry(1, 14, 8), lente, x, y, z); l.scale.set(w / 2, h / 2, prof); return l; };
+    const vidrio = new THREE.MeshStandardMaterial({ color: 0x1a1d21, roughness: 0.05, metalness: 0.2, transparent: true, opacity: 0.85 });
+    const leds = [];
+    const led = (color, x, y, z, r) => { const m = new THREE.Mesh(new THREE.SphereGeometry(r || 0.25, 12, 10), new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.9 })); m.position.set(x, y, z); leds.push(m); return m; };
+    // Caja con bordes redondeados (extrusión con bisel).
+    const caja = (w, h, d, r) => {
+      const b = Math.min(r, d / 3), rr = Math.max(0.01, r - b * 0.2), x = w / 2 - b, y = h / 2 - b, s = new THREE.Shape();
+      s.moveTo(-x + rr, -y); s.lineTo(x - rr, -y); s.quadraticCurveTo(x, -y, x, -y + rr); s.lineTo(x, y - rr); s.quadraticCurveTo(x, y, x - rr, y); s.lineTo(-x + rr, y); s.quadraticCurveTo(-x, y, -x, y - rr); s.lineTo(-x, -y + rr); s.quadraticCurveTo(-x, -y, -x + rr, -y);
+      const g = new THREE.ExtrudeGeometry(s, { depth: Math.max(0.01, d - 2 * b), bevelEnabled: true, bevelThickness: b, bevelSize: b, bevelSegments: 4, curveSegments: 10 });
+      g.center(); return g;
+    };
+    const M = (g, m, x, y, z) => { const o = new THREE.Mesh(g, m); o.position.set(x || 0, y || 0, z || 0); return o; };
+    const Mx = (g, m, x, y, z) => { const o = M(g, m, x, y, z); o.rotation.x = Math.PI / 2; return o; }; // cilindro acostado (mirando al frente)
+    const texto = (t, w, h, o) => {
+      const cv = document.createElement("canvas"); cv.width = 256; cv.height = Math.round(256 * h / w);
+      const c = cv.getContext("2d"); c.fillStyle = (o && o.fondo) || "#000"; c.fillRect(0, 0, cv.width, cv.height);
+      c.fillStyle = (o && o.color) || "#fff"; c.font = `${(o && o.peso) || 700} ${Math.round(cv.height * ((o && o.tam) || 0.6))}px Arial, sans-serif`; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(t, cv.width / 2, cv.height / 2 + 2);
+      const tx = new THREE.CanvasTexture(cv); tx.encoding = THREE.sRGBEncoding;
+      return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: tx, roughness: 0.4 }));
+    };
+    // Fondos: esquina de pared, pared, techo, marco de puerta.
+    // Esquina de dos paredes (el rincón queda atrás, en z = -6).
+    const esquina = () => { [[-1, Math.PI / 4], [1, -Math.PI / 4]].forEach(([sx, giro]) => { const p = M(new THREE.PlaneGeometry(60, 120), pared, sx * 21.2, 0, -6 + 21.2); p.rotation.y = giro; fondo.add(p); }); };
+    const paredAtras = (z) => { fondo.add(M(new THREE.PlaneGeometry(200, 160), pared, 0, 0, z)); };
+    const techo = (y) => { const p = M(new THREE.PlaneGeometry(200, 160), pared, 0, y, 0); p.rotation.x = Math.PI / 2; fondo.add(p); };
+    let girar = true, base = 0.35, abajo = false; // oscilación suave (que siempre se vea el frente); abajo: va en el techo
+    const t0 = performance.now();
+    const arma = {
+      infrarrojo() {
+        esquina();
+        const g = new THREE.Group();
+        g.add(M(caja(6.4, 10.5, 4.6, 1.6), plastico));
+        // Lente de Fresnel (facetada) arriba al frente.
+        g.add(fresnel(5.2, 4.6, 1.1, 0, 2.4, 1.75));
+        g.add(M(new THREE.BoxGeometry(5.4, 0.15, 0.3), gris, 0, -0.6, 2.33));
+        g.add(led(0xff2020, 0, -2.5, 2.35));
+        // Rótula a la pared.
+        g.add(Mx(new THREE.CylinderGeometry(0.8, 1, 2.2, 12), plastico, 0, 0, -3));
+        g.position.set(0, 4, -2.6); g.rotation.x = -0.18; pieza.add(g);
+      },
+      infrarrojo_ext() {
+        paredAtras(-4);
+        const g = new THREE.Group();
+        g.add(M(caja(8, 15, 5.5, 2), plastico));
+        const visera = M(caja(8.6, 1.2, 6.5, 0.5), plastico, 0, 7.8, 0.6); visera.rotation.x = 0.15; g.add(visera);
+        [3.4, -1.8].forEach((y) => g.add(fresnel(6, 4, 1.2, 0, y, 2.3)));
+        g.add(led(0x2e86de, 0, -5.4, 2.8));
+        g.position.y = 1; pieza.add(g);
+      },
+      infrarrojo_cortina() {
+        paredAtras(-3);
+        const g = new THREE.Group();
+        g.add(M(caja(3, 16, 3, 1.2), plastico));
+        const l = M(caja(2, 12, 1, 0.4), lente, 0, 0.6, 1.2); g.add(l);
+        g.add(led(0xff2020, 0, -6.6, 1.6, 0.2));
+        pieza.add(g);
+      },
+      magnetico() {
+        // Marco de la puerta y la hoja apenas abierta; el imán en la hoja, el contacto en el marco.
+        fondo.add(M(new THREE.BoxGeometry(5, 34, 4), madera, -2.5, 0, 0));
+        const hoja = new THREE.Group(); hoja.add(M(new THREE.BoxGeometry(22, 34, 3.2), mat(0xc9a26f, { roughness: 0.6 }), 11, 0, 0)); hoja.position.set(0, 0, -0.4); hoja.rotation.y = -0.35;
+        hoja.add(M(caja(1.6, 3.2, 1.2, 0.4), plastico, 1.4, 9, 2.2));
+        fondo.add(hoja);
+        const contacto = new THREE.Group(); contacto.add(M(caja(1.8, 5.2, 1.4, 0.45), plastico)); contacto.add(led(0x2ecc71, 0, 1.6, 0.75, 0.18));
+        contacto.position.set(-2.4, 9, 2.6); pieza.add(contacto);
+        const cable = M(new THREE.CylinderGeometry(0.15, 0.15, 9, 8), mat(0xffffff), -2.4, 15, 2.2); pieza.add(cable);
+        girar = false; base = 0;
+      },
+      humo() {
+        abajo = true;
+        techo(4.5);
+        const g = new THREE.Group();
+        const perfil = [[0, 0], [5.6, 0], [5.8, 0.6], [5.6, 2.2], [4.6, 3.6], [0, 3.8]].map(([x, y]) => new THREE.Vector2(x, y));
+        g.add(M(new THREE.LatheGeometry(perfil, 48), plastico));
+        for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2, r = M(new THREE.BoxGeometry(0.35, 1.4, 0.6), gris, Math.cos(a) * 5.15, 1.5, Math.sin(a) * 5.15); r.rotation.y = -a; g.add(r); }
+        g.add(M(new THREE.CylinderGeometry(1.2, 1.2, 0.3, 24), plastico, 0, 3.9, 0));
+        g.add(led(0xff2020, 2.6, 3.75, 0, 0.22));
+        g.rotation.x = Math.PI; g.position.y = 4.4; pieza.add(g);
+        base = 0.6;
+      },
+      gas() { arma.humo(); },
+      detector_360() {
+        abajo = true;
+        techo(3.2);
+        const g = new THREE.Group();
+        const perfil = [[0, 0], [5.4, 0], [5.4, 1.2], [4.8, 1.8], [0, 1.9]].map(([x, y]) => new THREE.Vector2(x, y));
+        g.add(M(new THREE.LatheGeometry(perfil, 48), plastico));
+        const domo = M(new THREE.SphereGeometry(2.6, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), lente, 0, 1.8, 0); g.add(domo);
+        g.add(led(0xff2020, 4, 1.7, 0, 0.2));
+        g.rotation.x = Math.PI; g.position.y = 3.1; pieza.add(g);
+        base = 0.6;
+      },
+      sirena_int() {
+        paredAtras(-3);
+        const g = new THREE.Group();
+        g.add(M(caja(11, 11, 5, 2), plastico));
+        for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) if (i * i + j * j <= 5) g.add(Mx(new THREE.CylinderGeometry(0.4, 0.4, 0.4, 10), oscuro, i * 1.5, j * 1.5, 2.45));
+        pieza.add(g);
+      },
+      sirena_ext() {
+        paredAtras(-4);
+        const g = new THREE.Group();
+        g.add(M(caja(17, 24, 6.5, 2.5), mat(0xd23b34, { roughness: 0.35 })));
+        const tapa = M(caja(13.5, 16, 1.2, 1.5), mat(0xf3f3f0, { roughness: 0.35 }), 0, -2.5, 3.4); g.add(tapa);
+        const logo = texto("SAT", 9, 3.6, { fondo: "#F3F3F0", color: "#D23B34", tam: 0.82 }); logo.position.set(0, -2.5, 4.05); g.add(logo);
+        const flash = new THREE.Mesh(caja(13.5, 4.6, 2.6, 1.2), new THREE.MeshStandardMaterial({ color: 0xffb020, emissive: 0xff8c00, emissiveIntensity: 0.3, roughness: 0.15, transparent: true, opacity: 0.9 }));
+        flash.position.set(0, 9.2, 2.2); g.add(flash); leds.push(flash);
+        pieza.add(g);
+      },
+      sirena_flash() { arma.sirena_ext(); },
+      teclado() {
+        paredAtras(-2.2);
+        const g = new THREE.Group();
+        g.add(M(caja(12, 16, 3, 1.4), plastico));
+        const cv = document.createElement("canvas"); cv.width = 240; cv.height = 320;
+        const c = cv.getContext("2d"); c.fillStyle = "#F3F3F0"; c.fillRect(0, 0, 240, 320);
+        c.fillStyle = "#14281a"; c.fillRect(30, 26, 180, 52); c.fillStyle = "#7CFC9A"; c.font = "700 26px Arial"; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText("ARMADO", 120, 53);
+        "123456789*0#".split("").forEach((k, i) => { const x = 50 + (i % 3) * 70, y = 120 + Math.floor(i / 3) * 48; c.fillStyle = "#d8dbde"; c.beginPath(); c.roundRect ? c.roundRect(x - 24, y - 17, 48, 34, 8) : c.rect(x - 24, y - 17, 48, 34); c.fill(); c.fillStyle = "#2b2f33"; c.font = "700 20px Arial"; c.fillText(k, x, y + 1); });
+        const tx = new THREE.CanvasTexture(cv); tx.encoding = THREE.sRGBEncoding;
+        g.add(M(new THREE.PlaneGeometry(10.6, 14.2), new THREE.MeshStandardMaterial({ map: tx, roughness: 0.35 }), 0, 0, 1.52));
+        g.add(led(0x2ecc71, 4.2, -6.4, 1.6, 0.22)); g.add(led(0xff2020, 3.2, -6.4, 1.6, 0.22));
+        pieza.add(g);
+      },
+      central() {
+        paredAtras(-5);
+        const g = new THREE.Group();
+        g.add(M(caja(26, 30, 8, 0.8), metal, 0, 0, -0.5));
+        const pcb = M(new THREE.BoxGeometry(20, 14, 0.3), mat(0x2e7d4f, { roughness: 0.6 }), 0, 4, 3.5); g.add(pcb);
+        for (let i = 0; i < 6; i++) g.add(M(new THREE.BoxGeometry(2.2, 1.2, 1), oscuro, -7 + i * 2.8, 9, 4.2));
+        g.add(M(new THREE.BoxGeometry(8, 6, 6), mat(0x2b2f33, { roughness: 0.5 }), 6, -8, 1)); // batería
+        g.add(M(new THREE.BoxGeometry(6, 4, 1), mat(0xe6e6e6), -6, -2, 4));
+        g.add(led(0x2ecc71, -8, -10, 3.8, 0.35)); g.add(led(0xffb020, -6.5, -10, 3.8, 0.35));
+        // Tapa abierta.
+        const tapa = new THREE.Group(); tapa.add(M(caja(26, 30, 1, 0.5), metal, 13, 0, 0)); tapa.position.set(13, 0, 3.6); tapa.rotation.y = -1.1;
+        const marca = texto("SAT", 8, 3, { fondo: "#d5d8dc", color: "#1C1E21" }); marca.position.set(13, 8, 0.55); tapa.add(marca);
+        g.add(tapa);
+        pieza.add(g); base = 0.25;
+      },
+      hub() {
+        const g = new THREE.Group();
+        g.add(M(caja(11, 11, 3, 3.2), plastico));
+        const logo = texto("SAT", 4, 1.6, { fondo: "#F3F3F0", color: "#8e949a" }); logo.position.set(0, 1, 1.52); g.add(logo);
+        g.add(led(0x2ecc71, 0, -2.6, 1.55, 0.3));
+        g.rotation.x = -0.5; pieza.add(g);
+      },
+      repetidor() { arma.hub(); },
+      rotura_vidrio() {
+        paredAtras(-2);
+        const g = new THREE.Group();
+        const perfil = [[0, 0], [3.6, 0], [3.8, 0.5], [3.4, 1.8], [0, 2]].map(([x, y]) => new THREE.Vector2(x, y));
+        const cuerpo = M(new THREE.LatheGeometry(perfil, 40), plastico); cuerpo.rotation.x = Math.PI / 2; g.add(cuerpo);
+        for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; g.add(Mx(new THREE.CylinderGeometry(0.22, 0.22, 0.3, 8), oscuro, Math.cos(a) * 1.4, Math.sin(a) * 1.4, 2)); }
+        g.add(led(0x17a2b8, 0, 0, 2.05, 0.3));
+        pieza.add(g);
+      },
+      pulsador_asalto() {
+        paredAtras(-2);
+        const g = new THREE.Group();
+        g.add(M(caja(8, 8, 3, 1.2), plastico));
+        const b = M(new THREE.CylinderGeometry(2.4, 2.6, 1.4, 32), mat(0xd93a2b, { roughness: 0.3 }), 0, 0, 1.9); b.rotation.x = Math.PI / 2; g.add(b);
+        pieza.add(g); leds.push(b);
+      },
+      pulsador_incendio() { arma.pulsador_asalto(); },
+      camara_ip() {
+        paredAtras(-9);
+        const g = new THREE.Group();
+        // Soporte a la pared.
+        g.add(Mx(new THREE.CylinderGeometry(3.2, 3.2, 1.2, 28), plastico, 0, 0, -8.4));
+        const brazo = M(new THREE.CylinderGeometry(1, 1, 7, 14), plastico, 0, 1.4, -5); brazo.rotation.x = Math.PI / 2 - 0.35; g.add(brazo);
+        const cuerpo = new THREE.Group();
+        const tubo = M(new THREE.CylinderGeometry(3.4, 3.4, 15, 32), plastico); tubo.rotation.x = Math.PI / 2; cuerpo.add(tubo);
+        // Visera arriba (parasol), que sobresale un poco adelante.
+        const visera = M(new THREE.CylinderGeometry(3.85, 3.85, 9, 32, 1, true, Math.PI * 0.62, Math.PI * 0.76), mat(0xf1f1ee, { side: THREE.DoubleSide, roughness: 0.32 }), 0, 0, 5); visera.rotation.x = Math.PI / 2; cuerpo.add(visera);
+        const frente = M(new THREE.CylinderGeometry(3.1, 3.1, 0.4, 32), oscuro, 0, 0, 7.55); frente.rotation.x = Math.PI / 2; cuerpo.add(frente);
+        const lens = M(new THREE.CylinderGeometry(1.2, 1.4, 0.8, 24), vidrio, 0, 0.4, 7.9); lens.rotation.x = Math.PI / 2; cuerpo.add(lens);
+        for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; cuerpo.add(led(0x6b1010, Math.cos(a) * 2.2, Math.sin(a) * 2.2 + 0.2, 7.85, 0.28)); }
+        cuerpo.position.set(0, 3.2, 0); cuerpo.rotation.x = 0.25; g.add(cuerpo);
+        g.rotation.y = 0.5; pieza.add(g); base = 0.3;
+      },
+      camara_analoga() { arma.camara_ip(); },
+      camara_domo() {
+        abajo = true;
+        techo(4);
+        const g = new THREE.Group();
+        const perfil = [[0, 0], [6.4, 0], [6.6, 0.6], [6.2, 1.6], [0, 1.7]].map(([x, y]) => new THREE.Vector2(x, y));
+        g.add(M(new THREE.LatheGeometry(perfil, 48), plastico));
+        const domo = M(new THREE.SphereGeometry(4.6, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x30353a, roughness: 0.05, metalness: 0.3, transparent: true, opacity: 0.7 }), 0, 1.6, 0); g.add(domo);
+        const bola = M(new THREE.SphereGeometry(2.6, 24, 16), oscuro, 0, 2.6, 0); g.add(bola);
+        const lens = M(new THREE.CylinderGeometry(0.9, 1, 0.6, 20), vidrio, 1.6, 3.6, 1.2); lens.lookAt(4, 8, 3); g.add(lens);
+        g.rotation.x = Math.PI; g.position.y = 3.9; pieza.add(g); base = 0.5;
+      },
+      dvr() {
+        const g = new THREE.Group();
+        g.add(M(caja(30, 5, 22, 0.6), mat(0x2b2f33, { roughness: 0.4, metalness: 0.3 })));
+        for (let i = 0; i < 4; i++) g.add(led(i ? 0x2e86de : 0x2ecc71, -12 + i * 2, 0, 11.1, 0.3));
+        g.rotation.x = 0.35; pieza.add(g);
+      },
+    };
+    (arma[tipo] || (() => { paredAtras(-3); pieza.add(M(caja(9, 9, 4, 1.5), plastico)); pieza.add(led(0x2ecc71, 3, -3, 2.1)); }))();
+    // Sombras (la pieza sobre la pared/techo) y encuadre.
+    pieza.traverse((c) => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
+    fondo.traverse((c) => { if (c.isMesh) { c.receiveShadow = true; c.castShadow = true; } });
+    const caja3 = new THREE.Box3().setFromObject(pieza), centro = caja3.getCenter(new THREE.Vector3()), tam = caja3.getSize(new THREE.Vector3());
+    // Distancia para que entre la pieza (con aire) a lo alto y a lo ancho.
+    const tv = Math.tan(cam.fov * Math.PI / 360), th = tv * (W() / H());
+    const dist = Math.max((tam.y / 2) * 1.55 / tv, (Math.max(tam.x, tam.z) / 2) * 1.55 / th) + tam.z / 2;
+    if (abajo) { clave.position.set(25, -35, 40); relleno.position.set(-30, -20, 20); cam.position.set(centro.x + dist * 0.3, centro.y - dist * 0.45, centro.z + dist * 0.85); }
+    else cam.position.set(centro.x + dist * 0.35, centro.y + dist * 0.22, centro.z + dist * 0.92);
+    cam.lookAt(centro);
+    let vivo = true, pedido = 0;
+    const dibujar = () => {
+      if (!vivo) return;
+      if (!renderer.domElement.isConnected) { destruir(); return; }
+      const t = (performance.now() - t0) / 1000;
+      if (girar) pieza.rotation.y = Math.sin(t * 0.7) * base;
+      const prende = Math.sin(t * 4) > 0;
+      leds.forEach((l) => { if (l.material.emissive) l.material.emissiveIntensity = prende ? 0.95 : 0.15; });
+      renderer.render(escena, cam);
+      pedido = requestAnimationFrame(dibujar);
+    };
+    function destruir() {
+      if (!vivo) return;
+      vivo = false; cancelAnimationFrame(pedido);
+      escena.traverse((c) => { if (c.geometry) c.geometry.dispose(); if (c.material) { if (c.material.map) c.material.map.dispose(); c.material.dispose(); } });
+      renderer.dispose(); if (renderer.domElement.parentNode) renderer.domElement.parentNode.removeChild(renderer.domElement);
+      try { renderer.forceContextLoss(); } catch (e) { /* nada */ }
+    }
+    dibujar();
+    return { destruir, escena };
+  }
   // Carga three.js (de vendor/three) la primera vez.
   let cargando = null;
   function cargar() {
@@ -1215,7 +1470,7 @@ const Croquis3D = (() => {
     el.x = Math.round(px); el.y = Math.round(py);
     return el;
   }
-  return { crear, cargar, disponible, ubicar, analizar, ALTO_NIVEL };
+  return { crear, cargar, disponible, ubicar, analizar, vitrina, ALTO_NIVEL };
 })();
 
 // ---------- Visor para el cliente ----------
@@ -1266,28 +1521,8 @@ const CROQUIS_3D_ESTILO = `
 .v3-acciones button.v3-primario{background:#1C1E21;color:#fff;border-color:#1C1E21}
 .v3-link{display:block;margin:10px auto 0;background:none;border:0;color:var(--tenue);font:600 14px inherit;font-family:inherit;text-decoration:underline;cursor:pointer}
 @media (max-width:480px){.v3-barra,.v3-props{gap:4px}.v3-barra button,.v3-props button{padding:9px 9px;font-size:13px}}
-.v3-cari{margin:-2px 0 8px}.v3-cari-svg{display:block;width:100%;max-width:300px;margin:0 auto;height:auto}
-.v3-ani-onda{animation:v3onda 1.4s ease-out infinite;opacity:0}
-@keyframes v3onda{0%{opacity:0}30%{opacity:.9}100%{opacity:0}}
-.v3-ani-led{animation:v3led 1s steps(2) infinite}
-@keyframes v3led{50%{opacity:.15}}
-.v3-ani-puerta{transform-box:fill-box;transform-origin:left center;animation:v3puerta 3s ease-in-out infinite}
-@keyframes v3puerta{0%,35%,100%{transform:perspective(200px) rotateY(0)}55%,80%{transform:perspective(200px) rotateY(-38deg)}}
-.v3-ani-humo{animation:v3humo 1.8s ease-in infinite}
-@keyframes v3humo{0%{transform:translateY(0) scale(.6);opacity:0}30%{opacity:.7}100%{transform:translateY(-70px) scale(1.3);opacity:0}}
-.v3-ani-tecla{animation:v3tecla 1.2s infinite}
-@keyframes v3tecla{0%,60%,100%{fill:#D9D9D9}70%,90%{fill:#F2C94C}}
-.v3-ani-flash{animation:v3flash .5s steps(2) infinite}
-@keyframes v3flash{50%{fill:#FFFFFF}}
-.v3-ani-grieta{stroke-dasharray:30;animation:v3grieta 2.4s ease-out infinite}
-@keyframes v3grieta{0%,20%{stroke-dashoffset:30}60%,100%{stroke-dashoffset:0}}
-.v3-ani-boton{transform-box:fill-box;transform-origin:center;animation:v3boton 1.4s ease-in-out infinite}
-@keyframes v3boton{0%,100%{transform:scale(1)}50%{transform:scale(.88)}}
-.v3-ani-cono{animation:v3cono 2.4s ease-in-out infinite}
-@keyframes v3cono{50%{opacity:.4}}
-.v3-ani-camina{animation:v3camina 3s ease-in-out infinite}
-@keyframes v3camina{0%{transform:translateX(30px);opacity:0}20%{opacity:1}80%{opacity:1}100%{transform:translateX(-14px);opacity:0}}
-@media (prefers-reduced-motion:reduce){[class*="v3-ani-"]{animation:none!important;opacity:1}}
+.v3-vitrina{height:170px;margin:-4px -4px 10px;border-radius:12px;overflow:hidden;background:linear-gradient(#FFFFFF,#E4E8EC)}
+.v3-vitrina canvas{display:block}
 .v3-puntos{display:flex;gap:6px;justify-content:center;margin:0 0 8px}.v3-puntos i{width:8px;height:8px;border-radius:50%;background:var(--bd)}.v3-puntos i.on{background:var(--ac);width:20px;border-radius:4px}
 .v3-presentando .v3-barra,.v3-presentando .v3-props,.v3-presentando .v3-tira{display:none}
 .v3-hoja .v3-paso-texto{font-size:15px}
@@ -1330,48 +1565,6 @@ const CROQUIS_3D_EXPLICA = {
   camara_domo: "Cámara de techo que vigila todo el ambiente.",
   dvr: "Guarda las grabaciones de las cámaras.",
 };
-// Dibujito animado de cada equipo instalado (para el cliente, al tocarlo).
-function croquis3dCaricatura(tipo) {
-  const pared = `<rect x="0" y="0" width="200" height="120" rx="12" fill="#F4F1EA"/><path d="M0 104 H200" stroke="#D8D1C2" stroke-width="2"/>`;
-  const svg = (cuerpo) => `<svg viewBox="0 0 200 120" class="v3-cari-svg" aria-hidden="true">${pared}${cuerpo}</svg>`;
-  const ondas = (cx, cy, r0, color, desde, hasta) => [0, 1, 2].map((i) => `<path class="v3-ani-onda" style="animation-delay:${i * 0.45}s" d="M${cx + Math.cos(desde) * (r0 + i * 14)} ${cy + Math.sin(desde) * (r0 + i * 14)} A${r0 + i * 14} ${r0 + i * 14} 0 0 1 ${cx + Math.cos(hasta) * (r0 + i * 14)} ${cy + Math.sin(hasta) * (r0 + i * 14)}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round"/>`).join("");
-  const led = (x, y, c) => `<circle class="v3-ani-led" cx="${x}" cy="${y}" r="3" fill="${c || "#E00000"}"/>`;
-  const ir = (rot) => svg(`<path d="M30 0 V104 M30 104 L0 120" stroke="#D8D1C2" stroke-width="2"/>
-    <g transform="translate(32 14)"><rect x="0" y="0" width="30" height="40" rx="7" fill="#FFFFFF" stroke="#1C1E21" stroke-width="2.5"/><path d="M5 22 Q15 14 25 22 Q15 34 5 22Z" fill="#2B2F33"/>${led(24, 8)}</g>
-    ${ondas(50, 40, 22, rot || "#E00000", -0.35, 0.9)}
-    <g class="v3-ani-camina"><circle cx="160" cy="62" r="7" fill="#F1C27D"/><rect x="152" y="54" width="16" height="5" fill="#1C1E21"/><rect x="153" y="70" width="14" height="22" rx="4" fill="url(#rayas)"/><path d="M156 92 V104 M164 92 V104" stroke="#1C1E21" stroke-width="4" stroke-linecap="round"/></g>
-    <defs><pattern id="rayas" width="4" height="6" patternUnits="userSpaceOnUse"><rect width="4" height="3" fill="#1C1E21"/><rect y="3" width="4" height="3" fill="#FFFFFF"/></pattern></defs>`);
-  const mapa = {
-    infrarrojo: () => ir(),
-    infrarrojo_ext: () => ir("#7B4B94"),
-    infrarrojo_cortina: () => ir("#7B4B94"),
-    detector_360: () => svg(`<path d="M0 10 H200" stroke="#D8D1C2" stroke-width="2"/><ellipse cx="100" cy="16" rx="24" ry="8" fill="#FFFFFF" stroke="#1C1E21" stroke-width="2.5"/>${led(100, 18)}${[0, 1, 2].map((i) => `<ellipse class="v3-ani-onda" style="animation-delay:${i * 0.45}s" cx="100" cy="70" rx="${40 + i * 22}" ry="${12 + i * 6}" fill="none" stroke="#E00000" stroke-width="2.5"/>`).join("")}`),
-    magnetico: () => svg(`<rect x="60" y="14" width="80" height="90" fill="none" stroke="#B98C5A" stroke-width="6"/>
-      <g class="v3-ani-puerta"><rect x="63" y="17" width="74" height="87" fill="#C9A26F" stroke="#8C6A42" stroke-width="2"/><circle cx="128" cy="62" r="3.5" fill="#5B5F66"/><rect x="128" y="26" width="7" height="14" rx="2" fill="#FFFFFF" stroke="#1C1E21" stroke-width="1.5"/></g>
-      <rect x="140" y="26" width="9" height="14" rx="2" fill="#FFFFFF" stroke="#1C1E21" stroke-width="1.5"/>${led(144.5, 30, "#2E9E4F")}${ondas(150, 33, 10, "#2E9E4F", -0.8, 0.8)}`),
-    humo: () => svg(`<path d="M0 10 H200" stroke="#D8D1C2" stroke-width="2"/><ellipse cx="100" cy="17" rx="22" ry="8" fill="#FFFFFF" stroke="#1C1E21" stroke-width="2.5"/>${led(100, 20)}
-      ${[0, 1, 2].map((i) => `<circle class="v3-ani-humo" style="animation-delay:${i * 0.6}s" cx="${92 + i * 8}" cy="96" r="${9 + i * 2}" fill="#A6ADB4" opacity="0.6"/>`).join("")}`),
-    gas: () => mapa.humo(),
-    central: () => svg(`<rect x="62" y="16" width="76" height="80" rx="4" fill="#E8E2D2" stroke="#1C1E21" stroke-width="2.5"/><path d="M68 24 H132 M68 32 H118" stroke="#8E949A" stroke-width="2"/><rect x="72" y="44" width="56" height="34" rx="3" fill="#2E7D4F"/><path d="M78 52 H98 M78 60 H116 M78 68 H104" stroke="#A9D8B8" stroke-width="2"/>${led(126, 88, "#2E9E4F")}${led(116, 88, "#F2A900")}<path d="M100 96 V112" stroke="#5B5F66" stroke-width="3"/>`),
-    hub: () => svg(`<rect x="74" y="50" width="52" height="50" rx="12" fill="#FFFFFF" stroke="#1C1E21" stroke-width="2.5"/>${led(100, 88, "#2E9E4F")}${ondas(100, 50, 10, "#2E86DE", -2.5, -0.6)}`),
-    repetidor: () => mapa.hub(),
-    teclado: () => svg(`<rect x="70" y="14" width="60" height="84" rx="8" fill="#FFFFFF" stroke="#1C1E21" stroke-width="2.5"/><rect x="78" y="22" width="44" height="14" rx="2" fill="#2B2F33"/><text x="100" y="33" text-anchor="middle" font-family="Arial" font-size="7.5" font-weight="700" fill="#7CFC9A">ARMADO</text>
-      ${[0, 1, 2, 3].map((f) => [0, 1, 2].map((cc) => `<rect class="${f === 1 && cc === 1 ? "v3-ani-tecla" : ""}" x="${80 + cc * 14}" y="${42 + f * 13}" width="11" height="9" rx="2" fill="#D9D9D9" stroke="#8E949A"/>`).join("")).join("")}${led(122, 90, "#2E9E4F")}`),
-    sirena_int: () => svg(`<rect x="78" y="24" width="44" height="34" rx="5" fill="#E6E6E6" stroke="#1C1E21" stroke-width="2.5"/><path d="M84 40 H116" stroke="#8E949A" stroke-width="2"/>${ondas(100, 41, 30, "#E8741E", -0.6, 0.6)}${ondas(100, 41, 30, "#E8741E", 2.54, 3.74)}`),
-    sirena_ext: () => svg(`<rect x="76" y="14" width="48" height="58" rx="6" fill="#E05050" stroke="#1C1E21" stroke-width="2.5"/><rect class="v3-ani-flash" x="86" y="22" width="28" height="14" rx="4" fill="#FFD84D"/><text x="100" y="60" text-anchor="middle" font-family="Arial Black,Arial" font-weight="900" font-size="13" fill="#FFFFFF">SAT</text>${ondas(100, 44, 34, "#E05050", -0.6, 0.6)}${ondas(100, 44, 34, "#E05050", 2.54, 3.74)}`),
-    sirena_flash: () => mapa.sirena_ext(),
-    rotura_vidrio: () => svg(`<rect x="24" y="18" width="80" height="62" fill="#CFE6F2" stroke="#8E949A" stroke-width="4"/><path class="v3-ani-grieta" d="M60 46 L48 30 M60 46 L76 32 M60 46 L50 66 M60 46 L80 60" stroke="#5B6B7B" stroke-width="2"/>
-      <rect x="140" y="24" width="22" height="22" rx="4" fill="#FFFFFF" stroke="#1C1E21" stroke-width="2"/>${led(151, 35, "#17809B")}${ondas(151, 35, 16, "#17809B", 2.4, 3.9)}`),
-    pulsador_asalto: () => svg(`<rect x="76" y="28" width="48" height="48" rx="8" fill="#FFFFFF" stroke="#1C1E21" stroke-width="2.5"/><circle class="v3-ani-boton" cx="100" cy="52" r="15" fill="#E8741E" stroke="#B5541A" stroke-width="2"/><text x="100" y="56" text-anchor="middle" font-family="Arial" font-weight="700" font-size="9" fill="#FFFFFF">SOS</text>`),
-    pulsador_incendio: () => mapa.pulsador_asalto(),
-    camara_ip: () => svg(`<path d="M150 20 V40 H128" stroke="#5B5F66" stroke-width="5" fill="none"/><g transform="rotate(14 112 44)"><rect x="70" y="32" width="60" height="26" rx="8" fill="#FFFFFF" stroke="#1C1E21" stroke-width="2.5"/><circle cx="74" cy="45" r="9" fill="#2B2F33"/><circle cx="74" cy="45" r="4" fill="#5B8DB8"/></g>${led(122, 40)}
-      <path class="v3-ani-cono" d="M66 50 L10 90 L40 110 Z" fill="#2E86DE" opacity="0.25"/><text class="v3-ani-led" x="160" y="100" font-family="Arial" font-weight="700" font-size="11" fill="#E00000">● REC</text>`),
-    camara_analoga: () => mapa.camara_ip(),
-    camara_domo: () => svg(`<path d="M0 10 H200" stroke="#D8D1C2" stroke-width="2"/><path d="M76 12 H124 A24 24 0 0 1 76 12 Z" fill="#2B2F33" opacity="0.85"/><rect x="72" y="8" width="56" height="6" rx="2" fill="#FFFFFF" stroke="#1C1E21" stroke-width="2"/><circle cx="100" cy="24" r="5" fill="#5B8DB8"/>
-      <path class="v3-ani-cono" d="M100 30 L40 104 L160 104 Z" fill="#2E86DE" opacity="0.22"/><text class="v3-ani-led" x="160" y="100" font-family="Arial" font-weight="700" font-size="11" fill="#E00000">● REC</text>`),
-  };
-  return (mapa[tipo] || (() => svg(`<rect x="76" y="34" width="48" height="40" rx="6" fill="#FFFFFF" stroke="#1C1E21" stroke-width="2.5"/>${led(116, 42, "#2E9E4F")}`)))();
-}
 const ALCANCE_TXT = { infrarrojo: "11", infrarrojo_ext: "12", infrarrojo_cortina: "10" };
 // Equipos que se pueden agregar tocando en el 3D (en este orden).
 const CROQUIS_3D_PALETA = ["infrarrojo", "infrarrojo_ext", "infrarrojo_cortina", "magnetico", "humo", "rotura_vidrio", "detector_360", "sirena_int", "sirena_ext", "teclado", "central", "pulsador_asalto", "camara_ip", "camara_domo"];
@@ -1749,9 +1942,11 @@ function iniciarVisor3D(datos, opciones) {
     let texto = CROQUIS_3D_EXPLICA[e.tipo] || "Forma parte del sistema de seguridad.";
     if (def.ir) { const { ang, doble } = croquisIRParams(e, def); texto += ` Cubre hasta ${ALCANCE_TXT[e.tipo] || "11"} m, en un ángulo de ${doble ? ang * 2 : ang}°.`; }
     const lugar = dondeEsta(e);
-    hoja.innerHTML = `<div class="v3-cari">${croquis3dCaricatura(e.tipo)}</div><b>${esc(nombreDe(e.tipo))}${e.etq ? " · zona " + esc(e.etq) : ""}</b>${lugar ? `<p class="v3-nota">En ${esc(lugar.toLowerCase())}</p>` : ""}<p>${esc(texto)}</p>${e.prev ? `<p class="v3-nota">Ya está instalado.</p>` : e.inst ? `<p class="v3-nota">Se agrega con esta propuesta.</p>` : ""}
+    hoja.innerHTML = `<div class="v3-vitrina"></div><b>${esc(nombreDe(e.tipo))}${e.etq ? " · zona " + esc(e.etq) : ""}</b>${lugar ? `<p class="v3-nota">En ${esc(lugar.toLowerCase())}</p>` : ""}<p>${esc(texto)}</p>${e.prev ? `<p class="v3-nota">Ya está instalado.</p>` : e.inst ? `<p class="v3-nota">Se agrega con esta propuesta.</p>` : ""}
       ${esCamara(e) ? `<div class="v3-acciones"><button type="button" data-h="vercam" class="v3-primario">Ver lo que ve</button></div>` : ""}<button type="button" class="v3-link" data-h="cerrar">Cerrar</button>`;
     hoja.classList.remove("hidden");
+    // El equipo en 3D, como es de verdad (se libera solo al cerrar la ficha).
+    try { Croquis3D.vitrina(hoja.querySelector(".v3-vitrina"), e.tipo); } catch (er) { hoja.querySelector(".v3-vitrina").remove(); }
     visor.marcar(e.id);
     hoja.onclick = (ev) => { const b = ev.target.closest("button"); if (!b) return; if (b.dataset.h === "vercam") { verCamara(e); return; } cerrarHoja(); };
   }

@@ -4183,7 +4183,9 @@ test("Link para el cliente: la presentación guiada arranca sola (una vez), comp
     const [x, y] = await page.evaluate(() => window.visor3d.visor.aPantalla(0, 0, 2.3));
     await page.mouse.click(x, y);
     await page.waitForFunction(() => /Detecta el movimiento/.test(document.querySelector(".v3-hoja").textContent), null, { timeout: 5000 });
-    assert.ok(await page.$(".v3-hoja .v3-cari svg .v3-ani-onda"), "con el dibujito animado del sensor");
+    assert.ok(await page.$(".v3-hoja .v3-vitrina canvas"), "con el equipo en 3D");
+    const vit = await page.evaluate(() => new Promise((ok) => requestAnimationFrame(() => { const c = document.querySelector(".v3-vitrina canvas"); ok(c.width > 100 && c.height > 100); })));
+    assert.ok(vit);
     assert.match(await page.textContent(".v3-hoja"), /zona 1[\s\S]*En living[\s\S]*Cubre hasta 11 m, en un ángulo de 90°/);
     // Al volver a abrir, no arranca sola (se puede ver desde Vista)
     await page.reload();
