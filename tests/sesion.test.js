@@ -784,3 +784,60 @@ test("Seguimiento de propuestas 3D: a quién llamar, y solo quien la mandó (o l
     global.fetch = fetchViejo;
   }
 });
+
+test("Tarjeta de contacto del asesor: cada uno edita la suya, la oficina la de cualquiera y la empresa; va en la vista 3D limpia (sin links peligrosos)", async () => {
+  const { armarContacto, limpiarEmpresa } = require(path.join(raiz, "lib/tarjeta-contacto.js"));
+  const e = limpiarEmpresa({ web: "javascript:alert(1)", instagram: "@sat.alarmas", facebook: "facebook.com/satalarmas", telefono: "abc" });
+  assert.strictEqual(e.web, "", "nada de javascript:");
+  assert.strictEqual(e.instagram, "https://instagram.com/sat.alarmas");
+  assert.strictEqual(e.facebook, "https://facebook.com/satalarmas");
+  assert.strictEqual(e.telefono, "");
+  assert.strictEqual(armarContacto({ nombre: "Ana" }), null, "sin forma de contacto, no hay tarjeta");
+
+  const fetchViejo = global.fetch;
+  const archivos = {};
+  global.fetch = async (url, op = {}) => {
+    const ruta = (String(url).match(/contents\/([^?]+)/) || [])[1];
+    const r = ruta && decodeURIComponent(ruta);
+    if (r === "tecnicos.json") return new Response(JSON.stringify({ content: Buffer.from(JSON.stringify([{ nombre: "Luis", permisos: {} }])).toString("base64"), encoding: "base64", sha: "t" }));
+    if (r) {
+      if (op.method === "PUT") { archivos[r] = JSON.parse(Buffer.from(JSON.parse(op.body).content, "base64").toString("utf-8")); return new Response("{}", { status: 200 }); }
+      if (!archivos[r]) return new Response("{}", { status: 404 });
+      return new Response(JSON.stringify({ sha: "s", encoding: "base64", content: Buffer.from(JSON.stringify(archivos[r])).toString("base64") }));
+    }
+    return new Response("[]");
+  };
+  try {
+    const luis = crearSesion({ nombre: "Luis", rol: "tecnico" }), admin = crearSesion({ nombre: "Oficina", rol: "admin" });
+    let r = resFalso();
+    await datos(pedido("POST", { coleccion: "croquis" }, { accion: "tarjeta_guardar", persona: "Luis", tarjeta: { nombre: "Luis Gómez", puesto: "Asesor comercial", telefono: "11 5555-1234" } }, luis), r);
+    assert.strictEqual(r.statusCode, 200, JSON.stringify(r.cuerpo));
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "croquis" }, { accion: "tarjeta_guardar", persona: "Ana", tarjeta: { nombre: "Ana" } }, luis), r);
+    assert.strictEqual(r.statusCode, 403, "la de otro no");
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "croquis" }, { accion: "tarjeta_guardar", empresa: { nombre: "SAT" } }, luis), r);
+    assert.strictEqual(r.statusCode, 403, "la empresa no (sin permiso de planos)");
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "croquis" }, { accion: "tarjeta_guardar", persona: "Ana", tarjeta: { nombre: "Ana Ruiz", puesto: "Ventas", email: "ana@sat.com" }, empresa: { nombre: "SAT Alarmas", horarios: "Lun a vie de 9 a 18", web: "sat365.com.ar", instagram: "@sat" } }, admin), r);
+    assert.strictEqual(r.statusCode, 200);
+    r = resFalso();
+    await datos(pedido("GET", { coleccion: "croquis", tarjetas: "1" }, null, luis), r);
+    assert.deepStrictEqual(Object.keys(r.cuerpo.personas).sort(), ["Ana", "Luis"]);
+    assert.strictEqual(r.cuerpo.empresa.web, "https://sat365.com.ar");
+    assert.strictEqual(r.cuerpo.yo, "Luis");
+    // Se manda con la tarjeta: el cliente la ve
+    const t = r.cuerpo;
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "croquis" }, { accion: "compartir_3d", titulo: "Casa", paginas: [{ elementos: [{ id: "a", t: "linea", pts: [0, 0, 100, 0] }] }], contacto: { ...t.personas.Ana, empresa: { ...t.empresa, web: "javascript:x" } } }, luis), r);
+    const id = r.cuerpo.id;
+    r = resFalso();
+    await datos(pedido("GET", { publico: "vista3d", id, contar: "0" }), r);
+    assert.strictEqual(r.cuerpo.contacto.nombre, "Ana Ruiz");
+    assert.strictEqual(r.cuerpo.contacto.empresa.horarios, "Lun a vie de 9 a 18");
+    assert.strictEqual(r.cuerpo.contacto.empresa.web, "");
+    assert.strictEqual(archivos["vistas3d/indice.json"][0].asesor, "Ana Ruiz");
+  } finally {
+    global.fetch = fetchViejo;
+  }
+});

@@ -374,6 +374,7 @@ async function estadoInstalacion(id) {
 const MENSAJE_CROQUIS_CERRADO = "La instalación ya se cerró: este plano quedó como registro y no se puede modificar. Si hace falta cambiarlo, pedíselo a la oficina.";
 // Índice de los links 3D mandados a clientes (aperturas y pedidos de llamada).
 const RUTA_VISTAS3D_INDICE = "vistas3d/indice.json";
+const RUTA_TARJETAS = "tarjetas-contacto.json";
 async function anotarVista3d(id, cambiar) {
   for (let intento = 0; intento < 3; intento++) {
     const { data, sha } = await leerArchivoDatos(RUTA_VISTAS3D_INDICE, []);
@@ -401,12 +402,19 @@ async function manejarCroquis(req, res, autorizacion, body) {
   // en la instalación, aunque no tenga el permiso de croquis en general.
   // Y cualquier técnico puede ver los planos de un cliente (para el servicio técnico).
   const porCliente = req.method === "GET" && !!(String(req.query.numero_cliente || "").replace(/\D/g, "") || String(req.query.cliente || "").trim());
-  const deInstalacion = req.method === "GET" ? !!(req.query.id || instValida(req.query.instalacion) || porCliente || req.query.vistas3d) : (instValida(b.instalacion) || instValida(b.instalacion_id) || b.accion === "borrar" || b.accion === "compartir_3d" || b.accion === "vista3d_estado");
+  const deInstalacion = req.method === "GET" ? !!(req.query.id || instValida(req.query.instalacion) || porCliente || req.query.vistas3d || req.query.tarjetas) : (instValida(b.instalacion) || instValida(b.instalacion_id) || b.accion === "borrar" || b.accion === "compartir_3d" || b.accion === "vista3d_estado" || b.accion === "tarjeta_guardar");
   if (!puede && !deInstalacion) { res.status(403).json({ error: "No tenés habilitados los croquis" }); return; }
   const txt = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
   const idValido = (id) => /^[a-z0-9]{6,32}$/.test(String(id || ""));
   try {
     if (req.method === "GET") {
+      if (req.query.tarjetas) {
+        // Tarjetas de contacto (quién asesoró) para la vista 3D del cliente.
+        const { data } = await leerArchivoDatos(RUTA_TARJETAS, {});
+        const t = data && typeof data === "object" ? data : {};
+        res.status(200).json({ yo: autorizacion.nombre || "", admin: esAdmin, empresaEditable: esAdmin || puede, empresa: t.empresa || {}, personas: t.personas && typeof t.personas === "object" ? t.personas : {} });
+        return;
+      }
       if (req.query.vistas3d) {
         // Links 3D que se mandaron (de un croquis o un cliente): cuántas veces
         // los abrieron y si pidieron que los llamen.
@@ -473,6 +481,26 @@ async function manejarCroquis(req, res, autorizacion, body) {
       res.status(200).json({ ok: true, propuesta: actualizado });
       return;
     }
+    if (b.accion === "tarjeta_guardar") {
+      // Cada uno edita su tarjeta; la oficina, la de cualquiera (y la de un
+      // vendedor que no usa la app). Los datos de la empresa, quien hace planos.
+      const { limpiarTarjeta, limpiarEmpresa } = require("../lib/tarjeta-contacto");
+      const persona = txt(b.persona, 60);
+      if (persona && !esAdmin && persona !== autorizacion.nombre) { res.status(403).json({ error: "Solo podés editar tu propia tarjeta" }); return; }
+      if (b.empresa && !esAdmin && !puede) { res.status(403).json({ error: "Los datos de la empresa los edita la oficina" }); return; }
+      for (let intento = 0; intento < 4; intento++) {
+        const { data, sha } = await leerArchivoDatos(RUTA_TARJETAS, {});
+        const t = data && typeof data === "object" ? data : {};
+        t.personas = t.personas && typeof t.personas === "object" ? t.personas : {};
+        if (persona) { if (b.borrar && esAdmin) delete t.personas[persona]; else t.personas[persona] = limpiarTarjeta(b.tarjeta); }
+        if (b.empresa) t.empresa = limpiarEmpresa(b.empresa);
+        const r = await escribirArchivoDatos(RUTA_TARJETAS, t, sha, `Tarjeta de contacto${persona ? " — " + persona : " — empresa"}`);
+        if (r.ok) { res.status(200).json({ ok: true, empresa: t.empresa || {}, personas: t.personas }); return; }
+        if (r.status !== 409 && r.status !== 422) break;
+      }
+      res.status(502).json({ error: "No se pudo guardar la tarjeta" });
+      return;
+    }
     if (b.accion === "compartir_3d") {
       // Vista 3D para mandarle al cliente (por WhatsApp): se guarda una copia
       // del dibujo con un id al azar, sin dirección ni datos internos, y se
@@ -487,11 +515,13 @@ async function manejarCroquis(req, res, autorizacion, body) {
       const propuestas = fuente.slice(0, 3).map((pr) => ({ nombre: txt(pr && pr.nombre, 40), paginas: limpiarPaginas(pr && pr.paginas) })).filter((pr) => pr.paginas.length);
       if (!propuestas.length) { res.status(400).json({ error: "El plano está vacío" }); return; }
       const reg = { titulo: txt(b.titulo, 100) || "Tu sistema de seguridad", cliente: txt(b.cliente, 80), fecha: new Date().toISOString(), por: autorizacion.nombre || "admin", croquis_id: idValido(b.croquis_id) ? b.croquis_id : "", propuestas, paginas: propuestas[0].paginas, presentacion: b.presentacion !== false };
+      const contacto = require("../lib/tarjeta-contacto").armarContacto(b.contacto);
+      if (contacto) reg.contacto = contacto;
       if (JSON.stringify(reg).length > 1500000) { res.status(413).json({ error: "El plano es demasiado grande para compartir" }); return; }
       const id = crypto.randomBytes(8).toString("hex");
       const r = await escribirArchivoDatos(`vistas3d/${id}.json`, reg, undefined, `Vista 3D compartida — ${reg.titulo}`);
       if (!r.ok) { res.status(502).json({ error: "No se pudo guardar la vista 3D" }); return; }
-      await anotarVista3d(id, (lista) => { lista.unshift({ id, titulo: reg.titulo, cliente: reg.cliente, por: reg.por, croquis_id: reg.croquis_id, fecha: reg.fecha, propuestas: propuestas.map((pr) => pr.nombre), aperturas: 0, llamadas: [] }); return lista.slice(0, 500); }).catch(() => {});
+      await anotarVista3d(id, (lista) => { lista.unshift({ id, titulo: reg.titulo, cliente: reg.cliente, por: reg.por, croquis_id: reg.croquis_id, fecha: reg.fecha, propuestas: propuestas.map((pr) => pr.nombre), ...(contacto && contacto.nombre ? { asesor: contacto.nombre } : {}), aperturas: 0, llamadas: [] }); return lista.slice(0, 500); }).catch(() => {});
       res.status(200).json({ ok: true, id });
       return;
     }
@@ -949,7 +979,7 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
         }
       }
       const propuestas = Array.isArray(data.propuestas) && data.propuestas.length ? data.propuestas : [{ nombre: "", paginas: data.paginas || [] }];
-      res.status(200).json({ titulo: data.titulo, cliente: data.cliente, fecha: data.fecha, propuestas, paginas: propuestas[0].paginas, presentacion: data.presentacion !== false });
+      res.status(200).json({ titulo: data.titulo, cliente: data.cliente, fecha: data.fecha, propuestas, paginas: propuestas[0].paginas, presentacion: data.presentacion !== false, ...(data.contacto ? { contacto: data.contacto } : {}) });
     } catch (e) { res.status(502).json({ error: "No se pudo abrir la vista" }); }
     return;
   }

@@ -38,6 +38,10 @@ const Croquis3D = (() => {
     videoportero: { h: 1.5, caja: [0.1, 0.18, 0.03], color: "#2B2F33", pared: true },
     comunicador: { h: 1.7, caja: [0.12, 0.1, 0.04], color: "#E6E6E6", pared: true },
     energizador: { h: 1.6, caja: [0.2, 0.25, 0.08], color: "#F2C94C", pared: true },
+    monoxido: { h: 1.5, caja: [0.12, 0.12, 0.04], color: "#FFFFFF", pared: true },
+    control_remoto: { h: 1.0, caja: [0.035, 0.06, 0.012], color: "#2B2F33" },
+    modulo_rele: { h: 1.6, caja: [0.08, 0.06, 0.03], color: "#FFFFFF", pared: true },
+    camara_solar: { h: 2.8, caja: [0.12, 0.12, 0.2], color: "#F4F4F4", camara: true },
     panico_colgante: { h: 1.0, caja: [0.035, 0.047, 0.016], color: "#FFFFFF" },
     fuente_ups: { h: 0.5, caja: [0.25, 0.3, 0.09], color: "#BFC3C8", pared: true },
     sismico: { h: 0.8, caja: [0.08, 0.06, 0.03], color: "#8E949A", pared: true },
@@ -971,6 +975,7 @@ const Croquis3D = (() => {
           for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; g.add(M(new THREE.SphereGeometry(0.13, 8, 6), mat(0x5a1515), Math.cos(a) * 0.95, -2.2 + Math.sin(a) * 0.95, 2.55)); }
         }
         if (opc.inal) { const w = calcoInal(1.3); w.position.set(-1.9, -3.9, 2.34); g.add(w); }
+        if (opc.mascota && !opc.video) { const pet = texto("PET", 1.9, 0.75, { fondo: "#f1f1ee", color: "#5b6b7b" }); pet.position.set(0, -4.2, 2.34); g.add(pet); }
         // Rótula a la pared.
         g.add(Mx(new THREE.CylinderGeometry(0.8, 1, 2.2, 12), plastico, 0, 0, -3));
         g.position.set(0, 4, -2.6); g.rotation.x = -0.18; pieza.add(g);
@@ -1127,6 +1132,69 @@ const Croquis3D = (() => {
         g.add(led(0xff2020, -1.6, -4.4, 2.5, 0.22)); g.add(led(0x2ecc71, 1.6, -4.4, 2.5, 0.22));
         g.add(Mx(new THREE.CylinderGeometry(0.8, 1, 2.2, 12), plastico, 0, 0, -3));
         g.position.set(0, 4, -2.8); g.rotation.x = -0.18; pieza.add(g);
+      },
+      monoxido() {
+        paredAtras(-2.2);
+        const g = new THREE.Group();
+        g.add(Mx(new THREE.CylinderGeometry(6, 6.2, 3.6, 48), mat(0xf6f6f4, { roughness: 0.3 })));
+        for (let i = -2; i <= 2; i++) g.add(M(new THREE.BoxGeometry(6.4 - Math.abs(i) * 1.1, 0.35, 0.3), mat(0xb9bfc5), 0, -3.2 + i * 0.75, 1.85));
+        const t = texto("CO", 3, 1.6, { fondo: "#f6f6f4", color: "#6b6f76" }); t.position.set(-1.6, 2.6, 1.82); g.add(t);
+        const disp = texto("0 ppm", 3.4, 1.4, { fondo: "#1d2a1d", color: "#7CFC8A", tam: 0.55 }); disp.position.set(0.4, 0.6, 1.82); g.add(disp);
+        g.add(led(0x2ecc71, 2.4, 2.7, 1.85, 0.22));
+        g.rotation.y = -0.2; pieza.add(g);
+      },
+      control_remoto() {
+        // Llavero de 4 botones (armar, desarmar, parcial y pánico) con su argolla.
+        const g = new THREE.Group();
+        g.add(M(caja(3.6, 6.2, 1.2, 1.3), mat(0x23272b, { roughness: 0.35 })));
+        const ic = ["A", "D", "P", "!"];
+        [[-0.85, 1.1], [0.85, 1.1], [-0.85, -0.7], [0.85, -0.7]].forEach(([x, y], i) => {
+          g.add(Mx(new THREE.CylinderGeometry(0.62, 0.62, 0.2, 24), mat(i === 3 ? 0xd63031 : 0x3b4046, { roughness: 0.5 }), x, y, 0.62));
+          const t = texto(ic[i], 0.9, 0.9, { fondo: i === 3 ? "#d63031" : "#3b4046", color: "#e9ecef", tam: 0.7 }); t.position.set(x, y, 0.73); g.add(t);
+        });
+        g.add(led(0x2ecc71, 0, -2.2, 0.62, 0.13));
+        g.add(M(new THREE.TorusGeometry(0.5, 0.18, 8, 20), mat(0x23272b), 0, 3.4, 0));
+        g.add(M(new THREE.TorusGeometry(1.6, 0.12, 8, 40), metal, 0, 5.2, 0));
+        g.rotation.set(0.25, -0.35, 0.12);
+        anim.push((t) => { g.rotation.z = 0.12 + Math.sin(t * 1.3) * 0.06; });
+        paredAtras(-4);
+        pieza.add(g); girar = false;
+      },
+      modulo_rele() {
+        // Módulo relé inalámbrico: cajita blanca con borneras, LED y los cables al motor del portón.
+        paredAtras(-1.6);
+        const g = new THREE.Group();
+        g.add(M(caja(7.5, 5, 2.6, 0.8), mat(0xf6f6f4, { roughness: 0.3 })));
+        for (let i = 0; i < 4; i++) {
+          g.add(M(new THREE.BoxGeometry(1.2, 1.2, 1), mat(0x2e7d32, { roughness: 0.5 }), -2.4 + i * 1.6, -1.4, 1.4));
+          g.add(Mx(new THREE.CylinderGeometry(0.32, 0.32, 0.2, 12), metal, -2.4 + i * 1.6, -1.4, 1.95));
+        }
+        g.add(led(0x2e86de, 2.7, 1.4, 1.32, 0.22));
+        const c = calcoInal(1.3); c.position.set(-2.4, 1.2, 1.31); g.add(c);
+        [0x1c1e21, 0xc0392b].forEach((col, i) => g.add(M(new THREE.CylinderGeometry(0.18, 0.18, 6, 8), mat(col), -1.6 + i * 1.6, -5, 1.4)));
+        pieza.add(g); base = 0.3;
+      },
+      camara_solar() {
+        // Cámara 4G en un caño, con el panel solar arriba y la antena.
+        const g = new THREE.Group();
+        g.add(M(new THREE.CylinderGeometry(1.2, 1.2, 14, 16), metal, 0, -6, -3));
+        const panel = new THREE.Group();
+        panel.add(M(new THREE.BoxGeometry(26, 0.8, 18), mat(0xc9ced3, { metalness: 0.6, roughness: 0.35 })));
+        const cv = document.createElement("canvas"); cv.width = 260; cv.height = 180; const cx = cv.getContext("2d");
+        cx.fillStyle = "#16283f"; cx.fillRect(0, 0, 260, 180); cx.strokeStyle = "#5f86b3"; cx.lineWidth = 2;
+        for (let x = 0; x <= 260; x += 26) { cx.beginPath(); cx.moveTo(x, 0); cx.lineTo(x, 180); cx.stroke(); }
+        for (let y = 0; y <= 180; y += 30) { cx.beginPath(); cx.moveTo(0, y); cx.lineTo(260, y); cx.stroke(); }
+        const cel = M(new THREE.PlaneGeometry(25, 17), new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(cv), roughness: 0.15, metalness: 0.4 }), 0, 0.42, 0); cel.rotation.x = -Math.PI / 2; panel.add(cel);
+        panel.position.set(0, 12, -3); panel.rotation.x = 0.6; g.add(panel);
+        g.add(M(new THREE.CylinderGeometry(0.6, 0.6, 10, 10), metal, 0, 6, -3));
+        const cam = new THREE.Group();
+        cam.add(M(caja(9, 6, 9, 2), plastico));
+        cam.add(M(new THREE.SphereGeometry(4.2, 32, 20), plastico, 0, -4.6, 0));
+        cam.add(Mx(new THREE.CylinderGeometry(1.6, 1.6, 0.8, 24), oscuro, 0, -4.8, 3.9));
+        cam.add(Mx(new THREE.CylinderGeometry(0.8, 0.9, 0.5, 20), vidrio, 0, -4.8, 4.35));
+        cam.add(M(new THREE.CylinderGeometry(0.35, 0.35, 9, 8), oscuro, 3.6, 6, -2.4));
+        cam.position.set(0, -2, 1.5); g.add(cam);
+        pieza.add(g); base = 0.2;
       },
       panico_colgante() {
         // Botón colgante: cuerpo chico redondeado con el botón grande, y el cordón.
@@ -1804,6 +1872,19 @@ const CROQUIS_3D_ESTILO = `
 .v3-acciones{display:flex;flex-wrap:wrap;gap:6px}.v3-acciones button{justify-content:center;flex:1 1 auto}
 .v3-acciones button.on{background:var(--ac);color:#1C1E21}.v3-acciones .v3-peligro{color:#C0392B;border-color:#C0392B}
 .v3-acciones button.v3-primario{background:#1C1E21;color:#fff;border-color:#1C1E21}
+.v3-asesor{margin-left:auto;pointer-events:auto;display:flex;gap:8px;align-items:center;max-width:52%;padding:5px 10px 5px 5px;border-radius:999px;border:1px solid var(--bd);background:var(--sup);color:var(--fg);font:inherit;text-align:left;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.v3-asesor b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.v3-asesor small{font-size:11px}.v3-asesor>span:last-child{min-width:0}
+.v3-av{flex:none;display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:#1C1E21;color:#F2C94C;font:700 13px system-ui,sans-serif;letter-spacing:.5px}
+.v3-tarjeta .v3-av{width:52px;height:52px;font-size:18px}
+.v3-asesor{position:relative}
+@media (max-width:600px){.v3-asesor{padding:3px;max-width:none;border-color:#25D366;border-width:2px}.v3-asesor>span:last-child{display:none}.v3-asesor .v3-av{width:40px;height:40px}.v3-asesor::after{content:"";position:absolute;right:-1px;bottom:-1px;width:13px;height:13px;border-radius:50%;background:#25D366;border:2px solid var(--sup)}}
+.v3-tj-cab{display:flex;gap:12px;align-items:center;margin-bottom:12px}.v3-tj-cab b{display:block;font-size:17px}.v3-tj-cab small{display:block;color:var(--tenue);font-size:13px;margin-top:2px}
+.v3-tj-acc{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:6px;margin-bottom:10px}
+.v3-tj-acc a,.v3-tj-redes a{display:flex;gap:6px;align-items:center;justify-content:center;padding:10px 8px;border-radius:10px;border:1px solid var(--bd);background:var(--bg);color:var(--fg);font:600 13.5px system-ui,sans-serif;text-decoration:none}
+.v3-tj-acc a.v3-wa{background:#25D366;border-color:#25D366;color:#fff}
+.v3-tj-dato{display:flex;gap:8px;align-items:flex-start;margin:6px 0;color:var(--tenue);font-size:13.5px}
+.v3-tj-redes{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}.v3-tj-redes a{flex:1 1 auto;padding:8px}
+.v3-tj-redes svg,.v3-tj-acc svg{width:17px;height:17px;flex:none}
 .v3-link{display:block;margin:10px auto 0;background:none;border:0;color:var(--tenue);font:600 14px inherit;font-family:inherit;text-decoration:underline;cursor:pointer}
 @media (max-width:480px){.v3-barra,.v3-props{gap:4px}.v3-barra button,.v3-props button{padding:9px 9px;font-size:13px}}
 .v3-vitrina{height:170px;margin:-4px -4px 10px;border-radius:12px;overflow:hidden;background:linear-gradient(#FFFFFF,#E4E8EC)}
@@ -1826,13 +1907,14 @@ const CROQUIS_3D_LEYENDA = {
   rotura_vidrio: ["Detector de rotura de vidrio", "#17809B"], pulsador_asalto: ["Botón de pánico", "#E8741E"], pulsador_incendio: ["Pulsador de incendio", "#E00000"],
   camara_ip: ["Cámara", "#F4F4F4"], camara_analoga: ["Cámara", "#F4F4F4"], camara_domo: ["Cámara domo", "#F4F4F4"], dvr: ["Grabador DVR / NVR", "#2B2F33"], detector_360: ["Detector de techo 360°", "#FFFFFF"],
   barrera: ["Barrera infrarroja exterior", "#E00000"], lector_acceso: ["Lectora de tag / tarjeta", "#1B5FA8"], cerradura: ["Cerradura de pestillo", "#1B5FA8"], cerradura_magnetica: ["Cerradura electromagnética", "#1B5FA8"],
-  boton_salida: ["Botón de salida", "#2E9E4F"], doble_tecnologia: ["Sensor de doble tecnología", "#C0392B"], panico_colgante: ["Botón de pánico colgante", "#E8741E"], fuente_ups: ["UPS / fuente con batería", "#5B5F66"], sismico: ["Sensor sísmico (caja fuerte)", "#8A5A00"], videoportero: ["Videoportero", "#1C1E21"], comunicador: ["Comunicador 4G", "#D9D9D9"], energizador: ["Energizador de cerco eléctrico", "#F2C94C"], vibracion: ["Sensor de vibración", "#8A5A00"], inundacion: ["Detector de inundación", "#2E86DE"],
+  boton_salida: ["Botón de salida", "#2E9E4F"], doble_tecnologia: ["Sensor de doble tecnología", "#C0392B"], panico_colgante: ["Botón de pánico colgante", "#E8741E"], fuente_ups: ["UPS / fuente con batería", "#5B5F66"], monoxido: ["Detector de monóxido (CO)", "#6B6F76"], control_remoto: ["Control remoto (llavero)", "#2B2F33"], modulo_rele: ["Módulo relé (portón / automatización)", "#2E86DE"], camara_solar: ["Cámara 4G con panel solar", "#F4F4F4"], sismico: ["Sensor sísmico (caja fuerte)", "#8A5A00"], videoportero: ["Videoportero", "#1C1E21"], comunicador: ["Comunicador 4G", "#D9D9D9"], energizador: ["Energizador de cerco eléctrico", "#F2C94C"], vibracion: ["Sensor de vibración", "#8A5A00"], inundacion: ["Detector de inundación", "#2E86DE"],
 };
 // Nombre de un equipo según cómo es (inalámbrico, PIR con cámara...).
 function croquis3dNombre(e) {
   if (!e) return "";
   const base = (CROQUIS_3D_LEYENDA[e.tipo] || [(CROQUIS_SIMBOLOS[e.tipo] || {}).nombre || e.tipo])[0];
-  if (e.tipo === "infrarrojo" && e.video) return "Sensor de movimiento con cámara (PIR CAM)" + (e.inal ? "" : "");
+  if (e.tipo === "infrarrojo" && e.video) return "Sensor de movimiento con cámara (PIR CAM)";
+  if (e.tipo === "infrarrojo" && e.mascota) return "Sensor de movimiento antimascotas" + (e.inal ? " inalámbrico" : "");
   if (e.inal && /^(infrarrojo|magnetico|humo|sirena|teclado|rotura|pulsador|detector_360|vibracion|doble_tecnologia)/.test(e.tipo)) return base.replace(/ \(.*?\)$/, "") + (/^sirena/.test(e.tipo) ? " inalámbrica" : " inalámbrico");
   return base;
 }
@@ -1876,14 +1958,18 @@ const CROQUIS_3D_EXPLICA = {
   vibracion: "Detecta golpes o vibraciones en una pared, una caja fuerte o una reja, antes de que la rompan.",
   inundacion: "Va en el piso: avisa apenas detecta agua (pérdidas, lavarropas, termotanque, bombas) antes de que sea un problema.",
   doble_tecnologia: "Combina infrarrojo y microondas: solo avisa cuando las dos tecnologías detectan a la vez. Ideal para garajes, galpones o lugares con corrientes de aire, sol o calefacción, porque casi no da falsas alarmas.",
+  monoxido: "Avisa si hay monóxido de carbono, el gas invisible y sin olor que largan calefactores, estufas y calefones mal ventilados. Salva vidas.",
+  control_remoto: "Un llavero para activar y desactivar la alarma sin tocar el teclado, desde el auto o la puerta. También tiene botón de pánico.",
+  modulo_rele: "Abre el portón o prende luces y riego desde el celular, o automáticamente cuando suena la alarma.",
+  camara_solar: "Cámara que funciona sin cables: se alimenta con el panel solar y transmite por 4G. Ideal para campos, obras, quintas o lugares sin luz ni internet.",
   panico_colgante: "Se lleva colgado del cuello o en la muñeca: con un toque pedís ayuda desde cualquier lugar de la casa. Ideal para personas mayores.",
   fuente_ups: "Mantiene funcionando las cámaras, el grabador y la alarma cuando se corta la luz.",
   sismico: "Va pegado a la caja fuerte o al tesoro: detecta golpes, taladros y amoladoras antes de que logren abrirla.",
 };
 const ALCANCE_TXT = { infrarrojo: "11", infrarrojo_ext: "12", infrarrojo_cortina: "10", doble_tecnologia: "12" };
 // Equipos que se pueden agregar tocando en el 3D (en este orden).
-const CROQUIS_3D_PALETA = ["infrarrojo", "infrarrojo|inal", "infrarrojo|video,inal", "doble_tecnologia", "infrarrojo_ext", "infrarrojo_cortina", "barrera", "magnetico", "magnetico|inal", "humo", "inundacion", "rotura_vidrio", "sismico", "detector_360", "sirena_int", "sirena_int|inal", "sirena_ext", "sirena_ext|inal", "teclado", "teclado|inal", "central", "hub", "pulsador_asalto", "panico_colgante", "fuente_ups", "camara_ip", "camara_domo", "dvr", "lector_acceso", "cerradura_magnetica", "cerradura", "boton_salida", "videoportero"];
-const CROQUIS_3D_CON_ZONA = ["barrera", "doble_tecnologia", "panico_colgante", "sismico", "inundacion", "infrarrojo", "infrarrojo_ext", "infrarrojo_cortina", "magnetico", "humo", "gas", "rotura_vidrio", "detector_360", "pulsador_asalto", "pulsador_incendio"];
+const CROQUIS_3D_PALETA = ["infrarrojo", "infrarrojo|inal", "infrarrojo|video,inal", "infrarrojo|mascota", "doble_tecnologia", "infrarrojo_ext", "infrarrojo_cortina", "barrera", "magnetico", "magnetico|inal", "humo", "monoxido", "inundacion", "rotura_vidrio", "sismico", "detector_360", "sirena_int", "sirena_int|inal", "sirena_ext", "sirena_ext|inal", "teclado", "teclado|inal", "control_remoto", "central", "hub", "modulo_rele", "pulsador_asalto", "panico_colgante", "fuente_ups", "camara_ip", "camara_domo", "camara_solar", "dvr", "lector_acceso", "cerradura_magnetica", "cerradura", "boton_salida", "videoportero"];
+const CROQUIS_3D_CON_ZONA = ["barrera", "monoxido", "doble_tecnologia", "panico_colgante", "sismico", "inundacion", "infrarrojo", "infrarrojo_ext", "infrarrojo_cortina", "magnetico", "humo", "gas", "rotura_vidrio", "detector_360", "pulsador_asalto", "pulsador_incendio"];
 // Pitido corto (detección) — solo si el navegador lo permite.
 let croquis3dAudio = null;
 function croquis3dPitido(frec, dur) {
@@ -1899,6 +1985,39 @@ function croquis3dPitido(frec, dur) {
 //   edicion { alCambiar(indicePagina, elementos), marcarInst },
 //   debiles (mostrar puntos débiles al abrir), llamar(datos) -> Promise (botón
 //   "Quiero que me llamen"), paraCaptura.
+// Tarjeta de contacto (quien asesoró): se vuelve a limpiar acá porque el
+// archivo HTML independiente no pasa por el servidor.
+function croquis3dContacto(c) {
+  if (!c || typeof c !== "object") return null;
+  const t = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
+  const url = (v) => { const u = t(v, 200); return /^https?:\/\/[^\s<>"']+$/i.test(u) ? u : ""; };
+  const e = c.empresa && typeof c.empresa === "object" ? c.empresa : {};
+  const r = { nombre: t(c.nombre, 60), puesto: t(c.puesto, 60), telefono: t(c.telefono, 30), email: /^[^\s@<>"]+@[^\s@<>"]+$/.test(t(c.email, 80)) ? t(c.email, 80) : "",
+    empresa: { nombre: t(e.nombre, 60), horarios: t(e.horarios, 160), telefono: t(e.telefono, 30), web: url(e.web), instagram: url(e.instagram), facebook: url(e.facebook) } };
+  if (!r.nombre && !r.empresa.nombre) return null;
+  r.iniciales = (r.nombre || r.empresa.nombre).split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0].toUpperCase()).join("");
+  r.whatsapp = croquis3dWhatsapp(r.telefono || r.empresa.telefono);
+  return r;
+}
+// Número para wa.me (Argentina): "011 15 5555-1234" -> 5491155551234.
+function croquis3dWhatsapp(tel) {
+  let d = String(tel || "").replace(/\D/g, "");
+  if (!d) return "";
+  if (/^549\d{10}$/.test(d)) return d;
+  if (/^54\d{10}$/.test(d)) return "549" + d.slice(2);
+  d = d.replace(/^0/, "");
+  if (d.length === 12) for (const a of [2, 3, 4]) if (d.substr(a, 2) === "15") { d = d.slice(0, a) + d.slice(a + 2); break; }
+  return d.length === 10 ? "549" + d : d.length >= 11 ? d : "";
+}
+function croquis3dVCard(c) {
+  const e = c.empresa || {}, x = (v) => String(v || "").replace(/[\\;,]/g, (m) => "\\" + m);
+  const partes = String(c.nombre || e.nombre || "").split(" ");
+  return ["BEGIN:VCARD", "VERSION:3.0", `FN:${x(c.nombre || e.nombre)}`, `N:${x(partes.slice(1).join(" "))};${x(partes[0])};;;`,
+    e.nombre ? `ORG:${x(e.nombre)}` : "", c.puesto ? `TITLE:${x(c.puesto)}` : "",
+    c.telefono ? `TEL;TYPE=CELL:${c.telefono}` : "", e.telefono ? `TEL;TYPE=WORK:${e.telefono}` : "", c.email ? `EMAIL:${c.email}` : "",
+    e.web ? `URL:${e.web}` : "", e.instagram ? `URL:${e.instagram}` : "", e.horarios ? `NOTE:${x("Horarios: " + e.horarios)}` : "", "END:VCARD"].filter(Boolean).join("\r\n");
+}
+if (typeof window !== "undefined") Object.assign(window, { croquis3dContacto, croquis3dWhatsapp, croquis3dVCard });
 function iniciarVisor3D(datos, opciones) {
   const o = opciones || {};
   const d = datos || {};
@@ -1916,6 +2035,7 @@ function iniciarVisor3D(datos, opciones) {
     .map((pr) => ({ nombre: String(pr.nombre || ""), paginas: limpiarPaginas(pr.paginas) }))
     .filter((pr) => pr.paginas.length);
   if (!propuestas.length) { raiz.innerHTML = `<div class="v3-error">Este plano no tiene nada para mostrar en 3D.</div>`; return null; }
+  const contacto = croquis3dContacto(d.contacto);
   let prop = 0, pag = 0;
   let paginas = propuestas[0].paginas;
   const titulo = d.titulo || "Tu sistema de seguridad";
@@ -1926,7 +2046,7 @@ function iniciarVisor3D(datos, opciones) {
   const enFrase = (e) => croquis3dNombre(e).replace(/\s*\(.*?\)/g, "").toLowerCase() + (e.etq ? " de la zona " + e.etq : "");
   raiz.insertAdjacentHTML("beforeend", `
     <div class="v3-lienzo"></div>
-    <div class="v3-cab">${d.logo ? `<img src="${d.logo}" alt="">` : ""}<div><b>${esc(titulo)}</b><small>${esc([d.cliente, d.empresa ? "Propuesta de " + d.empresa : ""].filter(Boolean).join(" · "))}</small></div></div>
+    <div class="v3-cab">${d.logo ? `<img src="${d.logo}" alt="">` : ""}<div><b>${esc(titulo)}</b><small>${esc([d.cliente, d.empresa ? "Propuesta de " + d.empresa : ""].filter(Boolean).join(" · "))}</small></div>${contacto ? `<button type="button" class="v3-asesor" data-a="contacto" aria-label="Contacto de quien te asesoró"><span class="v3-av">${esc(contacto.iniciales)}</span><span><small>Te asesoró</small><b>${esc(contacto.nombre || contacto.empresa.nombre)}</b></span></button>` : ""}</div>
     <div class="v3-pags hidden"></div>
     <details class="v3-ley" ${window.innerWidth > 700 ? "open" : ""}></details>
     <div class="v3-pie"><div class="v3-aviso hidden"></div><div class="v3-hoja hidden"></div><div class="v3-props hidden"></div><div class="v3-tira hidden"></div><div class="v3-barra"></div></div>`);
@@ -2263,7 +2383,7 @@ function iniciarVisor3D(datos, opciones) {
       ${esCamara(e) ? `<div class="v3-acciones"><button type="button" data-h="vercam" class="v3-primario">Ver lo que ve</button></div>` : ""}<button type="button" class="v3-link" data-h="cerrar">Cerrar</button>`;
     hoja.classList.remove("hidden");
     // El equipo en 3D, como es de verdad (se libera solo al cerrar la ficha).
-    try { Croquis3D.vitrina(hoja.querySelector(".v3-vitrina"), e.tipo, { inal: !!e.inal, video: !!e.video }); } catch (er) { hoja.querySelector(".v3-vitrina").remove(); }
+    try { Croquis3D.vitrina(hoja.querySelector(".v3-vitrina"), e.tipo, { inal: !!e.inal, video: !!e.video, mascota: !!e.mascota }); } catch (er) { hoja.querySelector(".v3-vitrina").remove(); }
     visor.marcar(e.id);
     hoja.onclick = (ev) => { const b = ev.target.closest("button"); if (!b) return; if (b.dataset.h === "vercam") { verCamara(e); return; } cerrarHoja(); };
   }
@@ -2304,7 +2424,7 @@ function iniciarVisor3D(datos, opciones) {
       if (ps.vista) visor.alternar(ps.vista);
       decir("");
       hoja.innerHTML = `<div class="v3-puntos">${pasos.map((x, j) => `<i class="${j === i ? "on" : ""}"></i>`).join("")}</div><b>${ps.t}</b><p class="v3-paso-texto">${ps.p()}</p>
-        <div class="v3-acciones">${i > 0 ? `<button type="button" data-h="ant">Anterior</button>` : ""}${ps.final ? (o.llamar ? `<button type="button" data-h="llamar" class="v3-primario">Quiero que me llamen</button>` : "") + `<button type="button" data-h="fin"${o.llamar ? "" : ' class="v3-primario"'}>Ver la casa por mi cuenta</button>` : `<button type="button" data-h="sig" class="v3-primario">${i === 0 ? "Empezar" : "Siguiente"}</button>`}</div>
+        <div class="v3-acciones">${i > 0 ? `<button type="button" data-h="ant">Anterior</button>` : ""}${ps.final ? (o.llamar ? `<button type="button" data-h="llamar" class="v3-primario">Quiero que me llamen</button>` : "") + (contacto && contacto.nombre ? `<button type="button" data-h="contacto">Hablar con ${esc(contacto.nombre.split(" ")[0])}</button>` : "") + `<button type="button" data-h="fin"${o.llamar ? "" : ' class="v3-primario"'}>Ver la casa por mi cuenta</button>` : `<button type="button" data-h="sig" class="v3-primario">${i === 0 ? "Empezar" : "Siguiente"}</button>`}</div>
         ${ps.final ? "" : `<button type="button" class="v3-link" data-h="fin">Saltar</button>`}`;
       hoja.classList.remove("hidden");
       if (ps.simular) {
@@ -2322,9 +2442,50 @@ function iniciarVisor3D(datos, opciones) {
         if (b.dataset.h === "ant") { i = Math.max(0, i - 1); mostrar(); }
         if (b.dataset.h === "fin") fin();
         if (b.dataset.h === "llamar") { fin(); hojaLlamar(); }
+        if (b.dataset.h === "contacto") { fin(); hojaContacto(); }
       };
     };
     mostrar();
+  }
+  // ---- Tarjeta de contacto de quien lo asesoró ----
+  function hojaContacto() {
+    if (!contacto) return;
+    const c = contacto, em = c.empresa;
+    const ic = {
+      wa: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm5.3 14.1c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.3-.7-2.8-1.1-4.5-3.9-4.7-4.1-.1-.2-1.1-1.5-1.1-2.9s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.4 0 .5l-.3.5-.4.4c-.1.1-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.3 2.4 1.5.3.1.5.1.6-.1l.9-1c.2-.3.4-.2.6-.1l1.9.9c.3.1.5.2.5.3.1.1.1.6-.1 1.2Z"/></svg>',
+      tel: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 3h4l2 5-2.5 1.5a11 11 0 0 0 6 6L16 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 5a2 2 0 0 1 2-2Z"/></svg>',
+      mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>',
+      web: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>',
+      ig: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/></svg>',
+      fb: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 8h3V4h-3a4 4 0 0 0-4 4v2H7v4h3v8h4v-8h3l1-4h-4V8.5c0-.3.2-.5.5-.5Z"/></svg>',
+      reloj: '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    };
+    const a = (href, cls, icono, txt) => `<a href="${esc(href)}" target="_blank" rel="noopener" class="${cls}">${icono}${esc(txt)}</a>`;
+    const tel = c.telefono || em.telefono;
+    const saludo = `Hola${c.nombre ? " " + c.nombre.split(" ")[0] : ""}! Vi la propuesta en 3D de ${titulo}${propuestas.length > 1 ? " (me interesa: " + (propuestas[prop].nombre || "Propuesta " + (prop + 1)) + ")" : ""} y quería consultarte.`;
+    hoja.innerHTML = `<div class="v3-tarjeta">
+      <div class="v3-tj-cab"><span class="v3-av">${esc(c.iniciales)}</span><div><b>${esc(c.nombre || em.nombre)}</b><small>${esc([c.puesto, c.nombre ? em.nombre : ""].filter(Boolean).join(" · "))}</small></div></div>
+      <div class="v3-tj-acc">${c.whatsapp ? a(`https://wa.me/${c.whatsapp}?text=${encodeURIComponent(saludo)}`, "v3-wa", ic.wa, "WhatsApp") : ""}${tel ? a("tel:" + tel.replace(/[^\d+]/g, ""), "", ic.tel, "Llamar") : ""}${c.email ? a("mailto:" + c.email + "?subject=" + encodeURIComponent("Propuesta " + titulo), "", ic.mail, "Mail") : ""}</div>
+      ${tel ? `<div class="v3-tj-dato">${ic.tel.replace("<svg ", '<svg width="17" height="17" ')}<span>${esc(tel)}${c.email ? " · " + esc(c.email) : ""}</span></div>` : ""}
+      ${em.horarios ? `<div class="v3-tj-dato">${ic.reloj}<span>${esc(em.horarios)}</span></div>` : ""}
+      ${em.web || em.instagram || em.facebook ? `<div class="v3-tj-redes">${em.web ? a(em.web, "", ic.web, em.web.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "")) : ""}${em.instagram ? a(em.instagram, "", ic.ig, "Instagram") : ""}${em.facebook ? a(em.facebook, "", ic.fb, "Facebook") : ""}</div>` : ""}
+      <div class="v3-acciones"><button type="button" data-h="guardar" class="v3-primario">Guardar contacto</button>${o.llamar ? `<button type="button" data-h="llamar">Quiero que me llamen</button>` : ""}</div>
+      <button type="button" class="v3-link" data-h="cerrar">Cerrar</button></div>`;
+    hoja.classList.remove("hidden");
+    hoja.onclick = (ev) => {
+      const b = ev.target.closest("button"); if (!b) return;
+      if (b.dataset.h === "cerrar") cerrarHoja();
+      if (b.dataset.h === "llamar") hojaLlamar();
+      if (b.dataset.h === "guardar") {
+        // vCard: el teléfono la abre y ofrece agendar el contacto.
+        const ln = document.createElement("a");
+        ln.href = URL.createObjectURL(new Blob([croquis3dVCard(c)], { type: "text/vcard;charset=utf-8" }));
+        setTimeout(() => URL.revokeObjectURL(ln.href), 60000);
+        ln.download = ((c.nombre || em.nombre || "contacto").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\w\s-]/g, "").trim() || "contacto") + ".vcf";
+        document.body.appendChild(ln); ln.click(); ln.remove();
+        decir("Abrí el archivo para agendar el contacto.", false, 3);
+      }
+    };
   }
   // ---- Quiero que me llamen ----
   function hojaLlamar() {
@@ -2371,6 +2532,8 @@ function iniciarVisor3D(datos, opciones) {
     cerrarHoja(); decir(""); armar(true);
     pintarLeyenda(); pintarProps(); pintarPags(); pintarBarra();
   });
+  const btnAsesor = raiz.querySelector(".v3-asesor");
+  if (btnAsesor) btnAsesor.addEventListener("click", () => { if (!editando) { if (visor) visor.pararSimulacion(); hojaContacto(); } });
   barra.addEventListener("click", (ev) => {
     const b = ev.target.closest("button"); if (!b) return;
     if (b.dataset.extra != null) { const x = o.extras[Number(b.dataset.extra)]; if (x && x.alHacer) x.alHacer(); return; }
@@ -2400,7 +2563,7 @@ function iniciarVisor3D(datos, opciones) {
     const v = visor.alternar(a);
     if (a === "cobertura") b.classList.toggle("on", v.cobertura);
   });
-  return { destruir() { visor.destruir(); raiz.innerHTML = ""; }, captura() { return visor.captura(); }, get visor() { return visor; }, get paginas() { return paginas; }, presentar };
+  return { destruir() { visor.destruir(); raiz.innerHTML = ""; }, captura() { return visor.captura(); }, get visor() { return visor; }, get paginas() { return paginas; }, presentar, contacto: hojaContacto };
 }
 if (typeof window !== "undefined") window.iniciarVisor3D = iniciarVisor3D;
 

@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.33.0";
+const APP_VERSION = "4.34.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -17076,6 +17076,7 @@ function cqMandar3D(datos) {
     <div class="cq3d-estado pe-nota"></div>
     <label class="cq3d-fila cq3d-pres"><input type="checkbox" class="cq3d-presentacion"${cqTodosLosElementos().some((e) => e.prev) ? "" : " checked"}> Mostrarle la presentación guiada al abrir</label>
     <p class="pe-nota" style="margin-top:-4px">${cqTodosLosElementos().some((e) => e.prev) ? "Es un agregado a un sistema que ya tiene: por eso viene sin presentación (podés activarla)." : "Para un cliente nuevo: le explica paso a paso su casa, por dónde podrían entrar y cómo la protege."}</p>
+    <div class="cq3d-tarjeta pe-nota">Buscando tu tarjeta de contacto…</div>
     <details class="cq3d-comparar"><summary>Mandar junto con otra propuesta para comparar</summary>
       <div class="cq3d-otras pe-nota">Buscando otros planos de este cliente…</div>
     </details>
@@ -17094,6 +17095,30 @@ function cqMandar3D(datos) {
     const f = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }); };
     caja.innerHTML = "<b>Ya mandados:</b><br>" + l.slice(0, 4).map((v) => `${escapeHtml(f(v.fecha))}${v.propuestas && v.propuestas.length > 1 ? " (" + v.propuestas.map(escapeHtml).join(" / ") + ")" : ""}: ${v.aperturas ? `abierto ${v.aperturas} ${v.aperturas === 1 ? "vez" : "veces"}, último ${escapeHtml(f(v.ultima))}` : "todavía no lo abrió"}${(v.llamadas || []).length ? ` · <b>pidió que lo llamen: ${escapeHtml(v.llamadas[v.llamadas.length - 1].telefono)}</b>` : ""}`).join("<br>");
   }).catch(() => {});
+  // Tarjeta de contacto de quien lo asesoró (va en la vista del cliente).
+  let tarjetas = null;
+  const pintarTarjeta = () => {
+    const caja = capa.querySelector(".cq3d-tarjeta");
+    if (!caja) return;
+    if (!tarjetas) { caja.innerHTML = `Sin conexión: no se puede sumar la tarjeta de contacto.`; return; }
+    const claves = Object.keys(tarjetas.personas).filter((k) => tarjetas.personas[k] && (tarjetas.personas[k].nombre || "").trim());
+    const previa = caja.querySelector("select") ? caja.querySelector("select").value : "";
+    const elegida = claves.includes(previa) ? previa : claves.includes(tarjetas.yo) ? tarjetas.yo : claves[0] || "";
+    if (!claves.length) {
+      caja.innerHTML = `<b>Tarjeta de contacto</b><br>Todavía no cargaste tu tarjeta: el cliente vería tu nombre, tu WhatsApp, los horarios y las redes de la empresa. <button type="button" class="link-btn" data-m="tarjeta">Cargar mi tarjeta</button>`;
+      return;
+    }
+    caja.innerHTML = `<label class="cq3d-fila"><input type="checkbox" class="cq3d-con-tarjeta" checked> <b>Incluir la tarjeta de contacto de quien lo asesoró</b></label>
+      <label class="cq3d-fila">Lo asesoró: <select class="cq3d-asesor">${claves.map((k) => `<option value="${escapeHtml(k)}"${k === elegida ? " selected" : ""}>${escapeHtml(tarjetas.personas[k].nombre)}${tarjetas.personas[k].puesto ? " — " + escapeHtml(tarjetas.personas[k].puesto) : ""}</option>`).join("")}</select></label>
+      <button type="button" class="link-btn" data-m="tarjeta">${tarjetas.admin ? "Editar las tarjetas" : "Editar mi tarjeta"}</button>`;
+  };
+  cq3dTraerTarjetas().then((t) => { tarjetas = t; pintarTarjeta(); }).catch(() => { tarjetas = null; pintarTarjeta(); });
+  capa.addEventListener("click", (e) => {
+    if (!e.target.closest('[data-m="tarjeta"]')) return;
+    e.stopImmediatePropagation();
+    const sel = capa.querySelector(".cq3d-asesor");
+    cqEditarTarjetas(tarjetas, sel ? sel.value : "").then((t) => { if (t) { tarjetas = t; pintarTarjeta(); } });
+  }, true);
   // Otras propuestas del mismo cliente.
   let otras = [];
   cq3dOtrosDelCliente().then((l) => {
@@ -17115,10 +17140,12 @@ function cqMandar3D(datos) {
     const elegidas = [...capa.querySelectorAll(".cq3d-otras input[type=checkbox]:checked")].slice(0, 2).map((x) => ({ c: otras[Number(x.dataset.i)], nombre: (capa.querySelector(`[data-n="${x.dataset.i}"]`).value || "").trim() }));
     const nombreActual = ((capa.querySelector(".cq3d-nombre-actual") || {}).value || "").trim();
     const conPresentacion = !!(capa.querySelector(".cq3d-presentacion") || {}).checked;
+    const asesor = (capa.querySelector(".cq3d-con-tarjeta") || {}).checked ? (capa.querySelector(".cq3d-asesor") || {}).value : "";
+    const contacto = asesor && tarjetas && tarjetas.personas[asesor] ? { ...tarjetas.personas[asesor], empresa: tarjetas.empresa || {} } : null;
     capa.remove();
     if (m === "copia") { document.querySelector(".v3-capa [data-a=cerrar]")?.click(); cqOtraPropuesta(); return; }
     if (m === "cerrar") return;
-    let paquete = { titulo: datos.titulo, cliente: datos.cliente, croquis_id: cq.id || "", paginas: datos.paginas, presentacion: conPresentacion };
+    let paquete = { titulo: datos.titulo, cliente: datos.cliente, croquis_id: cq.id || "", paginas: datos.paginas, presentacion: conPresentacion, ...(contacto ? { contacto } : {}) };
     if (elegidas.length) {
       const espera = cqCapaCargando("Juntando las propuestas…");
       espera.style.zIndex = "9600";
@@ -17131,6 +17158,76 @@ function cqMandar3D(datos) {
     }
     if (m === "link") cqMandar3DLink(paquete);
     if (m === "html") cqMandar3DArchivo(paquete);
+  });
+}
+// ---------- Tarjeta de contacto (quién asesoró al cliente) ----------
+async function cq3dTraerTarjetas() {
+  const r = await fetch("/api/datos?coleccion=croquis&tarjetas=1", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN } });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || "No se pudieron traer las tarjetas");
+  return { yo: d.yo || tecnicoLogueado || "", admin: !!d.admin, empresaEditable: !!d.empresaEditable, empresa: d.empresa || {}, personas: d.personas || {} };
+}
+// Editor: la propia (o, la oficina, la de cualquiera) y los datos de la empresa.
+function cqEditarTarjetas(info, quien) {
+  return new Promise((ok) => {
+    const t = info || { yo: tecnicoLogueado || "", admin: false, empresaEditable: false, empresa: {}, personas: {} };
+    const claves = [...new Set([t.yo, ...Object.keys(t.personas)].filter(Boolean))];
+    let persona = t.admin ? (quien || t.yo || claves[0] || "") : t.yo;
+    const em = t.empresa || {};
+    const capa = document.createElement("div");
+    capa.className = "cq-datos-capa";
+    capa.style.zIndex = "9700";
+    const campo = (id, rotulo, valor, extra) => `<label class="field-label" for="${id}" style="margin-top:8px;">${rotulo}</label><input class="field-input" id="${id}" value="${escapeHtml(valor || "")}" autocomplete="off" ${extra || ""}>`;
+    const pintar = () => {
+      const p = t.personas[persona] || (persona === t.yo ? { nombre: t.yo } : { nombre: persona });
+      capa.innerHTML = `<div class="cq-datos cq-menu">
+        <h3>Tarjeta de contacto</h3>
+        <p class="pe-nota">El cliente la ve en la vista 3D: con un toque te escribe por WhatsApp, te llama o te agenda.</p>
+        ${t.admin ? `<label class="field-label" for="tjQuien">De quién</label><select class="field-input" id="tjQuien">${claves.map((k) => `<option value="${escapeHtml(k)}"${k === persona ? " selected" : ""}>${escapeHtml((t.personas[k] || {}).nombre || k)}</option>`).join("")}<option value="__otra">Otra persona (un vendedor sin la app)…</option></select>` : ""}
+        ${campo("tjNombre", "Nombre y apellido", p.nombre, 'maxlength="60" placeholder="Ej: Ana Ruiz"')}
+        ${campo("tjPuesto", "Puesto", p.puesto, 'maxlength="60" placeholder="Ej: Asesora comercial"')}
+        ${campo("tjTel", "Celular (WhatsApp)", p.telefono, 'type="tel" inputmode="tel" maxlength="30" placeholder="Ej: 11 5555-1234"')}
+        ${campo("tjMail", "Mail", p.email, 'type="email" maxlength="80" placeholder="nombre@sat365.com.ar"')}
+        ${t.empresaEditable ? `<details${em.nombre ? "" : " open"} style="margin-top:12px;"><summary><b>Datos de la empresa</b> (los mismos para todos)</summary>
+          ${campo("tjEmp", "Empresa", em.nombre || "SAT Alarmas", 'maxlength="60"')}
+          ${campo("tjHor", "Horarios de atención", em.horarios, 'maxlength="160" placeholder="Ej: Lunes a viernes de 9 a 18 · Sábados de 9 a 13"')}
+          ${campo("tjTelEmp", "Teléfono de la oficina", em.telefono, 'type="tel" maxlength="30"')}
+          ${campo("tjWeb", "Página web", em.web || "sat365.com.ar", 'maxlength="200"')}
+          ${campo("tjIg", "Instagram", em.instagram, 'maxlength="200" placeholder="@usuario o el link"')}
+          ${campo("tjFb", "Facebook", em.facebook, 'maxlength="200" placeholder="usuario o el link"')}
+        </details>` : `<p class="pe-nota">${em.nombre ? `Se suman los datos de ${escapeHtml(em.nombre)}: ${escapeHtml([em.horarios, em.web, em.instagram && "Instagram", em.facebook && "Facebook"].filter(Boolean).join(" · ") || "sin horarios ni redes cargados")}.` : "Los horarios y las redes de la empresa los carga la oficina."}</p>`}
+        <div class="cq-datos-btns"><button type="button" class="btn btn-secondary" data-r="no">Cancelar</button><button type="button" class="btn btn-primary" data-r="si">Guardar</button></div>
+      </div>`;
+      const q = capa.querySelector("#tjQuien");
+      if (q) q.addEventListener("change", () => {
+        if (q.value !== "__otra") { persona = q.value; pintar(); return; }
+        const n = (prompt("Nombre de la persona (por ejemplo, el vendedor):") || "").trim().slice(0, 60);
+        if (!n) { q.value = persona; return; }
+        persona = n; if (!claves.includes(n)) claves.push(n); t.personas[n] = t.personas[n] || { nombre: n }; pintar();
+      });
+    };
+    pintar();
+    document.body.appendChild(capa);
+    capa.addEventListener("click", async (e) => {
+      const b = e.target.closest("[data-r]");
+      if (!b && e.target !== capa) return;
+      if (!b || b.dataset.r === "no") { capa.remove(); ok(null); return; }
+      const v = (id) => ((capa.querySelector("#" + id) || {}).value || "").trim();
+      const tarjeta = { nombre: v("tjNombre"), puesto: v("tjPuesto"), telefono: v("tjTel"), email: v("tjMail") };
+      if (!tarjeta.nombre) { showToast("Poné el nombre."); return; }
+      if (tarjeta.telefono.replace(/\D/g, "").length < 6 && !tarjeta.email) { showToast("Poné un celular o un mail para que te puedan contactar."); return; }
+      const cuerpo = { accion: "tarjeta_guardar", persona, tarjeta };
+      if (t.empresaEditable) cuerpo.empresa = { nombre: v("tjEmp"), horarios: v("tjHor"), telefono: v("tjTelEmp"), web: v("tjWeb"), instagram: v("tjIg"), facebook: v("tjFb") };
+      b.disabled = true;
+      try {
+        const r = await fetch("/api/datos?coleccion=croquis", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify(cuerpo) });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.error || "No se pudo guardar");
+        capa.remove();
+        showToast("Tarjeta guardada.");
+        ok({ ...t, empresa: d.empresa || t.empresa, personas: d.personas || t.personas });
+      } catch (err) { b.disabled = false; showToast(err.message); }
+    });
   });
 }
 // Copia del plano para armar otra propuesta (p. ej. "Básica" y "Completa").
@@ -17489,7 +17586,8 @@ const CQ_BUSQUEDA_PRESU = {
   magnetico: "magnetico", infrarrojo: "infrarrojo", infrarrojo_ext: "infrarrojo exterior", infrarrojo_cortina: "cortina", humo: "detector humo",
   gas: "detector gas", pulsador_incendio: "pulsador incendio", pulsador_asalto: "pulsador asalto", dvr: "dvr", camara_ip: "camara ip",
   camara_analoga: "camara", monitor: "monitor", doble_tecnologia: "doble tecnologia", panico_colgante: "panico colgante",
-  fuente_ups: "fuente", sismico: "sismico", inundacion: "inundacion",
+  fuente_ups: "fuente", sismico: "sismico", inundacion: "inundacion", monoxido: "monoxido", control_remoto: "control remoto",
+  modulo_rele: "rele", camara_solar: "camara 4g solar",
 };
 function cqPasarAPresupuesto() {
   const cuenta = {};

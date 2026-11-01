@@ -4340,15 +4340,89 @@ test("Más equipos: doble tecnología, pánico colgante, UPS, sísmico, inundaci
     await page.click('.v3-barra [data-a="editar"]');
     await page.click('.v3-tira [data-tipo="__mas"]');
     const items = await page.$$eval(".v3-hoja .v3-paleta button", (bs) => bs.map((b) => b.textContent.trim()));
-    for (const n of ["Sensor de doble tecnología", "Botón de pánico colgante", "UPS / fuente con batería", "Sensor sísmico (caja fuerte)", "Detector de inundación", "Sirena interior inalámbrica", "Sirena exterior inalámbrica", "Teclado inalámbrico"]) assert.ok(items.some((t) => t.startsWith(n)), n + " en: " + items.join(" | "));
+    for (const n of ["Sensor de doble tecnología", "Botón de pánico colgante", "UPS / fuente con batería", "Sensor sísmico (caja fuerte)", "Detector de inundación", "Sirena interior inalámbrica", "Sirena exterior inalámbrica", "Teclado inalámbrico", "Detector de monóxido (CO)", "Control remoto (llavero)", "Módulo relé", "Sensor de movimiento antimascotas", "Cámara 4G con panel solar"]) assert.ok(items.some((t) => t.startsWith(n)), n + " en: " + items.join(" | "));
     // Cada modelo 3D se arma sin errores
     const ok = await page.evaluate(async () => {
-      const lista = [["teclado", {}], ["teclado", { inal: true }], ["sirena_int", { inal: true }], ["sirena_ext", { inal: true }], ["doble_tecnologia", {}], ["panico_colgante", {}], ["fuente_ups", {}], ["sismico", {}], ["inundacion", {}]];
+      const lista = [["teclado", {}], ["teclado", { inal: true }], ["sirena_int", { inal: true }], ["sirena_ext", { inal: true }], ["doble_tecnologia", {}], ["panico_colgante", {}], ["fuente_ups", {}], ["sismico", {}], ["inundacion", {}], ["monoxido", {}], ["control_remoto", {}], ["modulo_rele", {}], ["infrarrojo", { mascota: true }], ["camara_solar", {}]];
       const n = [];
       for (const [t, o] of lista) { const d = document.createElement("div"); d.style.cssText = "width:200px;height:150px"; document.body.appendChild(d); Croquis3D.vitrina(d, t, o); await new Promise((r) => setTimeout(r, 60)); n.push(!!d.querySelector("canvas")); d.remove(); }
       return n;
     });
     assert.deepStrictEqual(ok, ok.map(() => true));
+    assert.deepStrictEqual(errores, []);
+    await ctx.close();
+  } finally { await nav.close(); }
+});
+
+test("Tarjeta de contacto del asesor: se elige y edita al mandar la vista 3D, y el cliente la ve (WhatsApp, llamar, horarios, redes y agendar)", async () => {
+  const nav = await navegador3D();
+  try {
+    const ctx = await nav.newContext({ serviceWorkers: "block", viewport: { width: 420, height: 860 }, acceptDownloads: true });
+    const page = await ctx.newPage();
+    const errores = [];
+    page.on("pageerror", (e) => errores.push(e.message));
+    const empresa = { nombre: "SAT Alarmas", horarios: "Lunes a viernes de 9 a 18", web: "https://sat365.com.ar", instagram: "https://instagram.com/satalarmas", facebook: "" };
+    let personas = { Luis: { nombre: "Luis Gómez", puesto: "Técnico", telefono: "011 15 5555-1234", email: "" }, Ana: { nombre: "Ana Ruiz", puesto: "Ventas", telefono: "11 4444 0000", email: "" } };
+    let pedido = null, guardado = null;
+    await page.route("**/api/**", (route) => {
+      const req = route.request(), u = req.url();
+      if (u.includes("tarjetas=1")) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ yo: "Luis", admin: false, empresaEditable: false, empresa, personas }) });
+      if (u.includes("coleccion=croquis") && req.method() === "POST") {
+        const b = JSON.parse(req.postData());
+        if (b.accion === "tarjeta_guardar") { guardado = b; personas = { ...personas, [b.persona]: b.tarjeta }; return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, empresa, personas }) }); }
+        pedido = b; return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, id: "0123456789abcdef" }) });
+      }
+      route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+    });
+    await page.goto(base + "/");
+    await page.waitForTimeout(400);
+    await page.evaluate((els) => {
+      tecnicoLogueado = "Luis"; localStorage.removeItem("croquis_borrador");
+      cqAbrirEditor({ titulo: "Casa Pérez", cliente: "Juan Pérez", elementos: els });
+      window.__abierto = null; window.open = (u) => { window.__abierto = u; };
+      Object.defineProperty(navigator, "share", { value: undefined, configurable: true });
+    }, CASA_3D);
+    await page.click("#cqMenuBtn");
+    await page.click('[data-m="ver3d"]');
+    await page.waitForSelector(".v3-capa canvas", { timeout: 20000 });
+    await page.click('.v3-barra [data-extra="0"]');
+    await page.waitForSelector(".cq3d-asesor");
+    assert.strictEqual(await page.$eval(".cq3d-asesor", (s) => s.value), "Luis", "por defecto, quien lo manda");
+    // Editar la propia: cambia el puesto
+    await page.click('.cq3d-tarjeta [data-m="tarjeta"]');
+    await page.fill("#tjPuesto", "Asesor técnico");
+    await page.click('.cq-datos [data-r="si"]');
+    await page.waitForFunction(() => /Asesor técnico/.test(document.querySelector(".cq3d-asesor").textContent));
+    assert.strictEqual(guardado.persona, "Luis");
+    assert.ok(!guardado.empresa, "sin permiso no toca la empresa");
+    await page.click('[data-m="link"]');
+    await page.waitForFunction(() => window.__abierto, null, { timeout: 5000 });
+    assert.strictEqual(pedido.contacto.nombre, "Luis Gómez");
+    assert.strictEqual(pedido.contacto.puesto, "Asesor técnico");
+    assert.strictEqual(pedido.contacto.empresa.horarios, "Lunes a viernes de 9 a 18");
+
+    // El cliente la ve en la vista pública
+    const p2 = await ctx.newPage();
+    p2.on("pageerror", (e) => errores.push(e.message));
+    await p2.route("**/api/**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ titulo: "Casa Pérez", cliente: "Juan Pérez", paginas: [{ nombre: "", elementos: CASA_3D }], contacto: { ...pedido.contacto, empresa: { ...pedido.contacto.empresa, facebook: "javascript:alert(1)" } } }) }));
+    await p2.addInitScript(() => { try { localStorage.setItem("v3-presentacion:0123456789abcdef", "1"); } catch (e) { /* nada */ } });
+    await p2.goto(base + "/vista-3d.html?id=0123456789abcdef");
+    await p2.waitForSelector(".v3-asesor");
+    assert.match(await p2.textContent(".v3-asesor"), /Te asesoró\s*Luis Gómez/);
+    assert.strictEqual(await p2.textContent(".v3-asesor .v3-av"), "LG");
+    await p2.click(".v3-asesor");
+    await p2.waitForSelector(".v3-tarjeta");
+    const links = await p2.$$eval(".v3-tarjeta a", (as) => as.map((a) => a.getAttribute("href")));
+    assert.ok(links.some((h) => h.startsWith("https://wa.me/5491155551234?text=")), "WhatsApp con el número bien armado: " + links.join(" "));
+    assert.ok(links.includes("tel:0111555551234"));
+    assert.ok(links.includes("https://instagram.com/satalarmas"));
+    assert.ok(!links.some((h) => /javascript/.test(h)), "nada de links peligrosos");
+    assert.match(await p2.textContent(".v3-tarjeta"), /Asesor técnico · SAT Alarmas/);
+    assert.match(await p2.textContent(".v3-tarjeta"), /Lunes a viernes de 9 a 18/);
+    const [descarga] = await Promise.all([p2.waitForEvent("download"), p2.click('.v3-tarjeta [data-h="guardar"]')]);
+    assert.strictEqual(descarga.suggestedFilename(), "Luis Gomez.vcf");
+    const vcf = require("fs").readFileSync(await descarga.path(), "utf8");
+    assert.match(vcf, /FN:Luis Gómez/); assert.match(vcf, /TITLE:Asesor técnico/); assert.match(vcf, /ORG:SAT Alarmas/); assert.match(vcf, /TEL;TYPE=CELL:011 15 5555-1234/);
     assert.deepStrictEqual(errores, []);
     await ctx.close();
   } finally { await nav.close(); }

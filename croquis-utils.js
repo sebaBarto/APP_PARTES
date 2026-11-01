@@ -16,7 +16,7 @@
 //   simbolo { tipo, x, y, rot, esc, color?, esp? }  equipos y objetos de obra
 
 // Tiene que ser igual a APP_VERSION de app.js (si no, la app recarga).
-const CROQUIS_UTILS_VERSION = "4.33.0";
+const CROQUIS_UTILS_VERSION = "4.34.0";
 const CROQUIS_GRILLA = 20;
 
 // Cada símbolo se dibuja centrado en 0,0 con dib(color). "cat" separa los
@@ -109,6 +109,18 @@ const CROQUIS_SIMBOLOS = {
   doble_tecnologia: {
     nombre: "Sensor de doble tecnología", cat: "equipo", color: "#C0392B", ir: true, alc: 80, ang: 90, vb: "-84 -84 110 110",
     dib: (c, el) => croquisIR(c, el, CROQUIS_SIMBOLOS.doble_tecnologia) + `<text x="9" y="12" text-anchor="middle" ${CROQUIS_FUENTE} font-size="6" fill="#FFFFFF">DT</text>`,
+  },
+  monoxido: {
+    nombre: "Detector de monóxido de carbono (CO)", cat: "equipo", color: "#6B6F76", r: 16,
+    dib: (c) => `<circle r="12" fill="#FFFFFF" stroke="${c}" stroke-width="2.2"/><text x="0" y="4" text-anchor="middle" ${CROQUIS_FUENTE} font-size="10" font-weight="700" fill="${c}">CO</text>`,
+  },
+  modulo_rele: {
+    nombre: "Módulo relé (portón / automatización)", cat: "equipo", color: "#2E86DE", r: 16,
+    dib: (c) => `<rect x="-11" y="-9" width="22" height="18" rx="3" fill="#FFFFFF" stroke="${c}" stroke-width="2.2"/><path d="M-6 3 h4 l5 -6 M3 3 h3" fill="none" stroke="${c}" stroke-width="1.6" stroke-linecap="round"/><circle cx="-6" cy="3" r="1.4" fill="${c}"/><circle cx="6" cy="3" r="1.4" fill="${c}"/>`,
+  },
+  camara_solar: {
+    nombre: "Cámara 4G con panel solar", cat: "equipo", color: "#17809B", r: 32,
+    dib: (c) => `<path d="M0 2 L-20 -26 L20 -26 Z" fill="${c}" fill-opacity="0.16" stroke="${c}" stroke-width="1.2" stroke-dasharray="3 2"/><rect x="-7" y="-4" width="14" height="20" rx="3" fill="#FFFFFF" stroke="${c}" stroke-width="2.4"/><circle cx="0" cy="-4" r="4.5" fill="${c}"/><rect x="-9" y="9" width="18" height="9" fill="#1F3A5F" stroke="#FFFFFF" stroke-width="1"/><path d="M-3 9 v9 M3 9 v9 M-9 13.5 h18" stroke="#8FB3D9" stroke-width="0.7"/>`,
   },
   panico_colgante: {
     nombre: "Botón de pánico colgante", cat: "equipo", color: "#E8741E", r: 14,
@@ -389,15 +401,17 @@ function croquisSirena(c, k) {
 // hacia arriba a la izquierda (bisectriz a -135°).
 const CROQUIS_IR_BIS = -135;
 function croquisIRParams(el, def) {
-  return { alc: Math.max(20, Number(el && el.alc) || def.alc), ang: Math.max(5, Number(el && el.ang) || def.ang), doble: !!(el && el.doble), video: !!(el && el.video) };
+  return { alc: Math.max(20, Number(el && el.alc) || def.alc), ang: Math.max(5, Number(el && el.ang) || def.ang), doble: !!(el && el.doble), video: !!(el && el.video), mascota: !!(el && el.mascota) };
 }
 function croquisIR(c, el, def) {
-  const { alc, ang, doble, video } = croquisIRParams(el, def);
+  const { alc, ang, doble, video, mascota } = croquisIRParams(el, def);
   const total = Math.min(359, doble ? ang * 2 : ang);
   const pt = (g) => { const a = g * Math.PI / 180; return `${(Math.cos(a) * alc).toFixed(1)} ${(Math.sin(a) * alc).toFixed(1)}`; };
   let out = `<path d="M0 0 L${pt(CROQUIS_IR_BIS - total / 2)} A${alc} ${alc} 0 ${total > 180 ? 1 : 0} 1 ${pt(CROQUIS_IR_BIS + total / 2)} Z" fill="#8E949A" fill-opacity="0.13" stroke="#1C1E21" stroke-width="1.6" stroke-dasharray="4 3" stroke-linejoin="round"/>`;
   if (doble) out += `<line x1="0" y1="0" x2="${pt(CROQUIS_IR_BIS).split(" ")[0]}" y2="${pt(CROQUIS_IR_BIS).split(" ")[1]}" stroke="#1C1E21" stroke-width="1" stroke-dasharray="3 3"/>`;
   out += `<rect x="0" y="0" width="18" height="18" fill="${c}" stroke="#1C1E21" stroke-width="2.2"/>`;
+  // Antimascotas: una huellita.
+  if (mascota && !video) out += `<g fill="#FFFFFF"><ellipse cx="9" cy="11" rx="3.4" ry="2.8"/><circle cx="4.6" cy="6.6" r="1.5"/><circle cx="7.6" cy="4.8" r="1.5"/><circle cx="10.6" cy="4.8" r="1.5"/><circle cx="13.4" cy="6.6" r="1.5"/></g>`;
   if (video) out += `<path d="M2.2 9 Q9 2.6 15.8 9 Q9 15.4 2.2 9 Z" fill="#FFFFFF" stroke="#1C1E21" stroke-width="1"/><circle cx="9" cy="9" r="2.4" fill="#1C1E21"/>`;
   return out;
 }
