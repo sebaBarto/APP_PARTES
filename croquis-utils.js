@@ -16,7 +16,7 @@
 //   simbolo { tipo, x, y, rot, esc, color?, esp? }  equipos y objetos de obra
 
 // Tiene que ser igual a APP_VERSION de app.js (si no, la app recarga).
-const CROQUIS_UTILS_VERSION = "4.31.0";
+const CROQUIS_UTILS_VERSION = "4.32.0";
 const CROQUIS_GRILLA = 20;
 
 // Cada símbolo se dibuja centrado en 0,0 con dib(color). "cat" separa los
@@ -115,7 +115,7 @@ const CROQUIS_SIMBOLOS = {
     dib: (c) => `<circle cx="0" cy="0" r="36" fill="#8E949A" fill-opacity="0.12" stroke="#1C1E21" stroke-width="1.4" stroke-dasharray="4 3"/><circle cx="0" cy="0" r="9" fill="${c}" stroke="#1C1E21" stroke-width="2"/><text x="0" y="3" text-anchor="middle" ${CROQUIS_FUENTE} font-size="6.5" fill="#FFFFFF">360</text>`,
   },
   barrera: {
-    nombre: "Barrera infrarroja", cat: "equipo", color: "#E00000", r: 64,
+    nombre: "Barrera infrarroja exterior", cat: "equipo", color: "#E00000", r: 64,
     dib: (c) => `<line x1="-54" y1="0" x2="54" y2="0" stroke="${c}" stroke-width="1.6" stroke-dasharray="6 4"/><rect x="-62" y="-7" width="10" height="14" rx="2" fill="${c}" stroke="#1C1E21" stroke-width="1.6"/><rect x="52" y="-7" width="10" height="14" rx="2" fill="${c}" stroke="#1C1E21" stroke-width="1.6"/>`,
   },
   sirena_flash: {
@@ -131,12 +131,16 @@ const CROQUIS_SIMBOLOS = {
     dib: (c) => `<rect x="-6" y="-11" width="12" height="22" rx="4" fill="#FFFFFF" stroke="${c}" stroke-width="2"/><circle cx="0" cy="-5" r="1.8" fill="${c}"/><circle cx="0" cy="0" r="1.8" fill="${c}"/><circle cx="0" cy="5" r="1.8" fill="${c}"/>`,
   },
   lector_acceso: {
-    nombre: "Lector de acceso", cat: "equipo", color: "#1B5FA8", r: 16,
+    nombre: "Lectora de tag / tarjeta", cat: "equipo", color: "#1B5FA8", r: 16,
     dib: (c) => `<rect x="-9" y="-12" width="18" height="24" rx="3" fill="#FFFFFF" stroke="${c}" stroke-width="2.2"/><path d="M-4 3 a4 4 0 0 1 8 0 M-5.5 1 a6 6 0 0 1 11 0 M-2 5 a2 2 0 0 1 4 0" fill="none" stroke="${c}" stroke-width="1.2"/>`,
   },
   cerradura: {
-    nombre: "Cerradura eléctrica", cat: "equipo", color: "#1B5FA8", r: 14,
+    nombre: "Cerradura de pestillo (eléctrica)", cat: "equipo", color: "#1B5FA8", r: 14,
     dib: (c) => `<rect x="-8" y="-3" width="16" height="12" rx="2" fill="${c}"/><path d="M-5 -3 v-3 a5 5 0 0 1 10 0 v3" fill="none" stroke="${c}" stroke-width="2.2"/>`,
+  },
+  cerradura_magnetica: {
+    nombre: "Cerradura electromagnética", cat: "equipo", color: "#1B5FA8", r: 22,
+    dib: (c) => `<rect x="-20" y="-6" width="40" height="12" rx="2" fill="#FFFFFF" stroke="${c}" stroke-width="2.4"/><path d="M-9 -2 v3 a4 4 0 0 0 8 0 v-3 M1 -2 v3 a4 4 0 0 0 8 0 v-3" fill="none" stroke="${c}" stroke-width="1.6"/>`,
   },
   boton_salida: {
     nombre: "Botón de salida", cat: "equipo", color: "#2E9E4F", r: 14,

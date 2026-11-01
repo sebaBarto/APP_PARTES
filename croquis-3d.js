@@ -31,6 +31,13 @@ const Croquis3D = (() => {
     camara_ip: { h: 2.6, caja: [0.09, 0.09, 0.18], color: "#F4F4F4", camara: true },
     camara_analoga: { h: 2.6, caja: [0.09, 0.09, 0.18], color: "#F4F4F4", camara: true },
     camara_domo: { h: ALTO - 0.05, disco: 0.07, color: "#F4F4F4", camara: true },
+    lector_acceso: { h: 1.3, caja: [0.05, 0.09, 0.02], color: "#2B2F33", pared: true },
+    cerradura: { h: 1.0, caja: [0.03, 0.2, 0.03], color: "#BFC3C8", pared: true },
+    cerradura_magnetica: { h: 2.02, caja: [0.25, 0.045, 0.07], color: "#BFC3C8", pared: true },
+    boton_salida: { h: 1.2, caja: [0.09, 0.09, 0.03], color: "#FFFFFF", pared: true },
+    videoportero: { h: 1.5, caja: [0.1, 0.18, 0.03], color: "#2B2F33", pared: true },
+    comunicador: { h: 1.7, caja: [0.12, 0.1, 0.04], color: "#E6E6E6", pared: true },
+    energizador: { h: 1.6, caja: [0.2, 0.25, 0.08], color: "#F2C94C", pared: true },
   };
   const COLOR_PARED = "#E9E5DC", COLOR_PISO = "#C9C2B5";
   // Los equipos se dibujan más grandes que en la realidad para que se vean.
@@ -146,6 +153,29 @@ const Croquis3D = (() => {
     return res;
   }
 
+  // Barrera infrarroja: dos columnas que se miran, con los haces entre ellas.
+  function puntasBarrera(e) { const a = croquisLocalAMundo(e, -57, 0), b = croquisLocalAMundo(e, 57, 0); return [[M(a[0]), M(a[1])], [M(b[0]), M(b[1])]]; }
+  function armarBarrera(e, fant) {
+    const [a, b] = puntasBarrera(e);
+    const g = new THREE.Group();
+    const mat = new THREE.MeshLambertMaterial({ color: 0x2b2f33, transparent: !!fant || !!e.prev, opacity: fant ? 0.7 : e.prev ? 0.35 : 1, emissive: fant ? 0x443300 : e.inst ? 0x331100 : 0 });
+    [a, b].forEach((p) => {
+      const col = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.1, 0.1), mat); col.position.set(p[0], 0.55, p[1]); g.add(col);
+      const cab = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.08, 0.12), new THREE.MeshLambertMaterial({ color: 0xd23b34 })); cab.position.set(p[0], 1.14, p[1]); g.add(cab);
+    });
+    [0.35, 0.65, 0.95].forEach((y) => {
+      const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(a[0], y, a[1]), new THREE.Vector3(b[0], y, b[1])]);
+      const l = new THREE.Line(geo, new THREE.LineDashedMaterial({ color: fant ? 0xf2a900 : 0xff2020, dashSize: 0.12, gapSize: 0.08, transparent: true, opacity: 0.85 }));
+      l.computeLineDistances(); g.add(l);
+    });
+    g.userData.equipo = e;
+    g.children.forEach((c) => { c.userData.equipo = e; });
+    const obj = g.children[0];
+    let cartelZona = null, aro = null;
+    if (String(e.etq || "").trim()) { cartelZona = cartel(String(e.etq).trim(), e.inst ? "#E8741E" : "#E00000"); cartelZona.position.set(a[0], 1.5, a[1]); cartelZona.userData.equipo = e; }
+    if (e.inst && !fant) { aro = new THREE.Mesh(new THREE.RingGeometry(0.18, 0.24, 24), new THREE.MeshBasicMaterial({ color: 0xe8741e, side: THREE.DoubleSide })); aro.rotation.x = -Math.PI / 2; aro.position.set(a[0], 0.02, a[1]); aro.userData.de = e; }
+    return { obj: g, cobertura: null, cartel: cartelZona, aro, _obj: obj };
+  }
   // Un equipo en 3D: la pieza, su cobertura (infrarrojo o cámara), el cartel
   // con la zona y el aro naranja si se instala. segmentos: paredes (m).
   function armarEquipo(e, segmentos, opc) {
@@ -155,6 +185,7 @@ const Croquis3D = (() => {
     const p3 = EQUIPOS[e.tipo] || { h: 1.5, caja: [0.12, 0.12, 0.06], color: e.color || def.color, pared: true };
     const color = def.ir ? (e.color || def.color) : (p3.color || e.color || def.color);
     const fant = op.fantasma; // vista previa (mientras se arrastra)
+    if (e.tipo === "barrera") return armarBarrera(e, fant);
     const mat = new THREE.MeshLambertMaterial({ color, transparent: !!e.prev || !!fant, opacity: fant ? 0.75 : e.prev ? 0.35 : 1, emissive: fant ? 0x443300 : e.inst ? 0x553300 : 0x000000 });
     let x, z, h = p3.h, obj, cobertura = null;
     if (def.ir) {
@@ -570,7 +601,7 @@ const Croquis3D = (() => {
       const r = lienzo.getBoundingClientRect();
       const ray = new THREE.Raycaster();
       ray.setFromCamera(new THREE.Vector2(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1), camara);
-      const golpes = ray.intersectObjects([...grupoEquipos.children, ...grupoCarteles.children], false).filter((g) => g.object.userData.equipo || g.object.userData.de);
+      const golpes = ray.intersectObjects([...grupoEquipos.children, ...grupoCarteles.children], true).filter((g) => g.object.userData.equipo || g.object.userData.de);
       const piso0 = new THREE.Vector3();
       const enPiso = ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -altura), piso0) ? [piso0.x * CROQUIS_POR_METRO, piso0.z * CROQUIS_POR_METRO] : null;
       const eq = golpes.length ? (golpes[0].object.userData.equipo || golpes[0].object.userData.de) : null;
@@ -649,7 +680,7 @@ const Croquis3D = (() => {
         controles.enabled = false;
         return;
       }
-      const g = ray.intersectObjects([...grupoEquipos.children, ...grupoCarteles.children], false).find((x) => x.object.userData.equipo || x.object.userData.de);
+      const g = ray.intersectObjects([...grupoEquipos.children, ...grupoCarteles.children], true).find((x) => x.object.userData.equipo || x.object.userData.de);
       if (g) { gesto = { tipo: "mover", e: g.object.userData.equipo || g.object.userData.de, x: ev.clientX, y: ev.clientY, activo: false }; controles.enabled = false; }
     };
     const mueve = (ev) => {
@@ -733,7 +764,12 @@ const Croquis3D = (() => {
       else { u.brazos[0].rotation.z = -Math.sin(fase) * 0.5; u.brazos[1].rotation.z = Math.sin(fase) * 0.5; }
       u.cuerpo.position.y = Math.abs(Math.sin(fase)) * 0.05;
       // Quién lo detecta acá.
-      const nuevos = an.detecta([x, z]).filter((e) => !sim.vistos.has(e.id));
+      // Se revisa todo el tramo desde el cuadro anterior (en un celular lento
+      // el muñeco avanza a saltos y podría "saltar" una barrera).
+      const prev = sim.ultimo || [x, z], pasos = Math.max(1, Math.ceil(Math.hypot(x - prev[0], z - prev[1]) / 0.15));
+      const nuevos = [];
+      for (let k = 1; k <= pasos; k++) an.detecta([prev[0] + (x - prev[0]) * k / pasos, prev[1] + (z - prev[1]) * k / pasos]).forEach((e) => { if (!sim.vistos.has(e.id) && !nuevos.includes(e)) nuevos.push(e); });
+      sim.ultimo = [x, z];
       // Apertura: al pasar por una abertura con magnético.
       an.aberturas.forEach((ab) => {
         if (!ab.exterior || !ab.por || ab.por.tipo !== "magnetico" || sim.vistos.has(ab.por.id)) return;
@@ -742,7 +778,7 @@ const Croquis3D = (() => {
       nuevos.forEach((e) => {
         sim.vistos.add(e.id);
         const m = malla(e.id);
-        if (m) { if (m.userData.emisivoOriginal == null) m.userData.emisivoOriginal = m.material.emissive.getHex(); sim.encendidos.push(m); }
+        if (m && m.material && m.material.emissive) { if (m.userData.emisivoOriginal == null) m.userData.emisivoOriginal = m.material.emissive.getHex(); sim.encendidos.push(m); }
         if (sim.primera == null) {
           sim.primera = seg;
           // Suenan las sirenas.
@@ -826,7 +862,7 @@ const Croquis3D = (() => {
       marcar(id) {
         const m = id ? grupoEquipos.children.find((c) => c.userData.equipo && c.userData.equipo.id === id) : null;
         marca.visible = !!m;
-        if (m) marca.position.set(m.position.x, 0.03, m.position.z);
+        if (m) { const c = m.isGroup ? new THREE.Box3().setFromObject(m).getCenter(new THREE.Vector3()).sub(mundo.position) : m.position; marca.position.set(c.x, 0.03, c.z); }
         ponerManija(m ? m.userData.equipo : null);
       },
       pisoEn, previa, mostrarPropuestas, elementos: els,
@@ -852,7 +888,9 @@ const Croquis3D = (() => {
   }
   // ---- Vitrina: cada equipo en 3D, como es de verdad, montado en su lugar ----
   // Unidades: centímetros. Se muestra en la ficha del equipo (al tocarlo).
-  function vitrina(contenedor, tipo) {
+  function vitrina(contenedor, tipo, opciones) {
+    const opc = opciones || {};
+    const anim = []; // animaciones propias de cada equipo (f(t))
     const W = () => contenedor.clientWidth || 300, H = () => contenedor.clientHeight || 180;
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
@@ -895,6 +933,16 @@ const Croquis3D = (() => {
       const tx = new THREE.CanvasTexture(cv); tx.encoding = THREE.sRGBEncoding;
       return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: tx, roughness: 0.4 }));
     };
+    // Calco "inalámbrico" (ondas) para el frente.
+    const calcoInal = (w) => {
+      const cv = document.createElement("canvas"); cv.width = cv.height = 64;
+      const c = cv.getContext("2d"); c.fillStyle = "#F1F1EE"; c.fillRect(0, 0, 64, 64); c.strokeStyle = "#8E949A"; c.lineWidth = 5; c.lineCap = "round";
+      [10, 20, 30].forEach((r) => { c.beginPath(); c.arc(32, 50, r, Math.PI * 1.25, Math.PI * 1.75); c.stroke(); });
+      c.fillStyle = "#8E949A"; c.beginPath(); c.arc(32, 50, 4, 0, Math.PI * 2); c.fill();
+      return new THREE.Mesh(new THREE.PlaneGeometry(w, w), new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(cv), roughness: 0.4 }));
+    };
+    // Piso de pasto (afuera).
+    const pasto = () => { const p = M(new THREE.PlaneGeometry(400, 300), mat(0x8fb07a, { roughness: 1 }), 0, 0, 0); p.rotation.x = -Math.PI / 2; fondo.add(p); };
     // Fondos: esquina de pared, pared, techo, marco de puerta.
     // Esquina de dos paredes (el rincón queda atrás, en z = -6).
     const esquina = () => { [[-1, Math.PI / 4], [1, -Math.PI / 4]].forEach(([sx, giro]) => { const p = M(new THREE.PlaneGeometry(60, 120), pared, sx * 21.2, 0, -6 + 21.2); p.rotation.y = giro; fondo.add(p); }); };
@@ -910,7 +958,14 @@ const Croquis3D = (() => {
         // Lente de Fresnel (facetada) arriba al frente.
         g.add(fresnel(5.2, 4.6, 1.1, 0, 2.4, 1.75));
         g.add(M(new THREE.BoxGeometry(5.4, 0.15, 0.3), gris, 0, -0.6, 2.33));
-        g.add(led(0xff2020, 0, -2.5, 2.35));
+        g.add(led(0xff2020, opc.video ? 1.8 : 0, opc.video ? -3.9 : -2.5, 2.35));
+        if (opc.video) {
+          // PIR CAM: la cámara abajo de la lente, con su anillo de LEDs infrarrojos.
+          g.add(Mx(new THREE.CylinderGeometry(1.25, 1.25, 0.4, 28), oscuro, 0, -2.2, 2.3));
+          g.add(Mx(new THREE.CylinderGeometry(0.55, 0.65, 0.5, 20), vidrio, 0, -2.2, 2.55));
+          for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; g.add(M(new THREE.SphereGeometry(0.13, 8, 6), mat(0x5a1515), Math.cos(a) * 0.95, -2.2 + Math.sin(a) * 0.95, 2.55)); }
+        }
+        if (opc.inal) { const w = calcoInal(1.3); w.position.set(-1.9, -3.9, 2.34); g.add(w); }
         // Rótula a la pared.
         g.add(Mx(new THREE.CylinderGeometry(0.8, 1, 2.2, 12), plastico, 0, 0, -3));
         g.position.set(0, 4, -2.6); g.rotation.x = -0.18; pieza.add(g);
@@ -938,9 +993,18 @@ const Croquis3D = (() => {
         const hoja = new THREE.Group(); hoja.add(M(new THREE.BoxGeometry(22, 34, 3.2), mat(0xc9a26f, { roughness: 0.6 }), 11, 0, 0)); hoja.position.set(0, 0, -0.4); hoja.rotation.y = -0.35;
         hoja.add(M(caja(1.6, 3.2, 1.2, 0.4), plastico, 1.4, 9, 2.2));
         fondo.add(hoja);
-        const contacto = new THREE.Group(); contacto.add(M(caja(1.8, 5.2, 1.4, 0.45), plastico)); contacto.add(led(0x2ecc71, 0, 1.6, 0.75, 0.18));
-        contacto.position.set(-2.4, 9, 2.6); pieza.add(contacto);
-        const cable = M(new THREE.CylinderGeometry(0.15, 0.15, 9, 8), mat(0xffffff), -2.4, 15, 2.2); pieza.add(cable);
+        const contacto = new THREE.Group();
+        if (opc.inal) {
+          // Transmisor inalámbrico: más grande (lleva la pila), sin cable.
+          contacto.add(M(caja(2.8, 7.5, 2, 0.6), plastico)); contacto.add(led(0x2ecc71, 0, 2.6, 1.02, 0.2));
+          const w = calcoInal(1.6); w.position.set(0, -1.6, 1.02); contacto.add(w);
+          contacto.position.set(-2.6, 8.6, 2.9);
+        } else {
+          contacto.add(M(caja(1.8, 5.2, 1.4, 0.45), plastico)); contacto.add(led(0x2ecc71, 0, 1.6, 0.75, 0.18));
+          contacto.position.set(-2.4, 9, 2.6);
+          pieza.add(M(new THREE.CylinderGeometry(0.15, 0.15, 9, 8), mat(0xffffff), -2.4, 15, 2.2));
+        }
+        pieza.add(contacto);
         girar = false; base = 0;
       },
       humo() {
@@ -1067,11 +1131,79 @@ const Croquis3D = (() => {
         g.rotation.x = Math.PI; g.position.y = 3.9; pieza.add(g); base = 0.5;
       },
       dvr() {
+        // Grabador (DVR o NVR): gabinete negro, frente con LEDs y la marca.
         const g = new THREE.Group();
-        g.add(M(caja(30, 5, 22, 0.6), mat(0x2b2f33, { roughness: 0.4, metalness: 0.3 })));
-        for (let i = 0; i < 4; i++) g.add(led(i ? 0x2e86de : 0x2ecc71, -12 + i * 2, 0, 11.1, 0.3));
-        g.rotation.x = 0.35; pieza.add(g);
+        g.add(M(caja(32, 5, 24, 0.6), mat(0x23272b, { roughness: 0.35, metalness: 0.35 })));
+        const frente = texto("DVR / NVR", 10, 1.8, { fondo: "#23272b", color: "#c9ced3", tam: 0.62 }); frente.position.set(-8, 0.4, 12.01); g.add(frente);
+        for (let i = 0; i < 4; i++) g.add(led(i ? 0x2e86de : 0x2ecc71, 7 + i * 2, 0.4, 12.05, 0.28));
+        g.add(M(new THREE.BoxGeometry(32.2, 0.4, 24.2), mat(0x15181b), 0, -2.6, 0)); // patitas
+        g.rotation.x = 0.32; pieza.add(g); base = 0.4;
       },
+      barrera() {
+        // Dos columnas en el jardín, con los haces invisibles (acá en rojo) entre ellas.
+        pasto();
+        const col = (x) => { const c = new THREE.Group(); c.add(M(caja(5, 60, 5, 1), mat(0x2b2f33, { roughness: 0.35 }), 0, 30, 0)); c.add(M(caja(5.6, 3, 5.6, 1), mat(0xd23b34, { roughness: 0.35 }), 0, 61.5, 0)); [12, 30, 48].forEach((y) => c.add(Mx(new THREE.CylinderGeometry(1.4, 1.4, 0.6, 18), vidrio, 0, y, x > 0 ? -2.6 : 2.6))); c.position.x = x; return c; };
+        pieza.add(col(-45)); pieza.add(col(45));
+        [12, 30, 48].forEach((y) => {
+          const haz = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 90, 8), new THREE.MeshBasicMaterial({ color: 0xff2020, transparent: true, opacity: 0.55 }));
+          haz.rotation.z = Math.PI / 2; haz.position.y = y; pieza.add(haz); anim.push((t) => { haz.material.opacity = 0.3 + 0.3 * (1 + Math.sin(t * 5 + y)) / 2; });
+        });
+        pieza.rotation.y = -0.35; girar = false;
+      },
+      lector_acceso() {
+        // Lectora al lado del marco de la puerta; el llavero se acerca y se prende la luz.
+        paredAtras(-1.6);
+        fondo.add(M(new THREE.BoxGeometry(5, 40, 3), madera, -11, 0, 0));
+        const g = new THREE.Group();
+        g.add(M(caja(5, 9, 1.6, 0.8), mat(0x23272b, { roughness: 0.3 })));
+        const anillo = new THREE.Mesh(new THREE.TorusGeometry(1.2, 0.18, 10, 32), new THREE.MeshStandardMaterial({ color: 0x2e86de, emissive: 0x2e86de, emissiveIntensity: 0.3 })); anillo.position.set(0, 1.2, 0.85); g.add(anillo);
+        g.add(led(0x2ecc71, 0, -2.8, 0.85, 0.2));
+        pieza.add(g);
+        const llavero = new THREE.Group(); llavero.add(M(caja(2.6, 3.4, 0.6, 0.9), mat(0x1b5fa8, { roughness: 0.35 }))); llavero.add(Mx(new THREE.TorusGeometry(0.6, 0.12, 8, 20), metal, 0, 2.2, 0));
+        pieza.add(llavero);
+        anim.push((t) => { const f = (Math.sin(t * 1.6) + 1) / 2; llavero.position.set(5 - f * 4.2, 1.2, 7 - f * 5.6); llavero.rotation.y = 0.5 - f * 0.5; anillo.material.emissiveIntensity = f > 0.85 ? 1 : 0.25; });
+        girar = false;
+      },
+      cerradura_magnetica() {
+        // Electroimán bajo el dintel; la placa de anclaje en la hoja de la puerta.
+        fondo.add(M(new THREE.BoxGeometry(46, 5, 6), madera, 0, 4, 0));
+        fondo.add(M(new THREE.BoxGeometry(40, 30, 4), mat(0xc9a26f, { roughness: 0.6 }), 0, -14, 1));
+        pieza.add(M(caja(25, 4.5, 6.5, 0.6), metal, 0, -1.2, 3.6));
+        pieza.add(M(caja(18, 3.8, 1.2, 0.3), metal, 0, -1.2, 7.4));
+        pieza.add(led(0xff2020, 10.5, -1.2, 6.9, 0.3));
+        const tx = texto("12V", 4, 1.4, { fondo: "#bfc3c8", color: "#2b2f33", tam: 0.7 }); tx.position.set(-8, -1.2, 6.87); pieza.add(tx);
+        base = 0.25;
+      },
+      cerradura() {
+        // Cerradero eléctrico (pestillo) en el marco, frente a la cerradura de la puerta.
+        fondo.add(M(new THREE.BoxGeometry(6, 40, 4), madera, -4, 0, 0));
+        const puerta = M(new THREE.BoxGeometry(24, 40, 4), mat(0xc9a26f, { roughness: 0.6 }), 11, 0, -0.5); puerta.rotation.y = -0.45; fondo.add(puerta);
+        pieza.add(M(caja(3, 16, 1, 0.3), metal, -1.4, 0, 2.2));
+        pieza.add(M(new THREE.BoxGeometry(1.2, 3, 0.4), oscuro, -1.4, 0.5, 2.75));
+        pieza.add(led(0x2ecc71, -1.4, 6, 2.8, 0.22));
+        base = 0.3;
+      },
+      boton_salida() {
+        paredAtras(-1.6);
+        const g = new THREE.Group();
+        g.add(M(caja(8.6, 8.6, 1.6, 0.8), plastico));
+        const b = Mx(new THREE.CylinderGeometry(2.6, 2.8, 1.2, 32), mat(0x2e9e4f, { roughness: 0.3 }), 0, 0.4, 1.2); g.add(b); leds.push(b);
+        const tx = texto("SALIDA", 5.2, 1.1, { fondo: "#F1F1EE", color: "#2b2f33", tam: 0.75 }); tx.position.set(0, -3.4, 0.81); g.add(tx);
+        pieza.add(g);
+      },
+      videoportero() {
+        paredAtras(-1.6);
+        const g = new THREE.Group();
+        g.add(M(caja(10, 18, 2.2, 1), mat(0x2b2f33, { roughness: 0.3, metalness: 0.4 })));
+        g.add(Mx(new THREE.CylinderGeometry(1, 1, 0.4, 24), vidrio, 0, 5.5, 1.2));
+        for (let i = 0; i < 4; i++) g.add(led(0x5a1515, -2 + i * 1.33, 3.6, 1.15, 0.18));
+        for (let i = 0; i < 9; i++) g.add(Mx(new THREE.CylinderGeometry(0.22, 0.22, 0.3, 8), oscuro, -1.2 + (i % 3) * 1.2, 0.5 - Math.floor(i / 3) * 1.2, 1.15));
+        const boton = Mx(new THREE.CylinderGeometry(1.4, 1.4, 0.6, 28), metal, 0, -5.5, 1.25); g.add(boton);
+        const anilloB = new THREE.Mesh(new THREE.TorusGeometry(1.45, 0.12, 8, 32), new THREE.MeshStandardMaterial({ color: 0x2e86de, emissive: 0x2e86de, emissiveIntensity: 0.8 })); anilloB.position.set(0, -5.5, 1.5); g.add(anilloB); leds.push(anilloB);
+        pieza.add(g);
+      },
+      comunicador() { paredAtras(-2.2); const g = new THREE.Group(); g.add(M(caja(12, 10, 4, 1), plastico)); g.add(M(new THREE.CylinderGeometry(0.4, 0.5, 8, 10), oscuro, 4.5, 8, 0)); g.add(led(0x2ecc71, -3.5, -3, 2.05)); g.add(led(0x2e86de, -2, -3, 2.05)); const tx = texto("4G", 3, 1.6, { fondo: "#F1F1EE", color: "#2b2f33" }); tx.position.set(0, 1, 2.02); g.add(tx); pieza.add(g); },
+      energizador() { paredAtras(-4); const g = new THREE.Group(); g.add(M(caja(20, 25, 8, 1.4), mat(0xf2c94c, { roughness: 0.4 }))); const tx = texto("ALTA TENSIÓN", 15, 2.4, { fondo: "#f2c94c", color: "#1C1E21", tam: 0.55 }); tx.position.set(0, 6, 4.02); g.add(tx); g.add(led(0xff2020, -6, -8, 4.05, 0.4)); pieza.add(g); },
     };
     (arma[tipo] || (() => { paredAtras(-3); pieza.add(M(caja(9, 9, 4, 1.5), plastico)); pieza.add(led(0x2ecc71, 3, -3, 2.1)); }))();
     // Sombras (la pieza sobre la pared/techo) y encuadre.
@@ -1092,6 +1224,7 @@ const Croquis3D = (() => {
       if (girar) pieza.rotation.y = Math.sin(t * 0.7) * base;
       const prende = Math.sin(t * 4) > 0;
       leds.forEach((l) => { if (l.material.emissive) l.material.emissiveIntensity = prende ? 0.95 : 0.15; });
+      anim.forEach((f) => f(t));
       renderer.render(escena, cam);
       pedido = requestAnimationFrame(dibujar);
     };
@@ -1192,7 +1325,9 @@ const Croquis3D = (() => {
       const t0 = d > 0 ? 0.15 / d : 1, t1 = d > 0 ? 1 - 0.03 / d : 1;
       return !paredes.some(([a, b]) => { const t = corte(s.p, q, a, b); return t !== null && t > t0 && t < t1; });
     };
-    const detecta = (q) => sensores.filter((s) => ve(s, q)).map((s) => s.el);
+    // Barreras: detectan a quien cruza la línea de los haces.
+    const barreras = els.filter((e) => e.t === "simbolo" && e.tipo === "barrera").map((e) => ({ el: e, seg: puntasBarrera(e) }));
+    const detecta = (q) => sensores.filter((s) => ve(s, q)).map((s) => s.el).concat(barreras.filter((b) => distSeg(q, b.seg[0], b.seg[1]) < 0.35).map((b) => b.el));
     const cubierto = new Uint8Array(nx * ny);
     let nInt = 0, nCub = 0;
     for (let k = 0; k < nx * ny; k++) if (interior[k]) {
@@ -1375,6 +1510,38 @@ const Croquis3D = (() => {
       return o1 * o2 < -1e-6 && o3 * o4 < -1e-6;
     };
     const visible = (c) => !segs.some(([a, b]) => cruza([px, py], c, a, b));
+    // Barrera: donde se tocó, paralela a la pared o cerco más cercano.
+    if (el.tipo === "barrera") {
+      let mejor = null;
+      (elementos || []).filter((e) => e.t === "linea" && e.id !== el.id).forEach((e) => {
+        const dx = e.x2 - e.x1, dy = e.y2 - e.y1, L2 = dx * dx + dy * dy || 1, t = Math.max(0, Math.min(1, ((px - e.x1) * dx + (py - e.y1) * dy) / L2));
+        const d = Math.hypot(px - e.x1 - t * dx, py - e.y1 - t * dy);
+        if (!mejor || d < mejor.d) mejor = { d, ang: Math.atan2(dy, dx) * 180 / Math.PI };
+      });
+      el.x = Math.round(px); el.y = Math.round(py); el.rot = mejor && mejor.d < 3 * CROQUIS_POR_METRO ? Math.round(((mejor.ang % 180) + 180) % 180) : 0;
+      return el;
+    }
+    // Control de acceso: junto a la puerta más cercana.
+    const ACCESO = { lector_acceso: 1, cerradura: 2, cerradura_magnetica: 3, boton_salida: 4, videoportero: 1 };
+    if (ACCESO[el.tipo]) {
+      let ab = null, md = 2 * CROQUIS_POR_METRO;
+      (elementos || []).forEach((e) => {
+        if (e.t !== "simbolo" || !["puerta", "porton_batiente", "porton_corredizo", "corrediza"].includes(e.tipo)) return;
+        const d = Math.hypot(e.x - px, e.y - py);
+        if (d < md) { md = d; ab = e; }
+      });
+      if (ab) {
+        const w2 = (CROQUIS_ANCHO_ABERTURA[ab.tipo] || 40) / 2;
+        const n0 = croquisLocalAMundo(ab, 0, 0), n1 = croquisLocalAMundo(ab, 0, 10);
+        let nx = n1[0] - n0[0], ny = n1[1] - n0[1]; const nl = Math.hypot(nx, ny) || 1; nx /= nl; ny /= nl;
+        if ((px - n0[0]) * nx + (py - n0[1]) * ny < 0) { nx = -nx; ny = -ny; }
+        // Lectora y portero: en la pared al lado del marco; pestillo: en el marco; electroimán: arriba al centro; botón de salida: del otro lado.
+        const lx = { 1: w2 + 12, 2: w2 - 3, 3: 0, 4: -(w2 + 12) }[ACCESO[el.tipo]];
+        const base = croquisLocalAMundo(ab, lx, 0);
+        el.x = Math.round(base[0] + nx * 5); el.y = Math.round(base[1] + ny * 5); el.rot = Math.round(ab.rot || 0);
+        return el;
+      }
+    }
     // Apertura (o rotura de vidrio): a la abertura más cercana, del lado tocado.
     if (el.tipo === "magnetico" || el.tipo === "rotura_vidrio") {
       let ab = null, md = 1.6 * CROQUIS_POR_METRO;
@@ -1539,8 +1706,24 @@ const CROQUIS_3D_LEYENDA = {
   central: ["Central de alarma", "#F2C94C"], hub: ["Central inalámbrica (Hub)", "#E6E6E6"], repetidor: ["Repetidor de señal", "#E6E6E6"], teclado: ["Teclado", "#D9D9D9"],
   sirena_int: ["Sirena interior", "#D9D9D9"], sirena_ext: ["Sirena exterior", "#E05050"], sirena_flash: ["Sirena con flash", "#E05050"],
   rotura_vidrio: ["Detector de rotura de vidrio", "#17809B"], pulsador_asalto: ["Botón de pánico", "#E8741E"], pulsador_incendio: ["Pulsador de incendio", "#E00000"],
-  camara_ip: ["Cámara", "#F4F4F4"], camara_analoga: ["Cámara", "#F4F4F4"], camara_domo: ["Cámara domo", "#F4F4F4"], dvr: ["Grabador de cámaras", "#2B2F33"], detector_360: ["Detector de techo 360°", "#FFFFFF"],
+  camara_ip: ["Cámara", "#F4F4F4"], camara_analoga: ["Cámara", "#F4F4F4"], camara_domo: ["Cámara domo", "#F4F4F4"], dvr: ["Grabador DVR / NVR", "#2B2F33"], detector_360: ["Detector de techo 360°", "#FFFFFF"],
+  barrera: ["Barrera infrarroja exterior", "#E00000"], lector_acceso: ["Lectora de tag / tarjeta", "#1B5FA8"], cerradura: ["Cerradura de pestillo", "#1B5FA8"], cerradura_magnetica: ["Cerradura electromagnética", "#1B5FA8"],
+  boton_salida: ["Botón de salida", "#2E9E4F"], videoportero: ["Videoportero", "#1C1E21"], comunicador: ["Comunicador 4G", "#D9D9D9"], energizador: ["Energizador de cerco eléctrico", "#F2C94C"], vibracion: ["Sensor de vibración", "#8A5A00"], inundacion: ["Detector de inundación", "#2E86DE"],
 };
+// Nombre de un equipo según cómo es (inalámbrico, PIR con cámara...).
+function croquis3dNombre(e) {
+  if (!e) return "";
+  const base = (CROQUIS_3D_LEYENDA[e.tipo] || [(CROQUIS_SIMBOLOS[e.tipo] || {}).nombre || e.tipo])[0];
+  if (e.tipo === "infrarrojo" && e.video) return "Sensor de movimiento con cámara (PIR CAM)" + (e.inal ? "" : "");
+  if (e.inal && /^(infrarrojo|magnetico|humo|sirena|teclado|rotura|pulsador|detector_360|vibracion|inundacion)/.test(e.tipo)) return base.replace(/ \(.*?\)$/, "") + " inalámbrico";
+  return base;
+}
+// Equipos con variantes ("tipo|marca,marca"): PIR inalámbrico, PIR CAM...
+function croquis3dDePreset(p) {
+  const [tipo, m] = String(p).split("|"), el = { tipo };
+  (m || "").split(",").filter(Boolean).forEach((k) => { el[k] = true; });
+  return el;
+}
 // Qué hace cada equipo, en palabras simples (para el cliente).
 const CROQUIS_3D_EXPLICA = {
   infrarrojo: "Detecta el movimiento de una persona en el ambiente y le avisa a la central.",
@@ -1563,12 +1746,22 @@ const CROQUIS_3D_EXPLICA = {
   camara_ip: "Graba y te deja ver en vivo desde el celular lo que pasa en esa zona.",
   camara_analoga: "Graba lo que pasa en esa zona para poder verlo después.",
   camara_domo: "Cámara de techo que vigila todo el ambiente.",
-  dvr: "Guarda las grabaciones de las cámaras.",
+  dvr: "Grabador de las cámaras (DVR para cámaras analógicas, NVR para cámaras IP): guarda las grabaciones y te deja verlas desde el celular.",
+  barrera: "Dos columnas que se miran con haces infrarrojos invisibles: si alguien cruza la línea (por ejemplo en el jardín o el frente), avisa antes de que llegue a la casa.",
+  lector_acceso: "Se acerca el tag o la tarjeta y la puerta se abre: cada persona tiene el suyo y queda registrado quién entró y a qué hora.",
+  cerradura: "Cerradura de pestillo eléctrica: la puerta queda trabada y se libera desde la lectora, el botón de salida o el portero.",
+  cerradura_magnetica: "Un electroimán muy fuerte arriba de la puerta la mantiene cerrada; se libera con el tag, el botón de salida o a distancia.",
+  boton_salida: "Para salir: se aprieta y libera la cerradura sin necesidad de tag.",
+  videoportero: "Ves y hablás con quien toca el timbre, y le abrís desde adentro o desde el celular.",
+  comunicador: "Manda los avisos de la alarma al monitoreo por la red celular, aunque se corte internet o el teléfono.",
+  energizador: "Alimenta el cerco eléctrico: da una descarga disuasiva y avisa si cortan o tocan los hilos.",
+  vibracion: "Detecta golpes o vibraciones en una pared, una caja fuerte o una reja, antes de que la rompan.",
+  inundacion: "Avisa si hay agua en el piso (pérdidas, lavarropas, bombas) antes de que sea un problema.",
 };
 const ALCANCE_TXT = { infrarrojo: "11", infrarrojo_ext: "12", infrarrojo_cortina: "10" };
 // Equipos que se pueden agregar tocando en el 3D (en este orden).
-const CROQUIS_3D_PALETA = ["infrarrojo", "infrarrojo_ext", "infrarrojo_cortina", "magnetico", "humo", "rotura_vidrio", "detector_360", "sirena_int", "sirena_ext", "teclado", "central", "pulsador_asalto", "camara_ip", "camara_domo"];
-const CROQUIS_3D_CON_ZONA = ["infrarrojo", "infrarrojo_ext", "infrarrojo_cortina", "magnetico", "humo", "gas", "rotura_vidrio", "detector_360", "pulsador_asalto", "pulsador_incendio"];
+const CROQUIS_3D_PALETA = ["infrarrojo", "infrarrojo|inal", "infrarrojo|video,inal", "infrarrojo_ext", "infrarrojo_cortina", "barrera", "magnetico", "magnetico|inal", "humo", "rotura_vidrio", "detector_360", "sirena_int", "sirena_ext", "teclado", "central", "hub", "pulsador_asalto", "camara_ip", "camara_domo", "dvr", "lector_acceso", "cerradura_magnetica", "cerradura", "boton_salida", "videoportero"];
+const CROQUIS_3D_CON_ZONA = ["barrera", "infrarrojo", "infrarrojo_ext", "infrarrojo_cortina", "magnetico", "humo", "gas", "rotura_vidrio", "detector_360", "pulsador_asalto", "pulsador_incendio"];
 // Pitido corto (detección) — solo si el navegador lo permite.
 let croquis3dAudio = null;
 function croquis3dPitido(frec, dur) {
@@ -1604,10 +1797,11 @@ function iniciarVisor3D(datos, opciones) {
   let prop = 0, pag = 0;
   let paginas = propuestas[0].paginas;
   const titulo = d.titulo || "Tu sistema de seguridad";
-  const nombreDe = (tipo) => (CROQUIS_3D_LEYENDA[tipo] || [(CROQUIS_SIMBOLOS[tipo] || {}).nombre || tipo])[0];
+  const nombreDe = (tipo) => (String(tipo).includes("|") ? croquis3dNombre(croquis3dDePreset(tipo)) : (CROQUIS_3D_LEYENDA[tipo] || [(CROQUIS_SIMBOLOS[tipo] || {}).nombre || tipo])[0]);
+  const colorDe = (p) => { const t = String(p).split("|")[0]; return (CROQUIS_3D_LEYENDA[t] || [0, (CROQUIS_SIMBOLOS[t] || {}).color || "#8E949A"])[1]; };
   const zonaDe = (e) => (e && e.etq ? " (zona " + e.etq + ")" : "");
   // Para usar dentro de una frase: "el sensor de movimiento de la zona 2".
-  const enFrase = (e) => nombreDe(e.tipo).replace(/\s*\(.*?\)/g, "").toLowerCase() + (e.etq ? " de la zona " + e.etq : "");
+  const enFrase = (e) => croquis3dNombre(e).replace(/\s*\(.*?\)/g, "").toLowerCase() + (e.etq ? " de la zona " + e.etq : "");
   raiz.insertAdjacentHTML("beforeend", `
     <div class="v3-lienzo"></div>
     <div class="v3-cab">${d.logo ? `<img src="${d.logo}" alt="">` : ""}<div><b>${esc(titulo)}</b><small>${esc([d.cliente, d.empresa ? "Propuesta de " + d.empresa : ""].filter(Boolean).join(" · "))}</small></div></div>
@@ -1659,7 +1853,7 @@ function iniciarVisor3D(datos, opciones) {
     const todos = paginas.flatMap((p) => filtro(p.elementos));
     const cuenta = {};
     todos.filter((e) => e.t === "simbolo" && CROQUIS_3D_LEYENDA[e.tipo] && !e.prev).forEach((e) => {
-      const k = CROQUIS_3D_LEYENDA[e.tipo][0];
+      const k = croquis3dNombre(e);
       cuenta[k] = cuenta[k] || { n: 0, color: CROQUIS_3D_LEYENDA[e.tipo][1] };
       cuenta[k].n++;
     });
@@ -1712,8 +1906,9 @@ function iniciarVisor3D(datos, opciones) {
       decir(`Cobertura: ${antes}% → ${an.porcentaje}%${ab !== abiertasAntes ? ` · ${ab === 0 ? "todas las aberturas protegidas" : ab + " abertura" + (ab > 1 ? "s" : "") + " sin sensor"}` : ""}`, false, 3);
     }
   };
-  const nuevoEquipo = (tipo) => {
-    const el = { id: idNuevo(), t: "simbolo", tipo, x: 0, y: 0, rot: 0, esc: 1 };
+  const nuevoEquipo = (preset) => {
+    const { tipo, ...marcas } = croquis3dDePreset(preset);
+    const el = { id: idNuevo(), t: "simbolo", tipo, x: 0, y: 0, rot: 0, esc: 1, ...marcas };
     if (CROQUIS_3D_CON_ZONA.includes(tipo)) el.etq = siguienteZona();
     if (ed && ed.marcarInst) el.inst = true;
     return el;
@@ -1763,7 +1958,7 @@ function iniciarVisor3D(datos, opciones) {
   tira.addEventListener("click", (ev) => {
     const b = ev.target.closest('[data-tipo="__mas"]'); if (!b) return;
     // Lista completa para elegir el sello.
-    hoja.innerHTML = `<b>¿Qué querés poner?</b><div class="v3-paleta">${CROQUIS_3D_PALETA.filter((t) => CROQUIS_SIMBOLOS[t]).map((t) => `<button type="button" data-tipo="${t}"><i style="background:${(CROQUIS_3D_LEYENDA[t] || [0, CROQUIS_SIMBOLOS[t].color])[1]}"></i>${esc(nombreDe(t))}</button>`).join("")}</div><p class="v3-nota" style="margin-top:8px">Después tocá en la casa donde va cada uno.</p><button type="button" class="v3-link" data-h="cancelar">Cancelar</button>`;
+    hoja.innerHTML = `<b>¿Qué querés poner?</b><div class="v3-paleta">${CROQUIS_3D_PALETA.filter((t) => CROQUIS_SIMBOLOS[t.split("|")[0]]).map((t) => `<button type="button" data-tipo="${t}"><i style="background:${colorDe(t)}"></i>${esc(nombreDe(t))}</button>`).join("")}</div><p class="v3-nota" style="margin-top:8px">Después tocá en la casa donde va cada uno.</p><button type="button" class="v3-link" data-h="cancelar">Cancelar</button>`;
     hoja.classList.remove("hidden");
     hoja.onclick = (e2) => { const x = e2.target.closest("button"); if (!x) return; if (x.dataset.tipo) { sello = x.dataset.tipo; pintarTira(); decir(textoEdicion()); } cerrarHoja(); };
   });
@@ -1820,15 +2015,13 @@ function iniciarVisor3D(datos, opciones) {
   function salirCamara() { visor.salirCamara(); if (!editando) ley.classList.remove("hidden"); decir(editando ? textoEdicion() : ""); pintarBarra(); }
   function hojaPaleta(punto) {
     sel = null; visor.marcar(null);
-    hoja.innerHTML = `<b>¿Qué agregás acá?</b><div class="v3-paleta">${CROQUIS_3D_PALETA.filter((t) => CROQUIS_SIMBOLOS[t]).map((t) => `<button type="button" data-tipo="${t}"><i style="background:${(CROQUIS_3D_LEYENDA[t] || [0, CROQUIS_SIMBOLOS[t].color])[1]}"></i>${esc(nombreDe(t))}</button>`).join("")}</div><button type="button" class="v3-link" data-h="cancelar">Cancelar</button>`;
+    hoja.innerHTML = `<b>¿Qué agregás acá?</b><div class="v3-paleta">${CROQUIS_3D_PALETA.filter((t) => CROQUIS_SIMBOLOS[t.split("|")[0]]).map((t) => `<button type="button" data-tipo="${t}"><i style="background:${colorDe(t)}"></i>${esc(nombreDe(t))}</button>`).join("")}</div><button type="button" class="v3-link" data-h="cancelar">Cancelar</button>`;
     hoja.classList.remove("hidden");
     hoja.onclick = (ev) => {
       const b = ev.target.closest("button"); if (!b) return;
       if (b.dataset.h === "cancelar") { cerrarHoja(); return; }
       const tipo = b.dataset.tipo; if (!tipo) return;
-      const el = { id: idNuevo(), t: "simbolo", tipo, x: 0, y: 0, rot: 0, esc: 1 };
-      if (CROQUIS_3D_CON_ZONA.includes(tipo)) el.etq = siguienteZona();
-      if (ed.marcarInst) el.inst = true;
+      const el = nuevoEquipo(tipo);
       cerrarHoja();
       cambiar((els) => { Croquis3D.ubicar(el, punto, els); els.push(el); });
       hojaEquipo(el);
@@ -1839,7 +2032,7 @@ function iniciarVisor3D(datos, opciones) {
     if (!sel) { cerrarHoja(); return; }
     visor.marcar(sel.id);
     const def = CROQUIS_SIMBOLOS[sel.tipo] || {};
-    hoja.innerHTML = `<b>${esc(nombreDe(sel.tipo))}${sel.etq ? " · zona " + esc(sel.etq) : ""}</b>${sel.prev ? `<p class="v3-nota">Ya estaba instalado.</p>` : ""}
+    hoja.innerHTML = `<b>${esc(croquis3dNombre(sel))}${sel.etq ? " · zona " + esc(sel.etq) : ""}</b>${sel.prev ? `<p class="v3-nota">Ya estaba instalado.</p>` : ""}
       <div class="v3-acciones"><button type="button" data-h="girar">Girar</button><button type="button" data-h="mover">Mover</button><button type="button" data-h="zona">Zona</button>${sel.prev ? "" : `<button type="button" data-h="inst" class="${sel.inst ? "on" : ""}">A instalar</button>`}${esCamara(sel) ? `<button type="button" data-h="vercam">Ver lo que ve</button>` : ""}<button type="button" data-h="sacar" class="v3-peligro">Sacar</button></div>
       <button type="button" class="v3-link" data-h="cerrar">Cerrar</button>`;
     hoja.classList.remove("hidden");
@@ -1940,13 +2133,15 @@ function iniciarVisor3D(datos, opciones) {
   function hojaQueHace(e) {
     const def = CROQUIS_SIMBOLOS[e.tipo] || {};
     let texto = CROQUIS_3D_EXPLICA[e.tipo] || "Forma parte del sistema de seguridad.";
+    if (e.tipo === "infrarrojo" && e.video) texto = "Detecta movimiento y en ese momento saca fotos: el monitoreo (y vos, en el celular) ve qué pasó y confirma si es un intruso real.";
+    if (e.inal) texto += " Es inalámbrico: funciona a pila y se comunica por radio, sin cables a la central.";
     if (def.ir) { const { ang, doble } = croquisIRParams(e, def); texto += ` Cubre hasta ${ALCANCE_TXT[e.tipo] || "11"} m, en un ángulo de ${doble ? ang * 2 : ang}°.`; }
     const lugar = dondeEsta(e);
-    hoja.innerHTML = `<div class="v3-vitrina"></div><b>${esc(nombreDe(e.tipo))}${e.etq ? " · zona " + esc(e.etq) : ""}</b>${lugar ? `<p class="v3-nota">En ${esc(lugar.toLowerCase())}</p>` : ""}<p>${esc(texto)}</p>${e.prev ? `<p class="v3-nota">Ya está instalado.</p>` : e.inst ? `<p class="v3-nota">Se agrega con esta propuesta.</p>` : ""}
+    hoja.innerHTML = `<div class="v3-vitrina"></div><b>${esc(croquis3dNombre(e))}${e.etq ? " · zona " + esc(e.etq) : ""}</b>${lugar ? `<p class="v3-nota">En ${esc(lugar.toLowerCase())}</p>` : ""}<p>${esc(texto)}</p>${e.prev ? `<p class="v3-nota">Ya está instalado.</p>` : e.inst ? `<p class="v3-nota">Se agrega con esta propuesta.</p>` : ""}
       ${esCamara(e) ? `<div class="v3-acciones"><button type="button" data-h="vercam" class="v3-primario">Ver lo que ve</button></div>` : ""}<button type="button" class="v3-link" data-h="cerrar">Cerrar</button>`;
     hoja.classList.remove("hidden");
     // El equipo en 3D, como es de verdad (se libera solo al cerrar la ficha).
-    try { Croquis3D.vitrina(hoja.querySelector(".v3-vitrina"), e.tipo); } catch (er) { hoja.querySelector(".v3-vitrina").remove(); }
+    try { Croquis3D.vitrina(hoja.querySelector(".v3-vitrina"), e.tipo, { inal: !!e.inal, video: !!e.video }); } catch (er) { hoja.querySelector(".v3-vitrina").remove(); }
     visor.marcar(e.id);
     hoja.onclick = (ev) => { const b = ev.target.closest("button"); if (!b) return; if (b.dataset.h === "vercam") { verCamara(e); return; } cerrarHoja(); };
   }
@@ -1965,7 +2160,7 @@ function iniciarVisor3D(datos, opciones) {
     if (editando) return;
     const conteo = () => {
       const c = {};
-      paginas.flatMap((p) => p.elementos).filter((e) => e.t === "simbolo" && CROQUIS_SIMBOLOS[e.tipo] && CROQUIS_SIMBOLOS[e.tipo].cat === "equipo" && !e.prev).forEach((e) => { const k = (CROQUIS_3D_LEYENDA[e.tipo] || [nombreDe(e.tipo)])[0]; c[k] = (c[k] || 0) + 1; });
+      paginas.flatMap((p) => p.elementos).filter((e) => e.t === "simbolo" && CROQUIS_SIMBOLOS[e.tipo] && CROQUIS_SIMBOLOS[e.tipo].cat === "equipo" && !e.prev).forEach((e) => { const k = croquis3dNombre(e); c[k] = (c[k] || 0) + 1; });
       return Object.entries(c).map(([k, n]) => `${n} × ${k.toLowerCase()}`);
     };
     const pasos = [

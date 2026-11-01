@@ -4270,3 +4270,51 @@ test("Link sin presentación guiada (agregado a un cliente que ya tiene el siste
     await ctx.close();
   } finally { await nav.close(); }
 });
+
+test("Equipos nuevos: inalámbricos, PIR CAM, barrera exterior, DVR/NVR y control de acceso (en la paleta, en el 3D y en la simulación)", async () => {
+  const nav = await navegador3D();
+  try {
+    const ctx = await nav.newContext({ serviceWorkers: "block", viewport: { width: 900, height: 800 } });
+    const page = await ctx.newPage();
+    const errores = [];
+    page.on("pageerror", (e) => errores.push(e.message));
+    await page.route("**/api/**", (r) => r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+    await page.goto(base + "/");
+    await page.waitForTimeout(400);
+    // Una barrera cruzando el ambiente derecho (por donde entra el intruso, por la ventana) y nada más que la detecte
+    const casa = CASA_B.filter((e) => e.id !== "ir").concat([{ id: "bar", t: "simbolo", tipo: "barrera", x: 300, y: 150, rot: 90, esc: 1.7, etq: "5" }, { id: "pc", t: "simbolo", tipo: "infrarrojo", x: 0, y: 300, rot: 90, esc: 1, video: true, inal: true, etq: "6" }]);
+    await page.evaluate((els) => { tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); window.CROQUIS_3D_VELOCIDAD = 12; cqAbrirEditor({ titulo: "Casa", elementos: els }); }, casa);
+    await page.click("#cqMenuBtn");
+    await page.click('[data-m="ver3d"]');
+    await page.waitForSelector(".v3-capa canvas", { timeout: 20000 });
+    const ley = await page.textContent(".v3-ley");
+    assert.match(ley, /Barrera infrarroja exterior/);
+    assert.match(ley, /Sensor de movimiento con cámara \(PIR CAM\)/);
+    // La simulación: la barrera lo detecta al cruzarla
+    const r = await page.evaluate(() => new Promise((ok) => { const ev = []; window.__visor3d.visor.simular((e) => { ev.push(e); if (e.tipo === "fin") ok(ev.filter((x) => x.tipo === "detecta").map((x) => x.equipo.tipo)); }); }));
+    assert.ok(r.includes("barrera"), "la barrera detecta: " + r.join(","));
+    // Tocar la barrera muestra qué hace
+    const [x, y] = await page.evaluate(() => window.__visor3d.visor.aPantalla(300, 150 - 57 * 1.7, 0.6));
+    await page.mouse.click(x, y);
+    await page.waitForFunction(() => /haces infrarrojos/.test(document.querySelector(".v3-hoja").textContent), null, { timeout: 5000 });
+    await page.click('.v3-hoja [data-h="cerrar"]');
+    // Paleta del 3D: los nuevos; agregar una lectora junto a la puerta y un magnético inalámbrico
+    await page.click('.v3-barra [data-a="editar"]');
+    await page.click('.v3-tira [data-tipo="__mas"]');
+    const items = await page.$$eval(".v3-hoja .v3-paleta button", (bs) => bs.map((b) => b.textContent.trim()));
+    for (const n of ["Sensor de movimiento inalámbrico", "Sensor de movimiento con cámara (PIR CAM)", "Barrera infrarroja exterior", "Sensor de apertura inalámbrico", "Grabador DVR / NVR", "Lectora de tag / tarjeta", "Cerradura electromagnética", "Cerradura de pestillo", "Botón de salida"]) assert.ok(items.includes(n), n + " en: " + items.join(" | "));
+    await page.click('.v3-hoja [data-tipo="lector_acceso"]');
+    const cerca = await page.evaluate(() => window.__visor3d.visor.aPantalla(150, 280, 0));
+    await page.mouse.click(cerca[0], cerca[1]);
+    const lect = await page.evaluate(() => cq.elementos.find((e) => e.tipo === "lector_acceso"));
+    assert.ok(lect && Math.abs(lect.y - 300) <= 6 && lect.x > 120 && lect.x < 145, "al lado del marco de la puerta: " + JSON.stringify(lect));
+    await page.click('.v3-tira [data-tipo="__mas"]');
+    await page.click('.v3-hoja [data-tipo="magnetico|inal"]');
+    const cv = await page.evaluate(() => window.__visor3d.visor.aPantalla(352, 10, 0));
+    await page.mouse.click(cv[0], cv[1]);
+    const mag = await page.evaluate(() => cq.elementos.find((e) => e.tipo === "magnetico"));
+    assert.ok(mag && mag.inal === true, "magnético inalámbrico");
+    assert.deepStrictEqual(errores, []);
+    await ctx.close();
+  } finally { await nav.close(); }
+});
