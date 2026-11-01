@@ -3673,3 +3673,72 @@ test("Vista 3D pública (vista-3d.html): abre por id sin login y avisa si el lin
     await ctx.close();
   } finally { await nav.close(); }
 });
+
+test("Vista 3D: se edita desde el 3D (agregar en la esquina con zona, mover, girar, sacar, deshacer) y pasa al croquis; un plano cerrado no se edita", async () => {
+  const nav = await navegador3D();
+  try {
+    const ctx = await nav.newContext({ serviceWorkers: "block", viewport: { width: 900, height: 800 } });
+    const page = await ctx.newPage();
+    const errores = [];
+    page.on("pageerror", (e) => errores.push(e.message));
+    await page.route("**/api/**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+    await page.goto(base + "/");
+    await page.waitForTimeout(400);
+    const elementos = [...CASA_3D.map((e) => ({ ...e })), { id: "c1", t: "cable", x1: 0, y1: 0, x2: 50, y2: 50 }];
+    elementos.find((e) => e.id === "s3").etq = "7";
+    await page.evaluate((els) => { tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); window.prompt = () => "12"; cqAbrirEditor({ titulo: "Casa", cliente: "Juan", elementos: els }); }, elementos);
+    await page.click("#cqMenuBtn");
+    await page.click('[data-m="ver3d"]');
+    await page.waitForSelector(".v3-capa canvas", { timeout: 20000 });
+    await page.click('.v3-barra [data-a="editar"]');
+    assert.match(await page.textContent(".v3-aviso"), /Tocá un ambiente/);
+    const tocar = async (ux, uy, h) => { const [x, y] = await page.evaluate(([a, b, c]) => document.querySelector(".v3-capa").__v.aPantalla(a, b, c), [ux, uy, h]); await page.mouse.click(x, y); };
+    await page.evaluate(() => { document.querySelector(".v3-capa").__v = null; });
+    await page.evaluate(() => { const c = document.querySelector(".v3-capa"); Object.defineProperty(c, "__v", { get: () => window.__visor3d.visor, configurable: true }); });
+    // Agregar: tocar el piso del ambiente izquierdo, cerca de la esquina de abajo
+    await tocar(60, 240, 0);
+    await page.waitForSelector(".v3-hoja:not(.hidden) .v3-paleta");
+    await page.click('.v3-paleta [data-tipo="infrarrojo"]');
+    let nuevo = await page.evaluate(() => cq.elementos.find((e) => String(e.id).startsWith("v3")));
+    assert.ok(nuevo, "quedó en el croquis");
+    assert.deepStrictEqual([nuevo.x, nuevo.y, nuevo.rot], [0, 300, 90], "a la esquina, mirando al ambiente");
+    assert.strictEqual(nuevo.etq, "8", "zona siguiente");
+    assert.strictEqual(nuevo.inst, true, "a instalar (el plano ya tenía marcados)");
+    assert.match(await page.textContent(".v3-hoja"), /Sensor de movimiento.*zona 8/);
+    assert.match(await page.textContent(".v3-ley"), /2 × Sensor de movimiento/);
+    // Girar
+    await page.click('.v3-hoja [data-h="girar"]');
+    assert.strictEqual(await page.evaluate((id) => cq.elementos.find((e) => e.id === id).rot, nuevo.id), 135);
+    // Zona
+    await page.click('.v3-hoja [data-h="zona"]');
+    assert.strictEqual(await page.evaluate((id) => cq.elementos.find((e) => e.id === id).etq, nuevo.id), "12");
+    // Mover al otro ambiente
+    await page.click('.v3-hoja [data-h="mover"]');
+    assert.match(await page.textContent(".v3-aviso"), /Tocá dónde va/);
+    await tocar(340, 60, 0);
+    nuevo = await page.evaluate((id) => cq.elementos.find((e) => e.id === id), nuevo.id);
+    assert.deepStrictEqual([nuevo.x, nuevo.y], [400, 0], "a la esquina del otro ambiente");
+    // Tocar un equipo abre sus opciones: sacar la central
+    await tocar(300, 290, 1.6);
+    await page.waitForFunction(() => /Central/.test(document.querySelector(".v3-hoja").textContent));
+    await page.click('.v3-hoja [data-h="sacar"]');
+    assert.ok(!(await page.evaluate(() => cq.elementos.some((e) => e.id === "s3"))));
+    assert.ok(await page.evaluate(() => cq.elementos.some((e) => e.id === "c1")), "el cable no se toca");
+    // Deshacer vuelve la central
+    await page.click('.v3-barra [data-a="deshacer"]');
+    assert.ok(await page.evaluate(() => cq.elementos.some((e) => e.id === "s3")));
+    assert.strictEqual(await page.evaluate(() => cq.cambios), true);
+    // Listo y cerrar: el 2D muestra lo nuevo
+    await page.click('.v3-barra [data-a="listo"]');
+    await page.click('.v3-barra [data-a="cerrar"]');
+    assert.strictEqual(await page.evaluate(() => cq.elementos.filter((e) => e.tipo === "infrarrojo").length), 3);
+    // Plano cerrado: sin Editar
+    await page.evaluate(() => cqModoLectura(true));
+    await page.click("#cqMenuBtn");
+    await page.click('[data-m="ver3d"]');
+    await page.waitForSelector(".v3-capa canvas", { timeout: 20000 });
+    assert.strictEqual(await page.$('.v3-barra [data-a="editar"]'), null);
+    assert.deepStrictEqual(errores, []);
+    await ctx.close();
+  } finally { await nav.close(); }
+});

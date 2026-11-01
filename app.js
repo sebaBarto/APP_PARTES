@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.22.0";
+const APP_VERSION = "4.23.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -16801,7 +16801,7 @@ cqEl("cqMenuBtn").addEventListener("click", () => {
     <h3>${escapeHtml(cq.titulo || cq.cliente || "Croquis")}</h3>
     <button type="button" class="btn btn-primary" data-m="guardar">Guardar</button>
     <button type="button" class="btn btn-secondary" data-m="pdf">Compartir / descargar PDF</button>
-    <button type="button" class="btn btn-secondary" data-m="ver3d">${cqIc("cubo")} Ver en 3D / mandar al cliente</button>
+    <button type="button" class="btn btn-secondary" data-m="ver3d">${cqIc("cubo")} Ver y editar en 3D / mandar al cliente</button>
     <button type="button" class="btn btn-secondary" data-m="png">Imagen (PNG)</button>
     <button type="button" class="btn btn-secondary" data-m="svg">Archivo editable (SVG, se abre en Visio)</button>
     <div class="cq-menu-fila"><button type="button" class="btn btn-secondary" data-m="foto">${cqIc("galeria")} Boceto desde galería</button><button type="button" class="btn btn-secondary" data-m="camara">${cqIc("camara")} Sacar foto</button></div>
@@ -16888,9 +16888,38 @@ function cqMenuLectura() {
   });
 }
 // ---------- Vista 3D (para la venta: el cliente ve su casa con los sensores) ----------
+// Lo que no va al 3D (ni se toca al editar desde el 3D).
+const CQ_3D_FUERA = ["cable", "cota", "tabla"];
+// Cambio hecho en el 3D (agregar, mover, sacar equipos): se pasa al dibujo.
+// Se reemplazan los elementos que ve el 3D y se dejan como estaban los que no
+// (cables, medidas, tablas), en el mismo orden.
+function cq3dAplicar(idx, nuevos) {
+  if (cq.soloLectura) return;
+  cqSyncPagina();
+  const actual = idx === cq.pagina;
+  if (actual) cqMemoria();
+  const pagina = cq.paginas[idx];
+  if (!pagina) return;
+  const porId = new Map(nuevos.map((e) => [e.id, e]));
+  const usados = new Set();
+  const res = [];
+  (pagina.elementos || []).forEach((e) => {
+    if (CQ_3D_FUERA.includes(e.t)) { res.push(e); return; }
+    const n = porId.get(e.id);
+    if (n) { res.push(n); usados.add(e.id); }
+  });
+  nuevos.forEach((e) => { if (!usados.has(e.id)) res.push(e); });
+  pagina.elementos = res;
+  if (actual) { cq.elementos = res; cq.sel = null; cq.multi = []; }
+  cq.cambios = true;
+  cqGuardarBorrador();
+  cqRender();
+}
 function cq3dDatos() {
+  cqSyncPagina();
+  cq.paginas.forEach((p) => (p.elementos || []).forEach((e) => { if (!e.id) e.id = cqId(); }));
   const d = cqDibujoCompleto();
-  const paginas = d.paginas.map((p) => ({ nombre: d.paginas.length > 1 ? p.nombre : "", elementos: (p.elementos || []).filter((e) => e.t !== "cable" && e.t !== "cota" && e.t !== "tabla") })).filter((p) => p.elementos.length);
+  const paginas = JSON.parse(JSON.stringify(d.paginas.map((p, idx) => ({ idx, nombre: d.paginas.length > 1 ? p.nombre : "", elementos: (p.elementos || []).filter((e) => !CQ_3D_FUERA.includes(e.t)) })))).filter((p) => p.elementos.length);
   return { titulo: cq.titulo || "Tu sistema de seguridad", cliente: cq.cliente || "", paginas };
 }
 async function cqVer3D() {
@@ -16907,12 +16936,17 @@ async function cqVer3D() {
   document.body.appendChild(capa);
   let visor = null;
   const cerrar = () => { if (visor) visor.destruir(); capa.remove(); };
+  const todos = datos.paginas.flatMap((p) => p.elementos);
   visor = iniciarVisor3D({ ...datos, empresa: "SAT Alarmas", logo: "icons/logo.png" }, {
     contenedor: capa, botonCerrar: true,
     alCerrar: cerrar,
-    extras: [{ texto: "Mandar al cliente", alHacer: () => cqMandar3D(datos) }],
+    // Mandar siempre lo último (con lo que se haya cambiado en el 3D).
+    extras: [{ texto: "Mandar al cliente", alHacer: () => cqMandar3D(cq3dDatos()) }],
+    // Editar desde el 3D: solo si el plano no quedó como registro.
+    edicion: cq.soloLectura ? null : { marcarInst: todos.some((e) => e.inst || e.prev), alCambiar: cq3dAplicar },
   });
   if (!visor) { cerrar(); showToast("El plano no tiene nada para mostrar en 3D."); }
+  window.__visor3d = visor; // para las pruebas
 }
 function cqMandar3D(datos) {
   const capa = document.createElement("div");
