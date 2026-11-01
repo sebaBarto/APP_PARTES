@@ -3711,3 +3711,6 @@ html .app .equipo-acciones .btn.eq-util.activo, .equipo-acciones .eq-util.activo
 .cq3d-comparar summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
 .cq3d-fila { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
 .cq3d-fila input[type=text] { flex: 1; min-width: 0; padding: 8px; border-radius: 8px; border: 1px solid var(--border, #C9CED4); background: var(--surface, #fff); color: inherit; font: inherit; }
+/* Croquis: tipo de línea (pared o cerco) */
+.cq-tipo-linea { border: 1px solid var(--border, #C9CED4); background: var(--surface, #fff); color: inherit; border-radius: 8px; padding: 6px 8px; font: 600 12.5px inherit; font-family: inherit; white-space: nowrap; }
+.cq-tipo-linea.activo { background: #F2C94C; color: #1C1E21; border-color: #D4A017; }

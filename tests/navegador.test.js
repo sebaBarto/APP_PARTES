@@ -3896,3 +3896,60 @@ test("Paso (abertura sin puerta): se pone desde Obra, se apoya en la pared y en 
     await ctx.close();
   } finally { await nav.close(); }
 });
+
+test("Cercos: reja completa, reja con tapial y tejido perimetral se trazan como una pared, se cambian de tipo y en el 3D no cuentan como pared", async () => {
+  const nav = await navegador3D();
+  try {
+    const ctx = await nav.newContext({ serviceWorkers: "block" });
+    const page = await ctx.newPage();
+    const errores = [];
+    page.on("pageerror", (e) => errores.push(e.message));
+    await page.route("**/api/**", (r) => r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+    await page.goto(base + "/");
+    await page.waitForTimeout(400);
+    await page.evaluate(() => { tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); cqAbrirEditor({ titulo: "Casa" }); });
+    await page.waitForTimeout(200);
+    // Desde Obra: elegir "Reja con tapial" lleva a la herramienta Pared con ese tipo
+    await page.click('[data-herr="objetos"]');
+    await page.click('#cqSimbolos [data-cerco="reja_tapial"]');
+    assert.strictEqual(await page.evaluate(() => cq.herr), "linea");
+    assert.ok(await page.$('#cqSimbolos [data-subpared="reja_tapial"].activo'));
+    assert.match(await page.textContent("#cqAyuda"), /reja con tapial/);
+    const caja = await page.locator("#cqSvg").boundingBox();
+    const arrastrar = async (a, b) => { await page.mouse.move(caja.x + a[0], caja.y + a[1]); await page.mouse.down(); for (let i = 1; i <= 8; i++) await page.mouse.move(caja.x + a[0] + (b[0] - a[0]) * i / 8, caja.y + a[1] + (b[1] - a[1]) * i / 8); await page.mouse.up(); };
+    await arrastrar([60, 80], [260, 80]);
+    let lineas = await page.evaluate(() => cq.elementos.filter((e) => e.t === "linea"));
+    assert.strictEqual(lineas.length, 1);
+    assert.strictEqual(lineas[0].cerco, "reja_tapial");
+    // Sigue la cadena con el mismo tipo
+    await page.mouse.click(caja.x + 260, caja.y + 220);
+    lineas = await page.evaluate(() => cq.elementos.filter((e) => e.t === "linea"));
+    assert.deepStrictEqual(lineas.map((l) => l.cerco), ["reja_tapial", "reja_tapial"]);
+    // Tejido desde la paleta de Pared
+    await page.click('#cqSimbolos [data-subpared="tejido"]');
+    await arrastrar([60, 300], [260, 300]);
+    const tejido = await page.evaluate(() => cq.elementos.filter((e) => e.t === "linea").pop());
+    assert.strictEqual(tejido.cerco, "tejido");
+    const svgT = await page.evaluate((id) => croquisSvgElemento(cq.elementos.find((e) => e.id === id)), tejido.id);
+    assert.match(svgT, /<circle/, "con postes");
+    // Cambiar el tipo desde la barra: toda la cadena pasa a reja completa
+    await page.click('[data-herr="mover"]');
+    await page.evaluate(() => { const l = cq.elementos.find((e) => e.cerco === "reja_tapial"); cq.sel = l.id; cqRender(); });
+    assert.match(await page.textContent("#cqProps"), /Reja con tapial/);
+    await page.click('#cqProps [data-cerco-sel="reja"]');
+    assert.deepStrictEqual(await page.evaluate(() => cq.elementos.filter((e) => e.cadena && e.cadena === cq.elementos.find((x) => x.cerco === "reja").cadena).map((e) => e.cerco)), ["reja", "reja"]);
+    await page.click('#cqProps [data-cerco-sel="pared"]');
+    assert.ok(await page.evaluate(() => cq.elementos.filter((e) => e.t === "linea" && !e.cerco).length === 2), "vuelve a ser pared");
+    // En el análisis 3D los cercos no cierran ambientes
+    const a = await page.evaluate(() => Croquis3D.analizar([{ id: "1", t: "linea", cerco: "reja", x1: 0, y1: 0, x2: 400, y2: 0 }, { id: "2", t: "linea", cerco: "reja", x1: 400, y1: 0, x2: 400, y2: 300 }, { id: "3", t: "linea", cerco: "tejido", x1: 400, y1: 300, x2: 0, y2: 300 }, { id: "4", t: "linea", cerco: "reja_tapial", x1: 0, y1: 300, x2: 0, y2: 0 }]));
+    assert.strictEqual(a, null);
+    // Se ven en el 3D sin errores
+    await page.evaluate(() => { cq.elementos.forEach((e) => { if (e.t === "linea") e.cerco = "reja_tapial"; }); });
+    await page.click("#cqMenuBtn");
+    await page.click('[data-m="ver3d"]');
+    await page.waitForSelector(".v3-capa canvas", { timeout: 20000 });
+    assert.strictEqual(await page.evaluate(() => window.__visor3d.visor.resumen.paredes), 0);
+    assert.deepStrictEqual(errores, []);
+    await ctx.close();
+  } finally { await nav.close(); }
+});

@@ -16,7 +16,7 @@
 //   simbolo { tipo, x, y, rot, esc, color?, esp? }  equipos y objetos de obra
 
 // Tiene que ser igual a APP_VERSION de app.js (si no, la app recarga).
-const CROQUIS_UTILS_VERSION = "4.25.0";
+const CROQUIS_UTILS_VERSION = "4.26.0";
 const CROQUIS_GRILLA = 20;
 
 // Cada símbolo se dibuja centrado en 0,0 con dib(color). "cat" separa los
@@ -548,6 +548,11 @@ function croquisSvgElementoBase(el, attrs) {
     } else figura = `<rect x="${x}" y="${y}" width="${w}" height="${h}" ${estilo}/>`;
     const etiqueta = el.nombre ? `<text x="${cx}" y="${cy + 5}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" fill="#5B5F66" letter-spacing="0.5">${croquisEsc(el.nombre)}</text>` : "";
     return `<g ${a}>${figura}${etiqueta}</g>`;
+  }
+  if (el.t === "linea" && el.cerco && CROQUIS_CERCOS[el.cerco]) {
+    // Cerco perimetral (reja, reja con tapial, tejido): no es pared.
+    const toque = a ? `<path d="${croquisCercoCamino(el)}" fill="none" stroke="#000" stroke-opacity="0" stroke-width="14"/>` : "";
+    return `<g ${a}>${toque}${croquisCercoSvg(el)}</g>`;
   }
   if (el.t === "linea") {
     const t = el.trazo && el.trazo !== "continuo";
@@ -1367,6 +1372,54 @@ function croquisDesdeIACompleto(r, W, H) {
 // ---------- Ordenar un dibujo a mano alzada ----------
 // Junta los bordes casi alineados (habitaciones y paredes que tendrían que
 // coincidir) y apoya puertas, ventanas y portones sobre la pared más cercana.
+// Cercos perimetrales: se dibujan con la herramienta Pared, pero no son
+// paredes de la casa (no cierran ambientes ni tapan sensores).
+const CROQUIS_CERCOS = {
+  reja: { nombre: "Reja completa", alto: 1.8 },
+  reja_tapial: { nombre: "Reja con tapial", alto: 1.8, tapial: 0.6 },
+  tejido: { nombre: "Tejido perimetral", alto: 1.8 },
+};
+const croquisEsCerco = (e) => !!(e && e.t === "linea" && e.cerco && CROQUIS_CERCOS[e.cerco]);
+// Puntos a lo largo de la línea (recta o curva), cada "paso" unidades.
+function croquisCercoPuntos(el, paso) {
+  const pts = [];
+  const enT = (t) => {
+    if (!Array.isArray(el.c)) return [el.x1 + (el.x2 - el.x1) * t, el.y1 + (el.y2 - el.y1) * t];
+    const u = 1 - t;
+    return [u * u * el.x1 + 2 * u * t * el.c[0] + t * t * el.x2, u * u * el.y1 + 2 * u * t * el.c[1] + t * t * el.y2];
+  };
+  // Largo aproximado.
+  let L = 0, prev = enT(0);
+  for (let i = 1; i <= 24; i++) { const p = enT(i / 24); L += Math.hypot(p[0] - prev[0], p[1] - prev[1]); prev = p; }
+  const n = Math.max(1, Math.round(L / paso));
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, p = enT(t), q = enT(Math.min(1, t + 0.01)), r = enT(Math.max(0, t - 0.01));
+    const dx = q[0] - r[0], dy = q[1] - r[1], l = Math.hypot(dx, dy) || 1;
+    pts.push({ x: p[0], y: p[1], nx: -dy / l, ny: dx / l });
+  }
+  return { pts, largo: L };
+}
+function croquisCercoCamino(el) {
+  return Array.isArray(el.c) ? `M${el.x1} ${el.y1} Q${el.c[0]} ${el.c[1]} ${el.x2} ${el.y2}` : `M${el.x1} ${el.y1} L${el.x2} ${el.y2}`;
+}
+function croquisCercoSvg(el) {
+  const c = el.color || (el.cerco === "tejido" ? "#2E7D4F" : "#1C1E21");
+  const camino = croquisCercoCamino(el);
+  const f = (v) => +v.toFixed(1);
+  if (el.cerco === "tejido") {
+    // Línea fina con crucecitas (malla romboidal).
+    const { pts } = croquisCercoPuntos(el, 12);
+    const cruces = pts.slice(0, -1).map((p, i) => { const q = pts[i + 1], mx = (p.x + q.x) / 2, my = (p.y + q.y) / 2, ux = (q.x - p.x) / 2, uy = (q.y - p.y) / 2, k = 3.5; return `M${f(mx - ux * 0.45 + p.nx * k)} ${f(my - uy * 0.45 + p.ny * k)} L${f(mx + ux * 0.45 - p.nx * k)} ${f(my + uy * 0.45 - p.ny * k)} M${f(mx - ux * 0.45 - p.nx * k)} ${f(my - uy * 0.45 - p.ny * k)} L${f(mx + ux * 0.45 + p.nx * k)} ${f(my + uy * 0.45 + p.ny * k)}`; }).join(" ");
+    const postes = croquisCercoPuntos(el, 100).pts.map((p) => `<circle cx="${f(p.x)}" cy="${f(p.y)}" r="2.6" fill="${c}"/>`).join("");
+    return `<path d="${camino}" fill="none" stroke="${c}" stroke-width="1.4"/><path d="${cruces}" fill="none" stroke="${c}" stroke-width="1"/>${postes}`;
+  }
+  // Reja: barrotes cruzados a la línea; con tapial, además una franja gris.
+  const { pts } = croquisCercoPuntos(el, 8);
+  const k = el.cerco === "reja_tapial" ? 6 : 5;
+  const barrotes = pts.map((p) => `M${f(p.x - p.nx * k)} ${f(p.y - p.ny * k)} L${f(p.x + p.nx * k)} ${f(p.y + p.ny * k)}`).join(" ");
+  const tapial = el.cerco === "reja_tapial" ? `<path d="${camino}" fill="none" stroke="#9AA0A6" stroke-width="7" stroke-linecap="butt"/>` : "";
+  return `${tapial}<path d="${camino}" fill="none" stroke="${c}" stroke-width="2"/><path d="${barrotes}" fill="none" stroke="${c}" stroke-width="1.5"/>`;
+}
 const CROQUIS_ABERTURAS = ["puerta", "paso", "ventana", "corrediza", "porton_corredizo", "porton_batiente"];
 function croquisOrdenar(elementos, tolerancia) {
   const tol = tolerancia || 16;

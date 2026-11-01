@@ -166,6 +166,7 @@ const Croquis3D = (() => {
     const els = (elementos || []).filter((e) => e && !(o.ocultarAntes && e.prev));
     // ---- Paredes ----
     els.forEach((e) => {
+      if (croquisEsCerco(e)) return; // los cercos van aparte
       if (e.t === "linea") {
         if (Array.isArray(e.c)) {
           let prev = pt(e.x1, e.y1);
@@ -189,6 +190,7 @@ const Croquis3D = (() => {
     });
     // Paredes cortadas en las aberturas: para dibujar (todas) y para lo que
     // ven los sensores (solo los pasos).
+    const paredesEnteras = segmentos.slice();
     const paredesDibujo = cortarParedes(segmentos, tramosAbertura(els, true));
     const sinPuertas = cortarParedes(segmentos, tramosAbertura(els, false));
     segmentos.length = 0; sinPuertas.forEach((x) => segmentos.push(x));
@@ -200,6 +202,9 @@ const Croquis3D = (() => {
         const ancho2 = (CROQUIS_ANCHO_ABERTURA[e.tipo] || 40) / 2;
         const a = croquisLocalAMundo(e, -ancho2, 0), b = croquisLocalAMundo(e, ancho2, 0);
         const A = pt(a[0], a[1]), B = pt(b[0], b[1]);
+        // Una abertura que no está en una pared (p. ej. un portón en la reja) no lleva dintel ni antepecho.
+        const pc = paredMasCercana((A[0] + B[0]) / 2, (A[1] + B[1]) / 2, paredesEnteras);
+        if (!pc || pc.d > 0.2) return;
         // Antepecho de la ventana (debajo) y vidrio.
         if (e.tipo === "ventana") {
           const m = pared(A, B, Math.min(1.0, altoParedes()), COLOR_PARED); if (m) grupoParedes.add(m);
@@ -226,6 +231,50 @@ const Croquis3D = (() => {
     piso.rotation.x = -Math.PI / 2; piso.position.set(cx, 0, cz); escena.add(piso);
     const grilla = new THREE.GridHelper(Math.ceil(lado + 2), Math.ceil(lado + 2), 0xb5ad9f, 0xb5ad9f);
     grilla.position.set(cx, 0.005, cz); grilla.material.transparent = true; grilla.material.opacity = 0.35; escena.add(grilla);
+
+    // ---- Cercos perimetrales (reja, reja con tapial, tejido) ----
+    const grupoCercos = new THREE.Group();
+    escena.add(grupoCercos);
+    let texTejido = null;
+    els.filter(croquisEsCerco).forEach((e) => {
+      const def = CROQUIS_CERCOS[e.cerco];
+      const color = e.cerco === "tejido" ? 0x5f6b63 : 0x2b2f33;
+      const tramos = croquisCercoPuntos(e, 8).pts.map((p) => [M(p.x), M(p.y)]);
+      const desde = def.tapial || 0, alto = def.alto - desde;
+      // Tramo a tramo (así sigue también las curvas).
+      const largoTotal = [];
+      for (let i = 1; i < tramos.length; i++) largoTotal.push([tramos[i - 1], tramos[i]]);
+      largoTotal.forEach(([a, b]) => {
+        if (def.tapial) { const t = pared(a, b, def.tapial, "#B7B1A6"); if (t) { t.scale.z = 1.6; grupoCercos.add(t); } }
+        const l = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        if (l < 0.01) return;
+        const ang = -Math.atan2(b[1] - a[1], b[0] - a[0]);
+        // Caños de arriba y abajo.
+        [desde + 0.05, desde + alto - 0.03].forEach((y) => {
+          const r = new THREE.Mesh(new THREE.BoxGeometry(l, 0.04, 0.04), new THREE.MeshLambertMaterial({ color }));
+          r.position.set((a[0] + b[0]) / 2, y, (a[1] + b[1]) / 2); r.rotation.y = ang; grupoCercos.add(r);
+        });
+        if (e.cerco === "tejido") {
+          if (!texTejido) {
+            const cv = document.createElement("canvas"); cv.width = cv.height = 64;
+            const g = cv.getContext("2d"); g.strokeStyle = "rgba(70,80,74,0.9)"; g.lineWidth = 3;
+            g.beginPath(); g.moveTo(0, 0); g.lineTo(64, 64); g.moveTo(64, 0); g.lineTo(0, 64); g.stroke();
+            texTejido = new THREE.CanvasTexture(cv); texTejido.wrapS = texTejido.wrapT = THREE.RepeatWrapping;
+          }
+          const tx = texTejido.clone(); tx.needsUpdate = true; tx.repeat.set(l / 0.12, alto / 0.12);
+          const malla = new THREE.Mesh(new THREE.PlaneGeometry(l, alto), new THREE.MeshBasicMaterial({ map: tx, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
+          malla.position.set((a[0] + b[0]) / 2, desde + alto / 2, (a[1] + b[1]) / 2); malla.rotation.y = ang; grupoCercos.add(malla);
+        }
+      });
+      // Barrotes (reja) o postes (tejido), en una sola malla instanciada.
+      const sep = e.cerco === "tejido" ? 2.5 : 0.12;
+      const pts = croquisCercoPuntos(e, sep * CROQUIS_POR_METRO).pts;
+      const geo = e.cerco === "tejido" ? new THREE.CylinderGeometry(0.035, 0.035, alto + 0.1, 8) : new THREE.BoxGeometry(0.018, alto, 0.018);
+      const inst = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ color }), pts.length);
+      const mtx = new THREE.Matrix4();
+      pts.forEach((p, i) => { mtx.makeTranslation(M(p.x), desde + alto / 2, M(p.y)); inst.setMatrixAt(i, mtx); });
+      grupoCercos.add(inst);
+    });
 
     // ---- Puertas (hoja abierta) ----
     els.filter((e) => e.t === "simbolo" && e.tipo === "puerta").forEach((e) => {
@@ -548,6 +597,7 @@ const Croquis3D = (() => {
     const els = (elementos || []).filter(Boolean);
     const paredes = [];
     els.forEach((e) => {
+      if (croquisEsCerco(e)) return;
       if (e.t === "linea") {
         if (Array.isArray(e.c)) {
           let prev = [M(e.x1), M(e.y1)];
@@ -712,7 +762,7 @@ const Croquis3D = (() => {
     const p3 = EQUIPOS[el.tipo] || {};
     const segs = [];
     (elementos || []).forEach((e) => {
-      if (e.id === el.id) return;
+      if (e.id === el.id || croquisEsCerco(e)) return;
       if (e.t === "linea") segs.push([[e.x1, e.y1], [e.x2, e.y2]]);
       else if (e.t === "rect" && (!e.forma || e.forma === "rect") && Math.abs(e.w * e.h) >= 1.5 * CROQUIS_POR_METRO * CROQUIS_POR_METRO) {
         const x = Math.min(e.x, e.x + e.w), y = Math.min(e.y, e.y + e.h), w = Math.abs(e.w), h = Math.abs(e.h);

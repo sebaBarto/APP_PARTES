@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.25.0";
+const APP_VERSION = "4.26.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -15742,6 +15742,9 @@ const CQ_AYUDAS = {
   texto: "Tocá donde va el texto, el cuadro o la tabla.",
   simbolo: "Tocá en el plano dónde va. Las aberturas se apoyan sobre la pared.",
 };
+// Cerco elegido en la herramienta Pared (reja, reja con tapial, tejido) o null.
+const cqCercoActual = () => (CROQUIS_CERCOS[cq.subPared] ? cq.subPared : null);
+const cqConCerco = (el) => { const c = cqCercoActual(); if (c) el.cerco = c; return el; };
 function cqElegirHerr(h) {
   if (h !== "linea") cq.cadena = null;
   if (h !== "mover") { cq.modoMulti = false; cq.multi = []; }
@@ -15778,8 +15781,16 @@ function cqRenderPaleta() {
   }
   if (cq.paleta === "pared") {
     const sub = cq.subPared || "pared";
-    caja.innerHTML = `<button type="button" data-subpared="pared" class="${sub === "pared" ? "activo" : ""}">${cqIc("pared")}<span>Pared</span></button><button type="button" data-subpared="cota" class="${sub === "cota" ? "activo" : ""}">${cqIc("cota")}<span>Medida (cota)</span></button>`;
-    caja.querySelectorAll("[data-subpared]").forEach((b) => b.addEventListener("click", () => { cq.subPared = b.dataset.subpared; cq.cadena = null; cqRenderPaleta(); cqRender(); }));
+    const muestra = (k) => `<svg viewBox="0 0 60 24"><g transform="translate(0 12)">${croquisCercoSvg({ t: "linea", x1: 4, y1: 0, x2: 56, y2: 0, cerco: k })}</g></svg>`;
+    caja.innerHTML = `<button type="button" data-subpared="pared" class="${sub === "pared" ? "activo" : ""}">${cqIc("pared")}<span>Pared</span></button>` +
+      Object.entries(CROQUIS_CERCOS).map(([k, c]) => `<button type="button" data-subpared="${k}" class="${sub === k ? "activo" : ""}">${muestra(k)}<span>${c.nombre}</span></button>`).join("") +
+      `<button type="button" data-subpared="cota" class="${sub === "cota" ? "activo" : ""}">${cqIc("cota")}<span>Medida (cota)</span></button>`;
+    caja.querySelectorAll("[data-subpared]").forEach((b) => b.addEventListener("click", () => {
+      cq.subPared = b.dataset.subpared; cq.cadena = null;
+      const c = CROQUIS_CERCOS[cq.subPared];
+      cqEl("cqAyuda").textContent = c ? `Arrastrá para trazar ${c.nombre.toLowerCase()}. Después tocá dónde sigue para hacer los quiebres.` : CQ_AYUDAS.linea;
+      cqRenderPaleta(); cqRender();
+    }));
     return;
   }
   const pestanas = cq.paleta === "obra" || cq.paleta === "mueble"
@@ -15791,6 +15802,15 @@ function cqRenderPaleta() {
     const r = Math.max(28, s.r + 4);
     return `<button type="button" data-simbolo="${k}" class="${cq.simboloElegido === k && cq.herr === "simbolo" ? "activo" : ""}"><svg viewBox="${s.vb || `${-r} ${-r} ${r * 2} ${r * 2}`}">${croquisSimboloSvg(k)}</svg><span>${s.nombre}</span></button>`;
   }).join("");
+  if (cq.paleta === "obra") {
+    // Cercos: se trazan como una pared (con la herramienta Pared).
+    caja.insertAdjacentHTML("beforeend", Object.entries(CROQUIS_CERCOS).map(([k, c]) => `<button type="button" data-cerco="${k}"><svg viewBox="0 0 60 24"><g transform="translate(0 12)">${croquisCercoSvg({ t: "linea", x1: 4, y1: 0, x2: 56, y2: 0, cerco: k })}</g></svg><span>${c.nombre}</span></button>`).join(""));
+    caja.querySelectorAll("[data-cerco]").forEach((b) => b.addEventListener("click", () => {
+      cq.subPared = b.dataset.cerco;
+      cqElegirHerr("linea");
+      cqEl("cqAyuda").textContent = `Arrastrá para trazar ${CROQUIS_CERCOS[cq.subPared].nombre.toLowerCase()}. Después tocá dónde sigue para hacer los quiebres.`;
+    }));
+  }
   caja.querySelectorAll("[data-simbolo]").forEach((b) => b.addEventListener("click", () => {
     cq.simboloElegido = b.dataset.simbolo;
     cqElegirHerr("simbolo");
@@ -15864,7 +15884,12 @@ function cqRenderProps() {
     filaSl += sl("alc", "Alcance", 30, 400, 5, pr.alc, (pr.alc / CROQUIS_POR_METRO).toLocaleString("es-AR", { maximumFractionDigits: 1 }) + " m") + sl("ang", "Ángulo", 10, 180, 5, pr.ang, (pr.doble ? pr.ang * 2 : pr.ang) + "°");
     fila2 += b("doble", "Doble lente", "Dos lentes: captación doble (ej. 2 × 90° = 180°)", pr.doble) + b("video", cqIc("ojo") + "Video", "Con videoverificación", pr.video);
   }
-  if (el.t === "cable" || el.t === "linea" || el.t === "rect") {
+  if (el.t === "linea") {
+    // Qué es la línea: pared o un cerco.
+    const tipo = el.cerco && CROQUIS_CERCOS[el.cerco] ? el.cerco : "pared";
+    fila2 += [["pared", "Pared"], ...Object.entries(CROQUIS_CERCOS).map(([k, c]) => [k, c.nombre])].map(([k, n]) => `<button type="button" class="cq-tipo-linea${k === tipo ? " activo" : ""}" data-cerco-sel="${k}">${n}</button>`).join("") + '<span class="cq-sep"></span>';
+  }
+  if (el.t === "cable" || (el.t === "linea" && !croquisEsCerco(el)) || el.t === "rect") {
     const actual = el.trazo || (el.t === "cable" ? "guiones" : "continuo");
     fila2 += Object.entries(CROQUIS_TRAZOS).map(([k, t]) => `<button type="button" class="cq-trazo${k === actual ? " activo" : ""}" data-trazo="${k}" title="${t.nombre}" aria-label="Trazo ${t.nombre}"><svg viewBox="0 0 40 10"><line x1="3" y1="5" x2="37" y2="5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"${t.dash ? ` stroke-dasharray="${t.dash.split(" ").map((n) => Number(n) * 0.7).join(" ")}"` : ""}/></svg></button>`).join("");
   }
@@ -15887,6 +15912,12 @@ function cqRenderProps() {
     });
     inp.addEventListener("change", () => { memorizado = false; cqGuardarBorrador(); });
   });
+  box.querySelectorAll("[data-cerco-sel]").forEach((x) => x.addEventListener("click", () => {
+    cqMemoria();
+    // Cambia toda la pared seguida (los tramos soldados juntos).
+    (el.cadena ? cq.elementos.filter((y) => y.cadena === el.cadena && !cqBloq(y)) : cqDelGrupo(el)).filter((y) => y.t === "linea").forEach((y) => { if (x.dataset.cercoSel === "pared") delete y.cerco; else { y.cerco = x.dataset.cercoSel; delete y.trazo; } });
+    cqRender(); cqGuardarBorrador();
+  }));
   box.querySelectorAll("[data-trazo]").forEach((x) => x.addEventListener("click", () => {
     cqMemoria();
     el.trazo = x.dataset.trazo;
@@ -15972,6 +16003,7 @@ function cqNombreElemento(el) {
   if (el.t === "rect") return { elipse: "Círculo", triangulo: "Triángulo", triangulo_rect: "Triángulo" }[el.forma] || "Habitación";
   if (el.t === "simbolo") return (CROQUIS_SIMBOLOS[el.tipo] || {}).nombre || "Equipo";
   if (el.t === "tabla") return el.celdas && (el.celdas.length > 1 || el.celdas[0].length > 1) ? "Tabla" : "Cuadro de texto";
+  if (croquisEsCerco(el)) return CROQUIS_CERCOS[el.cerco].nombre;
   return { linea: "Pared", cable: "Cableado", texto: "Texto", cota: "Medida" }[el.t] || "";
 }
 function cqAccion(acc) {
@@ -16183,7 +16215,7 @@ cqSvg.addEventListener("pointerdown", (e) => {
     // Pared continua: el tramo nuevo arranca donde terminó el anterior.
     const ini = cq.cadena.ultimo;
     cqGesto = { tipo: "crear", inicio: ini, pts: [[mx, my]], fin: cqEnderezar(ini, [cqSnap(mx), cqSnap(my)]) };
-    cqEl("cqTemporal").innerHTML = croquisSvgElemento({ t: "linea", x1: ini[0], y1: ini[1], x2: cqGesto.fin[0], y2: cqGesto.fin[1] });
+    cqEl("cqTemporal").innerHTML = croquisSvgElemento(cqConCerco({ t: "linea", x1: ini[0], y1: ini[1], x2: cqGesto.fin[0], y2: cqGesto.fin[1] }));
     return;
   }
   if (cq.herr === "rect" || cq.herr === "linea" || cq.herr === "cable") {
@@ -16283,7 +16315,7 @@ cqSvg.addEventListener("pointermove", (e) => {
       cqGesto.fin = fin;
     } else if (cq.herr === "linea") {
       const p = cqEnderezar([x0, y0], [cqSnap(mx), cqSnap(my)]);
-      tmp.innerHTML = croquisSvgElemento({ t: cq.subPared === "cota" ? "cota" : "linea", x1: x0, y1: y0, x2: p[0], y2: p[1] });
+      tmp.innerHTML = croquisSvgElemento(cq.subPared === "cota" ? { t: "cota", x1: x0, y1: y0, x2: p[0], y2: p[1] } : cqConCerco({ t: "linea", x1: x0, y1: y0, x2: p[0], y2: p[1] }));
       cqGesto.fin = p;
     } else {
       const ult = cqGesto.pts[cqGesto.pts.length - 1];
@@ -16330,7 +16362,7 @@ function cqTerminarGesto(e) {
     if (cq.herr === "linea" && cq.subPared === "cota") {
       if (cqGesto.fin && Math.hypot(cqGesto.fin[0] - x0, cqGesto.fin[1] - y0) >= CROQUIS_GRILLA / 2) nuevo = { t: "cota", x1: x0, y1: y0, x2: cqGesto.fin[0], y2: cqGesto.fin[1] };
     } else if (cq.herr === "linea" && cqGesto.fin && Math.hypot(cqGesto.fin[0] - x0, cqGesto.fin[1] - y0) >= CROQUIS_GRILLA / 2) {
-      nuevo = { t: "linea", x1: x0, y1: y0, x2: cqGesto.fin[0], y2: cqGesto.fin[1] };
+      nuevo = cqConCerco({ t: "linea", x1: x0, y1: y0, x2: cqGesto.fin[0], y2: cqGesto.fin[1] });
       // Queda una pared en curso: los tramos siguientes salen de este punto y quedan soldados.
       if (!cq.cadena) cq.cadena = { grupo: "g" + cqId(), inicio: [x0, y0], ultimo: cqGesto.fin };
       else cq.cadena.ultimo = cqGesto.fin;
@@ -16422,7 +16454,7 @@ cqEl("cqCadenaCerrar").addEventListener("click", () => {
   const c = cq.cadena;
   if (c && (c.ultimo[0] !== c.inicio[0] || c.ultimo[1] !== c.inicio[1])) {
     cqMemoria();
-    cq.elementos.push({ id: cqId(), t: "linea", x1: c.ultimo[0], y1: c.ultimo[1], x2: c.inicio[0], y2: c.inicio[1], cadena: c.grupo });
+    cq.elementos.push(cqConCerco({ id: cqId(), t: "linea", x1: c.ultimo[0], y1: c.ultimo[1], x2: c.inicio[0], y2: c.inicio[1], cadena: c.grupo }));
     cqGuardarBorrador();
   }
   cq.cadena = null;
