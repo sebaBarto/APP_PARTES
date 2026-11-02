@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.38.1";
+const APP_VERSION = "4.39.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -16612,6 +16612,66 @@ cqEl("cqZoomMenos").addEventListener("click", () => { const r = cqSvg.getBoundin
 cqEl("cqCentrar").addEventListener("click", cqVerTodo);
 cqEl("cqFondoBtn").addEventListener("click", () => { cq.verFondo = !cq.verFondo; cqRender(); });
 if (cqEl("cqCapasBtn")) cqEl("cqCapasBtn").addEventListener("click", cqPanelCapas);
+if (cqEl("cqListaBtn")) cqEl("cqListaBtn").addEventListener("click", cqPanelLista);
+// Lista de elementos: se elige uno y queda seleccionado (y centrado) para moverlo o editarlo.
+function cqPanelLista() {
+  const capa = document.createElement("div");
+  capa.className = "cq-datos-capa";
+  const grupos = [
+    ["alarma", "Alarma"], ["camaras", "Cámaras y video"], ["aberturas", "Puertas, ventanas y portones"], ["ambientes", "Ambientes"], ["muebles", "Muebles y objetos"], ["textos", "Textos y medidas"],
+  ];
+  const grupoDe = (e) => {
+    if (e.t === "rect") return "ambientes";
+    if (e.t === "texto" || e.t === "tabla" || e.t === "cota") return "textos";
+    if (e.t !== "simbolo") return null;
+    if (CROQUIS_ABERTURAS.includes(e.tipo)) return "aberturas";
+    const k = croquisCapaDe(e);
+    return k === "alarma" || k === "camaras" ? k : "muebles";
+  };
+  const nombre = (e) => (e.t === "rect" ? e.nombre || cqNombreElemento(e) : e.t === "texto" ? "Texto: " + String(e.texto || "").slice(0, 30) : e.t === "cota" ? "Medida" : e.t === "tabla" ? "Tabla" : typeof croquis3dNombre === "function" && CROQUIS_SIMBOLOS[e.tipo] && CROQUIS_SIMBOLOS[e.tipo].cat === "equipo" ? croquis3dNombre(e) : cqNombreElemento(e));
+  const icono = (e) => (e.t === "simbolo" && CROQUIS_SIMBOLOS[e.tipo] ? `<svg viewBox="${CROQUIS_SIMBOLOS[e.tipo].vb || (() => { const r = Math.max(28, CROQUIS_SIMBOLOS[e.tipo].r + 4); return `${-r} ${-r} ${r * 2} ${r * 2}`; })()}">${croquisSimboloSvg(e.tipo)}</svg>` : `<svg viewBox="0 0 24 24">${e.t === "rect" ? '<rect x="3" y="5" width="18" height="14" fill="none" stroke="#5B5F66" stroke-width="2"/>' : '<path d="M5 7h14M5 12h10M5 17h12" stroke="#5B5F66" stroke-width="2"/>'}</svg>`);
+  let filtro = "";
+  const pintar = () => {
+    const f = normalizeText(filtro);
+    const html = grupos.map(([k, titulo]) => {
+      const lista = cq.elementos.filter((e) => grupoDe(e) === k && (!f || normalizeText(nombre(e) + (e.etq ? " zona " + e.etq : "")).includes(f)))
+        .sort((a, b) => (parseInt(String(a.etq || "").replace(/\D/g, ""), 10) || 9999) - (parseInt(String(b.etq || "").replace(/\D/g, ""), 10) || 9999));
+      if (!lista.length) return "";
+      return `<details class="cq-lista-grupo"${k === "alarma" || k === "camaras" || f ? " open" : ""}><summary>${titulo} <small>${lista.length}</small></summary>${lista.map((e) => `<button type="button" class="cq-lista-item${e.id === cq.sel ? " activo" : ""}" data-id="${escapeHtml(e.id)}">${icono(e)}<span><b>${escapeHtml(nombre(e))}</b>${e.etq ? `<small>Zona ${escapeHtml(String(e.etq))}</small>` : ""}${e.inst ? '<small class="cq-lista-inst">A instalar</small>' : ""}${e.prev ? "<small>Ya instalado</small>" : ""}${cqBloq(e) ? "<small>Bloqueado</small>" : ""}</span></button>`).join("")}</details>`;
+    }).join("");
+    capa.querySelector(".cq-lista-cuerpo").innerHTML = html || '<p class="pe-nota">No hay elementos en esta página.</p>';
+  };
+  capa.innerHTML = `<div class="cq-datos cq-lista-panel">
+    <h3>Elementos${cq.paginas.length > 1 ? " · " + escapeHtml(cq.paginas[cq.pagina].nombre || "") : ""}</h3>
+    <input class="field-input" type="search" placeholder="Buscar (ej. infrarrojo, zona 5, cámara)" autocomplete="off">
+    <div class="cq-lista-cuerpo"></div>
+    <div class="cq-datos-btns"><button type="button" class="btn btn-secondary" data-cerrar="1">Cerrar</button></div>
+  </div>`;
+  document.body.appendChild(capa);
+  pintar();
+  capa.querySelector("input").addEventListener("input", (ev) => { filtro = ev.target.value; pintar(); });
+  capa.addEventListener("click", (ev) => {
+    if (ev.target === capa || ev.target.closest("[data-cerrar]")) { capa.remove(); return; }
+    const b = ev.target.closest(".cq-lista-item"); if (!b) return;
+    const el = cq.elementos.find((e) => e.id === b.dataset.id); if (!el) return;
+    capa.remove();
+    // Si su capa está oculta, se muestra para poder verlo.
+    const st = cqCapa(croquisCapaDe(el)); if (st.ver === false) { st.ver = true; cqGuardarCapas(); }
+    cq.multi = []; cq.sel = el.id;
+    if (cq.herr !== "mover") cqElegirHerr("mover");
+    cqCentrarEn(el);
+    cqRender();
+    // Con el panel de propiedades el lienzo se achica: se vuelve a centrar.
+    requestAnimationFrame(() => requestAnimationFrame(() => { cqCentrarEn(el); cqRender(); }));
+  });
+}
+// Centra la vista en un elemento (sin cambiar el zoom, salvo que esté muy lejos).
+function cqCentrarEn(el) {
+  const c = croquisCaja({ elementos: [el] }), t = cqTamLienzo();
+  if (cq.vista.s < 0.6) cq.vista.s = 1;
+  cq.vista.x = c.x + c.w / 2 - t.w / 2 / cq.vista.s;
+  cq.vista.y = c.y + c.h / 2 - t.h / 2 / cq.vista.s;
+}
 // Panel de capas: ver u ocultar y bloquear por tipo, y mostrar las medidas.
 function cqPanelCapas() {
   const capa = document.createElement("div");

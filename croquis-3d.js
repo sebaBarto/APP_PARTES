@@ -53,6 +53,7 @@ const Croquis3D = (() => {
   const COLOR_PARED = "#E9E5DC", COLOR_PISO = "#C9C2B5";
   // Los equipos se dibujan más grandes que en la realidad para que se vean.
   const AUMENTO = 2.2;
+  const COLOR_CAMARA = "#1593B5";
   // Alcance real de cada sensor (m): el del croquis es solo el tamaño del dibujo.
   // ---- Muebles en 3D ----
   // Partes de cada mueble en coordenadas del símbolo (unidades del croquis,
@@ -99,6 +100,34 @@ const Croquis3D = (() => {
       const c = croquisLocalAMundo(e, cx, cy);
       return { e, c: [M(c[0]), M(c[1])], w: M(w * (e.esc || 1)), d: M(d * (e.esc || 1)), desde, hasta, color, forma, giro: ((e.rot || 0) + (e.esp ? -(g || 0) : (g || 0))) * Math.PI / 180, esquinas };
     });
+  }
+  // Hojas de un portón (o puerta) entre A y B (metros): el corredizo, una hoja
+  // cerrada; el batiente, dos hojas entreabiertas hacia el lado del arco.
+  let texPorton = null;
+  function hojasPorton(e, A, B, alto, grupo, marca) {
+    if (!texPorton) {
+      const cv = document.createElement("canvas"); cv.width = 64; cv.height = 64;
+      const g2 = cv.getContext("2d"); g2.fillStyle = "rgba(59,64,70,0.25)"; g2.fillRect(0, 0, 64, 64); g2.strokeStyle = "#2b2f33"; g2.lineWidth = 6;
+      g2.strokeRect(0, 0, 64, 64); for (let x = 8; x < 64; x += 12) { g2.beginPath(); g2.moveTo(x, 0); g2.lineTo(x, 64); g2.stroke(); }
+      texPorton = new THREE.CanvasTexture(cv); texPorton.wrapS = THREE.RepeatWrapping;
+    }
+    const hoja = (P, Q) => {
+      const l = Math.hypot(Q[0] - P[0], Q[1] - P[1]); if (l < 0.05) return;
+      const tx = texPorton.clone(); tx.needsUpdate = true; tx.repeat.set(Math.max(1, Math.round(l / 0.6)), 1);
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(l, alto), new THREE.MeshLambertMaterial({ map: tx, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
+      m.position.set((P[0] + Q[0]) / 2, alto / 2, (P[1] + Q[1]) / 2); m.rotation.y = -Math.atan2(Q[1] - P[1], Q[0] - P[0]);
+      const marco = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(l, alto, 0.04)), new THREE.LineBasicMaterial({ color: 0x2b2f33 }));
+      marco.position.copy(m.position); marco.rotation.copy(m.rotation);
+      [m, marco].forEach((x) => { if (marca) Object.assign(x.userData, marca); grupo.add(x); });
+    };
+    if (e.tipo === "porton_batiente") {
+      // Hacia dónde abren: el lado del arco del símbolo.
+      const c = croquisLocalAMundo(e, 0, 0), n0 = croquisLocalAMundo(e, 0, -40);
+      const n = [M(n0[0] - c[0]), M(n0[1] - c[1])], nl = Math.hypot(n[0], n[1]) || 1, u = [(B[0] - A[0]), (B[1] - A[1])], L = Math.hypot(u[0], u[1]) || 1;
+      const ux = u[0] / L, uy = u[1] / L, nx = n[0] / nl, ny = n[1] / nl, a = 0.42, w = L / 2;
+      hoja(A, [A[0] + (ux * Math.cos(a) + nx * Math.sin(a)) * w, A[1] + (uy * Math.cos(a) + ny * Math.sin(a)) * w]);
+      hoja(B, [B[0] + (-ux * Math.cos(a) + nx * Math.sin(a)) * w, B[1] + (-uy * Math.cos(a) + ny * Math.sin(a)) * w]);
+    } else hoja(A, B);
   }
   // Semicubierto (galería, sector techado): techo fino sobre columnas, sin
   // paredes. Balcón: baranda de caño y vidrio, sin techo.
@@ -340,10 +369,11 @@ const Croquis3D = (() => {
     const pt = (x, y) => [M(x), M(y)];
     const def = CROQUIS_SIMBOLOS[e.tipo];
     const p3 = EQUIPOS[e.tipo] || { h: 1.5, caja: [0.12, 0.12, 0.06], color: e.color || def.color, pared: true };
-    const color = def.ir ? (e.color || def.color) : (p3.color || e.color || def.color);
+    // Las cámaras van en color (en blanco no se distinguían de la pared).
+    const color = def.ir ? (e.color || def.color) : p3.camara ? COLOR_CAMARA : (p3.color || e.color || def.color);
     const fant = op.fantasma; // vista previa (mientras se arrastra)
     if (e.tipo === "barrera") return armarBarrera(e, fant);
-    const mat = new THREE.MeshLambertMaterial({ color, transparent: !!e.prev || !!fant, opacity: fant ? 0.75 : e.prev ? 0.35 : 1, emissive: fant ? 0x443300 : e.inst ? 0x553300 : 0x000000 });
+    const mat = new THREE.MeshLambertMaterial({ color, transparent: !!e.prev || !!fant, opacity: fant ? 0.75 : e.prev ? 0.35 : 1, emissive: fant ? 0x443300 : e.inst ? 0x553300 : p3.camara ? 0x06303a : 0x000000 });
     let x, z, h = p3.h, obj, cobertura = null;
     if (def.ir) {
       // El vértice de captación es la esquina donde va el sensor.
@@ -403,6 +433,14 @@ const Croquis3D = (() => {
       cartelZona.position.set(obj.position.x, Math.min(ALTO + 0.35, h + 0.3), obj.position.z);
       cartelZona.material.opacity = e.prev ? 0.5 : 1;
       cartelZona.userData.equipo = e;
+    }
+    if (p3.camara && !fant && !e.inst) {
+      // Cámara: aro de su color en el piso y un poste fino, para ubicarla de un vistazo.
+      aro = new THREE.Group();
+      const r = new THREE.Mesh(new THREE.RingGeometry(0.2, 0.3, 28), new THREE.MeshBasicMaterial({ color: COLOR_CAMARA, side: THREE.DoubleSide, transparent: true, opacity: e.prev ? 0.35 : 0.9 }));
+      r.rotation.x = -Math.PI / 2; r.position.set(obj.position.x, 0.055, obj.position.z); r.userData.de = e; aro.add(r);
+      const poste = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, Math.max(0.1, obj.position.y - 0.1), 6), new THREE.MeshBasicMaterial({ color: COLOR_CAMARA, transparent: true, opacity: 0.45 }));
+      poste.position.set(obj.position.x, (obj.position.y - 0.1) / 2, obj.position.z); aro.add(poste);
     }
     if (e.inst && !fant) {
       // A instalar: aro naranja en el piso debajo.
@@ -535,7 +573,7 @@ const Croquis3D = (() => {
 
     const pt = (x, y) => [M(x), M(y)];
     const els = (elementos || []).filter((e) => e && !(o.ocultarAntes && e.prev));
-    const vista = { paredesBajas: !!o.paredesBajas, cobertura: o.cobertura !== false, debiles: !!o.debiles, muebles: !!o.muebles };
+    const vista = { paredesBajas: !!o.paredesBajas, cobertura: o.cobertura !== false, debiles: !!o.debiles, muebles: !!o.muebles, alarma: o.alarma !== false, camaras: o.camaras !== false };
     const cuadro = []; // cosas que se animan en cada cuadro
     const fantasma = (g) => g.traverse((c) => { if (c.material) { c.material.transparent = true; c.material.opacity = 0.16; c.material.depthWrite = false; c.material.needsUpdate = true; } });
     // ---- Un piso de la casa: paredes, aberturas, cercos, equipos, coberturas
@@ -608,6 +646,8 @@ const Croquis3D = (() => {
             [[A, [A[0] + ux * g, A[1] + uz * g]], [[B[0] - ux * g, B[1] - uz * g], B]].forEach(([p, q]) => { const j = pared(p, q, alto, "#B98C5A"); if (j) { j.scale.z = 1.5; grupoParedes.add(j); } });
             if (!vista.paredesBajas) { const t = pared(A, B, 0.06, "#B98C5A", ALTO_PUERTA - 0.06); if (t) { t.scale.z = 1.5; grupoParedes.add(t); } }
           }
+          // Portón en una pared (garaje): sus hojas.
+          if (e.tipo.startsWith("porton")) hojasPorton(e, A, B, Math.min(2.38, altoParedes()), grupoParedes, { pared: true });
           // Dintel sobre la abertura (solo con paredes altas).
           if (vista.paredesBajas) return;
           const desde = e.tipo === "ventana" ? 2.1 : e.tipo.startsWith("porton") ? 2.4 : ALTO_PUERTA;
@@ -652,13 +692,9 @@ const Croquis3D = (() => {
       const cortado = (a, b) => { const m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; return enCerco.some((ab) => distSegM(m, ab.a, ab.b) < 0.25); };
       enCerco.forEach((ab) => {
         const l = Math.hypot(ab.b[0] - ab.a[0], ab.b[1] - ab.a[1]), ang = -Math.atan2(ab.b[1] - ab.a[1], ab.b[0] - ab.a[0]);
-        const alto = ab.e.tipo.startsWith("porton") ? 1.9 : 1.9;
-        const cv = document.createElement("canvas"); cv.width = 64; cv.height = 64;
-        const g2 = cv.getContext("2d"); g2.strokeStyle = "#2b2f33"; g2.lineWidth = 6;
-        g2.strokeRect(0, 0, 64, 64); for (let x = 8; x < 64; x += 12) { g2.beginPath(); g2.moveTo(x, 0); g2.lineTo(x, 64); g2.stroke(); }
-        const tx = new THREE.CanvasTexture(cv); tx.wrapS = THREE.RepeatWrapping; tx.repeat.set(Math.max(1, Math.round(l / 0.6)), 1);
-        const hoja = new THREE.Mesh(new THREE.PlaneGeometry(l, alto), new THREE.MeshBasicMaterial({ map: tx, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
-        hoja.position.set((ab.a[0] + ab.b[0]) / 2, alto / 2, (ab.a[1] + ab.b[1]) / 2); hoja.rotation.y = ang; grupoCercos.add(hoja);
+        const alto = 1.9;
+        if (l < 0.01) return;
+        hojasPorton(ab.e, ab.a, ab.b, alto, grupoCercos);
         [ab.a, ab.b].forEach((p) => { const c = new THREE.Mesh(new THREE.BoxGeometry(0.1, alto + 0.1, 0.1), new THREE.MeshLambertMaterial({ color: 0x2b2f33 })); c.position.set(p[0], (alto + 0.1) / 2, p[1]); grupoCercos.add(c); });
       });
       els.filter(croquisEsCerco).forEach((e) => {
@@ -826,6 +862,14 @@ const Croquis3D = (() => {
     const centroY = o.todaLaCasa ? (alturaMax + ALTO) / 2 : altura;
     // ---- Cámara y controles ----
     todos.forEach((n) => { if (!n.fantasma) { n.grupoCobertura.visible = vista.cobertura; n.grupoDebiles.visible = vista.debiles; n.grupoSombras.visible = vista.muebles; } n.armarParedes(); });
+    // Capas: alarma y cámaras se pueden ocultar por separado (con sus coberturas).
+    function aplicarCapas() {
+      todos.forEach((n) => [n.grupoEquipos, n.grupoCobertura, n.grupoCarteles].forEach((g) => g.children.forEach((c) => {
+        const e = c.userData.equipo || c.userData.de || (c.children && c.children[0] && c.children[0].userData.de);
+        if (e && e.tipo) c.visible = croquisEsVideo(e.tipo) ? vista.camaras : vista.alarma;
+      })));
+    }
+    aplicarCapas();
     const controles = new THREE.OrbitControls(camara, renderer.domElement);
     controles.target.set(cx, centroY, cz);
     controles.maxPolarAngle = Math.PI / 2 - 0.05;
@@ -1148,6 +1192,7 @@ const Croquis3D = (() => {
         if (que === "cobertura") { vista.cobertura = !vista.cobertura; todos.forEach((n) => { if (!n.fantasma) n.grupoCobertura.visible = vista.cobertura; }); }
         if (que === "paredes") { vista.paredesBajas = !vista.paredesBajas; todos.forEach((n) => n.armarParedes()); }
         if (que === "debiles") { vista.debiles = !vista.debiles; todos.forEach((n) => { if (!n.fantasma) n.grupoDebiles.visible = vista.debiles; }); }
+        if (que === "alarma" || que === "camaras") { vista[que] = !vista[que]; aplicarCapas(); }
         if (que === "muebles") { vista.muebles = !vista.muebles; todos.forEach((n) => { if (!n.fantasma) n.grupoSombras.visible = vista.muebles; }); }
         if (que === "arriba" || que === "inicio") salirCamara();
         if (que === "arriba") vistaInicial(true);
@@ -2398,6 +2443,8 @@ const CROQUIS_3D_ESTILO = `
 .v3-tj-dato{display:flex;gap:8px;align-items:flex-start;margin:6px 0;color:var(--tenue);font-size:13.5px}
 .v3-tj-redes{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}.v3-tj-redes a{flex:1 1 auto;padding:8px}
 .v3-tj-redes svg,.v3-tj-acc svg{width:17px;height:17px;flex:none}
+.v3-lista{display:flex;flex-direction:column;gap:2px;margin:4px 0 8px}.v3-lista button{display:flex;align-items:center;gap:8px;text-align:left;padding:7px 8px;border:0;border-radius:8px;background:var(--bg);color:var(--fg);font:500 13.5px system-ui,sans-serif;cursor:pointer}
+.v3-lista i{width:12px;height:12px;border-radius:3px;flex:none;border:1px solid rgba(0,0,0,.2)}.v3-lista small{color:var(--tenue)}.v3-lista .v3-inst{color:#E8741E;font-weight:700}
 .v3-arreglar{margin-left:4px;padding:2px 8px;border-radius:999px;border:1px solid #8A5A00;background:#FFF6DA;color:#8A5A00;font:700 11.5px system-ui,sans-serif;cursor:pointer}
 .v3-avisos{margin:6px 0 0;font-size:12.5px;color:#8A5A00}.v3-avisos summary{font-weight:700;cursor:pointer}.v3-avisos ul{margin:4px 0 0;padding-left:16px}.v3-avisos li{margin:3px 0;list-style:disc}
 .v3-tapa{margin:6px 0 0;color:#7B4B94;font-weight:600;font-size:12.5px}
@@ -2422,9 +2469,9 @@ const CROQUIS_3D_LEYENDA = {
   central: ["Central de alarma", "#F2C94C"], hub: ["Central inalámbrica (Hub)", "#E6E6E6"], repetidor: ["Repetidor de señal", "#E6E6E6"], teclado: ["Teclado", "#D9D9D9"],
   sirena_int: ["Sirena interior", "#D9D9D9"], sirena_ext: ["Sirena exterior", "#E05050"], sirena_flash: ["Sirena con flash", "#E05050"],
   rotura_vidrio: ["Detector de rotura de vidrio", "#17809B"], pulsador_asalto: ["Botón de pánico", "#E8741E"], pulsador_incendio: ["Pulsador de incendio", "#E00000"],
-  camara_ip: ["Cámara", "#F4F4F4"], camara_analoga: ["Cámara", "#F4F4F4"], camara_domo: ["Cámara domo", "#F4F4F4"], dvr: ["Grabador DVR / NVR", "#2B2F33"], detector_360: ["Detector de techo 360°", "#FFFFFF"],
+  camara_ip: ["Cámara", "#1593B5"], camara_analoga: ["Cámara", "#1593B5"], camara_domo: ["Cámara domo", "#1593B5"], dvr: ["Grabador DVR / NVR", "#2B2F33"], detector_360: ["Detector de techo 360°", "#FFFFFF"],
   barrera: ["Barrera infrarroja exterior", "#E00000"], lector_acceso: ["Lectora de tag / tarjeta", "#1B5FA8"], cerradura: ["Cerradura de pestillo", "#1B5FA8"], cerradura_magnetica: ["Cerradura electromagnética", "#1B5FA8"],
-  boton_salida: ["Botón de salida", "#2E9E4F"], doble_tecnologia: ["Sensor de doble tecnología", "#C0392B"], panico_colgante: ["Botón de pánico colgante", "#E8741E"], fuente_ups: ["UPS / fuente con batería", "#5B5F66"], monoxido: ["Detector de monóxido (CO)", "#6B6F76"], reflector: ["Reflector con sensor", "#E0A800"], control_remoto: ["Control remoto (llavero)", "#2B2F33"], modulo_rele: ["Módulo relé (portón / automatización)", "#2E86DE"], camara_solar: ["Cámara 4G con panel solar", "#F4F4F4"], sismico: ["Sensor sísmico (caja fuerte)", "#8A5A00"], videoportero: ["Videoportero", "#1C1E21"], comunicador: ["Comunicador 4G", "#D9D9D9"], energizador: ["Energizador de cerco eléctrico", "#F2C94C"], vibracion: ["Sensor de vibración", "#8A5A00"], inundacion: ["Detector de inundación", "#2E86DE"],
+  boton_salida: ["Botón de salida", "#2E9E4F"], doble_tecnologia: ["Sensor de doble tecnología", "#C0392B"], panico_colgante: ["Botón de pánico colgante", "#E8741E"], fuente_ups: ["UPS / fuente con batería", "#5B5F66"], monoxido: ["Detector de monóxido (CO)", "#6B6F76"], reflector: ["Reflector con sensor", "#E0A800"], control_remoto: ["Control remoto (llavero)", "#2B2F33"], modulo_rele: ["Módulo relé (portón / automatización)", "#2E86DE"], camara_solar: ["Cámara 4G con panel solar", "#1593B5"], sismico: ["Sensor sísmico (caja fuerte)", "#8A5A00"], videoportero: ["Videoportero", "#1C1E21"], comunicador: ["Comunicador 4G", "#D9D9D9"], energizador: ["Energizador de cerco eléctrico", "#F2C94C"], vibracion: ["Sensor de vibración", "#8A5A00"], inundacion: ["Detector de inundación", "#2E86DE"],
 };
 // Nombre de un equipo según cómo es (inalámbrico, PIR con cámara...).
 function croquis3dNombre(e) {
@@ -2593,7 +2640,7 @@ function iniciarVisor3D(datos, opciones) {
     <details class="v3-ley" ${window.innerWidth > 700 ? "open" : ""}></details>
     <div class="v3-pie"><div class="v3-aviso hidden"></div><div class="v3-hoja hidden"></div><div class="v3-props hidden"></div><div class="v3-tira hidden"></div><div class="v3-barra"></div></div>`);
   const lienzo = raiz.querySelector(".v3-lienzo"), ley = raiz.querySelector(".v3-ley"), barra = raiz.querySelector(".v3-barra"), aviso = raiz.querySelector(".v3-aviso"), hoja = raiz.querySelector(".v3-hoja"), propsEl = raiz.querySelector(".v3-props"), pagsEl = raiz.querySelector(".v3-pags"), tira = raiz.querySelector(".v3-tira"), pie = raiz.querySelector(".v3-pie");
-  let editando = false, sel = null, moviendo = null, visor = null, debiles = !!o.debiles, avisoTimer = null, verMuebles = !!o.muebles;
+  let editando = false, sel = null, moviendo = null, visor = null, debiles = !!o.debiles, avisoTimer = null, verMuebles = !!o.muebles, capaAlarma = true, capaCamaras = true;
   // Casa de varias plantas: las páginas que son pisos se ven una arriba de la otra.
   const pisosDe = () => paginas.map((p, i) => ({ i, nivel: croquisNivelPagina(p) })).filter((x) => x.nivel != null).sort((a, b) => a.nivel - b.nivel);
   let todo = pisosDe().length >= 2;
@@ -2666,7 +2713,7 @@ function iniciarVisor3D(datos, opciones) {
       return;
     }
     barra.innerHTML = editando
-      ? `<button type="button" data-a="deshacer" ${pila.length ? "" : "disabled"}>Deshacer</button><button type="button" data-a="completar" class="v3-fuerte">Completar la protección</button><button type="button" data-a="debiles" class="${debiles ? "on" : ""}">Puntos débiles</button><button type="button" data-a="vistaed">${vistaEd === "planta" ? "Ver en 3D" : "Ver de arriba"}</button><button type="button" data-a="listo" class="on">Listo</button>`
+      ? `<button type="button" data-a="deshacer" ${pila.length ? "" : "disabled"}>Deshacer</button><button type="button" data-a="lista">Lista</button><button type="button" data-a="completar" class="v3-fuerte">Completar la protección</button><button type="button" data-a="debiles" class="${debiles ? "on" : ""}">Puntos débiles</button><button type="button" data-a="vistaed">${vistaEd === "planta" ? "Ver en 3D" : "Ver de arriba"}</button><button type="button" data-a="listo" class="on">Listo</button>`
       : `<button type="button" data-a="antes" class="${sinAlarma ? "on" : ""}">${sinAlarma ? "Ver con SAT" : "Ver sin alarma"}</button><button type="button" data-a="simular">${visor && visor.simulando ? "Parar" : "Simular intruso"}</button><button type="button" data-a="vista">Vista ▾</button>${ed ? `<button type="button" data-a="editar">Editar</button>` : ""}${o.llamar ? `<button type="button" data-a="llamar" class="v3-fuerte">Quiero que me llamen</button>` : ""}${(o.extras || []).map((x, i) => `<button type="button" data-extra="${i}">${esc(x.texto)}</button>`).join("")}${o.botonCerrar ? `<button type="button" data-a="cerrar">Cerrar</button>` : ""}`;
   };
   const decir = (t, alarma, segundos) => {
@@ -2679,7 +2726,7 @@ function iniciarVisor3D(datos, opciones) {
     const v = visor ? visor.vista : {};
     const cam = mantenerCamara && visor && !visor.enCamara ? visor.estadoCamara() : null;
     if (visor) visor.destruir();
-    visor = Croquis3D.crear(lienzo, filtro(paginas[pag].elementos), { paraCaptura: o.paraCaptura, paredesBajas: v.paredesBajas, cobertura: v.cobertura, debiles: debiles || (sinAlarma && !presentando), muebles: verMuebles && !sinAlarma, camaraInicial: cam, alTocar: tocar, editable: () => editando, alArrastrar: arrastre, ...opcionesPisos() });
+    visor = Croquis3D.crear(lienzo, filtro(paginas[pag].elementos), { paraCaptura: o.paraCaptura, paredesBajas: v.paredesBajas, cobertura: v.cobertura, debiles: debiles || (sinAlarma && !presentando), muebles: verMuebles && !sinAlarma, alarma: capaAlarma, camaras: capaCamaras, camaraInicial: cam, alTocar: tocar, editable: () => editando, alArrastrar: arrastre, ...opcionesPisos() });
     if (sel) visor.marcar(sel.id);
   };
   const cerrarHoja = () => { hoja.classList.add("hidden"); hoja.innerHTML = ""; hoja.onclick = null; sel = null; if (visor) visor.marcar(null); };
@@ -2922,13 +2969,15 @@ function iniciarVisor3D(datos, opciones) {
   // ---- Vista ▾ ----
   function hojaVista() {
     const v = visor.vista;
-    hoja.innerHTML = `<b>Vista</b><div class="v3-acciones"><button type="button" data-h="cobertura" class="${v.cobertura === false ? "" : "on"}">Coberturas</button><button type="button" data-h="debiles" class="${debiles ? "on" : ""}">Puntos débiles</button><button type="button" data-h="paredes" class="${v.paredesBajas ? "on" : ""}">Ver adentro</button>${visor.analisis && visor.analisis.hayMuebles ? `<button type="button" data-h="muebles" class="${verMuebles ? "on" : ""}">Lo que tapan los muebles</button>` : ""}<button type="button" data-h="arriba">Desde arriba</button><button type="button" data-h="inicio">Vista inicial</button>${o.presentacion ? `<button type="button" data-h="presentacion">Ver la presentación</button>` : ""}</div><button type="button" class="v3-link" data-h="cerrar">Cerrar</button>`;
+    hoja.innerHTML = `<b>Vista</b><div class="v3-acciones"><button type="button" data-h="cobertura" class="${v.cobertura === false ? "" : "on"}">Coberturas</button><button type="button" data-h="debiles" class="${debiles ? "on" : ""}">Puntos débiles</button><button type="button" data-h="paredes" class="${v.paredesBajas ? "on" : ""}">Ver adentro</button><button type="button" data-h="alarma" class="${capaAlarma ? "on" : ""}">Alarma</button><button type="button" data-h="camaras" class="${capaCamaras ? "on" : ""}">Cámaras</button>${visor.analisis && visor.analisis.hayMuebles ? `<button type="button" data-h="muebles" class="${verMuebles ? "on" : ""}">Lo que tapan los muebles</button>` : ""}<button type="button" data-h="arriba">Desde arriba</button><button type="button" data-h="inicio">Vista inicial</button>${o.presentacion ? `<button type="button" data-h="presentacion">Ver la presentación</button>` : ""}</div><button type="button" class="v3-link" data-h="cerrar">Cerrar</button>`;
     hoja.classList.remove("hidden");
     hoja.onclick = (ev) => {
       const b = ev.target.closest("button"); if (!b) return;
       const h = b.dataset.h;
       if (h === "debiles") { debiles = !debiles; visor.alternar("debiles"); b.classList.toggle("on", debiles); return; }
       if (h === "cobertura") { b.classList.toggle("on", visor.alternar("cobertura").cobertura); return; }
+      if (h === "alarma") { capaAlarma = !capaAlarma; visor.alternar("alarma"); b.classList.toggle("on", capaAlarma); return; }
+      if (h === "camaras") { capaCamaras = !capaCamaras; visor.alternar("camaras"); b.classList.toggle("on", capaCamaras); return; }
       if (h === "muebles") { verMuebles = !verMuebles; visor.alternar("muebles"); b.classList.toggle("on", verMuebles); pintarLeyenda(); return; }
       if (h === "presentacion") { cerrarHoja(); presentar(); return; }
       if (h !== "cerrar") visor.alternar(h);
@@ -3062,6 +3111,20 @@ function iniciarVisor3D(datos, opciones) {
         document.body.appendChild(ln); ln.click(); ln.remove();
         decir("Abrí el archivo para agendar el contacto.", false, 3);
       }
+    };
+  }
+  // ---- Lista de equipos: se elige uno y queda seleccionado ----
+  function hojaLista() {
+    const eqs = paginas[pag].elementos.filter((e) => e.t === "simbolo" && CROQUIS_SIMBOLOS[e.tipo] && CROQUIS_SIMBOLOS[e.tipo].cat === "equipo");
+    const orden = (e) => parseInt(String(e.etq || "").replace(/\D/g, ""), 10) || 9999;
+    const grupo = (titulo, l) => (l.length ? `<b>${titulo}</b><div class="v3-lista">${l.sort((a, b) => orden(a) - orden(b)).map((e) => `<button type="button" data-eq="${esc(e.id)}"><i style="background:${colorDe(e.tipo)}"></i>${esc(croquis3dNombre(e))}${e.etq ? ` <small>zona ${esc(e.etq)}</small>` : ""}${e.inst ? ' <small class="v3-inst">a instalar</small>' : ""}</button>`).join("")}</div>` : "");
+    hoja.innerHTML = (grupo("Alarma", eqs.filter((e) => !croquisEsVideo(e.tipo))) + grupo("Cámaras y video", eqs.filter((e) => croquisEsVideo(e.tipo)))) || "<p>No hay equipos en esta planta.</p>";
+    hoja.innerHTML += `<button type="button" class="v3-link" data-h="cerrar">Cerrar</button>`;
+    hoja.classList.remove("hidden");
+    hoja.onclick = (ev) => {
+      const b = ev.target.closest("button"); if (!b) return;
+      if (b.dataset.h === "cerrar") { cerrarHoja(); return; }
+      if (b.dataset.eq) hojaEquipo({ id: b.dataset.eq });
     };
   }
   // ---- Arreglar un aviso con un toque ----
@@ -3198,6 +3261,7 @@ function iniciarVisor3D(datos, opciones) {
     if (a === "editar") { visor.pararSimulacion(); editando = true; ley.classList.add("hidden"); if (!visor.vista.paredesBajas) visor.alternar("paredes"); vistaEd = "planta"; visor.vistaPlanta(); cerrarHoja(); pintarBarra(); pintarProps(); pintarTira(); decir(textoEdicion()); return; }
     if (a === "listo") { editando = false; moviendo = null; sello = null; limpiarPropuesta(); ley.classList.remove("hidden"); cerrarHoja(); decir(""); visor.marcar(null); pintarBarra(); pintarProps(); pintarTira(); return; }
     if (a === "completar") { completar(); return; }
+    if (a === "lista") { hojaLista(); return; }
     if (a === "vistaed") { vistaEd = vistaEd === "planta" ? "3d" : "planta"; if (vistaEd === "planta") visor.vistaPlanta(); else visor.vistaInclinada(); pintarBarra(); return; }
     if (a === "deshacer") {
       const u = pila.pop(); if (!u) return;

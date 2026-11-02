@@ -3729,3 +3729,17 @@ html .app .equipo-acciones .btn.eq-util.activo, .equipo-acciones .eq-util.activo
 .cq-prop-aviso { margin: 4px 0 0; padding: 6px 8px; border-radius: 8px; background: #FFF4D6; color: #6B4E00; font-weight: 600; font-size: 13.5px; }
 .cq-prop-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; align-items: center; }
 .cq-prop-btns a.btn { text-decoration: none; }
+
+/* Lista de elementos del croquis */
+.cq-lista-panel { max-height: 80vh; display: flex; flex-direction: column; }
+.cq-lista-cuerpo { overflow-y: auto; margin-top: 8px; flex: 1; min-height: 120px; }
+.cq-lista-grupo { margin: 4px 0; border-top: 1px solid var(--border, #E2E6EA); padding-top: 4px; }
+.cq-lista-grupo summary { font-weight: 700; cursor: pointer; padding: 6px 2px; }
+.cq-lista-grupo summary small { color: var(--text-muted, #5B6B7B); font-weight: 600; margin-left: 4px; }
+.cq-lista-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 8px; border: 0; border-radius: 10px; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.cq-lista-item:hover, .cq-lista-item.activo { background: var(--surface-2, #EEF1F4); }
+.cq-lista-item svg { width: 30px; height: 30px; flex: none; }
+.cq-lista-item span { display: flex; flex-direction: column; min-width: 0; }
+.cq-lista-item b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cq-lista-item small { font-size: 12px; color: var(--text-muted, #5B6B7B); }
+.cq-lista-item small.cq-lista-inst { color: #E8741E; font-weight: 700; }

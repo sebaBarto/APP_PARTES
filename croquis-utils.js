@@ -16,7 +16,7 @@
 //   simbolo { tipo, x, y, rot, esc, color?, esp? }  equipos y objetos de obra
 
 // Tiene que ser igual a APP_VERSION de app.js (si no, la app recarga).
-const CROQUIS_UTILS_VERSION = "4.38.1";
+const CROQUIS_UTILS_VERSION = "4.39.0";
 const CROQUIS_GRILLA = 20;
 
 // Cada símbolo se dibuja centrado en 0,0 con dib(color). "cat" separa los
@@ -2044,15 +2044,18 @@ const CROQUIS_CAPAS = {
   plano: { nombre: "Plano (habitaciones, paredes, aberturas)", z: 0 },
   muebles: { nombre: "Muebles", z: 15 },
   cableado: { nombre: "Cableado", z: 25 },
-  equipos: { nombre: "Equipos de seguridad", z: 30 },
+  alarma: { nombre: "Alarma (sensores, sirenas, central y demás)", z: 30 },
+  camaras: { nombre: "Cámaras y video (cámaras, grabador, monitor)", z: 31 },
   textos: { nombre: "Textos, tablas y medidas", z: 40 },
 };
+// Equipos de video (cámaras, grabador, monitor, videoportero): capa aparte.
+function croquisEsVideo(tipo) { return /^camara/.test(tipo || "") || ["dvr", "monitor", "videoportero", "switch_red"].includes(tipo); }
 function croquisCapaDe(el) {
   if (el.t === "rect" || el.t === "linea") return "plano";
   if (el.t === "cable") return "cableado";
   if (el.t === "texto" || el.t === "tabla" || el.t === "cota") return "textos";
   const cat = (CROQUIS_SIMBOLOS[el.tipo] || {}).cat;
-  return cat === "equipo" ? "equipos" : cat === "mueble" ? "muebles" : "plano";
+  return cat === "equipo" ? (croquisEsVideo(el.tipo) ? "camaras" : "alarma") : cat === "mueble" ? "muebles" : "plano";
 }
 function croquisZ(el) {
   if (typeof el.z === "number") return el.z;

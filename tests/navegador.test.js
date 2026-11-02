@@ -4640,3 +4640,76 @@ test("Pulido: R gira y Shift+arrastrar elige varios; en 3D se elige por dónde e
     await ctx.close();
   } finally { await nav.close(); }
 });
+
+test("Lista de elementos (elegir uno lo selecciona y lo centra), capas de alarma y de cámaras (2D y 3D), portones y cámaras visibles en 3D", async () => {
+  const nav = await navegador3D();
+  try {
+    const ctx = await nav.newContext({ serviceWorkers: "block", viewport: { width: 1100, height: 800 } });
+    const page = await ctx.newPage();
+    const errores = [];
+    page.on("pageerror", (e) => errores.push(e.message));
+    await page.route("**/api/**", (r) => r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+    await page.goto(base + "/");
+    await page.waitForTimeout(400);
+    const casa = [
+      { id: "w1", t: "linea", x1: 0, y1: 0, x2: 400, y2: 0 }, { id: "w2", t: "linea", x1: 400, y1: 0, x2: 400, y2: 300 },
+      { id: "w3", t: "linea", x1: 400, y1: 300, x2: 0, y2: 300 }, { id: "w4", t: "linea", x1: 0, y1: 300, x2: 0, y2: 0 },
+      { id: "pc", t: "simbolo", tipo: "porton_corredizo", x: 280, y: 300, rot: 0, esc: 1 },
+      { id: "ir", t: "simbolo", tipo: "infrarrojo", x: 0, y: 0, rot: 180, esc: 1, etq: "3" },
+      { id: "mg", t: "simbolo", tipo: "magnetico", x: 1500, y: 1500, rot: 0, esc: 1, etq: "1" },
+      { id: "ca", t: "simbolo", tipo: "camara_ip", x: 395, y: 295, rot: 225, esc: 1, etq: "C1" },
+    ];
+    await page.evaluate((els) => { tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); localStorage.removeItem("croquis_capas"); cqAbrirEditor({ titulo: "Casa", elementos: els }); }, casa);
+    // Lista: alarma ordenada por zona, cámaras aparte; elegir el magnético (lejos) lo selecciona y lo centra
+    await page.click("#cqListaBtn");
+    const grupos = await page.$$eval(".cq-lista-grupo summary", (s) => s.map((x) => x.textContent.trim()));
+    assert.ok(grupos[0].startsWith("Alarma") && grupos[1].startsWith("Cámaras"), grupos.join(" | "));
+    const alarma = await page.$$eval(".cq-lista-grupo:first-child .cq-lista-item b", (b) => b.map((x) => x.textContent));
+    assert.match(alarma[0], /apertura|magn/i, "zona 1 primero: " + alarma.join(","));
+    await page.fill(".cq-lista-panel input", "zona 1");
+    await page.click('.cq-lista-item[data-id="mg"]');
+    assert.strictEqual(await page.evaluate(() => cq.sel), "mg");
+    await page.waitForTimeout(200);
+    const centrado = await page.evaluate(() => { const r = cqSvg.getBoundingClientRect(); const [x, y] = cqAMundo(r.left + r.width / 2, r.top + r.height / 2); return Math.hypot(x - 1500, y - 1500) < 40; });
+    assert.ok(centrado, "quedó en el centro de la pantalla");
+    // Se mueve con las flechas, como cualquier elegido
+    await page.keyboard.press("ArrowLeft");
+    assert.strictEqual(await page.evaluate(() => cq.elementos.find((e) => e.id === "mg").x), 1490);
+    // Capas: alarma y cámaras por separado
+    await page.click("#cqCapasBtn");
+    const capas = await page.$$eval(".cq-capa-fila b", (b) => b.map((x) => x.textContent));
+    assert.ok(capas.some((c) => /^Alarma/.test(c)) && capas.some((c) => /^Cámaras y video/.test(c)), capas.join(" | "));
+    await page.click('[data-ver="camaras"]');
+    await page.click(".cq-capas-panel [data-cerrar]");
+    assert.strictEqual(await page.$('#cqSvg [data-id="ca"]'), null, "la cámara oculta");
+    assert.ok(await page.$('#cqSvg [data-id="ir"]'));
+    await page.evaluate(() => { cq.capas.camaras.ver = true; cqRender(); });
+    // 3D: capas y lista
+    await page.click("#cqMenuBtn");
+    await page.click('[data-m="ver3d"]');
+    await page.waitForSelector(".v3-capa canvas", { timeout: 20000 });
+    const visibles = () => page.evaluate(() => { const r = {}; window.__visor3d.visor.escena.traverse((o) => { const e = o.userData && o.userData.equipo; if (e && o.isMesh) { let v = true; for (let x = o; x; x = x.parent) if (x.visible === false) v = false; r[e.id] = v; } }); return r; });
+    let v = await visibles();
+    assert.ok(v.ca && v.ir);
+    await page.click('.v3-barra [data-a="vista"]');
+    await page.click('.v3-hoja [data-h="camaras"]');
+    v = await visibles();
+    assert.ok(!v.ca && v.ir, "solo la alarma");
+    await page.click('.v3-hoja [data-h="camaras"]');
+    await page.click('.v3-hoja [data-h="alarma"]');
+    v = await visibles();
+    assert.ok(v.ca && !v.ir, "solo las cámaras");
+    await page.click('.v3-hoja [data-h="alarma"]');
+    await page.click('.v3-hoja [data-h="cerrar"]');
+    // Portón en la pared: tiene sus hojas
+    const hojas = await page.evaluate(() => { let n = 0; window.__visor3d.visor.escena.traverse((o) => { if (o.isMesh && o.geometry && o.geometry.type === "PlaneGeometry" && o.material && o.material.map && o.userData.pared) n++; }); return n; });
+    assert.ok(hojas >= 1, "el portón del garaje se dibuja");
+    // Lista en 3D (editando): elegir lo selecciona
+    await page.click('.v3-barra [data-a="editar"]');
+    await page.click('.v3-barra [data-a="lista"]');
+    await page.click('.v3-hoja [data-eq="ca"]');
+    await page.waitForFunction(() => /Cámara/.test(document.querySelector(".v3-hoja b").textContent));
+    assert.deepStrictEqual(errores, []);
+    await ctx.close();
+  } finally { await nav.close(); }
+});
