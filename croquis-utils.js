@@ -16,7 +16,7 @@
 //   simbolo { tipo, x, y, rot, esc, color?, esp? }  equipos y objetos de obra
 
 // Tiene que ser igual a APP_VERSION de app.js (si no, la app recarga).
-const CROQUIS_UTILS_VERSION = "4.36.0";
+const CROQUIS_UTILS_VERSION = "4.37.0";
 const CROQUIS_GRILLA = 20;
 
 // Cada símbolo se dibuja centrado en 0,0 con dib(color). "cat" separa los
@@ -109,6 +109,10 @@ const CROQUIS_SIMBOLOS = {
   doble_tecnologia: {
     nombre: "Sensor de doble tecnología", cat: "equipo", color: "#C0392B", ir: true, alc: 80, ang: 90, vb: "-84 -84 110 110",
     dib: (c, el) => croquisIR(c, el, CROQUIS_SIMBOLOS.doble_tecnologia) + `<text x="9" y="12" text-anchor="middle" ${CROQUIS_FUENTE} font-size="6" fill="#FFFFFF">DT</text>`,
+  },
+  reflector: {
+    nombre: "Reflector con sensor", cat: "equipo", color: "#E0A800", r: 26,
+    dib: (c) => `<path d="M0 0 L-22 -26 L22 -26 Z" fill="${c}" fill-opacity="0.18" stroke="${c}" stroke-width="1" stroke-dasharray="3 2"/><rect x="-11" y="-4" width="22" height="12" rx="2" fill="#2B2F33" stroke="${c}" stroke-width="2"/><rect x="-8" y="-2" width="16" height="5" fill="#FFF3B0"/>`,
   },
   monoxido: {
     nombre: "Detector de monóxido de carbono (CO)", cat: "equipo", color: "#6B6F76", r: 16,
@@ -293,6 +297,18 @@ const CROQUIS_SIMBOLOS = {
     nombre: "Piscina", cat: "obra", color: "#2E86DE", r: 50,
     dib: (c) => `<rect x="-45" y="-26" width="90" height="52" rx="10" fill="#D6ECFA" stroke="${c}" stroke-width="2.4"/><rect x="-38" y="-19" width="76" height="38" rx="6" fill="none" stroke="${c}" stroke-width="0.8" opacity="0.6"/>` +
       [-8, 6].map((y) => `<path d="M-24 ${y} q6 -5 12 0 t12 0 t12 0 t12 0" fill="none" stroke="${c}" stroke-width="1.3" opacity="0.8"/>`).join(""),
+  },
+  arbol: {
+    nombre: "Árbol", cat: "obra", color: "#2E7D4F", r: 60,
+    dib: (c) => `<circle r="56" fill="${c}" fill-opacity="0.22" stroke="${c}" stroke-width="2"/>` + [0, 45, 90, 135, 180, 225, 270, 315].map((a) => { const r = a * Math.PI / 180; return `<circle cx="${(Math.cos(r) * 34).toFixed(1)}" cy="${(Math.sin(r) * 34).toFixed(1)}" r="18" fill="${c}" fill-opacity="0.18" stroke="${c}" stroke-width="1"/>`; }).join("") + `<circle r="6" fill="#6B4F3A"/>`,
+  },
+  arbusto: {
+    nombre: "Arbusto", cat: "obra", color: "#3F8F4A", r: 22,
+    dib: (c) => [0, 72, 144, 216, 288].map((a) => { const r = a * Math.PI / 180; return `<circle cx="${(Math.cos(r) * 9).toFixed(1)}" cy="${(Math.sin(r) * 9).toFixed(1)}" r="10" fill="${c}" fill-opacity="0.4" stroke="${c}" stroke-width="1.2"/>`; }).join(""),
+  },
+  norte: {
+    nombre: "Norte (orientación)", cat: "obra", color: "#C0392B", r: 30,
+    dib: (c) => `<circle r="24" fill="#FFFFFF" fill-opacity="0.85" stroke="#5B5F66" stroke-width="1.4"/><path d="M0 -22 L7 0 L0 -4 L-7 0 Z" fill="${c}"/><path d="M0 22 L7 0 L0 4 L-7 0 Z" fill="#8E949A"/><text x="0" y="-27" text-anchor="middle" ${CROQUIS_FUENTE} font-size="12" font-weight="700" fill="${c}">N</text>`,
   },
   planta: {
     nombre: "Planta", cat: "obra", color: "#2E9E4F", r: 18,
@@ -582,6 +598,10 @@ function croquisSvgElementoBase(el, attrs) {
     // (el techo). Balcón: baranda (doble línea fina).
     let fondo = "";
     // Suelo: césped (verde con matitas) o piso (baldosas).
+    if (el.suelo === "pileta" && forma === "rect") {
+      fondo += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#E3DDD2"/><rect x="${x + 8}" y="${y + 8}" width="${Math.max(0, w - 16)}" height="${Math.max(0, h - 16)}" fill="#7FC4E8" stroke="#3B8FC2" stroke-width="1.5"/>` +
+        [0.3, 0.55, 0.8].map((k) => `<path d="M${x + 16} ${y + h * k} q10 -5 20 0 t20 0 t20 0" fill="none" stroke="#FFFFFF" stroke-width="1.2" stroke-opacity="0.8"/>`).join("");
+    }
     if (el.suelo === "cesped" || el.suelo === "piso") {
       const color = el.suelo === "cesped" ? "#8FCB7E" : "#E3DDD2";
       if (forma === "rect") {
@@ -1894,7 +1914,23 @@ function croquisCercoPuntos(el, paso) {
 function croquisCercoCamino(el) {
   return Array.isArray(el.c) ? `M${el.x1} ${el.y1} Q${el.c[0]} ${el.c[1]} ${el.x2} ${el.y2}` : `M${el.x1} ${el.y1} L${el.x2} ${el.y2}`;
 }
+// Alto de un cerco (se puede cambiar por elemento) y lo que mide su tapial.
+function croquisAltoCerco(e) {
+  const def = CROQUIS_CERCOS[e.cerco] || {};
+  const alto = Math.max(0.6, Math.min(4, Number(e.alto) || def.alto || 1.8));
+  return { alto, tapial: def.macizo ? alto : def.tapial ? Math.min(def.tapial, alto - 0.3) : 0 };
+}
 function croquisCercoSvg(el) {
+  return croquisCercoSvgBase(el) + (el.electrico ? croquisElectricoSvg(el) : "");
+}
+// Cerco eléctrico arriba: zigzag amarillo con carteles.
+function croquisElectricoSvg(el) {
+  const { pts } = croquisCercoPuntos(el, 10), f = (v) => +v.toFixed(1);
+  const d = pts.map((p, i) => `${i ? "L" : "M"}${f(p.x + p.nx * (i % 2 ? 4 : -4))} ${f(p.y + p.ny * (i % 2 ? 4 : -4))}`).join(" ");
+  const carteles = croquisCercoPuntos(el, 120).pts.slice(1, -1).map((p) => `<path d="M${f(p.x)} ${f(p.y - 6)} L${f(p.x + 5)} ${f(p.y + 3)} L${f(p.x - 5)} ${f(p.y + 3)} Z" fill="#F2C94C" stroke="#1C1E21" stroke-width="0.8"/>`).join("");
+  return `<path d="${d}" fill="none" stroke="#E0A800" stroke-width="1.3"/>${carteles}`;
+}
+function croquisCercoSvgBase(el) {
   const c = el.color || (el.cerco === "tejido" ? "#2E7D4F" : "#1C1E21");
   const camino = croquisCercoCamino(el);
   const f = (v) => +v.toFixed(1);

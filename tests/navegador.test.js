@@ -4509,3 +4509,60 @@ test("Croquis en la PC: flechas mueven, + y - cambian el tamaño, Ctrl+C / Ctrl+
     await ctx.close();
   } finally { await nav.close(); }
 });
+
+test("Exterior en 3D: avisos para el técnico, la cámara a la mañana (contraluz), a la noche (infrarrojo y reflector) y el intruso entra por el portón", async () => {
+  const nav = await navegador3D();
+  try {
+    const ctx = await nav.newContext({ serviceWorkers: "block", viewport: { width: 1000, height: 800 } });
+    const page = await ctx.newPage();
+    const errores = [];
+    page.on("pageerror", (e) => errores.push(e.message));
+    await page.route("**/api/**", (r) => r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+    await page.goto(base + "/");
+    await page.waitForTimeout(400);
+    const casa = [
+      { id: "w1", t: "linea", x1: 0, y1: 0, x2: 400, y2: 0 }, { id: "w2", t: "linea", x1: 400, y1: 0, x2: 400, y2: 300 },
+      { id: "w3", t: "linea", x1: 400, y1: 300, x2: 0, y2: 300 }, { id: "w4", t: "linea", x1: 0, y1: 300, x2: 0, y2: 0 },
+      { id: "pe", t: "simbolo", tipo: "puerta", x: 100, y: 300, rot: 0, esc: 1 },
+      { id: "ja", t: "rect", x: 0, y: 300, w: 400, h: 300, cierre: "abierto", suelo: "cesped" },
+      { id: "pi", t: "rect", x: 220, y: 380, w: 140, h: 80, cierre: "abierto", suelo: "pileta" },
+      { id: "t1", t: "linea", x1: 0, y1: 300, x2: 0, y2: 600, cerco: "tapial", electrico: true },
+      { id: "rj", t: "linea", x1: 0, y1: 600, x2: 400, y2: 600, cerco: "reja" },
+      { id: "po", t: "simbolo", tipo: "porton_batiente", x: 300, y: 600, rot: 0, esc: 1 },
+      { id: "ar", t: "simbolo", tipo: "arbol", x: 80, y: 500, rot: 0, esc: 1 },
+      { id: "ix", t: "simbolo", tipo: "infrarrojo_ext", x: 395, y: 305, rot: 270, esc: 1, etq: "9" },
+      { id: "ca", t: "simbolo", tipo: "camara_ip", x: 20, y: 310, rot: 95, esc: 1, etq: "C1" },
+      { id: "rf", t: "simbolo", tipo: "reflector", x: 200, y: 305, rot: 180, esc: 1 },
+      { id: "no", t: "simbolo", tipo: "norte", x: 470, y: 60, rot: 0, esc: 1 },
+    ];
+    await page.evaluate((els) => { tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); window.CROQUIS_3D_VELOCIDAD = 12; cqAbrirEditor({ titulo: "Casa", elementos: els }); }, casa);
+    await page.click("#cqMenuBtn");
+    await page.click('[data-m="ver3d"]');
+    await page.waitForSelector(".v3-capa canvas", { timeout: 20000 });
+    const ley = await page.textContent(".v3-ley");
+    assert.match(ley, /avisos para el técnico/);
+    assert.match(ley, /pileta/); assert.match(ley, /vereda/); assert.match(ley, /Contraluz a la mañana/); assert.match(ley, /falta el energizador/);
+    // Simulación: entra por el portón
+    const ev = await page.evaluate(() => new Promise((ok) => { window.__visor3d.visor.simular((e) => { if (e.tipo === "entra") ok(e.porton && e.porton.id); }); }));
+    assert.strictEqual(ev, "po");
+    await page.evaluate(() => window.__visor3d.visor.pararSimulacion());
+    // La cámara: mañana con contraluz, noche en blanco y negro con el reflector
+    await page.evaluate(() => { const v = window.__visor3d; v.visor.verCamara("ca"); });
+    await page.evaluate(() => document.querySelector(".v3-barra").dispatchEvent(new Event("noop")));
+    const r1 = await page.evaluate(() => window.__visor3d.visor.momento("manana"));
+    assert.ok(r1.contraluz, "a la mañana le da el sol de frente");
+    const r2 = await page.evaluate(() => window.__visor3d.visor.momento("noche"));
+    assert.strictEqual(r2.reflectores, 1);
+    assert.match(await page.$eval(".v3-capa canvas", (c) => c.style.filter), /grayscale/);
+    await page.evaluate(() => window.__visor3d.visor.salirCamara());
+    assert.strictEqual(await page.$eval(".v3-capa canvas", (c) => c.style.filter), "");
+    // Los botones de la hora aparecen al ver lo que ve la cámara
+    const [x, y] = await page.evaluate(() => window.__visor3d.visor.aPantalla(20, 310, 2.6));
+    await page.mouse.click(x, y);
+    await page.click('.v3-hoja [data-h="vercam"]');
+    await page.click('.v3-barra [data-momento="tarde"]');
+    assert.match(await page.textContent(".v3-aviso"), /A la tarde/);
+    assert.deepStrictEqual(errores, []);
+    await ctx.close();
+  } finally { await nav.close(); }
+});

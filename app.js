@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.36.0";
+const APP_VERSION = "4.37.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -15881,7 +15881,7 @@ function cqRenderProps() {
     const m = (v) => (Math.abs(v) / CROQUIS_POR_METRO).toLocaleString("es-AR", { maximumFractionDigits: 2 });
     html += `<span class="cq-props-tit">${escapeHtml(cqNombreElemento(el))} · ${m(el.w)} × ${m(el.h)} m</span>` + b("medidas", cqIc("regla") + "Medidas", "Escribir el ancho y el largo en metros") + b("nombre", cqIc("lapiz") + (el.nombre ? escapeHtml(el.nombre).slice(0, 14) : "Nombre"), "Nombre del ambiente");
     if (el.forma === "triangulo" || el.forma === "triangulo_rect") html += b("ori", cqIc("rotDer") + "90°", "Girar el triángulo");
-    html += b("suelo", el.suelo === "cesped" ? "Césped" : el.suelo === "piso" ? "Piso" : "Suelo", "Qué hay en el suelo: césped o piso (útil para patios y jardines)", !!el.suelo);
+    html += b("suelo", el.suelo === "cesped" ? "Césped" : el.suelo === "piso" ? "Piso" : el.suelo === "pileta" ? "Pileta" : "Suelo", "Qué hay en el suelo: césped o piso (útil para patios y jardines)", !!el.suelo);
     if (!el.forma || el.forma === "rect") html += b("cierre", el.cierre === "abierto" ? "Al aire libre" : el.cierre === "semi" ? "Semicubierto" : el.cierre === "balcon" ? "Balcón" : "Cerrado", "Cerrado (con paredes), al aire libre (patio, jardín: sin paredes ni techo), semicubierto (techo con columnas: galería, sector techado) o balcón (con baranda)", !!el.cierre);
   }
   if (el.t === "texto" || el.t === "tabla") html += `<span class="cq-props-tit">${escapeHtml(cqNombreElemento(el))}</span>` + b("texto", cqIc("lapiz") + "Editar");
@@ -15907,6 +15907,11 @@ function cqRenderProps() {
     // Qué es la línea: pared o un cerco.
     const tipo = el.cerco && CROQUIS_CERCOS[el.cerco] ? el.cerco : "pared";
     fila2 += [["pared", "Pared"], ...Object.entries(CROQUIS_CERCOS).map(([k, c]) => [k, c.nombre])].map(([k, n]) => `<button type="button" class="cq-tipo-linea${k === tipo ? " activo" : ""}" data-cerco-sel="${k}">${n}</button>`).join("") + '<span class="cq-sep"></span>';
+    if (croquisEsCerco(el)) {
+      const { alto } = croquisAltoCerco(el);
+      filaSl += sl("alto", "Altura", 1, 3.5, 0.1, alto, alto.toLocaleString("es-AR", { maximumFractionDigits: 1 }) + " m");
+      fila2 += b("electrico", "Cerco eléctrico", "Cerco eléctrico arriba (va con un energizador)", !!el.electrico) + '<span class="cq-sep"></span>';
+    }
   }
   if (el.t === "cable" || (el.t === "linea" && !croquisEsCerco(el)) || el.t === "rect") {
     const actual = el.trazo || (el.t === "cable" ? "guiones" : "continuo");
@@ -15927,6 +15932,7 @@ function cqRenderProps() {
       if (k === "tam") { el.tam = v; txt.textContent = v; }
       if (k === "alc") { el.alc = v; txt.textContent = (v / CROQUIS_POR_METRO).toLocaleString("es-AR", { maximumFractionDigits: 1 }) + " m"; }
       if (k === "ang") { el.ang = v; txt.textContent = (el.doble ? v * 2 : v) + "°"; }
+      if (k === "alto") { cqTramosDe(el).forEach((y) => { y.alto = Math.round(v * 10) / 10; }); txt.textContent = v.toLocaleString("es-AR", { maximumFractionDigits: 1 }) + " m"; }
       cqRender({ sinProps: true });
     });
     inp.addEventListener("change", () => { memorizado = false; cqGuardarBorrador(); });
@@ -15934,7 +15940,7 @@ function cqRenderProps() {
   box.querySelectorAll("[data-cerco-sel]").forEach((x) => x.addEventListener("click", () => {
     cqMemoria();
     // Cambia toda la pared seguida (los tramos soldados juntos).
-    (el.cadena ? cq.elementos.filter((y) => y.cadena === el.cadena && !cqBloq(y)) : cqDelGrupo(el)).filter((y) => y.t === "linea").forEach((y) => { if (x.dataset.cercoSel === "pared") delete y.cerco; else { y.cerco = x.dataset.cercoSel; delete y.trazo; } });
+    cqTramosDe(el).forEach((y) => { if (x.dataset.cercoSel === "pared") delete y.cerco; else { y.cerco = x.dataset.cercoSel; delete y.trazo; } });
     cqRender(); cqGuardarBorrador();
   }));
   box.querySelectorAll("[data-trazo]").forEach((x) => x.addEventListener("click", () => {
@@ -16106,6 +16112,10 @@ document.addEventListener("keydown", (ev) => {
     cqRender(); cqGuardarBorrador();
   }
 });
+// Los tramos de una misma pared seguida (o soldados): cambian juntos.
+function cqTramosDe(el) {
+  return (el.cadena ? cq.elementos.filter((y) => y.cadena === el.cadena && !cqBloq(y)) : cqDelGrupo(el)).filter((y) => y.t === "linea");
+}
 // Orden de las capas: al frente, adelante, atrás, al fondo.
 function cqCambiarOrden(els, acc) {
   // Se numera todo según cómo se ve ahora y se mueven los elegidos.
@@ -16176,7 +16186,7 @@ function cqAccion(acc) {
     if (acc === "curvar") { const mx = (el.x1 + el.x2) / 2, my = (el.y1 + el.y2) / 2, l = Math.hypot(el.x2 - el.x1, el.y2 - el.y1) || 1; el.c = [mx - (el.y2 - el.y1) / l * l * 0.35, my + (el.x2 - el.x1) / l * l * 0.35]; }
     if (acc === "recta") delete el.c;
     if (acc === "ori") el.ori = ((el.ori || 0) + 1) % 4;
-    if (acc === "suelo") { const sig = { "": "cesped", cesped: "piso", piso: "" }[el.suelo || ""]; if (sig) el.suelo = sig; else delete el.suelo; }
+    if (acc === "suelo") { const sig = { "": "cesped", cesped: "piso", piso: "pileta", pileta: "" }[el.suelo || ""]; if (sig) el.suelo = sig; else delete el.suelo; }
     if (acc === "cierre") { const sig = { "": "abierto", abierto: "semi", semi: "balcon", balcon: "" }[el.cierre || ""]; if (sig) el.cierre = sig; else delete el.cierre; showToast(el.cierre === "abierto" ? "Al aire libre: sin paredes ni techo (patio, jardín)." : el.cierre === "semi" ? "Semicubierto: techo con columnas, sin paredes." : el.cierre === "balcon" ? "Balcón: con baranda, sin techo." : "Cerrado: con paredes."); }
     const defIr = el.t === "simbolo" && CROQUIS_SIMBOLOS[el.tipo] && CROQUIS_SIMBOLOS[el.tipo].ir ? CROQUIS_SIMBOLOS[el.tipo] : null;
     if (defIr && /^(alc|ang)[+-]$/.test(acc)) {
@@ -16185,6 +16195,11 @@ function cqAccion(acc) {
       if (acc === "alc-") el.alc = Math.max(30, pr.alc - 10);
       if (acc === "ang+") el.ang = Math.min(180, pr.ang + 5);
       if (acc === "ang-") el.ang = Math.max(10, pr.ang - 5);
+    }
+    if (acc === "electrico") {
+      const on = !el.electrico;
+      cqTramosDe(el).forEach((y) => { if (on) y.electrico = true; else delete y.electrico; });
+      if (on && !cqTodosLosElementos().some((y) => y.tipo === "energizador")) showToast("Cerco eléctrico: acordate de agregar el energizador (en Equipos).");
     }
     if (acc === "inal" || acc === "doble" || acc === "video" || acc === "inst") { if (el[acc]) delete el[acc]; else el[acc] = true; }
     if (acc === "bloq") { if (el.bloq) delete el.bloq; else el.bloq = true; }
@@ -16650,7 +16665,7 @@ const CQ_AMBIENTES = [
   { nombre: "Dormitorio", w: 3, h: 3 }, { nombre: "Dormitorio principal", w: 4, h: 3.5 }, { nombre: "Baño", w: 2, h: 1.5 },
   { nombre: "Toilette", w: 1.5, h: 1 }, { nombre: "Lavadero", w: 2, h: 2 }, { nombre: "Pasillo", w: 1, h: 4 },
   { nombre: "Hall", w: 2, h: 2 }, { nombre: "Garage", w: 3, h: 5.5 }, { nombre: "Patio", w: 5, h: 5, cierre: "abierto", suelo: "piso" },
-  { nombre: "Jardín", w: 6, h: 5, cierre: "abierto", suelo: "cesped" },
+  { nombre: "Jardín", w: 6, h: 5, cierre: "abierto", suelo: "cesped" }, { nombre: "Pileta", w: 6, h: 3, cierre: "abierto", suelo: "pileta" },
   { nombre: "Balcón", w: 3, h: 1.2, cierre: "balcon", suelo: "piso" }, { nombre: "Galería", w: 4, h: 3, cierre: "semi", suelo: "piso" }, { nombre: "Sector techado", w: 3, h: 3, cierre: "semi", suelo: "piso" },
   { nombre: "Local", w: 6, h: 4 }, { nombre: "Oficina", w: 3, h: 3 }, { nombre: "Depósito", w: 3, h: 2 },
 ];
@@ -17720,7 +17735,7 @@ const CQ_BUSQUEDA_PRESU = {
   gas: "detector gas", pulsador_incendio: "pulsador incendio", pulsador_asalto: "pulsador asalto", dvr: "dvr", camara_ip: "camara ip",
   camara_analoga: "camara", monitor: "monitor", doble_tecnologia: "doble tecnologia", panico_colgante: "panico colgante",
   fuente_ups: "fuente", sismico: "sismico", inundacion: "inundacion", monoxido: "monoxido", control_remoto: "control remoto",
-  modulo_rele: "rele", camara_solar: "camara 4g solar",
+  modulo_rele: "rele", camara_solar: "camara 4g solar", reflector: "reflector",
 };
 function cqPasarAPresupuesto() {
   const cuenta = {};

@@ -931,3 +931,51 @@ test("Tapial (tipo de pared) y suelo de césped o piso: se dibujan, el tapial ta
   const b = ctx.C3.analizar([...casa, { id: "ja", t: "rect", x: 20, y: 20, w: 160, h: 260, cierre: "abierto", suelo: "cesped" }]);
   assert.strictEqual(b.porcentaje, 100, "un sector al aire libre dibujado adentro no corta la vista");
 });
+
+test("Exterior: avisos para el técnico (plantas, pileta, reja hacia la vereda, sol de frente con el Norte, energizador) y el intruso entra por el portón del cerco", () => {
+  const vm = require("vm");
+  const ctx = { window: {}, document: { createElement: () => ({ getContext: () => null }) }, console };
+  ctx.window = ctx;
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(raiz, "croquis-utils.js"), "utf8") + "\n;" + fs.readFileSync(path.join(raiz, "croquis-3d.js"), "utf8") + "\n;this.C3=Croquis3D;this.sol=croquis3dSol;this.alto=croquisAltoCerco;", ctx);
+  // Norte arriba: el este a la derecha, la mañana viene del este (un poco al norte).
+  const s = ctx.sol({ rot: 0 });
+  assert.deepStrictEqual(Array.from(s.este, (v) => Math.round(v) + 0), [1, 0]);
+  assert.ok(s.manana[0] > 0.9 && s.manana[1] < 0, "mañana: este, un poco al norte");
+  assert.ok(s.tarde[0] < -0.9);
+  const s90 = ctx.sol({ rot: 90 }); // el norte a la derecha
+  assert.deepStrictEqual(Array.from(s90.este, (v) => Math.round(v) + 0), [0, 1]);
+  assert.strictEqual(ctx.alto({ t: "linea", cerco: "tapial", alto: 2.2 }).tapial, 2.2);
+  assert.strictEqual(ctx.alto({ t: "linea", cerco: "reja_tapial" }).tapial, 0.6);
+  const casa = [
+    { id: "w1", t: "linea", x1: 0, y1: 0, x2: 400, y2: 0 }, { id: "w2", t: "linea", x1: 400, y1: 0, x2: 400, y2: 300 },
+    { id: "w3", t: "linea", x1: 400, y1: 300, x2: 0, y2: 300 }, { id: "w4", t: "linea", x1: 0, y1: 300, x2: 0, y2: 0 },
+    { id: "pe", t: "simbolo", tipo: "puerta", x: 100, y: 300, rot: 0, esc: 1 },
+    { id: "ir", t: "simbolo", tipo: "infrarrojo", x: 0, y: 0, rot: 180, esc: 1 },
+    { id: "pi", t: "rect", x: 220, y: 380, w: 140, h: 80, cierre: "abierto", suelo: "pileta" },
+    { id: "t1", t: "linea", x1: 0, y1: 300, x2: 0, y2: 600, cerco: "tapial", electrico: true },
+    { id: "rj", t: "linea", x1: 0, y1: 600, x2: 400, y2: 600, cerco: "reja" },
+    { id: "po", t: "simbolo", tipo: "porton_batiente", x: 300, y: 600, rot: 0, esc: 1 },
+    { id: "ab", t: "simbolo", tipo: "arbusto", x: 370, y: 330, rot: 0, esc: 1 },
+    { id: "ix", t: "simbolo", tipo: "infrarrojo_ext", x: 395, y: 305, rot: 270, esc: 1 },
+    { id: "ca", t: "simbolo", tipo: "camara_ip", x: 20, y: 310, rot: 95, esc: 1 },
+  ];
+  const sinNorte = ctx.C3.analizar(casa);
+  const tipos = (an, id) => Array.from(an.avisos.filter((a) => (a.equipo ? a.equipo.id : null) === id).map((a) => a.tipo)).sort();
+  assert.deepStrictEqual(tipos(sinNorte, "ix"), ["agua", "plantas", "vereda"]);
+  assert.deepStrictEqual(tipos(sinNorte, null), ["energizador", "norte"]);
+  assert.deepStrictEqual(tipos(sinNorte, "ir"), [], "el de adentro no lleva avisos de afuera");
+  const conNorte = ctx.C3.analizar([...casa, { id: "no", t: "simbolo", tipo: "norte", x: 500, y: 0, rot: 0 }, { id: "en", t: "simbolo", tipo: "energizador", x: 10, y: 10 }]);
+  assert.deepStrictEqual(tipos(conNorte, "ca"), ["sol"], "la cámara mira al este: contraluz a la mañana");
+  assert.strictEqual(conNorte.avisos.find((a) => a.tipo === "sol").momento, "manana");
+  assert.deepStrictEqual(tipos(conNorte, null), []);
+  // Con el norte girado (el este para abajo), la misma cámara ya no tiene el sol de frente
+  const girado = ctx.C3.analizar([...casa, { id: "no", t: "simbolo", tipo: "norte", x: 500, y: 0, rot: 270 }]);
+  assert.ok(!tipos(girado, "ca").includes("sol") || girado.avisos.find((a) => a.equipo && a.equipo.id === "ca").momento !== "manana");
+  // El intruso entra por el portón (desde la calle) y después va a la casa
+  const r = sinNorte.recorrido();
+  assert.ok(r.porton && r.porton.el.id === "po");
+  assert.ok(r.puntos[0][1] > 15, "arranca del lado de la calle: " + r.puntos[0]);
+  // La reja no tapa; el tapial sí: el exterior detecta en el jardín
+  assert.ok(sinNorte.detecta([8, 10]).some((e) => e.id === "ix"));
+});

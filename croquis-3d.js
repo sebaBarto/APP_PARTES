@@ -9,6 +9,7 @@
 const CROQUIS_3D_VERSION = 1;
 const Croquis3D = (() => {
   const M = (v) => v / CROQUIS_POR_METRO; // unidades del croquis -> metros
+  const distSegM = (p, a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy || 1; const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2)); return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy); };
   const ALTO = 2.6, ESPESOR = 0.12, ALTO_PUERTA = 2.05, ALTO_SENSOR = 2.3;
   // Altura (m), tamaño (ancho, alto, prof) y forma de cada equipo.
   const EQUIPOS = {
@@ -38,6 +39,7 @@ const Croquis3D = (() => {
     videoportero: { h: 1.5, caja: [0.1, 0.18, 0.03], color: "#2B2F33", pared: true },
     comunicador: { h: 1.7, caja: [0.12, 0.1, 0.04], color: "#E6E6E6", pared: true },
     energizador: { h: 1.6, caja: [0.2, 0.25, 0.08], color: "#F2C94C", pared: true },
+    reflector: { h: 2.6, caja: [0.2, 0.14, 0.08], color: "#2B2F33", pared: true, luz: true },
     monoxido: { h: 1.5, caja: [0.12, 0.12, 0.04], color: "#FFFFFF", pared: true },
     control_remoto: { h: 1.0, caja: [0.035, 0.06, 0.012], color: "#2B2F33" },
     modulo_rele: { h: 1.6, caja: [0.08, 0.06, 0.03], color: "#FFFFFF", pared: true },
@@ -84,6 +86,8 @@ const Croquis3D = (() => {
     estufa: [[0, 0, 32, 18, 0, 0.75, OSCURO]],
     parrilla: [[0, 0, 48, 28, 0, 0.95, "#9A6B4F"]],
     lavarropas: [[0, 0, 28, 28, 0, 0.85, BLANCO]],
+    arbol: [[0, 0, 12, 12, 0, 2.4, "#6B4F3A", "c"], [0, 0, 112, 112, 1.9, 5.2, "#4E8F45", "esfera"]],
+    arbusto: [[0, 0, 40, 40, 0, 1.2, "#4E8F45", "esfera"]],
     cantero: [[0, 0, 60, 24, 0, 0.45, "#B08A64"], ...[-20, -7, 7, 20].map((x, i) => [x, i % 2 ? 2 : -2, 15, 15, 0.42, 0.95, "#3F8F4A", "esfera"])],
   };
   // Cada parte, en metros: centro, esquinas (en el plano), alturas y giro.
@@ -148,8 +152,18 @@ const Croquis3D = (() => {
     return t;
   }
   function armarSuelo(e, g) {
-    if (e.suelo !== "cesped" && e.suelo !== "piso") return;
     const w = M(Math.abs(e.w)), h = M(Math.abs(e.h)), x = M(Math.min(e.x, e.x + e.w)), z = M(Math.min(e.y, e.y + e.h));
+    if (e.suelo === "pileta") {
+      // Pileta: borde de piedra y el agua un poco más abajo, que brilla.
+      const borde = 0.2;
+      [[x, z, w, borde], [x, z + h - borde, w, borde], [x, z, borde, h], [x + w - borde, z, borde, h]].forEach(([bx, bz, bw, bh]) => {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(bw, 0.06, bh), new THREE.MeshLambertMaterial({ color: 0xe8e2d6 })); m.position.set(bx + bw / 2, 0.03, bz + bh / 2); g.add(m);
+      });
+      const agua = new THREE.Mesh(new THREE.PlaneGeometry(Math.max(0.1, w - borde * 2), Math.max(0.1, h - borde * 2)), new THREE.MeshPhongMaterial({ color: 0x4aa8de, shininess: 90, specular: 0xffffff, transparent: true, opacity: 0.9 }));
+      agua.rotation.x = -Math.PI / 2; agua.position.set(x + w / 2, 0.015, z + h / 2); agua.userData.agua = true; g.add(agua);
+      return;
+    }
+    if (e.suelo !== "cesped" && e.suelo !== "piso") return;
     const t = texturaSuelo(e.suelo).clone(); t.needsUpdate = true;
     const lado = e.suelo === "cesped" ? 1.5 : 0.5; // una baldosa de 50 cm
     t.repeat.set(w / lado, h / lado);
@@ -495,8 +509,8 @@ const Croquis3D = (() => {
     contenedor.appendChild(renderer.domElement);
     const escena = new THREE.Scene();
     const camara = new THREE.PerspectiveCamera(45, ancho() / alto(), 0.1, 400);
-    escena.add(new THREE.HemisphereLight(0xffffff, 0x8a8f96, 0.85));
-    const sol = new THREE.DirectionalLight(0xffffff, 0.55); sol.position.set(-12, 25, 18); escena.add(sol);
+    const hemi = new THREE.HemisphereLight(0xffffff, 0x8a8f96, 0.85); escena.add(hemi);
+    const sol = new THREE.DirectionalLight(0xffffff, 0.55); sol.position.set(-12, 25, 18); escena.add(sol); escena.add(sol.target);
 
     const pt = (x, y) => [M(x), M(y)];
     const els = (elementos || []).filter((e) => e && !(o.ocultarAntes && e.prev));
@@ -595,20 +609,60 @@ const Croquis3D = (() => {
       }
       armarEscaleras(els, padre);
       const grupoMuebles = armarMuebles(els, padre);
+      // Norte: flecha en el piso.
+      els.filter((e) => e.t === "simbolo" && e.tipo === "norte").forEach((e) => {
+        const r = (e.rot || 0) * Math.PI / 180, forma = new THREE.Shape();
+        forma.moveTo(0, 0.9); forma.lineTo(0.35, -0.5); forma.lineTo(0, -0.25); forma.lineTo(-0.35, -0.5); forma.closePath();
+        const f = new THREE.Mesh(new THREE.ShapeGeometry(forma), new THREE.MeshBasicMaterial({ color: 0xc0392b, side: THREE.DoubleSide }));
+        f.rotation.x = -Math.PI / 2; f.rotation.z = -r; f.position.set(M(e.x), 0.06, M(e.y)); padre.add(f);
+        const n = cartel("N", "#C0392B"); n.scale.set(0.5, 0.3, 1); n.position.set(M(e.x) + Math.sin(r) * 1.3, 0.4, M(e.y) - Math.cos(r) * 1.3); padre.add(n);
+      });
       if (nv.fantasma) { fantasma(grupoMuebles); fantasma(grupoCierres); }
 
       // ---- Cercos perimetrales (reja, reja con tapial, tejido) ----
       const grupoCercos = new THREE.Group();
       padre.add(grupoCercos);
       let texTejido = null;
+      // Portones y puertas puestos sobre un cerco: el cerco se corta ahí y va la hoja.
+      const enCerco = els.filter((e) => e.t === "simbolo" && CROQUIS_ABERTURAS.includes(e.tipo)).map((e) => {
+        const w2 = (CROQUIS_ANCHO_ABERTURA[e.tipo] || 40) / 2, a = croquisLocalAMundo(e, -w2, 0), b = croquisLocalAMundo(e, w2, 0);
+        return { e, a: [M(a[0]), M(a[1])], b: [M(b[0]), M(b[1])] };
+      }).filter((ab) => els.some((c) => croquisEsCerco(c) && croquisCercoPuntos(c, 10).pts.some((p) => distSegM([M(p.x), M(p.y)], ab.a, ab.b) < 0.2)));
+      const cortado = (a, b) => { const m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2]; return enCerco.some((ab) => distSegM(m, ab.a, ab.b) < 0.25); };
+      enCerco.forEach((ab) => {
+        const l = Math.hypot(ab.b[0] - ab.a[0], ab.b[1] - ab.a[1]), ang = -Math.atan2(ab.b[1] - ab.a[1], ab.b[0] - ab.a[0]);
+        const alto = ab.e.tipo.startsWith("porton") ? 1.9 : 1.9;
+        const cv = document.createElement("canvas"); cv.width = 64; cv.height = 64;
+        const g2 = cv.getContext("2d"); g2.strokeStyle = "#2b2f33"; g2.lineWidth = 6;
+        g2.strokeRect(0, 0, 64, 64); for (let x = 8; x < 64; x += 12) { g2.beginPath(); g2.moveTo(x, 0); g2.lineTo(x, 64); g2.stroke(); }
+        const tx = new THREE.CanvasTexture(cv); tx.wrapS = THREE.RepeatWrapping; tx.repeat.set(Math.max(1, Math.round(l / 0.6)), 1);
+        const hoja = new THREE.Mesh(new THREE.PlaneGeometry(l, alto), new THREE.MeshBasicMaterial({ map: tx, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
+        hoja.position.set((ab.a[0] + ab.b[0]) / 2, alto / 2, (ab.a[1] + ab.b[1]) / 2); hoja.rotation.y = ang; grupoCercos.add(hoja);
+        [ab.a, ab.b].forEach((p) => { const c = new THREE.Mesh(new THREE.BoxGeometry(0.1, alto + 0.1, 0.1), new THREE.MeshLambertMaterial({ color: 0x2b2f33 })); c.position.set(p[0], (alto + 0.1) / 2, p[1]); grupoCercos.add(c); });
+      });
       els.filter(croquisEsCerco).forEach((e) => {
-        const def = CROQUIS_CERCOS[e.cerco];
+        const def = { ...CROQUIS_CERCOS[e.cerco], ...croquisAltoCerco(e) };
         const color = e.cerco === "tejido" ? 0x5f6b63 : 0x2b2f33;
         const tramos = croquisCercoPuntos(e, 8).pts.map((p) => [M(p.x), M(p.y)]);
         const desde = def.tapial || 0, alto = def.alto - desde;
         // Tramo a tramo (así sigue también las curvas).
         const largoTotal = [];
-        for (let i = 1; i < tramos.length; i++) largoTotal.push([tramos[i - 1], tramos[i]]);
+        for (let i = 1; i < tramos.length; i++) if (!cortado(tramos[i - 1], tramos[i])) largoTotal.push([tramos[i - 1], tramos[i]]);
+        // Cerco eléctrico arriba: postes cada 2,5 m, 4 hilos y carteles amarillos.
+        if (e.electrico) {
+          const top = def.alto, hilos = [0.12, 0.24, 0.36, 0.48];
+          largoTotal.forEach(([a, b]) => hilos.forEach((dy) => {
+            const l = Math.hypot(b[0] - a[0], b[1] - a[1]); if (l < 0.01) return;
+            const h = new THREE.Mesh(new THREE.BoxGeometry(l, 0.008, 0.008), new THREE.MeshBasicMaterial({ color: 0xc9ced3 }));
+            h.position.set((a[0] + b[0]) / 2, top + dy, (a[1] + b[1]) / 2); h.rotation.y = -Math.atan2(b[1] - a[1], b[0] - a[0]); grupoCercos.add(h);
+          }));
+          croquisCercoPuntos(e, 2.5 * CROQUIS_POR_METRO).pts.forEach((p, i) => {
+            const q = [M(p.x), M(p.y)];
+            if (enCerco.some((ab) => distSegM(q, ab.a, ab.b) < 0.2)) return;
+            const poste = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.56, 0.03), new THREE.MeshLambertMaterial({ color: 0x3b4046 })); poste.position.set(q[0], top + 0.28, q[1]); grupoCercos.add(poste);
+            if (i % 2) { const c = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.1, 0.01), new THREE.MeshLambertMaterial({ color: 0xf2c94c })); c.position.set(q[0], top + 0.3, q[1]); c.rotation.y = -Math.atan2(p.ny, p.nx) + Math.PI / 2; grupoCercos.add(c); }
+          });
+        }
         largoTotal.forEach(([a, b]) => {
           if (def.tapial) { const t = pared(a, b, def.tapial, def.macizo ? "#CFC7BA" : "#B7B1A6"); if (t) { t.scale.z = def.macizo ? 1.8 : 1.6; grupoCercos.add(t); } }
           const l = Math.hypot(b[0] - a[0], b[1] - a[1]);
@@ -634,7 +688,7 @@ const Croquis3D = (() => {
         if (def.macizo) return;
         // Barrotes (reja) o postes (tejido), en una sola malla instanciada.
         const sep = e.cerco === "tejido" ? 2.5 : 0.12;
-        const pts = croquisCercoPuntos(e, sep * CROQUIS_POR_METRO).pts;
+        const pts = croquisCercoPuntos(e, sep * CROQUIS_POR_METRO).pts.filter((p) => !enCerco.some((ab) => distSegM([M(p.x), M(p.y)], ab.a, ab.b) < 0.2));
         const geo = e.cerco === "tejido" ? new THREE.CylinderGeometry(0.035, 0.035, alto + 0.1, 8) : new THREE.BoxGeometry(0.018, alto, 0.018);
         const inst = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ color }), pts.length);
         const mtx = new THREE.Matrix4();
@@ -923,7 +977,7 @@ const Croquis3D = (() => {
       const acum = [0];
       for (let i = 1; i < r.puntos.length; i++) acum.push(acum[i - 1] + Math.hypot(r.puntos[i][0] - r.puntos[i - 1][0], r.puntos[i][1] - r.puntos[i - 1][1]));
       sim = { figura, r, acum, inicio: performance.now(), vistos: new Set(), encendidos: [], primera: null, alEvento: alEvento || (() => {}), fin: false };
-      sim.alEvento({ tipo: "entra", entrada: r.entrada ? r.entrada.el : null, protegida: r.entrada ? !!r.entrada.protegida : null });
+      sim.alEvento({ tipo: "entra", entrada: r.entrada ? r.entrada.el : null, protegida: r.entrada ? !!r.entrada.protegida : null, porton: r.porton ? r.porton.el : null });
       return true;
     }
     const VELOCIDAD = window.CROQUIS_3D_VELOCIDAD || 1.8; // m/s (más rápido en las pruebas)
@@ -973,6 +1027,56 @@ const Croquis3D = (() => {
         sim.alEvento({ tipo: "fin", detectores: sim.vistos.size, primera: sim.primera, segundos: seg });
       }
     });
+    // ---- Hora del día: sol (con el Norte del plano), contraluz y noche ----
+    const datosSol = croquis3dSol(els.find((e) => e.t === "simbolo" && e.tipo === "norte")) || croquis3dSol({ rot: 0 });
+    let momento = null, lucesNoche = [], brillo = null;
+    const fondoNormal = o.fondo || "#EEF1F4";
+    function ponerMomento(m) {
+      momento = m || null;
+      lucesNoche.forEach((l) => { escena.remove(l); if (l.target) escena.remove(l.target); }); lucesNoche = [];
+      renderer.domElement.style.filter = "";
+      sol.target.position.set(cx, 0, cz);
+      if (!momento) { hemi.intensity = 0.85; hemi.color.set(0xffffff); sol.intensity = 0.55; sol.color.set(0xffffff); sol.position.set(-12, 25, 18); renderer.setClearColor(fondoNormal); actualizarBrillo(); return null; }
+      if (momento === "noche") {
+        hemi.intensity = 0.07; hemi.color.set(0x6070a0); sol.intensity = 0; renderer.setClearColor("#0B1220");
+        // Reflectores: luz hacia donde apuntan.
+        els.filter((e) => e.t === "simbolo" && EQUIPOS[e.tipo] && EQUIPOS[e.tipo].luz).forEach((e) => {
+          const g = ((e.rot || 0) - 90) * Math.PI / 180, x = M(e.x), z = M(e.y);
+          const l = new THREE.SpotLight(0xfff2c0, 2.4, 16, Math.PI / 3.2, 0.5, 1); l.position.set(x, altura + EQUIPOS[e.tipo].h, z);
+          l.target.position.set(x + Math.cos(g) * 4, altura, z + Math.sin(g) * 4); escena.add(l); escena.add(l.target); lucesNoche.push(l);
+        });
+        // La cámara de noche ve con su infrarrojo (en blanco y negro).
+        if (enCamara) {
+          const ir = new THREE.PointLight(0xffffff, 0.9, 12, 1.2); ir.position.copy(camara.position); escena.add(ir); lucesNoche.push(ir);
+          renderer.domElement.style.filter = "grayscale(1) contrast(1.15) brightness(1.15)";
+        }
+        actualizarBrillo();
+        return { noche: true, reflectores: lucesNoche.length - (enCamara ? 1 : 0) };
+      }
+      const h = datosSol[momento], alt = datosSol.altura[momento] * Math.PI / 180;
+      const d = new THREE.Vector3(h[0] * Math.cos(alt), Math.sin(alt), h[1] * Math.cos(alt));
+      sol.position.set(cx + d.x * 40, d.y * 40, cz + d.z * 40);
+      sol.intensity = momento === "mediodia" ? 0.95 : 0.85; sol.color.set(momento === "manana" ? 0xffd9a8 : momento === "tarde" ? 0xffbf80 : 0xffffff);
+      hemi.intensity = momento === "mediodia" ? 0.75 : 0.55; hemi.color.set(0xffffff);
+      renderer.setClearColor(momento === "mediodia" ? "#DDEBF7" : momento === "manana" ? "#F3E3CF" : "#F2D3B8");
+      return { contraluz: actualizarBrillo() };
+    }
+    // Encandilamiento: si la cámara mira hacia el sol, un resplandor donde está el sol.
+    function actualizarBrillo() {
+      if (!brillo) { brillo = document.createElement("div"); brillo.className = "v3-brillo"; brillo.style.cssText = "position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .4s"; contenedor.appendChild(brillo); }
+      if (!enCamara || !momento || momento === "noche") { brillo.style.opacity = 0; return false; }
+      const h = datosSol[momento], alt = datosSol.altura[momento] * Math.PI / 180;
+      const d = new THREE.Vector3(h[0] * Math.cos(alt), Math.sin(alt), h[1] * Math.cos(alt)).normalize();
+      const adelante = new THREE.Vector3(); camara.getWorldDirection(adelante);
+      const cos = adelante.dot(d), lim = Math.cos(60 * Math.PI / 180);
+      if (cos < lim) { brillo.style.opacity = 0; return false; }
+      const pS = camara.position.clone().add(d.clone().multiplyScalar(50)).project(camara);
+      // El sol puede quedar fuera del cuadro (más arriba): el resplandor entra desde ese borde.
+      const x = Math.max(-5, Math.min(105, (pS.x + 1) / 2 * 100)), y = Math.max(-5, Math.min(105, (1 - pS.y) / 2 * 100)), f = Math.max(0.35, (cos - lim) / (1 - lim));
+      brillo.style.background = `radial-gradient(circle at ${x}% ${y}%, rgba(255,255,250,1) 0%, rgba(255,250,225,0.95) ${10 + f * 12}%, rgba(255,240,200,${0.45 + 0.4 * f}) ${30 + f * 25}%, rgba(255,245,230,${0.3 + 0.3 * f}) 100%)`;
+      brillo.style.opacity = Math.min(0.95, 0.55 + f * 0.4);
+      return true;
+    }
     // ---- Lo que ve una cámara ----
     let enCamara = null;
     function verCamara(id) {
@@ -1001,6 +1105,7 @@ const Croquis3D = (() => {
       if (enCamara.bajas !== vista.paredesBajas) { vista.paredesBajas = enCamara.bajas; todos.forEach((n) => n.armarParedes()); }
       grupoCobertura.visible = enCamara.cob; grupoCarteles.visible = enCamara.carteles; grupoDebiles.visible = enCamara.deb; grupoSombras.visible = enCamara.som; enCamara.malla.visible = true;
       controles.enabled = true; enCamara = null; controles.update();
+      ponerMomento(null);
     }
     let vivo = true, pedido = 0;
     function dibujar() {
@@ -1028,7 +1133,7 @@ const Croquis3D = (() => {
       analisis: an,
       simular, pararSimulacion,
       get simulando() { return !!(sim && !sim.fin); },
-      verCamara, salirCamara,
+      verCamara, salirCamara, momento: ponerMomento, get momentoActual() { return momento; },
       get enCamara() { return !!enCamara; },
       captura() { renderer.render(escena, camara); return renderer.domElement.toDataURL("image/png"); },
       // Punto del plano (unidades del croquis, a h metros) -> lugar en la pantalla.
@@ -1561,6 +1666,18 @@ const Croquis3D = (() => {
         pieza.add(g);
       },
       comunicador() { paredAtras(-2.2); const g = new THREE.Group(); g.add(M(caja(12, 10, 4, 1), plastico)); g.add(M(new THREE.CylinderGeometry(0.4, 0.5, 8, 10), oscuro, 4.5, 8, 0)); g.add(led(0x2ecc71, -3.5, -3, 2.05)); g.add(led(0x2e86de, -2, -3, 2.05)); const tx = texto("4G", 3, 1.6, { fondo: "#F1F1EE", color: "#2b2f33" }); tx.position.set(0, 1, 2.02); g.add(tx); pieza.add(g); },
+      reflector() {
+        // Reflector LED con su sensor de movimiento abajo.
+        paredAtras(-6);
+        const g = new THREE.Group();
+        g.add(M(caja(16, 11, 4, 1), mat(0x2b2f33, { roughness: 0.4, metalness: 0.3 })));
+        const vidrioL = M(new THREE.PlaneGeometry(13, 8), new THREE.MeshStandardMaterial({ color: 0xfff6cc, emissive: 0xfff0a0, emissiveIntensity: 0.9 }), 0, 0, 2.05); g.add(vidrioL); leds.push(vidrioL);
+        for (let i = -6; i <= 6; i += 2) g.add(M(new THREE.BoxGeometry(0.3, 3, 1.6), mat(0x2b2f33), i, 0, -2.6));
+        g.add(Mx(new THREE.CylinderGeometry(1.4, 1.4, 1.6, 20), mat(0x2b2f33), 0, -7.6, 0));
+        g.add(M(new THREE.SphereGeometry(1.2, 16, 12), mat(0xeeeeee, { roughness: 0.2 }), 0, -7.6, 0.9));
+        g.add(M(new THREE.BoxGeometry(2, 4, 2), mat(0x2b2f33), 0, 0, -4.5));
+        g.rotation.x = 0.35; pieza.add(g);
+      },
       energizador() { paredAtras(-4); const g = new THREE.Group(); g.add(M(caja(20, 25, 8, 1.4), mat(0xf2c94c, { roughness: 0.4 }))); const tx = texto("ALTA TENSIÓN", 15, 2.4, { fondo: "#f2c94c", color: "#1C1E21", tam: 0.55 }); tx.position.set(0, 6, 4.02); g.add(tx); g.add(led(0xff2020, -6, -8, 4.05, 0.4)); pieza.add(g); },
     };
     (arma[tipo] || (() => { paredAtras(-3); pieza.add(M(caja(9, 9, 4, 1.5), plastico)); pieza.add(led(0x2ecc71, 3, -3, 2.1)); }))();
@@ -1673,7 +1790,7 @@ const Croquis3D = (() => {
       const ps = croquisCercoPuntos(e, 20).pts.map((p) => [M(p.x), M(p.y)]), r = [];
       for (let i = 1; i < ps.length; i++) {
         const a = ps[i - 1], b = ps[i], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, nx = -(b[1] - a[1]) / l * 0.08, ny = (b[0] - a[0]) / l * 0.08;
-        r.push({ e, esquinas: [[a[0] + nx, a[1] + ny], [b[0] + nx, b[1] + ny], [b[0] - nx, b[1] - ny], [a[0] - nx, a[1] - ny]], desde: 0, hasta: CROQUIS_CERCOS[e.cerco].tapial });
+        r.push({ e, esquinas: [[a[0] + nx, a[1] + ny], [b[0] + nx, b[1] + ny], [b[0] - nx, b[1] - ny], [a[0] - nx, a[1] - ny]], desde: 0, hasta: croquisAltoCerco(e).tapial });
       }
       return r;
     });
@@ -1836,6 +1953,18 @@ const Croquis3D = (() => {
         actual = mejor;
       }
       visitado.forEach((k) => puntos.push(centro(k % nx, Math.floor(k / nx))));
+      // Si hay un portón en el cerco, primero entra al terreno por ahí.
+      const pc = portonesCerco[0];
+      if (pc && entrada) {
+        let cxs = 0, czs = 0, nn = 0;
+        for (let k = 0; k < nx * ny; k++) if (interior[k]) { const q = centro(k % nx, Math.floor(k / nx)); cxs += q[0]; czs += q[1]; nn++; }
+        const casa = nn ? [cxs / nn, czs / nn] : pc.c;
+        const l1 = [pc.c[0] + pc.n[0] * 1.6, pc.c[1] + pc.n[1] * 1.6], l2 = [pc.c[0] - pc.n[0] * 1.6, pc.c[1] - pc.n[1] * 1.6];
+        const calle = Math.hypot(l1[0] - casa[0], l1[1] - casa[1]) > Math.hypot(l2[0] - casa[0], l2[1] - casa[1]) ? l1 : l2;
+        const patio = calle === l1 ? l2 : l1;
+        puntos.unshift(calle, pc.c, patio);
+        return { puntos, entrada, porton: pc };
+      }
       return { puntos, entrada: entrada || null };
     }
     // ---- "Completar la protección": dónde agregar sensores ----
@@ -1904,8 +2033,43 @@ const Croquis3D = (() => {
       elegidos.forEach((x) => { delete x.sen; });
       return { elementos: elegidos, antes: nInt ? Math.round(100 * nCub / nInt) : null, despues: nInt ? Math.round(100 * suma / nInt) : null };
     }
+    // ---- Avisos para el técnico (exteriores): plantas, pileta, reja hacia la
+    // vereda, sol de frente (con el Norte puesto en el plano) y cerco eléctrico
+    // sin energizador.
+    const norteEl = els.find((e) => e.t === "simbolo" && e.tipo === "norte");
+    const sol = croquis3dSol(norteEl);
+    const avisos = [];
+    const adelante = (s) => [s.p[0] + s.dir[0] * 0.8, s.p[1] + s.dir[1] * 0.8];
+    const exterior = (s) => !esInterior(adelante(s)) && !esInterior(s.p);
+    const plantas = els.filter((e) => e.t === "simbolo" && /^(arbol|arbusto|cantero)$/.test(e.tipo));
+    const piletas = els.filter((e) => e.t === "rect" && e.suelo === "pileta");
+    const rejas = els.filter((e) => croquisEsCerco(e) && !CROQUIS_CERCOS[e.cerco].macizo);
+    const nombreDe = (e) => (CROQUIS_SIMBOLOS[e.tipo] || {}).nombre || "";
+    const angulo = (a, b) => Math.acos(Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1]))) * 180 / Math.PI;
+    const exteriores = sensores.filter((x) => CROQUIS_SIMBOLOS[x.el.tipo].ir && exterior(x)).concat(camaras.filter(exterior));
+    exteriores.forEach((s) => {
+      const cam = !!s.camara;
+      if (!cam) {
+        const pl = plantas.find((e) => veParedes(s, [M(e.x), M(e.y)]));
+        if (pl) avisos.push({ equipo: s.el, tipo: "plantas", texto: `Mira ${pl.tipo === "arbol" ? "un árbol" : pl.tipo === "arbusto" ? "un arbusto" : "un cantero"}: con viento las plantas se mueven y pueden dar falsas alarmas. Giralo o achicale el alcance.` });
+        const pi = piletas.find((e) => [[0.5, 0.5], [0.2, 0.2], [0.8, 0.8], [0.2, 0.8], [0.8, 0.2]].some(([fx, fy]) => veParedes(s, [M(e.x + e.w * fx), M(e.y + e.h * fy)])));
+        if (pi) avisos.push({ equipo: s.el, tipo: "agua", texto: "Mira a la pileta: los reflejos y el agua en movimiento pueden dar falsas alarmas." });
+        const rj = rejas.find((e) => croquisCercoPuntos(e, 20).pts.some((q) => { const w = [M(q.x), M(q.y)]; return Math.hypot(w[0] - s.p[0], w[1] - s.p[1]) < s.alc - 0.5 && ve(s, w); }));
+        if (rj) avisos.push({ equipo: s.el, tipo: "vereda", texto: `Ve a través ${CROQUIS_CERCOS[rj.cerco].nombre.toLowerCase().startsWith("tejido") ? "del tejido" : "de la reja"} hacia afuera: va a detectar a la gente que pasa por la vereda. Achicale el alcance o giralo.` });
+      }
+      if (sol) {
+        const f = s.dir;
+        if (angulo(f, sol.manana) < 45) avisos.push({ equipo: s.el, tipo: "sol", momento: "manana", texto: cam ? "Contraluz a la mañana: mira al este y el sol de frente encandila la imagen. Conviene una cámara con WDR o girarla." : "Le da el sol de frente a la mañana (mira al este): el sol directo puede dar falsas alarmas." });
+        else if (angulo(f, sol.tarde) < 45) avisos.push({ equipo: s.el, tipo: "sol", momento: "tarde", texto: cam ? "Contraluz a la tarde: mira al oeste y el sol de frente encandila la imagen. Conviene una cámara con WDR o girarla." : "Le da el sol de frente a la tarde (mira al oeste): el sol directo puede dar falsas alarmas." });
+        else if (cam && angulo(f, sol.mediodia) < 35) avisos.push({ equipo: s.el, tipo: "sol", momento: "mediodia", texto: "Mira al norte: en invierno el sol del mediodía queda bajo y puede encandilarla." });
+      }
+    });
+    if (exteriores.length && !sol) avisos.push({ equipo: null, tipo: "norte", texto: "Poné el Norte en el plano (en Objetos) para revisar si a los equipos de afuera les da el sol de frente." });
+    if (els.some((e) => croquisEsCerco(e) && e.electrico) && !els.some((e) => e.t === "simbolo" && e.tipo === "energizador")) avisos.push({ equipo: null, tipo: "energizador", texto: "Hay cerco eléctrico pero falta el energizador." });
+    // Portón (o puerta) en el cerco: por ahí entra el intruso de la simulación.
+    const portonesCerco = aberturas.filter((ab) => !ab.exterior && els.some((c) => croquisEsCerco(c) && croquisCercoPuntos(c, 10).pts.some((q) => distSeg([M(q.x), M(q.y)], ab.a, ab.b) < 0.2)));
     return {
-      celda, x0, y0, nx, ny, interior, cubierto, centro, aberturas, sensores, detecta, recorrido, sugerir, sombra, tapados, hayMuebles: obstaculos.length > 0,
+      celda, x0, y0, nx, ny, interior, cubierto, centro, aberturas, sensores, detecta, recorrido, sugerir, sombra, tapados, hayMuebles: obstaculos.length > 0, avisos, sol, portonesCerco,
       porcentaje: nInt ? Math.round(100 * nCub / nInt) : null,
       aberturasSinProteger: aberturas.filter((ab) => ab.exterior && !ab.protegida),
     };
@@ -2123,6 +2287,7 @@ const CROQUIS_3D_ESTILO = `
 .v3-tj-dato{display:flex;gap:8px;align-items:flex-start;margin:6px 0;color:var(--tenue);font-size:13.5px}
 .v3-tj-redes{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}.v3-tj-redes a{flex:1 1 auto;padding:8px}
 .v3-tj-redes svg,.v3-tj-acc svg{width:17px;height:17px;flex:none}
+.v3-avisos{margin:6px 0 0;font-size:12.5px;color:#8A5A00}.v3-avisos summary{font-weight:700;cursor:pointer}.v3-avisos ul{margin:4px 0 0;padding-left:16px}.v3-avisos li{margin:3px 0;list-style:disc}
 .v3-tapa{margin:6px 0 0;color:#7B4B94;font-weight:600;font-size:12.5px}
 .v3-rayado-violeta{background:repeating-linear-gradient(45deg,rgba(123,75,148,.45) 0 4px,rgba(90,40,120,.9) 4px 6px)!important}
 .v3-link{display:block;margin:10px auto 0;background:none;border:0;color:var(--tenue);font:600 14px inherit;font-family:inherit;text-decoration:underline;cursor:pointer}
@@ -2147,7 +2312,7 @@ const CROQUIS_3D_LEYENDA = {
   rotura_vidrio: ["Detector de rotura de vidrio", "#17809B"], pulsador_asalto: ["Botón de pánico", "#E8741E"], pulsador_incendio: ["Pulsador de incendio", "#E00000"],
   camara_ip: ["Cámara", "#F4F4F4"], camara_analoga: ["Cámara", "#F4F4F4"], camara_domo: ["Cámara domo", "#F4F4F4"], dvr: ["Grabador DVR / NVR", "#2B2F33"], detector_360: ["Detector de techo 360°", "#FFFFFF"],
   barrera: ["Barrera infrarroja exterior", "#E00000"], lector_acceso: ["Lectora de tag / tarjeta", "#1B5FA8"], cerradura: ["Cerradura de pestillo", "#1B5FA8"], cerradura_magnetica: ["Cerradura electromagnética", "#1B5FA8"],
-  boton_salida: ["Botón de salida", "#2E9E4F"], doble_tecnologia: ["Sensor de doble tecnología", "#C0392B"], panico_colgante: ["Botón de pánico colgante", "#E8741E"], fuente_ups: ["UPS / fuente con batería", "#5B5F66"], monoxido: ["Detector de monóxido (CO)", "#6B6F76"], control_remoto: ["Control remoto (llavero)", "#2B2F33"], modulo_rele: ["Módulo relé (portón / automatización)", "#2E86DE"], camara_solar: ["Cámara 4G con panel solar", "#F4F4F4"], sismico: ["Sensor sísmico (caja fuerte)", "#8A5A00"], videoportero: ["Videoportero", "#1C1E21"], comunicador: ["Comunicador 4G", "#D9D9D9"], energizador: ["Energizador de cerco eléctrico", "#F2C94C"], vibracion: ["Sensor de vibración", "#8A5A00"], inundacion: ["Detector de inundación", "#2E86DE"],
+  boton_salida: ["Botón de salida", "#2E9E4F"], doble_tecnologia: ["Sensor de doble tecnología", "#C0392B"], panico_colgante: ["Botón de pánico colgante", "#E8741E"], fuente_ups: ["UPS / fuente con batería", "#5B5F66"], monoxido: ["Detector de monóxido (CO)", "#6B6F76"], reflector: ["Reflector con sensor", "#E0A800"], control_remoto: ["Control remoto (llavero)", "#2B2F33"], modulo_rele: ["Módulo relé (portón / automatización)", "#2E86DE"], camara_solar: ["Cámara 4G con panel solar", "#F4F4F4"], sismico: ["Sensor sísmico (caja fuerte)", "#8A5A00"], videoportero: ["Videoportero", "#1C1E21"], comunicador: ["Comunicador 4G", "#D9D9D9"], energizador: ["Energizador de cerco eléctrico", "#F2C94C"], vibracion: ["Sensor de vibración", "#8A5A00"], inundacion: ["Detector de inundación", "#2E86DE"],
 };
 // Nombre de un equipo según cómo es (inalámbrico, PIR con cámara...).
 function croquis3dNombre(e) {
@@ -2198,6 +2363,7 @@ const CROQUIS_3D_EXPLICA = {
   vibracion: "Detecta golpes o vibraciones en una pared, una caja fuerte o una reja, antes de que la rompan.",
   inundacion: "Va en el piso: avisa apenas detecta agua (pérdidas, lavarropas, termotanque, bombas) antes de que sea un problema.",
   doble_tecnologia: "Combina infrarrojo y microondas: solo avisa cuando las dos tecnologías detectan a la vez. Ideal para garajes, galpones o lugares con corrientes de aire, sol o calefacción, porque casi no da falsas alarmas.",
+  reflector: "Se prende solo cuando detecta movimiento: ilumina el patio de noche, ahuyenta y ayuda a que las cámaras vean mejor.",
   monoxido: "Avisa si hay monóxido de carbono, el gas invisible y sin olor que largan calefactores, estufas y calefones mal ventilados. Salva vidas.",
   control_remoto: "Un llavero para activar y desactivar la alarma sin tocar el teclado, desde el auto o la puerta. También tiene botón de pánico.",
   modulo_rele: "Abre el portón o prende luces y riego desde el celular, o automáticamente cuando suena la alarma.",
@@ -2208,7 +2374,7 @@ const CROQUIS_3D_EXPLICA = {
 };
 const ALCANCE_TXT = { infrarrojo: "11", infrarrojo_ext: "12", infrarrojo_cortina: "10", doble_tecnologia: "12" };
 // Equipos que se pueden agregar tocando en el 3D (en este orden).
-const CROQUIS_3D_PALETA = ["infrarrojo", "infrarrojo|inal", "infrarrojo|video,inal", "infrarrojo|mascota", "doble_tecnologia", "infrarrojo_ext", "infrarrojo_cortina", "barrera", "magnetico", "magnetico|inal", "humo", "monoxido", "inundacion", "rotura_vidrio", "sismico", "detector_360", "sirena_int", "sirena_int|inal", "sirena_ext", "sirena_ext|inal", "teclado", "teclado|inal", "control_remoto", "central", "hub", "modulo_rele", "pulsador_asalto", "panico_colgante", "fuente_ups", "camara_ip", "camara_domo", "camara_solar", "dvr", "lector_acceso", "cerradura_magnetica", "cerradura", "boton_salida", "videoportero"];
+const CROQUIS_3D_PALETA = ["infrarrojo", "infrarrojo|inal", "infrarrojo|video,inal", "infrarrojo|mascota", "doble_tecnologia", "infrarrojo_ext", "infrarrojo_cortina", "barrera", "magnetico", "magnetico|inal", "humo", "monoxido", "inundacion", "rotura_vidrio", "sismico", "detector_360", "sirena_int", "sirena_int|inal", "sirena_ext", "sirena_ext|inal", "teclado", "teclado|inal", "control_remoto", "central", "hub", "modulo_rele", "pulsador_asalto", "panico_colgante", "fuente_ups", "camara_ip", "camara_domo", "camara_solar", "reflector", "dvr", "lector_acceso", "cerradura_magnetica", "cerradura", "boton_salida", "videoportero"];
 const CROQUIS_3D_CON_ZONA = ["barrera", "monoxido", "doble_tecnologia", "panico_colgante", "sismico", "inundacion", "infrarrojo", "infrarrojo_ext", "infrarrojo_cortina", "magnetico", "humo", "gas", "rotura_vidrio", "detector_360", "pulsador_asalto", "pulsador_incendio"];
 // Pitido corto (detección) — solo si el navegador lo permite.
 let croquis3dAudio = null;
@@ -2225,6 +2391,17 @@ function croquis3dPitido(frec, dur) {
 //   edicion { alCambiar(indicePagina, elementos), marcarInst },
 //   debiles (mostrar puntos débiles al abrir), llamar(datos) -> Promise (botón
 //   "Quiero que me llamen"), paraCaptura.
+// Orientación con el símbolo "Norte" del plano (Argentina, hemisferio sur):
+// el sol sale por el este, al mediodía está al norte y se pone al oeste.
+// Devuelve direcciones en el plano (x a la derecha, y hacia abajo).
+function croquis3dSol(norteEl) {
+  if (!norteEl) return null;
+  const r = (norteEl.rot || 0) * Math.PI / 180;
+  const norte = [Math.sin(r), -Math.cos(r)], este = [Math.cos(r), Math.sin(r)];
+  const mezcla = (a, b, g) => { const v = [a[0] * Math.cos(g) + b[0] * Math.sin(g), a[1] * Math.cos(g) + b[1] * Math.sin(g)], n = Math.hypot(v[0], v[1]) || 1; return [v[0] / n, v[1] / n]; };
+  const g = 20 * Math.PI / 180;
+  return { norte, este, manana: mezcla(este, norte, g), tarde: mezcla([-este[0], -este[1]], norte, g), mediodia: norte, altura: { manana: 14, mediodia: 40, tarde: 14 } };
+}
 // "El placard", "La heladera": para las frases de lo que tapan los muebles.
 function croquis3dMueble(e) {
   if (croquisEsCerco(e)) { const n = CROQUIS_CERCOS[e.cerco].nombre; return (/^reja/i.test(n) ? "La " : "El ") + n.toLowerCase(); }
@@ -2352,6 +2529,7 @@ function iniciarVisor3D(datos, opciones) {
     ley.innerHTML = `<summary>${sinAlarma ? "Así está hoy" : "Qué se instala"}</summary>
       ${sinAlarma ? `<p class="v3-cubre">${an && an.porcentaje ? `Hoy los sensores cubren el ${an.porcentaje}%` : "Hoy ningún sensor cubre la casa"}</p>` : todo && cobertura(propuestas[prop]) ? `<p class="v3-cubre">Cubre el ${cobertura(propuestas[prop]).pct}% de la casa</p>` : an && an.porcentaje != null ? `<p class="v3-cubre">Cubre el ${an.porcentaje}% de ${paginas.length > 1 ? "esta planta" : "la casa"}</p>` : ""}
       ${an && an.tapados && an.tapados.length && !sinAlarma ? (verMuebles ? `<p class="v3-tapa">${an.tapados.slice(0, 4).map((t) => `${esc(croquis3dMueble(t.mueble))} le tapa ${String(t.m2).replace(".", ",")} m² ${t.equipo.tipo.startsWith("camara") ? "a la cámara" : "al " + esc(enFrase(t.equipo))}`).join("<br>")}</p>` : `<p class="v3-tapa">${an.tapados.length === 1 ? "Un mueble tapa" : "Hay muebles que tapan"} parte de lo que ven los equipos (Vista ▸ Lo que tapan los muebles)</p>`) : ""}
+      ${ed && an && an.avisos && an.avisos.length && !sinAlarma ? `<details class="v3-avisos"><summary>⚠ ${an.avisos.length === 1 ? "1 aviso" : an.avisos.length + " avisos"} para el técnico</summary><ul>${an.avisos.map((a) => `<li>${a.equipo ? `<b>${esc(croquis3dNombre(a.equipo))}${zonaDe(a.equipo)}:</b> ` : ""}${esc(a.texto)}</li>`).join("")}</ul></details>` : ""}
       ${abiertas ? `<p class="v3-mal">${abiertas === 1 ? "1 abertura que da afuera no tiene sensor" : abiertas + " aberturas que dan afuera no tienen sensor"}</p>` : ""}
       <ul>${Object.entries(cuenta).map(([k, v]) => `<li><i style="background:${v.color}"></i>${v.n} × ${esc(k)}</li>`).join("")}
       <li><i style="background:rgba(224,0,0,.35)"></i>Zona que cubre cada sensor</li>
@@ -2363,7 +2541,11 @@ function iniciarVisor3D(datos, opciones) {
   };
   const pintarBarra = () => {
     const v = visor ? visor.vista : {};
-    if (visor && visor.enCamara) { barra.innerHTML = `<button type="button" data-a="salircam" class="v3-fuerte">Salir de la cámara</button>`; return; }
+    if (visor && visor.enCamara) {
+      const m = visor.momentoActual;
+      barra.innerHTML = [["manana", "Mañana"], ["mediodia", "Mediodía"], ["tarde", "Tarde"], ["noche", "Noche"]].map(([k, t]) => `<button type="button" data-momento="${k}" class="${m === k ? "on" : ""}">${t}</button>`).join("") + `<button type="button" data-a="salircam" class="v3-fuerte">Salir de la cámara</button>`;
+      return;
+    }
     barra.innerHTML = editando
       ? `<button type="button" data-a="deshacer" ${pila.length ? "" : "disabled"}>Deshacer</button><button type="button" data-a="completar" class="v3-fuerte">Completar la protección</button><button type="button" data-a="debiles" class="${debiles ? "on" : ""}">Puntos débiles</button><button type="button" data-a="vistaed">${vistaEd === "planta" ? "Ver en 3D" : "Ver de arriba"}</button><button type="button" data-a="listo" class="on">Listo</button>`
       : `<button type="button" data-a="antes" class="${sinAlarma ? "on" : ""}">${sinAlarma ? "Ver con SAT" : "Ver sin alarma"}</button><button type="button" data-a="simular">${visor && visor.simulando ? "Parar" : "Simular intruso"}</button><button type="button" data-a="vista">Vista ▾</button>${ed ? `<button type="button" data-a="editar">Editar</button>` : ""}${o.llamar ? `<button type="button" data-a="llamar" class="v3-fuerte">Quiero que me llamen</button>` : ""}${(o.extras || []).map((x, i) => `<button type="button" data-extra="${i}">${esc(x.texto)}</button>`).join("")}${o.botonCerrar ? `<button type="button" data-a="cerrar">Cerrar</button>` : ""}`;
@@ -2577,7 +2759,8 @@ function iniciarVisor3D(datos, opciones) {
     const ok = visor.simular((ev) => {
       if (ev.tipo === "entra") {
         const por = ev.entrada ? (ev.entrada.tipo === "ventana" ? "una ventana" : ev.entrada.tipo.startsWith("porton") ? "el portón" : ev.entrada.tipo === "paso" ? "una abertura" : "una puerta") : "afuera";
-        decir("Un intruso entra por " + por + (ev.protegida === false ? " que no tiene sensor…" : "…"));
+        if (ev.porton) decir("Un intruso entra al terreno por " + (ev.porton.tipo.startsWith("porton") ? "el portón" : "la puerta del frente") + " y va hacia la casa…");
+        else decir("Un intruso entra por " + por + (ev.protegida === false ? " que no tiene sensor…" : "…"));
       }
       if (ev.tipo === "detecta") {
         if (primera == null) { primera = ev; croquis3dPitido(660, 0.5); setTimeout(() => croquis3dPitido(880, 0.5), 520); } else croquis3dPitido(880, 0.1);
@@ -2628,6 +2811,8 @@ function iniciarVisor3D(datos, opciones) {
     if (e.tipo === "infrarrojo" && e.video) texto = "Detecta movimiento y en ese momento saca fotos: el monitoreo (y vos, en el celular) ve qué pasó y confirma si es un intruso real.";
     if (e.inal) texto += " Es inalámbrico: funciona a pila y se comunica por radio, sin cables a la central.";
     if (def.ir) { const { ang, doble } = croquisIRParams(e, def); texto += ` Cubre hasta ${ALCANCE_TXT[e.tipo] || "11"} m, en un ángulo de ${doble ? ang * 2 : ang}°.`; }
+    const avisosE = ed && visor && visor.analisis && visor.analisis.avisos ? visor.analisis.avisos.filter((a) => a.equipo === e) : [];
+    if (avisosE.length) texto += " ⚠ " + avisosE.map((a) => a.texto).join(" ");
     const tapa = visor && visor.analisis ? visor.analisis.tapados.filter((t) => t.equipo === e) : [];
     if (tapa.length) texto += ` Ojo: ${tapa.map((t) => `${croquis3dMueble(t.mueble)} le tapa ${String(t.m2).replace(".", ",")} m²`).join(" y ")} de lo que ve${verMuebles ? "" : " (Vista ▸ Lo que tapan los muebles)"}.`;
     const lugar = dondeEsta(e);
@@ -2789,6 +2974,16 @@ function iniciarVisor3D(datos, opciones) {
   barra.addEventListener("click", (ev) => {
     const b = ev.target.closest("button"); if (!b) return;
     if (b.dataset.extra != null) { const x = o.extras[Number(b.dataset.extra)]; if (x && x.alHacer) x.alHacer(); return; }
+    if (b.dataset.momento) {
+      const m = visor.momentoActual === b.dataset.momento ? null : b.dataset.momento;
+      const r = visor.momento(m) || {};
+      pintarBarra();
+      const nombre = { manana: "A la mañana", mediodia: "Al mediodía", tarde: "A la tarde" }[m];
+      if (!m) decir("Lo que ve la cámara.");
+      else if (m === "noche") decir(`De noche: la cámara ve con su infrarrojo, en blanco y negro${r.reflectores ? `, y ${r.reflectores === 1 ? "el reflector ilumina" : "los reflectores iluminan"} el patio` : ". Un reflector con sensor ayudaría a ver mejor"}.`);
+      else decir(r.contraluz ? `${nombre} le da el sol de frente: contraluz, la imagen se encandila. Conviene una cámara con WDR o girarla.` : `${nombre}: el sol no le da de frente.`, !!r.contraluz);
+      return;
+    }
     const a = b.dataset.a;
     if (a === "cerrar") { if (o.alCerrar) o.alCerrar(); return; }
     if (a === "salircam") { salirCamara(); return; }
