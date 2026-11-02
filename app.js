@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.35.0";
+const APP_VERSION = "4.36.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -15881,7 +15881,8 @@ function cqRenderProps() {
     const m = (v) => (Math.abs(v) / CROQUIS_POR_METRO).toLocaleString("es-AR", { maximumFractionDigits: 2 });
     html += `<span class="cq-props-tit">${escapeHtml(cqNombreElemento(el))} · ${m(el.w)} × ${m(el.h)} m</span>` + b("medidas", cqIc("regla") + "Medidas", "Escribir el ancho y el largo en metros") + b("nombre", cqIc("lapiz") + (el.nombre ? escapeHtml(el.nombre).slice(0, 14) : "Nombre"), "Nombre del ambiente");
     if (el.forma === "triangulo" || el.forma === "triangulo_rect") html += b("ori", cqIc("rotDer") + "90°", "Girar el triángulo");
-    if (!el.forma || el.forma === "rect") html += b("cierre", el.cierre === "semi" ? "Semicubierto" : el.cierre === "balcon" ? "Balcón" : "Cerrado", "Cerrado (con paredes), semicubierto (techo con columnas, sin paredes: galería, sector techado) o balcón (con baranda)", !!el.cierre);
+    html += b("suelo", el.suelo === "cesped" ? "Césped" : el.suelo === "piso" ? "Piso" : "Suelo", "Qué hay en el suelo: césped o piso (útil para patios y jardines)", !!el.suelo);
+    if (!el.forma || el.forma === "rect") html += b("cierre", el.cierre === "abierto" ? "Al aire libre" : el.cierre === "semi" ? "Semicubierto" : el.cierre === "balcon" ? "Balcón" : "Cerrado", "Cerrado (con paredes), al aire libre (patio, jardín: sin paredes ni techo), semicubierto (techo con columnas: galería, sector techado) o balcón (con baranda)", !!el.cierre);
   }
   if (el.t === "texto" || el.t === "tabla") html += `<span class="cq-props-tit">${escapeHtml(cqNombreElemento(el))}</span>` + b("texto", cqIc("lapiz") + "Editar");
   if (el.t === "linea") html += `<span class="cq-props-tit">Pared</span>` + (Array.isArray(el.c) ? b("recta", cqIc("recta") + "Recta", "Volver a pared recta") : b("curvar", cqIc("curva") + "Curvar", "Hacerla curva: después arrastrá el punto del medio"));
@@ -16130,7 +16131,7 @@ function cqDelGrupo(el) {
   return g.length ? g : [el];
 }
 function cqNombreElemento(el) {
-  if (el.t === "rect") return { elipse: "Círculo", triangulo: "Triángulo", triangulo_rect: "Triángulo" }[el.forma] || (el.cierre === "semi" ? "Semicubierto" : el.cierre === "balcon" ? "Balcón" : "Habitación");
+  if (el.t === "rect") return { elipse: "Círculo", triangulo: "Triángulo", triangulo_rect: "Triángulo" }[el.forma] || (el.cierre === "semi" ? "Semicubierto" : el.cierre === "balcon" ? "Balcón" : el.cierre === "abierto" ? "Sector al aire libre" : "Habitación");
   if (el.t === "simbolo") return (CROQUIS_SIMBOLOS[el.tipo] || {}).nombre || "Equipo";
   if (el.t === "tabla") return el.celdas && (el.celdas.length > 1 || el.celdas[0].length > 1) ? "Tabla" : "Cuadro de texto";
   if (croquisEsCerco(el)) return CROQUIS_CERCOS[el.cerco].nombre;
@@ -16175,7 +16176,8 @@ function cqAccion(acc) {
     if (acc === "curvar") { const mx = (el.x1 + el.x2) / 2, my = (el.y1 + el.y2) / 2, l = Math.hypot(el.x2 - el.x1, el.y2 - el.y1) || 1; el.c = [mx - (el.y2 - el.y1) / l * l * 0.35, my + (el.x2 - el.x1) / l * l * 0.35]; }
     if (acc === "recta") delete el.c;
     if (acc === "ori") el.ori = ((el.ori || 0) + 1) % 4;
-    if (acc === "cierre") { const sig = { "": "semi", semi: "balcon", balcon: "" }[el.cierre || ""]; if (sig) el.cierre = sig; else delete el.cierre; showToast(el.cierre === "semi" ? "Semicubierto: techo con columnas, sin paredes." : el.cierre === "balcon" ? "Balcón: con baranda, sin techo." : "Cerrado: con paredes."); }
+    if (acc === "suelo") { const sig = { "": "cesped", cesped: "piso", piso: "" }[el.suelo || ""]; if (sig) el.suelo = sig; else delete el.suelo; }
+    if (acc === "cierre") { const sig = { "": "abierto", abierto: "semi", semi: "balcon", balcon: "" }[el.cierre || ""]; if (sig) el.cierre = sig; else delete el.cierre; showToast(el.cierre === "abierto" ? "Al aire libre: sin paredes ni techo (patio, jardín)." : el.cierre === "semi" ? "Semicubierto: techo con columnas, sin paredes." : el.cierre === "balcon" ? "Balcón: con baranda, sin techo." : "Cerrado: con paredes."); }
     const defIr = el.t === "simbolo" && CROQUIS_SIMBOLOS[el.tipo] && CROQUIS_SIMBOLOS[el.tipo].ir ? CROQUIS_SIMBOLOS[el.tipo] : null;
     if (defIr && /^(alc|ang)[+-]$/.test(acc)) {
       const pr = croquisIRParams(el, defIr);
@@ -16333,7 +16335,7 @@ cqSvg.addEventListener("pointerdown", (e) => {
     // Ambiente con medida: se apoya donde se tocó (centrado) y se pega a las vecinas.
     const a = cq.plantilla, w = Math.round(a.w * CROQUIS_POR_METRO), h = Math.round(a.h * CROQUIS_POR_METRO);
     cqMemoria();
-    const el = { id: cqId(), t: "rect", x: cqSnap(mx - w / 2), y: cqSnap(my - h / 2), w, h, nombre: a.nombre, ...(a.cierre ? { cierre: a.cierre } : {}) };
+    const el = { id: cqId(), t: "rect", x: cqSnap(mx - w / 2), y: cqSnap(my - h / 2), w, h, nombre: a.nombre, ...(a.cierre ? { cierre: a.cierre } : {}), ...(a.suelo ? { suelo: a.suelo } : {}) };
     cq.elementos.push(el);
     cqImanHabitacion(el);
     cq.sel = el.id;
@@ -16647,8 +16649,9 @@ const CQ_AMBIENTES = [
   { nombre: "Living", w: 5, h: 4 }, { nombre: "Comedor", w: 4, h: 3.5 }, { nombre: "Cocina", w: 3, h: 3 },
   { nombre: "Dormitorio", w: 3, h: 3 }, { nombre: "Dormitorio principal", w: 4, h: 3.5 }, { nombre: "Baño", w: 2, h: 1.5 },
   { nombre: "Toilette", w: 1.5, h: 1 }, { nombre: "Lavadero", w: 2, h: 2 }, { nombre: "Pasillo", w: 1, h: 4 },
-  { nombre: "Hall", w: 2, h: 2 }, { nombre: "Garage", w: 3, h: 5.5 }, { nombre: "Patio", w: 5, h: 5 },
-  { nombre: "Balcón", w: 3, h: 1.2, cierre: "balcon" }, { nombre: "Galería", w: 4, h: 3, cierre: "semi" }, { nombre: "Sector techado", w: 3, h: 3, cierre: "semi" },
+  { nombre: "Hall", w: 2, h: 2 }, { nombre: "Garage", w: 3, h: 5.5 }, { nombre: "Patio", w: 5, h: 5, cierre: "abierto", suelo: "piso" },
+  { nombre: "Jardín", w: 6, h: 5, cierre: "abierto", suelo: "cesped" },
+  { nombre: "Balcón", w: 3, h: 1.2, cierre: "balcon", suelo: "piso" }, { nombre: "Galería", w: 4, h: 3, cierre: "semi", suelo: "piso" }, { nombre: "Sector techado", w: 3, h: 3, cierre: "semi", suelo: "piso" },
   { nombre: "Local", w: 6, h: 4 }, { nombre: "Oficina", w: 3, h: 3 }, { nombre: "Depósito", w: 3, h: 2 },
 ];
 

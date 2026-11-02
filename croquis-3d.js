@@ -109,7 +109,8 @@ const Croquis3D = (() => {
       const nx = Math.max(1, Math.ceil(w / 3)), nz = Math.max(1, Math.ceil(h / 3)), pts = [];
       for (let i = 0; i <= nx; i++) for (let j = 0; j <= nz; j++) if (i === 0 || j === 0 || i === nx || j === nz) pts.push([x + w * i / nx, z + h * j / nz]);
       pts.forEach(([px, pz]) => { const c = new THREE.Mesh(new THREE.BoxGeometry(0.15, ALTO - 0.12, 0.15), new THREE.MeshLambertMaterial({ color: 0xd8d2c8 })); c.position.set(px, (ALTO - 0.12) / 2, pz); g.add(c); });
-      // El piso de la galería, un poco distinto.
+      // El piso de la galería, un poco distinto (si no se eligió el suelo).
+      if (e.suelo) return;
       const piso = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshLambertMaterial({ color: 0xd9cdb8 }));
       piso.rotation.x = -Math.PI / 2; piso.position.set(x + w / 2, 0.008, z + h / 2); g.add(piso);
     } else if (e.cierre === "balcon") {
@@ -121,9 +122,43 @@ const Croquis3D = (() => {
         const cano = new THREE.Mesh(new THREE.BoxGeometry(l, 0.05, 0.06), new THREE.MeshLambertMaterial({ color: 0x5b5f66 }));
         cano.position.set((a[0] + b[0]) / 2, 1.0, (a[1] + b[1]) / 2); cano.rotation.y = ang; g.add(cano);
       }
+      if (e.suelo) return;
       const piso = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshLambertMaterial({ color: 0xcfc6b8 }));
       piso.rotation.x = -Math.PI / 2; piso.position.set(x + w / 2, 0.008, z + h / 2); g.add(piso);
     }
+  }
+  // Suelo de un sector: césped o piso de baldosas (texturas dibujadas acá).
+  const texSuelo = {};
+  function texturaSuelo(tipo) {
+    if (texSuelo[tipo]) return texSuelo[tipo];
+    const cv = document.createElement("canvas"); cv.width = cv.height = 128;
+    const g = cv.getContext("2d");
+    if (tipo === "cesped") {
+      g.fillStyle = "#6FAE5E"; g.fillRect(0, 0, 128, 128);
+      let sem = 7;
+      const azar = () => { sem = (sem * 9301 + 49297) % 233280; return sem / 233280; };
+      for (let i = 0; i < 900; i++) { g.strokeStyle = azar() > 0.5 ? "rgba(60,120,50,0.55)" : "rgba(150,200,110,0.5)"; const x = azar() * 128, y = azar() * 128; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (azar() - 0.5) * 3, y - 2 - azar() * 4); g.stroke(); }
+    } else {
+      g.fillStyle = "#D6CCBC"; g.fillRect(0, 0, 128, 128);
+      g.fillStyle = "rgba(255,255,255,0.18)"; g.fillRect(6, 6, 50, 50); g.fillRect(70, 70, 50, 50);
+      g.strokeStyle = "#9C907C"; g.lineWidth = 5; g.strokeRect(0, 0, 128, 128);
+    }
+    const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    texSuelo[tipo] = t;
+    return t;
+  }
+  function armarSuelo(e, g) {
+    if (e.suelo !== "cesped" && e.suelo !== "piso") return;
+    const w = M(Math.abs(e.w)), h = M(Math.abs(e.h)), x = M(Math.min(e.x, e.x + e.w)), z = M(Math.min(e.y, e.y + e.h));
+    const t = texturaSuelo(e.suelo).clone(); t.needsUpdate = true;
+    const lado = e.suelo === "cesped" ? 1.5 : 0.5; // una baldosa de 50 cm
+    t.repeat.set(w / lado, h / lado);
+    const geo = e.forma === "elipse" ? new THREE.CircleGeometry(0.5, 40) : new THREE.PlaneGeometry(1, 1);
+    // Un poco "hacia atrás" en profundidad: la cobertura y las capas se dibujan encima sin parpadear.
+    const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: t }));
+    m.rotation.x = -Math.PI / 2; m.scale.set(w, h, 1); m.position.set(x + w / 2, 0.01, z + h / 2);
+    if (e.forma && e.forma !== "rect" && e.forma !== "elipse") return;
+    g.add(m);
   }
   function armarMuebles(els, padre) {
     const g = new THREE.Group();
@@ -302,7 +337,7 @@ const Croquis3D = (() => {
         const dx = w[0] - w0[0], dz = w[1] - w0[1], n = Math.hypot(dx, dz) || 1;
         arco.push(rayo([x, z], [dx / n, dz / n], alcance, segmentos));
       }
-      cobertura = sector([x, z], h, arco, 0.02, fant ? 0xf2a900 : e.tipo === "infrarrojo" ? 0xe00000 : 0x7b4b94, fant ? 0.16 : e.prev ? 0.05 : 0.11);
+      cobertura = sector([x, z], h, arco, 0.045, fant ? 0xf2a900 : e.tipo === "infrarrojo" ? 0xe00000 : 0x7b4b94, fant ? 0.16 : e.prev ? 0.05 : 0.11);
     } else {
       [x, z] = pt(e.x, e.y);
       if (p3.disco) {
@@ -321,7 +356,7 @@ const Croquis3D = (() => {
       if (p3.camara) {
         const ang = 80, alc = 15, giro = ((e.rot || 0) - 90) * Math.PI / 180, arco = [];
         for (let i = 0; i <= 26; i++) { const g = giro - (ang / 2) * Math.PI / 180 + (ang * Math.PI / 180) * i / 26; arco.push(rayo([x, z], [Math.cos(g), Math.sin(g)], alc, segmentos)); }
-        cobertura = sector([x, z], h, arco, 0.02, fant ? 0xf2a900 : 0x2e86de, fant ? 0.12 : e.prev ? 0.04 : 0.08);
+        cobertura = sector([x, z], h, arco, 0.045, fant ? 0xf2a900 : 0x2e86de, fant ? 0.12 : e.prev ? 0.04 : 0.08);
       }
     }
     obj.userData.equipo = e;
@@ -492,8 +527,10 @@ const Croquis3D = (() => {
           } else segmentos.push([pt(e.x1, e.y1), pt(e.x2, e.y2)]);
         } else if (e.t === "rect" && (!e.forma || e.forma === "rect") && e.cierre) {
           armarCierre(e, grupoCierres);
+          armarSuelo(e, grupoCierres);
         } else if (e.t === "rect" && (!e.forma || e.forma === "rect")) {
           const w = M(Math.abs(e.w)), h = M(Math.abs(e.h)), x = M(Math.min(e.x, e.x + e.w)), z = M(Math.min(e.y, e.y + e.h));
+          armarSuelo(e, grupoCierres);
           if (w * h < 1.5) {
             // Rectángulo chico (mueble, tablero): una caja de 1 m.
             const m = new THREE.Mesh(new THREE.BoxGeometry(w, 1, h), new THREE.MeshLambertMaterial({ color: e.color || "#8E949A" }));
@@ -510,6 +547,8 @@ const Croquis3D = (() => {
       const paredesDibujo = cortarParedes(segmentos, tramosAbertura(els, true));
       const sinPuertas = cortarParedes(segmentos, tramosAbertura(els, false));
       segmentos.length = 0; sinPuertas.forEach((x) => segmentos.push(x));
+      // Los tapiales cortan lo que dibuja la cobertura (y los equipos se pueden apoyar en ellos).
+      els.filter((e) => croquisEsCerco(e) && CROQUIS_CERCOS[e.cerco].macizo).forEach((e) => { const ps = croquisCercoPuntos(e, 20).pts.map((p) => [M(p.x), M(p.y)]); for (let i = 1; i < ps.length; i++) segmentos.push([ps[i - 1], ps[i]]); });
       const altoParedes = () => (vista.paredesBajas ? 1.1 : ALTO);
       function armarParedes() {
         grupoParedes.children.filter((c) => c.userData.pared).forEach((c) => { grupoParedes.remove(c); c.geometry.dispose(); });
@@ -571,9 +610,9 @@ const Croquis3D = (() => {
         const largoTotal = [];
         for (let i = 1; i < tramos.length; i++) largoTotal.push([tramos[i - 1], tramos[i]]);
         largoTotal.forEach(([a, b]) => {
-          if (def.tapial) { const t = pared(a, b, def.tapial, "#B7B1A6"); if (t) { t.scale.z = 1.6; grupoCercos.add(t); } }
+          if (def.tapial) { const t = pared(a, b, def.tapial, def.macizo ? "#CFC7BA" : "#B7B1A6"); if (t) { t.scale.z = def.macizo ? 1.8 : 1.6; grupoCercos.add(t); } }
           const l = Math.hypot(b[0] - a[0], b[1] - a[1]);
-          if (l < 0.01) return;
+          if (l < 0.01 || def.macizo) return;
           const ang = -Math.atan2(b[1] - a[1], b[0] - a[0]);
           // Caños de arriba y abajo.
           [desde + 0.05, desde + alto - 0.03].forEach((y) => {
@@ -592,6 +631,7 @@ const Croquis3D = (() => {
             malla.position.set((a[0] + b[0]) / 2, desde + alto / 2, (a[1] + b[1]) / 2); malla.rotation.y = ang; grupoCercos.add(malla);
           }
         });
+        if (def.macizo) return;
         // Barrotes (reja) o postes (tejido), en una sola malla instanciada.
         const sep = e.cerco === "tejido" ? 2.5 : 0.12;
         const pts = croquisCercoPuntos(e, sep * CROQUIS_POR_METRO).pts;
@@ -633,7 +673,7 @@ const Croquis3D = (() => {
         const pos = [], uv = [], c = an.celda / 2;
         for (let k = 0; k < an.nx * an.ny; k++) if (an.interior[k] && !an.cubierto[k]) {
           const [x, z] = an.centro(k % an.nx, Math.floor(k / an.nx));
-          pos.push(x - c, 0.018, z - c, x + c, 0.018, z + c, x + c, 0.018, z - c, x - c, 0.018, z - c, x - c, 0.018, z + c, x + c, 0.018, z + c);
+          pos.push(x - c, 0.04, z - c, x + c, 0.04, z + c, x + c, 0.04, z - c, x - c, 0.04, z - c, x - c, 0.04, z + c, x + c, 0.04, z + c);
           uv.push(0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1);
         }
         if (pos.length) {
@@ -669,7 +709,7 @@ const Croquis3D = (() => {
         const pos = [], uv = [], c = an.celda / 2;
         for (let k = 0; k < an.nx * an.ny; k++) if (an.sombra[k]) {
           const [x, z] = an.centro(k % an.nx, Math.floor(k / an.nx));
-          pos.push(x - c, 0.022, z - c, x + c, 0.022, z + c, x + c, 0.022, z - c, x - c, 0.022, z - c, x - c, 0.022, z + c, x + c, 0.022, z + c);
+          pos.push(x - c, 0.05, z - c, x + c, 0.05, z + c, x + c, 0.05, z - c, x - c, 0.05, z - c, x - c, 0.05, z + c, x + c, 0.05, z + c);
           uv.push(0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1);
         }
         if (pos.length) {
@@ -1628,7 +1668,16 @@ const Croquis3D = (() => {
     // la esquina, arriba) al cuerpo de la persona (~1 m): un sillón casi no
     // tapa; un placard, una heladera o una mampara sí, y dejan "sombra".
     const ALTO_CUERPO = ALTO_CUERPO_3D;
-    const obstaculos = els.filter((e) => e.t === "simbolo" && MUEBLES_3D[e.tipo]).flatMap(partesMueble).filter((p) => p.hasta > 0.3).map((p) => {
+    // Los tapiales también tapan (a la altura del tapial).
+    const tramosTapial = els.filter((e) => croquisEsCerco(e) && CROQUIS_CERCOS[e.cerco].tapial).flatMap((e) => {
+      const ps = croquisCercoPuntos(e, 20).pts.map((p) => [M(p.x), M(p.y)]), r = [];
+      for (let i = 1; i < ps.length; i++) {
+        const a = ps[i - 1], b = ps[i], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, nx = -(b[1] - a[1]) / l * 0.08, ny = (b[0] - a[0]) / l * 0.08;
+        r.push({ e, esquinas: [[a[0] + nx, a[1] + ny], [b[0] + nx, b[1] + ny], [b[0] - nx, b[1] - ny], [a[0] - nx, a[1] - ny]], desde: 0, hasta: CROQUIS_CERCOS[e.cerco].tapial });
+      }
+      return r;
+    });
+    const obstaculos = els.filter((e) => e.t === "simbolo" && MUEBLES_3D[e.tipo]).flatMap(partesMueble).concat(tramosTapial).filter((p) => p.hasta > 0.3).map((p) => {
       const cx = p.esquinas.reduce((a, q) => a + q[0], 0) / 4, cy = p.esquinas.reduce((a, q) => a + q[1], 0) / 4;
       const lados = p.esquinas.map((a, i) => { const b = p.esquinas[(i + 1) % 4]; let n = [b[1] - a[1], -(b[0] - a[0])]; if (n[0] * (a[0] - cx) + n[1] * (a[1] - cy) < 0) n = [-n[0], -n[1]]; return { a, n }; });
       return { ...p, lados };
@@ -2178,6 +2227,7 @@ function croquis3dPitido(frec, dur) {
 //   "Quiero que me llamen"), paraCaptura.
 // "El placard", "La heladera": para las frases de lo que tapan los muebles.
 function croquis3dMueble(e) {
+  if (croquisEsCerco(e)) { const n = CROQUIS_CERCOS[e.cerco].nombre; return (/^reja/i.test(n) ? "La " : "El ") + n.toLowerCase(); }
   const n = ((CROQUIS_SIMBOLOS[e.tipo] || {}).nombre || "Un mueble").split(" / ")[0];
   const fem = /^(heladera|mesa|mesada|cama|ducha|bañera|cocina|estufa|parrilla|pileta|silla|tv)/i.test(n) && !/^tv/i.test(n) ? "La " : /^tv/i.test(n) ? "La " : "El ";
   return fem + n.toLowerCase().replace(/^tv$/, "tele");

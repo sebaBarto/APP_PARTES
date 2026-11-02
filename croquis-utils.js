@@ -16,7 +16,7 @@
 //   simbolo { tipo, x, y, rot, esc, color?, esp? }  equipos y objetos de obra
 
 // Tiene que ser igual a APP_VERSION de app.js (si no, la app recarga).
-const CROQUIS_UTILS_VERSION = "4.35.0";
+const CROQUIS_UTILS_VERSION = "4.36.0";
 const CROQUIS_GRILLA = 20;
 
 // Cada símbolo se dibuja centrado en 0,0 con dib(color). "cat" separa los
@@ -581,16 +581,36 @@ function croquisSvgElementoBase(el, attrs) {
     // Semicubierto (galería, sector techado): borde de guiones y rayado suave
     // (el techo). Balcón: baranda (doble línea fina).
     let fondo = "";
+    // Suelo: césped (verde con matitas) o piso (baldosas).
+    if (el.suelo === "cesped" || el.suelo === "piso") {
+      const color = el.suelo === "cesped" ? "#8FCB7E" : "#E3DDD2";
+      if (forma === "rect") {
+        fondo += `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${color}" fill-opacity="0.55"/>`;
+        if (el.suelo === "piso") {
+          const ls = [];
+          for (let gx = x + 20; gx < x + w - 1; gx += 20) ls.push(`M${gx} ${y} V${y + h}`);
+          for (let gy = y + 20; gy < y + h - 1; gy += 20) ls.push(`M${x} ${gy} H${x + w}`);
+          fondo += `<path d="${ls.join(" ")}" stroke="#B9B1A3" stroke-width="0.8" fill="none"/>`;
+        } else {
+          const ms = [];
+          for (let gy = y + 12, f = 0; gy < y + h - 4; gy += 18, f++) for (let gx = x + 10 + (f % 2) * 9; gx < x + w - 6; gx += 18) ms.push(`M${gx - 3} ${gy + 2} L${gx - 1} ${gy - 3} M${gx} ${gy + 2} L${gx} ${gy - 4} M${gx + 3} ${gy + 2} L${gx + 1} ${gy - 3}`);
+          fondo += `<path d="${ms.join(" ")}" stroke="#3F8F4A" stroke-width="0.9" fill="none" stroke-linecap="round"/>`;
+        }
+      }
+    }
     if (el.cierre === "semi" && forma === "rect") {
       estilo = `fill="none" stroke="${el.color || "#5B5F66"}" stroke-width="3" stroke-dasharray="12 7"`;
+      if (fondo) fondo += ""; // el suelo va debajo del rayado del techo
       const cs = [];
       for (let k = 14; k < w + h; k += 14) { const x1 = x + Math.max(0, k - h), y1 = y + Math.min(h, k), x2 = x + Math.min(w, k), y2 = y + Math.max(0, k - w); cs.push(`M${x1} ${y1} L${x2} ${y2}`); }
       fondo = `<path d="${cs.join(" ")}" stroke="#8E949A" stroke-width="1" stroke-opacity="0.55" fill="none"/>` + [[x, y], [x + w, y], [x, y + h], [x + w, y + h]].map(([px, py]) => `<rect x="${px - 5}" y="${py - 5}" width="10" height="10" fill="#5B5F66"/>`).join("");
     }
+    if (el.cierre === "abierto" && forma === "rect") estilo = `fill="none" stroke="${el.color || "#5B5F66"}" stroke-width="1.6" stroke-dasharray="6 5"`;
     if (el.cierre === "balcon" && forma === "rect") {
       estilo = `fill="#FFFFFF" fill-opacity="0.001" stroke="${el.color || "#1C1E21"}" stroke-width="1.6"`;
       fondo = `<rect x="${x + 4}" y="${y + 4}" width="${Math.max(0, w - 8)}" height="${Math.max(0, h - 8)}" fill="none" stroke="${el.color || "#1C1E21"}" stroke-width="1.6"/>`;
     }
+    if ((el.suelo === "cesped" || el.suelo === "piso") && forma !== "rect") estilo = estilo.replace('fill="#FFFFFF" fill-opacity="0.001"', `fill="${el.suelo === "cesped" ? "#8FCB7E" : "#E3DDD2"}" fill-opacity="0.55"`);
     if (forma === "elipse") figura = `<ellipse cx="${cx}" cy="${cy}" rx="${w / 2}" ry="${h / 2}" ${estilo}/>`;
     else if (forma === "triangulo" || forma === "triangulo_rect") {
       const p = croquisTriangulo(forma, x, y, w, h, el.ori);
@@ -1849,6 +1869,7 @@ const CROQUIS_CERCOS = {
   reja: { nombre: "Reja completa", alto: 1.8 },
   reja_tapial: { nombre: "Reja con tapial", alto: 1.8, tapial: 0.6 },
   tejido: { nombre: "Tejido perimetral", alto: 1.8 },
+  tapial: { nombre: "Tapial", alto: 1.8, tapial: 1.8, macizo: true },
 };
 const croquisEsCerco = (e) => !!(e && e.t === "linea" && e.cerco && CROQUIS_CERCOS[e.cerco]);
 // Puntos a lo largo de la línea (recta o curva), cada "paso" unidades.
@@ -1883,6 +1904,10 @@ function croquisCercoSvg(el) {
     const cruces = pts.slice(0, -1).map((p, i) => { const q = pts[i + 1], mx = (p.x + q.x) / 2, my = (p.y + q.y) / 2, ux = (q.x - p.x) / 2, uy = (q.y - p.y) / 2, k = 3.5; return `M${f(mx - ux * 0.45 + p.nx * k)} ${f(my - uy * 0.45 + p.ny * k)} L${f(mx + ux * 0.45 - p.nx * k)} ${f(my + uy * 0.45 - p.ny * k)} M${f(mx - ux * 0.45 - p.nx * k)} ${f(my - uy * 0.45 - p.ny * k)} L${f(mx + ux * 0.45 + p.nx * k)} ${f(my + uy * 0.45 + p.ny * k)}`; }).join(" ");
     const postes = croquisCercoPuntos(el, 100).pts.map((p) => `<circle cx="${f(p.x)}" cy="${f(p.y)}" r="2.6" fill="${c}"/>`).join("");
     return `<path d="${camino}" fill="none" stroke="${c}" stroke-width="1.4"/><path d="${cruces}" fill="none" stroke="${c}" stroke-width="1"/>${postes}`;
+  }
+  if (el.cerco === "tapial") {
+    // Tapial (muro de material): franja gruesa con borde oscuro.
+    return `<path d="${camino}" fill="none" stroke="${el.color || "#5B5F66"}" stroke-width="10" stroke-linecap="butt"/><path d="${camino}" fill="none" stroke="#D3CCC0" stroke-width="6" stroke-linecap="butt"/>`;
   }
   // Reja: barrotes cruzados a la línea; con tapial, además una franja gris.
   const { pts } = croquisCercoPuntos(el, 8);

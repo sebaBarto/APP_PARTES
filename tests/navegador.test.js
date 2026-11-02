@@ -4488,7 +4488,13 @@ test("Croquis en la PC: flechas mueven, + y - cambian el tamaño, Ctrl+C / Ctrl+
     // El patio pasa a semicubierto (galería): techo con columnas, sin paredes
     await page.evaluate(() => { cq.sel = "ga"; cq.multi = []; cqRender(); });
     await page.click('[data-acc="cierre"]');
+    assert.strictEqual(await page.evaluate(() => cq.elementos.find((e) => e.id === "ga").cierre), "abierto", "primero: al aire libre");
+    await page.click('[data-acc="cierre"]');
     assert.strictEqual(await page.evaluate(() => cq.elementos.find((e) => e.id === "ga").cierre), "semi");
+    await page.click('[data-acc="suelo"]');
+    assert.strictEqual(await page.evaluate(() => cq.elementos.find((e) => e.id === "ga").suelo), "cesped");
+    await page.click('[data-acc="suelo"]');
+    assert.strictEqual(await page.evaluate(() => cq.elementos.find((e) => e.id === "ga").suelo), "piso");
     // 3D: los muebles se ven y la capa muestra lo que tapa el placard
     await page.evaluate(() => { cq.elementos = cq.elementos.filter((e) => e.tipo !== "ropero" || e.id === "pl"); cq.paginas[cq.pagina].elementos = cq.elementos; cq.sel = null; cqRender(); });
     await page.click("#cqMenuBtn");

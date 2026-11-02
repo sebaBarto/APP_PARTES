@@ -907,3 +907,27 @@ test("Vista 3D: los muebles altos (placard, heladera) tapan parte de lo que ve e
   const conGaleria = ctx.C3.analizar([...casa, { id: "ga", t: "rect", x: 0, y: 300, w: 200, h: 120, cierre: "semi" }, { id: "ba", t: "rect", x: 200, y: 50, w: 40, h: 120, cierre: "balcon" }]);
   assert.strictEqual(conGaleria.porcentaje, 100);
 });
+
+test("Tapial (tipo de pared) y suelo de césped o piso: se dibujan, el tapial tapa la vista a la altura de una persona y los sectores al aire libre no son paredes", () => {
+  const vm = require("vm");
+  const ctx = { window: {}, document: { createElement: () => ({ getContext: () => null }) }, console };
+  ctx.window = ctx;
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(raiz, "croquis-utils.js"), "utf8") + "\n;" + fs.readFileSync(path.join(raiz, "croquis-3d.js"), "utf8") + "\n;this.C3=Croquis3D;this.svg=croquisSvgElemento;this.cerco=croquisEsCerco;", ctx);
+  const tapial = { id: "tp", t: "linea", x1: 0, y1: 150, x2: 150, y2: 150, cerco: "tapial" };
+  assert.ok(ctx.cerco(tapial));
+  assert.match(ctx.svg(tapial), /stroke-width="10"/);
+  assert.match(ctx.svg({ id: "j", t: "rect", x: 0, y: 0, w: 200, h: 120, suelo: "cesped", cierre: "abierto" }), /#8FCB7E/);
+  assert.match(ctx.svg({ id: "p", t: "rect", x: 0, y: 0, w: 200, h: 120, suelo: "piso" }), /#E3DDD2/);
+  const casa = [
+    { id: "w1", t: "linea", x1: 0, y1: 0, x2: 200, y2: 0 }, { id: "w2", t: "linea", x1: 200, y1: 0, x2: 200, y2: 300 },
+    { id: "w3", t: "linea", x1: 200, y1: 300, x2: 0, y2: 300 }, { id: "w4", t: "linea", x1: 0, y1: 300, x2: 0, y2: 0 },
+    { id: "ir", t: "simbolo", tipo: "infrarrojo", x: 0, y: 0, rot: 180, esc: 1 },
+  ];
+  const a = ctx.C3.analizar([...casa, tapial]);
+  assert.strictEqual(a.detecta([1, 6.5]).length, 0, "detrás del tapial no lo ve");
+  assert.strictEqual(a.detecta([1, 2]).length, 1);
+  assert.strictEqual(a.tapados[0].mueble.id, "tp");
+  const b = ctx.C3.analizar([...casa, { id: "ja", t: "rect", x: 20, y: 20, w: 160, h: 260, cierre: "abierto", suelo: "cesped" }]);
+  assert.strictEqual(b.porcentaje, 100, "un sector al aire libre dibujado adentro no corta la vista");
+});
