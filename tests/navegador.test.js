@@ -4771,3 +4771,33 @@ test("Casa de dos plantas: la losa de arriba va solo donde hay ambientes y el ba
     await ctx.close();
   } finally { await nav.close(); }
 });
+
+test("Croquis subido al cliente: aparece en la ficha del cliente y en la búsqueda de planos (aunque no tenga PDF)", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const pedidos = [];
+  await page.route("**/api/**", (route) => {
+    const u = route.request().url();
+    pedidos.push(u);
+    const j = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("coleccion=croquis") && u.includes("aprobados=1")) return j([{ id: "abc123", titulo: "Casa Bartolozzi", cliente: "Bartolozzi Sebastian", numero_cliente: "7117", publicado: true }]);
+    if (u.includes("coleccion=croquis") && u.includes("servicio=1")) return j([{ id: "abc123", titulo: "Casa Bartolozzi", cliente: "Bartolozzi Sebastian", numero_cliente: "7117", publicado: true }]);
+    if (u.includes("coleccion=croquis") && u.includes("id=abc123")) return j({ id: "abc123", titulo: "Casa Bartolozzi", cliente: "Bartolozzi Sebastian", numero_cliente: "7117", publicado: true, dibujo: { elementos: [{ id: "a", t: "rect", x: 0, y: 0, w: 200, h: 160 }] } });
+    if (u.includes("/api/planos")) return j([]);
+    j([]);
+  });
+  await page.goto(base + "/");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { tecnicoLogueado = "Juan"; abrirFichaCliente({ nombre: "Bartolozzi Sebastian", numero_cliente: "7117" }); });
+  await page.waitForSelector('#fichaPlanoBloque [data-croquis-id="abc123"]', { timeout: 8000 });
+  assert.doesNotMatch(await page.textContent("#fichaPlanoBloque"), /No tiene plano cargado/);
+  assert.ok(pedidos.some((u) => u.includes("servicio=1") && u.includes("numero_cliente=7117")));
+  await page.click('#fichaPlanoBloque [data-croquis-id="abc123"]');
+  await page.waitForFunction(() => screens.croquis.dataset.active === "true");
+  assert.strictEqual(await page.evaluate(() => cq.soloLectura), true, "se abre solo para ver");
+  // Búsqueda de planos
+  await page.evaluate(() => { showScreen("planos"); planosCache = []; return cargarPlanos(); });
+  await page.fill("#planosBuscarInput", "bartolozzi");
+  await page.waitForSelector('#planosResultados [data-croquis-id="abc123"]', { timeout: 8000 });
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

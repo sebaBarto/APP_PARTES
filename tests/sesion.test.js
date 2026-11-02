@@ -1052,6 +1052,7 @@ test("Croquis en el servicio técnico: un croquis sin instalación no le aparece
     await datos(pedido("POST", { coleccion: "croquis" }, { accion: "guardar", titulo: "Casa Tell", cliente: "Tell", numero_cliente: "60", dibujo }, seba), r);
     const id = r.cuerpo.id;
     const ver = async (q, quien) => { const x = resFalso(); await datos(pedido("GET", { coleccion: "croquis", ...q }, null, quien), x); return x.cuerpo.map((c) => c.id); };
+    assert.deepStrictEqual(await ver({ aprobados: "1" }, luis), [], "sin aprobar, no aparece en la búsqueda");
     // Otro cliente: no aparece (antes salía en todos)
     assert.deepStrictEqual(await ver({ numero_cliente: "99", servicio: "1" }, luis), []);
     assert.deepStrictEqual(await ver({ numero_cliente: "99", servicio: "1" }, seba), []);
@@ -1068,6 +1069,8 @@ test("Croquis en el servicio técnico: un croquis sin instalación no le aparece
     assert.strictEqual(r.statusCode, 200);
     assert.deepStrictEqual(await ver({ numero_cliente: "60", servicio: "1" }, luis), [id]);
     assert.deepStrictEqual(await ver({ numero_cliente: "99", servicio: "1" }, luis), []);
+    assert.deepStrictEqual(await ver({ aprobados: "1" }, luis), [id], "aparece en la búsqueda de planos");
+    assert.deepStrictEqual(await ver({ cliente: "tell", servicio: "1" }, luis), [id], "también por el nombre del cliente");
     // Guardarlo de nuevo no le saca la aprobación; quitarlo, sí
     r = resFalso();
     await datos(pedido("POST", { coleccion: "croquis" }, { accion: "guardar", id, titulo: "Casa Tell", cliente: "Tell", numero_cliente: "60", dibujo }, seba), r);

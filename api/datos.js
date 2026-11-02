@@ -446,7 +446,7 @@ async function manejarCroquis(req, res, autorizacion, body) {
   // en la instalación, aunque no tenga el permiso de croquis en general.
   // Y cualquier técnico puede ver los planos de un cliente (para el servicio técnico).
   const porCliente = req.method === "GET" && !!(String(req.query.numero_cliente || "").replace(/\D/g, "") || String(req.query.cliente || "").trim());
-  const deInstalacion = req.method === "GET" ? !!(req.query.id || instValida(req.query.instalacion) || porCliente || req.query.vistas3d || req.query.tarjetas) : (instValida(b.instalacion) || instValida(b.instalacion_id) || b.accion === "borrar" || b.accion === "publicar" || b.accion === "compartir_3d" || b.accion === "vista3d_estado" || b.accion === "tarjeta_guardar");
+  const deInstalacion = req.method === "GET" ? !!(req.query.id || instValida(req.query.instalacion) || porCliente || req.query.vistas3d || req.query.tarjetas || req.query.aprobados) : (instValida(b.instalacion) || instValida(b.instalacion_id) || b.accion === "borrar" || b.accion === "publicar" || b.accion === "compartir_3d" || b.accion === "vista3d_estado" || b.accion === "tarjeta_guardar");
   if (!puede && !deInstalacion) { res.status(403).json({ error: "No tenés habilitados los croquis" }); return; }
   const txt = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
   const idValido = (id) => /^[a-z0-9]{6,32}$/.test(String(id || ""));
@@ -488,6 +488,12 @@ async function manejarCroquis(req, res, autorizacion, body) {
       }
       const { data } = await leerArchivoDatos(RUTA_CROQUIS_INDICE, []);
       let lista = Array.isArray(data) ? data : [];
+      // Todos los croquis aprobados para los clientes (o de instalaciones
+      // cerradas): para buscarlos junto con los planos en PDF.
+      if (req.query.aprobados) {
+        res.status(200).json(lista.filter((c) => c.cerrado || c.publicado).map((c) => ({ id: c.id, titulo: c.titulo, cliente: c.cliente, numero_cliente: c.numero_cliente, cerrado: !!c.cerrado, publicado: !!c.publicado, actualizado: c.actualizado })));
+        return;
+      }
       // Pedido de una instalación o un cliente puntual (o sin el permiso general):
       // solo los de esa instalación y los del mismo cliente.
       if (!puede || porCliente || instValida(req.query.instalacion)) {

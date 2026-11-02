@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.39.2";
+const APP_VERSION = "4.39.3";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -2134,11 +2134,14 @@ async function abrirPlanoVisioCliente(numero) {
   const blob = await res.blob();
   window.open(URL.createObjectURL(blob), "_blank");
 }
-async function croquisDelCliente(numero) {
+async function croquisDelCliente(numero, nombre) {
   const num = String(numero || "").replace(/\D/g, "").replace(/^0+/, "");
-  if (!num) return [];
+  if (!num && !nombre) return [];
   try {
-    const r = await fetch(`/api/datos?coleccion=croquis&servicio=1&numero_cliente=${encodeURIComponent(num)}`, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+    const q = new URLSearchParams({ coleccion: "croquis", servicio: "1" });
+    if (num) q.set("numero_cliente", num);
+    if (nombre) q.set("cliente", nombre);
+    const r = await fetch(`/api/datos?${q}`, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
     const d = await r.json();
     if (!r.ok || !Array.isArray(d)) return [];
     // Primero los de instalaciones cerradas (lo que quedó instalado), lo más nuevo arriba.
@@ -2158,7 +2161,7 @@ verPlanoClienteBtn.addEventListener("click", async () => {
   const iconoOriginal = verPlanoClienteBtn.innerHTML;
   verPlanoClienteBtn.disabled = true;
   try {
-    const croquis = await croquisDelCliente(numeroClienteActivo);
+    const croquis = await croquisDelCliente(numeroClienteActivo, (document.getElementById("f_cliente") || {}).value || "");
     if (!croquis.length) { await abrirPlanoVisioCliente(numeroClienteActivo); return; }
     const capa = document.createElement("div");
     capa.className = "cq-datos-capa";
@@ -2347,16 +2350,20 @@ async function abrirFichaCliente(c) {
       bloque.innerHTML = `<p class="dash-subtitulo">SIM instalada</p>${sims.length ? sims.map((x) => `<div class="ficha-sim"><span class="sim-card-dot" style="background:${COLORES_COMPANIA_SIM[x.empresa] || "#8A9089"};"></span><b>${escapeHtml(x.numero)}</b> · ${escapeHtml(x.empresa || "")}${x.estado_linea ? ` · ${escapeHtml(x.estado_linea)}` : ""}${x.fecha_activacion ? `<small> desde ${escapeHtml(x.fecha_activacion)}</small>` : ""}</div>`).join("") : '<p class="list-status">No tiene una SIM registrada.</p>'}`;
     } catch (e) { if (bloque) bloque.innerHTML = '<p class="dash-subtitulo">SIM instalada</p><p class="list-status">No se pudo consultar.</p>'; }
   })();
-  // Plano
+  // Plano: el PDF de Visio y los croquis hechos con la APP (los subidos al cliente o de instalaciones cerradas)
   (async () => {
     const bloque = document.getElementById("fichaPlanoBloque");
     try {
-      await cargarPlanos();
+      const [, croquis] = await Promise.all([cargarPlanos(), croquisDelCliente(c.numero_cliente, c.nombre)]);
       if (fichaClienteActual !== c || !bloque) return;
       const planos = (planosCache || []).filter((p) => (c.numero_cliente && p.numero_cliente && normalizarNumeroCliente(p.numero_cliente) === normalizarNumeroCliente(String(c.numero_cliente))) || (p.nombre_cliente && normalizeText(p.nombre_cliente) === normalizeText(c.nombre)))
         .sort((a, b) => a.indice_plano - b.indice_plano);
-      bloque.innerHTML = `<p class="dash-subtitulo">Plano</p>${planos.length ? `<div class="ficha-planos">${planos.map((p, i) => `<button type="button" class="btn btn-secondary btn-small" data-nombre="${escapeHtml(p.nombre)}">${planos.length > 1 ? "Plano " + (i + 1) : "Ver plano"}</button>`).join("")}</div>` : '<p class="list-status">No tiene plano cargado.</p>'}`;
+      const botonesCroquis = croquis.slice(0, 6).map((x) => `<button type="button" class="btn btn-secondary btn-small" data-croquis-id="${escapeHtml(x.id)}">${cqIc(x.cerrado ? "candado" : "plano")} ${escapeHtml(x.titulo || "Croquis")}</button>`).join("");
+      bloque.innerHTML = `<p class="dash-subtitulo">Plano</p>${planos.length || croquis.length ? `<div class="ficha-planos">${planos.map((p, i) => `<button type="button" class="btn btn-secondary btn-small" data-nombre="${escapeHtml(p.nombre)}">${planos.length > 1 ? "Plano " + (i + 1) : "Ver plano"}</button>`).join("")}${botonesCroquis}</div>` : '<p class="list-status">No tiene plano cargado.</p>'}`;
       bloque.querySelectorAll("button[data-nombre]").forEach((b) => b.addEventListener("click", () => abrirPlano(b.dataset.nombre, b)));
+      bloque.querySelectorAll("button[data-croquis-id]").forEach((b) => b.addEventListener("click", async () => {
+        try { await abrirCroquisSoloVer(b.dataset.croquisId, "fichaCliente"); } catch (err) { showToast(err.message); }
+      }));
     } catch (e) { if (bloque) bloque.innerHTML = '<p class="dash-subtitulo">Plano</p><p class="list-status">No se pudo consultar.</p>'; }
   })();
 }
@@ -14662,8 +14669,11 @@ tilePlanosBtn.addEventListener("click", () => {
 });
 volverDePlanosBtn.addEventListener("click", () => showScreen("home"));
 
+let croquisAprobadosCache = null;
 async function cargarPlanos() {
   const headers = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+  // Croquis de la APP subidos al cliente (se buscan junto con los PDF).
+  fetch("/api/datos?coleccion=croquis&aprobados=1", { headers, cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).then((l) => { croquisAprobadosCache = Array.isArray(l) ? l : []; if (typeof renderResultadosPlanos === "function" && planosBuscarInput && planosBuscarInput.value.trim()) renderResultadosPlanos(); }).catch(() => {});
   if (!clientesParaPlanosCache) {
     try {
       const resClientes = await fetch("/api/datos?coleccion=clientes", { headers, cache: "no-store" });
@@ -14721,6 +14731,9 @@ function renderResultadosPlanos() {
     (p.nombre_cliente && normalizeText(p.nombre_cliente).includes(busqueda)) ||
     (p.numero_cliente && p.numero_cliente.includes(busqueda))
   );
+  // Los croquis de la APP subidos al cliente también aparecen.
+  (croquisAprobadosCache || []).filter((x) => normalizeText(x.cliente || "").includes(busqueda) || normalizeText(x.titulo || "").includes(busqueda) || String(x.numero_cliente || "").replace(/\D/g, "").replace(/^0+/, "").includes(busqueda.replace(/^0+/, "")))
+    .forEach((x) => coincidencias.push({ croquis: x, nombre: "croquis:" + x.id, nombre_cliente: x.cliente || x.titulo, numero_cliente: x.numero_cliente ? normalizarNumeroCliente(x.numero_cliente) : "", indice_plano: 100 }));
   if (coincidencias.length === 0) {
     planosStatus.textContent = "Ningún plano coincide con esa búsqueda.";
     return;
@@ -14747,10 +14760,11 @@ function renderResultadosPlanos() {
     card.className = "sim-card";
     const tituloPrincipal = primero.nombre_cliente || primero.nombre;
     const subtitulo = primero.nombre_cliente ? `N° de cliente ${escapeHtml(primero.numero_cliente)}` : "PDF";
-    const botones = planosDelCliente.map((p, i) =>
-      `<button type="button" class="btn-small btn-secondary btn-secondary-en-card" style="width:auto;" data-nombre="${escapeHtml(p.nombre)}">${planosDelCliente.length > 1 ? `Plano ${i + 1}` : "Ver"}</button>`
-    ).join(" ") + (permisosDelTecnico(tecnicoLogueado).croquis
-      ? planosDelCliente.map((p, i) => ` <button type="button" class="btn-small btn-secondary btn-secondary-en-card" style="width:auto;" data-croquis="${escapeHtml(p.nombre)}" title="Abrir un croquis con este plano de base para dibujar encima">Croquis${planosDelCliente.length > 1 ? " " + (i + 1) : ""}</button>`).join("") : "");
+    const pdfs = planosDelCliente.filter((p) => !p.croquis), croquisCli = planosDelCliente.filter((p) => p.croquis);
+    const botones = pdfs.map((p, i) =>
+      `<button type="button" class="btn-small btn-secondary btn-secondary-en-card" style="width:auto;" data-nombre="${escapeHtml(p.nombre)}">${pdfs.length > 1 ? `Plano ${i + 1}` : "Ver"}</button>`
+    ).join(" ") + croquisCli.map((p) => ` <button type="button" class="btn-small btn-secondary btn-secondary-en-card" style="width:auto;" data-croquis-id="${escapeHtml(p.croquis.id)}">Croquis: ${escapeHtml(p.croquis.titulo || "ver")}</button>`).join("") + (permisosDelTecnico(tecnicoLogueado).croquis
+      ? pdfs.map((p, i) => ` <button type="button" class="btn-small btn-secondary btn-secondary-en-card" style="width:auto;" data-croquis="${escapeHtml(p.nombre)}" title="Abrir un croquis con este plano de base para dibujar encima">Croquis${planosDelCliente.length > 1 ? " " + (i + 1) : ""}</button>`).join("") : "");
     card.innerHTML = `
       <div style="flex:1;">
         <div class="sim-card-numero">${escapeHtml(tituloPrincipal)}</div>
@@ -14764,6 +14778,10 @@ function renderResultadosPlanos() {
         abrirPlano(btn.dataset.nombre, btn);
       });
     });
+    card.querySelectorAll("button[data-croquis-id]").forEach((btn) => btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      try { await abrirCroquisSoloVer(btn.dataset.croquisId, "planos"); } catch (err) { showToast(err.message); }
+    }));
     card.querySelectorAll("button[data-croquis]").forEach((btn) => btn.addEventListener("click", async (e) => {
       e.stopPropagation();
       const carga = cqCapaCargando("Preparando el plano…", "Se pone de base para dibujar encima.");
