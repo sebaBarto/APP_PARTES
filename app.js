@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.38.0";
+const APP_VERSION = "4.38.1";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -2138,7 +2138,7 @@ async function croquisDelCliente(numero) {
   const num = String(numero || "").replace(/\D/g, "").replace(/^0+/, "");
   if (!num) return [];
   try {
-    const r = await fetch(`/api/datos?coleccion=croquis&numero_cliente=${encodeURIComponent(num)}`, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+    const r = await fetch(`/api/datos?coleccion=croquis&servicio=1&numero_cliente=${encodeURIComponent(num)}`, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
     const d = await r.json();
     if (!r.ok || !Array.isArray(d)) return [];
     // Primero los de instalaciones cerradas (lo que quedó instalado), lo más nuevo arriba.
@@ -10615,7 +10615,7 @@ async function instPlanoAbrir(id) {
   try {
     const d = await instPlanoTraer(id);
     const dib = d.dibujo || {};
-    cqAbrirEditor({ id: d.id, instalacion: d.instalacion || String(instalacionActivaId), soloLectura: !!d.cerrado, volverA: "instalacion", titulo: d.titulo, cliente: d.cliente, numero_cliente: d.numero_cliente, direccion: d.direccion, autor: d.autor, actualizado: d.actualizado, elementos: dib.elementos || [], fondo: dib.fondo || null, paginas: dib.paginas || null, medidas: !!dib.medidas });
+    cqAbrirEditor({ id: d.id, instalacion: d.instalacion || String(instalacionActivaId), soloLectura: !!d.cerrado, volverA: "instalacion", publicado: !!d.publicado, titulo: d.titulo, cliente: d.cliente, numero_cliente: d.numero_cliente, direccion: d.direccion, autor: d.autor, actualizado: d.actualizado, elementos: dib.elementos || [], fondo: dib.fondo || null, paginas: dib.paginas || null, medidas: !!dib.medidas });
   } catch (err) { showToast("No se pudo abrir: " + err.message); }
 }
 function instPlanoNuevo(paginas, titulo) {
@@ -15640,7 +15640,7 @@ function cqTodosLosElementos() { cqSyncPagina(); return cq.paginas.flatMap((p) =
 function cqGuardarBorrador() {
   try {
     const d = cqDibujoCompleto();
-    localStorage.setItem(CQ_BORRADOR, JSON.stringify({ id: cq.id, instalacion: cq.instalacion || "", titulo: cq.titulo, cliente: cq.cliente, numero_cliente: cq.numero_cliente, direccion: cq.direccion, autor: cq.autor, elementos: d.elementos, fondo: d.fondo || null, paginas: d.paginas, medidas: !!cq.medidas, cambios: cq.cambios }));
+    localStorage.setItem(CQ_BORRADOR, JSON.stringify({ id: cq.id, instalacion: cq.instalacion || "", titulo: cq.titulo, cliente: cq.cliente, numero_cliente: cq.numero_cliente, direccion: cq.direccion, autor: cq.autor, publicado: !!cq.publicado, elementos: d.elementos, fondo: d.fondo || null, paginas: d.paginas, medidas: !!cq.medidas, cambios: cq.cambios }));
   } catch (e) { /* nada */ }
 }
 function cqMemoria() { cq.pasado.push(JSON.stringify(cq.elementos)); if (cq.pasado.length > 80) cq.pasado.shift(); cq.futuro = []; cq.cambios = true; }
@@ -17048,6 +17048,23 @@ async function cqGuardar() {
     return false;
   }
 }
+// "Subir al cliente": hasta que no se aprueba, el croquis no aparece en el
+// servicio técnico (los técnicos ven solo el PDF del cliente y lo aprobado).
+async function cqPublicar(on) {
+  if (on) {
+    if (!cq.numero_cliente && !confirm("Este croquis no tiene número de cliente: los técnicos lo van a encontrar solo por el nombre. ¿Subirlo igual?")) return;
+    if (!confirm(`¿Subir este croquis al cliente ${cq.cliente || cq.numero_cliente}? Desde ahí lo ven los técnicos cuando abren sus planos en el servicio técnico.`)) return;
+  }
+  if (!cq.id || cq.cambios) { if (!(await cqGuardar())) return; }
+  try {
+    const r = await fetch("/api/datos?coleccion=croquis", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ accion: "publicar", id: cq.id, publicar: on }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || "HTTP " + r.status);
+    cq.publicado = on;
+    cqGuardarBorrador();
+    showToast(on ? "Listo: el croquis quedó subido al cliente. Los técnicos lo ven desde el servicio técnico." : "Quitado: los técnicos ya no lo ven.");
+  } catch (err) { showToast("No se pudo: " + err.message); }
+}
 function cqDatosExport() { return { titulo: cq.titulo, cliente: cq.cliente, numero_cliente: cq.numero_cliente, direccion: cq.direccion, autor: cq.autor || tecnicoLogueado || "", actualizado: cq.actualizado || new Date().toISOString(), dibujo: cqDibujoCompleto() }; }
 async function cqExportar(formato) {
   // El PDF lleva todas las páginas; la imagen y el SVG, la página que se está viendo.
@@ -17076,6 +17093,7 @@ cqEl("cqMenuBtn").addEventListener("click", () => {
     <button type="button" class="btn btn-primary" data-m="guardar">Guardar</button>
     <button type="button" class="btn btn-secondary" data-m="pdf">Compartir / descargar PDF</button>
     <button type="button" class="btn btn-secondary" data-m="ver3d">${cqIc("cubo")} Ver y editar en 3D / mandar al cliente</button>
+    ${cq.cliente || cq.numero_cliente ? `<button type="button" class="btn btn-secondary" data-m="publicar">${cq.publicado ? cqIc("abierto") + " Quitar del cliente (que no lo vean los técnicos)" : cqIc("compartir") + " Subir al cliente (aprobado: lo ven los técnicos)"}</button>` : ""}
     <button type="button" class="btn btn-secondary" data-m="png">Imagen (PNG)</button>
     <button type="button" class="btn btn-secondary" data-m="svg">Archivo editable (SVG, se abre en Visio)</button>
     <div class="cq-menu-fila"><button type="button" class="btn btn-secondary" data-m="foto">${cqIc("galeria")} Boceto desde galería</button><button type="button" class="btn btn-secondary" data-m="camara">${cqIc("camara")} Sacar foto</button></div>
@@ -17098,6 +17116,7 @@ cqEl("cqMenuBtn").addEventListener("click", () => {
     capa.remove();
     if (m === "guardar") cqGuardar();
     if (m === "ver3d") cqVer3D();
+    if (m === "publicar") cqPublicar(!cq.publicado);
     if (m === "escaleras") {
       const r = croquisReconocerEscaleras(cq.elementos);
       if (!r.escaleras) { showToast("No encontré escaleras dibujadas con líneas en esta página."); }
@@ -17598,7 +17617,7 @@ function cqEscalaPlano() {
 
 // ---------- Lista ----------
 function cqAbrirEditor(datos) {
-  Object.assign(cq, { id: "", instalacion: "", soloLectura: false, soloVer: false, volverA: "", titulo: "", cliente: "", numero_cliente: "", direccion: "", autor: "", actualizado: "", elementos: [], fondo: null, paginas: null, pagina: 0, medidas: false, plantilla: null, verFondo: true, sel: null, multi: [], modoMulti: false, cadena: null, pasado: [], futuro: [], cambios: false }, datos || {});
+  Object.assign(cq, { id: "", instalacion: "", soloLectura: false, soloVer: false, volverA: "", titulo: "", cliente: "", numero_cliente: "", direccion: "", autor: "", actualizado: "", publicado: false, elementos: [], fondo: null, paginas: null, pagina: 0, medidas: false, plantilla: null, verFondo: true, sel: null, multi: [], modoMulti: false, cadena: null, pasado: [], futuro: [], cambios: false }, datos || {});
   // Páginas: los croquis viejos tienen una sola.
   if (!Array.isArray(cq.paginas) || !cq.paginas.length) cq.paginas = [{ nombre: "Página 1", elementos: cq.elementos || [], fondo: cq.fondo || null }];
   cq.paginas = cq.paginas.map((p, i) => ({ nombre: p.nombre || `Página ${i + 1}`, elementos: Array.isArray(p.elementos) ? p.elementos : [], fondo: p.fondo || null }));
@@ -17647,7 +17666,7 @@ function cqRenderLista() {
   };
   cqEl("cqLista").querySelectorAll("[data-borrador]").forEach((b) => b.addEventListener("click", () => cqAbrirEditor({ ...borrador, cambios: true })));
   cqEl("cqLista").querySelectorAll("[data-abrir]").forEach((b) => b.addEventListener("click", async () => {
-    try { const d = await traer(lista[Number(b.dataset.abrir)]); cqAbrirEditor({ id: d.id, instalacion: d.instalacion || "", soloLectura: !!d.cerrado, titulo: d.titulo, cliente: d.cliente, numero_cliente: d.numero_cliente, direccion: d.direccion, autor: d.autor, actualizado: d.actualizado, elementos: (d.dibujo && d.dibujo.elementos) || [], fondo: (d.dibujo && d.dibujo.fondo) || null, paginas: (d.dibujo && d.dibujo.paginas) || null, medidas: !!(d.dibujo && d.dibujo.medidas) }); }
+    try { const d = await traer(lista[Number(b.dataset.abrir)]); cqAbrirEditor({ id: d.id, instalacion: d.instalacion || "", soloLectura: !!d.cerrado, publicado: !!d.publicado, titulo: d.titulo, cliente: d.cliente, numero_cliente: d.numero_cliente, direccion: d.direccion, autor: d.autor, actualizado: d.actualizado, elementos: (d.dibujo && d.dibujo.elementos) || [], fondo: (d.dibujo && d.dibujo.fondo) || null, paginas: (d.dibujo && d.dibujo.paginas) || null, medidas: !!(d.dibujo && d.dibujo.medidas) }); }
     catch (err) { showToast("No se pudo abrir: " + err.message); }
   }));
   cqEl("cqLista").querySelectorAll("[data-pdf]").forEach((b) => b.addEventListener("click", async () => {

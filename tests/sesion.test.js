@@ -1030,3 +1030,52 @@ test("Cámaras (identifica/reconoce/detecta según lente y MP), por dónde entra
   assert.ok(!s2.avisos.some((x) => x.tipo === "senal"), "con un repetidor en el medio, bien");
   assert.ok(ctx.C3.analizar([...larga, { id: "mi", t: "simbolo", tipo: "magnetico", x: 1980, y: 100, inal: true }]).avisos.some((x) => x.tipo === "hub"));
 });
+
+test("Croquis en el servicio técnico: un croquis sin instalación no le aparece a otro cliente, y solo se ve después de «Subir al cliente» (o con la instalación cerrada)", async () => {
+  const fetchViejo = global.fetch;
+  const archivos = {};
+  global.fetch = async (url, op = {}) => {
+    const u = String(url);
+    const ruta = (u.match(/contents\/([^?]+)/) || [])[1];
+    if (ruta === "tecnicos.json") return new Response(JSON.stringify({ content: Buffer.from(JSON.stringify([{ nombre: "Seba", permisos: { croquis: true } }, { nombre: "Luis", permisos: {} }])).toString("base64"), encoding: "base64", sha: "t" }));
+    if (ruta) {
+      if (op.method === "PUT") { archivos[ruta] = JSON.parse(Buffer.from(JSON.parse(op.body).content, "base64").toString("utf-8")); return new Response("{}", { status: 200 }); }
+      if (!archivos[ruta]) return new Response("{}", { status: 404 });
+      return new Response(JSON.stringify({ sha: "s", encoding: "base64", content: Buffer.from(JSON.stringify(archivos[ruta])).toString("base64") }));
+    }
+    return new Response("[]");
+  };
+  try {
+    const seba = crearSesion({ nombre: "Seba", rol: "tecnico" }), luis = crearSesion({ nombre: "Luis", rol: "tecnico" });
+    const dibujo = { v: 1, elementos: [{ id: "a1", t: "rect", x: 0, y: 0, w: 100, h: 80 }] };
+    let r = resFalso();
+    await datos(pedido("POST", { coleccion: "croquis" }, { accion: "guardar", titulo: "Casa Tell", cliente: "Tell", numero_cliente: "60", dibujo }, seba), r);
+    const id = r.cuerpo.id;
+    const ver = async (q, quien) => { const x = resFalso(); await datos(pedido("GET", { coleccion: "croquis", ...q }, null, quien), x); return x.cuerpo.map((c) => c.id); };
+    // Otro cliente: no aparece (antes salía en todos)
+    assert.deepStrictEqual(await ver({ numero_cliente: "99", servicio: "1" }, luis), []);
+    assert.deepStrictEqual(await ver({ numero_cliente: "99", servicio: "1" }, seba), []);
+    // Su cliente, pero sin aprobar: tampoco
+    assert.deepStrictEqual(await ver({ numero_cliente: "60", servicio: "1" }, luis), []);
+    assert.deepStrictEqual(await ver({ numero_cliente: "60" }, luis), [], "sin el permiso de croquis tampoco, aunque no diga servicio");
+    assert.deepStrictEqual(await ver({ numero_cliente: "60" }, seba), [id], "quien dibuja sí lo ve (para comparar propuestas)");
+    // Luis no lo puede subir (no es el autor); Seba sí
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "croquis" }, { accion: "publicar", id }, luis), r);
+    assert.strictEqual(r.statusCode, 403);
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "croquis" }, { accion: "publicar", id }, seba), r);
+    assert.strictEqual(r.statusCode, 200);
+    assert.deepStrictEqual(await ver({ numero_cliente: "60", servicio: "1" }, luis), [id]);
+    assert.deepStrictEqual(await ver({ numero_cliente: "99", servicio: "1" }, luis), []);
+    // Guardarlo de nuevo no le saca la aprobación; quitarlo, sí
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "croquis" }, { accion: "guardar", id, titulo: "Casa Tell", cliente: "Tell", numero_cliente: "60", dibujo }, seba), r);
+    assert.deepStrictEqual(await ver({ numero_cliente: "60", servicio: "1" }, luis), [id]);
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "croquis" }, { accion: "publicar", id, publicar: false }, seba), r);
+    assert.deepStrictEqual(await ver({ numero_cliente: "60", servicio: "1" }, luis), []);
+  } finally {
+    global.fetch = fetchViejo;
+  }
+});

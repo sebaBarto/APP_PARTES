@@ -446,7 +446,7 @@ async function manejarCroquis(req, res, autorizacion, body) {
   // en la instalación, aunque no tenga el permiso de croquis en general.
   // Y cualquier técnico puede ver los planos de un cliente (para el servicio técnico).
   const porCliente = req.method === "GET" && !!(String(req.query.numero_cliente || "").replace(/\D/g, "") || String(req.query.cliente || "").trim());
-  const deInstalacion = req.method === "GET" ? !!(req.query.id || instValida(req.query.instalacion) || porCliente || req.query.vistas3d || req.query.tarjetas) : (instValida(b.instalacion) || instValida(b.instalacion_id) || b.accion === "borrar" || b.accion === "compartir_3d" || b.accion === "vista3d_estado" || b.accion === "tarjeta_guardar");
+  const deInstalacion = req.method === "GET" ? !!(req.query.id || instValida(req.query.instalacion) || porCliente || req.query.vistas3d || req.query.tarjetas) : (instValida(b.instalacion) || instValida(b.instalacion_id) || b.accion === "borrar" || b.accion === "publicar" || b.accion === "compartir_3d" || b.accion === "vista3d_estado" || b.accion === "tarjeta_guardar");
   if (!puede && !deInstalacion) { res.status(403).json({ error: "No tenés habilitados los croquis" }); return; }
   const txt = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
   const idValido = (id) => /^[a-z0-9]{6,32}$/.test(String(id || ""));
@@ -495,7 +495,12 @@ async function manejarCroquis(req, res, autorizacion, body) {
         const num = String(req.query.numero_cliente || "").replace(/\D/g, "").replace(/^0+/, "");
         const norm = (v) => String(v || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
         const cli = norm(req.query.cliente);
-        lista = lista.filter((c) => String(c.instalacion || "") === inst || (num && String(c.numero_cliente || "").replace(/\D/g, "").replace(/^0+/, "") === num) || (cli && norm(c.cliente) === cli));
+        // Desde el servicio técnico (o sin el permiso de croquis) solo se ven los
+        // planos aprobados para el cliente ("subidos") o los de instalaciones
+        // cerradas: un croquis a medio dibujar no le aparece a nadie más.
+        const soloAprobados = !!req.query.servicio || !puede;
+        const delCliente = (c) => (num && String(c.numero_cliente || "").replace(/\D/g, "").replace(/^0+/, "") === num) || (cli && norm(c.cliente) === cli);
+        lista = lista.filter((c) => (inst && String(c.instalacion || "") === inst) || (delCliente(c) && (!soloAprobados || c.cerrado || c.publicado)));
       }
       res.status(200).json(lista);
       return;
@@ -616,6 +621,7 @@ async function manejarCroquis(req, res, autorizacion, body) {
       };
       if (instalacion) registro.instalacion = instalacion;
       if (ant && ant.cerrado) { registro.cerrado = true; registro.cerrado_en = ant.cerrado_en; }
+      if (ant && ant.publicado) { registro.publicado = true; registro.publicado_por = ant.publicado_por; registro.publicado_en = ant.publicado_en; }
       const r1 = await escribirArchivoDatos(ruta, registro, previo.sha, `Croquis ${registro.titulo} — ${autorizacion.nombre || "admin"}`);
       if (!r1.ok) { res.status(502).json({ error: "No se pudo guardar el croquis" }); return; }
       const paginas = Array.isArray(dibujo.paginas) ? dibujo.paginas : null;
@@ -631,6 +637,31 @@ async function manejarCroquis(req, res, autorizacion, body) {
         if (r2.status !== 409 && r2.status !== 422) break;
       }
       res.status(200).json({ ok: true, id, actualizado: ahora, aviso: "Se guardó, pero puede tardar en aparecer en la lista" });
+      return;
+    }
+    if (b.accion === "publicar") {
+      // "Subir al cliente": quien lo dibujó (o la oficina) aprueba que el
+      // croquis lo vean los técnicos desde el servicio técnico.
+      if (!idValido(b.id)) { res.status(400).json({ error: "Id inválido" }); return; }
+      const ruta = `croquis/${b.id}.json`;
+      const previo = await leerArchivoDatos(ruta, null);
+      if (!previo.data) { res.status(404).json({ error: "Ese croquis no existe (guardalo primero)" }); return; }
+      if (!esAdmin && previo.data.autor !== autorizacion.nombre) { res.status(403).json({ error: "Solo lo puede subir al cliente quien lo dibujó, o la oficina" }); return; }
+      const on = b.publicar !== false;
+      const reg = { ...previo.data };
+      if (on) { reg.publicado = true; reg.publicado_por = autorizacion.nombre || "Oficina"; reg.publicado_en = new Date().toISOString(); } else { delete reg.publicado; delete reg.publicado_por; delete reg.publicado_en; }
+      const r1 = await escribirArchivoDatos(ruta, reg, previo.sha, `Croquis ${reg.titulo} — ${on ? "subido al cliente" : "quitado del cliente"}`);
+      if (!r1.ok) { res.status(502).json({ error: "No se pudo cambiar" }); return; }
+      for (let intento = 0; intento < 4; intento++) {
+        const { data, sha } = await leerArchivoDatos(RUTA_CROQUIS_INDICE, []);
+        const lista = Array.isArray(data) ? data : [];
+        const x = lista.find((c) => c.id === b.id);
+        if (!x) break;
+        if (on) { x.publicado = true; x.publicado_por = reg.publicado_por; x.publicado_en = reg.publicado_en; } else { delete x.publicado; delete x.publicado_por; delete x.publicado_en; }
+        const r2 = await escribirArchivoDatos(RUTA_CROQUIS_INDICE, lista, sha, `Índice de croquis — ${on ? "sube" : "quita"} ${b.id}`);
+        if (r2.ok || (r2.status !== 409 && r2.status !== 422)) break;
+      }
+      res.status(200).json({ ok: true, publicado: on });
       return;
     }
     if (b.accion === "borrar") {
