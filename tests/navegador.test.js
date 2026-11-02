@@ -4713,3 +4713,29 @@ test("Lista de elementos (elegir uno lo selecciona y lo centra), capas de alarma
     await ctx.close();
   } finally { await nav.close(); }
 });
+
+test("Paletas ordenadas por uso: lo que más se pone queda primero (croquis y 3D)", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route("**/api/**", (r) => r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+  await page.goto(base + "/");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { localStorage.removeItem("croquis_uso"); tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); cqAbrirEditor({ titulo: "Casa", elementos: [] }); });
+  const primeros = () => page.$$eval("#cqSimbolos [data-simbolo]", (b) => b.slice(0, 3).map((x) => x.dataset.simbolo));
+  await page.click('[data-herr="simbolos"]');
+  const antes = await primeros();
+  assert.strictEqual(antes[0], Object.keys(await page.evaluate(() => Object.fromEntries(Object.entries(CROQUIS_SIMBOLOS).filter(([, s]) => s.cat === "equipo"))))[0], "sin uso: el orden de siempre");
+  // Se ponen 3 cámaras y 2 magnéticos
+  const r = await page.evaluate(() => { const b = cqSvg.getBoundingClientRect(); return { x: b.left + 100, y: b.top + 100 }; });
+  for (const [tipo, n] of [["camara_ip", 3], ["magnetico", 2]]) {
+    for (let i = 0; i < n; i++) {
+      await page.click('[data-herr="simbolos"]');
+      await page.click(`#cqSimbolos [data-simbolo="${tipo}"]`);
+      await page.mouse.click(r.x + i * 40, r.y + (tipo === "camara_ip" ? 0 : 80));
+    }
+  }
+  await page.click('[data-herr="simbolos"]');
+  assert.deepStrictEqual((await primeros()).slice(0, 2), ["camara_ip", "magnetico"]);
+  assert.deepStrictEqual(await page.evaluate(() => croquisOrdenarPorUso(["humo", "magnetico", "camara_ip"])), ["camara_ip", "magnetico", "humo"]);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

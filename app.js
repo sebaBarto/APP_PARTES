@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.39.0";
+const APP_VERSION = "4.39.1";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -15815,9 +15815,12 @@ function cqRenderPaleta() {
   // "Repetir": se pueden poner varios seguidos (ej. 6 magnéticos) sin volver a elegir.
   const repetir = `<button type="button" class="cq-repetir${cq.repetir ? " activo" : ""}" data-repetir="1" title="Poner varios seguidos">${cqIc("repetir")}<span>${cq.repetir ? "Repetir: sí" : "Repetir"}</span></button>`;
   const buscar = `<input type="search" class="cq-pal-buscar" placeholder="Buscar…" aria-label="Buscar en la lista" value="${escapeHtml(cq.buscarPaleta || "")}">`;
-  caja.innerHTML = buscar + repetir + pestanas + Object.entries(CROQUIS_SIMBOLOS).filter(([, s]) => s.cat === (cq.paleta || "equipo")).map(([k, s]) => {
-    const r = Math.max(28, s.r + 4);
-    return `<button type="button" data-simbolo="${k}" class="${cq.simboloElegido === k && cq.herr === "simbolo" ? "activo" : ""}"><svg viewBox="${s.vb || `${-r} ${-r} ${r * 2} ${r * 2}`}">${croquisSimboloSvg(k)}</svg><span>${s.nombre}</span></button>`;
+  // Lo más usado, primero (lo que nunca se puso queda en su orden de siempre).
+  const uso = croquisUso();
+  const claves = croquisOrdenarPorUso(Object.keys(CROQUIS_SIMBOLOS).filter((k) => CROQUIS_SIMBOLOS[k].cat === (cq.paleta || "equipo")));
+  caja.innerHTML = buscar + repetir + pestanas + claves.map((k) => {
+    const s = CROQUIS_SIMBOLOS[k], r = Math.max(28, s.r + 4);
+    return `<button type="button" data-simbolo="${k}" class="${cq.simboloElegido === k && cq.herr === "simbolo" ? "activo" : ""}${uso[k] ? " cq-usado" : ""}"><svg viewBox="${s.vb || `${-r} ${-r} ${r * 2} ${r * 2}`}">${croquisSimboloSvg(k)}</svg><span>${s.nombre}</span></button>`;
   }).join("");
   if (cq.paleta === "obra") {
     // Cercos: se trazan como una pared (con la herramienta Pared).
@@ -16381,6 +16384,7 @@ cqSvg.addEventListener("pointerdown", (e) => {
     cqMemoria();
     const el = { id: cqId(), t: "simbolo", tipo: cq.simboloElegido, x: cqSnap(mx), y: cqSnap(my), rot: 0, esc: 1 };
     cq.elementos.push(el);
+    croquisUsoSumar(el.tipo);
     if (cq.repetir) {
       // Repetir: queda la misma herramienta para poner otro igual.
       cqImanSimbolo(el);

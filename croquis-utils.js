@@ -16,7 +16,7 @@
 //   simbolo { tipo, x, y, rot, esc, color?, esp? }  equipos y objetos de obra
 
 // Tiene que ser igual a APP_VERSION de app.js (si no, la app recarga).
-const CROQUIS_UTILS_VERSION = "4.39.0";
+const CROQUIS_UTILS_VERSION = "4.39.1";
 const CROQUIS_GRILLA = 20;
 
 // Cada símbolo se dibuja centrado en 0,0 con dib(color). "cat" separa los
@@ -2048,6 +2048,19 @@ const CROQUIS_CAPAS = {
   camaras: { nombre: "Cámaras y video (cámaras, grabador, monitor)", z: 31 },
   textos: { nombre: "Textos, tablas y medidas", z: 40 },
 };
+// Lo más usado primero: cuántas veces se puso cada equipo u objeto (en este
+// celular o PC). Las paletas del croquis y del 3D se ordenan con esto.
+const CROQUIS_USO_KEY = "croquis_uso";
+function croquisUso() { try { return JSON.parse(localStorage.getItem(CROQUIS_USO_KEY) || "{}") || {}; } catch (e) { return {}; } }
+function croquisUsoSumar(clave) {
+  if (!clave) return;
+  try { const u = croquisUso(); u[clave] = (u[clave] || 0) + 1; localStorage.setItem(CROQUIS_USO_KEY, JSON.stringify(u)); } catch (e) { /* sin almacenamiento: queda el orden de siempre */ }
+}
+// Ordena claves por uso (las que nunca se usaron quedan en su orden de siempre).
+function croquisOrdenarPorUso(claves) {
+  const u = croquisUso();
+  return claves.map((k, i) => ({ k, i, n: u[k] || 0 })).sort((a, b) => b.n - a.n || a.i - b.i).map((x) => x.k);
+}
 // Equipos de video (cámaras, grabador, monitor, videoportero): capa aparte.
 function croquisEsVideo(tipo) { return /^camara/.test(tipo || "") || ["dvr", "monitor", "videoportero", "switch_red"].includes(tipo); }
 function croquisCapaDe(el) {

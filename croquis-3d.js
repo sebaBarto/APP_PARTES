@@ -2746,6 +2746,7 @@ function iniciarVisor3D(datos, opciones) {
     }
   };
   const nuevoEquipo = (preset) => {
+    croquisUsoSumar(preset);
     const { tipo, ...marcas } = croquis3dDePreset(preset);
     const el = { id: idNuevo(), t: "simbolo", tipo, x: 0, y: 0, rot: 0, esc: 1, ...marcas };
     if (CROQUIS_3D_CON_ZONA.includes(tipo)) el.etq = siguienteZona();
@@ -2763,10 +2764,15 @@ function iniciarVisor3D(datos, opciones) {
   // Tira de equipos: arrastrar uno hasta la casa lo pone ahí; tocarlo deja
   // el "sello" puesto (cada toque en la casa pone otro igual).
   const CORTO = { infrarrojo: "Movimiento", magnetico: "Apertura", humo: "Humo", sirena_int: "Sirena int.", sirena_ext: "Sirena ext.", teclado: "Teclado", central: "Central", camara_ip: "Cámara" };
-  const TIRA = ["infrarrojo", "magnetico", "humo", "sirena_int", "sirena_ext", "teclado", "central", "camara_ip"];
+  // La tira de abajo: los 8 más usados (de entrada, los de siempre).
+  const TIRA_BASE = ["infrarrojo", "magnetico", "humo", "sirena_int", "sirena_ext", "teclado", "central", "camara_ip"];
+  const paletaOrdenada = () => croquisOrdenarPorUso([...TIRA_BASE, ...CROQUIS_3D_PALETA.filter((t) => !TIRA_BASE.includes(t))]).filter((t) => CROQUIS_SIMBOLOS[t.split("|")[0]]);
+  let TIRA = paletaOrdenada().slice(0, 8);
   const pintarTira = () => {
     tira.classList.toggle("hidden", !editando);
-    tira.innerHTML = TIRA.filter((t) => CROQUIS_SIMBOLOS[t]).map((t) => `<button type="button" data-tipo="${t}" class="${sello === t ? "on" : ""}" title="${esc(nombreDe(t))}"><svg viewBox="${CROQUIS_SIMBOLOS[t].vb || (() => { const r = Math.max(28, CROQUIS_SIMBOLOS[t].r + 4); return `${-r} ${-r} ${r * 2} ${r * 2}`; })()}">${typeof croquisSimboloSvg === "function" ? croquisSimboloSvg(t) : ""}</svg><span>${esc(CORTO[t] || nombreDe(t))}</span></button>`).join("") + `<button type="button" data-tipo="__mas"><b>+</b><span>Más</span></button>`;
+    if (!sello) TIRA = paletaOrdenada().slice(0, 8);
+    const base = (t) => t.split("|")[0], marcas = (t) => croquis3dDePreset(t);
+    tira.innerHTML = TIRA.filter((t) => CROQUIS_SIMBOLOS[base(t)]).map((t) => `<button type="button" data-tipo="${t}" class="${sello === t ? "on" : ""}" title="${esc(nombreDe(t))}"><svg viewBox="${CROQUIS_SIMBOLOS[base(t)].vb || (() => { const r = Math.max(28, CROQUIS_SIMBOLOS[base(t)].r + 4); return `${-r} ${-r} ${r * 2} ${r * 2}`; })()}">${typeof croquisSimboloSvg === "function" ? croquisSimboloSvg(base(t), undefined, { ...marcas(t), t: "simbolo" }) : ""}</svg><span>${esc(CORTO[t] || nombreDe(t).replace(/^Sensor de movimiento/, "Movimiento").replace(/^Sensor de /, ""))}</span></button>`).join("") + `<button type="button" data-tipo="__mas"><b>+</b><span>Más</span></button>`;
   };
   tira.addEventListener("pointerdown", (ev) => {
     const b = ev.target.closest("[data-tipo]"); if (!b || !editando) return;
@@ -2797,7 +2803,7 @@ function iniciarVisor3D(datos, opciones) {
   tira.addEventListener("click", (ev) => {
     const b = ev.target.closest('[data-tipo="__mas"]'); if (!b) return;
     // Lista completa para elegir el sello.
-    hoja.innerHTML = `<b>¿Qué querés poner?</b><div class="v3-paleta">${CROQUIS_3D_PALETA.filter((t) => CROQUIS_SIMBOLOS[t.split("|")[0]]).map((t) => `<button type="button" data-tipo="${t}"><i style="background:${colorDe(t)}"></i>${esc(nombreDe(t))}</button>`).join("")}</div><p class="v3-nota" style="margin-top:8px">Después tocá en la casa donde va cada uno.</p><button type="button" class="v3-link" data-h="cancelar">Cancelar</button>`;
+    hoja.innerHTML = `<b>¿Qué querés poner?</b><div class="v3-paleta">${paletaOrdenada().map((t) => `<button type="button" data-tipo="${t}"><i style="background:${colorDe(t)}"></i>${esc(nombreDe(t))}</button>`).join("")}</div><p class="v3-nota" style="margin-top:8px">Después tocá en la casa donde va cada uno.</p><button type="button" class="v3-link" data-h="cancelar">Cancelar</button>`;
     hoja.classList.remove("hidden");
     hoja.onclick = (e2) => { const x = e2.target.closest("button"); if (!x) return; if (x.dataset.tipo) { sello = x.dataset.tipo; pintarTira(); decir(textoEdicion()); } cerrarHoja(); };
   });
@@ -2854,7 +2860,7 @@ function iniciarVisor3D(datos, opciones) {
   function salirCamara() { visor.salirCamara(); if (!editando) ley.classList.remove("hidden"); decir(editando ? textoEdicion() : ""); pintarBarra(); }
   function hojaPaleta(punto) {
     sel = null; visor.marcar(null);
-    hoja.innerHTML = `<b>¿Qué agregás acá?</b><div class="v3-paleta">${CROQUIS_3D_PALETA.filter((t) => CROQUIS_SIMBOLOS[t.split("|")[0]]).map((t) => `<button type="button" data-tipo="${t}"><i style="background:${colorDe(t)}"></i>${esc(nombreDe(t))}</button>`).join("")}</div><button type="button" class="v3-link" data-h="cancelar">Cancelar</button>`;
+    hoja.innerHTML = `<b>¿Qué agregás acá?</b><div class="v3-paleta">${paletaOrdenada().map((t) => `<button type="button" data-tipo="${t}"><i style="background:${colorDe(t)}"></i>${esc(nombreDe(t))}</button>`).join("")}</div><button type="button" class="v3-link" data-h="cancelar">Cancelar</button>`;
     hoja.classList.remove("hidden");
     hoja.onclick = (ev) => {
       const b = ev.target.closest("button"); if (!b) return;
