@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.34.0";
+const APP_VERSION = "4.35.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -15752,7 +15752,7 @@ function cqRender(opciones) {
   cqEl("cqSubtitulo").textContent = cq.cliente ? `${cq.cliente}${cq.numero_cliente ? " · N° " + cq.numero_cliente : ""}` : "Tocá para poner cliente y título";
 }
 const CQ_AYUDAS = {
-  mover: "Tocá un elemento para elegirlo y arrastralo. Con dos dedos movés y hacés zoom.",
+  mover: (typeof matchMedia === "function" && matchMedia("(pointer: fine)").matches) ? "Hacé clic en un elemento para elegirlo y arrastralo. Teclado: flechas mueven (Shift: más), + / − tamaño, Ctrl+C / Ctrl+V / Ctrl+X, Supr borra, Ctrl+Z deshace." : "Tocá un elemento para elegirlo y arrastralo. Con dos dedos movés y hacés zoom.",
   rect: "Arrastrá para dibujarla, o elegí un ambiente con medida y tocá el plano.",
   linea: "Arrastrá para trazar una pared. Después tocá dónde sigue para hacer los quiebres. «Medida» dibuja una cota con los metros.",
   cable: "Dibujá el cableado con el dedo.",
@@ -15881,6 +15881,7 @@ function cqRenderProps() {
     const m = (v) => (Math.abs(v) / CROQUIS_POR_METRO).toLocaleString("es-AR", { maximumFractionDigits: 2 });
     html += `<span class="cq-props-tit">${escapeHtml(cqNombreElemento(el))} · ${m(el.w)} × ${m(el.h)} m</span>` + b("medidas", cqIc("regla") + "Medidas", "Escribir el ancho y el largo en metros") + b("nombre", cqIc("lapiz") + (el.nombre ? escapeHtml(el.nombre).slice(0, 14) : "Nombre"), "Nombre del ambiente");
     if (el.forma === "triangulo" || el.forma === "triangulo_rect") html += b("ori", cqIc("rotDer") + "90°", "Girar el triángulo");
+    if (!el.forma || el.forma === "rect") html += b("cierre", el.cierre === "semi" ? "Semicubierto" : el.cierre === "balcon" ? "Balcón" : "Cerrado", "Cerrado (con paredes), semicubierto (techo con columnas, sin paredes: galería, sector techado) o balcón (con baranda)", !!el.cierre);
   }
   if (el.t === "texto" || el.t === "tabla") html += `<span class="cq-props-tit">${escapeHtml(cqNombreElemento(el))}</span>` + b("texto", cqIc("lapiz") + "Editar");
   if (el.t === "linea") html += `<span class="cq-props-tit">Pared</span>` + (Array.isArray(el.c) ? b("recta", cqIc("recta") + "Recta", "Volver a pared recta") : b("curvar", cqIc("curva") + "Curvar", "Hacerla curva: después arrastrá el punto del medio"));
@@ -15992,6 +15993,118 @@ function cqAccionMulti(acc) {
   cqRender();
   cqGuardarBorrador();
 }
+// ---------- Atajos de teclado (en la PC) ----------
+// Flechas: mover (Shift: de a mucho, Alt: de a poquito) · + / -: tamaño ·
+// Ctrl+C / Ctrl+X / Ctrl+V: copiar, cortar, pegar · Supr: borrar ·
+// Ctrl+Z / Ctrl+Y: deshacer / rehacer · Ctrl+D: duplicar · Esc: soltar.
+let cqPortapapeles = null, cqPegadas = 0, cqUltimaTecla = 0;
+function cqElegidos() {
+  const ids = cq.multi && cq.multi.length ? new Set(cq.multi) : null;
+  if (ids) return cq.elementos.filter((e) => ids.has(e.id) && !cqBloq(e));
+  const el = cq.elementos.find((e) => e.id === cq.sel);
+  return el && !cqBloq(el) ? cqDelGrupo(el) : [];
+}
+function cqCopiarElegidos() {
+  const els = cqElegidos();
+  if (!els.length) return 0;
+  cqPortapapeles = JSON.stringify(els);
+  cqPegadas = 0;
+  try { localStorage.setItem("croquis_portapapeles", cqPortapapeles); } catch (e) { /* solo en memoria */ }
+  return els.length;
+}
+function cqPegar() {
+  let txt = cqPortapapeles;
+  try { txt = localStorage.getItem("croquis_portapapeles") || txt; } catch (e) { /* memoria */ }
+  let els = [];
+  try { els = JSON.parse(txt || "[]"); } catch (e) { els = []; }
+  if (!Array.isArray(els) || !els.length) { showToast("No hay nada copiado."); return; }
+  cqMemoria();
+  cqPegadas++;
+  const d = CROQUIS_GRILLA * 2 * cqPegadas, grupos = {}, nuevos = [];
+  els.forEach((e) => {
+    const c = JSON.parse(JSON.stringify(e));
+    c.id = cqId() + nuevos.length;
+    delete c.bloq; delete c.z;
+    if (c.grupo) c.grupo = grupos[c.grupo] || (grupos[c.grupo] = "g" + cqId() + nuevos.length);
+    if (c.cadena) c.cadena = grupos[c.cadena] || (grupos[c.cadena] = "c" + cqId() + nuevos.length);
+    cqMoverElemento(c, e, d, d);
+    nuevos.push(c);
+  });
+  cq.elementos.push(...nuevos);
+  if (nuevos.length === 1) { cq.sel = nuevos[0].id; cq.multi = []; } else { cq.sel = null; cq.multi = nuevos.map((e) => e.id); }
+  cqRender(); cqGuardarBorrador();
+}
+// Agrandar o achicar (f > 1 agranda) cada elemento sobre su propio centro.
+function cqEscalarElemento(el, mas) {
+  const f = mas ? 1.1 : 1 / 1.1;
+  if (el.t === "simbolo") { el.esc = Math.min(3, Math.max(0.3, Math.round((el.esc || 1) * f * 100) / 100)); return; }
+  if (el.t === "texto" || el.t === "tabla") { const b = el.tam || (el.t === "tabla" ? 14 : 16); el.tam = Math.min(48, Math.max(8, b + (mas ? 2 : -2))); return; }
+  if (el.t === "rect") { const cx = el.x + el.w / 2, cy = el.y + el.h / 2; el.w = Math.max(10, Math.round(el.w * f)); el.h = Math.max(10, Math.round(el.h * f)); el.x = Math.round(cx - el.w / 2); el.y = Math.round(cy - el.h / 2); return; }
+  if (el.t === "linea" || el.t === "cota") {
+    const mx = (el.x1 + el.x2) / 2, my = (el.y1 + el.y2) / 2, e2 = (x, y) => [Math.round(mx + (x - mx) * f), Math.round(my + (y - my) * f)];
+    [el.x1, el.y1] = e2(el.x1, el.y1); [el.x2, el.y2] = e2(el.x2, el.y2);
+    if (Array.isArray(el.c)) el.c = e2(el.c[0], el.c[1]);
+    return;
+  }
+  if (el.t === "cable" && Array.isArray(el.pts) && el.pts.length) {
+    const mx = el.pts.reduce((a, p) => a + p[0], 0) / el.pts.length, my = el.pts.reduce((a, p) => a + p[1], 0) / el.pts.length;
+    el.pts = el.pts.map((p) => [Math.round(mx + (p[0] - mx) * f), Math.round(my + (p[1] - my) * f)]);
+  }
+}
+document.addEventListener("keydown", (ev) => {
+  if (!screens.croquis || screens.croquis.dataset.active !== "true" || cq.soloLectura) return;
+  const t = ev.target;
+  if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+  if (document.querySelector(".cq-datos-capa, .v3-capa, .cq-texto-capa")) return;
+  const ctrl = ev.ctrlKey || ev.metaKey, k = ev.key;
+  const hecho = () => { ev.preventDefault(); ev.stopPropagation(); };
+  if (ctrl && !ev.altKey) {
+    const l = k.toLowerCase();
+    if (l === "c") { const n = cqCopiarElegidos(); if (n) { hecho(); showToast(n === 1 ? "Copiado." : `${n} copiados.`); } return; }
+    if (l === "x") {
+      const els = cqElegidos(); if (!els.length) return;
+      hecho(); cqCopiarElegidos(); cqMemoria();
+      const ids = new Set(els.map((e) => e.id)); cq.elementos = cq.elementos.filter((e) => !ids.has(e.id)); cq.sel = null; cq.multi = [];
+      cqPegadas = -1; // al pegar va en el mismo lugar
+      cqRender(); cqGuardarBorrador(); showToast(els.length === 1 ? "Cortado." : `${els.length} cortados.`);
+      return;
+    }
+    if (l === "v") { hecho(); cqPegar(); return; }
+    if (l === "d") { if (cqCopiarElegidos()) { hecho(); cqPegar(); } return; }
+    if (l === "z" && !ev.shiftKey) { hecho(); cqDeshacer(); return; }
+    if (l === "y" || (l === "z" && ev.shiftKey)) { hecho(); cqRehacer(); return; }
+    return;
+  }
+  if (k === "Escape") { if (cq.sel || (cq.multi && cq.multi.length)) { hecho(); cq.sel = null; cq.multi = []; cqRender(); } return; }
+  const els = cqElegidos();
+  if (!els.length) return;
+  const flechas = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+  if (flechas[k]) {
+    hecho();
+    // Varias flechas seguidas son un solo "deshacer".
+    if (Date.now() - cqUltimaTecla > 700) cqMemoria(); else cq.cambios = true;
+    cqUltimaTecla = Date.now();
+    const paso = ev.shiftKey ? CROQUIS_GRILLA * 5 : ev.altKey ? 1 : CROQUIS_GRILLA / 2;
+    const [dx, dy] = flechas[k];
+    els.forEach((e) => cqMoverElemento(e, JSON.parse(JSON.stringify(e)), dx * paso, dy * paso));
+    cqRender(); cqGuardarBorrador();
+    return;
+  }
+  const mas = k === "+" || k === "=" || ev.code === "NumpadAdd", menos = k === "-" || k === "_" || ev.code === "NumpadSubtract";
+  if (mas || menos) {
+    hecho();
+    if (Date.now() - cqUltimaTecla > 700) cqMemoria(); else cq.cambios = true;
+    cqUltimaTecla = Date.now();
+    els.forEach((e) => cqEscalarElemento(e, mas));
+    cqRender(); cqGuardarBorrador();
+    return;
+  }
+  if (k === "Delete" || k === "Backspace") {
+    hecho(); cqMemoria();
+    const ids = new Set(els.map((e) => e.id)); cq.elementos = cq.elementos.filter((e) => !ids.has(e.id)); cq.sel = null; cq.multi = [];
+    cqRender(); cqGuardarBorrador();
+  }
+});
 // Orden de las capas: al frente, adelante, atrás, al fondo.
 function cqCambiarOrden(els, acc) {
   // Se numera todo según cómo se ve ahora y se mueven los elegidos.
@@ -16017,7 +16130,7 @@ function cqDelGrupo(el) {
   return g.length ? g : [el];
 }
 function cqNombreElemento(el) {
-  if (el.t === "rect") return { elipse: "Círculo", triangulo: "Triángulo", triangulo_rect: "Triángulo" }[el.forma] || "Habitación";
+  if (el.t === "rect") return { elipse: "Círculo", triangulo: "Triángulo", triangulo_rect: "Triángulo" }[el.forma] || (el.cierre === "semi" ? "Semicubierto" : el.cierre === "balcon" ? "Balcón" : "Habitación");
   if (el.t === "simbolo") return (CROQUIS_SIMBOLOS[el.tipo] || {}).nombre || "Equipo";
   if (el.t === "tabla") return el.celdas && (el.celdas.length > 1 || el.celdas[0].length > 1) ? "Tabla" : "Cuadro de texto";
   if (croquisEsCerco(el)) return CROQUIS_CERCOS[el.cerco].nombre;
@@ -16062,6 +16175,7 @@ function cqAccion(acc) {
     if (acc === "curvar") { const mx = (el.x1 + el.x2) / 2, my = (el.y1 + el.y2) / 2, l = Math.hypot(el.x2 - el.x1, el.y2 - el.y1) || 1; el.c = [mx - (el.y2 - el.y1) / l * l * 0.35, my + (el.x2 - el.x1) / l * l * 0.35]; }
     if (acc === "recta") delete el.c;
     if (acc === "ori") el.ori = ((el.ori || 0) + 1) % 4;
+    if (acc === "cierre") { const sig = { "": "semi", semi: "balcon", balcon: "" }[el.cierre || ""]; if (sig) el.cierre = sig; else delete el.cierre; showToast(el.cierre === "semi" ? "Semicubierto: techo con columnas, sin paredes." : el.cierre === "balcon" ? "Balcón: con baranda, sin techo." : "Cerrado: con paredes."); }
     const defIr = el.t === "simbolo" && CROQUIS_SIMBOLOS[el.tipo] && CROQUIS_SIMBOLOS[el.tipo].ir ? CROQUIS_SIMBOLOS[el.tipo] : null;
     if (defIr && /^(alc|ang)[+-]$/.test(acc)) {
       const pr = croquisIRParams(el, defIr);
@@ -16219,7 +16333,7 @@ cqSvg.addEventListener("pointerdown", (e) => {
     // Ambiente con medida: se apoya donde se tocó (centrado) y se pega a las vecinas.
     const a = cq.plantilla, w = Math.round(a.w * CROQUIS_POR_METRO), h = Math.round(a.h * CROQUIS_POR_METRO);
     cqMemoria();
-    const el = { id: cqId(), t: "rect", x: cqSnap(mx - w / 2), y: cqSnap(my - h / 2), w, h, nombre: a.nombre };
+    const el = { id: cqId(), t: "rect", x: cqSnap(mx - w / 2), y: cqSnap(my - h / 2), w, h, nombre: a.nombre, ...(a.cierre ? { cierre: a.cierre } : {}) };
     cq.elementos.push(el);
     cqImanHabitacion(el);
     cq.sel = el.id;
@@ -16534,6 +16648,7 @@ const CQ_AMBIENTES = [
   { nombre: "Dormitorio", w: 3, h: 3 }, { nombre: "Dormitorio principal", w: 4, h: 3.5 }, { nombre: "Baño", w: 2, h: 1.5 },
   { nombre: "Toilette", w: 1.5, h: 1 }, { nombre: "Lavadero", w: 2, h: 2 }, { nombre: "Pasillo", w: 1, h: 4 },
   { nombre: "Hall", w: 2, h: 2 }, { nombre: "Garage", w: 3, h: 5.5 }, { nombre: "Patio", w: 5, h: 5 },
+  { nombre: "Balcón", w: 3, h: 1.2, cierre: "balcon" }, { nombre: "Galería", w: 4, h: 3, cierre: "semi" }, { nombre: "Sector techado", w: 3, h: 3, cierre: "semi" },
   { nombre: "Local", w: 6, h: 4 }, { nombre: "Oficina", w: 3, h: 3 }, { nombre: "Depósito", w: 3, h: 2 },
 ];
 
@@ -17309,12 +17424,13 @@ function cqPreguntarEditable() {
     capa.className = "cq-datos-capa";
     capa.innerHTML = `<div class="cq-datos cq-menu">
       <h3>Este PDF es un dibujo</h3>
-      <p class="pe-nota">Se puede pasar a croquis editable: paredes, puertas y equipos con su número de zona, que después se mueven y se corrigen. El plano original queda tenue de fondo para comparar.</p>
+      <p class="pe-nota">Se puede pasar a croquis editable: paredes, puertas, ventanas, pasos, escaleras y equipos con su número de zona, que después se mueven y se corrigen. El plano original queda tenue de fondo para comparar.</p>
+      <label class="cq3d-fila"><input type="checkbox" class="cq-ia-plano"${navigator.onLine ? " checked" : ""}> Revisar también con IA (encuentra puertas, ventanas y escaleras que el dibujo no deja claras; tarda unos segundos)</label>
       <button type="button" class="btn btn-primary" data-r="editable">${cqIc("lapiz")} Pasar a croquis editable</button>
       <button type="button" class="btn btn-secondary" data-r="imagen">${cqIc("galeria")} Usarlo como imagen de fondo</button>
     </div>`;
     document.body.appendChild(capa);
-    capa.querySelectorAll("[data-r]").forEach((b) => b.addEventListener("click", () => { capa.remove(); ok(b.dataset.r === "editable"); }));
+    capa.querySelectorAll("[data-r]").forEach((b) => b.addEventListener("click", () => { const ia = !!capa.querySelector(".cq-ia-plano").checked; capa.remove(); ok(b.dataset.r === "editable" ? { ia } : null); }));
   });
 }
 // Archivo -> páginas del croquis. Si es un PDF dibujado y se elige
@@ -17326,11 +17442,24 @@ async function cqPrepararPlano(archivo) {
     let editable = null;
     const bytes = new Uint8Array(await archivo.arrayBuffer());
     try { editable = await croquisPdfAEditable(bytes, CROQUIS_MAX_HOJAS); } catch (e) { editable = null; }
-    if (editable && await cqPreguntarEditable()) {
+    const eleccion = editable ? await cqPreguntarEditable() : null;
+    if (editable && eleccion) {
       const imgs = await croquisPdfAImagenes(bytes.slice(), 2000, editable.paginas.length);
       const paginas = [];
       for (const p of editable.paginas) {
         const img = imgs[p.hoja - 1];
+        if (img && eleccion.ia) {
+          // Segunda mirada: la IA marca puertas, ventanas, pasos y escaleras en la imagen de la hoja.
+          try {
+            const r = await fetch("/api/datos?coleccion=croquis", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ accion: "aberturas_plano", imagen: img.base64, instalacion: cq.instalacion || undefined }) });
+            const d = await r.json().catch(() => ({}));
+            if (r.ok && Array.isArray(d.objetos)) {
+              const f = croquisFusionarDetecciones(p.elementos, d.objetos, p.marco);
+              ["puertas", "ventanas", "escaleras", "pasos"].forEach((k) => { editable.resumen[k] = (editable.resumen[k] || 0) + f[k]; });
+              editable.resumen.ia = (editable.resumen.ia || 0) + f.puertas + f.ventanas + f.escaleras + f.pasos + f.corregidas;
+            } else editable.resumen.iaError = d.error || "La IA no respondió";
+          } catch (e) { editable.resumen.iaError = "Sin conexión con la IA"; }
+        }
         let fondo = null;
         if (img) {
           try { const f = await croquisSubirPlanoBase(img, SERVICIOS_API_TOKEN); fondo = { id: f.id, x: p.marco.x, y: p.marco.y, w: p.marco.w, h: p.marco.h }; } catch (e) { fondo = null; }
@@ -17346,7 +17475,8 @@ async function cqPrepararPlano(archivo) {
 function cqAvisoPlanoEditable(r, siNo) {
   if (!r.editable) { showToast(siNo); return; }
   const s = r.resumen || {};
-  showToast(`Listo: ${s.paredes || 0} paredes, ${s.puertas || 0} puertas y ${s.equipos || 0} equipos. Revisalo: el original queda tenue de fondo (se oculta con el botón de la foto).`);
+  const partes = [`${s.paredes || 0} paredes`, `${s.puertas || 0} puertas`, s.ventanas ? `${s.ventanas} ventanas` : "", s.pasos ? `${s.pasos} pasos` : "", s.escaleras ? `${s.escaleras} escaleras` : "", `${s.equipos || 0} equipos`].filter(Boolean);
+  showToast(`Listo: ${partes.slice(0, -1).join(", ")} y ${partes[partes.length - 1]}.${s.ia ? ` La IA sumó o corrigió ${s.ia}.` : s.iaError ? ` (No se pudo revisar con IA: ${s.iaError}.)` : ""} Revisalo: el original queda tenue de fondo (se oculta con el botón de la foto).`);
 }
 // Archivo o PDF -> imágenes subidas -> un fondo de plano base por hoja.
 async function cqPrepararPlanosBase(archivo) {

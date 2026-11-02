@@ -16,7 +16,7 @@
 //   simbolo { tipo, x, y, rot, esc, color?, esp? }  equipos y objetos de obra
 
 // Tiene que ser igual a APP_VERSION de app.js (si no, la app recarga).
-const CROQUIS_UTILS_VERSION = "4.34.0";
+const CROQUIS_UTILS_VERSION = "4.35.0";
 const CROQUIS_GRILLA = 20;
 
 // Cada símbolo se dibuja centrado en 0,0 con dib(color). "cat" separa los
@@ -356,6 +356,10 @@ const CROQUIS_SIMBOLOS = {
   termotanque: { nombre: "Termotanque / calefón", cat: "mueble", color: "#5B5F66", r: 14, dib: (c) => `<circle cx="0" cy="0" r="12" fill="#FFFFFF" stroke="${c}" stroke-width="1.8"/><text x="0" y="4" text-anchor="middle" ${CROQUIS_FUENTE} font-size="11" fill="${c}">T</text>` },
   aire_split: { nombre: "Aire acondicionado", cat: "mueble", color: "#5B5F66", r: 24, dib: (c) => `<rect x="-22" y="-6" width="44" height="12" rx="3" fill="#FFFFFF" stroke="${c}" stroke-width="1.6"/><path d="M-16 1 H16 M-16 3.5 H16" stroke="${c}" stroke-width="0.8"/><text x="0" y="-9" text-anchor="middle" ${CROQUIS_FUENTE} font-size="7" fill="${c}">AA</text>` },
   estufa: { nombre: "Estufa / hogar", cat: "mueble", color: "#5B5F66", r: 18, dib: (c) => `<rect x="-16" y="-9" width="32" height="18" rx="2" fill="#FFFFFF" stroke="${c}" stroke-width="1.8"/><path d="M0 5 C-5 1 -2 -3 0 -6 C2 -3 5 1 0 5 Z" fill="#E8741E" fill-opacity="0.6" stroke="#E8741E" stroke-width="1"/>` },
+  cantero: {
+    nombre: "Cantero con plantas", cat: "mueble", color: "#2E9E4F", r: 32,
+    dib: (c) => `<rect x="-30" y="-12" width="60" height="24" rx="2" fill="#E8DCC8" stroke="#8A6A4A" stroke-width="2"/>` + [-20, -7, 7, 20].map((x, i) => `<circle cx="${x}" cy="${i % 2 ? 2 : -2}" r="7" fill="${c}" fill-opacity="0.45" stroke="${c}" stroke-width="1.2"/><circle cx="${x}" cy="${i % 2 ? 2 : -2}" r="2.2" fill="${c}"/>`).join(""),
+  },
   parrilla: { nombre: "Parrilla", cat: "mueble", color: "#5B5F66", r: 26, dib: (c) => `<rect x="-24" y="-14" width="48" height="28" rx="2" fill="#FFFFFF" stroke="${c}" stroke-width="1.8"/>` + [-16, -8, 0, 8, 16].map((x) => `<line x1="${x}" y1="-10" x2="${x}" y2="10" stroke="${c}" stroke-width="1"/>`).join("") },
   lavarropas: {
     nombre: "Lavarropas", cat: "mueble", color: "#5B5F66", r: 20,
@@ -573,13 +577,26 @@ function croquisSvgElementoBase(el, attrs) {
     const forma = el.forma || "rect";
     let cx = x + w / 2, cy = y + h / 2, figura;
     const t = el.trazo && el.trazo !== "continuo";
-    const estilo = `fill="#FFFFFF" fill-opacity="0.001" stroke="${el.color || "#1C1E21"}" stroke-width="${t ? 3.5 : 5}"${croquisDash(el.trazo, "continuo")} stroke-linejoin="miter"${el.trazo === "puntos" ? ' stroke-linecap="round"' : ""}`;
+    let estilo = `fill="#FFFFFF" fill-opacity="0.001" stroke="${el.color || "#1C1E21"}" stroke-width="${t ? 3.5 : 5}"${croquisDash(el.trazo, "continuo")} stroke-linejoin="miter"${el.trazo === "puntos" ? ' stroke-linecap="round"' : ""}`;
+    // Semicubierto (galería, sector techado): borde de guiones y rayado suave
+    // (el techo). Balcón: baranda (doble línea fina).
+    let fondo = "";
+    if (el.cierre === "semi" && forma === "rect") {
+      estilo = `fill="none" stroke="${el.color || "#5B5F66"}" stroke-width="3" stroke-dasharray="12 7"`;
+      const cs = [];
+      for (let k = 14; k < w + h; k += 14) { const x1 = x + Math.max(0, k - h), y1 = y + Math.min(h, k), x2 = x + Math.min(w, k), y2 = y + Math.max(0, k - w); cs.push(`M${x1} ${y1} L${x2} ${y2}`); }
+      fondo = `<path d="${cs.join(" ")}" stroke="#8E949A" stroke-width="1" stroke-opacity="0.55" fill="none"/>` + [[x, y], [x + w, y], [x, y + h], [x + w, y + h]].map(([px, py]) => `<rect x="${px - 5}" y="${py - 5}" width="10" height="10" fill="#5B5F66"/>`).join("");
+    }
+    if (el.cierre === "balcon" && forma === "rect") {
+      estilo = `fill="#FFFFFF" fill-opacity="0.001" stroke="${el.color || "#1C1E21"}" stroke-width="1.6"`;
+      fondo = `<rect x="${x + 4}" y="${y + 4}" width="${Math.max(0, w - 8)}" height="${Math.max(0, h - 8)}" fill="none" stroke="${el.color || "#1C1E21"}" stroke-width="1.6"/>`;
+    }
     if (forma === "elipse") figura = `<ellipse cx="${cx}" cy="${cy}" rx="${w / 2}" ry="${h / 2}" ${estilo}/>`;
     else if (forma === "triangulo" || forma === "triangulo_rect") {
       const p = croquisTriangulo(forma, x, y, w, h, el.ori);
       cx = (p[0][0] + p[1][0] + p[2][0]) / 3; cy = (p[0][1] + p[1][1] + p[2][1]) / 3;
       figura = `<path d="M${p.map((q) => q.join(" ")).join(" L")} Z" ${estilo}/>`;
-    } else figura = `<rect x="${x}" y="${y}" width="${w}" height="${h}" ${estilo}/>`;
+    } else figura = `${fondo}<rect x="${x}" y="${y}" width="${w}" height="${h}" ${estilo}/>`;
     const etiqueta = el.nombre ? `<text x="${cx}" y="${cy + 5}" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="14" font-weight="700" fill="#5B5F66" letter-spacing="0.5">${croquisEsc(el.nombre)}</text>` : "";
     return `<g ${a}>${figura}${etiqueta}</g>`;
   }
@@ -895,8 +912,19 @@ function croquisPrimitivasPdf(OPS, ops, tc, vp) {
       for (const c of codigos) {
         if (c === OPS.moveTo) { sub = [pt(coords[j], coords[j + 1])]; actual.push(sub); j += 2; }
         else if (c === OPS.lineTo) { if (!sub) { sub = []; actual.push(sub); } sub.push(pt(coords[j], coords[j + 1])); j += 2; }
-        else if (c === OPS.curveTo) { if (sub) { sub.curvo = true; sub.push(pt(coords[j + 4], coords[j + 5])); } j += 6; }
-        else if (c === OPS.curveTo2 || c === OPS.curveTo3) { if (sub) { sub.curvo = true; sub.push(pt(coords[j + 2], coords[j + 3])); } j += 4; }
+        else if (c === OPS.curveTo || c === OPS.curveTo2 || c === OPS.curveTo3) {
+          if (sub && sub.length) {
+            // Se guarda el punto medio de la curva (sirve para hallar el
+            // centro de un arco de puerta).
+            const p0 = sub[sub.length - 1];
+            const p3 = c === OPS.curveTo ? pt(coords[j + 4], coords[j + 5]) : pt(coords[j + 2], coords[j + 3]);
+            const c1 = c === OPS.curveTo ? pt(coords[j], coords[j + 1]) : c === OPS.curveTo2 ? p0 : pt(coords[j], coords[j + 1]);
+            const c2 = c === OPS.curveTo ? pt(coords[j + 2], coords[j + 3]) : c === OPS.curveTo2 ? pt(coords[j], coords[j + 1]) : p3;
+            (sub.medios = sub.medios || []).push([0.125 * p0[0] + 0.375 * c1[0] + 0.375 * c2[0] + 0.125 * p3[0], 0.125 * p0[1] + 0.375 * c1[1] + 0.375 * c2[1] + 0.125 * p3[1]]);
+            sub.curvo = true; sub.push(p3);
+          }
+          j += c === OPS.curveTo ? 6 : 4;
+        }
         else if (c === OPS.closePath) { if (sub) sub.cerrado = true; }
         else if (c === OPS.rectangle) {
           const x = coords[j], y = coords[j + 1], w = coords[j + 2], h = coords[j + 3];
@@ -990,6 +1018,54 @@ function croquisDesdeVectores(datos) {
     s1.usado = s2.usado = true;
     puertas.push({ A, B, C, ancho: dist(A, C) });
   });
+  // 1b) Puertas de planos de arquitectura (AutoCAD, Revit…): arco de 90°
+  // (la barrida de la hoja) con o sin la hoja dibujada.
+  const arcos = [];
+  prims.filter((p) => p.traza && !p.dash).forEach((p) => p.sub.forEach((s) => { if (s.curvo && s.length >= 2) arcos.push(s); }));
+  const finesCerca = (X, r) => segs.filter((sg) => !sg.usado && !sg.dash && (dist(sg.a, X) < r || dist(sg.b, X) < r)).length;
+  arcos.forEach((s) => {
+    const P = s[0], Q = s[s.length - 1], cuerda = dist(P, Q);
+    if (cuerda < 8 || cuerda > 140) return;
+    const L0 = cuerda / Math.SQRT2;
+    // a) Con la hoja: un segmento de largo ~radio que sale de una punta del arco.
+    let mejor = null;
+    segs.forEach((sg) => {
+      if (sg.usado || sg.dash) return;
+      const Ls = largo(sg);
+      if (Math.abs(Ls - L0) > L0 * 0.2) return;
+      [[P, Q], [Q, P]].forEach(([B, A]) => [[sg.a, sg.b], [sg.b, sg.a]].forEach(([e1, C]) => {
+        const d = dist(e1, B);
+        if (d > Math.max(1.5, L0 * 0.06)) return;
+        const err = Math.abs(dist(C, A) - Ls);
+        if (err > Ls * 0.2) return;
+        if (!mejor || d + err < mejor.d) mejor = { d: d + err, sg, A, B, C };
+      }));
+    });
+    if (mejor) {
+      mejor.sg.usado = true;
+      // Hoja dibujada como rectángulo finito: el resto del rectángulo tampoco es pared.
+      segs.forEach((o) => { if (!o.usado && o.camino === mejor.sg.camino && (largo(o) < L0 * 0.25 || Math.abs(largo(o) - largo(mejor.sg)) < L0 * 0.1)) o.usado = true; });
+      puertas.push({ A: mejor.A, B: mejor.B, C: mejor.C, ancho: dist(mejor.A, mejor.C), arco: true });
+      return;
+    }
+    // b) Solo el arco: el centro (la bisagra) sale de tres puntos del arco.
+    const M = s.medios && s.medios[Math.floor(s.medios.length / 2)];
+    if (!M) return;
+    const ax = P[0], ay = P[1], bx = Q[0], by = Q[1], cx = M[0], cy = M[1];
+    const D = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by));
+    if (Math.abs(D) < 1e-6) return;
+    const ux = ((ax * ax + ay * ay) * (by - cy) + (bx * bx + by * by) * (cy - ay) + (cx * cx + cy * cy) * (ay - by)) / D;
+    const uy = ((ax * ax + ay * ay) * (cx - bx) + (bx * bx + by * by) * (ax - cx) + (cx * cx + cy * cy) * (bx - ax)) / D;
+    const C = [ux, uy], r = dist(C, P);
+    if (Math.abs(dist(C, Q) - r) > r * 0.1) return;
+    const ang = Math.acos(Math.max(-1, Math.min(1, ((P[0] - ux) * (Q[0] - ux) + (P[1] - uy) * (Q[1] - uy)) / (r * r)))) * 180 / Math.PI;
+    if (Math.abs(ang - 90) > 15) return;
+    // La punta que queda sobre la pared tiene paredes que terminan ahí; la hoja abierta, no.
+    const rr = Math.max(2, r * 0.15), fP = finesCerca(P, rr), fQ = finesCerca(Q, rr);
+    const [A, B] = fQ > fP ? [Q, P] : [P, Q];
+    if (puertas.some((q) => dist(q.C, C) < 2)) return;
+    puertas.push({ A, B, C, ancho: dist(A, C), arco: true });
+  });
   // 2) Escala: las puertas de Visio miden ~0,80 m (32 unidades del croquis).
   const anchos = puertas.map((p) => p.ancho).sort((a, b) => a - b);
   const k = anchos.length ? 32 / anchos[Math.floor(anchos.length / 2)] : 1.5;
@@ -998,6 +1074,9 @@ function croquisDesdeVectores(datos) {
   // solo = escalera recta. Todo lo que está adentro (contorno, flechas, la X
   // del descanso) deja de ser pared.
   const escaleras = croquisEscalerasEnVectores(segs, figuras, textos, k);
+  // 2c) Ventanas de planos de arquitectura: 3 a 5 líneas paralelas del mismo
+  // largo dentro del espesor de la pared (los dos filos y el vidrio).
+  const ventanas = croquisVentanasEnVectores(segs, k);
   // 3) Equipos por color y forma.
   const textoEn = (f, re) => textos.find((t) => t.x1 >= f.x0 - 1 && t.x0 <= f.x1 + 1 && t.y >= f.y0 - 2 && t.y <= f.y1 + 2 && re.test(t.s));
   const dentroEdificio = (() => { const ss = segs.filter((s) => !s.usado && !s.dash); if (!ss.length) return () => true; const b = caja(ss.flatMap((s) => [s.a, s.b])); return (x, y) => x >= b.x0 - 1 && x <= b.x1 + 1 && y >= b.y0 - 1 && y <= b.y1 + 1; })();
@@ -1032,6 +1111,9 @@ function croquisDesdeVectores(datos) {
     equipos.push({ tipo, x: f.cx, y: f.cy, rot: tipo === "teclado" && f.h > f.w ? 90 : 0, f });
   });
   // Otras figuras rellenas rectangulares (muebles, tableros...): quedan como rectángulo.
+  // Paredes pintadas (rectángulo relleno largo y del espesor de una pared): pared.
+  const murosLlenos = figuras.filter((f) => !f.usado && !f.curvo && f.n === 4 && !esBlanco(f.fill) && Math.min(f.w, f.h) * k >= 2.8 && Math.min(f.w, f.h) * k <= 16 && Math.max(f.w, f.h) / Math.max(0.1, Math.min(f.w, f.h)) >= 4);
+  murosLlenos.forEach((f) => { f.usado = true; const h = f.w >= f.h; segs.push(h ? { a: [f.x0, f.cy], b: [f.x1, f.cy], camino: "m", usado: false } : { a: [f.cx, f.y0], b: [f.cx, f.y1], camino: "m", usado: false }); });
   const otras = figuras.filter((f) => !f.usado && !f.curvo && f.n === 4 && f.w > 3 && f.h > 3 && f.w < ancho * 0.8 && !esBlanco(f.fill));
   otras.forEach((f) => { f.usado = true; });
   // Infrarrojos: la captación sale de la esquina del cuadradito (líneas punteadas).
@@ -1089,10 +1171,32 @@ function croquisDesdeVectores(datos) {
     if (Math.abs(a[0] - b[0]) < 1.5) b = [a[0], b[1]]; else if (Math.abs(a[1] - b[1]) < 1.5) b = [b[0], a[1]];
     if (Math.hypot(b[0] - a[0], b[1] - a[1]) >= 2) out.push({ id: id(), t: "linea", x1: a[0], y1: a[1], x2: b[0], y2: b[1] });
   });
+  // Plano de arquitectura: cada pared dibujada con sus dos filos pasa a una
+  // sola línea por el medio; se cierran las esquinas y los vanos que quedan
+  // entre dos tramos de pared, sin puerta ni ventana, son pasos.
+  ventanas.forEach((v) => {
+    const a = m(v.h ? [v.i0, v.c] : [v.c, v.i0]), b = m(v.h ? [v.i1, v.c] : [v.c, v.i1]);
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    out.push({ id: id(), t: "simbolo", tipo: "ventana", x: (a[0] + b[0]) / 2, y: (a[1] + b[1]) / 2, rot: v.h ? 0 : 90, esc: Math.max(0.5, Math.min(3, Math.round(L / CROQUIS_ANCHO_ABERTURA.ventana * 100) / 100)) });
+    out.push({ id: id(), t: "linea", x1: a[0], y1: a[1], x2: b[0], y2: b[1], relleno: true });
+  });
+  puertas.forEach((p) => {
+    const A = m(p.A), B = m(p.B), C = m(p.C);
+    if (p.arco) out.push({ id: id(), t: "linea", x1: C[0], y1: C[1], x2: A[0], y2: A[1], relleno: true });
+    const u = [A[0] - C[0], A[1] - C[1]], v = [B[0] - C[0], B[1] - C[1]];
+    const L = Math.hypot(u[0], u[1]) || 1;
+    let rot = Math.atan2(u[1], u[0]), esp = false;
+    if (v[0] * Math.sin(rot) - v[1] * Math.cos(rot) < 0) { esp = true; rot += Math.PI; }
+    const el = { id: id(), t: "simbolo", tipo: "puerta", x: (A[0] + C[0]) / 2, y: (A[1] + C[1]) / 2, rot: Math.round(((rot * 180 / Math.PI) % 360 + 360) % 360) % 360, esc: Math.round(L / 40 * 100) / 100 };
+    if (esp) el.esp = true;
+    out.push(el);
+  });
+  croquisUnirParedesDobles(out, id);
   // Paredes que siguen en línea recta se unen en una sola.
   for (let i = 0; i < out.length; i++) {
     for (let j = i + 1; j < out.length; j++) {
       const p = out[i], q = out[j];
+      if (p.t !== "linea" || q.t !== "linea") continue;
       const hor = p.y1 === p.y2 && q.y1 === q.y2 && p.y1 === q.y1, ver = p.x1 === p.x2 && q.x1 === q.x2 && p.x1 === q.x1;
       if (!hor && !ver) continue;
       const [p0, p1] = hor ? [Math.min(p.x1, p.x2), Math.max(p.x1, p.x2)] : [Math.min(p.y1, p.y2), Math.max(p.y1, p.y2)];
@@ -1117,16 +1221,6 @@ function croquisDesdeVectores(datos) {
     const el = { id: id(), t: "simbolo", tipo: e.tipo, x: c[0], y: c[1], rot: e.rot, esc: Math.round(e.ancho * k / (e.tipo === "escalera_u" ? 92 : 40) * 100) / 100 };
     out.push(el);
   });
-  puertas.forEach((p) => {
-    const A = m(p.A), B = m(p.B), C = m(p.C);
-    const u = [A[0] - C[0], A[1] - C[1]], v = [B[0] - C[0], B[1] - C[1]];
-    const L = Math.hypot(u[0], u[1]) || 1;
-    let rot = Math.atan2(u[1], u[0]), esp = false;
-    if (v[0] * Math.sin(rot) - v[1] * Math.cos(rot) < 0) { esp = true; rot += Math.PI; }
-    const el = { id: id(), t: "simbolo", tipo: "puerta", x: (A[0] + C[0]) / 2, y: (A[1] + C[1]) / 2, rot: Math.round(((rot * 180 / Math.PI) % 360 + 360) % 360) % 360, esc: Math.round(L / 40 * 100) / 100 };
-    if (esp) el.esp = true;
-    out.push(el);
-  });
   equipos.forEach((e) => {
     const p = m([e.x, e.y]);
     const el = { id: id(), t: "simbolo", tipo: e.tipo, x: p[0], y: p[1], rot: e.rot || 0, esc: 0.8 };
@@ -1139,12 +1233,203 @@ function croquisDesdeVectores(datos) {
     const p = m([t.x, t.y]);
     out.push({ id: id(), t: "texto", x: p[0], y: p[1] + 5, texto: t.s.slice(0, 120), tam: Math.max(10, Math.min(28, Math.round(t.alto * k * 0.9))) });
   });
+  out.forEach((e) => { delete e.relleno; delete e.doble; });
   return {
-    elementos: out, titulo, escala: k, puertas: puertas.length, escaleras: escaleras.length,
+    elementos: out, titulo, escala: k, puertas: puertas.length, escaleras: escaleras.length, ventanas: ventanas.length, pasos: out.filter((e) => e.tipo === "paso").length,
     equipos: equipos.length, paredes: out.filter((e) => e.t === "linea").length,
     // Dónde queda la hoja entera en el croquis (para poner la imagen de fondo).
     marco: { x: Math.round(-ox * k), y: Math.round(-oy * k), w: Math.round(ancho * k), h: Math.round(alto * k) },
   };
+}
+// Lo que vio la IA en la imagen de la hoja (cajas 0-1000) se suma a lo que
+// ya se leyó de las líneas: aberturas sobre la pared más cercana, escaleras
+// (las líneas de los escalones dejan de ser paredes) y un "paso" que la IA
+// ve como puerta pasa a puerta. marco: dónde quedó la hoja en el croquis.
+function croquisFusionarDetecciones(elementos, objetos, marco) {
+  const res = { puertas: 0, ventanas: 0, escaleras: 0, pasos: 0, corregidas: 0 };
+  if (!Array.isArray(objetos) || !marco || !marco.w) return res;
+  const ESC = { escalera_recta: [40, 120], escalera_u: [92, 140], escalera_l: [120, 140], escalera_caracol: [84, 84] };
+  const distSeg = (p, e) => { const dx = e.x2 - e.x1, dy = e.y2 - e.y1, L2 = dx * dx + dy * dy || 1; const t = Math.max(0, Math.min(1, ((p[0] - e.x1) * dx + (p[1] - e.y1) * dy) / L2)); const q = [e.x1 + t * dx, e.y1 + t * dy]; return { d: Math.hypot(p[0] - q[0], p[1] - q[1]), q, t }; };
+  let n = 0;
+  const id = () => "ia" + Date.now().toString(36) + (n++).toString(36);
+  objetos.forEach((o) => {
+    const [ya, xa, yb, xb] = o.box_2d.map(Number);
+    const X0 = marco.x + Math.min(xa, xb) / 1000 * marco.w, X1 = marco.x + Math.max(xa, xb) / 1000 * marco.w;
+    const Y0 = marco.y + Math.min(ya, yb) / 1000 * marco.h, Y1 = marco.y + Math.max(ya, yb) / 1000 * marco.h;
+    const w = X1 - X0, h = Y1 - Y0, cx = (X0 + X1) / 2, cy = (Y0 + Y1) / 2;
+    if (w < 4 || h < 2 && w < 2) return;
+    const tipoEsc = o.tipo === "escalera_l" ? "escalera_l_izq" : o.tipo;
+    if (ESC[o.tipo]) {
+      if (elementos.some((e) => e.t === "simbolo" && /^escalera/.test(e.tipo) && e.x > X0 && e.x < X1 && e.y > Y0 && e.y < Y1)) return;
+      const [cw, ch] = ESC[o.tipo], acostada = w > h * 1.15 && o.tipo !== "escalera_caracol";
+      const largo = Math.max(w, h), ancho = Math.min(w, h);
+      const esc = Math.max(0.4, Math.min(3, Math.round(Math.min(largo / ch, ancho / cw) * 100) / 100));
+      // Los escalones que quedaron como paredes adentro de la caja se sacan.
+      const m = Math.min(w, h) * 0.06;
+      for (let i = elementos.length - 1; i >= 0; i--) {
+        const e = elementos[i];
+        if (e.t === "linea" && [[e.x1, e.y1], [e.x2, e.y2]].every(([x, y]) => x > X0 + m && x < X1 - m && y > Y0 + m && y < Y1 - m)) elementos.splice(i, 1);
+      }
+      elementos.push({ id: id(), t: "simbolo", tipo: tipoEsc, x: Math.round(cx), y: Math.round(cy), rot: acostada ? 90 : 0, esc });
+      res.escaleras++;
+      return;
+    }
+    const tipo = o.tipo === "porton" ? "porton_batiente" : o.tipo;
+    if (!CROQUIS_ANCHO_ABERTURA[tipo]) return;
+    // La pared donde va: la más cercana al centro de la caja.
+    let mejor = null;
+    elementos.forEach((e) => { if (e.t !== "linea") return; const r = distSeg([cx, cy], e); if (!mejor || r.d < mejor.d) mejor = { ...r, e }; });
+    if (!mejor || mejor.d > Math.max(w, h) * 0.8 + 6) return;
+    const ang = Math.atan2(mejor.e.y2 - mejor.e.y1, mejor.e.x2 - mejor.e.x1);
+    const ux = Math.abs(Math.cos(ang)), uy = Math.abs(Math.sin(ang));
+    const anchoSobrePared = ux >= uy ? w : h;
+    // ¿Ya hay una abertura ahí?
+    const yaHay = elementos.find((e) => e.t === "simbolo" && CROQUIS_ABERTURAS.includes(e.tipo) && Math.hypot(e.x - mejor.q[0], e.y - mejor.q[1]) < anchoSobrePared / 2 + 8);
+    if (yaHay) {
+      if (yaHay.tipo === "paso" && tipo === "puerta") { yaHay.tipo = "puerta"; res.corregidas++; }
+      return;
+    }
+    let rot = ang * 180 / Math.PI;
+    if (tipo === "puerta") {
+      // La hoja abre del lado donde está la caja (el arco).
+      const a = rot * Math.PI / 180, lado = (cx - mejor.q[0]) * Math.sin(a) - (cy - mejor.q[1]) * Math.cos(a);
+      if (lado < 0) rot += 180;
+    }
+    rot = Math.round(((rot % 360) + 360) % 360);
+    elementos.push({ id: id(), t: "simbolo", tipo, x: Math.round(mejor.q[0]), y: Math.round(mejor.q[1]), rot, esc: Math.max(0.4, Math.min(3, Math.round(anchoSobrePared / CROQUIS_ANCHO_ABERTURA[tipo] * 100) / 100)) });
+    if (tipo === "puerta" || tipo === "corrediza" || tipo === "porton_batiente") res.puertas++; else if (tipo === "ventana") res.ventanas++; else if (tipo === "paso") res.pasos++;
+  });
+  return res;
+}
+// Ventanas en un plano vectorial: grupos de 3 a 5 líneas paralelas, del
+// mismo largo (0,4 a 3,5 m) y juntas (todo el grupo entra en ~40 cm).
+function croquisVentanasEnVectores(segs, k) {
+  const res = [];
+  const libres = segs.filter((s) => !s.usado && !s.dash);
+  [true, false].forEach((h) => {
+    const L = libres.filter((s) => (h ? Math.abs(s.a[1] - s.b[1]) < 0.6 : Math.abs(s.a[0] - s.b[0]) < 0.6)).map((s) => {
+      const i0 = h ? Math.min(s.a[0], s.b[0]) : Math.min(s.a[1], s.b[1]), i1 = h ? Math.max(s.a[0], s.b[0]) : Math.max(s.a[1], s.b[1]);
+      return { s, c: h ? (s.a[1] + s.b[1]) / 2 : (s.a[0] + s.b[0]) / 2, i0, i1 };
+    }).filter((x) => (x.i1 - x.i0) * k >= 16 && (x.i1 - x.i0) * k <= 140).sort((a, b) => a.c - b.c);
+    const tol = Math.max(0.8, 2.5 / k);
+    L.forEach((p) => {
+      if (p.s.usado) return;
+      const g = L.filter((q) => !q.s.usado && Math.abs(q.i0 - p.i0) <= tol && Math.abs(q.i1 - p.i1) <= tol && q.c >= p.c - 1e-6 && (q.c - p.c) * k <= 16);
+      // Líneas encimadas cuentan una vez.
+      const cs = [];
+      g.forEach((q) => { if (!cs.length || q.c - cs[cs.length - 1] > 0.3) cs.push(q.c); });
+      if (cs.length < 3 || cs.length > 5) return;
+      g.forEach((q) => { q.s.usado = true; });
+      const c0 = cs[0], c1 = cs[cs.length - 1], i0 = g.reduce((a, q) => a + q.i0, 0) / g.length, i1 = g.reduce((a, q) => a + q.i1, 0) / g.length;
+      // Las jambas (cortitas, de filo a filo) tampoco son pared.
+      libres.forEach((s) => {
+        if (s.usado) return;
+        const en = (pt) => (h ? Math.abs(pt[0] - i0) < tol * 2 || Math.abs(pt[0] - i1) < tol * 2 : Math.abs(pt[1] - i0) < tol * 2 || Math.abs(pt[1] - i1) < tol * 2) && (h ? pt[1] : pt[0]) >= c0 - tol && (h ? pt[1] : pt[0]) <= c1 + tol;
+        if (en(s.a) && en(s.b)) s.usado = true;
+      });
+      res.push({ h, c: (c0 + c1) / 2, i0, i1, espesor: c1 - c0 });
+    });
+  });
+  return res;
+}
+// Paredes con sus dos filos (planos de arquitectura) -> una línea por el
+// medio (en unidades del croquis). Modifica "out": saca los filos, agrega
+// las líneas del medio (doble: true), acomoda los rellenos de las aberturas
+// sobre esas líneas, cierra esquinas y uniones en T, y pone un "paso" en los
+// vanos entre dos tramos de pared en línea.
+function croquisUnirParedesDobles(out, id) {
+  const MIN = 2.8, MAX = 16; // 7 a 40 cm de espesor
+  const lineas = out.filter((e) => e.t === "linea" && !e.relleno && (e.x1 === e.x2 || e.y1 === e.y2));
+  const datos = lineas.map((e) => { const h = e.y1 === e.y2; return { e, h, c: h ? e.y1 : e.x1, i0: h ? Math.min(e.x1, e.x2) : Math.min(e.y1, e.y2), i1: h ? Math.max(e.x1, e.x2) : Math.max(e.y1, e.y2) }; }).filter((d) => d.i1 - d.i0 >= 4);
+  const centros = [], consumidos = new Set();
+  datos.forEach((s) => {
+    // Su compañero: paralelo, a un espesor de pared, que lo cubra casi entero,
+    // y sin otra línea en el medio.
+    let mejor = null;
+    datos.forEach((p) => {
+      if (p === s || p.h !== s.h) return;
+      const sep = Math.abs(p.c - s.c);
+      if (sep < MIN || sep > MAX) return;
+      const sol = Math.min(s.i1, p.i1) - Math.max(s.i0, p.i0);
+      if (sol < 0.85 * (s.i1 - s.i0)) return;
+      if (datos.some((q) => q !== s && q !== p && q.h === s.h && (q.c - s.c) * (q.c - p.c) < 0 && Math.min(q.i1, s.i1) - Math.max(q.i0, s.i0) > 0.5 * (s.i1 - s.i0))) return;
+      if (!mejor || sep < mejor.sep) mejor = { p, sep };
+    });
+    if (!mejor) return;
+    const p = mejor.p;
+    // Si el compañero es más corto, el par lo arma él (así no se duplica).
+    if (p.i1 - p.i0 < s.i1 - s.i0 - 0.5 && Math.min(s.i1, p.i1) - Math.max(s.i0, p.i0) >= 0.85 * (p.i1 - p.i0)) { consumidos.add(s); return; }
+    consumidos.add(s); consumidos.add(p);
+    const c = Math.round((s.c + p.c) / 2 * 2) / 2;
+    // En la esquina, el filo de afuera sigue un espesor más: la línea del medio, medio espesor.
+    const ext = (a, b) => (Math.abs(a - b) <= mejor.sep * 1.3 ? (a + b) / 2 : a);
+    const i0 = p.i0 < s.i0 ? ext(s.i0, p.i0) : s.i0, i1 = p.i1 > s.i1 ? ext(s.i1, p.i1) : s.i1;
+    centros.push({ h: s.h, c, i0: Math.round(i0 * 2) / 2, i1: Math.round(i1 * 2) / 2, sep: mejor.sep });
+  });
+  if (!centros.length) return;
+  // Sin repetidos (dos filos cortos contra el mismo largo dan el mismo medio).
+  const unicos = [];
+  centros.forEach((x) => { if (!unicos.some((u) => u.h === x.h && Math.abs(u.c - x.c) < 0.6 && Math.abs(u.i0 - x.i0) < 0.6 && Math.abs(u.i1 - x.i1) < 0.6)) unicos.push(x); });
+  for (let i = out.length - 1; i >= 0; i--) if (datos.some((d) => d.e === out[i] && consumidos.has(d))) out.splice(i, 1);
+  // Los rellenos de puertas y ventanas van sobre la línea del medio de su pared (y el símbolo con ellos).
+  out.filter((e) => e.relleno).forEach((r) => {
+    const h = Math.abs(r.y1 - r.y2) < 0.6, c = h ? (r.y1 + r.y2) / 2 : (r.x1 + r.x2) / 2, a = h ? Math.min(r.x1, r.x2) : Math.min(r.y1, r.y2), b = h ? Math.max(r.x1, r.x2) : Math.max(r.y1, r.y2);
+    const w = unicos.filter((u) => u.h === h && Math.abs(u.c - c) <= u.sep && (Math.abs(u.i1 - a) < MAX || Math.abs(u.i0 - b) < MAX)).sort((p, q) => Math.abs(p.c - c) - Math.abs(q.c - c))[0];
+    if (!w) return;
+    const d = w.c - c;
+    if (h) { r.y1 = r.y2 = w.c; } else { r.x1 = r.x2 = w.c; }
+    const sim = out.find((e) => e.t === "simbolo" && (e.tipo === "puerta" || e.tipo === "ventana") && Math.hypot(e.x - (h ? (a + b) / 2 : c), e.y - (h ? c : (a + b) / 2)) < 4);
+    if (sim) { if (h) sim.y += d; else sim.x += d; }
+    r.doble = true;
+  });
+  // Esquinas y T: cada punta se estira hasta la línea perpendicular más cercana (si está a medio metro).
+  unicos.forEach((u) => {
+    ["i0", "i1"].forEach((punta) => {
+      const v = u[punta], sentido = punta === "i0" ? -1 : 1;
+      let mejor = null;
+      unicos.forEach((o) => {
+        if (o.h === u.h) return;
+        if (u.c < o.i0 - MAX || u.c > o.i1 + MAX) return;
+        const dd = (o.c - v) * sentido;
+        if (dd < -MAX || dd > MAX) return;
+        if (!mejor || Math.abs(dd) < Math.abs(mejor.dd)) mejor = { o, dd };
+      });
+      if (mejor && mejor.dd > 0) u[punta] = mejor.o.c;
+    });
+  });
+  // Tramos en la misma línea: se unen si los separa poco (el espesor de una
+  // pared que llega); si los separa un vano de 0,6 a 1,6 m, es un paso.
+  const grupos = {};
+  unicos.forEach((u) => { (grupos[(u.h ? "h" : "v") + u.c] = grupos[(u.h ? "h" : "v") + u.c] || []).push(u); });
+  const aberturas = out.filter((e) => e.t === "simbolo" && CROQUIS_ABERTURAS.includes(e.tipo));
+  const finales = [];
+  Object.values(grupos).forEach((g) => {
+    g.sort((a, b) => a.i0 - b.i0);
+    let act = { ...g[0] };
+    for (let i = 1; i < g.length; i++) {
+      const x = g[i], hueco = x.i0 - act.i1;
+      if (hueco <= MAX) { act.i1 = Math.max(act.i1, x.i1); continue; }
+      if (hueco >= 24 && hueco <= 64) {
+        const cx = act.h ? (act.i1 + x.i0) / 2 : act.c, cy = act.h ? act.c : (act.i1 + x.i0) / 2;
+        const tapado = aberturas.some((ab) => Math.hypot(ab.x - cx, ab.y - cy) < hueco) || out.some((e) => e.relleno && e.doble && Math.hypot((e.x1 + e.x2) / 2 - cx, (e.y1 + e.y2) / 2 - cy) < hueco / 2 + 2);
+        if (!tapado) {
+          out.push({ id: id(), t: "simbolo", tipo: "paso", x: cx, y: cy, rot: act.h ? 0 : 90, esc: Math.round(hueco / CROQUIS_ANCHO_ABERTURA.paso * 100) / 100 });
+          act.i1 = x.i1; continue;
+        }
+      }
+      finales.push(act); act = { ...x };
+    }
+    finales.push(act);
+  });
+  // Las jambas (cortitas, de filo a filo de una pared que ya es una sola línea) se van.
+  for (let i = out.length - 1; i >= 0; i--) {
+    const e = out[i];
+    if (e.t !== "linea" || e.relleno || Math.hypot(e.x2 - e.x1, e.y2 - e.y1) > MAX + 1) continue;
+    const h = Math.abs(e.y1 - e.y2) < 0.6;
+    const cruza = finales.some((u) => u.h !== h && (h ? (Math.min(e.x1, e.x2) <= u.c + 0.6 && Math.max(e.x1, e.x2) >= u.c - 0.6 && e.y1 >= u.i0 - MAX && e.y1 <= u.i1 + MAX) : (Math.min(e.y1, e.y2) <= u.c + 0.6 && Math.max(e.y1, e.y2) >= u.c - 0.6 && e.x1 >= u.i0 - MAX && e.x1 <= u.i1 + MAX)));
+    if (cruza) out.splice(i, 1);
+  }
+  finales.forEach((u) => out.push(u.h ? { id: id(), t: "linea", x1: u.i0, y1: u.c, x2: u.i1, y2: u.c } : { id: id(), t: "linea", x1: u.c, y1: u.i0, x2: u.c, y2: u.i1 }));
 }
 // Escaleras en un plano vectorial (unidades del PDF; k = unidades del croquis
 // por unidad del PDF, 40 unidades = 1 m). Marca como usado lo que es escalera.
@@ -1270,14 +1555,14 @@ async function croquisPdfAEditable(bytes, max) {
   const doc = await pdfjs.getDocument({ data: bytes.slice() }).promise;
   try {
     const total = doc.numPages, paginas = [];
-    let titulo = "", resumen = { paredes: 0, puertas: 0, equipos: 0 };
+    let titulo = "", resumen = { paredes: 0, puertas: 0, equipos: 0, ventanas: 0, pasos: 0, escaleras: 0 };
     for (let n = 1; n <= Math.min(total, max || CROQUIS_MAX_HOJAS); n++) {
       const pag = await doc.getPage(n);
       const datos = croquisPrimitivasPdf(pdfjs.OPS, await pag.getOperatorList(), await pag.getTextContent(), pag.getViewport({ scale: 1 }));
       if (!croquisEsVectorial(datos)) { if (n === 1) return null; continue; }
       const r = croquisDesdeVectores(datos);
       if (!titulo && r.titulo) titulo = r.titulo;
-      ["paredes", "puertas", "equipos"].forEach((k) => { resumen[k] += r[k]; });
+      ["paredes", "puertas", "equipos", "ventanas", "pasos", "escaleras"].forEach((k) => { resumen[k] += r[k] || 0; });
       paginas.push({ nombre: total > 1 ? `Hoja ${n}` : "Página 1", elementos: r.elementos, marco: r.marco, hoja: n });
     }
     return paginas.length ? { paginas, titulo, total, resumen } : null;

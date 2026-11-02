@@ -359,6 +359,50 @@ async function interpretarBocetoCroquis(b, res) {
   if (!resultado || typeof resultado !== "object") { res.status(502).json({ error: "La IA no pudo interpretar el boceto. Probá con una foto más de frente y con buena luz." }); return; }
   res.status(200).json({ ok: true, resultado });
 }
+// ---------- Plano en PDF (de arquitecto): segunda mirada con IA ----------
+// La app ya leyó las líneas del PDF; la IA (un modelo de visión) mira la
+// hoja como imagen y marca dónde ve puertas, ventanas, pasos y escaleras,
+// para sumar lo que las reglas no reconocieron (fusión en croquis-utils.js).
+const PROMPT_ABERTURAS_PLANO = `Te paso la imagen de un plano de arquitectura (vista en planta) de una casa o local.
+Marcá cada uno de estos elementos con su caja:
+- "puerta": puerta de abrir (se ve el arco de barrido y/o la hoja). La caja incluye la hoja y el arco.
+- "corrediza": puerta o ventanal corredizo (dos hojas paralelas encimadas dentro de la pared).
+- "ventana": ventana (líneas finas paralelas dentro del espesor de la pared, o el símbolo de ventana).
+- "porton": portón de garaje o de entrada de autos.
+- "paso": vano sin puerta entre dos ambientes (la pared se corta y no hay hoja ni arco).
+- "escalera_recta", "escalera_u" (dos tramos con descanso, en U), "escalera_l" (en L) o "escalera_caracol": la caja abarca toda la escalera.
+Devolvé SOLO un JSON: {"objetos":[{"tipo":"puerta","box_2d":[ymin,xmin,ymax,xmax]}]}
+Las coordenadas van de 0 a 1000 (0,0 arriba a la izquierda de la imagen).
+No marques muebles, artefactos de baño o cocina, cotas, textos ni el rótulo. No inventes: si no estás seguro, no lo pongas.`;
+async function detectarAberturasPlano(b, res) {
+  const { GEMINI_API_KEY } = process.env;
+  if (!GEMINI_API_KEY) { res.status(500).json({ error: "Falta configurar GEMINI_API_KEY en Vercel" }); return; }
+  const imagen = String(b.imagen || "").replace(/^data:[^,]*,/, "");
+  if (imagen.length < 1000) { res.status(400).json({ error: "Falta la imagen del plano" }); return; }
+  if (imagen.length > 4500000) { res.status(400).json({ error: "La imagen es demasiado grande" }); return; }
+  const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
+    body: JSON.stringify({
+      contents: [{ role: "user", parts: [{ inline_data: { mime_type: "image/jpeg", data: imagen } }, { text: PROMPT_ABERTURAS_PLANO }] }],
+      generationConfig: { responseMimeType: "application/json", temperature: 0 },
+    }),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    if (r.status === 429) { res.status(429).json({ error: "Se alcanzó el límite de consultas a la IA por ahora." }); return; }
+    res.status(502).json({ error: "No se pudo consultar la IA" });
+    return;
+  }
+  const texto = ((d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts) || []).map((p) => p.text || "").join("");
+  let resultado = null;
+  try { resultado = JSON.parse(texto.replace(/^```(json)?/i, "").replace(/```\s*$/, "").trim()); } catch (e) { resultado = null; }
+  const lista = Array.isArray(resultado) ? resultado : resultado && Array.isArray(resultado.objetos) ? resultado.objetos : [];
+  const TIPOS = new Set(["puerta", "corrediza", "ventana", "porton", "paso", "escalera_recta", "escalera_u", "escalera_l", "escalera_caracol"]);
+  const objetos = lista.filter((o) => o && TIPOS.has(o.tipo) && Array.isArray(o.box_2d) && o.box_2d.length === 4 && o.box_2d.every((v) => Number.isFinite(Number(v))))
+    .slice(0, 200).map((o) => ({ tipo: o.tipo, box_2d: o.box_2d.map((v) => Math.max(0, Math.min(1000, Number(v)))) }));
+  res.status(200).json({ ok: true, objetos });
+}
 // Estado de una instalación en el backend ('abierta' | 'cerrada'), o null si
 // no se pudo saber (sin backend o sin señal: en ese caso no se bloquea).
 async function estadoInstalacion(id) {
@@ -458,6 +502,7 @@ async function manejarCroquis(req, res, autorizacion, body) {
     }
     if (req.method !== "POST") { res.status(405).json({ error: "Método no permitido" }); return; }
     if (b.accion === "interpretar") { await interpretarBocetoCroquis(b, res); return; }
+    if (b.accion === "aberturas_plano") { await detectarAberturasPlano(b, res); return; }
     if (b.accion === "vista3d_estado") {
       // Seguimiento: ganada / perdida / reabrir, y "ya lo llamé".
       const id = String(b.id || "");

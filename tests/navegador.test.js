@@ -3256,8 +3256,11 @@ test("Plano en PDF dibujado (estilo Visio de SAT) -> croquis editable: paredes, 
     const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
     if (req.method() === "POST" && u.includes("/api/foto")) { const id = "f" + nFoto++; fotos[id] = JSON.parse(req.postData()).base64; return json({ id }); }
     if (u.includes("/api/foto")) return route.fulfill({ status: 200, contentType: "image/jpeg", body: Buffer.from(fotos[new URL(u).searchParams.get("id")] || "", "base64") });
+    // La IA ve una ventana en la pared de arriba (x 380 a 440 de la hoja de 600 x 420) que el dibujo no tiene.
+    if (req.method() === "POST" && (req.postData() || "").includes("aberturas_plano")) { iaPedida = true; return json({ ok: true, objetos: [{ tipo: "ventana", box_2d: [228, 633, 248, 733] }, { tipo: "puerta", box_2d: [470, 450, 540, 510] }] }); }
     json([]);
   });
+  let iaPedida = false;
   await page.goto(base + "/");
   await page.waitForTimeout(300);
   await page.evaluate(() => { tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); cqAbrirLista(); });
@@ -3306,7 +3309,11 @@ test("Plano en PDF dibujado (estilo Visio de SAT) -> croquis editable: paredes, 
   assert.deepStrictEqual(r.textos, [], "el título y los números no quedan sueltos");
   assert.strictEqual(r.paredes.length, 6, "4 del contorno + 2 tramos de la pared interna (el subrayado del título no es pared)");
   const tipos = r.simbolos.map((s) => s.tipo).sort();
-  assert.deepStrictEqual(tipos, ["central", "humo", "infrarrojo", "magnetico", "puerta", "sirena_int"]);
+  assert.ok(iaPedida, "con la IA tildada se pide la segunda mirada");
+  assert.deepStrictEqual(tipos, ["central", "humo", "infrarrojo", "magnetico", "puerta", "sirena_int", "ventana"], "la ventana la sumó la IA; la puerta que ya estaba no se repite");
+  const ven = await page.evaluate(() => { const e = cq.elementos.find((x) => x.tipo === "ventana"); const w = cq.elementos.filter((x) => x.t === "linea").map((l) => Math.abs(l.y1 - l.y2) < 1 ? Math.abs(l.y1 - e.y) : 999); return { rot: e.rot, d: Math.min(...w) }; });
+  assert.strictEqual(ven.rot % 180, 0, "acostada sobre la pared de arriba");
+  assert.ok(ven.d < 1, "pegada a la pared");
   const ir = r.simbolos.find((s) => s.tipo === "infrarrojo");
   assert.deepStrictEqual([ir.etq, ir.rot], ["7", 270], "el infrarrojo mira hacia la habitación (abajo a la izquierda) y lleva su zona");
   assert.strictEqual(r.simbolos.find((s) => s.tipo === "magnetico").etq, "1");
@@ -4423,6 +4430,75 @@ test("Tarjeta de contacto del asesor: se elige y edita al mandar la vista 3D, y 
     assert.strictEqual(descarga.suggestedFilename(), "Luis Gomez.vcf");
     const vcf = require("fs").readFileSync(await descarga.path(), "utf8");
     assert.match(vcf, /FN:Luis Gómez/); assert.match(vcf, /TITLE:Asesor técnico/); assert.match(vcf, /ORG:SAT Alarmas/); assert.match(vcf, /TEL;TYPE=CELL:011 15 5555-1234/);
+    assert.deepStrictEqual(errores, []);
+    await ctx.close();
+  } finally { await nav.close(); }
+});
+
+test("Croquis en la PC: flechas mueven, + y - cambian el tamaño, Ctrl+C / Ctrl+V / Ctrl+X, Supr y Ctrl+Z; semicubierto y la capa de muebles en 3D", async () => {
+  const nav = await navegador3D();
+  try {
+    const ctx = await nav.newContext({ serviceWorkers: "block", viewport: { width: 1100, height: 800 } });
+    const page = await ctx.newPage();
+    const errores = [];
+    page.on("pageerror", (e) => errores.push(e.message));
+    await page.route("**/api/**", (r) => r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+    await page.goto(base + "/");
+    await page.waitForTimeout(400);
+    const casa = [
+      { id: "w1", t: "linea", x1: 0, y1: 0, x2: 200, y2: 0 }, { id: "w2", t: "linea", x1: 200, y1: 0, x2: 200, y2: 300 },
+      { id: "w3", t: "linea", x1: 200, y1: 300, x2: 0, y2: 300 }, { id: "w4", t: "linea", x1: 0, y1: 300, x2: 0, y2: 0 },
+      { id: "ir", t: "simbolo", tipo: "infrarrojo", x: 0, y: 0, rot: 180, esc: 1, etq: "1" },
+      { id: "pl", t: "simbolo", tipo: "ropero", x: 100, y: 130, rot: 0, esc: 1 },
+      { id: "ga", t: "rect", x: 0, y: 300, w: 200, h: 120, nombre: "Patio" },
+    ];
+    await page.evaluate((els) => { tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); cqAbrirEditor({ titulo: "Casa", elementos: els }); cq.sel = "pl"; cqRender(); }, casa);
+    const pl = () => page.evaluate(() => { const e = cq.elementos.find((x) => x.id === "pl"); return e ? { x: e.x, y: e.y, esc: e.esc } : null; });
+    await page.keyboard.press("ArrowRight"); await page.keyboard.press("ArrowRight"); await page.keyboard.press("ArrowDown");
+    assert.deepStrictEqual(await pl(), { x: 120, y: 140, esc: 1 }, "de a media cuadrícula");
+    await page.keyboard.press("Shift+ArrowLeft");
+    assert.strictEqual((await pl()).x, 20);
+    await page.keyboard.press("+");
+    assert.strictEqual((await pl()).esc, 1.1);
+    await page.keyboard.press("-"); await page.keyboard.press("-");
+    assert.ok((await pl()).esc < 1);
+    // Copiar y pegar: una copia corrida y elegida
+    await page.keyboard.press("Control+c");
+    await page.keyboard.press("Control+v");
+    let n = await page.evaluate(() => cq.elementos.filter((e) => e.tipo === "ropero").length);
+    assert.strictEqual(n, 2);
+    const copia = await page.evaluate(() => { const e = cq.elementos.find((x) => x.id === cq.sel); return e.id !== "pl" && e.tipo === "ropero" ? [e.x, e.y] : null; });
+    assert.deepStrictEqual(copia, [60, 180]);
+    // Cortar y pegar: vuelve en el mismo lugar
+    await page.keyboard.press("Control+x");
+    assert.strictEqual(await page.evaluate(() => cq.elementos.filter((e) => e.tipo === "ropero").length), 1);
+    await page.keyboard.press("Control+v");
+    assert.deepStrictEqual(await page.evaluate(() => { const e = cq.elementos.find((x) => x.id === cq.sel); return [e.x, e.y]; }), [60, 180]);
+    // Supr borra, Ctrl+Z lo vuelve
+    await page.keyboard.press("Delete");
+    assert.strictEqual(await page.evaluate(() => cq.elementos.filter((e) => e.tipo === "ropero").length), 1);
+    await page.keyboard.press("Control+z");
+    assert.strictEqual(await page.evaluate(() => cq.elementos.filter((e) => e.tipo === "ropero").length), 2);
+    // Escribiendo en un campo, las teclas no mueven nada
+    await page.evaluate(() => { const i = document.createElement("input"); i.id = "tmpInput"; document.body.appendChild(i); i.focus(); });
+    const antes = await pl();
+    await page.keyboard.press("ArrowLeft");
+    assert.deepStrictEqual(await pl(), antes);
+    await page.evaluate(() => document.getElementById("tmpInput").remove());
+    // El patio pasa a semicubierto (galería): techo con columnas, sin paredes
+    await page.evaluate(() => { cq.sel = "ga"; cq.multi = []; cqRender(); });
+    await page.click('[data-acc="cierre"]');
+    assert.strictEqual(await page.evaluate(() => cq.elementos.find((e) => e.id === "ga").cierre), "semi");
+    // 3D: los muebles se ven y la capa muestra lo que tapa el placard
+    await page.evaluate(() => { cq.elementos = cq.elementos.filter((e) => e.tipo !== "ropero" || e.id === "pl"); cq.paginas[cq.pagina].elementos = cq.elementos; cq.sel = null; cqRender(); });
+    await page.click("#cqMenuBtn");
+    await page.click('[data-m="ver3d"]');
+    await page.waitForSelector(".v3-capa canvas", { timeout: 20000 });
+    assert.match(await page.textContent(".v3-ley"), /mueble/);
+    await page.click('.v3-barra [data-a="vista"]');
+    await page.click('.v3-hoja [data-h="muebles"]');
+    await page.waitForFunction(() => /El placard le tapa/.test(document.querySelector(".v3-ley").textContent));
+    assert.ok(await page.evaluate(() => window.__visor3d.visor.vista.muebles));
     assert.deepStrictEqual(errores, []);
     await ctx.close();
   } finally { await nav.close(); }

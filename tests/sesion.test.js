@@ -841,3 +841,69 @@ test("Tarjeta de contacto del asesor: cada uno edita la suya, la oficina la de c
     global.fetch = fetchViejo;
   }
 });
+
+test("PDF de arquitectura: paredes de doble línea pasan a una, puerta con arco, ventana de tres líneas y paso entre ambientes", () => {
+  const vm = require("vm");
+  const ctx = { window: {}, document: { createElement: () => ({ getContext: () => null }) }, console };
+  ctx.window = ctx;
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(raiz, "croquis-utils.js"), "utf8") + "\n;this.dv=croquisDesdeVectores;", ctx);
+  // 1 m = 28 puntos; paredes de 20 cm (5,6 pt). Casa de 6 x 4 m, tabique al medio con un paso.
+  const prims = [];
+  const L = (x1, y1, x2, y2) => prims.push({ traza: true, rellena: false, dash: false, sub: [[[x1, y1], [x2, y2]]] });
+  L(0, 0, 100, 0); L(140, 0, 168, 0); L(5.6, 5.6, 81.2, 5.6); L(86.8, 5.6, 100, 5.6); L(140, 5.6, 162.4, 5.6);
+  L(0, 0, 0, 112); L(5.6, 5.6, 5.6, 106.4); L(168, 0, 168, 112); L(162.4, 5.6, 162.4, 106.4);
+  L(0, 112, 30, 112); L(52.4, 112, 168, 112); L(5.6, 106.4, 30, 106.4); L(52.4, 106.4, 81.2, 106.4); L(86.8, 106.4, 162.4, 106.4);
+  L(81.2, 5.6, 81.2, 40); L(86.8, 5.6, 86.8, 40); L(81.2, 62.4, 81.2, 106.4); L(86.8, 62.4, 86.8, 106.4);
+  L(81.2, 40, 86.8, 40); L(81.2, 62.4, 86.8, 62.4); // jambas del paso
+  L(30, 106.4, 30, 112); L(52.4, 106.4, 52.4, 112); // jambas de la puerta
+  L(100, 0, 140, 0); L(100, 2.8, 140, 2.8); L(100, 5.6, 140, 5.6); L(100, 0, 100, 5.6); L(140, 0, 140, 5.6); // ventana
+  // Puerta: bisagra (30,106.4), cerrada hasta (52.4,106.4), abre hacia adentro: arco + hoja.
+  const r = 22.4, kk = 0.5523 * r, A = [52.4, 106.4], B = [30, 84], c1 = [52.4, 106.4 - kk], c2 = [30 + kk, 84];
+  const arco = [A, B]; arco.curvo = true; arco.medios = [[0.125 * A[0] + 0.375 * c1[0] + 0.375 * c2[0] + 0.125 * B[0], 0.125 * A[1] + 0.375 * c1[1] + 0.375 * c2[1] + 0.125 * B[1]]];
+  prims.push({ traza: true, rellena: false, dash: false, sub: [arco] });
+  L(30, 106.4, 30, 84); // hoja
+  const r1 = ctx.dv({ prims, textos: [], ancho: 300, alto: 200 });
+  const els = r1.elementos;
+  const tipos = (t) => els.filter((e) => e.tipo === t);
+  assert.strictEqual(tipos("puerta").length, 1, "la puerta con arco");
+  assert.strictEqual(tipos("ventana").length, 1, "la ventana de tres líneas");
+  assert.strictEqual(tipos("paso").length, 1, "el paso del tabique");
+  assert.ok(Math.abs(tipos("ventana")[0].esc * 44 - 40 * r1.escala) < 3, "ancho de la ventana");
+  const paredes = els.filter((e) => e.t === "linea");
+  // Una línea por pared: 4 del contorno + 1 del tabique (los vanos con abertura quedan cubiertos).
+  assert.ok(paredes.length <= 6, "paredes: " + JSON.stringify(paredes.map((e) => [e.x1, e.y1, e.x2, e.y2])));
+  const k = r1.escala;
+  const sup = paredes.filter((e) => e.y1 === e.y2 && Math.abs(e.x2 - e.x1) > 100 * k);
+  assert.ok(sup.length >= 2, "arriba y abajo, de punta a punta");
+  assert.strictEqual(r1.ventanas, 1); assert.strictEqual(r1.pasos, 1);
+});
+
+test("Vista 3D: los muebles altos (placard, heladera) tapan parte de lo que ve el sensor; los bajos (sillón) no; galería y balcón no son paredes", () => {
+  const vm = require("vm");
+  const ctx = { window: {}, document: { createElement: () => ({ getContext: () => null }) }, console };
+  ctx.window = ctx;
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(raiz, "croquis-utils.js"), "utf8") + "\n;" + fs.readFileSync(path.join(raiz, "croquis-3d.js"), "utf8") + "\n;this.C3=Croquis3D;", ctx);
+  const casa = [
+    { id: "w1", t: "linea", x1: 0, y1: 0, x2: 200, y2: 0 }, { id: "w2", t: "linea", x1: 200, y1: 0, x2: 200, y2: 300 },
+    { id: "w3", t: "linea", x1: 200, y1: 300, x2: 0, y2: 300 }, { id: "w4", t: "linea", x1: 0, y1: 300, x2: 0, y2: 0 },
+    { id: "ir", t: "simbolo", tipo: "infrarrojo", x: 0, y: 0, rot: 180, esc: 1 },
+  ];
+  const sin = ctx.C3.analizar(casa);
+  assert.strictEqual(sin.porcentaje, 100);
+  assert.ok(!sin.hayMuebles && sin.tapados.length === 0);
+  const sillon = ctx.C3.analizar([...casa, { id: "so", t: "simbolo", tipo: "sillon", x: 100, y: 150, rot: 0, esc: 1 }]);
+  assert.strictEqual(sillon.porcentaje, 100, "un sillón no tapa a una persona parada");
+  const placard = ctx.C3.analizar([...casa, { id: "pl", t: "simbolo", tipo: "ropero", x: 100, y: 130, rot: 0, esc: 1 }]);
+  assert.ok(placard.porcentaje < 100, "detrás del placard queda una sombra: " + placard.porcentaje);
+  assert.strictEqual(placard.tapados[0].mueble.id, "pl");
+  assert.strictEqual(placard.tapados[0].equipo.id, "ir");
+  assert.ok(placard.tapados[0].m2 > 1);
+  // El intruso escondido detrás del placard no se detecta; adelante sí.
+  assert.strictEqual(placard.detecta([3.5, 4.4]).length, 0);
+  assert.strictEqual(placard.detecta([1, 1]).length, 1);
+  // Galería (semicubierta) y balcón al lado: no cierran ambientes ni cortan la vista.
+  const conGaleria = ctx.C3.analizar([...casa, { id: "ga", t: "rect", x: 0, y: 300, w: 200, h: 120, cierre: "semi" }, { id: "ba", t: "rect", x: 200, y: 50, w: 40, h: 120, cierre: "balcon" }]);
+  assert.strictEqual(conGaleria.porcentaje, 100);
+});
