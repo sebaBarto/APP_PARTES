@@ -205,6 +205,17 @@ const Croquis3D = (() => {
   }
   // Sector de cobertura: del equipo (a su altura) hasta el piso, abierto en
   // el ángulo del sensor. Es una "carpa" transparente con el borde marcado.
+  // Banda en el piso entre dos arcos (el de adentro puede no estar: desde el vértice).
+  function anillo(apice, dentro, fuera, y, color, opacidad) {
+    const pos = [];
+    for (let i = 0; i < fuera.length - 1; i++) {
+      const a0 = dentro ? dentro[i] : apice, a1 = dentro ? dentro[i + 1] : apice, b0 = fuera[i], b1 = fuera[i + 1];
+      pos.push(a0[0], y, a0[1], b0[0], y, b0[1], b1[0], y, b1[1], a0[0], y, a0[1], b1[0], y, b1[1], a1[0], y, a1[1]);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    return new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: opacidad, side: THREE.DoubleSide, depthWrite: false }));
+  }
   function sector(apice, alturaApice, puntos, alturaFin, color, opacidad) {
     const g = new THREE.Group();
     const pos = [];
@@ -368,9 +379,19 @@ const Croquis3D = (() => {
         } else obj.position.set(x, h, z);
       }
       if (p3.camara) {
-        const ang = 80, alc = 15, giro = ((e.rot || 0) - 90) * Math.PI / 180, arco = [];
-        for (let i = 0; i <= 26; i++) { const g = giro - (ang / 2) * Math.PI / 180 + (ang * Math.PI / 180) * i / 26; arco.push(rayo([x, z], [Math.cos(g), Math.sin(g)], alc, segmentos)); }
-        cobertura = sector([x, z], h, arco, 0.045, fant ? 0xf2a900 : 0x2e86de, fant ? 0.12 : e.prev ? 0.04 : 0.08);
+        // Bandas en el piso: identifica (verde oscuro), reconoce (verde), observa (amarillo) y detecta (celeste).
+        const d = croquisCamaraDori(e), ang = p3.disco ? 359 : d.fov, giro = ((e.rot || 0) - 90) * Math.PI / 180, n = Math.max(26, Math.round(ang / 3));
+        const arcoA = (r) => { const a = []; for (let i = 0; i <= n; i++) { const g = giro - (ang / 2) * Math.PI / 180 + (ang * Math.PI / 180) * i / n; a.push(rayo([x, z], [Math.cos(g), Math.sin(g)], r, segmentos)); } return a; };
+        const tope = Math.min(d.detecta, 30);
+        if (fant || e.prev) cobertura = sector([x, z], h, arcoA(tope), 0.045, fant ? 0xf2a900 : 0x2e86de, fant ? 0.12 : 0.04);
+        else {
+          cobertura = new THREE.Group();
+          const bandas = [[0, d.identifica, 0x1e8449, 0.42], [d.identifica, d.reconoce, 0x27ae60, 0.3], [d.reconoce, d.observa, 0xe6b800, 0.24], [d.observa, tope, 0x2e86de, 0.14]];
+          bandas.forEach(([r0, r1, color, op]) => { if (r1 > r0) cobertura.add(anillo([x, z], r0 ? arcoA(r0) : null, arcoA(Math.min(r1, tope)), 0.03, color, op)); });
+          // El abanico de la vista (sin relleno en el piso).
+          const ab = sector([x, z], h, arcoA(tope), 0.045, 0x2e86de, 0.05); ab.children[1].visible = false; cobertura.add(ab);
+          cobertura.userData.cobertura = true;
+        }
       }
     }
     obj.userData.equipo = e;
@@ -966,10 +987,10 @@ const Croquis3D = (() => {
       sim.encendidos.forEach((m) => { m.material.emissive.setHex(m.userData.emisivoOriginal); });
       sim = null;
     }
-    function simular(alEvento) {
+    function simular(alEvento, op) {
       pararSimulacion();
       if (!an) return false;
-      const r = an.recorrido();
+      const r = op && op.r ? op.r : an.recorrido(op);
       if (!r || r.puntos.length < 2) return false;
       const figura = armarLadron();
       mundo.add(figura);
@@ -977,7 +998,7 @@ const Croquis3D = (() => {
       const acum = [0];
       for (let i = 1; i < r.puntos.length; i++) acum.push(acum[i - 1] + Math.hypot(r.puntos[i][0] - r.puntos[i - 1][0], r.puntos[i][1] - r.puntos[i - 1][1]));
       sim = { figura, r, acum, inicio: performance.now(), vistos: new Set(), encendidos: [], primera: null, alEvento: alEvento || (() => {}), fin: false };
-      sim.alEvento({ tipo: "entra", entrada: r.entrada ? r.entrada.el : null, protegida: r.entrada ? !!r.entrada.protegida : null, porton: r.porton ? r.porton.el : null });
+      sim.alEvento({ tipo: "entra", entrada: r.entrada ? r.entrada.el : null, protegida: r.entrada ? !!r.entrada.protegida : null, porton: r.porton ? r.porton.el : null, salto: r.salto ? r.salto.el : null });
       return true;
     }
     const VELOCIDAD = window.CROQUIS_3D_VELOCIDAD || 1.8; // m/s (más rápido en las pruebas)
@@ -1004,6 +1025,8 @@ const Croquis3D = (() => {
       const nuevos = [];
       for (let k = 1; k <= pasos; k++) an.detecta([prev[0] + (x - prev[0]) * k / pasos, prev[1] + (z - prev[1]) * k / pasos]).forEach((e) => { if (!sim.vistos.has(e.id) && !nuevos.includes(e)) nuevos.push(e); });
       sim.ultimo = [x, z];
+      // Saltando un cerco eléctrico: lo detecta el energizador.
+      if (sim.r.salto && sim.r.salto.electrico && !sim.vistos.has("cerco-electrico") && Math.hypot(sim.r.salto.punto[0] - x, sim.r.salto.punto[1] - z) < 0.5) nuevos.push({ id: "cerco-electrico", tipo: "energizador", etq: "" });
       // Apertura: al pasar por una abertura con magnético.
       an.aberturas.forEach((ab) => {
         if (!ab.exterior || !ab.por || ab.por.tipo !== "magnetico" || sim.vistos.has(ab.por.id)) return;
@@ -1089,9 +1112,10 @@ const Croquis3D = (() => {
       grupoCobertura.visible = false; grupoCarteles.visible = false; grupoDebiles.visible = false; grupoSombras.visible = false; m.visible = false;
       const h = m.position.y + altura - 0.05;
       camara.position.set(m.position.x + dir[0] * 0.2, h, m.position.z + dir[1] * 0.2);
-      // 80° de ancho; en el celular parado se limita para que no se deforme.
+      // El ancho del lente de la cámara; en el celular parado se limita para que no se deforme.
       const asp = ancho() / alto();
-      camara.fov = Math.min(95, 2 * Math.atan(Math.tan(40 * Math.PI / 180) / asp) * 180 / Math.PI);
+      const medioAncho = Math.min(55, croquisCamaraDori(e).fov / 2);
+      camara.fov = Math.min(100, 2 * Math.atan(Math.tan(medioAncho * Math.PI / 180) / asp) * 180 / Math.PI);
       camara.updateProjectionMatrix();
       controles.enabled = false;
       controles.target.set(m.position.x + dir[0] * 5, Math.max(altura + 0.3, h - 1.9), m.position.z + dir[1] * 5);
@@ -1826,7 +1850,7 @@ const Croquis3D = (() => {
       if (!def.ir) return { el: e, p: [M(e.x), M(e.y)], alc: ALCANCE_360, medio: 180, dir: [1, 0], h: ALTO - 0.03 };
       const { ang, doble } = croquisIRParams(e, def);
       const g = CROQUIS_IR_BIS * Math.PI / 180, w = croquisLocalAMundo(e, Math.cos(g) * 100, Math.sin(g) * 100);
-      return { el: e, p: [M(ap[0]), M(ap[1])], alc: ALCANCE_REAL[e.tipo] || 10, medio: Math.min(179.5, (doble ? ang * 2 : ang) / 2), dir: norm([w[0] - ap[0], w[1] - ap[1]]), h: ALTO_SENSOR };
+      return { el: e, p: [M(ap[0]), M(ap[1])], alc: Math.min(ALCANCE_REAL[e.tipo] || 10, Number(e.alcReal) || 99), medio: Math.min(179.5, (doble ? ang * 2 : ang) / 2), dir: norm([w[0] - ap[0], w[1] - ap[1]]), h: ALTO_SENSOR };
     });
     const ve = (s, q, sinMuebles) => veParedes(s, q) && (sinMuebles || !tapaMueble(s, q));
     const veParedes = (s, q) => {
@@ -1854,7 +1878,8 @@ const Croquis3D = (() => {
     // estuviera el mueble. Para la capa "Lo que tapan los muebles".
     const camaras = els.filter((e) => e.t === "simbolo" && EQUIPOS[e.tipo] && EQUIPOS[e.tipo].camara).map((e) => {
       const g = ((e.rot || 0) - 90) * Math.PI / 180, domo = !!EQUIPOS[e.tipo].disco;
-      return { el: e, p: [M(e.x), M(e.y)], alc: domo ? 8 : 15, medio: domo ? 180 : 40, dir: [Math.cos(g), Math.sin(g)], h: EQUIPOS[e.tipo].h, camara: true };
+      const dori = croquisCamaraDori(e);
+      return { el: e, p: [M(e.x), M(e.y)], alc: Math.min(30, dori.detecta), medio: domo ? 180 : dori.fov / 2, dir: [Math.cos(g), Math.sin(g)], h: EQUIPOS[e.tipo].h, camara: true, dori };
     });
     const sombra = new Uint8Array(nx * ny), tapados = [];
     if (obstaculos.length) {
@@ -1918,9 +1943,13 @@ const Croquis3D = (() => {
     const camino = (padre, hasta) => { const r = []; for (let k = hasta; k >= 0; k = padre[k]) r.push(k); return r.reverse(); };
     // Recorrido de un intruso: entra por una abertura que da afuera (la que
     // no tiene sensor, si hay) y recorre la casa hasta lo más lejos.
-    function recorrido() {
+    // op: { abertura } entra directo por esa abertura; { porton } entra al
+    // terreno por el portón del cerco; { tapial } salta ese cerco; sin op, lo
+    // de siempre (por el portón si hay, después lo que no tiene sensor).
+    function recorrido(op) {
+      const o = op || {};
       const ext = aberturas.filter((ab) => ab.exterior);
-      const entrada = ext.find((ab) => !ab.protegida && ab.el.tipo !== "ventana") || ext.find((ab) => !ab.protegida) || ext.find((ab) => ab.el.tipo === "puerta") || ext[0];
+      const entrada = o.abertura || ext.find((ab) => !ab.protegida && ab.el.tipo !== "ventana") || ext.find((ab) => !ab.protegida) || ext.find((ab) => ab.el.tipo === "puerta") || ext[0];
       let ini, puntos = [];
       if (entrada) {
         const afuera = [entrada.c[0] - entrada.adentro[0] * 1.8, entrada.c[1] - entrada.adentro[1] * 1.8];
@@ -1953,19 +1982,76 @@ const Croquis3D = (() => {
         actual = mejor;
       }
       visitado.forEach((k) => puntos.push(centro(k % nx, Math.floor(k / nx))));
-      // Si hay un portón en el cerco, primero entra al terreno por ahí.
-      const pc = portonesCerco[0];
-      if (pc && entrada) {
-        let cxs = 0, czs = 0, nn = 0;
-        for (let k = 0; k < nx * ny; k++) if (interior[k]) { const q = centro(k % nx, Math.floor(k / nx)); cxs += q[0]; czs += q[1]; nn++; }
-        const casa = nn ? [cxs / nn, czs / nn] : pc.c;
-        const l1 = [pc.c[0] + pc.n[0] * 1.6, pc.c[1] + pc.n[1] * 1.6], l2 = [pc.c[0] - pc.n[0] * 1.6, pc.c[1] - pc.n[1] * 1.6];
+      let cxs = 0, czs = 0, nn = 0;
+      for (let k = 0; k < nx * ny; k++) if (interior[k]) { const q = centro(k % nx, Math.floor(k / nx)); cxs += q[0]; czs += q[1]; nn++; }
+      const casa = nn ? [cxs / nn, czs / nn] : [0, 0];
+      // De la calle al terreno: por un punto P del cerco con normal n.
+      const cruzar = (P, n) => {
+        const l1 = [P[0] + n[0] * 1.6, P[1] + n[1] * 1.6], l2 = [P[0] - n[0] * 1.6, P[1] - n[1] * 1.6];
         const calle = Math.hypot(l1[0] - casa[0], l1[1] - casa[1]) > Math.hypot(l2[0] - casa[0], l2[1] - casa[1]) ? l1 : l2;
-        const patio = calle === l1 ? l2 : l1;
-        puntos.unshift(calle, pc.c, patio);
+        return [calle, P, calle === l1 ? l2 : l1];
+      };
+      if (o.tapial && entrada) {
+        // Salta el cerco por el medio del tramo más largo.
+        const ps = croquisCercoPuntos(o.tapial, 10).pts, q = ps[Math.floor(ps.length / 2)];
+        const P = [M(q.x), M(q.y)];
+        puntos.unshift(...cruzar(P, [q.nx, q.ny]));
+        return { puntos, entrada, salto: { el: o.tapial, punto: P, electrico: !!o.tapial.electrico } };
+      }
+      // Si hay un portón en el cerco, primero entra al terreno por ahí.
+      const pc = o.abertura ? null : o.porton || portonesCerco[0];
+      if (pc && entrada) {
+        puntos.unshift(...cruzar(pc.c, pc.n));
         return { puntos, entrada, porton: pc };
       }
       return { puntos, entrada: entrada || null };
+    }
+    // Por dónde puede entrar (para elegir en la simulación).
+    function opciones() {
+      const r = [];
+      const cuenta = {};
+      aberturas.filter((ab) => ab.exterior).forEach((ab) => {
+        const t = ab.el.tipo === "ventana" ? "Ventana" : ab.el.tipo.startsWith("porton") ? "Portón" : ab.el.tipo === "paso" ? "Abertura" : ab.el.tipo === "corrediza" ? "Corrediza" : "Puerta";
+        cuenta[t] = (cuenta[t] || 0) + 1;
+        r.push({ clave: "ab:" + (ab.el.id || r.length), texto: `${t} ${cuenta[t]}${ab.protegida ? "" : " (sin sensor)"}`, op: { abertura: ab } });
+      });
+      portonesCerco.forEach((pc, i) => r.push({ clave: "po:" + (pc.el.id || i), texto: portonesCerco.length > 1 ? `El portón ${i + 1}` : "El portón del frente", op: { porton: pc } }));
+      const tipoCerco = (e) => (CROQUIS_CERCOS[e.cerco].macizo ? "el tapial" : CROQUIS_CERCOS[e.cerco].nombre.toLowerCase().startsWith("tejido") ? "el tejido" : "la reja");
+      const nCerco = {};
+      els.filter((e) => croquisEsCerco(e)).forEach((e, i) => {
+        const t = tipoCerco(e), mismos = els.filter((x) => croquisEsCerco(x) && tipoCerco(x) === t).length;
+        nCerco[t] = (nCerco[t] || 0) + 1;
+        r.push({ clave: "ta:" + (e.id || i), texto: `Saltando ${t}${mismos > 1 ? " " + nCerco[t] : ""}${e.electrico ? " (eléctrico)" : ""}`, op: { tapial: e } });
+      });
+      return r;
+    }
+    // Hasta dónde llega sin que lo detecten (metros), o null si nadie lo detecta.
+    function evaluar(r) {
+      if (!r) return null;
+      let andado = 0;
+      for (let i = 1; i < r.puntos.length; i++) {
+        const a = r.puntos[i - 1], b = r.puntos[i], L = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.max(1, Math.ceil(L / 0.15));
+        for (let k = 1; k <= n; k++) {
+          const q = [a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n];
+          const d = andado + L * k / n;
+          if (detecta(q).length) return d;
+          if (r.salto && r.salto.electrico && Math.hypot(q[0] - r.salto.punto[0], q[1] - r.salto.punto[1]) < 0.3) return d;
+          if (r.entrada && r.entrada.por && r.entrada.por.tipo === "magnetico" && Math.hypot(q[0] - r.entrada.c[0], q[1] - r.entrada.c[1]) < 0.4) return d;
+        }
+        andado += L;
+      }
+      return null;
+    }
+    // El peor caso: por donde llega más lejos sin que lo detecten.
+    function peorCaso() {
+      let peor = null;
+      opciones().forEach((x) => {
+        const r = recorrido(x.op);
+        if (!r || r.puntos.length < 2) return;
+        const d = evaluar(r), valor = d == null ? Infinity : d;
+        if (!peor || valor > peor.valor) peor = { ...x, r, valor, distancia: d };
+      });
+      return peor;
     }
     // ---- "Completar la protección": dónde agregar sensores ----
     // Infrarrojos en esquinas (mirando al ambiente) que cubran lo que falta,
@@ -2065,11 +2151,36 @@ const Croquis3D = (() => {
       }
     });
     if (exteriores.length && !sol) avisos.push({ equipo: null, tipo: "norte", texto: "Poné el Norte en el plano (en Objetos) para revisar si a los equipos de afuera les da el sol de frente." });
+    // ---- Señal inalámbrica: del hub (o la central) a cada equipo inalámbrico ----
+    // Distancia + 25 m "equivalentes" por cada pared o tapial que atraviesa.
+    const muros = paredesEnteras.concat(els.filter((e) => croquisEsCerco(e) && CROQUIS_CERCOS[e.cerco].macizo).flatMap((e) => { const ps = croquisCercoPuntos(e, 20).pts.map((q) => [M(q.x), M(q.y)]); return ps.slice(1).map((q, i) => [ps[i], q]); }));
+    const costo = (a, b) => {
+      const n = muros.reduce((k, [p, q]) => { const t = corte(a, b, p, q); return k + (t !== null && t > 0.02 && t < 0.98 ? 1 : 0); }, 0);
+      return { metros: Math.hypot(b[0] - a[0], b[1] - a[1]), paredes: n, eq: Math.hypot(b[0] - a[0], b[1] - a[1]) + n * 25 };
+    };
+    const BUENA = 150, DEBIL = 220;
+    const pos = (e) => [M(e.x), M(e.y)];
+    const bases = els.filter((e) => e.t === "simbolo" && e.tipo === "hub");
+    if (!bases.length) bases.push(...els.filter((e) => e.t === "simbolo" && e.tipo === "central"));
+    const repes = els.filter((e) => e.t === "simbolo" && e.tipo === "repetidor").filter((r) => bases.some((b) => costo(pos(b), pos(r)).eq <= BUENA));
+    const inalambricos = els.filter((e) => e.t === "simbolo" && e.inal && CROQUIS_SIMBOLOS[e.tipo] && CROQUIS_SIMBOLOS[e.tipo].cat === "equipo");
+    const senal = [];
+    if (inalambricos.length && !bases.length) avisos.push({ equipo: null, tipo: "hub", texto: "Hay equipos inalámbricos pero en esta planta no hay hub ni central." });
+    if (bases.length) inalambricos.forEach((e) => {
+      let mejor = null;
+      bases.concat(repes).forEach((b) => { const c = costo(pos(b), pos(e)); if (!mejor || c.eq < mejor.eq) mejor = { ...c, via: b }; });
+      const nivel = mejor.eq <= BUENA ? "buena" : mejor.eq <= DEBIL ? "debil" : "sin";
+      senal.push({ equipo: e, nivel, ...mejor });
+      if (nivel !== "buena") {
+        const desde = mejor.via.tipo === "repetidor" ? "el repetidor" : mejor.via.tipo === "hub" ? "el hub" : "la central";
+        avisos.push({ equipo: e, tipo: "senal", base: mejor.via, texto: `${nivel === "sin" ? "Sin señal segura" : "Señal débil"} desde ${desde} (${Math.round(mejor.metros)} m y ${mejor.paredes} ${mejor.paredes === 1 ? "pared" : "paredes"} en el medio): conviene un repetidor entre los dos.` });
+      }
+    });
     if (els.some((e) => croquisEsCerco(e) && e.electrico) && !els.some((e) => e.t === "simbolo" && e.tipo === "energizador")) avisos.push({ equipo: null, tipo: "energizador", texto: "Hay cerco eléctrico pero falta el energizador." });
     // Portón (o puerta) en el cerco: por ahí entra el intruso de la simulación.
     const portonesCerco = aberturas.filter((ab) => !ab.exterior && els.some((c) => croquisEsCerco(c) && croquisCercoPuntos(c, 10).pts.some((q) => distSeg([M(q.x), M(q.y)], ab.a, ab.b) < 0.2)));
     return {
-      celda, x0, y0, nx, ny, interior, cubierto, centro, aberturas, sensores, detecta, recorrido, sugerir, sombra, tapados, hayMuebles: obstaculos.length > 0, avisos, sol, portonesCerco,
+      celda, x0, y0, nx, ny, interior, cubierto, centro, aberturas, sensores, detecta, recorrido, opciones, evaluar, peorCaso, sugerir, senal, sombra, tapados, hayMuebles: obstaculos.length > 0, avisos, sol, portonesCerco,
       porcentaje: nInt ? Math.round(100 * nCub / nInt) : null,
       aberturasSinProteger: aberturas.filter((ab) => ab.exterior && !ab.protegida),
     };
@@ -2287,6 +2398,7 @@ const CROQUIS_3D_ESTILO = `
 .v3-tj-dato{display:flex;gap:8px;align-items:flex-start;margin:6px 0;color:var(--tenue);font-size:13.5px}
 .v3-tj-redes{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}.v3-tj-redes a{flex:1 1 auto;padding:8px}
 .v3-tj-redes svg,.v3-tj-acc svg{width:17px;height:17px;flex:none}
+.v3-arreglar{margin-left:4px;padding:2px 8px;border-radius:999px;border:1px solid #8A5A00;background:#FFF6DA;color:#8A5A00;font:700 11.5px system-ui,sans-serif;cursor:pointer}
 .v3-avisos{margin:6px 0 0;font-size:12.5px;color:#8A5A00}.v3-avisos summary{font-weight:700;cursor:pointer}.v3-avisos ul{margin:4px 0 0;padding-left:16px}.v3-avisos li{margin:3px 0;list-style:disc}
 .v3-tapa{margin:6px 0 0;color:#7B4B94;font-weight:600;font-size:12.5px}
 .v3-rayado-violeta{background:repeating-linear-gradient(45deg,rgba(123,75,148,.45) 0 4px,rgba(90,40,120,.9) 4px 6px)!important}
@@ -2391,6 +2503,12 @@ function croquis3dPitido(frec, dur) {
 //   edicion { alCambiar(indicePagina, elementos), marcarInst },
 //   debiles (mostrar puntos débiles al abrir), llamar(datos) -> Promise (botón
 //   "Quiero que me llamen"), paraCaptura.
+// Qué se puede arreglar con un toque, según el aviso.
+const ARREGLOS = { plantas: ["girar", "alcance"], agua: ["girar", "alcance"], vereda: ["alcance", "girar"], sol: ["girar"], senal: ["repetidor"], norte: ["norte"] };
+function croquis3dDori(e) {
+  const d = croquisCamaraDori(e), m = (v) => String(v).replace(".", ",") + " m";
+  return { ...d, txt: { identifica: m(d.identifica), reconoce: m(d.reconoce), observa: m(d.observa), detecta: m(Math.min(30, d.detecta)) } };
+}
 // Orientación con el símbolo "Norte" del plano (Argentina, hemisferio sur):
 // el sol sale por el este, al mediodía está al norte y se pone al oeste.
 // Devuelve direcciones en el plano (x a la derecha, y hacia abajo).
@@ -2529,10 +2647,11 @@ function iniciarVisor3D(datos, opciones) {
     ley.innerHTML = `<summary>${sinAlarma ? "Así está hoy" : "Qué se instala"}</summary>
       ${sinAlarma ? `<p class="v3-cubre">${an && an.porcentaje ? `Hoy los sensores cubren el ${an.porcentaje}%` : "Hoy ningún sensor cubre la casa"}</p>` : todo && cobertura(propuestas[prop]) ? `<p class="v3-cubre">Cubre el ${cobertura(propuestas[prop]).pct}% de la casa</p>` : an && an.porcentaje != null ? `<p class="v3-cubre">Cubre el ${an.porcentaje}% de ${paginas.length > 1 ? "esta planta" : "la casa"}</p>` : ""}
       ${an && an.tapados && an.tapados.length && !sinAlarma ? (verMuebles ? `<p class="v3-tapa">${an.tapados.slice(0, 4).map((t) => `${esc(croquis3dMueble(t.mueble))} le tapa ${String(t.m2).replace(".", ",")} m² ${t.equipo.tipo.startsWith("camara") ? "a la cámara" : "al " + esc(enFrase(t.equipo))}`).join("<br>")}</p>` : `<p class="v3-tapa">${an.tapados.length === 1 ? "Un mueble tapa" : "Hay muebles que tapan"} parte de lo que ven los equipos (Vista ▸ Lo que tapan los muebles)</p>`) : ""}
-      ${ed && an && an.avisos && an.avisos.length && !sinAlarma ? `<details class="v3-avisos"><summary>⚠ ${an.avisos.length === 1 ? "1 aviso" : an.avisos.length + " avisos"} para el técnico</summary><ul>${an.avisos.map((a) => `<li>${a.equipo ? `<b>${esc(croquis3dNombre(a.equipo))}${zonaDe(a.equipo)}:</b> ` : ""}${esc(a.texto)}</li>`).join("")}</ul></details>` : ""}
+      ${ed && an && an.avisos && an.avisos.length && !sinAlarma ? `<details class="v3-avisos"><summary>⚠ ${an.avisos.length === 1 ? "1 aviso" : an.avisos.length + " avisos"} para el técnico</summary><ul>${an.avisos.map((a, i) => `<li><span>${a.equipo ? `<b>${esc(croquis3dNombre(a.equipo))}${zonaDe(a.equipo)}:</b> ` : ""}${esc(a.texto)}${ARREGLOS[a.tipo] && (a.equipo || a.tipo === "norte") && !todo ? ` <button type="button" class="v3-arreglar" data-arreglo="${i}">Arreglar</button>` : ""}</span></li>`).join("")}</ul></details>` : ""}
       ${abiertas ? `<p class="v3-mal">${abiertas === 1 ? "1 abertura que da afuera no tiene sensor" : abiertas + " aberturas que dan afuera no tienen sensor"}</p>` : ""}
       <ul>${Object.entries(cuenta).map(([k, v]) => `<li><i style="background:${v.color}"></i>${v.n} × ${esc(k)}</li>`).join("")}
       <li><i style="background:rgba(224,0,0,.35)"></i>Zona que cubre cada sensor</li>
+      ${todos.some((e) => e.t === "simbolo" && /^camara/.test(e.tipo)) ? `<li><i style="background:linear-gradient(90deg,#1E8449 0 25%,#27AE60 25% 50%,#E6B800 50% 75%,#8FC3EE 75%)"></i>Cámara: identifica una cara · reconoce · ve · detecta</li>` : ""}
       ${verMuebles && an && an.tapados && an.tapados.length ? `<li><i class="v3-rayado v3-rayado-violeta"></i>Tapado por un mueble</li>` : ""}
       ${an && an.porcentaje != null && an.porcentaje < 100 ? `<li><i class="v3-rayado"></i>Sin cubrir (con «Puntos débiles»)</li>` : ""}</ul>
       ${todos.some((e) => e.inst) ? `<p class="v3-nota">Con aro naranja: lo que se agrega.</p>` : ""}${todos.some((e) => e.prev) ? `<p class="v3-nota">Atenuado: lo que ya está instalado.</p>` : ""}
@@ -2752,11 +2871,31 @@ function iniciarVisor3D(datos, opciones) {
     if (punto) hojaPaleta(punto);
   }
   // ---- Simulación ----
-  function simular() {
+  // El que diseña elige por dónde entra (o el peor caso); el cliente ve el recorrido de siempre.
+  function hojaEntrada() {
+    const ops = visor.analisis ? visor.analisis.opciones() : [];
+    hoja.innerHTML = `<b>¿Por dónde entra el intruso?</b><div class="v3-acciones"><button type="button" data-ent="peor" class="v3-primario">El peor caso</button>${ops.map((x, i) => `<button type="button" data-ent="${i}">${esc(x.texto)}</button>`).join("")}</div><button type="button" class="v3-link" data-h="cerrar">Cancelar</button>`;
+    hoja.classList.remove("hidden");
+    hoja.onclick = (ev) => {
+      const b = ev.target.closest("button"); if (!b) return;
+      if (b.dataset.h === "cerrar") { cerrarHoja(); return; }
+      if (b.dataset.ent === "peor") {
+        const p = visor.analisis.peorCaso();
+        if (!p) { cerrarHoja(); simular(null); return; }
+        simular({ r: p.r }, `El peor caso: ${p.texto.toLowerCase()}${p.distancia == null ? " — así nadie lo detecta" : ` — llega ${String(Math.round(p.distancia * 10) / 10).replace(".", ",")} m sin que lo detecten`}.`);
+        return;
+      }
+      const x = ops[Number(b.dataset.ent)];
+      if (x) simular(x.op, x.texto);
+    };
+  }
+  function simular(op, titulo) {
+    if (op === undefined && ed && !visor.simulando && visor.analisis && visor.analisis.opciones().length > 1) { hojaEntrada(); return; }
     cerrarHoja();
     if (visor.simulando) { visor.pararSimulacion(); decir(""); pintarBarra(); return; }
     let primera = null;
     const ok = visor.simular((ev) => {
+      if (ev.tipo === "entra" && titulo) { decir(titulo); return; }
       if (ev.tipo === "entra") {
         const por = ev.entrada ? (ev.entrada.tipo === "ventana" ? "una ventana" : ev.entrada.tipo.startsWith("porton") ? "el portón" : ev.entrada.tipo === "paso" ? "una abertura" : "una puerta") : "afuera";
         if (ev.porton) decir("Un intruso entra al terreno por " + (ev.porton.tipo.startsWith("porton") ? "el portón" : "la puerta del frente") + " y va hacia la casa…");
@@ -2776,7 +2915,7 @@ function iniciarVisor3D(datos, opciones) {
         decir("");
         hoja.onclick = (e2) => { const b = e2.target.closest("button"); if (!b) return; if (b.dataset.h === "otra") simular(); else { cerrarHoja(); visor.pararSimulacion(); } };
       }
-    });
+    }, op || undefined);
     if (!ok) { decir("Para simular hacen falta las paredes de la casa.", false, 3); return; }
     pintarBarra();
   }
@@ -2811,6 +2950,7 @@ function iniciarVisor3D(datos, opciones) {
     if (e.tipo === "infrarrojo" && e.video) texto = "Detecta movimiento y en ese momento saca fotos: el monitoreo (y vos, en el celular) ve qué pasó y confirma si es un intruso real.";
     if (e.inal) texto += " Es inalámbrico: funciona a pila y se comunica por radio, sin cables a la central.";
     if (def.ir) { const { ang, doble } = croquisIRParams(e, def); texto += ` Cubre hasta ${ALCANCE_TXT[e.tipo] || "11"} m, en un ángulo de ${doble ? ang * 2 : ang}°.`; }
+    if (/^camara/.test(e.tipo)) { const d = croquis3dDori(e); texto += ` Con ${d.mp} MP y lente de ${String(d.lente).replace(".", ",")} mm: identifica una cara hasta ${d.txt.identifica}, reconoce a una persona hasta ${d.txt.reconoce} y la detecta hasta ${d.txt.detecta}.`; }
     const avisosE = ed && visor && visor.analisis && visor.analisis.avisos ? visor.analisis.avisos.filter((a) => a.equipo === e) : [];
     if (avisosE.length) texto += " ⚠ " + avisosE.map((a) => a.texto).join(" ");
     const tapa = visor && visor.analisis ? visor.analisis.tapados.filter((t) => t.equipo === e) : [];
@@ -2924,6 +3064,61 @@ function iniciarVisor3D(datos, opciones) {
       }
     };
   }
+  // ---- Arreglar un aviso con un toque ----
+  function hojaArreglo(a) {
+    const opts = ARREGLOS[a.tipo] || [];
+    const nombres = { girar: "Girarlo", alcance: "Achicar el alcance", repetidor: "Agregar un repetidor", norte: "Poner el Norte" };
+    hoja.innerHTML = `<b>${a.equipo ? esc(croquis3dNombre(a.equipo)) + zonaDe(a.equipo) : "Arreglar"}</b><p>${esc(a.texto)}</p><div class="v3-acciones">${opts.map((k) => `<button type="button" data-arr="${k}">${nombres[k]}</button>`).join("")}</div><button type="button" class="v3-link" data-h="cerrar">Cancelar</button>`;
+    hoja.classList.remove("hidden");
+    hoja.onclick = (ev) => {
+      const b = ev.target.closest("button"); if (!b) return;
+      if (b.dataset.h === "cerrar") { cerrarHoja(); return; }
+      const k = b.dataset.arr, id = a.equipo && a.equipo.id;
+      if (k === "girar") {
+        decir("Buscando el giro que lo arregla…");
+        setTimeout(() => {
+          const base = paginas[pag].elementos, el = base.find((x) => x.id === id);
+          if (!el) return;
+          const quedan = (els) => { const r = Croquis3D.analizar(els); return r ? r.avisos.filter((x) => x.equipo && x.equipo.id === id && x.tipo === a.tipo).length : 0; };
+          let giro = null;
+          for (const d of [15, -15, 30, -30, 45, -45, 60, -60, 75, -75, 90, -90]) {
+            const copia = base.map((x) => (x.id === id ? { ...x, rot: (((x.rot || 0) + d) % 360 + 360) % 360 } : x));
+            if (!quedan(copia)) { giro = d; break; }
+          }
+          if (giro == null) { cerrarHoja(); decir("Girándolo no se arregla: probá achicarle el alcance o moverlo.", true, 4); return; }
+          cerrarHoja();
+          cambiar((els) => { const x = els.find((y) => y.id === id); if (x) x.rot = (((x.rot || 0) + giro) % 360 + 360) % 360; });
+          decir(`Listo: lo giré ${Math.abs(giro)}° ${giro > 0 ? "a la derecha" : "a la izquierda"}.`, false, 4);
+        }, 30);
+        return;
+      }
+      if (k === "alcance") {
+        cerrarHoja();
+        const s0 = visor.analisis.sensores.find((x) => x.el.id === id), nuevo = Math.max(3, Math.round((s0 ? s0.alc : 10) * 0.6 * 2) / 2);
+        cambiar((els) => { const x = els.find((y) => y.id === id); if (x) x.alcReal = nuevo; });
+        decir(`Listo: alcance de ${String(nuevo).replace(".", ",")} m (se regula en el sensor).`, false, 4);
+        return;
+      }
+      if (k === "repetidor") {
+        cerrarHoja();
+        const de = a.base, eq = a.equipo;
+        if (!de || !eq) return;
+        const r = nuevoEquipo("repetidor");
+        cambiar((els) => {
+          r.x = Math.round((de.x + eq.x) / 2); r.y = Math.round((de.y + eq.y) / 2);
+          Croquis3D.ubicar(r, [r.x, r.y], els);
+          els.push(r);
+        });
+        decir("Listo: agregué un repetidor entre los dos. Movelo si hace falta.", false, 4);
+        return;
+      }
+      if (k === "norte") {
+        cerrarHoja();
+        cambiar((els) => { const c = croquisCaja({ elementos: els }); els.push({ id: idNuevo(), t: "simbolo", tipo: "norte", x: Math.round(c.x + c.w + 60), y: Math.round(c.y + 40), rot: 0, esc: 1 }); });
+        decir("Puse el Norte apuntando para arriba: en el plano, giralo hasta que apunte al norte real.", false, 5);
+      }
+    };
+  }
   // ---- Quiero que me llamen ----
   function hojaLlamar() {
     hoja.innerHTML = `<b>¿Te llamamos?</b><p>Dejanos tu teléfono y te contactamos para charlar la propuesta.</p>
@@ -2968,6 +3163,12 @@ function iniciarVisor3D(datos, opciones) {
     if (pisosDe().length >= 2) { todo = true; pag = pisosDe()[0].i; } else todo = false;
     cerrarHoja(); decir(""); armar(true);
     pintarLeyenda(); pintarProps(); pintarPags(); pintarBarra();
+  });
+  ley.addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-arreglo]"); if (!b || !ed || !visor || !visor.analisis) return;
+    ev.preventDefault();
+    const a = visor.analisis.avisos[Number(b.dataset.arreglo)];
+    if (a) hojaArreglo(a);
   });
   const btnAsesor = raiz.querySelector(".v3-asesor");
   if (btnAsesor) btnAsesor.addEventListener("click", () => { if (!editando) { if (visor) visor.pararSimulacion(); hojaContacto(); } });

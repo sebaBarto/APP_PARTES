@@ -4566,3 +4566,77 @@ test("Exterior en 3D: avisos para el técnico, la cámara a la mañana (contralu
     await ctx.close();
   } finally { await nav.close(); }
 });
+
+test("Pulido: R gira y Shift+arrastrar elige varios; en 3D se elige por dónde entra el intruso, los avisos se arreglan con un toque y la cámara muestra hasta dónde identifica", async () => {
+  const nav = await navegador3D();
+  try {
+    const ctx = await nav.newContext({ serviceWorkers: "block", viewport: { width: 1100, height: 800 } });
+    const page = await ctx.newPage();
+    const errores = [];
+    page.on("pageerror", (e) => errores.push(e.message));
+    await page.route("**/api/**", (r) => r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+    await page.goto(base + "/");
+    await page.waitForTimeout(400);
+    const casa = [
+      { id: "w1", t: "linea", x1: 0, y1: 0, x2: 400, y2: 0 }, { id: "w2", t: "linea", x1: 400, y1: 0, x2: 400, y2: 300 },
+      { id: "w3", t: "linea", x1: 400, y1: 300, x2: 0, y2: 300 }, { id: "w4", t: "linea", x1: 0, y1: 300, x2: 0, y2: 0 },
+      { id: "pe", t: "simbolo", tipo: "puerta", x: 100, y: 300, rot: 0, esc: 1 },
+      { id: "t1", t: "linea", x1: 0, y1: 300, x2: 0, y2: 600, cerco: "tapial" },
+      { id: "rj", t: "linea", x1: 0, y1: 600, x2: 400, y2: 600, cerco: "reja" },
+      { id: "po", t: "simbolo", tipo: "porton_batiente", x: 300, y: 600, rot: 0, esc: 1 },
+      { id: "ab", t: "simbolo", tipo: "arbusto", x: 370, y: 330, rot: 0, esc: 1 },
+      { id: "ix", t: "simbolo", tipo: "infrarrojo_ext", x: 395, y: 305, rot: 270, esc: 1, etq: "9" },
+      { id: "ca", t: "simbolo", tipo: "camara_ip", x: 20, y: 310, rot: 140, esc: 1, etq: "C1" },
+    ];
+    await page.evaluate((els) => { tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); window.CROQUIS_3D_VELOCIDAD = 12; cqAbrirEditor({ titulo: "Casa", elementos: els }); cq.sel = "ix"; cqRender(); }, casa);
+    // R gira 15°, Shift+R vuelve
+    await page.keyboard.press("r");
+    assert.strictEqual(await page.evaluate(() => cq.elementos.find((e) => e.id === "ix").rot), 285);
+    await page.keyboard.press("Shift+R");
+    assert.strictEqual(await page.evaluate(() => cq.elementos.find((e) => e.id === "ix").rot), 270);
+    // Cámara: elegir MP y lente
+    await page.evaluate(() => { cq.sel = "ca"; cqRender(); });
+    await page.click('[data-acc="lente"]');
+    assert.strictEqual(await page.evaluate(() => cq.elementos.find((e) => e.id === "ca").lente), 3.6);
+    await page.click('[data-acc="mp"]');
+    assert.strictEqual(await page.evaluate(() => cq.elementos.find((e) => e.id === "ca").mp), 4);
+    // Shift + arrastrar en un lugar vacío: recuadro que elige varios
+    await page.evaluate(() => { cq.sel = null; cq.multi = []; cqRender(); });
+    const caja = await page.evaluate(() => { const r = cqSvg.getBoundingClientRect(); return [[r.left + 15, r.top + 15], [r.right - 80, r.bottom - 15]]; });
+    await page.keyboard.down("Shift");
+    await page.mouse.move(caja[0][0], caja[0][1]); await page.mouse.down(); await page.mouse.move(caja[1][0], caja[1][1], { steps: 5 }); await page.mouse.up();
+    await page.keyboard.up("Shift");
+    const elegidos = await page.evaluate(() => cq.multi.slice().sort());
+    assert.ok(["w1", "w2", "w3", "w4", "pe", "ix"].every((id) => elegidos.includes(id)), "recuadro: " + elegidos.join(","));
+    await page.evaluate(() => { cq.multi = []; cqRender(); });
+    // 3D
+    await page.click("#cqMenuBtn");
+    await page.click('[data-m="ver3d"]');
+    await page.waitForSelector(".v3-capa canvas", { timeout: 20000 });
+    assert.match(await page.textContent(".v3-ley"), /identifica una cara/);
+    // Tocar la cámara: hasta dónde identifica y reconoce
+    const [cx, cy] = await page.evaluate(() => window.__visor3d.visor.aPantalla(20, 310, 2.6));
+    await page.mouse.click(cx, cy);
+    await page.waitForFunction(() => /identifica una cara hasta/.test(document.querySelector(".v3-hoja").textContent));
+    await page.click('.v3-hoja [data-h="cerrar"]');
+    // Elegir por dónde entra
+    await page.click('.v3-barra [data-a="simular"]');
+    const ops = await page.$$eval(".v3-hoja [data-ent]", (bs) => bs.map((b) => b.textContent));
+    assert.ok(ops.includes("El peor caso") && ops.includes("El portón del frente") && ops.includes("Saltando el tapial"), ops.join(" | "));
+    await page.click('.v3-hoja [data-ent="peor"]');
+    assert.match(await page.textContent(".v3-aviso"), /El peor caso/);
+    await page.waitForSelector(".v3-hoja:not(.hidden) [data-h=otra]", { timeout: 30000 });
+    await page.click('.v3-hoja [data-h="cerrar"]');
+    // Arreglar el aviso del arbusto: girarlo
+    await page.evaluate(() => { document.querySelector(".v3-ley").open = true; const d = document.querySelector(".v3-avisos"); if (d) d.open = true; });
+    const idx = await page.evaluate(() => window.__visor3d.visor.analisis.avisos.findIndex((a) => a.tipo === "plantas"));
+    assert.ok(idx >= 0);
+    await page.click(`.v3-ley [data-arreglo="${idx}"]`);
+    await page.click('.v3-hoja [data-arr="girar"]');
+    await page.waitForFunction(() => !window.__visor3d.visor.analisis.avisos.some((a) => a.tipo === "plantas"), null, { timeout: 15000 });
+    const rot = await page.evaluate(() => cq.paginas[cq.pagina].elementos.find((e) => e.id === "ix").rot);
+    assert.notStrictEqual(rot, 270, "quedó girado en el croquis");
+    assert.deepStrictEqual(errores, []);
+    await ctx.close();
+  } finally { await nav.close(); }
+});

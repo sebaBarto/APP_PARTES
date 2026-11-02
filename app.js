@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.37.0";
+const APP_VERSION = "4.38.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -15752,7 +15752,7 @@ function cqRender(opciones) {
   cqEl("cqSubtitulo").textContent = cq.cliente ? `${cq.cliente}${cq.numero_cliente ? " · N° " + cq.numero_cliente : ""}` : "Tocá para poner cliente y título";
 }
 const CQ_AYUDAS = {
-  mover: (typeof matchMedia === "function" && matchMedia("(pointer: fine)").matches) ? "Hacé clic en un elemento para elegirlo y arrastralo. Teclado: flechas mueven (Shift: más), + / − tamaño, Ctrl+C / Ctrl+V / Ctrl+X, Supr borra, Ctrl+Z deshace." : "Tocá un elemento para elegirlo y arrastralo. Con dos dedos movés y hacés zoom.",
+  mover: (typeof matchMedia === "function" && matchMedia("(pointer: fine)").matches) ? "Hacé clic en un elemento para elegirlo y arrastralo (Shift+arrastrar: recuadro para elegir varios). Teclado: flechas mueven, R gira, + / − tamaño, Ctrl+C / V / X, Ctrl+A todo, Supr borra, Ctrl+Z deshace." : "Tocá un elemento para elegirlo y arrastralo. Con dos dedos movés y hacés zoom.",
   rect: "Arrastrá para dibujarla, o elegí un ambiente con medida y tocá el plano.",
   linea: "Arrastrá para trazar una pared. Después tocá dónde sigue para hacer los quiebres. «Medida» dibuja una cota con los metros.",
   cable: "Dibujá el cableado con el dedo.",
@@ -15875,6 +15875,7 @@ function cqRenderProps() {
   if (el.t === "simbolo") {
     html += `<span class="cq-props-tit">${escapeHtml(def.nombre || "")}</span>` + b("rot-", cqIc("rotIzq") + "15°", "Rotar a la izquierda") + b("rot+", cqIc("rotDer") + "15°", "Rotar a la derecha") + b("rot90", cqIc("rotDer") + "90°", "Rotar 90°");
     if (def.espejable) html += b("espejo", cqIc("espejo"), "Abrir para el otro lado");
+    if (/^camara/.test(el.tipo)) { const d = croquisCamaraDori(el); html += b("mp", d.mp + " MP", "Resolución de la cámara") + b("lente", String(d.lente).replace(".", ",") + " mm", `Lente: ${d.fov}° de ancho. Identifica hasta ${String(d.identifica).replace(".", ",")} m, reconoce hasta ${String(d.reconoce).replace(".", ",")} m`); }
     if (def.cat === "equipo") html += b("etq", cqIc("zona") + (el.etq ? escapeHtml(String(el.etq)).slice(0, 8) : "Zona"), "Número de zona o de dispositivo (vacío = no se muestra)") + b("inal", cqIc("wifi"), "Inalámbrico", el.inal) + b("inst", cqIc("nuevo") + "A instalar", "Marcar como equipo a instalar (va al presupuesto)", el.inst);
   }
   if (el.t === "rect") {
@@ -16077,6 +16078,7 @@ document.addEventListener("keydown", (ev) => {
       return;
     }
     if (l === "v") { hecho(); cqPegar(); return; }
+    if (l === "a") { hecho(); cq.sel = null; cq.multi = cq.elementos.filter((e) => !cqBloq(e)).map((e) => e.id); cqRender(); return; }
     if (l === "d") { if (cqCopiarElegidos()) { hecho(); cqPegar(); } return; }
     if (l === "z" && !ev.shiftKey) { hecho(); cqDeshacer(); return; }
     if (l === "y" || (l === "z" && ev.shiftKey)) { hecho(); cqRehacer(); return; }
@@ -16106,12 +16108,50 @@ document.addEventListener("keydown", (ev) => {
     cqRender(); cqGuardarBorrador();
     return;
   }
+  if (k === "r" || k === "R") {
+    // R gira 15° (Shift+R al revés); las habitaciones giran 90°.
+    hecho();
+    if (Date.now() - cqUltimaTecla > 700) cqMemoria(); else cq.cambios = true;
+    cqUltimaTecla = Date.now();
+    const g = ev.shiftKey ? -15 : 15;
+    if (els.length > 1) {
+      // Varios: giran juntos alrededor del centro.
+      const c = croquisCaja({ elementos: els }), cx = c.x + c.w / 2, cy = c.y + c.h / 2;
+      const a = (ev.shiftKey ? -90 : 90) * Math.PI / 180, gira = (x, y) => [Math.round(cx + (x - cx) * Math.cos(a) - (y - cy) * Math.sin(a)), Math.round(cy + (x - cx) * Math.sin(a) + (y - cy) * Math.cos(a))];
+      els.forEach((e) => cqGirarElemento(e, ev.shiftKey ? -90 : 90, gira));
+    } else els.forEach((e) => cqGirarElemento(e, g));
+    cqRender(); cqGuardarBorrador();
+    return;
+  }
   if (k === "Delete" || k === "Backspace") {
     hecho(); cqMemoria();
     const ids = new Set(els.map((e) => e.id)); cq.elementos = cq.elementos.filter((e) => !ids.has(e.id)); cq.sel = null; cq.multi = [];
     cqRender(); cqGuardarBorrador();
   }
 });
+// Girar un elemento "grados" sobre su centro (o con "mover" para llevar su
+// centro a otro lado, cuando giran varios juntos).
+function cqGirarElemento(e, grados, mover) {
+  const a = grados * Math.PI / 180;
+  if (e.t === "simbolo" || e.t === "texto" || e.t === "tabla") {
+    if (e.t === "simbolo") e.rot = ((Math.round((e.rot || 0) + grados) % 360) + 360) % 360;
+    if (mover) [e.x, e.y] = mover(e.x, e.y);
+    return;
+  }
+  if (e.t === "rect") {
+    const cx = e.x + e.w / 2, cy = e.y + e.h / 2;
+    let [nx, ny] = mover ? mover(cx, cy) : [cx, cy];
+    if (Math.abs(grados) % 180 === 90 || !mover && Math.abs(grados) < 90) { const w = e.w; e.w = e.h; e.h = w; }
+    e.x = Math.round(nx - e.w / 2); e.y = Math.round(ny - e.h / 2);
+    return;
+  }
+  const pts = e.t === "cable" ? e.pts : [[e.x1, e.y1], [e.x2, e.y2]];
+  const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length, cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+  const gira = mover || ((x, y) => [Math.round(cx + (x - cx) * Math.cos(a) - (y - cy) * Math.sin(a)), Math.round(cy + (x - cx) * Math.sin(a) + (y - cy) * Math.cos(a))]);
+  if (e.t === "cable") { e.pts = e.pts.map((p) => gira(p[0], p[1])); return; }
+  [e.x1, e.y1] = gira(e.x1, e.y1); [e.x2, e.y2] = gira(e.x2, e.y2);
+  if (Array.isArray(e.c)) e.c = gira(e.c[0], e.c[1]);
+}
 // Los tramos de una misma pared seguida (o soldados): cambian juntos.
 function cqTramosDe(el) {
   return (el.cadena ? cq.elementos.filter((y) => y.cadena === el.cadena && !cqBloq(y)) : cqDelGrupo(el)).filter((y) => y.t === "linea");
@@ -16195,6 +16235,12 @@ function cqAccion(acc) {
       if (acc === "alc-") el.alc = Math.max(30, pr.alc - 10);
       if (acc === "ang+") el.ang = Math.min(180, pr.ang + 5);
       if (acc === "ang-") el.ang = Math.max(10, pr.ang - 5);
+    }
+    if (acc === "mp" || acc === "lente") {
+      const d = croquisCamaraDori(el), lista = acc === "mp" ? [2, 4, 5, 8] : [2.8, 3.6, 4, 6, 8, 12];
+      el[acc] = lista[(lista.indexOf(d[acc]) + 1) % lista.length];
+      const n = croquisCamaraDori(el);
+      showToast(`${n.mp} MP, lente ${String(n.lente).replace(".", ",")} mm (${n.fov}°): identifica hasta ${String(n.identifica).replace(".", ",")} m, reconoce hasta ${String(n.reconoce).replace(".", ",")} m, detecta hasta ${String(Math.min(30, n.detecta)).replace(".", ",")} m.`);
     }
     if (acc === "electrico") {
       const on = !el.electrico;
@@ -16283,10 +16329,12 @@ cqSvg.addEventListener("pointerdown", (e) => {
     const libreEl = libre ? cq.elementos.find((x) => x.id === libre) : null;
     // Selección de varios: modo "elegir varios", soldados, o algo ya elegido en grupo.
     const grupoDe = libreEl ? cqDelGrupo(libreEl) : [];
-    if (libreEl && (cq.modoMulti || grupoDe.length > 1 || cq.multi.includes(libreEl.id))) {
+    // En la PC: Shift+clic suma al elegido (o a los elegidos).
+    if (libreEl && e.shiftKey && !cq.modoMulti && cq.sel && !cq.multi.length) cq.multi = cqDelGrupo(cq.elementos.find((x) => x.id === cq.sel) || libreEl).map((x) => x.id);
+    if (libreEl && (cq.modoMulti || e.shiftKey || grupoDe.length > 1 || cq.multi.includes(libreEl.id))) {
       const ids = grupoDe.map((x) => x.id);
       const yaEstaba = ids.every((id) => cq.multi.includes(id));
-      if (cq.modoMulti) { if (!yaEstaba) cq.multi = [...new Set([...cq.multi, ...ids])]; }
+      if (cq.modoMulti || e.shiftKey) { if (!yaEstaba) cq.multi = [...new Set([...cq.multi, ...ids])]; }
       else if (!yaEstaba) cq.multi = ids;
       cq.sel = null;
       const originales = new Map(cq.multi.map((id) => { const x = cq.elementos.find((q) => q.id === id); return [id, JSON.parse(JSON.stringify(x))]; }));
@@ -16294,7 +16342,8 @@ cqSvg.addEventListener("pointerdown", (e) => {
       cqRender();
       return;
     }
-    if (cq.modoMulti) {
+    // Recuadro para elegir varios: en modo "elegir varios" o, en la PC, con Shift + arrastrar.
+    if (cq.modoMulti || (e.shiftKey && !libreEl)) {
       cqGesto = { tipo: "lazo", inicio: [mx, my], fin: [mx, my] };
       return;
     }

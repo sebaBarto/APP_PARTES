@@ -979,3 +979,54 @@ test("Exterior: avisos para el técnico (plantas, pileta, reja hacia la vereda, 
   // La reja no tapa; el tapial sí: el exterior detecta en el jardín
   assert.ok(sinNorte.detecta([8, 10]).some((e) => e.id === "ix"));
 });
+
+test("Cámaras (identifica/reconoce/detecta según lente y MP), por dónde entra el intruso (peor caso, tapial eléctrico) y señal inalámbrica del hub", () => {
+  const vm = require("vm");
+  const ctx = { window: {}, document: { createElement: () => ({ getContext: () => null }) }, console };
+  ctx.window = ctx;
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(raiz, "croquis-utils.js"), "utf8") + "\n;" + fs.readFileSync(path.join(raiz, "croquis-3d.js"), "utf8") + "\n;this.C3=Croquis3D;this.dori=croquisCamaraDori;", ctx);
+  const d = ctx.dori({ tipo: "camara_ip" });
+  assert.strictEqual(d.mp, 2); assert.strictEqual(d.lente, 2.8);
+  assert.ok(d.identifica > 2.5 && d.identifica < 4, "2 MP 2,8 mm: identifica ~3 m: " + d.identifica);
+  assert.ok(Math.abs(d.reconoce - d.identifica * 2) < 0.2);
+  const tele = ctx.dori({ tipo: "camara_ip", mp: 4, lente: 6 });
+  assert.ok(tele.identifica > d.identifica * 2.5, "4 MP con 6 mm identifica mucho más lejos: " + tele.identifica);
+  const casa = [
+    { id: "w1", t: "linea", x1: 0, y1: 0, x2: 400, y2: 0 }, { id: "w2", t: "linea", x1: 400, y1: 0, x2: 400, y2: 300 },
+    { id: "w3", t: "linea", x1: 400, y1: 300, x2: 0, y2: 300 }, { id: "w4", t: "linea", x1: 0, y1: 300, x2: 0, y2: 0 },
+    { id: "pe", t: "simbolo", tipo: "puerta", x: 100, y: 300, rot: 0, esc: 1 },
+    { id: "mg", t: "simbolo", tipo: "magnetico", x: 110, y: 294, rot: 0, esc: 1 },
+    { id: "t1", t: "linea", x1: 0, y1: 300, x2: 0, y2: 600, cerco: "tapial", electrico: true },
+    { id: "rj", t: "linea", x1: 0, y1: 600, x2: 400, y2: 600, cerco: "reja" },
+    { id: "po", t: "simbolo", tipo: "porton_batiente", x: 300, y: 600, rot: 0, esc: 1 },
+    { id: "pi", t: "rect", x: 220, y: 380, w: 140, h: 80, cierre: "abierto", suelo: "pileta" },
+    { id: "ix", t: "simbolo", tipo: "infrarrojo_ext", x: 395, y: 305, rot: 270, esc: 1 },
+  ];
+  const a = ctx.C3.analizar(casa);
+  const textos = Array.from(a.opciones(), (o) => o.texto);
+  assert.ok(textos.includes("El portón del frente") && textos.some((t) => /Saltando el tapial \(eléctrico\)/.test(t)) && textos.some((t) => /Saltando la reja/.test(t)), textos.join(" | "));
+  const tapial = a.opciones().find((o) => /tapial/.test(o.texto));
+  const rt = a.recorrido(tapial.op);
+  assert.ok(rt.salto && rt.salto.electrico);
+  const dT = a.evaluar(rt);
+  assert.ok(dT != null && dT < 3, "el cerco eléctrico lo detecta al saltar: " + dT);
+  const peor = a.peorCaso();
+  const todas = Array.from(a.opciones(), (o) => { const v = a.evaluar(a.recorrido(o.op)); return v == null ? Infinity : v; });
+  assert.ok(peor && (peor.distancia == null ? Infinity : peor.distancia) === Math.max(...todas), "el peor caso es el que más lejos llega sin que lo detecten");
+  // Achicar el alcance arregla el aviso de la pileta
+  assert.ok(a.avisos.some((x) => x.tipo === "agua"));
+  const b = ctx.C3.analizar(casa.map((e) => (e.id === "ix" ? { ...e, alcReal: 1.5 } : e)));
+  assert.ok(!b.avisos.some((x) => x.tipo === "agua"));
+  // Señal: hub en una punta, un magnético inalámbrico lejos con muchas paredes
+  const larga = [{ id: "h1", t: "linea", x1: 0, y1: 0, x2: 2000, y2: 0 }, { id: "h2", t: "linea", x1: 0, y1: 200, x2: 2000, y2: 200 }, { id: "h3", t: "linea", x1: 0, y1: 0, x2: 0, y2: 200 }, { id: "h4", t: "linea", x1: 2000, y1: 0, x2: 2000, y2: 200 }];
+  for (let x = 300; x < 2000; x += 300) larga.push({ id: "d" + x, t: "linea", x1: x, y1: 0, x2: x, y2: 200 });
+  const conHub = [...larga, { id: "hub", t: "simbolo", tipo: "hub", x: 20, y: 100 }, { id: "mi", t: "simbolo", tipo: "magnetico", x: 1980, y: 100, inal: true }];
+  const s1 = ctx.C3.analizar(conHub);
+  const av = s1.avisos.find((x) => x.tipo === "senal");
+  assert.ok(av && av.equipo.id === "mi", "lejos y con 6 paredes: señal débil");
+  assert.strictEqual(Array.from(s1.senal)[0].paredes, 6);
+  const s2 = ctx.C3.analizar([...conHub, { id: "rep", t: "simbolo", tipo: "repetidor", x: 1000, y: 100 }]);
+  assert.ok(!s2.avisos.some((x) => x.tipo === "senal"), "con un repetidor en el medio, bien");
+  assert.ok(ctx.C3.analizar([...larga, { id: "mi", t: "simbolo", tipo: "magnetico", x: 1980, y: 100, inal: true }]).avisos.some((x) => x.tipo === "hub"));
+});

@@ -16,7 +16,7 @@
 //   simbolo { tipo, x, y, rot, esc, color?, esp? }  equipos y objetos de obra
 
 // Tiene que ser igual a APP_VERSION de app.js (si no, la app recarga).
-const CROQUIS_UTILS_VERSION = "4.37.0";
+const CROQUIS_UTILS_VERSION = "4.38.0";
 const CROQUIS_GRILLA = 20;
 
 // Cada símbolo se dibuja centrado en 0,0 con dib(color). "cat" separa los
@@ -1913,6 +1913,18 @@ function croquisCercoPuntos(el, paso) {
 }
 function croquisCercoCamino(el) {
   return Array.isArray(el.c) ? `M${el.x1} ${el.y1} Q${el.c[0]} ${el.c[1]} ${el.x2} ${el.y2}` : `M${el.x1} ${el.y1} L${el.x2} ${el.y2}`;
+}
+// Cámaras: hasta dónde detecta, observa, reconoce e identifica según el
+// lente y la resolución (densidad de píxeles, norma IEC 62676-4: 25, 62,
+// 125 y 250 píxeles por metro).
+const CROQUIS_LENTES = { 2.8: 100, 3.6: 84, 4: 80, 6: 54, 8: 40, 12: 27 };
+const CROQUIS_MP_PX = { 2: 1920, 4: 2560, 5: 2880, 8: 3840 };
+function croquisCamaraDori(e) {
+  const def = e && e.tipo === "camara_solar" ? { mp: 4, lente: 4 } : { mp: 2, lente: 2.8 };
+  const mp = CROQUIS_MP_PX[e && e.mp] ? Number(e.mp) : def.mp, lente = CROQUIS_LENTES[e && e.lente] ? Number(e.lente) : def.lente;
+  const fov = CROQUIS_LENTES[lente], px = CROQUIS_MP_PX[mp], k = px / (2 * Math.tan(fov / 2 * Math.PI / 180));
+  const r = (v) => Math.round(v * 10) / 10;
+  return { mp, lente, fov, identifica: r(k / 250), reconoce: r(k / 125), observa: r(k / 62), detecta: r(Math.min(40, k / 25)) };
 }
 // Alto de un cerco (se puede cambiar por elemento) y lo que mide su tapial.
 function croquisAltoCerco(e) {
