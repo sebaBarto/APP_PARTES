@@ -536,27 +536,77 @@ const Croquis3D = (() => {
   }
   // Losa de un piso de arriba: cubre lo que ocupa ese piso, con el hueco de
   // las escaleras que suben desde el piso de abajo.
-  function armarLosa(paredes, abajo) {
-    if (!paredes.length) return null;
-    const c = croquisCaja({ elementos: paredes });
-    const forma = new THREE.Shape();
-    const x0 = M(c.x), z0 = M(c.y), x1 = M(c.x + c.w), z1 = M(c.y + c.h);
-    // La forma se dibuja en (x, -z) y se gira para quedar acostada.
-    forma.moveTo(x0, -z0); forma.lineTo(x1, -z0); forma.lineTo(x1, -z1); forma.lineTo(x0, -z1); forma.lineTo(x0, -z0);
-    abajo.filter((e) => e && e.t === "simbolo" && CROQUIS_ESCALERA_CAJA[e.tipo]).forEach((e) => {
-      const [a, b, cc, d] = CROQUIS_ESCALERA_CAJA[e.tipo];
-      const q = [[a, b], [cc, b], [cc, d], [a, d]].map(([x, y]) => croquisLocalAMundo(e, x, y)).map(([x, y]) => [M(x), -M(y)]);
-      const hueco = new THREE.Path();
-      // Sentido contrario al contorno.
-      const area = q.reduce((s, p, i) => s + p[0] * q[(i + 1) % 4][1] - q[(i + 1) % 4][0] * p[1], 0);
-      const pts = area > 0 ? q.slice().reverse() : q;
-      hueco.moveTo(...pts[0]); pts.slice(1).forEach((p) => hueco.lineTo(...p)); hueco.lineTo(...pts[0]);
-      forma.holes.push(hueco);
+  // Losa de un piso de arriba: solo donde hay ambientes cerrados (y los
+  // balcones, terrazas y galerías), no el rectángulo que encierra todo. Se
+  // arma con una grilla de 20 cm: cada celda encerrada por paredes es losa.
+  function armarLosa(els, abajo) {
+    const segs = [];
+    els.forEach((e) => {
+      if (croquisEsCerco(e)) return;
+      if (e.t === "linea") segs.push([[M(e.x1), M(e.y1)], [M(e.x2), M(e.y2)]]);
+      else if (e.t === "rect" && (!e.forma || e.forma === "rect") && !e.cierre) {
+        const x = M(Math.min(e.x, e.x + e.w)), z = M(Math.min(e.y, e.y + e.h)), w = M(Math.abs(e.w)), h = M(Math.abs(e.h));
+        const q = [[x, z], [x + w, z], [x + w, z + h], [x, z + h]];
+        for (let k = 0; k < 4; k++) segs.push([q[k], q[(k + 1) % 4]]);
+      } else if (e.t === "simbolo" && CROQUIS_ABERTURAS.includes(e.tipo)) {
+        const w2 = (CROQUIS_ANCHO_ABERTURA[e.tipo] || 40) / 2, a = croquisLocalAMundo(e, -w2, 0), b = croquisLocalAMundo(e, w2, 0);
+        segs.push([[M(a[0]), M(a[1])], [M(b[0]), M(b[1])]]);
+      }
     });
-    const geo = new THREE.ExtrudeGeometry(forma, { depth: LOSA, bevelEnabled: false });
-    const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: "#D8D3C8" }));
-    m.rotation.x = -Math.PI / 2; m.position.y = -LOSA;
-    return m;
+    const extras = els.filter((e) => e.t === "rect" && e.cierre).map((e) => ({ x0: M(Math.min(e.x, e.x + e.w)), z0: M(Math.min(e.y, e.y + e.h)), x1: M(Math.max(e.x, e.x + e.w)), z1: M(Math.max(e.y, e.y + e.h)) }));
+    if (!segs.length && !extras.length) return null;
+    let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+    segs.forEach(([a, b]) => { x0 = Math.min(x0, a[0], b[0]); z0 = Math.min(z0, a[1], b[1]); x1 = Math.max(x1, a[0], b[0]); z1 = Math.max(z1, a[1], b[1]); });
+    extras.forEach((r) => { x0 = Math.min(x0, r.x0); z0 = Math.min(z0, r.z0); x1 = Math.max(x1, r.x1); z1 = Math.max(z1, r.z1); });
+    const paso = 0.2;
+    x0 -= paso; z0 -= paso; x1 += paso; z1 += paso;
+    const nx = Math.ceil((x1 - x0) / paso), nz = Math.ceil((z1 - z0) / paso);
+    if (nx * nz > 400000) return null;
+    const corta = (p, q, a, b) => {
+      const rx = q[0] - p[0], ry = q[1] - p[1], sx = b[0] - a[0], sy = b[1] - a[1], den = rx * sy - ry * sx;
+      if (Math.abs(den) < 1e-12) return false;
+      const t = ((a[0] - p[0]) * sy - (a[1] - p[1]) * sx) / den, u = ((a[0] - p[0]) * ry - (a[1] - p[1]) * rx) / den;
+      return t >= 0 && t <= 1 && u >= -0.001 && u <= 1.001;
+    };
+    const largo = Math.hypot(x1 - x0, z1 - z0);
+    const dirs = [0, 1, 2, 3, 4, 5, 6, 7].map((k) => [Math.cos(k * Math.PI / 4 + 0.13), Math.sin(k * Math.PI / 4 + 0.13)]);
+    const lleno = new Uint8Array(nx * nz);
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+      const p = [x0 + (i + 0.5) * paso, z0 + (j + 0.5) * paso];
+      if (extras.some((r) => p[0] >= r.x0 && p[0] <= r.x1 && p[1] >= r.z0 && p[1] <= r.z1)) { lleno[j * nx + i] = 1; continue; }
+      if (segs.length >= 3 && dirs.every((d) => segs.some(([a, b]) => corta(p, [p[0] + d[0] * largo, p[1] + d[1] * largo], a, b)))) lleno[j * nx + i] = 1;
+    }
+    // Una celda más alrededor, para que la losa llegue hasta abajo de las paredes.
+    const losa = lleno.slice();
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) if (!lleno[j * nx + i]) {
+      for (let dj = -1; dj <= 1 && !losa[j * nx + i]; dj++) for (let di = -1; di <= 1; di++) { const ii = i + di, jj = j + dj; if (ii >= 0 && jj >= 0 && ii < nx && jj < nz && lleno[jj * nx + ii]) { losa[j * nx + i] = 1; break; } }
+    }
+    // Hueco de la escalera del piso de abajo.
+    (abajo || []).filter((e) => e && e.t === "simbolo" && CROQUIS_ESCALERA_CAJA[e.tipo]).forEach((e) => {
+      const [a, b, cc, d] = CROQUIS_ESCALERA_CAJA[e.tipo];
+      const q = [[a, b], [cc, b], [cc, d], [a, d]].map(([x, y]) => croquisLocalAMundo(e, x, y)).map(([x, y]) => [M(x), M(y)]);
+      const dentro = (p) => { let c = false; for (let k = 0, l = 3; k < 4; l = k++) { if ((q[k][1] > p[1]) !== (q[l][1] > p[1]) && p[0] < (q[l][0] - q[k][0]) * (p[1] - q[k][1]) / (q[l][1] - q[k][1]) + q[k][0]) c = !c; } return c; };
+      for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) if (losa[j * nx + i] && dentro([x0 + (i + 0.5) * paso, z0 + (j + 0.5) * paso])) losa[j * nx + i] = 0;
+    });
+    // Tiras por fila -> cajas, todas en una sola malla.
+    const pos = [], nor = [];
+    for (let j = 0; j < nz; j++) {
+      let i = 0;
+      while (i < nx) {
+        if (!losa[j * nx + i]) { i++; continue; }
+        let k = i; while (k < nx && losa[j * nx + k]) k++;
+        const g = new THREE.BoxGeometry((k - i) * paso, LOSA, paso).toNonIndexed();
+        g.translate(x0 + (i + k) / 2 * paso, -LOSA / 2, z0 + (j + 0.5) * paso);
+        pos.push(...g.attributes.position.array); nor.push(...g.attributes.normal.array);
+        g.dispose();
+        i = k;
+      }
+    }
+    if (!pos.length) return null;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3));
+    return new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: "#D8D3C8" }));
   }
   function crear(contenedor, elementos, opciones) {
     const o = opciones || {};
@@ -665,7 +715,7 @@ const Croquis3D = (() => {
         const grilla = new THREE.GridHelper(Math.ceil(lado + 2), Math.ceil(lado + 2), 0xb5ad9f, 0xb5ad9f);
         grilla.position.set(cx, 0.005, cz); grilla.material.transparent = true; grilla.material.opacity = 0.35; padre.add(grilla);
       } else {
-        const losa = armarLosa(els.filter((e) => !croquisEsCerco(e) && (e.t === "linea" || e.t === "rect" && e.cierre !== "semi")), nv.abajo || []);
+        const losa = armarLosa(els, nv.abajo || []);
         if (losa) { padre.add(losa); if (nv.fantasma) fantasma(losa); }
       }
       armarEscaleras(els, padre);

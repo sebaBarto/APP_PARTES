@@ -4739,3 +4739,35 @@ test("Paletas ordenadas por uso: lo que más se pone queda primero (croquis y 3D
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Casa de dos plantas: la losa de arriba va solo donde hay ambientes y el balcón (no sobre el jardín de abajo)", async () => {
+  const nav = await navegador3D();
+  try {
+    const ctx = await nav.newContext({ serviceWorkers: "block", viewport: { width: 1000, height: 800 } });
+    const page = await ctx.newPage();
+    const errores = [];
+    page.on("pageerror", (e) => errores.push(e.message));
+    await page.route("**/api/**", (r) => r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+    await page.goto(base + "/");
+    await page.waitForTimeout(400);
+    const L = (id, x1, y1, x2, y2) => ({ id, t: "linea", x1, y1, x2, y2 });
+    const PB = [L("a", 0, 0, 400, 0), L("b", 400, 0, 400, 300), L("c", 400, 300, 0, 300), L("d", 0, 300, 0, 0), { id: "ja", t: "rect", x: -240, y: 0, w: 240, h: 300, cierre: "abierto", suelo: "cesped" }, { id: "ar", t: "simbolo", tipo: "arbol", x: -120, y: 150, rot: 0, esc: 1 }];
+    // Arriba: en L (sin el rincón de arriba a la derecha) y un balcón hacia abajo; una pared suelta lejos (no hace losa)
+    const PA = [L("e", 0, 0, 260, 0), L("f", 260, 0, 260, 200), L("g", 260, 200, 400, 200), L("h", 400, 200, 400, 300), L("i", 400, 300, 0, 300), L("j", 0, 300, 0, 0), L("k", -200, 50, -200, 250), { id: "bal", t: "rect", x: 0, y: 300, w: 200, h: 60, cierre: "balcon" }];
+    await page.evaluate(([pb, pa]) => { tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); cqAbrirEditor({ titulo: "Casa", paginas: [{ nombre: "PB", elementos: pb }, { nombre: "PA", elementos: pa }] }); }, [PB, PA]);
+    await page.click("#cqMenuBtn");
+    await page.click('[data-m="ver3d"]');
+    await page.waitForSelector(".v3-capa canvas", { timeout: 20000 });
+    const r = await page.evaluate(() => {
+      const ray = new THREE.Raycaster(); let losa = null;
+      window.__visor3d.visor.escena.traverse((o) => { if (o.isMesh && o.material && o.material.color && o.material.color.getHexString() === "d8d3c8") losa = o; });
+      if (!losa) return null;
+      const hay = (x, z) => { ray.set(new THREE.Vector3(x, 50, z), new THREE.Vector3(0, -1, 0)); return ray.intersectObject(losa).length > 0; };
+      return { casa: hay(2, 5), balcon: hay(2.5, 8.2), jardin: hay(-3, 3.75), rincon: hay(8.5, 2) };
+    });
+    assert.ok(r, "hay losa");
+    assert.deepStrictEqual(r, { casa: true, balcon: true, jardin: false, rincon: false });
+    assert.deepStrictEqual(errores, []);
+    await ctx.close();
+  } finally { await nav.close(); }
+});
