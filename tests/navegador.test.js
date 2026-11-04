@@ -3184,6 +3184,50 @@ test("Admin: el detalle de una instalación muestra su plano y la configuración
   await ctx.close();
 });
 
+test("Admin: a una instalación abierta se le carga el boceto del cliente y queda como plano de esa instalación", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const posts = [];
+  let lista = [];
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (req.method() === "POST") {
+      const b = JSON.parse(req.postData() || "{}");
+      posts.push({ u, ...b });
+      if (u.includes("/api/foto")) return json({ id: "abcdef0123456789" });
+      if (b.accion === "guardar") { lista = [{ id: "boc00001", instalacion: b.instalacion, titulo: b.titulo, autor: "Oficina", elementos: 0 }]; return json({ ok: true, id: "boc00001" }); }
+      return json({ ok: true });
+    }
+    if (u.includes("tipo=instalacion&id=9")) return json({ id: 9, cliente: "Bartolozzi", numero_cliente: "7117", direccion: "Mitre 100", estado: "abierta", zonas: [], canales: [], fotos: [], dias: [] });
+    if (u.includes("tipo=instalacion&id=8")) return json({ id: 8, cliente: "Lara", estado: "cerrada", zonas: [], canales: [], fotos: [], dias: [] });
+    if (u.includes("coleccion=croquis&instalacion=9")) return json(lista);
+    json([]);
+  });
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { document.getElementById("mainCard").classList.remove("hidden"); document.getElementById("panelInstalaciones").classList.remove("hidden"); return mostrarDetalleInstalacionAdmin(8); });
+  await page.waitForFunction(() => /Sin plano/.test(document.getElementById("instalacionPlanosAdmin").textContent));
+  assert.strictEqual(await page.locator("[data-cargar-plano]").count(), 0, "una instalación cerrada no ofrece cargar");
+  await page.evaluate(() => mostrarDetalleInstalacionAdmin(9));
+  await page.waitForSelector("[data-cargar-plano]");
+  const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGP8z8DAwMDAxMDAwMDAAAANHQEDasKb6QAAAABJRU5ErkJggg==", "base64");
+  const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.click("[data-cargar-plano]")]);
+  await chooser.setFiles({ name: "boceto casa.png", mimeType: "image/png", buffer: png });
+  await page.waitForFunction(() => /Listo/.test((document.querySelector("[data-plano-estado]") || {}).textContent || ""));
+  const g = posts.find((p) => p.accion === "guardar");
+  assert.strictEqual(g.instalacion, "9");
+  assert.strictEqual(g.cliente, "Bartolozzi");
+  assert.strictEqual(g.numero_cliente, "7117");
+  assert.match(g.titulo, /boceto casa/);
+  assert.strictEqual(g.dibujo.paginas.length, 1);
+  assert.strictEqual(g.dibujo.paginas[0].fondo.id, "abcdef0123456789", "el boceto queda de fondo para dibujar encima");
+  assert.match(await page.textContent("#instalacionPlanosAdmin"), /Boceto — boceto casa/, "aparece en la lista de la instalación");
+  assert.match(await page.textContent("[data-cargar-plano]"), /Cargar otro/);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
 test("Ampliación sobre el último plano (lo anterior atenuado) y al cerrar el plano va a la carpeta de Visio (PDF + SVG)", async () => {
   const { ctx, page, erroresPagina } = await nuevaPagina();
   const posts = [];

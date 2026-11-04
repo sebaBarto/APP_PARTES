@@ -8179,7 +8179,7 @@ async function mostrarDetalleInstalacionAdmin(id) {
     `;
 
     document.getElementById("instalacionBorrarBtn").addEventListener("click", () => borrarInstalacionAdmin(id, inst.cliente, inst.estado));
-    planosDeInstalacionAdmin(id, document.getElementById("instalacionPlanosAdmin"));
+    planosDeInstalacionAdmin(id, document.getElementById("instalacionPlanosAdmin"), inst);
     // Las fotos piden el pase de la sesión (un <img src> común no lo manda).
     instalacionesAdminDetalleContenido.querySelectorAll("img.inst-foto-pase").forEach(async (img) => {
       try {
@@ -8846,22 +8846,99 @@ async function descargarCroquisAdmin(id, acc) {
   croquisDescargar(blob, croquisNombreArchivo(d, acc));
 }
 // Planos de una instalación, dentro de su detalle (pestaña Instalaciones).
-async function planosDeInstalacionAdmin(id, caja) {
+async function planosDeInstalacionAdmin(id, caja, inst) {
+  const abierta = !!inst && inst.estado !== "cerrada";
+  // Instalación abierta: la oficina le puede cargar el boceto o plano del
+  // cliente (PDF o foto) para que el técnico dibuje directo encima.
+  const cargador = (hay) => !abierta ? "" : `<div class="inst-plano-cargar" style="margin-top:10px;padding:12px 14px;border:1px dashed rgba(128,128,128,.45);border-radius:10px;">
+      <button type="button" class="btn-secondary" data-cargar-plano>📄 ${hay ? "Cargar otro" : "Cargar"} PDF / boceto del cliente</button>
+      <label style="display:block;font-size:13px;margin-top:8px;"><input type="checkbox" data-plano-editable checked> Si es un PDF dibujado, pasarlo a croquis editable (paredes, puertas, ventanas)</label>
+      <label style="display:block;font-size:13px;margin-top:4px;"><input type="checkbox" data-plano-ia checked> Revisar también con IA (tarda unos segundos)</label>
+      <p style="font-size:12px;opacity:.7;margin:6px 0 0;">Si es un boceto a mano, una foto o un PDF escaneado, queda de fondo y el técnico dibuja encima. Lo ve en la APP, en esta instalación → Plano.</p>
+      <p data-plano-estado style="font-size:13px;margin:6px 0 0;"></p>
+    </div>`;
+  const engancharCargador = () => {
+    const b = caja.querySelector("[data-cargar-plano]");
+    if (!b) return;
+    b.addEventListener("click", async () => {
+      const est = caja.querySelector("[data-plano-estado]");
+      const archivo = await elegirArchivoCroquisBase();
+      if (!archivo) return;
+      b.disabled = true;
+      est.style.color = "";
+      est.textContent = "Convirtiendo y subiendo el plano...";
+      try {
+        const r = await cargarPlanoEnInstalacionAdmin(id, inst, archivo, { editable: caja.querySelector("[data-plano-editable]").checked, ia: caja.querySelector("[data-plano-ia]").checked }, (t) => { est.textContent = t; });
+        await planosDeInstalacionAdmin(id, caja, inst);
+        const est2 = caja.querySelector("[data-plano-estado]");
+        if (est2) { est2.style.color = "#1F6B34"; est2.textContent = r; }
+      } catch (err) {
+        est.style.color = "#C0392B";
+        est.textContent = "No se pudo: " + err.message;
+        b.disabled = false;
+      }
+    });
+  };
   try {
     const r = await fetch(`/api/datos?coleccion=croquis&instalacion=${encodeURIComponent(id)}`, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || "HTTP " + r.status);
     const lista = (Array.isArray(d) ? d : []).filter((c) => String(c.instalacion || "") === String(id));
-    if (!lista.length) { caja.innerHTML = "<p style='color:#6B7680;'>Sin plano cargado.</p>"; return; }
+    if (!lista.length) { caja.innerHTML = "<p style='color:#6B7680;'>Sin plano cargado.</p>" + cargador(false); engancharCargador(); return; }
     caja.innerHTML = lista.map((c, i) => `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(128,128,128,.25);">
       <div><b>${escapeHtmlAdmin(c.titulo || "Croquis")}</b>${c.cerrado ? ' <span style="font-size:11px;background:#FFF4E5;color:#8A4B00;border-radius:8px;padding:1px 6px;">Cerrado</span>' : ""}<br><span style="font-size:12px;opacity:.7;">${escapeHtmlAdmin(c.autor || "")} · ${Number(c.elementos) || 0} elementos${c.paginas > 1 ? " · " + c.paginas + " páginas" : ""}</span></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;"><button type="button" class="btn-secondary" data-pi="ver" data-i="${i}">Ver</button><button type="button" class="btn-secondary" data-pi="pdf" data-i="${i}">PDF</button><button type="button" class="btn-secondary" data-pi="png" data-i="${i}">Imagen</button><button type="button" class="btn-secondary" data-pi="svg" data-i="${i}" title="Se abre y edita en Visio">SVG (Visio)</button></div>
-    </div>`).join("");
+    </div>`).join("") + cargador(true);
+    engancharCargador();
     caja.querySelectorAll("[data-pi]").forEach((b) => b.addEventListener("click", async () => {
       b.disabled = true;
       try { await descargarCroquisAdmin(lista[Number(b.dataset.i)].id, b.dataset.pi); } catch (err) { alert("No se pudo: " + err.message); } finally { b.disabled = false; }
     }));
   } catch (err) { caja.innerHTML = `<p style="color:#C0392B;">No se pudo cargar el plano: ${escapeHtmlAdmin(err.message)}</p>`; }
+}
+// Archivo del cliente -> croquis de la instalación (lo mismo que hace la APP
+// al importar un plano). Devuelve el texto para mostrar.
+async function cargarPlanoEnInstalacionAdmin(id, inst, archivo, op, aviso) {
+  const datos = { instalacion: String(id), cliente: inst.cliente || "", numero_cliente: String(inst.numero_cliente || ""), direccion: inst.direccion || "" };
+  const base = String(archivo.name || "").replace(/\.[a-z0-9]+$/i, "").trim();
+  const esPdf = /pdf$/i.test(archivo.type || "") || /\.pdf$/i.test(archivo.name || "");
+  if (esPdf && op.editable) {
+    const bytes = new Uint8Array(await archivo.arrayBuffer());
+    let ed = null;
+    try { ed = await croquisPdfAEditable(bytes, CROQUIS_MAX_HOJAS); } catch (e) { ed = null; }
+    if (ed) {
+      aviso("Es un dibujo: pasándolo a croquis editable...");
+      const imgs = await croquisPdfAImagenes(bytes.slice(), 2000, ed.paginas.length);
+      const paginas = [];
+      let ia = 0, iaError = "";
+      for (const p of ed.paginas) {
+        const img = imgs[p.hoja - 1];
+        if (img && op.ia) {
+          aviso(`Revisando con IA${ed.paginas.length > 1 ? ` la hoja ${p.hoja}` : ""}...`);
+          try {
+            const r = await fetch("/api/datos?coleccion=croquis", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ accion: "aberturas_plano", imagen: img.base64, instalacion: String(id) }) });
+            const d = await r.json().catch(() => ({}));
+            if (r.ok && Array.isArray(d.objetos)) {
+              const f = croquisFusionarDetecciones(p.elementos, d.objetos, p.marco);
+              ["puertas", "ventanas", "escaleras", "pasos"].forEach((k) => { ed.resumen[k] = (ed.resumen[k] || 0) + f[k]; });
+              ia += f.puertas + f.ventanas + f.escaleras + f.pasos + f.corregidas;
+            } else iaError = d.error || "la IA no respondió";
+          } catch (e) { iaError = "sin conexión con la IA"; }
+        }
+        let fondo = null;
+        if (img) { const f = await croquisSubirPlanoBase(img, SERVICIOS_API_TOKEN); fondo = { id: f.id, x: p.marco.x, y: p.marco.y, w: p.marco.w, h: p.marco.h }; }
+        paginas.push({ nombre: p.nombre, elementos: p.elementos, fondo });
+      }
+      const titulo = (ed.titulo || base || "Plano del cliente").slice(0, 120);
+      await guardarCroquisAdmin({ titulo, ...datos, dibujo: { v: 2, elementos: paginas[0].elementos, paginas, ...(paginas[0].fondo ? { fondo: paginas[0].fondo } : {}) } });
+      const s = ed.resumen;
+      return `Listo: quedó como croquis editable — ${s.paredes || 0} paredes, ${s.puertas || 0} puertas${s.ventanas ? `, ${s.ventanas} ventanas` : ""}${s.escaleras ? `, ${s.escaleras} escaleras` : ""}${paginas.length > 1 ? `, en ${paginas.length} hojas` : ""}.${ia ? ` La IA sumó o corrigió ${ia}.` : iaError ? ` (No se pudo revisar con IA: ${iaError}.)` : ""} El técnico lo abre en la APP, en esta instalación → Plano.`;
+    }
+  }
+  const imgs = await croquisArchivoAImagenes(archivo, 2400, CROQUIS_MAX_HOJAS);
+  const fondos = await croquisSubirPlanosBase(imgs, SERVICIOS_API_TOKEN);
+  await guardarCroquisAdmin({ titulo: (base ? "Boceto — " + base : "Boceto del cliente").slice(0, 120), ...datos, dibujo: { v: 2, elementos: [], paginas: croquisPaginasDesdeFondos(fondos), fondo: fondos[0] } });
+  return `Listo: el boceto quedó de fondo${fondos.length > 1 ? ` (${fondos.length} hojas, una página por hoja)` : ""}. El técnico lo abre en la APP, en esta instalación → Plano, y dibuja encima.`;
 }
 // ---------- Plano de la casa (de Visio) para un cliente ----------
 function elegirArchivoCroquisBase() {
