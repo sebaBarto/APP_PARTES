@@ -3228,6 +3228,51 @@ test("Admin: a una instalación abierta se le carga el boceto del cliente y qued
   await ctx.close();
 });
 
+test("Admin: el croquis de una instalación abierta se edita en el editor de la APP (otra pestaña con la sesión de la oficina) y se puede borrar", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const posts = [];
+  let lista = [{ id: "boc00001", instalacion: "9", titulo: "Boceto — casa", autor: "Oficina", elementos: 1 }];
+  const reg = { id: "boc00001", instalacion: "9", titulo: "Boceto — casa", cliente: "Bartolozzi", numero_cliente: "7117", autor: "Oficina", dibujo: { v: 2, elementos: [{ id: "p1", t: "linea", x1: 0, y1: 0, x2: 200, y2: 0 }], paginas: [{ nombre: "Página 1", elementos: [{ id: "p1", t: "linea", x1: 0, y1: 0, x2: 200, y2: 0 }] }] } };
+  await ctx.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  const api = (route) => {
+    const req = route.request(), u = req.url();
+    const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (req.method() === "POST") {
+      const b = JSON.parse(req.postData() || "{}");
+      posts.push({ u, auth: req.headers().authorization, ...b });
+      if (b.accion === "borrar") { lista = []; return json({ ok: true }); }
+      if (b.accion === "guardar") return json({ ok: true, id: b.id, actualizado: "2026-11-04T15:00:00Z" });
+      return json({ ok: true });
+    }
+    if (u.includes("tipo=instalacion&id=9")) return json({ id: 9, cliente: "Bartolozzi", numero_cliente: "7117", estado: "abierta", zonas: [], canales: [], fotos: [], dias: [] });
+    if (u.includes("coleccion=croquis&instalacion=9")) return json(lista);
+    if (u.includes("coleccion=croquis&id=boc00001")) return json(reg);
+    json([]);
+  };
+  await ctx.route("**/api/**", api);
+  await page.route("**/api/**", api);
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { sessionStorage.setItem("admin_pase", "paseoficina123"); sessionStorage.setItem("admin_nombre", "Seba"); SERVICIOS_API_TOKEN = "paseoficina123"; document.getElementById("mainCard").classList.remove("hidden"); document.getElementById("panelInstalaciones").classList.remove("hidden"); return mostrarDetalleInstalacionAdmin(9); });
+  await page.waitForSelector('[data-pi="editar"]');
+  const [pop] = await Promise.all([page.waitForEvent("popup"), page.click('[data-pi="editar"]')]);
+  await pop.waitForFunction(() => typeof screens !== "undefined" && screens.croquis.dataset.active === "true", null, { timeout: 15000 });
+  assert.strictEqual(await pop.evaluate(() => cq.elementos.length), 1, "abre el croquis con lo que tenía");
+  assert.strictEqual(await pop.evaluate(() => localStorage.getItem("sat_api_sesion")), null, "no pisa la sesión de técnico del navegador");
+  await pop.evaluate(() => { cq.elementos.push({ id: "s1", t: "simbolo", tipo: "infrarrojo", x: 100, y: 50 }); cq.cambios = true; return cqGuardar(); });
+  const g = posts.find((p) => p.accion === "guardar");
+  assert.strictEqual(g.auth, "Bearer paseoficina123", "guarda con la sesión de la oficina");
+  assert.strictEqual(g.instalacion, "9");
+  assert.strictEqual(g.dibujo.elementos.length, 2);
+  await Promise.all([pop.waitForEvent("close"), pop.click("#volverDeCroquisBtn")]);
+  page.once("dialog", (d) => d.accept());
+  await page.click('[data-pi="borrar"]');
+  await page.waitForFunction(() => /Sin plano/.test(document.getElementById("instalacionPlanosAdmin").textContent));
+  assert.ok(posts.some((p) => p.accion === "borrar" && p.id === "boc00001"));
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
 test("Ampliación sobre el último plano (lo anterior atenuado) y al cerrar el plano va a la carpeta de Visio (PDF + SVG)", async () => {
   const { ctx, page, erroresPagina } = await nuevaPagina();
   const posts = [];

@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.41.0";
+const APP_VERSION = "4.42.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -14822,7 +14822,34 @@ async function abrirPlano(nombre, boton) {
 
 // Al abrir la app, si hay una sesión guardada y vigente, entra directo
 // sin pasar por el login (ver SESION_DURACION_MS más arriba).
-if (intentarRestaurarSesion()) bloquearSiCorresponde();
+// Editor de la oficina: el admin abre un croquis (index.html?editor=croquis&id=...)
+// en una pestaña nueva, que hereda su sesión de admin (sessionStorage de la
+// pestaña que la abrió). No toca la sesión de técnico guardada en este navegador.
+const editorOficina = (() => {
+  try {
+    const p = new URLSearchParams(busquedaInicialApp || location.search);
+    if (p.get("editor") !== "croquis") return null;
+    history.replaceState(null, "", location.pathname);
+    const id = p.get("id") || "", pase = sessionStorage.getItem("admin_pase") || "";
+    return { id: /^[a-z0-9]{6,32}$/.test(id) ? id : "", pase, nombre: sessionStorage.getItem("admin_nombre") || "Oficina" };
+  } catch (e) { return null; }
+})();
+async function abrirEditorOficina(eo) {
+  document.body.classList.add("modo-oficina");
+  if (!eo.pase || !eo.id) { loginError.textContent = "Para preparar un croquis, abrilo desde el panel de administración (Instalaciones → Plano → Editar)."; return; }
+  SERVICIOS_API_TOKEN = eo.pase;
+  tecnicoLogueado = eo.nombre;
+  try {
+    const r = await fetch(`/api/datos?coleccion=croquis&id=${encodeURIComponent(eo.id)}`, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "HTTP " + r.status);
+    const dib = d.dibujo || {};
+    cqAbrirEditor({ id: d.id, instalacion: d.instalacion || "", volverA: "oficina", publicado: !!d.publicado, titulo: d.titulo, cliente: d.cliente, numero_cliente: d.numero_cliente, direccion: d.direccion, autor: d.autor, actualizado: d.actualizado, elementos: dib.elementos || [], fondo: dib.fondo || null, paginas: dib.paginas || null, medidas: !!dib.medidas });
+    showToast("Editando como " + eo.nombre + ". Al terminar, Guardar y volver.");
+  } catch (err) { loginError.textContent = "No se pudo abrir el croquis: " + err.message; }
+}
+if (editorOficina) abrirEditorOficina(editorOficina);
+else if (intentarRestaurarSesion()) bloquearSiCorresponde();
 
 // ============================================================
 // PRESUPUESTO EXPRESS
@@ -17226,6 +17253,13 @@ cqEl("cqMenuBtn").addEventListener("click", () => {
 cqEl("volverDeCroquisBtn").addEventListener("click", async () => {
   if (!cq.soloLectura && cq.cambios && (cqTodosLosElementos().length || cqHayBase())) {
     if (confirm("Tenés cambios sin guardar en el servidor. ¿Guardarlos antes de salir?")) { const ok = await cqGuardar(); if (!ok) return; }
+  }
+  if (cq.volverA === "oficina") {
+    // Vuelve al admin: avisa a la pestaña que lo abrió para que refresque la lista.
+    try { if (window.opener) window.opener.postMessage({ tipo: "croquis-editado", id: cq.id }, location.origin); } catch (e) { /* nada */ }
+    window.close();
+    setTimeout(() => showToast("Listo. Ya podés cerrar esta pestaña."), 300);
+    return;
   }
   if (cq.volverA === "instalacion") { showScreen("instalacion"); instPlanoCargar(); return; }
   if (cq.volverA && screens[cq.volverA]) { showScreen(cq.volverA); return; }
