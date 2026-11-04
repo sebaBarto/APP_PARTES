@@ -4692,9 +4692,7 @@ test("Lista de elementos (elegir uno lo selecciona y lo centra), capas de alarma
     await page.fill(".cq-lista-panel input", "zona 1");
     await page.click('.cq-lista-item[data-id="mg"]');
     assert.strictEqual(await page.evaluate(() => cq.sel), "mg");
-    await page.waitForTimeout(200);
-    const centrado = await page.evaluate(() => { const r = cqSvg.getBoundingClientRect(); const [x, y] = cqAMundo(r.left + r.width / 2, r.top + r.height / 2); return Math.hypot(x - 1500, y - 1500) < 40; });
-    assert.ok(centrado, "quedó en el centro de la pantalla");
+    await page.waitForFunction(() => { const r = cqSvg.getBoundingClientRect(); const [x, y] = cqAMundo(r.left + r.width / 2, r.top + r.height / 2); return Math.hypot(x - 1500, y - 1500) < 40; }, null, { timeout: 3000 });
     // Se mueve con las flechas, como cualquier elegido
     await page.keyboard.press("ArrowLeft");
     assert.strictEqual(await page.evaluate(() => cq.elementos.find((e) => e.id === "mg").x), 1490);
@@ -4821,6 +4819,69 @@ test("Croquis subido al cliente: aparece en la ficha del cliente y en la búsque
   await page.evaluate(() => { showScreen("planos"); planosCache = []; return cargarPlanos(); });
   await page.fill("#planosBuscarInput", "bartolozzi");
   await page.waitForSelector('#planosResultados [data-croquis-id="abc123"]', { timeout: 8000 });
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Conciliación de SIMs: números mal cargados (un dígito), comparación con la conciliación anterior, y alarmas que no comunican según el reporte del monitoreo", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: route.request().url().includes("xlsx.full.min.js") ? require("fs").readFileSync(require("path").join(__dirname, "..", "vendor", "xlsx.full.min.js"), "utf8") : "" }));
+  const instaladas = [
+    { numero: "3415550020", empresa: "Claro", cliente: "Kiosco", estado_linea: "Activo", numero_abonado: "555" },
+    { numero: "3415550030", empresa: "Claro", cliente: "Panadería", estado_linea: "Activo", numero_abonado: "0777" },
+    { numero: "3415550044", empresa: "Claro", cliente: "Ferretería", estado_linea: "Activo", numero_abonado: "999" },
+  ];
+  const acciones = [], corridas = [{ id: "old", empresa: "Claro", fecha: "2026-10-01T12:00:00Z", archivo: "claro octubre.xlsx", numeros: { noEnPlanilla: ["3415550044", "3415550099"] } }];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("coleccion=sims_conciliacion") && u.includes("historial=1")) return json(corridas);
+    if (u.includes("coleccion=sims_conciliacion") && req.method() === "GET") return json([]);
+    if (req.method() === "POST") { const b = JSON.parse(req.postData() || "{}"); acciones.push(b); return json({ ok: true }); }
+    if (u.includes("coleccion=sims_instaladas")) return json(instaladas);
+    if (u.includes("coleccion=sims")) return json([]);
+    if (u.includes("recurso=sim")) return json([]);
+    json([]);
+  });
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { document.getElementById("mainCard").classList.remove("hidden"); document.getElementById("panelSimsControl").classList.remove("hidden"); return cargarControlSims(); });
+  const xlsx = (filas) => page.evaluate((f) => { const lb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(lb, XLSX.utils.json_to_sheet(f), "H"); return Array.from(new Uint8Array(XLSX.write(lb, { type: "array", bookType: "xlsx" }))); }, filas);
+  // Planilla de Claro: la 0031 es la 0030 de SAT con un dígito mal
+  await page.setInputFiles("#simsConcArchivo", { name: "claro noviembre.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer: Buffer.from(await xlsx([{ Línea: "3415550020", Estado: "Activa" }, { Línea: "3415550031", Estado: "Activa" }])) });
+  await page.waitForSelector('.conc-bloque[data-k="posibleError"]');
+  const r = await page.evaluate(() => ({ err: ultimaConciliacion.posibleError.map((x) => [x.n, x.x.numero]), sin: ultimaConciliacion.sinRegistrar.map((x) => x.n), no: ultimaConciliacion.noEnPlanilla.map((x) => x.n) }));
+  assert.deepStrictEqual(r, { err: [["3415550031", "3415550030"]], sin: [], no: ["3415550044"] }, "el par no queda repetido en las otras listas");
+  // Comparación con la de octubre
+  const comp = await page.textContent(".conc-comparacion");
+  assert.match(comp, /Contra la conciliación del 01\/10\/2026/);
+  assert.match(comp, /2 → 2/); assert.match(comp, /1 nuevas · 1 ya no aparecen/);
+  assert.ok(await page.$('.conc-bloque[data-k="posibleError"] .conc-nueva'), "la del número mal cargado es nueva");
+  assert.ok(!(await page.$('.conc-bloque[data-k="noEnPlanilla"] .conc-nueva')), "la 0044 ya estaba el mes pasado");
+  await page.waitForFunction(() => true);
+  await page.waitForTimeout(1000);
+  const guardada = acciones.find((a) => a.accion === "guardar_corrida");
+  assert.ok(guardada && guardada.empresa === "Claro" && guardada.numeros.posibleError[0] === "3415550030", "se guarda la corrida para la próxima vez");
+  // Corregir el número en SAT
+  await page.click('.conc-acc[data-k="posibleError"][data-a="corregir"]');
+  await page.click(".cartel-admin .cartel-si");
+  await page.waitForFunction(() => /resuelta/.test(document.getElementById("simsConcStatus").textContent));
+  assert.ok(acciones.some((a) => a.accion === "corregir_numero" && a.numero === "3415550030" && a.numero_nuevo === "3415550031"));
+  // Reporte del monitoreo: el 555 hace 40 días que no comunica, el 777 comunicó hoy, el 999 no figura
+  const hace = (d) => { const f = new Date(Date.now() - d * 86400000); return `${String(f.getDate()).padStart(2, "0")}/${String(f.getMonth() + 1).padStart(2, "0")}/${f.getFullYear()} 10:30`; };
+  await page.setInputFiles("#simsComArchivo", { name: "reporte monitoreo.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer: Buffer.from(await xlsx([{ "Cuenta / Abonado": "0555", Nombre: "Kiosco", "Última señal": hace(40) }, { "Cuenta / Abonado": "777", Nombre: "Panadería", "Última señal": hace(0) }])) });
+  await page.waitForSelector("#simsComResultado .sims-resumen");
+  const com = await page.textContent("#simsComResultado");
+  assert.match(com, /Sin comunicar hace más de 30 días\s*1/);
+  assert.match(com, /Kiosco[\s\S]*hace (39|40) días/);
+  assert.match(com, /No están en el reporte\s*1/);
+  await page.selectOption("#simsComDias", "60");
+  assert.match(await page.textContent("#simsComResultado"), /Todas las alarmas con SIM comunicaron en los últimos 60 días/);
+  await page.selectOption("#simsComDias", "30");
+  await page.click('.com-acc[data-t="v"][data-a="inactiva"]');
+  await page.click(".cartel-admin .cartel-si");
+  await page.waitForFunction(() => /marcada inactiva/.test(document.getElementById("simsComStatus").textContent));
+  assert.ok(acciones.some((a) => a.accion === "editar_instalada" && a.numero === "3415550020" && a.campos.estado_linea === "Inactivo"));
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });

@@ -1221,6 +1221,16 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
         <p class="status" id="simsConcStatus"></p>
         <div id="simsConcResultado"></div>
       </div>
+      <div class="card">
+        <h3 style="margin-top:0;">Alarmas que no comunican (reporte del monitoreo)</h3>
+        <p class="subtitle" style="margin-top:0;">Subí el reporte del software de monitoreo (Excel o CSV) con el N° de abonado y la fecha de la última señal. Se cruza con las SIMs instaladas: las que hace mucho no comunican pueden tener la línea dada de baja, sin saldo o el equipo apagado.</p>
+        <div class="field-row">
+          <label style="display:flex;align-items:center;gap:6px;width:auto;">Sin comunicar hace más de <select id="simsComDias" style="width:auto;"><option>3</option><option>7</option><option>15</option><option selected>30</option><option>60</option><option>90</option></select> días</label>
+          <input type="file" id="simsComArchivo" accept=".xlsx,.xls,.csv">
+        </div>
+        <p class="status" id="simsComStatus"></p>
+        <div id="simsComResultado"></div>
+      </div>
     </div>
 
     <div id="panelSimsInstaladas" class="hidden">
@@ -5032,12 +5042,19 @@ async function cargarControlSims() {
     const [stock, inst, hist] = await Promise.all([rs.json(), ri.json(), rh.json()]);
     // Lo que se marcó como resuelto o para ignorar en la conciliación.
     let ignoradas = [];
-    try { const rg = await fetch("/api/datos?coleccion=sims_conciliacion", { headers: h, cache: "no-store" }); const dg = await rg.json(); if (rg.ok && Array.isArray(dg)) ignoradas = dg; } catch (e) { /* sin esto se muestra todo */ }
+    let corridas = [];
+    try {
+      const [rg, rc] = await Promise.all([fetch("/api/datos?coleccion=sims_conciliacion", { headers: h, cache: "no-store" }), fetch("/api/datos?coleccion=sims_conciliacion&historial=1", { headers: h, cache: "no-store" })]);
+      const [dg, dc] = await Promise.all([rg.json(), rc.json()]);
+      if (rg.ok && Array.isArray(dg)) ignoradas = dg;
+      if (rc.ok && Array.isArray(dc)) corridas = dc;
+    } catch (e) { /* sin esto se muestra todo */ }
     controlSims = {
       stock: Array.isArray(stock) ? stock : [],
       instaladas: Array.isArray(inst) ? inst : [],
       historial: Array.isArray(hist) ? hist : [],
       ignoradas,
+      corridas,
     };
     st.textContent = `${controlSims.stock.filter((x) => x.ubicacion_tipo !== "cliente").length} en stock · ${controlSims.instaladas.length} instaladas · ${controlSims.historial.length} movimientos.`;
     renderControlSims();
@@ -5341,6 +5358,28 @@ function conciliarSims(filasPlanilla, empresa, opciones) {
     if (x.empresa !== empresa || /inactiv|baja/i.test(x.estado_linea || "")) return;
     if (!plan.has(soloDigitosLinea(x.numero))) r.noEnPlanilla.push({ n: soloDigitosLinea(x.numero), x });
   });
+  // Números mal cargados: uno de la planilla (que no está en SAT) y uno de SAT
+  // de esta empresa (que no está en la planilla) que difieren en un dígito o
+  // en dos dígitos seguidos cambiados de lugar: probablemente la misma línea.
+  r.posibleError = [];
+  const parecidos = (a, b) => {
+    if (a.length !== 10 || b.length !== 10 || a === b) return false;
+    const d = []; for (let i = 0; i < 10; i++) if (a[i] !== b[i]) d.push(i);
+    return d.length === 1 || (d.length === 2 && d[1] === d[0] + 1 && a[d[0]] === b[d[1]] && a[d[1]] === b[d[0]]);
+  };
+  const enSatSinPlanilla = [
+    ...r.noEnPlanilla.map((it) => ({ n: it.n, x: it.x, donde: "instalada", de: "noEnPlanilla" })),
+    ...simsEnStockControl().filter((x) => (x.empresa || "") === empresa && !plan.has(soloDigitosLinea(x.numero))).map((x) => ({ n: soloDigitosLinea(x.numero), x, donde: "stock" })),
+  ];
+  const usados = new Set();
+  r.sinRegistrar = r.sinRegistrar.filter((it) => {
+    const par = enSatSinPlanilla.find((o) => !usados.has(o.n) && parecidos(it.n, o.n));
+    if (!par) return true;
+    usados.add(par.n);
+    r.posibleError.push({ n: it.n, x: par.x, donde: par.donde });
+    return false;
+  });
+  r.noEnPlanilla = r.noEnPlanilla.filter((it) => !usados.has(it.n));
   // Las que se dieron de baja en SAT primero (son plata que se va sin motivo).
   r.sinRegistrar.sort((a, b) => (a.ctx.tipo !== "baja") - (b.ctx.tipo !== "baja"));
   // Las marcadas como resueltas o para ignorar no se muestran (siguen en "Ocultas").
@@ -5356,9 +5395,49 @@ function conciliarSims(filasPlanilla, empresa, opciones) {
   return r;
 }
 
-let concEstado = null; // { filas, empresa, archivo, opciones }
+let concEstado = null; // { filas, empresa, archivo, opciones, id }
+// Comparación con la conciliación anterior de la misma empresa (lo nuevo y lo que ya no aparece).
+function concComparar(r) {
+  const prev = (controlSims.corridas || []).filter((c) => c.empresa === concEstado.empresa && c.id !== concEstado.id).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)))[0] || null;
+  r.anterior = prev;
+  r.nuevas = new Set();
+  r.yaNo = [];
+  if (!prev) return;
+  const ahora = new Set();
+  CONC_CATEGORIAS.forEach((c) => r[c.k].forEach((it) => {
+    const n = soloDigitosLinea((it.x || it.reg || {}).numero || it.n);
+    ahora.add(n);
+    if (!(prev.numeros[c.k] || []).includes(n)) r.nuevas.add(c.k + "|" + n);
+  }));
+  Object.entries(prev.numeros || {}).forEach(([k, l]) => l.forEach((n) => { if (!ahora.has(n)) r.yaNo.push({ n, k }); }));
+}
+let concGuardarTimer = null;
+function concGuardarCorrida(r) {
+  clearTimeout(concGuardarTimer);
+  const corrida = { accion: "guardar_corrida", id: concEstado.id, empresa: concEstado.empresa, archivo: concEstado.archivo, total: r.totalPlanilla, activas: r.activas, coinciden: r.coinciden.length, numeros: Object.fromEntries(CONC_CATEGORIAS.map((c) => [c.k, r[c.k].map((it) => soloDigitosLinea((it.x || it.reg || {}).numero || it.n))])) };
+  concGuardarTimer = setTimeout(() => {
+    fetch("/api/datos?coleccion=sims_conciliacion", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify(corrida) }).catch(() => {});
+    const local = { ...corrida, fecha: (controlSims.corridas.find((x) => x.id === corrida.id) || {}).fecha || new Date().toISOString() };
+    controlSims.corridas = [local, ...controlSims.corridas.filter((x) => x.id !== corrida.id)];
+  }, 800);
+}
+function concHtmlComparacion(r) {
+  const corridas = (controlSims.corridas || []).filter((c) => c.empresa === concEstado.empresa).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+  const total = (c) => Object.values(c.numeros || {}).reduce((s, l) => s + l.length, 0);
+  const ahora = CONC_CATEGORIAS.reduce((s, c) => s + r[c.k].length, 0);
+  if (!r.anterior) return `<p class="subtitle" style="margin:6px 0;">Es la primera conciliación de ${escapeHtmlAdmin(concEstado.empresa)} que queda guardada: la próxima se compara contra esta.</p>`;
+  const antes = total(r.anterior), dif = ahora - antes;
+  const etiq = CONC_CATEGORIAS.reduce((m, c) => ({ ...m, [c.k]: c.corto }), {});
+  return `<div class="conc-comparacion" style="margin:8px 0 4px;padding:10px 12px;border-radius:10px;background:#F3F6F9;">
+    <b>Contra la conciliación del ${escapeHtmlAdmin(fechaAR(String(r.anterior.fecha).slice(0, 10)))}</b> <span style="color:#6B7680;">(${escapeHtmlAdmin(r.anterior.archivo || "")})</span><br>
+    Diferencias: ${antes} → <b>${ahora}</b> ${dif < 0 ? `<span style="color:#1E7B34;font-weight:700;">▼ ${-dif} menos</span>` : dif > 0 ? `<span style="color:#B3261E;font-weight:700;">▲ ${dif} más</span>` : "(igual)"} · <b>${r.nuevas.size}</b> nuevas · <b>${r.yaNo.length}</b> ya no aparecen
+    ${r.yaNo.length ? `<details style="margin-top:4px;"><summary style="cursor:pointer;">Ver las que ya no aparecen</summary><div style="font-size:13px;margin-top:4px;">${r.yaNo.slice(0, 200).map((x) => `${escapeHtmlAdmin(x.n)} <span style="color:#6B7680;">(${escapeHtmlAdmin(etiq[x.k] || x.k)})</span>`).join(" · ")}</div></details>` : ""}
+    ${corridas.length > 1 ? `<details style="margin-top:4px;"><summary style="cursor:pointer;">Historial de conciliaciones de ${escapeHtmlAdmin(concEstado.empresa)}</summary><table class="sims-tabla" style="margin-top:4px;"><tbody>${corridas.slice(0, 12).map((c) => `<tr><td>${escapeHtmlAdmin(fechaAR(String(c.fecha).slice(0, 10)))}</td><td>${escapeHtmlAdmin(c.archivo || "")}</td><td><b>${total(c)}</b> diferencias</td><td>${c.total || 0} líneas en la planilla</td></tr>`).join("")}</tbody></table></details>` : ""}
+  </div>`;
+}
 let ultimaConciliacion = null;
 const CONC_CATEGORIAS = [
+  { k: "posibleError", corto: "¿Número mal cargado?", titulo: "Posible número mal cargado en SAT", ayuda: "Un número de la planilla y uno de SAT difieren en un solo dígito (o en dos seguidos dados vuelta): casi seguro es la misma línea cargada con un error de tipeo.", acciones: [["corregir", "Corregir el número en SAT"]] },
   { k: "sinRegistrar", corto: "Sin registrar", titulo: "Activas en la empresa, sin registrar en SAT", ayuda: "Se están pagando y no figuran ni instaladas ni en stock. Abajo de cada una, lo último que se sabe de esa línea.", acciones: [["alta", "Cargar al stock de Oficina"], ["instalar", "Instalar en un cliente…"]] },
   { k: "problemaPagando", corto: "Con problema y cobradas", titulo: "Defectuosas o extraviadas que la empresa sigue cobrando", ayuda: "En SAT están marcadas con problema pero la línea está activa: pedir la baja a la empresa y darlas de baja acá.", acciones: [["baja", "Dar de baja en SAT…"]] },
   { k: "inactivaPagando", corto: "Inactivas y cobradas", titulo: "Inactivas en SAT pero activas en la empresa", ayuda: "Se están pagando. O se pide la baja a la empresa, o en realidad funcionan y hay que marcarlas activas.", acciones: [["activa", "Marcar activa"]] },
@@ -5372,12 +5451,14 @@ function concFilaHtml(k, it, i) {
   const num = `<button type="button" class="sim-num-link" data-ficha="${escapeHtmlAdmin(x.numero || it.n)}">${escapeHtmlAdmin(x.numero || it.n)}</button>`;
   let det = "";
   if (k === "sinRegistrar") det = `<span class="conc-ctx conc-ctx-${it.ctx.tipo}">${escapeHtmlAdmin(it.ctx.texto)}</span>`;
+  else if (k === "posibleError") det = `En la planilla: <b>${escapeHtmlAdmin(it.n)}</b> · en SAT: <b>${escapeHtmlAdmin(x.numero)}</b> (${it.donde === "instalada" ? "instalada en " + escapeHtmlAdmin(x.cliente || "?") : "en stock de " + escapeHtmlAdmin(x.tecnico_actual || "Oficina")})`;
   else if (k === "enStock" || k === "problemaPagando") det = `En stock de <b>${escapeHtmlAdmin(x.tecnico_actual || "Oficina")}</b>${x.estado_fisico && x.estado_fisico !== "Disponible" ? ` · <b style="color:#B3261E;">${escapeHtmlAdmin(x.estado_fisico)}</b>` : ""}`;
   else if (k === "empresaDistinta") det = `En SAT: <b>${escapeHtmlAdmin(x.empresa || "sin empresa")}</b> · ${it.donde === "instalada" ? "instalada en " + escapeHtmlAdmin(x.cliente || "?") : "en stock de " + escapeHtmlAdmin(x.tecnico_actual || "Oficina")}${it.estadoEmpresa !== "activa" ? ` · en la empresa: ${it.estadoEmpresa}` : ""}`;
   else det = `<b>${escapeHtmlAdmin(x.cliente || "")}</b>${x.direccion ? " · " + escapeHtmlAdmin(x.direccion) : ""}${it.estadoEmpresa ? ` · en la empresa: <b>${escapeHtmlAdmin(it.crudo || it.estadoEmpresa)}</b>` : ""}${x.estado_linea === "Inactivo" ? " · inactiva en SAT" : ""}`;
   const botones = CONC_CATEGORIAS.find((c) => c.k === k).acciones.map(([a, t]) => `<button type="button" class="btn-secondary-admin conc-acc" data-k="${k}" data-i="${i}" data-a="${a}">${escapeHtmlAdmin(t.replace("…", ""))}</button>`).join("")
     + `<button type="button" class="btn-secondary-admin conc-marcar" data-k="${k}" data-i="${i}" data-estado="resuelta" title="Ya está resuelta: no mostrarla más">✓ Resuelto</button><button type="button" class="btn-secondary-admin conc-marcar" data-k="${k}" data-i="${i}" data-estado="ignorada" title="Es un error interno: no mostrarla más">Ignorar</button>`;
-  return `<tr><td style="width:26px;"><input type="checkbox" class="conc-sel" data-k="${k}" data-i="${i}"></td><td>${num}</td><td style="white-space:normal;">${det}</td><td class="conc-btns">${botones}</td></tr>`;
+  const esNueva = ultimaConciliacion && ultimaConciliacion.anterior && ultimaConciliacion.nuevas.has(k + "|" + soloDigitosLinea(x.numero || it.n));
+  return `<tr><td style="width:26px;"><input type="checkbox" class="conc-sel" data-k="${k}" data-i="${i}"></td><td>${num}${esNueva ? ' <span class="conc-nueva" style="display:inline-block;padding:1px 6px;border-radius:999px;background:#FFF1D6;color:#8A5A00;font-size:11px;font-weight:700;">Nueva</span>' : ""}</td><td style="white-space:normal;">${det}</td><td class="conc-btns">${botones}</td></tr>`;
 }
 function concRender() {
   const r = ultimaConciliacion;
@@ -5394,7 +5475,7 @@ function concRender() {
       <div class="conc-lote"><label style="display:inline-flex;align-items:center;gap:6px;"><input type="checkbox" class="conc-todas" data-k="${c.k}" style="width:auto;"> Todas</label>${c.acciones.filter(([a]) => a !== "instalar").map(([a, t]) => `<button type="button" class="btn-secondary-admin conc-lote-btn" data-k="${c.k}" data-a="${a}" style="width:auto;">${escapeHtmlAdmin(t.replace("…", ""))} (tildadas)</button>`).join("")}<button type="button" class="btn-secondary-admin conc-lote-marcar" data-k="${c.k}" data-estado="resuelta" style="width:auto;">✓ Resueltas (tildadas)</button><button type="button" class="btn-secondary-admin conc-lote-marcar" data-k="${c.k}" data-estado="ignorada" style="width:auto;">Ignorar (tildadas)</button></div>
       <div class="sims-tabla-wrap"><table class="sims-tabla"><tbody>${r[c.k].map((it, i) => concFilaHtml(c.k, it, i)).join("")}</tbody></table></div>
     </div>`).join("");
-  cont.innerHTML = columnas + resumen + (pendientes ? bloques : `<p class="status ok">No hay diferencias: todo lo activo en ${escapeHtmlAdmin(concEstado.empresa)} coincide con SAT.</p>`)
+  cont.innerHTML = columnas + concHtmlComparacion(r) + resumen + (pendientes ? bloques : `<p class="status ok">No hay diferencias: todo lo activo en ${escapeHtmlAdmin(concEstado.empresa)} coincide con SAT.</p>`)
     + (r.ocultas && r.ocultas.length ? `<details class="conc-ocultas" style="margin-top:14px;"><summary style="cursor:pointer;font-weight:600;">Ocultas: marcadas como resueltas o ignoradas (${r.ocultas.length})</summary><div class="sims-tabla-wrap"><table class="sims-tabla"><tbody>${r.ocultas.map((m, i) => `<tr><td>${escapeHtmlAdmin(m.numero)}</td><td style="white-space:normal;">${m.estado === "resuelta" ? "✓ Resuelta" : "Ignorada"} · ${escapeHtmlAdmin(m.titulo)}${m.motivo ? " · " + escapeHtmlAdmin(m.motivo) : ""}<br><small style="color:#6B7680;">${escapeHtmlAdmin(m.por || "")} · ${escapeHtmlAdmin(fechaAR(String(m.fecha || "").slice(0, 10)))}</small></td><td class="conc-btns"><button type="button" class="btn-secondary-admin conc-reactivar" data-i="${i}">Volver a mostrar</button></td></tr>`).join("")}</tbody></table></div></details>` : "")
     + (r.sinEmpresa ? `<p class="subtitle">Hay ${r.sinEmpresa} instaladas sin empresa cargada: las que figuran en esta planilla aparecen arriba para corregirles la empresa.</p>` : "")
     + `<button type="button" class="btn-secondary-admin" id="simsConcExcel" style="width:auto; margin-top:12px;">⬇ Descargar diferencias en Excel</button>`;
@@ -5452,6 +5533,7 @@ async function concGuardarMarcas(cuerpo, mensaje) {
 function concPedido(k, a, it, extra) {
   const x = it.x || it.reg || {};
   const empresa = concEstado.empresa;
+  if (a === "corregir") return { accion: "corregir_numero", numero: x.numero, numero_nuevo: it.n, tecnico: "Oficina" };
   if (a === "alta") return { accion: "alta_lote", tecnico: "Oficina", sims: [{ numero: it.n, empresa, tipo: "Estándar", tecnico_actual: "Oficina" }] };
   if (a === "baja") return { accion: "dar_de_baja", numero: x.numero, tecnico: "Oficina", motivo: extra.motivo };
   if (a === "activa" || a === "inactiva") return { accion: "editar_instalada", numero: x.numero, tecnico: "Oficina", campos: { estado_linea: a === "activa" ? "Activo" : "Inactivo" } };
@@ -5472,7 +5554,7 @@ async function concAplicar(k, a, items) {
     if (!await confirmarAdmin(`¿Retirar ${plural} del cliente y devolver${n === 1 ? "la" : "las"} al stock de Oficina?`)) return;
     extra.destino = "Oficina";
   } else {
-    const textos = { alta: `¿Cargar ${plural} al stock de Oficina como ${concEstado.empresa}?`, activa: `¿Marcar ${plural} como activa${n === 1 ? "" : "s"}?`, inactiva: `¿Marcar ${plural} como inactiva${n === 1 ? "" : "s"}?`, empresa: `¿Corregir ${plural} a ${concEstado.empresa}?` };
+    const textos = { corregir: n === 1 ? `¿Cambiar en SAT el ${(items[0].x || {}).numero} por ${items[0].n} (el de la planilla)?` : `¿Corregir en SAT los números de estas ${n} líneas por los de la planilla?`, alta: `¿Cargar ${plural} al stock de Oficina como ${concEstado.empresa}?`, activa: `¿Marcar ${plural} como activa${n === 1 ? "" : "s"}?`, inactiva: `¿Marcar ${plural} como inactiva${n === 1 ? "" : "s"}?`, empresa: `¿Corregir ${plural} a ${concEstado.empresa}?` };
     if (!await confirmarAdmin(textos[a])) return;
   }
   const errores = [];
@@ -5541,6 +5623,8 @@ function concRecalcular() {
   try {
     const r = conciliarSims(concEstado.filas, concEstado.empresa, concEstado.opciones);
     ultimaConciliacion = r;
+    concComparar(r);
+    concGuardarCorrida(r);
     st.className = "status ok";
     st.textContent = `${concEstado.archivo}: ${r.totalPlanilla} líneas de ${concEstado.empresa} (${r.activas} activas). ${r.coinciden.length} coinciden con lo instalado.`;
     concRender();
@@ -5558,6 +5642,7 @@ function concExcel() {
   const c = ultimaConciliacion;
   const libro = XLSX.utils.book_new();
   const hoja = (nombre, filas) => XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filas.length ? filas : [{ Número: "(ninguna)" }]), nombre.slice(0, 31));
+  hoja("Número mal cargado", c.posibleError.map((it) => ({ "En la planilla": it.n, "En SAT": it.x.numero, Dónde: it.donde === "instalada" ? "Instalada en " + (it.x.cliente || "") : "Stock de " + (it.x.tecnico_actual || "Oficina"), "Acción sugerida": "Corregir el número en SAT" })));
   hoja("Sin registrar en SAT", c.sinRegistrar.map((it) => ({ Número: it.n, "Qué se sabe": it.ctx.texto, "Acción sugerida": it.ctx.tipo === "baja" ? "Pedir la baja a la empresa" : "Averiguar dónde está / cargar en SAT" })));
   hoja("Con problema y cobradas", c.problemaPagando.map((it) => ({ Número: it.x.numero, Estado: it.x.estado_fisico, "Lo tiene": it.x.tecnico_actual || "Oficina", "Acción sugerida": "Pedir la baja a la empresa" })));
   hoja("Inactivas en SAT y cobradas", c.inactivaPagando.map((it) => ({ Número: it.x.numero, Cliente: it.x.cliente || "", Dirección: it.x.direccion || "", "Acción sugerida": "Pedir la baja o marcarla activa" })));
@@ -5568,6 +5653,99 @@ function concExcel() {
   XLSX.writeFile(libro, `conciliacion_${concEstado.empresa}_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 document.getElementById("simsConcEmpresa").addEventListener("change", (e) => { if (concEstado) { concEstado.empresa = e.target.value; concRecalcular(); } });
+
+// ---------- Alarmas que no comunican: reporte del monitoreo vs. SIMs instaladas ----------
+let comEstado = null; // { filas, archivo, colAbonado, colFecha }
+const soloDigitosAbonado = (v) => String(v == null ? "" : v).replace(/\D/g, "").replace(/^0+/, "");
+// Fecha de un Excel (número de serie), "dd/mm/aaaa hh:mm", ISO o texto: a milisegundos.
+function comFecha(v) {
+  if (v == null || v === "") return null;
+  if (typeof v === "number" && v > 20000 && v < 80000) return Math.round((v - 25569) * 86400000);
+  if (v instanceof Date) return v.getTime();
+  const t = String(v).trim();
+  let m = t.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})(?:[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (m) { const y = Number(m[3]) < 100 ? 2000 + Number(m[3]) : Number(m[3]); return new Date(y, Number(m[2]) - 1, Number(m[1]), Number(m[4] || 0), Number(m[5] || 0)).getTime(); }
+  m = t.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/);
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4] || 0), Number(m[5] || 0)).getTime();
+  return null;
+}
+function comColumnas(filas) {
+  const cab = [...new Set(filas.flatMap((f) => Object.keys(f)))];
+  const muestra = filas.slice(0, 300);
+  const puntaje = (c, test) => muestra.reduce((n, f) => n + (test(f[c]) ? 1 : 0), 0) / Math.max(1, muestra.filter((f) => String(f[c] == null ? "" : f[c]).trim()).length);
+  const abon = cab.map((c) => ({ c, p: (/abonado|cuenta|account|abon/.test(normalizeText(c)) ? 0.8 : /cliente|nro|numero/.test(normalizeText(c)) ? 0.3 : 0) + puntaje(c, (v) => /^\d{1,8}$/.test(soloDigitosAbonado(v)) && String(v).replace(/\D/g, "").length <= 8) })).sort((a, b) => b.p - a.p);
+  const fecha = cab.map((c) => ({ c, p: (/ultim|last|senal|señal|comunic|evento|fecha|test|reporte/.test(normalizeText(c)) ? 0.5 : 0) + puntaje(c, (v) => comFecha(v) != null) })).sort((a, b) => b.p - a.p);
+  return { cab, abonado: abon[0] && abon[0].c, fecha: fecha[0] && fecha[0].c };
+}
+function comCalcular() {
+  const st = document.getElementById("simsComStatus"), cont = document.getElementById("simsComResultado");
+  if (!comEstado) return;
+  const dias = Number(document.getElementById("simsComDias").value) || 30, ahora = Date.now();
+  // Último reporte de cada abonado (si aparece varias veces, el más nuevo).
+  const ultimo = new Map();
+  comEstado.filas.forEach((f) => {
+    const a = soloDigitosAbonado(f[comEstado.colAbonado]), t = comFecha(f[comEstado.colFecha]);
+    if (!a) return;
+    if (!ultimo.has(a) || (t || 0) > (ultimo.get(a) || 0)) ultimo.set(a, t);
+  });
+  const abonadoDe = (x) => soloDigitosAbonado(x.numero_abonado) || soloDigitosAbonado(((clientesGeneralParaSims || []).find((c) => x.numero_cliente && String(c.numero_cliente) === String(x.numero_cliente)) || {}).numero_abonado);
+  const activas = controlSims.instaladas.filter((x) => !/inactiv|baja/i.test(x.estado_linea || ""));
+  const viejas = [], noFiguran = [];
+  let sinAbonado = 0;
+  activas.forEach((x) => {
+    const a = abonadoDe(x);
+    if (!a) { sinAbonado++; return; }
+    if (!ultimo.has(a)) { noFiguran.push({ x, a }); return; }
+    const t = ultimo.get(a), d = t == null ? Infinity : Math.floor((ahora - t) / 86400000);
+    if (d > dias) viejas.push({ x, a, t, d });
+  });
+  viejas.sort((p, q) => q.d - p.d);
+  comEstado.resultado = { viejas, noFiguran };
+  const fila = (it, i, tipo) => `<tr><td><button type="button" class="sim-num-link" data-ficha="${escapeHtmlAdmin(it.x.numero)}">${escapeHtmlAdmin(it.x.numero)}</button></td><td style="white-space:normal;"><b>${escapeHtmlAdmin(it.x.cliente || "")}</b> · abonado ${escapeHtmlAdmin(it.a)}${it.x.empresa ? " · " + escapeHtmlAdmin(it.x.empresa) : ""}${tipo === "v" ? `<br><small style="color:#B3261E;font-weight:600;">${it.t == null ? "Sin fecha de última señal" : `Última señal: ${new Date(it.t).toLocaleDateString("es-AR")} (hace ${it.d} días)`}</small>` : ""}</td><td class="conc-btns"><button type="button" class="btn-secondary-admin com-acc" data-t="${tipo}" data-i="${i}" data-a="inactiva">Marcar inactiva</button><button type="button" class="btn-secondary-admin com-acc" data-t="${tipo}" data-i="${i}" data-a="retirar">Retirar del cliente</button></td></tr>`;
+  const opc = (sel) => comEstado.cab.map((c) => `<option ${c === sel ? "selected" : ""}>${escapeHtmlAdmin(c)}</option>`).join("");
+  cont.innerHTML = `<div class="field-row conc-columnas"><div><label>Columna del N° de abonado</label><select id="comColAbonado">${opc(comEstado.colAbonado)}</select></div><div><label>Columna de la última señal</label><select id="comColFecha">${opc(comEstado.colFecha)}</select></div></div><div class="sims-resumen" style="margin:10px 0;"><span class="sims-chip ${viejas.length ? "alerta" : ""}">Sin comunicar hace más de ${dias} días <b>${viejas.length}</b></span><span class="sims-chip">No están en el reporte <b>${noFiguran.length}</b></span><span class="sims-chip">Instaladas sin N° de abonado <b>${sinAbonado}</b></span></div>`
+    + (viejas.length ? `<h4 style="margin:12px 0 4px;">Sin comunicar hace más de ${dias} días (${viejas.length})</h4><p class="subtitle" style="margin:0 0 6px;">Revisar la línea con la empresa (baja, sin saldo) o el equipo con el cliente.</p><div class="sims-tabla-wrap"><table class="sims-tabla"><tbody>${viejas.map((it, i) => fila(it, i, "v")).join("")}</tbody></table></div>` : `<p class="status ok">Todas las alarmas con SIM comunicaron en los últimos ${dias} días.</p>`)
+    + (noFiguran.length ? `<details style="margin-top:10px;"><summary style="cursor:pointer;font-weight:600;">No están en el reporte del monitoreo (${noFiguran.length})</summary><p class="subtitle">El N° de abonado no aparece: puede ser otro software de monitoreo, un abonado mal cargado o un cliente dado de baja.</p><div class="sims-tabla-wrap"><table class="sims-tabla"><tbody>${noFiguran.map((it, i) => fila(it, i, "n")).join("")}</tbody></table></div></details>` : "");
+  cont.querySelectorAll("[data-ficha]").forEach((b) => b.addEventListener("click", () => abrirFichaLineaSim(b.dataset.ficha)));
+  document.getElementById("comColAbonado").addEventListener("change", (e) => { comEstado.colAbonado = e.target.value; comCalcular(); });
+  document.getElementById("comColFecha").addEventListener("change", (e) => { comEstado.colFecha = e.target.value; comCalcular(); });
+  cont.querySelectorAll(".com-acc").forEach((b) => b.addEventListener("click", async () => {
+    const it = (b.dataset.t === "v" ? comEstado.resultado.viejas : comEstado.resultado.noFiguran)[Number(b.dataset.i)];
+    const retirar = b.dataset.a === "retirar";
+    if (!await confirmarAdmin(retirar ? `¿Retirar la ${it.x.numero} de ${it.x.cliente || "el cliente"} y devolverla al stock de Oficina?` : `¿Marcar la ${it.x.numero} como inactiva?`)) return;
+    try {
+      await accionSimAdmin(retirar ? { accion: "retirar_de_registro", numero: it.x.numero, tecnico: "Oficina" } : { accion: "editar_instalada", numero: it.x.numero, tecnico: "Oficina", campos: { estado_linea: "Inactivo" } });
+      await cargarControlSims();
+      comCalcular();
+      st.className = "status ok"; st.textContent = `${it.x.numero}: ${retirar ? "retirada del cliente" : "marcada inactiva"}. Quedó en el historial de la línea.`;
+    } catch (err) { st.className = "status err"; st.textContent = "No se pudo: " + err.message; }
+  }));
+  st.className = "status ok";
+  st.textContent = `${comEstado.archivo}: ${ultimo.size} abonados en el reporte (columnas «${comEstado.colAbonado}» y «${comEstado.colFecha}»). ${activas.length} SIMs instaladas activas.`;
+}
+document.getElementById("simsComDias").addEventListener("change", comCalcular);
+document.getElementById("simsComArchivo").addEventListener("change", (ev) => {
+  const f = ev.target.files[0];
+  ev.target.value = "";
+  if (!f) return;
+  const st = document.getElementById("simsComStatus");
+  st.className = "status"; st.textContent = "Leyendo el reporte...";
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      if (!controlSims.instaladas.length) await cargarControlSims();
+      await concAsegurarClientes();
+      const wb = XLSX.read(e.target.result, { type: "array", cellDates: false });
+      const filas = wb.SheetNames.flatMap((n) => XLSX.utils.sheet_to_json(wb.Sheets[n], { defval: "" }));
+      if (!filas.length) throw new Error("El reporte está vacío.");
+      const col = comColumnas(filas);
+      if (!col.abonado || !col.fecha) throw new Error("No se encontraron las columnas del N° de abonado y de la fecha de la última señal.");
+      comEstado = { filas, archivo: f.name, colAbonado: col.abonado, colFecha: col.fecha, cab: col.cab };
+      comCalcular();
+    } catch (err) { st.className = "status err"; st.textContent = "No se pudo leer: " + err.message; }
+  };
+  reader.readAsArrayBuffer(f);
+});
 document.getElementById("simsConcArchivo").addEventListener("change", (ev) => {
   const f = ev.target.files[0];
   ev.target.value = "";
@@ -5587,7 +5765,7 @@ document.getElementById("simsConcArchivo").addEventListener("change", (ev) => {
       // Si el nombre del archivo dice la empresa, se elige sola.
       const enNombre = ["Claro", "Movistar", "Personal"].find((x) => normalizeText(f.name).includes(x.toLowerCase()));
       if (enNombre) document.getElementById("simsConcEmpresa").value = enNombre;
-      concEstado = { filas, empresa: document.getElementById("simsConcEmpresa").value, archivo: f.name, opciones: {} };
+      concEstado = { filas, empresa: document.getElementById("simsConcEmpresa").value, archivo: f.name, opciones: {}, id: "c" + Date.now().toString(36) };
       concRecalcular();
     } catch (err) {
       st.className = "status err";

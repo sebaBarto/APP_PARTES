@@ -1210,10 +1210,32 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
     // resueltas o para ignorar (errores internos): no vuelven a aparecer.
     if (!autorizacion) { res.status(401).json({ error: "No autorizado", sesion_vencida: true }); return; }
     if (autorizacion.rol !== "admin") { res.status(403).json({ error: "Solo desde el panel de administración" }); return; }
-    const RUTA = "sims-conciliacion-ignoradas.json";
+    const RUTA = "sims-conciliacion-ignoradas.json", RUTA_HIST = "sims-conciliacion-historial.json";
     const num = (v) => String(v == null ? "" : v).replace(/\D/g, "").slice(-10);
     const txt = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
     try {
+      // Historial de corridas: para comparar contra la conciliación anterior.
+      if (req.method === "GET" && req.query.historial) { const { data } = await leerArchivoDatos(RUTA_HIST, []); res.setHeader("Cache-Control", "no-store"); res.status(200).json(Array.isArray(data) ? data : []); return; }
+      if (req.method === "POST" && cuerpoAccion && cuerpoAccion.accion === "guardar_corrida") {
+        const c = cuerpoAccion;
+        const id = String(c.id || "").replace(/[^\w-]/g, "").slice(0, 40);
+        if (!id) { res.status(400).json({ error: "Falta el id" }); return; }
+        const numeros = {};
+        Object.entries(c.numeros && typeof c.numeros === "object" ? c.numeros : {}).slice(0, 20).forEach(([k, l]) => { numeros[txt(k, 40)] = (Array.isArray(l) ? l : []).slice(0, 3000).map(num).filter((n) => n.length === 10); });
+        const corrida = { id, fecha: new Date().toISOString(), empresa: txt(c.empresa, 40), archivo: txt(c.archivo, 120), total: Math.max(0, Number(c.total) || 0), activas: Math.max(0, Number(c.activas) || 0), coinciden: Math.max(0, Number(c.coinciden) || 0), numeros, por: autorizacion.nombre || "Oficina" };
+        for (let intento = 0; intento < 4; intento++) {
+          const { data, sha } = await leerArchivoDatos(RUTA_HIST, []);
+          const lista = (Array.isArray(data) ? data : []).filter((x) => x.id !== id);
+          const previa = (Array.isArray(data) ? data : []).find((x) => x.id === id);
+          if (previa) corrida.fecha = previa.fecha;
+          lista.unshift(corrida);
+          const r = await escribirArchivoDatos(RUTA_HIST, lista.slice(0, 120), sha, `Conciliación de SIMs ${corrida.empresa} — ${corrida.archivo}`);
+          if (r.ok) { res.status(200).json({ ok: true }); return; }
+          if (r.status !== 409 && r.status !== 422) break;
+        }
+        res.status(502).json({ error: "No se pudo guardar la corrida" });
+        return;
+      }
       if (req.method === "GET") { const { data } = await leerArchivoDatos(RUTA, []); res.setHeader("Cache-Control", "no-store"); res.status(200).json(Array.isArray(data) ? data : []); return; }
       if (req.method !== "POST") { res.status(405).json({ error: "Método no permitido" }); return; }
       const b = cuerpoAccion && typeof cuerpoAccion === "object" ? cuerpoAccion : {};
