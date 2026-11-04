@@ -5030,10 +5030,14 @@ async function cargarControlSims() {
       fetch("/api/recurso-uso?recurso=sim", { headers: h, cache: "no-store" }),
     ]);
     const [stock, inst, hist] = await Promise.all([rs.json(), ri.json(), rh.json()]);
+    // Lo que se marcó como resuelto o para ignorar en la conciliación.
+    let ignoradas = [];
+    try { const rg = await fetch("/api/datos?coleccion=sims_conciliacion", { headers: h, cache: "no-store" }); const dg = await rg.json(); if (rg.ok && Array.isArray(dg)) ignoradas = dg; } catch (e) { /* sin esto se muestra todo */ }
     controlSims = {
       stock: Array.isArray(stock) ? stock : [],
       instaladas: Array.isArray(inst) ? inst : [],
       historial: Array.isArray(hist) ? hist : [],
+      ignoradas,
     };
     st.textContent = `${controlSims.stock.filter((x) => x.ubicacion_tipo !== "cliente").length} en stock · ${controlSims.instaladas.length} instaladas · ${controlSims.historial.length} movimientos.`;
     renderControlSims();
@@ -5339,6 +5343,16 @@ function conciliarSims(filasPlanilla, empresa, opciones) {
   });
   // Las que se dieron de baja en SAT primero (son plata que se va sin motivo).
   r.sinRegistrar.sort((a, b) => (a.ctx.tipo !== "baja") - (b.ctx.tipo !== "baja"));
+  // Las marcadas como resueltas o para ignorar no se muestran (siguen en "Ocultas").
+  const marcadas = new Map((controlSims.ignoradas || []).filter((x) => x.empresa === empresa).map((x) => [`${x.categoria}|${x.numero}`, x]));
+  r.ocultas = [];
+  CONC_CATEGORIAS.forEach((c) => {
+    r[c.k] = r[c.k].filter((it) => {
+      const m = marcadas.get(`${c.k}|${soloDigitosLinea((it.x || it.reg || {}).numero || it.n)}`);
+      if (m) { r.ocultas.push({ ...m, titulo: c.corto }); return false; }
+      return true;
+    });
+  });
   return r;
 }
 
@@ -5361,7 +5375,8 @@ function concFilaHtml(k, it, i) {
   else if (k === "enStock" || k === "problemaPagando") det = `En stock de <b>${escapeHtmlAdmin(x.tecnico_actual || "Oficina")}</b>${x.estado_fisico && x.estado_fisico !== "Disponible" ? ` · <b style="color:#B3261E;">${escapeHtmlAdmin(x.estado_fisico)}</b>` : ""}`;
   else if (k === "empresaDistinta") det = `En SAT: <b>${escapeHtmlAdmin(x.empresa || "sin empresa")}</b> · ${it.donde === "instalada" ? "instalada en " + escapeHtmlAdmin(x.cliente || "?") : "en stock de " + escapeHtmlAdmin(x.tecnico_actual || "Oficina")}${it.estadoEmpresa !== "activa" ? ` · en la empresa: ${it.estadoEmpresa}` : ""}`;
   else det = `<b>${escapeHtmlAdmin(x.cliente || "")}</b>${x.direccion ? " · " + escapeHtmlAdmin(x.direccion) : ""}${it.estadoEmpresa ? ` · en la empresa: <b>${escapeHtmlAdmin(it.crudo || it.estadoEmpresa)}</b>` : ""}${x.estado_linea === "Inactivo" ? " · inactiva en SAT" : ""}`;
-  const botones = CONC_CATEGORIAS.find((c) => c.k === k).acciones.map(([a, t]) => `<button type="button" class="btn-secondary-admin conc-acc" data-k="${k}" data-i="${i}" data-a="${a}">${escapeHtmlAdmin(t.replace("…", ""))}</button>`).join("");
+  const botones = CONC_CATEGORIAS.find((c) => c.k === k).acciones.map(([a, t]) => `<button type="button" class="btn-secondary-admin conc-acc" data-k="${k}" data-i="${i}" data-a="${a}">${escapeHtmlAdmin(t.replace("…", ""))}</button>`).join("")
+    + `<button type="button" class="btn-secondary-admin conc-marcar" data-k="${k}" data-i="${i}" data-estado="resuelta" title="Ya está resuelta: no mostrarla más">✓ Resuelto</button><button type="button" class="btn-secondary-admin conc-marcar" data-k="${k}" data-i="${i}" data-estado="ignorada" title="Es un error interno: no mostrarla más">Ignorar</button>`;
   return `<tr><td style="width:26px;"><input type="checkbox" class="conc-sel" data-k="${k}" data-i="${i}"></td><td>${num}</td><td style="white-space:normal;">${det}</td><td class="conc-btns">${botones}</td></tr>`;
 }
 function concRender() {
@@ -5376,10 +5391,11 @@ function concRender() {
   const bloques = CONC_CATEGORIAS.filter((c) => r[c.k].length).map((c) => `<div class="conc-bloque" data-k="${c.k}">
       <h4 style="margin:16px 0 4px;">${escapeHtmlAdmin(c.titulo)} <span style="color:#6B7680; font-weight:500;">(${r[c.k].length})</span></h4>
       <p class="subtitle" style="margin:0 0 6px;">${escapeHtmlAdmin(c.ayuda)}</p>
-      <div class="conc-lote"><label style="display:inline-flex;align-items:center;gap:6px;"><input type="checkbox" class="conc-todas" data-k="${c.k}" style="width:auto;"> Todas</label>${c.acciones.filter(([a]) => a !== "instalar").map(([a, t]) => `<button type="button" class="btn-secondary-admin conc-lote-btn" data-k="${c.k}" data-a="${a}" style="width:auto;">${escapeHtmlAdmin(t.replace("…", ""))} (tildadas)</button>`).join("")}</div>
+      <div class="conc-lote"><label style="display:inline-flex;align-items:center;gap:6px;"><input type="checkbox" class="conc-todas" data-k="${c.k}" style="width:auto;"> Todas</label>${c.acciones.filter(([a]) => a !== "instalar").map(([a, t]) => `<button type="button" class="btn-secondary-admin conc-lote-btn" data-k="${c.k}" data-a="${a}" style="width:auto;">${escapeHtmlAdmin(t.replace("…", ""))} (tildadas)</button>`).join("")}<button type="button" class="btn-secondary-admin conc-lote-marcar" data-k="${c.k}" data-estado="resuelta" style="width:auto;">✓ Resueltas (tildadas)</button><button type="button" class="btn-secondary-admin conc-lote-marcar" data-k="${c.k}" data-estado="ignorada" style="width:auto;">Ignorar (tildadas)</button></div>
       <div class="sims-tabla-wrap"><table class="sims-tabla"><tbody>${r[c.k].map((it, i) => concFilaHtml(c.k, it, i)).join("")}</tbody></table></div>
     </div>`).join("");
   cont.innerHTML = columnas + resumen + (pendientes ? bloques : `<p class="status ok">No hay diferencias: todo lo activo en ${escapeHtmlAdmin(concEstado.empresa)} coincide con SAT.</p>`)
+    + (r.ocultas && r.ocultas.length ? `<details class="conc-ocultas" style="margin-top:14px;"><summary style="cursor:pointer;font-weight:600;">Ocultas: marcadas como resueltas o ignoradas (${r.ocultas.length})</summary><div class="sims-tabla-wrap"><table class="sims-tabla"><tbody>${r.ocultas.map((m, i) => `<tr><td>${escapeHtmlAdmin(m.numero)}</td><td style="white-space:normal;">${m.estado === "resuelta" ? "✓ Resuelta" : "Ignorada"} · ${escapeHtmlAdmin(m.titulo)}${m.motivo ? " · " + escapeHtmlAdmin(m.motivo) : ""}<br><small style="color:#6B7680;">${escapeHtmlAdmin(m.por || "")} · ${escapeHtmlAdmin(fechaAR(String(m.fecha || "").slice(0, 10)))}</small></td><td class="conc-btns"><button type="button" class="btn-secondary-admin conc-reactivar" data-i="${i}">Volver a mostrar</button></td></tr>`).join("")}</tbody></table></div></details>` : "")
     + (r.sinEmpresa ? `<p class="subtitle">Hay ${r.sinEmpresa} instaladas sin empresa cargada: las que figuran en esta planilla aparecen arriba para corregirles la empresa.</p>` : "")
     + `<button type="button" class="btn-secondary-admin" id="simsConcExcel" style="width:auto; margin-top:12px;">⬇ Descargar diferencias en Excel</button>`;
   document.getElementById("concColNum").addEventListener("change", (e) => { concEstado.opciones.colNum = e.target.value; concRecalcular(); });
@@ -5398,6 +5414,40 @@ function concRender() {
     concAplicar(k, b.dataset.a, items);
   }));
   document.getElementById("simsConcExcel").addEventListener("click", concExcel);
+  cont.querySelectorAll(".conc-marcar").forEach((b) => b.addEventListener("click", () => concMarcar(b.dataset.k, b.dataset.estado, [ultimaConciliacion[b.dataset.k][Number(b.dataset.i)]])));
+  cont.querySelectorAll(".conc-lote-marcar").forEach((b) => b.addEventListener("click", () => {
+    const k = b.dataset.k;
+    const items = [...cont.querySelectorAll(`.conc-sel[data-k="${k}"]:checked`)].map((x) => ultimaConciliacion[k][Number(x.dataset.i)]);
+    if (!items.length) { alert("Tildá primero las líneas."); return; }
+    concMarcar(k, b.dataset.estado, items);
+  }));
+  cont.querySelectorAll(".conc-reactivar").forEach((b) => b.addEventListener("click", async () => {
+    const m = ultimaConciliacion.ocultas[Number(b.dataset.i)];
+    await concGuardarMarcas({ accion: "reactivar", items: [{ numero: m.numero, categoria: m.categoria, empresa: m.empresa }] }, `${m.numero} vuelve a mostrarse.`);
+  }));
+}
+// Resuelto / Ignorar: la línea sale de la lista (queda en "Ocultas" y se puede volver a mostrar).
+async function concMarcar(k, estado, items) {
+  const n = items.length, plural = n === 1 ? "esta línea" : `estas ${n} líneas`;
+  let motivo = "";
+  if (estado === "ignorada") {
+    const m = prompt(`¿Por qué se ignora ${plural}? (opcional, ej. error interno de carga)`, "");
+    if (m === null) return;
+    motivo = m.trim();
+  } else if (!await confirmarAdmin(`¿Marcar ${plural} como resuelta${n === 1 ? "" : "s"}? Sale de la lista (se puede volver a mostrar desde "Ocultas").`)) return;
+  const lista = items.map((it) => ({ numero: soloDigitosLinea((it.x || it.reg || {}).numero || it.n), categoria: k, empresa: concEstado.empresa }));
+  await concGuardarMarcas({ accion: "marcar", estado, motivo, items: lista }, `${n} ${n === 1 ? "línea marcada" : "líneas marcadas"} como ${estado === "resuelta" ? "resuelta" + (n === 1 ? "" : "s") : "ignorada" + (n === 1 ? "" : "s")}.`);
+}
+async function concGuardarMarcas(cuerpo, mensaje) {
+  const st = document.getElementById("simsConcStatus");
+  try {
+    const r = await fetch("/api/datos?coleccion=sims_conciliacion", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify(cuerpo) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || "Error " + r.status);
+    controlSims.ignoradas = Array.isArray(d.lista) ? d.lista : controlSims.ignoradas;
+    concRecalcular();
+    st.className = "status ok"; st.textContent = mensaje;
+  } catch (err) { st.className = "status err"; st.textContent = "No se pudo: " + err.message; }
 }
 function concPedido(k, a, it, extra) {
   const x = it.x || it.reg || {};

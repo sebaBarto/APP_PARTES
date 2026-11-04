@@ -1205,6 +1205,38 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
     await manejarCroquis(req, res, autorizacion, cuerpoAccion);
     return;
   }
+  if (req.query && req.query.coleccion === "sims_conciliacion") {
+    // Diferencias de la conciliación de SIMs que la oficina marcó como
+    // resueltas o para ignorar (errores internos): no vuelven a aparecer.
+    if (!autorizacion) { res.status(401).json({ error: "No autorizado", sesion_vencida: true }); return; }
+    if (autorizacion.rol !== "admin") { res.status(403).json({ error: "Solo desde el panel de administración" }); return; }
+    const RUTA = "sims-conciliacion-ignoradas.json";
+    const num = (v) => String(v == null ? "" : v).replace(/\D/g, "").slice(-10);
+    const txt = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
+    try {
+      if (req.method === "GET") { const { data } = await leerArchivoDatos(RUTA, []); res.setHeader("Cache-Control", "no-store"); res.status(200).json(Array.isArray(data) ? data : []); return; }
+      if (req.method !== "POST") { res.status(405).json({ error: "Método no permitido" }); return; }
+      const b = cuerpoAccion && typeof cuerpoAccion === "object" ? cuerpoAccion : {};
+      const items = (Array.isArray(b.items) ? b.items : []).slice(0, 500).map((x) => ({ numero: num(x && x.numero), categoria: txt(x && x.categoria, 40), empresa: txt(x && x.empresa, 40) })).filter((x) => x.numero.length === 10 && x.categoria);
+      if (!items.length) { res.status(400).json({ error: "No hay líneas" }); return; }
+      const clave = (x) => `${x.empresa}|${x.categoria}|${x.numero}`;
+      for (let intento = 0; intento < 4; intento++) {
+        const { data, sha } = await leerArchivoDatos(RUTA, []);
+        let lista = Array.isArray(data) ? data : [];
+        const claves = new Set(items.map(clave));
+        lista = lista.filter((x) => !claves.has(clave(x)));
+        if (b.accion === "marcar") {
+          const estado = b.estado === "resuelta" ? "resuelta" : "ignorada", ahora = new Date().toISOString();
+          items.forEach((x) => lista.unshift({ ...x, estado, motivo: txt(b.motivo, 200), por: autorizacion.nombre || "Oficina", fecha: ahora }));
+        } else if (b.accion !== "reactivar") { res.status(400).json({ error: "Acción inválida" }); return; }
+        const r = await escribirArchivoDatos(RUTA, lista.slice(0, 5000), sha, `Conciliación de SIMs: ${b.accion === "marcar" ? (b.estado === "resuelta" ? "resueltas" : "ignoradas") : "vuelven a mostrarse"} ${items.length}`);
+        if (r.ok) { res.status(200).json({ ok: true, lista }); return; }
+        if (r.status !== 409 && r.status !== 422) break;
+      }
+      res.status(502).json({ error: "No se pudo guardar" });
+    } catch (e) { res.status(502).json({ error: "No se pudo guardar" }); }
+    return;
+  }
   if (req.query && (req.query.coleccion === "lista_precios" || req.query.coleccion === "presupuestos_express")) {
     if (!autorizacion) { res.status(401).json({ error: "No autorizado", sesion_vencida: true }); return; }
     await manejarPresupuestoExpress(req, res, autorizacion, cuerpoAccion);

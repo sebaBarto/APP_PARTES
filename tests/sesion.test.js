@@ -1082,3 +1082,34 @@ test("Croquis en el servicio técnico: un croquis sin instalación no le aparece
     global.fetch = fetchViejo;
   }
 });
+
+test("Conciliación de SIMs: la oficina marca diferencias como resueltas o ignoradas y se pueden volver a mostrar", async () => {
+  const fetchViejo = global.fetch;
+  const archivos = {};
+  global.fetch = async (url, op = {}) => {
+    const ruta = (String(url).match(/contents\/([^?]+)/) || [])[1];
+    if (ruta) {
+      if (op.method === "PUT") { archivos[ruta] = JSON.parse(Buffer.from(JSON.parse(op.body).content, "base64").toString("utf-8")); return new Response("{}", { status: 200 }); }
+      if (!archivos[ruta]) return new Response("{}", { status: 404 });
+      return new Response(JSON.stringify({ sha: "s", encoding: "base64", content: Buffer.from(JSON.stringify(archivos[ruta])).toString("base64") }));
+    }
+    return new Response("[]");
+  };
+  try {
+    const admin = crearSesion({ nombre: "Seba", rol: "admin" }), juan = crearSesion({ nombre: "Juan", rol: "tecnico" });
+    let r = resFalso();
+    await datos(pedido("POST", { coleccion: "sims_conciliacion" }, { accion: "marcar", estado: "ignorada", items: [{ numero: "341 555-0013", categoria: "noEnPlanilla", empresa: "Claro" }] }, juan), r);
+    assert.strictEqual(r.statusCode, 403, "solo la oficina");
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "sims_conciliacion" }, { accion: "marcar", estado: "ignorada", motivo: "Error interno", items: [{ numero: "341 555-0013", categoria: "noEnPlanilla", empresa: "Claro" }] }, admin), r);
+    assert.strictEqual(r.statusCode, 200);
+    r = resFalso();
+    await datos(pedido("GET", { coleccion: "sims_conciliacion" }, null, admin), r);
+    assert.deepStrictEqual(r.cuerpo.map((x) => [x.numero, x.categoria, x.empresa, x.estado, x.motivo, x.por]), [["3415550013", "noEnPlanilla", "Claro", "ignorada", "Error interno", "Seba"]]);
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "sims_conciliacion" }, { accion: "reactivar", items: [{ numero: "3415550013", categoria: "noEnPlanilla", empresa: "Claro" }] }, admin), r);
+    assert.deepStrictEqual(archivos["sims-conciliacion-ignoradas.json"], []);
+  } finally {
+    global.fetch = fetchViejo;
+  }
+});

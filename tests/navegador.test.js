@@ -3342,9 +3342,17 @@ test("Conciliación de SIMs: elige sola la columna del número, separa cada caso
   ];
   const historial = [{ fecha: "2026-09-01", hora: "10:00", numero: "3415550099", accion: "baja", tecnico: "Oficina", cliente: "Rota / no funciona" }];
   const acciones = [];
+  let marcas = [];
   await page.route("**/api/**", (route) => {
     const req = route.request(), u = req.url();
     const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("coleccion=sims_conciliacion")) {
+      if (req.method() === "GET") return json(marcas);
+      const b = JSON.parse(req.postData() || "{}"), k = (x) => `${x.empresa}|${x.categoria}|${x.numero}`, ks = new Set(b.items.map(k));
+      marcas = marcas.filter((x) => !ks.has(k(x)));
+      if (b.accion === "marcar") b.items.forEach((x) => marcas.unshift({ ...x, estado: b.estado, motivo: b.motivo, por: "Oficina", fecha: "2026-11-04T10:00:00Z" }));
+      return json({ ok: true, lista: marcas });
+    }
     if (req.method() === "POST") {
       const b = JSON.parse(req.postData() || "{}");
       acciones.push(b);
@@ -3416,6 +3424,21 @@ test("Conciliación de SIMs: elige sola la columna del número, separa cada caso
   await page.click('.conc-acc[data-k="problemaPagando"][data-a="baja"]');
   await page.waitForTimeout(300);
   assert.ok(acciones.some((a) => a.accion === "dar_de_baja" && a.numero === "3415550002" && /Extraviada/.test(a.motivo)));
+  // Ignorar una diferencia (error interno): sale de la lista y queda en "Ocultas"
+  page.once("dialog", (d) => d.accept("Error interno de carga"));
+  await page.click('.conc-marcar[data-k="noEnPlanilla"][data-estado="ignorada"]');
+  await page.waitForFunction(() => !ultimaConciliacion.noEnPlanilla.length);
+  assert.ok(!(await page.$('.conc-bloque[data-k="noEnPlanilla"]')), "ya no se muestra");
+  assert.deepStrictEqual(marcas.map((m) => [m.numero, m.categoria, m.empresa, m.estado, m.motivo]), [["3415550013", "noEnPlanilla", "Claro", "ignorada", "Error interno de carga"]]);
+  assert.match(await page.textContent(".conc-ocultas"), /Ocultas[\s\S]*3415550013[\s\S]*Ignorada[\s\S]*Error interno de carga/);
+  // Marcar resuelta: también se va
+  await page.click('.conc-marcar[data-k="inactivaPagando"][data-estado="resuelta"]');
+  await page.click(".cartel-admin .cartel-si");
+  await page.waitForFunction(() => !ultimaConciliacion.inactivaPagando.length);
+  // Volver a mostrar
+  await page.click(".conc-ocultas summary");
+  await page.click('.conc-reactivar >> text=Volver a mostrar >> nth=1');
+  await page.waitForFunction(() => ultimaConciliacion.noEnPlanilla.length === 1);
   // Si la columna elegida no era la buena, se cambia y se recalcula
   await page.selectOption("#concColEstado", "");
   assert.strictEqual(await page.evaluate(() => ultimaConciliacion.bajaEnEmpresa.length), 0, "sin columna de estado, todas cuentan como activas");
