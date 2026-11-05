@@ -1221,6 +1221,13 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
         <p class="status" id="simsConcStatus"></p>
         <div id="simsConcResultado"></div>
       </div>
+      <div class="card" id="simsOfCard">
+        <h3 style="margin-top:0;">Conciliación con el sistema de Oficina</h3>
+        <p class="subtitle" style="margin-top:0;">Subí el Excel o CSV del sistema de Oficina con todas las SIMs usadas en los clientes (de todas las empresas juntas). Se compara cada línea contra lo instalado en la APP de servicio técnico: qué falta de un lado o del otro, en qué cliente está, con qué empresa y si está activa.</p>
+        <input type="file" id="simsOfArchivo" accept=".xlsx,.xls,.csv">
+        <p class="status" id="simsOfStatus"></p>
+        <div id="simsOfResultado"></div>
+      </div>
       <div class="card">
         <h3 style="margin-top:0;">Alarmas que no comunican (reporte del monitoreo)</h3>
         <p class="subtitle" style="margin-top:0;">Subí el reporte del software de monitoreo (Excel o CSV) con el N° de abonado y la fecha de la última señal. Se cruza con las SIMs instaladas: las que hace mucho no comunican pueden tener la línea dada de baja, sin saldo o el equipo apagado.</p>
@@ -4868,6 +4875,11 @@ const AYUDAS_SIMS = {
     "La columna del número se elige mirando el contenido; si no es la correcta, cambiala arriba del resultado. Lo mismo la del estado.",
     "Cada diferencia se resuelve desde ahí: cargar al stock, instalar en un cliente, corregir la empresa, marcar activa o inactiva, retirar o dar de baja. De a una o tildando varias.",
     "En las líneas que SAT no tiene, se muestra lo último que se sabe de ellas (por ejemplo, si se dieron de baja en SAT y hay que pedir la baja a la empresa)." ] },
+  conc_oficina: { titulo: "Conciliación con el sistema de Oficina", texto: [
+    "Subí el listado del sistema de Oficina con las SIMs de los clientes. Puede traer las tres empresas mezcladas: la empresa de cada línea se toma de su columna.",
+    "Las columnas (número de línea, empresa, N° y nombre de cliente, estado, dirección) se eligen solas mirando el contenido; si alguna no es la correcta, cambiala arriba del resultado.",
+    "Se marca lo que no coincide: líneas que Oficina tiene y la APP no, las que la APP tiene y Oficina no, cliente distinto, empresa distinta, activa en un lado e inactiva en el otro, y números que parecen mal tipeados.",
+    "Cada diferencia se corrige en la APP desde ahí (instalar en el cliente de Oficina, pasar al cliente correcto, corregir empresa o número, marcar activa/inactiva, retirar) o se marca Resuelto / Ignorar si el error es del sistema de Oficina." ] },
   // ---- Técnicos ----
   tec_resumen: { titulo: "Agregar y editar técnicos", gif: "assets/ayuda/tecnicos-alta.gif", texto: [
     "\"+ Agregar técnico\" suma una fila nueva: poné nombre y apellido tal como querés que aparezca en la app.",
@@ -4907,7 +4919,7 @@ const LUGARES_AYUDA_SIMS = [
   ["#simsPendientesCard > h3", "pendientes"], ["#simsTabla thead th:nth-child(7)", "fila"], ["#simsLoteLimpiarBtn", "lote", "after"],
   ["#simsTabla thead th:nth-child(2)", "ficha"], ["#panelSimsInstaladas > h1", "instaladas"],
   ["#panelSimsControl h3", "tablero", "", 0], ["#panelSimsControl h3", "problemas", "", 1], ["#panelSimsControl h3", "dormidas", "", 2],
-  ["#panelSimsControl h3", "control", "", 3], ["#panelSimsControl h3", "conciliacion", "", 4],
+  ["#panelSimsControl h3", "control", "", 3], ["#panelSimsControl h3", "conciliacion", "", 4], ["#panelSimsControl h3", "conc_oficina", "", 5],
   ["#panelTecnicos > h1", "tec_resumen"], ["#tecnicosAyudaPermisos", "tec_permisos"],
   ["#panelRendiciones > h1", "rend_resumen"], ["#rendicionesAdminMes", "rend_estados", "after"],
   ["#rendicionesTotalesCard > h3", "rend_pagar_todo"], ["#descargarExcelRendicionesBtn", "rend_excel", "after"],
@@ -5653,6 +5665,380 @@ function concExcel() {
   XLSX.writeFile(libro, `conciliacion_${concEstado.empresa}_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 document.getElementById("simsConcEmpresa").addEventListener("change", (e) => { if (concEstado) { concEstado.empresa = e.target.value; concRecalcular(); } });
+
+// ---------- Conciliación con el sistema de Oficina ----------
+// El sistema de Oficina tiene todas las SIMs usadas en los clientes (de las
+// tres empresas mezcladas). Se cruza línea por línea contra lo instalado en
+// la APP: qué falta de cada lado, cliente, empresa y estado. Las marcas de
+// Resuelto / Ignorar y el historial usan la "empresa" Oficina.
+const OF_CLAVE = "Oficina";
+let ofEstado = null; // { filas, archivo, opciones, id }
+let ultimaOf = null;
+function ofEmpresaDe(v) {
+  const t = normalizeText(String(v == null ? "" : v));
+  if (!t) return "";
+  if (/claro|\bamx\b|\bcti\b/.test(t)) return "Claro";
+  if (/movistar|telefonica|unifon/.test(t)) return "Movistar";
+  if (/personal|telecom/.test(t)) return "Personal";
+  return "";
+}
+const ofDigitos = (v) => String(v == null ? "" : v).replace(/\D/g, "").replace(/^0+/, "");
+// Elige las columnas mirando el contenido (y el título, como ayuda).
+function ofColumnas(filas, colNum) {
+  const cab = [...new Set(filas.flatMap((f) => Object.keys(f)))].filter((c) => c !== colNum);
+  const muestra = filas.slice(0, 400);
+  const puntuar = (c, esValor, patron, anti) => {
+    let ok = 0, llenas = 0;
+    muestra.forEach((f) => { const v = String(f[c] == null ? "" : f[c]).trim(); if (!v) return; llenas++; if (esValor(v)) ok++; });
+    const t = normalizeText(c);
+    let p = llenas ? ok / llenas : 0;
+    if (patron.test(t)) p += 0.3;
+    if (anti && anti.test(t)) p -= 0.6;
+    return { c, p, llenas };
+  };
+  const mejor = (lista, min) => { const m = lista.filter((x) => x.llenas && x.p >= min).sort((a, b) => b.p - a.p)[0]; return m ? m.c : ""; };
+  const empresa = mejor(cab.map((c) => puntuar(c, (v) => !!ofEmpresaDe(v), /empresa|compan|operador|prestador|carrier|proveedor/)), 0.6);
+  const numCli = mejor(cab.filter((c) => c !== empresa).map((c) => puntuar(c, (v) => /^\d{1,8}$/.test(v.replace(/[\s.-]/g, "")), /(n|nro|num|numero|cod|codigo|id)\s*(de\s*)?(cliente|abonado|cuenta)|cliente\s*(n|nro|num)|abonado|cuenta/, /linea|telefono|celular|movil|dni|cuit|cuil|iccid|imei|fecha|serie/)), 0.85);
+  const nombre = mejor(cab.filter((c) => c !== empresa && c !== numCli).map((c) => puntuar(c, (v) => /[a-zA-ZáéíóúñÑ]{3}/.test(v) && !ofEmpresaDe(v), /nombre|razon|titular|cliente|apellido/, /direcc|domicilio|calle|localidad|estado|plan|observ|tipo|empresa/)), 0.9);
+  const estado = cab.find((c) => /estado|status|situacion/.test(normalizeText(c)) && c !== empresa) || "";
+  const direccion = cab.find((c) => /direcc|domicilio|calle/.test(normalizeText(c))) || "";
+  return { cab, empresa, numCli, nombre, estado, direccion };
+}
+function ofLeer(filas, col) {
+  const mapa = new Map(), duplicadas = [];
+  filas.forEach((f) => {
+    const n = soloDigitosLinea(f[col.num]);
+    if (n.length !== 10) return;
+    const reg = {
+      n, empresa: col.empresa ? ofEmpresaDe(f[col.empresa]) : "", cliente: col.nombre ? String(f[col.nombre] || "").replace(/\s+/g, " ").trim() : "",
+      numCli: col.numCli ? ofDigitos(f[col.numCli]) : "", direccion: col.direccion ? String(f[col.direccion] || "").replace(/\s+/g, " ").trim() : "",
+      estado: col.estado ? concClasificarEstado(f[col.estado]) : "activa", crudo: col.estado ? String(f[col.estado] || "") : "",
+    };
+    const previo = mapa.get(n);
+    if (!previo) { mapa.set(n, reg); return; }
+    const mismoCliente = (previo.numCli && previo.numCli === reg.numCli) || (!previo.numCli && normalizeText(previo.cliente) === normalizeText(reg.cliente));
+    if (!mismoCliente && previo.estado === "activa" && reg.estado === "activa" && !duplicadas.some((d) => d.n === n)) duplicadas.push({ n, a: previo, b: reg });
+    if (reg.estado === "activa" && previo.estado !== "activa") mapa.set(n, reg);
+  });
+  return { mapa, duplicadas };
+}
+// ¿Mismo cliente? Por número si los dos lo tienen; si no, por palabras del nombre.
+function ofMismoCliente(p, x) {
+  const nums = [x.numero_cliente, x.numero_abonado].map(ofDigitos).filter(Boolean);
+  if (p.numCli && nums.length) return nums.includes(p.numCli);
+  if (!p.cliente || !x.cliente) return true;
+  const pal = (t) => new Set(normalizeText(t).split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !/^(srl|sas|sa|del|los|las|consorcio|edificio)$/.test(w)));
+  const a = pal(p.cliente), b = pal(x.cliente);
+  if (!a.size || !b.size) return true;
+  let comunes = 0; a.forEach((w) => { if (b.has(w)) comunes++; });
+  return comunes / Math.min(a.size, b.size) >= 0.5;
+}
+const OF_CATEGORIAS = [
+  { k: "ofPosibleError", corto: "¿Número mal cargado?", titulo: "Posible número mal cargado", ayuda: "Un número de Oficina y uno de la APP difieren en un dígito (o dos seguidos dados vuelta) y no tienen pareja: casi seguro es la misma línea.", acciones: [["corregir", "Corregir el número en la APP"]] },
+  { k: "ofSoloOficina", corto: "Solo en Oficina", titulo: "En Oficina, pero no instaladas en la APP", ayuda: "Oficina las tiene en un cliente y la APP no. Abajo de cada una, lo que la APP sabe de esa línea.", acciones: [["instalar", "Instalar en el cliente de Oficina…"]] },
+  { k: "ofSoloApp", corto: "Solo en la APP", titulo: "Instaladas y activas en la APP, que Oficina no tiene", ayuda: "Faltan cargar en el sistema de Oficina, o se retiraron y la APP no se enteró.", acciones: [["inactiva", "Marcar inactiva"], ["retirar", "Retirar del cliente…"]] },
+  { k: "ofClienteDistinto", corto: "Otro cliente", titulo: "En un cliente distinto", ayuda: "La línea está en los dos lados, pero en clientes distintos.", acciones: [["cliente", "Pasar al cliente de Oficina en la APP"]] },
+  { k: "ofEmpresaDistinta", corto: "Otra empresa", titulo: "Con empresa distinta", ayuda: "Oficina y la APP dicen empresas distintas para la misma línea.", acciones: [["empresa", "Corregir la empresa en la APP"]] },
+  { k: "ofInactivaApp", corto: "Inactiva en la APP", titulo: "Activas en Oficina, inactivas en la APP", ayuda: "Oficina las da como activas en el cliente. O se activan en la APP, o hay que darlas de baja en Oficina.", acciones: [["activa", "Marcar activa en la APP"]] },
+  { k: "ofBajaOficina", corto: "Baja en Oficina", titulo: "Dadas de baja en Oficina, activas en la APP", ayuda: "Oficina ya no las tiene activas: marcarlas inactivas o retirarlas en la APP.", acciones: [["inactiva", "Marcar inactiva"], ["retirar", "Retirar del cliente…"]] },
+  { k: "ofDuplicada", corto: "Repetida en Oficina", titulo: "La misma línea en dos clientes de Oficina", ayuda: "Error del sistema de Oficina: la misma línea figura activa en dos clientes distintos.", acciones: [] },
+];
+function conciliarOficina(filas, opciones) {
+  const o = opciones || {};
+  const candidatas = concColumnasNumero(filas);
+  const num = o.num || (candidatas[0] && candidatas[0].col);
+  if (!num) throw new Error("No se encontró ninguna columna con números de línea.");
+  const auto = ofColumnas(filas, num);
+  const col = { num, ...auto };
+  ["empresa", "numCli", "nombre", "estado", "direccion"].forEach((k) => { if (o[k] !== undefined) col[k] = o[k]; });
+  const { mapa, duplicadas } = ofLeer(filas, col);
+  const inst = new Map(controlSims.instaladas.map((x) => [soloDigitosLinea(x.numero), x]));
+  const stock = new Map(simsEnStockControl().map((x) => [soloDigitosLinea(x.numero), x]));
+  const inactiva = (x) => /inactiv|baja/i.test(x.estado_linea || "");
+  const r = { col, cab: auto.cab, candidatas: candidatas.map((c) => c.col), total: mapa.size, activas: 0, coinciden: 0, porEmpresa: {}, ofPosibleError: [], ofSoloOficina: [], ofSoloApp: [], ofClienteDistinto: [], ofEmpresaDistinta: [], ofInactivaApp: [], ofBajaOficina: [], ofDuplicada: duplicadas.map((d) => ({ n: d.n, p: d.a, p2: d.b, x: inst.get(d.n) })) };
+  mapa.forEach((p, n) => {
+    const x = inst.get(n);
+    if (p.estado !== "activa") { if (x && !inactiva(x)) r.ofBajaOficina.push({ n, p, x }); return; }
+    r.activas++;
+    const e = p.empresa || "Sin empresa";
+    r.porEmpresa[e] = (r.porEmpresa[e] || 0) + 1;
+    if (!x) {
+      const s = stock.get(n);
+      r.ofSoloOficina.push({ n, p, s, ctx: s ? { texto: `En la APP está en stock de ${s.tecnico_actual || "Oficina"}${s.estado_fisico && s.estado_fisico !== "Disponible" ? " (" + s.estado_fisico + ")" : ""}: se instaló sin registrarlo`, tipo: "stock" } : concContextoLinea(n) });
+      return;
+    }
+    let ok = true;
+    if (inactiva(x)) { r.ofInactivaApp.push({ n, p, x }); ok = false; }
+    if (!ofMismoCliente(p, x)) { r.ofClienteDistinto.push({ n, p, x }); ok = false; }
+    if (p.empresa && (x.empresa || "") !== p.empresa) { r.ofEmpresaDistinta.push({ n, p, x }); ok = false; }
+    if (ok) r.coinciden++;
+  });
+  controlSims.instaladas.forEach((x) => {
+    const n = soloDigitosLinea(x.numero);
+    if (n.length === 10 && !inactiva(x) && !mapa.has(n)) r.ofSoloApp.push({ n, x });
+  });
+  // Pares que difieren en un dígito (o dos seguidos dados vuelta).
+  const parecidos = (a, b) => {
+    const d = []; for (let i = 0; i < 10; i++) if (a[i] !== b[i]) d.push(i);
+    return d.length === 1 || (d.length === 2 && d[1] === d[0] + 1 && a[d[0]] === b[d[1]] && a[d[1]] === b[d[0]]);
+  };
+  const usados = new Set();
+  r.ofSoloOficina = r.ofSoloOficina.filter((it) => {
+    if (it.s) return true;
+    const par = r.ofSoloApp.find((o2) => !usados.has(o2.n) && parecidos(it.n, o2.n));
+    if (!par) return true;
+    usados.add(par.n);
+    r.ofPosibleError.push({ n: it.n, p: it.p, x: par.x });
+    return false;
+  });
+  r.ofSoloApp = r.ofSoloApp.filter((it) => !usados.has(it.n));
+  // Marcadas como resueltas o ignoradas: a "Ocultas".
+  const marcadas = new Map((controlSims.ignoradas || []).filter((m) => m.empresa === OF_CLAVE).map((m) => [`${m.categoria}|${m.numero}`, m]));
+  r.ocultas = [];
+  OF_CATEGORIAS.forEach((c) => {
+    r[c.k] = r[c.k].filter((it) => {
+      const m = marcadas.get(`${c.k}|${ofNumeroItem(it)}`);
+      if (m) { r.ocultas.push({ ...m, titulo: c.corto }); return false; }
+      return true;
+    });
+  });
+  return r;
+}
+const ofNumeroItem = (it) => soloDigitosLinea((it.x && it.x.numero) || it.n);
+function ofCliTxt(p) { return [p.cliente, p.numCli ? "N° " + p.numCli : ""].filter(Boolean).join(" · ") || "(sin cliente)"; }
+function ofAppTxt(x) { return [x.cliente, x.numero_cliente ? "N° " + x.numero_cliente : x.numero_abonado ? "abonado " + x.numero_abonado : ""].filter(Boolean).join(" · ") || "(sin cliente)"; }
+function ofFilaHtml(k, it, i) {
+  const x = it.x || {}, p = it.p || {};
+  const num = `<button type="button" class="sim-num-link" data-ficha="${escapeHtmlAdmin(x.numero || it.n)}">${escapeHtmlAdmin(x.numero || it.n)}</button>`;
+  const emp = (e) => e ? ` <span style="color:#6B7680;">(${escapeHtmlAdmin(e)})</span>` : "";
+  let det = "";
+  if (k === "ofSoloOficina") det = `Oficina: <b>${escapeHtmlAdmin(ofCliTxt(p))}</b>${emp(p.empresa)}<br><span class="conc-ctx conc-ctx-${escapeHtmlAdmin(it.ctx.tipo)}">${escapeHtmlAdmin(it.ctx.texto)}</span>`;
+  else if (k === "ofSoloApp") det = `APP: <b>${escapeHtmlAdmin(ofAppTxt(x))}</b>${emp(x.empresa)}${x.direccion ? " · " + escapeHtmlAdmin(x.direccion) : ""}`;
+  else if (k === "ofPosibleError") det = `En Oficina: <b>${escapeHtmlAdmin(it.n)}</b> (${escapeHtmlAdmin(ofCliTxt(p))}) · en la APP: <b>${escapeHtmlAdmin(x.numero)}</b> (${escapeHtmlAdmin(ofAppTxt(x))})`;
+  else if (k === "ofClienteDistinto") det = `Oficina: <b>${escapeHtmlAdmin(ofCliTxt(p))}</b><br>APP: <b>${escapeHtmlAdmin(ofAppTxt(x))}</b>`;
+  else if (k === "ofEmpresaDistinta") det = `Oficina: <b>${escapeHtmlAdmin(p.empresa)}</b> · APP: <b>${escapeHtmlAdmin(x.empresa || "sin empresa")}</b> · ${escapeHtmlAdmin(ofAppTxt(x))}`;
+  else if (k === "ofDuplicada") det = `<b>${escapeHtmlAdmin(ofCliTxt(p))}</b> y <b>${escapeHtmlAdmin(ofCliTxt(it.p2))}</b>${it.x ? `<br>En la APP: ${escapeHtmlAdmin(ofAppTxt(it.x))}` : ""}`;
+  else det = `<b>${escapeHtmlAdmin(ofAppTxt(x))}</b>${p.crudo ? ` · en Oficina: <b>${escapeHtmlAdmin(p.crudo)}</b>` : ""}`;
+  const c = OF_CATEGORIAS.find((y) => y.k === k);
+  const botones = c.acciones.map(([a, t]) => `<button type="button" class="btn-secondary-admin of-acc" data-k="${k}" data-i="${i}" data-a="${a}">${escapeHtmlAdmin(t.replace("…", ""))}</button>`).join("")
+    + `<button type="button" class="btn-secondary-admin of-marcar" data-k="${k}" data-i="${i}" data-estado="resuelta" title="Ya está resuelta: no mostrarla más">✓ Resuelto</button><button type="button" class="btn-secondary-admin of-marcar" data-k="${k}" data-i="${i}" data-estado="ignorada" title="Error del sistema de Oficina o interno: no mostrarla más">Ignorar</button>`;
+  const nueva = ultimaOf && ultimaOf.anterior && ultimaOf.nuevas.has(k + "|" + ofNumeroItem(it));
+  return `<tr><td style="width:26px;"><input type="checkbox" class="of-sel" data-k="${k}" data-i="${i}"></td><td>${num}${nueva ? ' <span class="conc-nueva" style="display:inline-block;padding:1px 6px;border-radius:999px;background:#FFF1D6;color:#8A5A00;font-size:11px;font-weight:700;">Nueva</span>' : ""}</td><td style="white-space:normal;">${det}</td><td class="conc-btns">${botones}</td></tr>`;
+}
+function ofComparar(r) {
+  const prev = (controlSims.corridas || []).filter((c) => c.empresa === OF_CLAVE && c.id !== ofEstado.id).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)))[0] || null;
+  r.anterior = prev; r.nuevas = new Set(); r.yaNo = 0;
+  if (!prev) return;
+  const ahora = new Set();
+  OF_CATEGORIAS.forEach((c) => r[c.k].forEach((it) => { const n = ofNumeroItem(it); ahora.add(c.k + "|" + n); if (!(prev.numeros[c.k] || []).includes(n)) r.nuevas.add(c.k + "|" + n); }));
+  Object.entries(prev.numeros || {}).forEach(([k, l]) => l.forEach((n) => { if (!ahora.has(k + "|" + n)) r.yaNo++; }));
+}
+let ofGuardarTimer = null;
+function ofGuardarCorrida(r) {
+  clearTimeout(ofGuardarTimer);
+  const corrida = { accion: "guardar_corrida", id: ofEstado.id, empresa: OF_CLAVE, archivo: ofEstado.archivo, total: r.total, activas: r.activas, coinciden: r.coinciden, numeros: Object.fromEntries(OF_CATEGORIAS.map((c) => [c.k, r[c.k].map(ofNumeroItem)])) };
+  ofGuardarTimer = setTimeout(() => {
+    fetch("/api/datos?coleccion=sims_conciliacion", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify(corrida) }).catch(() => {});
+    const local = { ...corrida, fecha: ((controlSims.corridas || []).find((x) => x.id === corrida.id) || {}).fecha || new Date().toISOString() };
+    controlSims.corridas = [local, ...(controlSims.corridas || []).filter((x) => x.id !== corrida.id)];
+  }, 800);
+}
+function ofRender() {
+  const r = ultimaOf, cont = document.getElementById("simsOfResultado");
+  if (!r) { cont.innerHTML = ""; return; }
+  const sel = (id, etiqueta, valor, opciones, vacio) => `<div><label>${etiqueta}</label><select id="${id}">${vacio !== null ? `<option value="">${escapeHtmlAdmin(vacio)}</option>` : ""}${opciones.map((c) => `<option ${c === valor ? "selected" : ""}>${escapeHtmlAdmin(c)}</option>`).join("")}</select></div>`;
+  const columnas = `<details class="of-columnas" ${r.col.empresa && (r.col.numCli || r.col.nombre) ? "" : "open"} style="margin:8px 0;"><summary style="cursor:pointer;font-weight:600;">Columnas usadas del archivo</summary><div class="field-row conc-columnas" style="flex-wrap:wrap;">
+    ${sel("ofColNum", "Número de línea", r.col.num, r.candidatas.length ? r.candidatas : [r.col.num], null)}
+    ${sel("ofColEmpresa", "Empresa", r.col.empresa, r.cab, "(no tiene)")}
+    ${sel("ofColNumCli", "N° de cliente", r.col.numCli, r.cab, "(no tiene)")}
+    ${sel("ofColNombre", "Nombre del cliente", r.col.nombre, r.cab, "(no tiene)")}
+    ${sel("ofColEstado", "Estado", r.col.estado, r.cab, "(no tiene: todas activas)")}
+    ${sel("ofColDireccion", "Dirección", r.col.direccion, r.cab, "(no tiene)")}</div></details>`;
+  const avisos = [!r.col.empresa ? "No se encontró la columna de la empresa: no se compara la empresa." : "", !r.col.numCli && !r.col.nombre ? "No se encontró la columna del cliente: no se compara en qué cliente está." : ""].filter(Boolean).map((t) => `<p class="subtitle" style="color:#8A5A00;margin:4px 0;">⚠ ${escapeHtmlAdmin(t)}</p>`).join("");
+  const comp = r.anterior ? `<p class="subtitle" style="margin:6px 0;padding:8px 10px;border-radius:8px;background:#F3F6F9;">Contra la conciliación del ${escapeHtmlAdmin(fechaAR(String(r.anterior.fecha).slice(0, 10)))} (${escapeHtmlAdmin(r.anterior.archivo || "")}): <b>${r.nuevas.size}</b> diferencias nuevas · <b>${r.yaNo}</b> ya no aparecen.</p>` : `<p class="subtitle" style="margin:6px 0;">Es la primera conciliación con Oficina que queda guardada: la próxima se compara contra esta.</p>`;
+  const resumen = `<div class="sims-resumen" style="margin:10px 0;">${[["Coinciden", r.coinciden, ""], ...OF_CATEGORIAS.map((c) => [c.corto, r[c.k].length, c.k])].map(([t, n, k]) => `<span class="sims-chip ${k && n ? "alerta" : ""}">${escapeHtmlAdmin(t)} <b>${n}</b></span>`).join("")}</div>`;
+  const pendientes = OF_CATEGORIAS.reduce((s2, c) => s2 + r[c.k].length, 0);
+  const bloques = OF_CATEGORIAS.filter((c) => r[c.k].length).map((c) => `<div class="conc-bloque of-bloque" data-k="${c.k}">
+      <h4 style="margin:16px 0 4px;">${escapeHtmlAdmin(c.titulo)} <span style="color:#6B7680; font-weight:500;">(${r[c.k].length})</span></h4>
+      <p class="subtitle" style="margin:0 0 6px;">${escapeHtmlAdmin(c.ayuda)}</p>
+      <div class="conc-lote"><label style="display:inline-flex;align-items:center;gap:6px;"><input type="checkbox" class="of-todas" data-k="${c.k}" style="width:auto;"> Todas</label>${c.acciones.filter(([a]) => a !== "instalar").map(([a, t]) => `<button type="button" class="btn-secondary-admin of-lote-btn" data-k="${c.k}" data-a="${a}" style="width:auto;">${escapeHtmlAdmin(t.replace("…", ""))} (tildadas)</button>`).join("")}<button type="button" class="btn-secondary-admin of-lote-marcar" data-k="${c.k}" data-estado="resuelta" style="width:auto;">✓ Resueltas (tildadas)</button><button type="button" class="btn-secondary-admin of-lote-marcar" data-k="${c.k}" data-estado="ignorada" style="width:auto;">Ignorar (tildadas)</button></div>
+      <div class="sims-tabla-wrap"><table class="sims-tabla"><tbody>${r[c.k].map((it, i) => ofFilaHtml(c.k, it, i)).join("")}</tbody></table></div>
+    </div>`).join("");
+  cont.innerHTML = columnas + avisos + comp + resumen + (pendientes ? bloques : `<p class="status ok">No hay diferencias: lo de Oficina coincide con la APP.</p>`)
+    + (r.ocultas.length ? `<details class="conc-ocultas" style="margin-top:14px;"><summary style="cursor:pointer;font-weight:600;">Ocultas: marcadas como resueltas o ignoradas (${r.ocultas.length})</summary><div class="sims-tabla-wrap"><table class="sims-tabla"><tbody>${r.ocultas.map((m, i) => `<tr><td>${escapeHtmlAdmin(m.numero)}</td><td style="white-space:normal;">${m.estado === "resuelta" ? "✓ Resuelta" : "Ignorada"} · ${escapeHtmlAdmin(m.titulo)}${m.motivo ? " · " + escapeHtmlAdmin(m.motivo) : ""}<br><small style="color:#6B7680;">${escapeHtmlAdmin(m.por || "")} · ${escapeHtmlAdmin(fechaAR(String(m.fecha || "").slice(0, 10)))}</small></td><td class="conc-btns"><button type="button" class="btn-secondary-admin of-reactivar" data-i="${i}">Volver a mostrar</button></td></tr>`).join("")}</tbody></table></div></details>` : "")
+    + `<button type="button" class="btn-secondary-admin" id="simsOfExcel" style="width:auto; margin-top:12px;">⬇ Descargar diferencias en Excel</button>`;
+  [["ofColNum", "num"], ["ofColEmpresa", "empresa"], ["ofColNumCli", "numCli"], ["ofColNombre", "nombre"], ["ofColEstado", "estado"], ["ofColDireccion", "direccion"]].forEach(([id, k]) => {
+    document.getElementById(id).addEventListener("change", (e) => { ofEstado.opciones[k] = e.target.value; ofRecalcular(); });
+  });
+  const items = (k) => [...cont.querySelectorAll(`.of-sel[data-k="${k}"]:checked`)].map((x) => ultimaOf[k][Number(x.dataset.i)]);
+  cont.querySelectorAll("[data-ficha]").forEach((b) => b.addEventListener("click", () => abrirFichaLineaSim(b.dataset.ficha)));
+  cont.querySelectorAll(".of-todas").forEach((c) => c.addEventListener("change", () => cont.querySelectorAll(`.of-sel[data-k="${c.dataset.k}"]`).forEach((x) => { x.checked = c.checked; })));
+  cont.querySelectorAll(".of-acc").forEach((b) => b.addEventListener("click", () => {
+    const k = b.dataset.k, it = ultimaOf[k][Number(b.dataset.i)];
+    if (b.dataset.a === "instalar") return ofPanelInstalar(b.closest("tr"), it);
+    ofAplicar(k, b.dataset.a, [it]);
+  }));
+  cont.querySelectorAll(".of-lote-btn").forEach((b) => b.addEventListener("click", () => { const l = items(b.dataset.k); if (!l.length) { alert("Tildá primero las líneas."); return; } ofAplicar(b.dataset.k, b.dataset.a, l); }));
+  cont.querySelectorAll(".of-marcar").forEach((b) => b.addEventListener("click", () => ofMarcar(b.dataset.k, b.dataset.estado, [ultimaOf[b.dataset.k][Number(b.dataset.i)]])));
+  cont.querySelectorAll(".of-lote-marcar").forEach((b) => b.addEventListener("click", () => { const l = items(b.dataset.k); if (!l.length) { alert("Tildá primero las líneas."); return; } ofMarcar(b.dataset.k, b.dataset.estado, l); }));
+  cont.querySelectorAll(".of-reactivar").forEach((b) => b.addEventListener("click", () => {
+    const m = ultimaOf.ocultas[Number(b.dataset.i)];
+    ofGuardarMarcas({ accion: "reactivar", items: [{ numero: m.numero, categoria: m.categoria, empresa: OF_CLAVE }] }, `${m.numero} vuelve a mostrarse.`);
+  }));
+  document.getElementById("simsOfExcel").addEventListener("click", ofExcel);
+}
+async function ofMarcar(k, estado, items) {
+  const n = items.length, plural = n === 1 ? "esta línea" : `estas ${n} líneas`;
+  let motivo = "";
+  if (estado === "ignorada") {
+    const m = prompt(`¿Por qué se ignora ${plural}? (opcional, ej. error del sistema de Oficina)`, "");
+    if (m === null) return;
+    motivo = m.trim();
+  } else if (!await confirmarAdmin(`¿Marcar ${plural} como resuelta${n === 1 ? "" : "s"}? Sale de la lista (se puede volver a mostrar desde "Ocultas").`)) return;
+  await ofGuardarMarcas({ accion: "marcar", estado, motivo, items: items.map((it) => ({ numero: ofNumeroItem(it), categoria: k, empresa: OF_CLAVE })) }, `${n} ${n === 1 ? "línea marcada" : "líneas marcadas"} como ${estado === "resuelta" ? "resuelta" : "ignorada"}${n === 1 ? "" : "s"}.`);
+}
+async function ofGuardarMarcas(cuerpo, mensaje) {
+  const st = document.getElementById("simsOfStatus");
+  try {
+    const r = await fetch("/api/datos?coleccion=sims_conciliacion", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify(cuerpo) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || "Error " + r.status);
+    controlSims.ignoradas = Array.isArray(d.lista) ? d.lista : controlSims.ignoradas;
+    ofRecalcular();
+    st.className = "status ok"; st.textContent = mensaje;
+  } catch (err) { st.className = "status err"; st.textContent = "No se pudo: " + err.message; }
+}
+function ofPedido(a, it) {
+  const x = it.x || {}, p = it.p || {};
+  if (a === "corregir") return { accion: "corregir_numero", numero: x.numero, numero_nuevo: it.n, tecnico: "Oficina" };
+  if (a === "activa" || a === "inactiva") return { accion: "editar_instalada", numero: x.numero, tecnico: "Oficina", campos: { estado_linea: a === "activa" ? "Activo" : "Inactivo" } };
+  if (a === "retirar") return { accion: "retirar_de_registro", numero: x.numero, tecnico: "Oficina" };
+  if (a === "empresa") return { accion: "editar_instalada", numero: x.numero, tecnico: "Oficina", campos: { empresa: p.empresa } };
+  if (a === "cliente") {
+    const base = p.cliente ? buscarClienteSimsPorNombre(p.cliente) : null;
+    const campos = {};
+    if (p.cliente) campos.cliente = base ? base.nombre : p.cliente;
+    if (p.numCli || (base && base.numero_cliente)) campos.numero_cliente = p.numCli || String(base.numero_cliente);
+    if (p.direccion) campos.direccion = p.direccion;
+    return Object.keys(campos).length ? { accion: "editar_instalada", numero: x.numero, tecnico: "Oficina", campos } : null;
+  }
+  return null;
+}
+async function ofAplicar(k, a, items) {
+  const st = document.getElementById("simsOfStatus");
+  const n = items.length, plural = n === 1 ? "esta línea" : `estas ${n} líneas`;
+  const textos = { corregir: `¿Corregir en la APP ${n === 1 ? "el número" : "los números"} por ${n === 1 ? "el" : "los"} de Oficina?`, activa: `¿Marcar ${plural} como activa${n === 1 ? "" : "s"} en la APP?`, inactiva: `¿Marcar ${plural} como inactiva${n === 1 ? "" : "s"} en la APP?`, retirar: `¿Retirar ${plural} del cliente y devolver${n === 1 ? "la" : "las"} al stock de Oficina?`, empresa: `¿Poner en la APP la empresa que dice Oficina en ${plural}?`, cliente: `¿Pasar ${plural} en la APP al cliente que dice Oficina?` };
+  if (!await confirmarAdmin(textos[a])) return;
+  const errores = [];
+  for (let i = 0; i < n; i++) {
+    st.className = "status"; st.textContent = `Aplicando ${i + 1} de ${n}...`;
+    const pedido = ofPedido(a, items[i]);
+    if (!pedido) { errores.push(`${items[i].n}: Oficina no tiene el dato`); continue; }
+    try { await accionSimAdmin(pedido); } catch (err) { errores.push(`${items[i].n}: ${err.message}`); }
+  }
+  await cargarControlSims();
+  ofRecalcular();
+  st.className = errores.length ? "status err" : "status ok";
+  st.textContent = `${n - errores.length} de ${n} corregida${n === 1 ? "" : "s"} en la APP.${errores.length ? " Con error: " + errores.join(" · ") : ""} Quedó en el historial de cada línea.`;
+}
+// Instalar en el cliente que dice Oficina (desde el stock, o cargándola primero al stock de Oficina).
+function ofPanelInstalar(tr, it) {
+  const previo = tr.nextElementSibling;
+  if (previo && previo.classList.contains("sim-fila-extra")) { previo.remove(); return; }
+  const p = it.p || {};
+  const base = p.cliente ? buscarClienteSimsPorNombre(p.cliente) : null;
+  const extra = document.createElement("tr");
+  extra.className = "sim-fila-extra";
+  extra.innerHTML = `<td colspan="4" class="sim-extra"><div class="field-row" style="flex-wrap:wrap;">
+    <div><label>Cliente</label><input type="text" class="x-cliente" list="simInstalarClientesLista" value="${escapeHtmlAdmin(base ? base.nombre : p.cliente || "")}"></div>
+    <div><label>N° de cliente</label><input type="text" class="x-numcli" value="${escapeHtmlAdmin(p.numCli || (base && base.numero_cliente) || "")}"></div>
+    <div><label>N° de abonado</label><input type="text" class="x-abonado" value="${escapeHtmlAdmin((base && base.numero_abonado) || "")}"></div>
+    <div><label>Dirección</label><input type="text" class="x-direccion" value="${escapeHtmlAdmin(p.direccion || (base ? [base.direccion, base.localidad].filter(Boolean).join(", ") : ""))}"></div>
+    ${it.s ? "" : `<div><label>Empresa</label><select class="x-empresa">${EMPRESAS_SIM.map((e) => `<option ${e === p.empresa ? "selected" : ""}>${e}</option>`).join("")}</select></div>`}
+    <button type="button" class="x-ok" style="width:auto;">Instalar</button><button type="button" class="btn-secondary-admin x-cancel" style="width:auto;">Cancelar</button></div>
+    <p class="subtitle" style="margin:6px 0 0;">${it.s ? `Sale del stock de ${escapeHtmlAdmin(it.s.tecnico_actual || "Oficina")} y queda instalada en el cliente.` : "Se carga al stock de Oficina y queda instalada en el cliente."}</p></td>`;
+  tr.after(extra);
+  const q = (c) => extra.querySelector(c);
+  q(".x-cancel").addEventListener("click", () => extra.remove());
+  q(".x-ok").addEventListener("click", async () => {
+    const escrito = q(".x-cliente").value.trim();
+    if (!escrito) { alert("Escribí el cliente."); return; }
+    const c = buscarClienteSimsPorNombre(escrito);
+    const st = document.getElementById("simsOfStatus");
+    q(".x-ok").disabled = true;
+    try {
+      let numero = it.s ? it.s.numero : it.n, tecnico = it.s ? (it.s.tecnico_actual || "Oficina") : "Oficina";
+      if (!it.s) {
+        const empresa = q(".x-empresa").value;
+        const alta = await accionSimAdmin({ accion: "alta_lote", tecnico: "Oficina", sims: [{ numero: it.n, empresa, tipo: "Estándar", tecnico_actual: "Oficina" }] });
+        if (alta.agregadas && alta.agregadas[0]) numero = alta.agregadas[0].numero;
+        else if (alta.repetidas && alta.repetidas.length) throw new Error("La línea ya existe en la APP: actualizá la conciliación.");
+      }
+      await enviarAccionSimConRespaldo({ recurso: "sim", accion: "usar", numero, tecnico, cliente: c ? c.nombre : escrito,
+        direccion: q(".x-direccion").value.trim(), numero_abonado: q(".x-abonado").value.trim(), numero_cliente: q(".x-numcli").value.trim() || (c ? c.numero_cliente || "" : "") }, SERVICIOS_API_TOKEN);
+      await cargarControlSims();
+      ofRecalcular();
+      st.className = "status ok"; st.textContent = `${numero} instalada en ${c ? c.nombre : escrito}.`;
+    } catch (err) {
+      alert("No se pudo: " + err.message);
+      q(".x-ok").disabled = false;
+    }
+  });
+}
+function ofRecalcular() {
+  const st = document.getElementById("simsOfStatus");
+  try {
+    const r = conciliarOficina(ofEstado.filas, ofEstado.opciones);
+    ultimaOf = r;
+    ofComparar(r);
+    ofGuardarCorrida(r);
+    const emp = Object.entries(r.porEmpresa).map(([e, n]) => `${n} ${e}`).join(", ");
+    st.className = "status ok";
+    st.textContent = `${ofEstado.archivo}: ${r.total} líneas (${r.activas} activas${emp ? ": " + emp : ""}). ${r.coinciden} coinciden con la APP.`;
+    ofRender();
+  } catch (err) {
+    st.className = "status err";
+    st.textContent = "No se pudo conciliar: " + err.message;
+    document.getElementById("simsOfResultado").innerHTML = "";
+  }
+}
+function ofExcel() {
+  const c = ultimaOf;
+  const libro = XLSX.utils.book_new();
+  const hoja = (nombre, filas) => XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filas.length ? filas : [{ Número: "(ninguna)" }]), nombre.slice(0, 31));
+  const of = (p) => ({ "Cliente en Oficina": (p || {}).cliente || "", "N° cliente Oficina": (p || {}).numCli || "", "Empresa en Oficina": (p || {}).empresa || "" });
+  const app = (x) => ({ "Cliente en la APP": (x || {}).cliente || "", "N° cliente APP": (x || {}).numero_cliente || "", "Empresa en la APP": (x || {}).empresa || "", "Estado en la APP": (x || {}).estado_linea || "" });
+  hoja("Número mal cargado", c.ofPosibleError.map((it) => ({ "En Oficina": it.n, "En la APP": it.x.numero, ...of(it.p), ...app(it.x) })));
+  hoja("Solo en Oficina", c.ofSoloOficina.map((it) => ({ Número: it.n, ...of(it.p), "Qué sabe la APP": it.ctx.texto })));
+  hoja("Solo en la APP", c.ofSoloApp.map((it) => ({ Número: it.x.numero, ...app(it.x), Dirección: it.x.direccion || "" })));
+  hoja("Otro cliente", c.ofClienteDistinto.map((it) => ({ Número: it.x.numero, ...of(it.p), ...app(it.x) })));
+  hoja("Otra empresa", c.ofEmpresaDistinta.map((it) => ({ Número: it.x.numero, ...of(it.p), ...app(it.x) })));
+  hoja("Inactiva en la APP", c.ofInactivaApp.map((it) => ({ Número: it.x.numero, ...of(it.p), ...app(it.x) })));
+  hoja("Baja en Oficina", c.ofBajaOficina.map((it) => ({ Número: it.x.numero, ...of(it.p), "Estado en Oficina": it.p.crudo || it.p.estado, ...app(it.x) })));
+  hoja("Repetida en Oficina", c.ofDuplicada.map((it) => ({ Número: it.n, "Cliente 1": ofCliTxt(it.p), "Cliente 2": ofCliTxt(it.p2), "En la APP": it.x ? ofAppTxt(it.x) : "" })));
+  XLSX.writeFile(libro, `conciliacion_oficina_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+document.getElementById("simsOfArchivo").addEventListener("change", (ev) => {
+  const f = ev.target.files[0];
+  ev.target.value = "";
+  if (!f) return;
+  const st = document.getElementById("simsOfStatus");
+  st.className = "status"; st.textContent = "Leyendo el archivo de Oficina...";
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try {
+      if (!controlSims.instaladas.length && !controlSims.stock.length) await cargarControlSims();
+      concAsegurarClientes();
+      const wb = XLSX.read(e.target.result, { type: "array" });
+      const filas = wb.SheetNames.flatMap((nombre) => XLSX.utils.sheet_to_json(wb.Sheets[nombre], { defval: "" }))
+        .filter((fila) => Object.values(fila).some((v) => soloDigitosLinea(v).length === 10));
+      if (!filas.length) throw new Error("El archivo no tiene números de línea.");
+      ofEstado = { filas, archivo: f.name, opciones: {}, id: "o" + Date.now().toString(36) };
+      ofRecalcular();
+    } catch (err) { st.className = "status err"; st.textContent = "No se pudo conciliar: " + err.message; }
+  };
+  reader.readAsArrayBuffer(f);
+});
 
 // ---------- Alarmas que no comunican: reporte del monitoreo vs. SIMs instaladas ----------
 let comEstado = null; // { filas, archivo, colAbonado, colFecha }

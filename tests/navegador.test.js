@@ -4974,3 +4974,89 @@ test("Conciliación de SIMs: números mal cargados (un dígito), comparación co
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Conciliación de SIMs con el sistema de Oficina: todas las empresas juntas contra lo instalado en la APP, y se corrige desde ahí", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: route.request().url().includes("xlsx.full.min.js") ? require("fs").readFileSync(require("path").join(__dirname, "..", "vendor", "xlsx.full.min.js"), "utf8") : "" }));
+  const instaladas = [
+    { numero: "3415550020", empresa: "Claro", cliente: "Kiosco Pepe", numero_cliente: "101", estado_linea: "Activo" },
+    { numero: "3415550030", empresa: "Movistar", cliente: "Panadería", numero_cliente: "102", estado_linea: "Activo" },
+    { numero: "3415550044", empresa: "Claro", cliente: "Ferretería", numero_cliente: "103", estado_linea: "Activo" },
+    { numero: "3415550055", empresa: "Personal", cliente: "Taller", numero_cliente: "104", estado_linea: "Activo" },
+    { numero: "3415550066", empresa: "Claro", cliente: "Bar", numero_cliente: "105", estado_linea: "Inactivo" },
+    { numero: "3415550077", empresa: "Claro", cliente: "Gomería", numero_cliente: "106", estado_linea: "Activo" },
+    { numero: "3415550011", empresa: "Claro", cliente: "Vivero", numero_cliente: "107", estado_linea: "Activo" },
+  ];
+  const stock = [{ numero: "3415550088", empresa: "Claro", tecnico_actual: "Juan", estado_fisico: "Disponible", ubicacion_tipo: "tecnico" }];
+  const acciones = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("coleccion=sims_conciliacion") && req.method() === "GET") return json([]);
+    if (req.method() === "POST") {
+      const b = JSON.parse(req.postData() || "{}"); acciones.push(b);
+      if (b.accion === "marcar") return json({ ok: true, lista: b.items.map((x) => ({ ...x, estado: b.estado, motivo: b.motivo, por: "Seba", fecha: "2026-11-05T12:00:00Z" })) });
+      return json({ ok: true });
+    }
+    if (u.includes("coleccion=sims_instaladas")) return json(instaladas);
+    if (u.includes("coleccion=sims")) return json(stock);
+    json([]);
+  });
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { document.getElementById("mainCard").classList.remove("hidden"); document.getElementById("panelSimsControl").classList.remove("hidden"); return cargarControlSims(); });
+  const filas = [
+    { "Nro Cliente": 101, "Razón Social": "KIOSCO PEPE", "Línea": "341-5550020", "Compañía": "CLARO", Estado: "Activo" },
+    { "Nro Cliente": 102, "Razón Social": "Panadería", "Línea": "3415550030", "Compañía": "Personal", Estado: "Activo" },
+    { "Nro Cliente": 200, "Razón Social": "Farmacia Luna", "Línea": "3415550044", "Compañía": "Claro", Estado: "Activo" },
+    { "Nro Cliente": 105, "Razón Social": "Bar", "Línea": "3415550066", "Compañía": "Claro", Estado: "Activo" },
+    { "Nro Cliente": 106, "Razón Social": "Gomería", "Línea": "3415550078", "Compañía": "Claro", Estado: "Activo" },
+    { "Nro Cliente": 107, "Razón Social": "Vivero", "Línea": "3415550011", "Compañía": "Claro", Estado: "Baja" },
+    { "Nro Cliente": 300, "Razón Social": "Club Atlético", "Línea": "3415550088", "Compañía": "Claro", Estado: "Activo" },
+    { "Nro Cliente": 301, "Razón Social": "Estudio Gómez", "Línea": "3415550099", "Compañía": "Movistar", Estado: "Activo" },
+    { "Nro Cliente": 999, "Razón Social": "Otro", "Línea": "3415550020", "Compañía": "Claro", Estado: "Activo" },
+  ];
+  const buf = await page.evaluate((f) => { const lb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(lb, XLSX.utils.json_to_sheet(f), "SIMs"); return Array.from(new Uint8Array(XLSX.write(lb, { type: "array", bookType: "xlsx" }))); }, filas);
+  await page.setInputFiles("#simsOfArchivo", { name: "sims oficina.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer: Buffer.from(buf) });
+  await page.waitForSelector('.of-bloque[data-k="ofSoloOficina"]');
+  const r = await page.evaluate(() => {
+    const o = ultimaOf, ns = (k) => o[k].map((it) => it.n);
+    return { col: [o.col.num, o.col.empresa, o.col.numCli, o.col.nombre, o.col.estado], coinciden: o.coinciden, error: o.ofPosibleError.map((x) => [x.n, x.x.numero]), soloOf: ns("ofSoloOficina"), soloApp: ns("ofSoloApp"), cli: ns("ofClienteDistinto"), emp: ns("ofEmpresaDistinta"), inact: ns("ofInactivaApp"), baja: ns("ofBajaOficina"), dup: ns("ofDuplicada"), ctx: o.ofSoloOficina.map((x) => x.ctx.tipo) };
+  });
+  assert.deepStrictEqual(r, {
+    col: ["Línea", "Compañía", "Nro Cliente", "Razón Social", "Estado"], coinciden: 1,
+    error: [["3415550078", "3415550077"]], soloOf: ["3415550088", "3415550099"], soloApp: ["3415550055"],
+    cli: ["3415550044"], emp: ["3415550030"], inact: ["3415550066"], baja: ["3415550011"], dup: ["3415550020"], ctx: ["stock", "nunca"],
+  });
+  assert.match(await page.textContent("#simsOfStatus"), /Claro.*Movistar|Movistar.*Claro/);
+  // Pasar la 0044 al cliente de Oficina
+  await page.click('.of-acc[data-k="ofClienteDistinto"][data-a="cliente"]');
+  await page.click(".cartel-admin .cartel-si");
+  await page.waitForFunction(() => /corregida/.test(document.getElementById("simsOfStatus").textContent));
+  const ed = acciones.find((a) => a.accion === "editar_instalada");
+  assert.strictEqual(ed.numero, "3415550044");
+  assert.deepStrictEqual(ed.campos, { cliente: "Farmacia Luna", numero_cliente: "200" });
+  // Corregir la empresa de la 0030 a Personal
+  await page.click('.of-acc[data-k="ofEmpresaDistinta"][data-a="empresa"]');
+  await page.click(".cartel-admin .cartel-si");
+  await page.waitForTimeout(300);
+  assert.ok(acciones.some((a) => a.accion === "editar_instalada" && a.numero === "3415550030" && a.campos.empresa === "Personal"));
+  // Instalar la de stock de Juan en el cliente de Oficina
+  await page.click('.of-acc[data-k="ofSoloOficina"][data-a="instalar"]');
+  assert.strictEqual(await page.inputValue(".sim-fila-extra .x-cliente"), "Club Atlético");
+  assert.strictEqual(await page.inputValue(".sim-fila-extra .x-numcli"), "300");
+  await page.click(".sim-fila-extra .x-ok");
+  await page.waitForFunction(() => /instalada en Club/.test(document.getElementById("simsOfStatus").textContent));
+  assert.ok(acciones.some((a) => a.accion === "usar" && a.numero === "3415550088" && a.tecnico === "Juan" && a.numero_cliente === "300"));
+  // Ignorar la repetida (error del sistema de Oficina)
+  page.once("dialog", (d) => d.accept("error de Oficina"));
+  await page.click('.of-marcar[data-k="ofDuplicada"][data-estado="ignorada"]');
+  await page.waitForFunction(() => ultimaOf && !ultimaOf.ofDuplicada.length);
+  const m = acciones.find((a) => a.accion === "marcar");
+  assert.deepStrictEqual(m.items, [{ numero: "3415550020", categoria: "ofDuplicada", empresa: "Oficina" }]);
+  await page.waitForTimeout(1000);
+  const corrida = acciones.find((a) => a.accion === "guardar_corrida");
+  assert.ok(corrida && corrida.empresa === "Oficina", "queda en el historial para comparar la próxima");
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
