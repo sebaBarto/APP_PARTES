@@ -2398,6 +2398,7 @@ const PERMISOS_TECNICO = [
   { clave: "dash_sims", etiqueta: "Dashboard de SIMs" },
   { clave: "historial_todos", etiqueta: "Ver historial de todo el equipo" },
   { clave: "dash_stock", etiqueta: "Ver historial de Stock (materiales instalados/retirados)" },
+  { clave: "stock_responsable", etiqueta: "Responsable de stock (escanear, entregar y recibir material del depósito)" },
   { clave: "marcar_pasado_sistema", etiqueta: "Marcar partes y stock como \"pasado a mi sistema\" (uso de oficina)" },
   { clave: "instalador", etiqueta: "Instalador (Presencia en obra + Instalación)" },
   { clave: "vehiculos", etiqueta: "Sección Vehículos" },
@@ -6591,7 +6592,7 @@ function stkRenderPedidos() {
 
 // --- Movimientos ---
 let stkMovs = [];
-const STK_MOV_TIPO = { inicial: "Saldo inicial", ajuste: "Ajuste", entrega: "Entrega", devolucion: "Devolución", consumo: "Usado en cliente", ingreso: "Ingreso" };
+const STK_MOV_TIPO = { inicial: "Saldo inicial", ajuste: "Ajuste", entrega: "Entrega a técnico (en camino)", recibido: "Recibido", diferencia: "Diferencia (vuelve)", rechazado: "Rechazado (vuelve)", devolucion: "Devolución", a_cliente: "A cliente", retiro: "Retiro de cliente", traspaso: "Traspaso", consumo: "Usado en cliente", ingreso: "Ingreso (compra)" };
 async function stkCargarMovimientos() {
   const mesInp = document.getElementById("stkMovMes");
   if (!mesInp.value) mesInp.value = new Date().toISOString().slice(0, 7);

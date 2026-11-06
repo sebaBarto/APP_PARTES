@@ -653,6 +653,35 @@ async function chequearVencimientos(ghHeaders, headersBackendNuevo, estado, hoy)
   return avisados;
 }
 
+// Stock: envíos «en camino» sin confirmar hace más de 20 horas. Se recuerda una vez por día
+// al que tiene que confirmar (el técnico, o los responsables de stock si es una devolución).
+async function chequearEnviosStock(ghHeaders, estado, ahora) {
+  let sal = {};
+  try { sal = (await leerJSON(ghHeaders, "stock/saldos.json", {})).data || {}; } catch (e) { return []; }
+  const pendientes = (Array.isArray(sal.envios) ? sal.envios : []).filter((e) => ahora - new Date(e.fecha).getTime() > 20 * 3600e3);
+  if (!pendientes.length) return [];
+  let responsables = null;
+  const hoy = new Date(ahora).toISOString().slice(0, 10), avisados = [];
+  if (!estado.stock_envios) estado.stock_envios = {};
+  for (const e of pendientes) {
+    if (estado.stock_envios[e.id] === hoy) continue;
+    let a = [];
+    if (/^tec:/.test(e.a)) a = [e.a.slice(4)];
+    else {
+      if (!responsables) { try { responsables = ((await leerJSON(ghHeaders, "tecnicos.json", [])).data || []).filter((t) => t.permisos && t.permisos.stock_responsable).map((t) => t.nombre); } catch (err) { responsables = []; } }
+      a = responsables;
+    }
+    if (!a.length) continue;
+    const dias = Math.max(1, Math.round((ahora - new Date(e.fecha).getTime()) / 864e5));
+    await enviarASeleccionados(a, { titulo: "📦 Material sin confirmar", cuerpo: `${/^tec:/.test(e.a) ? `Te mandaron material hace ${dias} día(s)` : `${e.de.replace(/^tec:/, "")} devolvió material hace ${dias} día(s)`}: confirmá «Recibí» en Mi stock.`, url: "/?ir=mistock" });
+    estado.stock_envios[e.id] = hoy;
+    avisados.push(`${a.join(", ")}: ${e.id}`);
+  }
+  const vivos = new Set((sal.envios || []).map((e) => e.id));
+  Object.keys(estado.stock_envios).forEach((k) => { if (!vivos.has(k)) delete estado.stock_envios[k]; });
+  return avisados;
+}
+
 // Propuestas 3D mandadas a clientes: a quien la mandó se le avisa a quién
 // conviene llamar (la miró varias veces, no la abrió, se está enfriando).
 // Cada aviso sale una sola vez por propuesta y por motivo.
@@ -710,15 +739,18 @@ module.exports = async (req, res) => {
     const instalacionesAvisadas = await chequearInstalacionesAbandonadas(headersBackendNuevo, estado, ahora);
     let vencimientosAvisados = null;
     try { vencimientosAvisados = await chequearVencimientos(ghHeaders, headersBackendNuevo, estado, ahora); } catch (e) { vencimientosAvisados = "error: " + e.message; }
+    let enviosStock = null;
+    try { enviosStock = await chequearEnviosStock(ghHeaders, estado, Date.now()); } catch (e) { enviosStock = "error: " + e.message; }
     let propuestasAvisadas = null;
     try { propuestasAvisadas = await chequearPropuestas3d(ghHeaders); } catch (e) { propuestasAvisadas = "error: " + e.message; }
 
     await guardarJSON(ghHeaders, ESTADO_PATH, estado, shaEstado);
 
-    res.status(200).json({ ok: true, guardia_notificada: tecnicoDeGuardia || null, recordatorio_en_calle: tecnicosRecordados || null, felicitacion_semanal: ganadoresSemana || null, recordatorio_devolver: recordadosDevolver || null, resumen_semanal: resumenSemanal || null, instalaciones_avisadas: instalacionesAvisadas || null, propuestas_3d: propuestasAvisadas, vencimientos: vencimientosAvisados });
+    res.status(200).json({ ok: true, guardia_notificada: tecnicoDeGuardia || null, recordatorio_en_calle: tecnicosRecordados || null, felicitacion_semanal: ganadoresSemana || null, recordatorio_devolver: recordadosDevolver || null, resumen_semanal: resumenSemanal || null, instalaciones_avisadas: instalacionesAvisadas || null, propuestas_3d: propuestasAvisadas, vencimientos: vencimientosAvisados, stock_envios: enviosStock });
   } catch (err) {
     res.status(500).json({ error: "Error interno en el cron diario", detail: String(err.message || err) });
   }
 };
 module.exports.chequearPropuestas3d = chequearPropuestas3d;
 module.exports.chequearVencimientos = chequearVencimientos;
+module.exports.chequearEnviosStock = chequearEnviosStock;

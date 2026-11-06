@@ -3753,3 +3753,45 @@ html .app .equipo-acciones .btn.eq-util.activo, .equipo-acciones .eq-util.activo
 .dlg-botones button { min-height: 44px; padding: 10px 16px; border-radius: 10px; font-size: 15px; font-weight: 600; font-family: inherit; cursor: pointer; }
 .dlg-no { background: transparent; color: inherit; border: 1.5px solid currentColor; opacity: .85; }
 .dlg-si { background: #F5A623; color: #101820; border: none; }
+
+/* ---------- Stock: Mi stock y Depósito ---------- */
+.tile-mistock .panel-tile-icon-badge { background: var(--acc-gold); }
+.tile-deposito .panel-tile-icon-badge { background: var(--acc-navy); }
+.stk-h { font-size: 15px; margin: 18px 0 8px; }
+.stk-ayuda { font-size: 13px; opacity: .8; margin: 0 0 8px; }
+.stk-modos { display: flex; gap: 6px; margin: 4px 0 12px; }
+.stk-modos button { flex: 1; padding: 10px 6px; border-radius: 999px; border: 1px solid rgba(127,127,127,.45); background: transparent; color: inherit; font-weight: 700; font-size: 14px; }
+.stk-modos button.activo { background: var(--amber); border-color: var(--amber); color: #101820; }
+.stk-destino { display: flex; gap: 8px; flex-wrap: wrap; }
+.stk-destino .field-group { flex: 1 1 150px; }
+.stk-escanear-fila { display: flex; gap: 8px; align-items: stretch; margin: 6px 0 10px; }
+.stk-escanear-fila .btn { flex: 0 0 auto; }
+.stk-escanear-fila .field-input { flex: 1; min-width: 0; }
+.stk-linea, .stk-envio { border: 1px solid rgba(127,127,127,.35); background: rgba(127,127,127,.07); border-radius: 12px; padding: 10px 12px; margin: 0 0 8px; }
+.stk-linea-top { display: flex; gap: 8px; align-items: flex-start; justify-content: space-between; }
+.stk-linea-top b { font-size: 14px; line-height: 1.3; }
+.stk-linea small, .stk-envio small { display: block; font-size: 12px; opacity: .75; margin-top: 2px; }
+.stk-cant { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+.stk-cant button { width: 36px; height: 36px; min-height: 0; padding: 0; border-radius: 10px; border: 1px solid rgba(127,127,127,.45); background: transparent; color: inherit; font-size: 18px; font-weight: 700; }
+.stk-cant input { width: 64px; text-align: center; padding: 6px; }
+.stk-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.stk-chip { display: inline-flex; align-items: center; gap: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; padding: 3px 4px 3px 9px; border-radius: 999px; background: rgba(127,127,127,.16); }
+.stk-chip button { width: 22px; height: 22px; min-height: 0; padding: 0; border: 0; background: transparent; color: inherit; font-size: 14px; }
+.stk-falta { font-size: 12.5px; color: #B26A00; margin-top: 6px; }
+.stk-linea .stk-quitar, .stk-link { background: none; border: 0; padding: 4px 0; min-height: 0; color: inherit; text-decoration: underline; font-size: 12.5px; opacity: .8; width: auto; }
+.stk-res { display: block; width: 100%; text-align: left; padding: 10px 12px; margin: 0 0 6px; border-radius: 10px; border: 1px solid rgba(127,127,127,.35); background: transparent; color: inherit; font-size: 14px; min-height: 0; }
+.stk-res small { display: block; opacity: .7; font-size: 12px; }
+.stk-envio-items { margin: 8px 0; }
+.stk-envio-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; font-size: 14px; }
+.stk-envio-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.stk-envio-btns .btn { flex: 1 1 auto; }
+.stk-escaner { position: fixed; inset: 0; z-index: 99990; background: #000; color: #fff; display: flex; flex-direction: column; }
+.stk-escaner video { flex: 1; width: 100%; object-fit: cover; min-height: 0; }
+.stk-escaner-marco { position: absolute; left: 10%; right: 10%; top: 28%; height: 26%; border: 3px solid rgba(245,166,35,.9); border-radius: 14px; pointer-events: none; }
+.stk-escaner-arriba, .stk-escaner-abajo { padding: 12px 16px; background: rgba(16,24,32,.92); display: flex; align-items: center; gap: 10px; }
+.stk-escaner-arriba b { flex: 1; font-size: 15px; }
+.stk-escaner-abajo { flex-direction: column; align-items: stretch; }
+.stk-escaner-ultimo { min-height: 22px; font-size: 14px; }
+.stk-escaner-ultimo.ok { color: #7BE3A0; } .stk-escaner-ultimo.err { color: #FF9C8F; }
+.stk-escaner label { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.stk-escaner .btn { width: 100%; }

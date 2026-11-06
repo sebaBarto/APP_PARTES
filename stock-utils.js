@@ -133,6 +133,8 @@
   const UBIC_TEXTO = { dep: "Depósito", tec: "Técnico", veh: "Vehículo", cli: "Cliente (instalado)", com: "Cliente (comodato)", cam: "En camino" };
   function nombreUbicacion(u) {
     if (u === "dep") return "Depósito";
+    if (/^cam:dev:/.test(u || "")) return `En camino al depósito (devuelve ${u.slice(8)})`;
+    if (/^cam:/.test(u || "")) return `En camino a ${u.slice(4)}`;
     const [t, ...r] = String(u || "").split(":");
     return `${UBIC_TEXTO[t] || t}${r.length ? ": " + r.join(":") : ""}`;
   }
@@ -256,6 +258,152 @@
     return s;
   }
 
+  // ---------- Escaneo: qué es cada código ----------
+  // Forma de un N° de unidad: letras -> A, dígitos -> 9 ("GH120FF156" -> "AA999AA999").
+  // La APP va guardando las formas que ve en cada artículo y así aprende el formato de cada marca.
+  const limpiarCodigo = (t) => String(t == null ? "" : t).trim().replace(/^\]\w\d/, "").replace(/[\u0000-\u001f]/g, "").replace(/\s+/g, "").toUpperCase().slice(0, 64);
+  const formaCodigo = (t) => limpiarCodigo(t).replace(/[A-Z]/g, "A").replace(/\d/g, "9").replace(/[^A9]/g, "-");
+  function coincideFormato(tracking, formatos) {
+    const f = formaCodigo(tracking), lista = Array.isArray(formatos) ? formatos : [];
+    if (!lista.length) return null; // todavía no se aprendió nada: no se puede decir
+    return lista.some((x) => x === f || (x.length === f.length && x.slice(0, 2) === f.slice(0, 2)));
+  }
+  function agregarFormato(formatos, tracking) {
+    const f = formaCodigo(tracking), lista = Array.isArray(formatos) ? formatos.slice() : [];
+    if (!f || f.length < 4 || lista.includes(f)) return lista;
+    return [...lista, f].slice(-10);
+  }
+  // Devuelve qué se escaneó:
+  //  { tipo: "articulo", c, via: "etiqueta"|"ean"|"codigo" }   -> un artículo (si es por unidad, después va su N° de unidad)
+  //  { tipo: "unidad", c, tracking, ubic?, nuevo, aviso? }    -> un equipo puntual
+  //  { tipo: "ean_nuevo", ean }                                -> código de fabricante que todavía no se asoció a un artículo
+  //  { tipo: "desconocido", texto, aviso }
+  // actual: código del artículo de la última etiqueta escaneada (para leer a continuación sus N° de unidad).
+  function interpretarCodigo(texto, catalogo, saldos, actual) {
+    const t = limpiarCodigo(texto), arts = (catalogo && catalogo.articulos) || {};
+    if (!t) return { tipo: "desconocido", texto: t, aviso: "Código vacío" };
+    const sat = leerEtiquetaSat(t);
+    if (sat) {
+      if (arts[sat.codigo]) return { tipo: "articulo", c: sat.codigo, via: "etiqueta", proveedor: sat.proveedor };
+      return { tipo: "desconocido", texto: t, aviso: `La etiqueta es del artículo ${sat.codigo}, que no está en el catálogo de la APP.` };
+    }
+    const u = ((saldos && saldos.unidades) || {})[t];
+    if (u && u.c) return { tipo: "unidad", c: u.c, tracking: t, ubic: u.u, nuevo: false };
+    if (esEanValido(t)) {
+      const a = Object.values(arts).find((x) => Array.isArray(x.alias) && x.alias.includes(t));
+      return a ? { tipo: "articulo", c: a.c, via: "ean" } : { tipo: "ean_nuevo", ean: t };
+    }
+    const a2 = Object.values(arts).find((x) => Array.isArray(x.alias) && x.alias.includes(t));
+    if (a2 && a2.tipo !== "unidad") return { tipo: "articulo", c: a2.c, via: "ean" };
+    if (/^\d{1,8}$/.test(t) && arts[codigoArticulo(t)]) return { tipo: "articulo", c: codigoArticulo(t), via: "codigo" };
+    if (actual && arts[actual] && arts[actual].tipo === "unidad") {
+      if (t.length < 4) return { tipo: "desconocido", texto: t, aviso: "Ese código es muy corto para ser un N° de unidad." };
+      const ok = coincideFormato(t, arts[actual].formatos);
+      return { tipo: "unidad", c: actual, tracking: t, nuevo: true, aviso: ok === false ? `No se parece a los N° de unidad que ya vi de este artículo (${arts[actual].formatos.join(", ")}). ¿Seguro que es de esta caja?` : "" };
+    }
+    // Sin etiqueta antes: se busca un artículo cuyo formato aprendido coincida.
+    const candidatos = Object.values(arts).filter((x) => x.tipo === "unidad" && coincideFormato(t, x.formatos) && (x.formatos || []).includes(formaCodigo(t)));
+    if (candidatos.length === 1) return { tipo: "unidad", c: candidatos[0].c, tracking: t, nuevo: true, adivinado: true, aviso: `Parece un ${candidatos[0].d}: confirmalo escaneando la etiqueta de SAT.` };
+    return { tipo: "desconocido", texto: t, aviso: "No reconozco este código. Escaneá primero la etiqueta de SAT de la caja." };
+  }
+
+  // ---------- Movimientos con confirmación ----------
+  // Lo que va a un técnico (o vuelve de un técnico al depósito) queda «en camino» hasta que
+  // el que recibe confirma. Los envíos pendientes se guardan en saldos.envios.
+  const camino = (a, de) => (/^dep$/.test(a) && /^tec:/.test(de || "") ? `cam:dev:${de.slice(4)}` : `cam:${String(a).replace(/^tec:/, "")}`);
+  const idMov = (i) => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}${i == null ? "" : "-" + i}`;
+  // items: [{ c, cant, unidades?: [tracking] }]. op: { tipo, de?, a, por, fecha, motivo?, confirmar? }
+  // Devuelve { saldos, movs, envio } o { error }.
+  function moverStock(saldos, items, op, catalogo) {
+    const arts = (catalogo && catalogo.articulos) || {};
+    let s = JSON.parse(JSON.stringify(saldos || {}));
+    s.ubic = s.ubic || {}; s.unidades = s.unidades || {}; s.envios = Array.isArray(s.envios) ? s.envios : [];
+    const fecha = op.fecha || new Date().toISOString();
+    const lista = (items || []).map((x) => ({ c: codigoArticulo(x.c), cant: Math.round((Number(x.cant) || 0) * 1000) / 1000, unidades: [...new Set((x.unidades || []).map(limpiarCodigo).filter(Boolean))] }))
+      .map((x) => ({ ...x, cant: x.unidades.length > x.cant ? x.unidades.length : x.cant })).filter((x) => x.c && x.cant > 0);
+    if (!lista.length) return { error: "No hay nada para mover" };
+    if (!op.a && !op.de) return { error: "Falta el destino" };
+    if (op.a && op.a === op.de) return { error: "El origen y el destino son el mismo" };
+    for (const x of lista) {
+      if (!arts[x.c]) return { error: `El artículo ${x.c} no está en el catálogo` };
+      if (op.de && op.de !== "proveedor" && !op.deFlexible) {
+        const hay = (s.ubic[op.de] || {})[x.c] || 0;
+        if (hay < x.cant) return { error: `${arts[x.c].d}: en ${nombreUbicacion(op.de)} hay ${hay} y querés mover ${x.cant}.` };
+      }
+      for (const t of x.unidades) {
+        const u = s.unidades[t];
+        if (u && u.c !== x.c) return { error: `El N° de unidad ${t} es de otro artículo (${(arts[u.c] || {}).d || u.c}).` };
+        if (u && op.de && op.de !== "proveedor" && !op.deFlexible && u.u !== op.de) return { error: `El equipo ${t} figura en ${nombreUbicacion(u.u)}, no en ${nombreUbicacion(op.de)}.` };
+      }
+    }
+    const de = op.de === "proveedor" ? null : op.de || null;
+    const destino = op.confirmar ? camino(op.a, de) : op.a;
+    const base = (x, i, cant, desde, extra) => ({ id: idMov(i), fecha, por: op.por || "", tipo: op.tipo || "movimiento", c: x.c, cant, ...(desde ? { de: desde } : {}), a: destino, ...(op.motivo ? { motivo: op.motivo } : {}), ...(extra || {}) });
+    const movs = [];
+    lista.forEach((x, i) => {
+      const uni = x.unidades.length ? { unidades: x.unidades } : {};
+      // Retiro de un cliente que la APP no tenía registrado (o con menos): lo que falta sale del
+      // comodato «Sin asignar» si es comodato, y si no, entra igual (no figuraba en la APP).
+      const hay = de ? (s.ubic[de] || {})[x.c] || 0 : x.cant;
+      if (!op.deFlexible || hay >= x.cant) { movs.push(base(x, i, x.cant, de, uni)); return; }
+      let resto = x.cant;
+      if (hay > 0) { movs.push(base(x, `${i}a`, hay, de)); resto -= hay; }
+      const sinAsignar = /^com:/.test(de) ? (s.ubic["com:Sin asignar"] || {})[x.c] || 0 : 0;
+      if (sinAsignar > 0) { const n = Math.min(sinAsignar, resto); movs.push(base(x, `${i}b`, n, "com:Sin asignar")); resto -= n; }
+      if (resto > 0) movs.push(base(x, `${i}c`, Math.round(resto * 1000) / 1000, null, { motivo: `${op.motivo ? op.motivo + " · " : ""}no figuraba en la APP en ${nombreUbicacion(de)}` }));
+      if (x.unidades.length) movs[movs.length - 1].unidades = x.unidades;
+    });
+    movs.forEach((m) => { s = aplicarMovimiento(s, m); });
+    let envio = null;
+    if (op.confirmar) {
+      envio = { id: idMov(), tipo: op.tipo || "entrega", fecha, por: op.por || "", de: de || "dep", a: op.a, camino: destino, items: lista, ...(op.motivo ? { motivo: op.motivo } : {}) };
+      s.envios = [...s.envios, envio];
+      movs.forEach((m) => { m.envio = envio.id; });
+    }
+    return { saldos: s, movs, envio };
+  }
+  // El que recibe confirma (todo o parte) o rechaza. Lo que no se recibe vuelve al origen.
+  // resp: { accion: "recibi"|"rechazar", items?: [{ c, cant, unidades? }], por, fecha, motivo?, destino? }
+  function cerrarEnvio(saldos, id, resp) {
+    let s = JSON.parse(JSON.stringify(saldos || {}));
+    const envio = (s.envios || []).find((e) => e.id === id);
+    if (!envio) return { error: "Ese envío ya se confirmó o no existe" };
+    const fecha = resp.fecha || new Date().toISOString(), movs = [];
+    const final = resp.destino && envio.a === "dep" ? resp.destino : envio.a;
+    const recibidos = new Map();
+    if (resp.accion === "recibi") {
+      if (Array.isArray(resp.items)) resp.items.forEach((x) => recibidos.set(codigoArticulo(x.c), { cant: Number(x.cant) || 0, unidades: x.unidades }));
+      else envio.items.forEach((x) => recibidos.set(x.c, { cant: x.cant, unidades: x.unidades }));
+    } else if (resp.accion !== "rechazar") return { error: "Acción inválida" };
+    const diferencias = [];
+    envio.items.forEach((x, i) => {
+      const r = recibidos.get(x.c) || { cant: 0 };
+      const cant = Math.max(0, Math.min(x.cant, Math.round(r.cant * 1000) / 1000));
+      const uniRec = (x.unidades || []).filter((t) => !Array.isArray(r.unidades) || r.unidades.map(limpiarCodigo).includes(t)).slice(0, cant || 0);
+      const uniVuelven = (x.unidades || []).filter((t) => !uniRec.includes(t));
+      if (cant > 0) movs.push({ id: idMov(`r${i}`), fecha, por: resp.por || "", tipo: "recibido", c: x.c, cant, de: envio.camino, a: final, envio: envio.id, ...(uniRec.length ? { unidades: uniRec } : {}) });
+      if (cant < x.cant) {
+        diferencias.push({ c: x.c, enviado: x.cant, recibido: cant });
+        movs.push({ id: idMov(`v${i}`), fecha, por: resp.por || "", tipo: resp.accion === "rechazar" ? "rechazado" : "diferencia", c: x.c, cant: Math.round((x.cant - cant) * 1000) / 1000, de: envio.camino, a: envio.de, envio: envio.id, motivo: resp.motivo || (resp.accion === "rechazar" ? "Rechazado" : "No llegó todo"), ...(uniVuelven.length ? { unidades: uniVuelven } : {}) });
+      }
+    });
+    movs.forEach((m) => { s = aplicarMovimiento(s, m); });
+    s.envios = s.envios.filter((e) => e.id !== id);
+    const cerrado = { ...envio, estado: resp.accion === "rechazar" ? "rechazado" : diferencias.length ? "con_diferencias" : "recibido", cerrado: fecha, cerrado_por: resp.por || "", diferencias, ...(resp.motivo ? { motivo_cierre: resp.motivo } : {}) };
+    return { saldos: s, movs, envio: cerrado };
+  }
+  // Lo que tiene una persona: su ubicación, lo que le llega y lo que devolvió y falta confirmar.
+  function stockDePersona(saldos, nombre) {
+    const s = saldos || {}, envios = Array.isArray(s.envios) ? s.envios : [];
+    const unidades = Object.entries(s.unidades || {}).filter(([, u]) => u && u.u === `tec:${nombre}`).map(([t, u]) => ({ tracking: t, c: u.c }));
+    return {
+      tiene: { ...((s.ubic || {})[`tec:${nombre}`] || {}) },
+      unidades,
+      porRecibir: envios.filter((e) => e.a === `tec:${nombre}`),
+      devueltos: envios.filter((e) => e.de === `tec:${nombre}` && e.a === "dep"),
+    };
+  }
+
   // De un libro de Excel (SheetJS), las filas de la hoja que tiene el listado
   // (la que trae «Código» y «Descripción»; las hojas de instrucciones se saltean).
   function filasDelListado(wb, XLSX) {
@@ -268,7 +416,7 @@
     return mejor;
   }
 
-  const api = { STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num };
+  const api = { STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, moverStock, cerrarEnvio, stockDePersona };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else Object.assign(raiz, api);
 })(typeof window !== "undefined" ? window : globalThis);

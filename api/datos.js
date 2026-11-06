@@ -1201,7 +1201,26 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
   const q = req.query || {};
   const quien = autorizacion.nombre || "Oficina";
   res.setHeader("Cache-Control", "no-store");
+  const esAdmin = autorizacion.rol === "admin";
+  let esResp = esAdmin, tecnicosGuardados = null;
+  const tecnicos = async () => (tecnicosGuardados = tecnicosGuardados || (await leerTecnicosGuardados().catch(() => [])));
+  if (!esAdmin) { const t = (await tecnicos()).find((x) => x.nombre === autorizacion.nombre); esResp = !!(t && t.permisos && (t.permisos.stock_responsable || t.permisos.admin)); }
+  const SOLO_ADMIN = ["importar_catalogo", "configurar", "saldo_inicial", "ajustar", "conc_marcar", "conc_reactivar", "conc_corrida"];
   try {
+    if (req.method === "GET" && q.mio) {
+      // Lo que tiene el técnico que pregunta (y lo que le llega o devolvió).
+      const [cat, sal] = await Promise.all([leerArchivoDatos(STOCK_CAT, { articulos: {} }), leerArchivoDatos(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} })]);
+      const yo = S.stockDePersona(sal.data, quien), arts = (cat.data && cat.data.articulos) || {}, sub = {};
+      const codigos = new Set([...Object.keys(yo.tiene), ...yo.unidades.map((u) => u.c), ...[...yo.porRecibir, ...yo.devueltos].flatMap((e) => e.items.map((x) => x.c))]);
+      codigos.forEach((c) => { const a = arts[c]; if (a) sub[c] = { c, d: a.d, tipo: a.tipo, medida: a.medida || "unidades", alias: a.alias || [], formatos: a.formatos || [] }; });
+      res.status(200).json({ nombre: quien, responsable: esResp, ...yo, articulos: sub });
+      return;
+    }
+    if (!esResp) {
+      const accion = cuerpo && cuerpo.accion;
+      if (req.method !== "POST" || !["confirmar_envio", "devolver"].includes(accion)) { res.status(403).json({ error: "Necesitás el permiso «Responsable de stock»" }); return; }
+    }
+    if (req.method === "POST" && cuerpo && !esAdmin && SOLO_ADMIN.includes(cuerpo.accion)) { res.status(403).json({ error: "Solo desde el panel de administración" }); return; }
     if (req.method === "GET") {
       if (q.movimientos) {
         if (!/^\d{4}-\d{2}$/.test(String(q.movimientos))) { res.status(400).json({ error: "Mes inválido" }); return; }
@@ -1336,6 +1355,90 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
         }
         return { data: { marcas, corridas }, respuesta: { marcas, corridas: corridas.slice(0, 24) } };
       }, `Stock: conciliación con Oficina (por ${quien})`);
+      responder(r);
+      return;
+    }
+    if (b.accion === "alias") {
+      // Código de fabricante (EAN) que se asocia a un artículo la primera vez que se escanea.
+      const c = S.codigoArticulo(b.c), ean = S.limpiarCodigo(b.ean);
+      if (!c || !ean || ean.length < 6) { res.status(400).json({ error: "Falta el artículo o el código" }); return; }
+      const r = await stockActualizar(STOCK_CAT, { articulos: {} }, (cat) => {
+        const arts = { ...(cat.articulos || {}) };
+        if (!arts[c]) return { error: "No existe ese artículo", status: 404 };
+        const otro = Object.values(arts).find((a) => a.c !== c && (a.alias || []).includes(ean));
+        if (otro) return { error: `Ese código ya está asociado a ${otro.d}`, status: 409 };
+        arts[c] = { ...arts[c], alias: [...new Set([...(arts[c].alias || []), ean])].slice(-20) };
+        return { data: { ...cat, articulos: arts }, respuesta: { articulo: arts[c] } };
+      }, `Stock: código ${ean} asociado a ${c} (por ${quien})`);
+      responder(r);
+      return;
+    }
+    if (b.accion === "mover" || b.accion === "devolver") {
+      // mover (responsable): del depósito a un técnico, vehículo o cliente; compras que llegan; retiros.
+      // devolver (técnico): de lo suyo al depósito; queda en camino hasta que el responsable lo recibe.
+      const UB = /^(dep|tec:.{1,60}|veh:.{1,60}|cli:.{1,120}|com:.{1,120})$/;
+      let de = b.accion === "devolver" ? (esResp && b.de ? String(b.de) : `tec:${quien}`) : String(b.de || "dep");
+      const a = b.accion === "devolver" ? "dep" : String(b.a || "");
+      if (!(de === "proveedor" || UB.test(de)) || !UB.test(a)) { res.status(400).json({ error: "Origen o destino inválido" }); return; }
+      const tipo = b.accion === "devolver" ? "devolucion" : de === "proveedor" ? "ingreso" : /^tec:/.test(a) ? "entrega" : /^(cli|com):/.test(a) ? "a_cliente" : /^(cli|com):/.test(de) ? "retiro" : a === "dep" ? "devolucion" : "traspaso";
+      // Confirma el que recibe, salvo que sea el mismo que registra (Melina recibiendo en el depósito).
+      const confirmar = (/^tec:/.test(a) && a !== `tec:${quien}`) || (b.accion === "devolver" && !esResp);
+      const { data: cat } = await leerArchivoDatos(STOCK_CAT, { articulos: {} });
+      let resultado = null;
+      const r = await stockActualizar(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }, (sal) => {
+        const x = S.moverStock(sal, Array.isArray(b.items) ? b.items.slice(0, 500) : [], { tipo, de, a, por: quien, fecha: ahora, motivo: String(b.motivo || "").slice(0, 200), confirmar, deFlexible: /^(cli|com):/.test(de) && a === "dep" }, cat);
+        if (x.error) return { error: x.error, status: 409 };
+        resultado = x;
+        return { data: x.saldos, respuesta: { envio: x.envio, movimientos: x.movs.length } };
+      }, `Stock: ${tipo} ${de} → ${a} (por ${quien})`);
+      if (!r.error && resultado) {
+        await stockRegistrarMovimientos(resultado.movs, `Stock: movimientos (${tipo}, por ${quien})`);
+        // Aprende la forma de los N° de unidad de cada artículo.
+        const conUnidades = resultado.movs.filter((m) => m.unidades && m.unidades.length);
+        if (conUnidades.length) {
+          await stockActualizar(STOCK_CAT, { articulos: {} }, (c2) => {
+            const arts = { ...(c2.articulos || {}) };
+            let cambio = false;
+            conUnidades.forEach((m) => { const art = arts[m.c]; if (!art || art.tipo !== "unidad") return; const f = m.unidades.reduce((acc, t) => S.agregarFormato(acc, t), art.formatos || []); if (f.length !== (art.formatos || []).length) { arts[m.c] = { ...art, formatos: f }; cambio = true; } });
+            return cambio ? { data: { ...c2, articulos: arts } } : { error: "sin cambios" };
+          }, `Stock: formatos de N° de unidad aprendidos (por ${quien})`).catch(() => {});
+        }
+        if (resultado.envio) {
+          try {
+            const { enviarASeleccionados } = require("../lib/push-sender");
+            const e = resultado.envio, n = e.items.reduce((t, x) => t + x.cant, 0);
+            const destinatarios = /^tec:/.test(e.a) ? [e.a.slice(4)] : (await tecnicos()).filter((t) => t.permisos && t.permisos.stock_responsable).map((t) => t.nombre);
+            const titulo = /^tec:/.test(e.a) ? "📦 Te mandaron material" : `📦 ${quien} devolvió material`;
+            if (destinatarios.length) await enviarASeleccionados(destinatarios, { titulo, cuerpo: `${n} artículo(s): ${e.items.map((x) => ((cat.articulos || {})[x.c] || {}).d || x.c).slice(0, 3).join(", ")}. Confirmá «Recibí» en Mi stock.`.slice(0, 200), url: "/?ir=mistock" });
+          } catch (e) { /* el aviso es opcional */ }
+        }
+      }
+      responder(r);
+      return;
+    }
+    if (b.accion === "confirmar_envio") {
+      let resultado = null;
+      const r = await stockActualizar(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }, (sal) => {
+        const e = (sal.envios || []).find((x) => x.id === b.id);
+        if (!e) return { error: "Ese envío ya se confirmó o no existe", status: 409 };
+        const mio = e.a === `tec:${quien}`;
+        if (!mio && !esResp) return { error: "Este envío no es para vos", status: 403 };
+        const x = S.cerrarEnvio(sal, b.id, { accion: b.accion_envio === "rechazar" ? "rechazar" : "recibi", items: Array.isArray(b.items) ? b.items : undefined, por: mio ? quien : `${quien} (por ${e.a.replace(/^tec:/, "")})`, fecha: ahora, motivo: String(b.motivo || "").slice(0, 200) });
+        if (x.error) return { error: x.error, status: 409 };
+        x.saldos.envios_cerrados = [x.envio, ...(Array.isArray(sal.envios_cerrados) ? sal.envios_cerrados : [])].slice(0, 300);
+        resultado = x;
+        return { data: x.saldos, respuesta: { envio: x.envio } };
+      }, `Stock: envío confirmado (por ${quien})`);
+      if (!r.error && resultado) {
+        await stockRegistrarMovimientos(resultado.movs, `Stock: movimientos de confirmación (por ${quien})`);
+        if (resultado.envio.estado !== "recibido") {
+          try {
+            const { enviarASeleccionados } = require("../lib/push-sender");
+            const avisar = resultado.envio.a === "dep" ? [resultado.envio.de.replace(/^tec:/, "")] : [resultado.envio.por];
+            await enviarASeleccionados(avisar.filter(Boolean), { titulo: resultado.envio.estado === "rechazado" ? "⚠️ Rechazaron un envío de stock" : "⚠️ Envío de stock con diferencias", cuerpo: `${quien}: ${resultado.envio.diferencias.map((d) => `${d.c} mandado ${d.enviado}, recibido ${d.recibido}`).join(" · ")}${b.motivo ? " — " + b.motivo : ""}`.slice(0, 200), url: "/" });
+          } catch (e) { /* opcional */ }
+        }
+      }
       responder(r);
       return;
     }
@@ -1541,8 +1644,8 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
     return;
   }
   if (req.query && req.query.coleccion === "stock") {
+    // Admin: todo. Responsable de stock (Melina): escanear, entregar, recibir. Técnicos: su stock y confirmar.
     if (!autorizacion) { res.status(401).json({ error: "No autorizado", sesion_vencida: true }); return; }
-    if (autorizacion.rol !== "admin") { res.status(403).json({ error: "Solo desde el panel de administración" }); return; }
     await manejarStock(req, res, autorizacion, cuerpoAccion);
     return;
   }

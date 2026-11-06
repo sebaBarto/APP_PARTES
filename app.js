@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.46.0";
+const APP_VERSION = "4.47.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -324,6 +324,8 @@ const screens = {
   planos: document.getElementById("screen-planos"),
   emergencia: document.getElementById("screen-emergencia"),
   herramientas: document.getElementById("screen-herramientas"),
+  miStock: document.getElementById("screen-mistock"),
+  deposito: document.getElementById("screen-deposito"),
   presencia: document.getElementById("screen-presencia"),
   instalacion: document.getElementById("screen-instalacion"),
   herramientaDetalle: document.getElementById("screen-herramienta-detalle"),
@@ -966,7 +968,7 @@ function showScreen(name) {
   if (btnAjustes) btnAjustes.classList.toggle("hidden", name === "login");
   try { actualizarWakeLockPantalla(name); } catch (e) { /* los ajustes todavía no cargaron */ }
   if (name === "home") { try { actualizarProximoService(); } catch (e) { /* aún no cargó */ } }
-  if (name === "home") { try { document.getElementById("homeBuscarWrap").hidden = !esSkinNuevo(); actualizarAvisosInicio(); actualizarVehiculoInicio(); setTimeout(consumirIrPendiente, 300); } catch (e) { /* aún no cargó */ } }
+  if (name === "home") { try { document.getElementById("homeBuscarWrap").hidden = !esSkinNuevo(); actualizarAvisosInicio(); actualizarVehiculoInicio(); setTimeout(consumirIrPendiente, 300); setTimeout(() => { try { actualizarBadgeStock(); } catch (e) { /* aún no cargó */ } }, 800); } catch (e) { /* aún no cargó */ } }
   try { controlarFaltantesParte(name); } catch (e) { /* aún no cargó */ }
   try { actualizarBarraSuperior(name); } catch (e) { /* aún no cargó */ }
   if (name === "form") { try { pasoParteElegido = null; } catch (e) { /* aún no cargó */ } }
@@ -1155,7 +1157,7 @@ function permisosDelTecnico(nombre) {
     return {
       dash_general: true, dash_financiero: true, dash_vehiculos: true, dash_herramientas: true, dash_sims: true, dash_stock: true, instalador: true,
       historial_todos: true, vehiculos: true, sims: true, herramientas: true, marcar_pasado_sistema: true,
-      comodato: true, admin: true, agendar_emergencia: true, sims_ver_todas: true, presupuesto_express: true, croquis: true,
+      comodato: true, admin: true, agendar_emergencia: true, sims_ver_todas: true, presupuesto_express: true, croquis: true, stock_responsable: true,
     };
   }
   if (tecnicosPermisos[nombre]) {
@@ -1695,6 +1697,7 @@ function actualizarAccesoSeccionesPanel() {
   tileVehiculosBtn.classList.toggle("hidden", !permisos.vehiculos);
   tileSimsBtn.classList.toggle("hidden", !permisos.sims);
   tileHerramientasBtn.classList.toggle("hidden", !permisos.herramientas);
+  document.getElementById("tileDepositoBtn").classList.toggle("hidden", !permisos.stock_responsable);
   tileInstaladorBtn.classList.toggle("hidden", !permisos.instalador);
   tileComodatoBtn.classList.toggle("hidden", !permisos.comodato);
   tileEmergenciaBtn.classList.toggle("hidden", !permisos.agendar_emergencia);
@@ -11391,6 +11394,7 @@ let irPendienteVehiculo = (() => {
   } catch (e) { return false; }
 })();
 // El recordatorio de propuestas abre el tablero.
+let irPendienteMiStock = (() => { try { return new URLSearchParams(busquedaInicialApp).get("ir") === "mistock"; } catch (e) { return false; } })();
 let irPendientePropuestas = (() => { try { return new URLSearchParams(busquedaInicialApp).get("ir") === "propuestas"; } catch (e) { return false; } })();
 // La notificación de un dato nuevo del equipo abre ese dato.
 let irPendienteDato = (() => {
@@ -11400,6 +11404,7 @@ function consumirIrPendiente() {
   if (!tecnicoLogueado || screens.home.dataset.active !== "true") return;
   if (irPendienteDato !== null) { const id = irPendienteDato; irPendienteDato = null; abrirDatoEquipo(id); return; }
   if (irPendientePropuestas) { irPendientePropuestas = false; cqAbrirLista(); cqAbrirPropuestas(); return; }
+  if (irPendienteMiStock) { irPendienteMiStock = false; document.getElementById("tileMiStockBtn").click(); return; }
   if (!irPendienteVehiculo) return;
   irPendienteVehiculo = false;
   irADevolverVehiculo();
@@ -11409,6 +11414,7 @@ if (navigator.serviceWorker) {
     const d = e.data || {};
     if (d.tipo === "abrir-url" && String(d.url || "").includes("ir=devolver-vehiculo") && tecnicoLogueado) irADevolverVehiculo();
     if (d.tipo === "abrir-url" && String(d.url || "").includes("ir=propuestas") && tecnicoLogueado) { cqAbrirLista(); cqAbrirPropuestas(); }
+    if (d.tipo === "abrir-url" && String(d.url || "").includes("ir=mistock") && tecnicoLogueado) document.getElementById("tileMiStockBtn").click();
     if (d.tipo === "abrir-url" && String(d.url || "").includes("ir=dato-equipo") && tecnicoLogueado) {
       try { abrirDatoEquipo(new URL(d.url, location.href).searchParams.get("id") || ""); } catch (err) { /* nada */ }
     }
@@ -18115,3 +18121,487 @@ async function cqFotoNueva(inputId) {
 cqEl("cqDesdeFotoBtn").addEventListener("click", () => cqFotoNueva("cqFotoInput"));
 cqEl("cqDesdeCamaraBtn").addEventListener("click", () => cqFotoNueva("cqCamaraInput"));
 cqEl("volverDeCroquisListaBtn").addEventListener("click", () => showScreen("home"));
+
+// ============================================================
+// STOCK EN LA CALLE: «Mi stock» (cada técnico) y «Depósito» (responsable de stock)
+//  - Lo que sale del depósito a un técnico queda «en camino» hasta que él toca «Recibí».
+//  - Lo que el técnico devuelve queda en camino hasta que el depósito lo recibe.
+//  - Se escanea la etiqueta de SAT (artículo) y, en los equipos, el N° de unidad de la caja.
+// ============================================================
+const stkApi = async (metodo, query, cuerpo) => {
+  const r = await fetch("/api/datos?coleccion=stock" + (query ? "&" + query : ""), {
+    method: metodo, cache: "no-store",
+    headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN, ...(cuerpo ? { "Content-Type": "application/json" } : {}) },
+    ...(cuerpo ? { body: JSON.stringify(cuerpo) } : {}),
+  });
+  const d = await r.json().catch(() => null);
+  if (!r.ok || !d || d.ok === false) throw new Error((d && d.error) || "Sin conexión (" + r.status + ")");
+  return d;
+};
+const stkFmtN = (n) => (Number(n) || 0).toLocaleString("es-AR", { maximumFractionDigits: 3 });
+const stkNumApp = (v) => { const t = String(v == null ? "" : v).trim(); return /^[\d.,\s]+$/.test(t) && /\d/.test(t) ? numStock(t) : NaN; };
+function stkPitido(bien) {
+  try { if (navigator.vibrate) navigator.vibrate(bien ? 50 : [80, 60, 80]); } catch (e) { /* nada */ }
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    stkPitido.ctx = stkPitido.ctx || new AC();
+    const o = stkPitido.ctx.createOscillator(), g = stkPitido.ctx.createGain();
+    o.frequency.value = bien ? 1400 : 320; g.gain.value = 0.08;
+    o.connect(g); g.connect(stkPitido.ctx.destination); o.start(); o.stop(stkPitido.ctx.currentTime + (bien ? 0.08 : 0.25));
+  } catch (e) { /* nada */ }
+}
+
+// ---------- Escáner con la cámara ----------
+// alLeer(texto) devuelve { ok, texto, seguir } (seguir: no cerrar aunque esté en «de a uno»).
+let stkEscanerAbierto = null;
+async function abrirEscanerStock({ titulo, alLeer }) {
+  if (stkEscanerAbierto) return;
+  if (!("BarcodeDetector" in window) || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    await dialogoApp("Este celular no puede leer códigos desde la APP. Escribí el código en el casillero (o usá un lector por Bluetooth: escribe solo).", { soloAceptar: true, aceptar: "Entendido" });
+    return;
+  }
+  let detector;
+  try { detector = new window.BarcodeDetector({ formats: ["code_128", "code_39", "code_93", "ean_13", "ean_8", "upc_a", "upc_e", "itf", "codabar", "data_matrix", "qr_code"] }); }
+  catch (e) { detector = new window.BarcodeDetector(); }
+  const capa = document.createElement("div");
+  capa.className = "stk-escaner";
+  let rafaga = false;
+  try { rafaga = localStorage.getItem("stock_rafaga") === "1"; } catch (e) { /* nada */ }
+  capa.innerHTML = `<div class="stk-escaner-arriba"><b></b><label><input type="checkbox" class="stk-rafaga"> Ráfaga</label></div>
+    <video playsinline muted autoplay></video><div class="stk-escaner-marco"></div>
+    <div class="stk-escaner-abajo"><div class="stk-escaner-ultimo">Apuntá al código de barras</div><button type="button" class="btn btn-primary stk-escaner-listo">Listo</button></div>`;
+  capa.querySelector("b").textContent = titulo || "Escanear";
+  const chk = capa.querySelector(".stk-rafaga"), ultimo = capa.querySelector(".stk-escaner-ultimo"), video = capa.querySelector("video");
+  chk.checked = rafaga;
+  chk.addEventListener("change", () => { rafaga = chk.checked; try { localStorage.setItem("stock_rafaga", rafaga ? "1" : "0"); } catch (e) { /* nada */ } });
+  document.body.appendChild(capa);
+  let stream = null, timer = null, ocupado = false, cerrado = false;
+  const vistos = new Map();
+  const cerrar = () => {
+    if (cerrado) return; cerrado = true;
+    clearInterval(timer);
+    try { stream && stream.getTracks().forEach((t) => t.stop()); } catch (e) { /* nada */ }
+    capa.remove(); stkEscanerAbierto = null;
+  };
+  stkEscanerAbierto = { cerrar };
+  capa.querySelector(".stk-escaner-listo").addEventListener("click", cerrar);
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+    video.srcObject = stream;
+    await video.play().catch(() => {});
+  } catch (e) {
+    cerrar();
+    await dialogoApp("No se pudo abrir la cámara. Revisá que la APP tenga permiso de cámara, o escribí el código a mano.", { soloAceptar: true, aceptar: "Entendido" });
+    return;
+  }
+  timer = setInterval(async () => {
+    if (ocupado || cerrado || video.readyState < 2) return;
+    ocupado = true;
+    try {
+      const codigos = await detector.detect(video);
+      const texto = codigos && codigos[0] && String(codigos[0].rawValue || "").trim();
+      if (texto) {
+        const ahora = Date.now();
+        if (!(vistos.has(texto) && ahora - vistos.get(texto) < 2500)) {
+          vistos.set(texto, ahora);
+          const r = (await alLeer(texto)) || { ok: false };
+          stkPitido(!!r.ok);
+          ultimo.className = "stk-escaner-ultimo " + (r.ok ? "ok" : "err");
+          ultimo.textContent = (r.ok ? "✓ " : "✕ ") + (r.texto || texto);
+          if (r.ok && !rafaga && !r.seguir) setTimeout(cerrar, 350);
+        }
+      }
+    } catch (e) { /* sigue intentando */ }
+    ocupado = false;
+  }, 220);
+}
+
+// ---------- Canasta: lo que se va a mover ----------
+// op: { cont, catalogo(), saldos(), origen() (ubicación de donde sale, o "" si entra de afuera), alCambiar(), puedeAsociar }
+function crearCanastaStock(op) {
+  const can = { lineas: [], actual: "" };
+  const arts = () => (op.catalogo() || {}).articulos || {};
+  const disponible = (c) => { const o = op.origen(); return o ? (((op.saldos() || {}).ubic || {})[o] || {})[c] || 0 : Infinity; };
+  const linea = (c) => { let l = can.lineas.find((x) => x.c === c); if (!l) { l = { c, cant: 0, unidades: [] }; can.lineas.push(l); } return l; };
+  can.render = () => {
+    const a = arts();
+    op.cont.innerHTML = can.lineas.length ? can.lineas.map((l, i) => {
+      const art = a[l.c] || { d: l.c }, esU = art.tipo === "unidad", disp = disponible(l.c);
+      const sinN = esU ? Math.max(0, l.cant - l.unidades.length) : 0;
+      return `<div class="stk-linea" data-i="${i}">
+        <div class="stk-linea-top"><div><b>${escapeHtml(art.d)}</b><small>${escapeHtml(l.c)}${disp !== Infinity ? ` · hay ${stkFmtN(disp)}` : ""}${art.medida === "metros" ? " · en metros" : ""}</small></div>
+        <div class="stk-cant"><button type="button" data-menos aria-label="Uno menos">−</button><input class="field-input" inputmode="decimal" value="${stkFmtN(l.cant)}" aria-label="Cantidad"><button type="button" data-mas aria-label="Uno más">+</button></div></div>
+        ${l.unidades.length ? `<div class="stk-chips">${l.unidades.map((t, j) => `<span class="stk-chip">${escapeHtml(t)}<button type="button" data-quitar-u="${j}" aria-label="Sacar">✕</button></span>`).join("")}</div>` : ""}
+        ${esU && sinN ? `<div class="stk-falta">${sinN} sin N° de unidad: escaneá el código de cada caja${can.actual === l.c ? " (ahora)" : ""}.</div>` : ""}
+        ${l.cant > disp ? `<div class="stk-falta">Hay ${stkFmtN(disp)}: no alcanza.</div>` : ""}
+        <button type="button" class="stk-quitar" data-quitar>Sacar de la lista</button></div>`;
+    }).join("") : "";
+    op.cont.querySelectorAll(".stk-linea").forEach((div) => {
+      const l = can.lineas[Number(div.dataset.i)];
+      const inp = div.querySelector(".stk-cant input");
+      div.querySelector("[data-mas]").addEventListener("click", () => { l.cant = Math.round((l.cant + 1) * 1000) / 1000; can.cambio(); });
+      div.querySelector("[data-menos]").addEventListener("click", () => { l.cant = Math.max(l.unidades.length, Math.round((l.cant - 1) * 1000) / 1000); can.cambio(); });
+      inp.addEventListener("change", () => { const n = stkNumApp(inp.value); if (n >= 0) l.cant = Math.max(l.unidades.length, n); can.cambio(); });
+      div.querySelector("[data-quitar]").addEventListener("click", () => { can.lineas = can.lineas.filter((x) => x !== l); if (can.actual === l.c) can.actual = ""; can.cambio(); });
+      div.querySelectorAll("[data-quitar-u]").forEach((b) => b.addEventListener("click", () => { l.unidades.splice(Number(b.dataset.quitarU), 1); l.cant = Math.max(l.unidades.length, l.cant - 1); can.cambio(); }));
+    });
+  };
+  can.cambio = () => { can.lineas = can.lineas.filter((l) => l.cant > 0 || l.unidades.length || l.c === can.actual); can.render(); if (op.alCambiar) op.alCambiar(); };
+  can.limpiar = () => { can.lineas = []; can.actual = ""; can.cambio(); };
+  can.agregarArticulo = (c, cuanto) => {
+    const art = arts()[c]; if (!art) return { ok: false, texto: "No está en el catálogo" };
+    const l = linea(c);
+    if (art.tipo === "unidad") { can.actual = c; can.cambio(); return { ok: true, texto: `${art.d}: ahora escaneá el N° de unidad`, seguir: true }; }
+    l.cant = Math.round((l.cant + (cuanto || 1)) * 1000) / 1000;
+    can.cambio();
+    return { ok: true, texto: `${art.d} (${stkFmtN(l.cant)})` };
+  };
+  // Lee un código escaneado o escrito y lo suma a la lista.
+  can.agregarCodigo = async (texto) => {
+    const r = interpretarCodigo(texto, op.catalogo(), op.saldos(), can.actual);
+    const a = arts();
+    if (r.tipo === "articulo") return can.agregarArticulo(r.c);
+    if (r.tipo === "unidad") {
+      const art = a[r.c] || { d: r.c };
+      if (can.lineas.some((l) => l.unidades.includes(r.tracking))) return { ok: false, texto: `${r.tracking} ya está en la lista` };
+      const o = op.origen();
+      if (!r.nuevo && o && r.ubic !== o) return { ok: false, texto: `${r.tracking} figura en ${nombreUbicacion(r.ubic)}` };
+      if (r.aviso && !(await confirmarApp(`${art.d}\n${r.tracking}\n\n${r.aviso}`, { aceptar: "Sí, es de esta caja", cancelar: "No" }))) return { ok: false, texto: "No se agregó" };
+      const l = linea(r.c);
+      l.unidades.push(r.tracking);
+      if (l.cant < l.unidades.length) l.cant = l.unidades.length;
+      can.actual = r.c;
+      can.cambio();
+      return { ok: true, texto: `${art.d} · ${r.tracking} (${l.unidades.length})`, seguir: false };
+    }
+    if (r.tipo === "ean_nuevo") {
+      if (!op.puedeAsociar) return { ok: false, texto: "Código de fabricante que la APP no conoce: escaneá la etiqueta de SAT." };
+      const c = await elegirArticuloStock(op.catalogo(), `El código ${r.ean} es del fabricante y la APP todavía no sabe de qué artículo es. Elegilo una vez y la próxima lo reconoce sola:`);
+      if (!c) return { ok: false, texto: "No se agregó" };
+      try { await stkApi("POST", "", { accion: "alias", c, ean: r.ean }); const art = a[c]; art.alias = [...(art.alias || []), r.ean]; }
+      catch (e) { showToast("No se pudo guardar el código: " + e.message); }
+      return can.agregarArticulo(c);
+    }
+    return { ok: false, texto: r.aviso || "No reconozco el código" };
+  };
+  can.interpretar = (t) => interpretarCodigo(t, op.catalogo(), op.saldos(), can.actual);
+  can.items = () => can.lineas.filter((l) => l.cant > 0).map((l) => ({ c: l.c, cant: l.cant, unidades: l.unidades }));
+  return can;
+}
+// Buscar un artículo por código o descripción (para asociar un código o agregar a mano).
+function buscarArticulosStock(catalogo, texto, max) {
+  const q = normalizeText(String(texto || "").trim());
+  if (!q) return [];
+  const partes = q.split(/\s+/);
+  return Object.values((catalogo && catalogo.articulos) || {}).filter((a) => a.tipo !== "no" && partes.every((p) => normalizeText(`${a.c} ${a.d}`).includes(p)))
+    .sort((x, y) => (x.c === q ? -1 : y.c === q ? 1 : String(x.d).localeCompare(String(y.d), "es"))).slice(0, max || 30);
+}
+function elegirArticuloStock(catalogo, mensaje) {
+  return new Promise((resolver) => {
+    const capa = document.createElement("div");
+    capa.className = "modal-overlay dlg-app";
+    capa.innerHTML = `<div class="modal-caja" role="dialog" aria-modal="true"><p class="dlg-texto"></p><input class="field-input dlg-input" type="text" placeholder="Código o parte de la descripción" autocomplete="off"><div class="stk-elegir-lista" style="max-height:45vh;overflow:auto;margin:8px 0;"></div><div class="dlg-botones"><button type="button" class="dlg-no">Cancelar</button></div></div>`;
+    capa.querySelector(".dlg-texto").textContent = mensaje;
+    const inp = capa.querySelector("input"), lista = capa.querySelector(".stk-elegir-lista");
+    const fin = (c) => { capa.remove(); resolver(c || ""); };
+    const pintar = () => {
+      const r = buscarArticulosStock(catalogo, inp.value, 30);
+      lista.innerHTML = r.map((a) => `<button type="button" class="stk-res" data-c="${escapeHtml(a.c)}">${escapeHtml(a.d)}<small>${escapeHtml(a.c)}</small></button>`).join("") || (inp.value.trim() ? '<p class="stk-ayuda">No encontré nada.</p>' : "");
+      lista.querySelectorAll("[data-c]").forEach((b) => b.addEventListener("click", () => fin(b.dataset.c)));
+    };
+    inp.addEventListener("input", pintar);
+    capa.querySelector(".dlg-no").addEventListener("click", () => fin(""));
+    document.body.appendChild(capa);
+    inp.focus();
+  });
+}
+// Casillero de texto: Enter = código; si no es un código, busca por descripción.
+function conectarCasilleroStock(input, resultados, can, catalogo) {
+  input.addEventListener("keydown", async (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const t = input.value.trim();
+    if (!t) return;
+    const r = can.interpretar(t);
+    if (r.tipo !== "desconocido" || /^\d{12}$/.test(t)) {
+      const x = await can.agregarCodigo(t);
+      showToast((x.ok ? "✓ " : "✕ ") + (x.texto || t));
+      input.value = ""; if (resultados) resultados.innerHTML = "";
+      return;
+    }
+    if (!resultados) { showToast(r.aviso || "No reconozco el código"); return; }
+    const lista = buscarArticulosStock(catalogo(), t, 12);
+    resultados.innerHTML = lista.length ? lista.map((a) => `<button type="button" class="stk-res" data-c="${escapeHtml(a.c)}">${escapeHtml(a.d)}<small>${escapeHtml(a.c)}</small></button>`).join("") : `<p class="stk-ayuda">${escapeHtml(r.aviso || "No encontré nada")}</p>`;
+    resultados.querySelectorAll("[data-c]").forEach((b) => b.addEventListener("click", () => { const x = can.agregarArticulo(b.dataset.c); showToast(x.texto); resultados.innerHTML = ""; input.value = ""; }));
+  });
+}
+
+// ---------- Mi stock ----------
+let miStock = null;
+let miStockAvisoAt = 0;
+const miStockCatalogo = () => ({ articulos: (miStock && miStock.articulos) || {} });
+const miStockSaldos = () => {
+  if (!miStock) return { ubic: {}, unidades: {} };
+  const u = {};
+  (miStock.unidades || []).forEach((x) => { u[x.tracking] = { c: x.c, u: `tec:${miStock.nombre}` }; });
+  return { ubic: { [`tec:${miStock.nombre}`]: miStock.tiene || {} }, unidades: u };
+};
+const miStockCanasta = crearCanastaStock({
+  cont: document.getElementById("miStockCanasta"),
+  catalogo: miStockCatalogo, saldos: miStockSaldos,
+  origen: () => (miStock ? `tec:${miStock.nombre}` : ""),
+  alCambiar: () => { document.getElementById("miStockDevolverBtn").disabled = !miStockCanasta.items().length; },
+});
+async function cargarMiStock() {
+  const st = document.getElementById("miStockStatus");
+  st.className = "list-status"; st.textContent = "Cargando...";
+  try {
+    miStock = await stkApi("GET", "mio=1");
+    st.textContent = "";
+    pintarMiStock();
+  } catch (e) { st.textContent = "No se pudo cargar: " + e.message; }
+}
+function pintarMiStock() {
+  const a = miStock.articulos || {}, d = (c) => (a[c] || {}).d || c;
+  const items = (e, editable) => `<div class="stk-envio-items">${e.items.map((x, i) => `<div class="stk-envio-item"><span>${escapeHtml(d(x.c))}${x.unidades && x.unidades.length ? `<small>${x.unidades.map(escapeHtml).join(" · ")}</small>` : ""}</span>${editable ? `<input class="field-input" style="width:72px;text-align:center;padding:6px;" inputmode="decimal" data-i="${i}" value="${stkFmtN(x.cant)}" aria-label="Cantidad recibida">` : `<b>${stkFmtN(x.cant)}</b>`}</div>`).join("")}</div>`;
+  const cuando = (f) => new Date(f).toLocaleString("es-AR", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
+  const pr = document.getElementById("miStockPorRecibir");
+  pr.innerHTML = (miStock.porRecibir || []).length ? `<h3 class="stk-h">Te mandaron (confirmá cuando lo tengas)</h3>` + miStock.porRecibir.map((e) => `<div class="stk-envio" data-id="${escapeHtml(e.id)}">
+      <b>De ${escapeHtml(e.por || "Depósito")}</b><small>${escapeHtml(cuando(e.fecha))}${e.motivo ? " · " + escapeHtml(e.motivo) : ""}</small>
+      ${items(e, true)}
+      <p class="stk-ayuda">Si llegó menos, corregí la cantidad antes de confirmar.</p>
+      <div class="stk-envio-btns"><button type="button" class="btn btn-primary btn-small" data-recibi>✓ Recibí</button><button type="button" class="btn btn-secondary btn-small" data-rechazar>Rechazar</button></div></div>`).join("") : "";
+  pr.querySelectorAll(".stk-envio").forEach((div) => {
+    const e = miStock.porRecibir.find((x) => x.id === div.dataset.id);
+    div.querySelector("[data-recibi]").addEventListener("click", async (ev) => {
+      const btn = ev.currentTarget;
+      const recibidos = e.items.map((x, i) => { const n = stkNumApp(div.querySelector(`input[data-i="${i}"]`).value); return { c: x.c, cant: n >= 0 ? Math.min(n, x.cant) : x.cant, unidades: x.unidades }; });
+      const faltan = recibidos.filter((x, i) => x.cant < e.items[i].cant);
+      let motivo = "";
+      if (faltan.length) {
+        motivo = await pedirTextoApp(`Recibiste menos de lo mandado:\n${faltan.map((x) => `• ${d(x.c)}: ${stkFmtN(x.cant)} de ${stkFmtN(e.items.find((y) => y.c === x.c).cant)}`).join("\n")}\n\nLo que falta vuelve al depósito. ¿Qué pasó?`, "");
+        if (motivo === null) return;
+      }
+      btn.disabled = true;
+      try {
+        const r = await stkApi("POST", "", { accion: "confirmar_envio", id: e.id, items: recibidos, motivo });
+        showToast(r.envio && r.envio.estado === "recibido" ? "✓ Listo: quedó en tu stock" : "Listo: se avisó al depósito de la diferencia");
+      } catch (err) { showToast("No se pudo confirmar: " + err.message); }
+      cargarMiStock(); actualizarBadgeStock(true);
+    });
+    div.querySelector("[data-rechazar]").addEventListener("click", async (ev) => {
+      const motivo = await pedirTextoApp("¿Por qué lo rechazás? (todo vuelve al depósito)", "");
+      if (motivo === null) return;
+      ev.currentTarget.disabled = true;
+      try { await stkApi("POST", "", { accion: "confirmar_envio", accion_envio: "rechazar", id: e.id, motivo }); showToast("Rechazado: vuelve al depósito"); }
+      catch (err) { showToast("No se pudo: " + err.message); }
+      cargarMiStock(); actualizarBadgeStock(true);
+    });
+  });
+  const tengo = Object.entries(miStock.tiene || {}).filter(([, n]) => n > 0).sort((x, y) => d(x[0]).localeCompare(d(y[0]), "es"));
+  const unidadesDe = (c) => (miStock.unidades || []).filter((u) => u.c === c).map((u) => u.tracking);
+  document.getElementById("miStockTengo").innerHTML = tengo.length ? tengo.map(([c, n]) => `<div class="stk-linea"><div class="stk-linea-top"><div><b>${escapeHtml(d(c))}</b><small>${escapeHtml(c)}${unidadesDe(c).length ? " · " + unidadesDe(c).map(escapeHtml).join(" · ") : ""}</small></div><div class="stk-cant"><b style="font-size:16px;">${stkFmtN(n)}</b><button type="button" class="btn btn-secondary btn-small" style="width:auto;height:auto;padding:8px 10px;font-size:13px;" data-devolver="${escapeHtml(c)}">Devolver</button></div></div></div>`).join("")
+    : '<p class="stk-ayuda">No tenés nada a tu cargo.</p>';
+  document.querySelectorAll("#miStockTengo [data-devolver]").forEach((b) => b.addEventListener("click", () => {
+    const c = b.dataset.devolver, art = a[c] || {};
+    const l = miStockCanasta.lineas.find((x) => x.c === c);
+    if (art.tipo === "unidad" && unidadesDe(c).length) { miStockCanasta.actual = c; miStockCanasta.cambio(); showToast("Escaneá el N° de unidad de cada equipo que devolvés"); }
+    else if (!l || l.cant < (miStock.tiene[c] || 0)) miStockCanasta.agregarArticulo(c);
+    if (art.tipo === "unidad" && !unidadesDe(c).length) { const ll = miStockCanasta.lineas.find((x) => x.c === c); if (ll && ll.cant < 1) { ll.cant = 1; miStockCanasta.cambio(); } }
+    document.getElementById("miStockDevolverCaja").scrollIntoView({ behavior: "smooth", block: "start" });
+  }));
+  document.getElementById("miStockDevolverCaja").classList.toggle("hidden", !tengo.length);
+  miStockCanasta.render();
+  document.getElementById("miStockDevolverBtn").disabled = !miStockCanasta.items().length;
+  const dev = miStock.devueltos || [];
+  document.getElementById("miStockDevueltos").innerHTML = dev.length ? `<h3 class="stk-h">Devolviste (falta que el depósito confirme)</h3>` + dev.map((e) => `<div class="stk-envio"><small>${escapeHtml(cuando(e.fecha))}${e.motivo ? " · " + escapeHtml(e.motivo) : ""}</small>${items(e, false)}</div>`).join("") : "";
+}
+conectarCasilleroStock(document.getElementById("miStockCodigo"), null, miStockCanasta, miStockCatalogo);
+document.getElementById("miStockEscanearBtn").addEventListener("click", () => abrirEscanerStock({ titulo: "Devolver al depósito", alLeer: (t) => miStockCanasta.agregarCodigo(t) }));
+document.getElementById("miStockDevolverBtn").addEventListener("click", async (ev) => {
+  const btn = ev.currentTarget, items = miStockCanasta.items();
+  if (!items.length) return;
+  const a = miStock.articulos || {};
+  const faltanN = items.filter((x) => (a[x.c] || {}).tipo === "unidad" && x.cant > x.unidades.length && (miStock.unidades || []).some((u) => u.c === x.c));
+  if (faltanN.length && !(await confirmarApp(`Hay equipos sin escanear el N° de unidad (${faltanN.map((x) => (a[x.c] || {}).d).join(", ")}). ¿Devolver igual?`))) return;
+  if (!(await confirmarApp(`¿Devolver al depósito ${items.length} artículo${items.length === 1 ? "" : "s"}?\n\n${items.map((x) => `• ${(a[x.c] || {}).d || x.c}: ${stkFmtN(x.cant)}`).join("\n")}`, { aceptar: "Sí, devolver" }))) return;
+  btn.disabled = true;
+  try {
+    await stkApi("POST", "", { accion: "devolver", items, motivo: document.getElementById("miStockMotivo").value.trim() });
+    miStockCanasta.limpiar(); document.getElementById("miStockMotivo").value = "";
+    showToast("✓ Devuelto: queda en camino hasta que el depósito lo recibe");
+  } catch (e) { showToast("No se pudo devolver: " + e.message); }
+  btn.disabled = false;
+  cargarMiStock();
+});
+document.getElementById("tileMiStockBtn").addEventListener("click", () => { showScreen("miStock"); miStockCanasta.limpiar(); cargarMiStock(); });
+document.getElementById("volverDeMiStockBtn").addEventListener("click", () => showScreen("home"));
+
+// Globito con lo que falta confirmar (Mi stock: lo que te mandaron; Depósito: devoluciones).
+async function actualizarBadgeStock(forzar) {
+  if (!tecnicoLogueado && !SERVICIOS_API_TOKEN) return;
+  if (!forzar && Date.now() - miStockAvisoAt < 120000) return;
+  miStockAvisoAt = Date.now();
+  try {
+    const m = await stkApi("GET", "mio=1");
+    const n = (m.porRecibir || []).length, b = document.getElementById("miStockBadge");
+    b.textContent = String(n); b.classList.toggle("hidden", !n);
+  } catch (e) { /* sin conexión: queda como estaba */ }
+  if (document.getElementById("tileDepositoBtn").classList.contains("hidden")) return;
+  try {
+    const d = await stkApi("GET", "");
+    depDatos = d;
+    const n = ((d.saldos || {}).envios || []).filter((e) => e.a === "dep").length, b = document.getElementById("depositoBadge");
+    b.textContent = String(n); b.classList.toggle("hidden", !n);
+  } catch (e) { /* nada */ }
+}
+
+// ---------- Depósito (responsable de stock) ----------
+let depDatos = null, depModo = "entregar", depVehiculos = null;
+const depCatalogo = () => (depDatos && depDatos.catalogo) || { articulos: {} };
+const depSaldos = () => (depDatos && depDatos.saldos) || { ubic: {}, unidades: {} };
+const depOrigen = () => {
+  if (depModo === "entregar") return "dep";
+  const t = document.getElementById("depRecibirTipo").value, n = document.getElementById("depRecibirDe").value.trim();
+  return t === "proveedor" || !n ? "" : t === "veh" ? `veh:${n}` : ""; // de clientes: la APP puede no tenerlo registrado
+};
+const depCanasta = crearCanastaStock({
+  cont: document.getElementById("depCanasta"), catalogo: depCatalogo, saldos: depSaldos, origen: depOrigen, puedeAsociar: true,
+  alCambiar: () => depBotonTexto(),
+});
+function depBotonTexto() {
+  const n = depCanasta.items().length, btn = document.getElementById("depConfirmarBtn");
+  btn.disabled = !n;
+  if (depModo === "entregar") { const nom = document.getElementById("depDestNombre").value.trim(); btn.textContent = n ? `Entregar ${n} artículo${n === 1 ? "" : "s"}${nom ? " a " + nom : ""}` : "Entregar"; }
+  else btn.textContent = n ? `Ingresar ${n} artículo${n === 1 ? "" : "s"} al depósito` : "Ingresar al depósito";
+}
+async function depCargar() {
+  const st = document.getElementById("depStatus");
+  st.textContent = "Cargando...";
+  try { depDatos = await stkApi("GET", ""); st.textContent = ""; }
+  catch (e) { st.textContent = "No se pudo cargar el stock: " + e.message; return; }
+  if (!Object.keys(depCatalogo().articulos || {}).length) st.textContent = "Todavía no hay catálogo: se carga desde el panel de administración (Stock).";
+  depMostrarModo();
+}
+async function depListaNombres(tipo) {
+  if (tipo === "tec") return Object.keys(tecnicosPasswords).sort((a, b) => a.localeCompare(b, "es"));
+  if (tipo === "veh") {
+    if (!depVehiculos) { try { const r = await fetch("/api/datos?coleccion=vehiculos", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" }); const d = await r.json(); depVehiculos = (Array.isArray(d) ? d : []).map((v) => v.nombre).filter(Boolean); } catch (e) { depVehiculos = []; } }
+    return depVehiculos;
+  }
+  if (tipo === "cli" || tipo === "com") return (await cargarClientesGeneral()).map((c) => c.nombre).filter(Boolean).slice(0, 3000);
+  return [];
+}
+async function depLlenarLista(selectId, inputId, listaId) {
+  const tipo = document.getElementById(selectId).value;
+  const nombres = await depListaNombres(tipo);
+  document.getElementById(listaId).innerHTML = nombres.map((n) => `<option value="${escapeHtml(n)}">`).join("");
+  const inp = document.getElementById(inputId);
+  if (inp.value && !nombres.includes(inp.value) && tipo === "tec") inp.value = "";
+}
+function depMostrarModo() {
+  document.querySelectorAll("#depModos [data-modo]").forEach((b) => b.classList.toggle("activo", b.dataset.modo === depModo));
+  document.querySelectorAll("#screen-deposito [data-dep]").forEach((d) => d.classList.toggle("hidden", !d.dataset.dep.split(" ").includes(depModo)));
+  if (depModo === "recibir") {
+    const t = document.getElementById("depRecibirTipo").value;
+    document.getElementById("depRecibirDeCaja").classList.toggle("hidden", t === "proveedor");
+    depPintarDevoluciones();
+  }
+  if (depModo === "consultar") depPintarEnCamino();
+  depCanasta.render(); depBotonTexto();
+}
+document.querySelectorAll("#depModos [data-modo]").forEach((b) => b.addEventListener("click", () => {
+  if (b.dataset.modo !== depModo && depCanasta.items().length && depModo !== "consultar") { showToast("Primero terminá o vaciá la lista"); return; }
+  depModo = b.dataset.modo; depMostrarModo();
+}));
+document.getElementById("depDestTipo").addEventListener("change", () => { document.getElementById("depDestNombre").value = ""; depLlenarLista("depDestTipo", "depDestNombre", "depDestLista"); depBotonTexto(); });
+document.getElementById("depDestNombre").addEventListener("input", depBotonTexto);
+document.getElementById("depRecibirTipo").addEventListener("change", () => { document.getElementById("depRecibirDe").value = ""; depLlenarLista("depRecibirTipo", "depRecibirDe", "depRecibirLista"); depMostrarModo(); });
+document.getElementById("depRecibirDe").addEventListener("change", () => depCanasta.render());
+conectarCasilleroStock(document.getElementById("depCodigo"), document.getElementById("depBuscarResultados"), depCanasta, depCatalogo);
+document.getElementById("depEscanearBtn").addEventListener("click", () => abrirEscanerStock({ titulo: depModo === "entregar" ? "Entregar" : "Ingresar al depósito", alLeer: (t) => depCanasta.agregarCodigo(t) }));
+document.getElementById("depConfirmarBtn").addEventListener("click", async (ev) => {
+  const btn = ev.currentTarget, items = depCanasta.items(), a = depCatalogo().articulos;
+  if (!items.length) return;
+  let cuerpo;
+  if (depModo === "entregar") {
+    const tipo = document.getElementById("depDestTipo").value, nombre = document.getElementById("depDestNombre").value.trim();
+    if (!nombre) { showToast("Elegí a quién se entrega"); document.getElementById("depDestNombre").focus(); return; }
+    if (tipo === "tec" && !Object.keys(tecnicosPasswords).includes(nombre)) { showToast("Ese técnico no está en la lista"); return; }
+    const falta = items.find((x) => x.cant > (((depSaldos().ubic || {}).dep || {})[x.c] || 0));
+    if (falta) { showToast(`${(a[falta.c] || {}).d}: en el depósito no alcanza`); return; }
+    cuerpo = { accion: "mover", de: "dep", a: `${tipo}:${nombre}`, items };
+  } else {
+    const tipo = document.getElementById("depRecibirTipo").value, nombre = document.getElementById("depRecibirDe").value.trim();
+    if (tipo !== "proveedor" && !nombre) { showToast("Elegí de dónde viene"); return; }
+    cuerpo = { accion: "mover", de: tipo === "proveedor" ? "proveedor" : `${tipo}:${nombre}`, a: "dep", items };
+  }
+  cuerpo.motivo = document.getElementById("depMotivo").value.trim();
+  const sinN = items.filter((x) => (a[x.c] || {}).tipo === "unidad" && x.cant > x.unidades.length);
+  const resumen = items.map((x) => `• ${(a[x.c] || {}).d || x.c}: ${stkFmtN(x.cant)}`).join("\n");
+  const destino = depModo === "entregar" ? nombreUbicacion(cuerpo.a) : "el depósito";
+  if (!(await confirmarApp(`¿Confirmar? Va a ${destino}:\n\n${resumen}${sinN.length ? `\n\nOjo: ${sinN.length} equipo(s) sin N° de unidad escaneado.` : ""}${/^tec:/.test(cuerpo.a) ? "\n\nQueda en camino hasta que el técnico toque «Recibí»." : ""}`, { aceptar: "Sí, confirmar" }))) return;
+  btn.disabled = true;
+  try {
+    await stkApi("POST", "", cuerpo);
+    depCanasta.limpiar(); document.getElementById("depMotivo").value = "";
+    showToast(/^tec:/.test(cuerpo.a) ? "✓ Enviado: le llegó el aviso para que confirme" : "✓ Listo");
+    await depCargar();
+  } catch (e) { showToast("No se pudo: " + e.message); }
+  btn.disabled = false;
+  depBotonTexto();
+});
+function depPintarDevoluciones() {
+  const a = depCatalogo().articulos || {}, d = (c) => (a[c] || {}).d || c;
+  const lista = (depSaldos().envios || []).filter((e) => e.a === "dep");
+  const cont = document.getElementById("depDevoluciones");
+  cont.innerHTML = lista.length ? `<h3 class="stk-h">Devoluciones por recibir (${lista.length})</h3>` + lista.map((e) => `<div class="stk-envio" data-id="${escapeHtml(e.id)}">
+    <b>${escapeHtml(e.de.replace(/^tec:/, ""))}</b><small>${escapeHtml(new Date(e.fecha).toLocaleString("es-AR", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }))}${e.motivo ? " · " + escapeHtml(e.motivo) : ""}</small>
+    <div class="stk-envio-items">${e.items.map((x, i) => `<div class="stk-envio-item"><span>${escapeHtml(d(x.c))}${x.unidades && x.unidades.length ? `<small>${x.unidades.map(escapeHtml).join(" · ")}</small>` : ""}</span><input class="field-input" style="width:72px;text-align:center;padding:6px;" inputmode="decimal" data-i="${i}" value="${stkFmtN(x.cant)}" aria-label="Cantidad recibida"></div>`).join("")}</div>
+    <div class="stk-envio-btns"><button type="button" class="btn btn-primary btn-small" data-recibi>✓ Recibido en el depósito</button></div></div>`).join("") : "";
+  cont.querySelectorAll(".stk-envio").forEach((div) => div.querySelector("[data-recibi]").addEventListener("click", async (ev) => {
+    const e = lista.find((x) => x.id === div.dataset.id), btn = ev.currentTarget;
+    const items = e.items.map((x, i) => { const n = stkNumApp(div.querySelector(`input[data-i="${i}"]`).value); return { c: x.c, cant: n >= 0 ? Math.min(n, x.cant) : x.cant, unidades: x.unidades }; });
+    let motivo = "";
+    if (items.some((x, i) => x.cant < e.items[i].cant)) { motivo = await pedirTextoApp("Llegó menos de lo que devolvió: lo que falta vuelve a figurar a su nombre. ¿Qué pasó?", ""); if (motivo === null) return; }
+    btn.disabled = true;
+    try { await stkApi("POST", "", { accion: "confirmar_envio", id: e.id, items, motivo }); showToast("✓ Recibido"); }
+    catch (err) { showToast("No se pudo: " + err.message); }
+    await depCargar(); actualizarBadgeStock(true);
+  }));
+}
+function depPintarEnCamino() {
+  const a = depCatalogo().articulos || {}, d = (c) => (a[c] || {}).d || c;
+  const lista = (depSaldos().envios || []).filter((e) => e.a !== "dep");
+  document.getElementById("depEnCamino").innerHTML = lista.length ? `<h3 class="stk-h">En camino, sin confirmar por el técnico (${lista.length})</h3>` + lista.map((e) => {
+    const horas = Math.round((Date.now() - new Date(e.fecha).getTime()) / 36e5);
+    return `<div class="stk-envio"><b>${escapeHtml(e.a.replace(/^tec:/, ""))}</b><small>hace ${horas < 24 ? horas + " h" : Math.round(horas / 24) + " día(s)"}</small><div class="stk-envio-items">${e.items.map((x) => `<div class="stk-envio-item"><span>${escapeHtml(d(x.c))}</span><b>${stkFmtN(x.cant)}</b></div>`).join("")}</div></div>`;
+  }).join("") : "";
+}
+// Consultar: dónde está un artículo o un equipo.
+async function depConsultar(texto) {
+  const cat = depCatalogo(), sal = depSaldos(), cont = document.getElementById("depConsulta");
+  const r = interpretarCodigo(texto, cat, sal, "");
+  const mostrarArticulo = (c, resaltar) => {
+    const a = cat.articulos[c] || { d: c }, t = totalesPorArticulo(sal)[c] || { detalle: {} };
+    const uni = Object.entries(sal.unidades || {}).filter(([, u]) => u.c === c);
+    cont.innerHTML = `<div class="stk-envio"><b>${escapeHtml(a.d)}</b><small>${escapeHtml(c)}${a.min ? ` · mínimo ${stkFmtN(a.min)}` : ""}</small>
+      <div class="stk-envio-items">${Object.entries(t.detalle).map(([u, n]) => `<div class="stk-envio-item"><span>${escapeHtml(nombreUbicacion(u))}</span><b>${stkFmtN(n)}</b></div>`).join("") || '<p class="stk-ayuda">No hay en ningún lado.</p>'}</div>
+      ${uni.length ? `<p class="stk-ayuda" style="margin-top:8px;">Equipos con N° de unidad:</p>${uni.map(([tr, u]) => `<div class="stk-envio-item"${tr === resaltar ? ' style="font-weight:700;"' : ""}><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;">${escapeHtml(tr)}</span><span>${escapeHtml(nombreUbicacion(u.u))}</span></div>`).join("")}` : ""}</div>`;
+  };
+  if (r.tipo === "articulo") { mostrarArticulo(r.c); return { ok: true, texto: (cat.articulos[r.c] || {}).d }; }
+  if (r.tipo === "unidad" && !r.nuevo) { mostrarArticulo(r.c, r.tracking); return { ok: true, texto: `${r.tracking}: ${nombreUbicacion(r.ubic)}` }; }
+  if (r.tipo === "unidad") { cont.innerHTML = `<p class="stk-ayuda">El N° de unidad ${escapeHtml(r.tracking)} todavía no está registrado.</p>`; return { ok: false, texto: "No registrado" }; }
+  const lista = buscarArticulosStock(cat, texto, 12);
+  cont.innerHTML = lista.length ? lista.map((a) => `<button type="button" class="stk-res" data-c="${escapeHtml(a.c)}">${escapeHtml(a.d)}<small>${escapeHtml(a.c)}</small></button>`).join("") : `<p class="stk-ayuda">${escapeHtml(r.aviso || "No encontré nada")}</p>`;
+  cont.querySelectorAll("[data-c]").forEach((b) => b.addEventListener("click", () => mostrarArticulo(b.dataset.c)));
+  return { ok: !!lista.length, texto: lista.length ? `${lista.length} resultado(s)` : "Nada" };
+}
+document.getElementById("depConsultarCodigo").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); depConsultar(e.currentTarget.value.trim()); } });
+document.getElementById("depConsultarEscanearBtn").addEventListener("click", () => abrirEscanerStock({ titulo: "Consultar", alLeer: (t) => depConsultar(t) }));
+document.getElementById("tileDepositoBtn").addEventListener("click", () => {
+  showScreen("deposito");
+  depLlenarLista("depDestTipo", "depDestNombre", "depDestLista");
+  depCargar();
+});
+document.getElementById("volverDeDepositoBtn").addEventListener("click", () => { if (stkEscanerAbierto) stkEscanerAbierto.cerrar(); showScreen("home"); actualizarBadgeStock(true); });

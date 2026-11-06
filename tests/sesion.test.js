@@ -1300,6 +1300,90 @@ test("Stock: los chips (Personal Jasper, Movistar M2M, Movistar Kite, Claro IoT�
   ["GPRS PARADOX PCS250 DUAL SIM PARA COMUNICACIONES PARADOX", "COMUNICADOR GPRS PERSONAL", "TECLADO K10LH/V"].forEach((d) => assert.notStrictEqual(S.clasificarArticulo(d), "sim", d));
 });
 
+test("Stock: Melina entrega con escaneo, el técnico confirma «Recibí» (o con diferencias), devuelve y Melina recibe; cada uno solo puede lo suyo", async () => {
+  const fetchViejo = global.fetch;
+  const repo = {
+    "tecnicos.json": [{ nombre: "Melina", permisos: { stock_responsable: true } }, { nombre: "Juan", permisos: {} }, { nombre: "Luis", permisos: {} }],
+    "stock/catalogo.json": { articulos: { 20825: { c: "20825", d: "TECLADO K10LH/V", tipo: "unidad", formatos: [] }, 20208: { c: "20208", d: "SIRENA MP100", tipo: "cantidad" } } },
+    "stock/saldos.json": { inicializado: "2026-11-01", ubic: { dep: { 20825: 3, 20208: 10 } }, unidades: {}, pedidos: {} },
+  };
+  global.fetch = async (url, op = {}) => {
+    const u = String(url), metodo = op.method || "GET";
+    const m = u.match(/contents\/([^?]+)/);
+    if (m) {
+      const ruta = decodeURIComponent(m[1]);
+      if (metodo === "PUT") { repo[ruta] = JSON.parse(Buffer.from(JSON.parse(op.body).content, "base64").toString()); return new Response("{}", { status: 200 }); }
+      if (!(ruta in repo)) return new Response("{}", { status: 404 });
+      return new Response(JSON.stringify({ sha: "s", encoding: "base64", content: Buffer.from(JSON.stringify(repo[ruta])).toString("base64") }));
+    }
+    return new Response("[]");
+  };
+  try {
+    const melina = crearSesion({ nombre: "Melina", rol: "tecnico" }), juan = crearSesion({ nombre: "Juan", rol: "tecnico" }), luis = crearSesion({ nombre: "Luis", rol: "tecnico" });
+    const post = async (body, t) => { const r = resFalso(); await datos(pedido("POST", { coleccion: "stock" }, body, t), r); return r; };
+    const get = async (q, t) => { const r = resFalso(); await datos(pedido("GET", { coleccion: "stock", ...q }, null, t), r); return r; };
+    assert.strictEqual((await get({}, juan)).statusCode, 403, "un técnico no ve todo el stock");
+    assert.strictEqual((await get({}, melina)).statusCode, 200, "la responsable sí");
+    assert.strictEqual((await post({ accion: "mover", a: "tec:Juan", items: [{ c: "20208", cant: 1 }] }, juan)).statusCode, 403);
+    assert.strictEqual((await post({ accion: "ajustar", c: "20208", ubic: "dep", cantidad: 1, motivo: "x" }, melina)).statusCode, 403, "ajustes y conciliación solo desde el admin");
+    // Entrega a Juan: 2 teclados escaneados y 3 sirenas
+    let r = await post({ accion: "mover", de: "dep", a: "tec:Juan", items: [{ c: "20825", cant: 2, unidades: ["GH120FF156", "GH12100FD4"] }, { c: "20208", cant: 3 }] }, melina);
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    const envio = r.cuerpo.envio;
+    let sal = repo["stock/saldos.json"];
+    assert.deepStrictEqual(sal.ubic.dep, { 20825: 1, 20208: 7 });
+    assert.deepStrictEqual(sal.ubic["cam:Juan"], { 20825: 2, 20208: 3 }, "queda en camino hasta que confirma");
+    assert.deepStrictEqual(repo["stock/catalogo.json"].articulos["20825"].formatos, ["AA999AA999", "AA99999AA9"], "aprende la forma de los N° de unidad");
+    // Pedir más de lo que hay
+    assert.strictEqual((await post({ accion: "mover", de: "dep", a: "veh:Kangoo", items: [{ c: "20208", cant: 50 }] }, melina)).statusCode, 409);
+    // Lo que ve Juan
+    let mio = (await get({ mio: 1 }, juan)).cuerpo;
+    assert.strictEqual(mio.porRecibir.length, 1);
+    assert.strictEqual(mio.articulos["20825"].d, "TECLADO K10LH/V");
+    assert.strictEqual((await post({ accion: "confirmar_envio", id: envio.id }, luis)).statusCode, 403, "otro técnico no puede confirmar");
+    // Juan recibe los 2 teclados pero solo 2 sirenas
+    r = await post({ accion: "confirmar_envio", id: envio.id, items: [{ c: "20825", cant: 2 }, { c: "20208", cant: 2 }], motivo: "Faltó una sirena" }, juan);
+    assert.strictEqual(r.cuerpo.envio.estado, "con_diferencias");
+    sal = repo["stock/saldos.json"];
+    assert.deepStrictEqual(sal.ubic["tec:Juan"], { 20825: 2, 20208: 2 });
+    assert.strictEqual(sal.ubic.dep["20208"], 8, "la que faltó vuelve al depósito");
+    assert.ok(!sal.ubic["cam:Juan"]);
+    assert.strictEqual(sal.unidades["GH120FF156"].u, "tec:Juan");
+    assert.strictEqual((await post({ accion: "confirmar_envio", id: envio.id }, juan)).statusCode, 409, "no se confirma dos veces");
+    // Juan devuelve un teclado; Melina lo recibe
+    assert.strictEqual((await post({ accion: "devolver", items: [{ c: "20825", cant: 5 }] }, juan)).statusCode, 409, "no puede devolver más de lo que tiene");
+    r = await post({ accion: "devolver", items: [{ c: "20825", cant: 1, unidades: ["GH120FF156"] }], motivo: "Sobró" }, juan);
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    sal = repo["stock/saldos.json"];
+    assert.deepStrictEqual(sal.ubic["cam:dev:Juan"], { 20825: 1 });
+    assert.strictEqual((await post({ accion: "confirmar_envio", id: r.cuerpo.envio.id }, juan)).statusCode, 403, "la devolución la confirma la responsable");
+    r = await post({ accion: "confirmar_envio", id: r.cuerpo.envio.id }, melina);
+    assert.strictEqual(r.cuerpo.envio.estado, "recibido");
+    sal = repo["stock/saldos.json"];
+    assert.deepStrictEqual([sal.ubic.dep["20825"], sal.ubic["tec:Juan"]["20825"], sal.unidades["GH120FF156"].u], [2, 1, "dep"]);
+    // Directo a un vehículo / cliente (sin confirmación) y compra que llega
+    r = await post({ accion: "mover", de: "dep", a: "veh:Kangoo", items: [{ c: "20208", cant: 2 }] }, melina);
+    assert.ok(!r.cuerpo.envio);
+    r = await post({ accion: "mover", de: "proveedor", a: "dep", items: [{ c: "20208", cant: 20 }], motivo: "Factura 123" }, melina);
+    assert.strictEqual(repo["stock/saldos.json"].ubic.dep["20208"], 26);
+    // Código de fabricante asociado
+    r = await post({ accion: "alias", c: "20208", ean: "7798164500049" }, melina);
+    assert.deepStrictEqual(repo["stock/catalogo.json"].articulos["20208"].alias, ["7798164500049"]);
+    assert.strictEqual((await post({ accion: "alias", c: "20825", ean: "7798164500049" }, melina)).statusCode, 409);
+    const mes = new Date().toISOString().slice(0, 7);
+    const tipos = repo[`stock/movimientos-${mes}.json`].map((m) => m.tipo);
+    assert.deepStrictEqual(tipos, ["entrega", "entrega", "recibido", "recibido", "diferencia", "devolucion", "recibido", "traspaso", "ingreso"]);
+    // Recordatorio del cron: envío sin confirmar hace más de un día
+    await post({ accion: "mover", de: "dep", a: "tec:Luis", items: [{ c: "20208", cant: 1 }] }, melina);
+    const { chequearEnviosStock } = require(path.join(raiz, "api", "cron-diario.js"));
+    const estado = {};
+    const avisados = await chequearEnviosStock({}, estado, Date.now() + 25 * 3600e3);
+    assert.strictEqual(avisados.length, 1);
+    assert.match(avisados[0], /^Luis:/);
+    assert.strictEqual((await chequearEnviosStock({}, estado, Date.now() + 26 * 3600e3)).length, 0, "una vez por día");
+  } finally { global.fetch = fetchViejo; }
+});
+
 test("Stock: catálogo desde el listado de Oficina y la planilla revisada, saldo inicial una sola vez, ajustes con movimiento, pedidos y conciliación", async () => {
   const fetchViejo = global.fetch;
   const repo = {};
