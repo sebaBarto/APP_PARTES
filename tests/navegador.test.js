@@ -25,6 +25,31 @@ test.before(async () => {
 });
 test.after(async () => { await browser?.close(); server?.close(); });
 
+// Backend de SIMs de prueba que SÍ aplica cada acción, para probar que las
+// conciliaciones verifican lo hecho (y avisan cuando algo no quedó asentado).
+function simsBackendFalso(stock, instaladas, historial, opciones = {}) {
+  const d = (n) => String(n || "").replace(/\D/g, "").slice(-10);
+  const sacar = (lista, x) => lista.splice(lista.indexOf(x), 1);
+  return (b) => {
+    if (opciones.noAplicar && opciones.noAplicar(b)) return { ok: true };
+    const st = stock.find((x) => d(x.numero) === d(b.numero)), ins = instaladas.find((x) => d(x.numero) === d(b.numero));
+    if (b.accion === "editar_stock" && st) { st.empresa = b.empresa; if (b.tipo) st.tipo = b.tipo; }
+    else if (b.accion === "editar_instalada" && ins) Object.assign(ins, b.campos);
+    else if (b.accion === "alta_lote") {
+      const agregadas = [], repetidas = [];
+      b.sims.forEach((s) => { if (stock.some((x) => d(x.numero) === d(s.numero)) || instaladas.some((x) => d(x.numero) === d(s.numero))) repetidas.push({ numero: s.numero }); else { stock.push({ numero: s.numero, empresa: s.empresa, tecnico_actual: s.tecnico_actual || "Oficina", ubicacion_tipo: "oficina", estado_fisico: "Disponible" }); agregadas.push({ numero: s.numero }); } });
+      return { ok: true, agregadas, repetidas, invalidas: [] };
+    } else if (b.accion === "usar") {
+      if (!st) return { status: 400, error: "La SIM no está en stock" };
+      sacar(stock, st);
+      instaladas.push({ numero: st.numero, empresa: st.empresa, cliente: b.cliente, numero_cliente: b.numero_cliente || "", numero_abonado: b.numero_abonado || "", direccion: b.direccion || "", estado_linea: "Activo" });
+    } else if (b.accion === "dar_de_baja" && st) { sacar(stock, st); historial.push({ fecha: "2026-11-05", hora: "10:00", numero: st.numero, accion: "baja", tecnico: "Oficina" }); }
+    else if (b.accion === "retirar_de_registro" && ins) { sacar(instaladas, ins); stock.push({ numero: ins.numero, empresa: ins.empresa, tecnico_actual: b.tecnico || "Oficina", ubicacion_tipo: "oficina", estado_fisico: "Disponible" }); }
+    else if (b.accion === "corregir_numero" && (st || ins)) (st || ins).numero = b.numero_nuevo;
+    return { ok: true };
+  };
+}
+
 async function nuevaPagina() {
   // serviceWorkers bloqueados: si no, el SW saltea los mocks de la API
   const ctx = await browser.newContext({ serviceWorkers: "block" });
@@ -3265,8 +3290,8 @@ test("Admin: el croquis de una instalación abierta se edita en el editor de la 
   assert.strictEqual(g.instalacion, "9");
   assert.strictEqual(g.dibujo.elementos.length, 2);
   await Promise.all([pop.waitForEvent("close"), pop.click("#volverDeCroquisBtn")]);
-  page.once("dialog", (d) => d.accept());
   await page.click('[data-pi="borrar"]');
+  await page.click(".cartel-admin .cartel-si");
   await page.waitForFunction(() => /Sin plano/.test(document.getElementById("instalacionPlanosAdmin").textContent));
   assert.ok(posts.some((p) => p.accion === "borrar" && p.id === "boc00001"));
   assert.deepStrictEqual(erroresPagina, []);
@@ -3431,12 +3456,15 @@ test("Conciliación de SIMs: elige sola la columna del número, separa cada caso
   ];
   const historial = [{ fecha: "2026-09-01", hora: "10:00", numero: "3415550099", accion: "baja", tecnico: "Oficina", cliente: "Rota / no funciona" }];
   const acciones = [];
-  let marcas = [];
+  // Una que se dio por resuelta hace dos meses y sigue igual: vuelve a aparecer avisando
+  let marcas = [{ numero: "3415550001", categoria: "enStock", empresa: "Claro", estado: "resuelta", por: "Seba", fecha: "2026-09-01T10:00:00Z" }];
+  const opciones = {};
+  const sim = simsBackendFalso(stock, instaladas, historial, opciones);
   await page.route("**/api/**", (route) => {
     const req = route.request(), u = req.url();
     const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
     if (u.includes("coleccion=sims_conciliacion")) {
-      if (req.method() === "GET") return json(marcas);
+      if (req.method() === "GET") return json(u.includes("historial=1") ? [] : marcas);
       const b = JSON.parse(req.postData() || "{}"), k = (x) => `${x.empresa}|${x.categoria}|${x.numero}`, ks = new Set(b.items.map(k));
       marcas = marcas.filter((x) => !ks.has(k(x)));
       if (b.accion === "marcar") b.items.forEach((x) => marcas.unshift({ ...x, estado: b.estado, motivo: b.motivo, por: "Oficina", fecha: "2026-11-04T10:00:00Z" }));
@@ -3445,7 +3473,7 @@ test("Conciliación de SIMs: elige sola la columna del número, separa cada caso
     if (req.method() === "POST") {
       const b = JSON.parse(req.postData() || "{}");
       acciones.push(b);
-      if (b.accion === "alta_lote") return json({ ok: true, agregadas: [{ numero: b.sims[0].numero }], repetidas: [], invalidas: [] });
+      if (u.includes("recurso-uso")) { const r = sim(b); return route.fulfill({ status: r.status || 200, contentType: "application/json", body: JSON.stringify(r) }); }
       return json({ ok: true });
     }
     if (u.includes("coleccion=sims_instaladas")) return json(instaladas);
@@ -3486,17 +3514,27 @@ test("Conciliación de SIMs: elige sola la columna del número, separa cada caso
     coinciden: ["3415550010"], sinRegistrar: ["3415550099", "3415550098"], problemaPagando: ["3415550002"], inactivaPagando: ["3415550011"],
     empresaDistinta: ["3415550003", "3415550014"], enStock: ["3415550001"], bajaEnEmpresa: ["3415550012"], noEnPlanilla: ["3415550013"],
   });
+  assert.match(await page.textContent('.conc-bloque[data-k="enStock"]'), /Volvió a aparecer: se marcó resuelta el 01\/09\/2026 \(Seba\)/);
   assert.match(await page.textContent('.conc-bloque[data-k="sinRegistrar"]'), /Dada de baja en SAT el 01\/09\/2026[\s\S]*pedir la baja a la empresa[\s\S]*Nunca se registró en SAT/);
   // Resolver: corregir empresa de las dos en lote
   await page.check('.conc-todas[data-k="empresaDistinta"]');
   await page.click('.conc-lote-btn[data-k="empresaDistinta"][data-a="empresa"]');
   await page.click(".cartel-admin .cartel-si");
-  await page.waitForFunction(() => /2 de 2 resueltas/.test(document.getElementById("simsConcStatus").textContent));
+  await page.waitForFunction(() => /Verificado: las 2 ya no aparecen en «Otra empresa»/.test(document.getElementById("simsConcStatus").textContent));
+  assert.match(await page.textContent("#simsConcStatus"), /pasó a «Activas en stock»/, "la de stock ahora es de Claro y queda como activa en stock");
+  assert.match(await page.textContent("#avisoFlotanteAdmin"), /Verificado/, "el aviso se ve abajo aunque el estado quede arriba");
   assert.deepStrictEqual(acciones.filter((a) => /editar/.test(a.accion)).map((a) => [a.accion, a.numero, a.empresa || a.campos.empresa]), [["editar_stock", "3415550003", "Claro"], ["editar_instalada", "3415550014", "Claro"]]);
-  // Marcar inactiva la que la empresa suspendió
+  // Marcar inactiva la que la empresa suspendió. Primero el servidor dice "ok" pero no la cambia: se avisa
+  opciones.noAplicar = (b) => b.accion === "editar_instalada" && b.numero === "3415550012";
   await page.click('.conc-acc[data-k="bajaEnEmpresa"][data-a="inactiva"]');
   await page.click(".cartel-admin .cartel-si");
-  await page.waitForTimeout(300);
+  await page.waitForFunction(() => /NO quedó asentada/.test(document.getElementById("simsConcStatus").textContent));
+  assert.match(await page.textContent("#simsConcStatus"), /3415550012 sigue apareciendo/);
+  assert.strictEqual(await page.evaluate(() => ultimaConciliacion.bajaEnEmpresa.length), 1, "sigue en la lista");
+  opciones.noAplicar = null;
+  await page.click('.conc-acc[data-k="bajaEnEmpresa"][data-a="inactiva"]');
+  await page.click(".cartel-admin .cartel-si");
+  await page.waitForFunction(() => /Verificado: la línea ya no aparece/.test(document.getElementById("simsConcStatus").textContent));
   assert.ok(acciones.some((a) => a.accion === "editar_instalada" && a.numero === "3415550012" && a.campos.estado_linea === "Inactivo"));
   // Instalar una sin registrar en un cliente: se carga al stock y se instala
   await page.click('.conc-acc[data-k="sinRegistrar"][data-a="instalar"] >> nth=1');
@@ -3509,16 +3547,19 @@ test("Conciliación de SIMs: elige sola la columna del número, separa cada caso
   const usar = acciones.find((a) => a.accion === "usar");
   assert.deepStrictEqual([usar.numero, usar.cliente, usar.numero_cliente, usar.tecnico], ["3415550098", "Kiosco Este", "88", "Oficina"]);
   // Dar de baja la extraviada que se sigue cobrando
-  page.once("dialog", (d) => d.accept("Extraviada: baja pedida a Claro"));
   await page.click('.conc-acc[data-k="problemaPagando"][data-a="baja"]');
-  await page.waitForTimeout(300);
+  await page.fill(".cartel-admin-input", "Extraviada: baja pedida a Claro");
+  await page.click(".cartel-admin .cartel-si");
+  await page.waitForFunction(() => /Verificado/.test(document.getElementById("simsConcStatus").textContent));
+  assert.match(await page.textContent("#simsConcStatus"), /pasó a «Sin registrar»/, "dada de baja en SAT: falta que la empresa la dé de baja");
   assert.ok(acciones.some((a) => a.accion === "dar_de_baja" && a.numero === "3415550002" && /Extraviada/.test(a.motivo)));
   // Ignorar una diferencia (error interno): sale de la lista y queda en "Ocultas"
-  page.once("dialog", (d) => d.accept("Error interno de carga"));
   await page.click('.conc-marcar[data-k="noEnPlanilla"][data-estado="ignorada"]');
+  await page.fill(".cartel-admin-input", "Error interno de carga");
+  await page.click(".cartel-admin .cartel-si");
   await page.waitForFunction(() => !ultimaConciliacion.noEnPlanilla.length);
   assert.ok(!(await page.$('.conc-bloque[data-k="noEnPlanilla"]')), "ya no se muestra");
-  assert.deepStrictEqual(marcas.map((m) => [m.numero, m.categoria, m.empresa, m.estado, m.motivo]), [["3415550013", "noEnPlanilla", "Claro", "ignorada", "Error interno de carga"]]);
+  assert.deepStrictEqual(marcas.filter((m) => m.estado === "ignorada").map((m) => [m.numero, m.categoria, m.empresa, m.estado, m.motivo]), [["3415550013", "noEnPlanilla", "Claro", "ignorada", "Error interno de carga"]]);
   assert.match(await page.textContent(".conc-ocultas"), /Ocultas[\s\S]*3415550013[\s\S]*Ignorada[\s\S]*Error interno de carga/);
   // Marcar resuelta: también se va
   await page.click('.conc-marcar[data-k="inactivaPagando"][data-estado="resuelta"]');
@@ -4920,16 +4961,18 @@ test("Conciliación de SIMs: números mal cargados (un dígito), comparación co
     { numero: "3415550030", empresa: "Claro", cliente: "Panadería", estado_linea: "Activo", numero_abonado: "0777" },
     { numero: "3415550044", empresa: "Claro", cliente: "Ferretería", estado_linea: "Activo", numero_abonado: "999" },
   ];
-  const acciones = [], corridas = [{ id: "old", empresa: "Claro", fecha: "2026-10-01T12:00:00Z", archivo: "claro octubre.xlsx", numeros: { noEnPlanilla: ["3415550044", "3415550099"] } }];
+  const sim = simsBackendFalso([], instaladas, []);
+  const acciones = [], historialSims = [], corridas = [{ id: "old", empresa: "Claro", fecha: "2026-10-01T12:00:00Z", archivo: "claro octubre.xlsx", numeros: { noEnPlanilla: ["3415550044", "3415550099"] } }];
   await page.route("**/api/**", (route) => {
     const req = route.request(), u = req.url();
     const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
     if (u.includes("coleccion=sims_conciliacion") && u.includes("historial=1")) return json(corridas);
     if (u.includes("coleccion=sims_conciliacion") && req.method() === "GET") return json([]);
-    if (req.method() === "POST") { const b = JSON.parse(req.postData() || "{}"); acciones.push(b); return json({ ok: true }); }
+    if (u.includes("coleccion=sims_conciliacion") && req.method() === "POST") { const b = JSON.parse(req.postData() || "{}"); acciones.push(b); if (b.accion === "marcar") return route.fulfill({ status: 502, contentType: "application/json", body: JSON.stringify({ error: "No se pudo guardar" }) }); return json({ ok: true }); }
+    if (req.method() === "POST") { const b = JSON.parse(req.postData() || "{}"); acciones.push(b); const r = sim(b); return route.fulfill({ status: r.status || 200, contentType: "application/json", body: JSON.stringify(r) }); }
     if (u.includes("coleccion=sims_instaladas")) return json(instaladas);
     if (u.includes("coleccion=sims")) return json([]);
-    if (u.includes("recurso=sim")) return json([]);
+    if (u.includes("recurso=sim")) return json(historialSims);
     json([]);
   });
   await page.goto(base + "/admin.html");
@@ -4954,7 +4997,12 @@ test("Conciliación de SIMs: números mal cargados (un dígito), comparación co
   // Corregir el número en SAT
   await page.click('.conc-acc[data-k="posibleError"][data-a="corregir"]');
   await page.click(".cartel-admin .cartel-si");
-  await page.waitForFunction(() => /resuelta/.test(document.getElementById("simsConcStatus").textContent));
+  await page.waitForFunction(() => /Verificado: la línea ya no aparece en «¿Número mal cargado\?»/.test(document.getElementById("simsConcStatus").textContent));
+  // Si el servidor no guarda una marca (Ignorar), se avisa y la línea queda en la lista
+  await page.click('.conc-marcar[data-k="noEnPlanilla"][data-estado="ignorada"]');
+  await page.click(".cartel-admin .cartel-si");
+  await page.waitForFunction(() => /No se pudo guardar/.test(document.getElementById("avisoFlotanteAdmin").textContent));
+  assert.strictEqual(await page.evaluate(() => ultimaConciliacion.noEnPlanilla.length), 1);
   assert.ok(acciones.some((a) => a.accion === "corregir_numero" && a.numero === "3415550030" && a.numero_nuevo === "3415550031"));
   // Reporte del monitoreo: el 555 hace 40 días que no comunica, el 777 comunicó hoy, el 999 no figura
   const hace = (d) => { const f = new Date(Date.now() - d * 86400000); return `${String(f.getDate()).padStart(2, "0")}/${String(f.getMonth() + 1).padStart(2, "0")}/${f.getFullYear()} 10:30`; };
@@ -4969,7 +5017,7 @@ test("Conciliación de SIMs: números mal cargados (un dígito), comparación co
   await page.selectOption("#simsComDias", "30");
   await page.click('.com-acc[data-t="v"][data-a="inactiva"]');
   await page.click(".cartel-admin .cartel-si");
-  await page.waitForFunction(() => /marcada inactiva/.test(document.getElementById("simsComStatus").textContent));
+  await page.waitForFunction(() => /Verificado: 3415550020 figura inactiva/.test(document.getElementById("simsComStatus").textContent));
   assert.ok(acciones.some((a) => a.accion === "editar_instalada" && a.numero === "3415550020" && a.campos.estado_linea === "Inactivo"));
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
@@ -4989,6 +5037,7 @@ test("Conciliación de SIMs con el sistema de Oficina: todas las empresas juntas
   ];
   const stock = [{ numero: "3415550088", empresa: "Claro", tecnico_actual: "Juan", estado_fisico: "Disponible", ubicacion_tipo: "tecnico" }];
   const acciones = [];
+  const sim = simsBackendFalso(stock, instaladas, []);
   await page.route("**/api/**", (route) => {
     const req = route.request(), u = req.url();
     const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
@@ -4996,6 +5045,7 @@ test("Conciliación de SIMs con el sistema de Oficina: todas las empresas juntas
     if (req.method() === "POST") {
       const b = JSON.parse(req.postData() || "{}"); acciones.push(b);
       if (b.accion === "marcar") return json({ ok: true, lista: b.items.map((x) => ({ ...x, estado: b.estado, motivo: b.motivo, por: "Seba", fecha: "2026-11-05T12:00:00Z" })) });
+      if (u.includes("recurso-uso")) { const r = sim(b); return route.fulfill({ status: r.status || 200, contentType: "application/json", body: JSON.stringify(r) }); }
       return json({ ok: true });
     }
     if (u.includes("coleccion=sims_instaladas")) return json(instaladas);
@@ -5032,14 +5082,14 @@ test("Conciliación de SIMs con el sistema de Oficina: todas las empresas juntas
   // Pasar la 0044 al cliente de Oficina
   await page.click('.of-acc[data-k="ofClienteDistinto"][data-a="cliente"]');
   await page.click(".cartel-admin .cartel-si");
-  await page.waitForFunction(() => /corregida/.test(document.getElementById("simsOfStatus").textContent));
+  await page.waitForFunction(() => /Verificado: la línea ya no aparece en «Otro cliente»/.test(document.getElementById("simsOfStatus").textContent));
   const ed = acciones.find((a) => a.accion === "editar_instalada");
   assert.strictEqual(ed.numero, "3415550044");
   assert.deepStrictEqual(ed.campos, { cliente: "Farmacia Luna", numero_cliente: "200" });
   // Corregir la empresa de la 0030 a Personal
   await page.click('.of-acc[data-k="ofEmpresaDistinta"][data-a="empresa"]');
   await page.click(".cartel-admin .cartel-si");
-  await page.waitForTimeout(300);
+  await page.waitForFunction(() => /Verificado: la línea ya no aparece en «Otra empresa»/.test(document.getElementById("simsOfStatus").textContent));
   assert.ok(acciones.some((a) => a.accion === "editar_instalada" && a.numero === "3415550030" && a.campos.empresa === "Personal"));
   // Instalar la de stock de Juan en el cliente de Oficina
   await page.click('.of-acc[data-k="ofSoloOficina"][data-a="instalar"]');
@@ -5049,8 +5099,9 @@ test("Conciliación de SIMs con el sistema de Oficina: todas las empresas juntas
   await page.waitForFunction(() => /instalada en Club/.test(document.getElementById("simsOfStatus").textContent));
   assert.ok(acciones.some((a) => a.accion === "usar" && a.numero === "3415550088" && a.tecnico === "Juan" && a.numero_cliente === "300"));
   // Ignorar la repetida (error del sistema de Oficina)
-  page.once("dialog", (d) => d.accept("error de Oficina"));
   await page.click('.of-marcar[data-k="ofDuplicada"][data-estado="ignorada"]');
+  await page.fill(".cartel-admin-input", "error de Oficina");
+  await page.click(".cartel-admin .cartel-si");
   await page.waitForFunction(() => ultimaOf && !ultimaOf.ofDuplicada.length);
   const m = acciones.find((a) => a.accion === "marcar");
   assert.deepStrictEqual(m.items, [{ numero: "3415550020", categoria: "ofDuplicada", empresa: "Oficina" }]);

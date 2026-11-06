@@ -1679,7 +1679,7 @@ function cartelAdmin(mensaje, opciones = {}) {
     capa.innerHTML = `<div class="cartel-admin" role="dialog" aria-modal="true">
       <p class="cartel-admin-texto"></p>
       <div class="cartel-admin-botones">
-        ${opciones.confirmar ? '<button type="button" class="btn-secondary-admin cartel-no">Cancelar</button>' : ""}
+        ${opciones.confirmar ? `<button type="button" class="btn-secondary-admin cartel-no">${opciones.cancelar || "Cancelar"}</button>` : ""}
         <button type="button" class="cartel-si ${opciones.peligro ? "peligro" : ""}">${opciones.confirmar ? (opciones.aceptar || "Sí, seguir") : "Entendido"}</button>
       </div></div>`;
     capa.querySelector(".cartel-admin-texto").textContent = String(mensaje ?? "");
@@ -1688,17 +1688,60 @@ function cartelAdmin(mensaje, opciones = {}) {
     capa.querySelector(".cartel-si").addEventListener("click", () => cerrar(true));
     const no = capa.querySelector(".cartel-no");
     if (no) no.addEventListener("click", () => cerrar(false));
-    capa.addEventListener("click", (e) => { if (e.target === capa) cerrar(!opciones.confirmar); });
+    capa.addEventListener("click", (e) => { if (e.target === capa && !opciones.fijo) cerrar(!opciones.confirmar); });
     document.addEventListener("keydown", tecla);
     document.body.appendChild(capa);
     capa.querySelector(".cartel-si").focus();
   });
+}
+// Reemplazo de prompt(): el del navegador se puede bloquear (Chrome deja de
+// mostrarlo, algunos celulares no lo muestran) y entonces el botón "no hacía
+// nada". Devuelve el texto, o null si se canceló — igual que prompt().
+function pedirTextoAdmin(mensaje, valor = "") {
+  return new Promise((resolver) => {
+    const capa = document.createElement("div");
+    capa.className = "cartel-admin-capa";
+    capa.innerHTML = `<div class="cartel-admin" role="dialog" aria-modal="true">
+      <p class="cartel-admin-texto"></p>
+      <input type="text" class="field-input cartel-admin-input" style="width:100%;box-sizing:border-box;margin:4px 0 12px;">
+      <div class="cartel-admin-botones"><button type="button" class="btn-secondary-admin cartel-no">Cancelar</button><button type="button" class="cartel-si">Aceptar</button></div></div>`;
+    capa.querySelector(".cartel-admin-texto").textContent = String(mensaje ?? "");
+    const input = capa.querySelector(".cartel-admin-input");
+    input.value = valor == null ? "" : String(valor);
+    const cerrar = (v) => { capa.remove(); resolver(v); };
+    capa.querySelector(".cartel-si").addEventListener("click", () => cerrar(input.value));
+    capa.querySelector(".cartel-no").addEventListener("click", () => cerrar(null));
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); cerrar(input.value); } if (e.key === "Escape") cerrar(null); });
+    document.body.appendChild(capa);
+    input.focus();
+    input.select();
+  });
+}
+// Aviso flotante abajo: se ve aunque el mensaje de estado de la tarjeta haya
+// quedado arriba, fuera de la pantalla (en el celular pasaba seguido).
+function avisoAdmin(texto, tipo) {
+  let caja = document.getElementById("avisoFlotanteAdmin");
+  if (!caja) {
+    caja = document.createElement("div");
+    caja.id = "avisoFlotanteAdmin";
+    caja.setAttribute("role", "status");
+    caja.style.cssText = "position:fixed;left:50%;bottom:18px;transform:translateX(-50%);max-width:min(560px,calc(100vw - 32px));padding:12px 16px;border-radius:12px;font-size:14px;line-height:1.35;z-index:2147483000;box-shadow:0 8px 24px rgba(0,0,0,.22);cursor:pointer;";
+    caja.addEventListener("click", () => { caja.style.display = "none"; });
+    document.body.appendChild(caja);
+  }
+  caja.style.background = tipo === "err" ? "#B3261E" : tipo === "aviso" ? "#8A5A00" : "#1F6B34";
+  caja.style.color = "#fff";
+  caja.style.display = "block";
+  caja.textContent = texto;
+  clearTimeout(avisoAdmin.t);
+  avisoAdmin.t = setTimeout(() => { caja.style.display = "none"; }, tipo === "err" || tipo === "aviso" ? 12000 : 6000);
 }
 function confirmarAdmin(mensaje) {
   const peligro = /borrar|eliminar|vaciar|dar de baja|papelera|se pierde/i.test(String(mensaje));
   return cartelAdmin(mensaje, { confirmar: true, peligro, aceptar: peligro ? "Sí, hacerlo" : "Sí, seguir" });
 }
 window.alert = (mensaje) => { cartelAdmin(mensaje); };
+window.preguntarSimAsync = (m) => cartelAdmin(String(m).replace(/\n\nAceptar = [^\n]*\nCancelar = [^\n]*$/, ""), { confirmar: true, aceptar: "Reemplazarla (vuelve al stock)", cancelar: "Dejar las dos instaladas", fijo: true });
 
 const fetchOriginalAdmin = window.fetch.bind(window);
 window.fetch = async (...args) => {
@@ -2628,11 +2671,11 @@ function renderSugeridosMateriales(sugeridos) {
       try { localStorage.setItem("materiales_ignorados_admin", JSON.stringify(lista)); } catch (e) { /* sin almacenamiento */ }
       fila.remove(); if (!materialesSugeridosLista.children.length) materialesSugeridosCard.classList.add("hidden");
     });
-    fila.querySelector(".sug-agregar").addEventListener("click", () => {
+    fila.querySelector(".sug-agregar").addEventListener("click", async () => {
       let cat = fila.querySelector(".sug-categoria").value;
       if (!cat) { materialesStatus.className = "status err"; materialesStatus.textContent = "Elegí una categoría para «" + sug.nombre + "»."; return; }
       if (cat === "__nueva__") {
-        cat = (prompt("Nombre de la categoría nueva:") || "").trim();
+        cat = (await pedirTextoAdmin("Nombre de la categoría nueva:") || "").trim();
         if (!cat) return;
         renderFilaCategoria(cat, []);
       }
@@ -4204,7 +4247,7 @@ function renderEstadoVehiculosAdmin(config) {
 }
 
 async function forzarDevolucionVehiculo(vehiculo, tecnico) {
-  const km = prompt(`Kilometraje con el que devolvés "${vehiculo}" (a nombre de ${tecnico}):`);
+  const km = await pedirTextoAdmin(`Kilometraje con el que devolvés "${vehiculo}" (a nombre de ${tecnico}):`);
   if (km === null) return; // canceló
   if (!km.trim() || isNaN(Number(km))) {
     alert("Tenés que poner un kilometraje válido.");
@@ -4376,6 +4419,8 @@ async function accionSimAdmin(payload) {
   let data = {};
   try { data = await res.json(); } catch (e) { /* sin cuerpo */ }
   if (!res.ok) throw new Error(data.error || "Error " + res.status);
+  // Un 200 que dice que no se hizo también es un error (antes pasaba como hecho).
+  if (data && (data.ok === false || (data.error && !data.ok))) throw new Error(data.error || "El servidor no lo aplicó");
   return data;
 }
 function pendienteDe(numero) { return simsPendientes.find((p) => p.numero === numero) || null; }
@@ -4684,7 +4729,7 @@ document.getElementById("simsLoteEmpresa").addEventListener("change", async (e) 
   await aplicarLoteSims(`Cambiar a ${empresa}`, (s) => (s.empresa === empresa ? null : { accion: "editar_stock", numero: s.numero, tecnico: "Oficina", empresa, tipo: empresa === "Movistar" ? (s.tipo || "Estándar") : "Estándar" }));
 });
 document.getElementById("simsLoteBajaBtn").addEventListener("click", async () => {
-  const motivo = (prompt(`Motivo para dar de baja ${simsSeleccionadas.size} SIM(s):`, "Devuelta a la empresa") || "").trim();
+  const motivo = (await pedirTextoAdmin(`Motivo para dar de baja ${simsSeleccionadas.size} SIM(s):`, "Devuelta a la empresa") || "").trim();
   if (!motivo) return;
   await aplicarLoteSims("Dar de baja", (s) => ({ accion: "dar_de_baja", numero: s.numero, tecnico: "Oficina", motivo }));
 });
@@ -5110,7 +5155,12 @@ async function cargarControlSims() {
       fetch("/api/datos?coleccion=sims_instaladas", { headers: h, cache: "no-store" }),
       fetch("/api/recurso-uso?recurso=sim", { headers: h, cache: "no-store" }),
     ]);
-    const [stock, inst, hist] = await Promise.all([rs.json(), ri.json(), rh.json()]);
+    const [stock, inst, hist] = await Promise.all([rs.json().catch(() => null), ri.json().catch(() => null), rh.json().catch(() => null)]);
+    // Si alguna lista no llegó bien, NO se reemplaza lo que había: con una
+    // lista vacía la conciliación mostraría todo como "sin registrar".
+    [[rs, stock, "el stock"], [ri, inst, "las instaladas"], [rh, hist, "el historial"]].forEach(([r, d, que]) => {
+      if (!r.ok || !Array.isArray(d)) throw new Error(`no llegó ${que}${d && d.error ? " (" + d.error + ")" : ""}`);
+    });
     // Lo que se marcó como resuelto o para ignorar en la conciliación.
     let ignoradas = [];
     let corridas = [];
@@ -5129,9 +5179,11 @@ async function cargarControlSims() {
     };
     st.textContent = `${controlSims.stock.filter((x) => x.ubicacion_tipo !== "cliente").length} en stock · ${controlSims.instaladas.length} instaladas · ${controlSims.historial.length} movimientos.`;
     renderControlSims();
+    return true;
   } catch (err) {
     st.className = "status err";
     st.textContent = "No se pudieron cargar los datos: " + err.message;
+    return false;
   }
 }
 document.getElementById("simsControlRecargarBtn").addEventListener("click", cargarControlSims);
@@ -5459,6 +5511,7 @@ function conciliarSims(filasPlanilla, empresa, opciones) {
   CONC_CATEGORIAS.forEach((c) => {
     r[c.k] = r[c.k].filter((it) => {
       const m = marcadas.get(`${c.k}|${soloDigitosLinea((it.x || it.reg || {}).numero || it.n)}`);
+      if (m && simsMarcaVencida(m)) { it.reaparece = m; return true; }
       if (m) { r.ocultas.push({ ...m, titulo: c.corto }); return false; }
       return true;
     });
@@ -5478,9 +5531,9 @@ function concComparar(r) {
   CONC_CATEGORIAS.forEach((c) => r[c.k].forEach((it) => {
     const n = soloDigitosLinea((it.x || it.reg || {}).numero || it.n);
     ahora.add(n);
-    if (!(prev.numeros[c.k] || []).includes(n)) r.nuevas.add(c.k + "|" + n);
+    if (!((prev.numeros || {})[c.k] || []).includes(n)) r.nuevas.add(c.k + "|" + n);
   }));
-  Object.entries(prev.numeros || {}).forEach(([k, l]) => l.forEach((n) => { if (!ahora.has(n)) r.yaNo.push({ n, k }); }));
+  Object.entries(prev.numeros || {}).forEach(([k, l]) => (Array.isArray(l) ? l : []).forEach((n) => { if (!ahora.has(n)) r.yaNo.push({ n, k }); }));
 }
 let concGuardarTimer = null;
 function concGuardarCorrida(r) {
@@ -5528,6 +5581,7 @@ function concFilaHtml(k, it, i) {
   else det = `<b>${escapeHtmlAdmin(x.cliente || "")}</b>${x.direccion ? " · " + escapeHtmlAdmin(x.direccion) : ""}${it.estadoEmpresa ? ` · en la empresa: <b>${escapeHtmlAdmin(it.crudo || it.estadoEmpresa)}</b>` : ""}${x.estado_linea === "Inactivo" ? " · inactiva en SAT" : ""}`;
   const botones = CONC_CATEGORIAS.find((c) => c.k === k).acciones.map(([a, t]) => `<button type="button" class="btn-secondary-admin conc-acc" data-k="${k}" data-i="${i}" data-a="${a}">${escapeHtmlAdmin(t.replace("…", ""))}</button>`).join("")
     + `<button type="button" class="btn-secondary-admin conc-marcar" data-k="${k}" data-i="${i}" data-estado="resuelta" title="Ya está resuelta: no mostrarla más">✓ Resuelto</button><button type="button" class="btn-secondary-admin conc-marcar" data-k="${k}" data-i="${i}" data-estado="ignorada" title="Es un error interno: no mostrarla más">Ignorar</button>`;
+  det += simsHtmlReaparece(it);
   const esNueva = ultimaConciliacion && ultimaConciliacion.anterior && ultimaConciliacion.nuevas.has(k + "|" + soloDigitosLinea(x.numero || it.n));
   return `<tr><td style="width:26px;"><input type="checkbox" class="conc-sel" data-k="${k}" data-i="${i}"></td><td>${num}${esNueva ? ' <span class="conc-nueva" style="display:inline-block;padding:1px 6px;border-radius:999px;background:#FFF1D6;color:#8A5A00;font-size:11px;font-weight:700;">Nueva</span>' : ""}</td><td style="white-space:normal;">${det}</td><td class="conc-btns">${botones}</td></tr>`;
 }
@@ -5557,49 +5611,108 @@ function concRender() {
   cont.querySelectorAll(".conc-acc").forEach((b) => b.addEventListener("click", () => {
     const k = b.dataset.k, it = ultimaConciliacion[k][Number(b.dataset.i)];
     if (b.dataset.a === "instalar") return concPanelInstalar(b.closest("tr"), k, it);
-    concAplicar(k, b.dataset.a, [it]);
+    concAplicar(k, b.dataset.a, [it], b);
   }));
   cont.querySelectorAll(".conc-lote-btn").forEach((b) => b.addEventListener("click", () => {
     const k = b.dataset.k;
     const items = [...cont.querySelectorAll(`.conc-sel[data-k="${k}"]:checked`)].map((x) => ultimaConciliacion[k][Number(x.dataset.i)]);
     if (!items.length) { alert("Tildá primero las líneas."); return; }
-    concAplicar(k, b.dataset.a, items);
+    concAplicar(k, b.dataset.a, items, b);
   }));
   document.getElementById("simsConcExcel").addEventListener("click", concExcel);
-  cont.querySelectorAll(".conc-marcar").forEach((b) => b.addEventListener("click", () => concMarcar(b.dataset.k, b.dataset.estado, [ultimaConciliacion[b.dataset.k][Number(b.dataset.i)]])));
+  cont.querySelectorAll(".conc-marcar").forEach((b) => b.addEventListener("click", () => concMarcar(b.dataset.k, b.dataset.estado, [ultimaConciliacion[b.dataset.k][Number(b.dataset.i)]], b)));
   cont.querySelectorAll(".conc-lote-marcar").forEach((b) => b.addEventListener("click", () => {
     const k = b.dataset.k;
     const items = [...cont.querySelectorAll(`.conc-sel[data-k="${k}"]:checked`)].map((x) => ultimaConciliacion[k][Number(x.dataset.i)]);
     if (!items.length) { alert("Tildá primero las líneas."); return; }
-    concMarcar(k, b.dataset.estado, items);
+    concMarcar(k, b.dataset.estado, items, b);
   }));
   cont.querySelectorAll(".conc-reactivar").forEach((b) => b.addEventListener("click", async () => {
     const m = ultimaConciliacion.ocultas[Number(b.dataset.i)];
-    await concGuardarMarcas({ accion: "reactivar", items: [{ numero: m.numero, categoria: m.categoria, empresa: m.empresa }] }, `${m.numero} vuelve a mostrarse.`);
+    await simsConBoton(b, () => concGuardarMarcas({ accion: "reactivar", items: [{ numero: m.numero, categoria: m.categoria, empresa: m.empresa }] }, `${m.numero} vuelve a mostrarse.`));
   }));
 }
+// ---------- Conciliaciones: aplicar, marcar y VERIFICAR ----------
+// Después de cada corrección se vuelve a leer todo de la APP y se rehace la
+// conciliación: si la línea sigue apareciendo en la misma lista, la acción no
+// quedó asentada y se avisa (antes decía "resuelta" igual).
+// "Resuelto" esconde la diferencia un tiempo (lo que tarda en impactar), no
+// para siempre: si pasado ese plazo la planilla la sigue mostrando, vuelve a
+// aparecer avisando que se había dado por resuelta. "Ignorar" sí es para siempre.
+const SIMS_DIAS_RESUELTA = 40;
+const simsMarcaVencida = (m) => m.estado === "resuelta" && m.fecha && (Date.now() - new Date(m.fecha).getTime()) / 864e5 > SIMS_DIAS_RESUELTA;
+const simsHtmlReaparece = (it) => it.reaparece ? `<br><small style="color:#B3261E;font-weight:600;">⟳ Volvió a aparecer: se marcó resuelta el ${escapeHtmlAdmin(fechaAR(String(it.reaparece.fecha).slice(0, 10)))}${it.reaparece.por ? " (" + escapeHtmlAdmin(it.reaparece.por) + ")" : ""} y sigue igual</small>` : "";
+const simsNumItem = (it) => soloDigitosLinea((it.x || it.reg || {}).numero || it.n);
+function simsVerificar(r, categorias, k, numeros) {
+  const enLista = (kk, n) => (r[kk] || []).some((it) => simsNumItem(it) === n || soloDigitosLinea(it.n) === n);
+  const siguen = [], movidas = {};
+  numeros.forEach((n) => {
+    if (enLista(k, n)) { siguen.push(n); return; }
+    const otra = categorias.find((c) => c.k !== k && enLista(c.k, n));
+    if (otra) movidas[otra.corto] = (movidas[otra.corto] || 0) + 1;
+  });
+  return { siguen, movidas };
+}
+function simsTextoVerificacion(v, total, errores, etiqueta) {
+  const ok = total - errores.length - v.siguen.length;
+  const partes = [];
+  if (ok > 0) partes.push(`✓ Verificado: ${ok === 1 ? "la línea ya no aparece" : `las ${ok} ya no aparecen`} en «${etiqueta}».`);
+  const mov = Object.entries(v.movidas).map(([t, n]) => `${n} pasó${n === 1 ? "" : "aron"} a «${t}»`);
+  if (mov.length) partes.push(`(${mov.join(", ")}.)`);
+  if (v.siguen.length) partes.push(`⚠ ${v.siguen.length === 1 ? "La " + v.siguen[0] + " sigue" : `${v.siguen.length} siguen`} apareciendo: la corrección NO quedó asentada${v.siguen.length > 1 ? " (" + v.siguen.slice(0, 6).join(", ") + (v.siguen.length > 6 ? "…" : "") + ")" : ""}. Abrí la ficha de la línea para ver qué tiene.`);
+  if (errores.length) partes.push(`✕ Con error: ${errores.join(" · ")}`);
+  return { texto: partes.join(" ") || "Nada para aplicar.", tipo: errores.length || v.siguen.length ? "err" : "ok" };
+}
+// Las marcas (Resuelto / Ignorar) se guardan de a una tanda por vez: si se
+// tocan varias seguidas, la respuesta de una no pisa a la siguiente.
+let simsColaMarcas = Promise.resolve();
+async function simsGuardarMarcas(cuerpo) {
+  const tarea = simsColaMarcas.then(async () => {
+    const r = await fetch("/api/datos?coleccion=sims_conciliacion", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify(cuerpo) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || "Error " + r.status);
+    if (!Array.isArray(d.lista)) throw new Error("El servidor no confirmó lo guardado");
+    // Verificación: lo marcado tiene que estar (o no estar, si se reactivó) en lo que quedó guardado.
+    const clave = (x) => `${x.empresa}|${x.categoria}|${soloDigitosLinea(x.numero)}`;
+    const guardadas = new Set(d.lista.map(clave));
+    const mal = cuerpo.items.filter((x) => guardadas.has(clave(x)) !== (cuerpo.accion === "marcar"));
+    if (mal.length) throw new Error(`no quedó guardado para ${mal.map((x) => x.numero).join(", ")}`);
+    controlSims.ignoradas = d.lista;
+    return d.lista;
+  });
+  simsColaMarcas = tarea.catch(() => {});
+  return tarea;
+}
+// Botón ocupado mientras trabaja (que se note que el toque llegó).
+async function simsConBoton(boton, fn) {
+  if (boton && boton.disabled) return;
+  const texto = boton ? boton.textContent : "";
+  if (boton) { boton.disabled = true; boton.textContent = "Guardando…"; }
+  try { return await fn(); } finally { if (boton && boton.isConnected) { boton.disabled = false; boton.textContent = texto; } }
+}
 // Resuelto / Ignorar: la línea sale de la lista (queda en "Ocultas" y se puede volver a mostrar).
-async function concMarcar(k, estado, items) {
+async function concMarcar(k, estado, items, boton) {
   const n = items.length, plural = n === 1 ? "esta línea" : `estas ${n} líneas`;
   let motivo = "";
   if (estado === "ignorada") {
-    const m = prompt(`¿Por qué se ignora ${plural}? (opcional, ej. error interno de carga)`, "");
+    const m = await pedirTextoAdmin(`¿Por qué se ignora ${plural}? (opcional, ej. error interno de carga)`, "");
     if (m === null) return;
     motivo = m.trim();
   } else if (!await confirmarAdmin(`¿Marcar ${plural} como resuelta${n === 1 ? "" : "s"}? Sale de la lista (se puede volver a mostrar desde "Ocultas").`)) return;
-  const lista = items.map((it) => ({ numero: soloDigitosLinea((it.x || it.reg || {}).numero || it.n), categoria: k, empresa: concEstado.empresa }));
-  await concGuardarMarcas({ accion: "marcar", estado, motivo, items: lista }, `${n} ${n === 1 ? "línea marcada" : "líneas marcadas"} como ${estado === "resuelta" ? "resuelta" + (n === 1 ? "" : "s") : "ignorada" + (n === 1 ? "" : "s")}.`);
+  const lista = items.map((it) => ({ numero: simsNumItem(it), categoria: k, empresa: concEstado.empresa }));
+  await simsConBoton(boton, () => concGuardarMarcas({ accion: "marcar", estado, motivo, items: lista }, `${n} ${n === 1 ? "línea marcada" : "líneas marcadas"} como ${estado === "resuelta" ? "resuelta" + (n === 1 ? "" : "s") : "ignorada" + (n === 1 ? "" : "s")}. Quedó guardado.`));
 }
 async function concGuardarMarcas(cuerpo, mensaje) {
   const st = document.getElementById("simsConcStatus");
   try {
-    const r = await fetch("/api/datos?coleccion=sims_conciliacion", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify(cuerpo) });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(d.error || "Error " + r.status);
-    controlSims.ignoradas = Array.isArray(d.lista) ? d.lista : controlSims.ignoradas;
+    await simsGuardarMarcas(cuerpo);
     concRecalcular();
     st.className = "status ok"; st.textContent = mensaje;
-  } catch (err) { st.className = "status err"; st.textContent = "No se pudo: " + err.message; }
+    avisoAdmin(mensaje, "ok");
+  } catch (err) {
+    st.className = "status err"; st.textContent = "No se pudo guardar: " + err.message;
+    avisoAdmin("No se pudo guardar: " + err.message + ". La línea sigue en la lista; probá de nuevo.", "err");
+  }
 }
 function concPedido(k, a, it, extra) {
   const x = it.x || it.reg || {};
@@ -5614,12 +5727,12 @@ function concPedido(k, a, it, extra) {
     : { accion: "editar_stock", numero: x.numero, tecnico: "Oficina", empresa, tipo: empresa === "Movistar" ? (x.tipo || "Estándar") : "Estándar" };
   return null;
 }
-async function concAplicar(k, a, items) {
+async function concAplicar(k, a, items, boton) {
   const st = document.getElementById("simsConcStatus");
   const extra = {};
   const n = items.length, plural = n === 1 ? "esta línea" : `estas ${n} líneas`;
   if (a === "baja") {
-    extra.motivo = (prompt(`Motivo de la baja de ${plural}:`, k === "problemaPagando" ? "Con problema: se pide la baja a la empresa" : "Conciliación con la empresa") || "").trim();
+    extra.motivo = (await pedirTextoAdmin(`Motivo de la baja de ${plural}:`, k === "problemaPagando" ? "Con problema: se pide la baja a la empresa" : "Conciliación con la empresa") || "").trim();
     if (!extra.motivo) return;
   } else if (a === "retirar") {
     if (!await confirmarAdmin(`¿Retirar ${plural} del cliente y devolver${n === 1 ? "la" : "las"} al stock de Oficina?`)) return;
@@ -5628,14 +5741,23 @@ async function concAplicar(k, a, items) {
     const textos = { corregir: n === 1 ? `¿Cambiar en SAT el ${(items[0].x || {}).numero} por ${items[0].n} (el de la planilla)?` : `¿Corregir en SAT los números de estas ${n} líneas por los de la planilla?`, alta: `¿Cargar ${plural} al stock de Oficina como ${concEstado.empresa}?`, activa: `¿Marcar ${plural} como activa${n === 1 ? "" : "s"}?`, inactiva: `¿Marcar ${plural} como inactiva${n === 1 ? "" : "s"}?`, empresa: `¿Corregir ${plural} a ${concEstado.empresa}?` };
     if (!await confirmarAdmin(textos[a])) return;
   }
-  const errores = [];
-  for (let i = 0; i < items.length; i++) {
-    st.className = "status"; st.textContent = `Aplicando ${i + 1} de ${n}...`;
-    try { await accionSimAdmin(concPedido(k, a, items[i], extra)); } catch (err) { errores.push(`${items[i].n}: ${err.message}`); }
-  }
-  await concRecargarYRecalcular();
-  st.className = errores.length ? "status err" : "status ok";
-  st.textContent = `${n - errores.length} de ${n} resuelta${n === 1 ? "" : "s"}.${errores.length ? " Con error: " + errores.join(" · ") : ""} Quedó en el historial de cada línea.`;
+  await simsConBoton(boton, async () => {
+    const errores = [], hechos = [];
+    for (let i = 0; i < items.length; i++) {
+      st.className = "status"; st.textContent = `Aplicando ${i + 1} de ${n}...`;
+      try { await accionSimAdmin(concPedido(k, a, items[i], extra)); hechos.push(a === "corregir" ? soloDigitosLinea(items[i].n) : simsNumItem(items[i])); } catch (err) { errores.push(`${items[i].n}: ${err.message}`); }
+    }
+    st.textContent = "Verificando en la APP...";
+    const etiqueta = CONC_CATEGORIAS.find((c) => c.k === k).corto;
+    if (!await cargarControlSims()) {
+      const t = `Se mandaron ${hechos.length} de ${n}, pero no se pudo volver a leer la APP para verificar. Tocá «↻ Recargar» y volvé a subir la planilla.${errores.length ? " Con error: " + errores.join(" · ") : ""}`;
+      st.className = "status err"; st.textContent = t; avisoAdmin(t, "err"); return;
+    }
+    concRecalcular();
+    const { texto, tipo } = simsTextoVerificacion(simsVerificar(ultimaConciliacion, CONC_CATEGORIAS, k, hechos), n, errores, etiqueta);
+    st.className = tipo === "ok" ? "status ok" : "status err"; st.textContent = texto + " Queda en el historial de cada línea.";
+    avisoAdmin(texto, tipo);
+  });
 }
 // Instalar en un cliente: desde una línea sin registrar (primero se carga al stock) o desde el stock.
 function concPanelInstalar(tr, k, it) {
@@ -5668,14 +5790,17 @@ function concPanelInstalar(tr, k, it) {
       if (k === "sinRegistrar") {
         const alta = await accionSimAdmin(concPedido(k, "alta", it, {}));
         if (alta.agregadas && alta.agregadas[0]) numero = alta.agregadas[0].numero;
-        else if (alta.repetidas && alta.repetidas.length) throw new Error("La línea ya existe en SAT: actualizá la conciliación.");
+        // Ya estaba (p. ej. un intento anterior la cargó al stock y falló al instalar): se sigue.
       }
       await enviarAccionSimConRespaldo({ recurso: "sim", accion: "usar", numero, tecnico, cliente: c ? c.nombre : escrito,
         direccion: q(".x-direccion").value.trim(), numero_abonado: q(".x-abonado").value.trim(), numero_cliente: c ? c.numero_cliente || "" : "" }, SERVICIOS_API_TOKEN);
-      await concRecargarYRecalcular();
-      st.className = "status ok"; st.textContent = `${numero} instalada en ${c ? c.nombre : escrito}.`;
+      const leido = await concRecargarYRecalcular();
+      const instalada = controlSims.instaladas.some((x) => soloDigitosLinea(x.numero) === soloDigitosLinea(numero));
+      const t = !leido ? `${numero}: se mandó a instalar, pero no se pudo verificar. Tocá «↻ Recargar».` : instalada ? `✓ Verificado: ${numero} quedó instalada en ${c ? c.nombre : escrito}.` : `⚠ ${numero}: se mandó a instalar pero en la APP no figura instalada. Revisá la ficha de la línea.`;
+      st.className = leido && instalada ? "status ok" : "status err"; st.textContent = t;
+      avisoAdmin(t, leido && instalada ? "ok" : "err");
     } catch (err) {
-      alert("No se pudo: " + err.message);
+      avisoAdmin("No se pudo instalar: " + err.message, "err");
       q(".x-ok").disabled = false;
     }
   });
@@ -5706,8 +5831,9 @@ function concRecalcular() {
   }
 }
 async function concRecargarYRecalcular() {
-  await cargarControlSims();
+  const ok = await cargarControlSims();
   concRecalcular();
+  return ok;
 }
 function concExcel() {
   const c = ultimaConciliacion;
@@ -6106,6 +6232,7 @@ function conciliarOficina(filas, opciones) {
   OF_CATEGORIAS.forEach((c) => {
     r[c.k] = r[c.k].filter((it) => {
       const m = marcadas.get(`${c.k}|${ofNumeroItem(it)}`);
+      if (m && simsMarcaVencida(m)) { it.reaparece = m; return true; }
       if (m) { r.ocultas.push({ ...m, titulo: c.corto }); return false; }
       return true;
     });
@@ -6130,6 +6257,7 @@ function ofFilaHtml(k, it, i) {
   const c = OF_CATEGORIAS.find((y) => y.k === k);
   const botones = c.acciones.map(([a, t]) => `<button type="button" class="btn-secondary-admin of-acc" data-k="${k}" data-i="${i}" data-a="${a}">${escapeHtmlAdmin(t.replace("…", ""))}</button>`).join("")
     + `<button type="button" class="btn-secondary-admin of-marcar" data-k="${k}" data-i="${i}" data-estado="resuelta" title="Ya está resuelta: no mostrarla más">✓ Resuelto</button><button type="button" class="btn-secondary-admin of-marcar" data-k="${k}" data-i="${i}" data-estado="ignorada" title="Error del sistema de Oficina o interno: no mostrarla más">Ignorar</button>`;
+  det += simsHtmlReaparece(it);
   const nueva = ultimaOf && ultimaOf.anterior && ultimaOf.nuevas.has(k + "|" + ofNumeroItem(it));
   return `<tr><td style="width:26px;"><input type="checkbox" class="of-sel" data-k="${k}" data-i="${i}"></td><td>${num}${nueva ? ' <span class="conc-nueva" style="display:inline-block;padding:1px 6px;border-radius:999px;background:#FFF1D6;color:#8A5A00;font-size:11px;font-weight:700;">Nueva</span>' : ""}</td><td style="white-space:normal;">${det}</td><td class="conc-btns">${botones}</td></tr>`;
 }
@@ -6138,8 +6266,8 @@ function ofComparar(r) {
   r.anterior = prev; r.nuevas = new Set(); r.yaNo = 0;
   if (!prev) return;
   const ahora = new Set();
-  OF_CATEGORIAS.forEach((c) => r[c.k].forEach((it) => { const n = ofNumeroItem(it); ahora.add(c.k + "|" + n); if (!(prev.numeros[c.k] || []).includes(n)) r.nuevas.add(c.k + "|" + n); }));
-  Object.entries(prev.numeros || {}).forEach(([k, l]) => l.forEach((n) => { if (!ahora.has(k + "|" + n)) r.yaNo++; }));
+  OF_CATEGORIAS.forEach((c) => r[c.k].forEach((it) => { const n = ofNumeroItem(it); ahora.add(c.k + "|" + n); if (!((prev.numeros || {})[c.k] || []).includes(n)) r.nuevas.add(c.k + "|" + n); }));
+  Object.entries(prev.numeros || {}).forEach(([k, l]) => (Array.isArray(l) ? l : []).forEach((n) => { if (!ahora.has(k + "|" + n)) r.yaNo++; }));
 }
 let ofGuardarTimer = null;
 function ofGuardarCorrida(r) {
@@ -6184,37 +6312,38 @@ function ofRender() {
   cont.querySelectorAll(".of-acc").forEach((b) => b.addEventListener("click", () => {
     const k = b.dataset.k, it = ultimaOf[k][Number(b.dataset.i)];
     if (b.dataset.a === "instalar") return ofPanelInstalar(b.closest("tr"), it);
-    ofAplicar(k, b.dataset.a, [it]);
+    ofAplicar(k, b.dataset.a, [it], b);
   }));
-  cont.querySelectorAll(".of-lote-btn").forEach((b) => b.addEventListener("click", () => { const l = items(b.dataset.k); if (!l.length) { alert("Tildá primero las líneas."); return; } ofAplicar(b.dataset.k, b.dataset.a, l); }));
-  cont.querySelectorAll(".of-marcar").forEach((b) => b.addEventListener("click", () => ofMarcar(b.dataset.k, b.dataset.estado, [ultimaOf[b.dataset.k][Number(b.dataset.i)]])));
-  cont.querySelectorAll(".of-lote-marcar").forEach((b) => b.addEventListener("click", () => { const l = items(b.dataset.k); if (!l.length) { alert("Tildá primero las líneas."); return; } ofMarcar(b.dataset.k, b.dataset.estado, l); }));
+  cont.querySelectorAll(".of-lote-btn").forEach((b) => b.addEventListener("click", () => { const l = items(b.dataset.k); if (!l.length) { alert("Tildá primero las líneas."); return; } ofAplicar(b.dataset.k, b.dataset.a, l, b); }));
+  cont.querySelectorAll(".of-marcar").forEach((b) => b.addEventListener("click", () => ofMarcar(b.dataset.k, b.dataset.estado, [ultimaOf[b.dataset.k][Number(b.dataset.i)]], b)));
+  cont.querySelectorAll(".of-lote-marcar").forEach((b) => b.addEventListener("click", () => { const l = items(b.dataset.k); if (!l.length) { alert("Tildá primero las líneas."); return; } ofMarcar(b.dataset.k, b.dataset.estado, l, b); }));
   cont.querySelectorAll(".of-reactivar").forEach((b) => b.addEventListener("click", () => {
     const m = ultimaOf.ocultas[Number(b.dataset.i)];
-    ofGuardarMarcas({ accion: "reactivar", items: [{ numero: m.numero, categoria: m.categoria, empresa: OF_CLAVE }] }, `${m.numero} vuelve a mostrarse.`);
+    simsConBoton(b, () => ofGuardarMarcas({ accion: "reactivar", items: [{ numero: m.numero, categoria: m.categoria, empresa: OF_CLAVE }] }, `${m.numero} vuelve a mostrarse.`));
   }));
   document.getElementById("simsOfExcel").addEventListener("click", ofExcel);
 }
-async function ofMarcar(k, estado, items) {
+async function ofMarcar(k, estado, items, boton) {
   const n = items.length, plural = n === 1 ? "esta línea" : `estas ${n} líneas`;
   let motivo = "";
   if (estado === "ignorada") {
-    const m = prompt(`¿Por qué se ignora ${plural}? (opcional, ej. error del sistema de Oficina)`, "");
+    const m = await pedirTextoAdmin(`¿Por qué se ignora ${plural}? (opcional, ej. error del sistema de Oficina)`, "");
     if (m === null) return;
     motivo = m.trim();
   } else if (!await confirmarAdmin(`¿Marcar ${plural} como resuelta${n === 1 ? "" : "s"}? Sale de la lista (se puede volver a mostrar desde "Ocultas").`)) return;
-  await ofGuardarMarcas({ accion: "marcar", estado, motivo, items: items.map((it) => ({ numero: ofNumeroItem(it), categoria: k, empresa: OF_CLAVE })) }, `${n} ${n === 1 ? "línea marcada" : "líneas marcadas"} como ${estado === "resuelta" ? "resuelta" : "ignorada"}${n === 1 ? "" : "s"}.`);
+  await simsConBoton(boton, () => ofGuardarMarcas({ accion: "marcar", estado, motivo, items: items.map((it) => ({ numero: ofNumeroItem(it), categoria: k, empresa: OF_CLAVE })) }, `${n} ${n === 1 ? "línea marcada" : "líneas marcadas"} como ${estado === "resuelta" ? "resuelta" : "ignorada"}${n === 1 ? "" : "s"}. Quedó guardado.`));
 }
 async function ofGuardarMarcas(cuerpo, mensaje) {
   const st = document.getElementById("simsOfStatus");
   try {
-    const r = await fetch("/api/datos?coleccion=sims_conciliacion", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify(cuerpo) });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(d.error || "Error " + r.status);
-    controlSims.ignoradas = Array.isArray(d.lista) ? d.lista : controlSims.ignoradas;
+    await simsGuardarMarcas(cuerpo);
     ofRecalcular();
     st.className = "status ok"; st.textContent = mensaje;
-  } catch (err) { st.className = "status err"; st.textContent = "No se pudo: " + err.message; }
+    avisoAdmin(mensaje, "ok");
+  } catch (err) {
+    st.className = "status err"; st.textContent = "No se pudo guardar: " + err.message;
+    avisoAdmin("No se pudo guardar: " + err.message + ". La línea sigue en la lista; probá de nuevo.", "err");
+  }
 }
 function ofPedido(a, it) {
   const x = it.x || {}, p = it.p || {};
@@ -6232,22 +6361,29 @@ function ofPedido(a, it) {
   }
   return null;
 }
-async function ofAplicar(k, a, items) {
+async function ofAplicar(k, a, items, boton) {
   const st = document.getElementById("simsOfStatus");
   const n = items.length, plural = n === 1 ? "esta línea" : `estas ${n} líneas`;
   const textos = { corregir: `¿Corregir en la APP ${n === 1 ? "el número" : "los números"} por ${n === 1 ? "el" : "los"} de Oficina?`, activa: `¿Marcar ${plural} como activa${n === 1 ? "" : "s"} en la APP?`, inactiva: `¿Marcar ${plural} como inactiva${n === 1 ? "" : "s"} en la APP?`, retirar: `¿Retirar ${plural} del cliente y devolver${n === 1 ? "la" : "las"} al stock de Oficina?`, empresa: `¿Poner en la APP la empresa que dice Oficina en ${plural}?`, cliente: `¿Pasar ${plural} en la APP al cliente que dice Oficina?` };
   if (!await confirmarAdmin(textos[a])) return;
-  const errores = [];
-  for (let i = 0; i < n; i++) {
-    st.className = "status"; st.textContent = `Aplicando ${i + 1} de ${n}...`;
-    const pedido = ofPedido(a, items[i]);
-    if (!pedido) { errores.push(`${items[i].n}: Oficina no tiene el dato`); continue; }
-    try { await accionSimAdmin(pedido); } catch (err) { errores.push(`${items[i].n}: ${err.message}`); }
-  }
-  await cargarControlSims();
-  ofRecalcular();
-  st.className = errores.length ? "status err" : "status ok";
-  st.textContent = `${n - errores.length} de ${n} corregida${n === 1 ? "" : "s"} en la APP.${errores.length ? " Con error: " + errores.join(" · ") : ""} Quedó en el historial de cada línea.`;
+  await simsConBoton(boton, async () => {
+    const errores = [], hechos = [];
+    for (let i = 0; i < n; i++) {
+      st.className = "status"; st.textContent = `Aplicando ${i + 1} de ${n}...`;
+      const pedido = ofPedido(a, items[i]);
+      if (!pedido) { errores.push(`${items[i].n}: Oficina no tiene el dato`); continue; }
+      try { await accionSimAdmin(pedido); hechos.push(a === "corregir" ? soloDigitosLinea(items[i].n) : ofNumeroItem(items[i])); } catch (err) { errores.push(`${items[i].n}: ${err.message}`); }
+    }
+    st.textContent = "Verificando en la APP...";
+    if (!await cargarControlSims()) {
+      const t = `Se mandaron ${hechos.length} de ${n}, pero no se pudo volver a leer la APP para verificar. Tocá «↻ Recargar» y volvé a subir el archivo.`;
+      st.className = "status err"; st.textContent = t; avisoAdmin(t, "err"); return;
+    }
+    ofRecalcular();
+    const { texto, tipo } = simsTextoVerificacion(simsVerificar(ultimaOf, OF_CATEGORIAS, k, hechos), n, errores, OF_CATEGORIAS.find((c) => c.k === k).corto);
+    st.className = tipo === "ok" ? "status ok" : "status err"; st.textContent = texto + " Queda en el historial de cada línea.";
+    avisoAdmin(texto, tipo);
+  });
 }
 // Instalar en el cliente que dice Oficina (desde el stock, o cargándola primero al stock de Oficina).
 function ofPanelInstalar(tr, it) {
@@ -6280,15 +6416,18 @@ function ofPanelInstalar(tr, it) {
         const empresa = q(".x-empresa").value;
         const alta = await accionSimAdmin({ accion: "alta_lote", tecnico: "Oficina", sims: [{ numero: it.n, empresa, tipo: "Estándar", tecnico_actual: "Oficina" }] });
         if (alta.agregadas && alta.agregadas[0]) numero = alta.agregadas[0].numero;
-        else if (alta.repetidas && alta.repetidas.length) throw new Error("La línea ya existe en la APP: actualizá la conciliación.");
+        // Ya estaba (un intento anterior la cargó al stock y falló al instalar): se sigue.
       }
       await enviarAccionSimConRespaldo({ recurso: "sim", accion: "usar", numero, tecnico, cliente: c ? c.nombre : escrito,
         direccion: q(".x-direccion").value.trim(), numero_abonado: q(".x-abonado").value.trim(), numero_cliente: q(".x-numcli").value.trim() || (c ? c.numero_cliente || "" : "") }, SERVICIOS_API_TOKEN);
-      await cargarControlSims();
+      const leido = await cargarControlSims();
       ofRecalcular();
-      st.className = "status ok"; st.textContent = `${numero} instalada en ${c ? c.nombre : escrito}.`;
+      const instalada = controlSims.instaladas.some((x) => soloDigitosLinea(x.numero) === soloDigitosLinea(numero));
+      const t = !leido ? `${numero}: se mandó a instalar, pero no se pudo verificar. Tocá «↻ Recargar».` : instalada ? `✓ Verificado: ${numero} quedó instalada en ${c ? c.nombre : escrito}.` : `⚠ ${numero}: se mandó a instalar pero en la APP no figura instalada. Revisá la ficha de la línea.`;
+      st.className = leido && instalada ? "status ok" : "status err"; st.textContent = t;
+      avisoAdmin(t, leido && instalada ? "ok" : "err");
     } catch (err) {
-      alert("No se pudo: " + err.message);
+      avisoAdmin("No se pudo instalar: " + err.message, "err");
       q(".x-ok").disabled = false;
     }
   });
@@ -6335,7 +6474,7 @@ document.getElementById("simsOfArchivo").addEventListener("change", (ev) => {
   const reader = new FileReader();
   reader.onload = async (e) => {
     try {
-      if (!controlSims.instaladas.length && !controlSims.stock.length) await cargarControlSims();
+      if (!await cargarControlSims()) throw new Error("no se pudieron leer las SIMs de la APP (para no comparar contra una lista vacía, no se sigue). Probá de nuevo.");
       concAsegurarClientes();
       const wb = XLSX.read(e.target.result, { type: "array" });
       const filas = wb.SheetNames.flatMap((nombre) => XLSX.utils.sheet_to_json(wb.Sheets[nombre], { defval: "" }))
@@ -6407,12 +6546,17 @@ function comCalcular() {
     const it = (b.dataset.t === "v" ? comEstado.resultado.viejas : comEstado.resultado.noFiguran)[Number(b.dataset.i)];
     const retirar = b.dataset.a === "retirar";
     if (!await confirmarAdmin(retirar ? `¿Retirar la ${it.x.numero} de ${it.x.cliente || "el cliente"} y devolverla al stock de Oficina?` : `¿Marcar la ${it.x.numero} como inactiva?`)) return;
-    try {
-      await accionSimAdmin(retirar ? { accion: "retirar_de_registro", numero: it.x.numero, tecnico: "Oficina" } : { accion: "editar_instalada", numero: it.x.numero, tecnico: "Oficina", campos: { estado_linea: "Inactivo" } });
-      await cargarControlSims();
-      comCalcular();
-      st.className = "status ok"; st.textContent = `${it.x.numero}: ${retirar ? "retirada del cliente" : "marcada inactiva"}. Quedó en el historial de la línea.`;
-    } catch (err) { st.className = "status err"; st.textContent = "No se pudo: " + err.message; }
+    await simsConBoton(b, async () => {
+      try {
+        await accionSimAdmin(retirar ? { accion: "retirar_de_registro", numero: it.x.numero, tecnico: "Oficina" } : { accion: "editar_instalada", numero: it.x.numero, tecnico: "Oficina", campos: { estado_linea: "Inactivo" } });
+        const leido = await cargarControlSims();
+        const ahora = controlSims.instaladas.find((x) => soloDigitosLinea(x.numero) === soloDigitosLinea(it.x.numero));
+        const ok = leido && (retirar ? !ahora : ahora && /inactiv/i.test(ahora.estado_linea || ""));
+        comCalcular();
+        const t = !leido ? `${it.x.numero}: se mandó, pero no se pudo verificar. Tocá «↻ Recargar».` : ok ? `✓ Verificado: ${it.x.numero} ${retirar ? "ya no está instalada en el cliente" : "figura inactiva"}. Quedó en el historial de la línea.` : `⚠ ${it.x.numero}: se mandó pero en la APP no cambió. La corrección NO quedó asentada.`;
+        st.className = ok ? "status ok" : "status err"; st.textContent = t; avisoAdmin(t, ok ? "ok" : "err");
+      } catch (err) { st.className = "status err"; st.textContent = "No se pudo: " + err.message; avisoAdmin("No se pudo: " + err.message, "err"); }
+    });
   }));
   st.className = "status ok";
   st.textContent = `${comEstado.archivo}: ${ultimo.size} abonados en el reporte (columnas «${comEstado.colAbonado}» y «${comEstado.colFecha}»). ${activas.length} SIMs instaladas activas.`;
@@ -6427,7 +6571,7 @@ document.getElementById("simsComArchivo").addEventListener("change", (ev) => {
   const reader = new FileReader();
   reader.onload = async (e) => {
     try {
-      if (!controlSims.instaladas.length) await cargarControlSims();
+      if (!await cargarControlSims()) throw new Error("no se pudieron leer las SIMs de la APP. Probá de nuevo.");
       await concAsegurarClientes();
       const wb = XLSX.read(e.target.result, { type: "array", cellDates: false });
       const filas = wb.SheetNames.flatMap((n) => XLSX.utils.sheet_to_json(wb.Sheets[n], { defval: "" }));
@@ -6449,7 +6593,7 @@ document.getElementById("simsConcArchivo").addEventListener("change", (ev) => {
   const reader = new FileReader();
   reader.onload = async (e) => {
     try {
-      if (!controlSims.instaladas.length && !controlSims.stock.length) await cargarControlSims();
+      if (!await cargarControlSims()) throw new Error("no se pudieron leer las SIMs de la APP (para no comparar contra una lista vacía, no se sigue). Probá de nuevo.");
       concAsegurarClientes();
       const wb = XLSX.read(e.target.result, { type: "array" });
       // Todas las hojas que tengan números de línea.
@@ -7605,7 +7749,7 @@ function renderRendicionesAdmin() {
 
   rendicionesAdminLista.querySelectorAll(".rendicion-rechazar-btn").forEach((btn) => {
     btn.addEventListener("click", async () => {
-      const motivo = prompt("¿Por qué se rechaza esta rendición? (se le avisa al técnico con este motivo)");
+      const motivo = await pedirTextoAdmin("¿Por qué se rechaza esta rendición? (se le avisa al técnico con este motivo)");
       if (motivo === null) return; // canceló
       btn.disabled = true;
       try {
@@ -8898,7 +9042,7 @@ async function borrarInstalacionAdmin(id, cliente, estado) {
   // mano. Para las abiertas (trabajo en curso, nada que perder salvo
   // lo cargado hasta ahora) alcanza con el confirm de siempre.
   if (estado === "cerrada") {
-    const escrito = prompt(`Esta instalación ya está CERRADA (trabajo terminado). Para borrarla de verdad, escribí el nombre del cliente tal cual aparece arriba:\n\n"${cliente}"`);
+    const escrito = await pedirTextoAdmin(`Esta instalación ya está CERRADA (trabajo terminado). Para borrarla de verdad, escribí el nombre del cliente tal cual aparece arriba:\n\n"${cliente}"`);
     if (escrito === null) return;
     if (escrito.trim() !== cliente.trim()) {
       alert("No coincide con el nombre del cliente — no se borró nada.");
@@ -9481,7 +9625,7 @@ function renderCroquisAdmin() {
     try {
       if (acc === "editar") { abrirEditorCroquisAdmin(c.id, cargarCroquisAdmin); return; }
       if (acc === "borrar") {
-        if (!confirm(`¿Borrar el croquis "${c.titulo || c.cliente}"? No se puede deshacer.`)) return;
+        if (!await confirmarAdmin(`¿Borrar el croquis "${c.titulo || c.cliente}"? No se puede deshacer.`)) return;
         const r = await fetch("/api/datos?coleccion=croquis", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ accion: "borrar", id: c.id }) });
         const d = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(d.error || "HTTP " + r.status);
@@ -9589,7 +9733,7 @@ async function planosDeInstalacionAdmin(id, caja, inst) {
       const c = lista[Number(b.dataset.i)];
       if (b.dataset.pi === "editar") { abrirEditorCroquisAdmin(c.id, () => planosDeInstalacionAdmin(id, caja, inst)); return; }
       if (b.dataset.pi === "borrar") {
-        if (!confirm(`¿Borrar el croquis "${c.titulo || "Croquis"}" de esta instalación? No se puede deshacer.`)) return;
+        if (!await confirmarAdmin(`¿Borrar el croquis "${c.titulo || "Croquis"}" de esta instalación? No se puede deshacer.`)) return;
         b.disabled = true;
         try { await borrarCroquisAdmin(c.id); await planosDeInstalacionAdmin(id, caja, inst); } catch (err) { alert("No se pudo borrar: " + err.message); b.disabled = false; }
         return;

@@ -101,7 +101,10 @@ async function enviarAccionSimConRespaldo(payload, token) {
     const existente = primero.data.linea_existente;
     let siguienteCuerpo;
     if (primero.data.certeza === "confirmada") {
-      const reemplazar = confirm(
+      // En el panel de la oficina se pregunta con un cartel de la página (el
+      // confirm() del navegador se puede bloquear y elegía "dejar las dos" solo).
+      const preguntar = typeof window !== "undefined" && typeof window.preguntarSimAsync === "function" ? window.preguntarSimAsync : (m) => confirm(m);
+      const reemplazar = await preguntar(
         `Este cliente ya tiene la línea N° ${existente.numero} de ${existente.empresa}` +
         `${existente.tipo ? " " + existente.tipo : ""}, a nombre de "${existente.cliente}".\n\n` +
         `Aceptar = reemplazarla (vuelve a tu stock).\nCancelar = dejar las dos líneas instaladas.`
