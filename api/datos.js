@@ -1273,12 +1273,21 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
       const yo = S.stockDePersona(sal.data, quien), arts = (cat.data && cat.data.articulos) || {}, sub = {};
       const codigos = new Set([...Object.keys(yo.tiene), ...yo.unidades.map((u) => u.c), ...[...yo.porRecibir, ...yo.devueltos].flatMap((e) => e.items.map((x) => x.c))]);
       codigos.forEach((c) => { const a = arts[c]; if (a) sub[c] = { c, d: a.d, tipo: a.tipo, medida: a.medida || "unidades", alias: a.alias || [], formatos: a.formatos || [] }; });
-      res.status(200).json({ nombre: quien, responsable: esResp, ...yo, articulos: sub });
+      const porAprobar = (((sal.data || {}).aprobar) || []).filter((x) => x.por === quien);
+      res.status(200).json({ nombre: quien, responsable: esResp, ...yo, articulos: sub, porAprobar });
+      return;
+    }
+    if (req.method === "GET" && q.catalogo_basico) {
+      // Para escanear lo que se retira de un cliente (cualquier técnico): solo lo necesario de cada artículo.
+      const { data: cat } = await leerArchivoDatos(STOCK_CAT, { articulos: {} });
+      const arts = {};
+      Object.values((cat && cat.articulos) || {}).forEach((a) => { if (!/^(sim|herramienta|no)$/.test(a.tipo)) arts[a.c] = { c: a.c, d: a.d, tipo: a.tipo, medida: a.medida || "unidades", alias: a.alias || [], formatos: a.formatos || [] }; });
+      res.status(200).json({ articulos: arts, proveedores: (cat && cat.proveedores) || {} });
       return;
     }
     if (!esResp) {
       const accion = cuerpo && cuerpo.accion;
-      if (req.method !== "POST" || !["confirmar_envio", "devolver", "leer_codigo_foto"].includes(accion)) { res.status(403).json({ error: "Necesitás el permiso «Responsable de stock»" }); return; }
+      if (req.method !== "POST" || !["confirmar_envio", "devolver", "leer_codigo_foto", "consumo_parte"].includes(accion)) { res.status(403).json({ error: "Necesitás el permiso «Responsable de stock»" }); return; }
     }
     if (req.method === "POST" && cuerpo && !esAdmin && SOLO_ADMIN.includes(cuerpo.accion)) { res.status(403).json({ error: "Solo desde el panel de administración" }); return; }
     if (req.method === "GET") {
@@ -1306,6 +1315,85 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
       if (pend.length) await stockConfirmarMovs(pend, "Stock: movimientos pendientes pasados al historial");
     } catch (e) { /* se reintenta en la próxima */ }
 
+    if (b.accion === "consumo_parte") {
+      // Lo que el técnico cargó en el parte: lo de su stock pasa al cliente; lo que no figuraba queda
+      // para que el responsable de stock lo apruebe; lo retirado (escaneado) entra a su stock.
+      const opId = String(b.op_id || "").slice(0, 80), cliente = String(b.cliente || "").replace(/\s+/g, " ").trim().slice(0, 120);
+      if (!cliente) { res.status(400).json({ error: "Falta el cliente del parte" }); return; }
+      const parte = String(b.parte || "").slice(0, 40), presupuesto = String(b.presupuesto || "").trim().slice(0, 30);
+      const destino = `${b.comodato ? "com" : "cli"}:${cliente}`, tec = `tec:${quien}`;
+      const { data: cat } = await leerArchivoDatos(STOCK_CAT, { articulos: {} });
+      let movsTodos = [], resumen = null, duplicado = false;
+      const r = await stockActualizar(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }, (sal) => {
+        if (opId && (sal.ops || []).includes(opId)) { duplicado = true; return { error: "duplicado", status: 200 }; }
+        let s2 = sal;
+        const movs = [], aprobar = [], instalados = [], retirados = [];
+        const motivo = `Parte${parte ? " N° " + parte : ""}`;
+        // 1) Usados de Mi stock: de a uno, así lo que no se pueda (ya no lo tiene) queda para aprobar.
+        (Array.isArray(b.usados) ? b.usados.slice(0, 200) : []).forEach((x) => {
+          const it = { c: S.codigoArticulo(x.c), cant: Number(x.cant) || 0, unidades: x.unidades || [] };
+          const m = S.moverStock(s2, [it], { tipo: "instalado_parte", de: tec, a: destino, por: quien, fecha: ahora, motivo, presupuesto }, cat);
+          if (m.error) aprobar.push({ c: it.c, cant: it.cant, unidades: it.unidades, texto: ((cat.articulos || {})[it.c] || {}).d || it.c, error: m.error });
+          else { s2 = m.saldos; movs.push(...m.movs); instalados.push(it.c); }
+        });
+        // 2) Retirados escaneados: del cliente al técnico.
+        (Array.isArray(b.retirados) ? b.retirados.slice(0, 200) : []).forEach((x) => {
+          const it = { c: S.codigoArticulo(x.c), cant: Number(x.cant) || 0, unidades: x.unidades || [] };
+          const m = S.moverStock(s2, [it], { tipo: "retirado_parte", de: destino, a: tec, por: quien, fecha: ahora, motivo: `${motivo}${x.fallado ? " · fallado: " + String(x.falla || "").slice(0, 120) : ""}`, deFlexible: true }, cat);
+          if (!m.error) { s2 = m.saldos; movs.push(...m.movs); retirados.push(it.c); }
+        });
+        // 3) Lo que no estaba en su stock: para aprobar.
+        if (sal.inicializado) (Array.isArray(b.sinStock) ? b.sinStock.slice(0, 200) : []).forEach((x) => aprobar.push({ c: S.codigoArticulo(x.c) || "", cant: Number(x.cant) || 1, unidades: x.unidades || [], texto: String(x.texto || "").slice(0, 160) }));
+        const nuevos = aprobar.map((x, i) => ({ id: `${Date.now().toString(36)}-a${i}`, fecha: ahora, por: quien, parte, cliente, destino, presupuesto, ...x }));
+        s2 = { ...s2, aprobar: [...nuevos, ...(sal.aprobar || [])].slice(0, 1000) };
+        if (opId) s2.ops = [opId, ...(sal.ops || [])].slice(0, 300);
+        movsTodos = movs;
+        resumen = { instalados: instalados.length, retirados: retirados.length, paraAprobar: nuevos.length };
+        return { data: s2, respuesta: resumen, movs };
+      }, `Stock: materiales del parte ${parte} (por ${quien})`);
+      if (duplicado) { res.status(200).json({ ok: true, duplicado: true }); return; }
+      if (!r.error) { await stockConfirmarMovs(movsTodos, `Stock: movimientos del parte ${parte} (por ${quien})`); await stockAprender(movsTodos, quien); }
+      if (!r.error && resumen && resumen.paraAprobar) {
+        try {
+          const { enviarASeleccionados } = require("../lib/push-sender");
+          const resp = (await tecnicos()).filter((t) => t.permisos && t.permisos.stock_responsable).map((t) => t.nombre);
+          if (resp.length) await enviarASeleccionados(resp, { titulo: "📦 Materiales para aprobar", cuerpo: `${quien} cargó en un parte ${resumen.paraAprobar} material(es) que no estaban en su stock (${cliente}).`, url: "/" });
+        } catch (e) { /* opcional */ }
+      }
+      responder(r);
+      return;
+    }
+    if (b.accion === "aprobar_consumo") {
+      // El responsable decide de dónde sale lo que el técnico usó y no estaba en su stock.
+      const decision = b.decision === "rechazar" ? "rechazar" : "aprobar";
+      const de = String(b.de || "ninguno"), motivo = String(b.motivo || "").replace(/\s+/g, " ").trim().slice(0, 200);
+      if (decision === "aprobar" && de !== "ninguno" && !/^(dep|tec:.{1,60}|veh:.{1,60})$/.test(de)) { res.status(400).json({ error: "Origen inválido" }); return; }
+      if (decision === "rechazar" && !motivo) { res.status(400).json({ error: "Falta el motivo del rechazo" }); return; }
+      const { data: cat } = await leerArchivoDatos(STOCK_CAT, { articulos: {} });
+      let movs = [];
+      const r = await stockActualizar(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }, (sal) => {
+        const x = (sal.aprobar || []).find((y) => y.id === b.id);
+        if (!x) return { error: "Ya se resolvió o no existe", status: 409 };
+        let s2 = sal;
+        movs = [];
+        const c = S.codigoArticulo(b.c || x.c), cant = Number(b.cant) > 0 ? Number(b.cant) : x.cant;
+        if (decision === "aprobar" && de !== "ninguno") {
+          if (!c) return { error: "Elegí de qué artículo es", status: 400 };
+          const m = S.moverStock(sal, [{ c, cant, unidades: Array.isArray(b.unidades) ? b.unidades : x.unidades }], { tipo: "instalado_parte", de, a: x.destino, por: quien, fecha: ahora, motivo: `Aprobado: parte${x.parte ? " N° " + x.parte : ""} de ${x.por}${motivo ? " · " + motivo : ""}`, presupuesto: x.presupuesto }, cat);
+          if (m.error) return { error: m.error, status: 409 };
+          s2 = m.saldos; movs = m.movs;
+        }
+        const cerrado = { ...x, decision, de: decision === "aprobar" ? de : "", c, cant, resuelto: ahora, resuelto_por: quien, ...(motivo ? { motivo_resolucion: motivo } : {}) };
+        s2 = { ...s2, aprobar: (sal.aprobar || []).filter((y) => y.id !== b.id), aprobados: [cerrado, ...(sal.aprobados || [])].slice(0, 300) };
+        return { data: s2, respuesta: { resuelto: cerrado }, movs };
+      }, `Stock: ${decision === "aprobar" ? "aprobó" : "rechazó"} material de un parte (por ${quien})`);
+      if (!r.error) await stockConfirmarMovs(movs, `Stock: material de parte aprobado (por ${quien})`);
+      if (!r.error && decision === "rechazar" && r.respuesta && r.respuesta.resuelto) {
+        try { const { enviarASeleccionados } = require("../lib/push-sender"); await enviarASeleccionados([r.respuesta.resuelto.por], { titulo: "📦 Material de un parte rechazado", cuerpo: `${r.respuesta.resuelto.texto || r.respuesta.resuelto.c} (${r.respuesta.resuelto.cliente}): ${motivo}`.slice(0, 200), url: "/" }); } catch (e) { /* opcional */ }
+      }
+      responder(r);
+      return;
+    }
     if (b.accion === "baja_serie") {
       // Un equipo identificado que ya no está (perdido, robado, roto, vendido sin registrar): sale con su N°.
       const t = S.limpiarCodigo(b.serie), motivo = String(b.motivo || "").replace(/\s+/g, " ").trim().slice(0, 200);

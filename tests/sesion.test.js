@@ -1504,6 +1504,32 @@ test("Stock: Melina entrega con escaneo, el técnico confirma «Recibí» (o con
     const ids = repo[`stock/movimientos-${mes}.json`].map((m) => m.id);
     assert.strictEqual(new Set(ids).size, ids.length);
     assert.ok(repo[`stock/movimientos-${mes}.json`].some((m) => m.tipo === "baja" && m.motivo === "Perdido"));
+    // El parte: lo de Mi stock pasa al cliente, lo retirado entra al técnico, lo que no tenía queda para aprobar
+    const sirJuan = repo["stock/saldos.json"].ubic["tec:Juan"]["20208"];
+    const cuerpoParte = { accion: "consumo_parte", op_id: "parte-P77", parte: "P77", cliente: "Kiosco Pérez", presupuesto: "4521",
+      usados: [{ c: "20208", cant: 1 }, { c: "20825", cant: 1 }], retirados: [{ c: "20825", cant: 1, unidades: ["GH777AA001"], fallado: true, falla: "No anda" }], sinStock: [{ texto: "Cable 4 hilos", cant: 10 }] };
+    r = await post(cuerpoParte, juan);
+    assert.deepStrictEqual([r.cuerpo.instalados, r.cuerpo.retirados, r.cuerpo.paraAprobar], [1, 1, 2], JSON.stringify(r.cuerpo));
+    let salP = repo["stock/saldos.json"];
+    assert.deepStrictEqual([salP.ubic["tec:Juan"]["20208"], salP.ubic["cli:Kiosco Pérez"]["20208"], salP.unidades.GH777AA001.u], [sirJuan - 1, 1, "tec:Juan"]);
+    assert.deepStrictEqual(salP.aprobar.map((x) => [x.por, x.texto, x.cant, x.parte]).sort(), [["Juan", "Cable 4 hilos", 10, "P77"], ["Juan", "TECLADO K10LH/V", 1, "P77"]]);
+    r = await post(cuerpoParte, juan);
+    assert.ok(r.cuerpo.duplicado, "el mismo parte no descuenta dos veces");
+    const mioJ = (await get({ mio: 1 }, juan)).cuerpo;
+    assert.strictEqual(mioJ.porAprobar.length, 2);
+    // Aprobar: el cable no se descuenta; el teclado salió del depósito (con su N°)
+    const apCable = salP.aprobar.find((x) => x.texto === "Cable 4 hilos"), apTec = salP.aprobar.find((x) => x.c === "20825");
+    assert.strictEqual((await post({ accion: "aprobar_consumo", id: apCable.id, decision: "aprobar", de: "ninguno" }, juan)).statusCode, 403);
+    r = await post({ accion: "aprobar_consumo", id: apCable.id, decision: "aprobar", de: "ninguno" }, melina);
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    r = await post({ accion: "aprobar_consumo", id: apTec.id, decision: "aprobar", de: "dep", c: "20825", cant: 1 }, melina);
+    assert.strictEqual(r.statusCode, 409, "con N° registrados en el depósito hay que decir cuál");
+    const serieDep = S2.seriesEn(repo["stock/saldos.json"], "dep", "20825")[0];
+    r = await post({ accion: "aprobar_consumo", id: apTec.id, decision: "aprobar", de: "dep", c: "20825", cant: 1, unidades: [serieDep] }, melina);
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    salP = repo["stock/saldos.json"];
+    assert.deepStrictEqual([salP.aprobar.length, salP.unidades[serieDep].u, salP.aprobados.length], [0, "cli:Kiosco Pérez", 2]);
+    assert.ok(repo[`stock/movimientos-${mes}.json`].some((m) => m.tipo === "instalado_parte" && m.presupuesto === "4521"));
     // Archivo de saldos dañado: no se escribe encima
     const sano = repo["stock/saldos.json"];
     repo["stock/saldos.json"] = "{roto";

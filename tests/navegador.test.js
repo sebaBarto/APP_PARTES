@@ -6039,3 +6039,94 @@ test("Un solo lugar: si hay equipos con N° en el depósito hay que decir cuál 
   assert.deepStrictEqual(p2.erroresPagina, []);
   await p2.ctx.close();
 });
+
+test("El parte y el stock: el técnico usa material de Mi stock (con N° de serie), escanea lo retirado, lo que no tenía queda para aprobar y el depósito lo aprueba", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  const S = require(require("path").join(__dirname, "..", "stock-utils.js"));
+  const catalogo = { articulos: { 23940: { c: "23940", d: "W-AJAX PIR INFRARROJO", tipo: "unidad", formatos: ["AA9999"] }, 20208: { c: "20208", d: "SIRENA MP100", tipo: "cantidad" } } };
+  let saldos = { inicializado: "2026-11-01", ubic: { "tec:Juan": { 23940: 2, 20208: 3 }, dep: { 23940: 2 } }, unidades: { AJ0001: { c: "23940", u: "tec:Juan" }, AJ0002: { c: "23940", u: "tec:Juan" }, AJ0005: { c: "23940", u: "dep" }, AJ0006: { c: "23940", u: "dep" } }, envios: [], aprobar: [] };
+  let quien = "Juan";
+  const posts = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    const json = (o, st) => route.fulfill({ status: st || 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (!u.includes("coleccion=stock")) return json([]);
+    if (req.method() === "GET") {
+      if (u.includes("mio=1")) return json({ nombre: quien, ...S.stockDePersona(saldos, quien), articulos: catalogo.articulos, porAprobar: saldos.aprobar.filter((x) => x.por === quien) });
+      if (u.includes("catalogo_basico=1")) return json({ articulos: catalogo.articulos });
+      return json({ catalogo, saldos, conciliacion: { marcas: [], corridas: [] } });
+    }
+    const b = JSON.parse(req.postData()); posts.push(b);
+    if (b.accion === "consumo_parte") {
+      let s2 = saldos;
+      b.usados.forEach((x) => { const m = S.moverStock(s2, [x], { tipo: "instalado_parte", de: "tec:Juan", a: "cli:" + b.cliente }, catalogo); if (!m.error) s2 = m.saldos; });
+      b.retirados.forEach((x) => { const m = S.moverStock(s2, [x], { tipo: "retirado_parte", de: "cli:" + b.cliente, a: "tec:Juan", deFlexible: true }, catalogo); if (!m.error) s2 = m.saldos; });
+      s2.aprobar = b.sinStock.map((x, i) => ({ id: "ap" + i, fecha: new Date().toISOString(), por: "Juan", parte: b.parte, cliente: b.cliente, destino: "cli:" + b.cliente, texto: x.texto, cant: x.cant, unidades: [] }));
+      saldos = s2;
+      return json({ ok: true, instalados: b.usados.length, retirados: b.retirados.length, paraAprobar: b.sinStock.length });
+    }
+    if (b.accion === "aprobar_consumo") {
+      const x = saldos.aprobar.find((y) => y.id === b.id);
+      if (b.decision === "aprobar" && b.de !== "ninguno") { const m = S.moverStock(saldos, [{ c: b.c, cant: b.cant, unidades: b.unidades }], { de: b.de, a: x.destino }, catalogo); if (m.error) return json({ error: m.error }, 409); saldos = m.saldos; }
+      saldos.aprobar = saldos.aprobar.filter((y) => y.id !== b.id);
+      return json({ ok: true });
+    }
+    return json({ ok: true });
+  });
+  await page.goto(base + "/index.html");
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { localStorage.removeItem("stock_cola"); tecnicoLogueado = "Juan"; tecnicosPasswords = { Melina: "", Juan: "" }; tecnicosPermisos = { Melina: { stock_responsable: true }, Juan: {} }; refrescarAccesosPorPermisos(); showScreen("form"); });
+  // Usé material de mi stock: 1 infrarrojo (elige cuál) y 2 sirenas
+  await page.click("#parteStockUsadosBtn");
+  await page.waitForSelector('#stkPanelTengo [data-usar="23940"]');
+  await page.click('#stkPanelTengo [data-usar="23940"]');
+  await page.click('#stkPanelTengo [data-usar="20208"]');
+  await page.click('#stkPanelTengo [data-usar="20208"]');
+  await page.click("#stkPanelListoBtn");
+  assert.match(await page.textContent(".dlg-app .dlg-texto"), /Decí cuáles usaste/);
+  await page.click(".dlg-app .dlg-si");
+  await page.click("#stkPanelCanasta [data-elegir-n]");
+  await page.check('.stk-elegir-lista input[value="AJ0002"]');
+  await page.click(".dlg-app .dlg-si");
+  await page.click("#stkPanelListoBtn");
+  await page.waitForSelector("#stkPanel.hidden", { state: "attached" });
+  assert.match(await page.textContent("#parteStockUsadosLista"), /W-AJAX PIR INFRARROJO x1.*N° AJ0002.*SIRENA MP100 x2/s);
+  // Retiré un equipo: etiqueta SAT + N° de serie, fallado
+  await page.click("#parteStockRetiradosBtn");
+  await page.waitForFunction(() => stkPanelCatalogoBasico);
+  await page.fill("#stkPanelCodigo", "000239402779"); await page.press("#stkPanelCodigo", "Enter");
+  await page.fill("#stkPanelCodigo", "AJ9999"); await page.press("#stkPanelCodigo", "Enter");
+  await page.waitForSelector("#stkPanelCanasta .stk-chip");
+  await page.check("#stkPanelFallado");
+  await page.fill("#stkPanelFalla", "No detecta");
+  await page.click("#stkPanelListoBtn");
+  assert.match(await page.textContent("#parteStockRetiradosLista"), /W-AJAX PIR INFRARROJO x1.*fallado.*AJ9999/s);
+  // Algo que no figura (catálogo de materiales)
+  await page.evaluate(() => { agregarMaterialRapido("usados", "Cable 4 hilos"); });
+  const datos = await page.evaluate(() => { document.getElementById("f_cliente").value = "Kiosco Pérez"; return getFormData(); });
+  assert.match(datos.materiales, /W-AJAX PIR INFRARROJO x1 \(N° AJ0002\), SIRENA MP100 x2, Cable 4 hilos x1/);
+  assert.deepStrictEqual(datos.stock_parte.sinStock, [{ texto: "Cable 4 hilos", cant: 1 }]);
+  await page.evaluate((d) => registrarStockDelParte({ ...d, numero_servicio: "P77" }, "P77"), datos);
+  await page.waitForFunction(() => /quedan para que los apruebe el depósito/.test(document.getElementById("toast").textContent));
+  const env = posts.find((p) => p.accion === "consumo_parte");
+  assert.deepStrictEqual([env.op_id, env.usados, env.retirados[0].fallado], ["parte-P77", [{ c: "23940", cant: 1, unidades: ["AJ0002"] }, { c: "20208", cant: 2, unidades: [] }], true]);
+  assert.deepStrictEqual([saldos.unidades.AJ0002.u, saldos.ubic["tec:Juan"]["20208"], saldos.unidades.AJ9999.u], ["cli:Kiosco Pérez", 1, "tec:Juan"]);
+  // Mi stock muestra lo que espera aprobación
+  await page.evaluate(() => showScreen("home"));
+  await page.click("#tileMiStockBtn");
+  await page.waitForFunction(() => /Cargaste en partes y no estaba en tu stock/.test(document.getElementById("miStockDevueltos").textContent));
+  // Melina lo aprueba sin descontar
+  quien = "Melina";
+  await page.evaluate(() => { tecnicoLogueado = "Melina"; refrescarAccesosPorPermisos(); showScreen("home"); });
+  await page.click("#tileDepositoBtn");
+  await page.waitForFunction(() => depDatos && depDatos.saldos);
+  await page.click('#depModos [data-modo="recibir"]');
+  await page.waitForSelector("#depAprobar .stk-envio");
+  await page.selectOption("#depAprobar [data-origen]", "ninguno");
+  await page.click("#depAprobar [data-aprobar]");
+  await page.waitForFunction(() => !document.querySelector("#depAprobar .stk-envio"));
+  assert.deepStrictEqual(posts.at(-1), { accion: "aprobar_consumo", id: "ap0", decision: "aprobar", de: "ninguno", c: "", cant: 1, unidades: [] });
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

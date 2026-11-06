@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.52.0";
+const APP_VERSION = "4.53.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -845,6 +845,7 @@ function armarBorrador() {
     materiales_agregados: materialesAgregados,
     materiales_retirados: document.getElementById("f_materiales_retirados").value,
     materiales_retirados_agregados: materialesRetiradosAgregados,
+    parte_stock: parteStock,
     importe: document.getElementById("f_importe").value,
     costo_final: document.getElementById("f_costo_final").value,
     descuento_tipo: (Array.from(descuentoRadios).find((r) => r.checked) || {}).value || "0",
@@ -917,6 +918,8 @@ function restaurarBorradorSiExiste(numeroServicio) {
   document.getElementById("f_materiales_retirados").value = b.materiales_retirados || "";
   materialesRetiradosAgregados = Array.isArray(b.materiales_retirados_agregados) ? b.materiales_retirados_agregados : [];
   renderMaterialesRetiradosAgregados();
+  parteStock = b.parte_stock && Array.isArray(b.parte_stock.usados) ? b.parte_stock : { usados: [], retirados: [] };
+  try { pintarParteStock(); } catch (e) { /* aún no cargó */ }
   document.getElementById("f_importe").value = b.importe || "";
   document.getElementById("f_costo_final").value = b.costo_final || "";
   const radioDescuento = Array.from(descuentoRadios).find((r) => r.value === (b.descuento_tipo || "0"));
@@ -3342,6 +3345,7 @@ const simInstalarSelect = document.getElementById("simInstalarSelect");
 
 let materialesCatalogo = MATERIALES_CATALOGO_RESPALDO;
 let materialesAgregados = [];
+let parteStock = { usados: [], retirados: [] }; // materiales del parte que salen de Mi stock / retirados escaneados
 
 async function cargarMaterialesCatalogo() {
   try {
@@ -3422,7 +3426,8 @@ agregarMaterialBtn.addEventListener("click", () => {
 });
 
 function getMaterialesUtilizados() {
-  const agregados = materialesAgregados.map((item) => `${item.modelo} x${item.cantidad}`);
+  const deStock = parteStock.usados.map((x) => `${x.d} x${stkFmtN(x.cant)}${x.unidades.length ? ` (N° ${x.unidades.join(", ")})` : ""}`);
+  const agregados = [...deStock, ...materialesAgregados.map((item) => `${item.modelo} x${item.cantidad}`)];
   const otros = document.getElementById("f_materiales").value.trim();
   return [...agregados, otros].filter(Boolean).join(", ");
 }
@@ -3695,7 +3700,8 @@ agregarMaterialRetiradoBtn.addEventListener("click", () => {
 });
 
 function getMaterialesRetirados() {
-  const agregados = materialesRetiradosAgregados.map((item) => `${item.modelo} x${item.cantidad}`);
+  const deStock = parteStock.retirados.map((x) => `${x.d} x${stkFmtN(x.cant)}${x.unidades.length ? ` (N° ${x.unidades.join(", ")})` : ""}${x.fallado ? " — fallado" : ""}`);
+  const agregados = [...deStock, ...materialesRetiradosAgregados.map((item) => `${item.modelo} x${item.cantidad}`)];
   const otros = document.getElementById("f_materiales_retirados").value.trim();
   return [...agregados, otros].filter(Boolean).join(", ");
 }
@@ -3710,8 +3716,8 @@ function categoriaDeModelo(modelo) {
 }
 
 function armarMovimientosDeStock(instaladosParam, retiradosParam) {
-  const instalados = instaladosParam || materialesAgregados;
-  const retirados = retiradosParam || materialesRetiradosAgregados;
+  const instalados = [...(instaladosParam || materialesAgregados), ...parteStock.usados.map((x) => ({ modelo: x.d, cantidad: x.cant }))];
+  const retirados = [...(retiradosParam || materialesRetiradosAgregados), ...parteStock.retirados.map((x) => ({ modelo: x.d, cantidad: x.cant }))];
   const porModelo = {};
   instalados.forEach((item) => {
     if (!porModelo[item.modelo]) porModelo[item.modelo] = { modelo: item.modelo, categoria: categoriaDeModelo(item.modelo), cantidad_instalada: 0, cantidad_retirada: 0, es_manual: false };
@@ -4291,6 +4297,12 @@ function getFormData() {
     observaciones: document.getElementById("f_observaciones").value.trim(),
     imprevisto: getImprevistoTexto(),
     claves: clavesAgregadas,
+    // Stock: lo de Mi stock se descuenta; lo cargado con el catálogo de materiales queda para aprobar.
+    stock_parte: {
+      usados: parteStock.usados.map((x) => ({ c: x.c, cant: x.cant, unidades: x.unidades })),
+      retirados: parteStock.retirados.map((x) => ({ c: x.c, cant: x.cant, unidades: x.unidades, fallado: !!x.fallado, falla: x.falla || "" })),
+      sinStock: materialesAgregados.map((m) => ({ texto: m.modelo, cant: m.cantidad })),
+    },
   };
 }
 
@@ -4329,6 +4341,8 @@ function resetForm() {
   formaPagoChecks.forEach((c) => { c.checked = false; });
   materialesAgregados = [];
   renderMaterialesAgregados();
+  parteStock = { usados: [], retirados: [] };
+  try { pintarParteStock(); } catch (e) { /* aún no cargó */ }
   matCategoriaSelect.value = "";
   matModeloSelect.innerHTML = '<option value="" disabled selected>Elegí primero una categoría</option>';
   matModeloSelect.disabled = true;
@@ -4671,6 +4685,8 @@ async function intentarEnviarParte(payload, interactivo) {
       imprevisto: data.imprevisto,
     });
     oficinaOk = true;
+    // Stock: lo usado de Mi stock pasa al cliente (si no hay señal, queda en cola y se manda solo).
+    try { registrarStockDelParte(data, idParte); } catch (e) { console.error("Stock del parte:", e); }
     // Se anota en la memoria local del historial, así el inicio pasa
     // enseguida al servicio que sigue sin esperar a recargar.
     try { historialCache.unshift({ numero_servicio: data.numero_servicio || "", cliente: data.cliente || "", fecha: data.fecha || fechaLocalISO(), tecnico: data.tecnico || tecnicoLogueado || "" }); } catch (e) { /* sin historial */ }
@@ -18626,8 +18642,11 @@ function pintarMiStock() {
   document.getElementById("miStockDevolverCaja").classList.toggle("hidden", !tengo.length);
   miStockCanasta.render();
   document.getElementById("miStockDevolverBtn").disabled = !miStockCanasta.items().length;
+  const pa = miStock.porAprobar || [];
+  document.getElementById("miStockDevueltos").dataset.aprobar = pa.length;
   const dev = miStock.devueltos || [];
-  document.getElementById("miStockDevueltos").innerHTML = dev.length ? `<h3 class="stk-h">Devolviste (falta que el depósito confirme)</h3>` + dev.map((e) => `<div class="stk-envio"><small>${escapeHtml(cuando(e.fecha))}${e.motivo ? " · " + escapeHtml(e.motivo) : ""}</small>${items(e, false)}</div>`).join("") : "";
+  document.getElementById("miStockDevueltos").innerHTML = (dev.length ? `<h3 class="stk-h">Devolviste (falta que el depósito confirme)</h3>` + dev.map((e) => `<div class="stk-envio"><small>${escapeHtml(cuando(e.fecha))}${e.motivo ? " · " + escapeHtml(e.motivo) : ""}</small>${items(e, false)}</div>`).join("") : "")
+    + (pa.length ? `<h3 class="stk-h">Cargaste en partes y no estaba en tu stock (lo revisa el depósito)</h3>` + pa.map((x) => `<div class="stk-parte-item"><span>${escapeHtml(x.texto || x.c)} <b>x${stkFmtN(x.cant)}</b><small style="font-family:inherit;">${escapeHtml(x.cliente)}${x.parte ? ` · parte ${escapeHtml(x.parte)}` : ""}</small></span></div>`).join("") : "");
 }
 conectarCasilleroStock(document.getElementById("miStockCodigo"), null, miStockCanasta, miStockCatalogo);
 document.getElementById("miStockEscanearBtn").addEventListener("click", () => abrirEscanerStock({ titulo: "Devolver al depósito", leerCuadro: (t) => miStockCanasta.leerCuadro(t), estado: () => miStockCanasta.estado(), usar: (t) => miStockCanasta.agregarCodigo(t), describir: (t) => miStockCanasta.describir(t) }));
@@ -18668,7 +18687,7 @@ async function actualizarBadgeStock(forzar) {
   try {
     const d = await stkApi("GET", "");
     depDatos = d;
-    const n = ((d.saldos || {}).envios || []).filter((e) => e.a === "dep").length, b = document.getElementById("depositoBadge");
+    const n = ((d.saldos || {}).envios || []).filter((e) => e.a === "dep").length + ((d.saldos || {}).aprobar || []).length, b = document.getElementById("depositoBadge");
     b.textContent = String(n); b.classList.toggle("hidden", !n);
   } catch (e) { /* nada */ }
 }
@@ -18760,6 +18779,7 @@ function depMostrarModo() {
     document.getElementById("depRecibirDeCaja").classList.toggle("hidden", t === "proveedor");
     document.getElementById("depFalladoCaja").classList.toggle("hidden", t === "proveedor");
     depPintarDevoluciones();
+    depPintarAprobar();
   }
   if (depModo === "consultar") depPintarEnCamino();
   if (depModo === "inventario") depPintarInventario();
@@ -18972,6 +18992,47 @@ document.getElementById("miStockFallado").addEventListener("change", (e) => { do
 document.getElementById("depInvTipo").addEventListener("change", () => { document.getElementById("depInvSelect").value = ""; depPintarInventario(); depCanasta.render(); });
 document.getElementById("depInvSelect").addEventListener("change", () => { depPintarInventario(); depCanasta.render(); });
 
+// Materiales de partes que no estaban en el stock del técnico: el responsable dice de dónde salieron.
+function depPintarAprobar() {
+  const cont = document.getElementById("depAprobar"); if (!cont) return;
+  const a = depCatalogo().articulos || {}, lista = depSaldos().aprobar || [];
+  cont.innerHTML = lista.length ? `<h3 class="stk-h">Materiales de partes para aprobar (${lista.length})</h3><p class="stk-ayuda">Los cargó un técnico en un parte y no estaban en su stock. Decí de dónde salieron; si es consumible o no era de SAT, «No descontar».</p>` + lista.map((x) => `<div class="stk-envio" data-id="${escapeHtml(x.id)}">
+    <b>${escapeHtml(x.texto || (a[x.c] || {}).d || x.c)} ×${stkFmtN(x.cant)}</b><small>${escapeHtml(x.por)} · ${escapeHtml(x.cliente)}${x.parte ? ` · parte ${escapeHtml(x.parte)}` : ""} · ${escapeHtml(new Date(x.fecha).toLocaleDateString("es-AR"))}</small>
+    ${x.error ? `<small class="stk-fallado">${escapeHtml(x.error)}</small>` : ""}
+    <div style="margin:6px 0;">Artículo: <b data-art>${x.c && a[x.c] ? escapeHtml(a[x.c].d) : "sin elegir"}</b> <button type="button" class="stk-link" data-elegir-art>Elegir</button></div>
+    <div class="field-group" style="margin:4px 0;"><select class="field-input" data-origen><option value="dep">Salió del depósito</option><option value="tec:${escapeHtml(x.por)}">Lo tenía ${escapeHtml(x.por)} (sin registrar)</option><option value="ninguno">No descontar (consumible o no era de SAT)</option></select></div>
+    <div class="stk-envio-btns"><button type="button" class="btn btn-primary btn-small" data-aprobar>Aprobar</button><button type="button" class="btn btn-secondary btn-small" data-rechazar>Rechazar</button></div></div>`).join("") : "";
+  cont.querySelectorAll(".stk-envio").forEach((div) => {
+    const x = lista.find((y) => y.id === div.dataset.id);
+    let c = x.c && a[x.c] ? x.c : "";
+    div.querySelector("[data-elegir-art]").addEventListener("click", async () => { const e2 = await elegirArticuloStock(depCatalogo(), `¿Qué artículo es «${x.texto || x.c}»?`); if (e2) { c = e2; div.querySelector("[data-art]").textContent = a[c].d; } });
+    div.querySelector("[data-aprobar]").addEventListener("click", async (ev) => {
+      const btn = ev.currentTarget, de = div.querySelector("[data-origen]").value;
+      if (de !== "ninguno" && !c) { showToast("Elegí de qué artículo es"); return; }
+      let unidades = x.unidades || [];
+      if (de !== "ninguno" && (a[c] || {}).tipo === "unidad") {
+        const libres = seriesEn(depSaldos(), de, c).filter((t) => !unidades.includes(t));
+        const faltan = controlarSalidaConSerie(depSaldos(), de, [{ c, cant: x.cant, unidades }], depCatalogo());
+        if (faltan.length) {
+          const elegidos = await elegirVariasSeries(`${a[c].d}: ¿cuál${x.cant > 1 ? "es" : ""} se instaló?`, libres, faltan[0].faltan);
+          if (!elegidos.length) return;
+          unidades = [...unidades, ...elegidos];
+        }
+      }
+      btn.disabled = true;
+      try { await stkApi("POST", "", { accion: "aprobar_consumo", id: x.id, decision: "aprobar", de, c, cant: x.cant, unidades }); showToast("✓ Aprobado"); }
+      catch (err) { showToast("No se pudo: " + err.message); btn.disabled = false; return; }
+      await depCargar();
+    });
+    div.querySelector("[data-rechazar]").addEventListener("click", async () => {
+      const motivo = await pedirTextoApp("¿Por qué lo rechazás? (le llega al técnico)", "");
+      if (!motivo || !motivo.trim()) return;
+      try { await stkApi("POST", "", { accion: "aprobar_consumo", id: x.id, decision: "rechazar", motivo: motivo.trim() }); showToast("Rechazado"); }
+      catch (err) { showToast("No se pudo: " + err.message); return; }
+      await depCargar();
+    });
+  });
+}
 function depPintarDevoluciones() {
   const a = depCatalogo().articulos || {}, d = (c) => (a[c] || {}).d || c;
   const lista = (depSaldos().envios || []).filter((e) => e.a === "dep");
@@ -19040,3 +19101,110 @@ document.getElementById("tileDepositoBtn").addEventListener("click", () => {
   depCargar();
 });
 document.getElementById("volverDeDepositoBtn").addEventListener("click", () => { if (stkEscanerAbierto) stkEscanerAbierto.cerrar(); showScreen("home"); actualizarBadgeStock(true); });
+
+
+// ---------- El parte y el stock ----------
+// «Usé material de mi stock»: se elige de lo que tiene (o se escanea) y al mandar el parte pasa al
+// cliente. «Retiré equipos»: se escanean y entran a su stock. Lo cargado con el catálogo de
+// materiales (no estaba en su stock) lo aprueba el responsable de stock.
+let stkPanelModo = "usados", stkPanelMio = null, stkPanelCatalogoBasico = null, stkPanelCanasta = null;
+const stkPanelCatalogo = () => (stkPanelModo === "usados" ? { articulos: (stkPanelMio && stkPanelMio.articulos) || {} } : stkPanelCatalogoBasico || { articulos: {} });
+const stkPanelSaldos = () => {
+  if (stkPanelModo !== "usados" || !stkPanelMio) return { ubic: {}, unidades: {} };
+  const u = {};
+  (stkPanelMio.unidades || []).forEach((x) => { u[x.tracking] = { c: x.c, u: `tec:${stkPanelMio.nombre}` }; });
+  // Lo ya cargado en este parte no se puede volver a usar.
+  const ubic = { ...(stkPanelMio.tiene || {}) };
+  parteStock.usados.forEach((x) => { ubic[x.c] = Math.max(0, (ubic[x.c] || 0) - x.cant); x.unidades.forEach((t) => { delete u[t]; }); });
+  return { ubic: { [`tec:${stkPanelMio.nombre}`]: ubic }, unidades: u };
+};
+async function abrirPanelStockParte(modo) {
+  stkPanelModo = modo;
+  const panel = document.getElementById("stkPanel");
+  document.getElementById("stkPanelTitulo").textContent = modo === "usados" ? "Material de mi stock" : "Equipos que retiré";
+  document.getElementById("stkPanelAyuda").textContent = modo === "usados"
+    ? "Tocá «Usar» en lo que instalaste o escaneá la etiqueta de SAT y el N° de serie de cada equipo."
+    : "Escaneá la etiqueta de SAT y el N° de serie de cada equipo que retiraste del cliente. Entran a tu stock.";
+  document.getElementById("stkPanelFalladoCaja").classList.toggle("hidden", modo !== "retirados");
+  document.getElementById("stkPanelFallado").checked = false; document.getElementById("stkPanelFalla").value = ""; document.getElementById("stkPanelFalla").classList.add("hidden");
+  document.getElementById("stkPanelTengoTit").classList.toggle("hidden", modo !== "usados");
+  document.getElementById("stkPanelTengo").innerHTML = '<p class="stk-ayuda">Cargando…</p>';
+  document.getElementById("stkPanelResultados").innerHTML = "";
+  panel.classList.remove("hidden");
+  stkPanelCanasta = crearCanastaStock({
+    cont: document.getElementById("stkPanelCanasta"), catalogo: stkPanelCatalogo, saldos: stkPanelSaldos,
+    origen: () => (stkPanelModo === "usados" && stkPanelMio ? `tec:${stkPanelMio.nombre}` : ""), forma: () => "lote",
+  });
+  stkPanelCanasta.render();
+  try {
+    if (modo === "usados") stkPanelMio = await stkApi("GET", "mio=1");
+    else if (!stkPanelCatalogoBasico) stkPanelCatalogoBasico = await stkApi("GET", "catalogo_basico=1");
+  } catch (e) {
+    document.getElementById("stkPanelTengo").innerHTML = `<p class="stk-ayuda">No se pudo cargar (${escapeHtml(e.message)}). Si no hay señal, cargalo abajo con el catálogo de materiales.</p>`;
+    return;
+  }
+  pintarPanelTengo();
+}
+function pintarPanelTengo() {
+  const cont = document.getElementById("stkPanelTengo");
+  if (stkPanelModo !== "usados") { cont.innerHTML = ""; return; }
+  const sal = stkPanelSaldos(), tiene = sal.ubic[`tec:${stkPanelMio.nombre}`] || {}, a = stkPanelMio.articulos || {};
+  const lista = Object.entries(tiene).filter(([, n]) => n > 0).sort((x, y) => String((a[x[0]] || {}).d).localeCompare(String((a[y[0]] || {}).d), "es"));
+  cont.innerHTML = lista.length ? lista.map(([c, n]) => `<div class="stk-parte-item"><span>${escapeHtml((a[c] || {}).d || c)}<small>${escapeHtml(c)} · tenés ${stkFmtN(n)}</small></span><button type="button" class="btn btn-secondary btn-small" style="font-size:13px;padding:6px 12px;border:1px solid rgba(127,127,127,.5);border-radius:10px;" data-usar="${escapeHtml(c)}">Usar</button></div>`).join("")
+    : '<p class="stk-ayuda">No tenés nada a tu cargo. Si usaste material que no figura, cargalo abajo con el catálogo de materiales: lo revisa el depósito.</p>';
+  cont.querySelectorAll("[data-usar]").forEach((b) => b.addEventListener("click", async () => {
+    const r = await stkPanelCanasta.agregarArticulo(b.dataset.usar);
+    showToast(r.texto);
+    const libres = stkPanelCanasta.seriesLibres(b.dataset.usar);
+    if ((a[b.dataset.usar] || {}).tipo === "unidad" && libres.length === 1) {
+      // Si tiene uno solo con N°, es ese.
+      const l = stkPanelCanasta.lineas.find((x) => x.c === b.dataset.usar);
+      if (l && l.unidades.length < l.cant) { l.unidades.push(libres[0]); stkPanelCanasta.cambio(); }
+    }
+  }));
+}
+conectarCasilleroStock(document.getElementById("stkPanelCodigo"), document.getElementById("stkPanelResultados"), { get actual() { return stkPanelCanasta ? stkPanelCanasta.actual : ""; }, interpretar: (t) => stkPanelCanasta.interpretar(t), agregarCodigo: (t) => stkPanelCanasta.agregarCodigo(t), agregarArticulo: (c) => stkPanelCanasta.agregarArticulo(c) }, stkPanelCatalogo);
+document.getElementById("stkPanelEscanearBtn").addEventListener("click", () => abrirEscanerStock({ titulo: stkPanelModo === "usados" ? "Material de mi stock" : "Equipos retirados", leerCuadro: (t) => stkPanelCanasta.leerCuadro(t), estado: () => stkPanelCanasta.estado(), usar: (t) => stkPanelCanasta.agregarCodigo(t), describir: (t) => stkPanelCanasta.describir(t) }));
+document.getElementById("stkPanelFallado").addEventListener("change", (e) => { document.getElementById("stkPanelFalla").classList.toggle("hidden", !e.target.checked); });
+document.getElementById("stkPanelListoBtn").addEventListener("click", async () => {
+  const items = stkPanelCanasta ? stkPanelCanasta.items() : [];
+  const a = stkPanelCatalogo().articulos || {};
+  if (items.length && stkPanelModo === "usados") {
+    const faltan = stkPanelCanasta.faltanSeries();
+    if (faltan.length) { await dialogoApp(`Decí cuáles usaste:\n\n${faltan.map((f) => `• ${f.d}: faltan ${f.faltan} N° de serie (escanealos o tocá «Elegir el N° de serie de la lista»)`).join("\n")}`, { soloAceptar: true, aceptar: "Entendido" }); return; }
+  }
+  const fallado = stkPanelModo === "retirados" && document.getElementById("stkPanelFallado").checked, falla = document.getElementById("stkPanelFalla").value.trim();
+  if (fallado && !falla) { showToast("Escribí qué falla tiene"); return; }
+  const destino = stkPanelModo === "usados" ? parteStock.usados : parteStock.retirados;
+  items.forEach((x) => {
+    const l = destino.find((y) => y.c === x.c && !!y.fallado === fallado);
+    if (l) { l.cant = Math.round((l.cant + x.cant) * 1000) / 1000; l.unidades = [...new Set([...l.unidades, ...x.unidades])]; }
+    else destino.push({ c: x.c, d: (a[x.c] || {}).d || x.c, cant: x.cant, unidades: [...x.unidades], ...(fallado ? { fallado: true, falla } : {}) });
+  });
+  if (stkEscanerAbierto) stkEscanerAbierto.cerrar();
+  document.getElementById("stkPanel").classList.add("hidden");
+  pintarParteStock();
+  try { guardarBorradorActual(); } catch (e) { /* nada */ }
+});
+function pintarParteStock() {
+  const pintar = (id, lista, clave) => {
+    const cont = document.getElementById(id);
+    if (!cont) return;
+    cont.innerHTML = lista.map((x, i) => `<div class="stk-parte-item"><span>${escapeHtml(x.d)} <b>x${stkFmtN(x.cant)}</b>${x.fallado ? ' <span class="stk-fallado">fallado</span>' : ""}${x.unidades.length ? `<small>N° ${x.unidades.map(escapeHtml).join(", ")}</small>` : ""}</span><button type="button" data-quitar="${i}" aria-label="Sacar">✕</button></div>`).join("");
+    cont.querySelectorAll("[data-quitar]").forEach((b) => b.addEventListener("click", () => { parteStock[clave].splice(Number(b.dataset.quitar), 1); pintarParteStock(); try { guardarBorradorActual(); } catch (e) { /* nada */ } }));
+  };
+  pintar("parteStockUsadosLista", parteStock.usados, "usados");
+  pintar("parteStockRetiradosLista", parteStock.retirados, "retirados");
+}
+document.getElementById("parteStockUsadosBtn").addEventListener("click", () => abrirPanelStockParte("usados"));
+document.getElementById("parteStockRetiradosBtn").addEventListener("click", () => abrirPanelStockParte("retirados"));
+// Al mandar el parte: lo de Mi stock pasa al cliente; lo demás queda para aprobar. Con el mismo
+// op_id por parte, si se reintenta no se descuenta dos veces.
+function registrarStockDelParte(data, idParte) {
+  const sp = data && data.stock_parte;
+  if (!sp || !(sp.usados.length || sp.retirados.length || sp.sinStock.length) || !data.cliente) return;
+  const cuerpo = { accion: "consumo_parte", op_id: `parte-${idParte}`, parte: data.numero_servicio || idParte, cliente: data.cliente, presupuesto: data.numero_presupuesto || "", usados: sp.usados, retirados: sp.retirados, sinStock: sp.sinStock };
+  depEnviar(cuerpo, `Materiales del parte ${data.numero_servicio || idParte} (${data.cliente})`).then((r) => {
+    if (r && r.paraAprobar) showToast(`${r.paraAprobar} material(es) que no estaban en tu stock quedan para que los apruebe el depósito.`);
+  }).catch((e) => { console.error("No se pudo descontar el stock del parte:", e); });
+}

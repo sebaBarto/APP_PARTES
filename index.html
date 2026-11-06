@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#101820">
-<meta name="app-version" content="4.52.0">
+<meta name="app-version" content="4.53.0">
 <meta name="description" content="Digitalizador de partes técnicos de servicio">
 <title>Servicio Técnico SAT</title>
 <link rel="manifest" href="manifest.json">
@@ -1364,6 +1364,7 @@
       </div>
       <div data-dep="recibir" class="hidden">
         <div id="depDevoluciones"></div>
+        <div id="depAprobar"></div>
         <div class="field-group"><label class="field-label" for="depRecibirTipo">¿Qué entra al depósito?</label>
           <select class="field-input" id="depRecibirTipo"><option value="proveedor">Compra que llegó del proveedor</option><option value="cli">Retiro de un cliente (instalado)</option><option value="com">Retiro de un cliente (comodato)</option><option value="veh">Vuelve de un vehículo</option></select></div>
         <div class="field-group hidden" id="depRecibirDeCaja"><label class="field-label" for="depRecibirDe">¿De quién?</label>
@@ -2450,6 +2451,11 @@
 
       <div class="field-group">
         <label class="field-label" for="f_materiales">Materiales utilizados</label>
+        <div class="stk-parte">
+          <button type="button" class="btn btn-secondary btn-small" id="parteStockUsadosBtn">📦 Usé material de mi stock</button>
+          <div id="parteStockUsadosLista"></div>
+          <p class="stk-ayuda" style="margin:4px 0 0;">Lo de tu stock se descuenta solo. Lo que cargues abajo (no estaba en tu stock) lo revisa el depósito.</p>
+        </div>
 
         <div class="mat-rapidos-wrap hidden" id="matRapidosUsadosWrap">
           <p class="mat-rapidos-titulo">Más usados</p>
@@ -2511,6 +2517,10 @@
 
       <div class="field-group">
         <label class="field-label" for="f_materiales_retirados">Materiales retirados</label>
+        <div class="stk-parte">
+          <button type="button" class="btn btn-secondary btn-small" id="parteStockRetiradosBtn">📦 Retiré equipos (escanear)</button>
+          <div id="parteStockRetiradosLista"></div>
+        </div>
 
         <div class="mat-rapidos-wrap hidden" id="matRapidosRetiradosWrap">
           <p class="mat-rapidos-titulo">Más usados</p>
@@ -2850,6 +2860,23 @@
 
 </div>
 
+<div class="stk-panel hidden" id="stkPanel" role="dialog" aria-modal="true">
+  <div class="stk-panel-caja">
+    <div class="stk-panel-arriba"><b id="stkPanelTitulo">Mi stock</b><button type="button" class="btn btn-primary btn-small" id="stkPanelListoBtn">Listo</button></div>
+    <div class="stk-panel-cuerpo">
+      <p class="stk-ayuda" id="stkPanelAyuda"></p>
+      <div class="stk-escanear-fila"><button type="button" class="btn btn-primary btn-small" id="stkPanelEscanearBtn">📷 Escanear</button><input class="field-input" type="text" id="stkPanelCodigo" placeholder="Código o N° de serie" autocomplete="off" enterkeyhint="done"></div>
+      <div id="stkPanelResultados"></div>
+      <div id="stkPanelCanasta"></div>
+      <div id="stkPanelFalladoCaja" class="hidden">
+        <label class="stk-check"><input type="checkbox" id="stkPanelFallado"> Está fallado (lo devolvés a Garantía después)</label>
+        <input class="field-input hidden" type="text" id="stkPanelFalla" placeholder="¿Qué falla tiene?" autocomplete="off">
+      </div>
+      <h3 class="stk-h" id="stkPanelTengoTit">Lo que tenés</h3>
+      <div id="stkPanelTengo"></div>
+    </div>
+  </div>
+</div>
 <script src="sims-utils.js"></script>
 <script src="stock-utils.js"></script>
 <script src="croquis-utils.js"></script>

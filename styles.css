@@ -3826,3 +3826,15 @@ html .app .equipo-acciones .btn.eq-util.activo, .equipo-acciones .eq-util.activo
 .stk-hist { margin-top: 8px; border-left: 2px solid rgba(127,127,127,.35); padding-left: 10px; font-size: 13px; }
 .stk-hist div { padding: 3px 0; }
 .stk-hist small { opacity: .7; }
+.stk-parte { border: 1px dashed rgba(127,127,127,.5); border-radius: 12px; padding: 10px; margin: 0 0 10px; }
+.stk-parte .btn { width: 100%; }
+.stk-parte-item { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; padding: 6px 0; border-bottom: 1px solid rgba(127,127,127,.2); font-size: 14px; }
+.stk-parte-item small { display: block; opacity: .75; font-family: 'IBM Plex Mono', monospace; font-size: 12px; }
+.stk-parte-item button { width: auto; min-height: 0; padding: 2px 8px; border: 0; background: none; color: inherit; font-size: 16px; }
+.stk-panel { position: fixed; inset: 0; z-index: 9000; background: rgba(0,0,0,.55); display: flex; align-items: stretch; justify-content: center; }
+.stk-panel.hidden { display: none; }
+.stk-panel-caja { background: var(--paper, #F4F5F0); color: #101820; width: 100%; max-width: 640px; display: flex; flex-direction: column; }
+html[data-theme="night"] .stk-panel-caja { background: #16202b; color: #F4F5F0; }
+.stk-panel-arriba { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; border-bottom: 1px solid rgba(127,127,127,.3); }
+.stk-panel-arriba .btn { width: auto; }
+.stk-panel-cuerpo { flex: 1; overflow: auto; padding: 12px 16px 24px; }

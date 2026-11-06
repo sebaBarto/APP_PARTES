@@ -6700,7 +6700,7 @@ function stkRenderPedidos() {
 
 // --- Movimientos ---
 let stkMovs = [];
-const STK_MOV_TIPO = { inicial: "Saldo inicial", ajuste: "Ajuste", entrega: "Entrega a técnico (en camino)", recibido: "Recibido", diferencia: "Diferencia (vuelve)", rechazado: "Rechazado (vuelve)", devolucion: "Devolución", a_cliente: "A cliente", retiro: "Retiro de cliente", traspaso: "Traspaso", consumo: "Usado en cliente", ingreso: "Ingreso (compra)", inventario_series: "Inventario de N° de serie", baja: "Baja de un equipo", falla: "Fallado → Garantía", garantia_reparado: "Volvió reparado de garantía", garantia_reemplazo: "Reemplazo en garantía", garantia_rechazada: "Garantía rechazada (baja)" };
+const STK_MOV_TIPO = { inicial: "Saldo inicial", ajuste: "Ajuste", entrega: "Entrega a técnico (en camino)", recibido: "Recibido", diferencia: "Diferencia (vuelve)", rechazado: "Rechazado (vuelve)", devolucion: "Devolución", a_cliente: "A cliente", retiro: "Retiro de cliente", traspaso: "Traspaso", consumo: "Usado en cliente", ingreso: "Ingreso (compra)", inventario_series: "Inventario de N° de serie", baja: "Baja de un equipo", instalado_parte: "Instalado (parte)", retirado_parte: "Retirado de cliente (parte)", falla: "Fallado → Garantía", garantia_reparado: "Volvió reparado de garantía", garantia_reemplazo: "Reemplazo en garantía", garantia_rechazada: "Garantía rechazada (baja)" };
 async function stkCargarMovimientos() {
   const mesInp = document.getElementById("stkMovMes");
   if (!mesInp.value) mesInp.value = new Date().toISOString().slice(0, 7);
@@ -6823,12 +6823,22 @@ function stkRenderSalud() {
     <summary style="cursor:pointer;font-weight:700;color:${color[g.nivel]};">${escapeHtmlAdmin(g.titulo)} (${g.items.length})</summary>
     <p class="subtitle" style="margin:6px 0;">${escapeHtmlAdmin(g.ayuda)}</p>
     <table class="sims-tabla stk-tabla"><tbody>${g.items.slice(0, 300).map((x, i) => `<tr data-i="${i}"><td>${escapeHtmlAdmin(x.texto)}${x.series ? `<div class="stk-det">${x.series.map((t) => `<button type="button" class="btn-secondary-admin" data-baja="${escapeHtmlAdmin(t)}" style="width:auto;margin:2px;">Dar de baja ${escapeHtmlAdmin(t)}</button>`).join("")}</div>` : ""}</td>
-      <td class="stk-btns">${g.k === "revisar" ? `<button type="button" class="btn-secondary-admin" data-revisado="${escapeHtmlAdmin(x.id)}">✓ Revisado</button>` : ""}${(g.k === "negativo" || g.k === "otros" || g.k === "seriesDeMas") && x.c ? `<button type="button" class="btn-secondary-admin" data-ajustar="${escapeHtmlAdmin(x.c)}" data-ubic="${escapeHtmlAdmin(x.ubic)}">Ajustar cantidad</button>` : ""}</td></tr>`).join("")}</tbody></table></details>`).join("");
+      <td class="stk-btns">${g.k === "revisar" ? `<button type="button" class="btn-secondary-admin" data-revisado="${escapeHtmlAdmin(x.id)}">✓ Revisado</button>` : ""}${g.k === "aprobar" ? `<button type="button" class="btn-secondary-admin" data-aprobar-nd="${escapeHtmlAdmin(x.id)}">Aprobar sin descontar</button><button type="button" class="btn-secondary-admin" data-rechazar-ap="${escapeHtmlAdmin(x.id)}">Rechazar</button>` : ""}${(g.k === "negativo" || g.k === "otros" || g.k === "seriesDeMas") && x.c ? `<button type="button" class="btn-secondary-admin" data-ajustar="${escapeHtmlAdmin(x.c)}" data-ubic="${escapeHtmlAdmin(x.ubic)}">Ajustar cantidad</button>` : ""}</td></tr>`).join("")}</tbody></table></details>`).join("");
   cont.querySelectorAll("[data-revisado]").forEach((b) => b.addEventListener("click", (e) => simsConBoton(e.currentTarget, async () => {
     try { await stkPost({ accion: "salud_revisado", ids: [b.dataset.revisado] }); await stkLeer(); avisoAdmin("Marcado como revisado.", "ok"); } catch (err) { avisoAdmin("No se pudo: " + err.message, "err"); }
     stkMostrarVista();
   })));
   cont.querySelectorAll("[data-ajustar]").forEach((b) => b.addEventListener("click", () => stkAjustarDialogo(b.dataset.ajustar, b.dataset.ubic)));
+  cont.querySelectorAll("[data-aprobar-nd]").forEach((b) => b.addEventListener("click", (e) => simsConBoton(e.currentTarget, async () => {
+    try { await stkPost({ accion: "aprobar_consumo", id: b.dataset.aprobarNd, decision: "aprobar", de: "ninguno" }); await stkLeer(); avisoAdmin("Aprobado sin descontar.", "ok"); } catch (err) { avisoAdmin("No se pudo: " + err.message, "err"); }
+    stkMostrarVista();
+  })));
+  cont.querySelectorAll("[data-rechazar-ap]").forEach((b) => b.addEventListener("click", async () => {
+    const motivo = await pedirTextoAdmin("¿Por qué lo rechazás? (le llega al técnico)", "");
+    if (!motivo || !motivo.trim()) return;
+    try { await stkPost({ accion: "aprobar_consumo", id: b.dataset.rechazarAp, decision: "rechazar", motivo: motivo.trim() }); await stkLeer(); avisoAdmin("Rechazado.", "ok"); } catch (err) { avisoAdmin("No se pudo: " + err.message, "err"); }
+    stkMostrarVista();
+  }));
   cont.querySelectorAll("[data-baja]").forEach((b) => b.addEventListener("click", () => stkBajaSerie(b.dataset.baja)));
 }
 async function stkBajaSerie(t) {

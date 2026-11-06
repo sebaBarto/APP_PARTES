@@ -409,6 +409,9 @@
     // 4) Envíos sin confirmar hace más de 2 días
     grupo("envios", "aviso", "Envíos sin confirmar hace más de 2 días", "Material en camino que nadie confirmó: llamar al que tiene que tocar «Recibí».",
       (s.envios || []).filter((e) => t0 - new Date(e.fecha).getTime() > 2 * 864e5).map((e) => ({ texto: `${e.a === "dep" ? `Devolución de ${e.de.replace(/^tec:/, "")}` : `A ${e.a.replace(/^tec:/, "")}`}: ${e.items.map((x) => `${d(x.c)} ×${x.cant}`).join(", ")} (desde el ${new Date(e.fecha).toLocaleDateString("es-AR")})`, id: e.id })));
+    // 4b) Materiales de partes que no estaban en el stock del técnico
+    grupo("aprobar", "aviso", "Materiales de partes para aprobar", "El técnico los cargó en un parte y no estaban en su stock. Se aprueban en Depósito (de dónde salió) o acá sin descontar.",
+      (s.aprobar || []).map((x) => ({ texto: `${x.por}: ${x.texto || d(x.c)} ×${x.cant} → ${x.cliente}${x.parte ? ` (parte ${x.parte})` : ""}`, id: x.id })));
     // 5) Retiros que no figuraban en la APP
     grupo("revisar", "aviso", "Entraron cosas que no figuraban en la APP", "Retiros de clientes que la APP no tenía registrados. Revisá que estén bien y marcalos como revisados.",
       (s.revisar || []).map((x) => ({ texto: `${d(x.c)} ×${x.cant} de ${nombreUbicacion(x.de)} (${new Date(x.fecha).toLocaleDateString("es-AR")}, ${x.por || ""})`, id: x.id })));
