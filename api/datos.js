@@ -374,6 +374,10 @@ Marcá cada uno de estos elementos con su caja:
 Devolvé SOLO un JSON: {"objetos":[{"tipo":"puerta","box_2d":[ymin,xmin,ymax,xmax]}]}
 Las coordenadas van de 0 a 1000 (0,0 arriba a la izquierda de la imagen).
 No marques muebles, artefactos de baño o cocina, cotas, textos ni el rótulo. No inventes: si no estás seguro, no lo pongas.`;
+const PROMPT_LEER_CODIGOS = `Esta foto es de la etiqueta de un producto o de su caja (equipos de seguridad electrónica).
+Leé los códigos impresos como texto: los números y letras que están debajo o al lado de los códigos de barra, y los que tienen al lado S/N, Serial, Tracking, Model, P/N, Lote o un logo de la empresa SAT.
+Copiá cada código exactamente como está, sin espacios ni guiones agregados. Si algún carácter no se lee con seguridad, NO incluyas ese código (es mejor no devolverlo que devolverlo mal).
+Respondé solo con JSON: {"codigos":[{"texto":"...","rotulo":"lo que dice al lado (S/N, Tracking, Model...) o vacío"}]}`;
 async function detectarAberturasPlano(b, res) {
   const { GEMINI_API_KEY } = process.env;
   if (!GEMINI_API_KEY) { res.status(500).json({ error: "Falta configurar GEMINI_API_KEY en Vercel" }); return; }
@@ -1218,7 +1222,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
     }
     if (!esResp) {
       const accion = cuerpo && cuerpo.accion;
-      if (req.method !== "POST" || !["confirmar_envio", "devolver"].includes(accion)) { res.status(403).json({ error: "Necesitás el permiso «Responsable de stock»" }); return; }
+      if (req.method !== "POST" || !["confirmar_envio", "devolver", "leer_codigo_foto"].includes(accion)) { res.status(403).json({ error: "Necesitás el permiso «Responsable de stock»" }); return; }
     }
     if (req.method === "POST" && cuerpo && !esAdmin && SOLO_ADMIN.includes(cuerpo.accion)) { res.status(403).json({ error: "Solo desde el panel de administración" }); return; }
     if (req.method === "GET") {
@@ -1356,6 +1360,33 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
         return { data: { marcas, corridas }, respuesta: { marcas, corridas: corridas.slice(0, 24) } };
       }, `Stock: conciliación con Oficina (por ${quien})`);
       responder(r);
+      return;
+    }
+    if (b.accion === "leer_codigo_foto") {
+      // El lector no pudo con el código de barras (borroso, gastado): se leen los números impresos.
+      const { GEMINI_API_KEY } = process.env;
+      if (!GEMINI_API_KEY) { res.status(500).json({ error: "Falta configurar GEMINI_API_KEY en Vercel" }); return; }
+      const imagen = String(b.imagen || "").replace(/^data:[^,]*,/, "");
+      if (imagen.length < 1000) { res.status(400).json({ error: "Falta la foto" }); return; }
+      if (imagen.length > 4500000) { res.status(400).json({ error: "La foto es demasiado grande" }); return; }
+      const r2 = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": GEMINI_API_KEY },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ inline_data: { mime_type: "image/jpeg", data: imagen } }, { text: PROMPT_LEER_CODIGOS }] }],
+          generationConfig: { responseMimeType: "application/json", temperature: 0 },
+        }),
+      });
+      const d = await r2.json().catch(() => ({}));
+      if (!r2.ok) { res.status(r2.status === 429 ? 429 : 502).json({ error: r2.status === 429 ? "Se alcanzó el límite de consultas a la IA por ahora: escribilo a mano." : "No se pudo leer la foto" }); return; }
+      const texto = ((d.candidates && d.candidates[0] && d.candidates[0].content && d.candidates[0].content.parts) || []).map((p) => p.text || "").join("");
+      let resultado = null;
+      try { resultado = JSON.parse(texto.replace(/^```(json)?/i, "").replace(/```\s*$/, "").trim()); } catch (e) { resultado = null; }
+      const lista = Array.isArray(resultado) ? resultado : resultado && Array.isArray(resultado.codigos) ? resultado.codigos : [];
+      const vistos = new Set();
+      const codigos = lista.map((x) => ({ texto: S.limpiarCodigo(typeof x === "string" ? x : x && x.texto), rotulo: String((x && x.rotulo) || "").slice(0, 30) }))
+        .filter((x) => x.texto.length >= 4 && x.texto.length <= 40 && !S.esCodigoIgnorable(x.texto) && !vistos.has(x.texto) && vistos.add(x.texto)).slice(0, 8);
+      res.status(200).json({ ok: true, codigos });
       return;
     }
     if (b.accion === "alias") {

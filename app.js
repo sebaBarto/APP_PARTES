@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.47.1";
+const APP_VERSION = "4.48.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -18152,9 +18152,15 @@ function stkPitido(bien) {
 }
 
 // ---------- Escáner con la cámara ----------
-// alLeer(texto) devuelve { ok, texto, seguir } (seguir: no cerrar aunque esté en «de a uno»).
+// Queda abierto hasta «Listo». En cada cuadro puede haber varios códigos (la caja trae modelo,
+// N° de serie y QR): la canasta decide cuál usar. Un mismo código vuelve a contar recién cuando
+// salió de la vista (así se pueden pasar varias cajas iguales seguidas).
+// op: { titulo, leerCuadro(textos) -> { ok, texto } | null, estado() -> texto de "qué escanear ahora",
+//       usar(texto) -> { ok, texto } (código leído de la foto o escrito a mano), describir(texto) -> qué es }
+// Si el código de barras no se lee (gastado, borroso), a los 5 segundos se leen los números
+// impresos de la foto; si tampoco, se escribe a mano.
 let stkEscanerAbierto = null;
-async function abrirEscanerStock({ titulo, alLeer }) {
+async function abrirEscanerStock(op) {
   if (stkEscanerAbierto) return;
   if (!("BarcodeDetector" in window) || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     await dialogoApp("Este celular no puede leer códigos desde la APP. Escribí el código en el casillero (o usá un lector por Bluetooth: escribe solo).", { soloAceptar: true, aceptar: "Entendido" });
@@ -18165,23 +18171,77 @@ async function abrirEscanerStock({ titulo, alLeer }) {
   catch (e) { detector = new window.BarcodeDetector(); }
   const capa = document.createElement("div");
   capa.className = "stk-escaner";
-  let rafaga = false;
-  try { rafaga = localStorage.getItem("stock_rafaga") === "1"; } catch (e) { /* nada */ }
-  capa.innerHTML = `<div class="stk-escaner-arriba"><b></b><label><input type="checkbox" class="stk-rafaga"> Ráfaga</label></div>
+  capa.innerHTML = `<div class="stk-escaner-arriba"><b></b><span class="stk-escaner-total"></span></div>
+    <div class="stk-escaner-ahora"></div>
     <video playsinline muted autoplay></video><div class="stk-escaner-marco"></div>
-    <div class="stk-escaner-abajo"><div class="stk-escaner-ultimo">Apuntá al código de barras</div><button type="button" class="btn btn-primary stk-escaner-listo">Listo</button></div>`;
-  capa.querySelector("b").textContent = titulo || "Escanear";
-  const chk = capa.querySelector(".stk-rafaga"), ultimo = capa.querySelector(".stk-escaner-ultimo"), video = capa.querySelector("video");
-  chk.checked = rafaga;
-  chk.addEventListener("change", () => { rafaga = chk.checked; try { localStorage.setItem("stock_rafaga", rafaga ? "1" : "0"); } catch (e) { /* nada */ } });
+    <div class="stk-escaner-abajo"><div class="stk-escaner-ultimo">Apuntá al código de barras</div>
+      <div class="stk-escaner-ocr"></div>
+      <div class="stk-escaner-extra"><button type="button" class="btn btn-secondary btn-small stk-escaner-numeros">🔢 Leer los números</button><button type="button" class="btn btn-secondary btn-small stk-escaner-amano">⌨️ A mano</button></div>
+      <button type="button" class="btn btn-primary stk-escaner-listo">Listo</button></div>`;
+  capa.querySelector("b").textContent = op.titulo || "Escanear";
+  const ultimo = capa.querySelector(".stk-escaner-ultimo"), video = capa.querySelector("video"), ahoraEl = capa.querySelector(".stk-escaner-ahora"), totalEl = capa.querySelector(".stk-escaner-total");
+  const pintarEstado = () => { const e = op.estado ? op.estado() : {}; ahoraEl.textContent = e.ahora || ""; totalEl.textContent = e.total || ""; };
+  pintarEstado();
   document.body.appendChild(capa);
   let stream = null, timer = null, ocupado = false, cerrado = false;
-  const vistos = new Map();
+  const vistos = new Map(); // código -> última vez que se vio (se actualiza mientras sigue a la vista)
+  const ocrCaja = capa.querySelector(".stk-escaner-ocr");
+  let ultimaLectura = Date.now(), ultimoOcr = 0, ocrEnCurso = false;
+  const mostrarResultado = (r, texto) => {
+    if (!r) return;
+    stkPitido(!!r.ok);
+    ultimo.className = "stk-escaner-ultimo " + (r.ok ? "ok" : "err");
+    ultimo.textContent = (r.ok ? "✓ " : "✕ ") + (r.texto || texto || "");
+    pintarEstado();
+  };
+  // Usar un código que no vino del lector (de la foto o escrito): pausa la lectura mientras tanto.
+  const usarCodigo = async (texto) => {
+    while (ocupado) await new Promise((ok) => setTimeout(ok, 50));
+    ocupado = true;
+    try { mostrarResultado(await (op.usar ? op.usar(texto) : op.leerCuadro([texto])), texto); }
+    finally { ocupado = false; ultimaLectura = Date.now(); }
+  };
+  const aMano = async () => {
+    const t = await pedirTextoApp("Escribí el código (el de la etiqueta de SAT o el N° de serie):", "");
+    if (t && t.trim()) { ocrCaja.innerHTML = ""; await usarCodigo(t.trim()); }
+  };
+  // Saca una foto del video y le pide al servidor que lea los números impresos.
+  const leerNumeros = async (automatico) => {
+    if (ocrEnCurso || cerrado || video.readyState < 2) return;
+    ocrEnCurso = true; ultimoOcr = Date.now();
+    ocrCaja.innerHTML = '<p class="stk-ocr-msj">Leyendo los números de la etiqueta…</p>';
+    try {
+      const cv = document.createElement("canvas"), escala = Math.min(1, 1600 / Math.max(video.videoWidth || 1, video.videoHeight || 1));
+      cv.width = Math.max(1, Math.round((video.videoWidth || 640) * escala)); cv.height = Math.max(1, Math.round((video.videoHeight || 480) * escala));
+      cv.getContext("2d").drawImage(video, 0, 0, cv.width, cv.height);
+      const r = await stkApi("POST", "", { accion: "leer_codigo_foto", imagen: cv.toDataURL("image/jpeg", 0.85) });
+      if (cerrado) return;
+      const codigos = (r.codigos || []).map((x) => ({ ...x, que: op.describir ? op.describir(x.texto) : { texto: "", util: true } }))
+        .sort((x, y) => (y.que.util ? 1 : 0) - (x.que.util ? 1 : 0));
+      if (!codigos.length) {
+        ocrCaja.innerHTML = `<p class="stk-ocr-msj">${automatico ? "El código de barras no se lee y" : ""} no pude leer los números. Acercate un poco con buena luz, o escribilo a mano.</p><button type="button" class="btn btn-primary btn-small" data-amano>⌨️ Escribir a mano</button>`;
+      } else {
+        ocrCaja.innerHTML = `<p class="stk-ocr-msj">${automatico ? "No se lee el código de barras. " : ""}Leí estos números: tocá el correcto (fijate que coincida con la etiqueta).</p>`
+          + codigos.map((x) => `<button type="button" class="stk-ocr-cod${x.que.util ? "" : " dudoso"}" data-t="${escapeHtml(x.texto)}"><span>${escapeHtml(x.texto)}</span><small>${escapeHtml([x.rotulo, x.que.texto].filter(Boolean).join(" · "))}</small></button>`).join("")
+          + '<button type="button" class="stk-link" data-amano>Ninguno: escribirlo a mano</button>';
+      }
+      ocrCaja.querySelectorAll("[data-t]").forEach((b) => b.addEventListener("click", async () => { ocrCaja.innerHTML = ""; await usarCodigo(b.dataset.t); }));
+    } catch (e) {
+      if (!cerrado) ocrCaja.innerHTML = `<p class="stk-ocr-msj">No se pudieron leer los números (${escapeHtml(e.message)}).</p><button type="button" class="btn btn-primary btn-small" data-amano>⌨️ Escribir a mano</button>`;
+    } finally {
+      ocrEnCurso = false;
+      const b = ocrCaja.querySelector("[data-amano]");
+      if (b) b.addEventListener("click", aMano);
+    }
+  };
+  capa.querySelector(".stk-escaner-numeros").addEventListener("click", () => leerNumeros(false));
+  capa.querySelector(".stk-escaner-amano").addEventListener("click", aMano);
   const cerrar = () => {
     if (cerrado) return; cerrado = true;
     clearInterval(timer);
     try { stream && stream.getTracks().forEach((t) => t.stop()); } catch (e) { /* nada */ }
     capa.remove(); stkEscanerAbierto = null;
+    if (op.alCerrar) op.alCerrar();
   };
   stkEscanerAbierto = { cerrar };
   capa.querySelector(".stk-escaner-listo").addEventListener("click", cerrar);
@@ -18199,28 +18259,53 @@ async function abrirEscanerStock({ titulo, alLeer }) {
     ocupado = true;
     try {
       const codigos = await detector.detect(video);
-      const texto = codigos && codigos[0] && String(codigos[0].rawValue || "").trim();
-      if (texto) {
-        const ahora = Date.now();
-        if (!(vistos.has(texto) && ahora - vistos.get(texto) < 2500)) {
-          vistos.set(texto, ahora);
-          const r = (await alLeer(texto)) || { ok: false };
-          stkPitido(!!r.ok);
-          ultimo.className = "stk-escaner-ultimo " + (r.ok ? "ok" : "err");
-          ultimo.textContent = (r.ok ? "✓ " : "✕ ") + (r.texto || texto);
-          if (r.ok && !rafaga && !r.seguir) setTimeout(cerrar, 350);
-        }
+      const ahora = Date.now();
+      const textos = [...new Set((codigos || []).map((c) => String(c.rawValue || "").trim()).filter(Boolean))];
+      if (textos.length) { ultimaLectura = ahora; if (ocrCaja.querySelector(".stk-ocr-msj") && !ocrEnCurso && !ocrCaja.querySelector("[data-t]")) ocrCaja.innerHTML = ""; }
+      // 5 segundos sin leer ningún código de barras: prueba leyendo los números (una vez cada 15 s).
+      else if (!ocrEnCurso && ahora - ultimaLectura > 5000 && ahora - ultimoOcr > 15000 && !ocrCaja.querySelector("[data-t]")) leerNumeros(true);
+      // Lo ya usado sigue «visto» mientras esté a la vista; lo que no se usó todavía (ej. el N° de
+      // serie que estaba al lado de la etiqueta) se vuelve a ofrecer en el cuadro siguiente.
+      const yaVisto = (t) => vistos.has(t) && ahora - vistos.get(t) < 900;
+      textos.forEach((t) => { if (yaVisto(t)) vistos.set(t, ahora); });
+      const nuevos = textos.filter((t) => !yaVisto(t));
+      if (nuevos.length) {
+        const r = await op.leerCuadro(nuevos);
+        const fin = Date.now();
+        if (r) {
+          mostrarResultado(r, nuevos[0]);
+          [].concat(r.usado || nuevos[0]).forEach((t) => vistos.set(t, fin));
+          if (r.ok) ocrCaja.innerHTML = "";
+        } else nuevos.forEach((t) => vistos.set(t, fin)); // nada útil (links, el código del modelo)
+        pintarEstado();
       }
     } catch (e) { /* sigue intentando */ }
     ocupado = false;
-  }, 220);
+  }, 200);
+}
+// Cuando una caja tiene más de un código posible y todavía no se sabe cuál es el N° de serie.
+function elegirSerieStock(desc, opciones) {
+  return new Promise((resolver) => {
+    const capa = document.createElement("div");
+    capa.className = "modal-overlay dlg-app";
+    capa.innerHTML = `<div class="modal-caja" role="dialog" aria-modal="true"><p class="dlg-texto"></p><div class="stk-elegir-serie"></div><div class="dlg-botones"><button type="button" class="dlg-no">Ninguno</button></div></div>`;
+    capa.querySelector(".dlg-texto").textContent = `${desc}: la caja tiene ${opciones.length} códigos. Tocá el N° de serie (el que cambia en cada caja). Los otros se van a ignorar de ahora en más en este artículo.`;
+    capa.querySelector(".stk-elegir-serie").innerHTML = opciones.map((t) => `<button type="button" class="stk-res" data-t="${escapeHtml(t)}" style="font-family:'IBM Plex Mono',monospace;">${escapeHtml(t)}</button>`).join("");
+    const fin = (t) => { capa.remove(); resolver(t || ""); };
+    capa.querySelectorAll("[data-t]").forEach((b) => b.addEventListener("click", () => fin(b.dataset.t)));
+    capa.querySelector(".dlg-no").addEventListener("click", () => fin(""));
+    document.body.appendChild(capa);
+  });
 }
 
 // ---------- Canasta: lo que se va a mover ----------
-// op: { cont, catalogo(), saldos(), origen() (ubicación de donde sale, o "" si entra de afuera), alCambiar(), puedeAsociar }
+// op: { cont, catalogo(), saldos(), origen() (de dónde sale, o "" si entra de afuera), forma() ("individual"|"lote"), alCambiar(), puedeAsociar }
+//  Individual: cada caja es etiqueta de SAT + su N° de serie; después vuelve a esperar una etiqueta.
+//  En lote: una etiqueta de SAT y después todos los N° de serie seguidos (o la cantidad, si va por cantidad).
 function crearCanastaStock(op) {
   const can = { lineas: [], actual: "" };
   const arts = () => (op.catalogo() || {}).articulos || {};
+  const forma = () => (op.forma ? op.forma() : "individual");
   const disponible = (c) => { const o = op.origen(); return o ? (((op.saldos() || {}).ubic || {})[o] || {})[c] || 0 : Infinity; };
   const linea = (c) => { let l = can.lineas.find((x) => x.c === c); if (!l) { l = { c, cant: 0, unidades: [] }; can.lineas.push(l); } return l; };
   can.render = () => {
@@ -18228,11 +18313,11 @@ function crearCanastaStock(op) {
     op.cont.innerHTML = can.lineas.length ? can.lineas.map((l, i) => {
       const art = a[l.c] || { d: l.c }, esU = art.tipo === "unidad", disp = disponible(l.c);
       const sinN = esU ? Math.max(0, l.cant - l.unidades.length) : 0;
-      return `<div class="stk-linea" data-i="${i}">
+      return `<div class="stk-linea${can.actual === l.c ? " stk-linea-actual" : ""}" data-i="${i}">
         <div class="stk-linea-top"><div><b>${escapeHtml(art.d)}</b><small>${escapeHtml(l.c)}${disp !== Infinity ? ` · hay ${stkFmtN(disp)}` : ""}${art.medida === "metros" ? " · en metros" : ""}</small></div>
         <div class="stk-cant"><button type="button" data-menos aria-label="Uno menos">−</button><input class="field-input" inputmode="decimal" value="${stkFmtN(l.cant)}" aria-label="Cantidad"><button type="button" data-mas aria-label="Uno más">+</button></div></div>
         ${l.unidades.length ? `<div class="stk-chips">${l.unidades.map((t, j) => `<span class="stk-chip">${escapeHtml(t)}<button type="button" data-quitar-u="${j}" aria-label="Sacar">✕</button></span>`).join("")}</div>` : ""}
-        ${esU && sinN ? `<div class="stk-falta">${sinN} sin N° de unidad: escaneá el código de cada caja${can.actual === l.c ? " (ahora)" : ""}.</div>` : ""}
+        ${esU && can.actual === l.c ? `<div class="stk-falta">Escaneando N° de serie${forma() === "lote" ? " (en lote: seguí con todas las cajas)" : ""}.</div>` : esU && sinN ? `<div class="stk-falta">${sinN} sin N° de serie.</div>` : ""}
         ${l.cant > disp ? `<div class="stk-falta">Hay ${stkFmtN(disp)}: no alcanza.</div>` : ""}
         <button type="button" class="stk-quitar" data-quitar>Sacar de la lista</button></div>`;
     }).join("") : "";
@@ -18248,32 +18333,74 @@ function crearCanastaStock(op) {
   };
   can.cambio = () => { can.lineas = can.lineas.filter((l) => l.cant > 0 || l.unidades.length || l.c === can.actual); can.render(); if (op.alCambiar) op.alCambiar(); };
   can.limpiar = () => { can.lineas = []; can.actual = ""; can.cambio(); };
-  can.agregarArticulo = (c, cuanto) => {
+  // Qué hay que escanear ahora (se muestra arriba de la cámara).
+  can.estado = () => {
+    const a = arts()[can.actual], total = can.lineas.reduce((t, l) => t + l.cant, 0);
+    const l = can.lineas.find((x) => x.c === can.actual);
+    return {
+      ahora: a && a.tipo === "unidad" ? `Ahora: N° de serie de ${a.d}${l && l.unidades.length ? ` (${l.unidades.length})` : ""}` : "Ahora: etiqueta de SAT de la caja",
+      total: total ? `${stkFmtN(total)} en la lista` : "",
+    };
+  };
+  can.agregarArticulo = async (c) => {
     const art = arts()[c]; if (!art) return { ok: false, texto: "No está en el catálogo" };
+    if (art.tipo === "unidad") { linea(c); can.actual = c; can.cambio(); return { ok: true, texto: `${art.d}: ahora el N° de serie` }; }
+    can.actual = "";
+    let cuanto = 1;
+    if (forma() === "lote") {
+      const v = await pedirTextoApp(`${art.d}\n¿Cuántas${art.medida === "metros" ? " (metros)" : ""}?`, "1");
+      if (v === null) return { ok: false, texto: "No se agregó" };
+      cuanto = stkNumApp(v);
+      if (!(cuanto > 0)) return { ok: false, texto: "Cantidad inválida" };
+    }
     const l = linea(c);
-    if (art.tipo === "unidad") { can.actual = c; can.cambio(); return { ok: true, texto: `${art.d}: ahora escaneá el N° de unidad`, seguir: true }; }
-    l.cant = Math.round((l.cant + (cuanto || 1)) * 1000) / 1000;
+    l.cant = Math.round((l.cant + cuanto) * 1000) / 1000;
     can.cambio();
     return { ok: true, texto: `${art.d} (${stkFmtN(l.cant)})` };
+  };
+  // El código del modelo (igual en todas las cajas) se guarda para ignorarlo como N° de serie.
+  const aprenderModelo = async (c, codigo) => {
+    const art = arts()[c];
+    if (!art || !op.puedeAsociar) return;
+    art.alias = [...new Set([...(art.alias || []), codigo])];
+    try { await stkApi("POST", "", { accion: "alias", c, ean: codigo }); } catch (e) { /* queda en este celular por ahora */ }
+  };
+  const agregarUnidad = async (c, tracking, r) => {
+    const art = arts()[c] || { d: c };
+    const repetida = can.lineas.find((l) => l.unidades.includes(tracking));
+    if (repetida) {
+      // Un «N° de serie» que aparece en dos cajas es el código del modelo.
+      if (op.puedeAsociar && repetida.c === c && await confirmarApp(`«${tracking}» apareció en dos cajas: no es un N° de serie, es el código del modelo.\n¿Lo saco de la lista y lo ignoro de ahora en más?`, { aceptar: "Sí, ignorarlo", cancelar: "No" })) {
+        repetida.unidades = repetida.unidades.filter((t) => t !== tracking); repetida.cant = Math.max(repetida.unidades.length, repetida.cant - 1);
+        await aprenderModelo(c, tracking); can.cambio();
+        return { ok: true, texto: `${tracking}: código del modelo, ignorado` };
+      }
+      return { ok: false, texto: `${tracking} ya está en la lista` };
+    }
+    const o = op.origen();
+    if (r && !r.nuevo && o && r.ubic !== o) return { ok: false, texto: `${tracking} figura en ${nombreUbicacion(r.ubic)}` };
+    if (r && r.aviso && !(await confirmarApp(`${art.d}\n${tracking}\n\n${r.aviso}`, { aceptar: "Sí, es el N° de serie", cancelar: op.puedeAsociar ? "No, ignorar este código" : "No" }))) {
+      if (op.puedeAsociar && art.tipo === "unidad") await aprenderModelo(c, tracking); // no vuelve a preguntar por este código
+      return { ok: false, texto: "No se agregó" };
+    }
+    const l = linea(c);
+    l.unidades.push(tracking);
+    if (l.cant < l.unidades.length) l.cant = l.unidades.length;
+    if (art.tipo === "unidad") art.formatos = agregarFormato(art.formatos, tracking); // aprende ya, sin esperar al servidor
+    can.actual = forma() === "lote" ? c : ""; // individual: la próxima caja empieza por su etiqueta
+    can.cambio();
+    return { ok: true, texto: `${art.d} · ${tracking} (${l.unidades.length})` };
   };
   // Lee un código escaneado o escrito y lo suma a la lista.
   can.agregarCodigo = async (texto) => {
     const r = interpretarCodigo(texto, op.catalogo(), op.saldos(), can.actual);
     const a = arts();
-    if (r.tipo === "articulo") return can.agregarArticulo(r.c);
-    if (r.tipo === "unidad") {
-      const art = a[r.c] || { d: r.c };
-      if (can.lineas.some((l) => l.unidades.includes(r.tracking))) return { ok: false, texto: `${r.tracking} ya está en la lista` };
-      const o = op.origen();
-      if (!r.nuevo && o && r.ubic !== o) return { ok: false, texto: `${r.tracking} figura en ${nombreUbicacion(r.ubic)}` };
-      if (r.aviso && !(await confirmarApp(`${art.d}\n${r.tracking}\n\n${r.aviso}`, { aceptar: "Sí, es de esta caja", cancelar: "No" }))) return { ok: false, texto: "No se agregó" };
-      const l = linea(r.c);
-      l.unidades.push(r.tracking);
-      if (l.cant < l.unidades.length) l.cant = l.unidades.length;
-      can.actual = r.c;
-      can.cambio();
-      return { ok: true, texto: `${art.d} · ${r.tracking} (${l.unidades.length})`, seguir: false };
+    if (r.tipo === "ignorar") return { ok: false, texto: r.aviso };
+    if (r.tipo === "articulo") {
+      if (r.via === "modelo" && r.c === can.actual) return { ok: true, texto: "Código del modelo: ahora el N° de serie" };
+      return can.agregarArticulo(r.c);
     }
+    if (r.tipo === "unidad") return agregarUnidad(r.c, r.tracking, r);
     if (r.tipo === "ean_nuevo") {
       if (!op.puedeAsociar) return { ok: false, texto: "Código de fabricante que la APP no conoce: escaneá la etiqueta de SAT." };
       const c = await elegirArticuloStock(op.catalogo(), `El código ${r.ean} es del fabricante y la APP todavía no sabe de qué artículo es. Elegilo una vez y la próxima lo reconoce sola:`);
@@ -18282,12 +18409,34 @@ function crearCanastaStock(op) {
       catch (e) { showToast("No se pudo guardar el código: " + e.message); }
       return can.agregarArticulo(c);
     }
-    return { ok: false, texto: r.aviso || "No reconozco el código" };
+    return { ok: false, texto: can.actual ? r.aviso || "No reconozco el código" : "Escaneá primero la etiqueta de SAT de la caja" };
+  };
+  // Todo lo que la cámara vio en un cuadro: se usa un solo código (ver elegirCodigoDelCuadro).
+  can.leerCuadro = async (textos) => {
+    const d = elegirCodigoDelCuadro(textos, op.catalogo(), op.saldos(), can.actual);
+    if (d.elegir) {
+      const art = arts()[can.actual] || { d: can.actual };
+      const t = await elegirSerieStock(art.d, d.elegir);
+      if (!t) return { ok: false, texto: "No se agregó", usado: d.elegir };
+      for (const otro of d.elegir.filter((x) => x !== t)) await aprenderModelo(can.actual, limpiarCodigo(otro));
+      return { ...(await agregarUnidad(can.actual, t, interpretarCodigo(t, op.catalogo(), op.saldos(), can.actual))), usado: d.elegir };
+    }
+    if (!d.usar) return null; // nada útil en el cuadro (un link, el código del modelo): no hace ruido
+    return { ...(await can.agregarCodigo(d.usar)), usado: d.usar };
   };
   can.interpretar = (t) => interpretarCodigo(t, op.catalogo(), op.saldos(), can.actual);
+  // Para los números leídos de una foto: qué es cada uno (y si sirve).
+  can.describir = (t) => {
+    const r = can.interpretar(t), a = arts();
+    if (r.tipo === "articulo") return { util: true, texto: (a[r.c] || {}).d || r.c };
+    if (r.tipo === "unidad") return { util: !r.aviso, texto: r.nuevo ? `N° de serie de ${(a[r.c] || {}).d || r.c}${r.aviso ? " (no se parece a los anteriores)" : ""}` : `${(a[r.c] || {}).d || r.c} · ${nombreUbicacion(r.ubic)}` };
+    if (r.tipo === "ean_nuevo") return { util: true, texto: "Código de fabricante" };
+    return { util: false, texto: /^\d{12}$/.test(t) ? "Etiqueta SAT de un artículo que no está en el catálogo" : can.actual ? "" : "Primero la etiqueta de SAT" };
+  };
   can.items = () => can.lineas.filter((l) => l.cant > 0).map((l) => ({ c: l.c, cant: l.cant, unidades: l.unidades }));
   return can;
 }
+
 // Buscar un artículo por código o descripción (para asociar un código o agregar a mano).
 function buscarArticulosStock(catalogo, texto, max) {
   const q = normalizeText(String(texto || "").trim());
@@ -18323,16 +18472,17 @@ function conectarCasilleroStock(input, resultados, can, catalogo) {
     const t = input.value.trim();
     if (!t) return;
     const r = can.interpretar(t);
-    if (r.tipo !== "desconocido" || /^\d{12}$/.test(t)) {
+    if (r.tipo !== "desconocido" || /^\d{12}$/.test(t) || can.actual) {
       const x = await can.agregarCodigo(t);
       showToast((x.ok ? "✓ " : "✕ ") + (x.texto || t));
       input.value = ""; if (resultados) resultados.innerHTML = "";
+      input.focus(); // con un lector Bluetooth se sigue escaneando sin tocar la pantalla
       return;
     }
     if (!resultados) { showToast(r.aviso || "No reconozco el código"); return; }
     const lista = buscarArticulosStock(catalogo(), t, 12);
     resultados.innerHTML = lista.length ? lista.map((a) => `<button type="button" class="stk-res" data-c="${escapeHtml(a.c)}">${escapeHtml(a.d)}<small>${escapeHtml(a.c)}</small></button>`).join("") : `<p class="stk-ayuda">${escapeHtml(r.aviso || "No encontré nada")}</p>`;
-    resultados.querySelectorAll("[data-c]").forEach((b) => b.addEventListener("click", () => { const x = can.agregarArticulo(b.dataset.c); showToast(x.texto); resultados.innerHTML = ""; input.value = ""; }));
+    resultados.querySelectorAll("[data-c]").forEach((b) => b.addEventListener("click", async () => { resultados.innerHTML = ""; input.value = ""; const x = await can.agregarArticulo(b.dataset.c); showToast(x.texto); input.focus(); }));
   });
 }
 
@@ -18406,7 +18556,7 @@ function pintarMiStock() {
     const c = b.dataset.devolver, art = a[c] || {};
     const l = miStockCanasta.lineas.find((x) => x.c === c);
     if (art.tipo === "unidad" && unidadesDe(c).length) { miStockCanasta.actual = c; miStockCanasta.cambio(); showToast("Escaneá el N° de unidad de cada equipo que devolvés"); }
-    else if (!l || l.cant < (miStock.tiene[c] || 0)) miStockCanasta.agregarArticulo(c);
+    else if (!l || l.cant < (miStock.tiene[c] || 0)) miStockCanasta.agregarArticulo(c).then(() => {});
     if (art.tipo === "unidad" && !unidadesDe(c).length) { const ll = miStockCanasta.lineas.find((x) => x.c === c); if (ll && ll.cant < 1) { ll.cant = 1; miStockCanasta.cambio(); } }
     document.getElementById("miStockDevolverCaja").scrollIntoView({ behavior: "smooth", block: "start" });
   }));
@@ -18417,7 +18567,7 @@ function pintarMiStock() {
   document.getElementById("miStockDevueltos").innerHTML = dev.length ? `<h3 class="stk-h">Devolviste (falta que el depósito confirme)</h3>` + dev.map((e) => `<div class="stk-envio"><small>${escapeHtml(cuando(e.fecha))}${e.motivo ? " · " + escapeHtml(e.motivo) : ""}</small>${items(e, false)}</div>`).join("") : "";
 }
 conectarCasilleroStock(document.getElementById("miStockCodigo"), null, miStockCanasta, miStockCatalogo);
-document.getElementById("miStockEscanearBtn").addEventListener("click", () => abrirEscanerStock({ titulo: "Devolver al depósito", alLeer: (t) => miStockCanasta.agregarCodigo(t) }));
+document.getElementById("miStockEscanearBtn").addEventListener("click", () => abrirEscanerStock({ titulo: "Devolver al depósito", leerCuadro: (t) => miStockCanasta.leerCuadro(t), estado: () => miStockCanasta.estado(), usar: (t) => miStockCanasta.agregarCodigo(t), describir: (t) => miStockCanasta.describir(t) }));
 document.getElementById("miStockDevolverBtn").addEventListener("click", async (ev) => {
   const btn = ev.currentTarget, items = miStockCanasta.items();
   if (!items.length) return;
@@ -18458,6 +18608,7 @@ async function actualizarBadgeStock(forzar) {
 
 // ---------- Depósito (responsable de stock) ----------
 let depDatos = null, depModo = "entregar", depVehiculos = null;
+let depForma = (() => { try { return localStorage.getItem("stock_forma") === "lote" ? "lote" : "individual"; } catch (e) { return "individual"; } })();
 const depCatalogo = () => (depDatos && depDatos.catalogo) || { articulos: {} };
 const depSaldos = () => (depDatos && depDatos.saldos) || { ubic: {}, unidades: {} };
 const depOrigen = () => {
@@ -18466,7 +18617,7 @@ const depOrigen = () => {
   return t === "proveedor" || !n ? "" : t === "veh" ? `veh:${n}` : ""; // de clientes: la APP puede no tenerlo registrado
 };
 const depCanasta = crearCanastaStock({
-  cont: document.getElementById("depCanasta"), catalogo: depCatalogo, saldos: depSaldos, origen: depOrigen, puedeAsociar: true,
+  cont: document.getElementById("depCanasta"), catalogo: depCatalogo, saldos: depSaldos, origen: depOrigen, puedeAsociar: true, forma: () => depForma,
   alCambiar: () => depBotonTexto(),
 });
 function depBotonTexto() {
@@ -18515,6 +18666,10 @@ async function depLlenarLista(tipoId) {
 }
 function depMostrarModo() {
   document.querySelectorAll("#depModos [data-modo]").forEach((b) => b.classList.toggle("activo", b.dataset.modo === depModo));
+  document.querySelectorAll("#depFormas [data-forma]").forEach((b) => b.classList.toggle("activo", b.dataset.forma === depForma));
+  document.getElementById("depFormaAyuda").textContent = depForma === "lote"
+    ? "En lote: escaneá una etiqueta de SAT y después todos los N° de serie seguidos. Si el artículo va por cantidad, te pregunta cuántas."
+    : "Individual: por cada caja, la etiqueta de SAT y después su N° de serie. Si el equipo ya tiene el N° registrado, alcanza con escanear solo ese.";
   document.querySelectorAll("#screen-deposito [data-dep]").forEach((d) => d.classList.toggle("hidden", !d.dataset.dep.split(" ").includes(depModo)));
   if (depModo === "recibir") {
     const t = document.getElementById("depRecibirTipo").value;
@@ -18528,6 +18683,11 @@ document.querySelectorAll("#depModos [data-modo]").forEach((b) => b.addEventList
   if (b.dataset.modo !== depModo && depCanasta.items().length && depModo !== "consultar") { showToast("Primero terminá o vaciá la lista"); return; }
   depModo = b.dataset.modo; depMostrarModo();
 }));
+document.querySelectorAll("#depFormas [data-forma]").forEach((b) => b.addEventListener("click", () => {
+  depForma = b.dataset.forma; depCanasta.actual = "";
+  try { localStorage.setItem("stock_forma", depForma); } catch (e) { /* nada */ }
+  depMostrarModo();
+}));
 document.getElementById("depDestTipo").addEventListener("change", async () => { document.getElementById("depDestNombre").value = ""; document.getElementById("depDestSelect").value = ""; await depLlenarLista("depDestTipo"); depBotonTexto(); });
 document.getElementById("depDestNombre").addEventListener("input", depBotonTexto);
 document.getElementById("depDestSelect").addEventListener("change", depBotonTexto);
@@ -18535,7 +18695,7 @@ document.getElementById("depRecibirTipo").addEventListener("change", async () =>
 document.getElementById("depRecibirDe").addEventListener("change", () => depCanasta.render());
 document.getElementById("depRecibirSelect").addEventListener("change", () => depCanasta.render());
 conectarCasilleroStock(document.getElementById("depCodigo"), document.getElementById("depBuscarResultados"), depCanasta, depCatalogo);
-document.getElementById("depEscanearBtn").addEventListener("click", () => abrirEscanerStock({ titulo: depModo === "entregar" ? "Entregar" : "Ingresar al depósito", alLeer: (t) => depCanasta.agregarCodigo(t) }));
+document.getElementById("depEscanearBtn").addEventListener("click", () => abrirEscanerStock({ titulo: `${depModo === "entregar" ? "Baja" : "Alta"} · ${depForma === "lote" ? "en lote" : "individual"}`, leerCuadro: (t) => depCanasta.leerCuadro(t), estado: () => depCanasta.estado(), usar: (t) => depCanasta.agregarCodigo(t), describir: (t) => depCanasta.describir(t) }));
 document.getElementById("depConfirmarBtn").addEventListener("click", async (ev) => {
   const btn = ev.currentTarget, items = depCanasta.items(), a = depCatalogo().articulos;
   if (!items.length) return;
@@ -18615,7 +18775,7 @@ async function depConsultar(texto) {
   return { ok: !!lista.length, texto: lista.length ? `${lista.length} resultado(s)` : "Nada" };
 }
 document.getElementById("depConsultarCodigo").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); depConsultar(e.currentTarget.value.trim()); } });
-document.getElementById("depConsultarEscanearBtn").addEventListener("click", () => abrirEscanerStock({ titulo: "Consultar", alLeer: (t) => depConsultar(t) }));
+document.getElementById("depConsultarEscanearBtn").addEventListener("click", () => abrirEscanerStock({ titulo: "Consultar", leerCuadro: async (t) => { const d = elegirCodigoDelCuadro(t, depCatalogo(), depSaldos(), ""); return d.usar ? depConsultar(d.usar) : null; }, usar: (t) => depConsultar(t) }));
 document.getElementById("tileDepositoBtn").addEventListener("click", () => {
   showScreen("deposito");
   depLlenarLista("depDestTipo"); depLlenarLista("depRecibirTipo");

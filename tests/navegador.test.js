@@ -5576,6 +5576,7 @@ test("Stock en la APP: el depósito entrega escaneando (etiqueta SAT + N° de un
     }
     const b = JSON.parse(req.postData()); posts.push({ quien, ...b });
     if (b.accion === "alias") { catalogo.articulos[b.c].alias = [b.ean]; return json({ ok: true }); }
+    if (b.accion === "leer_codigo_foto") { assert.match(b.imagen, /^data:image\/jpeg;base64,/); return json({ ok: true, codigos: [{ texto: "GH300AA001", rotulo: "Tracking" }, { texto: "000208252779", rotulo: "" }] }); }
     if (b.accion === "mover" || b.accion === "devolver") {
       const de = b.accion === "devolver" ? `tec:${quien}` : b.de, a = b.accion === "devolver" ? "dep" : b.a;
       const x = S.moverStock(saldos, b.items, { tipo: b.accion, de, a, por: quien, confirmar: /^tec:/.test(a) || b.accion === "devolver" }, catalogo);
@@ -5615,7 +5616,8 @@ test("Stock en la APP: el depósito entrega escaneando (etiqueta SAT + N° de un
   });
   await page.click("#depEscanearBtn");
   await page.waitForSelector(".stk-escaner");
-  await page.waitForFunction(() => /TECLADO.*N° de unidad/.test(document.querySelector(".stk-escaner-ultimo").textContent));
+  await page.waitForFunction(() => /TECLADO.*N° de serie/.test(document.querySelector(".stk-escaner-ultimo").textContent));
+  assert.match(await page.textContent(".stk-escaner-ahora"), /Ahora: N° de serie de TECLADO/);
   await page.evaluate(() => { window.BarcodeDetector = class { async detect() { return [{ rawValue: "GH12100FD4" }]; } }; stkEscanerAbierto.cerrar(); });
   await page.fill("#depCodigo", "GH12100FD4"); await page.press("#depCodigo", "Enter");
   await page.waitForFunction(() => document.querySelectorAll("#depCanasta .stk-chip").length === 2);
@@ -5686,6 +5688,55 @@ test("Stock en la APP: el depósito entrega escaneando (etiqueta SAT + N° de un
   await page.click('#depModos [data-modo="consultar"]');
   await page.fill("#depConsultarCodigo", "GH12100FD4"); await page.press("#depConsultarCodigo", "Enter");
   await page.waitForFunction(() => /GH12100FD4\s*Técnico: Juan/.test(document.getElementById("depConsulta").textContent));
+  // Alta en lote con la cámara: la caja trae etiqueta SAT, código del modelo, N° de serie y un QR.
+  await page.click('#depModos [data-modo="recibir"]');
+  await page.click('#depFormas [data-forma="lote"]');
+  assert.match(await page.textContent("#depFormaAyuda"), /En lote/);
+  await page.evaluate(() => {
+    window.__cuadros = [
+      ["000208252779", "K10H-J9B", "https://www.paradox.com/manual"],
+      ["K10H-J9B", "GH200AA001"],
+      ["K10H-J9B", "GH200AA002", "https://www.paradox.com/manual"],
+      ["K10H-J9B", "GH200AA003"],
+    ];
+    window.BarcodeDetector = class { async detect() { const c = window.__cuadros.shift(); return (c || []).map((rawValue) => ({ rawValue })); } };
+  });
+  await page.click("#depEscanearBtn");
+  // Primera caja: no se sabe cuál es el N° de serie -> se elige una vez
+  await page.waitForSelector(".stk-elegir-serie [data-t]");
+  assert.deepStrictEqual(await page.$$eval(".stk-elegir-serie [data-t]", (b) => b.map((x) => x.dataset.t)), ["K10H-J9B", "GH200AA001"], "el link del QR no se ofrece");
+  await page.click('.stk-elegir-serie [data-t="GH200AA001"]');
+  await page.waitForFunction(() => document.querySelectorAll("#depCanasta .stk-chip").length === 3);
+  assert.deepStrictEqual(catalogo.articulos["20825"].alias, ["K10H-J9B"], "el código del modelo se ignora de ahora en más");
+  assert.match(await page.textContent(".stk-escaner-ahora"), /N° de serie de TECLADO.*\(3\)/);
+  assert.strictEqual(await page.locator(".dlg-app").count(), 0, "las cajas siguientes no preguntan nada");
+  await page.click(".stk-escaner-listo");
+  assert.deepStrictEqual(await page.$$eval("#depCanasta .stk-chip", (c) => c.map((x) => x.textContent.replace("✕", ""))), ["GH200AA001", "GH200AA002", "GH200AA003"]);
+  // En lote, un artículo por cantidad pregunta cuántas
+  await page.fill("#depCodigo", "7798164500049"); await page.press("#depCodigo", "Enter");
+  await page.fill(".dlg-app .dlg-input", "12");
+  await page.click(".dlg-app .dlg-si");
+  await page.waitForFunction(() => /SIRENA/.test(document.getElementById("depCanasta").textContent));
+  await page.click("#depConfirmarBtn");
+  await page.click(".dlg-app .dlg-si");
+  await page.waitForFunction(() => !document.querySelector("#depCanasta .stk-linea"));
+  assert.deepStrictEqual([posts.at(-1).de, posts.at(-1).a, posts.at(-1).items], ["proveedor", "dep", [{ c: "20825", cant: 3, unidades: ["GH200AA001", "GH200AA002", "GH200AA003"] }, { c: "20208", cant: 12, unidades: [] }]]);
+  // Código de barras gastado: a los 5 segundos sin leer nada, lee los números de la foto
+  await page.evaluate(() => { window.BarcodeDetector = class { async detect() { return []; } }; });
+  await page.click("#depEscanearBtn");
+  await page.waitForSelector(".stk-ocr-cod", { timeout: 12000 });
+  const leidos = await page.$$eval(".stk-ocr-cod", (b) => b.map((x) => x.textContent));
+  assert.match(leidos[0], /000208252779.*TECLADO/, "primero lo que se reconoce, con el nombre del artículo para comparar");
+  assert.match(leidos[1], /GH300AA001.*Tracking/);
+  await page.click('.stk-ocr-cod[data-t="000208252779"]');
+  await page.waitForFunction(() => /N° de serie de TECLADO/.test(document.querySelector(".stk-escaner-ahora").textContent));
+  // El N° de serie tampoco se lee: a mano
+  await page.click(".stk-escaner-amano");
+  await page.fill(".dlg-app .dlg-input", "gh300aa001");
+  await page.click(".dlg-app .dlg-si");
+  await page.waitForFunction(() => /GH300AA001/.test(document.querySelector(".stk-escaner-ultimo").textContent));
+  await page.click(".stk-escaner-listo");
+  assert.deepStrictEqual(await page.$$eval("#depCanasta .stk-chip", (c) => c.map((x) => x.textContent.replace("✕", ""))), ["GH300AA001"]);
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });

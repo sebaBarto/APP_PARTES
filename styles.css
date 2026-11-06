@@ -3795,3 +3795,19 @@ html .app .equipo-acciones .btn.eq-util.activo, .equipo-acciones .eq-util.activo
 .stk-escaner-ultimo.ok { color: #7BE3A0; } .stk-escaner-ultimo.err { color: #FF9C8F; }
 .stk-escaner label { display: flex; align-items: center; gap: 8px; font-size: 14px; }
 .stk-escaner .btn { width: 100%; }
+.stk-formas button { padding: 7px 6px; font-size: 13px; }
+.stk-formas button.activo { background: rgba(245,166,35,.18); color: inherit; border-color: var(--amber); }
+.stk-linea-actual { border-color: var(--amber); box-shadow: 0 0 0 1px var(--amber) inset; }
+.stk-escaner-ahora { padding: 10px 16px; background: var(--amber); color: #101820; font-weight: 700; font-size: 15px; }
+.stk-escaner-ahora:empty { display: none; }
+.stk-escaner-total { font-size: 13px; opacity: .85; }
+.stk-escaner-extra { display: flex; gap: 8px; }
+.stk-escaner-extra .btn { flex: 1; width: auto; }
+.stk-escaner-ocr:empty { display: none; }
+.stk-escaner-ocr { display: flex; flex-direction: column; gap: 6px; max-height: 38vh; overflow: auto; }
+.stk-ocr-msj { margin: 0; font-size: 13.5px; color: #FFD58A; }
+.stk-ocr-cod { display: block; width: 100%; text-align: left; padding: 9px 12px; min-height: 0; border-radius: 10px; border: 1px solid rgba(255,255,255,.35); background: rgba(255,255,255,.08); color: #fff; }
+.stk-ocr-cod span { font-family: 'IBM Plex Mono', monospace; font-size: 16px; font-weight: 700; letter-spacing: .5px; }
+.stk-ocr-cod small { display: block; font-size: 12px; opacity: .8; margin-top: 2px; }
+.stk-ocr-cod.dudoso { opacity: .65; }
+.stk-escaner .stk-link { color: #fff; }

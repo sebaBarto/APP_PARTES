@@ -282,6 +282,7 @@
   function interpretarCodigo(texto, catalogo, saldos, actual) {
     const t = limpiarCodigo(texto), arts = (catalogo && catalogo.articulos) || {};
     if (!t) return { tipo: "desconocido", texto: t, aviso: "Código vacío" };
+    if (esCodigoIgnorable(t)) return { tipo: "ignorar", texto: t, aviso: "Es un link (el QR del manual): no se usa." };
     const sat = leerEtiquetaSat(t);
     if (sat) {
       if (arts[sat.codigo]) return { tipo: "articulo", c: sat.codigo, via: "etiqueta", proveedor: sat.proveedor };
@@ -293,8 +294,10 @@
       const a = Object.values(arts).find((x) => Array.isArray(x.alias) && x.alias.includes(t));
       return a ? { tipo: "articulo", c: a.c, via: "ean" } : { tipo: "ean_nuevo", ean: t };
     }
+    // Código que se repite en todas las cajas (de fabricante o del modelo, ej. «K10H-J9B»):
+    // identifica el artículo, nunca es un N° de serie.
     const a2 = Object.values(arts).find((x) => Array.isArray(x.alias) && x.alias.includes(t));
-    if (a2 && a2.tipo !== "unidad") return { tipo: "articulo", c: a2.c, via: "ean" };
+    if (a2) return { tipo: "articulo", c: a2.c, via: a2.tipo === "unidad" ? "modelo" : "ean" };
     if (/^\d{1,8}$/.test(t) && arts[codigoArticulo(t)]) return { tipo: "articulo", c: codigoArticulo(t), via: "codigo" };
     if (actual && arts[actual] && arts[actual].tipo === "unidad") {
       if (t.length < 4) return { tipo: "desconocido", texto: t, aviso: "Ese código es muy corto para ser un N° de unidad." };
@@ -305,6 +308,37 @@
     const candidatos = Object.values(arts).filter((x) => x.tipo === "unidad" && coincideFormato(t, x.formatos) && (x.formatos || []).includes(formaCodigo(t)));
     if (candidatos.length === 1) return { tipo: "unidad", c: candidatos[0].c, tracking: t, nuevo: true, adivinado: true, aviso: `Parece un ${candidatos[0].d}: confirmalo escaneando la etiqueta de SAT.` };
     return { tipo: "desconocido", texto: t, aviso: "No reconozco este código. Escaneá primero la etiqueta de SAT de la caja." };
+  }
+
+  // Links (QR de manuales) y textos largos: no son ni artículo ni N° de serie.
+  function esCodigoIgnorable(t) { return /^(HTTPS?:\/\/|WWW\.)/.test(t) || /\.(COM|AR|NET|ORG)(\/|$)/.test(t) || t.length > 40; }
+  // Una caja tiene varios códigos a la vista (modelo, N° de serie, QR). De lo que la cámara leyó
+  // en un mismo cuadro decide cuál usar:
+  //  { usar: texto }            -> ese (la etiqueta de SAT primero, después un N° de serie ya conocido o con el formato aprendido)
+  //  { elegir: [textos] }       -> hay más de un candidato a N° de serie y todavía no se sabe el formato: que elija la persona
+  //  { usar: null }             -> nada útil (links, el código del modelo de la caja que ya se está escaneando)
+  function elegirCodigoDelCuadro(textos, catalogo, saldos, actual) {
+    const arts = (catalogo && catalogo.articulos) || {};
+    const lista = [...new Set((textos || []).map(limpiarCodigo).filter(Boolean))];
+    const info = lista.map((t) => ({ t, r: interpretarCodigo(t, catalogo, saldos, actual) })).filter((x) => x.r.tipo !== "ignorar");
+    const sat = info.find((x) => leerEtiquetaSat(x.t));
+    if (sat) return { usar: sat.t };
+    const conocida = info.find((x) => x.r.tipo === "unidad" && !x.r.nuevo);
+    if (conocida) return { usar: conocida.t };
+    // El código del modelo del mismo artículo que se está escaneando no cambia nada.
+    const utiles = info.filter((x) => !(x.r.tipo === "articulo" && x.r.c === actual && x.r.via === "modelo"));
+    const a = arts[actual];
+    if (a && a.tipo === "unidad") {
+      const candidatos = utiles.filter((x) => x.r.tipo === "unidad" && x.r.c === actual);
+      const conFormato = candidatos.filter((x) => coincideFormato(x.t, a.formatos) === true);
+      if (conFormato.length) return { usar: conFormato[0].t };
+      if (candidatos.length > 1 && !(a.formatos || []).length) return { elegir: candidatos.map((x) => x.t) };
+      if (candidatos.length) return { usar: candidatos[0].t };
+    }
+    // Con la cámara, lo que no se reconoce no hace ruido (el N° de serie suelto antes de la etiqueta,
+    // el código del modelo que todavía no se aprendió): arriba se indica qué escanear.
+    const art = utiles.find((x) => x.r.tipo !== "desconocido");
+    return { usar: art ? art.t : null };
   }
 
   // ---------- Movimientos con confirmación ----------
@@ -416,7 +450,7 @@
     return mejor;
   }
 
-  const api = { STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, moverStock, cerrarEnvio, stockDePersona };
+  const api = { STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, esCodigoIgnorable, elegirCodigoDelCuadro, moverStock, cerrarEnvio, stockDePersona };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else Object.assign(raiz, api);
 })(typeof window !== "undefined" ? window : globalThis);

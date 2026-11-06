@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#101820">
-<meta name="app-version" content="4.47.1">
+<meta name="app-version" content="4.48.0">
 <meta name="description" content="Digitalizador de partes técnicos de servicio">
 <title>Servicio Técnico SAT</title>
 <link rel="manifest" href="manifest.json">
@@ -1332,10 +1332,15 @@
     <div class="review-scroll">
       <p class="hint-eyebrow review-eyebrow">DEPÓSITO</p>
       <div class="stk-modos" id="depModos">
-        <button type="button" data-modo="entregar" class="activo">Entregar</button>
-        <button type="button" data-modo="recibir">Recibir</button>
+        <button type="button" data-modo="entregar" class="activo">Baja (sale)</button>
+        <button type="button" data-modo="recibir">Alta (entra)</button>
         <button type="button" data-modo="consultar">Consultar</button>
       </div>
+      <div class="stk-modos stk-formas" id="depFormas" data-dep="entregar recibir">
+        <button type="button" data-forma="individual" class="activo">Individual</button>
+        <button type="button" data-forma="lote">En lote</button>
+      </div>
+      <p class="stk-ayuda" id="depFormaAyuda" data-dep="entregar recibir"></p>
       <p class="list-status" id="depStatus"></p>
 
       <div data-dep="entregar">

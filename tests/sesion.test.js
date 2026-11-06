@@ -1293,6 +1293,44 @@ test("Vencimientos: la oficina carga, renueva (corre la fecha si se repite) y bo
   }
 });
 
+test("Stock: de una caja con varios códigos (etiqueta SAT, modelo, N° de serie, QR) se usa el correcto", () => {
+  const S = require(path.join(raiz, "stock-utils.js"));
+  const cat = { articulos: { 20825: { c: "20825", d: "TECLADO", tipo: "unidad", formatos: [] }, 20208: { c: "20208", d: "SIRENA", tipo: "cantidad", alias: ["7798164500049"] } } };
+  const caja = ["K10H-J9B", "GH120FF156", "https://www.paradox.com/manual"];
+  assert.deepStrictEqual(S.elegirCodigoDelCuadro(["000208252779", ...caja], cat, {}, ""), { usar: "000208252779" }, "la etiqueta de SAT primero");
+  assert.deepStrictEqual(S.elegirCodigoDelCuadro(caja, cat, {}, "20825"), { elegir: ["K10H-J9B", "GH120FF156"] }, "primera vez: que elija");
+  cat.articulos["20825"].alias = ["K10H-J9B"];
+  assert.deepStrictEqual(S.elegirCodigoDelCuadro(caja, cat, {}, "20825"), { usar: "GH120FF156" }, "el modelo aprendido se ignora");
+  cat.articulos["20825"].alias = []; cat.articulos["20825"].formatos = ["AA999AA999"];
+  assert.deepStrictEqual(S.elegirCodigoDelCuadro(caja, cat, {}, "20825"), { usar: "GH120FF156" }, "o se reconoce por el formato");
+  assert.deepStrictEqual(S.elegirCodigoDelCuadro(["https://x.com"], cat, {}, ""), { usar: null });
+  assert.deepStrictEqual(S.elegirCodigoDelCuadro(["GH120FF156"], cat, { unidades: { GH120FF156: { c: "20825", u: "dep" } } }, ""), { usar: "GH120FF156" }, "un equipo ya registrado alcanza solo");
+  assert.strictEqual(S.interpretarCodigo("HTTPS://WWW.PARADOX.COM", cat, {}, "").tipo, "ignorar");
+});
+
+test("Stock: si el código de barras no se lee, el servidor lee los números de la foto (y descarta links y lo dudoso)", async () => {
+  const fetchViejo = global.fetch, claveVieja = process.env.GEMINI_API_KEY;
+  process.env.GEMINI_API_KEY = "x";
+  let pedidoIA = null;
+  global.fetch = async (url, op = {}) => {
+    const u = String(url);
+    if (u.includes("generativelanguage")) {
+      pedidoIA = JSON.parse(op.body);
+      return new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify({ codigos: [{ texto: "GH120 FF156", rotulo: "Tracking" }, { texto: "https://paradox.com", rotulo: "" }, { texto: "000208252779" }, { texto: "AB" }] }) }] } }] }));
+    }
+    if (u.includes("contents/tecnicos.json")) return new Response(JSON.stringify({ sha: "s", content: Buffer.from(JSON.stringify([{ nombre: "Juan", permisos: {} }])).toString("base64") }));
+    return new Response("{}", { status: 404 });
+  };
+  try {
+    const juan = crearSesion({ nombre: "Juan", rol: "tecnico" });
+    const r = resFalso();
+    await datos(pedido("POST", { coleccion: "stock" }, { accion: "leer_codigo_foto", imagen: "data:image/jpeg;base64," + "A".repeat(2000) }, juan), r);
+    assert.strictEqual(r.statusCode, 200, JSON.stringify(r.cuerpo));
+    assert.deepStrictEqual(r.cuerpo.codigos, [{ texto: "GH120FF156", rotulo: "Tracking" }, { texto: "000208252779", rotulo: "" }]);
+    assert.strictEqual(pedidoIA.contents[0].parts[0].inline_data.data.length, 2000);
+  } finally { global.fetch = fetchViejo; if (claveVieja === undefined) delete process.env.GEMINI_API_KEY; else process.env.GEMINI_API_KEY = claveVieja; }
+});
+
 test("Stock: los chips (Personal Jasper, Movistar M2M, Movistar Kite, Claro IoT…) se reconocen como SIM, y los equipos que nombran la empresa no", () => {
   const S = require(path.join(raiz, "stock-utils.js"));
   ["PERSONAL JASPER", "251062 PERSONAL JASPER", "Personal Japer", "773381 personal gasper", "Pesonal Jasper", "Jasper Personal", "JASPER", "904008 MOVISTAR M2M", "Movistar Kite", "Kite Movistar", "MOVISTAR", "MOVISTAR 133858", "Movistar Global SIM", "CLARO IOT", "PERSONAL"]
