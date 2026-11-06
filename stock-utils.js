@@ -338,7 +338,7 @@
     }
     const de = op.de === "proveedor" ? null : op.de || null;
     const destino = op.confirmar ? camino(op.a, de) : op.a;
-    const base = (x, i, cant, desde, extra) => ({ id: idMov(i), fecha, por: op.por || "", tipo: op.tipo || "movimiento", c: x.c, cant, ...(desde ? { de: desde } : {}), a: destino, ...(op.motivo ? { motivo: op.motivo } : {}), ...(extra || {}) });
+    const base = (x, i, cant, desde, extra) => ({ id: idMov(i), fecha, por: op.por || "", tipo: op.tipo || "movimiento", c: x.c, cant, ...(desde ? { de: desde } : {}), a: destino, ...(op.motivo ? { motivo: op.motivo } : {}), ...(op.presupuesto ? { presupuesto: op.presupuesto } : {}), ...(extra || {}) });
     const movs = [];
     lista.forEach((x, i) => {
       const uni = x.unidades.length ? { unidades: x.unidades } : {};

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#101820">
-<meta name="app-version" content="4.47.0">
+<meta name="app-version" content="4.47.1">
 <meta name="description" content="Digitalizador de partes técnicos de servicio">
 <title>Servicio Técnico SAT</title>
 <link rel="manifest" href="manifest.json">
@@ -1343,15 +1343,19 @@
           <div class="field-group"><label class="field-label" for="depDestTipo">¿A dónde va?</label>
             <select class="field-input" id="depDestTipo"><option value="tec">Técnico</option><option value="veh">Vehículo</option><option value="cli">Cliente (queda instalado)</option><option value="com">Cliente (en comodato)</option></select></div>
           <div class="field-group"><label class="field-label" for="depDestNombre">¿Quién?</label>
-            <input class="field-input" type="text" id="depDestNombre" list="depDestLista" autocomplete="off" placeholder="Elegí o escribí"><datalist id="depDestLista"></datalist></div>
+            <select class="field-input" id="depDestSelect"></select>
+            <input class="field-input hidden" type="text" id="depDestNombre" list="depDestLista" autocomplete="off" placeholder="Nombre del cliente"><datalist id="depDestLista"></datalist></div>
         </div>
+        <div class="field-group hidden" id="depPresupuestoCaja"><label class="field-label" for="depPresupuesto">N° de presupuesto (opcional)</label>
+          <input class="field-input" type="text" inputmode="numeric" id="depPresupuesto" autocomplete="off" placeholder="Ej: 4521"></div>
       </div>
       <div data-dep="recibir" class="hidden">
         <div id="depDevoluciones"></div>
         <div class="field-group"><label class="field-label" for="depRecibirTipo">¿Qué entra al depósito?</label>
           <select class="field-input" id="depRecibirTipo"><option value="proveedor">Compra que llegó del proveedor</option><option value="cli">Retiro de un cliente (instalado)</option><option value="com">Retiro de un cliente (comodato)</option><option value="veh">Vuelve de un vehículo</option></select></div>
         <div class="field-group hidden" id="depRecibirDeCaja"><label class="field-label" for="depRecibirDe">¿De quién?</label>
-          <input class="field-input" type="text" id="depRecibirDe" list="depRecibirLista" autocomplete="off"><datalist id="depRecibirLista"></datalist></div>
+          <select class="field-input" id="depRecibirSelect"></select>
+          <input class="field-input hidden" type="text" id="depRecibirDe" list="depRecibirLista" autocomplete="off" placeholder="Nombre del cliente"><datalist id="depRecibirLista"></datalist></div>
       </div>
       <div data-dep="entregar recibir" id="depCanastaCaja">
         <div class="stk-escanear-fila"><button type="button" class="btn btn-primary btn-small" id="depEscanearBtn">📷 Escanear</button><input class="field-input" type="text" id="depCodigo" placeholder="Código, N° de unidad o descripción" autocomplete="off" enterkeyhint="done"></div>

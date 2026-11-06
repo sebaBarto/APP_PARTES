@@ -220,6 +220,11 @@
   .stk-tag { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 11.5px; font-weight: 700; background: #EEF0F2; color: #3A4651; }
   .stk-tag.unidad { background: #FFF1D6; color: #8A5A00; }
   .stk-tag.bajo { background: #FDE2E0; color: #B3261E; }
+  .stk-tipos { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; }
+  .stk-tipos label { display: inline-flex; align-items: center; gap: 6px; margin: 0; padding: 6px 12px; border-radius: 999px; border: 1px solid #D6D9DC; font-size: 13px; cursor: pointer; user-select: none; }
+  .stk-tipos label:has(input:checked) { background: #101820; color: #F5A623; border-color: #101820; }
+  .stk-tipos input { width: auto; margin: 0; accent-color: #F5A623; }
+  .stk-tipos .n { opacity: .7; font-size: 12px; }
   .rend-matriz { width: 100%; border-collapse: collapse; font-size: 13px; }
   .rend-matriz th, .rend-matriz td { padding: 6px 8px; border-bottom: 1px solid rgba(128,128,128,.2); text-align: right; white-space: nowrap; }
   .rend-matriz th:first-child, .rend-matriz td:first-child { text-align: left; }
@@ -1281,9 +1286,12 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
         <div class="card">
           <div class="field-row" style="flex-wrap:wrap;align-items:flex-end;">
             <div style="flex:2 1 220px;"><label>Buscar</label><input type="text" class="field-input" id="stkBuscar" placeholder="Código o parte de la descripción"></div>
-            <div><label>Mostrar</label><select id="stkFiltro"><option value="constock">Con stock</option><option value="unidad">Equipos con N° de unidad</option><option value="cantidad">Por cantidad</option><option value="bajo">En el mínimo o por debajo</option><option value="sinmin">Con stock y sin mínimo</option><option value="todos">Todos</option></select></div>
+            <div><label>Mostrar</label><select id="stkFiltro"><option value="constock">Con stock</option><option value="bajo">En el mínimo o por debajo</option><option value="sinmin">Con stock y sin mínimo</option><option value="sinstock">Sin stock</option><option value="baja">Deshabilitados en Oficina</option><option value="todos">Todos</option></select></div>
+            <div><label>Dónde</label><select id="stkDonde"><option value="">En cualquier lado</option><option value="dep">En el depósito</option><option value="tec">En técnicos</option><option value="veh">En vehículos</option><option value="cam">En camino</option><option value="cli">En clientes (instalado)</option><option value="com">En comodato</option></select></div>
+            <div><label>Proveedor</label><select id="stkProv"><option value="">Todos</option></select></div>
             <button type="button" class="btn-secondary-admin" id="stkExcelBtn" style="width:auto;">⬇ Excel</button>
           </div>
+          <div class="stk-tipos" id="stkTipos" role="group" aria-label="Tipos de artículo"></div>
           <div id="stkLista"></div>
         </div>
       </div>
@@ -1315,7 +1323,8 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
         <div class="card">
           <div class="field-row" style="flex-wrap:wrap;align-items:flex-end;">
             <div><label>Mes</label><input type="month" class="field-input" id="stkMovMes"></div>
-            <div style="flex:2 1 200px;"><label>Buscar</label><input type="text" class="field-input" id="stkMovBuscar" placeholder="Artículo, persona, motivo"></div>
+            <div><label>Tipo</label><select id="stkMovTipo"><option value="">Todos</option></select></div>
+            <div style="flex:2 1 200px;"><label>Buscar</label><input type="text" class="field-input" id="stkMovBuscar" placeholder="Artículo, persona, cliente, presupuesto, motivo"></div>
             <button type="button" class="btn-secondary-admin" id="stkMovExcelBtn" style="width:auto;">⬇ Excel (para cargar en Oficina)</button>
           </div>
           <div id="stkMovLista"></div>
@@ -6214,7 +6223,7 @@ function stkMostrarVista() {
   document.querySelectorAll("#stkSub [data-stk]").forEach((b) => b.classList.toggle("activo", b.dataset.stk === stkVista));
   document.querySelectorAll("#panelStock [data-stk-vista]").forEach((d) => d.classList.toggle("hidden", d.dataset.stkVista !== stkVista));
   if (!stk) return;
-  if (stkVista === "articulos") { stkRenderEstado(); stkRenderArticulos(); }
+  if (stkVista === "articulos") { stkRenderEstado(); stkPintarFiltros(); stkRenderArticulos(); }
   else if (stkVista === "conciliacion") stkRenderConciliacion();
   else if (stkVista === "pedidos") stkRenderPedidos();
   else if (stkVista === "movimientos") stkCargarMovimientos();
@@ -6281,17 +6290,37 @@ document.getElementById("stkCatArchivo").addEventListener("change", async (e) =>
 });
 
 // --- Artículos ---
+// Filtros de la lista de artículos. Los tipos que se ven quedan guardados en este navegador
+// (por defecto: equipos y por cantidad; los SIM y las herramientas se controlan en sus secciones).
+const STK_FILTRO_CLAVE = "stock_filtros_admin";
+let stkTiposVisibles = (() => { try { const x = JSON.parse(localStorage.getItem(STK_FILTRO_CLAVE) || "null"); if (Array.isArray(x)) return new Set(x); } catch (e) { /* nada */ } return new Set(["unidad", "cantidad"]); })();
+function stkGuardarFiltros() { try { localStorage.setItem(STK_FILTRO_CLAVE, JSON.stringify([...stkTiposVisibles])); } catch (e) { /* nada */ } }
+function stkPintarFiltros() {
+  const arts = Object.values(stk.catalogo.articulos || {});
+  const n = {}; arts.forEach((a) => { n[a.tipo] = (n[a.tipo] || 0) + 1; });
+  const nombres = { unidad: "Equipos con N° de unidad", cantidad: "Por cantidad", sim: "SIM", herramienta: "Herramientas", no: "No controlar" };
+  document.getElementById("stkTipos").innerHTML = Object.keys(STOCK_TIPOS).map((k) => `<label><input type="checkbox" value="${k}" ${stkTiposVisibles.has(k) ? "checked" : ""}> ${nombres[k]} <span class="n">${n[k] || 0}</span></label>`).join("");
+  document.querySelectorAll("#stkTipos input").forEach((i) => i.addEventListener("change", () => { if (i.checked) stkTiposVisibles.add(i.value); else stkTiposVisibles.delete(i.value); stkGuardarFiltros(); stkLimite = 200; stkRenderArticulos(); }));
+  const sel = document.getElementById("stkProv"), actual = sel.value;
+  const provs = [...new Set(arts.map((a) => a.prov).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es"));
+  sel.innerHTML = '<option value="">Todos</option><option value="-">Sin proveedor</option>' + provs.map((p) => `<option>${escapeHtmlAdmin(p)}</option>`).join("");
+  sel.value = actual === "-" || provs.includes(actual) ? actual : "";
+}
 function stkFiltrados() {
   const q = normalizeText(document.getElementById("stkBuscar").value || "");
-  const f = document.getElementById("stkFiltro").value;
+  const f = document.getElementById("stkFiltro").value, donde = document.getElementById("stkDonde").value, prov = document.getElementById("stkProv").value;
   const tot = totalesPorArticulo(stk.saldos);
   return Object.values(stk.catalogo.articulos || {}).map((a) => ({ a, t: tot[a.c] || { sat: 0, dep: 0, tec: 0, veh: 0, cam: 0, cli: 0, com: 0, detalle: {} } })).filter(({ a, t }) => {
+    if (!stkTiposVisibles.has(a.tipo)) return false;
     if (q && !normalizeText(`${a.c} ${a.d} ${a.prov || ""}`).includes(q)) return false;
+    if (prov && (prov === "-" ? a.prov : a.prov !== prov)) return false;
+    if (donde && !t[donde]) return false;
     const conStock = t.sat || t.com || t.cli;
     if (f === "constock") return conStock;
-    if (f === "unidad" || f === "cantidad") return a.tipo === f;
+    if (f === "sinstock") return !conStock;
+    if (f === "baja") return a.baja;
     if (f === "bajo") return Number(a.min) > 0 && t.dep <= Number(a.min);
-    if (f === "sinmin") return conStock && !(Number(a.min) > 0) && a.tipo !== "sim" && a.tipo !== "herramienta" && a.tipo !== "no";
+    if (f === "sinmin") return conStock && !(Number(a.min) > 0);
     return true;
   }).sort((x, y) => String(x.a.d).localeCompare(String(y.a.d), "es"));
 }
@@ -6335,7 +6364,7 @@ function stkRenderArticulos() {
   cont.querySelectorAll("[data-ajustar]").forEach((b) => b.addEventListener("click", () => stkAjustarDialogo(b.closest("tr").dataset.c, "dep")));
 }
 document.getElementById("stkBuscar").addEventListener("input", () => { stkLimite = 200; stkRenderArticulos(); });
-document.getElementById("stkFiltro").addEventListener("change", () => { stkLimite = 200; stkRenderArticulos(); });
+["stkFiltro", "stkDonde", "stkProv"].forEach((id) => document.getElementById(id).addEventListener("change", () => { stkLimite = 200; stkRenderArticulos(); }));
 async function stkAjustarDialogo(c, ubic) {
   const a = stk.catalogo.articulos[c] || { d: c };
   const actual = ((stk.saldos.ubic || {})[ubic] || {})[c] || 0;
@@ -6609,18 +6638,24 @@ async function stkCargarMovimientos() {
 function stkMovFiltrados() {
   const q = normalizeText(document.getElementById("stkMovBuscar").value || "");
   const arts = (stk && stk.catalogo.articulos) || {};
-  return stkMovs.map((m) => ({ ...m, d: (arts[m.c] || {}).d || "" })).filter((m) => !q || normalizeText(`${m.c} ${m.d} ${m.por} ${m.motivo} ${m.de || ""} ${m.a || ""}`).includes(q));
+  const tipo = document.getElementById("stkMovTipo").value;
+  return stkMovs.map((m) => ({ ...m, d: (arts[m.c] || {}).d || "" })).filter((m) => (!tipo || m.tipo === tipo) && (!q || normalizeText(`${m.c} ${m.d} ${m.por} ${m.motivo || ""} ${m.de || ""} ${m.a || ""} ${m.presupuesto || ""} ${(m.unidades || []).join(" ")}`).includes(q)));
 }
 function stkRenderMovimientos() {
+  const selT = document.getElementById("stkMovTipo"), actualT = selT.value;
+  const tipos = [...new Set(stkMovs.map((m) => m.tipo))];
+  selT.innerHTML = '<option value="">Todos</option>' + tipos.map((t) => `<option value="${escapeHtmlAdmin(t)}">${escapeHtmlAdmin(STK_MOV_TIPO[t] || t)}</option>`).join("");
+  selT.value = tipos.includes(actualT) ? actualT : "";
   const cont = document.getElementById("stkMovLista"), lista = stkMovFiltrados();
   cont.innerHTML = !lista.length ? '<p class="subtitle">No hay movimientos en ese mes.</p>'
     : `<p class="subtitle" style="margin:8px 0;">${lista.length} movimientos.</p><div style="overflow-x:auto;"><table class="sims-tabla stk-tabla"><thead><tr><th>Fecha</th><th>Tipo</th><th>Artículo</th><th class="num">Cantidad</th><th>De → A</th><th>Por</th><th>Motivo</th></tr></thead><tbody>
-      ${lista.slice(0, 500).map((m) => `<tr><td>${escapeHtmlAdmin(new Date(m.fecha).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }))}</td><td>${escapeHtmlAdmin(STK_MOV_TIPO[m.tipo] || m.tipo)}</td><td>${escapeHtmlAdmin(m.c)} ${escapeHtmlAdmin(m.d)}</td><td class="num">${stkFmt(m.cant)}</td><td>${escapeHtmlAdmin(m.de ? nombreUbicacion(m.de) : "—")} → ${escapeHtmlAdmin(m.a ? nombreUbicacion(m.a) : "—")}</td><td>${escapeHtmlAdmin(m.por || "")}</td><td>${escapeHtmlAdmin(m.motivo || "")}${m.antes != null ? `<div class="stk-det">${stkFmt(m.antes)} → ${stkFmt(m.despues)}</div>` : ""}</td></tr>`).join("")}</tbody></table></div>`;
+      ${lista.slice(0, 500).map((m) => `<tr><td>${escapeHtmlAdmin(new Date(m.fecha).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }))}</td><td>${escapeHtmlAdmin(STK_MOV_TIPO[m.tipo] || m.tipo)}</td><td>${escapeHtmlAdmin(m.c)} ${escapeHtmlAdmin(m.d)}</td><td class="num">${stkFmt(m.cant)}</td><td>${escapeHtmlAdmin(m.de ? nombreUbicacion(m.de) : "—")} → ${escapeHtmlAdmin(m.a ? nombreUbicacion(m.a) : "—")}</td><td>${escapeHtmlAdmin(m.por || "")}</td><td>${m.presupuesto ? `<b>Presupuesto N° ${escapeHtmlAdmin(m.presupuesto)}</b> ` : ""}${escapeHtmlAdmin(m.motivo || "")}${m.unidades && m.unidades.length ? `<div class="stk-det">${m.unidades.map(escapeHtmlAdmin).join(" · ")}</div>` : ""}${m.antes != null ? `<div class="stk-det">${stkFmt(m.antes)} → ${stkFmt(m.despues)}</div>` : ""}</td></tr>`).join("")}</tbody></table></div>`;
 }
 document.getElementById("stkMovMes").addEventListener("change", stkCargarMovimientos);
 document.getElementById("stkMovBuscar").addEventListener("input", stkRenderMovimientos);
+document.getElementById("stkMovTipo").addEventListener("change", stkRenderMovimientos);
 document.getElementById("stkMovExcelBtn").addEventListener("click", () => {
-  const filas = stkMovFiltrados().map((m) => ({ Fecha: new Date(m.fecha).toLocaleString("es-AR"), Tipo: STK_MOV_TIPO[m.tipo] || m.tipo, Código: m.c, Descripción: m.d, Cantidad: m.cant, De: m.de ? nombreUbicacion(m.de) : "", A: m.a ? nombreUbicacion(m.a) : "", Por: m.por || "", Motivo: m.motivo || "" }));
+  const filas = stkMovFiltrados().map((m) => ({ Fecha: new Date(m.fecha).toLocaleString("es-AR"), Tipo: STK_MOV_TIPO[m.tipo] || m.tipo, Código: m.c, Descripción: m.d, Cantidad: m.cant, De: m.de ? nombreUbicacion(m.de) : "", A: m.a ? nombreUbicacion(m.a) : "", Por: m.por || "", Presupuesto: m.presupuesto || "", "N° de unidad": (m.unidades || []).join(", "), Motivo: m.motivo || "" }));
   const libro = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filas.length ? filas : [{ Fecha: "Sin movimientos" }]), "Movimientos");
   XLSX.writeFile(libro, `stock_movimientos_${document.getElementById("stkMovMes").value}.xlsx`);

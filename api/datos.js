@@ -1386,7 +1386,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
       const { data: cat } = await leerArchivoDatos(STOCK_CAT, { articulos: {} });
       let resultado = null;
       const r = await stockActualizar(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }, (sal) => {
-        const x = S.moverStock(sal, Array.isArray(b.items) ? b.items.slice(0, 500) : [], { tipo, de, a, por: quien, fecha: ahora, motivo: String(b.motivo || "").slice(0, 200), confirmar, deFlexible: /^(cli|com):/.test(de) && a === "dep" }, cat);
+        const x = S.moverStock(sal, Array.isArray(b.items) ? b.items.slice(0, 500) : [], { tipo, de, a, por: quien, fecha: ahora, motivo: String(b.motivo || "").slice(0, 200), confirmar, deFlexible: /^(cli|com):/.test(de) && a === "dep", presupuesto: /^(cli|com):/.test(a) ? String(b.presupuesto || "").trim().slice(0, 30) : "" }, cat);
         if (x.error) return { error: x.error, status: 409 };
         resultado = x;
         return { data: x.saldos, respuesta: { envio: x.envio, movimientos: x.movs.length } };

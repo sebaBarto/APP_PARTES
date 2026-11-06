@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.47.0";
+const APP_VERSION = "4.47.1";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -18462,7 +18462,7 @@ const depCatalogo = () => (depDatos && depDatos.catalogo) || { articulos: {} };
 const depSaldos = () => (depDatos && depDatos.saldos) || { ubic: {}, unidades: {} };
 const depOrigen = () => {
   if (depModo === "entregar") return "dep";
-  const t = document.getElementById("depRecibirTipo").value, n = document.getElementById("depRecibirDe").value.trim();
+  const t = document.getElementById("depRecibirTipo").value, n = depNombreElegido("depRecibirTipo");
   return t === "proveedor" || !n ? "" : t === "veh" ? `veh:${n}` : ""; // de clientes: la APP puede no tenerlo registrado
 };
 const depCanasta = crearCanastaStock({
@@ -18472,7 +18472,7 @@ const depCanasta = crearCanastaStock({
 function depBotonTexto() {
   const n = depCanasta.items().length, btn = document.getElementById("depConfirmarBtn");
   btn.disabled = !n;
-  if (depModo === "entregar") { const nom = document.getElementById("depDestNombre").value.trim(); btn.textContent = n ? `Entregar ${n} artículo${n === 1 ? "" : "s"}${nom ? " a " + nom : ""}` : "Entregar"; }
+  if (depModo === "entregar") { const nom = depNombreElegido("depDestTipo"); btn.textContent = n ? `Entregar ${n} artículo${n === 1 ? "" : "s"}${nom ? " a " + nom : ""}` : "Entregar"; }
   else btn.textContent = n ? `Ingresar ${n} artículo${n === 1 ? "" : "s"} al depósito` : "Ingresar al depósito";
 }
 async function depCargar() {
@@ -18486,18 +18486,32 @@ async function depCargar() {
 async function depListaNombres(tipo) {
   if (tipo === "tec") return Object.keys(tecnicosPasswords).sort((a, b) => a.localeCompare(b, "es"));
   if (tipo === "veh") {
-    if (!depVehiculos) { try { const r = await fetch("/api/datos?coleccion=vehiculos", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" }); const d = await r.json(); depVehiculos = (Array.isArray(d) ? d : []).map((v) => v.nombre).filter(Boolean); } catch (e) { depVehiculos = []; } }
-    return depVehiculos;
+    if (!depVehiculos || !depVehiculos.length) { try { const r = await fetch("/api/datos?coleccion=vehiculos", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" }); const d = await r.json(); depVehiculos = (Array.isArray(d) ? d : []).filter((v) => v && v.nombre); } catch (e) { depVehiculos = []; } }
+    return depVehiculos.map((v) => v.nombre).sort((a, b) => a.localeCompare(b, "es"));
   }
   if (tipo === "cli" || tipo === "com") return (await cargarClientesGeneral()).map((c) => c.nombre).filter(Boolean).slice(0, 3000);
   return [];
 }
-async function depLlenarLista(selectId, inputId, listaId) {
-  const tipo = document.getElementById(selectId).value;
+// Técnicos y vehículos se eligen de una lista (no se puede escribir cualquier cosa);
+// los clientes se escriben con sugerencias.
+const DEP_CAMPOS = { depDestTipo: ["depDestSelect", "depDestNombre", "depDestLista"], depRecibirTipo: ["depRecibirSelect", "depRecibirDe", "depRecibirLista"] };
+function depNombreElegido(tipoId) {
+  const [sel, inp] = DEP_CAMPOS[tipoId], tipo = document.getElementById(tipoId).value;
+  return (tipo === "tec" || tipo === "veh" ? document.getElementById(sel).value : document.getElementById(inp).value).trim();
+}
+async function depLlenarLista(tipoId) {
+  const [selId, inpId, listaId] = DEP_CAMPOS[tipoId], tipo = document.getElementById(tipoId).value;
+  const deLista = tipo === "tec" || tipo === "veh";
+  const sel = document.getElementById(selId), inp = document.getElementById(inpId);
+  sel.classList.toggle("hidden", !deLista); inp.classList.toggle("hidden", deLista);
+  if (tipoId === "depDestTipo") document.getElementById("depPresupuestoCaja").classList.toggle("hidden", !(tipo === "cli" || tipo === "com"));
   const nombres = await depListaNombres(tipo);
-  document.getElementById(listaId).innerHTML = nombres.map((n) => `<option value="${escapeHtml(n)}">`).join("");
-  const inp = document.getElementById(inputId);
-  if (inp.value && !nombres.includes(inp.value) && tipo === "tec") inp.value = "";
+  if (deLista) {
+    const actual = sel.value;
+    const etiqueta = (n) => { const v = tipo === "veh" ? (depVehiculos || []).find((x) => x.nombre === n) : null; return v && v.patente && !String(n).includes(v.patente) ? `${n} (${v.patente})` : n; };
+    sel.innerHTML = `<option value="">${tipo === "veh" ? "Elegí el vehículo…" : "Elegí el técnico…"}</option>` + nombres.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(etiqueta(n))}</option>`).join("");
+    if (nombres.includes(actual)) sel.value = actual;
+  } else document.getElementById(listaId).innerHTML = nombres.map((n) => `<option value="${escapeHtml(n)}">`).join("");
 }
 function depMostrarModo() {
   document.querySelectorAll("#depModos [data-modo]").forEach((b) => b.classList.toggle("activo", b.dataset.modo === depModo));
@@ -18514,10 +18528,12 @@ document.querySelectorAll("#depModos [data-modo]").forEach((b) => b.addEventList
   if (b.dataset.modo !== depModo && depCanasta.items().length && depModo !== "consultar") { showToast("Primero terminá o vaciá la lista"); return; }
   depModo = b.dataset.modo; depMostrarModo();
 }));
-document.getElementById("depDestTipo").addEventListener("change", () => { document.getElementById("depDestNombre").value = ""; depLlenarLista("depDestTipo", "depDestNombre", "depDestLista"); depBotonTexto(); });
+document.getElementById("depDestTipo").addEventListener("change", async () => { document.getElementById("depDestNombre").value = ""; document.getElementById("depDestSelect").value = ""; await depLlenarLista("depDestTipo"); depBotonTexto(); });
 document.getElementById("depDestNombre").addEventListener("input", depBotonTexto);
-document.getElementById("depRecibirTipo").addEventListener("change", () => { document.getElementById("depRecibirDe").value = ""; depLlenarLista("depRecibirTipo", "depRecibirDe", "depRecibirLista"); depMostrarModo(); });
+document.getElementById("depDestSelect").addEventListener("change", depBotonTexto);
+document.getElementById("depRecibirTipo").addEventListener("change", async () => { document.getElementById("depRecibirDe").value = ""; document.getElementById("depRecibirSelect").value = ""; await depLlenarLista("depRecibirTipo"); depMostrarModo(); });
 document.getElementById("depRecibirDe").addEventListener("change", () => depCanasta.render());
+document.getElementById("depRecibirSelect").addEventListener("change", () => depCanasta.render());
 conectarCasilleroStock(document.getElementById("depCodigo"), document.getElementById("depBuscarResultados"), depCanasta, depCatalogo);
 document.getElementById("depEscanearBtn").addEventListener("click", () => abrirEscanerStock({ titulo: depModo === "entregar" ? "Entregar" : "Ingresar al depósito", alLeer: (t) => depCanasta.agregarCodigo(t) }));
 document.getElementById("depConfirmarBtn").addEventListener("click", async (ev) => {
@@ -18525,26 +18541,27 @@ document.getElementById("depConfirmarBtn").addEventListener("click", async (ev) 
   if (!items.length) return;
   let cuerpo;
   if (depModo === "entregar") {
-    const tipo = document.getElementById("depDestTipo").value, nombre = document.getElementById("depDestNombre").value.trim();
-    if (!nombre) { showToast("Elegí a quién se entrega"); document.getElementById("depDestNombre").focus(); return; }
-    if (tipo === "tec" && !Object.keys(tecnicosPasswords).includes(nombre)) { showToast("Ese técnico no está en la lista"); return; }
+    const tipo = document.getElementById("depDestTipo").value, nombre = depNombreElegido("depDestTipo");
+    if (!nombre) { showToast(tipo === "veh" ? "Elegí a qué vehículo va" : tipo === "tec" ? "Elegí a qué técnico va" : "Escribí el cliente"); document.getElementById(tipo === "tec" || tipo === "veh" ? "depDestSelect" : "depDestNombre").focus(); return; }
     const falta = items.find((x) => x.cant > (((depSaldos().ubic || {}).dep || {})[x.c] || 0));
     if (falta) { showToast(`${(a[falta.c] || {}).d}: en el depósito no alcanza`); return; }
     cuerpo = { accion: "mover", de: "dep", a: `${tipo}:${nombre}`, items };
+    const pres = document.getElementById("depPresupuesto").value.trim();
+    if ((tipo === "cli" || tipo === "com") && pres) cuerpo.presupuesto = pres;
   } else {
-    const tipo = document.getElementById("depRecibirTipo").value, nombre = document.getElementById("depRecibirDe").value.trim();
+    const tipo = document.getElementById("depRecibirTipo").value, nombre = depNombreElegido("depRecibirTipo");
     if (tipo !== "proveedor" && !nombre) { showToast("Elegí de dónde viene"); return; }
     cuerpo = { accion: "mover", de: tipo === "proveedor" ? "proveedor" : `${tipo}:${nombre}`, a: "dep", items };
   }
   cuerpo.motivo = document.getElementById("depMotivo").value.trim();
   const sinN = items.filter((x) => (a[x.c] || {}).tipo === "unidad" && x.cant > x.unidades.length);
   const resumen = items.map((x) => `• ${(a[x.c] || {}).d || x.c}: ${stkFmtN(x.cant)}`).join("\n");
-  const destino = depModo === "entregar" ? nombreUbicacion(cuerpo.a) : "el depósito";
+  const destino = depModo === "entregar" ? nombreUbicacion(cuerpo.a) + (cuerpo.presupuesto ? ` (presupuesto N° ${cuerpo.presupuesto})` : "") : "el depósito";
   if (!(await confirmarApp(`¿Confirmar? Va a ${destino}:\n\n${resumen}${sinN.length ? `\n\nOjo: ${sinN.length} equipo(s) sin N° de unidad escaneado.` : ""}${/^tec:/.test(cuerpo.a) ? "\n\nQueda en camino hasta que el técnico toque «Recibí»." : ""}`, { aceptar: "Sí, confirmar" }))) return;
   btn.disabled = true;
   try {
     await stkApi("POST", "", cuerpo);
-    depCanasta.limpiar(); document.getElementById("depMotivo").value = "";
+    depCanasta.limpiar(); document.getElementById("depMotivo").value = ""; document.getElementById("depPresupuesto").value = "";
     showToast(/^tec:/.test(cuerpo.a) ? "✓ Enviado: le llegó el aviso para que confirme" : "✓ Listo");
     await depCargar();
   } catch (e) { showToast("No se pudo: " + e.message); }
@@ -18601,7 +18618,7 @@ document.getElementById("depConsultarCodigo").addEventListener("keydown", (e) =>
 document.getElementById("depConsultarEscanearBtn").addEventListener("click", () => abrirEscanerStock({ titulo: "Consultar", alLeer: (t) => depConsultar(t) }));
 document.getElementById("tileDepositoBtn").addEventListener("click", () => {
   showScreen("deposito");
-  depLlenarLista("depDestTipo", "depDestNombre", "depDestLista");
+  depLlenarLista("depDestTipo"); depLlenarLista("depRecibirTipo");
   depCargar();
 });
 document.getElementById("volverDeDepositoBtn").addEventListener("click", () => { if (stkEscanerAbierto) stkEscanerAbierto.cerrar(); showScreen("home"); actualizarBadgeStock(true); });

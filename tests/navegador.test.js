@@ -5505,6 +5505,16 @@ test("Stock: catálogo desde el listado de Oficina, saldo inicial, mínimos, con
   await page.click(".cartel-admin .cartel-si");
   await page.waitForFunction(() => /Ajustado/.test((document.getElementById("avisoFlotanteAdmin") || {}).textContent || ""));
   assert.strictEqual(saldos.ubic.dep["300"], 250);
+  // Filtros: los SIM no se ven salvo que se pidan
+  await page.selectOption("#stkFiltro", "todos");
+  assert.ok(!/MOVISTAR/.test(await page.textContent("#stkLista")));
+  await page.check('#stkTipos input[value="sim"]');
+  assert.ok(/MOVISTAR/.test(await page.textContent("#stkLista")));
+  await page.uncheck('#stkTipos input[value="sim"]');
+  await page.uncheck('#stkTipos input[value="cantidad"]');
+  assert.deepStrictEqual(await page.$$eval("#stkLista tr[data-c]", (t) => t.map((r) => r.dataset.c)), ["20825"], "solo equipos");
+  await page.check('#stkTipos input[value="cantidad"]');
+  await page.selectOption("#stkFiltro", "constock");
   // Conciliación: Oficina dice 6 teclados, 2 sirenas, 300 m de cable y un artículo nuevo
   await page.click('#stkSub [data-stk="conciliacion"]');
   const lis = listado([6, 2, 300]); lis.push({ Código: "555", Descripción: "DETECTOR PIR NUEVO", "Cant. Depósito": 4, "Cant. Tránsito": 0, "Cant. Comodato": 0 });
@@ -5558,6 +5568,7 @@ test("Stock en la APP: el depósito entrega escaneando (etiqueta SAT + N° de un
     const req = route.request(), u = req.url();
     const json = (o, st) => route.fulfill({ status: st || 200, contentType: "application/json", body: JSON.stringify(o) });
     if (u.includes("coleccion=tecnicos")) return json([{ nombre: "Melina", permisos: { stock_responsable: true } }, { nombre: "Juan", permisos: {} }]);
+    if (u.includes("coleccion=vehiculos")) return json([{ nombre: "Kangoo", patente: "AB123CD" }, { nombre: "Partner" }]);
     if (!u.includes("coleccion=stock")) return json([]);
     if (req.method() === "GET") {
       if (u.includes("mio=1")) return json({ nombre: quien, ...S.stockDePersona(saldos, quien), articulos: catalogo.articulos });
@@ -5580,7 +5591,7 @@ test("Stock en la APP: el depósito entrega escaneando (etiqueta SAT + N° de un
   assert.ok(await page.isVisible("#tileDepositoBtn"), "la responsable ve Depósito");
   await page.click("#tileDepositoBtn");
   await page.waitForFunction(() => depDatos && depDatos.catalogo);
-  await page.fill("#depDestNombre", "Juan");
+  await page.selectOption("#depDestSelect", "Juan");
   // Etiqueta SAT del teclado + su N° de unidad
   await page.fill("#depCodigo", "000208252779"); await page.press("#depCodigo", "Enter");
   await page.waitForSelector("#depCanasta .stk-falta, #depCanasta .stk-linea");
@@ -5616,6 +5627,31 @@ test("Stock en la APP: el depósito entrega escaneando (etiqueta SAT + N° de un
   assert.deepStrictEqual(mov.items, [{ c: "20825", cant: 2, unidades: ["GH120FF156", "GH12100FD4"] }, { c: "20208", cant: 3, unidades: [] }]);
   assert.deepStrictEqual(catalogo.articulos["20208"].alias, ["7798164500049"], "aprendió el código de la sirena");
   assert.deepStrictEqual(saldos.ubic["cam:Juan"], { 20825: 2, 20208: 3 });
+  // A un cliente con N° de presupuesto, y a un vehículo elegido de la lista
+  await page.selectOption("#depDestTipo", "cli");
+  await page.waitForSelector("#depPresupuestoCaja:not(.hidden)");
+  await page.fill("#depDestNombre", "Kiosco Pérez");
+  await page.fill("#depPresupuesto", "4521");
+  await page.fill("#depCodigo", "20208"); await page.press("#depCodigo", "Enter");
+  await page.waitForSelector("#depCanasta .stk-linea");
+  await page.click("#depConfirmarBtn");
+  assert.match(await page.textContent(".dlg-app .dlg-texto"), /Kiosco Pérez \(presupuesto N° 4521\)/);
+  await page.click(".dlg-app .dlg-si");
+  await page.waitForFunction(() => !document.querySelector("#depCanasta .stk-linea"));
+  assert.deepStrictEqual([posts.at(-1).a, posts.at(-1).presupuesto], ["cli:Kiosco Pérez", "4521"]);
+  await page.selectOption("#depDestTipo", "veh");
+  await page.waitForFunction(() => !document.getElementById("depDestSelect").classList.contains("hidden") && document.getElementById("depPresupuestoCaja").classList.contains("hidden"));
+  await page.fill("#depCodigo", "20208"); await page.press("#depCodigo", "Enter");
+  await page.waitForSelector("#depCanasta .stk-linea");
+  await page.click("#depConfirmarBtn");
+  await page.waitForTimeout(200);
+  assert.strictEqual(await page.locator(".dlg-app").count(), 0, "sin vehículo elegido no sigue");
+  await page.selectOption("#depDestSelect", "Kangoo");
+  assert.match(await page.textContent("#depConfirmarBtn"), /a Kangoo/);
+  await page.click("#depConfirmarBtn");
+  await page.click(".dlg-app .dlg-si");
+  await page.waitForFunction(() => !document.querySelector("#depCanasta .stk-linea"));
+  assert.deepStrictEqual([posts.at(-1).a, posts.at(-1).presupuesto], ["veh:Kangoo", undefined]);
   // Juan: Mi stock -> recibe con una sirena de menos
   quien = "Juan";
   await page.evaluate(() => { tecnicoLogueado = "Juan"; showScreen("home"); });
@@ -5627,7 +5663,7 @@ test("Stock en la APP: el depósito entrega escaneando (etiqueta SAT + N° de un
   await page.click(".dlg-app .dlg-si");
   await page.waitForFunction(() => /TECLADO/.test(document.getElementById("miStockTengo").textContent) && !document.querySelector("#miStockPorRecibir .stk-envio"));
   assert.deepStrictEqual(saldos.ubic["tec:Juan"], { 20825: 2, 20208: 2 });
-  assert.strictEqual(saldos.ubic.dep["20208"], 8);
+  assert.strictEqual(saldos.ubic.dep["20208"], 6, "10 − 3 a Juan − 1 al cliente − 1 al vehículo + 1 que no le llegó");
   // Devuelve un teclado escaneando su N° de unidad
   await page.fill("#miStockCodigo", "GH120FF156"); await page.press("#miStockCodigo", "Enter");
   await page.waitForSelector("#miStockCanasta .stk-chip");
