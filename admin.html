@@ -206,6 +206,20 @@
   #tabGuardiasBtn:not(.active) .tab-icon { color: var(--acc-guardia); }
   #tabCredencialesBtn:not(.active) .tab-icon { color: var(--acc-gold); }
   #tabVehiculosBtn:not(.active) .tab-icon { color: var(--acc-green); }
+  #tabStockBtn:not(.active) .tab-icon { color: var(--acc-amber, #B5772A); }
+  .stk-sub { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 14px; }
+  .stk-sub button { width: auto; padding: 8px 14px; border-radius: 999px; }
+  .stk-sub button.activo { background: #101820; color: #F5A623; border-color: #101820; }
+  .stk-tabla td { vertical-align: middle; }
+  .stk-tabla .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .stk-tabla input.stk-min { width: 70px; padding: 4px 6px; text-align: right; }
+  .stk-tabla select.stk-tipo { padding: 4px; font-size: 12.5px; max-width: 170px; }
+  .stk-tabla .stk-btns { white-space: nowrap; text-align: right; }
+  .stk-tabla .stk-btns button { width: auto; margin: 2px 0 2px 4px; padding: 5px 9px; font-size: 12.5px; }
+  .stk-det { font-size: 12px; color: #6B7680; }
+  .stk-tag { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 11.5px; font-weight: 700; background: #EEF0F2; color: #3A4651; }
+  .stk-tag.unidad { background: #FFF1D6; color: #8A5A00; }
+  .stk-tag.bajo { background: #FDE2E0; color: #B3261E; }
   .rend-matriz { width: 100%; border-collapse: collapse; font-size: 13px; }
   .rend-matriz th, .rend-matriz td { padding: 6px 8px; border-bottom: 1px solid rgba(128,128,128,.2); text-align: right; white-space: nowrap; }
   .rend-matriz th:first-child, .rend-matriz td:first-child { text-align: left; }
@@ -712,6 +726,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
       <button type="button" class="tab-btn" id="tabVehiculosBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13l2-6a2 2 0 0 1 2-1h10a2 2 0 0 1 2 1l2 6"/><rect x="2" y="13" width="20" height="5" rx="1.5"/><circle cx="7" cy="18.5" r="1.5"/><circle cx="17" cy="18.5" r="1.5"/></svg></span>Vehículos</button>
       <button type="button" class="tab-btn" id="tabVencimientosBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 9h18"/><path d="M12 13v3l2 1"/></svg></span>Vencimientos</button>
       <button type="button" class="tab-btn" id="tabSimsBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h6l4 4v12a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><rect x="9.5" y="10" width="5" height="5.5" rx="1"/></svg></span>SIMs</button>
+      <button type="button" class="tab-btn" id="tabStockBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg></span>Stock</button>
       <button type="button" class="tab-btn" id="tabHerramientasBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h16v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M8 8V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="4" y1="12" x2="20" y2="12"/></svg></span>Herramientas</button>
       <button type="button" class="tab-btn" id="tabSimsInstaladasBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg></span>SIMs instaladas</button>
       <button type="button" class="tab-btn" id="tabSimsControlBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg></span>Control de SIMs</button>
@@ -1239,6 +1254,72 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
           </thead>
           <tbody id="simsTablaBody"></tbody>
         </table>
+      </div>
+    </div>
+
+    <div id="panelStock" class="hidden">
+      <h1>Stock</h1>
+      <p class="subtitle">Dónde está cada artículo: depósito, técnicos, vehículos y clientes. El sistema de Oficina sigue con precios y compras; acá se concilia contra lo que exporta y se arma el pedido de lo que falta.</p>
+      <div class="stk-sub" id="stkSub">
+        <button type="button" class="btn-secondary-admin activo" data-stk="articulos">Artículos</button>
+        <button type="button" class="btn-secondary-admin" data-stk="conciliacion">Conciliación con Oficina</button>
+        <button type="button" class="btn-secondary-admin" data-stk="pedidos">Pedidos</button>
+        <button type="button" class="btn-secondary-admin" data-stk="movimientos">Movimientos</button>
+      </div>
+      <p class="status" id="stkStatus"></p>
+
+      <div data-stk-vista="articulos">
+        <div class="card">
+          <h3 style="margin-top:0;">Catálogo</h3>
+          <div id="stkEstado" class="subtitle" style="margin:0 0 10px;"></div>
+          <div class="field-row" style="flex-wrap:wrap;align-items:flex-end;">
+            <div><label>Subir el listado de artículos del sistema de Oficina (o la planilla revisada)</label><input type="file" id="stkCatArchivo" accept=".xlsx,.xls,.csv"></div>
+          </div>
+          <p class="subtitle" style="margin:6px 0 0;">El listado de Oficina actualiza descripciones y precios y agrega los artículos nuevos. La planilla revisada (la de «cómo se controla cada artículo») aplica el tipo, la unidad, el mínimo, la cantidad a pedir y el proveedor.</p>
+          <div id="stkInicial"></div>
+        </div>
+        <div class="card">
+          <div class="field-row" style="flex-wrap:wrap;align-items:flex-end;">
+            <div style="flex:2 1 220px;"><label>Buscar</label><input type="text" class="field-input" id="stkBuscar" placeholder="Código o parte de la descripción"></div>
+            <div><label>Mostrar</label><select id="stkFiltro"><option value="constock">Con stock</option><option value="unidad">Equipos con N° de unidad</option><option value="cantidad">Por cantidad</option><option value="bajo">En el mínimo o por debajo</option><option value="sinmin">Con stock y sin mínimo</option><option value="todos">Todos</option></select></div>
+            <button type="button" class="btn-secondary-admin" id="stkExcelBtn" style="width:auto;">⬇ Excel</button>
+          </div>
+          <div id="stkLista"></div>
+        </div>
+      </div>
+
+      <div data-stk-vista="conciliacion" class="hidden">
+        <div class="card">
+          <h3 style="margin-top:0;">Conciliación con el sistema de Oficina</h3>
+          <p class="subtitle" style="margin-top:0;">Subí el listado de artículos que exporta Oficina (el mismo de siempre). Se compara artículo por artículo contra la APP y se muestran todas las diferencias. Oficina cuenta el depósito; la APP suma depósito + técnicos + vehículos + en camino, y aparte el comodato.</p>
+          <input type="file" id="stkConcArchivo" accept=".xlsx,.xls,.csv">
+          <p class="status" id="stkConcStatus"></p>
+          <div id="stkConcResultado"></div>
+        </div>
+      </div>
+
+      <div data-stk-vista="pedidos" class="hidden">
+        <div class="card">
+          <h3 style="margin-top:0;">Para pedir</h3>
+          <p class="subtitle" style="margin-top:0;">Artículos con mínimo cargado cuyo depósito quedó en el mínimo o por debajo. La cantidad sugerida es la «cantidad a pedir» del artículo o, si no tiene, lo que falta para llegar al doble del mínimo.</p>
+          <div id="stkPedidos"></div>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0;">Pedidos hechos (esperando que lleguen)</h3>
+          <p class="subtitle" style="margin-top:0;">Salen solos de esta lista cuando el depósito vuelve a estar por encima del mínimo.</p>
+          <div id="stkPedidosHechos"></div>
+        </div>
+      </div>
+
+      <div data-stk-vista="movimientos" class="hidden">
+        <div class="card">
+          <div class="field-row" style="flex-wrap:wrap;align-items:flex-end;">
+            <div><label>Mes</label><input type="month" class="field-input" id="stkMovMes"></div>
+            <div style="flex:2 1 200px;"><label>Buscar</label><input type="text" class="field-input" id="stkMovBuscar" placeholder="Artículo, persona, motivo"></div>
+            <button type="button" class="btn-secondary-admin" id="stkMovExcelBtn" style="width:auto;">⬇ Excel (para cargar en Oficina)</button>
+          </div>
+          <div id="stkMovLista"></div>
+        </div>
       </div>
     </div>
 
@@ -1781,6 +1862,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
 </div>
 
 <script src="sims-utils.js"></script>
+<script src="stock-utils.js"></script>
 <script src="croquis-utils.js"></script>
 <script>
 // ==== CONFIGURACIÓN ====
@@ -1931,6 +2013,8 @@ const tabSimsBtn = document.getElementById("tabSimsBtn");
 const panelSims = document.getElementById("panelSims");
 let simsCargadasUnaVez = false;
 const tabHerramientasBtn = document.getElementById("tabHerramientasBtn");
+const tabStockBtn = document.getElementById("tabStockBtn");
+const panelStock = document.getElementById("panelStock");
 const panelHerramientas = document.getElementById("panelHerramientas");
 let herramientasCargadasUnaVez = false;
 const tabSimsInstaladasBtn = document.getElementById("tabSimsInstaladasBtn");
@@ -2068,6 +2152,7 @@ const TABS = [
   { btn: tabCredencialesBtn, panel: panelCredenciales, onShow: () => recargarSiNoHayCambios(panelCredenciales, cargarCredencialesAdmin) },
   { btn: tabVehiculosBtn, panel: panelVehiculos, onShow: () => recargarSiNoHayCambios(panelVehiculos, cargarVehiculosAdmin, cargarEstadoVehiculosAdmin) },
   { btn: tabSimsBtn, panel: panelSims, onShow: () => cargarSimsAdmin() },
+  { btn: tabStockBtn, panel: panelStock, onShow: () => stkCargar() },
   { btn: tabHerramientasBtn, panel: panelHerramientas, onShow: () => recargarSiNoHayCambios(panelHerramientas, cargarHerramientasAdmin) },
   { btn: tabSimsInstaladasBtn, panel: panelSimsInstaladas, onShow: () => cargarSimsInstaladasAdmin() },
   { btn: tabSimsControlBtn, panel: panelSimsControl, onShow: () => cargarControlSims() },
@@ -2103,7 +2188,7 @@ const GRUPOS_MENU = [
   ["Día a día", ["tabServiciosBtn", "tabCronogramaBtn", "tabCoordinacionBtn", "tabEmergenciaBtn", "tabSeguimientosBtn", "tabSemaforoBtn", "tabNotasBtn"]],
   ["Administración", ["tabRendicionesBtn", "tabVencimientosBtn", "tabComodatosBtn", "tabInstalacionesBtn", "tabEncuestasBtn"]],
   ["SIMs", ["tabSimsBtn", "tabSimsInstaladasBtn", "tabSimsControlBtn"]],
-  ["Flota y herramientas", ["tabVehiculosBtn", "tabHerramientasBtn"]],
+  ["Flota y herramientas", ["tabStockBtn", "tabVehiculosBtn", "tabHerramientasBtn"]],
   ["Clientes", ["tabClientesBtn", "tabClavesClienteBtn", "tabPlanosBtn"]],
   ["Equipo y configuración", ["tabTecnicosBtn", "tabCredencialesBtn", "tabGuardiasBtn", "tabMaterialesBtn", "tabConsultasBtn", "tabErroresBtn", "tabAuditoriaBtn", "tabBackupBtn"]],
 ];
@@ -2146,7 +2231,7 @@ async function cargarInicioAdmin() {
   st.textContent = "Revisando...";
   const h = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
   const leer = (url) => fetch(url, { headers: h, cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-  const [emerg, rend, pend, sims, vehs, vehHist, errores, partes, clientes, instalaciones, presencias, historicas, simsInst, registroCopias, venPropios, venCreds] = await Promise.all([
+  const [emerg, rend, pend, sims, vehs, vehHist, errores, partes, clientes, instalaciones, presencias, historicas, simsInst, registroCopias, venPropios, venCreds, stockDatos] = await Promise.all([
     leer("/api/datos?coleccion=servicios_emergencia"),
     leer("/api/recurso-uso?recurso=rendicion"),
     leer("/api/recurso-uso?recurso=sim&pendientes=1&todas=1"),
@@ -2163,6 +2248,7 @@ async function cargarInicioAdmin() {
     leer("/api/datos?coleccion=backup&registro=1"),
     leer("/api/datos?coleccion=vencimientos"),
     leer("/api/datos?coleccion=credenciales"),
+    leer("/api/datos?coleccion=stock"),
   ]);
   const arr = (x) => (Array.isArray(x) ? x : []);
   const hoyISO = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
@@ -2182,6 +2268,14 @@ async function cargarInicioAdmin() {
     const venFilas = venArmarFilas({ propios: arr(venPropios), vehs: arr(vehs), creds: arr(venCreds) }, hoy).filter((f) => f.nivel === "vencido" || f.nivel === "pronto");
     const venVencidos = venFilas.filter((f) => f.nivel === "vencido").length;
     agregar(venFilas.length, venVencidos ? `Vencimientos (${venVencidos} vencido${venVencidos === 1 ? "" : "s"})` : "Vencimientos próximos", venFilas.slice(0, 2).map((f) => `${f.nombre}: ${venCuando(f)}`).join(" · "), "tabVencimientosBtn", venVencidos ? "urgente" : "atencion");
+  } catch (e) { /* nada */ }
+  // Stock: artículos en el mínimo o por debajo que todavía no se pidieron.
+  try {
+    if (stockDatos && stockDatos.catalogo && typeof articulosParaPedir === "function") {
+      const pp = articulosParaPedir(stockDatos.catalogo, stockDatos.saldos).pedir;
+      agregar(pp.length, "Artículos para pedir", pp.slice(0, 3).map((x) => x.d).join(" · ") + (pp.length > 3 ? ` y ${pp.length - 3} más` : ""), "tabStockBtn", "atencion");
+      if (pp.length) stkVistaPedida = "pedidos";
+    }
   } catch (e) { /* nada */ }
   agregar(arr(pend).length, "SIMs por aceptar", arr(pend).slice(0, 2).map((p) => `${p.numero} → ${p.tecnico_destino}`).join(" · "), "tabSimsBtn", "atencion");
   const simsProb = arr(sims).filter((s) => s.ubicacion_tipo !== "cliente" && s.estado_fisico && s.estado_fisico !== "Disponible");
@@ -6075,6 +6169,460 @@ document.getElementById("recParteGuardarBtn").addEventListener("click", async (e
     document.getElementById("recParteForm").classList.add("hidden");
   } catch (err) { st.className = "status err"; st.textContent = "No se pudo: " + err.message; }
   btn.disabled = false;
+});
+
+// ---------- Stock (etapa 1: catálogo, saldo inicial, conciliación con Oficina, pedidos) ----------
+let stk = null;                 // { catalogo, saldos, conc: { marcas, corridas } }
+let stkVista = "articulos";
+let stkVistaPedida = "";        // la pide la tarjeta del Inicio
+let stkUltimoListado = null;    // último listado de Oficina subido (para el saldo inicial)
+let stkConc = null;             // { listado, archivo, id }
+let stkLimite = 200;
+const stkFmt = (n) => (Number(n) || 0).toLocaleString("es-AR", { maximumFractionDigits: 3 });
+// Número escrito a mano: "12", "3,5", "1.250". Devuelve NaN si no es un número.
+const stkNum = (v) => { const t = String(v == null ? "" : v).trim(); return /^-?[\d.,\s]+$/.test(t) && /\d/.test(t) ? numStock(t) : NaN; };
+const stkUbicTexto = (detalle) => Object.entries(detalle || {}).filter(([, n]) => n).map(([u, n]) => `${nombreUbicacion(u)}: ${stkFmt(n)}`).join(" · ");
+
+async function stkPost(cuerpo) {
+  const r = await fetch("/api/datos?coleccion=stock", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify(cuerpo) });
+  const d = await r.json().catch(() => null);
+  if (!r.ok || !d || d.ok === false) throw new Error((d && d.error) || "Error " + r.status);
+  return d;
+}
+async function stkLeer() {
+  const r = await fetch("/api/datos?coleccion=stock", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+  const d = await r.json().catch(() => null);
+  if (!r.ok || !d || !d.catalogo) throw new Error((d && d.error) || "Error " + r.status);
+  stk = { catalogo: d.catalogo || { articulos: {} }, saldos: d.saldos || { ubic: {}, unidades: {}, pedidos: {} }, conc: d.conciliacion || { marcas: [], corridas: [] } };
+  return stk;
+}
+async function stkCargar() {
+  const st = document.getElementById("stkStatus");
+  if (stkVistaPedida) { stkVista = stkVistaPedida; stkVistaPedida = ""; }
+  st.className = "status"; st.textContent = "Cargando...";
+  try {
+    await stkLeer();
+    st.textContent = "";
+    // Pedidos que ya llegaron (el depósito volvió a estar por encima del mínimo): salen solos.
+    const cumplidos = pedidosCumplidos(stk.catalogo, stk.saldos);
+    if (cumplidos.length) { try { await stkPost({ accion: "quitar_pedido", items: cumplidos.map((c) => ({ c })) }); await stkLeer(); } catch (e) { /* se reintenta la próxima vez */ } }
+    stkMostrarVista();
+  } catch (err) { st.className = "status err"; st.textContent = "No se pudo cargar el stock: " + err.message; }
+}
+function stkMostrarVista() {
+  document.querySelectorAll("#stkSub [data-stk]").forEach((b) => b.classList.toggle("activo", b.dataset.stk === stkVista));
+  document.querySelectorAll("#panelStock [data-stk-vista]").forEach((d) => d.classList.toggle("hidden", d.dataset.stkVista !== stkVista));
+  if (!stk) return;
+  if (stkVista === "articulos") { stkRenderEstado(); stkRenderArticulos(); }
+  else if (stkVista === "conciliacion") stkRenderConciliacion();
+  else if (stkVista === "pedidos") stkRenderPedidos();
+  else if (stkVista === "movimientos") stkCargarMovimientos();
+}
+document.querySelectorAll("#stkSub [data-stk]").forEach((b) => b.addEventListener("click", () => { stkVista = b.dataset.stk; stkMostrarVista(); }));
+
+// --- Catálogo y saldo inicial ---
+function stkRenderEstado() {
+  const arts = Object.values(stk.catalogo.articulos || {});
+  const porTipo = {};
+  arts.forEach((a) => { porTipo[a.tipo] = (porTipo[a.tipo] || 0) + 1; });
+  const conMin = arts.filter((a) => Number(a.min) > 0).length;
+  document.getElementById("stkEstado").innerHTML = arts.length
+    ? `<b>${arts.length.toLocaleString("es-AR")}</b> artículos: ${Object.entries(STOCK_TIPOS).filter(([k]) => porTipo[k]).map(([k, t]) => `${porTipo[k]} ${escapeHtmlAdmin(t.replace(/ \(.*\)$/, "").toLowerCase())}`).join(" · ")}. ${conMin} con stock mínimo.<br>`
+      + (stk.saldos.inicializado ? `Saldo inicial cargado el ${escapeHtmlAdmin(new Date(stk.saldos.inicializado).toLocaleDateString("es-AR"))}.` : `<b>Falta cargar el saldo inicial.</b>`)
+    : "Todavía no hay catálogo. Subí el listado de artículos que exporta el sistema de Oficina.";
+  const ini = document.getElementById("stkInicial");
+  if (!stk.saldos.inicializado && stkUltimoListado && arts.length) {
+    const items = stkUltimoListado.articulos.filter((x) => (x.dep || x.com) && stk.catalogo.articulos[x.c] && !["sim", "herramienta", "no"].includes(stk.catalogo.articulos[x.c].tipo));
+    ini.innerHTML = `<div class="card" style="margin:12px 0 0;background:#FFF8EA;border-color:#F5D38A;">
+      <p style="margin:0 0 8px;"><b>Saldo inicial.</b> La APP arranca con lo que dice este listado: ${items.length} artículos con cantidad en depósito o comodato (no se cuentan los SIM, las herramientas ni lo marcado «no controlar»). Se hace una sola vez; después las diferencias se corrigen desde la conciliación.</p>
+      <button type="button" id="stkInicialBtn" style="width:auto;">Cargar el saldo inicial con estas cantidades</button></div>`;
+    document.getElementById("stkInicialBtn").addEventListener("click", async (e) => {
+      const btn = e.currentTarget;
+      if (!(await confirmarAdmin(`¿Cargar el saldo inicial de ${items.length} artículos desde «${stkUltimoListado.archivo}»?`))) return;
+      await simsConBoton(btn, async () => {
+        try {
+          const r = await stkPost({ accion: "saldo_inicial", items: items.map((x) => ({ c: x.c, dep: x.dep, com: x.com })) });
+          await stkLeer();
+          avisoAdmin(`Listo: saldo inicial cargado (${r.articulos} artículos).`, "ok");
+          stkMostrarVista();
+        } catch (err) { avisoAdmin("No se pudo cargar el saldo inicial: " + err.message, "err"); }
+      });
+    });
+  } else if (!stk.saldos.inicializado && arts.length) {
+    ini.innerHTML = `<p class="subtitle" style="margin:10px 0 0;">Para cargar el saldo inicial, subí de nuevo el listado de Oficina (el que trae las cantidades de depósito y comodato).</p>`;
+  } else ini.innerHTML = "";
+}
+async function stkLeerArchivo(archivo) {
+  const buf = await archivo.arrayBuffer();
+  const wb = XLSX.read(buf, { type: "array" });
+  const filas = filasDelListado(wb, XLSX);
+  if (!filas.length) throw new Error("No se encontró una hoja con las columnas «Código» y «Descripción».");
+  const r = leerListadoOficina(filas);
+  return { ...r, archivo: archivo.name };
+}
+document.getElementById("stkCatArchivo").addEventListener("change", async (e) => {
+  const inp = e.currentTarget, archivo = inp.files && inp.files[0];
+  if (!archivo) return;
+  const st = document.getElementById("stkStatus");
+  st.className = "status"; st.textContent = "Leyendo el archivo...";
+  try {
+    const l = await stkLeerArchivo(archivo);
+    const r = await stkPost({ accion: "importar_catalogo", revisada: l.esRevisada, articulos: l.articulos });
+    if (!l.esRevisada) stkUltimoListado = l;
+    await stkLeer();
+    st.className = "status ok";
+    st.textContent = l.esRevisada
+      ? `Planilla revisada aplicada: ${r.configurados} artículos configurados (tipo, unidad, mínimo, a pedir, proveedor)${r.nuevos ? `, ${r.nuevos} nuevos` : ""}.`
+      : `Catálogo actualizado: ${r.nuevos} nuevos, ${r.actualizados} actualizados (${r.total} en total).`;
+    stkMostrarVista();
+  } catch (err) { st.className = "status err"; st.textContent = "No se pudo leer el listado: " + err.message; }
+  inp.value = "";
+});
+
+// --- Artículos ---
+function stkFiltrados() {
+  const q = normalizeText(document.getElementById("stkBuscar").value || "");
+  const f = document.getElementById("stkFiltro").value;
+  const tot = totalesPorArticulo(stk.saldos);
+  return Object.values(stk.catalogo.articulos || {}).map((a) => ({ a, t: tot[a.c] || { sat: 0, dep: 0, tec: 0, veh: 0, cam: 0, cli: 0, com: 0, detalle: {} } })).filter(({ a, t }) => {
+    if (q && !normalizeText(`${a.c} ${a.d} ${a.prov || ""}`).includes(q)) return false;
+    const conStock = t.sat || t.com || t.cli;
+    if (f === "constock") return conStock;
+    if (f === "unidad" || f === "cantidad") return a.tipo === f;
+    if (f === "bajo") return Number(a.min) > 0 && t.dep <= Number(a.min);
+    if (f === "sinmin") return conStock && !(Number(a.min) > 0) && a.tipo !== "sim" && a.tipo !== "herramienta" && a.tipo !== "no";
+    return true;
+  }).sort((x, y) => String(x.a.d).localeCompare(String(y.a.d), "es"));
+}
+function stkRenderArticulos() {
+  const cont = document.getElementById("stkLista");
+  const filas = stkFiltrados();
+  if (!filas.length) { cont.innerHTML = `<p class="subtitle">${Object.keys(stk.catalogo.articulos || {}).length ? "No hay artículos con ese filtro." : "Todavía no hay catálogo."}</p>`; return; }
+  const opTipo = (t) => Object.entries(STOCK_TIPOS).map(([k, v]) => `<option value="${k}" ${k === t ? "selected" : ""}>${escapeHtmlAdmin(v)}</option>`).join("");
+  cont.innerHTML = `<p class="subtitle" style="margin:8px 0;">${filas.length.toLocaleString("es-AR")} artículos.</p>
+    <div style="overflow-x:auto;"><table class="sims-tabla stk-tabla"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Depósito</th><th class="num">Técnicos / vehículos</th><th class="num">Clientes</th><th>Cómo se controla</th><th class="num">Mínimo</th><th class="num">A pedir</th><th>Proveedor</th><th></th></tr></thead><tbody>
+    ${filas.slice(0, stkLimite).map(({ a, t }) => {
+      const bajo = Number(a.min) > 0 && t.dep <= Number(a.min);
+      const med = a.medida === "metros" ? " m" : "";
+      return `<tr data-c="${escapeHtmlAdmin(a.c)}">
+        <td>${escapeHtmlAdmin(a.c)}</td>
+        <td>${escapeHtmlAdmin(a.d)}${a.baja ? ' <span class="stk-tag">Deshabilitado</span>' : ""}${bajo ? ' <span class="stk-tag bajo">Para pedir</span>' : ""}${stkUbicTexto(t.detalle) ? `<div class="stk-det">${escapeHtmlAdmin(stkUbicTexto(t.detalle))}</div>` : ""}</td>
+        <td class="num"><b>${stkFmt(t.dep)}</b>${med}</td>
+        <td class="num">${stkFmt(t.tec + t.veh + t.cam)}</td>
+        <td class="num">${stkFmt(t.com + t.cli)}</td>
+        <td><select class="stk-tipo" data-campo="tipo">${opTipo(a.tipo)}</select></td>
+        <td class="num"><input class="stk-min" data-campo="min" inputmode="decimal" value="${a.min == null ? "" : escapeHtmlAdmin(String(a.min))}"></td>
+        <td class="num"><input class="stk-min" data-campo="pedir" inputmode="decimal" value="${a.pedir == null ? "" : escapeHtmlAdmin(String(a.pedir))}"></td>
+        <td><input class="field-input" data-campo="prov" style="padding:4px 6px;min-width:120px;" value="${escapeHtmlAdmin(a.prov || "")}"></td>
+        <td class="stk-btns"><button type="button" class="btn-secondary-admin" data-ajustar>Ajustar</button></td></tr>`;
+    }).join("")}</tbody></table></div>
+    ${filas.length > stkLimite ? `<button type="button" class="btn-secondary-admin" id="stkMasBtn" style="width:auto;margin-top:10px;">Mostrar ${Math.min(200, filas.length - stkLimite)} más</button>` : ""}`;
+  const mas = document.getElementById("stkMasBtn");
+  if (mas) mas.addEventListener("click", () => { stkLimite += 200; stkRenderArticulos(); });
+  cont.querySelectorAll("[data-campo]").forEach((el) => el.addEventListener("change", async () => {
+    const c = el.closest("tr").dataset.c, campo = el.dataset.campo;
+    let v = el.value.trim();
+    if (campo === "min" || campo === "pedir") { if (v !== "" && !(stkNum(v) >= 0)) { avisoAdmin("Poné un número.", "err"); return; } v = v === "" ? "" : stkNum(v); }
+    el.disabled = true;
+    try {
+      const r = await stkPost({ accion: "configurar", c, campos: { [campo]: v } });
+      stk.catalogo.articulos[c] = r.articulo;
+      avisoAdmin(`Guardado: ${r.articulo.d}`, "ok");
+    } catch (err) { avisoAdmin("No se pudo guardar: " + err.message, "err"); }
+    el.disabled = false;
+  }));
+  cont.querySelectorAll("[data-ajustar]").forEach((b) => b.addEventListener("click", () => stkAjustarDialogo(b.closest("tr").dataset.c, "dep")));
+}
+document.getElementById("stkBuscar").addEventListener("input", () => { stkLimite = 200; stkRenderArticulos(); });
+document.getElementById("stkFiltro").addEventListener("change", () => { stkLimite = 200; stkRenderArticulos(); });
+async function stkAjustarDialogo(c, ubic) {
+  const a = stk.catalogo.articulos[c] || { d: c };
+  const actual = ((stk.saldos.ubic || {})[ubic] || {})[c] || 0;
+  const v = await pedirTextoAdmin(`${a.d}\n${nombreUbicacion(ubic)}: hoy la APP tiene ${stkFmt(actual)}.\n¿Cuántos hay realmente?`, String(actual));
+  if (v == null || String(v).trim() === "") return;
+  const cant = stkNum(v);
+  if (!(cant >= 0)) { avisoAdmin("Poné un número igual o mayor a 0.", "err"); return; }
+  if (cant === actual) { avisoAdmin("Es la misma cantidad: no hay nada que cambiar.", "aviso"); return; }
+  const motivo = await pedirTextoAdmin("Motivo del ajuste (queda en Movimientos):", "Recuento de inventario");
+  if (!motivo || !motivo.trim()) { avisoAdmin("El ajuste necesita un motivo: no se cambió nada.", "aviso"); return; }
+  try {
+    await stkPost({ accion: "ajustar", c, ubic, cantidad: cant, motivo: motivo.trim() });
+    await stkLeer();
+    const ahora = ((stk.saldos.ubic || {})[ubic] || {})[c] || 0;
+    if (ahora !== cant) throw new Error(`después de guardar quedó en ${stkFmt(ahora)}`);
+    avisoAdmin(`Ajustado: ${a.d} — ${nombreUbicacion(ubic)} ${stkFmt(actual)} → ${stkFmt(cant)}.`, "ok");
+  } catch (err) { avisoAdmin("No se pudo ajustar: " + err.message, "err"); }
+  stkMostrarVista();
+}
+document.getElementById("stkExcelBtn").addEventListener("click", () => {
+  if (!stk) return;
+  const filas = stkFiltrados().map(({ a, t }) => ({ Código: a.c, Descripción: a.d, "Cómo se controla": STOCK_TIPOS[a.tipo] || a.tipo, Unidad: a.medida || "unidades", Depósito: t.dep, "Técnicos": t.tec, "Vehículos": t.veh, "En camino": t.cam, "Comodato": t.com, "Instalado en clientes": t.cli, "Stock mínimo": a.min ?? "", "Cantidad a pedir": a.pedir ?? "", Proveedor: a.prov || "", "Dónde está": stkUbicTexto(t.detalle) }));
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filas), "Stock");
+  XLSX.writeFile(libro, `stock_${new Date().toISOString().slice(0, 10)}.xlsx`);
+});
+
+// --- Conciliación con el sistema de Oficina ---
+document.getElementById("stkConcArchivo").addEventListener("change", async (e) => {
+  const inp = e.currentTarget, archivo = inp.files && inp.files[0];
+  if (!archivo) return;
+  const st = document.getElementById("stkConcStatus");
+  st.className = "status"; st.textContent = "Leyendo el archivo...";
+  try {
+    const l = await stkLeerArchivo(archivo);
+    if (l.esRevisada) throw new Error("Esta es la planilla revisada. Para conciliar subí el listado tal cual lo exporta Oficina.");
+    if (!l.columnas.deposito) throw new Error("El listado no trae la columna «Cant. Depósito».");
+    await stkLeer();
+    stkConc = { listado: l.articulos, archivo: archivo.name, id: Date.now().toString(36) };
+    if (!stk.saldos.inicializado) stkUltimoListado = l;
+    st.textContent = "";
+    stkRenderConciliacion(true);
+  } catch (err) { st.className = "status err"; st.textContent = "No se pudo leer el listado: " + err.message; }
+  inp.value = "";
+});
+function stkConcCalcular() { return conciliarStock(stkConc.listado, stk.catalogo, stk.saldos, stk.conc.marcas, new Date()); }
+async function stkRenderConciliacion(registrar) {
+  const cont = document.getElementById("stkConcResultado");
+  if (!stkConc) { cont.innerHTML = stkHistorialConc(); return; }
+  if (!stk.saldos.inicializado) {
+    cont.innerHTML = `<p class="status err">Primero hay que cargar el saldo inicial (en Artículos). Si querés, cargalo con este mismo listado: ya quedó listo ahí.</p>`;
+    return;
+  }
+  const r = stkConcCalcular();
+  const numeros = {};
+  STOCK_CONC_CATEGORIAS.forEach((c) => { numeros[c.k] = r[c.k].length; });
+  const totalDif = Object.values(numeros).reduce((a, b) => a + b, 0);
+  if (registrar) {
+    try { const x = await stkPost({ accion: "conc_corrida", id: stkConc.id, archivo: stkConc.archivo, revisados: r.revisados, coinciden: r.coinciden, numeros }); stk.conc.corridas = x.corridas || stk.conc.corridas; } catch (e) { /* el historial es secundario */ }
+  }
+  const fila = (cat, it) => {
+    const of = it.of || {}, t = it.t || {};
+    let oficina = "", app = "", dif = "";
+    if (cat.k === "comodatoDistinto") { oficina = stkFmt(of.com); app = stkFmt(t.com); dif = it.dif; }
+    else if (cat.k === "negativo") { oficina = "—"; app = `${escapeHtmlAdmin(nombreUbicacion(it.u))}: ${stkFmt(it.n)}`; }
+    else if (cat.k === "unidadesSinRegistrar") { oficina = stkFmt(of.dep); app = `${stkFmt(t.sat)} (${it.registradas} con N° de unidad)`; }
+    else { oficina = stkFmt(of.dep); app = stkFmt(t.sat); dif = it.dif != null ? it.dif : (t.sat || 0) - (of.dep || 0); }
+    const difTxt = dif === "" ? "" : `<b style="color:${dif > 0 ? "#8A5A00" : "#B3261E"}">${dif > 0 ? "+" : ""}${stkFmt(dif)}</b>`;
+    return `<tr data-c="${escapeHtmlAdmin(it.c)}" data-u="${escapeHtmlAdmin(it.u || "")}">
+      <td><input type="checkbox" class="stk-conc-sel"></td><td>${escapeHtmlAdmin(it.c)}</td>
+      <td>${escapeHtmlAdmin(it.d || "")}${it.reaparece ? ' <span class="stk-tag bajo">⟳ Volvió a aparecer</span>' : ""}${stkUbicTexto(t.detalle) ? `<div class="stk-det">APP: ${escapeHtmlAdmin(stkUbicTexto(t.detalle))}</div>` : ""}</td>
+      <td class="num">${oficina}</td><td class="num">${app}</td><td class="num">${difTxt}</td></tr>`;
+  };
+  const accionCat = { noEnCatalogo: "Agregar al catálogo", cantidadDistinta: "Dejar la APP como Oficina", soloEnApp: "Dejar la APP como Oficina (0)", comodatoDistinto: "Dejar el comodato como Oficina", negativo: "Poner en 0" };
+  cont.innerHTML = `<div class="sims-resumen" style="margin:10px 0;">
+      <p style="margin:0 0 6px;"><b>${escapeHtmlAdmin(stkConc.archivo)}</b>: ${r.revisados} artículos controlados comparados, <b>${r.coinciden}</b> coinciden, <b>${totalDif}</b> diferencia${totalDif === 1 ? "" : "s"}${r.ocultas.length ? ` (${r.ocultas.length} ocultas por Resuelto/Ignorar)` : ""}.</p>
+      <p class="stk-det" style="margin:0;">${STOCK_CONC_CATEGORIAS.map((c) => `${escapeHtmlAdmin(c.corto)}: ${numeros[c.k]}`).join(" · ")}</p>
+      <button type="button" class="btn-secondary-admin" id="stkConcExcelBtn" style="width:auto;margin-top:8px;">⬇ Excel con todas las diferencias</button></div>
+    ${totalDif ? "" : '<p class="status ok">No hay diferencias entre Oficina y la APP.</p>'}
+    ${STOCK_CONC_CATEGORIAS.filter((c) => r[c.k].length).map((cat) => `<details class="card" data-cat="${cat.k}" open style="margin:10px 0;">
+      <summary style="cursor:pointer;font-weight:700;">${escapeHtmlAdmin(cat.titulo)} (${r[cat.k].length})</summary>
+      <p class="subtitle" style="margin:6px 0;">${escapeHtmlAdmin(cat.ayuda)}</p>
+      <div class="field-row" style="flex-wrap:wrap;gap:6px;margin:6px 0;">
+        <label style="display:flex;align-items:center;gap:6px;margin:0;"><input type="checkbox" class="stk-conc-todos"> Tildar todos</label>
+        ${accionCat[cat.k] ? `<button type="button" data-accion="arreglar" style="width:auto;">${escapeHtmlAdmin(accionCat[cat.k])} (tildados)</button>` : ""}
+        <button type="button" class="btn-secondary-admin" data-accion="resuelta" style="width:auto;">✓ Resuelto (tildados)</button>
+        <button type="button" class="btn-secondary-admin" data-accion="ignorada" style="width:auto;">Ignorar (tildados)</button>
+      </div>
+      <div style="overflow-x:auto;"><table class="sims-tabla stk-tabla"><thead><tr><th></th><th>Código</th><th>Descripción</th><th class="num">Oficina</th><th class="num">APP</th><th class="num">Diferencia</th></tr></thead>
+      <tbody>${r[cat.k].map((it) => fila(cat, it)).join("")}</tbody></table></div></details>`).join("")}
+    ${r.ocultas.length ? `<details class="card" style="margin:10px 0;"><summary style="cursor:pointer;font-weight:700;">Ocultas por Resuelto / Ignorar (${r.ocultas.length})</summary>
+      <table class="sims-tabla stk-tabla"><tbody>${r.ocultas.map((m) => `<tr><td>${escapeHtmlAdmin(m.titulo)}</td><td>${escapeHtmlAdmin(m.codigo)}</td><td>${escapeHtmlAdmin(m.d || "")}</td><td>${m.estado === "ignorada" ? "Ignorada" : "Resuelta"}${m.motivo ? ": " + escapeHtmlAdmin(m.motivo) : ""}<div class="stk-det">${escapeHtmlAdmin(m.por || "")} · ${escapeHtmlAdmin(String(m.fecha || "").slice(0, 10))}</div></td>
+      <td class="stk-btns"><button type="button" class="btn-secondary-admin" data-reactivar="${escapeHtmlAdmin(m.categoria)}|${escapeHtmlAdmin(m.codigo)}">Volver a mostrar</button></td></tr>`).join("")}</tbody></table></details>` : ""}
+    ${stkHistorialConc()}`;
+  document.getElementById("stkConcExcelBtn").addEventListener("click", () => stkConcExcel(r));
+  cont.querySelectorAll("details[data-cat]").forEach((det) => {
+    const cat = STOCK_CONC_CATEGORIAS.find((c) => c.k === det.dataset.cat);
+    det.querySelector(".stk-conc-todos").addEventListener("change", (e) => det.querySelectorAll(".stk-conc-sel").forEach((x) => { x.checked = e.currentTarget.checked; }));
+    det.querySelectorAll("[data-accion]").forEach((b) => b.addEventListener("click", async (e) => {
+      const btn = e.currentTarget;
+      const elegidos = [...det.querySelectorAll(".stk-conc-sel:checked")].map((x) => x.closest("tr")).map((tr) => r[cat.k].find((it) => it.c === tr.dataset.c && (it.u || "") === tr.dataset.u)).filter(Boolean);
+      if (!elegidos.length) { avisoAdmin("Tildá al menos una línea.", "aviso"); return; }
+      await simsConBoton(btn, () => stkConcAccion(cat, btn.dataset.accion, elegidos));
+    }));
+  });
+  cont.querySelectorAll("[data-reactivar]").forEach((b) => b.addEventListener("click", async (e) => {
+    const btn = e.currentTarget, [categoria, codigo] = btn.dataset.reactivar.split("|");
+    await simsConBoton(btn, async () => {
+      try { const x = await stkPost({ accion: "conc_reactivar", items: [{ categoria, codigo }] }); stk.conc.marcas = x.marcas; avisoAdmin("Vuelve a aparecer en la lista.", "ok"); stkRenderConciliacion(); }
+      catch (err) { avisoAdmin("No se pudo: " + err.message, "err"); }
+    });
+  }));
+}
+// Arregla, marca Resuelto o Ignora las líneas elegidas, y después vuelve a leer y comprueba que quedó bien.
+async function stkConcAccion(cat, accion, elegidos) {
+  const n = elegidos.length;
+  if (accion === "resuelta" || accion === "ignorada") {
+    const motivo = await pedirTextoAdmin(`${accion === "ignorada" ? "Ignorar" : "Marcar como resuelto"} ${n} línea${n === 1 ? "" : "s"}. Motivo (opcional):`, "");
+    if (motivo === null) return;
+    try {
+      const x = await stkPost({ accion: "conc_marcar", estado: accion, motivo, items: elegidos.map((it) => ({ codigo: it.c, categoria: cat.k })) });
+      stk.conc.marcas = x.marcas;
+      avisoAdmin(`Listo: ${n} línea${n === 1 ? "" : "s"} ${accion === "ignorada" ? "ignorada" : "marcada"}${n === 1 ? "" : "s"}.`, "ok");
+    } catch (err) { avisoAdmin("No se pudo guardar: " + err.message, "err"); }
+    stkRenderConciliacion();
+    return;
+  }
+  // Arreglar
+  if (cat.k === "noEnCatalogo") {
+    try {
+      const r = await stkPost({ accion: "importar_catalogo", articulos: elegidos.map((it) => it.of) });
+      await stkLeer();
+      avisoAdmin(`Agregados al catálogo: ${r.nuevos}. Ahora aparecen como «cantidad distinta» para cargarles la cantidad.`, "ok");
+    } catch (err) { avisoAdmin("No se pudo agregar: " + err.message, "err"); }
+    stkRenderConciliacion();
+    return;
+  }
+  const planes = [], problemas = [];
+  elegidos.forEach((it) => {
+    const caja = (u) => ((stk.saldos.ubic || {})[u] || {})[it.c] || 0;
+    if (cat.k === "negativo") planes.push({ it, ubic: it.u, cantidad: 0 });
+    else if (cat.k === "comodatoDistinto") {
+      const u = "com:Sin asignar", nuevo = caja(u) - it.dif;
+      if (nuevo < 0) problemas.push(`${it.d}: el comodato está asignado a clientes; corregilo en cada cliente.`); else planes.push({ it, ubic: u, cantidad: nuevo });
+    } else {
+      const dif = it.dif != null ? it.dif : (it.t.sat || 0) - (it.of.dep || 0), nuevo = caja("dep") - dif;
+      if (nuevo < 0) problemas.push(`${it.d}: la diferencia está en técnicos o vehículos (${stkUbicTexto(it.t.detalle)}); ajustalo ahí.`); else planes.push({ it, ubic: "dep", cantidad: nuevo });
+    }
+  });
+  if (!planes.length) { cartelAdmin(problemas.join("\n")); return; }
+  if (!(await confirmarAdmin(`Se van a ajustar ${planes.length} artículo${planes.length === 1 ? "" : "s"} para que la APP quede igual que Oficina. Cada ajuste queda en Movimientos.${problemas.length ? `\n\n${problemas.length} no se pueden ajustar solos (te los muestro después).` : ""}`))) return;
+  const motivo = `Conciliación con Oficina (${stkConc.archivo})`;
+  let hechos = 0;
+  const fallas = [];
+  for (const p of planes) {
+    try { await stkPost({ accion: "ajustar", c: p.it.c, ubic: p.ubic, cantidad: p.cantidad, motivo }); hechos++; }
+    catch (err) { fallas.push(`${p.it.d}: ${err.message}`); }
+  }
+  // Verificación: se vuelve a leer y se recalcula.
+  try {
+    await stkLeer();
+    const r2 = stkConcCalcular();
+    const siguen = planes.filter((p) => r2[cat.k].some((x) => x.c === p.it.c && (x.u || "") === (p.it.u || ""))).length;
+    const txt = `Ajustados ${hechos} de ${planes.length}.` + (siguen ? ` Ojo: ${siguen} siguen con diferencia después de verificar.` : " Verificado: ya no aparecen como diferencia.");
+    avisoAdmin(txt, fallas.length || siguen ? "err" : "ok");
+  } catch (err) { avisoAdmin(`Ajustados ${hechos}, pero no se pudo verificar: ${err.message}`, "err"); }
+  if (fallas.length || problemas.length) cartelAdmin([...fallas, ...problemas].join("\n"));
+  stkRenderConciliacion();
+}
+function stkHistorialConc() {
+  const cs = (stk && stk.conc.corridas) || [];
+  if (!cs.length) return "";
+  return `<details class="card" style="margin:10px 0;"><summary style="cursor:pointer;font-weight:700;">Conciliaciones anteriores (${cs.length})</summary>
+    <div style="overflow-x:auto;"><table class="sims-tabla stk-tabla"><thead><tr><th>Fecha</th><th>Archivo</th><th class="num">Comparados</th><th class="num">Coinciden</th>${STOCK_CONC_CATEGORIAS.map((c) => `<th class="num">${escapeHtmlAdmin(c.corto)}</th>`).join("")}<th>Por</th></tr></thead>
+    <tbody>${cs.map((c) => `<tr><td>${escapeHtmlAdmin(new Date(c.fecha).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }))}</td><td>${escapeHtmlAdmin(c.archivo || "")}</td><td class="num">${c.revisados}</td><td class="num">${c.coinciden}</td>${STOCK_CONC_CATEGORIAS.map((k) => `<td class="num">${(c.numeros || {})[k.k] ?? ""}</td>`).join("")}<td>${escapeHtmlAdmin(c.por || "")}</td></tr>`).join("")}</tbody></table></div></details>`;
+}
+function stkConcExcel(r) {
+  const filas = [];
+  STOCK_CONC_CATEGORIAS.forEach((cat) => r[cat.k].forEach((it) => {
+    const of = it.of || {}, t = it.t || {};
+    filas.push({ Diferencia: cat.corto, Código: it.c, Descripción: it.d || "", "Oficina depósito": of.dep || 0, "Oficina comodato": of.com || 0, "APP en poder de SAT": t.sat || 0, "APP comodato": t.com || 0, "Diferencia (APP − Oficina)": it.dif ?? (cat.k === "negativo" ? it.n : ""), "Dónde está según la APP": stkUbicTexto(t.detalle) });
+  }));
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filas.length ? filas : [{ Diferencia: "Sin diferencias" }]), "Diferencias");
+  XLSX.writeFile(libro, `stock_conciliacion_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+// --- Pedidos automáticos ---
+function stkTextoPedido(prov, items) {
+  return `Pedido SAT — ${prov}\n${new Date().toLocaleDateString("es-AR")}\n\n` + items.map((x) => `• ${x.c} ${x.d}: ${stkFmt(x.cantidad)}${x.medida === "metros" ? " m" : ""}`).join("\n");
+}
+function stkRenderPedidos() {
+  const { pedir, pedidos } = articulosParaPedir(stk.catalogo, stk.saldos);
+  const cont = document.getElementById("stkPedidos");
+  const sinMin = Object.values(stk.catalogo.articulos || {}).filter((a) => Number(a.min) > 0).length;
+  if (!pedir.length) cont.innerHTML = `<p class="status ok">${sinMin ? "No hay nada para pedir: todo está por encima del mínimo." : "Todavía ningún artículo tiene stock mínimo. Cargalo en Artículos (o en la planilla revisada) y acá aparece lo que hay que pedir."}</p>`;
+  else {
+    const grupos = {};
+    pedir.forEach((x) => { (grupos[x.prov] = grupos[x.prov] || []).push(x); });
+    cont.innerHTML = `<button type="button" class="btn-secondary-admin" id="stkPedExcelBtn" style="width:auto;margin-bottom:8px;">⬇ Excel del pedido</button>` + Object.entries(grupos).map(([prov, items]) => `<div class="card" data-prov="${escapeHtmlAdmin(prov)}" style="margin:10px 0;">
+      <h4 style="margin:0 0 8px;">${escapeHtmlAdmin(prov)} <span class="stk-det">(${items.length})</span></h4>
+      <div style="overflow-x:auto;"><table class="sims-tabla stk-tabla"><thead><tr><th></th><th>Código</th><th>Descripción</th><th class="num">Depósito</th><th class="num">Mínimo</th><th class="num">Pedir</th></tr></thead><tbody>
+      ${items.map((x) => `<tr data-c="${escapeHtmlAdmin(x.c)}"><td><input type="checkbox" class="stk-ped-sel" checked></td><td>${escapeHtmlAdmin(x.c)}</td><td>${escapeHtmlAdmin(x.d)}</td><td class="num">${stkFmt(x.dep)}</td><td class="num">${stkFmt(x.min)}</td><td class="num"><input class="stk-min stk-ped-cant" inputmode="decimal" value="${x.sugerido}"></td></tr>`).join("")}
+      </tbody></table></div>
+      <div class="field-row" style="gap:6px;flex-wrap:wrap;margin-top:8px;">
+        <button type="button" class="btn-secondary-admin" data-ped="copiar" style="width:auto;">📋 Copiar el pedido (WhatsApp / mail)</button>
+        <button type="button" data-ped="marcar" style="width:auto;">Marcar como pedido (tildados)</button>
+      </div></div>`).join("");
+    const elegidos = (caja) => [...caja.querySelectorAll("tr[data-c]")].filter((tr) => tr.querySelector(".stk-ped-sel").checked).map((tr) => {
+      const x = pedir.find((p) => p.c === tr.dataset.c);
+      return { ...x, cantidad: stkNum(tr.querySelector(".stk-ped-cant").value) > 0 ? stkNum(tr.querySelector(".stk-ped-cant").value) : x.sugerido };
+    });
+    cont.querySelectorAll("[data-prov]").forEach((caja) => caja.querySelectorAll("[data-ped]").forEach((b) => b.addEventListener("click", async (e) => {
+      const btn = e.currentTarget, prov = caja.dataset.prov, items = elegidos(caja);
+      if (!items.length) { avisoAdmin("Tildá al menos un artículo.", "aviso"); return; }
+      if (btn.dataset.ped === "copiar") {
+        const texto = stkTextoPedido(prov, items);
+        try { await navigator.clipboard.writeText(texto); avisoAdmin("Pedido copiado: pegalo en WhatsApp o en el mail.", "ok"); }
+        catch (err) { await pedirTextoAdmin("Copiá este texto:", texto.replace(/\n/g, " | ")); }
+        return;
+      }
+      await simsConBoton(btn, async () => {
+        try {
+          await stkPost({ accion: "marcar_pedido", proveedor: prov, items: items.map((x) => ({ c: x.c, cantidad: x.cantidad })) });
+          await stkLeer();
+          const faltan = items.filter((x) => !(stk.saldos.pedidos || {})[x.c]).length;
+          avisoAdmin(faltan ? `Ojo: ${faltan} no quedaron marcados. Probá de nuevo.` : `Marcados como pedidos: ${items.length}.`, faltan ? "err" : "ok");
+        } catch (err) { avisoAdmin("No se pudo guardar: " + err.message, "err"); }
+        stkRenderPedidos();
+      });
+    })));
+    document.getElementById("stkPedExcelBtn").addEventListener("click", () => {
+      const filas = [];
+      cont.querySelectorAll("[data-prov]").forEach((caja) => elegidos(caja).forEach((x) => filas.push({ Proveedor: caja.dataset.prov, Código: x.c, Descripción: x.d, Depósito: x.dep, Mínimo: x.min, "Cantidad a pedir": x.cantidad, Unidad: x.medida })));
+      const libro = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filas.length ? filas : [{ Proveedor: "Nada tildado" }]), "Pedido");
+      XLSX.writeFile(libro, `stock_pedido_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    });
+  }
+  const hechos = document.getElementById("stkPedidosHechos");
+  hechos.innerHTML = !pedidos.length ? '<p class="subtitle">No hay pedidos esperando.</p>'
+    : `<div style="overflow-x:auto;"><table class="sims-tabla stk-tabla"><thead><tr><th>Proveedor</th><th>Artículo</th><th class="num">Depósito / mínimo</th><th class="num">Pedido</th><th>Cuándo</th><th></th></tr></thead><tbody>
+      ${pedidos.map((x) => `<tr data-c="${escapeHtmlAdmin(x.c)}"><td>${escapeHtmlAdmin(x.pedido.proveedor || x.prov)}</td><td>${escapeHtmlAdmin(x.c)} ${escapeHtmlAdmin(x.d)}</td><td class="num">${stkFmt(x.dep)} / ${stkFmt(x.min)}</td><td class="num">${stkFmt(x.pedido.cantidad)}</td><td>${escapeHtmlAdmin(new Date(x.pedido.fecha).toLocaleDateString("es-AR"))}<div class="stk-det">${escapeHtmlAdmin(x.pedido.por || "")}</div></td>
+      <td class="stk-btns"><button type="button" class="btn-secondary-admin" data-sacar>Sacar</button></td></tr>`).join("")}</tbody></table></div>`;
+  hechos.querySelectorAll("[data-sacar]").forEach((b) => b.addEventListener("click", async (e) => {
+    const btn = e.currentTarget, c = btn.closest("tr").dataset.c;
+    await simsConBoton(btn, async () => {
+      try { await stkPost({ accion: "quitar_pedido", items: [{ c }] }); await stkLeer(); avisoAdmin("Sacado de pedidos: si sigue bajo el mínimo vuelve a «Para pedir».", "ok"); }
+      catch (err) { avisoAdmin("No se pudo: " + err.message, "err"); }
+      stkRenderPedidos();
+    });
+  }));
+}
+
+// --- Movimientos ---
+let stkMovs = [];
+const STK_MOV_TIPO = { inicial: "Saldo inicial", ajuste: "Ajuste", entrega: "Entrega", devolucion: "Devolución", consumo: "Usado en cliente", ingreso: "Ingreso" };
+async function stkCargarMovimientos() {
+  const mesInp = document.getElementById("stkMovMes");
+  if (!mesInp.value) mesInp.value = new Date().toISOString().slice(0, 7);
+  const cont = document.getElementById("stkMovLista");
+  cont.innerHTML = '<p class="subtitle">Cargando...</p>';
+  try {
+    const r = await fetch(`/api/datos?coleccion=stock&movimientos=${encodeURIComponent(mesInp.value)}`, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+    const d = await r.json().catch(() => null);
+    if (!r.ok) throw new Error((d && d.error) || "Error " + r.status);
+    stkMovs = (Array.isArray(d) ? d : []).slice().sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+    stkRenderMovimientos();
+  } catch (err) { cont.innerHTML = `<p class="status err">No se pudieron cargar: ${escapeHtmlAdmin(err.message)}</p>`; }
+}
+function stkMovFiltrados() {
+  const q = normalizeText(document.getElementById("stkMovBuscar").value || "");
+  const arts = (stk && stk.catalogo.articulos) || {};
+  return stkMovs.map((m) => ({ ...m, d: (arts[m.c] || {}).d || "" })).filter((m) => !q || normalizeText(`${m.c} ${m.d} ${m.por} ${m.motivo} ${m.de || ""} ${m.a || ""}`).includes(q));
+}
+function stkRenderMovimientos() {
+  const cont = document.getElementById("stkMovLista"), lista = stkMovFiltrados();
+  cont.innerHTML = !lista.length ? '<p class="subtitle">No hay movimientos en ese mes.</p>'
+    : `<p class="subtitle" style="margin:8px 0;">${lista.length} movimientos.</p><div style="overflow-x:auto;"><table class="sims-tabla stk-tabla"><thead><tr><th>Fecha</th><th>Tipo</th><th>Artículo</th><th class="num">Cantidad</th><th>De → A</th><th>Por</th><th>Motivo</th></tr></thead><tbody>
+      ${lista.slice(0, 500).map((m) => `<tr><td>${escapeHtmlAdmin(new Date(m.fecha).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }))}</td><td>${escapeHtmlAdmin(STK_MOV_TIPO[m.tipo] || m.tipo)}</td><td>${escapeHtmlAdmin(m.c)} ${escapeHtmlAdmin(m.d)}</td><td class="num">${stkFmt(m.cant)}</td><td>${escapeHtmlAdmin(m.de ? nombreUbicacion(m.de) : "—")} → ${escapeHtmlAdmin(m.a ? nombreUbicacion(m.a) : "—")}</td><td>${escapeHtmlAdmin(m.por || "")}</td><td>${escapeHtmlAdmin(m.motivo || "")}${m.antes != null ? `<div class="stk-det">${stkFmt(m.antes)} → ${stkFmt(m.despues)}</div>` : ""}</td></tr>`).join("")}</tbody></table></div>`;
+}
+document.getElementById("stkMovMes").addEventListener("change", stkCargarMovimientos);
+document.getElementById("stkMovBuscar").addEventListener("input", stkRenderMovimientos);
+document.getElementById("stkMovExcelBtn").addEventListener("click", () => {
+  const filas = stkMovFiltrados().map((m) => ({ Fecha: new Date(m.fecha).toLocaleString("es-AR"), Tipo: STK_MOV_TIPO[m.tipo] || m.tipo, Código: m.c, Descripción: m.d, Cantidad: m.cant, De: m.de ? nombreUbicacion(m.de) : "", A: m.a ? nombreUbicacion(m.a) : "", Por: m.por || "", Motivo: m.motivo || "" }));
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filas.length ? filas : [{ Fecha: "Sin movimientos" }]), "Movimientos");
+  XLSX.writeFile(libro, `stock_movimientos_${document.getElementById("stkMovMes").value}.xlsx`);
 });
 
 // ---------- Vencimientos ----------

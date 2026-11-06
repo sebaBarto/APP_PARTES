@@ -8,7 +8,7 @@ const raiz = path.join(__dirname, "..");
 const leer = (f) => fs.readFileSync(path.join(raiz, f), "utf8");
 
 test("sintaxis de los JS principales", () => {
-  const archivos = ["app.js", "sw.js", "sims-utils.js", "middleware.js", ...fs.readdirSync(path.join(raiz, "api")).filter((f) => f.endsWith(".js")).map((f) => "api/" + f)];
+  const archivos = ["app.js", "sw.js", "sims-utils.js", "stock-utils.js", "middleware.js", ...fs.readdirSync(path.join(raiz, "api")).filter((f) => f.endsWith(".js")).map((f) => "api/" + f)];
   for (const f of archivos) {
     execFileSync(process.execPath, ["--check", path.join(raiz, f)], { stdio: "pipe" });
   }

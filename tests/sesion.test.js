@@ -28,7 +28,7 @@ const pedido = (metodo, query, body, token) => ({
 });
 
 test("No queda ninguna clave fija en el código que se publica", () => {
-  for (const archivo of ["app.js", "admin.html", "README.md", "sims-utils.js"]) {
+  for (const archivo of ["app.js", "admin.html", "README.md", "sims-utils.js", "stock-utils.js"]) {
     const texto = fs.readFileSync(path.join(raiz, archivo), "utf-8");
     assert.ok(!/["'][0-9a-f]{40,}["']/.test(texto), `${archivo} tiene algo que parece una clave`);
     assert.ok(!texto.includes("54455ad29a4eb28e"), `${archivo} todavía tiene la clave vieja`);
@@ -1291,4 +1291,83 @@ test("Vencimientos: la oficina carga, renueva (corre la fecha si se repite) y bo
     global.fetch = fetchViejo;
     if (viejo) require.cache[rutaPush] = viejo; else delete require.cache[rutaPush];
   }
+});
+
+test("Stock: los chips (Personal Jasper, Movistar M2M, Movistar Kite, Claro IoT…) se reconocen como SIM, y los equipos que nombran la empresa no", () => {
+  const S = require(path.join(raiz, "stock-utils.js"));
+  ["PERSONAL JASPER", "251062 PERSONAL JASPER", "Personal Japer", "773381 personal gasper", "Pesonal Jasper", "Jasper Personal", "JASPER", "904008 MOVISTAR M2M", "Movistar Kite", "Kite Movistar", "MOVISTAR", "MOVISTAR 133858", "Movistar Global SIM", "CLARO IOT", "PERSONAL"]
+    .forEach((d) => assert.strictEqual(S.clasificarArticulo(d), "sim", d));
+  ["GPRS PARADOX PCS250 DUAL SIM PARA COMUNICACIONES PARADOX", "COMUNICADOR GPRS PERSONAL", "TECLADO K10LH/V"].forEach((d) => assert.notStrictEqual(S.clasificarArticulo(d), "sim", d));
+});
+
+test("Stock: catálogo desde el listado de Oficina y la planilla revisada, saldo inicial una sola vez, ajustes con movimiento, pedidos y conciliación", async () => {
+  const fetchViejo = global.fetch;
+  const repo = {};
+  global.fetch = async (url, op = {}) => {
+    const u = String(url), metodo = op.method || "GET";
+    const m = u.match(/contents\/([^?]+)/);
+    if (m) {
+      const ruta = decodeURIComponent(m[1]);
+      if (metodo === "PUT") { repo[ruta] = JSON.parse(Buffer.from(JSON.parse(op.body).content, "base64").toString()); return new Response("{}", { status: 200 }); }
+      if (!(ruta in repo)) return new Response("{}", { status: 404 });
+      return new Response(JSON.stringify({ sha: "s", encoding: "base64", content: Buffer.from(JSON.stringify(repo[ruta])).toString("base64") }));
+    }
+    return new Response("[]");
+  };
+  try {
+    const S = require(path.join(raiz, "stock-utils.js"));
+    const admin = crearSesion({ nombre: "Seba", rol: "admin" }), juan = crearSesion({ nombre: "Juan", rol: "tecnico" });
+    const post = async (body, t = admin) => { const r = resFalso(); await datos(pedido("POST", { coleccion: "stock" }, body, t), r); return r; };
+    const get = async (q = {}) => { const r = resFalso(); await datos(pedido("GET", { coleccion: "stock", ...q }, null, admin), r); return r.cuerpo; };
+    assert.strictEqual((await post({ accion: "importar_catalogo", articulos: [{ c: "1" }] }, juan)).statusCode, 403);
+    const listado = [
+      { c: "20825", d: "TECLADO K10LH/V 10 ZONAS P/2 PARTICIONES PARADOX E55", dep: 8, com: 1, precio: 31.37, moneda: "USD" },
+      { c: "20208", d: "SIRENA MP100 INTERIOR MONOTONAL", dep: 0, com: 7 },
+      { c: "10350", d: "CABLE 2 PARES TELEFONICO", dep: 30175, com: 0 },
+      { c: "215063", d: "Movistar", dep: 1, com: 0 },
+    ];
+    let r = await post({ accion: "importar_catalogo", articulos: listado });
+    assert.deepStrictEqual([r.cuerpo.nuevos, r.cuerpo.total], [4, 4]);
+    const arts = repo["stock/catalogo.json"].articulos;
+    assert.deepStrictEqual([arts["20825"].tipo, arts["20208"].tipo, arts["10350"].tipo, arts["10350"].medida, arts["215063"].tipo], ["unidad", "cantidad", "cantidad", "metros", "sim"], "propuesta automática");
+    // Planilla revisada: cambia el tipo y pone mínimos
+    r = await post({ accion: "importar_catalogo", revisada: true, articulos: [{ c: "20208", tipo: "cantidad", min: 5, pedir: 10, prov: "Propiedad Protegida" }, { c: "20825", min: 3 }] });
+    assert.strictEqual(r.cuerpo.configurados, 2);
+    assert.strictEqual(repo["stock/catalogo.json"].articulos["20208"].min, 5);
+    assert.strictEqual(repo["stock/catalogo.json"].articulos["20825"].precio, 31.37, "la revisada no pisa precios");
+    // Saldo inicial (la SIM no entra: va en Control de SIMs)
+    r = await post({ accion: "saldo_inicial", items: listado.map((x) => ({ c: x.c, dep: x.dep, com: x.com })) });
+    assert.ok(r.cuerpo.ok);
+    const sal = repo["stock/saldos.json"];
+    assert.deepStrictEqual(sal.ubic.dep, { 20825: 8, 10350: 30175 });
+    assert.deepStrictEqual(sal.ubic["com:Sin asignar"], { 20825: 1, 20208: 7 });
+    assert.strictEqual((await post({ accion: "saldo_inicial", items: [] })).statusCode, 409, "una sola vez");
+    const mes = new Date().toISOString().slice(0, 7);
+    assert.strictEqual(repo[`stock/movimientos-${mes}.json`].length, 4);
+    // Ajuste con motivo
+    assert.strictEqual((await post({ accion: "ajustar", c: "20825", ubic: "dep", cantidad: 6 })).statusCode, 400, "sin motivo no");
+    r = await post({ accion: "ajustar", c: "20825", ubic: "dep", cantidad: 6, motivo: "Conteo: había 6" });
+    assert.deepStrictEqual([r.cuerpo.antes, r.cuerpo.despues], [8, 6]);
+    const mov = repo[`stock/movimientos-${mes}.json`].slice(-1)[0];
+    assert.deepStrictEqual([mov.tipo, mov.c, mov.cant, mov.de, mov.por], ["ajuste", "20825", 2, "dep", "Seba"]);
+    // Pedidos: la sirena tiene 0 en depósito y mínimo 5 -> pedir 10
+    const datosStock = await get();
+    let p = S.articulosParaPedir(datosStock.catalogo, datosStock.saldos);
+    assert.deepStrictEqual(p.pedir.map((x) => [x.c, x.sugerido, x.prov]), [["20208", 10, "Propiedad Protegida"]]);
+    await post({ accion: "marcar_pedido", items: [{ c: "20208", cantidad: 10 }], proveedor: "Propiedad Protegida" });
+    const d2 = await get();
+    p = S.articulosParaPedir(d2.catalogo, d2.saldos);
+    assert.deepStrictEqual([p.pedir.length, p.pedidos.length], [0, 1], "ya pedido: no se repite");
+    // Conciliación contra un listado nuevo de Oficina
+    const nuevo = [{ c: "20825", d: "TECLADO K10LH", dep: 8, com: 1 }, { c: "20208", dep: 0, com: 7 }, { c: "10350", dep: 30175, com: 0 }, { c: "99999", d: "CAMARA NUEVA", dep: 2, com: 0 }];
+    const conc = S.conciliarStock(nuevo, d2.catalogo, d2.saldos, []);
+    assert.deepStrictEqual(conc.cantidadDistinta.map((x) => [x.c, x.dif]), [["20825", -2]]);
+    assert.deepStrictEqual(conc.noEnCatalogo.map((x) => x.c), ["99999"]);
+    assert.deepStrictEqual(conc.unidadesSinRegistrar.map((x) => x.c), ["20825"], "faltan escanear los teclados");
+    assert.strictEqual(conc.comodatoDistinto.length, 0);
+    r = await post({ accion: "conc_marcar", estado: "ignorada", items: [{ codigo: "99999", categoria: "noEnCatalogo" }] });
+    const conc2 = S.conciliarStock(nuevo, d2.catalogo, d2.saldos, r.cuerpo.marcas);
+    assert.strictEqual(conc2.noEnCatalogo.length, 0);
+    assert.strictEqual(conc2.ocultas.length, 1);
+  } finally { global.fetch = fetchViejo; }
 });

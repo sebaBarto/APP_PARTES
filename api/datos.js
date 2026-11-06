@@ -1167,6 +1167,182 @@ async function manejarBackup(req, res, autorizacion, cuerpo) {
   } catch (e) { res.status(502).json({ error: String(e.message || e) }); }
 }
 
+// ---------- Stock de artículos (catálogo, saldos por ubicación, conciliación, pedidos) ----------
+// Se guarda en el repo de datos: stock/catalogo.json, stock/saldos.json,
+// stock/movimientos-AAAA-MM.json y stock/conciliacion.json. Cada cambio de
+// saldos se escribe releyendo el archivo (si otro lo cambió en el medio, se
+// reintenta) y queda un movimiento con quién, cuándo y por qué.
+const STOCK_CAT = "stock/catalogo.json", STOCK_SAL = "stock/saldos.json", STOCK_CONC = "stock/conciliacion.json";
+const stockMovRuta = (d) => `stock/movimientos-${(d || new Date().toISOString()).slice(0, 7)}.json`;
+async function stockActualizar(ruta, porDefecto, cambiar, mensaje) {
+  for (let i = 0; i < 5; i++) {
+    const { data, sha } = await leerArchivoDatos(ruta, porDefecto);
+    const res = cambiar(data && typeof data === "object" ? data : porDefecto);
+    if (res && res.error) return res;
+    const r = await escribirArchivoDatos(ruta, res.data, sha, mensaje);
+    if (r.ok) return res;
+    if (r.status !== 409 && r.status !== 422) break;
+  }
+  return { error: "No se pudo guardar (probá de nuevo)", status: 502 };
+}
+async function stockRegistrarMovimientos(movs, mensaje) {
+  if (!movs.length) return true;
+  const porMes = {};
+  movs.forEach((m) => { (porMes[stockMovRuta(m.fecha)] = porMes[stockMovRuta(m.fecha)] || []).push(m); });
+  let ok = true;
+  for (const [ruta, lista] of Object.entries(porMes)) {
+    const r = await stockActualizar(ruta, [], (d) => ({ data: [...(Array.isArray(d) ? d : []), ...lista] }), mensaje);
+    if (r.error) ok = false;
+  }
+  return ok;
+}
+async function manejarStock(req, res, autorizacion, cuerpo) {
+  const S = require("../stock-utils.js");
+  const q = req.query || {};
+  const quien = autorizacion.nombre || "Oficina";
+  res.setHeader("Cache-Control", "no-store");
+  try {
+    if (req.method === "GET") {
+      if (q.movimientos) {
+        if (!/^\d{4}-\d{2}$/.test(String(q.movimientos))) { res.status(400).json({ error: "Mes inválido" }); return; }
+        const { data } = await leerArchivoDatos(stockMovRuta(q.movimientos + "-01"), []);
+        res.status(200).json(Array.isArray(data) ? data : []);
+        return;
+      }
+      const [cat, sal, conc] = await Promise.all([leerArchivoDatos(STOCK_CAT, { articulos: {} }), leerArchivoDatos(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }), leerArchivoDatos(STOCK_CONC, { marcas: [], corridas: [] })]);
+      res.status(200).json({ catalogo: cat.data, saldos: sal.data, conciliacion: { marcas: (conc.data && conc.data.marcas) || [], corridas: ((conc.data && conc.data.corridas) || []).slice(0, 24) } });
+      return;
+    }
+    if (req.method !== "POST") { res.status(405).json({ error: "Método no permitido" }); return; }
+    const b = cuerpo && typeof cuerpo === "object" ? cuerpo : {};
+    const ahora = new Date().toISOString();
+    const responder = (r, extra) => { if (r.error) res.status(r.status || 400).json({ error: r.error }); else res.status(200).json({ ok: true, ...(extra || {}), ...(r.respuesta || {}) }); };
+
+    if (b.accion === "importar_catalogo") {
+      const lista = Array.isArray(b.articulos) ? b.articulos.slice(0, 20000) : [];
+      if (!lista.length) { res.status(400).json({ error: "El listado no tiene artículos" }); return; }
+      const r = await stockActualizar(STOCK_CAT, { articulos: {} }, (cat) => {
+        const arts = { ...(cat.articulos || {}) };
+        let nuevos = 0, actualizados = 0, configurados = 0;
+        lista.forEach((x) => {
+          const c = S.codigoArticulo(x && x.c);
+          if (!c || !/^[\w.-]{1,20}$/.test(c)) return;
+          const d = String(x.d || "").slice(0, 160);
+          const previo = arts[c];
+          const a = previo ? { ...previo } : { c, d, tipo: S.clasificarArticulo(d), medida: S.medidaArticulo(d), min: null, pedir: null, prov: "", alias: [] };
+          if (previo) actualizados++; else nuevos++;
+          if (d) a.d = d;
+          if (!b.revisada) { a.precio = Number(x.precio) || 0; a.moneda = x.moneda || a.moneda || ""; a.baja = !!x.baja; }
+          if (b.revisada) {
+            let cambio = false;
+            if (S.STOCK_TIPOS[x.tipo]) { a.tipo = x.tipo; cambio = true; }
+            if (x.medida === "metros" || x.medida === "unidades") { a.medida = x.medida; cambio = true; }
+            if (x.min != null && Number.isFinite(Number(x.min))) { a.min = Math.max(0, Number(x.min)); cambio = true; }
+            if (x.pedir != null && Number.isFinite(Number(x.pedir))) { a.pedir = Math.max(0, Number(x.pedir)); cambio = true; }
+            if (x.prov) { a.prov = String(x.prov).slice(0, 60); cambio = true; }
+            if (cambio) configurados++;
+          }
+          arts[c] = a;
+        });
+        return { data: { ...cat, articulos: arts, actualizado: ahora }, respuesta: { nuevos, actualizados, configurados, total: Object.keys(arts).length } };
+      }, `Stock: catálogo actualizado desde ${b.revisada ? "la planilla revisada" : "el listado de Oficina"} (por ${quien})`);
+      responder(r);
+      return;
+    }
+    if (b.accion === "configurar") {
+      const c = S.codigoArticulo(b.c), campos = b.campos && typeof b.campos === "object" ? b.campos : {};
+      const r = await stockActualizar(STOCK_CAT, { articulos: {} }, (cat) => {
+        const a = cat.articulos && cat.articulos[c];
+        if (!a) return { error: "No existe ese artículo", status: 404 };
+        const n = { ...a };
+        if ("tipo" in campos && S.STOCK_TIPOS[campos.tipo]) n.tipo = campos.tipo;
+        if ("medida" in campos && /^(metros|unidades)$/.test(campos.medida)) n.medida = campos.medida;
+        ["min", "pedir"].forEach((k) => { if (k in campos) n[k] = campos[k] === "" || campos[k] == null ? null : Math.max(0, Number(campos[k]) || 0); });
+        if ("prov" in campos) n.prov = String(campos.prov || "").slice(0, 60);
+        return { data: { ...cat, articulos: { ...cat.articulos, [c]: n } }, respuesta: { articulo: n } };
+      }, `Stock: configuró el artículo ${c} (por ${quien})`);
+      responder(r);
+      return;
+    }
+    if (b.accion === "saldo_inicial") {
+      // Arranque: el depósito y el comodato de la APP toman lo que dice el listado de Oficina.
+      const items = Array.isArray(b.items) ? b.items : [];
+      const { data: cat } = await leerArchivoDatos(STOCK_CAT, { articulos: {} });
+      const arts = (cat && cat.articulos) || {};
+      const controla = (c) => arts[c] && !["sim", "herramienta", "no"].includes(arts[c].tipo);
+      let movs = [];
+      const r = await stockActualizar(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }, (sal) => {
+        if (sal.inicializado && !b.forzar) return { error: `El stock ya se inicializó el ${String(sal.inicializado).slice(0, 10)}. Para corregir diferencias usá la conciliación.`, status: 409 };
+        const nuevo = { ...sal, ubic: { ...(sal.ubic || {}) }, inicializado: ahora, unidades: sal.unidades || {}, pedidos: sal.pedidos || {} };
+        nuevo.ubic.dep = {}; delete nuevo.ubic["com:Sin asignar"];
+        movs = [];
+        items.forEach((x) => {
+          const c = S.codigoArticulo(x.c);
+          if (!controla(c)) return;
+          const dep = Number(x.dep) || 0, com = Number(x.com) || 0;
+          if (dep) { nuevo.ubic.dep[c] = dep; movs.push({ id: `${Date.now().toString(36)}-${movs.length}`, fecha: ahora, por: quien, tipo: "inicial", c, cant: dep, a: "dep", motivo: "Saldo inicial desde el listado de Oficina" }); }
+          if (com) { (nuevo.ubic["com:Sin asignar"] = nuevo.ubic["com:Sin asignar"] || {})[c] = com; movs.push({ id: `${Date.now().toString(36)}-${movs.length}`, fecha: ahora, por: quien, tipo: "inicial", c, cant: com, a: "com:Sin asignar", motivo: "Comodato inicial desde el listado de Oficina (falta asignar el cliente)" }); }
+        });
+        return { data: nuevo, respuesta: { articulos: new Set(movs.map((m) => m.c)).size } };
+      }, `Stock: saldo inicial desde el listado de Oficina (por ${quien})`);
+      if (!r.error) await stockRegistrarMovimientos(movs, `Stock: movimientos del saldo inicial (por ${quien})`);
+      responder(r);
+      return;
+    }
+    if (b.accion === "ajustar") {
+      // Deja la cantidad de un artículo en una ubicación como se indica (inventario o conciliación).
+      const c = S.codigoArticulo(b.c), ubic = String(b.ubic || "dep").slice(0, 80), motivo = String(b.motivo || "").trim().slice(0, 200);
+      if (!c) { res.status(400).json({ error: "Falta el artículo" }); return; }
+      if (!/^(dep|tec:.+|veh:.+|cli:.+|com:.+)$/.test(ubic)) { res.status(400).json({ error: "Ubicación inválida" }); return; }
+      if (!motivo) { res.status(400).json({ error: "Falta el motivo del ajuste" }); return; }
+      const cantidad = Number(b.cantidad);
+      if (!Number.isFinite(cantidad) || cantidad < 0) { res.status(400).json({ error: "Cantidad inválida" }); return; }
+      let mov = null;
+      const r = await stockActualizar(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }, (sal) => {
+        const antes = ((sal.ubic || {})[ubic] || {})[c] || 0, dif = Math.round((cantidad - antes) * 1000) / 1000;
+        if (!dif) return { data: sal, respuesta: { sinCambios: true } };
+        mov = { id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, fecha: ahora, por: quien, tipo: "ajuste", c, cant: Math.abs(dif), ...(dif > 0 ? { a: ubic } : { de: ubic }), motivo, antes, despues: cantidad };
+        const nuevo = S.aplicarMovimiento(sal, mov);
+        return { data: nuevo, respuesta: { antes, despues: cantidad } };
+      }, `Stock: ajuste de ${c} en ${ubic} (por ${quien}): ${motivo}`);
+      if (!r.error && mov) await stockRegistrarMovimientos([mov], `Stock: movimiento de ajuste (por ${quien})`);
+      responder(r);
+      return;
+    }
+    if (b.accion === "marcar_pedido" || b.accion === "quitar_pedido") {
+      const items = (Array.isArray(b.items) ? b.items : []).map((x) => ({ c: S.codigoArticulo(x.c), cantidad: Math.max(0, Number(x.cantidad) || 0) })).filter((x) => x.c);
+      if (!items.length) { res.status(400).json({ error: "No hay artículos" }); return; }
+      const r = await stockActualizar(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }, (sal) => {
+        const pedidos = { ...(sal.pedidos || {}) };
+        items.forEach((x) => { if (b.accion === "marcar_pedido") pedidos[x.c] = { fecha: ahora, cantidad: x.cantidad, por: quien, proveedor: String(b.proveedor || "").slice(0, 60) }; else delete pedidos[x.c]; });
+        return { data: { ...sal, pedidos }, respuesta: { pedidos } };
+      }, `Stock: ${b.accion === "marcar_pedido" ? "pidió" : "sacó de pedidos"} ${items.length} artículo(s) (por ${quien})`);
+      responder(r);
+      return;
+    }
+    if (b.accion === "conc_marcar" || b.accion === "conc_reactivar" || b.accion === "conc_corrida") {
+      const r = await stockActualizar(STOCK_CONC, { marcas: [], corridas: [] }, (conc) => {
+        let marcas = Array.isArray(conc.marcas) ? conc.marcas : [], corridas = Array.isArray(conc.corridas) ? conc.corridas : [];
+        const items = (Array.isArray(b.items) ? b.items : []).map((x) => ({ codigo: S.codigoArticulo(x.codigo), categoria: String(x.categoria || "").slice(0, 40) })).filter((x) => x.codigo && x.categoria);
+        const clave = (x) => `${x.categoria}|${x.codigo}`, set = new Set(items.map(clave));
+        if (b.accion === "conc_marcar") {
+          if (!items.length) return { error: "No hay diferencias para marcar" };
+          const estado = b.estado === "ignorada" ? "ignorada" : "resuelta";
+          marcas = [...items.map((x) => ({ ...x, estado, motivo: String(b.motivo || "").slice(0, 200), por: quien, fecha: ahora })), ...marcas.filter((m) => !set.has(clave(m)))].slice(0, 5000);
+        } else if (b.accion === "conc_reactivar") marcas = marcas.filter((m) => !set.has(clave(m)));
+        else {
+          const c = { id: String(b.id || "").slice(0, 40) || Date.now().toString(36), fecha: ahora, por: quien, archivo: String(b.archivo || "").slice(0, 120), revisados: Number(b.revisados) || 0, coinciden: Number(b.coinciden) || 0, numeros: b.numeros && typeof b.numeros === "object" ? b.numeros : {} };
+          corridas = [c, ...corridas.filter((x) => x.id !== c.id)].slice(0, 36);
+        }
+        return { data: { marcas, corridas }, respuesta: { marcas, corridas: corridas.slice(0, 24) } };
+      }, `Stock: conciliación con Oficina (por ${quien})`);
+      responder(r);
+      return;
+    }
+    res.status(400).json({ error: "Acción inválida" });
+  } catch (e) { res.status(502).json({ error: String(e.message || e) }); }
+}
+
 module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, res) => {
   // Formulario público de "pedir servicio" — pensado para un cliente
   // que escribe fuera de horario y no tiene ni necesita ningún login.
@@ -1362,6 +1538,12 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
     if (autorizacion.rol !== "admin") { res.status(403).json({ error: "Solo desde el panel de administración" }); return; }
     if (!process.env.BACKEND_NUEVO_URL || !process.env.BACKEND_NUEVO_TOKEN || !process.env.GITHUB_DATA_REPO) { res.status(500).json({ error: "Falta configuración del servidor" }); return; }
     await manejarBackup(req, res, autorizacion, cuerpoAccion);
+    return;
+  }
+  if (req.query && req.query.coleccion === "stock") {
+    if (!autorizacion) { res.status(401).json({ error: "No autorizado", sesion_vencida: true }); return; }
+    if (autorizacion.rol !== "admin") { res.status(403).json({ error: "Solo desde el panel de administración" }); return; }
+    await manejarStock(req, res, autorizacion, cuerpoAccion);
     return;
   }
   if (req.query && req.query.coleccion === "vencimientos") {

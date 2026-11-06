@@ -5440,3 +5440,108 @@ test("Admin: un parte que llegó por mail y no quedó en el historial se carga p
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Stock: catálogo desde el listado de Oficina, saldo inicial, mínimos, conciliación con todas las diferencias y pedido automático", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: route.request().url().includes("xlsx.full.min.js") ? require("fs").readFileSync(require("path").join(__dirname, "..", "vendor", "xlsx.full.min.js"), "utf8") : "" }));
+  const S = require(require("path").join(__dirname, "..", "stock-utils.js"));
+  let catalogo = { articulos: {} }, saldos = { ubic: {}, unidades: {}, pedidos: {} }, conc = { marcas: [], corridas: [] };
+  const posts = [], movs = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    const json = (o, st) => route.fulfill({ status: st || 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (!u.includes("coleccion=stock")) return json([]);
+    if (req.method() === "GET") return u.includes("movimientos=") ? json(movs) : json({ catalogo, saldos, conciliacion: conc });
+    const b = JSON.parse(req.postData()); posts.push(b);
+    if (b.accion === "importar_catalogo") {
+      let nuevos = 0;
+      b.articulos.forEach((x) => { if (!catalogo.articulos[x.c]) { nuevos++; catalogo.articulos[x.c] = { c: x.c, d: x.d, tipo: S.clasificarArticulo(x.d), medida: S.medidaArticulo(x.d), min: null, pedir: null, prov: "" }; } });
+      return json({ ok: true, nuevos, actualizados: b.articulos.length - nuevos, configurados: 0, total: Object.keys(catalogo.articulos).length });
+    }
+    if (b.accion === "saldo_inicial") { saldos = { ...saldos, inicializado: new Date().toISOString(), ubic: { dep: {} } }; b.items.forEach((x) => { if (x.dep) saldos.ubic.dep[x.c] = x.dep; if (x.com) (saldos.ubic["com:Sin asignar"] = saldos.ubic["com:Sin asignar"] || {})[x.c] = x.com; }); return json({ ok: true, articulos: b.items.length }); }
+    if (b.accion === "configurar") { catalogo.articulos[b.c] = { ...catalogo.articulos[b.c], ...b.campos }; return json({ ok: true, articulo: catalogo.articulos[b.c] }); }
+    if (b.accion === "ajustar") {
+      const antes = ((saldos.ubic || {})[b.ubic] || {})[b.c] || 0, dif = b.cantidad - antes;
+      const m = { fecha: new Date().toISOString(), tipo: "ajuste", c: b.c, cant: Math.abs(dif), ...(dif > 0 ? { a: b.ubic } : { de: b.ubic }), motivo: b.motivo, antes, despues: b.cantidad, por: "Seba" };
+      saldos = S.aplicarMovimiento(saldos, m); movs.push(m);
+      return json({ ok: true });
+    }
+    if (b.accion === "marcar_pedido") { b.items.forEach((x) => { saldos.pedidos[x.c] = { fecha: new Date().toISOString(), cantidad: x.cantidad, proveedor: b.proveedor, por: "Seba" }; }); return json({ ok: true }); }
+    if (b.accion === "quitar_pedido") { b.items.forEach((x) => delete saldos.pedidos[x.c]); return json({ ok: true }); }
+    if (b.accion === "conc_corrida") { conc.corridas = [{ ...b, fecha: new Date().toISOString(), por: "Seba" }, ...conc.corridas]; return json({ ok: true, corridas: conc.corridas }); }
+    if (b.accion === "conc_marcar") { conc.marcas = [...b.items.map((x) => ({ ...x, estado: b.estado, motivo: b.motivo, fecha: new Date().toISOString() })), ...conc.marcas]; return json({ ok: true, marcas: conc.marcas }); }
+    return json({ error: "?" }, 400);
+  });
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { document.getElementById("mainCard").classList.remove("hidden"); document.getElementById("tabStockBtn").click(); });
+  await page.waitForFunction(() => /Todavía no hay catálogo/.test(document.getElementById("stkEstado").textContent));
+  const xlsx = (filas) => page.evaluate((f) => { const lb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(lb, XLSX.utils.json_to_sheet(f), "Articulos"); return Array.from(new Uint8Array(XLSX.write(lb, { type: "array", bookType: "xlsx" }))); }, filas);
+  const listado = (dep) => [
+    { Código: "20825", Descripción: "TECLADO K10LH/V", "Cant. Depósito": dep[0], "Cant. Tránsito": 0, "Cant. Comodato": 1 },
+    { Código: "20208", Descripción: "SIRENA MP100 INTERIOR MONOTONAL", "Cant. Depósito": dep[1], "Cant. Tránsito": 0, "Cant. Comodato": 7 },
+    { Código: "300", Descripción: "CABLE UTP CAT5 EXTERIOR", "Cant. Depósito": dep[2], "Cant. Tránsito": 0, "Cant. Comodato": 0 },
+    { Código: "9001", Descripción: "MOVISTAR", "Cant. Depósito": 40, "Cant. Tránsito": 0, "Cant. Comodato": 0 },
+  ];
+  await page.setInputFiles("#stkCatArchivo", { name: "Articulos_Stock.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer: Buffer.from(await xlsx(listado([8, 0, 300]))) });
+  await page.waitForFunction(() => /4 nuevos/.test(document.getElementById("stkStatus").textContent));
+  assert.match(await page.textContent("#stkInicial"), /3 artículos con cantidad/, "el SIM no entra en el saldo inicial");
+  await page.click("#stkInicialBtn");
+  await page.click(".cartel-admin .cartel-si");
+  await page.waitForFunction(() => /Saldo inicial cargado/.test(document.getElementById("stkEstado").textContent));
+  assert.deepStrictEqual(saldos.ubic.dep, { 20825: 8, 300: 300 });
+  // Mínimo del teclado = 10: queda para pedir
+  await page.fill('#stkLista tr[data-c="20825"] input[data-campo="min"]', "10");
+  await page.press('#stkLista tr[data-c="20825"] input[data-campo="min"]', "Tab");
+  await page.waitForFunction(() => /Guardado/.test((document.getElementById("avisoFlotanteAdmin") || {}).textContent || ""));
+  await page.fill('#stkLista tr[data-c="20825"] input[data-campo="prov"]', "Propiedad Protegida");
+  await page.press('#stkLista tr[data-c="20825"] input[data-campo="prov"]', "Tab");
+  await page.waitForFunction(() => document.querySelector('#stkLista tr[data-c="20825"] input[data-campo="prov"]').disabled === false && /Propiedad/.test(JSON.stringify(stk.catalogo.articulos["20825"])));
+  // Ajuste con motivo
+  await page.click('#stkLista tr[data-c="300"] [data-ajustar]');
+  await page.fill(".cartel-admin-input", "250");
+  await page.click(".cartel-admin .cartel-si");
+  await page.fill(".cartel-admin-input", "Recuento");
+  await page.click(".cartel-admin .cartel-si");
+  await page.waitForFunction(() => /Ajustado/.test((document.getElementById("avisoFlotanteAdmin") || {}).textContent || ""));
+  assert.strictEqual(saldos.ubic.dep["300"], 250);
+  // Conciliación: Oficina dice 6 teclados, 2 sirenas, 300 m de cable y un artículo nuevo
+  await page.click('#stkSub [data-stk="conciliacion"]');
+  const lis = listado([6, 2, 300]); lis.push({ Código: "555", Descripción: "DETECTOR PIR NUEVO", "Cant. Depósito": 4, "Cant. Tránsito": 0, "Cant. Comodato": 0 });
+  await page.setInputFiles("#stkConcArchivo", { name: "Stock noviembre.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer: Buffer.from(await xlsx(lis)) });
+  await page.waitForSelector('#stkConcResultado details[data-cat="cantidadDistinta"]');
+  const txt = await page.textContent("#stkConcResultado");
+  assert.match(txt, /No está en la APP: 1 · Cantidad distinta: 3 · Solo en la APP: 0 · Comodato distinto: 0 · Unidades sin escanear: 1/);
+  assert.ok(!/MOVISTAR/.test(txt), "los SIM se concilian en Control de SIMs");
+  assert.strictEqual(posts.filter((p) => p.accion === "conc_corrida").length, 1);
+  // Dejar el teclado y el cable como Oficina
+  const det = page.locator('#stkConcResultado details[data-cat="cantidadDistinta"]');
+  await det.locator('tr[data-c="20825"] .stk-conc-sel').check();
+  await det.locator('tr[data-c="300"] .stk-conc-sel').check();
+  await det.locator('[data-accion="arreglar"]').click();
+  await page.click(".cartel-admin .cartel-si");
+  await page.waitForFunction(() => /Verificado/.test((document.getElementById("avisoFlotanteAdmin") || {}).textContent || ""));
+  assert.strictEqual(saldos.ubic.dep["20825"], 6);
+  assert.strictEqual(saldos.ubic.dep["300"], 300);
+  assert.ok(movs.every((m) => /Conciliación con Oficina|Recuento/.test(m.motivo)));
+  // La sirena: Ignorar con motivo
+  await page.locator('#stkConcResultado details[data-cat="cantidadDistinta"] tr[data-c="20208"] .stk-conc-sel').check();
+  await page.locator('#stkConcResultado details[data-cat="cantidadDistinta"] [data-accion="ignorada"]').click();
+  await page.fill(".cartel-admin-input", "Llegan con la compra del lunes");
+  await page.click(".cartel-admin .cartel-si");
+  await page.waitForFunction(() => !document.querySelector('#stkConcResultado details[data-cat="cantidadDistinta"]'));
+  assert.match(await page.textContent("#stkConcResultado"), /Ocultas por Resuelto \/ Ignorar \(1\)/);
+  // Pedidos: el teclado (6 ≤ 10) aparece con el proveedor y lo sugerido (2×10 − 6 = 14)
+  await page.click('#stkSub [data-stk="pedidos"]');
+  await page.waitForSelector('#stkPedidos [data-prov="Propiedad Protegida"]');
+  assert.strictEqual(await page.inputValue('#stkPedidos tr[data-c="20825"] .stk-ped-cant'), "14");
+  await page.locator('#stkPedidos [data-prov="Propiedad Protegida"] [data-ped="marcar"]').click();
+  await page.waitForFunction(() => /Marcados como pedidos: 1/.test((document.getElementById("avisoFlotanteAdmin") || {}).textContent || ""));
+  assert.match(await page.textContent("#stkPedidosHechos"), /Propiedad Protegida.*20825.*14/s);
+  assert.match(await page.textContent("#stkPedidos"), /No hay nada para pedir/);
+  // Movimientos
+  await page.click('#stkSub [data-stk="movimientos"]');
+  await page.waitForFunction(() => /3 movimientos/.test(document.getElementById("stkMovLista").textContent));
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
