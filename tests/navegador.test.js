@@ -5200,7 +5200,9 @@ test("Abonados con letras o convertidos por Excel (48ED, 48E2 -> 4800, 0555): la
       { Abonado: 555, "Razón Social": "Bar", "Línea": "3415550040", "Compañía": "Claro" },
       { Abonado: "48EA", "Razón Social": "Gomería", "Línea": "3415550050", "Compañía": "Claro" },
     ];
-    const lb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(lb, XLSX.utils.json_to_sheet(filas), "S");
+    const hoja = XLSX.utils.json_to_sheet(filas);
+    hoja.A2.z = "0.00E+00"; // como lo deja Excel cuando convierte "48E2"
+    const lb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(lb, hoja, "S");
     return Array.from(new Uint8Array(XLSX.write(lb, { type: "array", bookType: "xlsx" })));
   });
   await page.setInputFiles("#simsOfArchivo", { name: "oficina.xlsx", mimeType: "application/octet-stream", buffer: Buffer.from(buf) });

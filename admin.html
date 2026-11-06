@@ -6493,6 +6493,24 @@ function ofEmpresaDe(v) {
   if (/personal|telecom/.test(t)) return "Personal";
   return "";
 }
+// Celdas que Excel convirtió a notación científica (formato "0.00E+00", ej.
+// la cuenta "2E07" quedó como 20000000): se toman como el texto que muestran
+// ("2,00E+07"), así se reconoce de qué código salieron. Los números de línea
+// (10 dígitos) no se tocan.
+function marcarCientificosComoTexto(wb) {
+  (wb.SheetNames || []).forEach((n) => {
+    const hoja = wb.Sheets[n];
+    Object.keys(hoja).forEach((ref) => {
+      const c = hoja[ref];
+      // Con formato científico: lo dice el formato (z) o el texto que muestra Excel (w, ej. "2,00E+07").
+      if (ref[0] === "!" || !c || c.t !== "n" || !(/E\+?0/i.test(String(c.z || "")) || /\dE\+\d/i.test(String(c.w || "")))) return;
+      if (Number.isSafeInteger(c.v) && String(c.v).length === 10) return;
+      c.t = "s";
+      c.v = c.v === 0 ? "0E+00" : Number(c.v).toExponential().toUpperCase();
+      delete c.w;
+    });
+  });
+}
 // N° de cliente o de abonado: solo números, o números y letras de A a F
 // (cuentas en hexadecimal, ej. 48ED), o lo que Excel hizo con "48E2" (4800 o 4,80E+03).
 function esCodigoClienteAbonado(v) {
@@ -6518,7 +6536,9 @@ function ofColumnas(filas, colNum) {
   const nombre = mejor(cab.filter((c) => c !== empresa && c !== numCli).map((c) => puntuar(c, (v) => /[a-zA-ZáéíóúñÑ]{3}/.test(v) && !ofEmpresaDe(v), /nombre|razon|titular|cliente|apellido/, /direcc|domicilio|calle|localidad|estado|plan|observ|tipo|empresa/)), 0.9);
   const estado = cab.find((c) => /estado|status|situacion/.test(normalizeText(c)) && c !== empresa) || "";
   const direccion = cab.find((c) => /direcc|domicilio|calle/.test(normalizeText(c))) || "";
-  return { cab, empresa, numCli, nombre, estado, direccion };
+  // Segundo nombre del cliente (ej. "Nombre" y "Razón Social"): se compara contra los dos.
+  const nombre2 = cab.find((c) => c !== nombre && c !== numCli && /razon|titular|nombre|apellido/.test(normalizeText(c))) || "";
+  return { cab, empresa, numCli, nombre, nombre2, estado, direccion };
 }
 function ofLeer(filas, col) {
   const mapa = new Map(), duplicadas = [];
@@ -6526,7 +6546,7 @@ function ofLeer(filas, col) {
     const n = soloDigitosLinea(f[col.num]);
     if (n.length !== 10) return;
     const reg = {
-      n, empresa: col.empresa ? ofEmpresaDe(f[col.empresa]) : "", cliente: col.nombre ? String(f[col.nombre] || "").replace(/\s+/g, " ").trim() : "",
+      n, empresa: col.empresa ? ofEmpresaDe(f[col.empresa]) : "", cliente: col.nombre ? String(f[col.nombre] || "").replace(/\s+/g, " ").trim() : "", cliente2: col.nombre2 ? String(f[col.nombre2] || "").replace(/\s+/g, " ").trim() : "",
       numCliClaves: col.numCli ? clavesAbonado(f[col.numCli]) : [], numCli: "", direccion: col.direccion ? String(f[col.direccion] || "").replace(/\s+/g, " ").trim() : "",
       estado: col.estado ? concClasificarEstado(f[col.estado]) : "activa", crudo: col.estado ? String(f[col.estado] || "") : "",
     };
@@ -6544,12 +6564,18 @@ function ofLeer(filas, col) {
 function ofMismoCliente(p, x) {
   const nums = [x.numero_cliente, x.numero_abonado].map(claveAbonado).filter(Boolean);
   if (p.numCliClaves && p.numCliClaves.length && nums.length) return p.numCliClaves.some((c) => nums.includes(c));
-  if (!p.cliente || !x.cliente) return true;
+  if ((!p.cliente && !p.cliente2) || !x.cliente) return true;
   const pal = (t) => new Set(normalizeText(t).split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !/^(srl|sas|sa|del|los|las|consorcio|edificio)$/.test(w)));
-  const a = pal(p.cliente), b = pal(x.cliente);
-  if (!a.size || !b.size) return true;
-  let comunes = 0; a.forEach((w) => { if (b.has(w)) comunes++; });
-  return comunes / Math.min(a.size, b.size) >= 0.5;
+  const b = pal(x.cliente);
+  const parecido = (nombre) => {
+    const a = pal(nombre);
+    if (!a.size || !b.size) return null;
+    let comunes = 0; a.forEach((w) => { if (b.has(w)) comunes++; });
+    return comunes / Math.min(a.size, b.size) >= 0.5;
+  };
+  const r1 = parecido(p.cliente), r2 = parecido(p.cliente2);
+  if (r1 === null && r2 === null) return true;
+  return !!(r1 || r2);
 }
 const OF_CATEGORIAS = [
   { k: "ofPosibleError", corto: "¿Número mal cargado?", titulo: "Posible número mal cargado", ayuda: "Un número de Oficina y uno de la APP difieren en un dígito (o dos seguidos dados vuelta) y no tienen pareja: casi seguro es la misma línea.", acciones: [["corregir", "Corregir el número en la APP"]] },
@@ -6568,7 +6594,7 @@ function conciliarOficina(filas, opciones) {
   if (!num) throw new Error("No se encontró ninguna columna con números de línea.");
   const auto = ofColumnas(filas, num);
   const col = { num, ...auto };
-  ["empresa", "numCli", "nombre", "estado", "direccion"].forEach((k) => { if (o[k] !== undefined) col[k] = o[k]; });
+  ["empresa", "numCli", "nombre", "nombre2", "estado", "direccion"].forEach((k) => { if (o[k] !== undefined) col[k] = o[k]; });
   col.codigosApp = new Set(controlSims.instaladas.flatMap((x) => [x.numero_cliente, x.numero_abonado]).map(claveAbonado).filter(Boolean));
   col.esAbonado = !!col.numCli && /abonado|cuenta|account/.test(normalizeText(col.numCli));
   const { mapa, duplicadas } = ofLeer(filas, col);
@@ -6674,6 +6700,7 @@ function ofRender() {
     ${sel("ofColEmpresa", "Empresa", r.col.empresa, r.cab, "(no tiene)")}
     ${sel("ofColNumCli", "N° de cliente", r.col.numCli, r.cab, "(no tiene)")}
     ${sel("ofColNombre", "Nombre del cliente", r.col.nombre, r.cab, "(no tiene)")}
+    ${sel("ofColNombre2", "Otro nombre (razón social)", r.col.nombre2, r.cab, "(no tiene)")}
     ${sel("ofColEstado", "Estado", r.col.estado, r.cab, "(no tiene: todas activas)")}
     ${sel("ofColDireccion", "Dirección", r.col.direccion, r.cab, "(no tiene)")}</div></details>`;
   const avisos = [!r.col.empresa ? "No se encontró la columna de la empresa: no se compara la empresa." : "", !r.col.numCli && !r.col.nombre ? "No se encontró la columna del cliente: no se compara en qué cliente está." : ""].filter(Boolean).map((t) => `<p class="subtitle" style="color:#8A5A00;margin:4px 0;">⚠ ${escapeHtmlAdmin(t)}</p>`).join("");
@@ -6689,7 +6716,7 @@ function ofRender() {
   cont.innerHTML = columnas + avisos + comp + resumen + (pendientes ? bloques : `<p class="status ok">No hay diferencias: lo de Oficina coincide con la APP.</p>`)
     + (r.ocultas.length ? `<details class="conc-ocultas" style="margin-top:14px;"><summary style="cursor:pointer;font-weight:600;">Ocultas: marcadas como resueltas o ignoradas (${r.ocultas.length})</summary><div class="sims-tabla-wrap"><table class="sims-tabla"><tbody>${r.ocultas.map((m, i) => `<tr><td>${escapeHtmlAdmin(m.numero)}</td><td style="white-space:normal;">${m.estado === "resuelta" ? "✓ Resuelta" : "Ignorada"} · ${escapeHtmlAdmin(m.titulo)}${m.motivo ? " · " + escapeHtmlAdmin(m.motivo) : ""}<br><small style="color:#6B7680;">${escapeHtmlAdmin(m.por || "")} · ${escapeHtmlAdmin(fechaAR(String(m.fecha || "").slice(0, 10)))}</small></td><td class="conc-btns"><button type="button" class="btn-secondary-admin of-reactivar" data-i="${i}">Volver a mostrar</button></td></tr>`).join("")}</tbody></table></div></details>` : "")
     + `<button type="button" class="btn-secondary-admin" id="simsOfExcel" style="width:auto; margin-top:12px;">⬇ Descargar diferencias en Excel</button>`;
-  [["ofColNum", "num"], ["ofColEmpresa", "empresa"], ["ofColNumCli", "numCli"], ["ofColNombre", "nombre"], ["ofColEstado", "estado"], ["ofColDireccion", "direccion"]].forEach(([id, k]) => {
+  [["ofColNum", "num"], ["ofColEmpresa", "empresa"], ["ofColNumCli", "numCli"], ["ofColNombre", "nombre"], ["ofColNombre2", "nombre2"], ["ofColEstado", "estado"], ["ofColDireccion", "direccion"]].forEach(([id, k]) => {
     document.getElementById(id).addEventListener("change", (e) => { ofEstado.opciones[k] = e.target.value; ofRecalcular(); });
   });
   const items = (k) => [...cont.querySelectorAll(`.of-sel[data-k="${k}"]:checked`)].map((x) => ultimaOf[k][Number(x.dataset.i)]);
@@ -6865,6 +6892,7 @@ document.getElementById("simsOfArchivo").addEventListener("change", (ev) => {
       concAsegurarClientes();
       // CSV: se lee como texto, para que "48E2" no pase a 4800 (en un Excel ya convertido, se reconoce después).
       const wb = XLSX.read(e.target.result, { type: "array", raw: /\.csv$/i.test(f.name) });
+      marcarCientificosComoTexto(wb);
       const filas = wb.SheetNames.flatMap((nombre) => XLSX.utils.sheet_to_json(wb.Sheets[nombre], { defval: "" }))
         .filter((fila) => Object.values(fila).some((v) => soloDigitosLinea(v).length === 10));
       if (!filas.length) throw new Error("El archivo no tiene números de línea.");
@@ -6963,6 +6991,7 @@ document.getElementById("simsComArchivo").addEventListener("change", (ev) => {
       if (!await cargarControlSims()) throw new Error("no se pudieron leer las SIMs de la APP. Probá de nuevo.");
       await concAsegurarClientes();
       const wb = XLSX.read(e.target.result, { type: "array", cellDates: false, raw: /\.csv$/i.test(f.name) });
+      marcarCientificosComoTexto(wb);
       const filas = wb.SheetNames.flatMap((n) => XLSX.utils.sheet_to_json(wb.Sheets[n], { defval: "" }));
       if (!filas.length) throw new Error("El reporte está vacío.");
       const col = comColumnas(filas);

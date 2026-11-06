@@ -142,22 +142,31 @@ function claveAbonado(v) {
   return String(v == null ? "" : v).trim().toUpperCase().replace(/[\s\-_/.]/g, "").replace(/^0+(?=.)/, "");
 }
 // Un número que puede haber salido de un código como "48E2": las formas
-// "<mantisa>E<exponente>" de hasta 6 caracteres que dan ese número.
+// "<mantisa>E<exponente>" de hasta 6 caracteres que dan ese número. Las
+// cuentas son de 4 caracteres en hexadecimal, así que también "2E07" (que
+// Excel lee como 2×10⁷). Se arma desde la notación exponencial para que los
+// números enormes (5E99 -> 5×10⁹⁹) no pierdan precisión.
 function formasCientificasAbonado(n) {
-  if (!Number.isFinite(n) || n <= 0 || n !== Math.round(n)) return [];
+  if (!Number.isFinite(n) || n <= 0) return [];
+  const m = n.toExponential().match(/^(\d)(?:\.(\d+))?e\+?(-?\d+)$/);
+  if (!m) return [];
+  const digitos = (m[1] + (m[2] || "")).replace(/0+$/, "") || "0";
+  const exp = Number(m[3]) - (digitos.length - 1); // n = digitos × 10^exp
+  if (exp < 1) return [];
   const formas = [];
-  for (let e = 1; e <= 30; e++) {
-    const m = n / Math.pow(10, e);
-    if (m < 1) break;
-    if (m !== Math.round(m)) continue;
-    const f = `${m}E${e}`;
-    if (f.length <= 6) formas.push(f);
+  for (let k = 0; k <= exp - 1 && k < 6; k++) {
+    const mant = digitos + "0".repeat(k), e = exp - k;
+    formas.push(`${mant}E${e}`);
+    if (e < 10) formas.push(`${mant}E0${e}`);
   }
-  // La de 4 caracteres primero (el largo habitual de una cuenta), después las más cortas.
-  return formas.sort((a, b) => (a.length === 4 ? -1 : 0) - (b.length === 4 ? -1 : 0) || a.length - b.length);
+  const validas = [...new Set(formas)].filter((f) => f.length <= 6);
+  // Las de 4 caracteres primero (el largo habitual de una cuenta), después las más cortas.
+  return validas.sort((a, b) => (a.length === 4 ? -1 : 0) - (b.length === 4 ? -1 : 0) || a.length - b.length);
 }
 // Todas las formas posibles del código de abonado leído de una planilla.
-// La primera es la que se muestra.
+// La primera es la que se muestra. Un 0 que puso Excel ("0E05" -> 0) no se
+// puede recuperar: no devuelve nada y se compara por el nombre del cliente.
+// Una celda con dos cuentas ("310E/311C", "2665/6", "404A/F") da las dos.
 function clavesAbonado(v) {
   if (v == null || v === "") return [];
   let n = null;
@@ -166,12 +175,23 @@ function clavesAbonado(v) {
     const t = String(v).trim();
     // Texto que muestra Excel para esos números: "4,80E+03", "4.8E+3", "1,2E+05".
     if (/^\d+(?:[.,]\d+)?E\+\d+$/i.test(t) || /^\d+[.,]\d+E\d+$/i.test(t)) n = Number(t.replace(",", ".").replace(/e\+?/i, "e"));
-    else { const c = claveAbonado(t); return c ? [c] : []; }
+    else {
+      const partes = t.split(/\s*(?:\/|,|;|\sy\s)\s*/i).filter(Boolean);
+      const claves = [];
+      partes.forEach((p, i) => {
+        let x = p;
+        // "2665/6" o "404A/F": la segunda es la primera con el final cambiado.
+        if (i > 0 && p.length < partes[0].length) x = partes[0].slice(0, partes[0].length - p.length) + p;
+        const c = claveAbonado(x);
+        if (c) claves.push(c);
+      });
+      return [...new Set(claves)];
+    }
   }
-  if (!Number.isFinite(n)) return [];
-  const entero = String(Math.round(n));
-  const ciencia = formasCientificasAbonado(Math.round(n));
-  return [...new Set([...(ciencia.length && typeof v !== "number" ? ciencia : []), entero, ...ciencia].map(claveAbonado))];
+  if (!Number.isFinite(n) || n === 0) return [];
+  const ciencia = formasCientificasAbonado(n);
+  const entero = Number.isSafeInteger(Math.round(n)) ? String(Math.round(n)) : "";
+  return [...new Set([...(ciencia.length && (typeof v !== "number" || !entero || n >= 1e6) ? ciencia : []), entero, ...ciencia].filter(Boolean).map(claveAbonado))];
 }
 // ¿El valor de la planilla corresponde a alguno de estos códigos (de la APP)?
 function mismoAbonado(valorPlanilla, ...codigosApp) {

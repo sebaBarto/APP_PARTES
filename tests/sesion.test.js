@@ -1226,6 +1226,16 @@ test("Código de abonado: letras (hexadecimal), ceros adelante y lo que Excel ha
   assert.ok(!u.mismoAbonado("48ED", "48EA"));
   assert.ok(u.mismoAbonado(4800, "4800"), "un 4800 de verdad sigue siendo 4800");
   assert.deepStrictEqual(u.clavesAbonado("4,80E+03")[0], "48E2", "se muestra como el código");
+  // Casos del listado real del sistema de Oficina
+  assert.ok(u.mismoAbonado(20000000, "2E07"), "2E07 (hexadecimal) -> 2×10⁷");
+  assert.strictEqual(u.clavesAbonado("2E+7")[0], "2E07", "la celda con formato científico se muestra como cuenta de 4");
+  assert.ok(u.mismoAbonado(5e99, "5E99"), "números enormes sin perder precisión");
+  assert.ok(u.mismoAbonado(27000000000, "27E9"));
+  assert.deepStrictEqual(u.clavesAbonado(0), [], "0E05 -> 0 no se puede recuperar: se compara por nombre");
+  assert.deepStrictEqual(u.clavesAbonado("310E/311C"), ["310E", "311C"], "dos cuentas en la misma celda");
+  assert.deepStrictEqual(u.clavesAbonado("2665/6"), ["2665", "2666"]);
+  assert.deepStrictEqual(u.clavesAbonado("404A/F"), ["404A", "404F"]);
+  assert.ok(u.mismoAbonado("S3 1292", "S3-1292"));
 });
 
 test("Vencimientos: la oficina carga, renueva (corre la fecha si se repite) y borra; el cron avisa una sola vez al responsable y al técnico de la credencial", async () => {
