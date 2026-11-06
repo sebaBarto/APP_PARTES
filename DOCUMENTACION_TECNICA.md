@@ -367,3 +367,26 @@ Invoke-RestMethod -Uri "https://sat-backend.gsigalovsky.workers.dev/api/config" 
 | "El mail de guardia no llegó" | Revisar el Cron Trigger en Cloudflare (`wrangler tail` para ver logs en vivo), y `RESEND_API_KEY` configurado. |
 | "Los planos no se actualizan" | Revisar `admin.html` → pestaña Planos → estado de sincronización. Si dice "hace más de 3 horas", la PC de la oficina puede estar apagada o sin conexión — revisar la tarea programada de Windows y `sync.log`. |
 | "Error 500 al guardar algo" | Casi siempre es un nombre de columna/tabla que no coincide — confirmar con `PRAGMA table_info()` antes de asumir. |
+
+
+---
+
+## Copias de seguridad y vuelta atrás (v4.44.0)
+
+- **Admin → Equipo y configuración → Copias de seguridad.** "Descargar copia completa" arma un .zip en el
+  navegador con todas las listas/tablas de D1 (vía `GET /api/datos?coleccion=backup&fuente=app:<x>|d1:<x>`) y
+  todos los archivos .json/.txt/.csv del repo de datos (`fuente=gh:<ruta>`). Las respuestas van en pedazos de
+  1,5 M caracteres (`parte=n`) por el límite de Vercel. Sin claves: se sacan campos password/hash/salt/token.
+  No incluye fotos ni PDF de planos (R2). Cada descarga queda anotada en `backups-registro.json`; si pasan
+  más de 7 días, aparece aviso en Inicio.
+- **Volver atrás desde una copia:** se abre el .zip (también si fue recomprimido), se compara con lo actual,
+  "Ver en Excel" por tabla, y "Restaurar esto" para: archivos del repo de datos (excepto tecnicos.json y
+  push-subscripciones.json) y las listas clientes, materiales, credenciales, consultas-categorias, config,
+  guardias, servicios_emergencia, vehiculos. Antes de restaurar se descarga el estado actual. Clientes se
+  reemplaza exacto (GET previo → DELETE → POST; si falla, vuelve lo previo).
+- **Versiones anteriores:** cualquier archivo del repo de datos se puede volver a una versión anterior
+  (`versiones=<ruta>` lista commits; `restaurar_archivo` con `ref`). Queda como un commit nuevo: reversible.
+- **Toda la base D1** (partes, SIMs, historiales...) vuelve atrás con Time Travel de D1 (30 días plan pago,
+  7 gratuito) usando `backup/restaurar-d1.ps1` desde la carpeta sat-backend-d1: exporta antes, anota el
+  bookmark para deshacer, pide escribir VOLVER. `backup/backup-d1.ps1` exporta la base a .sql (nombre
+  correcto de la base: `sat-servicios-db`).

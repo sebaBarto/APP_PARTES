@@ -219,6 +219,15 @@
   #tabSeguimientosBtn:not(.active) .tab-icon { color: var(--acc-slate); }
   #tabErroresBtn:not(.active) .tab-icon { color: var(--acc-slate); }
   #tabAuditoriaBtn:not(.active) .tab-icon { color: var(--acc-slate); }
+  #tabBackupBtn:not(.active) .tab-icon { color: var(--acc-teal); }
+  .bk-tabla td { vertical-align: middle; }
+  .bk-tabla .bk-btns { white-space: nowrap; text-align: right; }
+  .bk-tabla .bk-btns button { width: auto; margin: 2px 0 2px 4px; padding: 6px 10px; font-size: 13px; }
+  .bk-aviso { padding: 10px 12px; border-radius: 10px; background: #FFF4DC; color: #6B4A00; margin: 8px 0; }
+  .bk-aviso.ok { background: #E6F4EA; color: #1F6B34; }
+  .bk-pasos { margin: 6px 0 0 18px; padding: 0; }
+  .bk-pasos li { margin: 4px 0; }
+  .bk-pasos code { background: rgba(128,128,128,.15); padding: 1px 5px; border-radius: 5px; font-size: 12.5px; }
   #tabRendicionesBtn:not(.active) .tab-icon { color: var(--acc-teal); }
   #tabCoordinacionBtn:not(.active) .tab-icon { color: var(--acc-amberdark); }
   #tabSemaforoBtn:not(.active) .tab-icon { color: var(--acc-sky); }
@@ -681,6 +690,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
       <button type="button" class="tab-btn" id="tabComodatosBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span>Comodatos</button>
       <button type="button" class="tab-btn" id="tabNotasBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v13H8l-4 4z"/><path d="M8 9h8M8 13h5"/></svg></span>Notas</button>
       <button type="button" class="tab-btn" id="tabSeguimientosBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 C7 8 5 12 5 15 a7 7 0 0 0 14 0 C19 12 17 8 12 2 Z"/><circle cx="12" cy="15" r="2.5"/></svg></span>Seguimientos</button>
+      <button type="button" class="tab-btn" id="tabBackupBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 11v6c0 1.7 3.6 3 8 3"/><path d="M17 15v6M14.5 18.5 17 21l2.5-2.5"/></svg></span>Copias de seguridad</button>
       <button type="button" class="tab-btn" id="tabErroresBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4"/><path d="M12 17.5v.01"/></svg></span>Errores</button>
       <button type="button" class="tab-btn" id="tabAuditoriaBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h10a1 1 0 0 1 1 1v15H6a2 2 0 0 1-2-2V7"/><path d="M4 7a3 3 0 0 1 3-3h2v14"/><path d="M12 9h5M12 13h5M12 17h3"/></svg></span>Registro de cambios</button>
       <button type="button" class="tab-btn" id="tabRendicionesBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h12v19l-3-2-3 2-3-2-3 2V2z"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="11" x2="15" y2="11"/></svg></span>Rendiciones</button>
@@ -1409,6 +1419,45 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
       </div>
     </div>
 
+    <div id="panelBackup" class="hidden">
+      <h1>Copias de seguridad</h1>
+      <p class="subtitle">Descargá a la PC de la oficina todo lo que fue guardando la APP, y volvé atrás si algo se rompe o se pierde.</p>
+      <div class="card">
+        <h3 style="margin-top:0;">Descargar una copia completa</h3>
+        <div id="bkUltima"></div>
+        <p class="subtitle" id="bkContenido" style="margin:6px 0 10px;"></p>
+        <button type="button" id="bkDescargarBtn" style="width:auto;">⬇ Descargar copia completa (.zip)</button>
+        <p class="status" id="bkStatus"></p>
+        <p class="subtitle" style="margin:8px 0 0;">Conviene hacerla una vez por semana y guardarla en una carpeta de la PC de la oficina (y cada tanto en un pendrive o en Drive). Si pasan más de 7 días sin copia, aparece un aviso en Inicio.</p>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">Volver atrás desde una copia</h3>
+        <p class="subtitle" style="margin-top:0;">Elegí un .zip descargado de acá. Se muestra qué tiene y cuánto hay ahora, y restaurás solo lo que necesites. Antes de pisar algo, se descarga solo cómo está ahora (por si te arrepentís).</p>
+        <input type="file" id="bkZipArchivo" accept=".zip">
+        <p class="status" id="bkZipStatus"></p>
+        <div id="bkZipResultado"></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">Versiones anteriores de un archivo</h3>
+        <p class="subtitle" style="margin-top:0;">Croquis, conciliaciones de SIMs, tarjetas de contacto, lista de precios y el resto de los archivos de datos guardan cada cambio. Elegí uno para ver sus versiones y volver a cualquiera (sin necesidad de tener una copia descargada).</p>
+        <div class="field-row"><div><label>Archivo</label><input type="text" class="field-input" id="bkVerArchivo" list="bkArchivosLista" placeholder="Ej. croquis-index.json"></div><button type="button" class="btn-secondary-admin" id="bkVerBtn" style="width:auto;">Ver versiones</button></div>
+        <datalist id="bkArchivosLista"></datalist>
+        <p class="status" id="bkVerStatus"></p>
+        <div id="bkVersiones"></div>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0;">Volver atrás toda la base (partes, SIMs, instalaciones, historiales)</h3>
+        <p class="subtitle" style="margin-top:0;">Los partes, movimientos de SIMs, herramientas y vehículos, instalaciones, rendiciones y demás viven en la base de Cloudflare. Esa base se puede volver entera a cómo estaba en un día y hora (Cloudflare guarda los cambios de los últimos 30 días; 7 si el plan es el gratuito). Eso no se hace desde acá a propósito: pisa todo lo cargado después de ese momento.</p>
+        <p class="subtitle" style="margin:6px 0 0;">Se hace desde la PC de la oficina, en la carpeta <b>sat-backend-d1</b>, con el script <b>restaurar-d1.ps1</b> (está en la carpeta <i>backup</i> de la APP):</p>
+        <ol class="bk-pasos subtitle">
+          <li>Primero guarda una copia de cómo está la base ahora.</li>
+          <li>Pide la fecha y hora a la que querés volver (ej. <code>2026-11-05 18:30</code>) y que escribas <b>VOLVER</b> para confirmar.</li>
+          <li>Si después algo no quedó bien, se puede deshacer: el script muestra el código para volver al estado anterior.</li>
+        </ol>
+        <p class="subtitle" style="margin:8px 0 0;">Para recuperar <b>un</b> parte o un dato suelto, no hace falta volver toda la base: abrí la copia arriba y usá <b>Ver en Excel</b> sobre esa tabla.</p>
+      </div>
+    </div>
+
     <div id="panelAuditoria" class="hidden">
       <h1>Registro de cambios</h1>
       <p class="subtitle">Quién hizo cada cambio desde el panel de administración: entradas al panel, listas guardadas, SIMs, rendiciones, instalaciones y demás. Se guardan los últimos 5.000.</p>
@@ -1760,6 +1809,8 @@ const notasAdminLista = document.getElementById("notasAdminLista");
 const tabSeguimientosBtn = document.getElementById("tabSeguimientosBtn");
 const tabErroresBtn = document.getElementById("tabErroresBtn");
 const tabAuditoriaBtn = document.getElementById("tabAuditoriaBtn");
+const tabBackupBtn = document.getElementById("tabBackupBtn");
+const panelBackup = document.getElementById("panelBackup");
 const panelAuditoria = document.getElementById("panelAuditoria");
 const panelErrores = document.getElementById("panelErrores");
 const panelSeguimientos = document.getElementById("panelSeguimientos");
@@ -1865,6 +1916,7 @@ const TABS = [
   { btn: tabNotasBtn, panel: panelNotas, onShow: () => cargarNotasAdmin() },
   { btn: tabErroresBtn, panel: panelErrores, onShow: () => cargarErroresAdmin() },
   { btn: tabAuditoriaBtn, panel: panelAuditoria, onShow: () => cargarAuditoriaAdmin() },
+  { btn: tabBackupBtn, panel: panelBackup, onShow: () => bkCargar() },
   { btn: tabSeguimientosBtn, panel: panelSeguimientos, onShow: () => cargarSeguimientosAdmin() },
   { btn: tabRendicionesBtn, panel: panelRendiciones, onShow: () => cargarRendicionesAdmin() },
   { btn: tabCoordinacionBtn, panel: panelCoordinacion, onShow: () => cargarCoordinacionAdmin() },
@@ -1890,7 +1942,7 @@ const GRUPOS_MENU = [
   ["SIMs", ["tabSimsBtn", "tabSimsInstaladasBtn", "tabSimsControlBtn"]],
   ["Flota y herramientas", ["tabVehiculosBtn", "tabHerramientasBtn"]],
   ["Clientes", ["tabClientesBtn", "tabClavesClienteBtn", "tabPlanosBtn"]],
-  ["Equipo y configuración", ["tabTecnicosBtn", "tabCredencialesBtn", "tabGuardiasBtn", "tabMaterialesBtn", "tabConsultasBtn", "tabErroresBtn", "tabAuditoriaBtn"]],
+  ["Equipo y configuración", ["tabTecnicosBtn", "tabCredencialesBtn", "tabGuardiasBtn", "tabMaterialesBtn", "tabConsultasBtn", "tabErroresBtn", "tabAuditoriaBtn", "tabBackupBtn"]],
 ];
 (function armarMenuAgrupado() {
   const tabs = document.querySelector("#mainCard > .tabs");
@@ -1931,7 +1983,7 @@ async function cargarInicioAdmin() {
   st.textContent = "Revisando...";
   const h = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
   const leer = (url) => fetch(url, { headers: h, cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-  const [emerg, rend, pend, sims, vehs, vehHist, errores, partes, clientes, instalaciones, presencias, historicas, simsInst] = await Promise.all([
+  const [emerg, rend, pend, sims, vehs, vehHist, errores, partes, clientes, instalaciones, presencias, historicas, simsInst, registroCopias] = await Promise.all([
     leer("/api/datos?coleccion=servicios_emergencia"),
     leer("/api/recurso-uso?recurso=rendicion"),
     leer("/api/recurso-uso?recurso=sim&pendientes=1&todas=1"),
@@ -1945,6 +1997,7 @@ async function cargarInicioAdmin() {
     leer("/api/recurso-uso?recurso=presencia&historial=1"),
     leer("/api/datos?coleccion=visitas_historicas"),
     leer("/api/datos?coleccion=sims_instaladas"),
+    leer("/api/datos?coleccion=backup&registro=1"),
   ]);
   const arr = (x) => (Array.isArray(x) ? x : []);
   const hoyISO = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
@@ -1988,6 +2041,12 @@ async function cargarInicioAdmin() {
   const erroresSemana = arr(errores).filter((e) => String(e.fecha || "").slice(0, 10) >= hace7);
   agregar(erroresSemana.length, "Errores de la app (7 días)", erroresSemana.slice(0, 1).map((e) => String(e.mensaje || "").slice(0, 60)).join(""), "tabErroresBtn", "atencion");
 
+  // Copia de seguridad: aviso si pasó más de una semana sin descargar una.
+  if (Array.isArray(registroCopias)) {
+    const ult = registroCopias[0];
+    const dias = ult ? Math.floor((Date.now() - new Date(ult.fecha).getTime()) / 864e5) : null;
+    if (dias === null || dias > 7) agregar(1, "Copia de seguridad atrasada", dias === null ? "Todavía no se descargó ninguna" : `La última es de hace ${dias} días`, "tabBackupBtn", "atencion");
+  }
   tarjetas.sort((a, b) => ({ urgente: 0, atencion: 1, ok: 2 }[a.nivel] - { urgente: 0, atencion: 1, ok: 2 }[b.nivel]));
   const conAlgo = tarjetas.filter((x) => x.n > 0).length;
   st.className = conAlgo ? "status" : "status ok";
@@ -5665,6 +5724,255 @@ function concExcel() {
   XLSX.writeFile(libro, `conciliacion_${concEstado.empresa}_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 document.getElementById("simsConcEmpresa").addEventListener("change", (e) => { if (concEstado) { concEstado.empresa = e.target.value; concRecalcular(); } });
+
+// ---------- Copias de seguridad ----------
+// La copia es un .zip armado en el navegador: cada tabla de la base y cada
+// archivo del repo de datos, como JSON, más un manifiesto y un LEEME.
+const BK_NOMBRES = {
+  clientes: "Clientes", materiales: "Materiales", credenciales: "Credenciales", "consultas-categorias": "Manuales (categorías)",
+  config: "Configuración", guardias: "Guardias", servicios_emergencia: "Emergencias", vehiculos: "Vehículos", herramientas: "Herramientas",
+  sims: "SIMs en stock", sims_instaladas: "SIMs instaladas", notas: "Notas", visitas_historicas: "Semáforo (visitas)",
+  partes: "Partes", stock_movimientos: "Materiales por servicio", instalaciones: "Instalaciones", encuestas: "Encuestas",
+  comodatos: "Comodatos", guardia_historial: "Historial de guardias", sims_historial: "Historial de SIMs", vehiculos_historial: "Historial de vehículos",
+  herramientas_historial: "Historial de herramientas", seguimientos: "Seguimientos", rendiciones: "Rendiciones", presencias_obra: "Presencia en obra", tecnicos: "Técnicos (sin claves)",
+};
+let bkFuentes = null;
+// --- ZIP mínimo (sin comprimir al escribir; al leer acepta también comprimido) ---
+const BK_CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function bkCrc32(b) { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = BK_CRC[(c ^ b[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+function bkArmarZip(archivos) {
+  const enc = new TextEncoder(), partes = [], central = [];
+  let off = 0;
+  const d = new Date(), fecha = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate(), hora = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
+  archivos.forEach(({ nombre, datos }) => {
+    const n = enc.encode(nombre), b = typeof datos === "string" ? enc.encode(datos) : datos, crc = bkCrc32(b);
+    const h = new DataView(new ArrayBuffer(30));
+    [[0, 0x04034b50, 4], [4, 20, 2], [6, 0x0800, 2], [8, 0, 2], [10, hora, 2], [12, fecha, 2], [14, crc, 4], [18, b.length, 4], [22, b.length, 4], [26, n.length, 2], [28, 0, 2]].forEach(([o, v, l]) => l === 4 ? h.setUint32(o, v, true) : h.setUint16(o, v, true));
+    const c = new DataView(new ArrayBuffer(46));
+    [[0, 0x02014b50, 4], [4, 20, 2], [6, 20, 2], [8, 0x0800, 2], [10, 0, 2], [12, hora, 2], [14, fecha, 2], [16, crc, 4], [20, b.length, 4], [24, b.length, 4], [28, n.length, 2], [30, 0, 2], [32, 0, 2], [34, 0, 2], [36, 0, 2], [38, 0, 4], [42, off, 4]].forEach(([o, v, l]) => l === 4 ? c.setUint32(o, v, true) : c.setUint16(o, v, true));
+    partes.push(new Uint8Array(h.buffer), n, b);
+    central.push(new Uint8Array(c.buffer), n);
+    off += 30 + n.length + b.length;
+  });
+  const tamCentral = central.reduce((s, x) => s + x.length, 0);
+  const fin = new DataView(new ArrayBuffer(22));
+  [[0, 0x06054b50, 4], [8, archivos.length, 2], [10, archivos.length, 2], [12, tamCentral, 4], [16, off, 4]].forEach(([o, v, l]) => l === 4 ? fin.setUint32(o, v, true) : fin.setUint16(o, v, true));
+  return new Blob([...partes, ...central, new Uint8Array(fin.buffer)], { type: "application/zip" });
+}
+async function bkLeerZip(buffer) {
+  const u = new Uint8Array(buffer), v = new DataView(buffer), dec = new TextDecoder();
+  let e = -1;
+  for (let i = u.length - 22; i >= Math.max(0, u.length - 65557); i--) if (v.getUint32(i, true) === 0x06054b50) { e = i; break; }
+  if (e < 0) throw new Error("No es un archivo .zip válido.");
+  const total = v.getUint16(e + 10, true);
+  let p = v.getUint32(e + 16, true);
+  const salida = {};
+  for (let k = 0; k < total; k++) {
+    if (v.getUint32(p, true) !== 0x02014b50) throw new Error("El .zip está dañado.");
+    const metodo = v.getUint16(p + 10, true), comp = v.getUint32(p + 20, true), ln = v.getUint16(p + 28, true), lx = v.getUint16(p + 30, true), lc = v.getUint16(p + 32, true), loc = v.getUint32(p + 42, true);
+    const nombre = dec.decode(u.subarray(p + 46, p + 46 + ln));
+    p += 46 + ln + lx + lc;
+    if (nombre.endsWith("/")) continue;
+    const ini = loc + 30 + v.getUint16(loc + 26, true) + v.getUint16(loc + 28, true);
+    const crudo = u.subarray(ini, ini + comp);
+    let datos;
+    if (metodo === 0) datos = crudo;
+    else if (metodo === 8) datos = new Uint8Array(await new Response(new Blob([crudo]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer());
+    else continue;
+    salida[nombre] = dec.decode(datos);
+  }
+  return salida;
+}
+function bkDescargarBlob(blob, nombre) {
+  const url = URL.createObjectURL(blob), a = document.createElement("a");
+  a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+const bkFechaArchivo = () => { const d = new Date(), z = (n) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}_${z(d.getHours())}${z(d.getMinutes())}`; };
+const bkTamano = (n) => n >= 1048576 ? (n / 1048576).toLocaleString("es-AR", { maximumFractionDigits: 1 }) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB";
+async function bkApi(qs, cuerpo) {
+  const r = await fetch("/api/datos?coleccion=backup" + (qs || ""), cuerpo ? { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify(cuerpo) } : { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || "Error " + r.status);
+  return d;
+}
+// Una fuente entera (pedida en pedazos) como texto.
+async function bkLeerFuente(fuente, ref) {
+  let texto = "", partes = 1;
+  for (let i = 0; i < partes; i++) {
+    const d = await bkApi(`&fuente=${encodeURIComponent(fuente)}&parte=${i}${ref ? "&ref=" + ref : ""}`);
+    partes = d.partes || 1;
+    texto += d.texto || "";
+  }
+  return texto;
+}
+const bkRutaZip = (f) => { const [t, ...r] = f.split(":"); const n = r.join(":"); return t === "gh" ? "archivos-de-datos/" + n : `base-de-datos/${t === "app" ? "listas" : "tablas"}/${n}.json`; };
+const bkCantidad = (texto) => { try { const x = JSON.parse(texto); return Array.isArray(x) ? x.length : x && typeof x === "object" ? Object.keys(x).length : 1; } catch (e) { return null; } };
+async function bkCargar() {
+  const st = document.getElementById("bkStatus");
+  try {
+    bkFuentes = await bkApi("&fuentes=1");
+    const ult = bkFuentes.registro[0];
+    const dias = ult ? Math.floor((Date.now() - new Date(ult.fecha).getTime()) / 864e5) : null;
+    const u = document.getElementById("bkUltima");
+    u.innerHTML = ult
+      ? `<div class="bk-aviso ${dias > 7 ? "" : "ok"}">Última copia: <b>${escapeHtmlAdmin(new Date(ult.fecha).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }))}</b> (${dias === 0 ? "hoy" : dias === 1 ? "ayer" : `hace ${dias} días`}) por ${escapeHtmlAdmin(ult.por || "")} · ${escapeHtmlAdmin(bkTamano(ult.bytes || 0))}${ult.errores && ult.errores.length ? ` · ⚠ ${ult.errores.length} partes no se pudieron leer` : ""}</div>`
+      : `<div class="bk-aviso">Todavía no se descargó ninguna copia desde acá.</div>`;
+    const tamGh = bkFuentes.github.reduce((s, x) => s + x.size, 0);
+    document.getElementById("bkContenido").textContent = `Incluye ${bkFuentes.app.length + bkFuentes.d1.length} tablas de la base (partes, clientes, SIMs, instalaciones, historiales, etc.) y ${bkFuentes.github.length} ${bkFuentes.github.length === 1 ? "archivo" : "archivos"} de datos (croquis, conciliaciones, configuraciones; ${bkTamano(tamGh)}). No incluye las fotos ni los PDF de planos${bkFuentes.otros.cantidad ? ` (${bkFuentes.otros.cantidad} archivos, ${bkTamano(bkFuentes.otros.bytes)})` : ""}: esos quedan en Cloudflare y los originales de Visio en la PC.`;
+    document.getElementById("bkArchivosLista").innerHTML = bkFuentes.github.map((x) => `<option value="${escapeHtmlAdmin(x.path)}">`).join("");
+  } catch (err) { st.className = "status err"; st.textContent = "No se pudo consultar: " + err.message; }
+}
+document.getElementById("bkDescargarBtn").addEventListener("click", async () => {
+  const st = document.getElementById("bkStatus"), btn = document.getElementById("bkDescargarBtn");
+  btn.disabled = true;
+  try {
+    if (!bkFuentes) await bkCargar();
+    const fuentes = [...bkFuentes.app.map((x) => "app:" + x), ...bkFuentes.d1.map((x) => "d1:" + x), ...bkFuentes.github.map((x) => "gh:" + x.path)];
+    const archivos = [], errores = [], detalle = [];
+    for (let i = 0; i < fuentes.length; i++) {
+      const f = fuentes[i], nombre = f.split(":").slice(1).join(":");
+      st.className = "status"; st.textContent = `Descargando ${i + 1} de ${fuentes.length}: ${BK_NOMBRES[nombre] || nombre}...`;
+      try {
+        const texto = await bkLeerFuente(f);
+        archivos.push({ nombre: bkRutaZip(f), datos: texto });
+        detalle.push({ fuente: f, archivo: bkRutaZip(f), cantidad: bkCantidad(texto), bytes: texto.length });
+      } catch (err) { errores.push(`${BK_NOMBRES[nombre] || nombre}: ${err.message}`); }
+    }
+    const fecha = new Date().toISOString();
+    const manifiesto = { tipo: "copia-sat", version_app: (document.querySelector('meta[name="app-version"]') || {}).content || "", fecha, por: sessionStorage.getItem("admin_nombre") || "", restaurables: bkFuentes.restaurables, fuentes: detalle, errores };
+    const leeme = [
+      "COPIA DE SEGURIDAD — APP de Servicio Técnico SAT",
+      `Fecha: ${new Date(fecha).toLocaleString("es-AR")}`, "",
+      "base-de-datos/listas  -> listas de la base (clientes, materiales, SIMs, vehículos, etc.)",
+      "base-de-datos/tablas  -> tablas de la base (partes, instalaciones, historiales, rendiciones, etc.)",
+      "archivos-de-datos     -> archivos del repo de datos (croquis, conciliaciones, configuraciones)", "",
+      "Para volver atrás: Panel de administración -> Copias de seguridad -> 'Volver atrás desde una copia', y elegir este .zip.",
+      "Cada archivo es JSON: se puede abrir con cualquier editor de texto, o desde el panel con 'Ver en Excel'.",
+      "Las claves de los técnicos NO van en la copia.",
+      ...(errores.length ? ["", "NO SE PUDIERON LEER:", ...errores] : []),
+    ].join("\r\n");
+    archivos.unshift({ nombre: "LEEME.txt", datos: leeme }, { nombre: "manifiesto.json", datos: JSON.stringify(manifiesto, null, 1) });
+    const zip = bkArmarZip(archivos), nombreZip = `SAT-copia-${bkFechaArchivo()}.zip`;
+    bkDescargarBlob(zip, nombreZip);
+    await bkApi("", { accion: "registrar_copia", archivo: nombreZip, bytes: zip.size, fuentes: detalle.length, errores }).catch(() => {});
+    st.className = errores.length ? "status err" : "status ok";
+    st.textContent = errores.length ? `Se descargó ${nombreZip}, pero ${errores.length} partes no se pudieron leer: ${errores.join(" · ")}. Probá de nuevo en un rato.` : `Listo: ${nombreZip} (${bkTamano(zip.size)}, ${detalle.length} tablas y archivos). Guardalo en la carpeta de copias de la PC.`;
+    bkCargar();
+  } catch (err) { st.className = "status err"; st.textContent = "No se pudo armar la copia: " + err.message; }
+  btn.disabled = false;
+});
+// --- Volver atrás desde una copia ---
+let bkZip = null; // { archivos: {nombre: texto}, manifiesto, filas: [...] }
+function bkExcel(nombre, texto) {
+  let datos; try { datos = JSON.parse(texto); } catch (e) { alert("Ese archivo no es una tabla."); return; }
+  const filas = Array.isArray(datos) ? datos : datos && typeof datos === "object" ? Object.entries(datos).map(([k, x]) => (x && typeof x === "object" && !Array.isArray(x) ? { clave: k, ...x } : { clave: k, valor: x })) : [{ valor: datos }];
+  const plano = filas.map((f) => { const o = {}; Object.entries(f && typeof f === "object" ? f : { valor: f }).forEach(([k, x]) => { o[k] = x && typeof x === "object" ? JSON.stringify(x).slice(0, 32000) : x; }); return o; });
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(plano.length ? plano : [{ "(vacía)": "" }]), String(nombre).replace(/[\\/?*[\]:]/g, "_").slice(0, 31) || "Hoja1");
+  XLSX.writeFile(libro, `${String(nombre).replace(/[^\w.-]+/g, "_")}.xlsx`);
+}
+document.getElementById("bkZipArchivo").addEventListener("change", async (ev) => {
+  const f = ev.target.files[0];
+  ev.target.value = "";
+  if (!f) return;
+  const st = document.getElementById("bkZipStatus");
+  st.className = "status"; st.textContent = "Leyendo la copia...";
+  try {
+    const archivos = await bkLeerZip(await f.arrayBuffer());
+    let manifiesto = null; try { manifiesto = JSON.parse(archivos["manifiesto.json"] || ""); } catch (e) { /* nada */ }
+    if (!manifiesto || manifiesto.tipo !== "copia-sat") throw new Error("Ese .zip no es una copia descargada desde este panel.");
+    if (!bkFuentes) await bkCargar();
+    bkZip = { archivo: f.name, archivos, manifiesto };
+    st.className = "status ok";
+    st.textContent = `${f.name}: copia del ${new Date(manifiesto.fecha).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" })}${manifiesto.por ? " (" + manifiesto.por + ")" : ""}, ${manifiesto.fuentes.length} tablas y archivos.`;
+    bkRenderZip();
+  } catch (err) { st.className = "status err"; st.textContent = "No se pudo leer: " + err.message; document.getElementById("bkZipResultado").innerHTML = ""; }
+});
+function bkRenderZip() {
+  const m = bkZip.manifiesto, cont = document.getElementById("bkZipResultado");
+  const grupo = (titulo, ayuda, lista) => !lista.length ? "" : `<h4 style="margin:14px 0 4px;">${escapeHtmlAdmin(titulo)}</h4><p class="subtitle" style="margin:0 0 6px;">${escapeHtmlAdmin(ayuda)}</p>
+    <div class="sims-tabla-wrap"><table class="sims-tabla bk-tabla"><tbody>${lista.map((x) => {
+      const [t, ...r] = x.fuente.split(":"), n = r.join(":");
+      const restaurable = (t === "app" && (m.restaurables || []).includes(n)) || t === "gh";
+      return `<tr><td style="white-space:normal;"><b>${escapeHtmlAdmin(BK_NOMBRES[n] || n)}</b>${BK_NOMBRES[n] ? "" : ""}<br><small style="color:#6B7680;">${x.cantidad != null ? `${x.cantidad.toLocaleString("es-AR")} ${t === "gh" ? "elementos" : "filas"} en la copia` : ""}${x.bytes ? " · " + bkTamano(x.bytes) : ""}</small><span class="bk-ahora" data-f="${escapeHtmlAdmin(x.fuente)}"></span></td>
+        <td class="bk-btns"><button type="button" class="btn-secondary-admin bk-excel" data-f="${escapeHtmlAdmin(x.fuente)}">Ver en Excel</button>${restaurable ? `<button type="button" class="btn-secondary-admin bk-restaurar" data-f="${escapeHtmlAdmin(x.fuente)}" style="color:#B3261E;">Restaurar esto</button>` : ""}</td></tr>`;
+    }).join("")}</tbody></table></div>`;
+  const app = m.fuentes.filter((x) => x.fuente.startsWith("app:")), d1 = m.fuentes.filter((x) => x.fuente.startsWith("d1:")), gh = m.fuentes.filter((x) => x.fuente.startsWith("gh:"));
+  cont.innerHTML = (m.errores && m.errores.length ? `<div class="bk-aviso">⚠ Cuando se hizo esta copia no se pudieron leer: ${escapeHtmlAdmin(m.errores.join(" · "))}</div>` : "")
+    + `<button type="button" class="btn-secondary-admin" id="bkCompararBtn" style="width:auto;margin:6px 0;">Comparar con cómo está ahora</button>`
+    + grupo("Listas de la base", "Clientes, materiales, credenciales, configuración, guardias, emergencias y vehículos se pueden reemplazar enteros por lo de la copia. Las de SIMs, herramientas y notas solo se pueden ver (se mueven con su historial).", app)
+    + grupo("Tablas de la base", "Partes, instalaciones, historiales, rendiciones... Se pueden ver y bajar a Excel para recuperar un dato suelto. Para volver toda la base atrás, ver la última tarjeta de esta pantalla.", d1)
+    + grupo("Archivos de datos", "Croquis, conciliaciones de SIMs, lista de precios, tarjetas, etc. Cada uno se puede restaurar por separado.", gh);
+  cont.querySelectorAll(".bk-excel").forEach((b) => b.addEventListener("click", () => { const n = b.dataset.f.split(":").slice(1).join(":"); bkExcel(`copia_${(BK_NOMBRES[n] || n)}`, bkZip.archivos[bkRutaZip(b.dataset.f)] || ""); }));
+  cont.querySelectorAll(".bk-restaurar").forEach((b) => b.addEventListener("click", () => bkRestaurar(b.dataset.f, b)));
+  document.getElementById("bkCompararBtn").addEventListener("click", async (e) => {
+    e.target.disabled = true;
+    for (const el of cont.querySelectorAll(".bk-ahora")) {
+      el.innerHTML = ` <small style="color:#6B7680;">· ahora: ...</small>`;
+      try {
+        const texto = await bkLeerFuente(el.dataset.f);
+        const ahora = bkCantidad(texto), x = m.fuentes.find((y) => y.fuente === el.dataset.f);
+        const igual = texto === bkZip.archivos[bkRutaZip(el.dataset.f)];
+        el.innerHTML = ` <small style="color:${igual ? "#1F6B34" : "#8A5A00"};">· ahora: ${ahora != null ? ahora.toLocaleString("es-AR") : "?"}${igual ? " (igual a la copia)" : x && ahora != null && x.cantidad != null && ahora < x.cantidad ? ` — <b>faltan ${x.cantidad - ahora} respecto de la copia</b>` : " (cambió)"}</small>`;
+      } catch (err) { el.innerHTML = ` <small style="color:#B3261E;">· ahora: ${escapeHtmlAdmin(err.message)}</small>`; }
+    }
+    e.target.disabled = false;
+  });
+}
+async function bkRestaurar(fuente, boton) {
+  const [t, ...r] = fuente.split(":"), n = r.join(":");
+  const etiqueta = BK_NOMBRES[n] || n;
+  const texto = bkZip.archivos[bkRutaZip(fuente)];
+  const st = document.getElementById("bkZipStatus");
+  if (texto == null) { alert("La copia no tiene ese archivo."); return; }
+  const fechaCopia = new Date(bkZip.manifiesto.fecha).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
+  if (!await confirmarAdmin(`¿Reemplazar "${etiqueta}" por lo que había el ${fechaCopia}? Lo cargado después en esa parte se pierde. Antes se descarga cómo está ahora, por si hay que deshacerlo.`)) return;
+  boton.disabled = true;
+  try {
+    st.className = "status"; st.textContent = `Guardando cómo está ahora "${etiqueta}"...`;
+    const actual = await bkLeerFuente(fuente);
+    bkDescargarBlob(new Blob([actual], { type: "application/json" }), `antes-de-restaurar_${String(n).replace(/[^\w.-]+/g, "_")}_${bkFechaArchivo()}.json`);
+    st.textContent = `Restaurando "${etiqueta}"...`;
+    if (t === "gh") await bkApi("", { accion: "restaurar_archivo", path: n, texto });
+    else await bkApi("", { accion: "restaurar_coleccion", coleccion: n, data: JSON.parse(texto) });
+    st.className = "status ok"; st.textContent = `"${etiqueta}" quedó como estaba el ${fechaCopia}. Lo de antes quedó descargado (antes-de-restaurar…).`;
+  } catch (err) { st.className = "status err"; st.textContent = `No se pudo restaurar "${etiqueta}": ${err.message}`; }
+  boton.disabled = false;
+}
+// --- Versiones anteriores de un archivo del repo de datos ---
+document.getElementById("bkVerBtn").addEventListener("click", async () => {
+  const p = document.getElementById("bkVerArchivo").value.trim();
+  const st = document.getElementById("bkVerStatus"), cont = document.getElementById("bkVersiones");
+  if (!p) { st.className = "status err"; st.textContent = "Elegí un archivo."; return; }
+  st.className = "status"; st.textContent = "Buscando versiones...";
+  cont.innerHTML = "";
+  try {
+    const versiones = await bkApi(`&versiones=${encodeURIComponent(p)}`);
+    if (!versiones.length) { st.className = "status err"; st.textContent = "Ese archivo no tiene versiones (¿está bien escrito el nombre?)."; return; }
+    st.className = "status ok"; st.textContent = `${versiones.length} versiones de ${p} (la primera es la actual).`;
+    cont.innerHTML = `<div class="sims-tabla-wrap"><table class="sims-tabla bk-tabla"><tbody>${versiones.map((v, i) => `<tr><td style="white-space:normal;"><b>${escapeHtmlAdmin(new Date(v.fecha).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }))}</b>${i === 0 ? ' <span class="sims-chip">actual</span>' : ""}<br><small style="color:#6B7680;">${escapeHtmlAdmin(v.mensaje)}</small></td>
+      <td class="bk-btns"><button type="button" class="btn-secondary-admin bk-v-bajar" data-i="${i}">Descargar</button>${i === 0 ? "" : `<button type="button" class="btn-secondary-admin bk-v-volver" data-i="${i}" style="color:#B3261E;">Volver a esta versión</button>`}</td></tr>`).join("")}</tbody></table></div>`;
+    cont.querySelectorAll(".bk-v-bajar").forEach((b) => b.addEventListener("click", async () => {
+      const v = versiones[Number(b.dataset.i)];
+      b.disabled = true;
+      try { const texto = await bkLeerFuente("gh:" + p, v.sha); bkDescargarBlob(new Blob([texto], { type: "application/json" }), `${p.replace(/[^\w.-]+/g, "_").replace(/\.json$/, "")}_${String(v.fecha).slice(0, 16).replace(/[:T]/g, "-")}.json`); }
+      catch (err) { alert("No se pudo: " + err.message); }
+      b.disabled = false;
+    }));
+    cont.querySelectorAll(".bk-v-volver").forEach((b) => b.addEventListener("click", async () => {
+      const v = versiones[Number(b.dataset.i)];
+      const cuando = new Date(v.fecha).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
+      if (!await confirmarAdmin(`¿Volver ${p} a como estaba el ${cuando}? Los cambios posteriores dejan de verse, pero quedan en el historial: se puede volver a la versión de ahora desde esta misma lista.`)) return;
+      b.disabled = true;
+      try {
+        await bkApi("", { accion: "restaurar_archivo", path: p, ref: v.sha });
+        st.className = "status ok"; st.textContent = `${p} volvió a la versión del ${cuando}.`;
+        document.getElementById("bkVerBtn").click();
+      } catch (err) { st.className = "status err"; st.textContent = "No se pudo: " + err.message; b.disabled = false; }
+    }));
+  } catch (err) { st.className = "status err"; st.textContent = "No se pudo: " + err.message; }
+});
 
 // ---------- Conciliación con el sistema de Oficina ----------
 // El sistema de Oficina tiene todas las SIMs usadas en los clientes (de las

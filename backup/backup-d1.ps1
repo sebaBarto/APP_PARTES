@@ -1,9 +1,9 @@
-# Backup de la base D1 (sat-backend-d1) a un archivo .sql con fecha.
+﻿# Backup de la base D1 (sat-backend-d1) a un archivo .sql con fecha.
 # Uso (desde la carpeta sat-backend-d1, en PowerShell):
 #   powershell -ExecutionPolicy Bypass -File .\backup-d1.ps1
 # Guarda en .\backups\ y conserva solo los últimos 30.
 param(
-  [string]$BaseDeDatos = "sat-backend-d1",   # nombre en wrangler.toml (database_name)
+  [string]$BaseDeDatos = "sat-servicios-db",   # nombre en wrangler.toml (database_name)
   [string]$Carpeta = ".\backups",
   [int]$Conservar = 30
 )

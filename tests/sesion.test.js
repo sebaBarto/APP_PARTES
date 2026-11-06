@@ -1113,3 +1113,103 @@ test("Conciliación de SIMs: la oficina marca diferencias como resueltas o ignor
     global.fetch = fetchViejo;
   }
 });
+
+test("Copias de seguridad: solo la oficina; se baja en pedazos, sin claves, y se vuelve atrás de forma controlada", async () => {
+  const fetchViejo = global.fetch;
+  const archivos = { "croquis-index.json": [{ id: "a", titulo: "Casa" }], "tecnicos.json": [{ nombre: "Juan", password: "1234", permisos: {} }] };
+  const pedidosBackend = [];
+  const partesGrande = Array.from({ length: 30000 }, (_, i) => ({ id: "p" + i, cliente: "Cliente número " + i, tarea: "x".repeat(40) }));
+  global.fetch = async (url, op = {}) => {
+    const u = String(url), metodo = op.method || "GET";
+    if (u.includes("git/trees/HEAD")) return new Response(JSON.stringify({ tree: [{ type: "blob", path: "croquis-index.json", size: 40 }, { type: "blob", path: "tecnicos.json", size: 60 }, { type: "blob", path: "fotos/a.jpg", size: 5000 }] }));
+    if (u.includes("/commits?path=")) return new Response(JSON.stringify([{ sha: "b".repeat(40), commit: { message: "Croquis: guardó Casa", committer: { date: "2026-11-05T10:00:00Z" } } }, { sha: "a".repeat(40), commit: { message: "Croquis: primero", committer: { date: "2026-11-01T10:00:00Z" } } }]));
+    const ruta = decodeURIComponent((u.match(/contents\/([^?]+)/) || [])[1] || "");
+    if (ruta) {
+      if (metodo === "PUT") { const b = JSON.parse(op.body); archivos[ruta] = JSON.parse(Buffer.from(b.content, "base64").toString("utf-8")); archivos["__msg_" + ruta] = b.message; return new Response("{}", { status: 200 }); }
+      if (u.includes("?ref=")) return new Response(JSON.stringify([{ id: "a", titulo: "Versión vieja" }]));
+      if (!(ruta in archivos)) return new Response("{}", { status: 404 });
+      const raw = (op.headers || {}).Accept === "application/vnd.github.raw";
+      return new Response(raw ? JSON.stringify(archivos[ruta]) : JSON.stringify({ sha: "s", encoding: "base64", content: Buffer.from(JSON.stringify(archivos[ruta])).toString("base64") }));
+    }
+    if (u.startsWith("https://backend.prueba")) {
+      pedidosBackend.push(metodo + " " + u.replace("https://backend.prueba", ""));
+      if (u.endsWith("/api/partes")) return new Response(JSON.stringify(partesGrande));
+      if (u.endsWith("/api/tecnicos")) return new Response(JSON.stringify([{ nombre: "Juan", password_hash: "pbkdf2$xx", permisos: "{}" }]));
+      if (u.endsWith("/api/clientes") && metodo === "GET") return new Response(JSON.stringify([{ numero_cliente: "00000001", nombre: "Actual" }]));
+      return new Response(JSON.stringify(metodo === "GET" ? [] : { ok: true }));
+    }
+    return new Response("{}");
+  };
+  try {
+    const admin = crearSesion({ nombre: "Seba", rol: "admin" });
+    const juan = crearSesion({ nombre: "Juan", rol: "tecnico" });
+    let r = resFalso();
+    await datos(pedido("GET", { coleccion: "backup", fuentes: "1" }, null, juan), r);
+    assert.strictEqual(r.statusCode, 403, "un técnico no baja la base");
+    r = resFalso();
+    await datos(pedido("GET", { coleccion: "backup", fuentes: "1" }, null, admin), r);
+    assert.deepStrictEqual(r.cuerpo.github.map((x) => x.path), ["croquis-index.json", "tecnicos.json"]);
+    assert.deepStrictEqual(r.cuerpo.otros, { cantidad: 1, bytes: 5000 });
+    assert.ok(r.cuerpo.d1.includes("partes") && r.cuerpo.app.includes("clientes"));
+    // Partes grande: llega en pedazos que juntos son la tabla entera
+    let texto = "", partes = 1;
+    for (let i = 0; i < partes; i++) {
+      r = resFalso();
+      await datos(pedido("GET", { coleccion: "backup", fuente: "d1:partes", parte: String(i) }, null, admin), r);
+      partes = r.cuerpo.partes;
+      texto += r.cuerpo.texto;
+    }
+    assert.ok(partes > 1, "se parte en pedazos");
+    assert.strictEqual(JSON.parse(texto).length, 30000);
+    // Sin claves
+    r = resFalso();
+    await datos(pedido("GET", { coleccion: "backup", fuente: "d1:tecnicos" }, null, admin), r);
+    assert.ok(!r.cuerpo.texto.includes("pbkdf2") && r.cuerpo.texto.includes("Juan"));
+    r = resFalso();
+    await datos(pedido("GET", { coleccion: "backup", fuente: "gh:tecnicos.json" }, null, admin), r);
+    assert.ok(!r.cuerpo.texto.includes("1234"));
+    r = resFalso();
+    await datos(pedido("GET", { coleccion: "backup", fuente: "gh:../secreto.json" }, null, admin), r);
+    assert.strictEqual(r.statusCode, 400);
+    // Restaurar un archivo desde una copia y a una versión anterior
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "backup" }, { accion: "restaurar_archivo", path: "croquis-index.json", texto: JSON.stringify([{ id: "a", titulo: "De la copia" }]) }, admin), r);
+    assert.ok(r.cuerpo.ok);
+    assert.strictEqual(archivos["croquis-index.json"][0].titulo, "De la copia");
+    assert.match(archivos["__msg_croquis-index.json"], /desde una copia de seguridad \(por Seba\)/);
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "backup" }, { accion: "restaurar_archivo", path: "croquis-index.json", ref: "a".repeat(40) }, admin), r);
+    assert.strictEqual(archivos["croquis-index.json"][0].titulo, "Versión vieja");
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "backup" }, { accion: "restaurar_archivo", path: "tecnicos.json", texto: "[]" }, admin), r);
+    assert.strictEqual(r.statusCode, 400, "tecnicos.json no se pisa con una copia sin claves");
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "backup" }, { accion: "restaurar_archivo", path: "croquis-index.json", texto: "{roto" }, admin), r);
+    assert.strictEqual(r.statusCode, 400);
+    r = resFalso();
+    await datos(pedido("GET", { coleccion: "backup", versiones: "croquis-index.json" }, null, admin), r);
+    assert.strictEqual(r.cuerpo.length, 2);
+    assert.strictEqual(r.cuerpo[1].mensaje, "Croquis: primero");
+    // Listas: clientes se reemplaza exacto; partes no se restaura desde acá
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "backup" }, { accion: "restaurar_coleccion", coleccion: "partes", data: [{ id: "x" }] }, admin), r);
+    assert.strictEqual(r.statusCode, 400);
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "backup" }, { accion: "restaurar_coleccion", coleccion: "clientes", data: [] }, admin), r);
+    assert.strictEqual(r.statusCode, 400, "una copia vacía no borra la lista");
+    pedidosBackend.length = 0;
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "backup" }, { accion: "restaurar_coleccion", coleccion: "clientes", data: [{ numero_cliente: "00000002", nombre: "De la copia" }] }, admin), r);
+    assert.ok(r.cuerpo.ok);
+    assert.deepStrictEqual(pedidosBackend, ["GET /api/clientes", "DELETE /api/clientes", "POST /api/clientes"]);
+    // Registro de copias
+    r = resFalso();
+    await datos(pedido("POST", { coleccion: "backup" }, { accion: "registrar_copia", archivo: "SAT-copia.zip", bytes: 1000, fuentes: 40, errores: [] }, admin), r);
+    r = resFalso();
+    await datos(pedido("GET", { coleccion: "backup", registro: "1" }, null, admin), r);
+    assert.strictEqual(r.cuerpo[0].por, "Seba");
+    assert.strictEqual(r.cuerpo[0].archivo, "SAT-copia.zip");
+  } finally {
+    global.fetch = fetchViejo;
+  }
+});

@@ -5060,3 +5060,64 @@ test("Conciliación de SIMs con el sistema de Oficina: todas las empresas juntas
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Copias de seguridad: baja un .zip con todo, se vuelve a abrir, se ve en Excel y se restaura una lista (guardando antes cómo estaba)", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: route.request().url().includes("xlsx.full.min.js") ? require("fs").readFileSync(require("path").join(__dirname, "..", "vendor", "xlsx.full.min.js"), "utf8") : "" }));
+  const posts = [];
+  let clientesAhora = [{ numero_cliente: "00000001", nombre: "Kiosco" }];
+  const fuentes = { app: ["clientes", "sims"], d1: ["partes"], restaurables: ["clientes"], github: [{ path: "croquis-index.json", size: 30 }], otros: { cantidad: 3, bytes: 900000 }, registro: [] };
+  const contenido = { "app:clientes": () => JSON.stringify(clientesAhora), "app:sims": () => "[]", "d1:partes": () => JSON.stringify([{ id: "p1", cliente: "Kiosco", tarea: "Ñandú — revisión" }, { id: "p2", cliente: "Bar" }]), "gh:croquis-index.json": () => JSON.stringify([{ id: "a" }]) };
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = new URL(req.url());
+    const json = (o, st) => route.fulfill({ status: st || 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.searchParams.get("coleccion") === "backup") {
+      if (req.method() === "POST") {
+        const b = JSON.parse(req.postData() || "{}"); posts.push(b);
+        if (b.accion === "registrar_copia") fuentes.registro.unshift({ fecha: new Date().toISOString(), por: "Seba", bytes: b.bytes, archivo: b.archivo });
+        if (b.accion === "restaurar_coleccion") clientesAhora = b.data;
+        return json({ ok: true });
+      }
+      if (u.searchParams.get("fuentes")) return json(fuentes);
+      const f = u.searchParams.get("fuente");
+      if (f) { const t = contenido[f](); const P = 20; const partes = Math.ceil(t.length / P); const i = Number(u.searchParams.get("parte") || 0); return json({ partes, parte: i, texto: t.slice(i * P, (i + 1) * P) }); }
+    }
+    json([]);
+  });
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { sessionStorage.setItem("admin_nombre", "Seba"); document.getElementById("mainCard").classList.remove("hidden"); document.getElementById("tabBackupBtn").click(); });
+  await page.waitForFunction(() => /Incluye 3 tablas/.test(document.getElementById("bkContenido").textContent));
+  assert.match(await page.textContent("#bkUltima"), /Todavía no se descargó/);
+  const [descarga] = await Promise.all([page.waitForEvent("download"), page.click("#bkDescargarBtn")]);
+  assert.match(descarga.suggestedFilename(), /^SAT-copia-\d{4}-\d{2}-\d{2}_\d{4}\.zip$/);
+  const zipPath = await descarga.path();
+  await page.waitForFunction(() => /Listo: SAT-copia/.test(document.getElementById("bkStatus").textContent));
+  assert.ok(posts.some((p) => p.accion === "registrar_copia" && p.fuentes === 4));
+  assert.match(await page.textContent("#bkUltima"), /Última copia.*hoy.*Seba/);
+  // El zip se puede abrir con otro programa: lo lee Python
+  const { execFileSync } = require("child_process");
+  const lista = execFileSync("python3", ["-c", "import zipfile,sys,json;z=zipfile.ZipFile(sys.argv[1]);print(json.dumps({n:z.read(n).decode('utf-8') for n in z.namelist()}))", zipPath]).toString();
+  const enZip = JSON.parse(lista);
+  assert.deepStrictEqual(Object.keys(enZip).sort(), ["LEEME.txt", "archivos-de-datos/croquis-index.json", "base-de-datos/listas/clientes.json", "base-de-datos/listas/sims.json", "base-de-datos/tablas/partes.json", "manifiesto.json"]);
+  assert.strictEqual(JSON.parse(enZip["base-de-datos/tablas/partes.json"])[0].tarea, "Ñandú — revisión", "acentos y textos largos (en pedazos) bien");
+  // Después se borró un cliente y se cargó otro; se vuelve atrás con la copia
+  clientesAhora = [{ numero_cliente: "00000009", nombre: "Nuevo" }];
+  await page.setInputFiles("#bkZipArchivo", zipPath);
+  await page.waitForSelector(".bk-restaurar");
+  assert.strictEqual(await page.locator(".bk-restaurar").count(), 2, "se restauran clientes y el archivo de datos; SIMs y partes no");
+  await page.click("#bkCompararBtn");
+  await page.waitForFunction(() => [...document.querySelectorAll(".bk-ahora")].every((e) => !/\.\.\./.test(e.textContent) && e.textContent));
+  assert.match(await page.textContent('.bk-ahora[data-f="gh:croquis-index.json"]'), /igual a la copia/);
+  assert.match(await page.textContent('.bk-ahora[data-f="app:clientes"]'), /cambió/);
+  const [excel] = await Promise.all([page.waitForEvent("download"), page.click('.bk-excel[data-f="d1:partes"]')]);
+  assert.match(excel.suggestedFilename(), /\.xlsx$/);
+  await page.click('.bk-restaurar[data-f="app:clientes"]');
+  const [antes] = await Promise.all([page.waitForEvent("download"), page.click(".cartel-admin .cartel-si")]);
+  assert.match(antes.suggestedFilename(), /^antes-de-restaurar_clientes_/);
+  assert.strictEqual(JSON.parse(require("fs").readFileSync(await antes.path(), "utf8"))[0].nombre, "Nuevo", "se guardó cómo estaba antes");
+  await page.waitForFunction(() => /quedó como estaba/.test(document.getElementById("bkZipStatus").textContent));
+  assert.deepStrictEqual(clientesAhora, [{ numero_cliente: "00000001", nombre: "Kiosco" }]);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

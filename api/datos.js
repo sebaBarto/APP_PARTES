@@ -1015,6 +1015,158 @@ async function manejarColeccionCortada(nombreColeccion, metodo, body, backendUrl
   return { status: 405, data: { error: "Método no permitido" } };
 }
 
+// ---------- Copias de seguridad (solo admin) ----------
+// Descarga de todo lo que guarda la APP, en pedazos (Vercel no deja mandar
+// respuestas de más de ~4,5 MB): las tablas de la base (Cloudflare D1) y los
+// archivos del repo privado de datos (GitHub). Para volver atrás: los archivos
+// del repo se restauran desde una copia o desde cualquier versión anterior
+// (GitHub guarda todas), y algunas listas de la base se pueden reemplazar
+// desde una copia. El resto de la base vuelve atrás con Time Travel de D1.
+const BACKUP_APP = ["clientes", "materiales", "credenciales", "consultas-categorias", "config", "guardias", "servicios_emergencia", "vehiculos", "herramientas", "sims", "sims_instaladas", "notas", "visitas_historicas"];
+const BACKUP_RESTAURABLES = ["clientes", "materiales", "credenciales", "consultas-categorias", "config", "guardias", "servicios_emergencia", "vehiculos"];
+const BACKUP_D1 = {
+  partes: "/api/partes", stock_movimientos: "/api/stock", instalaciones: "/api/instalaciones", encuestas: "/api/encuestas",
+  comodatos: "/api/comodatos", guardia_historial: "/api/guardia-historial", sims_historial: "/api/sims/historial",
+  vehiculos_historial: "/api/vehiculos/historial", herramientas_historial: "/api/herramientas/historial",
+  seguimientos: "/api/seguimientos", rendiciones: "/api/rendiciones", presencias_obra: "/api/presencias-obra", tecnicos: "/api/tecnicos",
+};
+const BACKUP_PEDAZO = 1500000; // caracteres por pedido
+const BACKUP_REGISTRO = "backups-registro.json";
+const backupRutaValida = (p) => typeof p === "string" && p.length < 300 && !p.includes("..") && !p.startsWith("/") && /^[\w./ -]+$/.test(p) && /\.(json|txt|csv)$/i.test(p);
+// Sin hashes ni claves en la copia (los técnicos se pueden volver a poner la clave).
+function backupSinSecretos(v) {
+  if (Array.isArray(v)) return v.map(backupSinSecretos);
+  if (v && typeof v === "object") { const o = {}; Object.entries(v).forEach(([k, x]) => { if (!/password|hash|salt|^token$/i.test(k)) o[k] = x; }); return o; }
+  return v;
+}
+async function manejarBackup(req, res, autorizacion, cuerpo) {
+  const { BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN, GITHUB_DATA_REPO } = process.env;
+  const hb = { Authorization: `Bearer ${BACKEND_NUEVO_TOKEN}`, "Content-Type": "application/json" };
+  const q = req.query || {};
+  res.setHeader("Cache-Control", "no-store");
+  const pedazo = (texto) => {
+    const partes = Math.max(1, Math.ceil(texto.length / BACKUP_PEDAZO));
+    const parte = Math.min(Math.max(0, parseInt(q.parte, 10) || 0), partes - 1);
+    return { partes, parte, largo: texto.length, texto: texto.slice(parte * BACKUP_PEDAZO, (parte + 1) * BACKUP_PEDAZO) };
+  };
+  try {
+    if (req.method === "GET" && q.registro) {
+      const { data } = await leerArchivoDatos(BACKUP_REGISTRO, []);
+      res.status(200).json(Array.isArray(data) ? data.slice(0, 20) : []);
+      return;
+    }
+    if (req.method === "GET" && q.fuentes) {
+      // Árbol completo del repo de datos (con tamaños).
+      const rt = await fetch(`https://api.github.com/repos/${GITHUB_DATA_REPO}/git/trees/HEAD?recursive=1`, { headers: headersGithubDatos() });
+      const arbol = rt.ok ? await rt.json() : { tree: [] };
+      const archivos = (arbol.tree || []).filter((x) => x.type === "blob");
+      const github = archivos.filter((x) => backupRutaValida(x.path)).map((x) => ({ path: x.path, size: x.size || 0 }));
+      const otros = archivos.filter((x) => !backupRutaValida(x.path));
+      const { data: registro } = await leerArchivoDatos(BACKUP_REGISTRO, []);
+      res.status(200).json({ app: BACKUP_APP, d1: Object.keys(BACKUP_D1), restaurables: BACKUP_RESTAURABLES, github, otros: { cantidad: otros.length, bytes: otros.reduce((s, x) => s + (x.size || 0), 0) }, registro: Array.isArray(registro) ? registro.slice(0, 20) : [] });
+      return;
+    }
+    if (req.method === "GET" && q.fuente) {
+      const [tipo, ...resto] = String(q.fuente).split(":");
+      const nombre = resto.join(":");
+      let texto;
+      if (tipo === "app" && BACKUP_APP.includes(nombre)) {
+        const r = await manejarColeccionCortada(nombre, "GET", null, BACKEND_NUEVO_URL, hb);
+        if (r.status !== 200) throw new Error(`No se pudo leer ${nombre}`);
+        texto = JSON.stringify(backupSinSecretos(r.data));
+      } else if (tipo === "d1" && BACKUP_D1[nombre]) {
+        const r = await fetch(`${BACKEND_NUEVO_URL}${BACKUP_D1[nombre]}`, { headers: hb });
+        if (!r.ok) throw new Error(`No se pudo leer ${nombre}`);
+        texto = JSON.stringify(backupSinSecretos(await r.json()));
+      } else if (tipo === "gh" && backupRutaValida(nombre)) {
+        const ref = /^[0-9a-f]{40}$/.test(String(q.ref || "")) ? `?ref=${q.ref}` : "";
+        const r = await fetch(urlGithubDatos(nombre) + ref, { headers: headersGithubDatos({ Accept: "application/vnd.github.raw" }) });
+        if (r.status === 404) { res.status(404).json({ error: "No existe ese archivo" }); return; }
+        if (!r.ok) throw new Error(`No se pudo leer ${nombre}`);
+        texto = await r.text();
+        if (/\.json$/i.test(nombre)) { try { texto = JSON.stringify(backupSinSecretos(JSON.parse(texto))); } catch (e) { /* va tal cual */ } }
+      } else { res.status(400).json({ error: "Fuente desconocida" }); return; }
+      res.status(200).json(pedazo(texto));
+      return;
+    }
+    if (req.method === "GET" && q.versiones) {
+      const p = String(q.versiones);
+      if (!backupRutaValida(p)) { res.status(400).json({ error: "Archivo inválido" }); return; }
+      const r = await fetch(`https://api.github.com/repos/${GITHUB_DATA_REPO}/commits?path=${encodeURIComponent(p)}&per_page=100`, { headers: headersGithubDatos() });
+      if (!r.ok) throw new Error("No se pudo leer el historial del archivo");
+      const l = await r.json();
+      res.status(200).json((Array.isArray(l) ? l : []).map((c) => ({ sha: c.sha, fecha: c.commit && c.commit.committer && c.commit.committer.date, mensaje: String((c.commit && c.commit.message) || "").split("\n")[0].slice(0, 160) })));
+      return;
+    }
+    if (req.method !== "POST") { res.status(405).json({ error: "Método no permitido" }); return; }
+    const b = cuerpo && typeof cuerpo === "object" ? cuerpo : {};
+    const quien = autorizacion.nombre || "Oficina";
+    if (b.accion === "registrar_copia") {
+      const entrada = { fecha: new Date().toISOString(), por: quien, archivo: String(b.archivo || "").slice(0, 120), bytes: Math.max(0, Number(b.bytes) || 0), fuentes: Math.max(0, Number(b.fuentes) || 0), errores: (Array.isArray(b.errores) ? b.errores : []).slice(0, 20).map((x) => String(x).slice(0, 120)) };
+      for (let i = 0; i < 4; i++) {
+        const { data, sha } = await leerArchivoDatos(BACKUP_REGISTRO, []);
+        const r = await escribirArchivoDatos(BACKUP_REGISTRO, [entrada, ...(Array.isArray(data) ? data : [])].slice(0, 200), sha, `Copia de seguridad descargada por ${quien}`);
+        if (r.ok) { res.status(200).json({ ok: true }); return; }
+        if (r.status !== 409 && r.status !== 422) break;
+      }
+      res.status(502).json({ error: "No se pudo anotar la copia" });
+      return;
+    }
+    if (b.accion === "restaurar_archivo") {
+      const p = String(b.path || "");
+      if (!backupRutaValida(p) || p === BACKUP_REGISTRO) { res.status(400).json({ error: "Archivo inválido" }); return; }
+      let texto;
+      if (/^[0-9a-f]{40}$/.test(String(b.ref || ""))) {
+        const r = await fetch(urlGithubDatos(p) + `?ref=${b.ref}`, { headers: headersGithubDatos({ Accept: "application/vnd.github.raw" }) });
+        if (!r.ok) { res.status(404).json({ error: "No se encontró esa versión" }); return; }
+        texto = await r.text();
+      } else if (typeof b.texto === "string") {
+        // En la copia van sin claves: restaurar estos pisaría las claves con nada.
+        if (/^(tecnicos|push-subscripciones)\.json$/.test(p)) { res.status(400).json({ error: "Ese archivo se restaura desde \"Versiones anteriores\" (en la copia van sin las claves)" }); return; }
+        texto = b.texto;
+      }
+      else { res.status(400).json({ error: "Falta el contenido" }); return; }
+      if (/\.json$/i.test(p)) { try { JSON.parse(texto); } catch (e) { res.status(400).json({ error: "El contenido de la copia no es un JSON válido" }); return; } }
+      for (let i = 0; i < 4; i++) {
+        const rMeta = await fetch(urlGithubDatos(p), { headers: headersGithubDatos() });
+        const sha = rMeta.ok ? (await rMeta.json()).sha : undefined;
+        const r = await fetch(urlGithubDatos(p), { method: "PUT", headers: headersGithubDatos({ "Content-Type": "application/json" }), body: JSON.stringify({ message: `Restaurado ${p} ${b.ref ? "a la versión " + String(b.ref).slice(0, 7) : "desde una copia de seguridad"} (por ${quien})`, content: Buffer.from(texto, "utf-8").toString("base64"), sha }) });
+        if (r.ok) { res.status(200).json({ ok: true }); return; }
+        if (r.status !== 409 && r.status !== 422) break;
+      }
+      res.status(502).json({ error: "No se pudo restaurar el archivo" });
+      return;
+    }
+    if (b.accion === "restaurar_coleccion") {
+      const nombre = String(b.coleccion || "");
+      if (!BACKUP_RESTAURABLES.includes(nombre)) { res.status(400).json({ error: "Esa parte de la base no se restaura desde acá (usar la vuelta atrás de la base)" }); return; }
+      const data = b.data;
+      if (nombre === "config" || nombre === "guardias" ? !data || typeof data !== "object" || Array.isArray(data) : !Array.isArray(data)) { res.status(400).json({ error: "La copia no tiene el formato esperado" }); return; }
+      if (Array.isArray(data) && !data.length) { res.status(400).json({ error: "La copia de esa lista está vacía: no se restaura" }); return; }
+      if (nombre === "clientes") {
+        // Exacto: se vacía y se carga la copia; si falla, se vuelve a poner lo que había.
+        const rPrev = await fetch(`${BACKEND_NUEVO_URL}/api/clientes`, { headers: hb });
+        if (!rPrev.ok) throw new Error("No se pudo leer la lista actual");
+        const previas = await rPrev.json();
+        const rDel = await fetch(`${BACKEND_NUEVO_URL}/api/clientes`, { method: "DELETE", headers: hb });
+        if (!rDel.ok) throw new Error("No se pudo vaciar la lista actual");
+        const r = await fetch(`${BACKEND_NUEVO_URL}/api/clientes`, { method: "POST", headers: hb, body: JSON.stringify(data) });
+        if (!r.ok) {
+          if (Array.isArray(previas) && previas.length) await fetch(`${BACKEND_NUEVO_URL}/api/clientes`, { method: "POST", headers: hb, body: JSON.stringify(previas) }).catch(() => {});
+          res.status(502).json({ error: "No se pudo cargar la copia — quedó lo que había antes" });
+          return;
+        }
+        res.status(200).json({ ok: true, count: data.length });
+        return;
+      }
+      const r = await manejarColeccionCortada(nombre, "POST", data, BACKEND_NUEVO_URL, hb);
+      res.status(r.status).json(r.data);
+      return;
+    }
+    res.status(400).json({ error: "Acción inválida" });
+  } catch (e) { res.status(502).json({ error: String(e.message || e) }); }
+}
+
 module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, res) => {
   // Formulario público de "pedir servicio" — pensado para un cliente
   // que escribe fuera de horario y no tiene ni necesita ningún login.
@@ -1203,6 +1355,13 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
   if (req.query && req.query.coleccion === "croquis") {
     if (!autorizacion) { res.status(401).json({ error: "No autorizado", sesion_vencida: true }); return; }
     await manejarCroquis(req, res, autorizacion, cuerpoAccion);
+    return;
+  }
+  if (req.query && req.query.coleccion === "backup") {
+    if (!autorizacion) { res.status(401).json({ error: "No autorizado", sesion_vencida: true }); return; }
+    if (autorizacion.rol !== "admin") { res.status(403).json({ error: "Solo desde el panel de administración" }); return; }
+    if (!process.env.BACKEND_NUEVO_URL || !process.env.BACKEND_NUEVO_TOKEN || !process.env.GITHUB_DATA_REPO) { res.status(500).json({ error: "Falta configuración del servidor" }); return; }
+    await manejarBackup(req, res, autorizacion, cuerpoAccion);
     return;
   }
   if (req.query && req.query.coleccion === "sims_conciliacion") {
