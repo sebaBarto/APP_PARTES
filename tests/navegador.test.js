@@ -5355,3 +5355,86 @@ test("Rendiciones: revisión rápida de a una (foto grande, un toque o una tecla
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Parte: si el registro en el historial falla (o la app se corta después del mail), queda en la cola del celular y se reintenta sin duplicar", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  let historialCae = true, guardados = [], stock = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    const json = (o, st) => route.fulfill({ status: st || 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("/api/enviar-mail")) return json({ ok: true });
+    if (u.includes("/api/historial") && req.method() === "POST") {
+      const b = JSON.parse(req.postData());
+      if (b.accion === "guardar_stock") { stock.push(b); return json({ ok: true }); }
+      if (historialCae) return json({ error: "No se pudo guardar en el historial" }, 502);
+      guardados.push(b); return json({ ok: true, id_parte: b.id_parte });
+    }
+    if (u.includes("tipo=parte&id=")) { const id = decodeURIComponent(u.split("id=")[1]); const p = guardados.find((g) => g.id_parte === id); return p ? json({ id, cliente: p.cliente, fecha: p.fecha }) : json({ error: "No se encontró" }, 404); }
+    json([]);
+  });
+  await page.goto(base + "/index.html");
+  await page.waitForTimeout(300);
+  const data = { numero_servicio: "45120", cliente: "Genz", direccion: "Mitre 100", localidad: "Rosario", tarea: "Cambio de batería", materiales: "Batería 12V 7A", tecnico: "Sebastián Purello", fecha: "2026-11-05", hora_entrada: "09:00", hora_salida: "10:00", claves: [], materiales_agregados: [{ nombre: "Batería 12V 7A", cantidad: 1 }], materiales_retirados_agregados: [] };
+  const r = await page.evaluate((d) => intentarEnviarParte({ idParte: "45120", data: d, signatureImgTag: "", signatureDataUrl: "" }, false), data);
+  assert.strictEqual(r.oficinaOk, true, "el mail salió");
+  let cola = await page.evaluate(() => obtenerColaEnvios());
+  assert.deepStrictEqual(cola.map((x) => [x.tipo, x.idParte, x.cuerpo.cliente]), [["historial", "45120", "Genz"]], "el historial quedó pendiente en el celular");
+  // Vuelve el servidor: se reintenta y se guarda (con los materiales)
+  historialCae = false;
+  await page.evaluate(() => procesarColaEnvios());
+  assert.strictEqual(guardados.length, 1);
+  assert.strictEqual(guardados[0].tarea, "Cambio de batería");
+  assert.strictEqual(stock.length, 1, "también los movimientos de stock");
+  assert.deepStrictEqual(await page.evaluate(() => obtenerColaEnvios()), []);
+  // La app se cortó justo después de guardar (antes de sacarlo de la cola): al reintentar ve que ya está y no lo duplica
+  await page.evaluate((d) => { agregarAColaEnvios({ tipo: "historial", idParte: "45120", enCurso: 0, cuerpo: { id_parte: "45120", cliente: "Genz", fecha: "2026-11-05" }, movimientos: [] }); return procesarColaEnvios(); });
+  assert.strictEqual(guardados.length, 1, "no se duplicó");
+  assert.deepStrictEqual(await page.evaluate(() => obtenerColaEnvios()), []);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Admin: un parte que llegó por mail y no quedó en el historial se carga pegando el texto del mail (sin duplicar)", async () => {
+  // El mail tal cual lo arma el servidor, copiado como texto (como al hacer Ctrl+A / Ctrl+C en el correo)
+  const vm = require("vm"), fs = require("fs"), path = require("path");
+  const fuente = fs.readFileSync(path.join(__dirname, "..", "api", "enviar-mail.js"), "utf8") + "\nmodule.exports.__html = (d) => renderTemplate(PLANTILLA_OFICINA, enriquecerDatos(d));";
+  const mod = { exports: {} };
+  vm.runInNewContext(fuente, { module: mod, require: (n) => (n === "nodemailer" ? {} : require(n)), process, console, Buffer, encodeURIComponent });
+  const html = mod.exports.__html({ id_parte: "45120", tipo_servicio: "Servicio técnico", cliente: "Genz Ricardo", direccion: "Mitre 100", localidad: "Rosario", cliente_email_usado: "genz@mail.com", tecnico: "Sebastián Purello", fecha: "2026-11-05", hora_entrada: "09:05", hora_salida: "10:20", tiempo_transcurrido: "1 h 15 min", tarea: "Cambio de batería de la central", materiales: "Batería 12V 7A x1", materiales_retirados: "Batería vieja", observaciones: "Cliente conforme", importe: "$ 35.000", descuento: "Sin descuento", costo_final: "$ 35.000", forma_pago: "Transferencia", firma_img: "", firma_aclaracion: "Ricardo Genz", claves: [] });
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  const guardados = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    const json = (o, st) => route.fulfill({ status: st || 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("/api/historial") && req.method() === "POST") { const b = JSON.parse(req.postData()); guardados.push(b); return json({ ok: true, id_parte: b.id_parte }); }
+    if (u.includes("tipo=parte&id=")) { const p = guardados[0]; return p ? json({ id: p.id_parte, cliente: p.cliente, fecha: p.fecha }) : json({ error: "No se encontró" }, 404); }
+    if (u.includes("coleccion=clientes")) return json([{ nombre: "Genz Ricardo", numero_cliente: "00004521" }]);
+    json([]);
+  });
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(300);
+  const texto = await page.evaluate((h) => { const d = document.createElement("div"); d.style.position = "fixed"; d.innerHTML = h; document.body.appendChild(d); const t = d.innerText; d.remove(); return t; }, html);
+  await page.evaluate(() => { sessionStorage.setItem("admin_nombre", "Seba"); document.getElementById("mainCard").classList.remove("hidden"); document.getElementById("tabServiciosBtn").click(); });
+  await page.fill("#recParteTexto", texto);
+  await page.click("#recParteLeerBtn");
+  await page.waitForFunction(() => !document.getElementById("recParteForm").classList.contains("hidden"));
+  const v = await page.$$eval("#recParteForm [data-rp]", (els) => Object.fromEntries(els.map((e) => [e.dataset.rp, e.value])));
+  assert.deepStrictEqual(
+    [v.id_parte, v.cliente, v.numero_cliente, v.direccion, v.localidad, v.tecnico, v.fecha, v.hora_entrada, v.hora_salida, v.tarea, v.materiales, v.materiales_retirados, v.observaciones, v.costo_final, v.forma_pago, v.cliente_email, v.firma_aclaracion],
+    ["45120", "Genz Ricardo", "00004521", "Mitre 100", "Rosario", "Sebastián Purello", "2026-11-05", "09:05", "10:20", "Cambio de batería de la central", "Batería 12V 7A x1", "Batería vieja", "Cliente conforme", "$ 35.000", "Transferencia", "genz@mail.com", "Ricardo Genz"]);
+  await page.click("#recParteGuardarBtn");
+  await page.waitForFunction(() => /quedó en el historial/.test(document.getElementById("recParteStatus").textContent));
+  assert.strictEqual(guardados.length, 1);
+  assert.strictEqual(guardados[0].numero_servicio, "45120");
+  assert.match(guardados[0].observaciones, /Cliente conforme\n\[Cargado desde el mail del parte por Seba/);
+  // Si se intenta de nuevo, avisa que ya está y no lo duplica
+  await page.fill("#recParteTexto", texto);
+  await page.click("#recParteLeerBtn");
+  await page.click("#recParteGuardarBtn");
+  await page.waitForFunction(() => /ya está en el historial/.test(document.getElementById("recParteStatus").textContent));
+  assert.strictEqual(guardados.length, 1);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

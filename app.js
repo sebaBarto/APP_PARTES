@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.45.0";
+const APP_VERSION = "4.45.1";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -4684,11 +4684,18 @@ async function intentarEnviarParte(payload, interactivo) {
         console.error("No se pudo quitar el servicio de la lista compartida:", err);
       });
     }
-    try {
-      const histRes = await fetch("/api/historial", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-        body: JSON.stringify({
+    // Registro en el historial. ANTES, si esto fallaba (sin señal justo en ese
+    // momento, la app cerrada o recargada por una actualización), el mail ya
+    // había salido pero el parte se perdía del historial sin que nadie lo
+    // supiera. Ahora queda primero en la cola del celular y se saca recién
+    // cuando el servidor confirma: si algo corta en el medio, se reintenta
+    // solo (al volver la señal o al abrir la app).
+    const clienteEncontradoStock = (() => { try { return buscarClientePorNombre(data.cliente); } catch (e) { return null; } })();
+    const itemHistorial = {
+      tipo: "historial",
+      idParte,
+      enCurso: Date.now(),
+      cuerpo: {
           numero_servicio: data.numero_servicio || "",
           numero_cliente: data.numero_cliente || "",
           es_instalacion: data.es_instalacion,
@@ -4720,69 +4727,31 @@ async function intentarEnviarParte(payload, interactivo) {
           claves: data.claves,
           foto_ref: fotoLink,
           firma_img_ref: firmaLink,
-        }),
-      });
-      if (!histRes.ok) {
-        const histData = await histRes.json().catch(() => ({}));
-        console.error("Error registrando historial:", histData);
-        // Este caso (backend avisando error) ahora es rarísimo — el
-        // backend reintenta solo con sufijo /2, /3, etc. antes de
-        // rendirse. Si aun así llega acá, es porque ni 10 intentos
-        // alcanzaron, así que sí amerita una alerta que no se pueda
-        // ignorar.
-        if (interactivo) {
-          if (histData.id_duplicado) {
-            alert(`⚠️ ATENCIÓN: ${histData.error}\n\nEl mail a la oficina SÍ se mandó, pero este parte NO quedó guardado en el sistema — avisale a la oficina de este problema para que lo carguen a mano.`);
-          } else {
-            showToast("El mail se envió, pero no se pudo registrar en el dashboard.");
-          }
-        }
-      } else {
-        // Si el número de servicio ya estaba usado (un número
-        // reciclado, una prueba vieja, lo que sea), el backend lo
-        // guardó igual, agregándole un sufijo /2, /3, etc. para no
-        // pisar el que ya existía. Se avisa (sin frenar nada — el
-        // parte ya está guardado) para que quede claro que ese
-        // número de servicio tiene algo raro para revisar.
-        const histData = await histRes.json().catch(() => ({}));
-        if (histData.duplicado && interactivo) {
-          alert(`ℹ️ El número de servicio "${idParte}" ya se había usado antes en otro parte — este quedó guardado como "${histData.numero_servicio}" para no pisar el anterior. No hace falta que hagas nada ahora, pero convendría avisarle a la oficina para que revisen de dónde salió ese número repetido.`);
-        }
-        // Movimientos de stock (materiales instalados/retirados) —
-        // no bloquea nada si falla, el parte ya quedó guardado.
-        try {
-          // Se busca el número de cliente por nombre (igual que ya
-          // se hace en SIMs y Emergencias) — así quien pasa esto al
-          // sistema offline no se confunde de cliente.
-          const clienteEncontradoStock = buscarClientePorNombre(data.cliente);
-          const movimientos = armarMovimientosDeStock(data.materiales_agregados, data.materiales_retirados_agregados).map((m) => ({
-            ...m,
-            numero_servicio: data.numero_servicio || "",
-            numero_cliente: clienteEncontradoStock ? clienteEncontradoStock.numero_cliente || "" : "",
-            cliente: data.cliente,
-            direccion: data.direccion,
-            fecha: data.fecha,
-            hora: data.hora_entrada,
-            tecnico: data.tecnico,
-          }));
-          if (movimientos.length > 0) {
-            const resStock = await fetch("/api/historial", {
-              method: "POST",
-              headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-              body: JSON.stringify({ accion: "guardar_stock", parte_id: idParte, movimientos }),
-            });
-            const dataStock = await resStock.json().catch(() => ({}));
-            if (!resStock.ok) {
-              console.error("Error guardando movimientos de stock:", dataStock);
-            }
-          }
-        } catch (errStock) {
-          console.error("Error registrando movimientos de stock:", errStock);
-        }
+        },
+      movimientos: armarMovimientosDeStock(data.materiales_agregados, data.materiales_retirados_agregados).map((m) => ({
+        ...m,
+        numero_servicio: data.numero_servicio || "",
+        numero_cliente: clienteEncontradoStock ? clienteEncontradoStock.numero_cliente || "" : "",
+        cliente: data.cliente,
+        direccion: data.direccion,
+        fecha: data.fecha,
+        hora: data.hora_entrada,
+        tecnico: data.tecnico,
+      })),
+    };
+    agregarAColaEnvios(itemHistorial);
+    const reg = await registrarParteEnHistorial(itemHistorial, false);
+    if (reg.ok) {
+      quitarDeColaEnvios((x) => x.tipo === "historial" && x.idParte === idParte);
+      if (reg.duplicado && interactivo) {
+        alert(`ℹ️ El número de servicio "${idParte}" ya se había usado antes en otro parte — este quedó guardado como "${reg.numero_servicio}" para no pisar el anterior. No hace falta que hagas nada ahora, pero convendría avisarle a la oficina para que revisen de dónde salió ese número repetido.`);
       }
-    } catch (err) {
-      console.error("Error registrando historial:", err);
-      if (interactivo) showToast("El mail se envió, pero no se pudo registrar en el dashboard.");
+    } else {
+      // Queda en la cola y se reintenta solo. Se libera para el próximo intento.
+      const cola = obtenerColaEnvios();
+      cola.forEach((x) => { if (x.tipo === "historial" && x.idParte === idParte) x.enCurso = 0; });
+      guardarColaEnvios(cola);
+      if (interactivo) showToast("El mail salió. El registro en el historial quedó pendiente en este celular y se reintenta solo.");
     }
   } catch (err) {
     console.error("Error enviando a oficina:", err);
@@ -4823,6 +4792,46 @@ function agregarAColaEnvios(payload) {
   cola.push(payload);
   guardarColaEnvios(cola);
 }
+function quitarDeColaEnvios(condicion) {
+  guardarColaEnvios(obtenerColaEnvios().filter((x) => !condicion(x)));
+}
+// Guarda el parte en el historial (y después sus movimientos de stock).
+// Antes de reintentar se fija si ya quedó guardado (pudo guardarse y cortarse
+// la respuesta): así no queda repetido como "/2".
+async function registrarParteEnHistorial(item, esReintento) {
+  try {
+    if (esReintento && item.idParte) {
+      const rv = await fetch(`/api/historial?tipo=parte&id=${encodeURIComponent(item.idParte)}`, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+      // Ya está si es ESTE parte (mismo cliente y fecha), no otro viejo con el mismo número.
+      if (rv.ok) {
+        const p = await rv.json().catch(() => ({}));
+        const n = (t) => String(t || "").trim().toLowerCase();
+        if (n(p.cliente) === n(item.cuerpo.cliente) && String(p.fecha || "") === String(item.cuerpo.fecha || "")) return { ok: true, yaEstaba: true };
+      }
+    }
+    const histRes = await fetch("/api/historial", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+      body: JSON.stringify(item.cuerpo),
+    });
+    const histData = await histRes.json().catch(() => ({}));
+    if (!histRes.ok) { console.error("Error registrando historial:", histData); return { ok: false, error: histData.error || "HTTP " + histRes.status }; }
+    if (item.movimientos && item.movimientos.length) {
+      try {
+        const resStock = await fetch("/api/historial", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
+          body: JSON.stringify({ accion: "guardar_stock", parte_id: item.idParte, movimientos: item.movimientos }),
+        });
+        if (!resStock.ok) console.error("Error guardando movimientos de stock:", await resStock.json().catch(() => ({})));
+      } catch (errStock) { console.error("Error registrando movimientos de stock:", errStock); }
+    }
+    return { ok: true, duplicado: !!histData.duplicado, numero_servicio: histData.numero_servicio };
+  } catch (err) {
+    console.error("Error registrando historial:", err);
+    return { ok: false, error: err.message || String(err) };
+  }
+}
 
 function actualizarBadgeColaEnvios() {
   const cola = obtenerColaEnvios();
@@ -4835,6 +4844,9 @@ function actualizarBadgeColaEnvios() {
         }
         if (item.tipo === "vehiculo") {
           return `Vehículo: ${TEXTO_ACCION_VEHICULO[item.cuerpo && item.cuerpo.accion] || ""} ${(item.cuerpo && item.cuerpo.vehiculo) || ""}`.trim();
+        }
+        if (item.tipo === "historial") {
+          return `Historial: parte ${item.idParte || ""} (${(item.cuerpo && item.cuerpo.cliente) || ""})`;
         }
         if (item.tipo === "rendicion") {
           return `Rendición: ${(item.cuerpo && item.cuerpo.categoria) || ""} ${item.cuerpo ? formatoPesos(item.cuerpo.monto) : ""}`.trim();
@@ -4877,6 +4889,13 @@ async function procesarColaEnvios() {
         if (err.delServidor) vehiculoDescartados.push(`${TEXTO_ACCION_VEHICULO[item.cuerpo.accion] || ""} ${item.cuerpo.vehiculo}: ${err.message}`);
         else { vehiculoTrabado = true; restantes.push(item); }
       }
+      continue;
+    }
+    if (item.tipo === "historial") {
+      // Si lo está mandando ahora el envío del parte, no se pisa.
+      if (item.enCurso && Date.now() - item.enCurso < 120000) { restantes.push(item); continue; }
+      const reg = await registrarParteEnHistorial(item, true);
+      if (reg.ok) enviadosOk++; else restantes.push(item);
       continue;
     }
     try {

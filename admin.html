@@ -849,6 +849,47 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
 
     <button id="uploadBtn" type="button" class="hidden">Subir servicios a la app</button>
     <p class="status" id="uploadStatus"></p>
+
+    <div class="card" id="recParteCard" style="margin-top:22px;">
+      <h3 style="margin-top:0;">Cargar al historial un parte que llegó por mail y no quedó guardado</h3>
+      <p class="subtitle" style="margin-top:0;">Abrí el mail del parte, seleccioná todo (Ctrl+A), copialo (Ctrl+C) y pegalo acá. Se completan los datos solos; revisalos y guardalo. Si ese parte ya está en el historial, te avisa y no lo duplica.</p>
+      <textarea id="recParteTexto" class="field-input" rows="6" placeholder="Pegá acá el texto del mail «Parte técnico N° … - cliente»" style="width:100%;box-sizing:border-box;"></textarea>
+      <button type="button" id="recParteLeerBtn" class="btn-secondary-admin" style="width:auto;margin-top:8px;">Leer el mail</button>
+      <div id="recParteForm" class="hidden" style="margin-top:12px;">
+        <div class="field-row" style="flex-wrap:wrap;">
+          <div><label>N° de parte / servicio</label><input type="text" class="field-input" data-rp="id_parte"></div>
+          <div><label>Tipo</label><select class="field-input" data-rp="tipo_servicio"><option>Servicio técnico</option><option>Instalación</option></select></div>
+          <div><label>Fecha</label><input type="date" class="field-input" data-rp="fecha"></div>
+          <div><label>Entrada</label><input type="time" class="field-input" data-rp="hora_entrada"></div>
+          <div><label>Salida</label><input type="time" class="field-input" data-rp="hora_salida"></div>
+        </div>
+        <div class="field-row" style="flex-wrap:wrap;">
+          <div style="flex:2 1 220px;"><label>Cliente</label><input type="text" class="field-input" data-rp="cliente" list="recParteClientes"></div>
+          <div><label>N° de cliente</label><input type="text" class="field-input" data-rp="numero_cliente"></div>
+          <div style="flex:2 1 220px;"><label>Dirección</label><input type="text" class="field-input" data-rp="direccion"></div>
+          <div><label>Localidad</label><input type="text" class="field-input" data-rp="localidad"></div>
+        </div>
+        <datalist id="recParteClientes"></datalist>
+        <div class="field-row" style="flex-wrap:wrap;">
+          <div><label>Técnico</label><input type="text" class="field-input" data-rp="tecnico"></div>
+          <div><label>2° técnico</label><input type="text" class="field-input" data-rp="tecnico2"></div>
+          <div style="flex:2 1 200px;"><label>Mail del cliente</label><input type="text" class="field-input" data-rp="cliente_email"></div>
+        </div>
+        <label>Tarea realizada</label><textarea class="field-input" rows="3" data-rp="tarea" style="width:100%;box-sizing:border-box;"></textarea>
+        <label>Materiales utilizados</label><textarea class="field-input" rows="2" data-rp="materiales" style="width:100%;box-sizing:border-box;"></textarea>
+        <label>Materiales retirados</label><textarea class="field-input" rows="2" data-rp="materiales_retirados" style="width:100%;box-sizing:border-box;"></textarea>
+        <label>Observaciones</label><textarea class="field-input" rows="2" data-rp="observaciones" style="width:100%;box-sizing:border-box;"></textarea>
+        <div class="field-row" style="flex-wrap:wrap;">
+          <div><label>Importe</label><input type="text" class="field-input" data-rp="importe"></div>
+          <div><label>Descuento</label><input type="text" class="field-input" data-rp="descuento"></div>
+          <div><label>Costo final</label><input type="text" class="field-input" data-rp="costo_final"></div>
+          <div><label>Forma de pago</label><input type="text" class="field-input" data-rp="forma_pago"></div>
+          <div><label>Firmó</label><input type="text" class="field-input" data-rp="firma_aclaracion"></div>
+        </div>
+        <button type="button" id="recParteGuardarBtn" style="width:auto;margin-top:10px;">Guardar en el historial</button>
+      </div>
+      <p class="status" id="recParteStatus"></p>
+    </div>
     </div>
 
     <div id="panelCronograma" class="hidden">
@@ -5934,6 +5975,107 @@ function concExcel() {
   XLSX.writeFile(libro, `conciliacion_${concEstado.empresa}_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 document.getElementById("simsConcEmpresa").addEventListener("change", (e) => { if (concEstado) { concEstado.empresa = e.target.value; concRecalcular(); } });
+
+// ---------- Cargar al historial un parte que llegó por mail y no quedó guardado ----------
+// Se pega el texto del mail "Parte técnico N° … - cliente" y se reconstruye el parte.
+function leerMailParte(texto) {
+  const lineas = String(texto || "").replace(/\r/g, "").split("\n").map((l) => l.replace(/\u00a0/g, " ").trim()).filter(Boolean);
+  const sinEmoji = (l) => l.replace(/^[^\p{L}\p{N}°]+/u, "").trim();
+  const SECC = [["tarea realizada", "tarea"], ["materiales utilizados", "materiales"], ["materiales retirados", "materiales_retirados"], ["sim instalada", "sim_instalada_texto"], ["claves y codigos", null], ["costos", null], ["observaciones", "observaciones"], ["imprevisto", "imprevisto"], ["foto", null], ["firma del cliente", "__firma"]];
+  const CAMPOS = [["2° tecnico", "tecnico2"], ["copia al cliente", "__copia"], ["cliente", "cliente"], ["direccion", "direccion"], ["localidad", "localidad"], ["tecnico", "tecnico"], ["fecha", "fecha"], ["horario", "__horario"], ["importe del servicio", "importe"], ["descuento aplicado", "descuento"], ["costo final al cliente", "costo_final"], ["costo final", "costo_final"], ["forma de pago", "forma_pago"]];
+  const r = { tipo_servicio: "Servicio técnico" }, partes = {};
+  let seccion = null, firma = [];
+  for (let i = 0; i < lineas.length; i++) {
+    const l = lineas[i], n = normalizeText(sinEmoji(l)).replace(/\s+/g, " ");
+    if (/generado automaticamente/.test(n)) break;
+    if (!r.id_parte) { const m = l.match(/N°\s*([A-Za-z0-9][A-Za-z0-9\/_.-]*)/); if (m) { r.id_parte = m[1]; continue; } }
+    if (/^(instalacion|servicio tecnico)$/.test(n)) { r.tipo_servicio = n === "instalacion" ? "Instalación" : "Servicio técnico"; continue; }
+    if (/^parte (tecnico|de servicio)$/.test(n)) continue;
+    const sec = l.length < 80 && SECC.find(([k]) => n === k || n.startsWith(k + " ("));
+    if (sec) { seccion = sec[1]; continue; }
+    const campo = (seccion === null || seccion === undefined) && CAMPOS.find(([k]) => n === k || n.startsWith(k + " ") || n.startsWith(k + ":") || n.startsWith(k + "\t"));
+    if (campo) {
+      let valor = sinEmoji(l).slice(campo[0].length).replace(/^[\s:\t]+/, "").trim();
+      if (!valor && i + 1 < lineas.length) valor = lineas[++i];
+      valor = valor.replace(/\s*📍\s*$/u, "").trim();
+      if (campo[1] === "__horario") { const m = valor.match(/(\d{1,2}:\d{2})\s*a\s*(\d{1,2}:\d{2})/); if (m) { r.hora_entrada = m[1].padStart(5, "0"); r.hora_salida = m[2].padStart(5, "0"); } }
+      else if (campo[1] === "__copia") { const m = valor.match(/[^\s@]+@[^\s@]+\.[a-z]{2,}/i); if (m) r.cliente_email = m[0]; }
+      else if (campo[1] === "fecha") { const m = valor.match(/(\d{4})-(\d{2})-(\d{2})/) || valor.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/); if (m) r.fecha = m[1].length === 4 ? `${m[1]}-${m[2]}-${m[3]}` : `${m[3].length === 2 ? "20" + m[3] : m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`; }
+      else r[campo[1]] = valor;
+      continue;
+    }
+    if (seccion === "__firma") { firma.push(l); continue; }
+    if (seccion) partes[seccion] = (partes[seccion] ? partes[seccion] + "\n" : "") + l.replace(/^⚠\s*/u, "");
+  }
+  Object.assign(r, partes);
+  const f = firma.filter((x) => !/^(firma|sin firma)$/i.test(x));
+  if (f[0]) r.firma_aclaracion = f[0];
+  if (f[1]) r.firma_cargo = f[1];
+  return r;
+}
+const recCampo = (k) => document.querySelector(`#recParteForm [data-rp="${k}"]`);
+document.getElementById("recParteLeerBtn").addEventListener("click", async () => {
+  const st = document.getElementById("recParteStatus");
+  const r = leerMailParte(document.getElementById("recParteTexto").value);
+  if (!r.cliente && !r.id_parte) { st.className = "status err"; st.textContent = "No reconocí el mail: pegá el texto completo del parte (desde «Parte técnico N° …» hasta la firma)."; return; }
+  let lista = [];
+  try { lista = await cargarClientesCroquisBase(); } catch (e) { lista = []; }
+  document.getElementById("recParteClientes").innerHTML = lista.slice(0, 3000).map((c) => `<option value="${escapeHtmlAdmin(c.nombre || "")}">`).join("");
+  const enBase = r.cliente && lista.find((c) => normalizeText(c.nombre || "") === normalizeText(r.cliente));
+  if (enBase && !r.numero_cliente) r.numero_cliente = String(enBase.numero_cliente || "");
+  document.querySelectorAll("#recParteForm [data-rp]").forEach((el) => { el.value = r[el.dataset.rp] || (el.tagName === "SELECT" ? el.value : ""); });
+  if (r.tipo_servicio) recCampo("tipo_servicio").value = r.tipo_servicio;
+  document.getElementById("recParteForm").classList.remove("hidden");
+  const faltan = ["id_parte", "cliente", "fecha", "tecnico", "tarea"].filter((k) => !r[k]);
+  st.className = faltan.length ? "status err" : "status ok";
+  st.textContent = faltan.length ? `Revisá: no encontré ${faltan.map((k) => ({ id_parte: "el N° de parte", cliente: "el cliente", fecha: "la fecha", tecnico: "el técnico", tarea: "la tarea" }[k])).join(", ")}. Completalo a mano.` : "Datos leídos del mail. Revisalos y tocá «Guardar en el historial».";
+});
+document.getElementById("recParteGuardarBtn").addEventListener("click", async (e) => {
+  const btn = e.currentTarget, st = document.getElementById("recParteStatus");
+  const v = {};
+  document.querySelectorAll("#recParteForm [data-rp]").forEach((el) => { v[el.dataset.rp] = el.value.trim(); });
+  const faltan = ["id_parte", "cliente", "fecha", "tecnico"].filter((k) => !v[k]);
+  if (faltan.length) { st.className = "status err"; st.textContent = "Faltan datos: N° de parte, cliente, fecha y técnico son obligatorios."; return; }
+  btn.disabled = true;
+  try {
+    const h = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    // ¿Ya está? (mismo N°, mismo cliente y fecha): no se duplica.
+    const rv = await fetch(`/api/historial?tipo=parte&id=${encodeURIComponent(v.id_parte)}`, { headers: h, cache: "no-store" });
+    if (rv.ok) {
+      const p = await rv.json().catch(() => ({}));
+      if (normalizeText(p.cliente || "") === normalizeText(v.cliente) && String(p.fecha || "") === v.fecha) {
+        st.className = "status ok"; st.textContent = `Ese parte ya está en el historial (N° ${v.id_parte}, ${p.cliente}, ${v.fecha.split("-").reverse().join("/")}): no hace falta cargarlo.`;
+        avisoAdmin(st.textContent, "aviso");
+        btn.disabled = false;
+        return;
+      }
+      if (!await confirmarAdmin(`El N° ${v.id_parte} ya está usado por otro parte (${p.cliente || "otro cliente"}, ${String(p.fecha || "").split("-").reverse().join("/")}). Se guarda igual como «${v.id_parte}/2». ¿Seguir?`)) { btn.disabled = false; return; }
+    }
+    const quien = (() => { try { return sessionStorage.getItem("admin_nombre") || "la oficina"; } catch (er) { return "la oficina"; } })();
+    const hoy = new Date().toLocaleDateString("es-AR");
+    const cuerpo = {
+      numero_servicio: /^SAT-\d{8}-/.test(v.id_parte) ? "" : v.id_parte, numero_cliente: v.numero_cliente, es_instalacion: v.tipo_servicio === "Instalación", tipo_servicio: v.tipo_servicio,
+      id_parte: v.id_parte, cliente: v.cliente, direccion: v.direccion, localidad: v.localidad, cliente_email: v.cliente_email,
+      tarea: v.tarea, materiales: v.materiales, materiales_retirados: v.materiales_retirados, sim_instalada_texto: "",
+      observaciones: [v.observaciones, `[Cargado desde el mail del parte por ${quien} el ${hoy}]`].filter(Boolean).join("\n"),
+      tecnico: v.tecnico, tecnico2: v.tecnico2, fecha: v.fecha, hora_entrada: v.hora_entrada, hora_salida: v.hora_salida,
+      importe: v.importe, descuento: v.descuento, costo_final: v.costo_final, forma_pago: v.forma_pago, imprevisto: "",
+      firma_aclaracion: v.firma_aclaracion, firma_cargo: "", claves: [], foto_ref: "", firma_img_ref: "",
+    };
+    const r = await fetch("/api/historial", { method: "POST", headers: { ...h, "Content-Type": "application/json" }, body: JSON.stringify(cuerpo) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || "Error " + r.status);
+    // Verificación: se vuelve a leer.
+    const id = d.numero_servicio || d.id_parte || v.id_parte;
+    const rc = await fetch(`/api/historial?tipo=parte&id=${encodeURIComponent(id)}`, { headers: h, cache: "no-store" });
+    if (!rc.ok) throw new Error("se mandó, pero al volver a leerlo no aparece. Probá de nuevo en un rato.");
+    st.className = "status ok"; st.textContent = `✓ Listo: el parte N° ${id} de ${v.cliente} (${v.fecha.split("-").reverse().join("/")}, ${v.tecnico}) quedó en el historial. Las claves, la foto y la firma no se recuperan desde el mail; quedan en el mail original.`;
+    avisoAdmin(`✓ Parte de ${v.cliente} cargado en el historial.`, "ok");
+    document.getElementById("recParteTexto").value = "";
+    document.getElementById("recParteForm").classList.add("hidden");
+  } catch (err) { st.className = "status err"; st.textContent = "No se pudo: " + err.message; }
+  btn.disabled = false;
+});
 
 // ---------- Vencimientos ----------
 // Junta en una lista lo de los vehículos (umbrales por fecha y avisos por km),
