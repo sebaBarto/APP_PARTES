@@ -644,8 +644,8 @@ test("Rendición: foto obligatoria (salvo estacionamiento o 'sin ticket'), monto
   await page.check("#rendSinTicket");
   await page.fill("#rendFecha", "2026-10-20");
   await page.fill("#rendMonto", "12000");
-  page.once("dialog", (d) => d.dismiss());
   await page.click("#rendEnviarBtn");
+  await page.click(".dlg-app .dlg-no");
   await page.waitForTimeout(200);
   assert.strictEqual(enviados.length, 0, "repetida: si dice que no, no se manda");
   await page.fill("#rendMonto", "18.500");
@@ -1504,8 +1504,8 @@ test("Vehículos: control de km, toma sin devolver de ayer, tarjetas y combustib
   await page.click("[data-ir-modo=mio-devolver]");
   await page.fill("#vehiculoKmDevolucion", "4900");
   assert.match(await page.locator("#vehiculoKmAyuda").textContent(), /menor que el último registrado \(5\.000 km\)/);
-  page.once("dialog", (dlg) => dlg.dismiss());
   await page.click("#vehiculoDevolverBtn");
+  await page.click(".dlg-app .dlg-no");
   assert.strictEqual(posts.length, 0, "un km menor sin confirmar no se manda");
   await page.fill("#vehiculoKmDevolucion", "5120");
   assert.match(await page.locator("#vehiculoKmAyuda").textContent(), /Recorriste 120 km/);
@@ -2093,13 +2093,13 @@ test("Presupuesto express: cliente del listado, artículos (en pesos y en dólar
   assert.deepStrictEqual({ total: pedidos[0].total, mo: pedidos[0].mano_obra, fp: pedidos[0].forma_pago, cot: pedidos[0].cotizacion_usd, tipo: pedidos[0].tipo, abono: pedidos[0].abono }, { total: 190000, mo: 50000, fp: "A convenir", cot: 1000, tipo: "monitoreado", abono: 38500 });
   assert.match(await page.textContent("#peResultado"), /Presupuesto E-0001 listo/);
   // Al WhatsApp del cliente: chat con su número (Rosario) y el link al PDF
-  await page.evaluate(() => { window.prompt = (m, d) => d; window.__wa = ""; window.open = (u) => { window.__wa = u; }; });
+  await page.evaluate(() => { window.dialogoApp = async (m, op = {}) => (op.conTexto ? op.valor : true); window.__wa = ""; window.open = (u) => { window.__wa = u; }; });
   await page.click("#peWhatsappClienteBtn");
   await page.waitForFunction(() => window.__wa);
   const wa = decodeURIComponent(await page.evaluate(() => window.__wa));
   assert.match(wa, /^https:\/\/wa\.me\/5493414519509\?text=Hola Tell Cecilia! Te enviamos el presupuesto E-0001[\s\S]*\$190\.000[\s\S]*Abono mensual de monitoreo: \$38\.500 por mes[\s\S]*api\/foto\?id=pdf1&tipo=pdf/);
   // Corregir: sale como revisión del mismo número
-  await page.evaluate(() => { window.confirm = () => true; window.__compartido = null; });
+  await page.evaluate(() => { window.dialogoApp = async (m, op = {}) => (op.conTexto ? null : true); window.__compartido = null; });
   await page.click("[data-corregir]");
   assert.match(await page.textContent("#peAvisoRevision"), /Corrigiendo el presupuesto E-0001/);
   assert.strictEqual(await page.inputValue("#peManoObra"), "50.000");
@@ -2136,7 +2136,7 @@ test("Croquis: habitaciones, pared, equipos rotados, cableado y texto; se guarda
     window.__archivos = [];
     navigator.canShare = () => true;
     navigator.share = async (d) => { const f = d.files[0]; window.__archivos.push({ nombre: f.name, tipo: f.type, inicio: new TextDecoder().decode((await f.arrayBuffer()).slice(0, 5)) }); };
-    window.confirm = () => true;
+    window.dialogoApp = async (m, op = {}) => (op.conTexto ? null : true);
     localStorage.removeItem("croquis_borrador");
   });
   assert.strictEqual(await page.evaluate(() => document.getElementById("tileCroquisBtn").classList.contains("hidden")), false, "con permiso se ve el mosaico");
@@ -2257,7 +2257,7 @@ test("Croquis: cables con color y trazo, equipos de color, cámaras/DVR y objeto
   await page.evaluate(() => { cq.sel = cq.elementos.find((e) => e.t === "cable").id; cqRender(); });
   await page.click('.cq-color[data-color="#2E86DE"]');
   await page.click('[data-trazo="continuo"]');
-  await page.evaluate(() => { window.prompt = () => "Cámaras"; });
+  await page.evaluate(() => { window.dialogoApp = async (m, op = {}) => (op.conTexto ? "Cámaras" : true); });
   await page.click('[data-acc="cnombre"]');
   await page.click('[data-herr="cable"]');
   await arrastrar([60, 220], [300, 220]);
@@ -2296,7 +2296,7 @@ test("Croquis: círculo y triángulos, color y trazo de la habitación, bloquear
   await page.route("**/api/**", (r) => r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
   await page.goto(base + "/");
   await page.waitForTimeout(400);
-  await page.evaluate(() => { tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); window.confirm = () => true; cqAbrirEditor({}); });
+  await page.evaluate(() => { tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); window.dialogoApp = async (m, op = {}) => (op.conTexto ? null : true); cqAbrirEditor({}); });
   await page.waitForTimeout(200);
   const caja = await page.locator("#cqSvg").boundingBox();
   const clic = (x, y) => page.mouse.click(caja.x + x, caja.y + y);
@@ -2392,7 +2392,7 @@ test("Croquis: infrarrojo con número, alcance, ángulo, doble lente, video e in
   await page.click('[data-herr="simbolos"]');
   await page.click('[data-simbolo="infrarrojo"]');
   await page.mouse.click(caja.x + 250, caja.y + 250);
-  await page.evaluate(() => { window.prompt = () => "D23"; });
+  await page.evaluate(() => { window.dialogoApp = async (m, op = {}) => (op.conTexto ? "D23" : true); });
   await page.click('[data-acc="etq"]');
   // Alcance y ángulo con los deslizadores
   await page.$eval('[data-sl="alc"]', (i) => { i.value = "90"; i.dispatchEvent(new Event("input", { bubbles: true })); i.dispatchEvent(new Event("change", { bubbles: true })); });
@@ -2407,7 +2407,7 @@ test("Croquis: infrarrojo con número, alcance, ángulo, doble lente, video e in
   assert.match(svg, /A90 90 0 0 1/, "captación de 90 de alcance");
   assert.match(svg, /Q9 2.6 15.8 9/, "ojito de video");
   // Vaciar el número lo esconde
-  await page.evaluate(() => { window.prompt = () => ""; });
+  await page.evaluate(() => { window.dialogoApp = async (m, op = {}) => (op.conTexto ? "" : true); });
   await page.click('[data-acc="etq"]');
   ir = await page.evaluate(() => cq.elementos[0]);
   assert.strictEqual(ir.etq, undefined);
@@ -2507,7 +2507,7 @@ test("Croquis desde foto: queda la foto de fondo, el dibujo se ordena solo y los
   });
   await page.goto(base + "/");
   await page.waitForTimeout(400);
-  await page.evaluate(() => { tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); localStorage.removeItem("presupuesto_express_borrador"); window.confirm = () => true; cqAbrirLista(); });
+  await page.evaluate(() => { tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); localStorage.removeItem("presupuesto_express_borrador"); window.dialogoApp = async (m, op = {}) => (op.conTexto ? null : true); cqAbrirLista(); });
   const png = await page.evaluate(async () => {
     const cv = document.createElement("canvas"); cv.width = 1000; cv.height = 1000;
     const c = cv.getContext("2d"); c.fillStyle = "#fff"; c.fillRect(0, 0, 1000, 1000);
@@ -2566,7 +2566,7 @@ test("Croquis: pared continua con quiebres y curva, elegir varios y soldarlos, v
   await page.goto(base + "/");
   await page.waitForTimeout(400);
   await page.evaluate(() => {
-    tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); window.confirm = () => true;
+    tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); window.dialogoApp = async (m, op = {}) => (op.conTexto ? null : true);
     window.__archivos = []; navigator.canShare = () => true;
     navigator.share = async (d) => { const f = d.files[0]; window.__archivos.push({ nombre: f.name, bytes: Array.from(new Uint8Array(await f.arrayBuffer())) }); };
     cqAbrirEditor({ titulo: "Casa", cliente: "Tell" });
@@ -2841,7 +2841,7 @@ test("Croquis: flechas para mover fino (y más rápido dejando apretado), desliz
   assert.strictEqual(await page.evaluate(() => cq.elementos.find((e) => e.id === "c1").esc), 1.6);
   assert.match(await page.textContent('[data-sl-val="esc"]'), /160%/);
   // Medidas de la habitación en metros
-  await page.evaluate(() => { cq.sel = "r1"; cqRender(); window.prompt = () => "4,5 x 3"; });
+  await page.evaluate(() => { cq.sel = "r1"; cqRender(); window.dialogoApp = async (m, op = {}) => (op.conTexto ? "4,5 x 3" : true); });
   assert.match(await page.textContent("#cqProps"), /5 × 4 m/);
   await page.click('[data-acc="medidas"]');
   assert.deepStrictEqual(await page.evaluate(() => { const r = cq.elementos.find((e) => e.id === "r1"); return [r.w, r.h]; }), [180, 120]);
@@ -3094,7 +3094,7 @@ test("Croquis sobre un plano en PDF (exportado de Visio): se convierte en imagen
   await page.fill("#cqDatoCliente", "Lara Silvano");
   await page.click('[data-r="si"]');
   // Escala: el plano mide 12 m de ancho
-  await page.evaluate(() => { window.prompt = () => "12"; cqEscalaPlano(); });
+  await page.evaluate(() => { window.dialogoApp = async (m, op = {}) => (op.conTexto ? "12" : true); cqEscalaPlano(); });
   assert.deepStrictEqual(await page.evaluate(() => [cq.fondo.w, cq.fondo.h]), [480, 339]);
   assert.strictEqual(await page.evaluate(() => cqGuardar()), true, "se guarda aunque todavía no tenga nada dibujado");
   assert.strictEqual(posts[0].dibujo.paginas[0].fondo.base, true);
@@ -3621,9 +3621,9 @@ test("Datos del equipo: fotos desde la galería o la cámara, links tocables y v
   // Ver cambios y volver a la versión anterior
   await page.locator(".equipo-card", { hasText: "Reset Ajax" }).locator(".eq-historial").click();
   assert.match(await page.textContent(".equipo-cambios"), /Juan Pérez lo cambió el 25\/10\/2026/);
-  page.once("dialog", (d) => d.accept());
   await page.click(".equipo-cambios summary");
   await page.click(".equipo-cambios [data-restaurar]");
+  await page.click(".dlg-app .dlg-si");
   await page.waitForTimeout(300);
   assert.ok(posts.some((p) => p.accion === "restaurar" && p.id === "d1" && p.edicion === 0));
   assert.match(await page.locator(".equipo-card", { hasText: "Reset Ajax" }).textContent(), /Mantener 30 s/);
@@ -3686,12 +3686,13 @@ test("Datos del equipo: «me sirvió», avisar desactualizado, favoritos y orden
   assert.match(await page.textContent('.equipo-card[data-id="a1"] .eq-util'), /Me sirvió \(1\)/);
   assert.ok(await page.locator('.equipo-card[data-id="a1"] .eq-util.activo').count());
   // Avisar desactualizado y después «ya está bien»
-  page.once("dialog", (d) => d.accept("Ahora es igprs.claro.com"));
   await page.click('.equipo-card[data-id="a1"] .eq-desact');
+  await page.fill(".dlg-app .dlg-input", "Ahora es igprs.claro.com");
+  await page.click(".dlg-app .dlg-si");
   await page.waitForTimeout(200);
   assert.deepStrictEqual(posts.find((p) => p.accion === "desactualizado"), { accion: "desactualizado", id: "a1", nota: "Ahora es igprs.claro.com", autor: "Juan Pérez" });
-  page.once("dialog", (d) => d.accept());
   await page.click('.equipo-card[data-id="b2"] .eq-resolver');
+  await page.click(".dlg-app .dlg-si");
   await page.waitForTimeout(200);
   assert.strictEqual(await page.locator('.equipo-card[data-id="b2"] .equipo-aviso').count(), 0);
   // Favoritos: filtro propio, queda en el celular
@@ -3854,7 +3855,7 @@ test("Vista 3D: se edita desde el 3D (agregar en la esquina con zona, mover, gir
     await page.waitForTimeout(400);
     const elementos = [...CASA_3D.map((e) => ({ ...e })), { id: "c1", t: "cable", x1: 0, y1: 0, x2: 50, y2: 50 }];
     elementos.find((e) => e.id === "s3").etq = "7";
-    await page.evaluate((els) => { tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); window.prompt = () => "12"; cqAbrirEditor({ titulo: "Casa", cliente: "Juan", elementos: els }); }, elementos);
+    await page.evaluate((els) => { tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); window.dialogoApp = async (m, op = {}) => (op.conTexto ? "12" : true); cqAbrirEditor({ titulo: "Casa", cliente: "Juan", elementos: els }); }, elementos);
     await page.click("#cqMenuBtn");
     await page.click('[data-m="ver3d"]');
     await page.waitForSelector(".v3-capa canvas", { timeout: 20000 });
@@ -4186,7 +4187,7 @@ test("Editar en 3D más fácil: arrastrar desde la tira, sello, mover arrastrand
     await page.route("**/api/**", (r) => r.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
     await page.goto(base + "/");
     await page.waitForTimeout(400);
-    await page.evaluate((els) => { tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); window.prompt = () => null; cqAbrirEditor({ titulo: "Casa", elementos: els }); }, CASA_B);
+    await page.evaluate((els) => { tecnicoLogueado = ""; localStorage.removeItem("croquis_borrador"); window.dialogoApp = async (m, op = {}) => (op.conTexto ? null : true); cqAbrirEditor({ titulo: "Casa", elementos: els }); }, CASA_B);
     await page.click("#cqMenuBtn");
     await page.click('[data-m="ver3d"]');
     await page.waitForSelector(".v3-capa canvas", { timeout: 20000 });
@@ -5214,6 +5215,143 @@ test("Abonados con letras o convertidos por Excel (48ED, 48E2 -> 4800, 0555): la
   const com = await page.textContent("#simsComResultado");
   assert.match(com, /No están en el reporte\s*0/, "las cuatro se reconocen");
   assert.match(com, /Todas las alarmas con SIM comunicaron/);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("APP: confirmaciones, pedidos de texto y avisos con carteles propios (no dependen del confirm/prompt/alert del navegador)", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  let nativos = 0;
+  page.on("dialog", (d) => { nativos++; d.dismiss(); });
+  await page.goto(base + "/index.html");
+  await page.waitForTimeout(300);
+  const p1 = page.evaluate(() => confirmarApp("¿Retirar la línea?", { aceptar: "Sí, retirar", cancelar: "No" }));
+  await page.waitForSelector(".dlg-app");
+  assert.strictEqual(await page.textContent(".dlg-app .dlg-si"), "Sí, retirar");
+  await page.click(".dlg-app .dlg-si");
+  assert.strictEqual(await p1, true);
+  const p2 = page.evaluate(() => confirmarApp("¿Borrar?"));
+  await page.click(".dlg-app .dlg-no");
+  assert.strictEqual(await p2, false);
+  const p3 = page.evaluate(() => pedirTextoApp("Nombre de la página:", "Planta baja"));
+  await page.fill(".dlg-app .dlg-input", "Planta alta");
+  await page.press(".dlg-app .dlg-input", "Enter");
+  assert.strictEqual(await p3, "Planta alta");
+  const p4 = page.evaluate(() => pedirTextoApp("Nota:"));
+  await page.press(".dlg-app .dlg-input", "Escape");
+  assert.strictEqual(await p4, null);
+  await page.evaluate(() => alert("Este parte NO quedó guardado"));
+  assert.match(await page.textContent(".dlg-app"), /NO quedó guardado/);
+  assert.strictEqual(await page.locator(".dlg-app .dlg-no").count(), 0, "un aviso solo tiene «Entendido»");
+  await page.click(".dlg-app .dlg-si");
+  assert.strictEqual(await page.locator(".dlg-app").count(), 0);
+  assert.strictEqual(nativos, 0, "no se abrió ningún cuadro del navegador");
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Vencimientos: vehículos, credenciales y los de la oficina en una lista; se carga, se renueva y aparece en Inicio", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  const iso = (dias) => { const d = new Date(); d.setDate(d.getDate() + dias); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  let propios = [{ id: "mata00001", nombre: "Matafuegos depósito", categoria: "Matafuegos", fecha: iso(-3), aviso_dias: 30, repetir: 12, responsable: "Juan", nota: "", historial: [] }];
+  const posts = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("coleccion=vencimientos")) {
+      if (req.method() === "POST") {
+        const b = JSON.parse(req.postData()); posts.push(b);
+        if (b.accion === "guardar") propios = [...propios, { ...b.item, id: "nuevo00001", historial: [] }];
+        if (b.accion === "renovar") propios = propios.map((x) => (x.id === b.id ? { ...x, fecha: iso(362) } : x));
+        return json({ ok: true, lista: propios });
+      }
+      return json(propios);
+    }
+    if (u.includes("coleccion=vehiculos")) return json([{ nombre: "Kangoo", km_actual: 99500, umbrales: [{ nombre: "VTV", tipo: "fecha", valor: iso(10), aviso_antes: 30 }, { nombre: "Service", tipo: "km", valor: 100000, aviso_antes: 1000 }, { nombre: "Seguro", tipo: "fecha", valor: iso(200), aviso_antes: 30 }] }]);
+    if (u.includes("coleccion=credenciales")) return json([{ nombre: "Luis", cargo: "Técnico", vigencia: iso(20) }]);
+    if (u.includes("coleccion=tecnicos")) return json([{ nombre: "Juan" }, { nombre: "Luis" }]);
+    json([]);
+  });
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { document.getElementById("mainCard").classList.remove("hidden"); return cargarInicioAdmin(); });
+  await page.waitForFunction(() => /Vencimientos \(1 vencido\)/.test(document.getElementById("panelInicio").textContent));
+  await page.evaluate(() => document.getElementById("tabVencimientosBtn").click());
+  await page.waitForSelector(".ven-tabla");
+  const filas = await page.$$eval(".ven-tabla tr", (t) => t.map((r) => r.querySelector("b").textContent));
+  assert.deepStrictEqual(filas, ["Matafuegos depósito", "VTV — Kangoo", "Credencial — Luis", "Service — Kangoo"], "vencido primero, después lo más cercano; el seguro al día no se muestra");
+  assert.match(await page.textContent("#venResumen"), /Vencidos\s*1.*Por vencer\s*3.*Al día\s*1/s);
+  // Renovado (se repite cada año)
+  await page.click(".ven-renovar");
+  await page.click(".cartel-admin .cartel-si");
+  await page.waitForFunction(() => /renovado\. Próximo vencimiento/.test(document.getElementById("venStatus").textContent));
+  assert.deepStrictEqual(posts[0], { accion: "renovar", id: "mata00001", fecha: "" });
+  assert.strictEqual(await page.locator(".ven-renovar").count(), 0, "ya no está en la lista de atención");
+  // Uno nuevo de la oficina
+  await page.fill("#venNombre", "Habilitación municipal");
+  await page.fill("#venCat", "Habilitaciones y permisos");
+  await page.fill("#venFecha", iso(5));
+  await page.selectOption("#venResponsable", "Juan");
+  await page.click("#venGuardarBtn");
+  await page.waitForFunction(() => /guardado/.test(document.getElementById("venStatus").textContent));
+  assert.strictEqual(posts[1].item.responsable, "Juan");
+  assert.strictEqual(posts[1].item.aviso_dias, 30);
+  assert.ok(await page.locator(".ven-tabla b", { hasText: "Habilitación municipal" }).count());
+  assert.strictEqual(await page.inputValue("#venNombre"), "", "el formulario queda limpio");
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Rendiciones: revisión rápida de a una (foto grande, un toque o una tecla), repetidas marcadas y total por técnico y mes", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  const mes = new Date().toISOString().slice(0, 7);
+  let rend = [
+    { id: "r1", tecnico: "Juan", fecha: `${mes}-02`, monto: 12000, categoria: "Combustible", detalle: "Nafta", estado: "pendiente", foto_ref: JSON.stringify(["/icon-192.png", "/icon-512.png"]), creado_en: "1" },
+    { id: "r2", tecnico: "Juan", fecha: `${mes}-02`, monto: 12000, categoria: "Combustible", detalle: "Nafta", estado: "pendiente", foto_ref: "/icon-192.png", creado_en: "2" },
+    { id: "r3", tecnico: "Luis", fecha: `${mes}-03`, monto: 5000, categoria: "Materiales", detalle: "Cable", estado: "pendiente", foto_ref: "", creado_en: "3" },
+    { id: "r4", tecnico: "Luis", fecha: `${mes}-01`, monto: 3000, categoria: "Estacionamiento", detalle: "", estado: "pagado", creado_en: "4" },
+  ];
+  const posts = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("recurso=rendicion")) {
+      if (req.method() === "POST") {
+        const b = JSON.parse(req.postData()); posts.push(b);
+        rend = rend.map((r) => (r.id !== b.id ? r : { ...r, estado: b.accion === "marcar_pagado" ? "pagado" : b.accion === "pagado_app" ? "pagado_app" : "rechazado", observaciones_admin: b.observaciones_admin }));
+        return json({ ok: true });
+      }
+      return json(rend);
+    }
+    json([]);
+  });
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { sessionStorage.setItem("admin_nombre", "Seba"); document.getElementById("mainCard").classList.remove("hidden"); document.getElementById("tabRendicionesBtn").click(); });
+  await page.waitForFunction(() => /\(3\)/.test(document.getElementById("rendRevisionBtn").textContent));
+  assert.strictEqual(await page.locator("#rendicionesAdminLista .rend-repetida").count(), 2, "las dos de Juan iguales se marcan");
+  assert.match(await page.textContent("#rendMatriz"), /Juan.*\$24\.000.*\(\$24\.000\).*Luis.*\$8\.000.*\(\$5\.000\)/s);
+  await page.click("#rendRevisionBtn");
+  await page.waitForSelector(".rend-rev");
+  assert.match(await page.textContent(".rend-rev"), /Pendiente 1 de 3.*Juan.*\$12\.000.*Posible repetida/s);
+  assert.strictEqual(await page.locator(".rend-rev-minis img").count(), 2, "las dos fotos del ticket");
+  await page.click('.rr-acc[data-a="pagado"]');
+  await page.waitForFunction(() => /Pendiente 2 de 3/.test(document.querySelector(".rend-rev").textContent));
+  assert.deepStrictEqual(posts[0], { accion: "marcar_pagado", id: "r1", pagado: true, pagado_por: "Seba" }, "queda quién lo pagó");
+  // La repetida se rechaza con un motivo de un toque
+  await page.click(".rr-rechazar");
+  await page.click(".rr-motivo >> text=Está repetida");
+  await page.waitForFunction(() => /Pendiente 3 de 3/.test(document.querySelector(".rend-rev").textContent));
+  assert.deepStrictEqual(posts[1], { accion: "rechazar", id: "r2", observaciones_admin: "Está repetida" });
+  assert.match(await page.textContent(".rend-rev-foto"), /Sin foto del ticket/);
+  await page.keyboard.press("a");
+  await page.waitForFunction(() => /No quedan pendientes/.test(document.querySelector(".rend-rev").textContent));
+  assert.deepStrictEqual(posts[2], { accion: "pagado_app", id: "r3" });
+  await page.click(".rr-cerrar");
+  await page.waitForFunction(() => /1 pagadas, 1 con APP, 1 rechazadas/.test((document.getElementById("avisoFlotanteAdmin") || {}).textContent || ""));
+  assert.strictEqual(await page.locator(".rend-rev-capa").count(), 0);
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });

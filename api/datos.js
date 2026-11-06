@@ -1364,6 +1364,48 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
     await manejarBackup(req, res, autorizacion, cuerpoAccion);
     return;
   }
+  if (req.query && req.query.coleccion === "vencimientos") {
+    // Vencimientos de la oficina (matafuegos, seguros, habilitaciones...).
+    if (!autorizacion) { res.status(401).json({ error: "No autorizado", sesion_vencida: true }); return; }
+    if (autorizacion.rol !== "admin") { res.status(403).json({ error: "Solo desde el panel de administración" }); return; }
+    const { limpiarVencimiento, renovarVencimiento } = require("../lib/vencimientos");
+    const RUTA = "vencimientos.json";
+    res.setHeader("Cache-Control", "no-store");
+    try {
+      if (req.method === "GET") { const { data } = await leerArchivoDatos(RUTA, []); res.status(200).json(Array.isArray(data) ? data : []); return; }
+      const b = cuerpoAccion && typeof cuerpoAccion === "object" ? cuerpoAccion : {};
+      for (let intento = 0; intento < 4; intento++) {
+        const { data, sha } = await leerArchivoDatos(RUTA, []);
+        let lista = Array.isArray(data) ? data : [];
+        let mensaje = "";
+        if (b.accion === "guardar") {
+          const previo = lista.find((x) => b.item && x.id === b.item.id);
+          const item = limpiarVencimiento(b.item, previo);
+          if (!item.nombre) { res.status(400).json({ error: "Falta qué vence" }); return; }
+          if (!item.fecha) { res.status(400).json({ error: "Falta la fecha de vencimiento" }); return; }
+          lista = previo ? lista.map((x) => (x.id === item.id ? item : x)) : [...lista, item];
+          mensaje = `Vencimiento: ${previo ? "editó" : "agregó"} ${item.nombre} (por ${autorizacion.nombre || "Oficina"})`;
+        } else if (b.accion === "renovar") {
+          const it = lista.find((x) => x.id === b.id);
+          if (!it) { res.status(404).json({ error: "No existe ese vencimiento" }); return; }
+          const nuevo = renovarVencimiento(it, b.fecha, autorizacion.nombre || "Oficina");
+          if (!nuevo) { res.status(400).json({ error: "Poné la fecha del próximo vencimiento" }); return; }
+          lista = lista.map((x) => (x.id === it.id ? nuevo : x));
+          mensaje = `Vencimiento: renovó ${it.nombre} hasta ${nuevo.fecha} (por ${autorizacion.nombre || "Oficina"})`;
+        } else if (b.accion === "borrar") {
+          const it = lista.find((x) => x.id === b.id);
+          if (!it) { res.status(200).json({ ok: true, lista }); return; }
+          lista = lista.filter((x) => x.id !== b.id);
+          mensaje = `Vencimiento: borró ${it.nombre} (por ${autorizacion.nombre || "Oficina"})`;
+        } else { res.status(400).json({ error: "Acción inválida" }); return; }
+        const r = await escribirArchivoDatos(RUTA, lista, sha, mensaje);
+        if (r.ok) { res.status(200).json({ ok: true, lista }); return; }
+        if (r.status !== 409 && r.status !== 422) break;
+      }
+      res.status(502).json({ error: "No se pudo guardar" });
+    } catch (e) { res.status(502).json({ error: String(e.message || e) }); }
+    return;
+  }
   if (req.query && req.query.coleccion === "sims_conciliacion") {
     // Diferencias de la conciliación de SIMs que la oficina marcó como
     // resueltas o para ignorar (errores internos): no vuelven a aparecer.

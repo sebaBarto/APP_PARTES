@@ -2940,10 +2940,14 @@ function iniciarVisor3D(datos, opciones) {
       if (h === "girar") { con((x) => { x.rot = (((x.rot || 0) + (def.ir || esCamara(x) ? 45 : 90)) % 360 + 360) % 360; }); hojaEquipo({ id }); }
       if (h === "inst") { con((x) => { if (x.inst) delete x.inst; else x.inst = true; }); hojaEquipo({ id }); }
       if (h === "zona") {
-        const nuevo = prompt("Número de zona (vacío = sin número):", sel.etq || "");
-        if (nuevo == null) return;
-        con((x) => { const t = String(nuevo).trim().slice(0, 8); if (t) x.etq = t; else delete x.etq; });
-        hojaEquipo({ id });
+        // En la APP, con su cartel propio (el prompt del navegador se puede bloquear).
+        const pedir = typeof window.pedirTextoApp === "function" ? window.pedirTextoApp : (m, v) => Promise.resolve(window.prompt(m, v));
+        pedir("Número de zona (vacío = sin número):", sel.etq || "").then((nuevo) => {
+          if (nuevo == null) return;
+          con((x) => { const t = String(nuevo).trim().slice(0, 8); if (t) x.etq = t; else delete x.etq; });
+          hojaEquipo({ id });
+        });
+        return;
       }
       if (h === "vercam") verCamara(sel);
       if (h === "mover") { moviendo = sel; hoja.classList.add("hidden"); decir(textoEdicion()); }

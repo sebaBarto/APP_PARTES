@@ -1227,3 +1227,58 @@ test("Código de abonado: letras (hexadecimal), ceros adelante y lo que Excel ha
   assert.ok(u.mismoAbonado(4800, "4800"), "un 4800 de verdad sigue siendo 4800");
   assert.deepStrictEqual(u.clavesAbonado("4,80E+03")[0], "48E2", "se muestra como el código");
 });
+
+test("Vencimientos: la oficina carga, renueva (corre la fecha si se repite) y borra; el cron avisa una sola vez al responsable y al técnico de la credencial", async () => {
+  const fetchViejo = global.fetch;
+  let archivo = [], estadoCron = {};
+  const creds = [{ nombre: "Juan", vigencia: "2026-11-20" }, { nombre: "Luis", vigencia: "2027-06-01" }];
+  global.fetch = async (url, op = {}) => {
+    const u = String(url), metodo = op.method || "GET";
+    if (u.includes("contents/vencimientos.json")) {
+      if (metodo === "PUT") { archivo = JSON.parse(Buffer.from(JSON.parse(op.body).content, "base64").toString()); return new Response("{}", { status: 200 }); }
+      if ((op.headers || {}).Accept === "application/vnd.github.raw") return new Response(JSON.stringify(archivo));
+      return new Response(JSON.stringify({ sha: "s", encoding: "base64", content: Buffer.from(JSON.stringify(archivo)).toString("base64") }));
+    }
+    if (u.endsWith("/api/credenciales")) return new Response(JSON.stringify(creds));
+    return new Response("[]", { status: 200 });
+  };
+  const rutaPush = require.resolve(path.join(raiz, "lib/push-sender.js"));
+  const viejo = require.cache[rutaPush];
+  const avisos = [];
+  require.cache[rutaPush] = { id: rutaPush, filename: rutaPush, loaded: true, exports: { enviarATodos: async () => ({}), enviarASeleccionados: async (n, a) => { avisos.push({ n, ...a }); return {}; } } };
+  try {
+    const admin = crearSesion({ nombre: "Seba", rol: "admin" }), juan = crearSesion({ nombre: "Juan", rol: "tecnico" });
+    const llamar = async (body, t = admin) => { const res = resFalso(); await datos(pedido("POST", { coleccion: "vencimientos" }, body, t), res); return res; };
+    assert.strictEqual((await llamar({ accion: "guardar", item: { nombre: "Matafuegos" } }, juan)).statusCode, 403, "un técnico no los toca");
+    assert.strictEqual((await llamar({ accion: "guardar", item: { nombre: "Matafuegos" } })).statusCode, 400, "sin fecha no");
+    await llamar({ accion: "guardar", item: { nombre: "Matafuegos depósito", categoria: "Matafuegos", fecha: "2026-11-15", aviso_dias: 15, repetir: 12, responsable: "Juan" } });
+    await llamar({ accion: "guardar", item: { nombre: "Seguro de responsabilidad civil", categoria: "Seguros", fecha: "2027-05-01", aviso_dias: 30 } });
+    assert.strictEqual(archivo.length, 2);
+    // Cron: el matafuegos entra en aviso (faltan 9 días), la credencial de Juan también (14 días)
+    const { chequearVencimientos } = require(path.join(raiz, "api/cron-diario.js"));
+    const hoy = new Date(2026, 10, 6);
+    let av = await chequearVencimientos({}, {}, estadoCron, hoy);
+    assert.strictEqual(av.length, 2);
+    assert.deepStrictEqual(avisos.map((a) => [a.n[0], a.titulo]), [["Juan", "📅 Matafuegos depósito"], ["Juan", "🪪 Tu credencial"]]);
+    assert.match(avisos[0].cuerpo, /vence en 9 día\(s\) \(15\/11\/2026\)/);
+    av = await chequearVencimientos({}, {}, estadoCron, hoy);
+    assert.strictEqual(av.length, 0, "no se repite al día siguiente");
+    av = await chequearVencimientos({}, {}, estadoCron, new Date(2026, 10, 16));
+    assert.ok(av.some((x) => /Matafuegos/.test(x)), "cuando vence, avisa de nuevo");
+    // Renovado: se repite cada 12 meses -> 15/11/2027, queda en el historial
+    const id = archivo.find((x) => x.nombre === "Matafuegos depósito").id;
+    await llamar({ accion: "renovar", id });
+    const m = archivo.find((x) => x.id === id);
+    assert.strictEqual(m.fecha, "2027-11-15");
+    assert.deepStrictEqual([m.historial[0].antes, m.historial[0].nueva, m.historial[0].por], ["2026-11-15", "2027-11-15", "Seba"]);
+    const idSeg = archivo.find((x) => x.categoria === "Seguros").id;
+    assert.strictEqual((await llamar({ accion: "renovar", id: idSeg })).statusCode, 400, "si no se repite, hay que poner la fecha nueva");
+    await llamar({ accion: "renovar", id: idSeg, fecha: "2028-05-01" });
+    assert.strictEqual(archivo.find((x) => x.id === idSeg).fecha, "2028-05-01");
+    await llamar({ accion: "borrar", id: idSeg });
+    assert.strictEqual(archivo.length, 1);
+  } finally {
+    global.fetch = fetchViejo;
+    if (viejo) require.cache[rutaPush] = viejo; else delete require.cache[rutaPush];
+  }
+});

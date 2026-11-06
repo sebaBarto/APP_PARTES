@@ -3743,3 +3743,13 @@ html .app .equipo-acciones .btn.eq-util.activo, .equipo-acciones .eq-util.activo
 .cq-lista-item b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cq-lista-item small { font-size: 12px; color: var(--text-muted, #5B6B7B); }
 .cq-lista-item small.cq-lista-inst { color: #E8741E; font-weight: 700; }
+
+/* Carteles propios para confirmar / pedir un texto (reemplazan confirm/prompt) */
+.modal-overlay.dlg-app { z-index: 100000; }
+.dlg-app .modal-caja { max-width: 400px; color: #101820; }
+.dlg-texto { margin: 0 0 14px; font-size: 15px; line-height: 1.45; white-space: pre-line; color: inherit; }
+.dlg-input { width: 100%; box-sizing: border-box; margin: 0 0 14px; }
+.dlg-botones { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+.dlg-botones button { min-height: 44px; padding: 10px 16px; border-radius: 10px; font-size: 15px; font-weight: 600; font-family: inherit; cursor: pointer; }
+.dlg-no { background: transparent; color: inherit; border: 1.5px solid currentColor; opacity: .85; }
+.dlg-si { background: #F5A623; color: #101820; border: none; }

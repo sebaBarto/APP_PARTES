@@ -625,6 +625,34 @@ async function chequearVehiculos(headersBackendNuevo, estado, hoy) {
   }
 }
 
+// Vencimientos: los de la oficina (matafuegos, seguros...) le avisan a su
+// responsable, y las credenciales a su técnico, cuando entran en el plazo de
+// aviso y cuando vencen. Cada aviso sale una vez por nivel y por fecha.
+async function chequearVencimientos(ghHeaders, headersBackendNuevo, estado, hoy) {
+  const { estadoVencimiento } = require("../lib/vencimientos");
+  if (!estado.vencimientos) estado.vencimientos = {};
+  const avisados = [];
+  const dias = (e) => e.dias < 0 ? `venció hace ${-e.dias} día(s)` : e.dias === 0 ? "vence hoy" : `vence en ${e.dias} día(s)`;
+  const avisar = async (clave, nivel, persona, titulo, cuerpo) => {
+    if (!persona || (nivel !== "pronto" && nivel !== "vencido") || estado.vencimientos[clave] === nivel) return;
+    await enviarASeleccionados([persona], { titulo, cuerpo, url: "/", importante: nivel === "vencido" });
+    estado.vencimientos[clave] = nivel;
+    avisados.push(`${persona}: ${titulo}`);
+  };
+  let propios = [];
+  try { propios = (await leerJSON(ghHeaders, "vencimientos.json", [])).data; } catch (e) { propios = []; }
+  for (const v of Array.isArray(propios) ? propios : []) {
+    const e = estadoVencimiento(v.fecha, v.aviso_dias, hoy);
+    await avisar(`v|${v.id}|${v.fecha}`, e.nivel, v.responsable, `📅 ${v.nombre}`, `${dias(e)} (${v.fecha.split("-").reverse().join("/")}).`);
+  }
+  const creds = await fetchBackendArray("/api/credenciales", headersBackendNuevo);
+  for (const c of creds) {
+    const e = estadoVencimiento(c.vigencia, 30, hoy);
+    await avisar(`c|${c.nombre}|${c.vigencia}`, e.nivel, c.nombre, "🪪 Tu credencial", `${dias(e)}: avisá en la oficina para renovarla.`);
+  }
+  return avisados;
+}
+
 // Propuestas 3D mandadas a clientes: a quien la mandó se le avisa a quién
 // conviene llamar (la miró varias veces, no la abrió, se está enfriando).
 // Cada aviso sale una sola vez por propuesta y por motivo.
@@ -680,14 +708,17 @@ module.exports = async (req, res) => {
     const recordadosDevolver = await chequearRecordatorioDevolverVehiculo(ghHeaders, headersBackendNuevo, estado, ahora);
     const resumenSemanal = await chequearResumenSemanal(headersBackendNuevo, estado, ahora);
     const instalacionesAvisadas = await chequearInstalacionesAbandonadas(headersBackendNuevo, estado, ahora);
+    let vencimientosAvisados = null;
+    try { vencimientosAvisados = await chequearVencimientos(ghHeaders, headersBackendNuevo, estado, ahora); } catch (e) { vencimientosAvisados = "error: " + e.message; }
     let propuestasAvisadas = null;
     try { propuestasAvisadas = await chequearPropuestas3d(ghHeaders); } catch (e) { propuestasAvisadas = "error: " + e.message; }
 
     await guardarJSON(ghHeaders, ESTADO_PATH, estado, shaEstado);
 
-    res.status(200).json({ ok: true, guardia_notificada: tecnicoDeGuardia || null, recordatorio_en_calle: tecnicosRecordados || null, felicitacion_semanal: ganadoresSemana || null, recordatorio_devolver: recordadosDevolver || null, resumen_semanal: resumenSemanal || null, instalaciones_avisadas: instalacionesAvisadas || null, propuestas_3d: propuestasAvisadas });
+    res.status(200).json({ ok: true, guardia_notificada: tecnicoDeGuardia || null, recordatorio_en_calle: tecnicosRecordados || null, felicitacion_semanal: ganadoresSemana || null, recordatorio_devolver: recordadosDevolver || null, resumen_semanal: resumenSemanal || null, instalaciones_avisadas: instalacionesAvisadas || null, propuestas_3d: propuestasAvisadas, vencimientos: vencimientosAvisados });
   } catch (err) {
     res.status(500).json({ error: "Error interno en el cron diario", detail: String(err.message || err) });
   }
 };
 module.exports.chequearPropuestas3d = chequearPropuestas3d;
+module.exports.chequearVencimientos = chequearVencimientos;

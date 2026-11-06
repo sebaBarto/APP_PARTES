@@ -206,6 +206,36 @@
   #tabGuardiasBtn:not(.active) .tab-icon { color: var(--acc-guardia); }
   #tabCredencialesBtn:not(.active) .tab-icon { color: var(--acc-gold); }
   #tabVehiculosBtn:not(.active) .tab-icon { color: var(--acc-green); }
+  .rend-matriz { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .rend-matriz th, .rend-matriz td { padding: 6px 8px; border-bottom: 1px solid rgba(128,128,128,.2); text-align: right; white-space: nowrap; }
+  .rend-matriz th:first-child, .rend-matriz td:first-child { text-align: left; }
+  .rend-matriz .pend { color: #B5772A; font-size: 11.5px; }
+  .rend-matriz tfoot td { font-weight: 700; }
+  .rend-rev-capa { position: fixed; inset: 0; background: rgba(16,24,32,.72); z-index: 9000; display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .rend-rev { background: var(--card-bg, #fff); color: inherit; border-radius: 16px; width: min(980px, 100%); max-height: calc(100vh - 32px); overflow: auto; display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 18px; padding: 18px; box-shadow: 0 20px 60px rgba(0,0,0,.35); }
+  @media (max-width: 760px) { .rend-rev { grid-template-columns: 1fr; } }
+  .rend-rev-foto { background: #101820; border-radius: 12px; min-height: 280px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .rend-rev-foto img { max-width: 100%; max-height: 62vh; object-fit: contain; display: block; cursor: zoom-in; }
+  .rend-rev-foto .sin { color: #E8B04B; font-weight: 600; padding: 20px; text-align: center; }
+  .rend-rev-minis { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .rend-rev-minis img { width: 52px; height: 52px; object-fit: cover; border-radius: 8px; border: 2px solid transparent; cursor: pointer; }
+  .rend-rev-minis img.activa { border-color: #F5A623; }
+  .rend-rev-monto { font-size: 30px; font-weight: 800; margin: 6px 0; }
+  .rend-rev-acciones { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+  .rend-rev-acciones button { width: 100%; min-height: 46px; }
+  .rend-rev-motivos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .rend-rev-motivos button { width: auto; padding: 6px 10px; font-size: 13px; }
+  .rend-repetida { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #FFF1D6; color: #8A5A00; font-size: 12px; font-weight: 700; }
+  #tabVencimientosBtn:not(.active) .tab-icon { color: var(--acc-red, #C0392B); }
+  .ven-tabla td { vertical-align: middle; }
+  .ven-tabla .ven-btns { white-space: nowrap; text-align: right; }
+  .ven-tabla .ven-btns button { width: auto; margin: 2px 0 2px 4px; padding: 6px 10px; font-size: 13px; }
+  .ven-estado { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+  .ven-estado.vencido { background: #FDE2E0; color: #B3261E; }
+  .ven-estado.pronto { background: #FFF1D6; color: #8A5A00; }
+  .ven-estado.ok { background: #E6F4EA; color: #1F6B34; }
+  .ven-estado.sin { background: #EEF0F2; color: #6B7680; }
+  .ven-origen { font-size: 12px; color: #6B7680; }
   #tabSimsBtn:not(.active) .tab-icon,
   #tabSimsInstaladasBtn:not(.active) .tab-icon,
   #tabSimsControlBtn:not(.active) .tab-icon { color: var(--acc-blue); }
@@ -680,6 +710,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
       <button type="button" class="tab-btn" id="tabGuardiasBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a5 5 0 0 0-5 5c0 6-3 8-3 8h16s-3-2-3-8a5 5 0 0 0-5-5z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg></span>Guardias</button>
       <button type="button" class="tab-btn" id="tabCredencialesBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10.5" r="2"/><path d="M6 16c0-1.7 1.3-3 3-3s3 1.3 3 3"/><path d="M14 9h4"/><path d="M14 13h4"/></svg></span>Credenciales</button>
       <button type="button" class="tab-btn" id="tabVehiculosBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13l2-6a2 2 0 0 1 2-1h10a2 2 0 0 1 2 1l2 6"/><rect x="2" y="13" width="20" height="5" rx="1.5"/><circle cx="7" cy="18.5" r="1.5"/><circle cx="17" cy="18.5" r="1.5"/></svg></span>Vehículos</button>
+      <button type="button" class="tab-btn" id="tabVencimientosBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 9h18"/><path d="M12 13v3l2 1"/></svg></span>Vencimientos</button>
       <button type="button" class="tab-btn" id="tabSimsBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3h6l4 4v12a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><rect x="9.5" y="10" width="5" height="5.5" rx="1"/></svg></span>SIMs</button>
       <button type="button" class="tab-btn" id="tabHerramientasBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h16v11a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M8 8V6a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="4" y1="12" x2="20" y2="12"/></svg></span>Herramientas</button>
       <button type="button" class="tab-btn" id="tabSimsInstaladasBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="9" r="2.5"/></svg></span>SIMs instaladas</button>
@@ -1419,6 +1450,39 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
       </div>
     </div>
 
+    <div id="panelVencimientos" class="hidden">
+      <h1>Vencimientos</h1>
+      <p class="subtitle">Todo lo que vence, en un solo lugar: lo de los vehículos (VTV, seguro, service por fecha), las credenciales de los técnicos y lo de la oficina que cargues acá (matafuegos, seguros, habilitaciones, calibraciones, licencias...). Lo que entra en el plazo de aviso aparece en Inicio y, si tiene responsable, le llega un aviso al celular.</p>
+      <div class="card">
+        <div class="sims-resumen" id="venResumen" style="margin:0 0 10px;"></div>
+        <div class="field-row" style="flex-wrap:wrap;align-items:flex-end;">
+          <div><label>Mostrar</label><select id="venFiltro"><option value="atencion">Vencidos y próximos</option><option value="todos">Todos</option></select></div>
+          <div><label>Categoría</label><select id="venCategoria"><option value="">Todas</option></select></div>
+          <button type="button" class="btn-secondary-admin" id="venExcelBtn" style="width:auto;">⬇ Excel</button>
+        </div>
+        <p class="status" id="venStatus"></p>
+        <div id="venLista"></div>
+      </div>
+      <div class="card" id="venFormCard">
+        <h3 style="margin-top:0;" id="venFormTitulo">Agregar un vencimiento de la oficina</h3>
+        <input type="hidden" id="venId">
+        <div class="field-row" style="flex-wrap:wrap;">
+          <div style="flex:2 1 220px;"><label>Qué vence</label><input type="text" class="field-input" id="venNombre" placeholder="Ej. Matafuegos del depósito"></div>
+          <div style="flex:1 1 160px;"><label>Categoría</label><input type="text" class="field-input" id="venCat" list="venCategoriasLista" placeholder="Ej. Matafuegos"></div>
+          <div style="flex:1 1 150px;"><label>Vence el</label><input type="date" class="field-input" id="venFecha"></div>
+        </div>
+        <datalist id="venCategoriasLista"><option>Matafuegos</option><option>Seguros</option><option>Habilitaciones y permisos</option><option>Herramientas y calibración</option><option>Licencias y abonos</option><option>Impuestos y pagos</option><option>Contratos</option><option>Otro</option></datalist>
+        <div class="field-row" style="flex-wrap:wrap;">
+          <div><label>Avisar con</label><select id="venAviso"><option value="7">7 días de anticipación</option><option value="15">15 días</option><option value="30" selected>30 días</option><option value="60">60 días</option><option value="90">90 días</option></select></div>
+          <div><label>Se repite</label><select id="venRepetir"><option value="0">No se repite</option><option value="1">Cada mes</option><option value="3">Cada 3 meses</option><option value="6">Cada 6 meses</option><option value="12">Cada año</option><option value="24">Cada 2 años</option><option value="60">Cada 5 años</option></select></div>
+          <div style="flex:1 1 180px;"><label>Responsable (le llega el aviso)</label><select id="venResponsable"><option value="">Nadie: solo en el panel</option></select></div>
+        </div>
+        <div><label>Nota</label><input type="text" class="field-input" id="venNota" placeholder="Ej. Lo hace Extinguidores Rosario, tel. ..."></div>
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;"><button type="button" id="venGuardarBtn" style="width:auto;">Guardar</button><button type="button" class="btn-secondary-admin hidden" id="venCancelarBtn" style="width:auto;">Cancelar edición</button></div>
+        <p class="status" id="venFormStatus"></p>
+      </div>
+    </div>
+
     <div id="panelBackup" class="hidden">
       <h1>Copias de seguridad</h1>
       <p class="subtitle">Descargá a la PC de la oficina todo lo que fue guardando la APP, y volvé atrás si algo se rompe o se pierde.</p>
@@ -1531,8 +1595,20 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
       </div>
 
       <div class="card" id="rendicionesTotalesCard" style="margin-bottom:16px;">
-        <h3 style="margin:0 0 8px;">Pendiente de pagar por técnico</h3>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
+          <h3 style="margin:0;">Pendiente de pagar por técnico</h3>
+          <button type="button" id="rendRevisionBtn" style="width:auto;">⚡ Revisar pendientes de a una</button>
+        </div>
         <div id="rendicionesTotalesLista"></div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px;">
+          <h3 style="margin:0;">Rendido por técnico y por mes</h3>
+          <button type="button" class="btn-secondary-admin" id="rendMatrizExcelBtn" style="width:auto;">⬇ Excel</button>
+        </div>
+        <p class="subtitle" style="margin:0 0 8px;">Total rendido (sin los rechazados) en los últimos 6 meses. Entre paréntesis, lo que falta pagar.</p>
+        <div id="rendMatriz"></div>
       </div>
 
       <button type="button" class="btn btn-secondary" id="descargarExcelRendicionesBtn" style="margin-bottom:16px;">⬇ Descargar Excel (lo que esté filtrado)</button>
@@ -1736,9 +1812,9 @@ function avisoAdmin(texto, tipo) {
   clearTimeout(avisoAdmin.t);
   avisoAdmin.t = setTimeout(() => { caja.style.display = "none"; }, tipo === "err" || tipo === "aviso" ? 12000 : 6000);
 }
-function confirmarAdmin(mensaje) {
+function confirmarAdmin(mensaje, opciones = {}) {
   const peligro = /borrar|eliminar|vaciar|dar de baja|papelera|se pierde/i.test(String(mensaje));
-  return cartelAdmin(mensaje, { confirmar: true, peligro, aceptar: peligro ? "Sí, hacerlo" : "Sí, seguir" });
+  return cartelAdmin(mensaje, { confirmar: true, peligro, aceptar: peligro ? "Sí, hacerlo" : "Sí, seguir", ...opciones });
 }
 window.alert = (mensaje) => { cartelAdmin(mensaje); };
 window.preguntarSimAsync = (m) => cartelAdmin(String(m).replace(/\n\nAceptar = [^\n]*\nCancelar = [^\n]*$/, ""), { confirmar: true, aceptar: "Reemplazarla (vuelve al stock)", cancelar: "Dejar las dos instaladas", fijo: true });
@@ -1853,6 +1929,8 @@ const tabSeguimientosBtn = document.getElementById("tabSeguimientosBtn");
 const tabErroresBtn = document.getElementById("tabErroresBtn");
 const tabAuditoriaBtn = document.getElementById("tabAuditoriaBtn");
 const tabBackupBtn = document.getElementById("tabBackupBtn");
+const tabVencimientosBtn = document.getElementById("tabVencimientosBtn");
+const panelVencimientos = document.getElementById("panelVencimientos");
 const panelBackup = document.getElementById("panelBackup");
 const panelAuditoria = document.getElementById("panelAuditoria");
 const panelErrores = document.getElementById("panelErrores");
@@ -1960,6 +2038,7 @@ const TABS = [
   { btn: tabErroresBtn, panel: panelErrores, onShow: () => cargarErroresAdmin() },
   { btn: tabAuditoriaBtn, panel: panelAuditoria, onShow: () => cargarAuditoriaAdmin() },
   { btn: tabBackupBtn, panel: panelBackup, onShow: () => bkCargar() },
+  { btn: tabVencimientosBtn, panel: panelVencimientos, onShow: () => venCargar() },
   { btn: tabSeguimientosBtn, panel: panelSeguimientos, onShow: () => cargarSeguimientosAdmin() },
   { btn: tabRendicionesBtn, panel: panelRendiciones, onShow: () => cargarRendicionesAdmin() },
   { btn: tabCoordinacionBtn, panel: panelCoordinacion, onShow: () => cargarCoordinacionAdmin() },
@@ -1981,7 +2060,7 @@ TABS.forEach(({ btn, panel, onShow }) => {
 const GRUPOS_MENU = [
   ["", ["tabInicioBtn"]],
   ["Día a día", ["tabServiciosBtn", "tabCronogramaBtn", "tabCoordinacionBtn", "tabEmergenciaBtn", "tabSeguimientosBtn", "tabSemaforoBtn", "tabNotasBtn"]],
-  ["Administración", ["tabRendicionesBtn", "tabComodatosBtn", "tabInstalacionesBtn", "tabEncuestasBtn"]],
+  ["Administración", ["tabRendicionesBtn", "tabVencimientosBtn", "tabComodatosBtn", "tabInstalacionesBtn", "tabEncuestasBtn"]],
   ["SIMs", ["tabSimsBtn", "tabSimsInstaladasBtn", "tabSimsControlBtn"]],
   ["Flota y herramientas", ["tabVehiculosBtn", "tabHerramientasBtn"]],
   ["Clientes", ["tabClientesBtn", "tabClavesClienteBtn", "tabPlanosBtn"]],
@@ -2026,7 +2105,7 @@ async function cargarInicioAdmin() {
   st.textContent = "Revisando...";
   const h = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
   const leer = (url) => fetch(url, { headers: h, cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-  const [emerg, rend, pend, sims, vehs, vehHist, errores, partes, clientes, instalaciones, presencias, historicas, simsInst, registroCopias] = await Promise.all([
+  const [emerg, rend, pend, sims, vehs, vehHist, errores, partes, clientes, instalaciones, presencias, historicas, simsInst, registroCopias, venPropios, venCreds] = await Promise.all([
     leer("/api/datos?coleccion=servicios_emergencia"),
     leer("/api/recurso-uso?recurso=rendicion"),
     leer("/api/recurso-uso?recurso=sim&pendientes=1&todas=1"),
@@ -2041,6 +2120,8 @@ async function cargarInicioAdmin() {
     leer("/api/datos?coleccion=visitas_historicas"),
     leer("/api/datos?coleccion=sims_instaladas"),
     leer("/api/datos?coleccion=backup&registro=1"),
+    leer("/api/datos?coleccion=vencimientos"),
+    leer("/api/datos?coleccion=credenciales"),
   ]);
   const arr = (x) => (Array.isArray(x) ? x : []);
   const hoyISO = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
@@ -2053,11 +2134,14 @@ async function cargarInicioAdmin() {
   const rendPend = arr(rend).filter((r) => r.estado === "pendiente");
   const totalRend = rendPend.reduce((a, r) => a + (Number(r.monto) || 0), 0);
   agregar(rendPend.length, "Rendiciones por aprobar", rendPend.length ? `$ ${totalRend.toLocaleString("es-AR")} en total` : "", "tabRendicionesBtn", "atencion", true);
-  const vehAlertas = [];
-  arr(vehs).forEach((v) => { try { (calcularAlertasVehiculoAdmin(v, hoy) || []).forEach((a) => vehAlertas.push(`${v.nombre}: ${a.mensaje || a.texto || ""}`)); } catch (e) { /* nada */ } });
   const sinDevolver = arr(vehHist).filter((x) => x.tecnico && !x.hora_devolucion && x.accion !== "evento" && x.fecha && x.fecha < hoyISO);
   agregar(sinDevolver.length, "Vehículos sin devolver", sinDevolver.map((x) => `${x.vehiculo} (${x.tecnico})`).join(" · "), "tabVehiculosBtn", "urgente");
-  agregar(vehAlertas.length, "Vencimientos de vehículos", vehAlertas.slice(0, 2).join(" · "), "tabVehiculosBtn", "atencion");
+  // Vencimientos: vehículos (fecha y km), credenciales y lo de la oficina.
+  try {
+    const venFilas = venArmarFilas({ propios: arr(venPropios), vehs: arr(vehs), creds: arr(venCreds) }, hoy).filter((f) => f.nivel === "vencido" || f.nivel === "pronto");
+    const venVencidos = venFilas.filter((f) => f.nivel === "vencido").length;
+    agregar(venFilas.length, venVencidos ? `Vencimientos (${venVencidos} vencido${venVencidos === 1 ? "" : "s"})` : "Vencimientos próximos", venFilas.slice(0, 2).map((f) => `${f.nombre}: ${venCuando(f)}`).join(" · "), "tabVencimientosBtn", venVencidos ? "urgente" : "atencion");
+  } catch (e) { /* nada */ }
   agregar(arr(pend).length, "SIMs por aceptar", arr(pend).slice(0, 2).map((p) => `${p.numero} → ${p.tecnico_destino}`).join(" · "), "tabSimsBtn", "atencion");
   const simsProb = arr(sims).filter((s) => s.ubicacion_tipo !== "cliente" && s.estado_fisico && s.estado_fisico !== "Disponible");
   agregar(simsProb.length, "SIMs con problema", "Defectuosas o extraviadas para reclamar o dar de baja", "tabSimsControlBtn", "atencion");
@@ -5026,7 +5110,7 @@ const LUGARES_AYUDA_SIMS = [
   ["#panelSimsControl h3", "control", "", 3], ["#panelSimsControl h3", "conciliacion", "", 4], ["#panelSimsControl h3", "conc_oficina", "", 5],
   ["#panelTecnicos > h1", "tec_resumen"], ["#tecnicosAyudaPermisos", "tec_permisos"],
   ["#panelRendiciones > h1", "rend_resumen"], ["#rendicionesAdminMes", "rend_estados", "after"],
-  ["#rendicionesTotalesCard > h3", "rend_pagar_todo"], ["#descargarExcelRendicionesBtn", "rend_excel", "after"],
+  ["#rendicionesTotalesCard h3", "rend_pagar_todo"], ["#descargarExcelRendicionesBtn", "rend_excel", "after"],
 ];
 const ayudaPop = document.createElement("div");
 ayudaPop.className = "ayuda-pop hidden";
@@ -5850,6 +5934,157 @@ function concExcel() {
   XLSX.writeFile(libro, `conciliacion_${concEstado.empresa}_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
 document.getElementById("simsConcEmpresa").addEventListener("change", (e) => { if (concEstado) { concEstado.empresa = e.target.value; concRecalcular(); } });
+
+// ---------- Vencimientos ----------
+// Junta en una lista lo de los vehículos (umbrales por fecha y avisos por km),
+// las credenciales de los técnicos y lo de la oficina (vencimientos.json).
+let venDatos = null; // { propios, vehs, creds, tecnicos }
+function venEstado(fecha, avisoDias, hoy = new Date()) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(fecha || ""))) return { nivel: "sin", dias: null };
+  const [y, m, d] = fecha.split("-").map(Number);
+  const dias = Math.round((new Date(y, m - 1, d) - new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate())) / 864e5);
+  return { dias, nivel: dias < 0 ? "vencido" : dias <= (Number(avisoDias) || 0) ? "pronto" : "ok" };
+}
+function venArmarFilas({ propios, vehs, creds }, hoy = new Date()) {
+  const filas = [];
+  (propios || []).forEach((v) => filas.push({ origen: "oficina", id: v.id, nombre: v.nombre, categoria: v.categoria || "Otro", fecha: v.fecha, aviso_dias: v.aviso_dias, repetir: v.repetir, responsable: v.responsable || "", nota: v.nota || "", historial: v.historial || [], ...venEstado(v.fecha, v.aviso_dias, hoy) }));
+  (vehs || []).forEach((veh) => (veh.umbrales || []).forEach((u) => {
+    if (!u || !u.nombre || !u.valor) return;
+    if (u.tipo === "fecha") filas.push({ origen: "vehiculo", nombre: `${u.nombre} — ${veh.nombre}`, categoria: "Vehículos", fecha: u.valor, aviso_dias: u.aviso_antes, responsable: "", nota: "", ...venEstado(u.valor, u.aviso_antes, hoy) });
+    else {
+      const resta = (Number(u.valor) || 0) - (Number(veh.km_actual) || 0);
+      const nivel = resta <= 0 ? "vencido" : resta <= (Number(u.aviso_antes) || 0) ? "pronto" : "ok";
+      filas.push({ origen: "vehiculo", nombre: `${u.nombre} — ${veh.nombre}`, categoria: "Vehículos", fecha: "", km: resta, aviso_dias: 0, responsable: "", nota: `A los ${Number(u.valor).toLocaleString("es-AR")} km (ahora ${Number(veh.km_actual || 0).toLocaleString("es-AR")} km)`, nivel, dias: null });
+    }
+  }));
+  (creds || []).forEach((c) => { if (c && c.nombre) filas.push({ origen: "credencial", nombre: `Credencial — ${c.nombre}`, categoria: "Credenciales", fecha: c.vigencia || "", aviso_dias: 30, responsable: c.nombre, nota: c.cargo || "", ...venEstado(c.vigencia, 30, hoy) }); });
+  const orden = { vencido: 0, pronto: 1, ok: 2, sin: 3 };
+  return filas.sort((a, b) => orden[a.nivel] - orden[b.nivel] || (a.dias == null ? 1e9 : a.dias) - (b.dias == null ? 1e9 : b.dias) || (a.km == null ? 1e9 : a.km) - (b.km == null ? 1e9 : b.km) || a.nombre.localeCompare(b.nombre, "es"));
+}
+function venCuando(f) {
+  if (f.km != null) return f.km <= 0 ? `se pasó por ${Math.abs(f.km).toLocaleString("es-AR")} km` : `faltan ${f.km.toLocaleString("es-AR")} km`;
+  if (f.dias == null) return "sin fecha";
+  const fecha = f.fecha.split("-").reverse().join("/");
+  return f.dias < 0 ? `${fecha} · venció hace ${-f.dias} día${f.dias === -1 ? "" : "s"}` : f.dias === 0 ? `${fecha} · vence hoy` : `${fecha} · en ${f.dias} día${f.dias === 1 ? "" : "s"}`;
+}
+async function venCargar() {
+  const st = document.getElementById("venStatus");
+  st.className = "status"; st.textContent = "Cargando...";
+  try {
+    const h = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const leer = async (u) => { const r = await fetch(u, { headers: h, cache: "no-store" }); const d = await r.json().catch(() => null); if (!r.ok) throw new Error((d && d.error) || "Error " + r.status); return d; };
+    const [propios, vehs, creds, tecs] = await Promise.all([leer("/api/datos?coleccion=vencimientos"), leer("/api/datos?coleccion=vehiculos").catch(() => []), leer("/api/datos?coleccion=credenciales").catch(() => []), leer("/api/datos?coleccion=tecnicos").catch(() => [])]);
+    venDatos = { propios: Array.isArray(propios) ? propios : [], vehs: Array.isArray(vehs) ? vehs : [], creds: Array.isArray(creds) ? creds : [] };
+    const nombres = (Array.isArray(tecs) ? tecs : []).map((t) => t && t.nombre).filter(Boolean).sort((a, b) => a.localeCompare(b, "es"));
+    const sel = document.getElementById("venResponsable"), actual = sel.value;
+    sel.innerHTML = '<option value="">Nadie: solo en el panel</option>' + nombres.map((n) => `<option>${escapeHtmlAdmin(n)}</option>`).join("");
+    sel.value = actual;
+    st.textContent = "";
+    venRender();
+  } catch (err) { st.className = "status err"; st.textContent = "No se pudo cargar: " + err.message; }
+}
+function venRender() {
+  if (!venDatos) return;
+  const todas = venArmarFilas(venDatos);
+  const cats = [...new Set(todas.map((f) => f.categoria))].sort((a, b) => a.localeCompare(b, "es"));
+  const selCat = document.getElementById("venCategoria"), catActual = selCat.value;
+  selCat.innerHTML = '<option value="">Todas</option>' + cats.map((c) => `<option ${c === catActual ? "selected" : ""}>${escapeHtmlAdmin(c)}</option>`).join("");
+  const n = (nv) => todas.filter((f) => f.nivel === nv).length;
+  document.getElementById("venResumen").innerHTML = `<span class="sims-chip ${n("vencido") ? "alerta" : ""}">Vencidos <b>${n("vencido")}</b></span><span class="sims-chip ${n("pronto") ? "alerta" : ""}">Por vencer <b>${n("pronto")}</b></span><span class="sims-chip">Al día <b>${n("ok")}</b></span>${n("sin") ? `<span class="sims-chip">Sin fecha <b>${n("sin")}</b></span>` : ""}`;
+  const soloAtencion = document.getElementById("venFiltro").value === "atencion";
+  const filas = todas.filter((f) => (!catActual || f.categoria === catActual) && (!soloAtencion || f.nivel === "vencido" || f.nivel === "pronto"));
+  const etiqueta = { vencido: "Vencido", pronto: "Por vencer", ok: "Al día", sin: "Sin fecha" };
+  const origen = { vehiculo: "de Vehículos", credencial: "de Credenciales", oficina: "" };
+  const cont = document.getElementById("venLista");
+  cont.innerHTML = !filas.length ? `<p class="status ok">${soloAtencion ? "No hay nada vencido ni por vencer." : "No hay vencimientos cargados."}</p>`
+    : `<div class="sims-tabla-wrap"><table class="sims-tabla ven-tabla"><tbody>${filas.map((f, i) => `<tr>
+      <td style="white-space:normal;"><span class="ven-estado ${f.nivel}">${etiqueta[f.nivel]}</span> <b>${escapeHtmlAdmin(f.nombre)}</b><br><small>${escapeHtmlAdmin(venCuando(f))} · ${escapeHtmlAdmin(f.categoria)}${f.repetir ? ` · se repite cada ${f.repetir === 12 ? "año" : f.repetir + " meses"}` : ""}${f.responsable ? " · avisa a " + escapeHtmlAdmin(f.responsable) : ""}</small>${f.nota ? `<br><small class="ven-origen">${escapeHtmlAdmin(f.nota)}</small>` : ""}${origen[f.origen] ? `<br><small class="ven-origen">Se edita ${origen[f.origen]}</small>` : ""}</td>
+      <td class="ven-btns">${f.origen === "oficina" ? `<button type="button" class="ven-renovar" data-i="${i}">✓ Renovado</button><button type="button" class="btn-secondary-admin ven-editar" data-i="${i}">Editar</button><button type="button" class="btn-secondary-admin ven-borrar" data-i="${i}" style="color:#B3261E;">Borrar</button>` : `<button type="button" class="btn-secondary-admin ven-ir" data-tab="${f.origen === "vehiculo" ? "tabVehiculosBtn" : "tabCredencialesBtn"}">Ir a ${f.origen === "vehiculo" ? "Vehículos" : "Credenciales"}</button>`}</td></tr>`).join("")}</tbody></table></div>`;
+  cont.querySelectorAll(".ven-ir").forEach((b) => b.addEventListener("click", () => document.getElementById(b.dataset.tab).click()));
+  cont.querySelectorAll(".ven-editar").forEach((b) => b.addEventListener("click", () => venEditar(filas[Number(b.dataset.i)])));
+  cont.querySelectorAll(".ven-borrar").forEach((b) => b.addEventListener("click", async () => {
+    const f = filas[Number(b.dataset.i)];
+    if (!await confirmarAdmin(`¿Borrar el vencimiento «${f.nombre}»?`)) return;
+    await venAccion({ accion: "borrar", id: f.id }, `«${f.nombre}» borrado.`, b);
+  }));
+  cont.querySelectorAll(".ven-renovar").forEach((b) => b.addEventListener("click", async () => {
+    const f = filas[Number(b.dataset.i)];
+    let fecha = "";
+    if (f.repetir) {
+      if (!await confirmarAdmin(`¿Se renovó «${f.nombre}»? El próximo vencimiento pasa a ser ${f.repetir === 12 ? "dentro de un año" : `dentro de ${f.repetir} meses`} (desde el ${f.fecha.split("-").reverse().join("/")}).`, { aceptar: "Sí, renovado" })) return;
+    } else {
+      const t = await pedirTextoAdmin(`¿Hasta cuándo quedó renovado «${f.nombre}»? (dd/mm/aaaa)`, "");
+      if (t === null) return;
+      const m = t.trim().match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+      if (!m) { avisoAdmin("Escribí la fecha como dd/mm/aaaa (ej. 15/11/2027).", "err"); return; }
+      fecha = `${m[3].length === 2 ? "20" + m[3] : m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+    }
+    await venAccion({ accion: "renovar", id: f.id, fecha }, `«${f.nombre}» renovado.`, b);
+  }));
+}
+async function venAccion(cuerpo, mensaje, boton) {
+  const st = document.getElementById("venStatus");
+  if (boton) boton.disabled = true;
+  try {
+    const r = await fetch("/api/datos?coleccion=vencimientos", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify(cuerpo) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !Array.isArray(d.lista)) throw new Error(d.error || "Error " + r.status);
+    venDatos.propios = d.lista;
+    venRender();
+    const it = cuerpo.id && d.lista.find((x) => x.id === cuerpo.id);
+    const texto = mensaje + (it && cuerpo.accion === "renovar" ? ` Próximo vencimiento: ${it.fecha.split("-").reverse().join("/")}.` : "");
+    st.className = "status ok"; st.textContent = texto; avisoAdmin(texto, "ok");
+    return true;
+  } catch (err) {
+    st.className = "status err"; st.textContent = "No se pudo: " + err.message; avisoAdmin("No se pudo: " + err.message, "err");
+    if (boton && boton.isConnected) boton.disabled = false;
+    return false;
+  }
+}
+function venLimpiarForm() {
+  ["venId", "venNombre", "venCat", "venFecha", "venNota"].forEach((id) => { document.getElementById(id).value = ""; });
+  document.getElementById("venAviso").value = "30";
+  document.getElementById("venRepetir").value = "0";
+  document.getElementById("venResponsable").value = "";
+  document.getElementById("venFormTitulo").textContent = "Agregar un vencimiento de la oficina";
+  document.getElementById("venCancelarBtn").classList.add("hidden");
+}
+function venEditar(f) {
+  document.getElementById("venId").value = f.id;
+  document.getElementById("venNombre").value = f.nombre;
+  document.getElementById("venCat").value = f.categoria;
+  document.getElementById("venFecha").value = f.fecha;
+  const aviso = document.getElementById("venAviso");
+  if (![...aviso.options].some((o) => o.value === String(f.aviso_dias))) aviso.insertAdjacentHTML("beforeend", `<option value="${Number(f.aviso_dias) || 0}">${Number(f.aviso_dias) || 0} días</option>`);
+  aviso.value = String(f.aviso_dias);
+  document.getElementById("venRepetir").value = String(f.repetir || 0);
+  document.getElementById("venResponsable").value = f.responsable || "";
+  document.getElementById("venNota").value = f.nota || "";
+  document.getElementById("venFormTitulo").textContent = `Editar «${f.nombre}»`;
+  document.getElementById("venCancelarBtn").classList.remove("hidden");
+  document.getElementById("venFormCard").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+document.getElementById("venCancelarBtn").addEventListener("click", venLimpiarForm);
+document.getElementById("venFiltro").addEventListener("change", venRender);
+document.getElementById("venCategoria").addEventListener("change", venRender);
+document.getElementById("venGuardarBtn").addEventListener("click", async (e) => {
+  const btn = e.currentTarget;
+  const st = document.getElementById("venFormStatus");
+  const item = { id: document.getElementById("venId").value || undefined, nombre: document.getElementById("venNombre").value.trim(), categoria: document.getElementById("venCat").value.trim() || "Otro", fecha: document.getElementById("venFecha").value, aviso_dias: Number(document.getElementById("venAviso").value), repetir: Number(document.getElementById("venRepetir").value), responsable: document.getElementById("venResponsable").value, nota: document.getElementById("venNota").value.trim() };
+  if (!item.nombre) { st.className = "status err"; st.textContent = "Escribí qué vence."; return; }
+  if (!item.fecha) { st.className = "status err"; st.textContent = "Poné la fecha de vencimiento."; return; }
+  st.textContent = "";
+  if (!venDatos) await venCargar();
+  if (await venAccion({ accion: "guardar", item }, `«${item.nombre}» guardado.`, btn)) { venLimpiarForm(); btn.disabled = false; }
+});
+document.getElementById("venExcelBtn").addEventListener("click", () => {
+  if (!venDatos) return;
+  const etiqueta = { vencido: "Vencido", pronto: "Por vencer", ok: "Al día", sin: "Sin fecha" };
+  const filas = venArmarFilas(venDatos).map((f) => ({ Estado: etiqueta[f.nivel], "Qué vence": f.nombre, Categoría: f.categoria, Vence: f.fecha ? f.fecha.split("-").reverse().join("/") : "", Cuándo: venCuando(f), "Avisar (días antes)": f.aviso_dias || "", "Se repite (meses)": f.repetir || "", Responsable: f.responsable, Nota: f.nota, Origen: f.origen === "oficina" ? "Oficina" : f.origen === "vehiculo" ? "Vehículos" : "Credenciales" }));
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filas.length ? filas : [{ "Qué vence": "(nada)" }]), "Vencimientos");
+  XLSX.writeFile(libro, `vencimientos_${new Date().toISOString().slice(0, 10)}.xlsx`);
+});
 
 // ---------- Copias de seguridad ----------
 // La copia es un .zip armado en el navegador: cada tabla de la base y cada
@@ -7586,12 +7821,148 @@ const rendicionesAdminMes = document.getElementById("rendicionesAdminMes");
 const rendicionesTotalesLista = document.getElementById("rendicionesTotalesLista");
 rendicionesAdminMes.addEventListener("change", renderRendicionesAdmin);
 const pesosAdmin = (n) => "$" + (Number(n) || 0).toLocaleString("es-AR", { maximumFractionDigits: 2 });
+// Quién de la oficina lo marcó (antes quedaba siempre "Admin").
+const rendQuien = () => { try { return sessionStorage.getItem("admin_nombre") || "Oficina"; } catch (e) { return "Oficina"; } };
+// Misma rendición cargada dos veces: mismo técnico, fecha y monto.
+function rendRepetidas(lista) {
+  const grupos = new Map();
+  lista.filter((r) => r.estado !== "rechazado").forEach((r) => { const k = `${r.tecnico}|${r.fecha}|${Number(r.monto) || 0}`; grupos.set(k, (grupos.get(k) || 0) + 1); });
+  return new Set(lista.filter((r) => r.estado !== "rechazado" && grupos.get(`${r.tecnico}|${r.fecha}|${Number(r.monto) || 0}`) > 1).map((r) => r.id));
+}
+const rendFotos = (r) => { if (!r.foto_ref) return []; try { const x = JSON.parse(r.foto_ref); return Array.isArray(x) ? x : [r.foto_ref]; } catch (e) { return [r.foto_ref]; } };
+// Una acción sobre una rendición (pagado, pagado con APP, rechazar).
+async function rendAccion(r, accion, motivo) {
+  const cuerpo = accion === "pagado" ? { accion: "marcar_pagado", id: r.id, pagado: true, pagado_por: rendQuien() }
+    : accion === "pagado_app" ? { accion: "pagado_app", id: r.id }
+    : { accion: "rechazar", id: r.id, observaciones_admin: motivo };
+  const res = await fetch("/api/recurso-uso?recurso=rendicion", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify(cuerpo) });
+  const d = await res.json().catch(() => ({}));
+  if (!res.ok || d.ok === false) throw new Error(d.error || "No se pudo guardar");
+}
+// Total rendido por técnico y mes (últimos 6 meses), sin los rechazados.
+function rendMatrizDatos() {
+  const hoy = new Date(), meses = [];
+  for (let i = 5; i >= 0; i--) { const d = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1); meses.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`); }
+  const filas = {};
+  rendicionesAdminCache.filter((r) => r.estado !== "rechazado" && meses.includes(String(r.fecha || "").slice(0, 7))).forEach((r) => {
+    const t = r.tecnico || "Sin técnico", m = r.fecha.slice(0, 7), monto = Number(r.monto) || 0;
+    filas[t] = filas[t] || {};
+    filas[t][m] = filas[t][m] || { total: 0, pend: 0 };
+    filas[t][m].total += monto;
+    if (r.estado === "pendiente") filas[t][m].pend += monto;
+  });
+  return { meses, filas, tecnicos: Object.keys(filas).sort((a, b) => a.localeCompare(b, "es")) };
+}
+const RD_MES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+const rendMesTxt = (m) => `${RD_MES[Number(m.slice(5)) - 1]} ${m.slice(2, 4)}`;
+function renderMatrizRendiciones() {
+  const cont = document.getElementById("rendMatriz");
+  if (!cont) return;
+  const { meses, filas, tecnicos } = rendMatrizDatos();
+  if (!tecnicos.length) { cont.innerHTML = '<p class="status">No hay rendiciones en los últimos 6 meses.</p>'; return; }
+  const celda = (c) => !c ? '<td style="color:#9AA3A9;">—</td>' : `<td>${pesosAdmin(c.total)}${c.pend ? `<br><span class="pend">(${pesosAdmin(c.pend)})</span>` : ""}</td>`;
+  const totMes = meses.map((m) => tecnicos.reduce((a, t) => a + ((filas[t][m] || {}).total || 0), 0));
+  cont.innerHTML = `<div class="sims-tabla-wrap"><table class="rend-matriz"><thead><tr><th>Técnico</th>${meses.map((m) => `<th>${rendMesTxt(m)}</th>`).join("")}<th>Total</th></tr></thead><tbody>${tecnicos.map((t) => {
+    const tot = meses.reduce((a, m) => a + ((filas[t][m] || {}).total || 0), 0), pend = meses.reduce((a, m) => a + ((filas[t][m] || {}).pend || 0), 0);
+    return `<tr><td><b>${escapeHtmlAdmin(t)}</b></td>${meses.map((m) => celda(filas[t][m])).join("")}${celda({ total: tot, pend })}</tr>`;
+  }).join("")}</tbody><tfoot><tr><td>Total</td>${totMes.map((x) => `<td>${pesosAdmin(x)}</td>`).join("")}<td>${pesosAdmin(totMes.reduce((a, b) => a + b, 0))}</td></tr></tfoot></table></div>`;
+}
+document.getElementById("rendMatrizExcelBtn").addEventListener("click", () => {
+  const { meses, filas, tecnicos } = rendMatrizDatos();
+  const datos = tecnicos.map((t) => { const o = { Técnico: t }; meses.forEach((m) => { o[rendMesTxt(m)] = (filas[t][m] || {}).total || 0; o[rendMesTxt(m) + " (pendiente)"] = (filas[t][m] || {}).pend || 0; }); o.Total = meses.reduce((a, m) => a + ((filas[t][m] || {}).total || 0), 0); return o; });
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(datos.length ? datos : [{ Técnico: "(sin datos)" }]), "Por técnico y mes");
+  XLSX.writeFile(libro, `rendiciones_por_mes_${new Date().toISOString().slice(0, 10)}.xlsx`);
+});
+// ---- Revisión rápida: de a una, con la foto grande y un toque por decisión ----
+const REND_MOTIVOS = ["La foto no se lee", "Falta el ticket", "No corresponde a un trabajo", "Está repetida", "El monto no coincide con el ticket"];
+function abrirRevisionRendiciones() {
+  const pendientes = rendicionesFiltradas().filter((r) => r.estado === "pendiente").sort((a, b) => String(a.fecha || "").localeCompare(String(b.fecha || "")));
+  if (!pendientes.length) { avisoAdmin("No hay rendiciones pendientes con los filtros de arriba.", "aviso"); return; }
+  const repetidas = rendRepetidas(rendicionesAdminCache);
+  let i = 0, foto = 0, hechas = { pagado: 0, pagado_app: 0, rechazado: 0 }, ocupado = false;
+  const capa = document.createElement("div");
+  capa.className = "rend-rev-capa";
+  document.body.appendChild(capa);
+  const cerrar = async () => { document.removeEventListener("keydown", tecla); capa.remove(); await cargarRendicionesAdmin(); const n = hechas.pagado + hechas.pagado_app + hechas.rechazado; if (n) avisoAdmin(`Revisadas ${n}: ${hechas.pagado} pagadas, ${hechas.pagado_app} con APP, ${hechas.rechazado} rechazadas.`, "ok"); };
+  const pintar = () => {
+    if (i >= pendientes.length) {
+      capa.innerHTML = `<div class="rend-rev" style="grid-template-columns:1fr;text-align:center;"><div><h2 style="margin:6px 0;">✓ No quedan pendientes</h2><p>${hechas.pagado} pagadas · ${hechas.pagado_app} con APP · ${hechas.rechazado} rechazadas</p><button type="button" class="rr-cerrar" style="width:auto;">Cerrar</button></div></div>`;
+      capa.querySelector(".rr-cerrar").addEventListener("click", cerrar);
+      return;
+    }
+    const r = pendientes[i], fotos = rendFotos(r);
+    foto = Math.min(foto, Math.max(0, fotos.length - 1));
+    const fecha = r.fecha ? r.fecha.split("-").reverse().join("/") : "";
+    capa.innerHTML = `<div class="rend-rev" role="dialog" aria-modal="true">
+      <div><div class="rend-rev-foto">${fotos.length ? `<img src="${escapeHtmlAdmin(fotos[foto])}" alt="Ticket" class="rr-img">` : '<div class="sin">Sin foto del ticket</div>'}</div>
+        ${fotos.length > 1 ? `<div class="rend-rev-minis">${fotos.map((f, k) => `<img src="${escapeHtmlAdmin(f)}" data-k="${k}" class="${k === foto ? "activa" : ""}" alt="">`).join("")}</div>` : ""}</div>
+      <div>
+        <div style="display:flex;justify-content:space-between;gap:8px;color:#6B7680;font-size:13px;"><span>Pendiente ${i + 1} de ${pendientes.length}</span><button type="button" class="btn-secondary-admin rr-cerrar" style="width:auto;padding:4px 10px;">Cerrar (Esc)</button></div>
+        <h2 style="margin:8px 0 0;">${escapeHtmlAdmin(r.tecnico || "")}</h2>
+        <div style="color:#6B7680;">${escapeHtmlAdmin(fecha)}</div>
+        <div class="rend-rev-monto">${pesosAdmin(r.monto)}</div>
+        <div><b>${escapeHtmlAdmin(r.categoria || "")}</b> — ${escapeHtmlAdmin(r.detalle || "")}${r.cliente ? ` <span style="color:#6B7680;">(${escapeHtmlAdmin(r.cliente)})</span>` : ""}</div>
+        ${repetidas.has(r.id) ? '<p style="margin:8px 0 0;"><span class="rend-repetida">⚠ Posible repetida</span> mismo técnico, fecha y monto que otra.</p>' : ""}
+        <div class="rend-rev-acciones">
+          <button type="button" class="rr-acc" data-a="pagado">✓ Pagado <small>(P)</small></button>
+          <button type="button" class="btn-secondary-admin rr-acc" data-a="pagado_app">📱 Pagado con APP <small>(A)</small></button>
+          <button type="button" class="btn-secondary-admin rr-rechazar" style="color:#B3261E;">✕ Rechazar <small>(R)</small></button>
+          <button type="button" class="btn-secondary-admin rr-saltar">Saltar → <small>(S)</small></button>
+        </div>
+        <div class="rr-motivos-caja hidden"><p style="margin:12px 0 0;font-weight:600;">¿Por qué se rechaza? (le llega al técnico)</p><div class="rend-rev-motivos">${REND_MOTIVOS.map((m) => `<button type="button" class="btn-secondary-admin rr-motivo">${escapeHtmlAdmin(m)}</button>`).join("")}</div>
+          <div style="display:flex;gap:6px;margin-top:8px;"><input type="text" class="field-input rr-motivo-txt" placeholder="Otro motivo..." style="flex:1;"><button type="button" class="rr-motivo-ok" style="width:auto;">Rechazar</button></div></div>
+        <p class="status rr-estado" style="margin-top:10px;"></p>
+      </div></div>`;
+    const q = (c) => capa.querySelector(c);
+    capa.querySelectorAll(".rr-cerrar").forEach((b) => b.addEventListener("click", cerrar));
+    const img = q(".rr-img"); if (img) img.addEventListener("click", () => window.open(fotos[foto], "_blank", "noopener"));
+    capa.querySelectorAll(".rend-rev-minis img").forEach((m) => m.addEventListener("click", () => { foto = Number(m.dataset.k); pintar(); }));
+    capa.querySelectorAll(".rr-acc").forEach((b) => b.addEventListener("click", () => decidir(b.dataset.a)));
+    q(".rr-saltar").addEventListener("click", () => { i++; foto = 0; pintar(); });
+    q(".rr-rechazar").addEventListener("click", () => { q(".rr-motivos-caja").classList.remove("hidden"); q(".rr-motivo-txt").focus(); });
+    capa.querySelectorAll(".rr-motivo").forEach((b) => b.addEventListener("click", () => decidir("rechazado", b.textContent)));
+    q(".rr-motivo-ok").addEventListener("click", () => { const t = q(".rr-motivo-txt").value.trim(); if (!t) { q(".rr-motivo-txt").focus(); return; } decidir("rechazado", t); });
+    q(".rr-motivo-txt").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); q(".rr-motivo-ok").click(); } e.stopPropagation(); });
+  };
+  const decidir = async (accion, motivo) => {
+    if (ocupado) return;
+    ocupado = true;
+    const r = pendientes[i], est = capa.querySelector(".rr-estado");
+    capa.querySelectorAll("button").forEach((b) => { b.disabled = true; });
+    est.className = "status rr-estado"; est.textContent = "Guardando...";
+    try {
+      await rendAccion(r, accion, motivo);
+      r.estado = accion;
+      hechas[accion]++;
+      i++; foto = 0;
+      pintar();
+    } catch (err) {
+      est.className = "status err rr-estado"; est.textContent = "No se pudo: " + err.message + ". Probá de nuevo.";
+      capa.querySelectorAll("button").forEach((b) => { b.disabled = false; });
+    }
+    ocupado = false;
+  };
+  const tecla = (e) => {
+    if (e.target && e.target.tagName === "INPUT") return;
+    const k = e.key.toLowerCase();
+    if (k === "escape") { e.preventDefault(); cerrar(); }
+    else if (i < pendientes.length && k === "p") decidir("pagado");
+    else if (i < pendientes.length && k === "a") decidir("pagado_app");
+    else if (i < pendientes.length && k === "r") { const c = capa.querySelector(".rr-rechazar"); if (c) c.click(); e.preventDefault(); }
+    else if (i < pendientes.length && (k === "s" || k === "arrowright")) { i++; foto = 0; pintar(); }
+    else if (k === "arrowleft" && i > 0) { i--; foto = 0; pintar(); }
+  };
+  document.addEventListener("keydown", tecla);
+  pintar();
+}
+document.getElementById("rendRevisionBtn").addEventListener("click", abrirRevisionRendiciones);
 
 async function marcarRendicionPagada(id, pagado) {
   const res = await fetch("/api/recurso-uso?recurso=rendicion", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
-    body: JSON.stringify({ accion: "marcar_pagado", id, pagado, pagado_por: "Admin" }),
+    body: JSON.stringify({ accion: "marcar_pagado", id, pagado, pagado_por: rendQuien() }),
   });
   if (!res.ok) throw new Error("No se pudo guardar");
 }
@@ -7688,6 +8059,11 @@ function renderRendicionesAdmin() {
   rendicionesAdminStatus.textContent = `${filtrados.length} de ${rendicionesAdminCache.length} rendición(es)${totalPendiente > 0 ? ` — $${totalPendiente.toLocaleString("es-AR")} pendientes de pagar` : ""}.`;
 
   const ordenadas = [...filtrados].sort((a, b) => (b.creado_en || "").localeCompare(a.creado_en || ""));
+  const repetidas = rendRepetidas(rendicionesAdminCache);
+  renderMatrizRendiciones();
+  const nPend = rendicionesFiltradas().filter((r) => r.estado === "pendiente").length;
+  const btnRev = document.getElementById("rendRevisionBtn");
+  if (btnRev) { btnRev.textContent = nPend ? `⚡ Revisar pendientes de a una (${nPend})` : "⚡ Revisar pendientes de a una"; btnRev.disabled = !nPend; }
   const etiquetaEstado = { pendiente: "🟠 Pendiente", pagado: "✅ Pagado", pagado_app: "📱 Pagado con APP (sin reintegro)", rechazado: "❌ Rechazado" };
 
   rendicionesAdminLista.innerHTML = ordenadas.map((r) => {
@@ -7712,7 +8088,7 @@ function renderRendicionesAdmin() {
     return `
       <div style="padding:12px 0; border-bottom:1px solid #EEE;">
         <div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px;">
-          <b>${escapeHtmlAdmin(r.tecnico || "")}</b>
+          <b>${escapeHtmlAdmin(r.tecnico || "")}${repetidas.has(r.id) ? ' <span class="rend-repetida">⚠ Posible repetida</span>' : ""}</b>
           <span style="color:#6B7680; font-size:12px;">${escapeHtmlAdmin(fechaTexto)}</span>
         </div>
         <div style="font-size:13px; margin-top:4px;">${escapeHtmlAdmin(r.categoria || "")} — ${escapeHtmlAdmin(r.detalle || "")}${r.cliente ? " (" + escapeHtmlAdmin(r.cliente) + ")" : ""}</div>
@@ -7746,7 +8122,7 @@ function renderRendicionesAdmin() {
               accion: "marcar_pagado",
               id: checkbox.dataset.id,
               pagado: checkbox.checked,
-              pagado_por: "Admin", // TODO: si en algún momento admin.html tiene login por persona, usar ese nombre acá
+              pagado_por: rendQuien(),
             }),
         });
         if (!res.ok) throw new Error("No se pudo guardar");

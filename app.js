@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.44.2";
+const APP_VERSION = "4.45.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -1040,6 +1040,51 @@ statusPill.addEventListener("click", () => {
     showToast("Conectado — todo al día, sin envíos pendientes.");
   }
 });
+
+// Carteles propios para confirmar y para pedir un texto. Reemplazan a
+// confirm() y prompt() del navegador: el celular o Chrome los pueden
+// bloquear sin avisar y entonces el botón "no hacía nada".
+// confirmarApp -> true/false · pedirTextoApp -> texto, o null si se canceló.
+function dialogoApp(mensaje, op = {}) {
+  return new Promise((resolver) => {
+    const capa = document.createElement("div");
+    capa.className = "modal-overlay dlg-app";
+    capa.innerHTML = `<div class="modal-caja" role="dialog" aria-modal="true"><p class="dlg-texto"></p>${op.conTexto ? '<input class="field-input dlg-input" type="text" autocomplete="off">' : ""}<div class="dlg-botones"><button type="button" class="dlg-no"></button><button type="button" class="dlg-si"></button></div></div>`;
+    capa.querySelector(".dlg-texto").textContent = String(mensaje == null ? "" : mensaje);
+    capa.querySelector(".dlg-no").textContent = op.cancelar || "Cancelar";
+    if (op.soloAceptar) capa.querySelector(".dlg-no").remove();
+    capa.querySelector(".dlg-si").textContent = op.aceptar || "Aceptar";
+    const input = capa.querySelector(".dlg-input");
+    if (input) input.value = op.valor == null ? "" : String(op.valor);
+    let listo = false;
+    const cerrar = (si) => {
+      if (listo) return;
+      listo = true;
+      document.removeEventListener("keydown", tecla, true);
+      capa.remove();
+      resolver(op.conTexto ? (si ? input.value : null) : !!si);
+    };
+    const tecla = (e) => {
+      if (e.key === "Escape") { e.preventDefault(); cerrar(false); }
+      else if (e.key === "Enter" && (input ? document.activeElement === input : true)) { e.preventDefault(); cerrar(true); }
+    };
+    capa.querySelector(".dlg-si").addEventListener("click", () => cerrar(true));
+    if (!op.soloAceptar) capa.querySelector(".dlg-no").addEventListener("click", () => cerrar(false));
+    capa.addEventListener("click", (e) => { if (e.target === capa && !op.fijo) cerrar(false); });
+    document.addEventListener("keydown", tecla, true);
+    document.body.appendChild(capa);
+    if (input) { input.focus(); input.select(); } else capa.querySelector(".dlg-si").focus();
+  });
+}
+const confirmarApp = (mensaje, op) => dialogoApp(mensaje, op);
+// Los avisos importantes (ej. "este parte NO quedó guardado") tampoco
+// dependen del alert() del navegador, que se puede bloquear.
+window.alert = (mensaje) => { dialogoApp(mensaje, { soloAceptar: true, aceptar: "Entendido", fijo: true }); };
+const pedirTextoApp = (mensaje, valor) => dialogoApp(mensaje, { conTexto: true, valor });
+window.confirmarApp = confirmarApp;
+window.pedirTextoApp = pedirTextoApp;
+// sims-utils.js pregunta con esto al reemplazar la línea de un cliente.
+window.preguntarSimAsync = (m) => dialogoApp(String(m).replace(/\n\nAceptar = [^\n]*\nCancelar = [^\n]*$/, ""), { aceptar: "Reemplazarla (vuelve al stock)", cancelar: "Dejar las dos instaladas", fijo: true });
 
 function showToast(message) {
   toastEl.textContent = message;
@@ -3784,10 +3829,10 @@ async function validarSimAInstalar() {
   await cargarClientesGeneral();
   const clienteReal = buscarClientePorNombre(clienteEscrito);
   if (!clienteReal) {
-    const seguir = confirm(
+    const seguir = await confirmarApp(
       `No encontramos "${clienteEscrito}" en la base de clientes.\n\n` +
-      `Revisá que el nombre esté bien escrito — si seguís igual, la SIM va a quedar instalada bajo este nombre tal cual.\n\n` +
-      `Aceptar = seguir igual.\nCancelar = volver a elegir.`
+      `Revisá que el nombre esté bien escrito — si seguís igual, la SIM va a quedar instalada bajo este nombre tal cual.`,
+      { aceptar: "Seguir igual", cancelar: "Volver a elegir" }
     );
     if (!seguir) {
       simInstalarSelect.value = "";
@@ -3802,10 +3847,10 @@ async function validarSimAInstalar() {
     console.log("[validarSimAInstalar]", { clienteEscrito, numeroClienteParaBuscar, resultado, candidatasEnUso: sims.filter((s) => s.estado === "uso").length });
     if (resultado.tipo === "confirmada") {
       const existente = resultado.sim;
-      const reemplazar = confirm(
+      const reemplazar = await confirmarApp(
         `Este cliente ya tiene la línea N° ${existente.numero} de ${existente.empresa}` +
-        `${existente.tipo ? " " + existente.tipo : ""}, a nombre de "${existente.cliente}".\n\n` +
-        `Aceptar = reemplazarla (vuelve a tu stock).\nCancelar = dejar las dos líneas instaladas.`
+        `${existente.tipo ? " " + existente.tipo : ""}, a nombre de "${existente.cliente}".`,
+        { aceptar: "Reemplazarla (vuelve a mi stock)", cancelar: "Dejar las dos instaladas", fijo: true }
       );
       decisionSimInstalar = { numeroSimARetirar: reemplazar ? existente.numero : null };
       simInstalarEstadoInfo.textContent = reemplazar
@@ -6227,17 +6272,17 @@ function renderDatosEquipo() {
     card.querySelector(".equipo-fav").addEventListener("click", () => { showToast(alternarFavoritoEquipo(d) ? "Agregado a tus favoritos: queda guardado para verlo sin señal." : "Sacado de favoritos."); renderDatosEquipo(); });
     card.querySelector(".eq-util").addEventListener("click", () => guardarDatoEquipo({ accion: "util", id: d.id }, meSirvio ? "Listo." : "¡Gracias! Así los más útiles quedan arriba."));
     card.querySelector(".eq-desact").addEventListener("click", async () => {
-      const nota = prompt("¿Qué está desactualizado o no anda? (le llega un aviso a quien lo cargó)", "");
+      const nota = await pedirTextoApp("¿Qué está desactualizado o no anda? (le llega un aviso a quien lo cargó)", "");
       if (nota === null) return;
       await guardarDatoEquipo({ accion: "desactualizado", id: d.id, nota: nota.trim() }, "Avisado. Cuando alguien lo corrija, se saca el aviso.");
     });
     const resolver = card.querySelector(".eq-resolver");
-    if (resolver) resolver.addEventListener("click", async () => { if (confirm("¿Lo revisaste y está bien? Se saca el aviso de desactualizado.")) await guardarDatoEquipo({ accion: "resolver_reporte", id: d.id }, "Aviso sacado."); });
+    if (resolver) resolver.addEventListener("click", async () => { if (await confirmarApp("¿Lo revisaste y está bien? Se saca el aviso de desactualizado.")) await guardarDatoEquipo({ accion: "resolver_reporte", id: d.id }, "Aviso sacado."); });
     const hist = card.querySelector(".eq-historial");
     if (hist) hist.addEventListener("click", () => verCambiosEquipo(d));
     const borrar = card.querySelector(".eq-borrar");
     if (borrar) borrar.addEventListener("click", async () => {
-      if (!confirm(`¿Borrar "${d.titulo}" para todo el equipo?`)) return;
+      if (!await confirmarApp(`¿Borrar "${d.titulo}" para todo el equipo?`)) return;
       await guardarDatoEquipo({ accion: "borrar", id: d.id }, "Borrado.");
     });
     equipoLista.appendChild(card);
@@ -6304,7 +6349,7 @@ function verCambiosEquipo(d) {
     const b = ev.target.closest("button");
     if (ev.target === capa || (b && b.dataset.cerrar)) { capa.remove(); return; }
     if (b && b.dataset.restaurar !== undefined) {
-      if (!confirm("¿Volver a como estaba? (lo de ahora también queda guardado en los cambios)")) return;
+      if (!await confirmarApp("¿Volver a como estaba? (lo de ahora también queda guardado en los cambios)")) return;
       capa.remove();
       await guardarDatoEquipo({ accion: "restaurar", id: d.id, edicion: Number(b.dataset.restaurar) }, "Listo: volvió a la versión anterior.");
     }
@@ -6597,7 +6642,7 @@ async function enviarMarcarPasadoSistema(h, marcarComo) {
 
 async function marcarPartePasadoSistema(h, marcarComo) {
   const verbo = marcarComo ? "marcar" : "desmarcar";
-  const ok = confirm(
+  const ok = await confirmarApp(
     marcarComo
       ? `¿Confirmás que el parte N° ${h.numero_servicio || h.id_parte} (${h.cliente}) ya está pasado a tu sistema?`
       : `¿Desmarcar el parte N° ${h.numero_servicio || h.id_parte} (${h.cliente})?`
@@ -6616,7 +6661,7 @@ async function marcarPartePasadoSistema(h, marcarComo) {
 async function marcarSeleccionadosComoPasados() {
   const ids = Array.from(historialSeleccionados);
   if (ids.length === 0) return;
-  const ok = confirm(`¿Confirmás que marcás ${ids.length} parte(s) como pasados a tu sistema?`);
+  const ok = await confirmarApp(`¿Confirmás que marcás ${ids.length} parte(s) como pasados a tu sistema?`);
   if (!ok) return;
   historialMarcarSeleccionadosBtn.disabled = true;
   const objetivos = ids.map((id) => historialCache.find((h) => h.id_parte === id)).filter(Boolean);
@@ -7432,7 +7477,7 @@ async function enviarMarcarStockPasadoSistema(m, marcarComo) {
 }
 
 async function marcarStockPasadoSistema(m, marcarComo) {
-  const ok = confirm(
+  const ok = await confirmarApp(
     marcarComo
       ? `¿Confirmás que este movimiento (${m.modelo}, ${m.cliente}) ya está pasado a tu sistema?`
       : `¿Desmarcar este movimiento (${m.modelo}, ${m.cliente})?`
@@ -7450,7 +7495,7 @@ async function marcarStockPasadoSistema(m, marcarComo) {
 async function marcarStockSeleccionadosComoPasados() {
   const ids = Array.from(stockSeleccionados);
   if (ids.length === 0) return;
-  const ok = confirm(`¿Confirmás que marcás ${ids.length} movimiento(s) como pasados a tu sistema?`);
+  const ok = await confirmarApp(`¿Confirmás que marcás ${ids.length} movimiento(s) como pasados a tu sistema?`);
   if (!ok) return;
   stockMarcarSeleccionadosBtn.disabled = true;
   const objetivos = ids.map((id) => stockCache.find((m) => m.id === id)).filter(Boolean);
@@ -8549,8 +8594,8 @@ function aplicarEstiloInicio() {
 }
 
 // Restablecer todo
-document.getElementById("restablecerAjustesBtn").addEventListener("click", () => {
-  if (!confirm("¿Restablecer todos los ajustes (apariencia, tamaño, sonidos, avisos, mosaicos del inicio) a los valores de fábrica?")) return;
+document.getElementById("restablecerAjustesBtn").addEventListener("click", async () => {
+  if (!await confirmarApp("¿Restablecer todos los ajustes (apariencia, tamaño, sonidos, avisos, mosaicos del inicio) a los valores de fábrica?")) return;
   try { localStorage.removeItem("ajustes_app"); } catch (e) {}
   aplicarTema(); aplicarTamano(); aplicarBotonesGrandes(); aplicarEstiloInicio(); aplicarMosaicos();
   actualizarWakeLockPantalla();
@@ -9174,7 +9219,7 @@ rendEnviarBtn.addEventListener("click", async () => {
   }
   const fecha = rendFecha.value || fechaLocalISO();
   const parecida = rendicionesCache.find((r) => r.estado !== "rechazado" && r.fecha === fecha && Math.abs(Number(r.monto) - monto) < 0.01);
-  if (parecida && !confirm(`Ya mandaste una rendición de ${formatoPesos(monto)} con fecha ${fecha.split("-").reverse().join("/")} (${parecida.categoria || ""}). ¿Es otra distinta y querés mandarla igual?`)) {
+  if (parecida && !await confirmarApp(`Ya mandaste una rendición de ${formatoPesos(monto)} con fecha ${fecha.split("-").reverse().join("/")} (${parecida.categoria || ""}). ¿Es otra distinta y querés mandarla igual?`)) {
     return;
   }
   const cuerpo = {
@@ -9632,7 +9677,7 @@ seguimientoLlegueBtn.addEventListener("click", async () => {
 
 seguimientoCancelarBtn.addEventListener("click", async () => {
   if (!seguimientoActivoId) { detenerSeguimientoActivo(); return; }
-  const confirmar = confirm("¿Cancelar el seguimiento? El cliente va a dejar de ver tu ubicación.");
+  const confirmar = await confirmarApp("¿Cancelar el seguimiento? El cliente va a dejar de ver tu ubicación.", { aceptar: "Sí, cancelarlo", cancelar: "No" });
   if (!confirmar) return;
   seguimientoCancelarBtn.disabled = true;
   try {
@@ -10420,7 +10465,7 @@ function pintarFotosInstalacion(fotos) {
     img.addEventListener("click", () => { if (img.dataset.lista) ampliarImagenParte(img.src); });
     item.querySelector("button").addEventListener("click", async (e) => {
       e.stopPropagation();
-      if (!confirm("¿Borrar esta foto de la instalación?")) return;
+      if (!await confirmarApp("¿Borrar esta foto de la instalación?")) return;
       try {
         const res = await fetch("/api/historial", {
           method: "POST",
@@ -10495,13 +10540,13 @@ instalacionGuardarYCerrarBtn.addEventListener("click", async () => {
     if (planosPendientesDe(idInst).length) await planosPendientesSubir();
     await instPlanoCargar();
     if (planosPendientesDe(idInst).length) {
-      if (!confirm("Hay un plano de esta instalación que todavía no se subió (sin señal). Si cerrás ahora, ese plano se pierde.\n\n¿Cerrar igual?")) { irAlPlano(); return; }
+      if (!await confirmarApp("Hay un plano de esta instalación que todavía no se subió (sin señal). Si cerrás ahora, ese plano se pierde.\n\n¿Cerrar igual?")) { irAlPlano(); return; }
       planosPendientesDe(idInst).forEach((p) => planosPendientesQuitar(p.uid));
     }
     let borradorInst = null;
     try { borradorInst = JSON.parse(localStorage.getItem(CQ_BORRADOR) || "null"); } catch (e) { borradorInst = null; }
     if (borradorInst && borradorInst.cambios && String(borradorInst.instalacion || "") === idInst) {
-      if (!confirm("El croquis de esta instalación tiene cambios sin guardar en el servidor. Si cerrás ahora, esos cambios se pierden.\n\n¿Cerrar igual? (Cancelar para abrirlo y guardarlo)")) {
+      if (!await confirmarApp("El croquis de esta instalación tiene cambios sin guardar en el servidor. Si cerrás ahora, esos cambios se pierden.\n\n¿Cerrar igual?", { aceptar: "Cerrar igual", cancelar: "Abrir el croquis para guardarlo" })) {
         cqAbrirEditor({ ...borradorInst, volverA: "instalacion" });
         return;
       }
@@ -10509,7 +10554,7 @@ instalacionGuardarYCerrarBtn.addEventListener("click", async () => {
     const planos = instPlanoDeEsta();
     if (!planos.length) {
       if (PLANO_INSTALACION_OBLIGATORIO) { showToast("Para cerrar la instalación falta el plano: hacé el croquis o subí una foto del plano."); irAlPlano(); return; }
-      if (!confirm("No cargaste el plano de la instalación (croquis o foto).\n\n¿Cerrar igual sin plano?")) { irAlPlano(); return; }
+      if (!await confirmarApp("No cargaste el plano de la instalación (croquis o foto).\n\n¿Cerrar igual sin plano?")) { irAlPlano(); return; }
     }
     let planosPdf = [];
     if (planos.length) {
@@ -10595,14 +10640,14 @@ function instPlanoRender() {
     if (!n) showToast("Todavía no se pudo subir: revisá la señal.");
     instPlanoRender();
   }));
-  instPlanoLista.querySelectorAll("[data-descartar]").forEach((b) => b.addEventListener("click", () => {
-    if (!confirm("¿Descartar este plano? No se sube y se borra del celular.")) return;
+  instPlanoLista.querySelectorAll("[data-descartar]").forEach((b) => b.addEventListener("click", async () => {
+    if (!await confirmarApp("¿Descartar este plano? No se sube y se borra del celular.")) return;
     planosPendientesQuitar(b.dataset.descartar);
     instPlanoRender();
   }));
   instPlanoLista.querySelectorAll("[data-borrar]").forEach((b) => b.addEventListener("click", async () => {
     const c = mios[Number(b.dataset.borrar)];
-    if (!confirm(`¿Borrar "${c.titulo || "el plano"}" de esta instalación?`)) return;
+    if (!await confirmarApp(`¿Borrar "${c.titulo || "el plano"}" de esta instalación?`)) return;
     try {
       const r = await fetch("/api/datos?coleccion=croquis", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ accion: "borrar", id: c.id }) });
       const d = await r.json().catch(() => ({}));
@@ -11392,14 +11437,14 @@ vehiculoKmDevolucion.addEventListener("input", () => ayudaKm(vehiculoKmDevolucio
 vehiculoEventoKm.addEventListener("input", () => ayudaKm(vehiculoEventoKm, document.getElementById("vehiculoEventoKmAyuda"), "Son"));
 // Devuelve null si el técnico cancela, o una nota para dejar registrada
 // cuando confirma un número raro (vacía si estaba todo bien).
-function confirmarKm(n) {
+async function confirmarKm(n) {
   if (!vehKmUltimo) return "";
   if (n < vehKmUltimo) {
-    const ok = confirm(`El kilometraje que pusiste (${formatoKm(n)} km) es MENOR que el último registrado (${formatoKm(vehKmUltimo)} km).\n\nSeguí solo si el tablero marca eso: queda anotado para que la oficina lo revise.`);
+    const ok = await confirmarApp(`El kilometraje que pusiste (${formatoKm(n)} km) es MENOR que el último registrado (${formatoKm(vehKmUltimo)} km).\n\nSeguí solo si el tablero marca eso: queda anotado para que la oficina lo revise.`);
     return ok ? `⚠ Km menor al último registrado (${formatoKm(vehKmUltimo)})` : null;
   }
   if (n - vehKmUltimo > SALTO_KM_SOSPECHOSO) {
-    const ok = confirm(`Serían ${formatoKm(n - vehKmUltimo)} km desde el último registro (${formatoKm(vehKmUltimo)} km).\n\n¿Está bien el número (${formatoKm(n)} km)?`);
+    const ok = await confirmarApp(`Serían ${formatoKm(n - vehKmUltimo)} km desde el último registro (${formatoKm(vehKmUltimo)} km).\n\n¿Está bien el número (${formatoKm(n)} km)?`);
     return ok ? `⚠ Salto de ${formatoKm(n - vehKmUltimo)} km confirmado por el técnico` : null;
   }
   return "";
@@ -11716,7 +11761,7 @@ vehiculoRegistrarEventoBtn.addEventListener("click", async () => {
     showToast("Falta la foto del ticket. Si no te dieron, tildá \"No me dieron ticket\".");
     return;
   }
-  const notaKm = confirmarKm(km);
+  const notaKm = await confirmarKm(km);
   if (notaKm === null) { vehiculoEventoKm.focus(); return; }
   const detalleTexto = vehiculoEventoDetalleTexto.value.trim();
   const detalle = [detalleTexto, rendir ? "Rendido por el técnico" : "", notaKm].filter(Boolean).join(" · ");
@@ -11781,7 +11826,7 @@ vehiculoTomarBtn.addEventListener("click", async () => {
   const hayRevision = !!(kmToma || revision || vehDanoFotos.length);
   let notaKm = "";
   if (kmToma) {
-    notaKm = confirmarKm(kmToma);
+    notaKm = await confirmarKm(kmToma);
     if (notaKm === null) { vehiculoKmToma.focus(); return; }
     // Al tomarlo, cualquier diferencia con la última devolución son km que nadie registró.
     if (!notaKm && vehKmUltimo && kmToma - vehKmUltimo > 5) notaKm = `⚠ ${formatoKm(kmToma - vehKmUltimo)} km más que el último registro`;
@@ -11834,7 +11879,7 @@ vehiculoDevolverBtn.addEventListener("click", async () => {
     vehiculoKmDevolucion.focus();
     return;
   }
-  const notaKm = confirmarKm(km);
+  const notaKm = await confirmarKm(km);
   if (notaKm === null) { vehiculoKmDevolucion.focus(); return; }
   const eventoCompleto = [
     vehiculoEvento.value ? `${vehiculoEvento.value}${vehiculoEventoDetalle.value ? ": " + vehiculoEventoDetalle.value : ""}` : "",
@@ -11870,7 +11915,7 @@ vehiculoDevolverBtn.addEventListener("click", async () => {
 // km_actual con un número inventado.
 vehiculoForzarLiberarBtn.addEventListener("click", async () => {
   const tecnicoQueLoTenia = vehiculoForzarLiberarBtn.dataset.tecnicoActual || "otro técnico";
-  const confirmar = confirm(
+  const confirmar = await confirmarApp(
     `¿Forzar la liberación de "${vehiculoSeleccionado}"?\n\n` +
     `Lo tenía tomado ${tecnicoQueLoTenia}. Esta acción queda registrada en el historial, con tu nombre y el de quién lo tenía antes.\n\n` +
     `Usalo solo si estás seguro de que en verdad está libre (por ejemplo, si ${tecnicoQueLoTenia} se olvidó de devolverlo).`
@@ -13725,7 +13770,7 @@ async function cargarTransferenciasMandadas() {
       <button type="button" class="btn btn-ghost btn-small sim-cancelar-transf" data-id="${escapeHtml(String(t.id))}" data-destino="${escapeHtml(t.tecnico_destino || "")}">Cancelar</button>
     </div>`).join("");
   lista.querySelectorAll(".sim-cancelar-transf").forEach((b) => b.addEventListener("click", async () => {
-    if (!confirm("¿Cancelar esta transferencia? La SIM sigue en tu stock.")) return;
+    if (!await confirmarApp("¿Cancelar esta transferencia? La SIM sigue en tu stock.", { aceptar: "Sí, cancelarla", cancelar: "No" })) return;
     b.disabled = true;
     try {
       const res = await fetch("/api/recurso-uso", {
@@ -14357,7 +14402,7 @@ function renderResultadosSimRegistro() {
 simRegistroBuscarInput.addEventListener("input", renderResultadosSimRegistro);
 
 async function confirmarRetirarSim(sim) {
-  const ok = confirm(`¿Retirar la línea ${sim.numero} (${sim.cliente || "sin nombre"})? Vuelve a tu stock personal.`);
+  const ok = await confirmarApp(`¿Retirar la línea ${sim.numero} (${sim.cliente || "sin nombre"})? Vuelve a tu stock personal.`);
   if (!ok) return;
   try {
     const res = await fetch("/api/recurso-uso", {
@@ -14979,9 +15024,9 @@ function peRenderHechos() {
   const l = peLeerHechos();
   pe("peHechosWrap").classList.toggle("hidden", !l.length);
   pe("peHechos").innerHTML = l.slice(0, 10).map((x, i) => `<div class="pe-hecho"><div><b>${escapeHtml(x.numero)}</b> · ${escapeHtml(x.cliente || "")}<small>${new Date(x.fecha).toLocaleDateString("es-AR")}${x.titulo ? " · " + escapeHtml(x.titulo) : ""} · ${pePesos(x.total)}</small></div><button type="button" class="btn btn-secondary btn-small" data-corregir="${i}">Corregir</button></div>`).join("");
-  pe("peHechos").querySelectorAll("[data-corregir]").forEach((b) => b.addEventListener("click", () => {
+  pe("peHechos").querySelectorAll("[data-corregir]").forEach((b) => b.addEventListener("click", async () => {
     const x = l[Number(b.dataset.corregir)];
-    if ((peEstado.items.length || peEstado.cliente.nombre) && !peEstado.revisionDe && !confirm(`Se va a reemplazar lo que tenés cargado por el presupuesto ${x.numero} para corregirlo. ¿Seguimos?`)) return;
+    if ((peEstado.items.length || peEstado.cliente.nombre) && !peEstado.revisionDe && !await confirmarApp(`Se va a reemplazar lo que tenés cargado por el presupuesto ${x.numero} para corregirlo. ¿Seguimos?`)) return;
     peEstado = { ...peNuevoEstado(), ...JSON.parse(JSON.stringify(x.estado)), revisionDe: x.numero.replace(/-R\d+$/, "") };
     peUltimoPdf = null;
     pe("peResultado") && pe("peResultado").remove();
@@ -15246,7 +15291,7 @@ function peRenderTotales() {
 pe("tilePresupuestoBtn").addEventListener("click", peAbrir);
 pe("volverDePresupuestoBtn").addEventListener("click", () => showScreen("home"));
 pe("peLimpiarBtn").addEventListener("click", async () => {
-  if ((peEstado.items.length || peEstado.cliente.nombre) && !confirm("¿Borrar lo cargado y empezar un presupuesto nuevo?")) return;
+  if ((peEstado.items.length || peEstado.cliente.nombre) && !await confirmarApp("¿Borrar lo cargado y empezar un presupuesto nuevo?")) return;
   peEstado = peNuevoEstado();
   peUltimoPdf = null;
   peGuardarBorrador();
@@ -15572,7 +15617,7 @@ function peCelularWhatsapp(tel) {
 async function peEnviarWhatsappCliente() {
   if (!peUltimoPdf) return;
   const sugerido = peCelularWhatsapp(peUltimoPdf.telefono);
-  const escrito = prompt("Celular de WhatsApp del cliente (con código de área, ej. 341 555 1234):", sugerido ? sugerido.replace(/^549/, "") : "");
+  const escrito = await pedirTextoApp("Celular de WhatsApp del cliente (con código de área, ej. 341 555 1234):", sugerido ? sugerido.replace(/^549/, "") : "");
   if (escrito === null) return;
   const numero = peCelularWhatsapp(escrito);
   if (!numero) { showToast("Ese número no parece un celular con código de área (ej. 341 555 1234)."); return; }
@@ -16022,10 +16067,10 @@ function cqRenderPropsMulti(box) {
     b("ninguno", cqIc("check") + "Listo", "Dejar de elegir") + `</div>`;
   box.querySelectorAll("[data-macc]").forEach((x) => x.addEventListener("click", () => cqAccionMulti(x.dataset.macc)));
 }
-function cqAccionMulti(acc) {
+async function cqAccionMulti(acc) {
   const els = cq.multi.map((id) => cq.elementos.find((e) => e.id === id)).filter(Boolean);
   if (acc === "ninguno") { cq.multi = []; cqRender(); return; }
-  if (acc === "borrar" && !confirm(`¿Borrar los ${els.length} elementos elegidos?`)) return;
+  if (acc === "borrar" && !await confirmarApp(`¿Borrar los ${els.length} elementos elegidos?`)) return;
   cqMemoria();
   if (acc === "agrupar") { const g = "g" + cqId(); els.forEach((e) => { e.grupo = g; }); showToast("Soldados: se mueven juntos."); }
   if (/^z/.test(acc)) cqCambiarOrden(els, acc);
@@ -16235,13 +16280,13 @@ function cqNombreElemento(el) {
   if (croquisEsCerco(el)) return CROQUIS_CERCOS[el.cerco].nombre;
   return { linea: "Pared", cable: "Cableado", texto: "Texto", cota: "Medida" }[el.t] || "";
 }
-function cqAccion(acc) {
+async function cqAccion(acc) {
   const el = cq.elementos.find((e) => e.id === cq.sel);
   if (!el) return;
   if (acc === "texto") { cqEditorTexto(el); return; }
   if (acc === "medidas") {
     const m = (v) => (Math.abs(v) / CROQUIS_POR_METRO).toLocaleString("es-AR", { maximumFractionDigits: 2 });
-    const r = prompt("Medidas en metros: ancho x largo (ej. 4,5 x 3)", `${m(el.w)} x ${m(el.h)}`);
+    const r = await pedirTextoApp("Medidas en metros: ancho x largo (ej. 4,5 x 3)", `${m(el.w)} x ${m(el.h)}`);
     if (r === null) return;
     const nums = (r.replace(/,/g, ".").match(/\d+(\.\d+)?/g) || []).map(Number);
     if (nums.length < 2 || !(nums[0] > 0) || !(nums[1] > 0)) { showToast("Escribí dos medidas, ej. 4,5 x 3"); return; }
@@ -16251,7 +16296,7 @@ function cqAccion(acc) {
     return;
   }
   if (acc === "etq") {
-    const nuevo = prompt("Número de zona o de dispositivo (ej. 5, Z12, D23). Dejalo vacío para que no se muestre:", el.etq || "");
+    const nuevo = await pedirTextoApp("Número de zona o de dispositivo (ej. 5, Z12, D23). Dejalo vacío para que no se muestre:", el.etq || "");
     if (nuevo === null) return;
     cqMemoria();
     if (nuevo.trim()) el.etq = nuevo.trim().slice(0, 12); else delete el.etq;
@@ -16260,7 +16305,7 @@ function cqAccion(acc) {
   }
   if (acc === "nombre" || acc === "cnombre") {
     const actual = acc === "texto" ? el.texto : el.nombre || "";
-    const nuevo = prompt(acc === "nombre" ? "Nombre del ambiente (ej. Cocina, Dormitorio 1):" : acc === "cnombre" ? "Nombre de este cableado para la leyenda (ej. Sirena, Sensores, Cámaras):" : "Texto:", actual);
+    const nuevo = await pedirTextoApp(acc === "nombre" ? "Nombre del ambiente (ej. Cocina, Dormitorio 1):" : acc === "cnombre" ? "Nombre de este cableado para la leyenda (ej. Sirena, Sensores, Cámaras):" : "Texto:", actual);
     if (nuevo === null) return;
     cqMemoria();
     if (acc === "nombre" || acc === "cnombre") el.nombre = nuevo.trim().slice(0, 40);
@@ -16980,14 +17025,14 @@ function cqOpcionesPagina() {
     p.nivel = v === "" ? null : Number(v);
     cq.cambios = true; cqGuardarBorrador(); cqRender();
   });
-  capa.addEventListener("click", (e) => {
+  capa.addEventListener("click", async (e) => {
     const b = e.target.closest("[data-p]");
     if (!b && e.target !== capa) return;
     const acc = b ? b.dataset.p : "cerrar";
     capa.remove();
-    if (acc === "nombre") { const nuevo = prompt("Nombre de la página:", p.nombre || ""); if (nuevo !== null && nuevo.trim()) { p.nombre = nuevo.trim().slice(0, 40); cq.cambios = true; cqGuardarBorrador(); cqRender(); } }
+    if (acc === "nombre") { const nuevo = await pedirTextoApp("Nombre de la página:", p.nombre || ""); if (nuevo !== null && nuevo.trim()) { p.nombre = nuevo.trim().slice(0, 40); cq.cambios = true; cqGuardarBorrador(); cqRender(); } }
     if (acc === "nueva") cqPreguntarNuevaPagina();
-    if (acc === "borrar" && confirm(`¿Borrar la página "${p.nombre}" con todo lo que tiene?`)) {
+    if (acc === "borrar" && await confirmarApp(`¿Borrar la página "${p.nombre}" con todo lo que tiene?`)) {
       cq.paginas.splice(cq.pagina, 1);
       cq.pagina = Math.max(0, cq.pagina - 1);
       cq.elementos = cq.paginas[cq.pagina].elementos; cq.fondo = cq.paginas[cq.pagina].fondo || null;
@@ -17161,8 +17206,8 @@ async function cqGuardar() {
 // servicio técnico (los técnicos ven solo el PDF del cliente y lo aprobado).
 async function cqPublicar(on) {
   if (on) {
-    if (!cq.numero_cliente && !confirm("Este croquis no tiene número de cliente: los técnicos lo van a encontrar solo por el nombre. ¿Subirlo igual?")) return;
-    if (!confirm(`¿Subir este croquis al cliente ${cq.cliente || cq.numero_cliente}? Desde ahí lo ven los técnicos cuando abren sus planos en el servicio técnico.`)) return;
+    if (!cq.numero_cliente && !await confirmarApp("Este croquis no tiene número de cliente: los técnicos lo van a encontrar solo por el nombre. ¿Subirlo igual?")) return;
+    if (!await confirmarApp(`¿Subir este croquis al cliente ${cq.cliente || cq.numero_cliente}? Desde ahí lo ven los técnicos cuando abren sus planos en el servicio técnico.`)) return;
   }
   if (!cq.id || cq.cambios) { if (!(await cqGuardar())) return; }
   try {
@@ -17231,7 +17276,7 @@ cqEl("cqMenuBtn").addEventListener("click", () => {
       if (!r.escaleras) { showToast("No encontré escaleras dibujadas con líneas en esta página."); }
       else { cqMemoria(); cq.elementos = r.elementos; cq.sel = null; cq.multi = []; cqSyncPagina(); cqGuardarBorrador(); cqRender(); showToast(r.escaleras === 1 ? "Encontré 1 escalera y la pasé a escalera de verdad (con Deshacer volvés atrás)." : `Encontré ${r.escaleras} escaleras y las pasé a escaleras de verdad (con Deshacer volvés atrás).`); }
     }
-    if (m === "propuesta") { if (cq.cambios && confirm("¿Guardar este plano antes de hacer la copia?")) await cqGuardar(); cqOtraPropuesta(); }
+    if (m === "propuesta") { if (cq.cambios && await confirmarApp("¿Guardar este plano antes de hacer la copia?")) await cqGuardar(); cqOtraPropuesta(); }
     if (m === "pdf" || m === "png" || m === "svg") cqExportar(m);
     if (m === "datos") cqPedirDatos();
     if (m === "foto") { cqFotoDestino = "editor"; cqEl("cqFotoInput").click(); }
@@ -17240,7 +17285,7 @@ cqEl("cqMenuBtn").addEventListener("click", () => {
     if (m === "presu") cqPasarAPresupuesto();
     if (m === "base") cqElegirArchivo("image/*,application/pdf,.pdf,.svg").then((f) => f && cqPonerPlanoBase(f));
     if (m === "escala") cqEscalaPlano();
-    if (m === "sinfondo" && confirm(cq.fondo && cq.fondo.base ? "¿Quitar el plano de la casa? (lo dibujado encima no se toca)" : "¿Quitar la foto del boceto de fondo? (el dibujo no se toca)")) { cq.fondo = null; cq.cambios = true; cqGuardarBorrador(); cqRender(); }
+    if (m === "sinfondo" && await confirmarApp(cq.fondo && cq.fondo.base ? "¿Quitar el plano de la casa? (lo dibujado encima no se toca)" : "¿Quitar la foto del boceto de fondo? (el dibujo no se toca)")) { cq.fondo = null; cq.cambios = true; cqGuardarBorrador(); cqRender(); }
     if (m === "bloq" && cq.elementos.length) {
       cqMemoria();
       const todos = cq.elementos.every((x) => x.bloq);
@@ -17252,7 +17297,7 @@ cqEl("cqMenuBtn").addEventListener("click", () => {
 });
 cqEl("volverDeCroquisBtn").addEventListener("click", async () => {
   if (!cq.soloLectura && cq.cambios && (cqTodosLosElementos().length || cqHayBase())) {
-    if (confirm("Tenés cambios sin guardar en el servidor. ¿Guardarlos antes de salir?")) { const ok = await cqGuardar(); if (!ok) return; }
+    if (await confirmarApp("Tenés cambios sin guardar en el servidor. ¿Guardarlos antes de salir?")) { const ok = await cqGuardar(); if (!ok) return; }
   }
   if (cq.volverA === "oficina") {
     // Vuelve al admin: avisa a la pestaña que lo abrió para que refresque la lista.
@@ -17516,9 +17561,9 @@ function cqEditarTarjetas(info, quien) {
         <div class="cq-datos-btns"><button type="button" class="btn btn-secondary" data-r="no">Cancelar</button><button type="button" class="btn btn-primary" data-r="si">Guardar</button></div>
       </div>`;
       const q = capa.querySelector("#tjQuien");
-      if (q) q.addEventListener("change", () => {
+      if (q) q.addEventListener("change", async () => {
         if (q.value !== "__otra") { persona = q.value; pintar(); return; }
-        const n = (prompt("Nombre de la persona (por ejemplo, el vendedor):") || "").trim().slice(0, 60);
+        const n = (await pedirTextoApp("Nombre de la persona (por ejemplo, el vendedor):") || "").trim().slice(0, 60);
         if (!n) { q.value = persona; return; }
         persona = n; if (!claves.includes(n)) claves.push(n); t.personas[n] = t.personas[n] || { nombre: n }; pintar();
       });
@@ -17715,11 +17760,11 @@ async function cqPonerPlanoBase(archivo) {
     showToast("No se pudo usar ese archivo: " + err.message);
   }
 }
-function cqEscalaPlano() {
+async function cqEscalaPlano() {
   const f = cq.fondo;
   if (!f || !f.base) return;
   const actual = (f.w / CROQUIS_POR_METRO).toLocaleString("es-AR", { maximumFractionDigits: 2 });
-  const r = prompt(`¿Cuántos metros mide de ancho todo el plano (de borde a borde de la hoja)? Ahora: ${actual} m.\nAsí las medidas y los ambientes quedan en escala. Conviene hacerlo antes de dibujar encima.`, actual);
+  const r = await pedirTextoApp(`¿Cuántos metros mide de ancho todo el plano (de borde a borde de la hoja)? Ahora: ${actual} m.\nAsí las medidas y los ambientes quedan en escala. Conviene hacerlo antes de dibujar encima.`, actual);
   if (r == null) return;
   const m = Number(String(r).replace(",", "."));
   if (!(m > 0.5 && m < 1000)) { showToast("Poné un número de metros válido."); return; }
@@ -17797,7 +17842,7 @@ function cqRenderLista() {
   }));
   cqEl("cqLista").querySelectorAll("[data-borrar]").forEach((b) => b.addEventListener("click", async () => {
     const c = lista[Number(b.dataset.borrar)];
-    if (!confirm(`¿Borrar el croquis "${c.titulo || c.cliente}"? No se puede deshacer.`)) return;
+    if (!await confirmarApp(`¿Borrar el croquis "${c.titulo || c.cliente}"? No se puede deshacer.`)) return;
     try {
       const r = await fetch("/api/datos?coleccion=croquis", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ accion: "borrar", id: c.id }) });
       const d = await r.json();
@@ -17884,10 +17929,10 @@ async function cqAbrirPropuestas() {
   try { lista = await cqTraerPropuestas(); pintar(); } catch (err) { capa.querySelector(".pe-nota").textContent = err.message; }
 }
 cqEl("cqListaBuscar").addEventListener("input", cqRenderLista);
-cqEl("cqNuevoBtn").addEventListener("click", () => {
+cqEl("cqNuevoBtn").addEventListener("click", async () => {
   let borrador = null;
   try { borrador = JSON.parse(localStorage.getItem(CQ_BORRADOR) || "null"); } catch (e) { borrador = null; }
-  if (borrador && borrador.cambios && borrador.elementos && borrador.elementos.length && !confirm("Hay un croquis sin guardar en este celular. ¿Empezar uno nuevo igual? (el anterior se pierde)")) return;
+  if (borrador && borrador.cambios && borrador.elementos && borrador.elementos.length && !await confirmarApp("Hay un croquis sin guardar en este celular. ¿Empezar uno nuevo igual? (el anterior se pierde)")) return;
   try { localStorage.removeItem(CQ_BORRADOR); } catch (e) { /* nada */ }
   cqAbrirEditor({});
 });
@@ -17897,7 +17942,7 @@ cqEl("cqDesdePlanoBtn").addEventListener("click", async () => {
   if (!archivo) return;
   let borrador = null;
   try { borrador = JSON.parse(localStorage.getItem(CQ_BORRADOR) || "null"); } catch (e) { borrador = null; }
-  if (borrador && borrador.cambios && borrador.elementos && borrador.elementos.length && !confirm("Hay un croquis sin guardar en este celular. ¿Empezar uno nuevo igual? (el anterior se pierde)")) return;
+  if (borrador && borrador.cambios && borrador.elementos && borrador.elementos.length && !await confirmarApp("Hay un croquis sin guardar en este celular. ¿Empezar uno nuevo igual? (el anterior se pierde)")) return;
   const capa = cqCapaCargando("Preparando el plano…", "Se convierte en imagen y se sube. Tarda unos segundos.");
   try {
     const r = await cqPrepararPlano(archivo);
@@ -17921,13 +17966,13 @@ const CQ_BUSQUEDA_PRESU = {
   fuente_ups: "fuente", sismico: "sismico", inundacion: "inundacion", monoxido: "monoxido", control_remoto: "control remoto",
   modulo_rele: "rele", camara_solar: "camara 4g solar", reflector: "reflector",
 };
-function cqPasarAPresupuesto() {
+async function cqPasarAPresupuesto() {
   const cuenta = {};
   cqTodosLosElementos().filter((e) => e.t === "simbolo" && e.inst).forEach((e) => { cuenta[e.tipo] = (cuenta[e.tipo] || 0) + 1; });
   const lineas = Object.entries(cuenta).map(([tipo, cant]) => ({ tipo, cant, nombre: (CROQUIS_SIMBOLOS[tipo] || {}).nombre || tipo, busca: CQ_BUSQUEDA_PRESU[tipo] || "", hecho: false }));
   if (!lineas.length) { showToast("No hay equipos marcados como «a instalar»."); return; }
   const previo = peLeerBorrador();
-  if ((previo.items.length || previo.cliente.nombre) && !confirm("Ya tenés un presupuesto a medio armar. ¿Empezar uno nuevo con los equipos del croquis? (el otro se pierde)")) return;
+  if ((previo.items.length || previo.cliente.nombre) && !await confirmarApp("Ya tenés un presupuesto a medio armar. ¿Empezar uno nuevo con los equipos del croquis? (el otro se pierde)")) return;
   const estado = peNuevoEstado();
   const enLista = (clientesGeneralCache || []).find((c) => cq.numero_cliente && String(c.numero_cliente) === String(cq.numero_cliente));
   if (enLista) {
@@ -18041,10 +18086,10 @@ function cqGirarFoto(base64, grados) {
   e.target.value = "";
   if (f) cqDesdeFoto(f);
 }));
-function cqFotoNueva(inputId) {
+async function cqFotoNueva(inputId) {
   let borrador = null;
   try { borrador = JSON.parse(localStorage.getItem(CQ_BORRADOR) || "null"); } catch (e) { borrador = null; }
-  if (borrador && borrador.cambios && borrador.elementos && borrador.elementos.length && !confirm("Hay un croquis sin guardar en este celular. ¿Empezar uno nuevo desde la foto igual? (el anterior se pierde)")) return;
+  if (borrador && borrador.cambios && borrador.elementos && borrador.elementos.length && !await confirmarApp("Hay un croquis sin guardar en este celular. ¿Empezar uno nuevo desde la foto igual? (el anterior se pierde)")) return;
   cqFotoDestino = "nuevo";
   cqEl(inputId).click();
 }
