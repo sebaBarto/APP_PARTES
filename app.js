@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.49.0";
+const APP_VERSION = "4.50.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -18322,7 +18322,7 @@ function crearCanastaStock(op) {
       const art = a[l.c] || { d: l.c }, esU = art.tipo === "unidad", disp = disponible(l.c);
       const sinN = esU ? Math.max(0, l.cant - l.unidades.length) : 0;
       return `<div class="stk-linea${can.actual === l.c ? " stk-linea-actual" : ""}" data-i="${i}">
-        <div class="stk-linea-top"><div><b>${escapeHtml(art.d)}</b><small>${escapeHtml(l.c)}${disp !== Infinity ? ` · hay ${stkFmtN(disp)}` : ""}${art.medida === "metros" ? " · en metros" : ""}</small></div>
+        <div class="stk-linea-top"><div><b>${escapeHtml(art.d)}</b><small>${escapeHtml(l.c)}${l.prov ? ` · ${escapeHtml(nombreProveedor(op.catalogo(), l.prov) || "proveedor " + l.prov)}` : ""}${disp !== Infinity ? ` · hay ${stkFmtN(disp)}` : ""}${art.medida === "metros" ? " · en metros" : ""}</small></div>
         <div class="stk-cant"><button type="button" data-menos aria-label="Uno menos">−</button><input class="field-input" inputmode="decimal" value="${stkFmtN(l.cant)}" aria-label="Cantidad"><button type="button" data-mas aria-label="Uno más">+</button></div></div>
         ${l.unidades.length ? `<div class="stk-chips">${l.unidades.map((t, j) => `<span class="stk-chip">${escapeHtml(t)}<button type="button" data-quitar-u="${j}" aria-label="Sacar">✕</button></span>`).join("")}</div>` : ""}
         ${esU && sinN ? `<div class="stk-falta">${can.actual === l.c ? `Falta${sinN > 1 ? "n" : ""} ${sinN} N° de serie: escanealo${sinN > 1 ? "s" : ""} ahora.` : `${sinN} sin N° de serie.`}</div>` : ""}
@@ -18354,7 +18354,7 @@ function crearCanastaStock(op) {
   // Cada etiqueta de SAT suma uno de ese artículo (se pueden mezclar artículos: teclado, central,
   // 3 infrarrojos, sirena…). Los equipos quedan esperando su N° de serie. Solo lo que va en metros
   // pregunta la cantidad.
-  can.agregarArticulo = async (c) => {
+  can.agregarArticulo = async (c, prov) => {
     const art = arts()[c]; if (!art) return { ok: false, texto: "No está en el catálogo" };
     if (op.soloEquipos && op.soloEquipos() && art.tipo !== "unidad") return { ok: false, texto: `${art.d} va por cantidad: no lleva N° de serie` };
     let cuanto = 1;
@@ -18366,10 +18366,12 @@ function crearCanastaStock(op) {
     }
     const l = linea(c);
     l.cant = Math.round((l.cant + cuanto) * 1000) / 1000;
+    if (prov) l.prov = prov;
     can.actual = c;
     can.cambio();
-    if (art.tipo === "unidad") return { ok: true, texto: `${art.d} (${stkFmtN(l.cant)}): ahora su N° de serie`, completo: false };
-    return { ok: true, texto: `${art.d} (${stkFmtN(l.cant)})`, completo: true };
+    const pn = prov ? ` · ${nombreProveedor(op.catalogo(), prov) || "proveedor " + prov}` : "";
+    if (art.tipo === "unidad") return { ok: true, texto: `${art.d}${pn} (${stkFmtN(l.cant)}): ahora su N° de serie`, completo: false };
+    return { ok: true, texto: `${art.d}${pn} (${stkFmtN(l.cant)})`, completo: true };
   };
   // El código del modelo (igual en todas las cajas) se guarda para ignorarlo como N° de serie.
   const aprenderModelo = async (c, codigo) => {
@@ -18411,7 +18413,7 @@ function crearCanastaStock(op) {
     if (r.tipo === "ignorar") return { ok: false, texto: r.aviso };
     if (r.tipo === "articulo") {
       if (r.via === "modelo" && r.c === can.actual) return { ok: true, texto: "Código del modelo (no suma)", completo: false };
-      return can.agregarArticulo(r.c);
+      return can.agregarArticulo(r.c, r.proveedor);
     }
     if (r.tipo === "unidad") return agregarUnidad(r.c, r.tracking, r);
     if (r.tipo === "ean_nuevo") {
@@ -18442,12 +18444,12 @@ function crearCanastaStock(op) {
   // Para los números leídos de una foto: qué es cada uno (y si sirve).
   can.describir = (t) => {
     const r = can.interpretar(t), a = arts();
-    if (r.tipo === "articulo") return { util: true, texto: (a[r.c] || {}).d || r.c };
+    if (r.tipo === "articulo") return { util: true, texto: ((a[r.c] || {}).d || r.c) + (r.proveedor ? ` · ${nombreProveedor(op.catalogo(), r.proveedor) || "proveedor " + r.proveedor}` : "") };
     if (r.tipo === "unidad") return { util: !r.aviso, texto: r.nuevo ? `N° de serie de ${(a[r.c] || {}).d || r.c}${r.aviso ? " (no se parece a los anteriores)" : ""}` : `${(a[r.c] || {}).d || r.c} · ${nombreUbicacion(r.ubic)}` };
     if (r.tipo === "ean_nuevo") return { util: true, texto: "Código de fabricante" };
     return { util: false, texto: /^\d{12}$/.test(t) ? "Etiqueta SAT de un artículo que no está en el catálogo" : can.actual ? "" : "Primero la etiqueta de SAT" };
   };
-  can.items = () => can.lineas.filter((l) => l.cant > 0).map((l) => ({ c: l.c, cant: l.cant, unidades: l.unidades }));
+  can.items = () => can.lineas.filter((l) => l.cant > 0).map((l) => ({ c: l.c, cant: l.cant, unidades: l.unidades, ...(l.prov ? { prov: l.prov } : {}) }));
   return can;
 }
 
@@ -18738,7 +18740,7 @@ document.getElementById("depConfirmarBtn").addEventListener("click", async (ev) 
   if (depModo === "inventario") {
     const ubic = depInvUbic();
     if (!ubic) { showToast("Elegí dónde estás haciendo el inventario"); return; }
-    const conSerie = items.filter((x) => x.unidades.length).map((x) => ({ c: x.c, unidades: x.unidades }));
+    const conSerie = items.filter((x) => x.unidades.length).map((x) => ({ c: x.c, unidades: x.unidades, ...(x.prov ? { prov: x.prov } : {}) }));
     btn.disabled = true;
     try {
       const r = await depEnviar({ accion: "registrar_unidades", ubic, items: conSerie }, `Inventario de N° de serie en ${nombreUbicacion(ubic)}`);
@@ -18941,9 +18943,9 @@ async function depConsultar(texto) {
     const uni = Object.entries(sal.unidades || {}).filter(([, u]) => u.c === c);
     cont.innerHTML = `<div class="stk-envio"><b>${escapeHtml(a.d)}</b><small>${escapeHtml(c)}${a.min ? ` · mínimo ${stkFmtN(a.min)}` : ""}</small>
       <div class="stk-envio-items">${Object.entries(t.detalle).map(([u, n]) => `<div class="stk-envio-item"><span>${escapeHtml(nombreUbicacion(u))}</span><b>${stkFmtN(n)}</b></div>`).join("") || '<p class="stk-ayuda">No hay en ningún lado.</p>'}</div>
-      ${uni.length ? `<p class="stk-ayuda" style="margin-top:8px;">Equipos con N° de unidad:</p>${uni.map(([tr, u]) => `<div class="stk-envio-item"${tr === resaltar ? ' style="font-weight:700;"' : ""}><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;">${escapeHtml(tr)}</span><span>${escapeHtml(nombreUbicacion(u.u))}</span></div>`).join("")}` : ""}</div>`;
+      ${uni.length ? `<p class="stk-ayuda" style="margin-top:8px;">Equipos con N° de unidad:</p>${uni.map(([tr, u]) => `<div class="stk-envio-item"${tr === resaltar ? ' style="font-weight:700;"' : ""}><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;">${escapeHtml(tr)}${u.prov ? `<small style="font-family:inherit;">${escapeHtml(nombreProveedor(cat, u.prov) || "proveedor " + u.prov)}</small>` : ""}</span><span>${escapeHtml(nombreUbicacion(u.u))}</span></div>`).join("")}` : ""}</div>`;
   };
-  if (r.tipo === "articulo") { mostrarArticulo(r.c); return { ok: true, texto: (cat.articulos[r.c] || {}).d }; }
+  if (r.tipo === "articulo") { mostrarArticulo(r.c); return { ok: true, texto: ((cat.articulos[r.c] || {}).d || r.c) + (r.proveedor ? ` · ${nombreProveedor(cat, r.proveedor) || "proveedor " + r.proveedor}` : "") }; }
   if (r.tipo === "unidad" && !r.nuevo) { mostrarArticulo(r.c, r.tracking); return { ok: true, texto: `${r.tracking}: ${nombreUbicacion(r.ubic)}` }; }
   if (r.tipo === "unidad") { cont.innerHTML = `<p class="stk-ayuda">El N° de unidad ${escapeHtml(r.tracking)} todavía no está registrado.</p>`; return { ok: false, texto: "No registrado" }; }
   const lista = buscarArticulosStock(cat, texto, 12);

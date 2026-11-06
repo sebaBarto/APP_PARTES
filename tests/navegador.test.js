@@ -5470,6 +5470,8 @@ test("Stock: catálogo desde el listado de Oficina, saldo inicial, mínimos, con
     if (b.accion === "quitar_pedido") { b.items.forEach((x) => delete saldos.pedidos[x.c]); return json({ ok: true }); }
     if (b.accion === "conc_corrida") { conc.corridas = [{ ...b, fecha: new Date().toISOString(), por: "Seba" }, ...conc.corridas]; return json({ ok: true, corridas: conc.corridas }); }
     if (b.accion === "conc_marcar") { conc.marcas = [...b.items.map((x) => ({ ...x, estado: b.estado, motivo: b.motivo, fecha: new Date().toISOString() })), ...conc.marcas]; return json({ ok: true, marcas: conc.marcas }); }
+    if (b.accion === "proveedores") { catalogo.proveedores = Object.fromEntries(b.lista.map((x) => [x.codigo, x.nombre])); return json({ ok: true, completados: 0 }); }
+    if (b.accion === "marcar_oficina") { movs.forEach((m) => { if (b.ids.includes(m.id)) m.oficina = new Date().toISOString(); }); return json({ ok: true, marcados: b.ids.length }); }
     return json({ error: "?" }, 400);
   });
   await page.goto(base + "/admin.html");
@@ -5552,6 +5554,26 @@ test("Stock: catálogo desde el listado de Oficina, saldo inicial, mínimos, con
   // Movimientos
   await page.click('#stkSub [data-stk="movimientos"]');
   await page.waitForFunction(() => /3 movimientos/.test(document.getElementById("stkMovLista").textContent));
+  // Para Oficina: los ajustes del depósito, con su formato; se marcan como pasados
+  movs.forEach((m, i) => { m.id = m.id || "m" + i; });
+  await page.click('#stkSub [data-stk="oficina"]');
+  await page.waitForSelector("#stkOfExcelBtn");
+  assert.match(await page.textContent("#stkOfLista"), /3 pendientes de pasar a Oficina/);
+  assert.match(await page.textContent("#stkOfLista"), /AJUSTE.*300.*−?-50/s);
+  const descarga = page.waitForEvent("download");
+  await page.click("#stkOfExcelBtn");
+  assert.match((await descarga).suggestedFilename(), /^stock_para_oficina_/);
+  await page.click("#stkOfMarcarBtn");
+  await page.click(".cartel-admin .cartel-si");
+  await page.waitForFunction(() => /No hay nada pendiente/.test(document.getElementById("stkOfLista").textContent));
+  // Proveedores: código de la etiqueta -> nombre
+  await page.click('#stkSub [data-stk="proveedores"]');
+  await page.click("#stkProvAgregarBtn");
+  await page.fill("#stkProvTabla .stk-prov-cod", "2779");
+  await page.fill("#stkProvTabla .stk-prov-nom", "Propiedad Protegida");
+  await page.click("#stkProvGuardarBtn");
+  await page.waitForFunction(() => /Guardado: 1 proveedor/.test((document.getElementById("avisoFlotanteAdmin") || {}).textContent || ""));
+  assert.deepStrictEqual(catalogo.proveedores, { 2779: "Propiedad Protegida" });
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
@@ -5560,7 +5582,7 @@ test("Stock en la APP: el depósito entrega escaneando (etiqueta SAT + N° de un
   const { ctx, page, erroresPagina } = await nuevaPagina();
   await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
   const S = require(require("path").join(__dirname, "..", "stock-utils.js"));
-  const catalogo = { articulos: { 20825: { c: "20825", d: "TECLADO K10LH/V", tipo: "unidad", formatos: [] }, 20208: { c: "20208", d: "SIRENA MP100", tipo: "cantidad" } } };
+  const catalogo = { articulos: { 20825: { c: "20825", d: "TECLADO K10LH/V", tipo: "unidad", formatos: [] }, 20208: { c: "20208", d: "SIRENA MP100", tipo: "cantidad" } }, proveedores: { 2779: "Propiedad Protegida" } };
   let saldos = { inicializado: "2026-11-01", ubic: { dep: { 20825: 3, 20208: 10 } }, unidades: {}, pedidos: {}, envios: [] };
   let quien = "Melina";
   const posts = [];
@@ -5596,6 +5618,7 @@ test("Stock en la APP: el depósito entrega escaneando (etiqueta SAT + N° de un
   // Etiqueta SAT del teclado + su N° de unidad
   await page.fill("#depCodigo", "000208252779"); await page.press("#depCodigo", "Enter");
   await page.waitForSelector("#depCanasta .stk-falta, #depCanasta .stk-linea");
+  assert.match(await page.textContent("#depCanasta"), /20825 · Propiedad Protegida/, "el código de proveedor de la etiqueta muestra el nombre");
   await page.fill("#depCodigo", "GH120FF156"); await page.press("#depCodigo", "Enter");
   await page.waitForSelector("#depCanasta .stk-chip");
   // Sirena: código de fabricante desconocido -> se elige el artículo una vez
@@ -5626,7 +5649,7 @@ test("Stock en la APP: el depósito entrega escaneando (etiqueta SAT + N° de un
   await page.waitForFunction(() => !document.querySelector("#depCanasta .stk-linea"));
   const mov = posts.find((p) => p.accion === "mover");
   assert.deepStrictEqual(mov.a, "tec:Juan");
-  assert.deepStrictEqual(mov.items, [{ c: "20825", cant: 2, unidades: ["GH120FF156", "GH12100FD4"] }, { c: "20208", cant: 3, unidades: [] }]);
+  assert.deepStrictEqual(mov.items, [{ c: "20825", cant: 2, unidades: ["GH120FF156", "GH12100FD4"], prov: "2779" }, { c: "20208", cant: 3, unidades: [] }]);
   assert.deepStrictEqual(catalogo.articulos["20208"].alias, ["7798164500049"], "aprendió el código de la sirena");
   assert.deepStrictEqual(saldos.ubic["cam:Juan"], { 20825: 2, 20208: 3 });
   // A un cliente con N° de presupuesto, y a un vehículo elegido de la lista
@@ -5687,7 +5710,7 @@ test("Stock en la APP: el depósito entrega escaneando (etiqueta SAT + N° de un
   // Consultar dónde está un equipo
   await page.click('#depModos [data-modo="consultar"]');
   await page.fill("#depConsultarCodigo", "GH12100FD4"); await page.press("#depConsultarCodigo", "Enter");
-  await page.waitForFunction(() => /GH12100FD4\s*Técnico: Juan/.test(document.getElementById("depConsulta").textContent));
+  await page.waitForFunction(() => /GH12100FD4\s*Propiedad Protegida\s*Técnico: Juan/.test(document.getElementById("depConsulta").textContent));
   // Alta en lote con la cámara: la caja trae etiqueta SAT, código del modelo, N° de serie y un QR.
   await page.click('#depModos [data-modo="recibir"]');
   await page.click('#depFormas [data-forma="lote"]');
@@ -5720,7 +5743,7 @@ test("Stock en la APP: el depósito entrega escaneando (etiqueta SAT + N° de un
   await page.click("#depConfirmarBtn");
   await page.click(".dlg-app .dlg-si");
   await page.waitForFunction(() => !document.querySelector("#depCanasta .stk-linea"));
-  assert.deepStrictEqual([posts.at(-1).de, posts.at(-1).a, posts.at(-1).items], ["proveedor", "dep", [{ c: "20825", cant: 3, unidades: ["GH200AA001", "GH200AA002", "GH200AA003"] }, { c: "20208", cant: 2, unidades: [] }]]);
+  assert.deepStrictEqual([posts.at(-1).de, posts.at(-1).a, posts.at(-1).items], ["proveedor", "dep", [{ c: "20825", cant: 3, unidades: ["GH200AA001", "GH200AA002", "GH200AA003"], prov: "2779" }, { c: "20208", cant: 2, unidades: [] }]]);
   // Código de barras gastado: a los 5 segundos sin leer nada, lee los números de la foto
   await page.evaluate(() => { window.BarcodeDetector = class { async detect() { return []; } }; });
   await page.click("#depEscanearBtn");
@@ -5798,8 +5821,8 @@ test("Depósito: lote con artículos mezclados para un cliente, repetir la últi
   await page.click(".stk-escaner-listo");
   const items = await page.evaluate(() => depCanasta.items());
   assert.deepStrictEqual(items, [
-    { c: "20825", cant: 1, unidades: ["GH120FF156"] }, { c: "30001", cant: 1, unidades: ["123456"] },
-    { c: "20208", cant: 2, unidades: [] }, { c: "40001", cant: 3, unidades: [] },
+    { c: "20825", cant: 1, unidades: ["GH120FF156"], prov: "2779" }, { c: "30001", cant: 1, unidades: ["123456"], prov: "2779" },
+    { c: "20208", cant: 2, unidades: [], prov: "2779" }, { c: "40001", cant: 3, unidades: [], prov: "2779" },
   ]);
   // El cable va en metros: pregunta cuántos
   await page.fill("#depCodigo", "000500012779"); await page.press("#depCodigo", "Enter");

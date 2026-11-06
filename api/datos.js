@@ -1189,6 +1189,30 @@ async function stockActualizar(ruta, porDefecto, cambiar, mensaje) {
   }
   return { error: "No se pudo guardar (probá de nuevo)", status: 502 };
 }
+// Lo que se aprende de cada escaneo: la forma de los N° de serie de cada artículo y de qué
+// proveedores viene (el código de 4 dígitos de la etiqueta de SAT).
+async function stockAprender(movs, quien) {
+  const S = require("../stock-utils.js");
+  const utiles = (movs || []).filter((m) => m && m.c && ((m.unidades && m.unidades.length) || m.prov));
+  if (!utiles.length) return;
+  await stockActualizar(STOCK_CAT, { articulos: {} }, (c2) => {
+    const arts = { ...(c2.articulos || {}) }, provVistos = { ...(c2.provVistos || {}) };
+    let cambio = false;
+    utiles.forEach((m) => {
+      const art = arts[m.c]; if (!art) return;
+      const n = { ...art };
+      if (art.tipo === "unidad" && m.unidades && m.unidades.length) n.formatos = m.unidades.reduce((acc, t) => S.agregarFormato(acc, t), art.formatos || []);
+      if (m.prov) {
+        n.provCodigos = [...new Set([...(art.provCodigos || []), m.prov])].slice(-10);
+        if (!n.prov && S.nombreProveedor(c2, m.prov)) n.prov = S.nombreProveedor(c2, m.prov);
+        if (!S.nombreProveedor(c2, m.prov)) provVistos[m.prov] = (provVistos[m.prov] || 0) + 1;
+      }
+      if (JSON.stringify(n) !== JSON.stringify(art)) { arts[m.c] = n; cambio = true; }
+    });
+    if (JSON.stringify(provVistos) !== JSON.stringify(c2.provVistos || {})) cambio = true;
+    return cambio ? { data: { ...c2, articulos: arts, provVistos } } : { error: "sin cambios" };
+  }, `Stock: aprendió formatos y proveedores (por ${quien})`).catch(() => {});
+}
 async function stockRegistrarMovimientos(movs, mensaje) {
   if (!movs.length) return true;
   const porMes = {};
@@ -1209,7 +1233,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
   let esResp = esAdmin, tecnicosGuardados = null;
   const tecnicos = async () => (tecnicosGuardados = tecnicosGuardados || (await leerTecnicosGuardados().catch(() => [])));
   if (!esAdmin) { const t = (await tecnicos()).find((x) => x.nombre === autorizacion.nombre); esResp = !!(t && t.permisos && (t.permisos.stock_responsable || t.permisos.admin)); }
-  const SOLO_ADMIN = ["importar_catalogo", "configurar", "saldo_inicial", "ajustar", "conc_marcar", "conc_reactivar", "conc_corrida"];
+  const SOLO_ADMIN = ["proveedores", "marcar_oficina", "importar_catalogo", "configurar", "saldo_inicial", "ajustar", "conc_marcar", "conc_reactivar", "conc_corrida"];
   try {
     if (req.method === "GET" && q.mio) {
       // Lo que tiene el técnico que pregunta (y lo que le llega o devolvió).
@@ -1269,6 +1293,40 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
         });
         return { data: { ...cat, articulos: arts, actualizado: ahora }, respuesta: { nuevos, actualizados, configurados, total: Object.keys(arts).length } };
       }, `Stock: catálogo actualizado desde ${b.revisada ? "la planilla revisada" : "el listado de Oficina"} (por ${quien})`);
+      responder(r);
+      return;
+    }
+    if (b.accion === "proveedores") {
+      // Tabla código de proveedor (los 4 dígitos de la etiqueta de SAT) -> nombre.
+      const lista = Array.isArray(b.lista) ? b.lista.slice(0, 500) : [];
+      const mapa = {};
+      for (const x of lista) {
+        const c = S.codigoProveedor(x && x.codigo), n = String((x && x.nombre) || "").replace(/\s+/g, " ").trim().slice(0, 60);
+        if (!c || !n) continue;
+        mapa[c] = n;
+      }
+      const r = await stockActualizar(STOCK_CAT, { articulos: {} }, (cat) => {
+        const provVistos = { ...(cat.provVistos || {}) };
+        Object.keys(mapa).forEach((c) => delete provVistos[c]);
+        // Los artículos que ya se vieron con ese código y no tienen proveedor, lo toman.
+        const arts = { ...(cat.articulos || {}) };
+        let completados = 0;
+        Object.values(arts).forEach((a) => { if (!a.prov && (a.provCodigos || []).some((c) => mapa[c])) { arts[a.c] = { ...a, prov: mapa[(a.provCodigos || []).find((c) => mapa[c])] }; completados++; } });
+        return { data: { ...cat, articulos: arts, proveedores: mapa, provVistos }, respuesta: { proveedores: mapa, completados } };
+      }, `Stock: tabla de proveedores (por ${quien})`);
+      responder(r);
+      return;
+    }
+    if (b.accion === "marcar_oficina") {
+      // Movimientos ya pasados al sistema de Oficina (para no pasarlos dos veces).
+      if (!/^\d{4}-\d{2}$/.test(String(b.mes || ""))) { res.status(400).json({ error: "Mes inválido" }); return; }
+      const ids = new Set((Array.isArray(b.ids) ? b.ids : []).map(String));
+      let marcados = 0;
+      const r = await stockActualizar(stockMovRuta(b.mes + "-01"), [], (lista) => {
+        marcados = 0;
+        const nueva = (Array.isArray(lista) ? lista : []).map((m) => { if (!ids.has(String(m.id))) return m; marcados++; return b.desmarcar ? (({ oficina, ...resto }) => resto)(m) : { ...m, oficina: ahora, oficina_por: quien }; });
+        return { data: nueva, respuesta: { marcados } };
+      }, `Stock: ${marcados} movimiento(s) ${b.desmarcar ? "desmarcados" : "pasados a Oficina"} (por ${quien})`);
       responder(r);
       return;
     }
@@ -1404,6 +1462,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
         return { data: saldos, respuesta: resumen };
       }, `Stock: inventario de N° de serie en ${ubic} (por ${quien})`);
       if (duplicado) { res.status(200).json({ ok: true, duplicado: true }); return; }
+      if (!r.error && resultado) await stockAprender((Array.isArray(b.items) ? b.items : []).map((x) => ({ c: S.codigoArticulo(x.c), unidades: x.unidades || [], prov: S.codigoProveedor(x.prov) })), quien);
       if (!r.error && resultado && resultado.registradas) {
         await stockRegistrarMovimientos([{ id: `${Date.now().toString(36)}-inv`, fecha: ahora, por: quien, tipo: "inventario_series", c: "", cant: resultado.registradas, a: ubic, motivo: `Inventario de N° de serie: ${resultado.registradas} registrados` }], `Stock: inventario de N° de serie (por ${quien})`);
       }
@@ -1451,15 +1510,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
       if (!r.error && resultado) {
         await stockRegistrarMovimientos(resultado.movs, `Stock: movimientos (${tipo}, por ${quien})`);
         // Aprende la forma de los N° de unidad de cada artículo.
-        const conUnidades = resultado.movs.filter((m) => m.unidades && m.unidades.length);
-        if (conUnidades.length) {
-          await stockActualizar(STOCK_CAT, { articulos: {} }, (c2) => {
-            const arts = { ...(c2.articulos || {}) };
-            let cambio = false;
-            conUnidades.forEach((m) => { const art = arts[m.c]; if (!art || art.tipo !== "unidad") return; const f = m.unidades.reduce((acc, t) => S.agregarFormato(acc, t), art.formatos || []); if (f.length !== (art.formatos || []).length) { arts[m.c] = { ...art, formatos: f }; cambio = true; } });
-            return cambio ? { data: { ...c2, articulos: arts } } : { error: "sin cambios" };
-          }, `Stock: formatos de N° de unidad aprendidos (por ${quien})`).catch(() => {});
-        }
+        await stockAprender(resultado.movs, quien);
         if (resultado.envio) {
           try {
             const { enviarASeleccionados } = require("../lib/push-sender");

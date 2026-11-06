@@ -27,6 +27,10 @@
   const codigoArticulo = (v) => String(v == null ? "" : v).trim().replace(/\.0+$/, "").replace(/^0+(?=\d)/, "");
   const sinAcentos = (t) => String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 
+  // Código de proveedor (los 4 últimos dígitos de la etiqueta de SAT): "2779".
+  const codigoProveedor = (v) => { const t = String(v == null ? "" : v).replace(/\D/g, "").slice(0, 6); return t && Number(t) ? t : ""; };
+  // Nombre del proveedor según la tabla que se carga en el admin (catalogo.proveedores).
+  const nombreProveedor = (catalogo, codigo) => { const c = codigoProveedor(codigo); return c ? ((catalogo && catalogo.proveedores) || {})[c] || "" : ""; };
   // Etiqueta propia de SAT: 12 dígitos = 8 del artículo (con ceros adelante) + 4 del proveedor.
   // "000208252779" -> { codigo: "20825", proveedor: "2779" }
   function leerEtiquetaSat(texto) {
@@ -254,7 +258,7 @@
     };
     if (mov.de) mover(mov.de, -cant);
     if (mov.a) mover(mov.a, cant);
-    (mov.unidades || []).forEach((t) => { s.unidades[t] = { c: mov.c, u: mov.a || "baja", f: mov.fecha || new Date().toISOString() }; });
+    (mov.unidades || []).forEach((t) => { s.unidades[t] = { ...(s.unidades[t] || {}), c: mov.c, u: mov.a || "baja", f: mov.fecha || new Date().toISOString(), ...(mov.prov ? { prov: mov.prov } : {}) }; });
     return s;
   }
 
@@ -356,7 +360,7 @@
     let s = JSON.parse(JSON.stringify(saldos || {}));
     s.ubic = s.ubic || {}; s.unidades = s.unidades || {}; s.envios = Array.isArray(s.envios) ? s.envios : [];
     const fecha = op.fecha || new Date().toISOString();
-    const lista = (items || []).map((x) => ({ c: codigoArticulo(x.c), cant: Math.round((Number(x.cant) || 0) * 1000) / 1000, unidades: [...new Set((x.unidades || []).map(limpiarCodigo).filter(Boolean))] }))
+    const lista = (items || []).map((x) => ({ c: codigoArticulo(x.c), cant: Math.round((Number(x.cant) || 0) * 1000) / 1000, unidades: [...new Set((x.unidades || []).map(limpiarCodigo).filter(Boolean))], prov: codigoProveedor(x.prov) }))
       .map((x) => ({ ...x, cant: x.unidades.length > x.cant ? x.unidades.length : x.cant })).filter((x) => x.c && x.cant > 0);
     if (!lista.length) return { error: "No hay nada para mover" };
     if (!op.a && !op.de) return { error: "Falta el destino" };
@@ -378,16 +382,17 @@
     const base = (x, i, cant, desde, extra) => ({ id: idMov(i), fecha, por: op.por || "", tipo: op.tipo || "movimiento", c: x.c, cant, ...(desde ? { de: desde } : {}), a: destino, ...(op.motivo ? { motivo: op.motivo } : {}), ...(op.presupuesto ? { presupuesto: op.presupuesto } : {}), ...(extra || {}) });
     const movs = [];
     lista.forEach((x, i) => {
-      const uni = x.unidades.length ? { unidades: x.unidades } : {};
+      const uni = { ...(x.unidades.length ? { unidades: x.unidades } : {}), ...(x.prov ? { prov: x.prov } : {}) };
       // Retiro de un cliente que la APP no tenía registrado (o con menos): lo que falta sale del
       // comodato «Sin asignar» si es comodato, y si no, entra igual (no figuraba en la APP).
       const hay = de ? (s.ubic[de] || {})[x.c] || 0 : x.cant;
       if (!op.deFlexible || hay >= x.cant) { movs.push(base(x, i, x.cant, de, uni)); return; }
       let resto = x.cant;
-      if (hay > 0) { movs.push(base(x, `${i}a`, hay, de)); resto -= hay; }
+      const pv = x.prov ? { prov: x.prov } : {};
+      if (hay > 0) { movs.push(base(x, `${i}a`, hay, de, pv)); resto -= hay; }
       const sinAsignar = /^com:/.test(de) ? (s.ubic["com:Sin asignar"] || {})[x.c] || 0 : 0;
-      if (sinAsignar > 0) { const n = Math.min(sinAsignar, resto); movs.push(base(x, `${i}b`, n, "com:Sin asignar")); resto -= n; }
-      if (resto > 0) movs.push(base(x, `${i}c`, Math.round(resto * 1000) / 1000, null, { motivo: `${op.motivo ? op.motivo + " · " : ""}no figuraba en la APP en ${nombreUbicacion(de)}` }));
+      if (sinAsignar > 0) { const n = Math.min(sinAsignar, resto); movs.push(base(x, `${i}b`, n, "com:Sin asignar", pv)); resto -= n; }
+      if (resto > 0) movs.push(base(x, `${i}c`, Math.round(resto * 1000) / 1000, null, { ...pv, motivo: `${op.motivo ? op.motivo + " · " : ""}no figuraba en la APP en ${nombreUbicacion(de)}` }));
       if (x.unidades.length) movs[movs.length - 1].unidades = x.unidades;
     });
     movs.forEach((m) => { s = aplicarMovimiento(s, m); });
@@ -445,11 +450,34 @@
         if (u && u.u === ubic) { r.yaEstaban.push(t); return; }
         if (u) { r.enOtroLado.push({ t, c, u: u.u }); return; }
         if (conSerie >= hay) { r.sobran.push({ t, c, hay }); return; }
-        s.unidades[t] = { c, u: ubic, f: fecha || new Date().toISOString(), inventario: true };
+        s.unidades[t] = { c, u: ubic, f: fecha || new Date().toISOString(), inventario: true, ...(codigoProveedor(x.prov) ? { prov: codigoProveedor(x.prov) } : {}) };
         conSerie++; r.registradas++;
       });
     });
     return { saldos: s, ...r };
+  }
+  // ---------- Archivo para el sistema de Oficina ----------
+  // Oficina cuenta «Depósito» (todo lo que está en poder de SAT: depósito, técnicos, vehículos, en
+  // camino) y «Comodato». Los pases internos no le cambian nada; sí lo que sale a un cliente, lo que
+  // vuelve de un cliente, los ajustes y las compras.
+  const grupoOficina = (u) => (!u ? "afuera" : /^(dep|tec:|veh:|cam:)/.test(u) ? "sat" : /^com:/.test(u) ? "comodato" : /^cli:/.test(u) ? "cliente" : "otro");
+  function movimientoParaOficina(m) {
+    if (!m || !m.c || m.tipo === "inicial" || m.tipo === "inventario_series") return null;
+    const de = grupoOficina(m.de), a = grupoOficina(m.a);
+    if (de === a) return null;
+    const cliente = (u) => String(u || "").replace(/^(cli|com):/, "");
+    let operacion = "", deposito = 0, comodato = 0, quien = "";
+    if (de === "sat" && a === "cliente") { operacion = "SALIDA A CLIENTE"; deposito = -m.cant; quien = cliente(m.a); }
+    else if (de === "sat" && a === "comodato") { operacion = "PASE A COMODATO"; deposito = -m.cant; comodato = m.cant; quien = cliente(m.a); }
+    else if (de === "comodato" && a === "sat") { operacion = "DEVOLUCION DE COMODATO"; deposito = m.cant; comodato = -m.cant; quien = cliente(m.de); }
+    else if (de === "cliente" && a === "sat") { operacion = "RETIRO DE CLIENTE"; deposito = m.cant; quien = cliente(m.de); }
+    else if (de === "afuera" && a === "sat") { operacion = m.tipo === "ajuste" ? "AJUSTE" : "INGRESO"; deposito = m.cant; }
+    else if (de === "sat" && a === "afuera") { operacion = "AJUSTE"; deposito = -m.cant; }
+    else if (de === "afuera" && a === "comodato") { operacion = "AJUSTE"; comodato = m.cant; quien = cliente(m.a); }
+    else if (de === "comodato" && a === "afuera") { operacion = "AJUSTE"; comodato = -m.cant; quien = cliente(m.de); }
+    else if (de === "comodato" && a === "cliente") { operacion = "COMODATO A VENTA"; comodato = -m.cant; quien = cliente(m.a); }
+    else return null;
+    return { id: m.id, fecha: m.fecha, operacion, c: m.c, deposito, comodato, cliente: quien, presupuesto: m.presupuesto || "", series: (m.unidades || []).join(" "), prov: m.prov || "", por: m.por || "", motivo: m.motivo || "" };
   }
   // Lo que tiene una persona: su ubicación, lo que le llega y lo que devolvió y falta confirmar.
   function stockDePersona(saldos, nombre) {
@@ -475,7 +503,7 @@
     return mejor;
   }
 
-  const api = { STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, esCodigoIgnorable, elegirCodigoDelCuadro, registrarUnidades, moverStock, cerrarEnvio, stockDePersona };
+  const api = { codigoProveedor, nombreProveedor, STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, esCodigoIgnorable, elegirCodigoDelCuadro, registrarUnidades, movimientoParaOficina, moverStock, cerrarEnvio, stockDePersona };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else Object.assign(raiz, api);
 })(typeof window !== "undefined" ? window : globalThis);

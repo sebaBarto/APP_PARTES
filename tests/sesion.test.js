@@ -1427,6 +1427,33 @@ test("Stock: Melina entrega con escaneo, el técnico confirma «Recibí» (o con
     r = await post(cuerpoSinSenal, melina);
     assert.deepStrictEqual([r.cuerpo.duplicado, repo["stock/saldos.json"].ubic.dep["20208"]], [true, depSirenas]);
     assert.ok(repo[`stock/movimientos-${mes}.json`].some((m) => m.tipo === "inventario_series"));
+    // Proveedores: el código de la etiqueta de SAT queda en el movimiento y en el N° de serie
+    const admin = crearSesion({ nombre: "Seba", rol: "admin" });
+    r = await post({ accion: "mover", de: "proveedor", a: "dep", items: [{ c: "20825", cant: 1, unidades: ["GH600AA001"], prov: "2779" }, { c: "20208", cant: 2, prov: "0815" }] }, melina);
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    let cat = repo["stock/catalogo.json"];
+    assert.deepStrictEqual(cat.provVistos, { 2779: 1, "0815": 1 }, "códigos vistos sin nombre");
+    assert.strictEqual(repo["stock/saldos.json"].unidades.GH600AA001.prov, "2779");
+    assert.strictEqual((await post({ accion: "proveedores", lista: [{ codigo: "2779", nombre: "Propiedad Protegida" }] }, melina)).statusCode, 403, "la tabla se carga desde el admin");
+    r = await post({ accion: "proveedores", lista: [{ codigo: "2779", nombre: "Propiedad Protegida" }, { codigo: "x", nombre: "malo" }] }, admin);
+    cat = repo["stock/catalogo.json"];
+    assert.deepStrictEqual(cat.proveedores, { 2779: "Propiedad Protegida" });
+    assert.strictEqual(cat.articulos["20825"].prov, "Propiedad Protegida", "el artículo visto con ese código toma el proveedor");
+    assert.deepStrictEqual(cat.provVistos, { "0815": 1 });
+    assert.strictEqual(r.cuerpo.completados, 1);
+    // Para Oficina: solo lo que cambia el stock de Oficina, y se marca para no pasarlo dos veces
+    const movsMes = repo[`stock/movimientos-${mes}.json`];
+    const S = require(path.join(raiz, "stock-utils.js"));
+    const paraOficina = movsMes.map(S.movimientoParaOficina).filter(Boolean);
+    assert.deepStrictEqual([...new Set(paraOficina.map((o) => o.operacion))].sort(), ["INGRESO"], "entregas a técnicos, vehículos y devoluciones no le cambian nada a Oficina");
+    assert.deepStrictEqual(S.movimientoParaOficina({ id: "x", c: "1", cant: 2, de: "dep", a: "com:Pérez", presupuesto: "45" }), { id: "x", fecha: undefined, operacion: "PASE A COMODATO", c: "1", deposito: -2, comodato: 2, cliente: "Pérez", presupuesto: "45", series: "", prov: "", por: "", motivo: "" });
+    assert.strictEqual(S.movimientoParaOficina({ id: "y", c: "1", cant: 1, de: "tec:Juan", a: "cli:Kiosco" }).operacion, "SALIDA A CLIENTE");
+    assert.strictEqual(S.movimientoParaOficina({ id: "z", c: "1", cant: 1, de: "dep", a: "veh:Kangoo" }), null);
+    const ingreso = movsMes.find((m) => m.tipo === "ingreso");
+    r = await post({ accion: "marcar_oficina", mes, ids: [ingreso.id] }, admin);
+    assert.strictEqual(r.cuerpo.marcados, 1);
+    assert.ok(repo[`stock/movimientos-${mes}.json`].find((m) => m.id === ingreso.id).oficina);
+    assert.strictEqual((await post({ accion: "marcar_oficina", mes, ids: [ingreso.id] }, melina)).statusCode, 403);
     // Recordatorio del cron: envío sin confirmar hace más de un día
     await post({ accion: "mover", de: "dep", a: "tec:Luis", items: [{ c: "20208", cant: 1 }] }, melina);
     const { chequearEnviosStock } = require(path.join(raiz, "api", "cron-diario.js"));
