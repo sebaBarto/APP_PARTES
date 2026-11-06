@@ -128,3 +128,54 @@ async function enviarAccionSimConRespaldo(payload, token) {
 
   throw new Error(primero.data.error || "Error desconocido");
 }
+
+// ---------- Código de abonado (cuenta del monitoreo) ----------
+// Puede tener letras y números (hexadecimal, ej. 48ED, 0A3F). Excel (y la
+// lectura de CSV) toma los que parecen notación científica como número:
+// "48E2" pasa a 4800 (o "4,80E+03"), "12E4" a 120000; y a todos les saca los
+// ceros de adelante ("0555" → 555). Antes, además, la conciliación les
+// borraba las letras ("48ED" → "48"). Acá se arma la forma comparable.
+
+// Forma comparable de un código escrito como texto: mayúsculas, sin espacios
+// ni guiones, sin ceros a la izquierda.
+function claveAbonado(v) {
+  return String(v == null ? "" : v).trim().toUpperCase().replace(/[\s\-_/.]/g, "").replace(/^0+(?=.)/, "");
+}
+// Un número que puede haber salido de un código como "48E2": las formas
+// "<mantisa>E<exponente>" de hasta 6 caracteres que dan ese número.
+function formasCientificasAbonado(n) {
+  if (!Number.isFinite(n) || n <= 0 || n !== Math.round(n)) return [];
+  const formas = [];
+  for (let e = 1; e <= 30; e++) {
+    const m = n / Math.pow(10, e);
+    if (m < 1) break;
+    if (m !== Math.round(m)) continue;
+    const f = `${m}E${e}`;
+    if (f.length <= 6) formas.push(f);
+  }
+  // La de 4 caracteres primero (el largo habitual de una cuenta), después las más cortas.
+  return formas.sort((a, b) => (a.length === 4 ? -1 : 0) - (b.length === 4 ? -1 : 0) || a.length - b.length);
+}
+// Todas las formas posibles del código de abonado leído de una planilla.
+// La primera es la que se muestra.
+function clavesAbonado(v) {
+  if (v == null || v === "") return [];
+  let n = null;
+  if (typeof v === "number") n = v;
+  else {
+    const t = String(v).trim();
+    // Texto que muestra Excel para esos números: "4,80E+03", "4.8E+3", "1,2E+05".
+    if (/^\d+(?:[.,]\d+)?E\+\d+$/i.test(t) || /^\d+[.,]\d+E\d+$/i.test(t)) n = Number(t.replace(",", ".").replace(/e\+?/i, "e"));
+    else { const c = claveAbonado(t); return c ? [c] : []; }
+  }
+  if (!Number.isFinite(n)) return [];
+  const entero = String(Math.round(n));
+  const ciencia = formasCientificasAbonado(Math.round(n));
+  return [...new Set([...(ciencia.length && typeof v !== "number" ? ciencia : []), entero, ...ciencia].map(claveAbonado))];
+}
+// ¿El valor de la planilla corresponde a alguno de estos códigos (de la APP)?
+function mismoAbonado(valorPlanilla, ...codigosApp) {
+  const app = new Set(codigosApp.map(claveAbonado).filter(Boolean));
+  return clavesAbonado(valorPlanilla).some((c) => app.has(c));
+}
+if (typeof module !== "undefined") module.exports = { ...(module.exports || {}), claveAbonado, clavesAbonado, mismoAbonado, formasCientificasAbonado };

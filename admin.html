@@ -6116,7 +6116,12 @@ function ofEmpresaDe(v) {
   if (/personal|telecom/.test(t)) return "Personal";
   return "";
 }
-const ofDigitos = (v) => String(v == null ? "" : v).replace(/\D/g, "").replace(/^0+/, "");
+// N° de cliente o de abonado: solo números, o números y letras de A a F
+// (cuentas en hexadecimal, ej. 48ED), o lo que Excel hizo con "48E2" (4800 o 4,80E+03).
+function esCodigoClienteAbonado(v) {
+  const t = String(v == null ? "" : v).trim().replace(/[\s.-]/g, "");
+  return /^\d{1,9}$/.test(t) || (/^[0-9A-F]{1,8}$/i.test(t) && /\d/.test(t)) || /^\d+(?:[.,]\d+)?E\+\d+$/i.test(String(v).trim());
+}
 // Elige las columnas mirando el contenido (y el título, como ayuda).
 function ofColumnas(filas, colNum) {
   const cab = [...new Set(filas.flatMap((f) => Object.keys(f)))].filter((c) => c !== colNum);
@@ -6132,7 +6137,7 @@ function ofColumnas(filas, colNum) {
   };
   const mejor = (lista, min) => { const m = lista.filter((x) => x.llenas && x.p >= min).sort((a, b) => b.p - a.p)[0]; return m ? m.c : ""; };
   const empresa = mejor(cab.map((c) => puntuar(c, (v) => !!ofEmpresaDe(v), /empresa|compan|operador|prestador|carrier|proveedor/)), 0.6);
-  const numCli = mejor(cab.filter((c) => c !== empresa).map((c) => puntuar(c, (v) => /^\d{1,8}$/.test(v.replace(/[\s.-]/g, "")), /(n|nro|num|numero|cod|codigo|id)\s*(de\s*)?(cliente|abonado|cuenta)|cliente\s*(n|nro|num)|abonado|cuenta/, /linea|telefono|celular|movil|dni|cuit|cuil|iccid|imei|fecha|serie/)), 0.85);
+  const numCli = mejor(cab.filter((c) => c !== empresa).map((c) => puntuar(c, (v) => esCodigoClienteAbonado(v), /(n|nro|num|numero|cod|codigo|id)\s*(de\s*)?(cliente|abonado|cuenta)|cliente\s*(n|nro|num)|abonado|cuenta/, /linea|telefono|celular|movil|dni|cuit|cuil|iccid|imei|fecha|serie/)), 0.85);
   const nombre = mejor(cab.filter((c) => c !== empresa && c !== numCli).map((c) => puntuar(c, (v) => /[a-zA-ZáéíóúñÑ]{3}/.test(v) && !ofEmpresaDe(v), /nombre|razon|titular|cliente|apellido/, /direcc|domicilio|calle|localidad|estado|plan|observ|tipo|empresa/)), 0.9);
   const estado = cab.find((c) => /estado|status|situacion/.test(normalizeText(c)) && c !== empresa) || "";
   const direccion = cab.find((c) => /direcc|domicilio|calle/.test(normalizeText(c))) || "";
@@ -6145,12 +6150,14 @@ function ofLeer(filas, col) {
     if (n.length !== 10) return;
     const reg = {
       n, empresa: col.empresa ? ofEmpresaDe(f[col.empresa]) : "", cliente: col.nombre ? String(f[col.nombre] || "").replace(/\s+/g, " ").trim() : "",
-      numCli: col.numCli ? ofDigitos(f[col.numCli]) : "", direccion: col.direccion ? String(f[col.direccion] || "").replace(/\s+/g, " ").trim() : "",
+      numCliClaves: col.numCli ? clavesAbonado(f[col.numCli]) : [], numCli: "", direccion: col.direccion ? String(f[col.direccion] || "").replace(/\s+/g, " ").trim() : "",
       estado: col.estado ? concClasificarEstado(f[col.estado]) : "activa", crudo: col.estado ? String(f[col.estado] || "") : "",
     };
+    // Se muestra como está en la APP si coincide con algún código conocido (ej. 4800 de Excel -> 48E2).
+    reg.numCli = reg.numCliClaves.find((c) => col.codigosApp && col.codigosApp.has(c)) || reg.numCliClaves[0] || "";
     const previo = mapa.get(n);
     if (!previo) { mapa.set(n, reg); return; }
-    const mismoCliente = (previo.numCli && previo.numCli === reg.numCli) || (!previo.numCli && normalizeText(previo.cliente) === normalizeText(reg.cliente));
+    const mismoCliente = (previo.numCli && reg.numCliClaves.includes(previo.numCli)) || (!previo.numCli && normalizeText(previo.cliente) === normalizeText(reg.cliente));
     if (!mismoCliente && previo.estado === "activa" && reg.estado === "activa" && !duplicadas.some((d) => d.n === n)) duplicadas.push({ n, a: previo, b: reg });
     if (reg.estado === "activa" && previo.estado !== "activa") mapa.set(n, reg);
   });
@@ -6158,8 +6165,8 @@ function ofLeer(filas, col) {
 }
 // ¿Mismo cliente? Por número si los dos lo tienen; si no, por palabras del nombre.
 function ofMismoCliente(p, x) {
-  const nums = [x.numero_cliente, x.numero_abonado].map(ofDigitos).filter(Boolean);
-  if (p.numCli && nums.length) return nums.includes(p.numCli);
+  const nums = [x.numero_cliente, x.numero_abonado].map(claveAbonado).filter(Boolean);
+  if (p.numCliClaves && p.numCliClaves.length && nums.length) return p.numCliClaves.some((c) => nums.includes(c));
   if (!p.cliente || !x.cliente) return true;
   const pal = (t) => new Set(normalizeText(t).split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !/^(srl|sas|sa|del|los|las|consorcio|edificio)$/.test(w)));
   const a = pal(p.cliente), b = pal(x.cliente);
@@ -6185,6 +6192,8 @@ function conciliarOficina(filas, opciones) {
   const auto = ofColumnas(filas, num);
   const col = { num, ...auto };
   ["empresa", "numCli", "nombre", "estado", "direccion"].forEach((k) => { if (o[k] !== undefined) col[k] = o[k]; });
+  col.codigosApp = new Set(controlSims.instaladas.flatMap((x) => [x.numero_cliente, x.numero_abonado]).map(claveAbonado).filter(Boolean));
+  col.esAbonado = !!col.numCli && /abonado|cuenta|account/.test(normalizeText(col.numCli));
   const { mapa, duplicadas } = ofLeer(filas, col);
   const inst = new Map(controlSims.instaladas.map((x) => [soloDigitosLinea(x.numero), x]));
   const stock = new Map(simsEnStockControl().map((x) => [soloDigitosLinea(x.numero), x]));
@@ -6240,8 +6249,8 @@ function conciliarOficina(filas, opciones) {
   return r;
 }
 const ofNumeroItem = (it) => soloDigitosLinea((it.x && it.x.numero) || it.n);
-function ofCliTxt(p) { return [p.cliente, p.numCli ? "N° " + p.numCli : ""].filter(Boolean).join(" · ") || "(sin cliente)"; }
-function ofAppTxt(x) { return [x.cliente, x.numero_cliente ? "N° " + x.numero_cliente : x.numero_abonado ? "abonado " + x.numero_abonado : ""].filter(Boolean).join(" · ") || "(sin cliente)"; }
+function ofCliTxt(p) { return [p.cliente, p.numCli ? (ultimaOf && ultimaOf.col.esAbonado ? "abonado " : "N° ") + p.numCli : ""].filter(Boolean).join(" · ") || "(sin cliente)"; }
+function ofAppTxt(x) { return [x.cliente, x.numero_cliente ? "N° " + x.numero_cliente : "", x.numero_abonado ? "abonado " + x.numero_abonado : ""].filter(Boolean).join(" · ") || "(sin cliente)"; }
 function ofFilaHtml(k, it, i) {
   const x = it.x || {}, p = it.p || {};
   const num = `<button type="button" class="sim-num-link" data-ficha="${escapeHtmlAdmin(x.numero || it.n)}">${escapeHtmlAdmin(x.numero || it.n)}</button>`;
@@ -6355,7 +6364,8 @@ function ofPedido(a, it) {
     const base = p.cliente ? buscarClienteSimsPorNombre(p.cliente) : null;
     const campos = {};
     if (p.cliente) campos.cliente = base ? base.nombre : p.cliente;
-    if (p.numCli || (base && base.numero_cliente)) campos.numero_cliente = p.numCli || String(base.numero_cliente);
+    if (ultimaOf && ultimaOf.col.esAbonado) { if (p.numCli) campos.numero_abonado = p.numCli; if (base && base.numero_cliente) campos.numero_cliente = String(base.numero_cliente); }
+    else if (p.numCli || (base && base.numero_cliente)) campos.numero_cliente = p.numCli || String(base.numero_cliente);
     if (p.direccion) campos.direccion = p.direccion;
     return Object.keys(campos).length ? { accion: "editar_instalada", numero: x.numero, tecnico: "Oficina", campos } : null;
   }
@@ -6395,8 +6405,8 @@ function ofPanelInstalar(tr, it) {
   extra.className = "sim-fila-extra";
   extra.innerHTML = `<td colspan="4" class="sim-extra"><div class="field-row" style="flex-wrap:wrap;">
     <div><label>Cliente</label><input type="text" class="x-cliente" list="simInstalarClientesLista" value="${escapeHtmlAdmin(base ? base.nombre : p.cliente || "")}"></div>
-    <div><label>N° de cliente</label><input type="text" class="x-numcli" value="${escapeHtmlAdmin(p.numCli || (base && base.numero_cliente) || "")}"></div>
-    <div><label>N° de abonado</label><input type="text" class="x-abonado" value="${escapeHtmlAdmin((base && base.numero_abonado) || "")}"></div>
+    <div><label>N° de cliente</label><input type="text" class="x-numcli" value="${escapeHtmlAdmin((ultimaOf.col.esAbonado ? "" : p.numCli) || (base && base.numero_cliente) || "")}"></div>
+    <div><label>N° de abonado</label><input type="text" class="x-abonado" value="${escapeHtmlAdmin((ultimaOf.col.esAbonado ? p.numCli : "") || (base && base.numero_abonado) || "")}"></div>
     <div><label>Dirección</label><input type="text" class="x-direccion" value="${escapeHtmlAdmin(p.direccion || (base ? [base.direccion, base.localidad].filter(Boolean).join(", ") : ""))}"></div>
     ${it.s ? "" : `<div><label>Empresa</label><select class="x-empresa">${EMPRESAS_SIM.map((e) => `<option ${e === p.empresa ? "selected" : ""}>${e}</option>`).join("")}</select></div>`}
     <button type="button" class="x-ok" style="width:auto;">Instalar</button><button type="button" class="btn-secondary-admin x-cancel" style="width:auto;">Cancelar</button></div>
@@ -6453,7 +6463,7 @@ function ofExcel() {
   const c = ultimaOf;
   const libro = XLSX.utils.book_new();
   const hoja = (nombre, filas) => XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filas.length ? filas : [{ Número: "(ninguna)" }]), nombre.slice(0, 31));
-  const of = (p) => ({ "Cliente en Oficina": (p || {}).cliente || "", "N° cliente Oficina": (p || {}).numCli || "", "Empresa en Oficina": (p || {}).empresa || "" });
+  const of = (p) => ({ "Cliente en Oficina": (p || {}).cliente || "", [ultimaOf.col.esAbonado ? "Abonado en Oficina" : "N° cliente Oficina"]: (p || {}).numCli || "", "Empresa en Oficina": (p || {}).empresa || "" });
   const app = (x) => ({ "Cliente en la APP": (x || {}).cliente || "", "N° cliente APP": (x || {}).numero_cliente || "", "Empresa en la APP": (x || {}).empresa || "", "Estado en la APP": (x || {}).estado_linea || "" });
   hoja("Número mal cargado", c.ofPosibleError.map((it) => ({ "En Oficina": it.n, "En la APP": it.x.numero, ...of(it.p), ...app(it.x) })));
   hoja("Solo en Oficina", c.ofSoloOficina.map((it) => ({ Número: it.n, ...of(it.p), "Qué sabe la APP": it.ctx.texto })));
@@ -6476,7 +6486,8 @@ document.getElementById("simsOfArchivo").addEventListener("change", (ev) => {
     try {
       if (!await cargarControlSims()) throw new Error("no se pudieron leer las SIMs de la APP (para no comparar contra una lista vacía, no se sigue). Probá de nuevo.");
       concAsegurarClientes();
-      const wb = XLSX.read(e.target.result, { type: "array" });
+      // CSV: se lee como texto, para que "48E2" no pase a 4800 (en un Excel ya convertido, se reconoce después).
+      const wb = XLSX.read(e.target.result, { type: "array", raw: /\.csv$/i.test(f.name) });
       const filas = wb.SheetNames.flatMap((nombre) => XLSX.utils.sheet_to_json(wb.Sheets[nombre], { defval: "" }))
         .filter((fila) => Object.values(fila).some((v) => soloDigitosLinea(v).length === 10));
       if (!filas.length) throw new Error("El archivo no tiene números de línea.");
@@ -6489,7 +6500,6 @@ document.getElementById("simsOfArchivo").addEventListener("change", (ev) => {
 
 // ---------- Alarmas que no comunican: reporte del monitoreo vs. SIMs instaladas ----------
 let comEstado = null; // { filas, archivo, colAbonado, colFecha }
-const soloDigitosAbonado = (v) => String(v == null ? "" : v).replace(/\D/g, "").replace(/^0+/, "");
 // Fecha de un Excel (número de serie), "dd/mm/aaaa hh:mm", ISO o texto: a milisegundos.
 function comFecha(v) {
   if (v == null || v === "") return null;
@@ -6506,7 +6516,7 @@ function comColumnas(filas) {
   const cab = [...new Set(filas.flatMap((f) => Object.keys(f)))];
   const muestra = filas.slice(0, 300);
   const puntaje = (c, test) => muestra.reduce((n, f) => n + (test(f[c]) ? 1 : 0), 0) / Math.max(1, muestra.filter((f) => String(f[c] == null ? "" : f[c]).trim()).length);
-  const abon = cab.map((c) => ({ c, p: (/abonado|cuenta|account|abon/.test(normalizeText(c)) ? 0.8 : /cliente|nro|numero/.test(normalizeText(c)) ? 0.3 : 0) + puntaje(c, (v) => /^\d{1,8}$/.test(soloDigitosAbonado(v)) && String(v).replace(/\D/g, "").length <= 8) })).sort((a, b) => b.p - a.p);
+  const abon = cab.map((c) => ({ c, p: (/abonado|cuenta|account|abon/.test(normalizeText(c)) ? 0.8 : /cliente|nro|numero/.test(normalizeText(c)) ? 0.3 : 0) + puntaje(c, (v) => esCodigoClienteAbonado(v) && String(v).replace(/\W/g, "").length <= 9) })).sort((a, b) => b.p - a.p);
   const fecha = cab.map((c) => ({ c, p: (/ultim|last|senal|señal|comunic|evento|fecha|test|reporte/.test(normalizeText(c)) ? 0.5 : 0) + puntaje(c, (v) => comFecha(v) != null) })).sort((a, b) => b.p - a.p);
   return { cab, abonado: abon[0] && abon[0].c, fecha: fecha[0] && fecha[0].c };
 }
@@ -6516,12 +6526,14 @@ function comCalcular() {
   const dias = Number(document.getElementById("simsComDias").value) || 30, ahora = Date.now();
   // Último reporte de cada abonado (si aparece varias veces, el más nuevo).
   const ultimo = new Map();
+  let filasConAbonado = 0;
   comEstado.filas.forEach((f) => {
-    const a = soloDigitosAbonado(f[comEstado.colAbonado]), t = comFecha(f[comEstado.colFecha]);
-    if (!a) return;
-    if (!ultimo.has(a) || (t || 0) > (ultimo.get(a) || 0)) ultimo.set(a, t);
+    // Todas las formas posibles del código (48ED, 0555 -> 555, 4800 de Excel -> 48E2).
+    const claves = clavesAbonado(f[comEstado.colAbonado]), t = comFecha(f[comEstado.colFecha]);
+    if (claves.length) filasConAbonado++;
+    claves.forEach((a) => { if (!ultimo.has(a) || (t || 0) > (ultimo.get(a) || 0)) ultimo.set(a, t); });
   });
-  const abonadoDe = (x) => soloDigitosAbonado(x.numero_abonado) || soloDigitosAbonado(((clientesGeneralParaSims || []).find((c) => x.numero_cliente && String(c.numero_cliente) === String(x.numero_cliente)) || {}).numero_abonado);
+  const abonadoDe = (x) => claveAbonado(x.numero_abonado) || claveAbonado(((clientesGeneralParaSims || []).find((c) => x.numero_cliente && String(c.numero_cliente) === String(x.numero_cliente)) || {}).numero_abonado);
   const activas = controlSims.instaladas.filter((x) => !/inactiv|baja/i.test(x.estado_linea || ""));
   const viejas = [], noFiguran = [];
   let sinAbonado = 0;
@@ -6534,7 +6546,7 @@ function comCalcular() {
   });
   viejas.sort((p, q) => q.d - p.d);
   comEstado.resultado = { viejas, noFiguran };
-  const fila = (it, i, tipo) => `<tr><td><button type="button" class="sim-num-link" data-ficha="${escapeHtmlAdmin(it.x.numero)}">${escapeHtmlAdmin(it.x.numero)}</button></td><td style="white-space:normal;"><b>${escapeHtmlAdmin(it.x.cliente || "")}</b> · abonado ${escapeHtmlAdmin(it.a)}${it.x.empresa ? " · " + escapeHtmlAdmin(it.x.empresa) : ""}${tipo === "v" ? `<br><small style="color:#B3261E;font-weight:600;">${it.t == null ? "Sin fecha de última señal" : `Última señal: ${new Date(it.t).toLocaleDateString("es-AR")} (hace ${it.d} días)`}</small>` : ""}</td><td class="conc-btns"><button type="button" class="btn-secondary-admin com-acc" data-t="${tipo}" data-i="${i}" data-a="inactiva">Marcar inactiva</button><button type="button" class="btn-secondary-admin com-acc" data-t="${tipo}" data-i="${i}" data-a="retirar">Retirar del cliente</button></td></tr>`;
+  const fila = (it, i, tipo) => `<tr><td><button type="button" class="sim-num-link" data-ficha="${escapeHtmlAdmin(it.x.numero)}">${escapeHtmlAdmin(it.x.numero)}</button></td><td style="white-space:normal;"><b>${escapeHtmlAdmin(it.x.cliente || "")}</b> · abonado ${escapeHtmlAdmin(it.x.numero_abonado || it.a)}${it.x.empresa ? " · " + escapeHtmlAdmin(it.x.empresa) : ""}${tipo === "v" ? `<br><small style="color:#B3261E;font-weight:600;">${it.t == null ? "Sin fecha de última señal" : `Última señal: ${new Date(it.t).toLocaleDateString("es-AR")} (hace ${it.d} días)`}</small>` : ""}</td><td class="conc-btns"><button type="button" class="btn-secondary-admin com-acc" data-t="${tipo}" data-i="${i}" data-a="inactiva">Marcar inactiva</button><button type="button" class="btn-secondary-admin com-acc" data-t="${tipo}" data-i="${i}" data-a="retirar">Retirar del cliente</button></td></tr>`;
   const opc = (sel) => comEstado.cab.map((c) => `<option ${c === sel ? "selected" : ""}>${escapeHtmlAdmin(c)}</option>`).join("");
   cont.innerHTML = `<div class="field-row conc-columnas"><div><label>Columna del N° de abonado</label><select id="comColAbonado">${opc(comEstado.colAbonado)}</select></div><div><label>Columna de la última señal</label><select id="comColFecha">${opc(comEstado.colFecha)}</select></div></div><div class="sims-resumen" style="margin:10px 0;"><span class="sims-chip ${viejas.length ? "alerta" : ""}">Sin comunicar hace más de ${dias} días <b>${viejas.length}</b></span><span class="sims-chip">No están en el reporte <b>${noFiguran.length}</b></span><span class="sims-chip">Instaladas sin N° de abonado <b>${sinAbonado}</b></span></div>`
     + (viejas.length ? `<h4 style="margin:12px 0 4px;">Sin comunicar hace más de ${dias} días (${viejas.length})</h4><p class="subtitle" style="margin:0 0 6px;">Revisar la línea con la empresa (baja, sin saldo) o el equipo con el cliente.</p><div class="sims-tabla-wrap"><table class="sims-tabla"><tbody>${viejas.map((it, i) => fila(it, i, "v")).join("")}</tbody></table></div>` : `<p class="status ok">Todas las alarmas con SIM comunicaron en los últimos ${dias} días.</p>`)
@@ -6559,7 +6571,7 @@ function comCalcular() {
     });
   }));
   st.className = "status ok";
-  st.textContent = `${comEstado.archivo}: ${ultimo.size} abonados en el reporte (columnas «${comEstado.colAbonado}» y «${comEstado.colFecha}»). ${activas.length} SIMs instaladas activas.`;
+  st.textContent = `${comEstado.archivo}: ${filasConAbonado} filas con abonado en el reporte (columnas «${comEstado.colAbonado}» y «${comEstado.colFecha}»). ${activas.length} SIMs instaladas activas.`;
 }
 document.getElementById("simsComDias").addEventListener("change", comCalcular);
 document.getElementById("simsComArchivo").addEventListener("change", (ev) => {
@@ -6573,7 +6585,7 @@ document.getElementById("simsComArchivo").addEventListener("change", (ev) => {
     try {
       if (!await cargarControlSims()) throw new Error("no se pudieron leer las SIMs de la APP. Probá de nuevo.");
       await concAsegurarClientes();
-      const wb = XLSX.read(e.target.result, { type: "array", cellDates: false });
+      const wb = XLSX.read(e.target.result, { type: "array", cellDates: false, raw: /\.csv$/i.test(f.name) });
       const filas = wb.SheetNames.flatMap((n) => XLSX.utils.sheet_to_json(wb.Sheets[n], { defval: "" }));
       if (!filas.length) throw new Error("El reporte está vacío.");
       const col = comColumnas(filas);
@@ -6595,7 +6607,7 @@ document.getElementById("simsConcArchivo").addEventListener("change", (ev) => {
     try {
       if (!await cargarControlSims()) throw new Error("no se pudieron leer las SIMs de la APP (para no comparar contra una lista vacía, no se sigue). Probá de nuevo.");
       concAsegurarClientes();
-      const wb = XLSX.read(e.target.result, { type: "array" });
+      const wb = XLSX.read(e.target.result, { type: "array", raw: /\.csv$/i.test(f.name) });
       // Todas las hojas que tengan números de línea.
       const filas = wb.SheetNames.flatMap((nombre) => XLSX.utils.sheet_to_json(wb.Sheets[nombre], { defval: "" }))
         .filter((fila) => Object.values(fila).some((v) => soloDigitosLinea(v).length === 10));

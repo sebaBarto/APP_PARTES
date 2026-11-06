@@ -1213,3 +1213,17 @@ test("Copias de seguridad: solo la oficina; se baja en pedazos, sin claves, y se
     global.fetch = fetchViejo;
   }
 });
+
+test("Código de abonado: letras (hexadecimal), ceros adelante y lo que Excel hace con «48E2»", () => {
+  const u = require(path.join(raiz, "sims-utils.js"));
+  assert.ok(u.mismoAbonado(4800, "48E2"), "Excel: 48E2 -> 4800");
+  assert.ok(u.mismoAbonado("4,80E+03", "48E2"), "Excel muestra 4,80E+03");
+  assert.ok(u.mismoAbonado(120000, "12E4"));
+  assert.ok(u.mismoAbonado(40000, "40E3"));
+  assert.ok(u.mismoAbonado(555, "0555"), "ceros adelante");
+  assert.ok(u.mismoAbonado("48ed", "48ED"), "mayúsculas/minúsculas");
+  assert.ok(!u.mismoAbonado("48ED", "48"), "antes se borraban las letras y 48ED quedaba como 48");
+  assert.ok(!u.mismoAbonado("48ED", "48EA"));
+  assert.ok(u.mismoAbonado(4800, "4800"), "un 4800 de verdad sigue siendo 4800");
+  assert.deepStrictEqual(u.clavesAbonado("4,80E+03")[0], "48E2", "se muestra como el código");
+});

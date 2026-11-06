@@ -5172,3 +5172,48 @@ test("Copias de seguridad: baja un .zip con todo, se vuelve a abrir, se ve en Ex
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Abonados con letras o convertidos por Excel (48ED, 48E2 -> 4800, 0555): la conciliación con Oficina y el reporte del monitoreo los reconocen", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: route.request().url().includes("xlsx.full.min.js") ? require("fs").readFileSync(require("path").join(__dirname, "..", "vendor", "xlsx.full.min.js"), "utf8") : "" }));
+  const instaladas = [
+    { numero: "3415550020", empresa: "Claro", cliente: "Kiosco Pepe", numero_abonado: "48E2", estado_linea: "Activo" },
+    { numero: "3415550030", empresa: "Claro", cliente: "Panadería La Espiga", numero_abonado: "48ED", estado_linea: "Activo" },
+    { numero: "3415550040", empresa: "Claro", cliente: "Bar", numero_abonado: "0555", estado_linea: "Activo" },
+    { numero: "3415550050", empresa: "Claro", cliente: "Gomería", numero_abonado: "12E4", estado_linea: "Activo" },
+  ];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("coleccion=sims_instaladas")) return json(instaladas);
+    json([]);
+  });
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { document.getElementById("mainCard").classList.remove("hidden"); document.getElementById("panelSimsControl").classList.remove("hidden"); return cargarControlSims(); });
+  // Excel de Oficina: el 48E2 ya viene convertido a 4800 (número) y el nombre está escrito distinto
+  const buf = await page.evaluate(() => {
+    const filas = [
+      { Abonado: 4800, "Razón Social": "PEPE KIOSCO", "Línea": "3415550020", "Compañía": "Claro" },
+      { Abonado: "48ED", "Razón Social": "La Espiga", "Línea": "3415550030", "Compañía": "Claro" },
+      { Abonado: 555, "Razón Social": "Bar", "Línea": "3415550040", "Compañía": "Claro" },
+      { Abonado: "48EA", "Razón Social": "Gomería", "Línea": "3415550050", "Compañía": "Claro" },
+    ];
+    const lb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(lb, XLSX.utils.json_to_sheet(filas), "S");
+    return Array.from(new Uint8Array(XLSX.write(lb, { type: "array", bookType: "xlsx" })));
+  });
+  await page.setInputFiles("#simsOfArchivo", { name: "oficina.xlsx", mimeType: "application/octet-stream", buffer: Buffer.from(buf) });
+  await page.waitForFunction(() => ultimaOf);
+  const r = await page.evaluate(() => ({ col: ultimaOf.col.numCli, coinciden: ultimaOf.coinciden, distinto: ultimaOf.ofClienteDistinto.map((x) => [x.n, x.p.numCli]) }));
+  assert.deepStrictEqual(r, { col: "Abonado", coinciden: 3, distinto: [["3415550050", "48EA"]] }, "solo la que de verdad tiene otro abonado");
+  // Reporte del monitoreo en CSV: "48E2" y "12E4" como texto (no se convierten), "0555" con cero
+  const hoy = new Date(), f = `${String(hoy.getDate()).padStart(2, "0")}/${String(hoy.getMonth() + 1).padStart(2, "0")}/${hoy.getFullYear()} 10:00`;
+  const csv = `Cuenta,Nombre,Ultima senal\n48E2,Kiosco,${f}\n48ed,Panaderia,${f}\n0555,Bar,${f}\n12E4,Gomeria,${f}\n`;
+  await page.setInputFiles("#simsComArchivo", { name: "monitoreo.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
+  await page.waitForSelector("#simsComResultado .sims-resumen");
+  const com = await page.textContent("#simsComResultado");
+  assert.match(com, /No están en el reporte\s*0/, "las cuatro se reconocen");
+  assert.match(com, /Todas las alarmas con SIM comunicaron/);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
