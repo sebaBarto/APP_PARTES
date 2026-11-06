@@ -1271,6 +1271,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
         <button type="button" class="btn-secondary-admin" data-stk="pedidos">Pedidos</button>
         <button type="button" class="btn-secondary-admin" data-stk="movimientos">Movimientos</button>
         <button type="button" class="btn-secondary-admin" data-stk="oficina">Para Oficina</button>
+        <button type="button" class="btn-secondary-admin" data-stk="garantia">Garantía</button>
         <button type="button" class="btn-secondary-admin" data-stk="proveedores">Proveedores</button>
       </div>
       <p class="status" id="stkStatus"></p>
@@ -1292,6 +1293,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
             <div><label>Dónde</label><select id="stkDonde"><option value="">En cualquier lado</option><option value="dep">En el depósito</option><option value="tec">En técnicos</option><option value="veh">En vehículos</option><option value="cam">En camino</option><option value="cli">En clientes (instalado)</option><option value="com">En comodato</option></select></div>
             <div><label>Proveedor</label><select id="stkProv"><option value="">Todos</option></select></div>
             <button type="button" class="btn-secondary-admin" id="stkExcelBtn" style="width:auto;">⬇ Excel</button>
+            <button type="button" class="btn-secondary-admin" id="stkTipoVariosBtn" style="width:auto;">Cambiar cómo se controlan los que se ven…</button>
           </div>
           <div class="stk-tipos" id="stkTipos" role="group" aria-label="Tipos de artículo"></div>
           <div id="stkLista"></div>
@@ -1330,6 +1332,20 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
             <label style="display:flex;align-items:center;gap:6px;margin:0;"><input type="checkbox" id="stkOfVerPasados" style="width:auto;"> Mostrar también los ya pasados</label>
           </div>
           <div id="stkOfLista"></div>
+        </div>
+      </div>
+
+      <div data-stk-vista="garantia" class="hidden">
+        <div class="card">
+          <h3 style="margin-top:0;">Garantía: equipos fallados</h3>
+          <p class="subtitle" style="margin-top:0;">Los equipos que vuelven fallados (de un cliente o de un técnico) quedan acá con su N° de serie, a qué cliente se habían instalado, cuándo y con qué presupuesto, y de qué proveedor vinieron. Se sigue hasta que el proveedor lo repara, lo reemplaza o rechaza la garantía.</p>
+          <div class="field-row" style="flex-wrap:wrap;align-items:flex-end;">
+            <div style="flex:2 1 220px;"><label>Buscar un N° de serie (cualquier equipo)</label><input type="text" class="field-input" id="stkGarBuscar" placeholder="Ej: GH120FF156"></div>
+            <label style="display:flex;align-items:center;gap:6px;margin:0;"><input type="checkbox" id="stkGarCerradas" style="width:auto;"> Ver también las cerradas</label>
+            <button type="button" class="btn-secondary-admin" id="stkGarExcelBtn" style="width:auto;">⬇ Excel (para el proveedor)</button>
+          </div>
+          <div id="stkGarFicha"></div>
+          <div id="stkGarLista"></div>
         </div>
       </div>
 
@@ -6256,6 +6272,7 @@ function stkMostrarVista() {
   else if (stkVista === "movimientos") stkCargarMovimientos();
   else if (stkVista === "oficina") stkCargarOficina();
   else if (stkVista === "proveedores") stkRenderProveedores();
+  else if (stkVista === "garantia") stkRenderGarantia();
 }
 document.querySelectorAll("#stkSub [data-stk]").forEach((b) => b.addEventListener("click", () => { stkVista = b.dataset.stk; stkMostrarVista(); }));
 
@@ -6327,7 +6344,7 @@ function stkGuardarFiltros() { try { localStorage.setItem(STK_FILTRO_CLAVE, JSON
 function stkPintarFiltros() {
   const arts = Object.values(stk.catalogo.articulos || {});
   const n = {}; arts.forEach((a) => { n[a.tipo] = (n[a.tipo] || 0) + 1; });
-  const nombres = { unidad: "Equipos con N° de unidad", cantidad: "Por cantidad", sim: "SIM", herramienta: "Herramientas", no: "No controlar" };
+  const nombres = { unidad: "Equipos con N° de serie", cantidad: "Por cantidad", sim: "SIM", herramienta: "Herramientas", no: "No controlar" };
   document.getElementById("stkTipos").innerHTML = Object.keys(STOCK_TIPOS).map((k) => `<label><input type="checkbox" value="${k}" ${stkTiposVisibles.has(k) ? "checked" : ""}> ${nombres[k]} <span class="n">${n[k] || 0}</span></label>`).join("");
   document.querySelectorAll("#stkTipos input").forEach((i) => i.addEventListener("change", () => { if (i.checked) stkTiposVisibles.add(i.value); else stkTiposVisibles.delete(i.value); stkGuardarFiltros(); stkLimite = 200; stkRenderArticulos(); }));
   const sel = document.getElementById("stkProv"), actual = sel.value;
@@ -6413,6 +6430,25 @@ async function stkAjustarDialogo(c, ubic) {
   } catch (err) { avisoAdmin("No se pudo ajustar: " + err.message, "err"); }
   stkMostrarVista();
 }
+document.getElementById("stkTipoVariosBtn").addEventListener("click", async (e) => {
+  const btn = e.currentTarget, lista = stkFiltrados();
+  if (!lista.length) { avisoAdmin("No hay artículos con ese filtro.", "aviso"); return; }
+  const opciones = Object.entries(STOCK_TIPOS).map(([k, v], i) => `${i + 1}. ${v}`).join("\n");
+  const v = await pedirTextoAdmin(`Se van a cambiar los ${lista.length} artículos que se ven (usá el buscador y los filtros para elegirlos; ej. buscá «infrarrojo»).\n\n${opciones}\n\nEscribí el número:`, "1");
+  if (v === null) return;
+  const tipo = Object.keys(STOCK_TIPOS)[Number(v) - 1];
+  if (!tipo) { avisoAdmin("Número inválido.", "err"); return; }
+  if (!(await confirmarAdmin(`¿Pasar ${lista.length} artículos a «${STOCK_TIPOS[tipo]}»?\n\n${lista.slice(0, 8).map((x) => "• " + x.a.d).join("\n")}${lista.length > 8 ? `\n… y ${lista.length - 8} más` : ""}`))) return;
+  await simsConBoton(btn, async () => {
+    try {
+      const r = await stkPost({ accion: "configurar_varios", codigos: lista.map((x) => x.a.c), tipo });
+      await stkLeer();
+      const mal = lista.filter((x) => (stk.catalogo.articulos[x.a.c] || {}).tipo !== tipo).length;
+      avisoAdmin(mal ? `Ojo: ${mal} no quedaron cambiados.` : `Listo: ${r.cambiados} artículo(s) ahora son «${STOCK_TIPOS[tipo]}».`, mal ? "err" : "ok");
+      stkMostrarVista();
+    } catch (err) { avisoAdmin("No se pudo: " + err.message, "err"); }
+  });
+});
 document.getElementById("stkExcelBtn").addEventListener("click", () => {
   if (!stk) return;
   const filas = stkFiltrados().map(({ a, t }) => ({ Código: a.c, Descripción: a.d, "Cómo se controla": STOCK_TIPOS[a.tipo] || a.tipo, Unidad: a.medida || "unidades", Depósito: t.dep, "Técnicos": t.tec, "Vehículos": t.veh, "En camino": t.cam, "Comodato": t.com, "Instalado en clientes": t.cli, "Stock mínimo": a.min ?? "", "Cantidad a pedir": a.pedir ?? "", Proveedor: a.prov || "", "Dónde está": stkUbicTexto(t.detalle) }));
@@ -6459,7 +6495,7 @@ async function stkRenderConciliacion(registrar) {
     let oficina = "", app = "", dif = "";
     if (cat.k === "comodatoDistinto") { oficina = stkFmt(of.com); app = stkFmt(t.com); dif = it.dif; }
     else if (cat.k === "negativo") { oficina = "—"; app = `${escapeHtmlAdmin(nombreUbicacion(it.u))}: ${stkFmt(it.n)}`; }
-    else if (cat.k === "unidadesSinRegistrar") { oficina = stkFmt(of.dep); app = `${stkFmt(t.sat)} (${it.registradas} con N° de unidad)`; }
+    else if (cat.k === "unidadesSinRegistrar") { oficina = stkFmt(of.dep); app = `${stkFmt(t.sat)} (${it.registradas} con N° de serie)`; }
     else { oficina = stkFmt(of.dep); app = stkFmt(t.sat); dif = it.dif != null ? it.dif : (t.sat || 0) - (of.dep || 0); }
     const difTxt = dif === "" ? "" : `<b style="color:${dif > 0 ? "#8A5A00" : "#B3261E"}">${dif > 0 ? "+" : ""}${stkFmt(dif)}</b>`;
     return `<tr data-c="${escapeHtmlAdmin(it.c)}" data-u="${escapeHtmlAdmin(it.u || "")}">
@@ -6650,7 +6686,7 @@ function stkRenderPedidos() {
 
 // --- Movimientos ---
 let stkMovs = [];
-const STK_MOV_TIPO = { inicial: "Saldo inicial", ajuste: "Ajuste", entrega: "Entrega a técnico (en camino)", recibido: "Recibido", diferencia: "Diferencia (vuelve)", rechazado: "Rechazado (vuelve)", devolucion: "Devolución", a_cliente: "A cliente", retiro: "Retiro de cliente", traspaso: "Traspaso", consumo: "Usado en cliente", ingreso: "Ingreso (compra)", inventario_series: "Inventario de N° de serie" };
+const STK_MOV_TIPO = { inicial: "Saldo inicial", ajuste: "Ajuste", entrega: "Entrega a técnico (en camino)", recibido: "Recibido", diferencia: "Diferencia (vuelve)", rechazado: "Rechazado (vuelve)", devolucion: "Devolución", a_cliente: "A cliente", retiro: "Retiro de cliente", traspaso: "Traspaso", consumo: "Usado en cliente", ingreso: "Ingreso (compra)", inventario_series: "Inventario de N° de serie", falla: "Fallado → Garantía", garantia_reparado: "Volvió reparado de garantía", garantia_reemplazo: "Reemplazo en garantía", garantia_rechazada: "Garantía rechazada (baja)" };
 async function stkCargarMovimientos() {
   const mesInp = document.getElementById("stkMovMes");
   if (!mesInp.value) mesInp.value = new Date().toISOString().slice(0, 7);
@@ -6684,7 +6720,7 @@ document.getElementById("stkMovMes").addEventListener("change", stkCargarMovimie
 document.getElementById("stkMovBuscar").addEventListener("input", stkRenderMovimientos);
 document.getElementById("stkMovTipo").addEventListener("change", stkRenderMovimientos);
 document.getElementById("stkMovExcelBtn").addEventListener("click", () => {
-  const filas = stkMovFiltrados().map((m) => ({ Fecha: new Date(m.fecha).toLocaleString("es-AR"), Tipo: STK_MOV_TIPO[m.tipo] || m.tipo, Código: m.c, Descripción: m.d, Cantidad: m.cant, De: m.de ? nombreUbicacion(m.de) : "", A: m.a ? nombreUbicacion(m.a) : "", Por: m.por || "", Presupuesto: m.presupuesto || "", Proveedor: m.prov ? nombreProveedor(stk.catalogo, m.prov) || m.prov : "", "N° de unidad": (m.unidades || []).join(", "), Motivo: m.motivo || "", "Pasado a Oficina": m.oficina ? new Date(m.oficina).toLocaleDateString("es-AR") : "" }));
+  const filas = stkMovFiltrados().map((m) => ({ Fecha: new Date(m.fecha).toLocaleString("es-AR"), Tipo: STK_MOV_TIPO[m.tipo] || m.tipo, Código: m.c, Descripción: m.d, Cantidad: m.cant, De: m.de ? nombreUbicacion(m.de) : "", A: m.a ? nombreUbicacion(m.a) : "", Por: m.por || "", Presupuesto: m.presupuesto || "", Proveedor: m.prov ? nombreProveedor(stk.catalogo, m.prov) || m.prov : "", "N° de serie": (m.unidades || []).join(", "), Motivo: m.motivo || "", "Pasado a Oficina": m.oficina ? new Date(m.oficina).toLocaleDateString("es-AR") : "" }));
   const libro = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filas.length ? filas : [{ Fecha: "Sin movimientos" }]), "Movimientos");
   XLSX.writeFile(libro, `stock_movimientos_${document.getElementById("stkMovMes").value}.xlsx`);
@@ -6758,6 +6794,58 @@ function stkOficinaExcel(lista) {
 }
 document.getElementById("stkOfMes").addEventListener("change", stkCargarOficina);
 document.getElementById("stkOfVerPasados").addEventListener("change", stkRenderOficina);
+
+// --- Garantía ---
+const stkFecha = (f) => (f ? new Date(f).toLocaleDateString("es-AR") : "");
+function stkGarantias() {
+  const verCerradas = document.getElementById("stkGarCerradas").checked, arts = stk.catalogo.articulos || {};
+  return Object.entries(stk.saldos.unidades || {}).filter(([, u]) => u.garantia && (verCerradas || !u.garantia.cerrada))
+    .map(([t, u]) => ({ t, u, g: u.garantia, d: (arts[u.c] || {}).d || u.c, prov: nombreProveedor(stk.catalogo, u.prov) || (u.prov ? "Proveedor " + u.prov : (arts[u.c] || {}).prov || ""), inst: u.garantia.instalacion || instalacionDeUnidad(u) }))
+    .sort((x, y) => (x.g.cerrada ? 1 : 0) - (y.g.cerrada ? 1 : 0) || x.prov.localeCompare(y.prov, "es") || String(x.g.desde).localeCompare(String(y.g.desde)));
+}
+function stkRenderGarantia() {
+  const lista = stkGarantias(), cont = document.getElementById("stkGarLista");
+  const abiertas = lista.filter((x) => !x.g.cerrada).length;
+  cont.innerHTML = !lista.length ? '<p class="status ok" style="margin-top:12px;">No hay equipos fallados en garantía.</p>'
+    : `<p class="subtitle" style="margin:10px 0 6px;"><b>${abiertas}</b> abierta${abiertas === 1 ? "" : "s"}.</p><div style="overflow-x:auto;"><table class="sims-tabla stk-tabla"><thead><tr><th>N° de serie</th><th>Artículo</th><th>Proveedor</th><th>Estaba en</th><th>Falla</th><th>Estado</th><th></th></tr></thead><tbody>
+    ${lista.map((x) => `<tr data-t="${escapeHtmlAdmin(x.t)}"><td style="font-family:'IBM Plex Mono',monospace;">${escapeHtmlAdmin(x.t)}</td><td>${escapeHtmlAdmin(x.u.c)} ${escapeHtmlAdmin(x.d)}</td><td>${escapeHtmlAdmin(x.prov)}</td>
+      <td>${x.inst ? `${escapeHtmlAdmin(x.inst.cliente)}${x.inst.comodato ? " (comodato)" : ""}<div class="stk-det">instalado ${escapeHtmlAdmin(stkFecha(x.inst.fecha))}${x.inst.presupuesto ? ` · presup. ${escapeHtmlAdmin(x.inst.presupuesto)}` : ""}</div>` : '<span class="stk-det">Sin instalación registrada</span>'}</td>
+      <td>${escapeHtmlAdmin(x.g.falla || "")}<div class="stk-det">volvió ${escapeHtmlAdmin(stkFecha(x.g.desde))}${x.g.por ? ` · ${escapeHtmlAdmin(x.g.por)}` : ""}</div></td>
+      <td><span class="stk-tag ${x.g.cerrada ? "" : "bajo"}">${escapeHtmlAdmin(GARANTIA_ESTADOS[x.g.estado] || x.g.estado)}</span>${x.g.rma ? `<div class="stk-det">RMA ${escapeHtmlAdmin(x.g.rma)}</div>` : ""}${x.g.nuevo ? `<div class="stk-det">Nuevo: ${escapeHtmlAdmin(x.g.nuevo)}</div>` : ""}</td>
+      <td class="stk-btns">${x.g.cerrada ? "" : `${x.g.estado === "por_enviar" ? '<button type="button" class="btn-secondary-admin" data-gar="enviado">Mandado al proveedor</button>' : ""}<button type="button" class="btn-secondary-admin" data-gar="reparado">Volvió reparado</button><button type="button" class="btn-secondary-admin" data-gar="reemplazado">Lo reemplazaron</button><button type="button" class="btn-secondary-admin" data-gar="rechazado">Rechazada</button>`}</td></tr>`).join("")}</tbody></table></div>`;
+  cont.querySelectorAll("[data-gar]").forEach((b) => b.addEventListener("click", async (e) => {
+    const btn = e.currentTarget, t = btn.closest("tr").dataset.t, estado = btn.dataset.gar, cuerpo = { accion: "garantia", serie: t, estado };
+    if (estado === "enviado") { const v = await pedirTextoAdmin(`¿Mandaste ${t} al proveedor? N° de RMA o de reclamo (opcional):`, ""); if (v === null) return; cuerpo.rma = v.trim(); }
+    if (estado === "reemplazado") { const v = await pedirTextoAdmin(`El proveedor reemplazó ${t}. N° de serie del equipo nuevo (entra al depósito):`, ""); if (!v || !v.trim()) return; cuerpo.nuevo = v.trim(); }
+    if (estado === "reparado" && !(await confirmarAdmin(`¿${t} volvió reparado? Vuelve al depósito.`))) return;
+    if (estado === "rechazado") { const v = await pedirTextoAdmin(`Garantía rechazada para ${t}: el equipo se da de baja. Motivo:`, ""); if (v === null) return; cuerpo.nota = v.trim(); }
+    await simsConBoton(btn, async () => {
+      try { await stkPost(cuerpo); await stkLeer(); const g = ((stk.saldos.unidades || {})[t] || {}).garantia || {}; avisoAdmin(g.estado === estado ? `Listo: ${t} — ${GARANTIA_ESTADOS[estado]}.` : "Ojo: después de guardar no quedó como se esperaba.", g.estado === estado ? "ok" : "err"); }
+      catch (err) { avisoAdmin("No se pudo: " + err.message, "err"); }
+      stkRenderGarantia();
+    });
+  }));
+}
+function stkFichaSerie() {
+  const t = document.getElementById("stkGarBuscar").value.trim().toUpperCase().replace(/\s+/g, ""), cont = document.getElementById("stkGarFicha");
+  if (!t) { cont.innerHTML = ""; return; }
+  const u = (stk.saldos.unidades || {})[t];
+  if (!u) { cont.innerHTML = `<p class="subtitle" style="margin-top:10px;">El N° de serie ${escapeHtmlAdmin(t)} no está registrado.</p>`; return; }
+  const a = (stk.catalogo.articulos || {})[u.c] || {}, inst = instalacionDeUnidad(u);
+  cont.innerHTML = `<div class="sims-resumen" style="display:block;margin:12px 0;padding:12px;border:1px solid #D6D9DC;border-radius:10px;">
+    <b style="font-family:'IBM Plex Mono',monospace;">${escapeHtmlAdmin(t)}</b> · ${escapeHtmlAdmin(u.c)} ${escapeHtmlAdmin(a.d || "")}${u.prov ? ` · ${escapeHtmlAdmin(nombreProveedor(stk.catalogo, u.prov) || "Proveedor " + u.prov)}` : ""}<br>
+    Ahora: <b>${escapeHtmlAdmin(nombreUbicacion(u.u))}</b>${inst ? ` · Instalado en <b>${escapeHtmlAdmin(inst.cliente)}</b> el ${escapeHtmlAdmin(stkFecha(inst.fecha))}${inst.presupuesto ? ` (presupuesto ${escapeHtmlAdmin(inst.presupuesto)})` : ""}` : ""}
+    ${u.garantia ? `<br>Garantía: ${escapeHtmlAdmin(GARANTIA_ESTADOS[u.garantia.estado] || "")}${u.garantia.falla ? " · " + escapeHtmlAdmin(u.garantia.falla) : ""}` : ""}${u.reemplaza ? `<br>Reemplaza en garantía a ${escapeHtmlAdmin(u.reemplaza)}` : ""}
+    ${(u.h || []).length ? `<div class="stk-det" style="margin-top:8px;">${u.h.slice().reverse().map((x) => `${escapeHtmlAdmin(stkFecha(x.f))}: ${escapeHtmlAdmin(x.de ? nombreUbicacion(x.de) + " → " : "")}${escapeHtmlAdmin(nombreUbicacion(x.a))}${x.presupuesto ? ` · presup. ${escapeHtmlAdmin(x.presupuesto)}` : ""}${x.por ? ` · ${escapeHtmlAdmin(x.por)}` : ""}${x.motivo ? ` · ${escapeHtmlAdmin(x.motivo)}` : ""}`).join("<br>")}</div>` : ""}</div>`;
+}
+document.getElementById("stkGarBuscar").addEventListener("input", stkFichaSerie);
+document.getElementById("stkGarCerradas").addEventListener("change", stkRenderGarantia);
+document.getElementById("stkGarExcelBtn").addEventListener("click", () => {
+  const filas = stkGarantias().map((x) => ({ "N° de serie": x.t, Código: x.u.c, Artículo: x.d, Proveedor: x.prov, Cliente: x.inst ? x.inst.cliente : "", "Instalado el": x.inst ? stkFecha(x.inst.fecha) : "", Presupuesto: x.inst ? x.inst.presupuesto : "", Falla: x.g.falla || "", "Volvió el": stkFecha(x.g.desde), Estado: GARANTIA_ESTADOS[x.g.estado] || x.g.estado, RMA: x.g.rma || "", "Equipo nuevo": x.g.nuevo || "" }));
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filas.length ? filas : [{ "N° de serie": "Sin equipos en garantía" }]), "Garantía");
+  XLSX.writeFile(libro, `stock_garantia_${new Date().toISOString().slice(0, 10)}.xlsx`);
+});
 
 // --- Proveedores: código de la etiqueta de SAT -> nombre ---
 let stkProvFilas = null;

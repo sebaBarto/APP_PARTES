@@ -5788,7 +5788,7 @@ test("Depósito: lote con artículos mezclados para un cliente, repetir la últi
     const b = JSON.parse(req.postData()); posts.push(b);
     if (b.op_id && ops.has(b.op_id)) return json({ ok: true, duplicado: true });
     if (b.op_id) ops.add(b.op_id);
-    if (b.accion === "mover") { const x = S.moverStock(saldos, b.items, { tipo: "mover", de: b.de, a: b.a, confirmar: /^tec:/.test(b.a) }, catalogo); if (x.error) return json({ error: x.error }, 409); saldos = x.saldos; return json({ ok: true }); }
+    if (b.accion === "mover") { const x = S.moverStock(saldos, b.items, { tipo: "mover", de: b.de, a: b.a, confirmar: /^tec:/.test(b.a), deFlexible: /^(cli|com):/.test(b.de || ""), presupuesto: b.presupuesto }, catalogo); if (x.error) return json({ error: x.error }, 409); saldos = S.abrirGarantias(x.saldos, x.movs, { falla: b.falla }); return json({ ok: true }); }
     if (b.accion === "registrar_unidades") { const { saldos: s2, ...r } = S.registrarUnidades(saldos, b.ubic, b.items); saldos = s2; return json({ ok: true, ...r }); }
     return json({ error: "?" }, 400);
   });
@@ -5877,6 +5877,72 @@ test("Depósito: lote con artículos mezclados para un cliente, repetir la últi
   await page.click(".dlg-app .dlg-si");
   assert.deepStrictEqual([saldos.unidades.GH900AA002.u, saldos.ubic.dep["20825"]], ["dep", 3]);
   await page.waitForFunction(() => { const t = document.getElementById("depInvFaltan").textContent; return !/TECLADO/.test(t) && /CENTRAL SP6000\s*0 de 1/.test(t); });
+  // Vuelve fallado uno de los equipos que se instalaron: escaneando su N° de serie se sabe cuál es y va a Garantía
+  await page.click('#depModos [data-modo="recibir"]');
+  await page.selectOption("#depRecibirTipo", "cli");
+  await page.fill("#depRecibirDe", "Kiosco Pérez");
+  await page.check("#depFallado");
+  await page.fill("#depFalla", "No detecta");
+  await page.fill("#depCodigo", "123456"); await page.press("#depCodigo", "Enter");
+  await page.waitForSelector("#depCanasta .stk-chip");
+  assert.match(await page.textContent("#depConfirmarBtn"), /Mandar 1 fallado a Garantía/);
+  await page.click("#depConfirmarBtn");
+  assert.match(await page.textContent(".dlg-app .dlg-texto"), /Garantía/);
+  await page.click(".dlg-app .dlg-si");
+  await page.waitForFunction(() => !document.querySelector("#depCanasta .stk-linea"));
+  assert.deepStrictEqual([posts.at(-1).a, posts.at(-1).falla, saldos.unidades["123456"].u, saldos.unidades["123456"].garantia.instalacion.cliente], ["gar", "No detecta", "gar", "Kiosco Pérez"]);
+  // Consultar: la ficha del equipo con a dónde fue
+  await page.click('#depModos [data-modo="consultar"]');
+  await page.fill("#depConsultarCodigo", "123456"); await page.press("#depConsultarCodigo", "Enter");
+  await page.waitForFunction(() => /Instalado en Kiosco Pérez/.test(document.getElementById("depConsulta").textContent));
+  assert.match(await page.textContent("#depConsulta"), /Ahora: Garantía \(fallados\).*Garantía: Fallado: por mandar al proveedor · No detecta/s);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Admin Stock > Garantía: equipos fallados con su cliente, proveedor y seguimiento hasta el reemplazo", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  const catalogo = { articulos: { 23940: { c: "23940", d: "W-AJAX - PIR INTERIOR INFRARROJO", tipo: "unidad" } }, proveedores: { 2779: "Propiedad Protegida" } };
+  const h = [{ f: "2026-10-01T12:00:00Z", a: "cli:Kiosco Pérez", de: "dep", presupuesto: "4521" }, { f: "2026-11-02T12:00:00Z", a: "gar", de: "cli:Kiosco Pérez" }];
+  let saldos = { inicializado: "2026-10-01", ubic: { gar: { 23940: 1 }, dep: { 23940: 3 } }, envios: [], unidades: {
+    "AJ0001": { c: "23940", u: "gar", prov: "2779", h, garantia: { estado: "por_enviar", desde: "2026-11-02T12:00:00Z", por: "Melina", falla: "No detecta", instalacion: { cliente: "Kiosco Pérez", fecha: "2026-10-01T12:00:00Z", presupuesto: "4521" } } },
+    "AJ0002": { c: "23940", u: "cli:Kiosco Pérez", prov: "2779", h: h.slice(0, 1) },
+  } };
+  const posts = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    const json = (o, st) => route.fulfill({ status: st || 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (!u.includes("coleccion=stock")) return json([]);
+    if (req.method() === "GET") return json({ catalogo, saldos, conciliacion: { marcas: [], corridas: [] } });
+    const b = JSON.parse(req.postData()); posts.push(b);
+    if (b.accion === "garantia") {
+      const g = saldos.unidades[b.serie].garantia;
+      g.estado = b.estado; if (b.rma) g.rma = b.rma;
+      if (b.estado === "reemplazado") { g.nuevo = b.nuevo; g.cerrada = new Date().toISOString(); saldos.unidades[b.serie].u = "baja"; saldos.unidades[b.nuevo] = { c: "23940", u: "dep", reemplaza: b.serie }; }
+      return json({ ok: true, garantia: g });
+    }
+    return json({ error: "?" }, 400);
+  });
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { document.getElementById("mainCard").classList.remove("hidden"); document.getElementById("tabStockBtn").click(); });
+  await page.waitForFunction(() => stk && stk.saldos);
+  await page.click('#stkSub [data-stk="garantia"]');
+  await page.waitForSelector('#stkGarLista tr[data-t="AJ0001"]');
+  assert.match(await page.textContent('#stkGarLista tr[data-t="AJ0001"]'), /AJ0001.*PIR INTERIOR.*Propiedad Protegida.*Kiosco Pérez.*presup\. 4521.*No detecta.*por mandar al proveedor/s);
+  await page.click('#stkGarLista tr[data-t="AJ0001"] [data-gar="enviado"]');
+  await page.fill(".cartel-admin-input", "RMA-55");
+  await page.click(".cartel-admin .cartel-si");
+  await page.waitForFunction(() => /RMA RMA-55/.test(document.getElementById("stkGarLista").textContent));
+  await page.click('#stkGarLista tr[data-t="AJ0001"] [data-gar="reemplazado"]');
+  await page.fill(".cartel-admin-input", "aj0009");
+  await page.click(".cartel-admin .cartel-si");
+  await page.waitForFunction(() => /No hay equipos fallados/.test(document.getElementById("stkGarLista").textContent));
+  assert.deepStrictEqual(posts.map((p) => [p.estado, p.rma || p.nuevo]), [["enviado", "RMA-55"], ["reemplazado", "aj0009"]]);
+  // Ficha de cualquier N° de serie
+  await page.fill("#stkGarBuscar", "aj0002");
+  assert.match(await page.textContent("#stkGarFicha"), /AJ0002.*Ahora: Cliente \(instalado\): Kiosco Pérez.*presupuesto 4521/s);
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });

@@ -3820,3 +3820,9 @@ html .app .equipo-acciones .btn.eq-util.activo, .equipo-acciones .eq-util.activo
 .stk-cola { border: 1px dashed var(--amber); border-radius: 12px; padding: 10px 12px; margin: 0 0 10px; font-size: 13.5px; }
 .stk-cola .err { color: #E4402C; }
 .stk-cola-item { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 4px 0; }
+.stk-check { display: flex; align-items: center; gap: 10px; font-size: 14.5px; font-weight: 600; padding: 6px 0; cursor: pointer; }
+.stk-check input { width: 22px; height: 22px; flex: 0 0 auto; accent-color: var(--amber); }
+.stk-fallado { color: #E4402C; font-weight: 700; font-size: 13px; }
+.stk-hist { margin-top: 8px; border-left: 2px solid rgba(127,127,127,.35); padding-left: 10px; font-size: 13px; }
+.stk-hist div { padding: 3px 0; }
+.stk-hist small { opacity: .7; }

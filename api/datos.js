@@ -1233,8 +1233,18 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
   let esResp = esAdmin, tecnicosGuardados = null;
   const tecnicos = async () => (tecnicosGuardados = tecnicosGuardados || (await leerTecnicosGuardados().catch(() => [])));
   if (!esAdmin) { const t = (await tecnicos()).find((x) => x.nombre === autorizacion.nombre); esResp = !!(t && t.permisos && (t.permisos.stock_responsable || t.permisos.admin)); }
-  const SOLO_ADMIN = ["proveedores", "marcar_oficina", "importar_catalogo", "configurar", "saldo_inicial", "ajustar", "conc_marcar", "conc_reactivar", "conc_corrida"];
+  const SOLO_ADMIN = ["configurar_varios", "proveedores", "marcar_oficina", "importar_catalogo", "configurar", "saldo_inicial", "ajustar", "conc_marcar", "conc_reactivar", "conc_corrida"];
   try {
+    if (req.method === "GET" && q.serie) {
+      // Ficha de un equipo por su N° de serie: dónde está, a qué cliente fue y su garantía.
+      const t = S.limpiarCodigo(q.serie);
+      const [cat, sal] = await Promise.all([leerArchivoDatos(STOCK_CAT, { articulos: {} }), leerArchivoDatos(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} })]);
+      const u = ((sal.data || {}).unidades || {})[t];
+      if (!u) { res.status(404).json({ error: `El N° de serie ${t} no está registrado` }); return; }
+      const a = ((cat.data || {}).articulos || {})[u.c] || {};
+      res.status(200).json({ serie: t, unidad: u, articulo: { c: u.c, d: a.d || u.c }, proveedor: S.nombreProveedor(cat.data, u.prov), instalacion: S.instalacionDeUnidad(u) });
+      return;
+    }
     if (req.method === "GET" && q.mio) {
       // Lo que tiene el técnico que pregunta (y lo que le llega o devolvió).
       const [cat, sal] = await Promise.all([leerArchivoDatos(STOCK_CAT, { articulos: {} }), leerArchivoDatos(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} })]);
@@ -1330,6 +1340,19 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
       responder(r);
       return;
     }
+    if (b.accion === "configurar_varios") {
+      // Cambia el tipo de muchos artículos juntos (ej. todos los sensores a «Equipo con N° de serie»).
+      const codigos = new Set((Array.isArray(b.codigos) ? b.codigos.slice(0, 5000) : []).map(S.codigoArticulo));
+      if (!S.STOCK_TIPOS[b.tipo] || !codigos.size) { res.status(400).json({ error: "Faltan los artículos o el tipo" }); return; }
+      const r = await stockActualizar(STOCK_CAT, { articulos: {} }, (cat) => {
+        const arts = { ...(cat.articulos || {}) };
+        let cambiados = 0;
+        codigos.forEach((c) => { if (arts[c] && arts[c].tipo !== b.tipo) { arts[c] = { ...arts[c], tipo: b.tipo }; cambiados++; } });
+        return { data: { ...cat, articulos: arts }, respuesta: { cambiados } };
+      }, `Stock: ${codigos.size} artículo(s) pasados a «${S.STOCK_TIPOS[b.tipo]}» (por ${quien})`);
+      responder(r);
+      return;
+    }
     if (b.accion === "configurar") {
       const c = S.codigoArticulo(b.c), campos = b.campos && typeof b.campos === "object" ? b.campos : {};
       const r = await stockActualizar(STOCK_CAT, { articulos: {} }, (cat) => {
@@ -1374,7 +1397,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
       // Deja la cantidad de un artículo en una ubicación como se indica (inventario o conciliación).
       const c = S.codigoArticulo(b.c), ubic = String(b.ubic || "dep").slice(0, 80), motivo = String(b.motivo || "").trim().slice(0, 200);
       if (!c) { res.status(400).json({ error: "Falta el artículo" }); return; }
-      if (!/^(dep|tec:.+|veh:.+|cli:.+|com:.+)$/.test(ubic)) { res.status(400).json({ error: "Ubicación inválida" }); return; }
+      if (!/^(dep|gar|tec:.+|veh:.+|cli:.+|com:.+)$/.test(ubic)) { res.status(400).json({ error: "Ubicación inválida" }); return; }
       if (!motivo) { res.status(400).json({ error: "Falta el motivo del ajuste" }); return; }
       const cantidad = Number(b.cantidad);
       if (!Number.isFinite(cantidad) || cantidad < 0) { res.status(400).json({ error: "Cantidad inválida" }); return; }
@@ -1447,6 +1470,42 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
       res.status(200).json({ ok: true, codigos });
       return;
     }
+    if (b.accion === "garantia") {
+      // Seguimiento de un equipo fallado: mandado al proveedor, volvió reparado, reemplazado o rechazado.
+      const t = S.limpiarCodigo(b.serie), estado = String(b.estado || "");
+      if (!S.GARANTIA_ESTADOS[estado] || estado === "por_enviar") { res.status(400).json({ error: "Estado inválido" }); return; }
+      const nuevo = S.limpiarCodigo(b.nuevo), nota = String(b.nota || "").replace(/\s+/g, " ").trim().slice(0, 200), rma = String(b.rma || "").trim().slice(0, 40);
+      if (estado === "reemplazado" && !nuevo) { res.status(400).json({ error: "Falta el N° de serie del equipo nuevo" }); return; }
+      let movs = [];
+      const r = await stockActualizar(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }, (sal) => {
+        const u = (sal.unidades || {})[t];
+        if (!u || !u.garantia || u.garantia.cerrada) return { error: "Ese equipo no tiene una garantía abierta", status: 409 };
+        if (u.u !== "gar") return { error: `El equipo figura en ${S.nombreUbicacion(u.u)}, no en Garantía`, status: 409 };
+        if (estado === "reemplazado" && sal.unidades[nuevo]) return { error: `El N° de serie ${nuevo} ya está registrado`, status: 409 };
+        let s2 = JSON.parse(JSON.stringify(sal));
+        const g = { ...u.garantia, historial: [...(u.garantia.historial || []), { f: ahora, estado, por: quien, ...(rma ? { rma } : {}), ...(nota ? { nota } : {}), ...(nuevo ? { nuevo } : {}) }].slice(-20) };
+        g.estado = estado;
+        if (rma) g.rma = rma;
+        if (estado === "enviado") g.enviado = ahora;
+        movs = [];
+        const id = (k) => `${Date.now().toString(36)}-g${k}`;
+        if (estado === "reparado") movs.push({ id: id(1), fecha: ahora, por: quien, tipo: "garantia_reparado", c: u.c, cant: 1, de: "gar", a: "dep", unidades: [t], motivo: `Volvió reparado de garantía${nota ? ": " + nota : ""}` });
+        if (estado === "reemplazado") {
+          movs.push({ id: id(1), fecha: ahora, por: quien, tipo: "garantia_reemplazo", c: u.c, cant: 1, de: "gar", unidades: [t], motivo: `Reemplazado por el proveedor (nuevo: ${nuevo})` });
+          movs.push({ id: id(2), fecha: ahora, por: quien, tipo: "garantia_reemplazo", c: u.c, cant: 1, a: "dep", unidades: [nuevo], ...(u.prov ? { prov: u.prov } : {}), motivo: `Reemplazo en garantía de ${t}` });
+          g.nuevo = nuevo;
+        }
+        if (estado === "rechazado") movs.push({ id: id(1), fecha: ahora, por: quien, tipo: "garantia_rechazada", c: u.c, cant: 1, de: "gar", unidades: [t], motivo: `Garantía rechazada${nota ? ": " + nota : ""}` });
+        if (["reparado", "reemplazado", "rechazado"].includes(estado)) { g.cerrada = ahora; }
+        movs.forEach((m) => { s2 = S.aplicarMovimiento(s2, m); });
+        s2.unidades[t] = { ...s2.unidades[t], garantia: g };
+        if (estado === "reemplazado") s2.unidades[nuevo] = { ...s2.unidades[nuevo], reemplaza: t };
+        return { data: s2, respuesta: { garantia: g } };
+      }, `Stock: garantía de ${t}: ${estado} (por ${quien})`);
+      if (!r.error && movs.length) await stockRegistrarMovimientos(movs, `Stock: garantía (por ${quien})`);
+      responder(r);
+      return;
+    }
     if (b.accion === "registrar_unidades") {
       // Inventario de N° de serie de lo que ya está en una ubicación (no mueve cantidades).
       const ubic = String(b.ubic || "dep");
@@ -1487,11 +1546,14 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
     if (b.accion === "mover" || b.accion === "devolver") {
       // mover (responsable): del depósito a un técnico, vehículo o cliente; compras que llegan; retiros.
       // devolver (técnico): de lo suyo al depósito; queda en camino hasta que el responsable lo recibe.
-      const UB = /^(dep|tec:.{1,60}|veh:.{1,60}|cli:.{1,120}|com:.{1,120})$/;
+      const UB = /^(dep|gar|tec:.{1,60}|veh:.{1,60}|cli:.{1,120}|com:.{1,120})$/;
       let de = b.accion === "devolver" ? (esResp && b.de ? String(b.de) : `tec:${quien}`) : String(b.de || "dep");
       const a = b.accion === "devolver" ? "dep" : String(b.a || "");
       if (!(de === "proveedor" || UB.test(de)) || !UB.test(a)) { res.status(400).json({ error: "Origen o destino inválido" }); return; }
-      const tipo = b.accion === "devolver" ? "devolucion" : de === "proveedor" ? "ingreso" : /^tec:/.test(a) ? "entrega" : /^(cli|com):/.test(a) ? "a_cliente" : /^(cli|com):/.test(de) ? "retiro" : a === "dep" ? "devolucion" : "traspaso";
+      // Equipo fallado: lo que vuelve (de un cliente o de un técnico) va a «Garantía».
+      const fallado = !!b.fallado || a === "gar", falla = String(b.falla || "").replace(/\s+/g, " ").trim().slice(0, 200);
+      if (b.motivo == null && fallado && falla) b.motivo = `Fallado: ${falla}`;
+      const tipo = a === "gar" ? "falla" : b.accion === "devolver" ? "devolucion" : de === "proveedor" ? "ingreso" : /^tec:/.test(a) ? "entrega" : /^(cli|com):/.test(a) ? "a_cliente" : /^(cli|com):/.test(de) ? "retiro" : a === "dep" ? "devolucion" : "traspaso";
       // Confirma el que recibe, salvo que sea el mismo que registra (Melina recibiendo en el depósito).
       const confirmar = (/^tec:/.test(a) && a !== `tec:${quien}`) || (b.accion === "devolver" && !esResp);
       const { data: cat } = await leerArchivoDatos(STOCK_CAT, { articulos: {} });
@@ -1500,9 +1562,10 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
       const r = await stockActualizar(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }, (sal) => {
         // Lo que se mandó sin señal se reintenta: si ya llegó, no se aplica dos veces.
         if (opId && (sal.ops || []).includes(opId)) { duplicado = true; return { error: "duplicado", status: 200 }; }
-        const x = S.moverStock(sal, Array.isArray(b.items) ? b.items.slice(0, 500) : [], { tipo, de, a, por: quien, fecha: ahora, motivo: String(b.motivo || "").slice(0, 200), confirmar, deFlexible: /^(cli|com):/.test(de) && a === "dep", presupuesto: /^(cli|com):/.test(a) ? String(b.presupuesto || "").trim().slice(0, 30) : "" }, cat);
+        const x = S.moverStock(sal, Array.isArray(b.items) ? b.items.slice(0, 500) : [], { tipo, de, a, por: quien, fecha: ahora, motivo: String(b.motivo || "").slice(0, 200), confirmar, fallado: fallado && b.accion === "devolver", falla, deFlexible: /^(cli|com):/.test(de) && (a === "dep" || a === "gar"), presupuesto: /^(cli|com):/.test(a) ? String(b.presupuesto || "").trim().slice(0, 30) : "" }, cat);
         if (x.error) return { error: x.error, status: 409 };
         resultado = x;
+        S.abrirGarantias(x.saldos, x.movs, { falla, por: quien });
         if (opId) x.saldos.ops = [opId, ...(sal.ops || [])].slice(0, 300);
         return { data: x.saldos, respuesta: { envio: x.envio, movimientos: x.movs.length } };
       }, `Stock: ${tipo} ${de} → ${a} (por ${quien})`);
@@ -1531,8 +1594,11 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
         if (!e) return { error: "Ese envío ya se confirmó o no existe", status: 409 };
         const mio = e.a === `tec:${quien}`;
         if (!mio && !esResp) return { error: "Este envío no es para vos", status: 403 };
-        const x = S.cerrarEnvio(sal, b.id, { accion: b.accion_envio === "rechazar" ? "rechazar" : "recibi", items: Array.isArray(b.items) ? b.items : undefined, por: mio ? quien : `${quien} (por ${e.a.replace(/^tec:/, "")})`, fecha: ahora, motivo: String(b.motivo || "").slice(0, 200) });
+        // Una devolución de un equipo fallado va a Garantía (salvo que el depósito elija otra cosa).
+        const destino = e.a === "dep" ? (b.destino === "dep" || b.destino === "gar" ? b.destino : e.fallado ? "gar" : undefined) : undefined;
+        const x = S.cerrarEnvio(sal, b.id, { accion: b.accion_envio === "rechazar" ? "rechazar" : "recibi", items: Array.isArray(b.items) ? b.items : undefined, por: mio ? quien : `${quien} (por ${e.a.replace(/^tec:/, "")})`, fecha: ahora, motivo: String(b.motivo || "").slice(0, 200), destino });
         if (x.error) return { error: x.error, status: 409 };
+        S.abrirGarantias(x.saldos, x.movs, { falla: e.falla || e.motivo || "", por: quien });
         x.saldos.envios_cerrados = [x.envio, ...(Array.isArray(sal.envios_cerrados) ? sal.envios_cerrados : [])].slice(0, 300);
         resultado = x;
         return { data: x.saldos, respuesta: { envio: x.envio } };

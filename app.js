@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.50.0";
+const APP_VERSION = "4.51.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -18126,7 +18126,7 @@ cqEl("volverDeCroquisListaBtn").addEventListener("click", () => showScreen("home
 // STOCK EN LA CALLE: «Mi stock» (cada técnico) y «Depósito» (responsable de stock)
 //  - Lo que sale del depósito a un técnico queda «en camino» hasta que él toca «Recibí».
 //  - Lo que el técnico devuelve queda en camino hasta que el depósito lo recibe.
-//  - Se escanea la etiqueta de SAT (artículo) y, en los equipos, el N° de unidad de la caja.
+//  - Se escanea la etiqueta de SAT (artículo) y, en los equipos, el N° de serie de la caja.
 // ============================================================
 const stkApi = async (metodo, query, cuerpo) => {
   let r;
@@ -18571,7 +18571,7 @@ function pintarMiStock() {
   document.querySelectorAll("#miStockTengo [data-devolver]").forEach((b) => b.addEventListener("click", () => {
     const c = b.dataset.devolver, art = a[c] || {};
     const l = miStockCanasta.lineas.find((x) => x.c === c);
-    if (art.tipo === "unidad" && unidadesDe(c).length) { miStockCanasta.actual = c; miStockCanasta.cambio(); showToast("Escaneá el N° de unidad de cada equipo que devolvés"); }
+    if (art.tipo === "unidad" && unidadesDe(c).length) { miStockCanasta.actual = c; miStockCanasta.cambio(); showToast("Escaneá el N° de serie de cada equipo que devolvés"); }
     else if (!l || l.cant < (miStock.tiene[c] || 0)) miStockCanasta.agregarArticulo(c).then(() => {});
     if (art.tipo === "unidad" && !unidadesDe(c).length) { const ll = miStockCanasta.lineas.find((x) => x.c === c); if (ll && ll.cant < 1) { ll.cant = 1; miStockCanasta.cambio(); } }
     document.getElementById("miStockDevolverCaja").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -18589,12 +18589,16 @@ document.getElementById("miStockDevolverBtn").addEventListener("click", async (e
   if (!items.length) return;
   const a = miStock.articulos || {};
   const faltanN = items.filter((x) => (a[x.c] || {}).tipo === "unidad" && x.cant > x.unidades.length && (miStock.unidades || []).some((u) => u.c === x.c));
-  if (faltanN.length && !(await confirmarApp(`Hay equipos sin escanear el N° de unidad (${faltanN.map((x) => (a[x.c] || {}).d).join(", ")}). ¿Devolver igual?`))) return;
-  if (!(await confirmarApp(`¿Devolver al depósito ${items.length} artículo${items.length === 1 ? "" : "s"}?\n\n${items.map((x) => `• ${(a[x.c] || {}).d || x.c}: ${stkFmtN(x.cant)}`).join("\n")}`, { aceptar: "Sí, devolver" }))) return;
+  if (faltanN.length && !(await confirmarApp(`Hay equipos sin escanear el N° de serie (${faltanN.map((x) => (a[x.c] || {}).d).join(", ")}). ¿Devolver igual?`))) return;
+  const fallado = document.getElementById("miStockFallado").checked, falla = document.getElementById("miStockFalla").value.trim();
+  if (fallado && !falla) { showToast("Escribí qué falla tiene"); document.getElementById("miStockFalla").focus(); return; }
+  if (fallado && items.some((x) => (a[x.c] || {}).tipo === "unidad" && x.unidades.length < x.cant)) { showToast("Para la garantía escaneá el N° de serie de cada equipo fallado"); return; }
+  if (!(await confirmarApp(`¿Devolver al depósito ${items.length} artículo${items.length === 1 ? "" : "s"}${fallado ? " FALLADO(S), para Garantía" : ""}?\n\n${items.map((x) => `• ${(a[x.c] || {}).d || x.c}: ${stkFmtN(x.cant)}${x.unidades.length ? " (" + x.unidades.join(", ") + ")" : ""}`).join("\n")}`, { aceptar: "Sí, devolver" }))) return;
   btn.disabled = true;
   try {
-    await stkApi("POST", "", { accion: "devolver", items, motivo: document.getElementById("miStockMotivo").value.trim() });
+    await stkApi("POST", "", { accion: "devolver", items, motivo: document.getElementById("miStockMotivo").value.trim() || undefined, ...(fallado ? { fallado: true, falla } : {}) });
     miStockCanasta.limpiar(); document.getElementById("miStockMotivo").value = "";
+    document.getElementById("miStockFallado").checked = false; document.getElementById("miStockFalla").value = ""; document.getElementById("miStockFalla").classList.add("hidden");
     showToast("✓ Devuelto: queda en camino hasta que el depósito lo recibe");
   } catch (e) { showToast("No se pudo devolver: " + e.message); }
   btn.disabled = false;
@@ -18643,6 +18647,7 @@ function depBotonTexto() {
   btn.disabled = !n;
   if (depModo === "inventario") { const u = depCanasta.items().reduce((t, x) => t + x.unidades.length, 0); btn.disabled = !u; btn.textContent = u ? `Registrar ${u} N° de serie` : "Registrar N° de serie"; return; }
   if (depModo === "entregar") { const nom = depNombreElegido("depDestTipo"); btn.textContent = n ? `Entregar ${n} artículo${n === 1 ? "" : "s"}${nom ? " a " + nom : ""}` : "Entregar"; }
+  else if (document.getElementById("depFallado").checked && document.getElementById("depRecibirTipo").value !== "proveedor") btn.textContent = n ? `Mandar ${n} fallado${n === 1 ? "" : "s"} a Garantía` : "Mandar a Garantía";
   else btn.textContent = n ? `Ingresar ${n} artículo${n === 1 ? "" : "s"} al depósito` : "Ingresar al depósito";
 }
 async function depCargar() {
@@ -18706,6 +18711,7 @@ function depMostrarModo() {
   if (depModo === "recibir") {
     const t = document.getElementById("depRecibirTipo").value;
     document.getElementById("depRecibirDeCaja").classList.toggle("hidden", t === "proveedor");
+    document.getElementById("depFalladoCaja").classList.toggle("hidden", t === "proveedor");
     depPintarDevoluciones();
   }
   if (depModo === "consultar") depPintarEnCamino();
@@ -18772,17 +18778,25 @@ document.getElementById("depConfirmarBtn").addEventListener("click", async (ev) 
     const tipo = document.getElementById("depRecibirTipo").value, nombre = depNombreElegido("depRecibirTipo");
     if (tipo !== "proveedor" && !nombre) { showToast("Elegí de dónde viene"); return; }
     cuerpo = { accion: "mover", de: tipo === "proveedor" ? "proveedor" : `${tipo}:${nombre}`, a: "dep", items };
+    if (tipo !== "proveedor" && document.getElementById("depFallado").checked) {
+      const falla = document.getElementById("depFalla").value.trim();
+      if (!falla) { showToast("Escribí qué falla tiene"); document.getElementById("depFalla").focus(); return; }
+      const sinSerie = items.filter((x) => (a[x.c] || {}).tipo === "unidad" && x.unidades.length < x.cant);
+      if (sinSerie.length) { showToast("Para la garantía escaneá el N° de serie de cada equipo fallado"); return; }
+      cuerpo.a = "gar"; cuerpo.falla = falla;
+    }
   }
   cuerpo.motivo = document.getElementById("depMotivo").value.trim();
   const sinN = items.filter((x) => (a[x.c] || {}).tipo === "unidad" && x.cant > x.unidades.length);
   const resumen = items.map((x) => `• ${(a[x.c] || {}).d || x.c}: ${stkFmtN(x.cant)}`).join("\n");
-  const destino = depModo === "entregar" ? nombreUbicacion(cuerpo.a) + (cuerpo.presupuesto ? ` (presupuesto N° ${cuerpo.presupuesto})` : "") : "el depósito";
-  if (!(await confirmarApp(`¿Confirmar? Va a ${destino}:\n\n${resumen}${sinN.length ? `\n\nOjo: ${sinN.length} equipo(s) sin N° de unidad escaneado.` : ""}${/^tec:/.test(cuerpo.a) ? "\n\nQueda en camino hasta que el técnico toque «Recibí»." : ""}`, { aceptar: "Sí, confirmar" }))) return;
+  const destino = depModo === "entregar" ? nombreUbicacion(cuerpo.a) + (cuerpo.presupuesto ? ` (presupuesto N° ${cuerpo.presupuesto})` : "") : cuerpo.a === "gar" ? "Garantía (fallado)" : "el depósito";
+  if (!(await confirmarApp(`¿Confirmar? Va a ${destino}:\n\n${resumen}${sinN.length ? `\n\nOjo: ${sinN.length} equipo(s) sin N° de serie escaneado.` : ""}${/^tec:/.test(cuerpo.a) ? "\n\nQueda en camino hasta que el técnico toque «Recibí»." : ""}`, { aceptar: "Sí, confirmar" }))) return;
   btn.disabled = true;
   try {
     const r = await depEnviar(cuerpo, `${depModo === "entregar" ? "Baja a" : "Alta desde"} ${depModo === "entregar" ? nombreUbicacion(cuerpo.a) : cuerpo.de === "proveedor" ? "proveedor" : nombreUbicacion(cuerpo.de)} (${items.length} artículo${items.length === 1 ? "" : "s"})`);
     if (depModo === "entregar") depRecordarDestino(cuerpo.a, items);
     depCanasta.limpiar(); document.getElementById("depMotivo").value = ""; document.getElementById("depPresupuesto").value = "";
+    document.getElementById("depFallado").checked = false; document.getElementById("depFalla").value = ""; document.getElementById("depFalla").classList.add("hidden");
     showToast(r.enCola ? "Sin señal: quedó guardado y se manda solo cuando vuelva" : /^tec:/.test(cuerpo.a) ? "✓ Enviado: le llegó el aviso para que confirme" : "✓ Listo");
     if (!r.enCola) await depCargar(); else depMostrarModo();
   } catch (e) { showToast("No se pudo: " + e.message); }
@@ -18904,6 +18918,8 @@ async function depPintarInventario() {
   cont.innerHTML = faltan.length ? `<h3 class="stk-h">Equipos sin N° de serie en ${escapeHtml(nombreUbicacion(ubic))} (${faltan.reduce((t2, x) => t2 + x.n - x.con, 0)})</h3>` + faltan.map((x) => `<div class="stk-envio-item"><span>${escapeHtml(x.d)}</span><b>${x.con} de ${stkFmtN(x.n)}</b></div>`).join("")
     : `<p class="stk-ayuda">✓ Todos los equipos de ${escapeHtml(nombreUbicacion(ubic))} tienen su N° de serie.</p>`;
 }
+document.getElementById("depFallado").addEventListener("change", (e) => { document.getElementById("depFalla").classList.toggle("hidden", !e.target.checked); if (e.target.checked) document.getElementById("depFalla").focus(); depBotonTexto(); });
+document.getElementById("miStockFallado").addEventListener("change", (e) => { document.getElementById("miStockFalla").classList.toggle("hidden", !e.target.checked); if (e.target.checked) document.getElementById("miStockFalla").focus(); });
 document.getElementById("depInvTipo").addEventListener("change", () => { document.getElementById("depInvSelect").value = ""; depPintarInventario(); depCanasta.render(); });
 document.getElementById("depInvSelect").addEventListener("change", () => { depPintarInventario(); depCanasta.render(); });
 
@@ -18912,16 +18928,19 @@ function depPintarDevoluciones() {
   const lista = (depSaldos().envios || []).filter((e) => e.a === "dep");
   const cont = document.getElementById("depDevoluciones");
   cont.innerHTML = lista.length ? `<h3 class="stk-h">Devoluciones por recibir (${lista.length})</h3>` + lista.map((e) => `<div class="stk-envio" data-id="${escapeHtml(e.id)}">
-    <b>${escapeHtml(e.de.replace(/^tec:/, ""))}</b><small>${escapeHtml(new Date(e.fecha).toLocaleString("es-AR", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }))}${e.motivo ? " · " + escapeHtml(e.motivo) : ""}</small>
+    <b>${escapeHtml(e.de.replace(/^tec:/, ""))}</b><small>${escapeHtml(new Date(e.fecha).toLocaleString("es-AR", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }))}${e.motivo && !e.fallado ? " · " + escapeHtml(e.motivo) : ""}</small>
+    ${e.fallado ? `<div class="stk-fallado">⚠ Fallado: ${escapeHtml(e.falla || "")}</div>` : ""}
     <div class="stk-envio-items">${e.items.map((x, i) => `<div class="stk-envio-item"><span>${escapeHtml(d(x.c))}${x.unidades && x.unidades.length ? `<small>${x.unidades.map(escapeHtml).join(" · ")}</small>` : ""}</span><input class="field-input" style="width:72px;text-align:center;padding:6px;" inputmode="decimal" data-i="${i}" value="${stkFmtN(x.cant)}" aria-label="Cantidad recibida"></div>`).join("")}</div>
-    <div class="stk-envio-btns"><button type="button" class="btn btn-primary btn-small" data-recibi>✓ Recibido en el depósito</button></div></div>`).join("") : "";
+    <div class="field-group" style="margin:6px 0;"><label class="field-label">Va a</label><select class="field-input" data-destino><option value="dep" ${e.fallado ? "" : "selected"}>Depósito</option><option value="gar" ${e.fallado ? "selected" : ""}>Garantía (fallado)</option></select></div>
+    <div class="stk-envio-btns"><button type="button" class="btn btn-primary btn-small" data-recibi>✓ Recibido</button></div></div>`).join("") : "";
   cont.querySelectorAll(".stk-envio").forEach((div) => div.querySelector("[data-recibi]").addEventListener("click", async (ev) => {
     const e = lista.find((x) => x.id === div.dataset.id), btn = ev.currentTarget;
     const items = e.items.map((x, i) => { const n = stkNumApp(div.querySelector(`input[data-i="${i}"]`).value); return { c: x.c, cant: n >= 0 ? Math.min(n, x.cant) : x.cant, unidades: x.unidades }; });
     let motivo = "";
     if (items.some((x, i) => x.cant < e.items[i].cant)) { motivo = await pedirTextoApp("Llegó menos de lo que devolvió: lo que falta vuelve a figurar a su nombre. ¿Qué pasó?", ""); if (motivo === null) return; }
     btn.disabled = true;
-    try { await stkApi("POST", "", { accion: "confirmar_envio", id: e.id, items, motivo }); showToast("✓ Recibido"); }
+    const destino = div.querySelector("[data-destino]").value;
+    try { await stkApi("POST", "", { accion: "confirmar_envio", id: e.id, items, motivo, destino }); showToast(destino === "gar" ? "✓ Recibido: quedó en Garantía" : "✓ Recibido"); }
     catch (err) { showToast("No se pudo: " + err.message); }
     await depCargar(); actualizarBadgeStock(true);
   }));
@@ -18943,11 +18962,22 @@ async function depConsultar(texto) {
     const uni = Object.entries(sal.unidades || {}).filter(([, u]) => u.c === c);
     cont.innerHTML = `<div class="stk-envio"><b>${escapeHtml(a.d)}</b><small>${escapeHtml(c)}${a.min ? ` · mínimo ${stkFmtN(a.min)}` : ""}</small>
       <div class="stk-envio-items">${Object.entries(t.detalle).map(([u, n]) => `<div class="stk-envio-item"><span>${escapeHtml(nombreUbicacion(u))}</span><b>${stkFmtN(n)}</b></div>`).join("") || '<p class="stk-ayuda">No hay en ningún lado.</p>'}</div>
-      ${uni.length ? `<p class="stk-ayuda" style="margin-top:8px;">Equipos con N° de unidad:</p>${uni.map(([tr, u]) => `<div class="stk-envio-item"${tr === resaltar ? ' style="font-weight:700;"' : ""}><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;">${escapeHtml(tr)}${u.prov ? `<small style="font-family:inherit;">${escapeHtml(nombreProveedor(cat, u.prov) || "proveedor " + u.prov)}</small>` : ""}</span><span>${escapeHtml(nombreUbicacion(u.u))}</span></div>`).join("")}` : ""}</div>`;
+      ${uni.length ? `<p class="stk-ayuda" style="margin-top:8px;">Equipos con N° de serie:</p>${uni.map(([tr, u]) => `<div class="stk-envio-item"${tr === resaltar ? ' style="font-weight:700;"' : ""}><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;">${escapeHtml(tr)}${u.prov ? `<small style="font-family:inherit;">${escapeHtml(nombreProveedor(cat, u.prov) || "proveedor " + u.prov)}</small>` : ""}</span><span>${escapeHtml(nombreUbicacion(u.u))}</span></div>`).join("")}` : ""}</div>`;
   };
   if (r.tipo === "articulo") { mostrarArticulo(r.c); return { ok: true, texto: ((cat.articulos[r.c] || {}).d || r.c) + (r.proveedor ? ` · ${nombreProveedor(cat, r.proveedor) || "proveedor " + r.proveedor}` : "") }; }
-  if (r.tipo === "unidad" && !r.nuevo) { mostrarArticulo(r.c, r.tracking); return { ok: true, texto: `${r.tracking}: ${nombreUbicacion(r.ubic)}` }; }
-  if (r.tipo === "unidad") { cont.innerHTML = `<p class="stk-ayuda">El N° de unidad ${escapeHtml(r.tracking)} todavía no está registrado.</p>`; return { ok: false, texto: "No registrado" }; }
+  if (r.tipo === "unidad" && !r.nuevo) {
+    mostrarArticulo(r.c, r.tracking);
+    // Ficha del equipo: a dónde fue y su garantía.
+    const u = (sal.unidades || {})[r.tracking] || {}, inst = instalacionDeUnidad(u), g = u.garantia;
+    const fch = (f) => new Date(f).toLocaleDateString("es-AR");
+    cont.insertAdjacentHTML("afterbegin", `<div class="stk-envio"><b style="font-family:'IBM Plex Mono',monospace;">${escapeHtml(r.tracking)}</b><small>${escapeHtml((cat.articulos[r.c] || {}).d || r.c)}${u.prov ? " · " + escapeHtml(nombreProveedor(cat, u.prov) || "proveedor " + u.prov) : ""}</small>
+      <div style="margin-top:6px;">Ahora: <b>${escapeHtml(nombreUbicacion(u.u))}</b></div>
+      ${inst ? `<div>Instalado en <b>${escapeHtml(inst.cliente)}</b>${inst.comodato ? " (comodato)" : ""} el ${escapeHtml(fch(inst.fecha))}${inst.presupuesto ? ` · presupuesto N° ${escapeHtml(inst.presupuesto)}` : ""}</div>` : ""}
+      ${g ? `<div class="${g.cerrada ? "" : "stk-fallado"}">Garantía: ${escapeHtml(GARANTIA_ESTADOS[g.estado] || g.estado)}${g.falla ? ` · ${escapeHtml(g.falla)}` : ""}${g.rma ? ` · RMA ${escapeHtml(g.rma)}` : ""}</div>` : ""}
+      ${(u.h || []).length ? `<div class="stk-hist">${u.h.slice().reverse().map((x) => `<div>${escapeHtml(fch(x.f))} → ${escapeHtml(nombreUbicacion(x.a))}${x.presupuesto ? ` · presup. ${escapeHtml(x.presupuesto)}` : ""}${x.por ? ` <small>(${escapeHtml(x.por)})</small>` : ""}</div>`).join("")}</div>` : ""}</div>`);
+    return { ok: true, texto: `${r.tracking}: ${nombreUbicacion(r.ubic)}` };
+  }
+  if (r.tipo === "unidad") { cont.innerHTML = `<p class="stk-ayuda">El N° de serie ${escapeHtml(r.tracking)} todavía no está registrado.</p>`; return { ok: false, texto: "No registrado" }; }
   const lista = buscarArticulosStock(cat, texto, 12);
   cont.innerHTML = lista.length ? lista.map((a) => `<button type="button" class="stk-res" data-c="${escapeHtml(a.c)}">${escapeHtml(a.d)}<small>${escapeHtml(a.c)}</small></button>`).join("") : `<p class="stk-ayuda">${escapeHtml(r.aviso || "No encontré nada")}</p>`;
   cont.querySelectorAll("[data-c]").forEach((b) => b.addEventListener("click", () => mostrarArticulo(b.dataset.c)));

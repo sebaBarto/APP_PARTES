@@ -4,13 +4,13 @@
 //
 // Datos:
 //  - catálogo: { articulos: { "<código>": { c, d, tipo, medida, min, pedir, prov, alias[], baja, precio, moneda } } }
-//      tipo: "unidad" (equipo con N° de unidad), "cantidad", "sim", "herramienta", "no"
+//      tipo: "unidad" (equipo con N° de serie), "cantidad", "sim", "herramienta", "no"
 //  - saldos: { inicializado, ubic: { "<ubicación>": { "<código>": cantidad } }, unidades: { "<tracking>": { c, u, f } }, pedidos: { "<código>": { fecha, cantidad, por } } }
 //      ubicaciones: "dep" (depósito), "tec:<nombre>", "veh:<nombre>", "cli:<cliente>" (instalado), "com:<cliente>" (comodato)
 
 (function (raiz) {
   const STOCK_TIPOS = {
-    unidad: "Equipo con N° de unidad",
+    unidad: "Equipo con N° de serie",
     cantidad: "Por cantidad",
     sim: "SIM (va en Control de SIMs)",
     herramienta: "Herramienta (va en Herramientas)",
@@ -65,8 +65,13 @@
     const D = String(desc || "").toUpperCase();
     if (esDescripcionSim(D)) return "sim";
     if (/\b(DESTORNILLADOR|MECHA|PINZA|TALADRO|TESTER|ALICATE|MARTILLO|ESCALERA|CRIMP|PELACABLE|SOLDADOR|AMOLADORA|SIERRA|CUTTER|ATORNILLADOR|MULTIMETRO|PISTOLA)/.test(D)) return "herramienta";
+    // Sensores y equipos electrónicos: cada uno trae su N° de serie del fabricante (garantía).
+    // Los accesorios (soportes, bases, cubiertas, cajas de montaje) no.
+    const ACCESORIO = /\b(BASE PARA|BASES?\b(?! *[-/]?\s*\w*\s*(FIESA|INCLUIDA))|REJA|CARCAZA|SOPORTE|BRACKET|LENTE|TAPA|CUBIERTA|CAJA DE MONTAJE|FUNDA|PLACA DE MONTAJE)\b/;
+    if (/\bAJAX\b/.test(D) && !ACCESORIO.test(D)) return "unidad";
+    if (/\b(PIR|INFRARROJOS?|DETECTOR(ES)?|D\. HUMO|BARRERA|SENSOR(ES)?|SISMICO|MAGNETICO INAL|CONTACTO INAL|MOTIONPROTECT|DOORPROTECT|FIREPROTECT|GLASSPROTECT|LEAKSPROTECT|COMBIPROTECT|HOMESIREN|STREETSIREN|SPACECONTROL)\b/.test(D) && !/^(BASE|A35BS BASE)|\b(BASE PARA|REJA|CARCAZA|SOPORTE|BRACKET|LENTE|TAPA|CUBIERTA)\b/.test(D)) return "unidad";
     if (/ADAPTADOR|ANTENA|SOPORTE|BRAZO|CAJA|GABINETE|BASE |LENTE|TAPA|CARCAZA|FICHA|CONECTOR|BALUN|FUENTE|TRAFO|TRANSFORMADOR|BATERIA|PILA/.test(D) && !/^(CENTRAL|CAMARA|DVR|NVR)/.test(D)) return "cantidad";
-    if (/\b(CENTRAL|TECLADO|KEYPAD|CAMARA|CÁMARA|DVR|NVR|XVR|VIDEOGRABADOR|GRABADOR|COMUNICADOR|ED5800|IP100|IP150|ROUTER|SWITCH|ACCESS POINT|DISCO|HDD|INVERSOR|CENTRO DE MONITOREO|VIDEOPORTERO|MONITOR|LECTOR|UPS|PANEL M\d|MODEM)/.test(D)
+    if (/\b(CENTRAL|TECLADO|KEYPAD|CAMARA|CÁMARA|DOMO|BULLET|DVR|NVR|XVR|VIDEOGRABADOR|GRABADOR|COMUNICADOR|ED5800|IP100|IP150|ROUTER|SWITCH|ACCESS POINT|DISCO|HDD|INVERSOR|CENTRO DE MONITOREO|VIDEOPORTERO|MONITOR|LECTOR|UPS|PANEL M\d|MODEM)/.test(D)
       || /MODULO (INTERNET|EXPANSOR|DE AUDIO|IP|GPRS|WIFI|RADIO)/.test(D) || /^GPRS/.test(D)
       || /TRANSMISOR (FULL|REMOTO DR|PARA MONITOREO)|RECEPTOR (CE|INALAMBRICO|DR)|CONTROL DE ACCESO KIT|CERBO/.test(D)) return "unidad";
     return "cantidad";
@@ -134,9 +139,11 @@
   }
 
   // ---------- Saldos ----------
-  const UBIC_TEXTO = { dep: "Depósito", tec: "Técnico", veh: "Vehículo", cli: "Cliente (instalado)", com: "Cliente (comodato)", cam: "En camino" };
+  const UBIC_TEXTO = { gar: "Garantía (fallados)", dep: "Depósito", tec: "Técnico", veh: "Vehículo", cli: "Cliente (instalado)", com: "Cliente (comodato)", cam: "En camino" };
   function nombreUbicacion(u) {
     if (u === "dep") return "Depósito";
+    if (u === "gar") return "Garantía (fallados)";
+    if (u === "baja") return "Dado de baja";
     if (/^cam:dev:/.test(u || "")) return `En camino al depósito (devuelve ${u.slice(8)})`;
     if (/^cam:/.test(u || "")) return `En camino a ${u.slice(4)}`;
     const [t, ...r] = String(u || "").split(":");
@@ -149,7 +156,7 @@
     Object.entries((saldos && saldos.ubic) || {}).forEach(([u, items]) => {
       const t = u.split(":")[0];
       Object.entries(items || {}).forEach(([c, cant]) => {
-        const x = (tot[c] = tot[c] || { sat: 0, dep: 0, tec: 0, veh: 0, cam: 0, cli: 0, com: 0, detalle: {} });
+        const x = (tot[c] = tot[c] || { sat: 0, dep: 0, tec: 0, veh: 0, cam: 0, gar: 0, cli: 0, com: 0, detalle: {} });
         const n = Number(cant) || 0;
         if (!n) return;
         x.detalle[u] = n;
@@ -157,6 +164,7 @@
         else if (t === "tec") { x.tec += n; x.sat += n; }
         else if (t === "veh") { x.veh += n; x.sat += n; }
         else if (t === "cam") { x.cam += n; x.sat += n; }
+        else if (t === "gar") { x.gar += n; x.sat += n; } // fallados en garantía: siguen en poder de SAT
         else if (t === "com") x.com += n;
         else if (t === "cli") x.cli += n;
       });
@@ -258,12 +266,17 @@
     };
     if (mov.de) mover(mov.de, -cant);
     if (mov.a) mover(mov.a, cant);
-    (mov.unidades || []).forEach((t) => { s.unidades[t] = { ...(s.unidades[t] || {}), c: mov.c, u: mov.a || "baja", f: mov.fecha || new Date().toISOString(), ...(mov.prov ? { prov: mov.prov } : {}) }; });
+    (mov.unidades || []).forEach((t) => {
+      const antes = s.unidades[t] || {}, f = mov.fecha || new Date().toISOString();
+      // Historia del equipo (para garantía: a qué cliente fue, cuándo, con qué presupuesto).
+      const h = [...(antes.h || []), { f, a: mov.a || "baja", ...(mov.de ? { de: mov.de } : {}), tipo: mov.tipo || "", ...(mov.por ? { por: mov.por } : {}), ...(mov.presupuesto ? { presupuesto: mov.presupuesto } : {}), ...(mov.motivo ? { motivo: String(mov.motivo).slice(0, 120) } : {}) }].slice(-30);
+      s.unidades[t] = { ...antes, c: mov.c, u: mov.a || "baja", f, h, ...(mov.prov ? { prov: mov.prov } : {}) };
+    });
     return s;
   }
 
   // ---------- Escaneo: qué es cada código ----------
-  // Forma de un N° de unidad: letras -> A, dígitos -> 9 ("GH120FF156" -> "AA999AA999").
+  // Forma de un N° de serie: letras -> A, dígitos -> 9 ("GH120FF156" -> "AA999AA999").
   // La APP va guardando las formas que ve en cada artículo y así aprende el formato de cada marca.
   const limpiarCodigo = (t) => String(t == null ? "" : t).trim().replace(/^\]\w\d/, "").replace(/[\u0000-\u001f]/g, "").replace(/\s+/g, "").toUpperCase().slice(0, 64);
   const formaCodigo = (t) => limpiarCodigo(t).replace(/[A-Z]/g, "A").replace(/\d/g, "9").replace(/[^A9]/g, "-");
@@ -278,11 +291,11 @@
     return [...lista, f].slice(-10);
   }
   // Devuelve qué se escaneó:
-  //  { tipo: "articulo", c, via: "etiqueta"|"ean"|"codigo" }   -> un artículo (si es por unidad, después va su N° de unidad)
+  //  { tipo: "articulo", c, via: "etiqueta"|"ean"|"codigo" }   -> un artículo (si es por unidad, después va su N° de serie)
   //  { tipo: "unidad", c, tracking, ubic?, nuevo, aviso? }    -> un equipo puntual
   //  { tipo: "ean_nuevo", ean }                                -> código de fabricante que todavía no se asoció a un artículo
   //  { tipo: "desconocido", texto, aviso }
-  // actual: código del artículo de la última etiqueta escaneada (para leer a continuación sus N° de unidad).
+  // actual: código del artículo de la última etiqueta escaneada (para leer a continuación sus N° de serie).
   function interpretarCodigo(texto, catalogo, saldos, actual) {
     const t = limpiarCodigo(texto), arts = (catalogo && catalogo.articulos) || {};
     if (!t) return { tipo: "desconocido", texto: t, aviso: "Código vacío" };
@@ -304,9 +317,9 @@
     if (a2) return { tipo: "articulo", c: a2.c, via: a2.tipo === "unidad" ? "modelo" : "ean" };
     if (/^\d{1,8}$/.test(t) && arts[codigoArticulo(t)]) return { tipo: "articulo", c: codigoArticulo(t), via: "codigo" };
     if (actual && arts[actual] && arts[actual].tipo === "unidad") {
-      if (t.length < 4) return { tipo: "desconocido", texto: t, aviso: "Ese código es muy corto para ser un N° de unidad." };
+      if (t.length < 4) return { tipo: "desconocido", texto: t, aviso: "Ese código es muy corto para ser un N° de serie." };
       const ok = coincideFormato(t, arts[actual].formatos);
-      return { tipo: "unidad", c: actual, tracking: t, nuevo: true, aviso: ok === false ? `No se parece a los N° de unidad que ya vi de este artículo (${arts[actual].formatos.join(", ")}). ¿Seguro que es de esta caja?` : "" };
+      return { tipo: "unidad", c: actual, tracking: t, nuevo: true, aviso: ok === false ? `No se parece a los N° de serie que ya vi de este artículo (${arts[actual].formatos.join(", ")}). ¿Seguro que es de esta caja?` : "" };
     }
     // Sin etiqueta antes: se busca un artículo cuyo formato aprendido coincida.
     const candidatos = Object.values(arts).filter((x) => x.tipo === "unidad" && coincideFormato(t, x.formatos) && (x.formatos || []).includes(formaCodigo(t)));
@@ -373,7 +386,7 @@
       }
       for (const t of x.unidades) {
         const u = s.unidades[t];
-        if (u && u.c !== x.c) return { error: `El N° de unidad ${t} es de otro artículo (${(arts[u.c] || {}).d || u.c}).` };
+        if (u && u.c !== x.c) return { error: `El N° de serie ${t} es de otro artículo (${(arts[u.c] || {}).d || u.c}).` };
         if (u && op.de && op.de !== "proveedor" && !op.deFlexible && u.u !== op.de) return { error: `El equipo ${t} figura en ${nombreUbicacion(u.u)}, no en ${nombreUbicacion(op.de)}.` };
       }
     }
@@ -398,7 +411,7 @@
     movs.forEach((m) => { s = aplicarMovimiento(s, m); });
     let envio = null;
     if (op.confirmar) {
-      envio = { id: idMov(), tipo: op.tipo || "entrega", fecha, por: op.por || "", de: de || "dep", a: op.a, camino: destino, items: lista, ...(op.motivo ? { motivo: op.motivo } : {}) };
+      envio = { id: idMov(), tipo: op.tipo || "entrega", fecha, por: op.por || "", de: de || "dep", a: op.a, camino: destino, items: lista, ...(op.motivo ? { motivo: op.motivo } : {}), ...(op.fallado ? { fallado: true, falla: String(op.falla || "").slice(0, 200) } : {}) };
       s.envios = [...s.envios, envio];
       movs.forEach((m) => { m.envio = envio.id; });
     }
@@ -460,9 +473,9 @@
   // Oficina cuenta «Depósito» (todo lo que está en poder de SAT: depósito, técnicos, vehículos, en
   // camino) y «Comodato». Los pases internos no le cambian nada; sí lo que sale a un cliente, lo que
   // vuelve de un cliente, los ajustes y las compras.
-  const grupoOficina = (u) => (!u ? "afuera" : /^(dep|tec:|veh:|cam:)/.test(u) ? "sat" : /^com:/.test(u) ? "comodato" : /^cli:/.test(u) ? "cliente" : "otro");
+  const grupoOficina = (u) => (!u ? "afuera" : /^(dep|gar|tec:|veh:|cam:)/.test(u) ? "sat" : /^com:/.test(u) ? "comodato" : /^cli:/.test(u) ? "cliente" : "otro");
   function movimientoParaOficina(m) {
-    if (!m || !m.c || m.tipo === "inicial" || m.tipo === "inventario_series") return null;
+    if (!m || !m.c || m.tipo === "inicial" || m.tipo === "inventario_series" || m.tipo === "garantia_reemplazo") return null;
     const de = grupoOficina(m.de), a = grupoOficina(m.a);
     if (de === a) return null;
     const cliente = (u) => String(u || "").replace(/^(cli|com):/, "");
@@ -478,6 +491,32 @@
     else if (de === "comodato" && a === "cliente") { operacion = "COMODATO A VENTA"; comodato = -m.cant; quien = cliente(m.a); }
     else return null;
     return { id: m.id, fecha: m.fecha, operacion, c: m.c, deposito, comodato, cliente: quien, presupuesto: m.presupuesto || "", series: (m.unidades || []).join(" "), prov: m.prov || "", por: m.por || "", motivo: m.motivo || "" };
+  }
+  // ---------- Garantía ----------
+  const GARANTIA_ESTADOS = {
+    por_enviar: "Fallado: por mandar al proveedor",
+    enviado: "Mandado al proveedor",
+    reparado: "Volvió reparado",
+    reemplazado: "El proveedor lo reemplazó",
+    rechazado: "Garantía rechazada",
+  };
+  // Los equipos que entran a «Garantía» quedan con su ficha de garantía abierta.
+  function abrirGarantias(saldos, movs, datos) {
+    (movs || []).forEach((m) => {
+      if (m.a !== "gar") return;
+      (m.unidades || []).forEach((t) => {
+        const u = saldos.unidades && saldos.unidades[t];
+        if (!u) return;
+        u.garantia = { estado: "por_enviar", desde: m.fecha, por: m.por || datos.por || "", falla: String(datos.falla || m.motivo || "").slice(0, 200), instalacion: instalacionDeUnidad(u), historial: [...(((u.garantia && u.garantia.cerrada) ? u.garantia.historial : []) || [])] };
+      });
+    });
+    return saldos;
+  }
+  // Del historial de un equipo: a qué cliente fue y cuándo (lo último antes de volver).
+  function instalacionDeUnidad(u) {
+    const h = (u && u.h) || [];
+    for (let i = h.length - 1; i >= 0; i--) if (/^(cli|com):/.test(h[i].a)) return { cliente: h[i].a.replace(/^(cli|com):/, ""), comodato: /^com:/.test(h[i].a), fecha: h[i].f, presupuesto: h[i].presupuesto || "" };
+    return null;
   }
   // Lo que tiene una persona: su ubicación, lo que le llega y lo que devolvió y falta confirmar.
   function stockDePersona(saldos, nombre) {
@@ -503,7 +542,7 @@
     return mejor;
   }
 
-  const api = { codigoProveedor, nombreProveedor, STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, esCodigoIgnorable, elegirCodigoDelCuadro, registrarUnidades, movimientoParaOficina, moverStock, cerrarEnvio, stockDePersona };
+  const api = { codigoProveedor, nombreProveedor, STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, esCodigoIgnorable, elegirCodigoDelCuadro, registrarUnidades, movimientoParaOficina, GARANTIA_ESTADOS, instalacionDeUnidad, abrirGarantias, moverStock, cerrarEnvio, stockDePersona };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else Object.assign(raiz, api);
 })(typeof window !== "undefined" ? window : globalThis);

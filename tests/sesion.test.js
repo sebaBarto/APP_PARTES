@@ -1454,14 +1454,47 @@ test("Stock: Melina entrega con escaneo, el técnico confirma «Recibí» (o con
     assert.strictEqual(r.cuerpo.marcados, 1);
     assert.ok(repo[`stock/movimientos-${mes}.json`].find((m) => m.id === ingreso.id).oficina);
     assert.strictEqual((await post({ accion: "marcar_oficina", mes, ids: [ingreso.id] }, melina)).statusCode, 403);
+    // Cambiar el tipo de varios artículos juntos (solo admin)
+    assert.strictEqual((await post({ accion: "configurar_varios", codigos: ["20208"], tipo: "unidad" }, melina)).statusCode, 403);
+    r = await post({ accion: "configurar_varios", codigos: ["20208", "999"], tipo: "unidad" }, admin);
+    assert.deepStrictEqual([r.cuerpo.cambiados, repo["stock/catalogo.json"].articulos["20208"].tipo], [1, "unidad"]);
+    await post({ accion: "configurar_varios", codigos: ["20208"], tipo: "cantidad" }, admin);
+    // Garantía: los 4 iguales tienen la misma etiqueta pero cada uno su N° de serie; vuelve uno fallado
+    const dep0 = repo["stock/saldos.json"].ubic.dep["20825"];
+    r = await post({ accion: "mover", de: "dep", a: "cli:Kiosco Pérez", presupuesto: "4521", items: [{ c: "20825", cant: 1, unidades: ["GH600AA001"] }] }, melina);
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    r = await post({ accion: "mover", de: "cli:Kiosco Pérez", a: "gar", falla: "No detecta", items: [{ c: "20825", cant: 1, unidades: ["GH600AA001"] }] }, melina);
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    let uni = repo["stock/saldos.json"].unidades.GH600AA001;
+    assert.deepStrictEqual([uni.u, uni.garantia.estado, uni.garantia.falla, uni.garantia.instalacion.cliente, uni.garantia.instalacion.presupuesto, uni.prov], ["gar", "por_enviar", "No detecta", "Kiosco Pérez", "4521", "2779"]);
+    const ficha = (await get({ serie: "gh600aa001" }, juan)).cuerpo;
+    assert.deepStrictEqual([ficha.proveedor, ficha.instalacion.cliente], ["Propiedad Protegida", "Kiosco Pérez"], "cualquiera puede ver la ficha de un equipo");
+    assert.strictEqual((await post({ accion: "garantia", serie: "GH600AA001", estado: "enviado" }, juan)).statusCode, 403);
+    r = await post({ accion: "garantia", serie: "GH600AA001", estado: "enviado", rma: "R-77" }, melina);
+    assert.strictEqual(repo["stock/saldos.json"].unidades.GH600AA001.garantia.rma, "R-77");
+    assert.strictEqual((await post({ accion: "garantia", serie: "GH600AA001", estado: "reemplazado" }, melina)).statusCode, 400, "falta el N° nuevo");
+    r = await post({ accion: "garantia", serie: "GH600AA001", estado: "reemplazado", nuevo: "GH600AA999" }, melina);
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    const sal2 = repo["stock/saldos.json"];
+    assert.deepStrictEqual([sal2.unidades.GH600AA001.u, sal2.unidades.GH600AA001.garantia.cerrada ? "cerrada" : "", sal2.unidades.GH600AA999.u, sal2.unidades.GH600AA999.reemplaza, sal2.ubic.gar ? sal2.ubic.gar["20825"] : 0, sal2.ubic.dep["20825"]], ["baja", "cerrada", "dep", "GH600AA001", 0, dep0]);
+    assert.strictEqual((await post({ accion: "garantia", serie: "GH600AA001", estado: "reparado" }, melina)).statusCode, 409, "ya está cerrada");
+    // Un técnico devuelve un equipo fallado: al recibirlo va solo a Garantía
+    r = await post({ accion: "devolver", fallado: true, falla: "No enciende", items: [{ c: "20825", cant: 1, unidades: ["GH12100FD4"] }] }, juan);
+    assert.ok(r.cuerpo.envio.fallado);
+    r = await post({ accion: "confirmar_envio", id: r.cuerpo.envio.id }, melina);
+    uni = repo["stock/saldos.json"].unidades.GH12100FD4;
+    assert.deepStrictEqual([uni.u, uni.garantia.falla, uni.garantia.estado], ["gar", "No enciende", "por_enviar"]);
+    const S2 = require(path.join(raiz, "stock-utils.js"));
+    assert.strictEqual(S2.totalesPorArticulo(repo["stock/saldos.json"])["20825"].gar, 1, "lo de garantía sigue contando como de SAT para Oficina");
     // Recordatorio del cron: envío sin confirmar hace más de un día
     await post({ accion: "mover", de: "dep", a: "tec:Luis", items: [{ c: "20208", cant: 1 }] }, melina);
     const { chequearEnviosStock } = require(path.join(raiz, "api", "cron-diario.js"));
     const estado = {};
-    const avisados = await chequearEnviosStock({}, estado, Date.now() + 25 * 3600e3);
+    const t0 = Date.now() + 25 * 3600e3;
+    const avisados = await chequearEnviosStock({}, estado, t0);
     assert.strictEqual(avisados.length, 1);
     assert.match(avisados[0], /^Luis:/);
-    assert.strictEqual((await chequearEnviosStock({}, estado, Date.now() + 26 * 3600e3)).length, 0, "una vez por día");
+    assert.strictEqual((await chequearEnviosStock({}, estado, t0 + 60e3)).length, 0, "una vez por día");
   } finally { global.fetch = fetchViejo; }
 });
 
