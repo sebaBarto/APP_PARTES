@@ -5946,3 +5946,96 @@ test("Admin Stock > Garantía: equipos fallados con su cliente, proveedor y segu
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Un solo lugar: si hay equipos con N° en el depósito hay que decir cuál sale (de la lista), el técnico tilda cuál le llegó, y el admin ve la Salud del stock", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  const S = require(require("path").join(__dirname, "..", "stock-utils.js"));
+  const catalogo = { articulos: { 23940: { c: "23940", d: "W-AJAX PIR INFRARROJO", tipo: "unidad", formatos: ["AA9999"] }, 9: { c: "9", d: "MOVISTAR", tipo: "sim" } } };
+  let saldos = { inicializado: "2026-11-01", ubic: { dep: { 23940: 4 } }, unidades: { AJ0001: { c: "23940", u: "dep" }, AJ0002: { c: "23940", u: "dep" }, AJ0003: { c: "23940", u: "dep" }, AJ0004: { c: "23940", u: "dep" } }, envios: [] };
+  let quien = "Melina";
+  const posts = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    const json = (o, st) => route.fulfill({ status: st || 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (!u.includes("coleccion=stock")) return json([]);
+    if (req.method() === "GET") return u.includes("mio=1") ? json({ nombre: quien, ...S.stockDePersona(saldos, quien), articulos: catalogo.articulos }) : json({ catalogo, saldos, conciliacion: { marcas: [], corridas: [] } });
+    const b = JSON.parse(req.postData()); posts.push(b);
+    if (b.accion === "mover") { const x = S.moverStock(saldos, b.items, { tipo: "mover", de: b.de, a: b.a, confirmar: /^tec:/.test(b.a) }, catalogo); if (x.error) return json({ error: x.error }, 409); saldos = x.saldos; return json({ ok: true, envio: x.envio }); }
+    if (b.accion === "confirmar_envio") { const x = S.cerrarEnvio(saldos, b.id, { accion: "recibi", items: b.items, por: quien, motivo: b.motivo }); saldos = x.saldos; return json({ ok: true, envio: x.envio }); }
+    return json({ error: "?" }, 400);
+  });
+  await page.goto(base + "/index.html");
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { localStorage.removeItem("stock_cola"); tecnicoLogueado = "Melina"; tecnicosPasswords = { Melina: "", Juan: "" }; tecnicosPermisos = { Melina: { stock_responsable: true } }; refrescarAccesosPorPermisos(); showScreen("home"); });
+  await page.click("#tileDepositoBtn");
+  await page.waitForFunction(() => depDatos && depDatos.catalogo);
+  await page.selectOption("#depDestSelect", "Juan");
+  // El chip no entra
+  await page.fill("#depCodigo", "000000092779"); await page.press("#depCodigo", "Enter");
+  await page.waitForTimeout(200);
+  assert.strictEqual(await page.locator("#depCanasta .stk-linea").count(), 0, "el SIM no entra a la lista");
+  // Dos infrarrojos sin decir cuáles: no deja confirmar
+  await page.fill("#depCodigo", "000239402779"); await page.press("#depCodigo", "Enter");
+  await page.waitForSelector("#depCanasta .stk-linea");
+  await page.click('#depCanasta [data-mas]');
+  await page.click("#depConfirmarBtn");
+  assert.match(await page.textContent(".dlg-app .dlg-texto"), /decí cuáles salen.*W-AJAX PIR INFRARROJO: faltan 2 N° de serie/s);
+  await page.click(".dlg-app .dlg-si");
+  assert.strictEqual(posts.length, 0);
+  // Se eligen de la lista
+  assert.match(await page.textContent("#depCanasta"), /Elegir el N° de serie de la lista \(4 en Depósito\)/);
+  await page.click("#depCanasta [data-elegir-n]");
+  await page.check('.stk-elegir-lista input[value="AJ0002"]');
+  await page.check('.stk-elegir-lista input[value="AJ0004"]');
+  await page.click(".dlg-app .dlg-si");
+  await page.waitForFunction(() => document.querySelectorAll("#depCanasta .stk-chip").length === 2);
+  await page.click("#depConfirmarBtn");
+  await page.click(".dlg-app .dlg-si");
+  await page.waitForFunction(() => !document.querySelector("#depCanasta .stk-linea"));
+  assert.deepStrictEqual(posts.at(-1).items, [{ c: "23940", cant: 2, unidades: ["AJ0002", "AJ0004"], prov: "2779" }]);
+  // Juan: le llegó uno solo; destilda el que no vino
+  quien = "Juan";
+  await page.evaluate(() => { tecnicoLogueado = "Juan"; showScreen("home"); });
+  await page.click("#tileMiStockBtn");
+  await page.waitForSelector('#miStockPorRecibir input[data-serie="AJ0004"]');
+  await page.uncheck('#miStockPorRecibir input[data-serie="AJ0004"]');
+  await page.click("#miStockPorRecibir [data-recibi]");
+  await page.fill(".dlg-app .dlg-input", "No estaba en la caja");
+  await page.click(".dlg-app .dlg-si");
+  await page.waitForFunction(() => !document.querySelector("#miStockPorRecibir .stk-envio"));
+  assert.deepStrictEqual([saldos.unidades.AJ0002.u, saldos.unidades.AJ0004.u, saldos.ubic["tec:Juan"]["23940"], saldos.ubic.dep["23940"]], ["tec:Juan", "dep", 1, 3], "el que no llegó vuelve al depósito con su N°");
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+  // Admin: Salud del stock
+  const p2 = await nuevaPagina();
+  await p2.page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  const saldos2 = { ubic: { dep: { 23940: 1 }, "com:Sin asignar": { 23940: 2 } }, unidades: { AJ0001: { c: "23940", u: "dep" }, AJ0003: { c: "23940", u: "dep" } }, envios: [], revisar: [{ id: "r1", fecha: "2026-11-01T10:00:00Z", c: "23940", cant: 1, de: "cli:Pérez", por: "Melina" }] };
+  const posts2 = [];
+  await p2.page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (!u.includes("coleccion=stock")) return json([]);
+    if (req.method() === "GET") return json({ catalogo, saldos: saldos2, conciliacion: { marcas: [], corridas: [] } });
+    const b = JSON.parse(req.postData()); posts2.push(b);
+    if (b.accion === "baja_serie") { saldos2.unidades[b.serie].u = "baja"; return json({ ok: true, de: "dep" }); }
+    if (b.accion === "salud_revisado") { saldos2.revisar = []; return json({ ok: true }); }
+    return json({ ok: true });
+  });
+  await p2.page.goto(base + "/admin.html");
+  await p2.page.waitForTimeout(300);
+  await p2.page.evaluate(() => { document.getElementById("mainCard").classList.remove("hidden"); return cargarInicioAdmin(); });
+  await p2.page.waitForFunction(() => /Stock: cosas que no cuadran/.test(document.getElementById("panelInicio").textContent));
+  await p2.page.evaluate(() => { [...document.querySelectorAll(".inicio-tarjeta")].find((b) => /no cuadran/.test(b.textContent)).click(); });
+  await p2.page.waitForSelector('#stkSaludLista details[data-k="seriesDeMas"]');
+  assert.match(await p2.page.textContent("#stkSaludLista"), /Más N° de serie que cantidad \(1\).*2 N° de serie y cantidad 1.*Entraron cosas que no figuraban en la APP \(1\).*Comodato sin cliente asignado \(1\)/s);
+  await p2.page.click('[data-baja="AJ0003"]');
+  await p2.page.fill(".cartel-admin-input", "Perdido");
+  await p2.page.click(".cartel-admin .cartel-si");
+  await p2.page.waitForFunction(() => /dado de baja/.test((document.getElementById("avisoFlotanteAdmin") || {}).textContent || ""));
+  await p2.page.click('[data-revisado="r1"]');
+  await p2.page.waitForFunction(() => /Todo cuadra/.test(document.getElementById("stkSaludLista").textContent));
+  assert.deepStrictEqual(posts2.map((p) => p.accion), ["baja_serie", "salud_revisado"]);
+  assert.deepStrictEqual(p2.erroresPagina, []);
+  await p2.ctx.close();
+});

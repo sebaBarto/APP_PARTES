@@ -1486,6 +1486,33 @@ test("Stock: Melina entrega con escaneo, el técnico confirma «Recibí» (o con
     assert.deepStrictEqual([uni.u, uni.garantia.falla, uni.garantia.estado], ["gar", "No enciende", "por_enviar"]);
     const S2 = require(path.join(raiz, "stock-utils.js"));
     assert.strictEqual(S2.totalesPorArticulo(repo["stock/saldos.json"])["20825"].gar, 1, "lo de garantía sigue contando como de SAT para Oficina");
+    // Un solo lugar: si en el depósito hay teclados con N° de serie, hay que decir cuáles salen
+    const salX = repo["stock/saldos.json"], depT = salX.ubic.dep["20825"], conN = S2.seriesEn(salX, "dep", "20825");
+    assert.ok(conN.length >= 1);
+    r = await post({ accion: "mover", de: "dep", a: "veh:Kangoo", items: [{ c: "20825", cant: depT }] }, melina);
+    if (depT > depT - conN.length) assert.strictEqual(r.statusCode, 409, "sin decir cuáles no sale");
+    assert.match(r.cuerpo.error || "", /escaneá o elegí/);
+    r = await post({ accion: "ajustar", c: "20825", ubic: "dep", cantidad: 0, motivo: "x" }, admin);
+    assert.strictEqual(r.statusCode, 409, "no se ajusta por debajo de los N° registrados");
+    r = await post({ accion: "baja_serie", serie: conN[0], motivo: "Perdido" }, admin);
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    assert.deepStrictEqual([repo["stock/saldos.json"].unidades[conN[0]].u, repo["stock/saldos.json"].ubic.dep["20825"]], ["baja", depT - 1]);
+    // SIM: no entra al stock del depósito
+    assert.match(S2.moverStock({ ubic: {} }, [{ c: "9", cant: 1 }], { de: "proveedor", a: "dep" }, { articulos: { 9: { c: "9", d: "MOVISTAR", tipo: "sim" } } }).error, /Control de SIMs/);
+    // Saldo y movimiento juntos: no queda nada pendiente y cada movimiento está una sola vez en el historial
+    assert.deepStrictEqual(repo["stock/saldos.json"].movsPend || [], []);
+    const ids = repo[`stock/movimientos-${mes}.json`].map((m) => m.id);
+    assert.strictEqual(new Set(ids).size, ids.length);
+    assert.ok(repo[`stock/movimientos-${mes}.json`].some((m) => m.tipo === "baja" && m.motivo === "Perdido"));
+    // Archivo de saldos dañado: no se escribe encima
+    const sano = repo["stock/saldos.json"];
+    repo["stock/saldos.json"] = "{roto";
+    const fetchSano = global.fetch;
+    global.fetch = async (url, op = {}) => { const u = String(url); if (u.includes("stock%2Fsaldos.json") || u.includes("stock/saldos.json")) { if ((op.method || "GET") === "PUT") throw new Error("no debería escribir"); return new Response(JSON.stringify({ sha: "s", encoding: "base64", content: Buffer.from("{roto").toString("base64") })); } return fetchSano(url, op); };
+    r = await post({ accion: "mover", de: "proveedor", a: "dep", items: [{ c: "20208", cant: 1 }] }, melina);
+    assert.strictEqual(r.statusCode, 500);
+    assert.match(r.cuerpo.error, /no se pudo leer/);
+    global.fetch = fetchSano; repo["stock/saldos.json"] = sano;
     // Recordatorio del cron: envío sin confirmar hace más de un día
     await post({ accion: "mover", de: "dep", a: "tec:Luis", items: [{ c: "20208", cant: 1 }] }, melina);
     const { chequearEnviosStock } = require(path.join(raiz, "api", "cron-diario.js"));

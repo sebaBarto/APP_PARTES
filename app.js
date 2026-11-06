@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.51.0";
+const APP_VERSION = "4.52.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -18291,6 +18291,19 @@ async function abrirEscanerStock(op) {
     ocupado = false;
   }, 200);
 }
+// Elegir uno o varios N° de serie de una lista (tildando).
+function elegirVariasSeries(mensaje, series, sugeridos) {
+  return new Promise((resolver) => {
+    const capa = document.createElement("div");
+    capa.className = "modal-overlay dlg-app";
+    capa.innerHTML = `<div class="modal-caja" role="dialog" aria-modal="true"><p class="dlg-texto"></p><div class="stk-elegir-lista" style="max-height:45vh;overflow:auto;margin:8px 0;">${series.map((t) => `<label class="stk-check" style="font-family:'IBM Plex Mono',monospace;"><input type="checkbox" value="${escapeHtml(t)}"> ${escapeHtml(t)}</label>`).join("")}</div><div class="dlg-botones"><button type="button" class="dlg-no">Cancelar</button><button type="button" class="dlg-si">Listo</button></div></div>`;
+    capa.querySelector(".dlg-texto").textContent = mensaje + (sugeridos > 1 ? ` (faltan ${sugeridos})` : "");
+    const fin = (ok) => { const v = ok ? [...capa.querySelectorAll("input:checked")].map((i) => i.value) : []; capa.remove(); resolver(v); };
+    capa.querySelector(".dlg-no").addEventListener("click", () => fin(false));
+    capa.querySelector(".dlg-si").addEventListener("click", () => fin(true));
+    document.body.appendChild(capa);
+  });
+}
 // Cuando una caja tiene más de un código posible y todavía no se sabe cuál es el N° de serie.
 function elegirSerieStock(desc, opciones) {
   return new Promise((resolver) => {
@@ -18326,6 +18339,7 @@ function crearCanastaStock(op) {
         <div class="stk-cant"><button type="button" data-menos aria-label="Uno menos">−</button><input class="field-input" inputmode="decimal" value="${stkFmtN(l.cant)}" aria-label="Cantidad"><button type="button" data-mas aria-label="Uno más">+</button></div></div>
         ${l.unidades.length ? `<div class="stk-chips">${l.unidades.map((t, j) => `<span class="stk-chip">${escapeHtml(t)}<button type="button" data-quitar-u="${j}" aria-label="Sacar">✕</button></span>`).join("")}</div>` : ""}
         ${esU && sinN ? `<div class="stk-falta">${can.actual === l.c ? `Falta${sinN > 1 ? "n" : ""} ${sinN} N° de serie: escanealo${sinN > 1 ? "s" : ""} ahora.` : `${sinN} sin N° de serie.`}</div>` : ""}
+        ${esU && can.seriesLibres(l.c).length ? `<button type="button" class="stk-link" data-elegir-n>Elegir el N° de serie de la lista (${can.seriesLibres(l.c).length} en ${escapeHtml(nombreUbicacion(op.origen()))})</button>` : ""}
         ${l.cant > disp ? `<div class="stk-falta">Hay ${stkFmtN(disp)}: no alcanza.</div>` : ""}
         <button type="button" class="stk-quitar" data-quitar>Sacar de la lista</button></div>`;
     }).join("") : "";
@@ -18337,6 +18351,15 @@ function crearCanastaStock(op) {
       inp.addEventListener("change", () => { const n = stkNumApp(inp.value); if (n >= 0) l.cant = Math.max(l.unidades.length, n); can.cambio(); });
       div.querySelector("[data-quitar]").addEventListener("click", () => { can.lineas = can.lineas.filter((x) => x !== l); if (can.actual === l.c) can.actual = ""; can.cambio(); });
       div.querySelectorAll("[data-quitar-u]").forEach((b) => b.addEventListener("click", () => { l.unidades.splice(Number(b.dataset.quitarU), 1); l.cant = Math.max(l.unidades.length, l.cant - 1); can.cambio(); }));
+      const elegirN = div.querySelector("[data-elegir-n]");
+      if (elegirN) elegirN.addEventListener("click", async () => {
+        const art = arts()[l.c] || { d: l.c };
+        const elegidos = await elegirVariasSeries(`${art.d}: tocá los N° de serie que salen.`, can.seriesLibres(l.c), Math.max(1, l.cant - l.unidades.length));
+        if (!elegidos.length) return;
+        elegidos.forEach((t) => { if (!l.unidades.includes(t)) l.unidades.push(t); });
+        if (l.cant < l.unidades.length) l.cant = l.unidades.length;
+        can.cambio();
+      });
     });
   };
   can.cambio = () => { can.lineas = can.lineas.filter((l) => l.cant > 0 || l.unidades.length || l.c === can.actual); can.render(); if (op.alCambiar) op.alCambiar(); };
@@ -18357,6 +18380,9 @@ function crearCanastaStock(op) {
   can.agregarArticulo = async (c, prov) => {
     const art = arts()[c]; if (!art) return { ok: false, texto: "No está en el catálogo" };
     if (op.soloEquipos && op.soloEquipos() && art.tipo !== "unidad") return { ok: false, texto: `${art.d} va por cantidad: no lleva N° de serie` };
+    if (art.tipo === "sim") return { ok: false, texto: `${art.d} es un SIM: se maneja en Control de SIMs` };
+    if (art.tipo === "herramienta") return { ok: false, texto: `${art.d} es una herramienta: se maneja en Herramientas` };
+    if (art.tipo === "no") return { ok: false, texto: `${art.d} está marcado «No controlar»` };
     let cuanto = 1;
     if (art.medida === "metros") {
       const v = await pedirTextoApp(`${art.d}\n¿Cuántos metros?`, "");
@@ -18441,6 +18467,10 @@ function crearCanastaStock(op) {
     return { ...(await can.agregarCodigo(d.usar)), usado: d.usar };
   };
   can.interpretar = (t) => interpretarCodigo(t, op.catalogo(), op.saldos(), can.actual);
+  // N° de serie registrados en el origen que todavía no están en la lista.
+  can.seriesLibres = (c) => { const o = op.origen(); if (!o) return []; const usados = new Set(can.lineas.flatMap((x) => x.unidades)); return seriesEn(op.saldos(), o, c).filter((t) => !usados.has(t)).sort(); };
+  // Regla de un solo lugar: lo que sale sin N° no puede ser más que lo que hay sin N° en el origen.
+  can.faltanSeries = () => { const o = op.origen(); return o ? controlarSalidaConSerie(op.saldos(), o, can.items(), op.catalogo()) : []; };
   // Para los números leídos de una foto: qué es cada uno (y si sirve).
   can.describir = (t) => {
     const r = can.interpretar(t), a = arts();
@@ -18502,6 +18532,23 @@ function conectarCasilleroStock(input, resultados, can, catalogo) {
   });
 }
 
+// Recepción de un envío: los equipos con N° de serie se tildan uno por uno (así queda cuál llegó
+// y cuál no); lo demás va por cantidad.
+function htmlRecepcion(e, d) {
+  return `<div class="stk-envio-items">${e.items.map((x, i) => {
+    const uni = x.unidades || [], sinN = Math.max(0, x.cant - uni.length);
+    return `<div class="stk-envio-item" style="align-items:flex-start;"><span>${escapeHtml(d(x.c))}${uni.length ? `<span style="display:block;">${uni.map((t) => `<label class="stk-check" style="font-weight:500;font-size:13.5px;padding:3px 0;font-family:'IBM Plex Mono',monospace;"><input type="checkbox" data-i="${i}" data-serie="${escapeHtml(t)}" checked> ${escapeHtml(t)}</label>`).join("")}</span>` : ""}${uni.length && sinN ? `<small>y ${stkFmtN(sinN)} sin N° de serie:</small>` : ""}</span>${!uni.length || sinN ? `<input class="field-input" style="width:72px;text-align:center;padding:6px;" inputmode="decimal" data-i="${i}" data-sin-n value="${stkFmtN(uni.length ? sinN : x.cant)}" aria-label="Cantidad recibida">` : ""}</div>`;
+  }).join("")}</div>`;
+}
+function leerRecepcion(div, e) {
+  return e.items.map((x, i) => {
+    const uni = x.unidades || [];
+    const tildadas = [...div.querySelectorAll(`input[data-i="${i}"][data-serie]`)].filter((c) => c.checked).map((c) => c.dataset.serie);
+    const inp = div.querySelector(`input[data-i="${i}"][data-sin-n]`), maxSinN = uni.length ? Math.max(0, x.cant - uni.length) : x.cant;
+    const n = inp ? stkNumApp(inp.value) : 0, sinN = inp ? (n >= 0 ? Math.min(n, maxSinN) : maxSinN) : 0;
+    return { c: x.c, cant: Math.round((tildadas.length + sinN) * 1000) / 1000, unidades: tildadas };
+  });
+}
 // ---------- Mi stock ----------
 let miStock = null;
 let miStockAvisoAt = 0;
@@ -18534,14 +18581,14 @@ function pintarMiStock() {
   const pr = document.getElementById("miStockPorRecibir");
   pr.innerHTML = (miStock.porRecibir || []).length ? `<h3 class="stk-h">Te mandaron (confirmá cuando lo tengas)</h3>` + miStock.porRecibir.map((e) => `<div class="stk-envio" data-id="${escapeHtml(e.id)}">
       <b>De ${escapeHtml(e.por || "Depósito")}</b><small>${escapeHtml(cuando(e.fecha))}${e.motivo ? " · " + escapeHtml(e.motivo) : ""}</small>
-      ${items(e, true)}
-      <p class="stk-ayuda">Si llegó menos, corregí la cantidad antes de confirmar.</p>
+      ${htmlRecepcion(e, d)}
+      <p class="stk-ayuda">Si llegó menos, destildá el N° de serie que no vino o corregí la cantidad antes de confirmar.</p>
       <div class="stk-envio-btns"><button type="button" class="btn btn-primary btn-small" data-recibi>✓ Recibí</button><button type="button" class="btn btn-secondary btn-small" data-rechazar>Rechazar</button></div></div>`).join("") : "";
   pr.querySelectorAll(".stk-envio").forEach((div) => {
     const e = miStock.porRecibir.find((x) => x.id === div.dataset.id);
     div.querySelector("[data-recibi]").addEventListener("click", async (ev) => {
       const btn = ev.currentTarget;
-      const recibidos = e.items.map((x, i) => { const n = stkNumApp(div.querySelector(`input[data-i="${i}"]`).value); return { c: x.c, cant: n >= 0 ? Math.min(n, x.cant) : x.cant, unidades: x.unidades }; });
+      const recibidos = leerRecepcion(div, e);
       const faltan = recibidos.filter((x, i) => x.cant < e.items[i].cant);
       let motivo = "";
       if (faltan.length) {
@@ -18588,8 +18635,8 @@ document.getElementById("miStockDevolverBtn").addEventListener("click", async (e
   const btn = ev.currentTarget, items = miStockCanasta.items();
   if (!items.length) return;
   const a = miStock.articulos || {};
-  const faltanN = items.filter((x) => (a[x.c] || {}).tipo === "unidad" && x.cant > x.unidades.length && (miStock.unidades || []).some((u) => u.c === x.c));
-  if (faltanN.length && !(await confirmarApp(`Hay equipos sin escanear el N° de serie (${faltanN.map((x) => (a[x.c] || {}).d).join(", ")}). ¿Devolver igual?`))) return;
+  const faltanN = miStockCanasta.faltanSeries();
+  if (faltanN.length) { await dialogoApp(`Decí cuáles devolvés:\n\n${faltanN.map((f) => `• ${f.d}: faltan ${f.faltan} N° de serie (escanealos o tocá «Elegir el N° de serie de la lista»)`).join("\n")}`, { soloAceptar: true, aceptar: "Entendido" }); return; }
   const fallado = document.getElementById("miStockFallado").checked, falla = document.getElementById("miStockFalla").value.trim();
   if (fallado && !falla) { showToast("Escribí qué falla tiene"); document.getElementById("miStockFalla").focus(); return; }
   if (fallado && items.some((x) => (a[x.c] || {}).tipo === "unidad" && x.unidades.length < x.cant)) { showToast("Para la garantía escaneá el N° de serie de cada equipo fallado"); return; }
@@ -18787,6 +18834,8 @@ document.getElementById("depConfirmarBtn").addEventListener("click", async (ev) 
     }
   }
   cuerpo.motivo = document.getElementById("depMotivo").value.trim();
+  const faltanN = cuerpo.de && cuerpo.de !== "proveedor" && !/^(cli|com):/.test(cuerpo.de) ? controlarSalidaConSerie(depSaldos(), cuerpo.de, items, depCatalogo()) : [];
+  if (faltanN.length) { await dialogoApp(`Antes de confirmar, decí cuáles salen:\n\n${faltanN.map((f) => `• ${f.d}: faltan ${f.faltan} N° de serie (escanealos o tocá «Elegir el N° de serie de la lista»)`).join("\n")}`, { soloAceptar: true, aceptar: "Entendido" }); return; }
   const sinN = items.filter((x) => (a[x.c] || {}).tipo === "unidad" && x.cant > x.unidades.length);
   const resumen = items.map((x) => `• ${(a[x.c] || {}).d || x.c}: ${stkFmtN(x.cant)}`).join("\n");
   const destino = depModo === "entregar" ? nombreUbicacion(cuerpo.a) + (cuerpo.presupuesto ? ` (presupuesto N° ${cuerpo.presupuesto})` : "") : cuerpo.a === "gar" ? "Garantía (fallado)" : "el depósito";
@@ -18930,12 +18979,12 @@ function depPintarDevoluciones() {
   cont.innerHTML = lista.length ? `<h3 class="stk-h">Devoluciones por recibir (${lista.length})</h3>` + lista.map((e) => `<div class="stk-envio" data-id="${escapeHtml(e.id)}">
     <b>${escapeHtml(e.de.replace(/^tec:/, ""))}</b><small>${escapeHtml(new Date(e.fecha).toLocaleString("es-AR", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }))}${e.motivo && !e.fallado ? " · " + escapeHtml(e.motivo) : ""}</small>
     ${e.fallado ? `<div class="stk-fallado">⚠ Fallado: ${escapeHtml(e.falla || "")}</div>` : ""}
-    <div class="stk-envio-items">${e.items.map((x, i) => `<div class="stk-envio-item"><span>${escapeHtml(d(x.c))}${x.unidades && x.unidades.length ? `<small>${x.unidades.map(escapeHtml).join(" · ")}</small>` : ""}</span><input class="field-input" style="width:72px;text-align:center;padding:6px;" inputmode="decimal" data-i="${i}" value="${stkFmtN(x.cant)}" aria-label="Cantidad recibida"></div>`).join("")}</div>
+    ${htmlRecepcion(e, d)}
     <div class="field-group" style="margin:6px 0;"><label class="field-label">Va a</label><select class="field-input" data-destino><option value="dep" ${e.fallado ? "" : "selected"}>Depósito</option><option value="gar" ${e.fallado ? "selected" : ""}>Garantía (fallado)</option></select></div>
     <div class="stk-envio-btns"><button type="button" class="btn btn-primary btn-small" data-recibi>✓ Recibido</button></div></div>`).join("") : "";
   cont.querySelectorAll(".stk-envio").forEach((div) => div.querySelector("[data-recibi]").addEventListener("click", async (ev) => {
     const e = lista.find((x) => x.id === div.dataset.id), btn = ev.currentTarget;
-    const items = e.items.map((x, i) => { const n = stkNumApp(div.querySelector(`input[data-i="${i}"]`).value); return { c: x.c, cant: n >= 0 ? Math.min(n, x.cant) : x.cant, unidades: x.unidades }; });
+    const items = leerRecepcion(div, e);
     let motivo = "";
     if (items.some((x, i) => x.cant < e.items[i].cant)) { motivo = await pedirTextoApp("Llegó menos de lo que devolvió: lo que falta vuelve a figurar a su nombre. ¿Qué pasó?", ""); if (motivo === null) return; }
     btn.disabled = true;

@@ -131,9 +131,9 @@ async function leerArchivoDatos(ruta, porDefecto) {
     if (!rRaw.ok) throw new Error("No se pudo leer " + ruta);
     texto = await rRaw.text();
   }
-  let data = porDefecto;
-  try { data = JSON.parse(texto); } catch (e) { data = porDefecto; }
-  return { data, sha: meta.sha };
+  let data = porDefecto, corrupto = false;
+  try { data = JSON.parse(texto); } catch (e) { data = porDefecto; corrupto = true; }
+  return { data, sha: meta.sha, corrupto };
 }
 async function escribirArchivoDatos(ruta, data, sha, mensaje) {
   const r = await fetch(urlGithubDatos(ruta), {
@@ -1180,9 +1180,14 @@ const STOCK_CAT = "stock/catalogo.json", STOCK_SAL = "stock/saldos.json", STOCK_
 const stockMovRuta = (d) => `stock/movimientos-${(d || new Date().toISOString()).slice(0, 7)}.json`;
 async function stockActualizar(ruta, porDefecto, cambiar, mensaje) {
   for (let i = 0; i < 5; i++) {
-    const { data, sha } = await leerArchivoDatos(ruta, porDefecto);
+    const { data, sha, corrupto } = await leerArchivoDatos(ruta, porDefecto);
+    // Nunca escribir sobre un archivo que existe pero no se pudo leer: se perderían los datos.
+    if (corrupto) return { error: `El archivo ${ruta} no se pudo leer. No se guardó nada para no perder datos: hay que restaurarlo desde una copia de seguridad.`, status: 500 };
     const res = cambiar(data && typeof data === "object" ? data : porDefecto);
     if (res && res.error) return res;
+    // Saldo y movimiento en la misma escritura: los movimientos quedan en «movsPend» del archivo de
+    // saldos hasta que se pasan al historial del mes (si eso falla, se pasan en la próxima operación).
+    if (ruta === STOCK_SAL && Array.isArray(res.movs) && res.movs.length) res.data = { ...res.data, movsPend: [...((res.data && res.data.movsPend) || []), ...res.movs].slice(-2000) };
     const r = await escribirArchivoDatos(ruta, res.data, sha, mensaje);
     if (r.ok) return res;
     if (r.status !== 409 && r.status !== 422) break;
@@ -1219,10 +1224,27 @@ async function stockRegistrarMovimientos(movs, mensaje) {
   movs.forEach((m) => { (porMes[stockMovRuta(m.fecha)] = porMes[stockMovRuta(m.fecha)] || []).push(m); });
   let ok = true;
   for (const [ruta, lista] of Object.entries(porMes)) {
-    const r = await stockActualizar(ruta, [], (d) => ({ data: [...(Array.isArray(d) ? d : []), ...lista] }), mensaje);
-    if (r.error) ok = false;
+    const r = await stockActualizar(ruta, [], (d) => {
+      const actual = Array.isArray(d) ? d : [], ya = new Set(actual.map((m) => m.id));
+      const nuevos = lista.filter((m) => !ya.has(m.id)); // si se reintenta, no se duplica
+      return nuevos.length ? { data: [...actual, ...nuevos] } : { error: "ya estaban", status: 200, yaEstaban: true };
+    }, mensaje);
+    if (r.error && !r.yaEstaban) ok = false;
   }
   return ok;
+}
+// Pasa los movimientos al historial del mes y los saca de «movsPend».
+async function stockConfirmarMovs(movs, mensaje) {
+  if (!movs || !movs.length) return true;
+  const ok = await stockRegistrarMovimientos(movs, mensaje);
+  if (!ok) return false;
+  const ids = new Set(movs.map((m) => m.id));
+  await stockActualizar(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }, (sal) => {
+    const pend = sal.movsPend || [];
+    if (!pend.some((m) => ids.has(m.id))) return { error: "sin cambios", status: 200 };
+    return { data: { ...sal, movsPend: pend.filter((m) => !ids.has(m.id)) } };
+  }, "Stock: movimientos pasados al historial").catch(() => {});
+  return true;
 }
 async function manejarStock(req, res, autorizacion, cuerpo) {
   const S = require("../stock-utils.js");
@@ -1233,7 +1255,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
   let esResp = esAdmin, tecnicosGuardados = null;
   const tecnicos = async () => (tecnicosGuardados = tecnicosGuardados || (await leerTecnicosGuardados().catch(() => [])));
   if (!esAdmin) { const t = (await tecnicos()).find((x) => x.nombre === autorizacion.nombre); esResp = !!(t && t.permisos && (t.permisos.stock_responsable || t.permisos.admin)); }
-  const SOLO_ADMIN = ["configurar_varios", "proveedores", "marcar_oficina", "importar_catalogo", "configurar", "saldo_inicial", "ajustar", "conc_marcar", "conc_reactivar", "conc_corrida"];
+  const SOLO_ADMIN = ["baja_serie", "salud_revisado", "configurar_varios", "proveedores", "marcar_oficina", "importar_catalogo", "configurar", "saldo_inicial", "ajustar", "conc_marcar", "conc_reactivar", "conc_corrida"];
   try {
     if (req.method === "GET" && q.serie) {
       // Ficha de un equipo por su N° de serie: dónde está, a qué cliente fue y su garantía.
@@ -1262,11 +1284,14 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
     if (req.method === "GET") {
       if (q.movimientos) {
         if (!/^\d{4}-\d{2}$/.test(String(q.movimientos))) { res.status(400).json({ error: "Mes inválido" }); return; }
-        const { data } = await leerArchivoDatos(stockMovRuta(q.movimientos + "-01"), []);
-        res.status(200).json(Array.isArray(data) ? data : []);
+        const [{ data }, { data: sal0 }] = await Promise.all([leerArchivoDatos(stockMovRuta(q.movimientos + "-01"), []), leerArchivoDatos(STOCK_SAL, {})]);
+        const lista = Array.isArray(data) ? data : [], ya = new Set(lista.map((m) => m.id));
+        const pend = ((sal0 && sal0.movsPend) || []).filter((m) => String(m.fecha || "").slice(0, 7) === q.movimientos && !ya.has(m.id));
+        res.status(200).json([...lista, ...pend]);
         return;
       }
       const [cat, sal, conc] = await Promise.all([leerArchivoDatos(STOCK_CAT, { articulos: {} }), leerArchivoDatos(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }), leerArchivoDatos(STOCK_CONC, { marcas: [], corridas: [] })]);
+      if (cat.corrupto || sal.corrupto) { res.status(500).json({ error: "Un archivo del stock no se pudo leer: hay que restaurarlo desde una copia de seguridad." }); return; }
       res.status(200).json({ catalogo: cat.data, saldos: sal.data, conciliacion: { marcas: (conc.data && conc.data.marcas) || [], corridas: ((conc.data && conc.data.corridas) || []).slice(0, 24) } });
       return;
     }
@@ -1274,6 +1299,40 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
     const b = cuerpo && typeof cuerpo === "object" ? cuerpo : {};
     const ahora = new Date().toISOString();
     const responder = (r, extra) => { if (r.error) res.status(r.status || 400).json({ error: r.error }); else res.status(200).json({ ok: true, ...(extra || {}), ...(r.respuesta || {}) }); };
+    // Movimientos que quedaron sin pasar al historial (falló esa segunda escritura): se pasan ahora.
+    try {
+      const { data: sal0 } = await leerArchivoDatos(STOCK_SAL, {});
+      const pend = (sal0 && sal0.movsPend) || [];
+      if (pend.length) await stockConfirmarMovs(pend, "Stock: movimientos pendientes pasados al historial");
+    } catch (e) { /* se reintenta en la próxima */ }
+
+    if (b.accion === "baja_serie") {
+      // Un equipo identificado que ya no está (perdido, robado, roto, vendido sin registrar): sale con su N°.
+      const t = S.limpiarCodigo(b.serie), motivo = String(b.motivo || "").replace(/\s+/g, " ").trim().slice(0, 200);
+      if (!t || !motivo) { res.status(400).json({ error: "Falta el N° de serie o el motivo" }); return; }
+      let movs = [];
+      const r = await stockActualizar(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }, (sal) => {
+        const u = (sal.unidades || {})[t];
+        if (!u || !u.u || u.u === "baja") return { error: "Ese N° de serie no está registrado en ningún lugar", status: 404 };
+        if (/^cam:/.test(u.u)) return { error: "Está en camino: primero que se confirme el envío", status: 409 };
+        const hay = ((sal.ubic || {})[u.u] || {})[u.c] || 0;
+        // Si la cantidad ya no lo contaba (más N° que cantidad), solo se da de baja el N°.
+        const conSerie = S.seriesEn(sal, u.u, u.c).length;
+        const m = { id: `${Date.now().toString(36)}-b`, fecha: ahora, por: quien, tipo: "baja", c: u.c, cant: hay >= conSerie && hay > 0 ? 1 : 0, de: u.u, unidades: [t], motivo };
+        movs = [m];
+        let s2 = S.aplicarMovimiento(sal, m);
+        return { data: s2, respuesta: { de: u.u }, movs };
+      }, `Stock: baja del N° ${t} (por ${quien}): ${motivo}`);
+      if (!r.error) await stockConfirmarMovs(movs, `Stock: baja de un N° de serie (por ${quien})`);
+      responder(r);
+      return;
+    }
+    if (b.accion === "salud_revisado") {
+      const ids = new Set((Array.isArray(b.ids) ? b.ids : []).map(String));
+      const r = await stockActualizar(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }, (sal) => ({ data: { ...sal, revisar: (sal.revisar || []).filter((x) => !ids.has(String(x.id))) }, respuesta: {} }), `Stock: retiros revisados (por ${quien})`);
+      responder(r);
+      return;
+    }
 
     if (b.accion === "importar_catalogo") {
       const lista = Array.isArray(b.articulos) ? b.articulos.slice(0, 20000) : [];
@@ -1387,9 +1446,9 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
           if (dep) { nuevo.ubic.dep[c] = dep; movs.push({ id: `${Date.now().toString(36)}-${movs.length}`, fecha: ahora, por: quien, tipo: "inicial", c, cant: dep, a: "dep", motivo: "Saldo inicial desde el listado de Oficina" }); }
           if (com) { (nuevo.ubic["com:Sin asignar"] = nuevo.ubic["com:Sin asignar"] || {})[c] = com; movs.push({ id: `${Date.now().toString(36)}-${movs.length}`, fecha: ahora, por: quien, tipo: "inicial", c, cant: com, a: "com:Sin asignar", motivo: "Comodato inicial desde el listado de Oficina (falta asignar el cliente)" }); }
         });
-        return { data: nuevo, respuesta: { articulos: new Set(movs.map((m) => m.c)).size } };
+        return { data: nuevo, respuesta: { articulos: new Set(movs.map((m) => m.c)).size }, movs };
       }, `Stock: saldo inicial desde el listado de Oficina (por ${quien})`);
-      if (!r.error) await stockRegistrarMovimientos(movs, `Stock: movimientos del saldo inicial (por ${quien})`);
+      if (!r.error) await stockConfirmarMovs(movs, `Stock: movimientos del saldo inicial (por ${quien})`);
       responder(r);
       return;
     }
@@ -1406,10 +1465,13 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
         const antes = ((sal.ubic || {})[ubic] || {})[c] || 0, dif = Math.round((cantidad - antes) * 1000) / 1000;
         if (!dif) return { data: sal, respuesta: { sinCambios: true } };
         mov = { id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`, fecha: ahora, por: quien, tipo: "ajuste", c, cant: Math.abs(dif), ...(dif > 0 ? { a: ubic } : { de: ubic }), motivo, antes, despues: cantidad };
+        // No se puede dejar menos cantidad que equipos con N° de serie registrados ahí.
+        const series = S.seriesEn(sal, ubic, c);
+        if (cantidad < series.length) return { error: `En ${S.nombreUbicacion(ubic)} hay ${series.length} equipos con N° de serie (${series.slice(0, 5).join(", ")}${series.length > 5 ? "…" : ""}). Primero dá de baja los N° que ya no están (Stock › Salud), después ajustá.`, status: 409 };
         const nuevo = S.aplicarMovimiento(sal, mov);
-        return { data: nuevo, respuesta: { antes, despues: cantidad } };
+        return { data: nuevo, respuesta: { antes, despues: cantidad }, movs: [mov] };
       }, `Stock: ajuste de ${c} en ${ubic} (por ${quien}): ${motivo}`);
-      if (!r.error && mov) await stockRegistrarMovimientos([mov], `Stock: movimiento de ajuste (por ${quien})`);
+      if (!r.error && mov) await stockConfirmarMovs([mov], `Stock: movimiento de ajuste (por ${quien})`);
       responder(r);
       return;
     }
@@ -1500,9 +1562,9 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
         movs.forEach((m) => { s2 = S.aplicarMovimiento(s2, m); });
         s2.unidades[t] = { ...s2.unidades[t], garantia: g };
         if (estado === "reemplazado") s2.unidades[nuevo] = { ...s2.unidades[nuevo], reemplaza: t };
-        return { data: s2, respuesta: { garantia: g } };
+        return { data: s2, respuesta: { garantia: g }, movs };
       }, `Stock: garantía de ${t}: ${estado} (por ${quien})`);
-      if (!r.error && movs.length) await stockRegistrarMovimientos(movs, `Stock: garantía (por ${quien})`);
+      if (!r.error && movs.length) await stockConfirmarMovs(movs, `Stock: garantía (por ${quien})`);
       responder(r);
       return;
     }
@@ -1518,13 +1580,13 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
         if (opId) x.saldos.ops = [opId, ...(sal.ops || [])].slice(0, 300);
         resultado = x;
         const { saldos, ...resumen } = x;
-        return { data: saldos, respuesta: resumen };
+        const movsInv = x.registradas ? [{ id: `${Date.now().toString(36)}-inv`, fecha: ahora, por: quien, tipo: "inventario_series", c: "", cant: x.registradas, a: ubic, motivo: `Inventario de N° de serie: ${x.registradas} registrados` }] : [];
+        resultado.movsInv = movsInv;
+        return { data: saldos, respuesta: resumen, movs: movsInv };
       }, `Stock: inventario de N° de serie en ${ubic} (por ${quien})`);
       if (duplicado) { res.status(200).json({ ok: true, duplicado: true }); return; }
       if (!r.error && resultado) await stockAprender((Array.isArray(b.items) ? b.items : []).map((x) => ({ c: S.codigoArticulo(x.c), unidades: x.unidades || [], prov: S.codigoProveedor(x.prov) })), quien);
-      if (!r.error && resultado && resultado.registradas) {
-        await stockRegistrarMovimientos([{ id: `${Date.now().toString(36)}-inv`, fecha: ahora, por: quien, tipo: "inventario_series", c: "", cant: resultado.registradas, a: ubic, motivo: `Inventario de N° de serie: ${resultado.registradas} registrados` }], `Stock: inventario de N° de serie (por ${quien})`);
-      }
+      if (!r.error && resultado && resultado.registradas) await stockConfirmarMovs(resultado.movsInv, `Stock: inventario de N° de serie (por ${quien})`);
       responder(r);
       return;
     }
@@ -1567,11 +1629,14 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
         resultado = x;
         S.abrirGarantias(x.saldos, x.movs, { falla, por: quien });
         if (opId) x.saldos.ops = [opId, ...(sal.ops || [])].slice(0, 300);
-        return { data: x.saldos, respuesta: { envio: x.envio, movimientos: x.movs.length } };
+        // Retiros de clientes que la APP no tenía: quedan para revisar en Salud del stock.
+        const sinRegistro = x.movs.filter((m) => !m.de && /no figuraba en la APP/.test(m.motivo || ""));
+        if (sinRegistro.length) x.saldos.revisar = [...sinRegistro.map((m) => ({ id: m.id, fecha: m.fecha, c: m.c, cant: m.cant, de, por: quien })), ...(sal.revisar || [])].slice(0, 300);
+        return { data: x.saldos, respuesta: { envio: x.envio, movimientos: x.movs.length }, movs: x.movs };
       }, `Stock: ${tipo} ${de} → ${a} (por ${quien})`);
       if (duplicado) { res.status(200).json({ ok: true, duplicado: true }); return; }
       if (!r.error && resultado) {
-        await stockRegistrarMovimientos(resultado.movs, `Stock: movimientos (${tipo}, por ${quien})`);
+        await stockConfirmarMovs(resultado.movs, `Stock: movimientos (${tipo}, por ${quien})`);
         // Aprende la forma de los N° de unidad de cada artículo.
         await stockAprender(resultado.movs, quien);
         if (resultado.envio) {
@@ -1601,10 +1666,10 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
         S.abrirGarantias(x.saldos, x.movs, { falla: e.falla || e.motivo || "", por: quien });
         x.saldos.envios_cerrados = [x.envio, ...(Array.isArray(sal.envios_cerrados) ? sal.envios_cerrados : [])].slice(0, 300);
         resultado = x;
-        return { data: x.saldos, respuesta: { envio: x.envio } };
+        return { data: x.saldos, respuesta: { envio: x.envio }, movs: x.movs };
       }, `Stock: envío confirmado (por ${quien})`);
       if (!r.error && resultado) {
-        await stockRegistrarMovimientos(resultado.movs, `Stock: movimientos de confirmación (por ${quien})`);
+        await stockConfirmarMovs(resultado.movs, `Stock: movimientos de confirmación (por ${quien})`);
         if (resultado.envio.estado !== "recibido") {
           try {
             const { enviarASeleccionados } = require("../lib/push-sender");

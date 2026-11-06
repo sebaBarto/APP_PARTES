@@ -361,6 +361,72 @@
     return { usar: art ? art.t : null };
   }
 
+  // ---------- Un solo lugar: N° de serie contra cantidades ----------
+  // N° de serie registrados de un artículo en un lugar.
+  const seriesEn = (saldos, ubic, c) => Object.entries((saldos && saldos.unidades) || {}).filter(([, u]) => u && u.c === c && u.u === ubic).map(([t]) => t);
+  // Lo que sale «sin N°» no puede ser más que los equipos sin N° que hay en el origen.
+  // Devuelve [{ c, d, faltan, conSerie }] (vacío = está bien).
+  function controlarSalidaConSerie(saldos, de, items, catalogo) {
+    const arts = (catalogo && catalogo.articulos) || {}, porArticulo = {};
+    (items || []).forEach((x) => {
+      const c = codigoArticulo(x.c);
+      const p = (porArticulo[c] = porArticulo[c] || { cant: 0, unidades: [] });
+      p.cant += Number(x.cant) || 0;
+      p.unidades.push(...(x.unidades || []).map(limpiarCodigo));
+    });
+    const r = [];
+    Object.entries(porArticulo).forEach(([c, x]) => {
+      if ((arts[c] || {}).tipo !== "unidad") return;
+      const conSerie = seriesEn(saldos, de, c);
+      if (!conSerie.length) return;
+      const hay = (((saldos && saldos.ubic) || {})[de] || {})[c] || 0;
+      const identificados = x.unidades.filter((t) => conSerie.includes(t)).length;
+      const salenSinN = Math.max(x.cant, x.unidades.length) - identificados, sinNDisponibles = Math.max(0, hay - conSerie.length);
+      if (salenSinN > sinNDisponibles) r.push({ c, d: (arts[c] || {}).d || c, faltan: salenSinN - sinNDisponibles, conSerie: conSerie.filter((t) => !x.unidades.includes(t)) });
+    });
+    return r;
+  }
+  // Salud del stock: todo lo que rompe una regla, con qué hacer.
+  // Devuelve [{ k, nivel: "error"|"aviso"|"info", titulo, ayuda, items: [{ texto, c?, ubic?, serie?, id? }] }]
+  function saludStock(catalogo, saldos, ahora) {
+    const arts = (catalogo && catalogo.articulos) || {}, s = saldos || {}, ubic = s.ubic || {}, uni = s.unidades || {};
+    const d = (c) => (arts[c] || {}).d || c, t0 = (ahora || new Date()).getTime();
+    const out = [];
+    const grupo = (k, nivel, titulo, ayuda, items) => { if (items.length) out.push({ k, nivel, titulo, ayuda, items }); };
+    // 1) N° de serie de más en un lugar (más N° que cantidad)
+    const cuenta = {};
+    Object.entries(uni).forEach(([t, u]) => { if (!u || !u.c || !u.u || u.u === "baja") return; const k2 = `${u.u}|${u.c}`; (cuenta[k2] = cuenta[k2] || []).push(t); });
+    grupo("seriesDeMas", "error", "Más N° de serie que cantidad", "En ese lugar figuran más equipos identificados que la cantidad. Hay que dar de baja el N° que ya no está, o corregir la cantidad.",
+      Object.entries(cuenta).filter(([k2, ts]) => { const [u, c] = k2.split("|"); return ts.length > ((ubic[u] || {})[c] || 0); }).map(([k2, ts]) => { const [u, c] = k2.split("|"); return { texto: `${d(c)} en ${nombreUbicacion(u)}: ${ts.length} N° de serie y cantidad ${(ubic[u] || {})[c] || 0}`, c, ubic: u, series: ts }; }));
+    // 2) Cantidades negativas
+    const neg = [];
+    Object.entries(ubic).forEach(([u, items]) => Object.entries(items || {}).forEach(([c, n]) => { if (n < 0) neg.push({ texto: `${d(c)} en ${nombreUbicacion(u)}: ${n}`, c, ubic: u }); }));
+    grupo("negativo", "error", "Cantidades negativas", "Salió más de lo que había: falta registrar una entrada o se cargó mal una salida.", neg);
+    // 3) SIM, herramientas o «no controlar» con stock
+    const otros = [];
+    Object.entries(ubic).forEach(([u, items]) => Object.entries(items || {}).forEach(([c, n]) => { if (n && /^(sim|herramienta|no)$/.test((arts[c] || {}).tipo)) otros.push({ texto: `${d(c)} en ${nombreUbicacion(u)}: ${n}`, c, ubic: u }); }));
+    grupo("otros", "aviso", "SIM o herramientas en el stock", "Estos artículos se manejan en Control de SIMs o Herramientas: ajustalos a 0 acá.", otros);
+    // 4) Envíos sin confirmar hace más de 2 días
+    grupo("envios", "aviso", "Envíos sin confirmar hace más de 2 días", "Material en camino que nadie confirmó: llamar al que tiene que tocar «Recibí».",
+      (s.envios || []).filter((e) => t0 - new Date(e.fecha).getTime() > 2 * 864e5).map((e) => ({ texto: `${e.a === "dep" ? `Devolución de ${e.de.replace(/^tec:/, "")}` : `A ${e.a.replace(/^tec:/, "")}`}: ${e.items.map((x) => `${d(x.c)} ×${x.cant}`).join(", ")} (desde el ${new Date(e.fecha).toLocaleDateString("es-AR")})`, id: e.id })));
+    // 5) Retiros que no figuraban en la APP
+    grupo("revisar", "aviso", "Entraron cosas que no figuraban en la APP", "Retiros de clientes que la APP no tenía registrados. Revisá que estén bien y marcalos como revisados.",
+      (s.revisar || []).map((x) => ({ texto: `${d(x.c)} ×${x.cant} de ${nombreUbicacion(x.de)} (${new Date(x.fecha).toLocaleDateString("es-AR")}, ${x.por || ""})`, id: x.id })));
+    // 6) Comodato sin cliente
+    const sinCli = Object.entries(ubic["com:Sin asignar"] || {}).filter(([, n]) => n > 0);
+    grupo("comodatoSinCliente", "info", "Comodato sin cliente asignado", "Viene del saldo inicial. Se asigna a cada cliente con la planilla de comodatos.", sinCli.map(([c, n]) => ({ texto: `${d(c)}: ${n}`, c, ubic: "com:Sin asignar" })));
+    // 7) Equipos sin N° de serie todavía (en poder de SAT)
+    const sinN = [];
+    Object.entries(ubic).forEach(([u, items]) => {
+      if (!/^(dep|gar|tec:|veh:)/.test(u)) return;
+      Object.entries(items || {}).forEach(([c, n]) => { if ((arts[c] || {}).tipo !== "unidad") return; const f = n - ((cuenta[`${u}|${c}`] || []).length); if (f > 0) sinN.push({ texto: `${d(c)} en ${nombreUbicacion(u)}: ${f} sin N°`, c, ubic: u, n: f }); });
+    });
+    grupo("sinSerie", "info", "Equipos sin N° de serie todavía", "Se registran con el Inventario del Depósito (escanear etiqueta y N° de cada caja).", sinN);
+    // 8) Movimientos esperando pasar al historial
+    grupo("movsPend", "info", "Movimientos esperando pasar al historial", "Se pasan solos en la próxima operación.", (s.movsPend || []).length ? [{ texto: `${s.movsPend.length} movimiento(s)` }] : []);
+    return out;
+  }
+
   // ---------- Movimientos con confirmación ----------
   // Lo que va a un técnico (o vuelve de un técnico al depósito) queda «en camino» hasta que
   // el que recibe confirma. Los envíos pendientes se guardan en saldos.envios.
@@ -380,6 +446,7 @@
     if (op.a && op.a === op.de) return { error: "El origen y el destino son el mismo" };
     for (const x of lista) {
       if (!arts[x.c]) return { error: `El artículo ${x.c} no está en el catálogo` };
+      if (!op.permitirOtros && /^(sim|herramienta|no)$/.test(arts[x.c].tipo)) return { error: `${arts[x.c].d}: ${arts[x.c].tipo === "sim" ? "es un SIM, se maneja en Control de SIMs" : arts[x.c].tipo === "herramienta" ? "es una herramienta, se maneja en Herramientas" : "está marcado «No controlar»"}.` };
       if (op.de && op.de !== "proveedor" && !op.deFlexible) {
         const hay = (s.ubic[op.de] || {})[x.c] || 0;
         if (hay < x.cant) return { error: `${arts[x.c].d}: en ${nombreUbicacion(op.de)} hay ${hay} y querés mover ${x.cant}.` };
@@ -389,6 +456,11 @@
         if (u && u.c !== x.c) return { error: `El N° de serie ${t} es de otro artículo (${(arts[u.c] || {}).d || u.c}).` };
         if (u && op.de && op.de !== "proveedor" && !op.deFlexible && u.u !== op.de) return { error: `El equipo ${t} figura en ${nombreUbicacion(u.u)}, no en ${nombreUbicacion(op.de)}.` };
       }
+    }
+    // Regla de un solo lugar: si en el origen hay equipos con N° de serie, se dice cuáles salen.
+    if (op.de && op.de !== "proveedor" && !op.deFlexible) {
+      const faltan = controlarSalidaConSerie(s, op.de, lista, catalogo);
+      if (faltan.length) return { error: faltan.map((f) => `${f.d}: en ${nombreUbicacion(op.de)} hay ${f.conSerie.length} con N° de serie; escaneá o elegí cuál${f.faltan > 1 ? "es" : ""} sale${f.faltan > 1 ? "n" : ""} (faltan ${f.faltan}).`).join(" "), faltanSerie: faltan };
     }
     const de = op.de === "proveedor" ? null : op.de || null;
     const destino = op.confirmar ? camino(op.a, de) : op.a;
@@ -542,7 +614,7 @@
     return mejor;
   }
 
-  const api = { codigoProveedor, nombreProveedor, STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, esCodigoIgnorable, elegirCodigoDelCuadro, registrarUnidades, movimientoParaOficina, GARANTIA_ESTADOS, instalacionDeUnidad, abrirGarantias, moverStock, cerrarEnvio, stockDePersona };
+  const api = { codigoProveedor, nombreProveedor, STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, seriesEn, controlarSalidaConSerie, saludStock, esCodigoIgnorable, elegirCodigoDelCuadro, registrarUnidades, movimientoParaOficina, GARANTIA_ESTADOS, instalacionDeUnidad, abrirGarantias, moverStock, cerrarEnvio, stockDePersona };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else Object.assign(raiz, api);
 })(typeof window !== "undefined" ? window : globalThis);

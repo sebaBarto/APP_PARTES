@@ -1267,6 +1267,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
       <p class="subtitle">Dónde está cada artículo: depósito, técnicos, vehículos y clientes. El sistema de Oficina sigue con precios y compras; acá se concilia contra lo que exporta y se arma el pedido de lo que falta.</p>
       <div class="stk-sub" id="stkSub">
         <button type="button" class="btn-secondary-admin activo" data-stk="articulos">Artículos</button>
+        <button type="button" class="btn-secondary-admin" data-stk="salud">Salud <span id="stkSaludBadge" class="stk-tag bajo hidden"></span></button>
         <button type="button" class="btn-secondary-admin" data-stk="conciliacion">Conciliación con Oficina</button>
         <button type="button" class="btn-secondary-admin" data-stk="pedidos">Pedidos</button>
         <button type="button" class="btn-secondary-admin" data-stk="movimientos">Movimientos</button>
@@ -1332,6 +1333,14 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
             <label style="display:flex;align-items:center;gap:6px;margin:0;"><input type="checkbox" id="stkOfVerPasados" style="width:auto;"> Mostrar también los ya pasados</label>
           </div>
           <div id="stkOfLista"></div>
+        </div>
+      </div>
+
+      <div data-stk-vista="salud" class="hidden">
+        <div class="card">
+          <h3 style="margin-top:0;">Salud del stock</h3>
+          <p class="subtitle" style="margin-top:0;">Todo lo que no cumple la regla de un solo lugar (cada equipo en un único lugar, las cantidades de acuerdo con sus N° de serie), con qué hacer en cada caso.</p>
+          <div id="stkSaludLista"></div>
         </div>
       </div>
 
@@ -2325,8 +2334,10 @@ async function cargarInicioAdmin() {
   try {
     if (stockDatos && stockDatos.catalogo && typeof articulosParaPedir === "function") {
       const pp = articulosParaPedir(stockDatos.catalogo, stockDatos.saldos).pedir;
+      const salud = saludStock(stockDatos.catalogo, stockDatos.saldos).filter((g) => g.nivel !== "info");
+      const nSalud = salud.reduce((t, g) => t + g.items.length, 0);
+      agregar(nSalud, "Stock: cosas que no cuadran", salud.map((g) => `${g.titulo} (${g.items.length})`).slice(0, 2).join(" · "), "tabStockBtn", salud.some((g) => g.nivel === "error") ? "urgente" : "atencion");
       agregar(pp.length, "Artículos para pedir", pp.slice(0, 3).map((x) => x.d).join(" · ") + (pp.length > 3 ? ` y ${pp.length - 3} más` : ""), "tabStockBtn", "atencion");
-      if (pp.length) stkVistaPedida = "pedidos";
     }
   } catch (e) { /* nada */ }
   agregar(arr(pend).length, "SIMs por aceptar", arr(pend).slice(0, 2).map((p) => `${p.numero} → ${p.tecnico_destino}`).join(" · "), "tabSimsBtn", "atencion");
@@ -2370,6 +2381,7 @@ async function cargarInicioAdmin() {
   cont.querySelectorAll(".inicio-tarjeta").forEach((b) => b.addEventListener("click", () => {
     const x = tarjetas[Number(b.dataset.i)];
     if (x.pestana === "tabSemaforoBtn") { semaforoFiltro = "rojo"; semaforoAbonadoPedido = inicioSemaforoAbonado; }
+    if (x.pestana === "tabStockBtn") stkVistaPedida = /pedir/.test(x.titulo) ? "pedidos" : "salud";
     if (x.pestana) irAPestana(x.pestana);
   }));
 }
@@ -6266,6 +6278,7 @@ function stkMostrarVista() {
   document.querySelectorAll("#stkSub [data-stk]").forEach((b) => b.classList.toggle("activo", b.dataset.stk === stkVista));
   document.querySelectorAll("#panelStock [data-stk-vista]").forEach((d) => d.classList.toggle("hidden", d.dataset.stkVista !== stkVista));
   if (!stk) return;
+  stkPintarBadgeSalud();
   if (stkVista === "articulos") { stkRenderEstado(); stkPintarFiltros(); stkRenderArticulos(); }
   else if (stkVista === "conciliacion") stkRenderConciliacion();
   else if (stkVista === "pedidos") stkRenderPedidos();
@@ -6273,6 +6286,7 @@ function stkMostrarVista() {
   else if (stkVista === "oficina") stkCargarOficina();
   else if (stkVista === "proveedores") stkRenderProveedores();
   else if (stkVista === "garantia") stkRenderGarantia();
+  else if (stkVista === "salud") stkRenderSalud();
 }
 document.querySelectorAll("#stkSub [data-stk]").forEach((b) => b.addEventListener("click", () => { stkVista = b.dataset.stk; stkMostrarVista(); }));
 
@@ -6686,7 +6700,7 @@ function stkRenderPedidos() {
 
 // --- Movimientos ---
 let stkMovs = [];
-const STK_MOV_TIPO = { inicial: "Saldo inicial", ajuste: "Ajuste", entrega: "Entrega a técnico (en camino)", recibido: "Recibido", diferencia: "Diferencia (vuelve)", rechazado: "Rechazado (vuelve)", devolucion: "Devolución", a_cliente: "A cliente", retiro: "Retiro de cliente", traspaso: "Traspaso", consumo: "Usado en cliente", ingreso: "Ingreso (compra)", inventario_series: "Inventario de N° de serie", falla: "Fallado → Garantía", garantia_reparado: "Volvió reparado de garantía", garantia_reemplazo: "Reemplazo en garantía", garantia_rechazada: "Garantía rechazada (baja)" };
+const STK_MOV_TIPO = { inicial: "Saldo inicial", ajuste: "Ajuste", entrega: "Entrega a técnico (en camino)", recibido: "Recibido", diferencia: "Diferencia (vuelve)", rechazado: "Rechazado (vuelve)", devolucion: "Devolución", a_cliente: "A cliente", retiro: "Retiro de cliente", traspaso: "Traspaso", consumo: "Usado en cliente", ingreso: "Ingreso (compra)", inventario_series: "Inventario de N° de serie", baja: "Baja de un equipo", falla: "Fallado → Garantía", garantia_reparado: "Volvió reparado de garantía", garantia_reemplazo: "Reemplazo en garantía", garantia_rechazada: "Garantía rechazada (baja)" };
 async function stkCargarMovimientos() {
   const mesInp = document.getElementById("stkMovMes");
   if (!mesInp.value) mesInp.value = new Date().toISOString().slice(0, 7);
@@ -6795,6 +6809,40 @@ function stkOficinaExcel(lista) {
 document.getElementById("stkOfMes").addEventListener("change", stkCargarOficina);
 document.getElementById("stkOfVerPasados").addEventListener("change", stkRenderOficina);
 
+// --- Salud del stock ---
+function stkPintarBadgeSalud() {
+  const b = document.getElementById("stkSaludBadge"); if (!b || !stk) return;
+  const n = saludStock(stk.catalogo, stk.saldos).filter((g) => g.nivel !== "info").reduce((t, g) => t + g.items.length, 0);
+  b.textContent = String(n); b.classList.toggle("hidden", !n);
+}
+function stkRenderSalud() {
+  const grupos = saludStock(stk.catalogo, stk.saldos), cont = document.getElementById("stkSaludLista");
+  const color = { error: "#B3261E", aviso: "#8A5A00", info: "#3A4651" };
+  cont.innerHTML = !grupos.some((g) => g.nivel !== "info") ? '<p class="status ok">✓ Todo cuadra: cada equipo está en un solo lugar.</p>' : "";
+  cont.innerHTML += grupos.map((g) => `<details class="card" data-k="${g.k}" ${g.nivel === "info" ? "" : "open"} style="margin:10px 0;">
+    <summary style="cursor:pointer;font-weight:700;color:${color[g.nivel]};">${escapeHtmlAdmin(g.titulo)} (${g.items.length})</summary>
+    <p class="subtitle" style="margin:6px 0;">${escapeHtmlAdmin(g.ayuda)}</p>
+    <table class="sims-tabla stk-tabla"><tbody>${g.items.slice(0, 300).map((x, i) => `<tr data-i="${i}"><td>${escapeHtmlAdmin(x.texto)}${x.series ? `<div class="stk-det">${x.series.map((t) => `<button type="button" class="btn-secondary-admin" data-baja="${escapeHtmlAdmin(t)}" style="width:auto;margin:2px;">Dar de baja ${escapeHtmlAdmin(t)}</button>`).join("")}</div>` : ""}</td>
+      <td class="stk-btns">${g.k === "revisar" ? `<button type="button" class="btn-secondary-admin" data-revisado="${escapeHtmlAdmin(x.id)}">✓ Revisado</button>` : ""}${(g.k === "negativo" || g.k === "otros" || g.k === "seriesDeMas") && x.c ? `<button type="button" class="btn-secondary-admin" data-ajustar="${escapeHtmlAdmin(x.c)}" data-ubic="${escapeHtmlAdmin(x.ubic)}">Ajustar cantidad</button>` : ""}</td></tr>`).join("")}</tbody></table></details>`).join("");
+  cont.querySelectorAll("[data-revisado]").forEach((b) => b.addEventListener("click", (e) => simsConBoton(e.currentTarget, async () => {
+    try { await stkPost({ accion: "salud_revisado", ids: [b.dataset.revisado] }); await stkLeer(); avisoAdmin("Marcado como revisado.", "ok"); } catch (err) { avisoAdmin("No se pudo: " + err.message, "err"); }
+    stkMostrarVista();
+  })));
+  cont.querySelectorAll("[data-ajustar]").forEach((b) => b.addEventListener("click", () => stkAjustarDialogo(b.dataset.ajustar, b.dataset.ubic)));
+  cont.querySelectorAll("[data-baja]").forEach((b) => b.addEventListener("click", () => stkBajaSerie(b.dataset.baja)));
+}
+async function stkBajaSerie(t) {
+  const motivo = await pedirTextoAdmin(`Dar de baja el equipo ${t} (sale de donde está con su N° de serie). ¿Qué pasó? Ej: perdido, robado, roto sin garantía, vendido sin registrar:`, "");
+  if (!motivo || !motivo.trim()) return;
+  try {
+    const r = await stkPost({ accion: "baja_serie", serie: t, motivo: motivo.trim() });
+    await stkLeer();
+    const u = (stk.saldos.unidades || {})[t] || {};
+    avisoAdmin(u.u === "baja" ? `Listo: ${t} dado de baja (estaba en ${nombreUbicacion(r.de)}).` : "Ojo: después de guardar no quedó dado de baja.", u.u === "baja" ? "ok" : "err");
+  } catch (err) { avisoAdmin("No se pudo: " + err.message, "err"); }
+  stkMostrarVista();
+}
+
 // --- Garantía ---
 const stkFecha = (f) => (f ? new Date(f).toLocaleDateString("es-AR") : "");
 function stkGarantias() {
@@ -6836,9 +6884,11 @@ function stkFichaSerie() {
     <b style="font-family:'IBM Plex Mono',monospace;">${escapeHtmlAdmin(t)}</b> · ${escapeHtmlAdmin(u.c)} ${escapeHtmlAdmin(a.d || "")}${u.prov ? ` · ${escapeHtmlAdmin(nombreProveedor(stk.catalogo, u.prov) || "Proveedor " + u.prov)}` : ""}<br>
     Ahora: <b>${escapeHtmlAdmin(nombreUbicacion(u.u))}</b>${inst ? ` · Instalado en <b>${escapeHtmlAdmin(inst.cliente)}</b> el ${escapeHtmlAdmin(stkFecha(inst.fecha))}${inst.presupuesto ? ` (presupuesto ${escapeHtmlAdmin(inst.presupuesto)})` : ""}` : ""}
     ${u.garantia ? `<br>Garantía: ${escapeHtmlAdmin(GARANTIA_ESTADOS[u.garantia.estado] || "")}${u.garantia.falla ? " · " + escapeHtmlAdmin(u.garantia.falla) : ""}` : ""}${u.reemplaza ? `<br>Reemplaza en garantía a ${escapeHtmlAdmin(u.reemplaza)}` : ""}
+    ${u.u !== "baja" && !/^cam:/.test(u.u || "") ? `<br><button type="button" class="btn-secondary-admin" id="stkFichaBajaBtn" style="width:auto;margin-top:6px;">Dar de baja este equipo</button>` : ""}
     ${(u.h || []).length ? `<div class="stk-det" style="margin-top:8px;">${u.h.slice().reverse().map((x) => `${escapeHtmlAdmin(stkFecha(x.f))}: ${escapeHtmlAdmin(x.de ? nombreUbicacion(x.de) + " → " : "")}${escapeHtmlAdmin(nombreUbicacion(x.a))}${x.presupuesto ? ` · presup. ${escapeHtmlAdmin(x.presupuesto)}` : ""}${x.por ? ` · ${escapeHtmlAdmin(x.por)}` : ""}${x.motivo ? ` · ${escapeHtmlAdmin(x.motivo)}` : ""}`).join("<br>")}</div>` : ""}</div>`;
 }
 document.getElementById("stkGarBuscar").addEventListener("input", stkFichaSerie);
+document.getElementById("stkGarFicha").addEventListener("click", (e) => { if (e.target && e.target.id === "stkFichaBajaBtn") stkBajaSerie(document.getElementById("stkGarBuscar").value.trim().toUpperCase().replace(/\s+/g, "")); });
 document.getElementById("stkGarCerradas").addEventListener("change", stkRenderGarantia);
 document.getElementById("stkGarExcelBtn").addEventListener("click", () => {
   const filas = stkGarantias().map((x) => ({ "N° de serie": x.t, Código: x.u.c, Artículo: x.d, Proveedor: x.prov, Cliente: x.inst ? x.inst.cliente : "", "Instalado el": x.inst ? stkFecha(x.inst.fecha) : "", Presupuesto: x.inst ? x.inst.presupuesto : "", Falla: x.g.falla || "", "Volvió el": stkFecha(x.g.desde), Estado: GARANTIA_ESTADOS[x.g.estado] || x.g.estado, RMA: x.g.rma || "", "Equipo nuevo": x.g.nuevo || "" }));
