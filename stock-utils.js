@@ -317,7 +317,9 @@
   //  { usar: texto }            -> ese (la etiqueta de SAT primero, después un N° de serie ya conocido o con el formato aprendido)
   //  { elegir: [textos] }       -> hay más de un candidato a N° de serie y todavía no se sabe el formato: que elija la persona
   //  { usar: null }             -> nada útil (links, el código del modelo de la caja que ya se está escaneando)
-  function elegirCodigoDelCuadro(textos, catalogo, saldos, actual) {
+  // pendiente: el artículo actual tiene cajas esperando su N° de serie. Si no, un código que no tiene
+  // el formato aprendido se ignora (es de otra caja que todavía no se identificó con su etiqueta).
+  function elegirCodigoDelCuadro(textos, catalogo, saldos, actual, pendiente) {
     const arts = (catalogo && catalogo.articulos) || {};
     const lista = [...new Set((textos || []).map(limpiarCodigo).filter(Boolean))];
     const info = lista.map((t) => ({ t, r: interpretarCodigo(t, catalogo, saldos, actual) })).filter((x) => x.r.tipo !== "ignorar");
@@ -333,11 +335,12 @@
       const conFormato = candidatos.filter((x) => coincideFormato(x.t, a.formatos) === true);
       if (conFormato.length) return { usar: conFormato[0].t };
       if (candidatos.length > 1 && !(a.formatos || []).length) return { elegir: candidatos.map((x) => x.t) };
-      if (candidatos.length) return { usar: candidatos[0].t };
+      if (candidatos.length && (pendiente !== false || !(a.formatos || []).length)) return { usar: candidatos[0].t };
+      if (candidatos.length) return { usar: null };
     }
     // Con la cámara, lo que no se reconoce no hace ruido (el N° de serie suelto antes de la etiqueta,
     // el código del modelo que todavía no se aprendió): arriba se indica qué escanear.
-    const art = utiles.find((x) => x.r.tipo !== "desconocido");
+    const art = utiles.find((x) => x.r.tipo !== "desconocido" && !x.r.adivinado);
     return { usar: art ? art.t : null };
   }
 
@@ -426,6 +429,28 @@
     const cerrado = { ...envio, estado: resp.accion === "rechazar" ? "rechazado" : diferencias.length ? "con_diferencias" : "recibido", cerrado: fecha, cerrado_por: resp.por || "", diferencias, ...(resp.motivo ? { motivo_cierre: resp.motivo } : {}) };
     return { saldos: s, movs, envio: cerrado };
   }
+  // Inventario de N° de serie: registra los equipos que ya están en una ubicación (sin mover cantidades).
+  // No se registran más N° de serie que los equipos que hay ahí según la APP.
+  function registrarUnidades(saldos, ubic, items, fecha) {
+    const s = JSON.parse(JSON.stringify(saldos || {}));
+    s.unidades = s.unidades || {};
+    const r = { registradas: 0, yaEstaban: [], enOtroLado: [], deOtroArticulo: [], sobran: [] };
+    (items || []).forEach((x) => {
+      const c = codigoArticulo(x.c);
+      const hay = ((s.ubic || {})[ubic] || {})[c] || 0;
+      let conSerie = Object.values(s.unidades).filter((u) => u.c === c && u.u === ubic).length;
+      [...new Set((x.unidades || []).map(limpiarCodigo).filter(Boolean))].forEach((t) => {
+        const u = s.unidades[t];
+        if (u && u.c !== c) { r.deOtroArticulo.push({ t, c: u.c }); return; }
+        if (u && u.u === ubic) { r.yaEstaban.push(t); return; }
+        if (u) { r.enOtroLado.push({ t, c, u: u.u }); return; }
+        if (conSerie >= hay) { r.sobran.push({ t, c, hay }); return; }
+        s.unidades[t] = { c, u: ubic, f: fecha || new Date().toISOString(), inventario: true };
+        conSerie++; r.registradas++;
+      });
+    });
+    return { saldos: s, ...r };
+  }
   // Lo que tiene una persona: su ubicación, lo que le llega y lo que devolvió y falta confirmar.
   function stockDePersona(saldos, nombre) {
     const s = saldos || {}, envios = Array.isArray(s.envios) ? s.envios : [];
@@ -450,7 +475,7 @@
     return mejor;
   }
 
-  const api = { STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, esCodigoIgnorable, elegirCodigoDelCuadro, moverStock, cerrarEnvio, stockDePersona };
+  const api = { STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, esCodigoIgnorable, elegirCodigoDelCuadro, registrarUnidades, moverStock, cerrarEnvio, stockDePersona };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else Object.assign(raiz, api);
 })(typeof window !== "undefined" ? window : globalThis);

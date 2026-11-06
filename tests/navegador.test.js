@@ -5708,19 +5708,19 @@ test("Stock en la APP: el depósito entrega escaneando (etiqueta SAT + N° de un
   await page.click('.stk-elegir-serie [data-t="GH200AA001"]');
   await page.waitForFunction(() => document.querySelectorAll("#depCanasta .stk-chip").length === 3);
   assert.deepStrictEqual(catalogo.articulos["20825"].alias, ["K10H-J9B"], "el código del modelo se ignora de ahora en más");
-  assert.match(await page.textContent(".stk-escaner-ahora"), /N° de serie de TECLADO.*\(3\)/);
+  assert.match(await page.textContent(".stk-escaner-total"), /3 en la lista/);
   assert.strictEqual(await page.locator(".dlg-app").count(), 0, "las cajas siguientes no preguntan nada");
   await page.click(".stk-escaner-listo");
   assert.deepStrictEqual(await page.$$eval("#depCanasta .stk-chip", (c) => c.map((x) => x.textContent.replace("✕", ""))), ["GH200AA001", "GH200AA002", "GH200AA003"]);
-  // En lote, un artículo por cantidad pregunta cuántas
+  // Se mezclan artículos en el mismo lote: cada etiqueta suma uno, sin preguntar
   await page.fill("#depCodigo", "7798164500049"); await page.press("#depCodigo", "Enter");
-  await page.fill(".dlg-app .dlg-input", "12");
-  await page.click(".dlg-app .dlg-si");
+  await page.fill("#depCodigo", "7798164500049"); await page.press("#depCodigo", "Enter");
   await page.waitForFunction(() => /SIRENA/.test(document.getElementById("depCanasta").textContent));
+  assert.strictEqual(await page.locator(".dlg-app").count(), 0);
   await page.click("#depConfirmarBtn");
   await page.click(".dlg-app .dlg-si");
   await page.waitForFunction(() => !document.querySelector("#depCanasta .stk-linea"));
-  assert.deepStrictEqual([posts.at(-1).de, posts.at(-1).a, posts.at(-1).items], ["proveedor", "dep", [{ c: "20825", cant: 3, unidades: ["GH200AA001", "GH200AA002", "GH200AA003"] }, { c: "20208", cant: 12, unidades: [] }]]);
+  assert.deepStrictEqual([posts.at(-1).de, posts.at(-1).a, posts.at(-1).items], ["proveedor", "dep", [{ c: "20825", cant: 3, unidades: ["GH200AA001", "GH200AA002", "GH200AA003"] }, { c: "20208", cant: 2, unidades: [] }]]);
   // Código de barras gastado: a los 5 segundos sin leer nada, lee los números de la foto
   await page.evaluate(() => { window.BarcodeDetector = class { async detect() { return []; } }; });
   await page.click("#depEscanearBtn");
@@ -5737,6 +5737,123 @@ test("Stock en la APP: el depósito entrega escaneando (etiqueta SAT + N° de un
   await page.waitForFunction(() => /GH300AA001/.test(document.querySelector(".stk-escaner-ultimo").textContent));
   await page.click(".stk-escaner-listo");
   assert.deepStrictEqual(await page.$$eval("#depCanasta .stk-chip", (c) => c.map((x) => x.textContent.replace("✕", ""))), ["GH300AA001"]);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Depósito: lote con artículos mezclados para un cliente, repetir la última entrega, inventario de N° de serie y trabajo sin señal", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  const S = require(require("path").join(__dirname, "..", "stock-utils.js"));
+  const catalogo = { articulos: {
+    20825: { c: "20825", d: "TECLADO K10LH/V", tipo: "unidad", formatos: ["AA999AA999"] },
+    30001: { c: "30001", d: "CENTRAL SP6000", tipo: "unidad", formatos: ["999999"] },
+    20208: { c: "20208", d: "SIRENA MP100", tipo: "cantidad" },
+    40001: { c: "40001", d: "INFRARROJO PMD2P", tipo: "cantidad" },
+    50001: { c: "50001", d: "CABLE 4 HILOS", tipo: "cantidad", medida: "metros" },
+  } };
+  let saldos = { inicializado: "2026-11-01", ubic: { dep: { 20825: 4, 30001: 2, 20208: 10, 40001: 20, 50001: 300 } }, unidades: { GH900AA001: { c: "20825", u: "dep" } }, pedidos: {}, envios: [] };
+  let sinSenal = false;
+  const posts = [], ops = new Set();
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    const json = (o, st) => route.fulfill({ status: st || 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("coleccion=stock") && sinSenal) return route.abort("internetdisconnected");
+    if (u.includes("coleccion=tecnicos")) return json([{ nombre: "Melina", permisos: { stock_responsable: true } }, { nombre: "Juan", permisos: {} }]);
+    if (!u.includes("coleccion=stock")) return json([]);
+    if (req.method() === "GET") return json({ catalogo, saldos, conciliacion: { marcas: [], corridas: [] } });
+    const b = JSON.parse(req.postData()); posts.push(b);
+    if (b.op_id && ops.has(b.op_id)) return json({ ok: true, duplicado: true });
+    if (b.op_id) ops.add(b.op_id);
+    if (b.accion === "mover") { const x = S.moverStock(saldos, b.items, { tipo: "mover", de: b.de, a: b.a, confirmar: /^tec:/.test(b.a) }, catalogo); if (x.error) return json({ error: x.error }, 409); saldos = x.saldos; return json({ ok: true }); }
+    if (b.accion === "registrar_unidades") { const { saldos: s2, ...r } = S.registrarUnidades(saldos, b.ubic, b.items); saldos = s2; return json({ ok: true, ...r }); }
+    return json({ error: "?" }, 400);
+  });
+  await page.goto(base + "/index.html");
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { localStorage.removeItem("stock_destinos"); localStorage.removeItem("stock_cola"); tecnicoLogueado = "Melina"; tecnicosPasswords = { Melina: "", Juan: "" }; tecnicosPermisos = { Melina: { stock_responsable: true } }; refrescarAccesosPorPermisos(); showScreen("home"); });
+  await page.click("#tileDepositoBtn");
+  await page.waitForFunction(() => depDatos && depDatos.catalogo);
+  await page.click('#depFormas [data-forma="lote"]');
+  // Una instalación para un cliente: pip, pip, pip... artículos distintos con la cámara
+  await page.selectOption("#depDestTipo", "cli");
+  await page.fill("#depDestNombre", "Kiosco Pérez");
+  await page.evaluate(() => {
+    const cv = document.createElement("canvas"); cv.width = 64; cv.height = 64; const g = cv.getContext("2d");
+    setInterval(() => { g.fillStyle = "#" + Math.floor(Math.random() * 999); g.fillRect(0, 0, 64, 64); }, 50);
+    navigator.mediaDevices.getUserMedia = async () => cv.captureStream(20);
+    const F = [[], [], [], [], [], []];
+    window.__cuadros = [
+      ["000208252779", "K10H-J9B"], ["GH120FF156", "K10H-J9B"],      // teclado + su N° de serie (el modelo no suma)
+      ["000300012779"], ["123456"],                                   // central + su N° de serie
+      ["000202082779"], ...F, ["000202082779"],                       // dos sirenas (la etiqueta sale de la vista ~1 s entre una y otra)
+      ["000400012779"], ...F, ["000400012779"], ...F, ["000400012779"], // tres infrarrojos
+      ["GH777XX001"],                                                 // un N° de serie suelto de otra caja: se ignora
+    ];
+    window.BarcodeDetector = class { async detect() { const c = window.__cuadros.shift(); return (c || []).map((rawValue) => ({ rawValue })); } };
+  });
+  await page.click("#depEscanearBtn");
+  await page.waitForFunction(() => !window.__cuadros.length);
+  await page.waitForTimeout(400);
+  await page.click(".stk-escaner-listo");
+  const items = await page.evaluate(() => depCanasta.items());
+  assert.deepStrictEqual(items, [
+    { c: "20825", cant: 1, unidades: ["GH120FF156"] }, { c: "30001", cant: 1, unidades: ["123456"] },
+    { c: "20208", cant: 2, unidades: [] }, { c: "40001", cant: 3, unidades: [] },
+  ]);
+  // El cable va en metros: pregunta cuántos
+  await page.fill("#depCodigo", "000500012779"); await page.press("#depCodigo", "Enter");
+  await page.fill(".dlg-app .dlg-input", "25");
+  await page.click(".dlg-app .dlg-si");
+  await page.waitForFunction(() => depCanasta.items().length === 5);
+  await page.click("#depConfirmarBtn");
+  await page.click(".dlg-app .dlg-si");
+  await page.waitForFunction(() => !document.querySelector("#depCanasta .stk-linea"));
+  assert.strictEqual(posts.at(-1).a, "cli:Kiosco Pérez");
+  assert.ok(posts.at(-1).op_id);
+  // Recientes y repetir la última entrega
+  await page.selectOption("#depDestTipo", "tec");
+  await page.waitForSelector('#depRecientes button');
+  assert.match(await page.textContent("#depRecientes"), /Kiosco Pérez/);
+  await page.click("#depRecientes button");
+  await page.waitForSelector("#depRepetirBtn:not(.hidden)");
+  assert.match(await page.textContent("#depRepetirBtn"), /Repetir la última entrega a Kiosco Pérez \(5 artículos\)/);
+  await page.click("#depRepetirBtn");
+  assert.deepStrictEqual(await page.evaluate(() => depCanasta.items().map((x) => [x.c, x.cant, x.unidades.length])), [["20825", 1, 0], ["30001", 1, 0], ["20208", 2, 0], ["40001", 3, 0], ["50001", 25, 0]], "trae las cantidades; los N° de serie se escanean");
+  await page.evaluate(() => depCanasta.limpiar());
+  // Sin señal: queda en cola, se ve en la pantalla y se manda solo cuando vuelve (una sola vez)
+  sinSenal = true;
+  await page.selectOption("#depDestTipo", "veh");
+  await page.evaluate(() => { depVehiculos = [{ nombre: "Kangoo" }]; });
+  await page.selectOption("#depDestTipo", "tec");
+  await page.selectOption("#depDestSelect", "Juan");
+  await page.fill("#depCodigo", "000202082779"); await page.press("#depCodigo", "Enter");
+  await page.waitForSelector("#depCanasta .stk-linea");
+  await page.click("#depConfirmarBtn");
+  await page.click(".dlg-app .dlg-si");
+  await page.waitForSelector("#depCola .stk-cola");
+  assert.match(await page.textContent("#depCola"), /Guardado sin señal.*Baja a Técnico: Juan/s);
+  assert.strictEqual(await page.evaluate(() => depSaldos().ubic.dep["20208"]), 7, "se descuenta en el celular para seguir trabajando");
+  assert.strictEqual(saldos.ubic.dep["20208"], 8, "el servidor todavía no lo tiene");
+  sinSenal = false;
+  await page.evaluate(() => depProcesarCola());
+  await page.waitForFunction(() => !document.querySelector("#depCola .stk-cola"));
+  assert.strictEqual(saldos.ubic.dep["20208"], 7);
+  assert.deepStrictEqual(saldos.ubic["cam:Juan"], { 20208: 1 });
+  await page.evaluate(() => depProcesarCola());
+  assert.strictEqual(posts.filter((p) => p.a === "tec:Juan").length, 1, "llegó una sola vez");
+  // Inventario de N° de serie en el depósito
+  await page.click('#depModos [data-modo="inventario"]');
+  await page.waitForFunction(() => /Equipos sin N° de serie en Depósito/.test(document.getElementById("depInvFaltan").textContent));
+  assert.match(await page.textContent("#depInvFaltan"), /TECLADO K10LH\/V\s*1 de 3/);
+  for (const c of ["000208252779", "GH900AA002", "GH900AA003", "000202082779"]) { await page.fill("#depCodigo", c); await page.press("#depCodigo", "Enter"); await page.waitForTimeout(150); }
+  assert.match(await page.textContent("#depConfirmarBtn"), /Registrar 2 N° de serie/);
+  await page.click("#depConfirmarBtn");
+  await page.waitForSelector(".dlg-app .dlg-texto");
+  assert.match(await page.textContent(".dlg-app .dlg-texto"), /Registrados: 2/);
+  await page.click(".dlg-app .dlg-si");
+  assert.deepStrictEqual([saldos.unidades.GH900AA002.u, saldos.ubic.dep["20825"]], ["dep", 3]);
+  await page.waitForFunction(() => { const t = document.getElementById("depInvFaltan").textContent; return !/TECLADO/.test(t) && /CENTRAL SP6000\s*0 de 1/.test(t); });
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });

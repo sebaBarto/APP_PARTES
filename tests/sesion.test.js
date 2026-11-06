@@ -1411,6 +1411,22 @@ test("Stock: Melina entrega con escaneo, el técnico confirma «Recibí» (o con
     const mes = new Date().toISOString().slice(0, 7);
     const tipos = repo[`stock/movimientos-${mes}.json`].map((m) => m.tipo);
     assert.deepStrictEqual(tipos, ["entrega", "entrega", "recibido", "recibido", "diferencia", "devolucion", "recibido", "traspaso", "ingreso"]);
+    // Inventario de N° de serie: sin mover cantidades, sin pasarse de lo que hay
+    const antesDep = { ...repo["stock/saldos.json"].ubic.dep };
+    r = await post({ accion: "registrar_unidades", ubic: "dep", op_id: "inv-1", items: [{ c: "20825", unidades: ["GH500AA001", "GH500AA002", "GH500AA003", "GH12100FD4"] }] }, melina);
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    assert.strictEqual(r.cuerpo.registradas, 1, "en el depósito hay 2 teclados y uno ya tenía N° de serie");
+    assert.deepStrictEqual(r.cuerpo.sobran.map((x) => x.t), ["GH500AA002", "GH500AA003"]);
+    assert.deepStrictEqual(r.cuerpo.enOtroLado.map((x) => x.u), ["tec:Juan"]);
+    assert.deepStrictEqual(repo["stock/saldos.json"].ubic.dep, antesDep, "no cambia cantidades");
+    assert.strictEqual((await post({ accion: "registrar_unidades", ubic: "dep", items: [] }, juan)).statusCode, 403);
+    // Lo mandado sin señal que se reintenta no se aplica dos veces
+    const cuerpoSinSenal = { accion: "mover", de: "dep", a: "veh:Kangoo", items: [{ c: "20208", cant: 1 }], op_id: "melina-abc" };
+    await post(cuerpoSinSenal, melina);
+    const depSirenas = repo["stock/saldos.json"].ubic.dep["20208"];
+    r = await post(cuerpoSinSenal, melina);
+    assert.deepStrictEqual([r.cuerpo.duplicado, repo["stock/saldos.json"].ubic.dep["20208"]], [true, depSirenas]);
+    assert.ok(repo[`stock/movimientos-${mes}.json`].some((m) => m.tipo === "inventario_series"));
     // Recordatorio del cron: envío sin confirmar hace más de un día
     await post({ accion: "mover", de: "dep", a: "tec:Luis", items: [{ c: "20208", cant: 1 }] }, melina);
     const { chequearEnviosStock } = require(path.join(raiz, "api", "cron-diario.js"));

@@ -3811,3 +3811,12 @@ html .app .equipo-acciones .btn.eq-util.activo, .equipo-acciones .eq-util.activo
 .stk-ocr-cod small { display: block; font-size: 12px; opacity: .8; margin-top: 2px; }
 .stk-ocr-cod.dudoso { opacity: .65; }
 .stk-escaner .stk-link { color: #fff; }
+.stk-modos button { font-size: 13px; padding: 9px 4px; }
+.stk-recientes { display: flex; gap: 6px; overflow-x: auto; padding: 2px 0 8px; }
+.stk-recientes:empty { display: none; }
+.stk-recientes button { flex: 0 0 auto; width: auto; min-height: 0; padding: 7px 12px; border-radius: 999px; border: 1px solid rgba(127,127,127,.45); background: transparent; color: inherit; font-size: 13px; font-weight: 600; }
+.stk-recientes button.activo { border-color: var(--amber); background: rgba(245,166,35,.18); }
+#depRepetirBtn { width: 100%; margin: 0 0 10px; }
+.stk-cola { border: 1px dashed var(--amber); border-radius: 12px; padding: 10px 12px; margin: 0 0 10px; font-size: 13.5px; }
+.stk-cola .err { color: #E4402C; }
+.stk-cola-item { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 4px 0; }

@@ -1389,6 +1389,27 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
       res.status(200).json({ ok: true, codigos });
       return;
     }
+    if (b.accion === "registrar_unidades") {
+      // Inventario de N° de serie de lo que ya está en una ubicación (no mueve cantidades).
+      const ubic = String(b.ubic || "dep");
+      if (!/^(dep|tec:.{1,60}|veh:.{1,60})$/.test(ubic)) { res.status(400).json({ error: "Ubicación inválida" }); return; }
+      const opId = String(b.op_id || "").slice(0, 60);
+      let resultado = null, duplicado = false;
+      const r = await stockActualizar(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }, (sal) => {
+        if (opId && (sal.ops || []).includes(opId)) { duplicado = true; return { error: "duplicado", status: 200 }; }
+        const x = S.registrarUnidades(sal, ubic, Array.isArray(b.items) ? b.items.slice(0, 500) : [], ahora);
+        if (opId) x.saldos.ops = [opId, ...(sal.ops || [])].slice(0, 300);
+        resultado = x;
+        const { saldos, ...resumen } = x;
+        return { data: saldos, respuesta: resumen };
+      }, `Stock: inventario de N° de serie en ${ubic} (por ${quien})`);
+      if (duplicado) { res.status(200).json({ ok: true, duplicado: true }); return; }
+      if (!r.error && resultado && resultado.registradas) {
+        await stockRegistrarMovimientos([{ id: `${Date.now().toString(36)}-inv`, fecha: ahora, por: quien, tipo: "inventario_series", c: "", cant: resultado.registradas, a: ubic, motivo: `Inventario de N° de serie: ${resultado.registradas} registrados` }], `Stock: inventario de N° de serie (por ${quien})`);
+      }
+      responder(r);
+      return;
+    }
     if (b.accion === "alias") {
       // Código de fabricante (EAN) que se asocia a un artículo la primera vez que se escanea.
       const c = S.codigoArticulo(b.c), ean = S.limpiarCodigo(b.ean);
@@ -1415,13 +1436,18 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
       // Confirma el que recibe, salvo que sea el mismo que registra (Melina recibiendo en el depósito).
       const confirmar = (/^tec:/.test(a) && a !== `tec:${quien}`) || (b.accion === "devolver" && !esResp);
       const { data: cat } = await leerArchivoDatos(STOCK_CAT, { articulos: {} });
-      let resultado = null;
+      let resultado = null, duplicado = false;
+      const opId = String(b.op_id || "").slice(0, 60);
       const r = await stockActualizar(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }, (sal) => {
+        // Lo que se mandó sin señal se reintenta: si ya llegó, no se aplica dos veces.
+        if (opId && (sal.ops || []).includes(opId)) { duplicado = true; return { error: "duplicado", status: 200 }; }
         const x = S.moverStock(sal, Array.isArray(b.items) ? b.items.slice(0, 500) : [], { tipo, de, a, por: quien, fecha: ahora, motivo: String(b.motivo || "").slice(0, 200), confirmar, deFlexible: /^(cli|com):/.test(de) && a === "dep", presupuesto: /^(cli|com):/.test(a) ? String(b.presupuesto || "").trim().slice(0, 30) : "" }, cat);
         if (x.error) return { error: x.error, status: 409 };
         resultado = x;
+        if (opId) x.saldos.ops = [opId, ...(sal.ops || [])].slice(0, 300);
         return { data: x.saldos, respuesta: { envio: x.envio, movimientos: x.movs.length } };
       }, `Stock: ${tipo} ${de} → ${a} (por ${quien})`);
+      if (duplicado) { res.status(200).json({ ok: true, duplicado: true }); return; }
       if (!r.error && resultado) {
         await stockRegistrarMovimientos(resultado.movs, `Stock: movimientos (${tipo}, por ${quien})`);
         // Aprende la forma de los N° de unidad de cada artículo.
