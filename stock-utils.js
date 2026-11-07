@@ -751,6 +751,42 @@
     return { lineas, extras: Object.keys(lleva).filter((c) => !pedidos.has(c)), completo: lineas.every((x) => x.lleva >= x.pedido) };
   }
 
+  // Presupuestos: qué salió a cada cliente con cada N° de presupuesto y qué volvió sin usar
+  // (para el alta «Vuelve de un presupuesto»). Solo un índice: no cambia cantidades.
+  function anotarPresupuestos(saldos, movs) {
+    const idx = { ...((saldos && saldos.presupuestos) || {}) };
+    let cambio = false;
+    (movs || []).forEach((m) => {
+      const n = String((m && m.presupuesto) || "").trim();
+      if (!n || !m.c || !(Number(m.cant) > 0 || (m.unidades || []).length)) return;
+      const sale = /^(cli|com):/.test(m.a || ""), vuelve = /^(cli|com):/.test(m.de || "") && m.tipo === "devuelto_sin_usar";
+      if (!sale && !vuelve) return;
+      const p = { cliente: "", fecha: m.fecha, salio: {}, volvio: {}, series: [], ...(idx[n] || {}) };
+      p.salio = { ...p.salio }; p.volvio = { ...p.volvio };
+      if (sale) {
+        p.cliente = m.a; p.fecha = m.fecha;
+        p.salio[m.c] = red3((p.salio[m.c] || 0) + (Number(m.cant) || 0));
+        if ((m.unidades || []).length) p.series = [...new Set([...(p.series || []), ...m.unidades])].slice(-200);
+      } else p.volvio[m.c] = red3((p.volvio[m.c] || 0) + (Number(m.cant) || 0));
+      idx[n] = p; cambio = true;
+    });
+    if (!cambio) return saldos;
+    const claves = Object.keys(idx).sort((x, y) => String(idx[y].fecha || "").localeCompare(String(idx[x].fecha || ""))).slice(0, 400);
+    return { ...saldos, presupuestos: Object.fromEntries(claves.map((k) => [k, idx[k]])) };
+  }
+  // Lo que todavía puede volver de un presupuesto: lo que salió, menos lo que ya volvió, sin pasar de lo que hay en el cliente.
+  function pendienteDePresupuesto(saldos, numero) {
+    const p = ((saldos && saldos.presupuestos) || {})[String(numero || "").trim()];
+    if (!p) return null;
+    const enCliente = ((saldos.ubic || {})[p.cliente]) || {};
+    const items = Object.entries(p.salio || {}).map(([c, n]) => {
+      const cant = Math.max(0, Math.min(red3(n - ((p.volvio || {})[c] || 0)), Number(enCliente[c]) || 0));
+      const series = (p.series || []).filter((t) => ((saldos.unidades || {})[t] || {}).u === p.cliente && saldos.unidades[t].c === c);
+      return { c, cant, series };
+    }).filter((x) => x.cant > 0);
+    return { cliente: p.cliente, fecha: p.fecha, items };
+  }
+
   // ---------- Archivo para el sistema de Oficina ----------
   // Oficina cuenta «Depósito» (todo lo que está en poder de SAT: depósito, técnicos, vehículos, en
   // camino) y «Comodato». Los pases internos no le cambian nada; sí lo que sale a un cliente, lo que
@@ -764,8 +800,8 @@
     let operacion = "", deposito = 0, comodato = 0, quien = "";
     if (de === "sat" && a === "cliente") { operacion = "SALIDA A CLIENTE"; deposito = -m.cant; quien = cliente(m.a); }
     else if (de === "sat" && a === "comodato") { operacion = "PASE A COMODATO"; deposito = -m.cant; comodato = m.cant; quien = cliente(m.a); }
-    else if (de === "comodato" && a === "sat") { operacion = "DEVOLUCION DE COMODATO"; deposito = m.cant; comodato = -m.cant; quien = cliente(m.de); }
-    else if (de === "cliente" && a === "sat") { operacion = "RETIRO DE CLIENTE"; deposito = m.cant; quien = cliente(m.de); }
+    else if (de === "comodato" && a === "sat") { operacion = m.tipo === "devuelto_sin_usar" ? "VUELVE SIN USAR (PRESUPUESTO)" : "DEVOLUCION DE COMODATO"; deposito = m.cant; comodato = -m.cant; quien = cliente(m.de); }
+    else if (de === "cliente" && a === "sat") { operacion = m.tipo === "devuelto_sin_usar" ? "VUELVE SIN USAR (PRESUPUESTO)" : "RETIRO DE CLIENTE"; deposito = m.cant; quien = cliente(m.de); }
     else if (de === "afuera" && a === "sat") { operacion = m.tipo === "ajuste" || m.tipo === "regularizacion" ? "AJUSTE" : "INGRESO"; deposito = m.cant; }
     else if (de === "sat" && a === "afuera") { operacion = "AJUSTE"; deposito = -m.cant; }
     else if (de === "afuera" && a === "comodato") { operacion = "AJUSTE"; comodato = m.cant; quien = cliente(m.a); }
@@ -824,7 +860,7 @@
     return mejor;
   }
 
-  const api = { codigoProveedor, nombreProveedor, STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, datosLimpios, buscarPorDatos, infoSerie, seriesEn, controlarSalidaConSerie, saludStock, esCodigoIgnorable, elegirCodigoDelCuadro, registrarUnidades, movimientoParaOficina, GARANTIA_ESTADOS, instalacionDeUnidad, abrirGarantias, moverStock, cerrarEnvio, stockDePersona, auditarStock, recalcularDesdeMovimientos, movimientosDeRegularizacion, retiradosParaDevolver, avanceSolicitud };
+  const api = { codigoProveedor, nombreProveedor, STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, datosLimpios, buscarPorDatos, infoSerie, seriesEn, controlarSalidaConSerie, saludStock, esCodigoIgnorable, elegirCodigoDelCuadro, registrarUnidades, movimientoParaOficina, GARANTIA_ESTADOS, instalacionDeUnidad, abrirGarantias, moverStock, cerrarEnvio, stockDePersona, auditarStock, recalcularDesdeMovimientos, movimientosDeRegularizacion, retiradosParaDevolver, avanceSolicitud, anotarPresupuestos, pendienteDePresupuesto };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else Object.assign(raiz, api);
 })(typeof window !== "undefined" ? window : globalThis);

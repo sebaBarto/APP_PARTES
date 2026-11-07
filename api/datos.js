@@ -1187,7 +1187,7 @@ async function stockActualizar(ruta, porDefecto, cambiar, mensaje) {
     if (res && res.error) return res;
     // Saldo y movimiento en la misma escritura: los movimientos quedan en «movsPend» del archivo de
     // saldos hasta que se pasan al historial del mes (si eso falla, se pasan en la próxima operación).
-    if (ruta === STOCK_SAL && Array.isArray(res.movs) && res.movs.length) res.data = { ...res.data, movsPend: [...((res.data && res.data.movsPend) || []), ...res.movs].slice(-2000) };
+    if (ruta === STOCK_SAL && Array.isArray(res.movs) && res.movs.length) res.data = { ...require("../stock-utils.js").anotarPresupuestos(res.data, res.movs), movsPend: [...((res.data && res.data.movsPend) || []), ...res.movs].slice(-2000) };
     const r = await escribirArchivoDatos(ruta, res.data, sha, mensaje);
     if (r.ok) return res;
     if (r.status !== 409 && r.status !== 422) break;
@@ -1802,7 +1802,9 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
       // Equipo fallado: lo que vuelve (de un cliente o de un técnico) va a «Garantía».
       const fallado = !!b.fallado || a === "gar", falla = String(b.falla || "").replace(/\s+/g, " ").trim().slice(0, 200);
       if (b.motivo == null && fallado && falla) b.motivo = `Fallado: ${falla}`;
-      const tipo = a === "gar" ? "falla" : b.accion === "devolver" ? "devolucion" : de === "proveedor" ? "ingreso" : /^tec:/.test(a) ? "entrega" : /^(cli|com):/.test(a) ? "a_cliente" : /^(cli|com):/.test(de) ? "retiro" : a === "dep" ? "devolucion" : "traspaso";
+      // «Vuelve de un presupuesto (no se usó)»: salió para instalar y el cliente no lo quiso; no es un retiro.
+      const noUsado = !!b.no_usado && b.accion === "mover" && /^(cli|com):/.test(de) && a === "dep";
+      const tipo = a === "gar" ? "falla" : b.accion === "devolver" ? "devolucion" : de === "proveedor" ? "ingreso" : /^tec:/.test(a) ? "entrega" : /^(cli|com):/.test(a) ? "a_cliente" : noUsado ? "devuelto_sin_usar" : /^(cli|com):/.test(de) ? "retiro" : a === "dep" ? "devolucion" : "traspaso";
       // Confirma el que recibe, salvo que sea el mismo que registra (Melina recibiendo en el depósito)
       // o que lo reciba en mano: escaneó su código (QR de Mi stock) o puso su clave.
       let enMano = "";
@@ -1830,7 +1832,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
       const r = await stockActualizar(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }, (sal) => {
         // Lo que se mandó sin señal se reintenta: si ya llegó, no se aplica dos veces.
         if (opId && (sal.ops || []).includes(opId)) { duplicado = true; return { error: "duplicado", status: 200 }; }
-        const x = S.moverStock(sal, Array.isArray(b.items) ? b.items.slice(0, 500) : [], { tipo: enMano ? "entrega_mano" : tipo, de, a, por: quien, fecha: ahora, motivo: [motivoMano, String(b.motivo || "").slice(0, 200)].filter(Boolean).join(" · "), confirmar, fallado: fallado && b.accion === "devolver", falla, deFlexible: /^(cli|com):/.test(de) && (a === "dep" || a === "gar"), presupuesto: /^(cli|com):/.test(a) ? String(b.presupuesto || "").trim().slice(0, 30) : "" }, cat);
+        const x = S.moverStock(sal, Array.isArray(b.items) ? b.items.slice(0, 500) : [], { tipo: enMano ? "entrega_mano" : tipo, de, a, por: quien, fecha: ahora, motivo: [motivoMano, String(b.motivo || "").slice(0, 200)].filter(Boolean).join(" · "), confirmar, fallado: fallado && b.accion === "devolver", falla, deFlexible: /^(cli|com):/.test(de) && (a === "dep" || a === "gar"), presupuesto: /^(cli|com):/.test(a) || noUsado ? String(b.presupuesto || "").trim().slice(0, 30) : "" }, cat);
         if (x.error) return { error: x.error, status: 409 };
         resultado = x;
         S.abrirGarantias(x.saldos, x.movs, { falla, por: quien });

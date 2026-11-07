@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#101820">
-<meta name="app-version" content="4.57.0">
+<meta name="app-version" content="4.58.0">
 <meta name="description" content="Digitalizador de partes técnicos de servicio">
 <title>Servicio Técnico SAT</title>
 <link rel="manifest" href="manifest.json">
@@ -1387,7 +1387,13 @@
         <div id="depDevoluciones"></div>
         <div id="depAprobar"></div>
         <div class="field-group"><label class="field-label" for="depRecibirTipo">¿Qué entra al depósito?</label>
-          <select class="field-input" id="depRecibirTipo"><option value="proveedor">Compra que llegó del proveedor</option><option value="cli">Retiro de un cliente (instalado)</option><option value="com">Retiro de un cliente (comodato)</option><option value="veh">Vuelve de un vehículo</option></select></div>
+          <select class="field-input" id="depRecibirTipo"><option value="proveedor">Compra que llegó del proveedor</option><option value="presupuesto">Vuelve de un presupuesto (no se usó)</option><option value="cli">Retiro de un cliente (instalado)</option><option value="com">Retiro de un cliente (comodato)</option><option value="veh">Vuelve de un vehículo</option></select></div>
+        <div class="field-group hidden" id="depPresupVuelveCaja">
+          <label class="field-label" for="depPresupVuelve">N° de presupuesto</label>
+          <input class="field-input" type="text" id="depPresupVuelve" list="depPresupVuelveLista" inputmode="numeric" autocomplete="off" placeholder="Ej: 4521">
+          <datalist id="depPresupVuelveLista"></datalist>
+          <div id="depPresupVuelveItems"></div>
+        </div>
         <div class="field-group hidden" id="depRecibirDeCaja"><label class="field-label" for="depRecibirDe">¿De quién?</label>
           <select class="field-input" id="depRecibirSelect"></select>
           <input class="field-input hidden" type="text" id="depRecibirDe" list="depRecibirLista" autocomplete="off" placeholder="Nombre del cliente"><datalist id="depRecibirLista"></datalist></div>

@@ -6321,3 +6321,58 @@ test("Ayudas «?» del stock en la APP: video corto y qué hace, en Depósito, M
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Depósito, alta «Vuelve de un presupuesto (no se usó)»: con el N° aparece lo que se llevó, se toca lo que vuelve y entra al depósito sin ser un retiro", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  const S = require(require("path").join(__dirname, "..", "stock-utils.js"));
+  const catalogo = { articulos: { 23940: { c: "23940", d: "INFRARROJO AJAX", tipo: "unidad" }, 20208: { c: "20208", d: "SIRENA MP100", tipo: "cantidad" } } };
+  let saldos = { inicializado: "2026-11-01", ubic: { dep: { 23940: 4, 20208: 5 } }, unidades: { A1: { c: "23940", u: "dep" }, A2: { c: "23940", u: "dep" }, A3: { c: "23940", u: "dep" }, A4: { c: "23940", u: "dep" } }, envios: [] };
+  const sal = S.moverStock(saldos, [{ c: "23940", cant: 4, unidades: ["A1", "A2", "A3", "A4"] }, { c: "20208", cant: 2 }], { tipo: "a_cliente", de: "dep", a: "cli:Kiosco Pérez", presupuesto: "4521", fecha: "2026-11-05T12:00:00Z" }, catalogo);
+  saldos = S.anotarPresupuestos(sal.saldos, sal.movs);
+  const posts = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url(), json = (o, st) => route.fulfill({ status: st || 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (!u.includes("coleccion=stock")) return json([]);
+    if (req.method() === "GET") return json({ catalogo, saldos, conciliacion: { marcas: [], corridas: [] } });
+    const b = JSON.parse(req.postData()); posts.push(b);
+    const x = S.moverStock(saldos, b.items, { tipo: b.no_usado ? "devuelto_sin_usar" : "x", de: b.de, a: b.a, presupuesto: b.presupuesto, deFlexible: true }, catalogo);
+    if (x.error) return json({ error: x.error }, 409);
+    saldos = S.anotarPresupuestos(x.saldos, x.movs);
+    return json({ ok: true });
+  });
+  await page.goto(base + "/index.html");
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { tecnicoLogueado = "Melina"; tecnicosPasswords = { Melina: "" }; tecnicosPermisos = { Melina: { stock_responsable: true } }; refrescarAccesosPorPermisos(); showScreen("home"); });
+  await page.click("#tileDepositoBtn");
+  await page.waitForFunction(() => depDatos && depDatos.saldos);
+  await page.click('#depModos [data-modo="recibir"]');
+  await page.selectOption("#depRecibirTipo", "presupuesto");
+  await page.waitForSelector("#depPresupVuelveCaja:not(.hidden)");
+  assert.ok(await page.isHidden("#depFalladoCaja"), "no se usó: no es un fallado");
+  assert.strictEqual(await page.$eval("#depPresupVuelveLista option", (o) => o.value), "4521");
+  await page.fill("#depPresupVuelve", "4521");
+  await page.waitForSelector("#depPresupVuelveItems [data-vuelve]");
+  const lista = await page.textContent("#depPresupVuelveItems");
+  assert.match(lista, /Salió para Cliente \(instalado\): Kiosco Pérez/);
+  assert.match(lista, /INFRARROJO AJAXA1 · A2 · A3 · A44Vuelve/);
+  assert.match(lista, /SIRENA MP1002Vuelve/);
+  assert.strictEqual(await page.inputValue("#depRecibirDe"), "Kiosco Pérez", "el cliente sale del presupuesto");
+  await page.click('#depPresupVuelveItems [data-vuelve="20208"]');
+  await page.waitForSelector("#depCanasta .stk-linea");
+  // De los infrarrojos vuelven 2: se escanean sus N° (son del cliente)
+  await page.fill("#depCodigo", "A3"); await page.press("#depCodigo", "Enter");
+  await page.fill("#depCodigo", "A4"); await page.press("#depCodigo", "Enter");
+  await page.evaluate(() => { const l = depCanasta.lineas.find((x) => x.c === "20208"); l.cant = 1; depCanasta.cambio(); });
+  assert.match(await page.textContent("#depConfirmarBtn"), /Vuelven 2 artículos al depósito \(no se usó\)/);
+  await page.click("#depConfirmarBtn");
+  assert.match(await page.textContent(".dlg-app .dlg-texto"), /vuelve sin usar de Cliente.*Kiosco Pérez, presupuesto N° 4521/s);
+  await page.click(".dlg-app .dlg-si");
+  await page.waitForFunction(() => !document.querySelector("#depCanasta .stk-linea"));
+  const b = posts.at(-1);
+  assert.deepStrictEqual([b.de, b.a, b.no_usado, b.presupuesto], ["cli:Kiosco Pérez", "dep", true, "4521"]);
+  assert.deepStrictEqual(saldos.ubic.dep, { 23940: 2, 20208: 4 });
+  assert.strictEqual(saldos.unidades.A3.u, "dep");
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

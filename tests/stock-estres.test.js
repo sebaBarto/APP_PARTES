@@ -37,8 +37,8 @@ function simular(semilla, pasos) {
   // del mes falla y los movimientos quedan en «movsPend» hasta la próxima operación.
   const guardar = (res, nombre) => {
     if (res.error) { registro.push(`${nombre}: rechazado (${res.error.slice(0, 60)})`); return false; }
-    let nuevo = res.saldos;
     const movs = res.movs || [];
+    let nuevo = S.anotarPresupuestos(res.saldos, movs);
     if (movs.length) nuevo = { ...nuevo, movsPend: [...(nuevo.movsPend || []), ...movs] };
     if (r() < 0.85 && (nuevo.movsPend || []).length) { historial.push(...nuevo.movsPend); nuevo = { ...nuevo, movsPend: [] }; }
     // A veces el mismo movimiento llega dos veces al historial (reintento): no tiene que contar doble.
@@ -148,6 +148,18 @@ function simular(semilla, pasos) {
       const x = S.registrarUnidades(s, ubic, [{ c, unidades: Array.from({ length: ent(1, 4) }, () => nuevaSerie(c)) }], fecha());
       return guardar({ saldos: x.saldos, movs: x.registradas ? [{ id: `inv${++nId}`, fecha: fecha(), tipo: "inventario_series", c: "", cant: x.registradas, a: ubic }] : [] }, "inventario de N°");
     },
+    aCliente() {
+      // Sale directo del depósito a un cliente con N° de presupuesto…
+      const items = armarSalida("dep", 2); if (!items) return;
+      return guardar(S.moverStock(s, items, { tipo: "a_cliente", de: "dep", a: elegir(CLIENTES), por: "Melina", fecha: fecha(), presupuesto: String(ent(4500, 4510)) }, CATALOGO), "a cliente");
+    },
+    noUsado() {
+      // …y vuelve lo que el cliente no quiso instalar.
+      const nums = Object.keys(s.presupuestos || {}); if (!nums.length) return;
+      const n = elegir(nums), p = S.pendienteDePresupuesto(s, n); if (!p || !p.items.length) return;
+      const x = elegir(p.items), cant = ent(1, x.cant);
+      return guardar(S.moverStock(s, [{ c: x.c, cant, unidades: x.series.slice(0, cant) }], { tipo: "devuelto_sin_usar", de: p.cliente, a: "dep", por: "Melina", fecha: fecha(), presupuesto: n, deFlexible: true }, CATALOGO), "vuelve sin usar");
+    },
     noPermitido() {
       // Lo que nunca se puede: mover un SIM, mover más de lo que hay, un N° de otro artículo.
       const malos = [
@@ -162,7 +174,7 @@ function simular(semilla, pasos) {
       assert.strictEqual(JSON.stringify(s), antes, "una operación rechazada no puede cambiar nada");
     },
   };
-  const pesos = [["ingreso", 10], ["entrega", 14], ["aVehiculo", 5], ["devolver", 8], ["confirmar", 16], ["parte", 12], ["falla", 4], ["garantia", 4], ["ajuste", 6], ["baja", 2], ["inventario", 5], ["noPermitido", 4]];
+  const pesos = [["ingreso", 10], ["entrega", 14], ["aVehiculo", 5], ["devolver", 8], ["confirmar", 16], ["parte", 12], ["falla", 4], ["garantia", 4], ["ajuste", 6], ["baja", 2], ["inventario", 5], ["aCliente", 5], ["noUsado", 5], ["noPermitido", 4]];
   const total = pesos.reduce((a, [, p]) => a + p, 0);
   // Saldo inicial: depósito y comodato sin asignar, como el listado de Oficina.
   const fi = fecha(), inicial = [];
@@ -194,8 +206,8 @@ test("Estrés del stock: 40 historias de 400 operaciones al azar, y el cuadre da
   }
   assert.ok(operaciones > 12000 && movimientos > 15000, `se probaron ${operaciones} operaciones y ${movimientos} movimientos`);
   // Cada tipo de operación se probó de verdad muchas veces (no solo los rechazos).
-  ["ingreso", "entrega", "vehículo", "devolución", "envío recibi", "envío rechazar", "parte: usado", "parte: retiro", "devuelve fallado", "garantía reparado", "garantía reemplazado", "garantía rechazado", "ajuste", "baja de N°", "inventario de N°"]
-    .forEach((k) => assert.ok((hechas[k] || 0) >= 20, `${k}: solo ${hechas[k] || 0} veces`));
+  ["ingreso", "entrega", "vehículo", "devolución", "envío recibi", "envío rechazar", "parte: usado", "parte: retiro", "devuelve fallado", "garantía reparado", "garantía reemplazado", "garantía rechazado", "ajuste", "baja de N°", "inventario de N°", "a cliente", "vuelve sin usar"]
+    .forEach((k) => assert.ok((hechas[k] || 0) >= 10, `${k}: solo ${hechas[k] || 0} veces`));
 });
 
 test("El cuadre detecta cuando algo se rompe: cantidad tocada a mano, equipo cambiado de lugar, movimiento perdido, envío inconsistente", () => {

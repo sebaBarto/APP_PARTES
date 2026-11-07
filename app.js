@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.57.0";
+const APP_VERSION = "4.58.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -18637,6 +18637,7 @@ const AYUDAS_STOCK = {
   dep_alta: { titulo: "Alta: lo que entra", gif: "assets/ayuda/stock-app-alta.gif", texto: [
     "Compra del proveedor: escaneá cada caja (etiqueta de SAT y N° de serie) y tocá Ingresar.",
     "Retiro de un cliente: elegí el cliente. Si vuelve fallado, tildalo y escribí la falla: va a Garantía con toda su historia.",
+    "Vuelve de un presupuesto (no se usó): salió para instalar y el cliente no lo quiso. Poné el N° de presupuesto: aparece lo que se llevó y tocás lo que vuelve. Para Oficina va como «vuelve sin usar», no como retiro.",
     "Arriba están las devoluciones de los técnicos y los materiales de partes para aprobar." ] },
   dep_devoluciones: { titulo: "Recibir una devolución", gif: "assets/ayuda/stock-app-devolucion.gif", texto: [
     "El técnico te muestra el código de su devolución: escanealo con «Escanear» y se abre sola (o buscala en esta lista).",
@@ -18883,8 +18884,35 @@ const depOrigen = () => {
   if (depModo === "entregar") return "dep";
   if (depModo === "inventario") return depInvUbic() || "dep";
   const t = document.getElementById("depRecibirTipo").value, n = depNombreElegido("depRecibirTipo");
+  if (t === "presupuesto") { const p = depPresupElegido(); return p && p.cliente.replace(/^(cli|com):/, "") === n ? p.cliente : ""; }
   return t === "proveedor" || !n ? "" : t === "veh" ? `veh:${n}` : ""; // de clientes: la APP puede no tenerlo registrado
 };
+// «Vuelve de un presupuesto (no se usó)»: lo que salió a un cliente con ese N° y no se instaló.
+const depPresupElegido = () => pendienteDePresupuesto(depSaldos(), document.getElementById("depPresupVuelve").value);
+function depPintarPresupuesto() {
+  const cont = document.getElementById("depPresupVuelveItems"); if (!cont) return;
+  const idx = depSaldos().presupuestos || {}, a = depCatalogo().articulos || {};
+  document.getElementById("depPresupVuelveLista").innerHTML = Object.keys(idx).sort((x, y) => String(idx[y].fecha || "").localeCompare(String(idx[x].fecha || ""))).slice(0, 60)
+    .map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(nombreUbicacion(idx[n].cliente))} · ${escapeHtml(new Date(idx[n].fecha).toLocaleDateString("es-AR"))}</option>`).join("");
+  const num = document.getElementById("depPresupVuelve").value.trim(), p = depPresupElegido();
+  if (!num) { cont.innerHTML = '<p class="stk-ayuda">Poné el N° de presupuesto con el que salió: te muestro lo que se llevó y el cliente. Si no lo tenés, escribí el cliente abajo.</p>'; return; }
+  if (!p) { cont.innerHTML = '<p class="stk-ayuda">No encuentro ese presupuesto en lo que salió del depósito: escribí el cliente abajo y escaneá lo que vuelve.</p>'; return; }
+  const inp = document.getElementById("depRecibirDe"), nom = p.cliente.replace(/^(cli|com):/, "");
+  if (inp.value.trim() !== nom) { inp.value = nom; depCanasta.render(); }
+  cont.innerHTML = `<div class="stk-envio"><small>Salió para <b>${escapeHtml(nombreUbicacion(p.cliente))}</b> el ${escapeHtml(new Date(p.fecha).toLocaleDateString("es-AR"))}. Tocá lo que vuelve (o escanealo):</small>
+    ${p.items.length ? p.items.map((x) => `<div class="stk-envio-item"><span>${escapeHtml((a[x.c] || {}).d || x.c)}${x.series.length ? `<small>${escapeHtml(x.series.join(" · "))}</small>` : ""}</span><b>${stkFmtN(x.cant)}</b><button type="button" class="btn btn-secondary btn-small" data-vuelve="${escapeHtml(x.c)}">Vuelve</button></div>`).join("")
+      + `<div class="stk-envio-btns"><button type="button" class="btn btn-secondary btn-small" data-vuelve-todo>${stkIco("repetir")}Vuelve todo</button></div>` : '<p class="stk-ayuda">Ya volvió (o se instaló) todo lo de ese presupuesto.</p>'}</div>`;
+  const sumar = (x) => {
+    let l = depCanasta.lineas.find((y) => y.c === x.c);
+    if (!l) { l = { c: x.c, cant: 0, unidades: [] }; depCanasta.lineas.push(l); }
+    x.series.forEach((t) => { if (!l.unidades.includes(t)) l.unidades.push(t); });
+    l.cant = Math.max(l.cant, x.cant, l.unidades.length);
+  };
+  cont.querySelectorAll("[data-vuelve]").forEach((b) => b.addEventListener("click", () => { sumar(p.items.find((x) => x.c === b.dataset.vuelve)); depCanasta.actual = ""; depCanasta.cambio(); }));
+  const todo = cont.querySelector("[data-vuelve-todo]");
+  if (todo) todo.addEventListener("click", () => { p.items.forEach(sumar); depCanasta.actual = ""; depCanasta.cambio(); });
+}
+document.getElementById("depPresupVuelve").addEventListener("input", depPintarPresupuesto);
 const depCanasta = crearCanastaStock({
   cont: document.getElementById("depCanasta"), catalogo: depCatalogo, saldos: depSaldos, origen: depOrigen, puedeAsociar: true, forma: () => depForma, soloEquipos: () => depModo === "inventario",
   alCambiar: () => depBotonTexto(),
@@ -18895,6 +18923,7 @@ function depBotonTexto() {
   btn.disabled = !n;
   if (depModo === "inventario") { const u = depCanasta.items().reduce((t, x) => t + x.unidades.length, 0); btn.disabled = !u; btn.textContent = u ? `Registrar ${u} N° de serie` : "Registrar N° de serie"; return; }
   if (depModo === "entregar") { const nom = depNombreElegido("depDestTipo"); btn.textContent = n ? `Entregar ${n} artículo${n === 1 ? "" : "s"}${nom ? " a " + nom : ""}` : "Entregar"; }
+  else if (document.getElementById("depRecibirTipo").value === "presupuesto") btn.textContent = n ? `Vuelven ${n} artículo${n === 1 ? "" : "s"} al depósito (no se usó)` : "Vuelve al depósito (no se usó)";
   else if (document.getElementById("depFallado").checked && document.getElementById("depRecibirTipo").value !== "proveedor") btn.textContent = n ? `Mandar ${n} fallado${n === 1 ? "" : "s"} a Garantía` : "Mandar a Garantía";
   else btn.textContent = n ? `Ingresar ${n} artículo${n === 1 ? "" : "s"} al depósito` : "Ingresar al depósito";
 }
@@ -18934,7 +18963,7 @@ function depNombreElegido(tipoId) {
   return (tipo === "tec" || tipo === "veh" ? document.getElementById(sel).value : document.getElementById(inp).value).trim();
 }
 async function depLlenarLista(tipoId) {
-  const [selId, inpId, listaId] = DEP_CAMPOS[tipoId], tipo = document.getElementById(tipoId).value;
+  const [selId, inpId, listaId] = DEP_CAMPOS[tipoId], tipo0 = document.getElementById(tipoId).value, tipo = tipo0 === "presupuesto" ? "cli" : tipo0;
   const deLista = tipo === "tec" || tipo === "veh";
   const sel = document.getElementById(selId), inp = document.getElementById(inpId);
   sel.classList.toggle("hidden", !deLista); inp.classList.toggle("hidden", deLista);
@@ -18959,7 +18988,9 @@ function depMostrarModo() {
   if (depModo === "recibir") {
     const t = document.getElementById("depRecibirTipo").value;
     document.getElementById("depRecibirDeCaja").classList.toggle("hidden", t === "proveedor");
-    document.getElementById("depFalladoCaja").classList.toggle("hidden", t === "proveedor");
+    document.getElementById("depFalladoCaja").classList.toggle("hidden", t === "proveedor" || t === "presupuesto");
+    document.getElementById("depPresupVuelveCaja").classList.toggle("hidden", t !== "presupuesto");
+    if (t === "presupuesto") depPintarPresupuesto();
     depPintarDevoluciones();
     depPintarAprobar();
   }
@@ -19028,9 +19059,15 @@ document.getElementById("depConfirmarBtn").addEventListener("click", async (ev) 
     if ((tipo === "cli" || tipo === "com") && pres) cuerpo.presupuesto = pres;
   } else {
     const tipo = document.getElementById("depRecibirTipo").value, nombre = depNombreElegido("depRecibirTipo");
-    if (tipo !== "proveedor" && !nombre) { stkAviso("Elegí de dónde viene"); return; }
+    if (tipo !== "proveedor" && !nombre) { stkAviso(tipo === "presupuesto" ? "Poné el N° de presupuesto o el cliente" : "Elegí de dónde viene"); return; }
     cuerpo = { accion: "mover", de: tipo === "proveedor" ? "proveedor" : `${tipo}:${nombre}`, a: "dep", items };
-    if (tipo !== "proveedor" && document.getElementById("depFallado").checked) {
+    if (tipo === "presupuesto") {
+      const p = depPresupElegido(), num = document.getElementById("depPresupVuelve").value.trim();
+      cuerpo.de = p && p.cliente.replace(/^(cli|com):/, "") === nombre ? p.cliente : `cli:${nombre}`;
+      cuerpo.no_usado = true;
+      if (num) cuerpo.presupuesto = num;
+    }
+    if (tipo !== "proveedor" && tipo !== "presupuesto" && document.getElementById("depFallado").checked) {
       const falla = document.getElementById("depFalla").value.trim();
       if (!falla) { stkAviso("Escribí qué falla tiene"); document.getElementById("depFalla").focus(); return; }
       const sinSerie = items.filter((x) => (a[x.c] || {}).tipo === "unidad" && x.unidades.length < x.cant);
@@ -19043,7 +19080,7 @@ document.getElementById("depConfirmarBtn").addEventListener("click", async (ev) 
   if (faltanN.length) { await dialogoApp(`Antes de confirmar, decí cuáles salen:\n\n${faltanN.map((f) => `• ${f.d}: faltan ${f.faltan} N° de serie (escanealos o tocá «Elegir el N° de serie de la lista»)`).join("\n")}`, { soloAceptar: true, aceptar: "Entendido" }); return; }
   const sinN = items.filter((x) => (a[x.c] || {}).tipo === "unidad" && x.cant > x.unidades.length);
   const resumen = items.map((x) => `• ${(a[x.c] || {}).d || x.c}: ${stkFmtN(x.cant)}`).join("\n");
-  const destino = depModo === "entregar" ? nombreUbicacion(cuerpo.a) + (cuerpo.presupuesto ? ` (presupuesto N° ${cuerpo.presupuesto})` : "") : cuerpo.a === "gar" ? "Garantía (fallado)" : "el depósito";
+  const destino = depModo === "entregar" ? nombreUbicacion(cuerpo.a) + (cuerpo.presupuesto ? ` (presupuesto N° ${cuerpo.presupuesto})` : "") : cuerpo.a === "gar" ? "Garantía (fallado)" : cuerpo.no_usado ? `el depósito (vuelve sin usar de ${nombreUbicacion(cuerpo.de)}${cuerpo.presupuesto ? `, presupuesto N° ${cuerpo.presupuesto}` : ""})` : "el depósito";
   const ojo = sinN.length ? `\n\nOjo: ${sinN.length} equipo(s) sin N° de serie escaneado.` : "";
   const tecnicoDestino = depModo === "entregar" && /^tec:/.test(cuerpo.a) ? cuerpo.a.slice(4) : "";
   if (tecnicoDestino && tecnicoDestino !== tecnicoLogueado && !depPaseVale(tecnicoDestino)) {
@@ -19071,7 +19108,7 @@ document.getElementById("depConfirmarBtn").addEventListener("click", async (ev) 
     // Con la clave no se guarda nada en el celular: si no hay señal, no se hace.
     const r = cuerpo.en_mano && cuerpo.en_mano.clave ? await stkApi("POST", "", { ...cuerpo, op_id: depOpId() }) : await depEnviar(cuerpo, `${depModo === "entregar" ? "Baja a" : "Alta desde"} ${depModo === "entregar" ? nombreUbicacion(cuerpo.a) : cuerpo.de === "proveedor" ? "proveedor" : nombreUbicacion(cuerpo.de)} (${items.length} artículo${items.length === 1 ? "" : "s"})`);
     if (depModo === "entregar") depRecordarDestino(cuerpo.a, items);
-    depCanasta.limpiar(); document.getElementById("depMotivo").value = ""; document.getElementById("depPresupuesto").value = "";
+    depCanasta.limpiar(); document.getElementById("depMotivo").value = ""; document.getElementById("depPresupuesto").value = ""; document.getElementById("depPresupVuelve").value = "";
     document.getElementById("depFallado").checked = false; document.getElementById("depFalla").value = ""; document.getElementById("depFalla").classList.add("hidden");
     const enMano = !!cuerpo.en_mano;
     depPase = null; depSolicitudActiva = null;

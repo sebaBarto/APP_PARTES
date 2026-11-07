@@ -1805,3 +1805,53 @@ test("Stock: entrega en mano (código QR firmado del técnico o su clave), pedid
     assert.strictEqual(r.cuerpo.solicitud.estado, "cancelada");
   } finally { global.fetch = fetchViejo; if (viejoPush) require.cache[rutaPush] = viejoPush; else delete require.cache[rutaPush]; }
 });
+
+test("Stock: vuelve de un presupuesto (no se usó): sale al cliente con N° de presupuesto, vuelve lo que no se instaló, y para Oficina no es un retiro", async () => {
+  const fetchViejo = global.fetch;
+  const repo = {
+    "tecnicos.json": [{ nombre: "Melina", permisos: { stock_responsable: true } }],
+    "stock/catalogo.json": { articulos: { 23940: { c: "23940", d: "INFRARROJO AJAX", tipo: "unidad" }, 20825: { c: "20825", d: "TECLADO", tipo: "unidad" }, 20208: { c: "20208", d: "SIRENA", tipo: "cantidad" } } },
+    "stock/saldos.json": { inicializado: "2026-11-01", ubic: { dep: { 23940: 4, 20825: 1, 20208: 5 } }, unidades: { A1: { c: "23940", u: "dep" }, A2: { c: "23940", u: "dep" }, A3: { c: "23940", u: "dep" }, A4: { c: "23940", u: "dep" }, T1: { c: "20825", u: "dep" } }, pedidos: {} },
+  };
+  global.fetch = async (url, op = {}) => {
+    const m = String(url).match(/contents\/([^?]+)/);
+    if (m) {
+      const ruta = decodeURIComponent(m[1]);
+      if ((op.method || "GET") === "PUT") { repo[ruta] = JSON.parse(Buffer.from(JSON.parse(op.body).content, "base64").toString()); return new Response("{}", { status: 200 }); }
+      if (!(ruta in repo)) return new Response("{}", { status: 404 });
+      return new Response(JSON.stringify({ sha: "s", encoding: "base64", content: Buffer.from(JSON.stringify(repo[ruta])).toString("base64") }));
+    }
+    return new Response("[]");
+  };
+  try {
+    const melina = crearSesion({ nombre: "Melina", rol: "tecnico" });
+    const post = async (body) => { const r = resFalso(); await datos(pedido("POST", { coleccion: "stock" }, body, melina), r); return r; };
+    const S = require(path.join(raiz, "stock-utils.js"));
+    // Sale la instalación del presupuesto 4521: 4 infrarrojos, el teclado y 2 sirenas.
+    let r = await post({ accion: "mover", de: "dep", a: "cli:Kiosco Pérez", presupuesto: "4521", items: [{ c: "23940", cant: 4, unidades: ["A1", "A2", "A3", "A4"] }, { c: "20825", cant: 1, unidades: ["T1"] }, { c: "20208", cant: 2 }] });
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    let sal = repo["stock/saldos.json"];
+    assert.deepStrictEqual(sal.presupuestos["4521"].salio, { 23940: 4, 20825: 1, 20208: 2 });
+    assert.strictEqual(sal.presupuestos["4521"].cliente, "cli:Kiosco Pérez");
+    // El cliente no quiso 2 infrarrojos ni una sirena: vuelven sin usar.
+    r = await post({ accion: "mover", de: "cli:Kiosco Pérez", a: "dep", no_usado: true, presupuesto: "4521", items: [{ c: "23940", cant: 2, unidades: ["A3", "A4"] }, { c: "20208", cant: 1 }] });
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    sal = repo["stock/saldos.json"];
+    assert.deepStrictEqual([sal.ubic.dep["23940"], sal.ubic["cli:Kiosco Pérez"]["23940"], sal.ubic.dep["20208"]], [2, 2, 4]);
+    assert.strictEqual(sal.unidades.A3.u, "dep");
+    const mes = new Date().toISOString().slice(0, 7);
+    const movs = repo[`stock/movimientos-${mes}.json`].filter((m) => m.tipo === "devuelto_sin_usar");
+    assert.strictEqual(movs.length, 2);
+    assert.ok(movs.every((m) => m.presupuesto === "4521" && m.de === "cli:Kiosco Pérez"));
+    // Lo que todavía podría volver de ese presupuesto
+    assert.deepStrictEqual(S.pendienteDePresupuesto(sal, "4521").items.sort((x, y) => x.c.localeCompare(y.c)), [{ c: "20208", cant: 1, series: [] }, { c: "20825", cant: 1, series: ["T1"] }, { c: "23940", cant: 2, series: ["A1", "A2"] }]);
+    // Para Oficina: vuelve sin usar, no «retiro de cliente»
+    assert.deepStrictEqual(S.movimientoParaOficina(movs[0]).operacion, "VUELVE SIN USAR (PRESUPUESTO)");
+    assert.strictEqual(S.movimientoParaOficina(movs[0]).presupuesto, "4521");
+    // Y el cuadre sigue dando
+    const todos = Object.keys(repo).filter((k) => /movimientos-/.test(k)).flatMap((k) => repo[k]);
+    const inicial = [{ id: "i1", fecha: "2026-11-01T00:00:00Z", tipo: "inicial", c: "23940", cant: 4, a: "dep", unidades: ["A1", "A2", "A3", "A4"] }, { id: "i2", fecha: "2026-11-01T00:00:00Z", tipo: "inicial", c: "20825", cant: 1, a: "dep", unidades: ["T1"] }, { id: "i3", fecha: "2026-11-01T00:00:00Z", tipo: "inicial", c: "20208", cant: 5, a: "dep" }];
+    const cu = S.auditarStock(sal, [...inicial, ...todos], repo["stock/catalogo.json"]);
+    assert.ok(cu.ok, cu.errores.map((e) => e.texto).join("\n"));
+  } finally { global.fetch = fetchViejo; }
+});

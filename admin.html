@@ -6768,7 +6768,7 @@ function stkRenderPedidos() {
 
 // --- Movimientos ---
 let stkMovs = [];
-const STK_MOV_TIPO = { inicial: "Saldo inicial", ajuste: "Ajuste", regularizacion: "Regularización (cuadre)", entrega: "Entrega a técnico (en camino)", entrega_mano: "Entregado en mano", recibido: "Recibido", diferencia: "Diferencia (vuelve)", rechazado: "Rechazado (vuelve)", devolucion: "Devolución", a_cliente: "A cliente", retiro: "Retiro de cliente", traspaso: "Traspaso", consumo: "Usado en cliente", ingreso: "Ingreso (compra)", inventario_series: "Inventario de N° de serie", baja: "Baja de un equipo", instalado_parte: "Instalado (parte)", retirado_parte: "Retirado de cliente (parte)", falla: "Fallado → Garantía", garantia_reparado: "Volvió reparado de garantía", garantia_reemplazo: "Reemplazo en garantía", garantia_rechazada: "Garantía rechazada (baja)" };
+const STK_MOV_TIPO = { inicial: "Saldo inicial", ajuste: "Ajuste", regularizacion: "Regularización (cuadre)", entrega: "Entrega a técnico (en camino)", entrega_mano: "Entregado en mano", devuelto_sin_usar: "Vuelve sin usar (presupuesto)", recibido: "Recibido", diferencia: "Diferencia (vuelve)", rechazado: "Rechazado (vuelve)", devolucion: "Devolución", a_cliente: "A cliente", retiro: "Retiro de cliente", traspaso: "Traspaso", consumo: "Usado en cliente", ingreso: "Ingreso (compra)", inventario_series: "Inventario de N° de serie", baja: "Baja de un equipo", instalado_parte: "Instalado (parte)", retirado_parte: "Retirado de cliente (parte)", falla: "Fallado → Garantía", garantia_reparado: "Volvió reparado de garantía", garantia_reemplazo: "Reemplazo en garantía", garantia_rechazada: "Garantía rechazada (baja)" };
 async function stkCargarMovimientos() {
   const mesInp = document.getElementById("stkMovMes");
   if (!mesInp.value) mesInp.value = new Date().toISOString().slice(0, 7);
@@ -6813,7 +6813,7 @@ let stkOfMovs = [];
 const STK_OF_FORMATO = [
   ["ID", "Identificador único del movimiento en la APP. Si se importa dos veces, el mismo ID no se tiene que aplicar de nuevo."],
   ["Fecha", "Fecha y hora del movimiento (AAAA-MM-DD HH:MM)."],
-  ["Operación", "SALIDA A CLIENTE · PASE A COMODATO · DEVOLUCION DE COMODATO · RETIRO DE CLIENTE · COMODATO A VENTA · INGRESO · AJUSTE"],
+  ["Operación", "SALIDA A CLIENTE · PASE A COMODATO · DEVOLUCION DE COMODATO · RETIRO DE CLIENTE · VUELVE SIN USAR (PRESUPUESTO) · COMODATO A VENTA · INGRESO · AJUSTE"],
   ["Código", "Código del artículo (el mismo de Oficina)."],
   ["Descripción", "Descripción del artículo (solo informativa)."],
   ["Cant. Depósito", "Cuánto cambia la cantidad de Depósito: negativo = sale, positivo = entra."],
