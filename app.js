@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.58.0";
+const APP_VERSION = "4.59.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -18218,15 +18218,55 @@ function stkPitido(bien) {
 // Si el código de barras no se lee (gastado, borroso), a los 5 segundos se leen los números
 // impresos de la foto; si tampoco, se escribe a mano.
 let stkEscanerAbierto = null;
+const STK_FORMATOS = ["code_128", "code_39", "code_93", "ean_13", "ean_8", "upc_a", "upc_e", "itf", "codabar", "data_matrix", "qr_code"];
+// El lector de códigos. Chrome/Android trae uno propio (BarcodeDetector); el iPhone (Safari y todos
+// los navegadores de iOS) no, así que ahí se usa el lector ZXing que viene con la APP
+// (vendor/zxing: se baja una sola vez y queda guardado, así que funciona también sin señal).
+let stkLectorPropio = null;
+function stkCargarLectorPropio() {
+  if (stkLectorPropio) return stkLectorPropio;
+  stkLectorPropio = new Promise((ok, mal) => {
+    const listo = () => {
+      const api = window.BarcodeDetectionAPI;
+      if (!api || !api.BarcodeDetector) { mal(new Error("sin lector")); return; }
+      const overrides = { locateFile: (archivo, prefijo) => (archivo.endsWith(".wasm") ? new URL("vendor/zxing/" + archivo, document.baseURI).href : prefijo + archivo) };
+      try { api.setZXingModuleOverrides(overrides); } catch (e) { /* nada */ }
+      // Carga el motor ya (y no en el primer cuadro): si no se puede, se avisa en vez de quedar mudo.
+      Promise.resolve(api.prepareZXingModule ? api.prepareZXingModule({ overrides, fireImmediately: true }) : null)
+        .then(() => ok(api.BarcodeDetector), mal);
+    };
+    if (window.BarcodeDetectionAPI) { listo(); return; }
+    const s = document.createElement("script");
+    s.src = "vendor/zxing/barcode-detector.js";
+    s.onload = listo;
+    s.onerror = () => mal(new Error("no se pudo cargar el lector"));
+    document.head.appendChild(s);
+  }).catch((e) => { stkLectorPropio = null; throw e; });
+  return stkLectorPropio;
+}
+// Al entrar a Depósito o Mi stock en un iPhone, deja el lector bajado y guardado (para usarlo sin señal).
+const stkPrepararLector = () => { if (!("BarcodeDetector" in window)) setTimeout(() => stkCargarLectorPropio().catch(() => {}), 300); };
+async function stkCrearDetector() {
+  let Clase = "BarcodeDetector" in window ? window.BarcodeDetector : null;
+  if (Clase && Clase.getSupportedFormats) {
+    // Algún navegador lo trae pero sin formatos (ej. Chrome en computadoras sin soporte).
+    try { const f = await Clase.getSupportedFormats(); if (Array.isArray(f) && !f.length) Clase = null; } catch (e) { /* se usa igual */ }
+  }
+  if (!Clase) Clase = await stkCargarLectorPropio();
+  try { return new Clase({ formats: STK_FORMATOS }); } catch (e) { return new Clase(); }
+}
 async function abrirEscanerStock(op) {
   if (stkEscanerAbierto) return;
-  if (!("BarcodeDetector" in window) || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    await dialogoApp("Este celular no puede leer códigos desde la APP. Escribí el código en el casillero (o usá un lector por Bluetooth: escribe solo).", { soloAceptar: true, aceptar: "Entendido" });
+  const sinLector = () => dialogoApp("Este celular no puede leer códigos desde la APP. Escribí el código en el casillero (o usá un lector por Bluetooth: escribe solo).", { soloAceptar: true, aceptar: "Entendido" });
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    await (window.isSecureContext === false ? dialogoApp("La cámara solo se puede usar con la APP abierta desde su dirección segura (https).", { soloAceptar: true, aceptar: "Entendido" }) : sinLector());
     return;
   }
+  stkEscanerAbierto = { cerrar: () => {} }; // evita abrir dos veces mientras carga el lector
   let detector;
-  try { detector = new window.BarcodeDetector({ formats: ["code_128", "code_39", "code_93", "ean_13", "ean_8", "upc_a", "upc_e", "itf", "codabar", "data_matrix", "qr_code"] }); }
-  catch (e) { detector = new window.BarcodeDetector(); }
+  try { detector = await stkCrearDetector(); } catch (e) { detector = null; }
+  stkEscanerAbierto = null;
+  if (!detector) { await sinLector(); return; }
   const capa = document.createElement("div");
   capa.className = "stk-escaner";
   capa.innerHTML = `<div class="stk-escaner-arriba"><b></b><span class="stk-escaner-total"></span></div>
@@ -18852,7 +18892,7 @@ document.getElementById("miStockDevolverBtn").addEventListener("click", async (e
   btn.disabled = false;
   cargarMiStock();
 });
-document.getElementById("tileMiStockBtn").addEventListener("click", () => { showScreen("miStock"); miStockCanasta.limpiar(); cargarMiStock(); });
+document.getElementById("tileMiStockBtn").addEventListener("click", () => { stkPrepararLector(); showScreen("miStock"); miStockCanasta.limpiar(); cargarMiStock(); });
 document.getElementById("volverDeMiStockBtn").addEventListener("click", () => showScreen("home"));
 
 // Globito con lo que falta confirmar (Mi stock: lo que te mandaron; Depósito: devoluciones).
@@ -19347,6 +19387,7 @@ async function depConsultar(texto) {
 document.getElementById("depConsultarCodigo").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); depConsultar(e.currentTarget.value.trim()); } });
 document.getElementById("depConsultarEscanearBtn").addEventListener("click", () => abrirEscanerStock({ titulo: "Consultar", leerCuadro: async (t) => { const d = elegirCodigoDelCuadro(t, depCatalogo(), depSaldos(), ""); return d.usar ? depConsultar(d.usar) : null; }, usar: (t) => depConsultar(t) }));
 document.getElementById("tileDepositoBtn").addEventListener("click", () => {
+  stkPrepararLector();
   showScreen("deposito");
   depLlenarLista("depDestTipo"); depLlenarLista("depRecibirTipo");
   depCargar();

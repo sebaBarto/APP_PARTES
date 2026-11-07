@@ -6376,3 +6376,36 @@ test("Depósito, alta «Vuelve de un presupuesto (no se usó)»: con el N° apar
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("iPhone (sin BarcodeDetector): el escáner usa el lector ZXing que viene con la APP, bajado del propio sitio, y lee un QR real de la cámara", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const externos = [];
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => { externos.push(route.request().url()); route.fulfill({ status: 404, body: "" }); });
+  await page.route("**/api/**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+  const pedidos = [];
+  page.on("request", (r) => { if (/vendor\/zxing\//.test(r.url())) pedidos.push(r.url().replace(/^.*vendor\//, "")); });
+  await page.addInitScript(() => { delete window.BarcodeDetector; try { delete Window.prototype.BarcodeDetector; } catch (e) { /* nada */ } });
+  await page.goto(base + "/index.html");
+  await page.waitForTimeout(400);
+  const leidos = await page.evaluate(async () => {
+    if ("BarcodeDetector" in window) return "hay nativo";
+    // La «cámara»: un QR real dibujado en un canvas
+    const div = document.createElement("div");
+    new QRCode(div, { text: "SATD1.abc123", width: 300, height: 300, correctLevel: QRCode.CorrectLevel.M });
+    await new Promise((ok) => setTimeout(ok, 200));
+    const qr = div.querySelector("canvas") || div.querySelector("img");
+    const cv = document.createElement("canvas"); cv.width = 480; cv.height = 480; const g = cv.getContext("2d");
+    setInterval(() => { g.fillStyle = "#fff"; g.fillRect(0, 0, 480, 480); g.drawImage(qr, 90, 90, 300, 300); }, 40);
+    navigator.mediaDevices.getUserMedia = async () => cv.captureStream(20);
+    return await new Promise((ok) => {
+      setTimeout(() => ok("no leyó"), 20000);
+      abrirEscanerStock({ titulo: "Prueba", leerCuadro: (t) => { ok(t); return { ok: true, texto: "Leído", usado: t }; } });
+    });
+  });
+  assert.deepStrictEqual(leidos, ["SATD1.abc123"]);
+  assert.ok(pedidos.includes("zxing/barcode-detector.js") && pedidos.includes("zxing/zxing_reader.wasm"), "el lector y su motor salen del propio sitio: " + pedidos.join(", "));
+  assert.deepStrictEqual(externos.filter((u) => /zxing|jsdelivr/.test(u)), [], "no se baja nada de afuera");
+  await page.evaluate(() => stkEscanerAbierto && stkEscanerAbierto.cerrar());
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
