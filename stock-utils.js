@@ -69,6 +69,8 @@
     // Los accesorios (soportes, bases, cubiertas, cajas de montaje) no.
     const ACCESORIO = /\b(BASE PARA|BASES?\b(?! *[-/]?\s*\w*\s*(FIESA|INCLUIDA))|REJA|CARCAZA|SOPORTE|BRACKET|LENTE|TAPA|CUBIERTA|CAJA DE MONTAJE|FUNDA|PLACA DE MONTAJE)\b/;
     if (/\bAJAX\b/.test(D) && !ACCESORIO.test(D)) return "unidad";
+    // Comunicadores, módulos, receptores y transmisores: cada uno con su N° de serie o MAC.
+    if (/\b(CITYMESH|GPRS|COMUNICADOR|NT ?-?LINK|NT ?-?COM\d?|NTCOM\d?|LANTRIX|IP1\d\d|IP180|EXPANSOR|RECEPTOR|TRANSMISOR|REM\d+\w*|RTX3|RX1|PGM4|ZX\d+\w*|MODEM|HUB)\b/.test(D) && !/^(\S+ )?(ANTENA|CONO|CONECTOR|COMCAB|CABLE|SOPORTE|BRACKET|FUENTE)\b/.test(D) && !/\b(CORREA|PILA|BATERIA)\b/.test(D)) return "unidad";
     if (/\b(PIR|INFRARROJOS?|DETECTOR(ES)?|D\. HUMO|BARRERA|SENSOR(ES)?|SISMICO|MAGNETICO INAL|CONTACTO INAL|MOTIONPROTECT|DOORPROTECT|FIREPROTECT|GLASSPROTECT|LEAKSPROTECT|COMBIPROTECT|HOMESIREN|STREETSIREN|SPACECONTROL)\b/.test(D) && !/^(BASE|A35BS BASE)|\b(BASE PARA|REJA|CARCAZA|SOPORTE|BRACKET|LENTE|TAPA|CUBIERTA)\b/.test(D)) return "unidad";
     if (/ADAPTADOR|ANTENA|SOPORTE|BRAZO|CAJA|GABINETE|BASE |LENTE|TAPA|CARCAZA|FICHA|CONECTOR|BALUN|FUENTE|TRAFO|TRANSFORMADOR|BATERIA|PILA/.test(D) && !/^(CENTRAL|CAMARA|DVR|NVR)/.test(D)) return "cantidad";
     if (/\b(CENTRAL|TECLADO|KEYPAD|CAMARA|CÁMARA|DOMO|BULLET|DVR|NVR|XVR|VIDEOGRABADOR|GRABADOR|COMUNICADOR|ED5800|IP100|IP150|ROUTER|SWITCH|ACCESS POINT|DISCO|HDD|INVERSOR|CENTRO DE MONITOREO|VIDEOPORTERO|MONITOR|LECTOR|UPS|PANEL M\d|MODEM)/.test(D)
@@ -279,11 +281,14 @@
   // Forma de un N° de serie: letras -> A, dígitos -> 9 ("GH120FF156" -> "AA999AA999").
   // La APP va guardando las formas que ve en cada artículo y así aprende el formato de cada marca.
   const limpiarCodigo = (t) => String(t == null ? "" : t).trim().replace(/^\]\w\d/, "").replace(/[\u0000-\u001f]/g, "").replace(/\s+/g, "").toUpperCase().slice(0, 64);
-  const formaCodigo = (t) => limpiarCodigo(t).replace(/[A-Z]/g, "A").replace(/\d/g, "9").replace(/[^A9]/g, "-");
+  // Los N° hexadecimales (MAC, IDs de Ajax o Citymesh: «7A1D9CFC») mezclan letras y números al azar,
+  // así que su forma es solo «hexadecimal de N caracteres» (H8).
+  const esHex = (t) => /^[0-9A-F]{6,}$/.test(t) && /[A-F]/.test(t) && /\d/.test(t);
+  const formaCodigo = (t) => { const x = limpiarCodigo(t); return esHex(x) ? `H${x.length}` : x.replace(/[A-Z]/g, "A").replace(/\d/g, "9").replace(/[^A9]/g, "-"); };
   function coincideFormato(tracking, formatos) {
-    const f = formaCodigo(tracking), lista = Array.isArray(formatos) ? formatos : [];
+    const x = limpiarCodigo(tracking), f = formaCodigo(x), lista = Array.isArray(formatos) ? formatos : [];
     if (!lista.length) return null; // todavía no se aprendió nada: no se puede decir
-    return lista.some((x) => x === f || (x.length === f.length && x.slice(0, 2) === f.slice(0, 2)));
+    return lista.some((y) => y === f || (y[0] !== "H" && f[0] !== "H" && y.length === f.length && y.slice(0, 2) === f.slice(0, 2)) || (y === `H${x.length}` && /^[0-9A-F]+$/.test(x)));
   }
   function agregarFormato(formatos, tracking) {
     const f = formaCodigo(tracking), lista = Array.isArray(formatos) ? formatos.slice() : [];
