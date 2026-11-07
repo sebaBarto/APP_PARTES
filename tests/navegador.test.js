@@ -6437,3 +6437,35 @@ test("iPhone (sin BarcodeDetector): el escáner usa el lector ZXing de la APP (b
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Escáner: cada código leído suena un «pip» de confirmación (y un tono grave doble si hay un problema); el audio se destraba al tocar Escanear", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 404, body: "" }));
+  await page.route("**/api/**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+  await page.addInitScript(() => {
+    window.__tonos = []; window.__destrabado = 0;
+    const AC = window.AudioContext;
+    window.AudioContext = class extends AC {
+      createOscillator() { const o = super.createOscillator(); const st = o.start.bind(o); o.start = (t) => { window.__tonos.push(Math.round(o.frequency.value)); st(t); }; return o; }
+      createBufferSource() { window.__destrabado++; return super.createBufferSource(); }
+    };
+  });
+  await page.goto(base + "/index.html");
+  await page.waitForTimeout(400);
+  const r = await page.evaluate(async () => {
+    const cv = document.createElement("canvas"); cv.width = 64; cv.height = 64; const g = cv.getContext("2d");
+    setInterval(() => { g.fillStyle = "#" + Math.floor(Math.random() * 999); g.fillRect(0, 0, 64, 64); }, 50);
+    navigator.mediaDevices.getUserMedia = async () => cv.captureStream(20);
+    window.__cuadros = [["A1"], [], [], ["MALO"], [], [], ["LINK"]];
+    window.BarcodeDetector = class { async detect() { const c = window.__cuadros.shift(); return (c || []).map((rawValue) => ({ rawValue })); } };
+    await new Promise((ok) => {
+      abrirEscanerStock({ titulo: "Prueba", leerCuadro: (t) => { if (t[0] === "LINK") { setTimeout(ok, 300); return null; } return t[0] === "A1" ? { ok: true, texto: "Tomado" } : { ok: false, texto: "No es de acá" }; } });
+    });
+    stkEscanerAbierto.cerrar();
+    return { tonos: window.__tonos, destrabado: window.__destrabado };
+  });
+  assert.ok(r.destrabado >= 1, "se destraba el audio al abrir");
+  assert.deepStrictEqual(r.tonos, [1850, 330, 330], "pip al tomar A1, tono doble al rechazar MALO, nada con un link que no se usa");
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

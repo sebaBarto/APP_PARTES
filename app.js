@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.60.0";
+const APP_VERSION = "4.61.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -18198,14 +18198,42 @@ const stkApi = async (metodo, query, cuerpo) => {
 };
 const stkFmtN = (n) => (Number(n) || 0).toLocaleString("es-AR", { maximumFractionDigits: 3 });
 const stkNumApp = (v) => { const t = String(v == null ? "" : v).trim(); return /^[\d.,\s]+$/.test(t) && /\d/.test(t) ? numStock(t) : NaN; };
+// Pitido al leer un código: «pip» agudo y corto si se tomó, tono grave doble si hay un problema.
+// El iPhone solo deja sonar si el audio se «destraba» con un toque del usuario: stkDestrabarAudio()
+// se llama al tocar Escanear (antes de esperar nada).
+function stkAudio() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  try { stkAudio.ctx = stkAudio.ctx || new AC(); } catch (e) { return null; }
+  return stkAudio.ctx;
+}
+function stkDestrabarAudio() {
+  const ctx = stkAudio(); if (!ctx) return;
+  try {
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+    const b = ctx.createBuffer(1, 1, 22050), s = ctx.createBufferSource(); // sonido mudo: destraba iOS
+    s.buffer = b; s.connect(ctx.destination); s.start(0);
+  } catch (e) { /* nada */ }
+}
+// Si el iPhone volvió a dormir el audio (APP en segundo plano, llamada), lo despierta el próximo toque.
+["touchend", "click"].forEach((ev) => document.addEventListener(ev, () => { const c = stkAudio.ctx; if (c && c.state !== "running") stkDestrabarAudio(); }, true));
 function stkPitido(bien) {
   try { if (navigator.vibrate) navigator.vibrate(bien ? 50 : [80, 60, 80]); } catch (e) { /* nada */ }
+  const ctx = stkAudio(); if (!ctx) return;
   try {
-    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
-    stkPitido.ctx = stkPitido.ctx || new AC();
-    const o = stkPitido.ctx.createOscillator(), g = stkPitido.ctx.createGain();
-    o.frequency.value = bien ? 1400 : 320; g.gain.value = 0.08;
-    o.connect(g); g.connect(stkPitido.ctx.destination); o.start(); o.stop(stkPitido.ctx.currentTime + (bien ? 0.08 : 0.25));
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+    const t0 = ctx.currentTime + 0.01;
+    const tono = (frec, desde, dura, tipo) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = tipo; o.frequency.value = frec;
+      // subida y bajada rápidas: suena limpio, sin «clic»
+      g.gain.setValueAtTime(0.0001, desde);
+      g.gain.exponentialRampToValueAtTime(0.35, desde + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, desde + dura);
+      o.connect(g); g.connect(ctx.destination); o.start(desde); o.stop(desde + dura + 0.02);
+    };
+    if (bien) tono(1850, t0, 0.11, "sine");
+    else { tono(330, t0, 0.16, "square"); tono(330, t0 + 0.22, 0.16, "square"); }
   } catch (e) { /* nada */ }
 }
 
@@ -18316,6 +18344,7 @@ function stkAjustarCamara(stream, boton, propio) {
 }
 async function abrirEscanerStock(op) {
   if (stkEscanerAbierto) return;
+  stkDestrabarAudio();
   const sinLector = () => dialogoApp("Este celular no puede leer códigos desde la APP. Escribí el código en el casillero (o usá un lector por Bluetooth: escribe solo).", { soloAceptar: true, aceptar: "Entendido" });
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
     await (window.isSecureContext === false ? dialogoApp("La cámara solo se puede usar con la APP abierta desde su dirección segura (https).", { soloAceptar: true, aceptar: "Entendido" }) : sinLector());
