@@ -5328,8 +5328,49 @@ const AYUDAS_SIMS = {
     "Baja solo lo que esté filtrado (mes, estado y búsqueda).",
     "Trae tres hojas: el detalle, el total por técnico y el total por categoría, con columnas Pagado, Pagado con APP y Pendiente.",
     "Tip: elegí el mes arriba antes de descargar." ] },
+  // ---- Stock ----
+  stk_resumen: { titulo: "Cómo funciona el stock", texto: [
+    "Cada artículo está en un solo lugar: el depósito, un técnico, un vehículo, en camino, un cliente o Garantía. Los equipos se siguen uno por uno con su N° de serie.",
+    "Todo cambio queda como un movimiento, con quién y cuándo. Dos veces por día se controla solo que el stock sea igual a la suma de los movimientos (Salud).",
+    "El sistema de Oficina sigue con precios y compras: acá se concilia contra lo que exporta, y se baja el archivo con lo que cambió (Para Oficina).",
+    "En la APP: el depósito entrega y recibe escaneando (Depósito) y cada técnico ve lo suyo, pide material y devuelve (Mi stock)." ] },
+  stk_catalogo: { titulo: "Catálogo de artículos", gif: "assets/ayuda/stock-adm-catalogo.gif", texto: [
+    "Subí el listado de artículos del sistema de Oficina: actualiza descripciones y precios y agrega los nuevos. La planilla revisada aplica el tipo, la unidad, el mínimo, la cantidad a pedir y el proveedor.",
+    "Tipo: «Equipo con N° de serie» se sigue uno por uno; «Por cantidad» solo se cuenta; SIM y Herramientas se manejan en sus secciones; «No controlar» queda afuera." ] },
+  stk_lista: { titulo: "Buscar, filtrar y cambiar el tipo", gif: "assets/ayuda/stock-adm-articulos.gif", texto: [
+    "Buscá por código o descripción, y filtrá por lo que se muestra, dónde está y el proveedor. Los botones de tipo sacan o ponen grupos enteros (por ejemplo, los SIM).",
+    "Debajo de cada artículo ves dónde está cada unidad. «Para pedir» marca los que quedaron en el mínimo.",
+    "El tipo de cada artículo se cambia en su renglón. «Cambiar el tipo de los que se ven» cambia todos los filtrados de una vez. «Excel» baja lo que ves." ] },
+  stk_salud: { titulo: "Salud y control del stock", gif: "assets/ayuda/stock-adm-salud.gif", texto: [
+    "Arriba, el control: recalcula todo el stock desde los movimientos. Verde: cuadra. Rojo: dice qué artículo, dónde, qué guardó el stock y qué dan los movimientos. Se hace solo dos veces por día y te avisa al celular; «Controlar ahora» lo hace en el momento.",
+    "Si verificaste que lo guardado es lo real, «Regularizar» agrega al historial lo que faltaba, a tu nombre y sin tocar cantidades. Si el conteo da otra cosa, después ajustá.",
+    "Abajo, lo que rompe una regla y qué hacer: materiales de partes para aprobar, retiros que no figuraban, N° de serie de más, cantidades negativas." ] },
+  stk_conciliacion: { titulo: "Conciliación con Oficina", gif: "assets/ayuda/stock-adm-conciliacion.gif", texto: [
+    "Subí el listado que exporta Oficina (el de siempre). Se compara artículo por artículo con todo lo que está en poder de SAT y en comodato.",
+    "Cada grupo de diferencias tiene su explicación y su arreglo: agregar al catálogo, dejar la APP como Oficina, o marcar Resuelto / Ignorar si el error es de Oficina. Se puede de a uno o tildando varios.",
+    "«Excel con todas las diferencias» para revisarlas con tiempo." ] },
+  stk_pedidos: { titulo: "Pedidos a proveedores", gif: "assets/ayuda/stock-adm-pedidos.gif", texto: [
+    "Entra lo que tiene mínimo y quedó en el mínimo o por debajo en el depósito, agrupado por proveedor.",
+    "Corregí la cantidad, «Copiar el pedido» para mandarlo por WhatsApp o mail, y «Marcar como pedido»: pasa a «Pedidos hechos» y sale solo cuando el depósito vuelve a superar el mínimo." ] },
+  stk_movimientos: { titulo: "Movimientos", gif: "assets/ayuda/stock-adm-movimientos.gif", texto: [
+    "Todos los movimientos del mes: qué, cuánto, de dónde a dónde, quién, con N° de serie y presupuesto.",
+    "Filtrá por tipo (entregas, en mano, devoluciones, ajustes…) o buscá por artículo, persona, cliente o presupuesto. «Excel» baja lo filtrado." ] },
+  stk_oficina: { titulo: "Archivo para Oficina", gif: "assets/ayuda/stock-adm-oficina.gif", texto: [
+    "Solo lo que le cambia el stock a Oficina: salidas a clientes, retiros, comodatos, ajustes e ingresos. Los pases entre depósito, técnicos y vehículos no cuentan (para Oficina todo eso es «Depósito»).",
+    "«Bajar archivo para Oficina» trae una hoja «Formato» que explica cada columna. Después, «Marcar como pasados» para no repetirlos." ] },
+  stk_garantia: { titulo: "Garantía", gif: "assets/ayuda/stock-adm-garantia.gif", texto: [
+    "Los equipos que vuelven fallados quedan acá con su N° de serie, a qué cliente se instalaron, cuándo, con qué presupuesto y de qué proveedor vinieron.",
+    "Seguí cada uno: mandado al proveedor (con N° de RMA), volvió reparado, reemplazado (se carga el N° del nuevo) o garantía rechazada.",
+    "Buscá cualquier N° de serie para ver toda su historia. El Excel sirve para mandárselo al proveedor." ] },
+  stk_proveedores: { titulo: "Códigos de proveedor", gif: "assets/ayuda/stock-adm-proveedores.gif", texto: [
+    "La etiqueta de SAT trae al final el código del proveedor (4 dígitos). Acá le ponés el nombre a cada código.",
+    "Los códigos que se escanearon y todavía no tienen nombre aparecen para completar." ] },
 };
 const LUGARES_AYUDA_SIMS = [
+  ["#panelStock > h1", "stk_resumen"], ['[data-stk-vista="articulos"] h3', "stk_catalogo"], ["#stkTipoVariosBtn", "stk_lista", "after"],
+  ['[data-stk-vista="salud"] h3', "stk_salud"], ['[data-stk-vista="conciliacion"] h3', "stk_conciliacion"], ['[data-stk-vista="pedidos"] h3', "stk_pedidos"],
+  ["#stkMovExcelBtn", "stk_movimientos", "after"], ['[data-stk-vista="oficina"] h3', "stk_oficina"], ['[data-stk-vista="garantia"] h3', "stk_garantia"],
+  ['[data-stk-vista="proveedores"] h3', "stk_proveedores"],
   ["#panelSims > h1", "resumen"], ["#simsAltaBtn", "alta", "after"], ["#elegirExcelSimsBtn", "excel", "after"],
   ["#simsPendientesCard > h3", "pendientes"], ["#simsTabla thead th:nth-child(7)", "fila"], ["#simsLoteLimpiarBtn", "lote", "after"],
   ["#simsTabla thead th:nth-child(2)", "ficha"], ["#panelSimsInstaladas > h1", "instaladas"],

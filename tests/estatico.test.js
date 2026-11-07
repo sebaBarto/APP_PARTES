@@ -39,3 +39,15 @@ test("sin librerías externas y vendor/ completo", () => {
     assert.ok(fs.existsSync(path.join(raiz, ruta)), `falta ${ruta}`);
   }
 });
+
+test("Ayudas: cada video (GIF) que nombran el panel y la APP existe y no pesa de más", () => {
+  const fs = require("fs"), path = require("path"), raiz = path.join(__dirname, "..");
+  const nombrados = new Set();
+  for (const f of ["admin.html", "app.js"]) (fs.readFileSync(path.join(raiz, f), "utf8").match(/assets\/ayuda\/[\w-]+\.gif/g) || []).forEach((g) => nombrados.add(g));
+  assert.ok(nombrados.size >= 30, `hay ${nombrados.size}`);
+  for (const g of nombrados) {
+    const p = path.join(raiz, g);
+    assert.ok(fs.existsSync(p), "falta " + g);
+    assert.ok(fs.statSync(p).size < 600 * 1024, g + " pesa demasiado");
+  }
+});

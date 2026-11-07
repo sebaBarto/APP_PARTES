@@ -1208,7 +1208,7 @@ test("Admin SIMs: los signos de ayuda muestran un cartel con GIF y consejos al p
   await page.waitForTimeout(300);
   await page.evaluate(() => { document.getElementById("mainCard").classList.remove("hidden"); document.getElementById("panelSims").classList.remove("hidden"); return cargarSimsAdmin(); });
   const claves = await page.$$eval(".ayuda-btn", (bs) => bs.map((b) => b.dataset.ayuda));
-  for (const c of ["resumen", "alta", "excel", "pendientes", "fila", "ficha", "lote", "instaladas", "tablero", "conciliacion", "tec_resumen", "tec_permisos", "rend_resumen", "rend_estados", "rend_pagar_todo", "rend_excel"]) assert.ok(claves.includes(c), "falta ayuda " + c);
+  for (const c of ["resumen", "alta", "excel", "pendientes", "fila", "ficha", "lote", "instaladas", "tablero", "conciliacion", "tec_resumen", "tec_permisos", "rend_resumen", "rend_estados", "rend_pagar_todo", "rend_excel", "stk_resumen", "stk_catalogo", "stk_lista", "stk_salud", "stk_conciliacion", "stk_pedidos", "stk_movimientos", "stk_oficina", "stk_garantia", "stk_proveedores"]) assert.ok(claves.includes(c), "falta ayuda " + c);
   await page.hover('.ayuda-btn[data-ayuda="alta"]');
   await page.waitForSelector(".ayuda-pop:not(.hidden)");
   assert.match(await page.textContent(".ayuda-pop"), /Cargar SIMs nuevas/);
@@ -6267,6 +6267,57 @@ test("Entrega y devolución en mano: el técnico pide material y muestra su cód
   await page.waitForFunction(() => !document.querySelector("#depCanasta .stk-linea"));
   assert.deepStrictEqual(posts.at(-1).en_mano, { clave: "clave-juan" });
   assert.strictEqual(await page.evaluate(() => localStorage.getItem("stock_cola") || "[]"), "[]", "la clave no se guarda en el celular");
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Ayudas «?» del stock en la APP: video corto y qué hace, en Depósito, Mi stock y el parte (también en las listas que se dibujan después)", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  const catalogo = { articulos: { 40001: { c: "40001", d: "BATERIA 12V", tipo: "cantidad" } } };
+  const saldos = { inicializado: "2026-11-01", ubic: { dep: { 40001: 5 } }, unidades: {}, envios: [{ id: "d1", fecha: new Date().toISOString(), de: "tec:Juan", a: "dep", camino: "cam:dev:Juan", items: [{ c: "40001", cant: 1 }] }], solicitudes: [{ id: "s1", fecha: new Date().toISOString(), por: "Juan", items: [{ c: "40001", cant: 2 }], estado: "pendiente" }] };
+  await page.route("**/api/**", (route) => {
+    const u = route.request().url(), json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (!u.includes("coleccion=stock")) return json([]);
+    if (u.includes("mio=1")) return json({ nombre: "Juan", tiene: {}, unidades: [], porRecibir: [], devueltos: [], articulos: catalogo.articulos, porAprobar: [], solicitudes: [] });
+    return json({ catalogo, saldos, conciliacion: { marcas: [], corridas: [] } });
+  });
+  await page.goto(base + "/index.html");
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { tecnicoLogueado = "Melina"; tecnicosPasswords = { Melina: "", Juan: "" }; tecnicosPermisos = { Melina: { stock_responsable: true } }; refrescarAccesosPorPermisos(); showScreen("home"); });
+  await page.click("#tileDepositoBtn");
+  await page.waitForSelector('#depSolicitudes .ayuda-btn[data-ayuda="dep_pedidos"]');
+  const claves = await page.$$eval("#screen-deposito .ayuda-btn", (bs) => bs.map((b) => b.dataset.ayuda));
+  for (const c of ["dep_escanear", "dep_pedidos", "dep_entregar", "dep_lote"]) assert.ok(claves.includes(c), "falta " + c);
+  // Con el mouse: al pasar por arriba
+  await page.hover('.ayuda-btn[data-ayuda="dep_escanear"]');
+  await page.waitForSelector(".ayuda-pop:not(.hidden)");
+  assert.match(await page.textContent(".ayuda-pop"), /Escanear: lo primero decide.*código de un técnico/s);
+  assert.strictEqual(await page.getAttribute(".ayuda-pop .ayuda-pop-gif", "src"), "assets/ayuda/stock-app-escanear.gif");
+  await page.mouse.move(5, 700);
+  await page.waitForSelector(".ayuda-pop.hidden", { state: "attached" });
+  // Con el dedo: al tocar (queda fija) y en las listas que se dibujan después
+  await page.click('#depSolicitudes .ayuda-btn[data-ayuda="dep_pedidos"]');
+  await page.waitForSelector(".ayuda-pop:not(.hidden)");
+  assert.match(await page.textContent(".ayuda-pop .ayuda-pop-cab"), /Pedidos de los técnicos/);
+  await page.click(".ayuda-pop .ayuda-pop-cerrar");
+  await page.waitForSelector(".ayuda-pop.hidden", { state: "attached" });
+  await page.click('#depModos [data-modo="recibir"]');
+  await page.waitForSelector('#depDevoluciones .ayuda-btn[data-ayuda="dep_devoluciones"]');
+  assert.ok(await page.$('label[for="depRecibirTipo"] .ayuda-btn[data-ayuda="dep_alta"]'));
+  // Mi stock: el «?» del desplegable no lo abre ni lo cierra
+  await page.evaluate(() => { tecnicoLogueado = "Juan"; showScreen("home"); });
+  await page.click("#tileMiStockBtn");
+  await page.waitForSelector('#miStockPedirCaja .ayuda-btn[data-ayuda="mi_pedir"]');
+  await page.click('#miStockPedirCaja .ayuda-btn');
+  await page.waitForSelector(".ayuda-pop:not(.hidden)");
+  assert.strictEqual(await page.evaluate(() => document.getElementById("miStockPedirCaja").open), false);
+  for (const c of ["mi_codigo", "mi_devolver"]) assert.ok(await page.$(`#screen-mistock .ayuda-btn[data-ayuda="${c}"]`), "falta " + c);
+  assert.ok(await page.$('label[for="f_materiales"] .ayuda-btn[data-ayuda="parte_stock"]'));
+  // Todas las ayudas con video tienen su archivo
+  const gifs = await page.evaluate(() => Object.values(AYUDAS_STOCK).map((a) => a.gif).filter(Boolean));
+  const fs = require("fs"), path = require("path");
+  for (const g of gifs) assert.ok(fs.existsSync(path.join(__dirname, "..", g)), "falta el video " + g);
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });

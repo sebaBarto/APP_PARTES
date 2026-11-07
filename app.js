@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.56.0";
+const APP_VERSION = "4.57.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -18612,6 +18612,137 @@ function leerRecepcion(div, e) {
     return { c: x.c, cant: Math.round((tildadas.length + sinN) * 1000) / 1000, unidades: tildadas };
   });
 }
+// ---------- Ayudas «?» del stock (video corto + qué hace) ----------
+// Igual que en el panel (SIMs): con el mouse se abre al pasar por arriba; con el dedo, al tocar.
+const AYUDAS_STOCK = {
+  dep_escanear: { titulo: "Escanear: lo primero decide", gif: "assets/ayuda/stock-app-escanear.gif", texto: [
+    "Tocá Escanear y apuntá a lo que tengas en la mano: la APP se da cuenta sola de qué es.",
+    "El código de un técnico (Mi stock → Mi código) arranca una entrega para él. Seguí escaneando lo que lleva y tocá Entregar: queda en su stock al instante.",
+    "El código de una devolución la abre para recibirla.",
+    "Un artículo o un N° de serie: te muestra dónde está y su historia." ] },
+  dep_pedidos: { titulo: "Pedidos de los técnicos", gif: "assets/ayuda/stock-app-pedidos.gif", texto: [
+    "Lo que los técnicos piden desde Mi stock aparece acá arriba, con su nota, y te llega un aviso al celular.",
+    "«Avisar que está listo» le avisa al técnico que pase a buscarlo.",
+    "«Preparar» arma la entrega: a medida que escaneás, cada renglón se tilda (1 de 2, 2 de 2) y te avisa si escaneás algo que no estaba pedido.",
+    "Cuando llega, escaneá su código y tocá Entregar: el pedido se cierra solo." ] },
+  dep_entregar: { titulo: "Baja: entregar material", gif: "assets/ayuda/stock-app-entrega.gif", texto: [
+    "Elegí a dónde va: técnico, vehículo o cliente (con N° de presupuesto, opcional). Los botones de arriba repiten los destinos frecuentes.",
+    "Escaneá la etiqueta de SAT y, en los equipos, después su N° de serie.",
+    "A un técnico: si está ahí, escaneá su código (o que ponga su clave) y lo recibe en mano. Si no está, «Mandar en camino»: lo confirma él con «Recibí».",
+    "«Repetir la última entrega» carga lo mismo que la vez anterior a ese destino." ] },
+  dep_lote: { titulo: "Individual o en lote", gif: "assets/ayuda/stock-app-lote.gif", texto: [
+    "Individual: la cámara se cierra después de cada artículo, para revisar.",
+    "En lote: la cámara queda abierta y escaneás todo seguido (teclado, central, sirenas, infrarrojos…). Cada código suma uno; para volver a contar el mismo, sacalo de la vista un segundo.",
+    "Si el código de barras no se lee, a los 5 segundos intenta leer los números impresos; si tampoco, «A mano»." ] },
+  dep_alta: { titulo: "Alta: lo que entra", gif: "assets/ayuda/stock-app-alta.gif", texto: [
+    "Compra del proveedor: escaneá cada caja (etiqueta de SAT y N° de serie) y tocá Ingresar.",
+    "Retiro de un cliente: elegí el cliente. Si vuelve fallado, tildalo y escribí la falla: va a Garantía con toda su historia.",
+    "Arriba están las devoluciones de los técnicos y los materiales de partes para aprobar." ] },
+  dep_devoluciones: { titulo: "Recibir una devolución", gif: "assets/ayuda/stock-app-devolucion.gif", texto: [
+    "El técnico te muestra el código de su devolución: escanealo con «Escanear» y se abre sola (o buscala en esta lista).",
+    "«Recibido» si llegó todo. «Controlar escaneando» arranca de cero y cuenta cada cosa que escaneás; lo que no llegó vuelve a figurar a nombre del técnico.",
+    "Los fallados van a Garantía (se cambia en «Va a»).",
+    "Funciona sin señal: se manda solo cuando vuelve." ] },
+  dep_aprobar: { titulo: "Materiales de partes para aprobar", texto: [
+    "Un técnico cargó en un parte algo que no figuraba en su stock.",
+    "Elegí de qué artículo es y de dónde salió (el depósito, o lo tenía él sin registrar), o «No descontar» si es consumible o no era de SAT.",
+    "«Rechazar» le avisa al técnico con el motivo." ] },
+  dep_inventario: { titulo: "Inventario de N° de serie", gif: "assets/ayuda/stock-app-inventario.gif", texto: [
+    "Registra los N° de serie de lo que ya está en un lugar (depósito, un técnico o un vehículo). No cambia cantidades.",
+    "Escaneá la etiqueta de SAT y después el N° de cada caja, todo seguido. La lista muestra qué equipos todavía no tienen su N°." ] },
+  dep_consultar: { titulo: "Consultar", gif: "assets/ayuda/stock-app-consultar.gif", texto: [
+    "Escaneá o escribí una etiqueta, un código o un N° de serie.",
+    "Un artículo: cuánto hay en cada lugar. Un equipo: dónde está, a qué cliente fue, con qué presupuesto y su garantía.",
+    "Abajo, lo que está en camino sin confirmar." ] },
+  dep_sin_senal: { titulo: "Sin señal", texto: [
+    "Si no hay señal, lo que hacés queda guardado en el celular y se descuenta en la pantalla para que sigas trabajando.",
+    "Se manda solo cuando vuelve la señal, una sola vez. Si algo no se pudo, aparece en rojo con el motivo." ] },
+  mi_codigo: { titulo: "Mi código", gif: "assets/ayuda/stock-app-mi-codigo.gif", texto: [
+    "Mostrá este código en el depósito: te escanean y lo que te entregan queda en tu stock en el momento, sin tocar «Recibí».",
+    "Vale 15 minutos y se renueva solo mientras lo tenés abierto (una captura de pantalla no sirve).",
+    "Si no tenés el celular, podés poner tu clave en el celular del depósito." ] },
+  mi_pedir: { titulo: "Pedir material", gif: "assets/ayuda/stock-app-pedir.gif", texto: [
+    "Buscá el artículo por nombre o código, tocalo para agregarlo y ajustá la cantidad. Podés sumar una nota.",
+    "Le llega al depósito con la lista armada. Cuando está listo, te avisan.",
+    "En «Mis pedidos» ves en qué está cada uno y lo podés cancelar." ] },
+  mi_devolver: { titulo: "Devolver al depósito", gif: "assets/ayuda/stock-app-devolver.gif", texto: [
+    "Tocá «Devolver» en lo que vuelve o escaneá la etiqueta (y el N° de serie de los equipos). «Cargar lo que retiré de clientes» arma la lista sola.",
+    "Si es un equipo fallado, tildalo y escribí la falla: va a Garantía.",
+    "Al devolver te aparece un código: mostráselo al depósito y lo reciben de una." ] },
+  mi_recibir: { titulo: "Te mandaron material", gif: "assets/ayuda/stock-app-recibir.gif", texto: [
+    "Lo que te mandan «en camino» aparece acá, y te llega un aviso.",
+    "Si llegó todo, «Recibí». Si llegó menos, destildá el N° de serie que no vino o corregí la cantidad: lo que falta vuelve al depósito.",
+    "Si no es lo que pediste, «Rechazar» con el motivo." ] },
+  parte_stock: { titulo: "El parte y tu stock", gif: "assets/ayuda/stock-app-parte.gif", texto: [
+    "«Usé material de mi stock»: elegí de lo que tenés (o escaneá). Al mandar el parte pasa al cliente, con su N° de serie.",
+    "«Retiré equipos»: escanealos y entran a tu stock (si está fallado, va marcado).",
+    "Lo que cargues en la lista de abajo y no estaba en tu stock lo revisa el depósito." ] },
+};
+const ayudaBtn = (clave) => `<button type="button" class="ayuda-btn" data-ayuda="${clave}" aria-label="Ayuda: ${escapeHtml((AYUDAS_STOCK[clave] || {}).titulo || "")}" aria-expanded="false">?</button>`;
+const ayudaPopApp = document.createElement("div");
+ayudaPopApp.className = "ayuda-pop hidden";
+ayudaPopApp.setAttribute("role", "dialog");
+document.body.appendChild(ayudaPopApp);
+let ayudaAppAbierta = null, ayudaAppFijada = false, ayudaAppTimer = null;
+function mostrarAyudaApp(boton, fijar) {
+  const a = AYUDAS_STOCK[boton.dataset.ayuda];
+  if (!a) return;
+  clearTimeout(ayudaAppTimer);
+  if (ayudaAppAbierta && ayudaAppAbierta !== boton) ayudaAppAbierta.setAttribute("aria-expanded", "false");
+  ayudaAppAbierta = boton; ayudaAppFijada = !!fijar;
+  ayudaPopApp.innerHTML = `<div class="ayuda-pop-cab"><b>${escapeHtml(a.titulo)}</b><button type="button" class="ayuda-pop-cerrar" aria-label="Cerrar">${stkIco("x")}</button></div>
+    ${a.gif ? `<img src="${a.gif}" alt="Ejemplo animado: ${escapeHtml(a.titulo)}" class="ayuda-pop-gif">` : ""}
+    <ul>${a.texto.map((x) => `<li>${escapeHtml(x)}</li>`).join("")}</ul>`;
+  ayudaPopApp.querySelector(".ayuda-pop-cerrar").addEventListener("click", ocultarAyudaApp);
+  ayudaPopApp.classList.remove("hidden");
+  const gif = ayudaPopApp.querySelector(".ayuda-pop-gif");
+  if (gif && !gif.complete) gif.addEventListener("load", () => { if (ayudaAppAbierta === boton) ubicarAyudaApp(boton); }, { once: true });
+  ubicarAyudaApp(boton);
+  boton.setAttribute("aria-expanded", "true");
+}
+// En el celular sale como una hoja desde abajo; en pantallas grandes, al lado del «?».
+function ubicarAyudaApp(boton) {
+  const p = ayudaPopApp;
+  if (window.innerWidth < 700) { p.classList.add("hoja"); p.style.left = p.style.top = p.style.width = ""; return; }
+  p.classList.remove("hoja");
+  const r = boton.getBoundingClientRect(), ancho = Math.min(460, window.innerWidth - 24);
+  p.style.width = ancho + "px";
+  p.style.left = Math.max(12, Math.min(r.left + r.width / 2 - ancho / 2, window.innerWidth - ancho - 12)) + "px";
+  const alto = p.offsetHeight || 420, abajo = window.innerHeight - r.bottom - 16;
+  p.style.top = Math.max(12, alto <= abajo ? r.bottom + 8 : Math.min(r.top - alto - 8, window.innerHeight - alto - 12)) + "px";
+}
+function ocultarAyudaApp() {
+  ayudaPopApp.classList.add("hidden");
+  if (ayudaAppAbierta) ayudaAppAbierta.setAttribute("aria-expanded", "false");
+  ayudaAppAbierta = null; ayudaAppFijada = false;
+}
+// Delegado: sirve también para los «?» que se dibujan después (listas que cambian).
+document.addEventListener("pointerover", (e) => {
+  const b = e.target.closest && e.target.closest(".ayuda-btn[data-ayuda]");
+  if (b && e.pointerType === "mouse" && !ayudaAppFijada && AYUDAS_STOCK[b.dataset.ayuda]) mostrarAyudaApp(b, false);
+});
+document.addEventListener("pointerout", (e) => {
+  const b = e.target.closest && e.target.closest(".ayuda-btn[data-ayuda]");
+  if (b && e.pointerType === "mouse" && !ayudaAppFijada && !(e.relatedTarget && ayudaPopApp.contains(e.relatedTarget))) ayudaAppTimer = setTimeout(ocultarAyudaApp, 250);
+});
+document.addEventListener("click", (e) => {
+  const b = e.target.closest && e.target.closest(".ayuda-btn[data-ayuda]");
+  if (b && AYUDAS_STOCK[b.dataset.ayuda]) {
+    e.preventDefault(); e.stopPropagation(); // dentro de un <summary> no abre ni cierra el desplegable
+    if (ayudaAppAbierta === b && ayudaAppFijada) ocultarAyudaApp(); else mostrarAyudaApp(b, true);
+    return;
+  }
+  if (ayudaAppAbierta && !ayudaPopApp.contains(e.target)) ocultarAyudaApp();
+}, true);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && ayudaAppAbierta) ocultarAyudaApp(); });
+ayudaPopApp.addEventListener("mouseenter", () => clearTimeout(ayudaAppTimer));
+ayudaPopApp.addEventListener("mouseleave", () => { if (!ayudaAppFijada) ayudaAppTimer = setTimeout(ocultarAyudaApp, 250); });
+// Los «?» fijos de las pantallas (los de las listas se dibujan con ayudaBtn()).
+[["#screen-deposito .stk-unico .stk-ayuda", "dep_escanear"], ['label[for="depDestTipo"]', "dep_entregar"], ['label[for="depRecibirTipo"]', "dep_alta"],
+  ['#screen-deposito [data-dep="inventario"] > .stk-ayuda', "dep_inventario"], ["#depConsultarAyuda", "dep_consultar"],
+  ["#screen-mistock .stk-mi-codigo .stk-ayuda", "mi_codigo"], ["#miStockPedirCaja summary", "mi_pedir"], ["#miStockDevolverCaja > .stk-h", "mi_devolver"],
+  ['label[for="f_materiales"]', "parte_stock"]].forEach(([sel, clave]) => { const el = document.querySelector(sel); if (el && !el.querySelector(".ayuda-btn")) el.insertAdjacentHTML("beforeend", " " + ayudaBtn(clave)); });
+
 // ---------- Mi stock ----------
 let miStock = null;
 let miStockAvisoAt = 0;
@@ -18642,7 +18773,7 @@ function pintarMiStock() {
   const items = (e, editable) => `<div class="stk-envio-items">${e.items.map((x, i) => `<div class="stk-envio-item"><span>${escapeHtml(d(x.c))}${x.unidades && x.unidades.length ? `<small>${x.unidades.map(escapeHtml).join(" · ")}</small>` : ""}</span>${editable ? `<input class="field-input" style="width:72px;text-align:center;padding:6px;" inputmode="decimal" data-i="${i}" value="${stkFmtN(x.cant)}" aria-label="Cantidad recibida">` : `<b>${stkFmtN(x.cant)}</b>`}</div>`).join("")}</div>`;
   const cuando = (f) => new Date(f).toLocaleString("es-AR", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" });
   const pr = document.getElementById("miStockPorRecibir");
-  pr.innerHTML = (miStock.porRecibir || []).length ? `<h3 class="stk-h">Te mandaron (confirmá cuando lo tengas)</h3>` + miStock.porRecibir.map((e) => `<div class="stk-envio" data-id="${escapeHtml(e.id)}">
+  pr.innerHTML = (miStock.porRecibir || []).length ? `<h3 class="stk-h">Te mandaron (confirmá cuando lo tengas) ${ayudaBtn("mi_recibir")}</h3>` + miStock.porRecibir.map((e) => `<div class="stk-envio" data-id="${escapeHtml(e.id)}">
       <b>De ${escapeHtml(e.por || "Depósito")}</b><small>${escapeHtml(cuando(e.fecha))}${e.motivo ? " · " + escapeHtml(e.motivo) : ""}</small>
       ${htmlRecepcion(e, d)}
       <p class="stk-ayuda">Si llegó menos, destildá el N° de serie que no vino o corregí la cantidad antes de confirmar.</p>
@@ -18821,9 +18952,9 @@ async function depLlenarLista(tipoId) {
 function depMostrarModo() {
   document.querySelectorAll("#depModos [data-modo]").forEach((b) => b.classList.toggle("activo", b.dataset.modo === depModo));
   document.querySelectorAll("#depFormas [data-forma]").forEach((b) => b.classList.toggle("activo", b.dataset.forma === depForma));
-  document.getElementById("depFormaAyuda").textContent = depForma === "lote"
+  document.getElementById("depFormaAyuda").innerHTML = escapeHtml(depForma === "lote"
     ? "La cámara queda abierta: escaneá todo seguido. En los equipos, la etiqueta y después su N° de serie."
-    : "La cámara se cierra después de cada artículo, para revisar.";
+    : "La cámara se cierra después de cada artículo, para revisar.") + " " + ayudaBtn("dep_lote");
   document.querySelectorAll("#screen-deposito [data-dep]").forEach((d) => d.classList.toggle("hidden", !d.dataset.dep.split(" ").includes(depModo)));
   if (depModo === "recibir") {
     const t = document.getElementById("depRecibirTipo").value;
@@ -19002,7 +19133,7 @@ async function depProcesarCola() {
 function depPintarCola() {
   const cola = depLeerCola(), cont = document.getElementById("depCola");
   if (!cont) return;
-  cont.innerHTML = cola.length ? `<div class="stk-cola"><b>${cola.filter((x) => !x.error).length ? "Guardado sin señal (se manda solo cuando vuelva)" : "No se pudo mandar"}</b>${cola.map((x, i) => `<div class="stk-cola-item"><span>${escapeHtml(x.descripcion || x.cuerpo.accion)}<small style="display:block;opacity:.7;">${escapeHtml(new Date(x.fecha).toLocaleString("es-AR", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }))}</small>${x.error ? `<small class="err" style="display:block;">${escapeHtml(x.error)}</small>` : ""}</span>${x.error ? `<button type="button" class="stk-link" data-descartar="${i}">Descartar</button>` : ""}</div>`).join("")}</div>` : "";
+  cont.innerHTML = cola.length ? `<div class="stk-cola"><b>${cola.filter((x) => !x.error).length ? "Guardado sin señal (se manda solo cuando vuelva)" : "No se pudo mandar"} ${ayudaBtn("dep_sin_senal")}</b>${cola.map((x, i) => `<div class="stk-cola-item"><span>${escapeHtml(x.descripcion || x.cuerpo.accion)}<small style="display:block;opacity:.7;">${escapeHtml(new Date(x.fecha).toLocaleString("es-AR", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }))}</small>${x.error ? `<small class="err" style="display:block;">${escapeHtml(x.error)}</small>` : ""}</span>${x.error ? `<button type="button" class="stk-link" data-descartar="${i}">Descartar</button>` : ""}</div>`).join("")}</div>` : "";
   cont.querySelectorAll("[data-descartar]").forEach((b) => b.addEventListener("click", async () => {
     if (!(await confirmarApp("¿Descartar esta operación? No se va a registrar."))) return;
     const c = depLeerCola(); c.splice(Number(b.dataset.descartar), 1); depGuardarCola(c); depPintarCola();
@@ -19077,7 +19208,7 @@ document.getElementById("depInvSelect").addEventListener("change", () => { depPi
 function depPintarAprobar() {
   const cont = document.getElementById("depAprobar"); if (!cont) return;
   const a = depCatalogo().articulos || {}, lista = depSaldos().aprobar || [];
-  cont.innerHTML = lista.length ? `<h3 class="stk-h">Materiales de partes para aprobar (${lista.length})</h3><p class="stk-ayuda">Los cargó un técnico en un parte y no estaban en su stock. Decí de dónde salieron; si es consumible o no era de SAT, «No descontar».</p>` + lista.map((x) => `<div class="stk-envio" data-id="${escapeHtml(x.id)}">
+  cont.innerHTML = lista.length ? `<h3 class="stk-h">Materiales de partes para aprobar (${lista.length}) ${ayudaBtn("dep_aprobar")}</h3><p class="stk-ayuda">Los cargó un técnico en un parte y no estaban en su stock. Decí de dónde salieron; si es consumible o no era de SAT, «No descontar».</p>` + lista.map((x) => `<div class="stk-envio" data-id="${escapeHtml(x.id)}">
     <b>${escapeHtml(x.texto || (a[x.c] || {}).d || x.c)} ×${stkFmtN(x.cant)}</b><small>${escapeHtml(x.por)} · ${escapeHtml(x.cliente)}${x.parte ? ` · parte ${escapeHtml(x.parte)}` : ""} · ${escapeHtml(new Date(x.fecha).toLocaleDateString("es-AR"))}</small>
     ${x.error ? `<small class="stk-fallado">${escapeHtml(x.error)}</small>` : ""}
     <div style="margin:6px 0;">Artículo: <b data-art>${x.c && a[x.c] ? escapeHtml(a[x.c].d) : "sin elegir"}</b> <button type="button" class="stk-link" data-elegir-art>Elegir</button></div>
@@ -19118,7 +19249,7 @@ function depPintarDevoluciones() {
   const a = depCatalogo().articulos || {}, d = (c) => (a[c] || {}).d || c;
   const lista = (depSaldos().envios || []).filter((e) => e.a === "dep");
   const cont = document.getElementById("depDevoluciones");
-  cont.innerHTML = lista.length ? `<h3 class="stk-h">Devoluciones por recibir (${lista.length})</h3>` + lista.map((e) => `<div class="stk-envio" data-id="${escapeHtml(e.id)}">
+  cont.innerHTML = lista.length ? `<h3 class="stk-h">Devoluciones por recibir (${lista.length}) ${ayudaBtn("dep_devoluciones")}</h3>` + lista.map((e) => `<div class="stk-envio" data-id="${escapeHtml(e.id)}">
     <b>${escapeHtml(e.de.replace(/^tec:/, ""))}</b><small>${escapeHtml(new Date(e.fecha).toLocaleString("es-AR", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }))}${e.motivo && !e.fallado ? " · " + escapeHtml(e.motivo) : ""}</small>
     ${e.fallado ? `<div class="stk-fallado">${stkIco("alerta")}Fallado: ${escapeHtml(e.falla || "")}</div>` : ""}
     ${htmlRecepcion(e, d)}
@@ -19455,7 +19586,7 @@ function depPintarSolicitudes() {
   const cont = document.getElementById("depSolicitudes"); if (!cont) return;
   const a = depCatalogo().articulos || {}, lista = depSolicitudesAbiertas();
   const hace = (f) => { const m = Math.round((Date.now() - new Date(f).getTime()) / 60000); return m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} día(s)`; };
-  cont.innerHTML = lista.length ? `<h3 class="stk-h">Pedidos de técnicos (${lista.length})</h3>` + lista.map((x) => `<div class="stk-envio stk-sol ${escapeHtml(x.estado)}${depSolicitudActiva && depSolicitudActiva.id === x.id ? " stk-resaltado" : ""}" data-id="${escapeHtml(x.id)}">
+  cont.innerHTML = lista.length ? `<h3 class="stk-h">Pedidos de técnicos (${lista.length}) ${ayudaBtn("dep_pedidos")}</h3>` + lista.map((x) => `<div class="stk-envio stk-sol ${escapeHtml(x.estado)}${depSolicitudActiva && depSolicitudActiva.id === x.id ? " stk-resaltado" : ""}" data-id="${escapeHtml(x.id)}">
     <div class="stk-sol-top"><b>${escapeHtml(x.por)}</b><small>${escapeHtml(hace(x.fecha))}${x.estado === "lista" ? " · ya le avisaste que está listo" : ""}</small></div>
     <div class="stk-envio-items">${x.items.map((y) => `<div class="stk-envio-item"><span>${escapeHtml((a[y.c] || {}).d || y.c)}</span><b>${stkFmtN(y.cant)}</b></div>`).join("")}</div>
     ${x.nota ? `<small>${escapeHtml(x.nota)}</small>` : ""}

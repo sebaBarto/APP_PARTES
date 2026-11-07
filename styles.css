@@ -3904,3 +3904,19 @@ html[data-theme="day"] .toast.info { background: #E7F1FB; border-color: #5B7A99;
 .stk-qr { display: flex; justify-content: center; padding: 12px; background: #fff; border-radius: 12px; margin: 0 auto; width: max-content; max-width: 100%; }
 .stk-qr img, .stk-qr canvas { max-width: 100%; height: auto; }
 .stk-qr-estado { font-size: 13px; margin: 10px 0 4px; opacity: .85; }
+
+/* ---------- Ayudas «?» (video corto + qué hace) ---------- */
+.ayuda-btn { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; min-width: 22px; min-height: 0; padding: 0; margin: 0 0 0 6px; vertical-align: middle;
+  border-radius: 50%; border: 1.5px solid var(--ink); background: var(--amber); color: var(--ink); font-size: 13px; font-weight: 800; line-height: 1; box-shadow: none; cursor: help; flex: 0 0 auto; }
+.ayuda-btn:hover, .ayuda-btn[aria-expanded="true"] { background: var(--ink); color: var(--amber); border-color: var(--amber); }
+.ayuda-pop { position: fixed; z-index: 99995; background: #fff; color: #101820; border-radius: 16px; padding: 14px 16px 10px; border-top: 5px solid var(--amber);
+  box-shadow: 0 22px 50px -18px rgba(0,0,0,.6); font-size: 14.5px; line-height: 1.45; max-height: calc(100vh - 24px); overflow-y: auto; }
+.ayuda-pop.hidden { display: none; }
+.ayuda-pop.hoja { left: 0; right: 0; bottom: 0; top: auto; width: auto; border-radius: 18px 18px 0 0; max-height: 86vh; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+.ayuda-pop-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; font-size: 17px; }
+.ayuda-pop-cerrar { width: 36px; height: 36px; min-height: 0; padding: 0; border-radius: 50%; border: 0; background: #F0F0EC; color: #101820; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+.ayuda-pop-cerrar .stk-ico { margin: 0; }
+.ayuda-pop-gif { display: block; width: 100%; height: auto; border-radius: 10px; border: 1px solid #E2E2DC; background: #F4F5F0; min-height: 140px; max-height: 52vh; object-fit: contain; }
+.ayuda-pop ul { margin: 12px 0 4px; padding-left: 20px; }
+.ayuda-pop li { margin: 5px 0; }
+.stk-h .ayuda-btn, .stk-cola b .ayuda-btn { margin-left: 6px; }

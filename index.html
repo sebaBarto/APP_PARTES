@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#101820">
-<meta name="app-version" content="4.56.0">
+<meta name="app-version" content="4.57.0">
 <meta name="description" content="Digitalizador de partes técnicos de servicio">
 <title>Servicio Técnico SAT</title>
 <link rel="manifest" href="manifest.json">
@@ -1413,6 +1413,7 @@
         <div class="field-group" data-dep="entregar recibir"><label class="field-label" for="depMotivo">Nota (opcional)</label><input class="field-input" type="text" id="depMotivo" placeholder="Ej: remito 0001-1234, para la obra de..."></div>
       </div>
       <div data-dep="consultar" class="hidden">
+        <p class="stk-ayuda" id="depConsultarAyuda">Escaneá o escribí una etiqueta, un código o un N° de serie: dónde está y su historia.</p>
         <div class="stk-escanear-fila"><button type="button" class="btn btn-primary btn-small" id="depConsultarEscanearBtn"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>Escanear</button><input class="field-input" type="text" id="depConsultarCodigo" placeholder="Código, N° de serie o descripción" autocomplete="off" enterkeyhint="search"></div>
         <div id="depConsulta"></div>
         <div id="depEnCamino"></div>
