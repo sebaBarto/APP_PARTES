@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#101820">
-<meta name="app-version" content="4.53.2">
+<meta name="app-version" content="4.54.0">
 <meta name="description" content="Digitalizador de partes técnicos de servicio">
 <title>Servicio Técnico SAT</title>
 <link rel="manifest" href="manifest.json">
@@ -695,7 +695,7 @@
       <p class="subtitle-consultas">Materiales instalados y retirados en cada servicio.</p>
 
       <div class="list-toolbar">
-        <button class="btn btn-ghost btn-small" id="refreshStockBtn" type="button">↻ Actualizar</button>
+        <button class="btn btn-ghost btn-small" id="refreshStockBtn" type="button"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/></svg> Actualizar</button>
         <span class="list-sync-label" id="stockSyncLabel"></span>
       </div>
 
@@ -721,7 +721,7 @@
         <button type="button" class="stock-pasado-chip" data-pasado="si">Pasados</button>
       </div>
 
-      <button type="button" class="btn btn-secondary" id="descargarExcelStockBtn" style="margin-bottom:14px;">⬇ Descargar Excel</button>
+      <button type="button" class="btn btn-secondary" id="descargarExcelStockBtn" style="margin-bottom:14px;"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg> Descargar Excel</button>
 
       <div class="historial-seleccion-bar hidden" id="stockSeleccionBar">
         <label class="historial-select-all">
@@ -1315,7 +1315,7 @@
       <div id="miStockDevolverCaja" class="hidden">
         <h3 class="stk-h">Devolver al depósito</h3>
         <p class="stk-ayuda">Tocá «Devolver» en lo que vuelve, o escaneá la etiqueta (y el N° de serie de los equipos).</p>
-        <div class="stk-escanear-fila"><button type="button" class="btn btn-secondary btn-small" id="miStockEscanearBtn">📷 Escanear</button><input class="field-input" type="text" id="miStockCodigo" placeholder="Código o N° de serie" autocomplete="off" enterkeyhint="done"></div>
+        <div class="stk-escanear-fila"><button type="button" class="btn btn-secondary btn-small" id="miStockEscanearBtn"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>Escanear</button><input class="field-input" type="text" id="miStockCodigo" placeholder="Código o N° de serie" autocomplete="off" enterkeyhint="done"></div>
         <div id="miStockCanasta"></div>
         <div class="field-group">
           <label class="stk-check"><input type="checkbox" id="miStockFallado"> Es un equipo fallado (va a Garantía)</label>
@@ -1360,7 +1360,7 @@
         </div>
         <div class="field-group hidden" id="depPresupuestoCaja"><label class="field-label" for="depPresupuesto">N° de presupuesto (opcional)</label>
           <input class="field-input" type="text" inputmode="numeric" id="depPresupuesto" autocomplete="off" placeholder="Ej: 4521"></div>
-        <button type="button" class="btn btn-secondary btn-small hidden" id="depRepetirBtn">↻ Repetir la última entrega</button>
+        <button type="button" class="btn btn-secondary btn-small hidden" id="depRepetirBtn"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 0 1 14-5.3L20 9"/><path d="M20 4v5h-5"/><path d="M20 12a8 8 0 0 1-14 5.3L4 15"/><path d="M4 20v-5h5"/></svg>Repetir la última entrega</button>
       </div>
       <div data-dep="recibir" class="hidden">
         <div id="depDevoluciones"></div>
@@ -1385,20 +1385,20 @@
         <div id="depInvFaltan"></div>
       </div>
       <div data-dep="entregar recibir inventario" id="depCanastaCaja">
-        <div class="stk-escanear-fila"><button type="button" class="btn btn-primary btn-small" id="depEscanearBtn">📷 Escanear</button><input class="field-input" type="text" id="depCodigo" placeholder="Código, N° de serie o descripción" autocomplete="off" enterkeyhint="done"></div>
+        <div class="stk-escanear-fila"><button type="button" class="btn btn-primary btn-small" id="depEscanearBtn"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>Escanear</button><input class="field-input" type="text" id="depCodigo" placeholder="Código, N° de serie o descripción" autocomplete="off" enterkeyhint="done"></div>
         <div id="depBuscarResultados"></div>
         <div id="depCanasta"></div>
         <div class="field-group" data-dep="entregar recibir"><label class="field-label" for="depMotivo">Nota (opcional)</label><input class="field-input" type="text" id="depMotivo" placeholder="Ej: remito 0001-1234, para la obra de..."></div>
-        <button type="button" class="btn btn-primary" id="depConfirmarBtn">Entregar</button>
       </div>
       <div data-dep="consultar" class="hidden">
-        <div class="stk-escanear-fila"><button type="button" class="btn btn-primary btn-small" id="depConsultarEscanearBtn">📷 Escanear</button><input class="field-input" type="text" id="depConsultarCodigo" placeholder="Código, N° de serie o descripción" autocomplete="off" enterkeyhint="search"></div>
+        <div class="stk-escanear-fila"><button type="button" class="btn btn-primary btn-small" id="depConsultarEscanearBtn"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>Escanear</button><input class="field-input" type="text" id="depConsultarCodigo" placeholder="Código, N° de serie o descripción" autocomplete="off" enterkeyhint="search"></div>
         <div id="depConsulta"></div>
         <div id="depEnCamino"></div>
       </div>
     </div>
     <div class="action-bar">
-      <button class="btn btn-secondary" id="volverDeDepositoBtn" type="button">Volver</button>
+      <button class="btn btn-secondary stk-volver" id="volverDeDepositoBtn" type="button">Volver</button>
+      <button type="button" class="btn btn-primary" id="depConfirmarBtn">Entregar</button>
     </div>
   </section>
 
@@ -2452,7 +2452,7 @@
       <div class="field-group">
         <label class="field-label" for="f_materiales">Materiales utilizados</label>
         <div class="stk-parte">
-          <button type="button" class="btn btn-secondary btn-small" id="parteStockUsadosBtn">📦 Usé material de mi stock</button>
+          <button type="button" class="btn btn-secondary btn-small" id="parteStockUsadosBtn"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg>Usé material de mi stock</button>
           <div id="parteStockUsadosLista"></div>
           <p class="stk-ayuda" style="margin:4px 0 0;">Lo de tu stock se descuenta solo. Lo que cargues abajo (no estaba en tu stock) lo revisa el depósito.</p>
         </div>
@@ -2518,7 +2518,7 @@
       <div class="field-group">
         <label class="field-label" for="f_materiales_retirados">Materiales retirados</label>
         <div class="stk-parte">
-          <button type="button" class="btn btn-secondary btn-small" id="parteStockRetiradosBtn">📦 Retiré equipos (escanear)</button>
+          <button type="button" class="btn btn-secondary btn-small" id="parteStockRetiradosBtn"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg>Retiré equipos (escanear)</button>
           <div id="parteStockRetiradosLista"></div>
         </div>
 
@@ -2865,7 +2865,7 @@
     <div class="stk-panel-arriba"><b id="stkPanelTitulo">Mi stock</b><button type="button" class="btn btn-primary btn-small" id="stkPanelListoBtn">Listo</button></div>
     <div class="stk-panel-cuerpo">
       <p class="stk-ayuda" id="stkPanelAyuda"></p>
-      <div class="stk-escanear-fila"><button type="button" class="btn btn-primary btn-small" id="stkPanelEscanearBtn">📷 Escanear</button><input class="field-input" type="text" id="stkPanelCodigo" placeholder="Código o N° de serie" autocomplete="off" enterkeyhint="done"></div>
+      <div class="stk-escanear-fila"><button type="button" class="btn btn-primary btn-small" id="stkPanelEscanearBtn"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>Escanear</button><input class="field-input" type="text" id="stkPanelCodigo" placeholder="Código o N° de serie" autocomplete="off" enterkeyhint="done"></div>
       <div id="stkPanelResultados"></div>
       <div id="stkPanelCanasta"></div>
       <div id="stkPanelFalladoCaja" class="hidden">

@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.53.2";
+const APP_VERSION = "4.54.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -18144,6 +18144,35 @@ cqEl("volverDeCroquisListaBtn").addEventListener("click", () => showScreen("home
 //  - Lo que el técnico devuelve queda en camino hasta que el depósito lo recibe.
 //  - Se escanea la etiqueta de SAT (artículo) y, en los equipos, el N° de serie de la caja.
 // ============================================================
+// Íconos (SVG de trazo, como el resto de la APP).
+const STK_ICONOS = {
+  camara: '<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/>',
+  numeros: '<path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/>',
+  teclado: '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>',
+  caja: '<path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/>',
+  repetir: '<path d="M4 12a8 8 0 0 1 14-5.3L20 9"/><path d="M20 4v5h-5"/><path d="M20 12a8 8 0 0 1-14 5.3L4 15"/><path d="M4 20v-5h5"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  x: '<path d="M6 6l12 12M18 6 6 18"/>',
+  alerta: '<path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/>',
+  tecnico: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/>',
+  vehiculo: '<path d="M3 16V7a1 1 0 0 1 1-1h10v10M14 9h4l3 4v3h-7"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/>',
+  cliente: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+  basura: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
+  lista: '<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>',
+};
+const stkIco = (n, cls) => `<svg class="stk-ico${cls ? " " + cls : ""}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${STK_ICONOS[n] || ""}</svg>`;
+// Aviso abajo: verde si salió bien, rojo si no, neutro si es solo información.
+function stkAviso(texto, tipo) {
+  let t = String(texto || "");
+  if (!tipo) tipo = /^✓/.test(t) ? "ok" : /^(✕|No se pudo|No reconozco)|no alcanza|inválid/i.test(t) ? "err" : "info";
+  t = t.replace(/^[✓✕]\s*/, "");
+  toastEl.textContent = t;
+  toastEl.classList.remove("ok", "info");
+  if (tipo !== "err") toastEl.classList.add(tipo);
+  toastEl.classList.add("show");
+  clearTimeout(stkAviso.t);
+  stkAviso.t = setTimeout(() => toastEl.classList.remove("show", "ok", "info"), 3600);
+}
 const stkApi = async (metodo, query, cuerpo) => {
   let r;
   try {
@@ -18199,7 +18228,7 @@ async function abrirEscanerStock(op) {
     <video playsinline muted autoplay></video><div class="stk-escaner-marco"></div>
     <div class="stk-escaner-abajo"><div class="stk-escaner-ultimo">Apuntá al código de barras</div>
       <div class="stk-escaner-ocr"></div>
-      <div class="stk-escaner-extra"><button type="button" class="btn btn-secondary btn-small stk-escaner-numeros">🔢 Leer los números</button><button type="button" class="btn btn-secondary btn-small stk-escaner-amano">⌨️ A mano</button></div>
+      <div class="stk-escaner-extra"><button type="button" class="btn btn-secondary btn-small stk-escaner-numeros">${stkIco("numeros")}Leer los números</button><button type="button" class="btn btn-secondary btn-small stk-escaner-amano">${stkIco("teclado")}A mano</button></div>
       <button type="button" class="btn btn-primary stk-escaner-listo">Listo</button></div>`;
   capa.querySelector("b").textContent = op.titulo || "Escanear";
   const ultimo = capa.querySelector(".stk-escaner-ultimo"), video = capa.querySelector("video"), ahoraEl = capa.querySelector(".stk-escaner-ahora"), totalEl = capa.querySelector(".stk-escaner-total");
@@ -18214,7 +18243,7 @@ async function abrirEscanerStock(op) {
     if (!r) return;
     stkPitido(!!r.ok);
     ultimo.className = "stk-escaner-ultimo " + (r.ok ? "ok" : "err");
-    ultimo.textContent = (r.ok ? "✓ " : "✕ ") + (r.texto || texto || "");
+    ultimo.innerHTML = stkIco(r.ok ? "check" : "x") + escapeHtml(r.texto || texto || "");
     pintarEstado();
   };
   // Usar un código que no vino del lector (de la foto o escrito): pausa la lectura mientras tanto.
@@ -18242,7 +18271,7 @@ async function abrirEscanerStock(op) {
       const codigos = (r.codigos || []).map((x) => ({ ...x, que: op.describir ? op.describir(x.texto) : { texto: "", util: true } }))
         .sort((x, y) => (y.que.util ? 1 : 0) - (x.que.util ? 1 : 0));
       if (!codigos.length) {
-        ocrCaja.innerHTML = `<p class="stk-ocr-msj">${automatico ? "El código de barras no se lee y" : ""} no pude leer los números. Acercate un poco con buena luz, o escribilo a mano.</p><button type="button" class="btn btn-primary btn-small" data-amano>⌨️ Escribir a mano</button>`;
+        ocrCaja.innerHTML = `<p class="stk-ocr-msj">${automatico ? "El código de barras no se lee y" : ""} no pude leer los números. Acercate un poco con buena luz, o escribilo a mano.</p><button type="button" class="btn btn-primary btn-small" data-amano>${stkIco("teclado")}Escribir a mano</button>`;
       } else {
         ocrCaja.innerHTML = `<p class="stk-ocr-msj">${automatico ? "No se lee el código de barras. " : ""}Leí estos números: tocá el correcto (fijate que coincida con la etiqueta).</p>`
           + codigos.map((x) => `<button type="button" class="stk-ocr-cod${x.que.util ? "" : " dudoso"}" data-t="${escapeHtml(x.texto)}"><span>${escapeHtml(x.texto)}</span><small>${escapeHtml([x.rotulo, x.que.texto].filter(Boolean).join(" · "))}</small></button>`).join("")
@@ -18250,7 +18279,7 @@ async function abrirEscanerStock(op) {
       }
       ocrCaja.querySelectorAll("[data-t]").forEach((b) => b.addEventListener("click", async () => { ocrCaja.innerHTML = ""; await usarCodigo(b.dataset.t, codigos); }));
     } catch (e) {
-      if (!cerrado) ocrCaja.innerHTML = `<p class="stk-ocr-msj">No se pudieron leer los números (${escapeHtml(e.message)}).</p><button type="button" class="btn btn-primary btn-small" data-amano>⌨️ Escribir a mano</button>`;
+      if (!cerrado) ocrCaja.innerHTML = `<p class="stk-ocr-msj">No se pudieron leer los números (${escapeHtml(e.message)}).</p><button type="button" class="btn btn-primary btn-small" data-amano>${stkIco("teclado")}Escribir a mano</button>`;
     } finally {
       ocrEnCurso = false;
       const b = ocrCaja.querySelector("[data-amano]");
@@ -18353,11 +18382,11 @@ function crearCanastaStock(op) {
       return `<div class="stk-linea${can.actual === l.c ? " stk-linea-actual" : ""}" data-i="${i}">
         <div class="stk-linea-top"><div><b>${escapeHtml(art.d)}</b><small>${escapeHtml(l.c)}${l.prov ? ` · ${escapeHtml(nombreProveedor(op.catalogo(), l.prov) || "proveedor " + l.prov)}` : ""}${disp !== Infinity ? ` · hay ${stkFmtN(disp)}` : ""}${art.medida === "metros" ? " · en metros" : ""}</small></div>
         <div class="stk-cant"><button type="button" data-menos aria-label="Uno menos">−</button><input class="field-input" inputmode="decimal" value="${stkFmtN(l.cant)}" aria-label="Cantidad"><button type="button" data-mas aria-label="Uno más">+</button></div></div>
-        ${l.unidades.length ? `<div class="stk-chips">${l.unidades.map((t, j) => { const info = infoSerie(t, { datos: (l.extras || {})[t] ? datosLimpios(l.extras[t]) : (((op.saldos() || {}).unidades || {})[t] || {}).datos }); return `<span class="stk-chip">${escapeHtml(t)}${info ? ` <small style="opacity:.75;">${escapeHtml(info)}</small>` : ""}<button type="button" data-quitar-u="${j}" aria-label="Sacar">✕</button></span>`; }).join("")}</div>` : ""}
+        ${l.unidades.length ? `<div class="stk-chips">${l.unidades.map((t, j) => { const info = infoSerie(t, { datos: (l.extras || {})[t] ? datosLimpios(l.extras[t]) : (((op.saldos() || {}).unidades || {})[t] || {}).datos }); return `<span class="stk-chip">${escapeHtml(t)}${info ? ` <small style="opacity:.75;">${escapeHtml(info)}</small>` : ""}<button type="button" data-quitar-u="${j}" aria-label="Sacar">${stkIco("x")}</button></span>`; }).join("")}</div>` : ""}
         ${esU && sinN ? `<div class="stk-falta">${can.actual === l.c ? `Falta${sinN > 1 ? "n" : ""} ${sinN} N° de serie: escanealo${sinN > 1 ? "s" : ""} ahora.` : `${sinN} sin N° de serie.`}</div>` : ""}
         ${esU && can.seriesLibres(l.c).length ? `<button type="button" class="stk-link" data-elegir-n>Elegir el N° de serie de la lista (${can.seriesLibres(l.c).length} en ${escapeHtml(nombreUbicacion(op.origen()))})</button>` : ""}
         ${l.cant > disp ? `<div class="stk-falta">Hay ${stkFmtN(disp)}: no alcanza.</div>` : ""}
-        <button type="button" class="stk-quitar" data-quitar>Sacar de la lista</button></div>`;
+        <button type="button" class="stk-quitar" data-quitar>${stkIco("basura")}Sacar</button></div>`;
     }).join("") : "";
     op.cont.querySelectorAll(".stk-linea").forEach((div) => {
       const l = can.lineas[Number(div.dataset.i)];
@@ -18475,7 +18504,7 @@ function crearCanastaStock(op) {
       const c = await elegirArticuloStock(op.catalogo(), `El código ${r.ean} es del fabricante y la APP todavía no sabe de qué artículo es. Elegilo una vez y la próxima lo reconoce sola:`);
       if (!c) return { ok: false, texto: "No se agregó" };
       try { await stkApi("POST", "", { accion: "alias", c, ean: r.ean }); const art = a[c]; art.alias = [...(art.alias || []), r.ean]; }
-      catch (e) { showToast("No se pudo guardar el código: " + e.message); }
+      catch (e) { stkAviso("No se pudo guardar el código: " + e.message); }
       return can.agregarArticulo(c);
     }
     return { ok: false, texto: can.actual ? r.aviso || "No reconozco el código" : "Escaneá primero la etiqueta de SAT de la caja" };
@@ -18548,15 +18577,15 @@ function conectarCasilleroStock(input, resultados, can, catalogo) {
     const r = can.interpretar(t);
     if (r.tipo !== "desconocido" || /^\d{12}$/.test(t) || can.actual) {
       const x = await can.agregarCodigo(t);
-      showToast((x.ok ? "✓ " : "✕ ") + (x.texto || t));
+      stkAviso(x.texto || t, x.ok ? "ok" : "err");
       input.value = ""; if (resultados) resultados.innerHTML = "";
       input.focus(); // con un lector Bluetooth se sigue escaneando sin tocar la pantalla
       return;
     }
-    if (!resultados) { showToast(r.aviso || "No reconozco el código"); return; }
+    if (!resultados) { stkAviso(r.aviso || "No reconozco el código"); return; }
     const lista = buscarArticulosStock(catalogo(), t, 12);
     resultados.innerHTML = lista.length ? lista.map((a) => `<button type="button" class="stk-res" data-c="${escapeHtml(a.c)}">${escapeHtml(a.d)}<small>${escapeHtml(a.c)}</small></button>`).join("") : `<p class="stk-ayuda">${escapeHtml(r.aviso || "No encontré nada")}</p>`;
-    resultados.querySelectorAll("[data-c]").forEach((b) => b.addEventListener("click", async () => { resultados.innerHTML = ""; input.value = ""; const x = await can.agregarArticulo(b.dataset.c); showToast(x.texto); input.focus(); }));
+    resultados.querySelectorAll("[data-c]").forEach((b) => b.addEventListener("click", async () => { resultados.innerHTML = ""; input.value = ""; const x = await can.agregarArticulo(b.dataset.c); stkAviso(x.texto); input.focus(); }));
   });
 }
 
@@ -18611,7 +18640,7 @@ function pintarMiStock() {
       <b>De ${escapeHtml(e.por || "Depósito")}</b><small>${escapeHtml(cuando(e.fecha))}${e.motivo ? " · " + escapeHtml(e.motivo) : ""}</small>
       ${htmlRecepcion(e, d)}
       <p class="stk-ayuda">Si llegó menos, destildá el N° de serie que no vino o corregí la cantidad antes de confirmar.</p>
-      <div class="stk-envio-btns"><button type="button" class="btn btn-primary btn-small" data-recibi>✓ Recibí</button><button type="button" class="btn btn-secondary btn-small" data-rechazar>Rechazar</button></div></div>`).join("") : "";
+      <div class="stk-envio-btns"><button type="button" class="btn btn-primary btn-small" data-recibi>${stkIco("check")}Recibí</button><button type="button" class="btn btn-secondary btn-small" data-rechazar>Rechazar</button></div></div>`).join("") : "";
   pr.querySelectorAll(".stk-envio").forEach((div) => {
     const e = miStock.porRecibir.find((x) => x.id === div.dataset.id);
     div.querySelector("[data-recibi]").addEventListener("click", async (ev) => {
@@ -18626,16 +18655,16 @@ function pintarMiStock() {
       btn.disabled = true;
       try {
         const r = await stkApi("POST", "", { accion: "confirmar_envio", id: e.id, items: recibidos, motivo });
-        showToast(r.envio && r.envio.estado === "recibido" ? "✓ Listo: quedó en tu stock" : "Listo: se avisó al depósito de la diferencia");
-      } catch (err) { showToast("No se pudo confirmar: " + err.message); }
+        stkAviso(r.envio && r.envio.estado === "recibido" ? "✓ Listo: quedó en tu stock" : "Listo: se avisó al depósito de la diferencia");
+      } catch (err) { stkAviso("No se pudo confirmar: " + err.message); }
       cargarMiStock(); actualizarBadgeStock(true);
     });
     div.querySelector("[data-rechazar]").addEventListener("click", async (ev) => {
       const motivo = await pedirTextoApp("¿Por qué lo rechazás? (todo vuelve al depósito)", "");
       if (motivo === null) return;
       ev.currentTarget.disabled = true;
-      try { await stkApi("POST", "", { accion: "confirmar_envio", accion_envio: "rechazar", id: e.id, motivo }); showToast("Rechazado: vuelve al depósito"); }
-      catch (err) { showToast("No se pudo: " + err.message); }
+      try { await stkApi("POST", "", { accion: "confirmar_envio", accion_envio: "rechazar", id: e.id, motivo }); stkAviso("Rechazado: vuelve al depósito"); }
+      catch (err) { stkAviso("No se pudo: " + err.message); }
       cargarMiStock(); actualizarBadgeStock(true);
     });
   });
@@ -18646,7 +18675,7 @@ function pintarMiStock() {
   document.querySelectorAll("#miStockTengo [data-devolver]").forEach((b) => b.addEventListener("click", () => {
     const c = b.dataset.devolver, art = a[c] || {};
     const l = miStockCanasta.lineas.find((x) => x.c === c);
-    if (art.tipo === "unidad" && unidadesDe(c).length) { miStockCanasta.actual = c; miStockCanasta.cambio(); showToast("Escaneá el N° de serie de cada equipo que devolvés"); }
+    if (art.tipo === "unidad" && unidadesDe(c).length) { miStockCanasta.actual = c; miStockCanasta.cambio(); stkAviso("Escaneá el N° de serie de cada equipo que devolvés"); }
     else if (!l || l.cant < (miStock.tiene[c] || 0)) miStockCanasta.agregarArticulo(c).then(() => {});
     if (art.tipo === "unidad" && !unidadesDe(c).length) { const ll = miStockCanasta.lineas.find((x) => x.c === c); if (ll && ll.cant < 1) { ll.cant = 1; miStockCanasta.cambio(); } }
     document.getElementById("miStockDevolverCaja").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -18669,16 +18698,16 @@ document.getElementById("miStockDevolverBtn").addEventListener("click", async (e
   const faltanN = miStockCanasta.faltanSeries();
   if (faltanN.length) { await dialogoApp(`Decí cuáles devolvés:\n\n${faltanN.map((f) => `• ${f.d}: faltan ${f.faltan} N° de serie (escanealos o tocá «Elegir el N° de serie de la lista»)`).join("\n")}`, { soloAceptar: true, aceptar: "Entendido" }); return; }
   const fallado = document.getElementById("miStockFallado").checked, falla = document.getElementById("miStockFalla").value.trim();
-  if (fallado && !falla) { showToast("Escribí qué falla tiene"); document.getElementById("miStockFalla").focus(); return; }
-  if (fallado && items.some((x) => (a[x.c] || {}).tipo === "unidad" && x.unidades.length < x.cant)) { showToast("Para la garantía escaneá el N° de serie de cada equipo fallado"); return; }
+  if (fallado && !falla) { stkAviso("Escribí qué falla tiene"); document.getElementById("miStockFalla").focus(); return; }
+  if (fallado && items.some((x) => (a[x.c] || {}).tipo === "unidad" && x.unidades.length < x.cant)) { stkAviso("Para la garantía escaneá el N° de serie de cada equipo fallado"); return; }
   if (!(await confirmarApp(`¿Devolver al depósito ${items.length} artículo${items.length === 1 ? "" : "s"}${fallado ? " FALLADO(S), para Garantía" : ""}?\n\n${items.map((x) => `• ${(a[x.c] || {}).d || x.c}: ${stkFmtN(x.cant)}${x.unidades.length ? " (" + x.unidades.join(", ") + ")" : ""}`).join("\n")}`, { aceptar: "Sí, devolver" }))) return;
   btn.disabled = true;
   try {
     await stkApi("POST", "", { accion: "devolver", items, motivo: document.getElementById("miStockMotivo").value.trim() || undefined, ...(fallado ? { fallado: true, falla } : {}) });
     miStockCanasta.limpiar(); document.getElementById("miStockMotivo").value = "";
     document.getElementById("miStockFallado").checked = false; document.getElementById("miStockFalla").value = ""; document.getElementById("miStockFalla").classList.add("hidden");
-    showToast("✓ Devuelto: queda en camino hasta que el depósito lo recibe");
-  } catch (e) { showToast("No se pudo devolver: " + e.message); }
+    stkAviso("✓ Devuelto: queda en camino hasta que el depósito lo recibe");
+  } catch (e) { stkAviso("No se pudo devolver: " + e.message); }
   btn.disabled = false;
   cargarMiStock();
 });
@@ -18783,8 +18812,8 @@ function depMostrarModo() {
   document.querySelectorAll("#depModos [data-modo]").forEach((b) => b.classList.toggle("activo", b.dataset.modo === depModo));
   document.querySelectorAll("#depFormas [data-forma]").forEach((b) => b.classList.toggle("activo", b.dataset.forma === depForma));
   document.getElementById("depFormaAyuda").textContent = depForma === "lote"
-    ? "En lote: la cámara queda abierta y vas escaneando todo seguido, aunque sean artículos distintos (teclado, central, 3 infrarrojos…). Cada etiqueta suma uno; en los equipos, después de la etiqueta escaneá su N° de serie."
-    : "Individual: escaneás un artículo (y su N° de serie si es un equipo) y la cámara se cierra para revisar antes del siguiente.";
+    ? "La cámara queda abierta: escaneá todo seguido. En los equipos, la etiqueta y después su N° de serie."
+    : "La cámara se cierra después de cada artículo, para revisar.";
   document.querySelectorAll("#screen-deposito [data-dep]").forEach((d) => d.classList.toggle("hidden", !d.dataset.dep.split(" ").includes(depModo)));
   if (depModo === "recibir") {
     const t = document.getElementById("depRecibirTipo").value;
@@ -18797,10 +18826,11 @@ function depMostrarModo() {
   if (depModo === "inventario") depPintarInventario();
   if (depModo === "entregar") depPintarRecientes();
   depPintarCola();
+  document.getElementById("depConfirmarBtn").classList.toggle("hidden", depModo === "consultar");
   depCanasta.render(); depBotonTexto();
 }
 document.querySelectorAll("#depModos [data-modo]").forEach((b) => b.addEventListener("click", () => {
-  if (b.dataset.modo !== depModo && depCanasta.items().length && depModo !== "consultar") { showToast("Primero terminá o vaciá la lista"); return; }
+  if (b.dataset.modo !== depModo && depCanasta.items().length && depModo !== "consultar") { stkAviso("Primero terminá o vaciá la lista"); return; }
   depCanasta.actual = "";
   depModo = b.dataset.modo; depMostrarModo();
 }));
@@ -18824,13 +18854,13 @@ document.getElementById("depConfirmarBtn").addEventListener("click", async (ev) 
   let cuerpo;
   if (depModo === "inventario") {
     const ubic = depInvUbic();
-    if (!ubic) { showToast("Elegí dónde estás haciendo el inventario"); return; }
+    if (!ubic) { stkAviso("Elegí dónde estás haciendo el inventario"); return; }
     const conSerie = items.filter((x) => x.unidades.length).map((x) => ({ c: x.c, unidades: x.unidades, ...(x.prov ? { prov: x.prov } : {}) }));
     btn.disabled = true;
     try {
       const r = await depEnviar({ accion: "registrar_unidades", ubic, items: conSerie }, `Inventario de N° de serie en ${nombreUbicacion(ubic)}`);
       depCanasta.limpiar();
-      if (r.enCola) showToast("Sin señal: quedó guardado y se manda solo cuando vuelva");
+      if (r.enCola) stkAviso("Sin señal: quedó guardado y se manda solo cuando vuelva");
       else {
         const aa = depCatalogo().articulos || {}, nom = (c) => (aa[c] || {}).d || c;
         const partes = [`Registrados: ${r.registradas}.`];
@@ -18841,27 +18871,27 @@ document.getElementById("depConfirmarBtn").addEventListener("click", async (ev) 
         await dialogoApp(partes.join("\n\n"), { soloAceptar: true, aceptar: "Entendido" });
       }
       await depCargar();
-    } catch (e) { showToast("No se pudo: " + e.message); }
+    } catch (e) { stkAviso("No se pudo: " + e.message); }
     btn.disabled = false; depBotonTexto();
     return;
   }
   if (depModo === "entregar") {
     const tipo = document.getElementById("depDestTipo").value, nombre = depNombreElegido("depDestTipo");
-    if (!nombre) { showToast(tipo === "veh" ? "Elegí a qué vehículo va" : tipo === "tec" ? "Elegí a qué técnico va" : "Escribí el cliente"); document.getElementById(tipo === "tec" || tipo === "veh" ? "depDestSelect" : "depDestNombre").focus(); return; }
+    if (!nombre) { stkAviso(tipo === "veh" ? "Elegí a qué vehículo va" : tipo === "tec" ? "Elegí a qué técnico va" : "Escribí el cliente"); document.getElementById(tipo === "tec" || tipo === "veh" ? "depDestSelect" : "depDestNombre").focus(); return; }
     const falta = items.find((x) => x.cant > (((depSaldos().ubic || {}).dep || {})[x.c] || 0));
-    if (falta) { showToast(`${(a[falta.c] || {}).d}: en el depósito no alcanza`); return; }
+    if (falta) { stkAviso(`${(a[falta.c] || {}).d}: en el depósito no alcanza`); return; }
     cuerpo = { accion: "mover", de: "dep", a: `${tipo}:${nombre}`, items };
     const pres = document.getElementById("depPresupuesto").value.trim();
     if ((tipo === "cli" || tipo === "com") && pres) cuerpo.presupuesto = pres;
   } else {
     const tipo = document.getElementById("depRecibirTipo").value, nombre = depNombreElegido("depRecibirTipo");
-    if (tipo !== "proveedor" && !nombre) { showToast("Elegí de dónde viene"); return; }
+    if (tipo !== "proveedor" && !nombre) { stkAviso("Elegí de dónde viene"); return; }
     cuerpo = { accion: "mover", de: tipo === "proveedor" ? "proveedor" : `${tipo}:${nombre}`, a: "dep", items };
     if (tipo !== "proveedor" && document.getElementById("depFallado").checked) {
       const falla = document.getElementById("depFalla").value.trim();
-      if (!falla) { showToast("Escribí qué falla tiene"); document.getElementById("depFalla").focus(); return; }
+      if (!falla) { stkAviso("Escribí qué falla tiene"); document.getElementById("depFalla").focus(); return; }
       const sinSerie = items.filter((x) => (a[x.c] || {}).tipo === "unidad" && x.unidades.length < x.cant);
-      if (sinSerie.length) { showToast("Para la garantía escaneá el N° de serie de cada equipo fallado"); return; }
+      if (sinSerie.length) { stkAviso("Para la garantía escaneá el N° de serie de cada equipo fallado"); return; }
       cuerpo.a = "gar"; cuerpo.falla = falla;
     }
   }
@@ -18878,9 +18908,9 @@ document.getElementById("depConfirmarBtn").addEventListener("click", async (ev) 
     if (depModo === "entregar") depRecordarDestino(cuerpo.a, items);
     depCanasta.limpiar(); document.getElementById("depMotivo").value = ""; document.getElementById("depPresupuesto").value = "";
     document.getElementById("depFallado").checked = false; document.getElementById("depFalla").value = ""; document.getElementById("depFalla").classList.add("hidden");
-    showToast(r.enCola ? "Sin señal: quedó guardado y se manda solo cuando vuelva" : /^tec:/.test(cuerpo.a) ? "✓ Enviado: le llegó el aviso para que confirme" : "✓ Listo");
+    stkAviso(r.enCola ? "Sin señal: quedó guardado y se manda solo cuando vuelva" : /^tec:/.test(cuerpo.a) ? "✓ Enviado: le llegó el aviso para que confirme" : "✓ Listo");
     if (!r.enCola) await depCargar(); else depMostrarModo();
-  } catch (e) { showToast("No se pudo: " + e.message); }
+  } catch (e) { stkAviso("No se pudo: " + e.message); }
   btn.disabled = false;
   depBotonTexto();
 });
@@ -18927,7 +18957,7 @@ async function depProcesarCola() {
     depGuardarCola(depLeerCola().map((x) => cola.find((y) => y.cuerpo.op_id === x.cuerpo.op_id) || x).filter((x) => !x.listo));
     depProcesando = false;
   }
-  if (mandados) showToast(`✓ Se mandó lo que estaba guardado sin señal (${mandados})`);
+  if (mandados) stkAviso(`✓ Se mandó lo que estaba guardado sin señal (${mandados})`);
   depPintarCola();
 }
 function depPintarCola() {
@@ -18953,11 +18983,11 @@ function depRecordarDestino(destino, items) {
     localStorage.setItem("stock_destinos", JSON.stringify(lista));
   } catch (e) { /* nada */ }
 }
-const DEP_ICONO = { tec: "🔧", veh: "🚐", cli: "🏠", com: "🏠" };
+const DEP_ICONO = { tec: "tecnico", veh: "vehiculo", cli: "cliente", com: "cliente" };
 function depPintarRecientes() {
   const cont = document.getElementById("depRecientes"), lista = depRecientesLista().slice(0, 6);
   const actual = `${document.getElementById("depDestTipo").value}:${depNombreElegido("depDestTipo")}`;
-  cont.innerHTML = lista.map((x, i) => { const [t, ...n] = x.destino.split(":"); return `<button type="button" data-i="${i}" class="${x.destino === actual ? "activo" : ""}">${DEP_ICONO[t] || ""} ${escapeHtml(n.join(":"))}${t === "com" ? " (comodato)" : ""}</button>`; }).join("");
+  cont.innerHTML = lista.map((x, i) => { const [t, ...n] = x.destino.split(":"); return `<button type="button" data-i="${i}" class="${x.destino === actual ? "activo" : ""}">${DEP_ICONO[t] ? stkIco(DEP_ICONO[t]) : ""}${escapeHtml(n.join(":"))}${t === "com" ? " (comodato)" : ""}</button>`; }).join("");
   cont.querySelectorAll("[data-i]").forEach((b) => b.addEventListener("click", async () => {
     const [t, ...n] = lista[Number(b.dataset.i)].destino.split(":"), nombre = n.join(":");
     document.getElementById("depDestTipo").value = t;
@@ -18967,7 +18997,7 @@ function depPintarRecientes() {
   }));
   const ult = depRecientesLista().find((x) => x.destino === actual), rep = document.getElementById("depRepetirBtn");
   rep.classList.toggle("hidden", !ult || !depNombreElegido("depDestTipo"));
-  if (ult) rep.textContent = `↻ Repetir la última entrega a ${actual.split(":").slice(1).join(":")} (${ult.items.length} artículo${ult.items.length === 1 ? "" : "s"})`;
+  if (ult) rep.innerHTML = `${stkIco("repetir")}Repetir la última entrega a ${escapeHtml(actual.split(":").slice(1).join(":"))} (${ult.items.length} artículo${ult.items.length === 1 ? "" : "s"})`;
 }
 document.getElementById("depRepetirBtn").addEventListener("click", () => {
   const actual = `${document.getElementById("depDestTipo").value}:${depNombreElegido("depDestTipo")}`;
@@ -18978,7 +19008,7 @@ document.getElementById("depRepetirBtn").addEventListener("click", () => {
   depCanasta.actual = "";
   depCanasta.cambio();
   const faltanSerie = ult.items.filter((x) => (a[x.c] || {}).tipo === "unidad").length;
-  showToast(faltanSerie ? "Cargado. Escaneá el N° de serie de los equipos" : "Cargado: revisá las cantidades");
+  stkAviso(faltanSerie ? "Cargado. Escaneá el N° de serie de los equipos" : "Cargado: revisá las cantidades");
 });
 
 // ---- Inventario de N° de serie ----
@@ -18997,7 +19027,7 @@ async function depPintarInventario() {
   Object.values(sal.unidades || {}).forEach((u) => { if (u.u === ubic) conSerie[u.c] = (conSerie[u.c] || 0) + 1; });
   const faltan = Object.entries(caja).filter(([c, n]) => (a[c] || {}).tipo === "unidad" && n > (conSerie[c] || 0)).map(([c, n]) => ({ c, d: a[c].d, n, con: conSerie[c] || 0 })).sort((x, y) => x.d.localeCompare(y.d, "es"));
   cont.innerHTML = faltan.length ? `<h3 class="stk-h">Equipos sin N° de serie en ${escapeHtml(nombreUbicacion(ubic))} (${faltan.reduce((t2, x) => t2 + x.n - x.con, 0)})</h3>` + faltan.map((x) => `<div class="stk-envio-item"><span>${escapeHtml(x.d)}</span><b>${x.con} de ${stkFmtN(x.n)}</b></div>`).join("")
-    : `<p class="stk-ayuda">✓ Todos los equipos de ${escapeHtml(nombreUbicacion(ubic))} tienen su N° de serie.</p>`;
+    : `<p class="stk-ayuda">${stkIco("check")}Todos los equipos de ${escapeHtml(nombreUbicacion(ubic))} tienen su N° de serie.</p>`;
 }
 document.getElementById("depFallado").addEventListener("change", (e) => { document.getElementById("depFalla").classList.toggle("hidden", !e.target.checked); if (e.target.checked) document.getElementById("depFalla").focus(); depBotonTexto(); });
 document.getElementById("miStockFallado").addEventListener("change", (e) => { document.getElementById("miStockFalla").classList.toggle("hidden", !e.target.checked); if (e.target.checked) document.getElementById("miStockFalla").focus(); });
@@ -19020,7 +19050,7 @@ function depPintarAprobar() {
     div.querySelector("[data-elegir-art]").addEventListener("click", async () => { const e2 = await elegirArticuloStock(depCatalogo(), `¿Qué artículo es «${x.texto || x.c}»?`); if (e2) { c = e2; div.querySelector("[data-art]").textContent = a[c].d; } });
     div.querySelector("[data-aprobar]").addEventListener("click", async (ev) => {
       const btn = ev.currentTarget, de = div.querySelector("[data-origen]").value;
-      if (de !== "ninguno" && !c) { showToast("Elegí de qué artículo es"); return; }
+      if (de !== "ninguno" && !c) { stkAviso("Elegí de qué artículo es"); return; }
       let unidades = x.unidades || [];
       if (de !== "ninguno" && (a[c] || {}).tipo === "unidad") {
         const libres = seriesEn(depSaldos(), de, c).filter((t) => !unidades.includes(t));
@@ -19032,15 +19062,15 @@ function depPintarAprobar() {
         }
       }
       btn.disabled = true;
-      try { await stkApi("POST", "", { accion: "aprobar_consumo", id: x.id, decision: "aprobar", de, c, cant: x.cant, unidades }); showToast("✓ Aprobado"); }
-      catch (err) { showToast("No se pudo: " + err.message); btn.disabled = false; return; }
+      try { await stkApi("POST", "", { accion: "aprobar_consumo", id: x.id, decision: "aprobar", de, c, cant: x.cant, unidades }); stkAviso("✓ Aprobado"); }
+      catch (err) { stkAviso("No se pudo: " + err.message); btn.disabled = false; return; }
       await depCargar();
     });
     div.querySelector("[data-rechazar]").addEventListener("click", async () => {
       const motivo = await pedirTextoApp("¿Por qué lo rechazás? (le llega al técnico)", "");
       if (!motivo || !motivo.trim()) return;
-      try { await stkApi("POST", "", { accion: "aprobar_consumo", id: x.id, decision: "rechazar", motivo: motivo.trim() }); showToast("Rechazado"); }
-      catch (err) { showToast("No se pudo: " + err.message); return; }
+      try { await stkApi("POST", "", { accion: "aprobar_consumo", id: x.id, decision: "rechazar", motivo: motivo.trim() }); stkAviso("Rechazado"); }
+      catch (err) { stkAviso("No se pudo: " + err.message); return; }
       await depCargar();
     });
   });
@@ -19051,10 +19081,10 @@ function depPintarDevoluciones() {
   const cont = document.getElementById("depDevoluciones");
   cont.innerHTML = lista.length ? `<h3 class="stk-h">Devoluciones por recibir (${lista.length})</h3>` + lista.map((e) => `<div class="stk-envio" data-id="${escapeHtml(e.id)}">
     <b>${escapeHtml(e.de.replace(/^tec:/, ""))}</b><small>${escapeHtml(new Date(e.fecha).toLocaleString("es-AR", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }))}${e.motivo && !e.fallado ? " · " + escapeHtml(e.motivo) : ""}</small>
-    ${e.fallado ? `<div class="stk-fallado">⚠ Fallado: ${escapeHtml(e.falla || "")}</div>` : ""}
+    ${e.fallado ? `<div class="stk-fallado">${stkIco("alerta")}Fallado: ${escapeHtml(e.falla || "")}</div>` : ""}
     ${htmlRecepcion(e, d)}
     <div class="field-group" style="margin:6px 0;"><label class="field-label">Va a</label><select class="field-input" data-destino><option value="dep" ${e.fallado ? "" : "selected"}>Depósito</option><option value="gar" ${e.fallado ? "selected" : ""}>Garantía (fallado)</option></select></div>
-    <div class="stk-envio-btns"><button type="button" class="btn btn-primary btn-small" data-recibi>✓ Recibido</button></div></div>`).join("") : "";
+    <div class="stk-envio-btns"><button type="button" class="btn btn-primary btn-small" data-recibi>${stkIco("check")}Recibido</button></div></div>`).join("") : "";
   cont.querySelectorAll(".stk-envio").forEach((div) => div.querySelector("[data-recibi]").addEventListener("click", async (ev) => {
     const e = lista.find((x) => x.id === div.dataset.id), btn = ev.currentTarget;
     const items = leerRecepcion(div, e);
@@ -19062,8 +19092,8 @@ function depPintarDevoluciones() {
     if (items.some((x, i) => x.cant < e.items[i].cant)) { motivo = await pedirTextoApp("Llegó menos de lo que devolvió: lo que falta vuelve a figurar a su nombre. ¿Qué pasó?", ""); if (motivo === null) return; }
     btn.disabled = true;
     const destino = div.querySelector("[data-destino]").value;
-    try { await stkApi("POST", "", { accion: "confirmar_envio", id: e.id, items, motivo, destino }); showToast(destino === "gar" ? "✓ Recibido: quedó en Garantía" : "✓ Recibido"); }
-    catch (err) { showToast("No se pudo: " + err.message); }
+    try { await stkApi("POST", "", { accion: "confirmar_envio", id: e.id, items, motivo, destino }); stkAviso(destino === "gar" ? "✓ Recibido: quedó en Garantía" : "✓ Recibido"); }
+    catch (err) { stkAviso("No se pudo: " + err.message); }
     await depCargar(); actualizarBadgeStock(true);
   }));
 }
@@ -19167,7 +19197,7 @@ function pintarPanelTengo() {
     : '<p class="stk-ayuda">No tenés nada a tu cargo. Si usaste material que no figura, cargalo abajo con el catálogo de materiales: lo revisa el depósito.</p>';
   cont.querySelectorAll("[data-usar]").forEach((b) => b.addEventListener("click", async () => {
     const r = await stkPanelCanasta.agregarArticulo(b.dataset.usar);
-    showToast(r.texto);
+    stkAviso(r.texto);
     const libres = stkPanelCanasta.seriesLibres(b.dataset.usar);
     if ((a[b.dataset.usar] || {}).tipo === "unidad" && libres.length === 1) {
       // Si tiene uno solo con N°, es ese.
@@ -19187,7 +19217,7 @@ document.getElementById("stkPanelListoBtn").addEventListener("click", async () =
     if (faltan.length) { await dialogoApp(`Decí cuáles usaste:\n\n${faltan.map((f) => `• ${f.d}: faltan ${f.faltan} N° de serie (escanealos o tocá «Elegir el N° de serie de la lista»)`).join("\n")}`, { soloAceptar: true, aceptar: "Entendido" }); return; }
   }
   const fallado = stkPanelModo === "retirados" && document.getElementById("stkPanelFallado").checked, falla = document.getElementById("stkPanelFalla").value.trim();
-  if (fallado && !falla) { showToast("Escribí qué falla tiene"); return; }
+  if (fallado && !falla) { stkAviso("Escribí qué falla tiene"); return; }
   const destino = stkPanelModo === "usados" ? parteStock.usados : parteStock.retirados;
   items.forEach((x) => {
     const l = destino.find((y) => y.c === x.c && !!y.fallado === fallado);
@@ -19203,7 +19233,7 @@ function pintarParteStock() {
   const pintar = (id, lista, clave) => {
     const cont = document.getElementById(id);
     if (!cont) return;
-    cont.innerHTML = lista.map((x, i) => `<div class="stk-parte-item"><span>${escapeHtml(x.d)} <b>x${stkFmtN(x.cant)}</b>${x.fallado ? ' <span class="stk-fallado">fallado</span>' : ""}${x.unidades.length ? `<small>N° ${x.unidades.map(escapeHtml).join(", ")}</small>` : ""}</span><button type="button" data-quitar="${i}" aria-label="Sacar">✕</button></div>`).join("");
+    cont.innerHTML = lista.map((x, i) => `<div class="stk-parte-item"><span>${escapeHtml(x.d)} <b>x${stkFmtN(x.cant)}</b>${x.fallado ? ' <span class="stk-fallado">fallado</span>' : ""}${x.unidades.length ? `<small>N° ${x.unidades.map(escapeHtml).join(", ")}</small>` : ""}</span><button type="button" data-quitar="${i}" aria-label="Sacar">${stkIco("x")}</button></div>`).join("");
     cont.querySelectorAll("[data-quitar]").forEach((b) => b.addEventListener("click", () => { parteStock[clave].splice(Number(b.dataset.quitar), 1); pintarParteStock(); try { guardarBorradorActual(); } catch (e) { /* nada */ } }));
   };
   pintar("parteStockUsadosLista", parteStock.usados, "usados");
@@ -19218,6 +19248,6 @@ function registrarStockDelParte(data, idParte) {
   if (!sp || !(sp.usados.length || sp.retirados.length || sp.sinStock.length) || !data.cliente) return;
   const cuerpo = { accion: "consumo_parte", op_id: `parte-${idParte}`, parte: data.numero_servicio || idParte, cliente: data.cliente, presupuesto: data.numero_presupuesto || "", usados: sp.usados, retirados: sp.retirados, sinStock: sp.sinStock };
   depEnviar(cuerpo, `Materiales del parte ${data.numero_servicio || idParte} (${data.cliente})`).then((r) => {
-    if (r && r.paraAprobar) showToast(`${r.paraAprobar} material(es) que no estaban en tu stock quedan para que los apruebe el depósito.`);
+    if (r && r.paraAprobar) stkAviso(`${r.paraAprobar} material(es) que no estaban en tu stock quedan para que los apruebe el depósito.`);
   }).catch((e) => { console.error("No se pudo descontar el stock del parte:", e); });
 }

@@ -5523,7 +5523,7 @@ test("Stock: catálogo desde el listado de Oficina, saldo inicial, mínimos, con
   await page.setInputFiles("#stkConcArchivo", { name: "Stock noviembre.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer: Buffer.from(await xlsx(lis)) });
   await page.waitForSelector('#stkConcResultado details[data-cat="cantidadDistinta"]');
   const txt = await page.textContent("#stkConcResultado");
-  assert.match(txt, /No está en la APP: 1 · Cantidad distinta: 3 · Solo en la APP: 0 · Comodato distinto: 0 · Unidades sin escanear: 1/);
+  assert.match(txt, /No está en la APP: 1 · Cantidad distinta: 3 · Solo en la APP: 0 · Comodato distinto: 0 · Sin N° de serie: 1/);
   assert.ok(!/MOVISTAR/.test(txt), "los SIM se concilian en Control de SIMs");
   assert.strictEqual(posts.filter((p) => p.accion === "conc_corrida").length, 1);
   // Dejar el teclado y el cable como Oficina
@@ -5714,7 +5714,7 @@ test("Stock en la APP: el depósito entrega escaneando (etiqueta SAT + N° de un
   // Alta en lote con la cámara: la caja trae etiqueta SAT, código del modelo, N° de serie y un QR.
   await page.click('#depModos [data-modo="recibir"]');
   await page.click('#depFormas [data-forma="lote"]');
-  assert.match(await page.textContent("#depFormaAyuda"), /En lote/);
+  assert.match(await page.textContent("#depFormaAyuda"), /escaneá todo seguido/);
   await page.evaluate(() => {
     window.__cuadros = [
       ["000208252779", "K10H-J9B", "https://www.paradox.com/manual"],

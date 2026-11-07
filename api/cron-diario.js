@@ -673,7 +673,7 @@ async function chequearEnviosStock(ghHeaders, estado, ahora) {
     }
     if (!a.length) continue;
     const dias = Math.max(1, Math.round((ahora - new Date(e.fecha).getTime()) / 864e5));
-    await enviarASeleccionados(a, { titulo: "📦 Material sin confirmar", cuerpo: `${/^tec:/.test(e.a) ? `Te mandaron material hace ${dias} día(s)` : `${e.de.replace(/^tec:/, "")} devolvió material hace ${dias} día(s)`}: confirmá «Recibí» en Mi stock.`, url: "/?ir=mistock" });
+    await enviarASeleccionados(a, { titulo: "Material sin confirmar", cuerpo: `${/^tec:/.test(e.a) ? `Te mandaron material hace ${dias} día(s)` : `${e.de.replace(/^tec:/, "")} devolvió material hace ${dias} día(s)`}: confirmá «Recibí» en Mi stock.`, url: "/?ir=mistock" });
     estado.stock_envios[e.id] = hoy;
     avisados.push(`${a.join(", ")}: ${e.id}`);
   }

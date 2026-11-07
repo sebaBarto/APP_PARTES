@@ -217,6 +217,11 @@
   .stk-tabla .stk-btns { white-space: nowrap; text-align: right; }
   .stk-tabla .stk-btns button { width: auto; margin: 2px 0 2px 4px; padding: 5px 9px; font-size: 12.5px; }
   .stk-det { font-size: 12px; color: #6B7680; }
+  .stk-ico { width: 16px; height: 16px; flex: none; vertical-align: -3px; }
+  .stk-tag .stk-ico { width: 12px; height: 12px; vertical-align: -2px; }
+  .stk-tabla select.stk-tipo { min-width: 160px; }
+  .stk-det .stk-ico { width: 12px; height: 12px; vertical-align: -2px; color: #1E7B3A; }
+  #panelStock button:has(> .stk-ico) { display: inline-flex; align-items: center; gap: 6px; }
   .stk-tag { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 11.5px; font-weight: 700; background: #EEF0F2; color: #3A4651; }
   .stk-tag.unidad { background: #FFF1D6; color: #8A5A00; }
   .stk-tag.bajo { background: #FDE2E0; color: #B3261E; }
@@ -1290,11 +1295,11 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
         <div class="card">
           <div class="field-row" style="flex-wrap:wrap;align-items:flex-end;">
             <div style="flex:2 1 220px;"><label>Buscar</label><input type="text" class="field-input" id="stkBuscar" placeholder="Código o parte de la descripción"></div>
-            <div><label>Mostrar</label><select id="stkFiltro"><option value="constock">Con stock</option><option value="bajo">En el mínimo o por debajo</option><option value="sinmin">Con stock y sin mínimo</option><option value="sinstock">Sin stock</option><option value="baja">Deshabilitados en Oficina</option><option value="todos">Todos</option></select></div>
-            <div><label>Dónde</label><select id="stkDonde"><option value="">En cualquier lado</option><option value="dep">En el depósito</option><option value="tec">En técnicos</option><option value="veh">En vehículos</option><option value="cam">En camino</option><option value="cli">En clientes (instalado)</option><option value="com">En comodato</option></select></div>
-            <div><label>Proveedor</label><select id="stkProv"><option value="">Todos</option></select></div>
-            <button type="button" class="btn-secondary-admin" id="stkExcelBtn" style="width:auto;">⬇ Excel</button>
-            <button type="button" class="btn-secondary-admin" id="stkTipoVariosBtn" style="width:auto;">Cambiar cómo se controlan los que se ven…</button>
+            <div><label>Mostrar</label><select id="stkFiltro" style="min-width:190px;"><option value="constock">Con stock</option><option value="bajo">En el mínimo o por debajo</option><option value="sinmin">Con stock y sin mínimo</option><option value="sinstock">Sin stock</option><option value="baja">Deshabilitados en Oficina</option><option value="todos">Todos</option></select></div>
+            <div><label>Dónde</label><select id="stkDonde" style="min-width:170px;"><option value="">En cualquier lado</option><option value="dep">En el depósito</option><option value="tec">En técnicos</option><option value="veh">En vehículos</option><option value="cam">En camino</option><option value="cli">En clientes (instalado)</option><option value="com">En comodato</option></select></div>
+            <div><label>Proveedor</label><select id="stkProv" style="min-width:150px;"><option value="">Todos</option></select></div>
+            <button type="button" class="btn-secondary-admin" id="stkExcelBtn" style="width:auto;"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg> Excel</button>
+            <button type="button" class="btn-secondary-admin" id="stkTipoVariosBtn" style="width:auto;">Cambiar el tipo de los que se ven</button>
           </div>
           <div class="stk-tipos" id="stkTipos" role="group" aria-label="Tipos de artículo"></div>
           <div id="stkLista"></div>
@@ -1351,7 +1356,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
           <div class="field-row" style="flex-wrap:wrap;align-items:flex-end;">
             <div style="flex:2 1 220px;"><label>Buscar un N° de serie (cualquier equipo)</label><input type="text" class="field-input" id="stkGarBuscar" placeholder="Ej: GH120FF156"></div>
             <label style="display:flex;align-items:center;gap:6px;margin:0;"><input type="checkbox" id="stkGarCerradas" style="width:auto;"> Ver también las cerradas</label>
-            <button type="button" class="btn-secondary-admin" id="stkGarExcelBtn" style="width:auto;">⬇ Excel (para el proveedor)</button>
+            <button type="button" class="btn-secondary-admin" id="stkGarExcelBtn" style="width:auto;"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg> Excel (para el proveedor)</button>
           </div>
           <div id="stkGarFicha"></div>
           <div id="stkGarLista"></div>
@@ -1377,7 +1382,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
             <div><label>Mes</label><input type="month" class="field-input" id="stkMovMes"></div>
             <div><label>Tipo</label><select id="stkMovTipo"><option value="">Todos</option></select></div>
             <div style="flex:2 1 200px;"><label>Buscar</label><input type="text" class="field-input" id="stkMovBuscar" placeholder="Artículo, persona, cliente, presupuesto, motivo"></div>
-            <button type="button" class="btn-secondary-admin" id="stkMovExcelBtn" style="width:auto;">⬇ Excel</button>
+            <button type="button" class="btn-secondary-admin" id="stkMovExcelBtn" style="width:auto;"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg> Excel</button>
           </div>
           <div id="stkMovLista"></div>
         </div>
@@ -6514,14 +6519,14 @@ async function stkRenderConciliacion(registrar) {
     const difTxt = dif === "" ? "" : `<b style="color:${dif > 0 ? "#8A5A00" : "#B3261E"}">${dif > 0 ? "+" : ""}${stkFmt(dif)}</b>`;
     return `<tr data-c="${escapeHtmlAdmin(it.c)}" data-u="${escapeHtmlAdmin(it.u || "")}">
       <td><input type="checkbox" class="stk-conc-sel"></td><td>${escapeHtmlAdmin(it.c)}</td>
-      <td>${escapeHtmlAdmin(it.d || "")}${it.reaparece ? ' <span class="stk-tag bajo">⟳ Volvió a aparecer</span>' : ""}${stkUbicTexto(t.detalle) ? `<div class="stk-det">APP: ${escapeHtmlAdmin(stkUbicTexto(t.detalle))}</div>` : ""}</td>
+      <td>${escapeHtmlAdmin(it.d || "")}${it.reaparece ? ' <span class="stk-tag bajo"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/></svg> Volvió a aparecer</span>' : ""}${stkUbicTexto(t.detalle) ? `<div class="stk-det">APP: ${escapeHtmlAdmin(stkUbicTexto(t.detalle))}</div>` : ""}</td>
       <td class="num">${oficina}</td><td class="num">${app}</td><td class="num">${difTxt}</td></tr>`;
   };
   const accionCat = { noEnCatalogo: "Agregar al catálogo", cantidadDistinta: "Dejar la APP como Oficina", soloEnApp: "Dejar la APP como Oficina (0)", comodatoDistinto: "Dejar el comodato como Oficina", negativo: "Poner en 0" };
   cont.innerHTML = `<div class="sims-resumen" style="margin:10px 0;">
       <p style="margin:0 0 6px;"><b>${escapeHtmlAdmin(stkConc.archivo)}</b>: ${r.revisados} artículos controlados comparados, <b>${r.coinciden}</b> coinciden, <b>${totalDif}</b> diferencia${totalDif === 1 ? "" : "s"}${r.ocultas.length ? ` (${r.ocultas.length} ocultas por Resuelto/Ignorar)` : ""}.</p>
       <p class="stk-det" style="margin:0;">${STOCK_CONC_CATEGORIAS.map((c) => `${escapeHtmlAdmin(c.corto)}: ${numeros[c.k]}`).join(" · ")}</p>
-      <button type="button" class="btn-secondary-admin" id="stkConcExcelBtn" style="width:auto;margin-top:8px;">⬇ Excel con todas las diferencias</button></div>
+      <button type="button" class="btn-secondary-admin" id="stkConcExcelBtn" style="width:auto;margin-top:8px;"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg> Excel con todas las diferencias</button></div>
     ${totalDif ? "" : '<p class="status ok">No hay diferencias entre Oficina y la APP.</p>'}
     ${STOCK_CONC_CATEGORIAS.filter((c) => r[c.k].length).map((cat) => `<details class="card" data-cat="${cat.k}" open style="margin:10px 0;">
       <summary style="cursor:pointer;font-weight:700;">${escapeHtmlAdmin(cat.titulo)} (${r[cat.k].length})</summary>
@@ -6529,7 +6534,7 @@ async function stkRenderConciliacion(registrar) {
       <div class="field-row" style="flex-wrap:wrap;gap:6px;margin:6px 0;">
         <label style="display:flex;align-items:center;gap:6px;margin:0;"><input type="checkbox" class="stk-conc-todos"> Tildar todos</label>
         ${accionCat[cat.k] ? `<button type="button" data-accion="arreglar" style="width:auto;">${escapeHtmlAdmin(accionCat[cat.k])} (tildados)</button>` : ""}
-        <button type="button" class="btn-secondary-admin" data-accion="resuelta" style="width:auto;">✓ Resuelto (tildados)</button>
+        <button type="button" class="btn-secondary-admin" data-accion="resuelta" style="width:auto;"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg> Resuelto (tildados)</button>
         <button type="button" class="btn-secondary-admin" data-accion="ignorada" style="width:auto;">Ignorar (tildados)</button>
       </div>
       <div style="overflow-x:auto;"><table class="sims-tabla stk-tabla"><thead><tr><th></th><th>Código</th><th>Descripción</th><th class="num">Oficina</th><th class="num">APP</th><th class="num">Diferencia</th></tr></thead>
@@ -6643,13 +6648,13 @@ function stkRenderPedidos() {
   else {
     const grupos = {};
     pedir.forEach((x) => { (grupos[x.prov] = grupos[x.prov] || []).push(x); });
-    cont.innerHTML = `<button type="button" class="btn-secondary-admin" id="stkPedExcelBtn" style="width:auto;margin-bottom:8px;">⬇ Excel del pedido</button>` + Object.entries(grupos).map(([prov, items]) => `<div class="card" data-prov="${escapeHtmlAdmin(prov)}" style="margin:10px 0;">
+    cont.innerHTML = `<button type="button" class="btn-secondary-admin" id="stkPedExcelBtn" style="width:auto;margin-bottom:8px;"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg> Excel del pedido</button>` + Object.entries(grupos).map(([prov, items]) => `<div class="card" data-prov="${escapeHtmlAdmin(prov)}" style="margin:10px 0;">
       <h4 style="margin:0 0 8px;">${escapeHtmlAdmin(prov)} <span class="stk-det">(${items.length})</span></h4>
       <div style="overflow-x:auto;"><table class="sims-tabla stk-tabla"><thead><tr><th></th><th>Código</th><th>Descripción</th><th class="num">Depósito</th><th class="num">Mínimo</th><th class="num">Pedir</th></tr></thead><tbody>
       ${items.map((x) => `<tr data-c="${escapeHtmlAdmin(x.c)}"><td><input type="checkbox" class="stk-ped-sel" checked></td><td>${escapeHtmlAdmin(x.c)}</td><td>${escapeHtmlAdmin(x.d)}</td><td class="num">${stkFmt(x.dep)}</td><td class="num">${stkFmt(x.min)}</td><td class="num"><input class="stk-min stk-ped-cant" inputmode="decimal" value="${x.sugerido}"></td></tr>`).join("")}
       </tbody></table></div>
       <div class="field-row" style="gap:6px;flex-wrap:wrap;margin-top:8px;">
-        <button type="button" class="btn-secondary-admin" data-ped="copiar" style="width:auto;">📋 Copiar el pedido (WhatsApp / mail)</button>
+        <button type="button" class="btn-secondary-admin" data-ped="copiar" style="width:auto;"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/></svg> Copiar el pedido (WhatsApp / mail)</button>
         <button type="button" data-ped="marcar" style="width:auto;">Marcar como pedido (tildados)</button>
       </div></div>`).join("");
     const elegidos = (caja) => [...caja.querySelectorAll("tr[data-c]")].filter((tr) => tr.querySelector(".stk-ped-sel").checked).map((tr) => {
@@ -6728,7 +6733,7 @@ function stkRenderMovimientos() {
   const cont = document.getElementById("stkMovLista"), lista = stkMovFiltrados();
   cont.innerHTML = !lista.length ? '<p class="subtitle">No hay movimientos en ese mes.</p>'
     : `<p class="subtitle" style="margin:8px 0;">${lista.length} movimientos.</p><div style="overflow-x:auto;"><table class="sims-tabla stk-tabla"><thead><tr><th>Fecha</th><th>Tipo</th><th>Artículo</th><th class="num">Cantidad</th><th>De → A</th><th>Por</th><th>Motivo</th></tr></thead><tbody>
-      ${lista.slice(0, 500).map((m) => `<tr><td>${escapeHtmlAdmin(new Date(m.fecha).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }))}${m.oficina ? '<div class="stk-det">✓ En Oficina</div>' : ""}</td><td>${escapeHtmlAdmin(STK_MOV_TIPO[m.tipo] || m.tipo)}</td><td>${escapeHtmlAdmin(m.c)} ${escapeHtmlAdmin(m.d)}${m.prov ? `<div class="stk-det">${escapeHtmlAdmin(nombreProveedor(stk.catalogo, m.prov) || "Proveedor " + m.prov)}</div>` : ""}</td><td class="num">${stkFmt(m.cant)}</td><td>${escapeHtmlAdmin(m.de ? nombreUbicacion(m.de) : "—")} → ${escapeHtmlAdmin(m.a ? nombreUbicacion(m.a) : "—")}</td><td>${escapeHtmlAdmin(m.por || "")}</td><td>${m.presupuesto ? `<b>Presupuesto N° ${escapeHtmlAdmin(m.presupuesto)}</b> ` : ""}${escapeHtmlAdmin(m.motivo || "")}${m.unidades && m.unidades.length ? `<div class="stk-det">${m.unidades.map(escapeHtmlAdmin).join(" · ")}</div>` : ""}${m.antes != null ? `<div class="stk-det">${stkFmt(m.antes)} → ${stkFmt(m.despues)}</div>` : ""}</td></tr>`).join("")}</tbody></table></div>`;
+      ${lista.slice(0, 500).map((m) => `<tr><td>${escapeHtmlAdmin(new Date(m.fecha).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }))}${m.oficina ? '<div class="stk-det"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg> En Oficina</div>' : ""}</td><td>${escapeHtmlAdmin(STK_MOV_TIPO[m.tipo] || m.tipo)}</td><td>${escapeHtmlAdmin(m.c)} ${escapeHtmlAdmin(m.d)}${m.prov ? `<div class="stk-det">${escapeHtmlAdmin(nombreProveedor(stk.catalogo, m.prov) || "Proveedor " + m.prov)}</div>` : ""}</td><td class="num">${stkFmt(m.cant)}</td><td>${escapeHtmlAdmin(m.de ? nombreUbicacion(m.de) : "—")} → ${escapeHtmlAdmin(m.a ? nombreUbicacion(m.a) : "—")}</td><td>${escapeHtmlAdmin(m.por || "")}</td><td>${m.presupuesto ? `<b>Presupuesto N° ${escapeHtmlAdmin(m.presupuesto)}</b> ` : ""}${escapeHtmlAdmin(m.motivo || "")}${m.unidades && m.unidades.length ? `<div class="stk-det">${m.unidades.map(escapeHtmlAdmin).join(" · ")}</div>` : ""}${m.antes != null ? `<div class="stk-det">${stkFmt(m.antes)} → ${stkFmt(m.despues)}</div>` : ""}</td></tr>`).join("")}</tbody></table></div>`;
 }
 document.getElementById("stkMovMes").addEventListener("change", stkCargarMovimientos);
 document.getElementById("stkMovBuscar").addEventListener("input", stkRenderMovimientos);
@@ -6775,10 +6780,10 @@ function stkRenderOficina() {
   const pendientes = stkOfMovs.filter((x) => !x.m.oficina), lista = ver ? stkOfMovs : pendientes;
   const cont = document.getElementById("stkOfLista");
   cont.innerHTML = `<p class="subtitle" style="margin:8px 0;"><b>${pendientes.length}</b> pendiente${pendientes.length === 1 ? "" : "s"} de pasar a Oficina${stkOfMovs.length - pendientes.length ? ` · ${stkOfMovs.length - pendientes.length} ya pasados` : ""}.</p>
-    ${pendientes.length ? `<div class="field-row" style="gap:8px;flex-wrap:wrap;margin-bottom:8px;"><button type="button" id="stkOfExcelBtn" style="width:auto;">⬇ Bajar archivo para Oficina (${pendientes.length})</button><button type="button" class="btn-secondary-admin" id="stkOfMarcarBtn" style="width:auto;">✓ Marcar como pasados</button></div>` : ""}
+    ${pendientes.length ? `<div class="field-row" style="gap:8px;flex-wrap:wrap;margin-bottom:8px;"><button type="button" id="stkOfExcelBtn" style="width:auto;"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg> Bajar archivo para Oficina (${pendientes.length})</button><button type="button" class="btn-secondary-admin" id="stkOfMarcarBtn" style="width:auto;"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg> Marcar como pasados</button></div>` : ""}
     ${lista.length ? `<div style="overflow-x:auto;"><table class="sims-tabla stk-tabla"><thead><tr><th>Fecha</th><th>Operación</th><th>Artículo</th><th class="num">Depósito</th><th class="num">Comodato</th><th>Cliente</th><th>Presupuesto</th><th></th></tr></thead><tbody>
     ${lista.map(({ m, o }) => `<tr><td>${escapeHtmlAdmin(new Date(m.fecha).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }))}</td><td>${escapeHtmlAdmin(o.operacion)}</td><td>${escapeHtmlAdmin(o.c)} ${escapeHtmlAdmin((arts[o.c] || {}).d || "")}${o.series ? `<div class="stk-det">${escapeHtmlAdmin(o.series)}</div>` : ""}</td><td class="num">${o.deposito ? (o.deposito > 0 ? "+" : "") + stkFmt(o.deposito) : ""}</td><td class="num">${o.comodato ? (o.comodato > 0 ? "+" : "") + stkFmt(o.comodato) : ""}</td><td>${escapeHtmlAdmin(o.cliente)}</td><td>${escapeHtmlAdmin(o.presupuesto)}</td>
-      <td class="stk-btns">${m.oficina ? `<span class="stk-det">✓ ${escapeHtmlAdmin(new Date(m.oficina).toLocaleDateString("es-AR"))}</span> <button type="button" class="btn-secondary-admin" data-desmarcar="${escapeHtmlAdmin(m.id)}">Desmarcar</button>` : ""}</td></tr>`).join("")}</tbody></table></div>` : '<p class="status ok">No hay nada pendiente de pasar a Oficina en este mes.</p>'}`;
+      <td class="stk-btns">${m.oficina ? `<span class="stk-det"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg> ${escapeHtmlAdmin(new Date(m.oficina).toLocaleDateString("es-AR"))}</span> <button type="button" class="btn-secondary-admin" data-desmarcar="${escapeHtmlAdmin(m.id)}">Desmarcar</button>` : ""}</td></tr>`).join("")}</tbody></table></div>` : '<p class="status ok">No hay nada pendiente de pasar a Oficina en este mes.</p>'}`;
   const bajar = document.getElementById("stkOfExcelBtn");
   if (bajar) bajar.addEventListener("click", () => stkOficinaExcel(pendientes));
   const marcar = document.getElementById("stkOfMarcarBtn");
@@ -6818,12 +6823,12 @@ function stkPintarBadgeSalud() {
 function stkRenderSalud() {
   const grupos = saludStock(stk.catalogo, stk.saldos), cont = document.getElementById("stkSaludLista");
   const color = { error: "#B3261E", aviso: "#8A5A00", info: "#3A4651" };
-  cont.innerHTML = !grupos.some((g) => g.nivel !== "info") ? '<p class="status ok">✓ Todo cuadra: cada equipo está en un solo lugar.</p>' : "";
+  cont.innerHTML = !grupos.some((g) => g.nivel !== "info") ? '<p class="status ok">Todo cuadra: cada equipo está en un solo lugar.</p>' : "";
   cont.innerHTML += grupos.map((g) => `<details class="card" data-k="${g.k}" ${g.nivel === "info" ? "" : "open"} style="margin:10px 0;">
     <summary style="cursor:pointer;font-weight:700;color:${color[g.nivel]};">${escapeHtmlAdmin(g.titulo)} (${g.items.length})</summary>
     <p class="subtitle" style="margin:6px 0;">${escapeHtmlAdmin(g.ayuda)}</p>
     <table class="sims-tabla stk-tabla"><tbody>${g.items.slice(0, 300).map((x, i) => `<tr data-i="${i}"><td>${escapeHtmlAdmin(x.texto)}${x.series ? `<div class="stk-det">${x.series.map((t) => `<button type="button" class="btn-secondary-admin" data-baja="${escapeHtmlAdmin(t)}" style="width:auto;margin:2px;">Dar de baja ${escapeHtmlAdmin(t)}</button>`).join("")}</div>` : ""}</td>
-      <td class="stk-btns">${g.k === "revisar" ? `<button type="button" class="btn-secondary-admin" data-revisado="${escapeHtmlAdmin(x.id)}">✓ Revisado</button>` : ""}${g.k === "aprobar" ? `<button type="button" class="btn-secondary-admin" data-aprobar-nd="${escapeHtmlAdmin(x.id)}">Aprobar sin descontar</button><button type="button" class="btn-secondary-admin" data-rechazar-ap="${escapeHtmlAdmin(x.id)}">Rechazar</button>` : ""}${(g.k === "negativo" || g.k === "otros" || g.k === "seriesDeMas") && x.c ? `<button type="button" class="btn-secondary-admin" data-ajustar="${escapeHtmlAdmin(x.c)}" data-ubic="${escapeHtmlAdmin(x.ubic)}">Ajustar cantidad</button>` : ""}</td></tr>`).join("")}</tbody></table></details>`).join("");
+      <td class="stk-btns">${g.k === "revisar" ? `<button type="button" class="btn-secondary-admin" data-revisado="${escapeHtmlAdmin(x.id)}"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg> Revisado</button>` : ""}${g.k === "aprobar" ? `<button type="button" class="btn-secondary-admin" data-aprobar-nd="${escapeHtmlAdmin(x.id)}">Aprobar sin descontar</button><button type="button" class="btn-secondary-admin" data-rechazar-ap="${escapeHtmlAdmin(x.id)}">Rechazar</button>` : ""}${(g.k === "negativo" || g.k === "otros" || g.k === "seriesDeMas") && x.c ? `<button type="button" class="btn-secondary-admin" data-ajustar="${escapeHtmlAdmin(x.c)}" data-ubic="${escapeHtmlAdmin(x.ubic)}">Ajustar cantidad</button>` : ""}</td></tr>`).join("")}</tbody></table></details>`).join("");
   cont.querySelectorAll("[data-revisado]").forEach((b) => b.addEventListener("click", (e) => simsConBoton(e.currentTarget, async () => {
     try { await stkPost({ accion: "salud_revisado", ids: [b.dataset.revisado] }); await stkLeer(); avisoAdmin("Marcado como revisado.", "ok"); } catch (err) { avisoAdmin("No se pudo: " + err.message, "err"); }
     stkMostrarVista();

@@ -1357,7 +1357,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
         try {
           const { enviarASeleccionados } = require("../lib/push-sender");
           const resp = (await tecnicos()).filter((t) => t.permisos && t.permisos.stock_responsable).map((t) => t.nombre);
-          if (resp.length) await enviarASeleccionados(resp, { titulo: "📦 Materiales para aprobar", cuerpo: `${quien} cargó en un parte ${resumen.paraAprobar} material(es) que no estaban en su stock (${cliente}).`, url: "/" });
+          if (resp.length) await enviarASeleccionados(resp, { titulo: "Materiales para aprobar", cuerpo: `${quien} cargó en un parte ${resumen.paraAprobar} material(es) que no estaban en su stock (${cliente}).`, url: "/" });
         } catch (e) { /* opcional */ }
       }
       responder(r);
@@ -1389,7 +1389,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
       }, `Stock: ${decision === "aprobar" ? "aprobó" : "rechazó"} material de un parte (por ${quien})`);
       if (!r.error) await stockConfirmarMovs(movs, `Stock: material de parte aprobado (por ${quien})`);
       if (!r.error && decision === "rechazar" && r.respuesta && r.respuesta.resuelto) {
-        try { const { enviarASeleccionados } = require("../lib/push-sender"); await enviarASeleccionados([r.respuesta.resuelto.por], { titulo: "📦 Material de un parte rechazado", cuerpo: `${r.respuesta.resuelto.texto || r.respuesta.resuelto.c} (${r.respuesta.resuelto.cliente}): ${motivo}`.slice(0, 200), url: "/" }); } catch (e) { /* opcional */ }
+        try { const { enviarASeleccionados } = require("../lib/push-sender"); await enviarASeleccionados([r.respuesta.resuelto.por], { titulo: "Material de un parte rechazado", cuerpo: `${r.respuesta.resuelto.texto || r.respuesta.resuelto.c} (${r.respuesta.resuelto.cliente}): ${motivo}`.slice(0, 200), url: "/" }); } catch (e) { /* opcional */ }
       }
       responder(r);
       return;
@@ -1732,7 +1732,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
             const { enviarASeleccionados } = require("../lib/push-sender");
             const e = resultado.envio, n = e.items.reduce((t, x) => t + x.cant, 0);
             const destinatarios = /^tec:/.test(e.a) ? [e.a.slice(4)] : (await tecnicos()).filter((t) => t.permisos && t.permisos.stock_responsable).map((t) => t.nombre);
-            const titulo = /^tec:/.test(e.a) ? "📦 Te mandaron material" : `📦 ${quien} devolvió material`;
+            const titulo = /^tec:/.test(e.a) ? "Te mandaron material" : `${quien} devolvió material`;
             if (destinatarios.length) await enviarASeleccionados(destinatarios, { titulo, cuerpo: `${n} artículo(s): ${e.items.map((x) => ((cat.articulos || {})[x.c] || {}).d || x.c).slice(0, 3).join(", ")}. Confirmá «Recibí» en Mi stock.`.slice(0, 200), url: "/?ir=mistock" });
           } catch (e) { /* el aviso es opcional */ }
         }
@@ -1762,7 +1762,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
           try {
             const { enviarASeleccionados } = require("../lib/push-sender");
             const avisar = resultado.envio.a === "dep" ? [resultado.envio.de.replace(/^tec:/, "")] : [resultado.envio.por];
-            await enviarASeleccionados(avisar.filter(Boolean), { titulo: resultado.envio.estado === "rechazado" ? "⚠️ Rechazaron un envío de stock" : "⚠️ Envío de stock con diferencias", cuerpo: `${quien}: ${resultado.envio.diferencias.map((d) => `${d.c} mandado ${d.enviado}, recibido ${d.recibido}`).join(" · ")}${b.motivo ? " — " + b.motivo : ""}`.slice(0, 200), url: "/" });
+            await enviarASeleccionados(avisar.filter(Boolean), { titulo: resultado.envio.estado === "rechazado" ? "Rechazaron un envío de stock" : "Envío de stock con diferencias", cuerpo: `${quien}: ${resultado.envio.diferencias.map((d) => `${d.c} mandado ${d.enviado}, recibido ${d.recibido}`).join(" · ")}${b.motivo ? " — " + b.motivo : ""}`.slice(0, 200), url: "/" });
           } catch (e) { /* opcional */ }
         }
       }

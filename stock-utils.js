@@ -185,7 +185,7 @@
     { k: "cantidadDistinta", corto: "Cantidad distinta", titulo: "Cantidad distinta (en poder de SAT)", ayuda: "Oficina cuenta el depósito; la APP suma depósito + técnicos + vehículos + en camino. Abajo de cada uno, dónde está según la APP." },
     { k: "soloEnApp", corto: "Solo en la APP", titulo: "La APP tiene stock y Oficina dice 0", ayuda: "Puede faltar cargar una compra en Oficina, o se usó/vendió sin registrarlo en la APP." },
     { k: "comodatoDistinto", corto: "Comodato distinto", titulo: "Cantidad en comodato distinta", ayuda: "Oficina y la APP no cuentan lo mismo en comodato en clientes." },
-    { k: "unidadesSinRegistrar", corto: "Unidades sin escanear", titulo: "Equipos sin todas sus unidades registradas", ayuda: "Hay más equipos que números de unidad escaneados: falta escanearlos (inventario)." },
+    { k: "unidadesSinRegistrar", corto: "Sin N° de serie", titulo: "Equipos sin todos sus N° de serie registrados", ayuda: "Hay más equipos que N° de serie registrados: falta escanearlos (inventario)." },
     { k: "deshabilitado", corto: "Deshabilitado en Oficina", titulo: "Deshabilitados en Oficina, con stock en la APP", ayuda: "Oficina ya no los usa, pero la APP tiene stock." },
     { k: "negativo", corto: "Negativo en la APP", titulo: "Stock negativo en la APP", ayuda: "Salió más de lo que entró: falta registrar una entrada o se cargó mal una salida." },
   ];
