@@ -307,6 +307,9 @@
     }
     const u = ((saldos && saldos.unidades) || {})[t];
     if (u && u.c) return { tipo: "unidad", c: u.c, tracking: t, ubic: u.u, nuevo: false };
+    // También por los otros datos del equipo (Serial o MAC de Paradox, guardados junto al Tracking).
+    const otro = buscarPorDatos(saldos, t);
+    if (otro) return { tipo: "unidad", c: otro.u.c, tracking: otro.t, ubic: otro.u.u, nuevo: false, via: otro.via };
     if (esEanValido(t)) {
       const a = Object.values(arts).find((x) => Array.isArray(x.alias) && x.alias.includes(t));
       return a ? { tipo: "articulo", c: a.c, via: "ean" } : { tipo: "ean_nuevo", ean: t };
@@ -345,7 +348,7 @@
     const conocida = info.find((x) => x.r.tipo === "unidad" && !x.r.nuevo);
     if (conocida) return { usar: conocida.t };
     // El código del modelo del mismo artículo que se está escaneando no cambia nada.
-    const utiles = info.filter((x) => !(x.r.tipo === "articulo" && x.r.c === actual && x.r.via === "modelo"));
+    const utiles = info.filter((x) => !(x.r.tipo === "articulo" && x.r.c === actual && (x.r.via === "modelo" || (x.r.via === "ean" && pendiente && (arts[actual] || {}).tipo === "unidad"))));
     const a = arts[actual];
     if (a && a.tipo === "unidad") {
       const candidatos = utiles.filter((x) => x.r.tipo === "unidad" && x.r.c === actual);
@@ -430,6 +433,39 @@
     return out;
   }
 
+  // ---------- Datos extra de cada equipo ----------
+  // Paradox: el código de barras es el Tracking (único por equipo); el Serial y la MAC no tienen
+  // código de barras y se guardan como datos del mismo equipo. Ajax: el código de barras de la caja
+  // trae el ID del equipo (6 caracteres, el que muestra la app de Ajax) y un control.
+  const normMac = (t) => String(t || "").toUpperCase().replace(/[^0-9A-F]/g, "");
+  function datosLimpios(d) {
+    const r = {};
+    if (!d || typeof d !== "object") return r;
+    const serial = limpiarCodigo(d.serial).slice(0, 40), mac = normMac(d.mac);
+    if (serial) r.serial = serial;
+    if (mac.length === 12) r.mac = mac.match(/../g).join(":");
+    return r;
+  }
+  function buscarPorDatos(saldos, t) {
+    const x = limpiarCodigo(t), m = normMac(t);
+    if (!x) return null;
+    for (const [k, u] of Object.entries((saldos && saldos.unidades) || {})) {
+      const d = (u && u.datos) || {};
+      if (d.serial && d.serial === x) return { t: k, u, via: "serial" };
+      if (d.mac && m.length === 12 && normMac(d.mac) === m) return { t: k, u, via: "mac" };
+    }
+    return null;
+  }
+  // Texto que ayuda a reconocer el N° de serie (ej. el ID de Ajax).
+  function infoSerie(t, u) {
+    const x = limpiarCodigo(t), partes = [];
+    if (/^[0-9A-F]{6}[0-9]{5}$/.test(x)) partes.push(`ID Ajax ${x.slice(0, 6)}`);
+    const d = (u && u.datos) || {};
+    if (d.serial) partes.push(`Serial ${d.serial}`);
+    if (d.mac) partes.push(`MAC ${d.mac}`);
+    return partes.join(" · ");
+  }
+
   // ---------- Movimientos con confirmación ----------
   // Lo que va a un técnico (o vuelve de un técnico al depósito) queda «en camino» hasta que
   // el que recibe confirma. Los envíos pendientes se guardan en saldos.envios.
@@ -484,6 +520,10 @@
       if (x.unidades.length) movs[movs.length - 1].unidades = x.unidades;
     });
     movs.forEach((m) => { s = aplicarMovimiento(s, m); });
+    (items || []).forEach((x) => Object.entries((x && x.extras) || {}).forEach(([t, d]) => {
+      const k = limpiarCodigo(t), limpio = datosLimpios(d);
+      if (s.unidades[k] && Object.keys(limpio).length) s.unidades[k] = { ...s.unidades[k], datos: { ...(s.unidades[k].datos || {}), ...limpio } };
+    }));
     let envio = null;
     if (op.confirmar) {
       envio = { id: idMov(), tipo: op.tipo || "entrega", fecha, por: op.por || "", de: de || "dep", a: op.a, camino: destino, items: lista, ...(op.motivo ? { motivo: op.motivo } : {}), ...(op.fallado ? { fallado: true, falla: String(op.falla || "").slice(0, 200) } : {}) };
@@ -538,7 +578,8 @@
         if (u && u.u === ubic) { r.yaEstaban.push(t); return; }
         if (u) { r.enOtroLado.push({ t, c, u: u.u }); return; }
         if (conSerie >= hay) { r.sobran.push({ t, c, hay }); return; }
-        s.unidades[t] = { c, u: ubic, f: fecha || new Date().toISOString(), inventario: true, ...(codigoProveedor(x.prov) ? { prov: codigoProveedor(x.prov) } : {}) };
+        const extra = datosLimpios(((x.extras || {})[t]));
+        s.unidades[t] = { c, u: ubic, f: fecha || new Date().toISOString(), inventario: true, ...(codigoProveedor(x.prov) ? { prov: codigoProveedor(x.prov) } : {}), ...(Object.keys(extra).length ? { datos: extra } : {}) };
         conSerie++; r.registradas++;
       });
     });
@@ -617,7 +658,7 @@
     return mejor;
   }
 
-  const api = { codigoProveedor, nombreProveedor, STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, seriesEn, controlarSalidaConSerie, saludStock, esCodigoIgnorable, elegirCodigoDelCuadro, registrarUnidades, movimientoParaOficina, GARANTIA_ESTADOS, instalacionDeUnidad, abrirGarantias, moverStock, cerrarEnvio, stockDePersona };
+  const api = { codigoProveedor, nombreProveedor, STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, datosLimpios, buscarPorDatos, infoSerie, seriesEn, controlarSalidaConSerie, saludStock, esCodigoIgnorable, elegirCodigoDelCuadro, registrarUnidades, movimientoParaOficina, GARANTIA_ESTADOS, instalacionDeUnidad, abrirGarantias, moverStock, cerrarEnvio, stockDePersona };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else Object.assign(raiz, api);
 })(typeof window !== "undefined" ? window : globalThis);

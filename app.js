@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.53.0";
+const APP_VERSION = "4.53.1";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -18218,10 +18218,10 @@ async function abrirEscanerStock(op) {
     pintarEstado();
   };
   // Usar un código que no vino del lector (de la foto o escrito): pausa la lectura mientras tanto.
-  const usarCodigo = async (texto) => {
+  const usarCodigo = async (texto, otros) => {
     while (ocupado) await new Promise((ok) => setTimeout(ok, 50));
     ocupado = true;
-    try { const r = await (op.usar ? op.usar(texto) : op.leerCuadro([texto])); mostrarResultado(r, texto); if (r && op.cerrarSi && op.cerrarSi(r)) setTimeout(cerrar, 400); }
+    try { const r = await (op.usar ? op.usar(texto, otros) : op.leerCuadro([texto])); mostrarResultado(r, texto); if (r && op.cerrarSi && op.cerrarSi(r)) setTimeout(cerrar, 400); }
     finally { ocupado = false; ultimaLectura = Date.now(); }
   };
   const aMano = async () => {
@@ -18248,7 +18248,7 @@ async function abrirEscanerStock(op) {
           + codigos.map((x) => `<button type="button" class="stk-ocr-cod${x.que.util ? "" : " dudoso"}" data-t="${escapeHtml(x.texto)}"><span>${escapeHtml(x.texto)}</span><small>${escapeHtml([x.rotulo, x.que.texto].filter(Boolean).join(" · "))}</small></button>`).join("")
           + '<button type="button" class="stk-link" data-amano>Ninguno: escribirlo a mano</button>';
       }
-      ocrCaja.querySelectorAll("[data-t]").forEach((b) => b.addEventListener("click", async () => { ocrCaja.innerHTML = ""; await usarCodigo(b.dataset.t); }));
+      ocrCaja.querySelectorAll("[data-t]").forEach((b) => b.addEventListener("click", async () => { ocrCaja.innerHTML = ""; await usarCodigo(b.dataset.t, codigos); }));
     } catch (e) {
       if (!cerrado) ocrCaja.innerHTML = `<p class="stk-ocr-msj">No se pudieron leer los números (${escapeHtml(e.message)}).</p><button type="button" class="btn btn-primary btn-small" data-amano>⌨️ Escribir a mano</button>`;
     } finally {
@@ -18353,7 +18353,7 @@ function crearCanastaStock(op) {
       return `<div class="stk-linea${can.actual === l.c ? " stk-linea-actual" : ""}" data-i="${i}">
         <div class="stk-linea-top"><div><b>${escapeHtml(art.d)}</b><small>${escapeHtml(l.c)}${l.prov ? ` · ${escapeHtml(nombreProveedor(op.catalogo(), l.prov) || "proveedor " + l.prov)}` : ""}${disp !== Infinity ? ` · hay ${stkFmtN(disp)}` : ""}${art.medida === "metros" ? " · en metros" : ""}</small></div>
         <div class="stk-cant"><button type="button" data-menos aria-label="Uno menos">−</button><input class="field-input" inputmode="decimal" value="${stkFmtN(l.cant)}" aria-label="Cantidad"><button type="button" data-mas aria-label="Uno más">+</button></div></div>
-        ${l.unidades.length ? `<div class="stk-chips">${l.unidades.map((t, j) => `<span class="stk-chip">${escapeHtml(t)}<button type="button" data-quitar-u="${j}" aria-label="Sacar">✕</button></span>`).join("")}</div>` : ""}
+        ${l.unidades.length ? `<div class="stk-chips">${l.unidades.map((t, j) => { const info = infoSerie(t, { datos: (l.extras || {})[t] ? datosLimpios(l.extras[t]) : (((op.saldos() || {}).unidades || {})[t] || {}).datos }); return `<span class="stk-chip">${escapeHtml(t)}${info ? ` <small style="opacity:.75;">${escapeHtml(info)}</small>` : ""}<button type="button" data-quitar-u="${j}" aria-label="Sacar">✕</button></span>`; }).join("")}</div>` : ""}
         ${esU && sinN ? `<div class="stk-falta">${can.actual === l.c ? `Falta${sinN > 1 ? "n" : ""} ${sinN} N° de serie: escanealo${sinN > 1 ? "s" : ""} ahora.` : `${sinN} sin N° de serie.`}</div>` : ""}
         ${esU && can.seriesLibres(l.c).length ? `<button type="button" class="stk-link" data-elegir-n>Elegir el N° de serie de la lista (${can.seriesLibres(l.c).length} en ${escapeHtml(nombreUbicacion(op.origen()))})</button>` : ""}
         ${l.cant > disp ? `<div class="stk-falta">Hay ${stkFmtN(disp)}: no alcanza.</div>` : ""}
@@ -18449,15 +18449,27 @@ function crearCanastaStock(op) {
     return { ok: true, texto: `${art.d} · ${tracking} (${l.unidades.length})`, completo: true };
   };
   // Lee un código escaneado o escrito y lo suma a la lista.
-  can.agregarCodigo = async (texto) => {
+  can.agregarCodigo = async (texto, otros) => {
+    // Lo leído de la foto trae también Serial y MAC: se guardan con el N° de serie (Tracking).
+    const extras = {};
+    (otros || []).forEach((o) => { if (/serial|s\/n/i.test(o.rotulo || "") && o.texto !== limpiarCodigo(texto)) extras.serial = o.texto; if (/mac/i.test(o.rotulo || "") || /^([0-9A-F]{2}[:-]?){5}[0-9A-F]{2}$/i.test(o.texto || "")) extras.mac = o.texto; });
+    const yaEsta = can.lineas.find((l) => l.unidades.includes(limpiarCodigo(texto)));
+    if (yaEsta && Object.keys(extras).length) { yaEsta.extras = { ...(yaEsta.extras || {}), [limpiarCodigo(texto)]: extras }; can.cambio(); return { ok: true, texto: `Datos guardados con ${limpiarCodigo(texto)}: ${Object.entries(extras).map(([k, v]) => `${k === "mac" ? "MAC" : "Serial"} ${v}`).join(" · ")}` }; }
     const r = interpretarCodigo(texto, op.catalogo(), op.saldos(), can.actual);
     const a = arts();
     if (r.tipo === "ignorar") return { ok: false, texto: r.aviso };
     if (r.tipo === "articulo") {
       if (r.via === "modelo" && r.c === can.actual) return { ok: true, texto: "Código del modelo (no suma)", completo: false };
+      // El código de producto (EAN) de la caja que está esperando su N° de serie no suma otra.
+      const la = can.lineas.find((x) => x.c === r.c);
+      if (r.via === "ean" && r.c === can.actual && (a[r.c] || {}).tipo === "unidad" && la && la.cant > la.unidades.length) return { ok: true, texto: "Código del producto (no suma): ahora el N° de serie", completo: false };
       return can.agregarArticulo(r.c, r.proveedor);
     }
-    if (r.tipo === "unidad") return agregarUnidad(r.c, r.tracking, r);
+    if (r.tipo === "unidad") {
+      const res = await agregarUnidad(r.c, r.tracking, r);
+      if (res.ok && Object.keys(extras).length) { const l = can.lineas.find((x) => x.unidades.includes(r.tracking)); if (l) { l.extras = { ...(l.extras || {}), [r.tracking]: extras }; can.cambio(); } }
+      return r.via ? { ...res, texto: `${res.texto} (encontrado por ${r.via === "mac" ? "MAC" : "Serial"})` } : res;
+    }
     if (r.tipo === "ean_nuevo") {
       if (!op.puedeAsociar) return { ok: false, texto: "Código de fabricante que la APP no conoce: escaneá la etiqueta de SAT." };
       const c = await elegirArticuloStock(op.catalogo(), `El código ${r.ean} es del fabricante y la APP todavía no sabe de qué artículo es. Elegilo una vez y la próxima lo reconoce sola:`);
@@ -18495,7 +18507,7 @@ function crearCanastaStock(op) {
     if (r.tipo === "ean_nuevo") return { util: true, texto: "Código de fabricante" };
     return { util: false, texto: /^\d{12}$/.test(t) ? "Etiqueta SAT de un artículo que no está en el catálogo" : can.actual ? "" : "Primero la etiqueta de SAT" };
   };
-  can.items = () => can.lineas.filter((l) => l.cant > 0).map((l) => ({ c: l.c, cant: l.cant, unidades: l.unidades, ...(l.prov ? { prov: l.prov } : {}) }));
+  can.items = () => can.lineas.filter((l) => l.cant > 0).map((l) => ({ c: l.c, cant: l.cant, unidades: l.unidades, ...(l.prov ? { prov: l.prov } : {}), ...(l.extras && Object.keys(l.extras).length ? { extras: l.extras } : {}) }));
   return can;
 }
 
@@ -18649,7 +18661,7 @@ function pintarMiStock() {
     + (pa.length ? `<h3 class="stk-h">Cargaste en partes y no estaba en tu stock (lo revisa el depósito)</h3>` + pa.map((x) => `<div class="stk-parte-item"><span>${escapeHtml(x.texto || x.c)} <b>x${stkFmtN(x.cant)}</b><small style="font-family:inherit;">${escapeHtml(x.cliente)}${x.parte ? ` · parte ${escapeHtml(x.parte)}` : ""}</small></span></div>`).join("") : "");
 }
 conectarCasilleroStock(document.getElementById("miStockCodigo"), null, miStockCanasta, miStockCatalogo);
-document.getElementById("miStockEscanearBtn").addEventListener("click", () => abrirEscanerStock({ titulo: "Devolver al depósito", leerCuadro: (t) => miStockCanasta.leerCuadro(t), estado: () => miStockCanasta.estado(), usar: (t) => miStockCanasta.agregarCodigo(t), describir: (t) => miStockCanasta.describir(t) }));
+document.getElementById("miStockEscanearBtn").addEventListener("click", () => abrirEscanerStock({ titulo: "Devolver al depósito", leerCuadro: (t) => miStockCanasta.leerCuadro(t), estado: () => miStockCanasta.estado(), usar: (t, o) => miStockCanasta.agregarCodigo(t, o), describir: (t) => miStockCanasta.describir(t) }));
 document.getElementById("miStockDevolverBtn").addEventListener("click", async (ev) => {
   const btn = ev.currentTarget, items = miStockCanasta.items();
   if (!items.length) return;
@@ -18805,7 +18817,7 @@ document.getElementById("depRecibirTipo").addEventListener("change", async () =>
 document.getElementById("depRecibirDe").addEventListener("change", () => depCanasta.render());
 document.getElementById("depRecibirSelect").addEventListener("change", () => depCanasta.render());
 conectarCasilleroStock(document.getElementById("depCodigo"), document.getElementById("depBuscarResultados"), depCanasta, depCatalogo);
-document.getElementById("depEscanearBtn").addEventListener("click", () => abrirEscanerStock({ titulo: depModo === "inventario" ? "Inventario de N° de serie" : `${depModo === "entregar" ? "Baja" : "Alta"} · ${depForma === "lote" ? "en lote" : "individual"}`, leerCuadro: (t) => depCanasta.leerCuadro(t), estado: () => depCanasta.estado(), usar: (t) => depCanasta.agregarCodigo(t), describir: (t) => depCanasta.describir(t), cerrarSi: (r) => depModo !== "inventario" && depForma === "individual" && r.ok && r.completo }));
+document.getElementById("depEscanearBtn").addEventListener("click", () => abrirEscanerStock({ titulo: depModo === "inventario" ? "Inventario de N° de serie" : `${depModo === "entregar" ? "Baja" : "Alta"} · ${depForma === "lote" ? "en lote" : "individual"}`, leerCuadro: (t) => depCanasta.leerCuadro(t), estado: () => depCanasta.estado(), usar: (t, o) => depCanasta.agregarCodigo(t, o), describir: (t) => depCanasta.describir(t), cerrarSi: (r) => depModo !== "inventario" && depForma === "individual" && r.ok && r.completo }));
 document.getElementById("depConfirmarBtn").addEventListener("click", async (ev) => {
   const btn = ev.currentTarget, items = depCanasta.items(), a = depCatalogo().articulos;
   if (!items.length) return;
@@ -19081,6 +19093,7 @@ async function depConsultar(texto) {
     const u = (sal.unidades || {})[r.tracking] || {}, inst = instalacionDeUnidad(u), g = u.garantia;
     const fch = (f) => new Date(f).toLocaleDateString("es-AR");
     cont.insertAdjacentHTML("afterbegin", `<div class="stk-envio"><b style="font-family:'IBM Plex Mono',monospace;">${escapeHtml(r.tracking)}</b><small>${escapeHtml((cat.articulos[r.c] || {}).d || r.c)}${u.prov ? " · " + escapeHtml(nombreProveedor(cat, u.prov) || "proveedor " + u.prov) : ""}</small>
+      ${infoSerie(r.tracking, u) ? `<div class="stk-det" style="font-size:13px;">${escapeHtml(infoSerie(r.tracking, u))}</div>` : ""}
       <div style="margin-top:6px;">Ahora: <b>${escapeHtml(nombreUbicacion(u.u))}</b></div>
       ${inst ? `<div>Instalado en <b>${escapeHtml(inst.cliente)}</b>${inst.comodato ? " (comodato)" : ""} el ${escapeHtml(fch(inst.fecha))}${inst.presupuesto ? ` · presupuesto N° ${escapeHtml(inst.presupuesto)}` : ""}</div>` : ""}
       ${g ? `<div class="${g.cerrada ? "" : "stk-fallado"}">Garantía: ${escapeHtml(GARANTIA_ESTADOS[g.estado] || g.estado)}${g.falla ? ` · ${escapeHtml(g.falla)}` : ""}${g.rma ? ` · RMA ${escapeHtml(g.rma)}` : ""}</div>` : ""}
@@ -19164,7 +19177,7 @@ function pintarPanelTengo() {
   }));
 }
 conectarCasilleroStock(document.getElementById("stkPanelCodigo"), document.getElementById("stkPanelResultados"), { get actual() { return stkPanelCanasta ? stkPanelCanasta.actual : ""; }, interpretar: (t) => stkPanelCanasta.interpretar(t), agregarCodigo: (t) => stkPanelCanasta.agregarCodigo(t), agregarArticulo: (c) => stkPanelCanasta.agregarArticulo(c) }, stkPanelCatalogo);
-document.getElementById("stkPanelEscanearBtn").addEventListener("click", () => abrirEscanerStock({ titulo: stkPanelModo === "usados" ? "Material de mi stock" : "Equipos retirados", leerCuadro: (t) => stkPanelCanasta.leerCuadro(t), estado: () => stkPanelCanasta.estado(), usar: (t) => stkPanelCanasta.agregarCodigo(t), describir: (t) => stkPanelCanasta.describir(t) }));
+document.getElementById("stkPanelEscanearBtn").addEventListener("click", () => abrirEscanerStock({ titulo: stkPanelModo === "usados" ? "Material de mi stock" : "Equipos retirados", leerCuadro: (t) => stkPanelCanasta.leerCuadro(t), estado: () => stkPanelCanasta.estado(), usar: (t, o) => stkPanelCanasta.agregarCodigo(t, o), describir: (t) => stkPanelCanasta.describir(t) }));
 document.getElementById("stkPanelFallado").addEventListener("change", (e) => { document.getElementById("stkPanelFalla").classList.toggle("hidden", !e.target.checked); });
 document.getElementById("stkPanelListoBtn").addEventListener("click", async () => {
   const items = stkPanelCanasta ? stkPanelCanasta.items() : [];

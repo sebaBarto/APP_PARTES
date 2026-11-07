@@ -1306,6 +1306,16 @@ test("Stock: de una caja con varios códigos (etiqueta SAT, modelo, N° de serie
   assert.deepStrictEqual(S.elegirCodigoDelCuadro(["https://x.com"], cat, {}, ""), { usar: null });
   assert.deepStrictEqual(S.elegirCodigoDelCuadro(["GH120FF156"], cat, { unidades: { GH120FF156: { c: "20825", u: "dep" } } }, ""), { usar: "GH120FF156" }, "un equipo ya registrado alcanza solo");
   assert.strictEqual(S.interpretarCodigo("HTTPS://WWW.PARADOX.COM", cat, {}, "").tipo, "ignorar");
+  // Ajax: la etiqueta trae el EAN del producto (igual en todas las cajas) y el ID del equipo
+  const cat2 = { articulos: { 23940: { c: "23940", d: "PIR AJAX", tipo: "unidad", alias: ["4823114000621"], formatos: ["9999AA99999"] } } };
+  assert.deepStrictEqual(S.elegirCodigoDelCuadro(["4823114000621", "3082be85021"], cat2, {}, "23940", true), { usar: "3082BE85021" }, "el EAN de la caja que espera su N° no suma otra");
+  assert.strictEqual(S.infoSerie("3082be85021"), "ID Ajax 3082BE");
+  // Paradox IP150: el Tracking es el N° de serie; Serial y MAC quedan guardados y también sirven para buscarlo
+  const cat3 = { articulos: { 30150: { c: "30150", d: "IP150+ MQT", tipo: "unidad" } } };
+  const m = S.moverStock({ ubic: {} }, [{ c: "30150", cant: 1, unidades: ["1GB000FFA9"], extras: { "1GB000FFA9": { serial: "72075101", mac: "00:19:ba:1d:3f:db" } } }], { de: "proveedor", a: "dep" }, cat3);
+  assert.deepStrictEqual(m.saldos.unidades["1GB000FFA9"].datos, { serial: "72075101", mac: "00:19:BA:1D:3F:DB" });
+  assert.deepStrictEqual([S.interpretarCodigo("72075101", cat3, m.saldos, "").tracking, S.interpretarCodigo("0019BA1D3FDB", cat3, m.saldos, "").tracking], ["1GB000FFA9", "1GB000FFA9"]);
+  assert.strictEqual(S.infoSerie("1GB000FFA9", m.saldos.unidades["1GB000FFA9"]), "Serial 72075101 · MAC 00:19:BA:1D:3F:DB");
 });
 
 test("Stock: si el código de barras no se lee, el servidor lee los números de la foto (y descarta links y lo dudoso)", async () => {

@@ -5598,7 +5598,7 @@ test("Stock en la APP: el depósito entrega escaneando (etiqueta SAT + N° de un
     }
     const b = JSON.parse(req.postData()); posts.push({ quien, ...b });
     if (b.accion === "alias") { catalogo.articulos[b.c].alias = [b.ean]; return json({ ok: true }); }
-    if (b.accion === "leer_codigo_foto") { assert.match(b.imagen, /^data:image\/jpeg;base64,/); return json({ ok: true, codigos: [{ texto: "GH300AA001", rotulo: "Tracking" }, { texto: "000208252779", rotulo: "" }] }); }
+    if (b.accion === "leer_codigo_foto") { assert.match(b.imagen, /^data:image\/jpeg;base64,/); return json({ ok: true, codigos: [{ texto: "GH300AA001", rotulo: "Tracking" }, { texto: "000208252779", rotulo: "" }, { texto: "72075101", rotulo: "Serial" }, { texto: "00:19:BA:1D:3F:DB", rotulo: "MAC" }] }); }
     if (b.accion === "mover" || b.accion === "devolver") {
       const de = b.accion === "devolver" ? `tec:${quien}` : b.de, a = b.accion === "devolver" ? "dep" : b.a;
       const x = S.moverStock(saldos, b.items, { tipo: b.accion, de, a, por: quien, confirmar: /^tec:/.test(a) || b.accion === "devolver" }, catalogo);
@@ -5758,8 +5758,15 @@ test("Stock en la APP: el depósito entrega escaneando (etiqueta SAT + N° de un
   await page.fill(".dlg-app .dlg-input", "gh300aa001");
   await page.click(".dlg-app .dlg-si");
   await page.waitForFunction(() => /GH300AA001/.test(document.querySelector(".stk-escaner-ultimo").textContent));
+  // Leyendo la etiqueta entera se guardan también el Serial y la MAC con ese N° de serie
+  await page.click(".stk-escaner-numeros");
+  await page.waitForSelector('.stk-ocr-cod[data-t="GH300AA001"]');
+  await page.click('.stk-ocr-cod[data-t="GH300AA001"]');
+  await page.waitForFunction(() => { const t = document.querySelector(".stk-escaner-ultimo").textContent; return /Datos guardados con GH300AA001/.test(t) && /Serial 72075101/.test(t) && /MAC 00:19:BA:1D:3F:DB/.test(t); });
   await page.click(".stk-escaner-listo");
-  assert.deepStrictEqual(await page.$$eval("#depCanasta .stk-chip", (c) => c.map((x) => x.textContent.replace("✕", ""))), ["GH300AA001"]);
+  assert.deepStrictEqual(await page.evaluate(() => depCanasta.items()[0].extras), { GH300AA001: { serial: "72075101", mac: "00:19:BA:1D:3F:DB" } });
+  assert.match(await page.textContent("#depCanasta .stk-chip"), /Serial 72075101 · MAC 00:19:BA:1D:3F:DB/);
+  assert.deepStrictEqual(await page.$$eval("#depCanasta .stk-chip", (c) => c.map((x) => x.textContent.replace("✕", "").split(" ")[0])), ["GH300AA001"]);
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });

@@ -6885,20 +6885,23 @@ function stkRenderGarantia() {
   }));
 }
 function stkFichaSerie() {
-  const t = document.getElementById("stkGarBuscar").value.trim().toUpperCase().replace(/\s+/g, ""), cont = document.getElementById("stkGarFicha");
+  let t = document.getElementById("stkGarBuscar").value.trim().toUpperCase().replace(/\s+/g, "");
+  const cont = document.getElementById("stkGarFicha");
   if (!t) { cont.innerHTML = ""; return; }
+  if (!(stk.saldos.unidades || {})[t]) { const o = buscarPorDatos(stk.saldos, t); if (o) t = o.t; } // también por Serial o MAC
   const u = (stk.saldos.unidades || {})[t];
+  cont.dataset.serie = t;
   if (!u) { cont.innerHTML = `<p class="subtitle" style="margin-top:10px;">El N° de serie ${escapeHtmlAdmin(t)} no está registrado.</p>`; return; }
   const a = (stk.catalogo.articulos || {})[u.c] || {}, inst = instalacionDeUnidad(u);
   cont.innerHTML = `<div class="sims-resumen" style="display:block;margin:12px 0;padding:12px;border:1px solid #D6D9DC;border-radius:10px;">
-    <b style="font-family:'IBM Plex Mono',monospace;">${escapeHtmlAdmin(t)}</b> · ${escapeHtmlAdmin(u.c)} ${escapeHtmlAdmin(a.d || "")}${u.prov ? ` · ${escapeHtmlAdmin(nombreProveedor(stk.catalogo, u.prov) || "Proveedor " + u.prov)}` : ""}<br>
+    <b style="font-family:'IBM Plex Mono',monospace;">${escapeHtmlAdmin(t)}</b>${infoSerie(t, u) ? ` <span class="stk-det">(${escapeHtmlAdmin(infoSerie(t, u))})</span>` : ""} · ${escapeHtmlAdmin(u.c)} ${escapeHtmlAdmin(a.d || "")}${u.prov ? ` · ${escapeHtmlAdmin(nombreProveedor(stk.catalogo, u.prov) || "Proveedor " + u.prov)}` : ""}<br>
     Ahora: <b>${escapeHtmlAdmin(nombreUbicacion(u.u))}</b>${inst ? ` · Instalado en <b>${escapeHtmlAdmin(inst.cliente)}</b> el ${escapeHtmlAdmin(stkFecha(inst.fecha))}${inst.presupuesto ? ` (presupuesto ${escapeHtmlAdmin(inst.presupuesto)})` : ""}` : ""}
     ${u.garantia ? `<br>Garantía: ${escapeHtmlAdmin(GARANTIA_ESTADOS[u.garantia.estado] || "")}${u.garantia.falla ? " · " + escapeHtmlAdmin(u.garantia.falla) : ""}` : ""}${u.reemplaza ? `<br>Reemplaza en garantía a ${escapeHtmlAdmin(u.reemplaza)}` : ""}
     ${u.u !== "baja" && !/^cam:/.test(u.u || "") ? `<br><button type="button" class="btn-secondary-admin" id="stkFichaBajaBtn" style="width:auto;margin-top:6px;">Dar de baja este equipo</button>` : ""}
     ${(u.h || []).length ? `<div class="stk-det" style="margin-top:8px;">${u.h.slice().reverse().map((x) => `${escapeHtmlAdmin(stkFecha(x.f))}: ${escapeHtmlAdmin(x.de ? nombreUbicacion(x.de) + " → " : "")}${escapeHtmlAdmin(nombreUbicacion(x.a))}${x.presupuesto ? ` · presup. ${escapeHtmlAdmin(x.presupuesto)}` : ""}${x.por ? ` · ${escapeHtmlAdmin(x.por)}` : ""}${x.motivo ? ` · ${escapeHtmlAdmin(x.motivo)}` : ""}`).join("<br>")}</div>` : ""}</div>`;
 }
 document.getElementById("stkGarBuscar").addEventListener("input", stkFichaSerie);
-document.getElementById("stkGarFicha").addEventListener("click", (e) => { if (e.target && e.target.id === "stkFichaBajaBtn") stkBajaSerie(document.getElementById("stkGarBuscar").value.trim().toUpperCase().replace(/\s+/g, "")); });
+document.getElementById("stkGarFicha").addEventListener("click", (e) => { if (e.target && e.target.id === "stkFichaBajaBtn") stkBajaSerie(document.getElementById("stkGarFicha").dataset.serie); });
 document.getElementById("stkGarCerradas").addEventListener("change", stkRenderGarantia);
 document.getElementById("stkGarExcelBtn").addEventListener("click", () => {
   const filas = stkGarantias().map((x) => ({ "N° de serie": x.t, Código: x.u.c, Artículo: x.d, Proveedor: x.prov, Cliente: x.inst ? x.inst.cliente : "", "Instalado el": x.inst ? stkFecha(x.inst.fecha) : "", Presupuesto: x.inst ? x.inst.presupuesto : "", Falla: x.g.falla || "", "Volvió el": stkFecha(x.g.desde), Estado: GARANTIA_ESTADOS[x.g.estado] || x.g.estado, RMA: x.g.rma || "", "Equipo nuevo": x.g.nuevo || "" }));
