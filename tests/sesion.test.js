@@ -1640,3 +1640,82 @@ test("Stock: catálogo desde el listado de Oficina y la planilla revisada, saldo
     assert.strictEqual(conc2.ocultas.length, 1);
   } finally { global.fetch = fetchViejo; }
 });
+
+test("Stock: control del cuadre (servidor y cron): todo lo hecho por la API cuadra contra el historial, y si alguien toca el stock a mano lo detecta y avisa una vez", async () => {
+  const fetchViejo = global.fetch;
+  const repo = { "tecnicos.json": [{ nombre: "Seba", permisos: { admin: true } }, { nombre: "Melina", permisos: { stock_responsable: true } }, { nombre: "Juan", permisos: {} }] };
+  let version = 0;
+  global.fetch = async (url, op = {}) => {
+    const u = String(url), metodo = op.method || "GET";
+    const m = u.match(/contents\/([^?]+)/);
+    if (m) {
+      const ruta = decodeURIComponent(m[1]);
+      if (metodo === "PUT") { repo[ruta] = JSON.parse(Buffer.from(JSON.parse(op.body).content, "base64").toString()); version++; return new Response("{}", { status: 200 }); }
+      if (!/\.json$/.test(ruta)) { const hijos = Object.keys(repo).filter((k) => k.startsWith(ruta + "/")).map((k) => ({ name: k.slice(ruta.length + 1), type: "file" })); return new Response(JSON.stringify(hijos), { status: hijos.length ? 200 : 404 }); }
+      if (!(ruta in repo)) return new Response("{}", { status: 404 });
+      return new Response(JSON.stringify({ sha: `s${version}`, encoding: "base64", content: Buffer.from(JSON.stringify(repo[ruta])).toString("base64") }));
+    }
+    return new Response("[]");
+  };
+  try {
+    const admin = crearSesion({ nombre: "Seba", rol: "admin" }), melina = crearSesion({ nombre: "Melina", rol: "tecnico" }), juan = crearSesion({ nombre: "Juan", rol: "tecnico" });
+    const post = async (body, t = admin) => { const r = resFalso(); await datos(pedido("POST", { coleccion: "stock" }, body, t), r); return r; };
+    const get = async () => { const r = resFalso(); await datos(pedido("GET", { coleccion: "stock" }, null, admin), r); return r.cuerpo; };
+    await post({ accion: "importar_catalogo", articulos: [{ c: "20825", d: "TECLADO K10LH/V PARADOX", dep: 4 }, { c: "20208", d: "SIRENA MP100 INTERIOR", dep: 10, com: 2 }] });
+    await post({ accion: "configurar", c: "20825", tipo: "unidad" });
+    let r = await post({ accion: "saldo_inicial", items: [{ c: "20825", dep: 4 }, { c: "20208", dep: 10, com: 2 }] });
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    // Un día normal: entrega, el técnico recibe con diferencia, usa en un parte, devuelve; ajuste del admin.
+    r = await post({ accion: "mover", de: "dep", a: "tec:Juan", items: [{ c: "20825", cant: 2, unidades: ["GH12000001", "GH12000002"] }, { c: "20208", cant: 3 }] }, melina);
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    r = await post({ accion: "confirmar_envio", id: r.cuerpo.envio.id, items: [{ c: "20825", cant: 2, unidades: ["GH12000001"] }, { c: "20208", cant: 2 }] }, juan);
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    r = await post({ accion: "consumo_parte", op_id: "parte-1", cliente: "Kiosco", parte: "P1", usados: [{ c: "20825", cant: 1, unidades: ["GH12000002"] }, { c: "20208", cant: 1 }] }, juan);
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    r = await post({ accion: "devolver", items: [{ c: "20208", cant: 1 }] }, juan);
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    r = await post({ accion: "ajustar", c: "20208", ubic: "dep", cantidad: 9, motivo: "Conteo" });
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    // Solo el admin controla; y cuadra.
+    assert.strictEqual((await post({ accion: "cuadrar" }, melina)).statusCode, 403);
+    r = await post({ accion: "cuadrar" });
+    assert.ok(r.cuerpo.cuadre.ok, JSON.stringify(r.cuerpo.cuadre.errores));
+    assert.ok(r.cuerpo.cuadre.revisados.movimientos >= 8);
+    assert.strictEqual((await get()).cuadre.ultimo.ok, true, "el panel ve el último control");
+    // Alguien cambia el archivo a mano: el cron lo detecta, avisa una vez y no repite el mismo aviso al otro día.
+    const sal = repo["stock/saldos.json"];
+    sal.ubic.dep["20208"] += 5;
+    const rutaPush = require.resolve(path.join(raiz, "lib/push-sender.js"));
+    if (!require.cache[rutaPush]) require.cache[rutaPush] = { id: rutaPush, filename: rutaPush, loaded: true, exports: { enviarATodos: async () => ({}), enviarASeleccionados: async () => ({}) } };
+    const { chequearCuadreStock } = require(path.join(raiz, "api", "cron-diario.js"));
+    const t0 = Date.now();
+    let txt = await chequearCuadreStock({}, t0);
+    assert.match(txt, /1 problema\(s\), avisado/);
+    assert.match(repo["stock/cuadre.json"].ultimo.errores[0].texto, /SIRENA MP100 INTERIOR en Depósito: el stock dice 14 y los movimientos dan 9/);
+    txt = await chequearCuadreStock({}, t0 + 864e5);
+    assert.match(txt, /^1 problema\(s\)$/, "el mismo problema no se avisa todos los días");
+    const panel = await get();
+    assert.strictEqual(panel.cuadre.ultimo.ok, false);
+    assert.strictEqual(panel.cuadre.historial.length, 3);
+    // Se verificó que hay 14: se regulariza (el historial queda con el movimiento que faltaba) y vuelve a cuadrar.
+    assert.strictEqual((await post({ accion: "regularizar_cuadre", motivo: "Contado" }, melina)).statusCode, 403);
+    assert.strictEqual((await post({ accion: "regularizar_cuadre" })).statusCode, 400, "sin motivo no");
+    r = await post({ accion: "regularizar_cuadre", motivo: "Contado en el depósito: hay 14" });
+    assert.strictEqual(r.cuerpo.movimientos, 1);
+    assert.ok(r.cuerpo.cuadre.ok, JSON.stringify(r.cuerpo.cuadre.errores));
+    assert.deepStrictEqual(repo["stock/saldos.json"].ubic.dep["20208"], 14, "regularizar no cambia cantidades");
+    const reg = Object.keys(repo).filter((k) => /movimientos-/.test(k)).flatMap((k) => repo[k]).find((m) => m.tipo === "regularizacion");
+    assert.deepStrictEqual([reg.c, reg.cant, reg.a, reg.por], ["20208", 5, "dep", "Seba"]);
+    // Después un conteo da 9: el ajuste queda como movimiento y sigue cuadrando.
+    r = await post({ accion: "ajustar", c: "20208", ubic: "dep", cantidad: 9, motivo: "Conteo" });
+    assert.ok(r.cuerpo.ok);
+    assert.match(await chequearCuadreStock({}, t0 + 2 * 864e5), /^cuadra/);
+    // Un equipo que aparece en otro lugar sin movimiento también se regulariza.
+    repo["stock/saldos.json"].unidades.GH12000001.u = "dep";
+    repo["stock/saldos.json"].ubic["tec:Juan"]["20825"] -= 1; repo["stock/saldos.json"].ubic.dep["20825"] += 1;
+    r = await post({ accion: "cuadrar" });
+    assert.ok(r.cuerpo.cuadre.errores.some((e) => e.k === "serieLugar" && e.serie === "GH12000001"));
+    r = await post({ accion: "regularizar_cuadre", motivo: "El teclado está en el depósito" });
+    assert.ok(r.cuerpo.cuadre.ok, JSON.stringify(r.cuerpo.cuadre.errores));
+  } finally { global.fetch = fetchViejo; }
+});

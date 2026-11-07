@@ -1255,7 +1255,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
   let esResp = esAdmin, tecnicosGuardados = null;
   const tecnicos = async () => (tecnicosGuardados = tecnicosGuardados || (await leerTecnicosGuardados().catch(() => [])));
   if (!esAdmin) { const t = (await tecnicos()).find((x) => x.nombre === autorizacion.nombre); esResp = !!(t && t.permisos && (t.permisos.stock_responsable || t.permisos.admin)); }
-  const SOLO_ADMIN = ["baja_serie", "salud_revisado", "configurar_varios", "proveedores", "marcar_oficina", "importar_catalogo", "configurar", "saldo_inicial", "ajustar", "conc_marcar", "conc_reactivar", "conc_corrida"];
+  const SOLO_ADMIN = ["cuadrar", "regularizar_cuadre", "baja_serie", "salud_revisado", "configurar_varios", "proveedores", "marcar_oficina", "importar_catalogo", "configurar", "saldo_inicial", "ajustar", "conc_marcar", "conc_reactivar", "conc_corrida"];
   try {
     if (req.method === "GET" && q.serie) {
       // Ficha de un equipo por su N° de serie: dónde está, a qué cliente fue y su garantía.
@@ -1301,7 +1301,9 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
       }
       const [cat, sal, conc] = await Promise.all([leerArchivoDatos(STOCK_CAT, { articulos: {} }), leerArchivoDatos(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }), leerArchivoDatos(STOCK_CONC, { marcas: [], corridas: [] })]);
       if (cat.corrupto || sal.corrupto) { res.status(500).json({ error: "Un archivo del stock no se pudo leer: hay que restaurarlo desde una copia de seguridad." }); return; }
-      res.status(200).json({ catalogo: cat.data, saldos: sal.data, conciliacion: { marcas: (conc.data && conc.data.marcas) || [], corridas: ((conc.data && conc.data.corridas) || []).slice(0, 24) } });
+      let cuadre = null;
+      try { const { data } = await leerArchivoDatos("stock/cuadre.json", {}); cuadre = data && data.ultimo ? { ultimo: data.ultimo, historial: (data.historial || []).slice(0, 14) } : null; } catch (e) { cuadre = null; }
+      res.status(200).json({ catalogo: cat.data, saldos: sal.data, conciliacion: { marcas: (conc.data && conc.data.marcas) || [], corridas: ((conc.data && conc.data.corridas) || []).slice(0, 24) }, cuadre });
       return;
     }
     if (req.method !== "POST") { res.status(405).json({ error: "Método no permitido" }); return; }
@@ -1315,6 +1317,35 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
       if (pend.length) await stockConfirmarMovs(pend, "Stock: movimientos pendientes pasados al historial");
     } catch (e) { /* se reintenta en la próxima */ }
 
+    if (b.accion === "cuadrar") {
+      // «Controlar ahora»: el mismo cuadre del control automático, a pedido.
+      const C = require("../lib/stock-cuadre");
+      let r;
+      try { r = await C.cuadrarStock(new Date()); } catch (e) { res.status(502).json({ error: `No se pudo hacer el control: ${String(e.message || e).slice(0, 200)}` }); return; }
+      r.por = quien;
+      if (!r.sinStock) { try { await C.guardarCuadre(r); } catch (e) { /* el resultado igual se muestra */ } }
+      res.status(200).json({ ok: true, cuadre: r });
+      return;
+    }
+    if (b.accion === "regularizar_cuadre") {
+      // El admin verificó que lo guardado es lo real: se agregan al historial los movimientos que faltan
+      // para que cuadre (no cambia ninguna cantidad). Después, si el conteo físico da otra cosa, se ajusta.
+      const C = require("../lib/stock-cuadre");
+      const motivo = String(b.motivo || "").replace(/\s+/g, " ").trim().slice(0, 160);
+      if (!motivo) { res.status(400).json({ error: "Falta el motivo (qué se verificó)" }); return; }
+      let x = null;
+      for (let i = 0; i < 3 && !(x && x.estable); i++) x = await C.leerParaCuadre();
+      if (!x || x.sinStock) { res.status(409).json({ error: "El stock no está inicializado" }); return; }
+      if (!x.estable) { res.status(409).json({ error: "El stock está cambiando ahora (alguien está operando): probá en un minuto" }); return; }
+      const movs = S.movimientosDeRegularizacion(x.saldos, x.movimientos, x.catalogo, { fecha: ahora, por: quien, motivo: `Regularización del cuadre: ${motivo}` });
+      if (!movs.length) { res.status(200).json({ ok: true, movimientos: 0 }); return; }
+      const ok = await stockRegistrarMovimientos(movs, `Stock: regularización del cuadre, ${movs.length} movimiento(s) (por ${quien}): ${motivo}`);
+      if (!ok) { res.status(502).json({ error: "No se pudo guardar en el historial (probá de nuevo)" }); return; }
+      let cuadre = null;
+      try { cuadre = await C.cuadrarStock(new Date()); cuadre.por = quien; await C.guardarCuadre(cuadre); } catch (e) { /* se ve en el próximo control */ }
+      res.status(200).json({ ok: true, movimientos: movs.length, cuadre });
+      return;
+    }
     if (b.accion === "consumo_parte") {
       // Lo que el técnico cargó en el parte: lo de su stock pasa al cliente; lo que no figuraba queda
       // para que el responsable de stock lo apruebe; lo retirado (escaneado) entra a su stock.

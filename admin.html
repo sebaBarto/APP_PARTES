@@ -220,6 +220,25 @@
   .stk-ico { width: 16px; height: 16px; flex: none; vertical-align: -3px; }
   .stk-tag .stk-ico { width: 12px; height: 12px; vertical-align: -2px; }
   .stk-tabla select.stk-tipo { min-width: 160px; }
+  .stk-cuadre { margin: 4px 0 14px; padding: 12px 14px; border: 1px solid #E2E5E8; border-radius: 12px; }
+  .stk-cuadre-estado { display: flex; gap: 10px; align-items: flex-start; }
+  .stk-cuadre-estado > .stk-ico { width: 22px; height: 22px; margin-top: 1px; }
+  .stk-cuadre-estado b { display: block; font-size: 15px; }
+  .stk-cuadre-estado span { display: block; font-size: 13px; color: #6B7680; margin-top: 2px; }
+  .stk-cuadre-estado.ok > .stk-ico, .stk-cuadre-estado.ok b { color: #1E7B3A; }
+  .stk-cuadre-estado.err > .stk-ico, .stk-cuadre-estado.err b { color: #B3261E; }
+  .stk-cuadre-lista { margin: 8px 0 0 32px; padding: 0; font-size: 13.5px; }
+  .stk-cuadre-lista li { margin: 3px 0; }
+  .stk-cuadre-lista.aviso { color: #8A5A00; }
+  .stk-punto { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin: 0 2px; vertical-align: -1px; background: #1E7B3A; }
+  .stk-punto.err { background: #B3261E; }
+  #stkSaludLista .stk-tabla td { white-space: normal !important; overflow-wrap: anywhere; }
+  #stkSaludLista .stk-tabla { width: 100%; min-width: 0; }
+  @media (max-width: 640px) {
+    #stkSaludLista .stk-tabla tr { display: block; padding: 6px 0; }
+    #stkSaludLista .stk-tabla td { display: block; border: 0; padding: 4px 6px; }
+    #stkSaludLista .stk-tabla .stk-btns { text-align: left; white-space: normal; }
+  }
   .stk-det .stk-ico { width: 12px; height: 12px; vertical-align: -2px; color: #1E7B3A; }
   #panelStock button:has(> .stk-ico) { display: inline-flex; align-items: center; gap: 6px; }
   .stk-tag { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: 11.5px; font-weight: 700; background: #EEF0F2; color: #3A4651; }
@@ -1345,6 +1364,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
         <div class="card">
           <h3 style="margin-top:0;">Salud del stock</h3>
           <p class="subtitle" style="margin-top:0;">Todo lo que no cumple la regla de un solo lugar (cada equipo en un único lugar, las cantidades de acuerdo con sus N° de serie), con qué hacer en cada caso.</p>
+          <div id="stkCuadre" class="stk-cuadre"></div>
           <div id="stkSaludLista"></div>
         </div>
       </div>
@@ -2342,6 +2362,8 @@ async function cargarInicioAdmin() {
       const salud = saludStock(stockDatos.catalogo, stockDatos.saldos).filter((g) => g.nivel !== "info");
       const nSalud = salud.reduce((t, g) => t + g.items.length, 0);
       agregar(nSalud, "Stock: cosas que no cuadran", salud.map((g) => `${g.titulo} (${g.items.length})`).slice(0, 2).join(" · "), "tabStockBtn", salud.some((g) => g.nivel === "error") ? "urgente" : "atencion");
+      const cu = stockDatos.cuadre && stockDatos.cuadre.ultimo;
+      if (cu && !cu.ok) agregar(cu.totalErrores || 1, "Stock: el control encontró problemas", ((cu.errores || [])[0] || {}).texto || "", "tabStockBtn", "urgente");
       agregar(pp.length, "Artículos para pedir", pp.slice(0, 3).map((x) => x.d).join(" · ") + (pp.length > 3 ? ` y ${pp.length - 3} más` : ""), "tabStockBtn", "atencion");
     }
   } catch (e) { /* nada */ }
@@ -6263,7 +6285,7 @@ async function stkLeer() {
   const r = await fetch("/api/datos?coleccion=stock", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
   const d = await r.json().catch(() => null);
   if (!r.ok || !d || !d.catalogo) throw new Error((d && d.error) || "Error " + r.status);
-  stk = { catalogo: d.catalogo || { articulos: {} }, saldos: d.saldos || { ubic: {}, unidades: {}, pedidos: {} }, conc: d.conciliacion || { marcas: [], corridas: [] } };
+  stk = { catalogo: d.catalogo || { articulos: {} }, saldos: d.saldos || { ubic: {}, unidades: {}, pedidos: {} }, conc: d.conciliacion || { marcas: [], corridas: [] }, cuadre: d.cuadre || null };
   return stk;
 }
 async function stkCargar() {
@@ -6705,7 +6727,7 @@ function stkRenderPedidos() {
 
 // --- Movimientos ---
 let stkMovs = [];
-const STK_MOV_TIPO = { inicial: "Saldo inicial", ajuste: "Ajuste", entrega: "Entrega a técnico (en camino)", recibido: "Recibido", diferencia: "Diferencia (vuelve)", rechazado: "Rechazado (vuelve)", devolucion: "Devolución", a_cliente: "A cliente", retiro: "Retiro de cliente", traspaso: "Traspaso", consumo: "Usado en cliente", ingreso: "Ingreso (compra)", inventario_series: "Inventario de N° de serie", baja: "Baja de un equipo", instalado_parte: "Instalado (parte)", retirado_parte: "Retirado de cliente (parte)", falla: "Fallado → Garantía", garantia_reparado: "Volvió reparado de garantía", garantia_reemplazo: "Reemplazo en garantía", garantia_rechazada: "Garantía rechazada (baja)" };
+const STK_MOV_TIPO = { inicial: "Saldo inicial", ajuste: "Ajuste", regularizacion: "Regularización (cuadre)", entrega: "Entrega a técnico (en camino)", recibido: "Recibido", diferencia: "Diferencia (vuelve)", rechazado: "Rechazado (vuelve)", devolucion: "Devolución", a_cliente: "A cliente", retiro: "Retiro de cliente", traspaso: "Traspaso", consumo: "Usado en cliente", ingreso: "Ingreso (compra)", inventario_series: "Inventario de N° de serie", baja: "Baja de un equipo", instalado_parte: "Instalado (parte)", retirado_parte: "Retirado de cliente (parte)", falla: "Fallado → Garantía", garantia_reparado: "Volvió reparado de garantía", garantia_reemplazo: "Reemplazo en garantía", garantia_rechazada: "Garantía rechazada (baja)" };
 async function stkCargarMovimientos() {
   const mesInp = document.getElementById("stkMovMes");
   if (!mesInp.value) mesInp.value = new Date().toISOString().slice(0, 7);
@@ -6814,13 +6836,57 @@ function stkOficinaExcel(lista) {
 document.getElementById("stkOfMes").addEventListener("change", stkCargarOficina);
 document.getElementById("stkOfVerPasados").addEventListener("change", stkRenderOficina);
 
+// Iconos (SVG) del stock en el panel.
+const STK_ICONOS_ADMIN = {
+  check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  alerta: '<path d="M12 3.5l9.5 16.5h-19z"/><path d="M12 10v4.5"/><path d="M12 17.5v.01"/>',
+  repetir: '<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/>',
+};
+const stkIcoAdmin = (n) => `<svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${STK_ICONOS_ADMIN[n] || ""}</svg>`;
 // --- Salud del stock ---
 function stkPintarBadgeSalud() {
   const b = document.getElementById("stkSaludBadge"); if (!b || !stk) return;
-  const n = saludStock(stk.catalogo, stk.saldos).filter((g) => g.nivel !== "info").reduce((t, g) => t + g.items.length, 0);
+  const u = stk.cuadre && stk.cuadre.ultimo;
+  const n = saludStock(stk.catalogo, stk.saldos).filter((g) => g.nivel !== "info").reduce((t, g) => t + g.items.length, 0) + (u && !u.ok ? u.totalErrores || 1 : 0);
   b.textContent = String(n); b.classList.toggle("hidden", !n);
 }
+// Control del stock: el cuadre contra todo el historial de movimientos (automático dos veces por día).
+function stkRenderCuadre() {
+  const cont = document.getElementById("stkCuadre"); if (!cont) return;
+  const u = stk.cuadre && stk.cuadre.ultimo, hist = (stk.cuadre && stk.cuadre.historial) || [];
+  const cuando = (f) => new Date(f).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
+  const rev = (u && u.revisados) || {};
+  const estado = !u ? `<div class="stk-cuadre-estado"><b>Todavía no se hizo ningún control.</b><span>Se hace solo todos los días; podés hacerlo ahora.</span></div>`
+    : u.ok ? `<div class="stk-cuadre-estado ok">${stkIcoAdmin("check")}<div><b>El stock cuadra</b><span>Control del ${escapeHtmlAdmin(cuando(u.fecha))} (${escapeHtmlAdmin(u.por || "automático")}): ${rev.movimientos || 0} movimientos, ${rev.series || 0} N° de serie. Cada equipo está en un solo lugar y el saldo es igual a la suma de los movimientos.</span></div></div>`
+    : `<div class="stk-cuadre-estado err">${stkIcoAdmin("alerta")}<div><b>El stock no cuadra: ${u.totalErrores} problema(s)</b><span>Control del ${escapeHtmlAdmin(cuando(u.fecha))} (${escapeHtmlAdmin(u.por || "automático")}). Cada línea dice qué guardó el stock y qué dan los movimientos.</span></div></div>
+      <ul class="stk-cuadre-lista">${(u.errores || []).map((e) => `<li>${escapeHtmlAdmin(e.texto)}</li>`).join("")}${u.totalErrores > (u.errores || []).length ? `<li>… y ${u.totalErrores - u.errores.length} más.</li>` : ""}</ul>`;
+  const avisos = u && (u.avisos || []).length ? `<ul class="stk-cuadre-lista aviso">${u.avisos.map((a) => `<li>${escapeHtmlAdmin(a.texto)}</li>`).join("")}</ul>` : "";
+  const dias = hist.length > 1 ? `<div class="stk-det" style="margin-top:6px;">Últimos controles: ${hist.slice(0, 10).map((h) => `<span class="stk-punto ${h.ok ? "ok" : "err"}" title="${escapeHtmlAdmin(cuando(h.fecha))}: ${h.ok ? "cuadra" : `${h.errores} problema(s)`}"></span>`).join(" ")}</div>` : "";
+  cont.innerHTML = `${estado}${avisos}<div class="field-row" style="gap:8px;margin-top:8px;align-items:center;"><button type="button" class="btn-secondary-admin" id="stkCuadrarBtn" style="width:auto;">${stkIcoAdmin("repetir")} Controlar ahora</button>${u && !u.ok && !u.fallo ? `<button type="button" class="btn-secondary-admin" id="stkRegularizarBtn" style="width:auto;">${stkIcoAdmin("check")} Lo guardado es lo real: regularizar</button>` : ""}</div>${u && !u.ok && !u.fallo ? '<p class="stk-det" style="margin:6px 0 0;">Primero verificá en el depósito (o con el técnico) qué hay de verdad. Si es lo que dice el stock, regularizá: se agregan al historial los movimientos que faltaban, sin cambiar cantidades. Si no, regularizá y después ajustá con el conteo.</p>' : ""}${dias}`;
+  document.getElementById("stkCuadrarBtn").addEventListener("click", (e) => simsConBoton(e.currentTarget, async () => {
+    try {
+      const r = await stkPost({ accion: "cuadrar" });
+      stk.cuadre = { ultimo: r.cuadre, historial: [{ fecha: r.cuadre.fecha, ok: r.cuadre.ok, errores: r.cuadre.totalErrores || 0 }, ...hist] };
+      avisoAdmin(r.cuadre.ok ? "Listo: el stock cuadra." : `El stock no cuadra: ${r.cuadre.totalErrores} problema(s).`, r.cuadre.ok ? "ok" : "err");
+    } catch (err) { avisoAdmin("No se pudo controlar: " + err.message, "err"); }
+    stkRenderCuadre(); stkPintarBadgeSalud();
+  }));
+  const reg = document.getElementById("stkRegularizarBtn");
+  if (reg) reg.addEventListener("click", async (e) => {
+    const motivo = await pedirTextoAdmin(`Regularizar ${u.totalErrores} problema(s): se acepta lo que dice el stock como correcto y queda registrado en el historial a tu nombre. ¿Qué verificaste? Ej: contado en el depósito, el teclado está en la camioneta de Juan:`, "");
+    if (!motivo || !motivo.trim()) return;
+    await simsConBoton(e.currentTarget, async () => {
+      try {
+        const r = await stkPost({ accion: "regularizar_cuadre", motivo: motivo.trim() });
+        if (r.cuadre) stk.cuadre = { ultimo: r.cuadre, historial: [{ fecha: r.cuadre.fecha, ok: r.cuadre.ok, errores: r.cuadre.totalErrores || 0 }, ...hist] };
+        avisoAdmin(r.cuadre && r.cuadre.ok ? `Listo: ${r.movimientos} movimiento(s) de regularización; el stock cuadra.` : "Se regularizó, pero quedan problemas: revisalos.", r.cuadre && r.cuadre.ok ? "ok" : "err");
+      } catch (err) { avisoAdmin("No se pudo: " + err.message, "err"); }
+    });
+    stkRenderCuadre(); stkPintarBadgeSalud();
+  });
+}
 function stkRenderSalud() {
+  stkRenderCuadre();
   const grupos = saludStock(stk.catalogo, stk.saldos), cont = document.getElementById("stkSaludLista");
   const color = { error: "#B3261E", aviso: "#8A5A00", info: "#3A4651" };
   cont.innerHTML = !grupos.some((g) => g.nivel !== "info") ? '<p class="status ok">Todo cuadra: cada equipo está en un solo lugar.</p>' : "";

@@ -682,6 +682,35 @@ async function chequearEnviosStock(ghHeaders, estado, ahora) {
   return avisados;
 }
 
+// Stock: cuadre automático. Recalcula todo el stock desde el historial de movimientos y lo compara
+// con el saldo guardado (cada equipo en un solo lugar, nada negativo, lo «en camino» igual a los
+// envíos abiertos). Si algo no da, avisa a los administradores (el mismo problema, cada 3 días).
+async function chequearCuadreStock(ghHeaders, ahora) {
+  const C = require("../lib/stock-cuadre");
+  let r;
+  try { r = await C.cuadrarStock(new Date(ahora)); } catch (e) {
+    r = { fecha: new Date(ahora).toISOString(), ok: false, fallo: true, errores: [{ k: "fallo", texto: `No se pudo hacer el control del stock: ${String(e.message || e).slice(0, 200)}` }], totalErrores: 1, avisos: [], revisados: {} };
+  }
+  if (r.sinStock) return "sin stock inicializado";
+  r.por = "control automático";
+  const firma = C.firmaCuadre(r);
+  let avisar = false;
+  await C.guardarCuadre(r, (av) => {
+    if (!firma) return null;
+    if (av && av.firma === firma && ahora - new Date(av.fecha).getTime() < 3 * 864e5) return av;
+    avisar = true;
+    return { firma, fecha: new Date(ahora).toISOString() };
+  });
+  if (avisar) {
+    let admins = [];
+    try { admins = ((await leerJSON(ghHeaders, "tecnicos.json", [])).data || []).filter((t) => t.permisos && t.permisos.admin).map((t) => t.nombre); } catch (e) { admins = []; }
+    if (admins.length) {
+      try { await enviarASeleccionados(admins, { titulo: r.fallo ? "No se pudo controlar el stock" : "El stock no cuadra", cuerpo: `${r.fallo ? "" : `${r.totalErrores} problema(s). `}${r.errores[0].texto}`.slice(0, 180) + " Ver Stock › Salud en el panel.", url: "/admin.html" }); } catch (e) { /* el aviso es opcional */ }
+    }
+  }
+  return r.ok ? `cuadra (${(r.revisados || {}).movimientos || 0} movimientos)` : `${r.totalErrores} problema(s)${avisar ? ", avisado" : ""}`;
+}
+
 // Propuestas 3D mandadas a clientes: a quien la mandó se le avisa a quién
 // conviene llamar (la miró varias veces, no la abrió, se está enfriando).
 // Cada aviso sale una sola vez por propuesta y por motivo.
@@ -741,12 +770,14 @@ module.exports = async (req, res) => {
     try { vencimientosAvisados = await chequearVencimientos(ghHeaders, headersBackendNuevo, estado, ahora); } catch (e) { vencimientosAvisados = "error: " + e.message; }
     let enviosStock = null;
     try { enviosStock = await chequearEnviosStock(ghHeaders, estado, Date.now()); } catch (e) { enviosStock = "error: " + e.message; }
+    let cuadreStock = null;
+    try { cuadreStock = await chequearCuadreStock(ghHeaders, Date.now()); } catch (e) { cuadreStock = "error: " + e.message; }
     let propuestasAvisadas = null;
     try { propuestasAvisadas = await chequearPropuestas3d(ghHeaders); } catch (e) { propuestasAvisadas = "error: " + e.message; }
 
     await guardarJSON(ghHeaders, ESTADO_PATH, estado, shaEstado);
 
-    res.status(200).json({ ok: true, guardia_notificada: tecnicoDeGuardia || null, recordatorio_en_calle: tecnicosRecordados || null, felicitacion_semanal: ganadoresSemana || null, recordatorio_devolver: recordadosDevolver || null, resumen_semanal: resumenSemanal || null, instalaciones_avisadas: instalacionesAvisadas || null, propuestas_3d: propuestasAvisadas, vencimientos: vencimientosAvisados, stock_envios: enviosStock });
+    res.status(200).json({ ok: true, guardia_notificada: tecnicoDeGuardia || null, recordatorio_en_calle: tecnicosRecordados || null, felicitacion_semanal: ganadoresSemana || null, recordatorio_devolver: recordadosDevolver || null, resumen_semanal: resumenSemanal || null, instalaciones_avisadas: instalacionesAvisadas || null, propuestas_3d: propuestasAvisadas, vencimientos: vencimientosAvisados, stock_envios: enviosStock, stock_cuadre: cuadreStock });
   } catch (err) {
     res.status(500).json({ error: "Error interno en el cron diario", detail: String(err.message || err) });
   }
@@ -754,3 +785,4 @@ module.exports = async (req, res) => {
 module.exports.chequearPropuestas3d = chequearPropuestas3d;
 module.exports.chequearVencimientos = chequearVencimientos;
 module.exports.chequearEnviosStock = chequearEnviosStock;
+module.exports.chequearCuadreStock = chequearCuadreStock;
