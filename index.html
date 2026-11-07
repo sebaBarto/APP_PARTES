@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#101820">
-<meta name="app-version" content="4.55.0">
+<meta name="app-version" content="4.56.0">
 <meta name="description" content="Digitalizador de partes técnicos de servicio">
 <title>Servicio Técnico SAT</title>
 <link rel="manifest" href="manifest.json">
@@ -1309,12 +1309,27 @@
     <div class="review-scroll">
       <p class="hint-eyebrow review-eyebrow">MI STOCK</p>
       <p class="list-status" id="miStockStatus"></p>
+      <div class="stk-mi-codigo">
+        <button type="button" class="btn btn-primary" id="miStockCodigoBtn"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3"/></svg>Mi código para recibir en mano</button>
+        <p class="stk-ayuda">En el depósito mostrá este código: lo que te entregan queda confirmado en el momento, sin tocar «Recibí».</p>
+      </div>
       <div id="miStockPorRecibir"></div>
       <h3 class="stk-h">Lo que tengo</h3>
       <div id="miStockTengo"></div>
+      <details class="stk-pedir" id="miStockPedirCaja">
+        <summary><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/></svg>Pedir material al depósito</summary>
+        <p class="stk-ayuda">Armá la lista: le llega al depósito para que lo prepare.</p>
+        <input class="field-input" type="search" id="miStockPedirBuscar" placeholder="Buscá el artículo (nombre o código)" autocomplete="off">
+        <div id="miStockPedirResultados"></div>
+        <div id="miStockPedirLista"></div>
+        <input class="field-input" type="text" id="miStockPedirNota" placeholder="Nota (opcional). Ej: para la obra de mañana" autocomplete="off">
+        <button type="button" class="btn btn-primary" id="miStockPedirBtn" disabled>Pedir</button>
+      </details>
+      <div id="miStockPedidos"></div>
       <div id="miStockDevolverCaja" class="hidden">
         <h3 class="stk-h">Devolver al depósito</h3>
         <p class="stk-ayuda">Tocá «Devolver» en lo que vuelve, o escaneá la etiqueta (y el N° de serie de los equipos).</p>
+        <button type="button" class="btn btn-secondary btn-small" id="miStockRetiradosBtn"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Cargar lo que retiré de clientes</button>
         <div class="stk-escanear-fila"><button type="button" class="btn btn-secondary btn-small" id="miStockEscanearBtn"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>Escanear</button><input class="field-input" type="text" id="miStockCodigo" placeholder="Código o N° de serie" autocomplete="off" enterkeyhint="done"></div>
         <div id="miStockCanasta"></div>
         <div class="field-group">
@@ -1335,6 +1350,11 @@
   <section class="screen" id="screen-deposito">
     <div class="review-scroll">
       <p class="hint-eyebrow review-eyebrow">DEPÓSITO</p>
+      <div class="stk-unico">
+        <button type="button" class="btn btn-primary" id="depEscaneoUnicoBtn"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>Escanear</button>
+        <p class="stk-ayuda">El código del técnico (le entregás en mano), el de una devolución, o un artículo para ver dónde está.</p>
+      </div>
+      <div id="depSolicitudes"></div>
       <div class="stk-modos" id="depModos">
         <button type="button" data-modo="entregar" class="activo">Baja (sale)</button>
         <button type="button" data-modo="recibir">Alta (entra)</button>
@@ -1361,6 +1381,7 @@
         <div class="field-group hidden" id="depPresupuestoCaja"><label class="field-label" for="depPresupuesto">N° de presupuesto (opcional)</label>
           <input class="field-input" type="text" inputmode="numeric" id="depPresupuesto" autocomplete="off" placeholder="Ej: 4521"></div>
         <button type="button" class="btn btn-secondary btn-small hidden" id="depRepetirBtn"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 0 1 14-5.3L20 9"/><path d="M20 4v5h-5"/><path d="M20 12a8 8 0 0 1-14 5.3L4 15"/><path d="M4 20v-5h5"/></svg>Repetir la última entrega</button>
+        <div id="depPaseCaja"></div>
       </div>
       <div data-dep="recibir" class="hidden">
         <div id="depDevoluciones"></div>
@@ -1385,6 +1406,7 @@
         <div id="depInvFaltan"></div>
       </div>
       <div data-dep="entregar recibir inventario" id="depCanastaCaja">
+        <div id="depSolicitudAvance" data-dep="entregar"></div>
         <div class="stk-escanear-fila"><button type="button" class="btn btn-primary btn-small" id="depEscanearBtn"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>Escanear</button><input class="field-input" type="text" id="depCodigo" placeholder="Código, N° de serie o descripción" autocomplete="off" enterkeyhint="done"></div>
         <div id="depBuscarResultados"></div>
         <div id="depCanasta"></div>

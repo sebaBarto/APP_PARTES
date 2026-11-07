@@ -1719,3 +1719,89 @@ test("Stock: control del cuadre (servidor y cron): todo lo hecho por la API cuad
     assert.ok(r.cuerpo.cuadre.ok, JSON.stringify(r.cuerpo.cuadre.errores));
   } finally { global.fetch = fetchViejo; }
 });
+
+test("Stock: entrega en mano (código QR firmado del técnico o su clave), pedidos de material y devolver lo retirado de clientes", async () => {
+  const fetchViejo = global.fetch;
+  const repo = {
+    "tecnicos.json": [{ nombre: "Melina", password: "m1", permisos: { stock_responsable: true } }, { nombre: "Juan", password: "clave-juan", permisos: {} }, { nombre: "Luis", password: "l1", permisos: {} }],
+    "stock/catalogo.json": { articulos: { 20825: { c: "20825", d: "TECLADO K10LH/V", tipo: "unidad" }, 20208: { c: "20208", d: "SIRENA MP100", tipo: "cantidad" }, 40001: { c: "40001", d: "BATERIA 12V", tipo: "cantidad" } } },
+    "stock/saldos.json": { inicializado: "2026-11-01", ubic: { dep: { 20825: 3, 20208: 10, 40001: 6 } }, unidades: {}, pedidos: {} },
+  };
+  global.fetch = async (url, op = {}) => {
+    const u = String(url), metodo = op.method || "GET";
+    if (u.includes("/api/tecnicos") || u.includes("/api/login")) return new Response("{}", { status: 404 });
+    const m = u.match(/contents\/([^?]+)/);
+    if (m) {
+      const ruta = decodeURIComponent(m[1]);
+      if (metodo === "PUT") { repo[ruta] = JSON.parse(Buffer.from(JSON.parse(op.body).content, "base64").toString()); return new Response("{}", { status: 200 }); }
+      if (!(ruta in repo)) return new Response("{}", { status: 404 });
+      return new Response(JSON.stringify({ sha: "s", encoding: "base64", content: Buffer.from(JSON.stringify(repo[ruta])).toString("base64") }));
+    }
+    return new Response("[]");
+  };
+  const rutaPush = require.resolve(path.join(raiz, "lib/push-sender.js"));
+  const viejoPush = require.cache[rutaPush], avisos = [];
+  require.cache[rutaPush] = { id: rutaPush, filename: rutaPush, loaded: true, exports: { enviarATodos: async () => ({}), enviarASeleccionados: async (n, a) => { avisos.push({ n, ...a }); return {}; } } };
+  try {
+    const melina = crearSesion({ nombre: "Melina", rol: "tecnico" }), juan = crearSesion({ nombre: "Juan", rol: "tecnico" }), luis = crearSesion({ nombre: "Luis", rol: "tecnico" });
+    const post = async (body, t) => { const r = resFalso(); await datos(pedido("POST", { coleccion: "stock" }, body, t), r); return r; };
+    const get = async (q, t) => { const r = resFalso(); await datos(pedido("GET", { coleccion: "stock", ...q }, null, t), r); return r; };
+    // 1) Juan pide material desde la APP: le llega a Melina.
+    let r = await post({ accion: "pedir_material", items: [{ c: "40001", cant: 2 }, { c: "20825", cant: 1 }, { c: "99999", cant: 1 }], nota: "Para la obra de mañana" }, juan);
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    const sol = r.cuerpo.solicitud;
+    assert.deepStrictEqual(sol.items, [{ c: "40001", cant: 2 }, { c: "20825", cant: 1 }], "lo que no está en el catálogo no entra");
+    assert.ok(avisos.some((a) => a.n.includes("Melina") && /Juan pide material/.test(a.titulo) && /2 BATERIA 12V/.test(a.cuerpo)));
+    assert.strictEqual((await post({ accion: "pedido_listo", id: sol.id }, luis)).statusCode, 403);
+    assert.strictEqual((await post({ accion: "cancelar_pedido", id: sol.id }, luis)).statusCode, 403, "otro técnico no cancela lo de Juan");
+    r = await post({ accion: "pedido_listo", id: sol.id }, melina);
+    assert.strictEqual(r.cuerpo.solicitud.estado, "lista");
+    assert.ok(avisos.some((a) => a.n.includes("Juan") && /listo/.test(a.titulo)));
+    assert.strictEqual((await get({ mio: 1 }, juan)).cuerpo.solicitudes[0].estado, "lista");
+    // 2) Juan muestra su código: Melina lo escanea y entrega en mano (sin «en camino»).
+    const { codigo } = (await get({ mi_codigo: 1 }, juan)).cuerpo;
+    assert.match(codigo, /^SATT1\./);
+    const codigoLuis = (await get({ mi_codigo: 1 }, luis)).cuerpo.codigo;
+    r = await post({ accion: "mover", de: "dep", a: "tec:Juan", items: [{ c: "40001", cant: 2 }], en_mano: { codigo: codigoLuis } }, melina);
+    assert.strictEqual(r.statusCode, 403, "el código de otro técnico no sirve");
+    r = await post({ accion: "mover", de: "dep", a: "tec:Juan", items: [{ c: "40001", cant: 2 }], en_mano: { codigo: codigo.slice(0, -3) + "AAA" } }, melina);
+    assert.strictEqual(r.statusCode, 403, "un código adulterado no sirve");
+    r = await post({ accion: "mover", de: "dep", a: "tec:Juan", items: [{ c: "40001", cant: 2 }, { c: "20825", cant: 1, unidades: ["GH12000001"] }], en_mano: { codigo, escaneado: new Date().toISOString() }, solicitud: sol.id }, melina);
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    assert.strictEqual(r.cuerpo.en_mano, "código");
+    assert.ok(!r.cuerpo.envio, "no queda en camino");
+    let sal = repo["stock/saldos.json"];
+    assert.deepStrictEqual(sal.ubic["tec:Juan"], { 40001: 2, 20825: 1 });
+    assert.ok(!sal.ubic["cam:Juan"]);
+    assert.strictEqual(sal.unidades.GH12000001.u, "tec:Juan");
+    assert.strictEqual(sal.solicitudes.find((x) => x.id === sol.id).estado, "entregada");
+    const mes = new Date().toISOString().slice(0, 7);
+    assert.ok(repo[`stock/movimientos-${mes}.json`].some((m) => m.tipo === "entrega_mano" && /Recibido en mano por Juan \(código\)/.test(m.motivo)));
+    // Un código vencido (escaneado hace más de 15 minutos) no sirve.
+    r = await post({ accion: "mover", de: "dep", a: "tec:Juan", items: [{ c: "20208", cant: 1 }], en_mano: { codigo, escaneado: new Date(Date.now() - 40 * 60e3).toISOString() } }, melina);
+    assert.strictEqual(r.statusCode, 403);
+    const { crearPaseStock } = require(path.join(raiz, "lib/sesion.js"));
+    const viejo = crearPaseStock("Juan", Date.now() - 30 * 60e3).codigo;
+    r = await post({ accion: "mover", de: "dep", a: "tec:Juan", items: [{ c: "20208", cant: 1 }], en_mano: { codigo: viejo } }, melina);
+    assert.strictEqual(r.statusCode, 403, "un código de hace media hora (captura de pantalla) no sirve");
+    assert.match(r.cuerpo.error, /venció/);
+    // 3) Con la clave de Juan (no tenía el celular a mano).
+    r = await post({ accion: "mover", de: "dep", a: "tec:Juan", items: [{ c: "20208", cant: 1 }], en_mano: { clave: "otra" } }, melina);
+    assert.strictEqual(r.statusCode, 403);
+    r = await post({ accion: "mover", de: "dep", a: "tec:Juan", items: [{ c: "20208", cant: 1 }], en_mano: { clave: "clave-juan" } }, melina);
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    assert.strictEqual(repo["stock/saldos.json"].ubic["tec:Juan"]["20208"], 1);
+    // Sin código ni clave sigue como antes: en camino hasta que confirme.
+    r = await post({ accion: "mover", de: "dep", a: "tec:Juan", items: [{ c: "20208", cant: 1 }] }, melina);
+    assert.ok(r.cuerpo.envio);
+    // 4) Retira de un cliente y después devuelve «lo retirado» de una.
+    r = await post({ accion: "consumo_parte", op_id: "p-9", cliente: "Kiosco", retirados: [{ c: "20825", cant: 1, unidades: ["GH12000099"] }, { c: "20208", cant: 2 }] }, juan);
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    const ret = (await get({ retirados: 1 }, juan)).cuerpo.items;
+    assert.deepStrictEqual(ret.sort((x, y) => x.c.localeCompare(y.c)), [{ c: "20208", cant: 2, unidades: [] }, { c: "20825", cant: 1, unidades: ["GH12000099"] }]);
+    // 5) Cancelar un pedido propio.
+    r = await post({ accion: "pedir_material", items: [{ c: "20208", cant: 3 }] }, luis);
+    r = await post({ accion: "cancelar_pedido", id: r.cuerpo.solicitud.id }, luis);
+    assert.strictEqual(r.cuerpo.solicitud.estado, "cancelada");
+  } finally { global.fetch = fetchViejo; if (viejoPush) require.cache[rutaPush] = viejoPush; else delete require.cache[rutaPush]; }
+});

@@ -5645,7 +5645,7 @@ test("Stock en la APP: el depósito entrega escaneando (etiqueta SAT + N° de un
   await page.fill("#depCodigo", "GH12100FD4"); await page.press("#depCodigo", "Enter");
   await page.waitForFunction(() => document.querySelectorAll("#depCanasta .stk-chip").length === 2);
   await page.click("#depConfirmarBtn");
-  await page.click(".dlg-app .dlg-si");
+  await page.click('.stk-opcion:has-text("Mandar en camino")');
   await page.waitForFunction(() => !document.querySelector("#depCanasta .stk-linea"));
   const mov = posts.find((p) => p.accion === "mover");
   assert.deepStrictEqual(mov.a, "tec:Juan");
@@ -5697,13 +5697,20 @@ test("Stock en la APP: el depósito entrega escaneando (etiqueta SAT + N° de un
   await page.waitForSelector("#miStockDevueltos .stk-envio");
   assert.deepStrictEqual(posts.at(-1).items, [{ c: "20825", cant: 1, unidades: ["GH120FF156"] }]);
   assert.deepStrictEqual(saldos.ubic["cam:dev:Juan"], { 20825: 1 });
-  // Melina la recibe en el depósito
+  // Al devolver, la APP le muestra el código de la devolución para el depósito.
+  await page.waitForFunction(() => document.querySelector(".stk-qr-capa .stk-qr canvas, .stk-qr-capa .stk-qr img"));
+  assert.match(await page.textContent(".stk-qr-capa"), /Devolución al depósito/);
+  const idDev = saldos.envios.find((e) => e.a === "dep").id;
+  await page.click(".stk-qr-capa .dlg-si");
+  // Melina escanea ese código (escaneo único) y la devolución se abre sola
   quien = "Melina";
   await page.evaluate(() => { tecnicoLogueado = "Melina"; showScreen("home"); });
   await page.click("#tileDepositoBtn");
   await page.waitForFunction(() => depDatos && (depDatos.saldos.envios || []).length);
-  await page.click('#depModos [data-modo="recibir"]');
-  await page.waitForSelector("#depDevoluciones .stk-envio");
+  await page.evaluate((id) => { window.__cuadros = [["SATD1." + id]]; window.BarcodeDetector = class { async detect() { const c = (window.__cuadros || []).shift(); return (c || []).map((rawValue) => ({ rawValue })); } }; }, idDev);
+  await page.click("#depEscaneoUnicoBtn");
+  await page.waitForSelector("#depDevoluciones .stk-envio.stk-resaltado");
+  await page.waitForFunction(() => !document.querySelector(".stk-escaner"));
   await page.click("#depDevoluciones [data-recibi]");
   await page.waitForFunction(() => !document.querySelector("#depDevoluciones .stk-envio"));
   assert.strictEqual(saldos.ubic.dep["20825"], 2);
@@ -5860,7 +5867,7 @@ test("Depósito: lote con artículos mezclados para un cliente, repetir la últi
   await page.fill("#depCodigo", "000202082779"); await page.press("#depCodigo", "Enter");
   await page.waitForSelector("#depCanasta .stk-linea");
   await page.click("#depConfirmarBtn");
-  await page.click(".dlg-app .dlg-si");
+  await page.click('.stk-opcion:has-text("Mandar en camino")');
   await page.waitForSelector("#depCola .stk-cola");
   assert.match(await page.textContent("#depCola"), /Guardado sin señal.*Baja a Técnico: Juan/s);
   assert.strictEqual(await page.evaluate(() => depSaldos().ubic.dep["20208"]), 7, "se descuenta en el celular para seguir trabajando");
@@ -5998,7 +6005,7 @@ test("Un solo lugar: si hay equipos con N° en el depósito hay que decir cuál 
   await page.click(".dlg-app .dlg-si");
   await page.waitForFunction(() => document.querySelectorAll("#depCanasta .stk-chip").length === 2);
   await page.click("#depConfirmarBtn");
-  await page.click(".dlg-app .dlg-si");
+  await page.click('.stk-opcion:has-text("Mandar en camino")');
   await page.waitForFunction(() => !document.querySelector("#depCanasta .stk-linea"));
   assert.deepStrictEqual(posts.at(-1).items, [{ c: "23940", cant: 2, unidades: ["AJ0002", "AJ0004"], prov: "2779" }]);
   // Juan: le llegó uno solo; destilda el que no vino
@@ -6134,6 +6141,132 @@ test("El parte y el stock: el técnico usa material de Mi stock (con N° de seri
   await page.click("#depAprobar [data-aprobar]");
   await page.waitForFunction(() => !document.querySelector("#depAprobar .stk-envio"));
   assert.deepStrictEqual(posts.at(-1), { accion: "aprobar_consumo", id: "ap0", decision: "aprobar", de: "ninguno", c: "", cant: 1, unidades: [] });
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Entrega y devolución en mano: el técnico pide material y muestra su código, el depósito prepara el pedido escaneando y se lo entrega confirmado al instante", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  const S = require(require("path").join(__dirname, "..", "stock-utils.js"));
+  const catalogo = { articulos: {
+    20825: { c: "20825", d: "TECLADO K10LH/V", tipo: "unidad", formatos: ["AA999AA999"] },
+    20208: { c: "20208", d: "SIRENA MP100", tipo: "cantidad" },
+    40001: { c: "40001", d: "BATERIA 12V", tipo: "cantidad" },
+  } };
+  let saldos = { inicializado: "2026-11-01", ubic: { dep: { 20825: 4, 20208: 10, 40001: 20 }, "tec:Juan": { 20208: 2 } }, unidades: {}, pedidos: {}, envios: [], solicitudes: [] };
+  let quien = "Juan";
+  const posts = [];
+  const codigoDe = (n, vence) => "SATT1." + Buffer.from(JSON.stringify({ n, e: vence })).toString("base64url") + ".firma";
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    const json = (o, st) => route.fulfill({ status: st || 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("coleccion=tecnicos")) return json([{ nombre: "Melina", permisos: { stock_responsable: true } }, { nombre: "Juan", permisos: {} }]);
+    if (!u.includes("coleccion=stock")) return json([]);
+    if (req.method() === "GET") {
+      if (u.includes("mi_codigo=1")) { const vence = Date.now() + 15 * 60e3; return json({ codigo: codigoDe(quien, vence), vence }); }
+      if (u.includes("catalogo_basico=1")) return json({ articulos: catalogo.articulos, proveedores: {} });
+      if (u.includes("retirados=1")) return json({ items: [{ c: "20208", cant: 2, unidades: [] }] });
+      if (u.includes("mio=1")) return json({ nombre: quien, ...S.stockDePersona(saldos, quien), articulos: catalogo.articulos, porAprobar: [], solicitudes: saldos.solicitudes.filter((x) => x.por === quien) });
+      return json({ catalogo, saldos, conciliacion: { marcas: [], corridas: [] } });
+    }
+    const b = JSON.parse(req.postData()); posts.push(b);
+    if (b.accion === "pedir_material") { const sol = { id: "sol1", fecha: new Date().toISOString(), por: quien, items: b.items, nota: b.nota, estado: "pendiente" }; saldos.solicitudes = [sol, ...saldos.solicitudes]; return json({ ok: true, solicitud: sol }); }
+    if (b.accion === "pedido_listo") { saldos.solicitudes = saldos.solicitudes.map((x) => (x.id === b.id ? { ...x, estado: "lista" } : x)); return json({ ok: true }); }
+    if (b.accion === "mover") {
+      const x = S.moverStock(saldos, b.items, { tipo: "entrega", de: b.de, a: b.a, confirmar: /^tec:/.test(b.a) && !b.en_mano }, catalogo);
+      if (x.error) return json({ error: x.error }, 409);
+      saldos = x.saldos;
+      if (b.solicitud) saldos.solicitudes = saldos.solicitudes.map((y) => (y.id === b.solicitud ? { ...y, estado: "entregada" } : y));
+      return json({ ok: true, envio: x.envio, ...(b.en_mano ? { en_mano: b.en_mano.codigo ? "código" : "clave" } : {}) });
+    }
+    return json({ error: "?" }, 400);
+  });
+  await page.goto(base + "/index.html");
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { localStorage.removeItem("stock_mi_pedido"); tecnicoLogueado = "Juan"; tecnicosPasswords = { Melina: "", Juan: "" }; tecnicosPermisos = { Melina: { stock_responsable: true } }; refrescarAccesosPorPermisos(); showScreen("home"); });
+  // 1) Juan pide material desde Mi stock
+  await page.click("#tileMiStockBtn");
+  await page.waitForFunction(() => miStock && miStock.nombre === "Juan");
+  await page.click("#miStockPedirCaja summary");
+  await page.fill("#miStockPedirBuscar", "bateria");
+  await page.click('#miStockPedirResultados [data-c="40001"]');
+  await page.click('#miStockPedirLista [data-mas="0"]');
+  await page.fill("#miStockPedirBuscar", "teclado");
+  await page.click('#miStockPedirResultados [data-c="20825"]');
+  await page.fill("#miStockPedirNota", "Para la obra de mañana");
+  assert.match(await page.textContent("#miStockPedirBtn"), /Pedir 2 artículos/);
+  await page.click("#miStockPedirBtn");
+  await page.click(".dlg-app .dlg-si");
+  await page.waitForSelector("#miStockPedidos .stk-sol");
+  assert.deepStrictEqual(posts.at(-1).items, [{ c: "40001", cant: 2 }, { c: "20825", cant: 1 }]);
+  assert.match(await page.textContent("#miStockPedidos"), /Esperando al depósito.*BATERIA 12V\s*2/s);
+  // «Cargar lo que retiré de clientes» arma la devolución
+  await page.click("#miStockRetiradosBtn");
+  await page.waitForFunction(() => miStockCanasta.items().length === 1);
+  assert.deepStrictEqual(await page.evaluate(() => miStockCanasta.items()), [{ c: "20208", cant: 2, unidades: [] }]);
+  await page.evaluate(() => miStockCanasta.limpiar());
+  // Mi código: QR que se renueva
+  await page.click("#miStockCodigoBtn");
+  await page.waitForFunction(() => document.querySelector(".stk-qr-capa .stk-qr canvas, .stk-qr-capa .stk-qr img"));
+  assert.match(await page.textContent(".stk-qr-capa .stk-qr-estado"), /Vale 15 minutos/);
+  await page.click(".stk-qr-capa .dlg-si");
+  // 2) Melina ve el pedido arriba de todo, lo prepara escaneando y la lista se tilda sola
+  quien = "Melina";
+  await page.evaluate(() => { tecnicoLogueado = "Melina"; refrescarAccesosPorPermisos(); showScreen("home"); });
+  await page.click("#tileDepositoBtn");
+  await page.waitForSelector("#depSolicitudes .stk-sol");
+  assert.match(await page.textContent("#depSolicitudes"), /Pedidos de técnicos \(1\).*Juan.*BATERIA 12V\s*2.*Para la obra de mañana/s);
+  await page.click("#depSolicitudes [data-listo]");
+  await page.waitForSelector("#depSolicitudes .stk-sol.lista");
+  await page.click("#depSolicitudes [data-preparar]");
+  await page.waitForSelector("#depSolicitudAvance .stk-avance");
+  assert.strictEqual(await page.inputValue("#depDestSelect"), "Juan");
+  await page.fill("#depCodigo", "40001"); await page.press("#depCodigo", "Enter");
+  await page.waitForFunction(() => /BATERIA 12V\s*1 de 2/.test(document.getElementById("depSolicitudAvance").textContent));
+  await page.click('#depCanasta [data-mas]');
+  await page.fill("#depCodigo", "000208252779"); await page.press("#depCodigo", "Enter");
+  await page.fill("#depCodigo", "GH120FF156"); await page.press("#depCodigo", "Enter");
+  await page.waitForFunction(() => document.querySelector("#depSolicitudAvance .stk-avance.completo"));
+  await page.fill("#depCodigo", "20208"); await page.press("#depCodigo", "Enter");
+  await page.waitForFunction(() => /No estaba en el pedido: SIRENA MP100/.test(document.getElementById("depSolicitudAvance").textContent));
+  await page.evaluate(() => { const l = depCanasta.lineas.find((x) => x.c === "20208"); depCanasta.lineas = depCanasta.lineas.filter((x) => x !== l); depCanasta.cambio(); });
+  // 3) Llega Juan: Melina escanea su código y entrega en mano (sin «en camino» ni «Recibí»)
+  await page.evaluate((codigo) => {
+    const cv = document.createElement("canvas"); cv.width = 64; cv.height = 64; const g = cv.getContext("2d");
+    setInterval(() => { g.fillStyle = "#" + Math.floor(Math.random() * 999); g.fillRect(0, 0, 64, 64); }, 50);
+    navigator.mediaDevices.getUserMedia = async () => cv.captureStream(20);
+    window.__cuadros = [[codigo]];
+    window.BarcodeDetector = class { async detect() { const c = (window.__cuadros || []).shift(); return (c || []).map((rawValue) => ({ rawValue })); } };
+  }, codigoDe("Juan", Date.now() + 14 * 60e3));
+  await page.click("#depEscanearBtn");
+  await page.waitForSelector("#depPaseCaja .stk-pase.ok");
+  assert.match(await page.textContent("#depPaseCaja"), /Juan está acá/);
+  await page.click(".stk-escaner-listo");
+  await page.click("#depConfirmarBtn");
+  assert.match(await page.textContent(".dlg-app .dlg-texto"), /Lo recibe Juan en mano/);
+  await page.click(".dlg-app .dlg-si");
+  await page.waitForFunction(() => !document.querySelector("#depCanasta .stk-linea"));
+  const mov = posts.at(-1);
+  assert.strictEqual(mov.a, "tec:Juan");
+  assert.match(mov.en_mano.codigo, /^SATT1\./);
+  assert.strictEqual(mov.solicitud, "sol1");
+  assert.deepStrictEqual(saldos.ubic["tec:Juan"], { 20208: 2, 40001: 2, 20825: 1 });
+  assert.ok(!saldos.ubic["cam:Juan"], "no queda en camino");
+  assert.strictEqual(saldos.solicitudes[0].estado, "entregada");
+  await page.waitForFunction(() => !document.querySelector("#depSolicitudes .stk-sol"));
+  // 4) Sin código: se elige cómo lo recibe (la clave de Juan, o en camino)
+  await page.fill("#depCodigo", "20208"); await page.press("#depCodigo", "Enter");
+  await page.waitForSelector("#depCanasta .stk-linea");
+  await page.click("#depConfirmarBtn");
+  assert.match(await page.textContent(".dlg-app .dlg-texto"), /Para Juan:.*SIRENA MP100: 1.*¿Cómo lo recibe\?/s);
+  await page.click('.stk-opcion:has-text("pone su clave")');
+  assert.strictEqual(await page.getAttribute(".dlg-app .dlg-input", "type"), "password");
+  await page.fill(".dlg-app .dlg-input", "clave-juan");
+  await page.click(".dlg-app .dlg-si");
+  await page.waitForFunction(() => !document.querySelector("#depCanasta .stk-linea"));
+  assert.deepStrictEqual(posts.at(-1).en_mano, { clave: "clave-juan" });
+  assert.strictEqual(await page.evaluate(() => localStorage.getItem("stock_cola") || "[]"), "[]", "la clave no se guarda en el celular");
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });

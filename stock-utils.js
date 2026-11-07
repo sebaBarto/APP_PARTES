@@ -718,6 +718,39 @@
     return movs;
   }
 
+  // Lo que un técnico retiró de clientes y todavía tiene (para devolverlo de una): los equipos cuyo
+  // último movimiento fue un retiro, y de lo demás, lo retirado que no volvió a salir de su stock.
+  function retiradosParaDevolver(saldos, movimientos, nombre) {
+    const s = saldos || {}, tec = `tec:${nombre}`, tiene = (s.ubic || {})[tec] || {};
+    const series = {};
+    Object.entries(s.unidades || {}).forEach(([t, u]) => {
+      if (!u || u.u !== tec) return;
+      const h = u.h || [], ult = h[h.length - 1];
+      if (ult && ult.tipo === "retirado_parte") (series[u.c] = series[u.c] || []).push(t);
+    });
+    const r = {}, vistos = new Set();
+    [...(movimientos || []), ...(s.movsPend || [])].filter((m) => m && m.c && (!m.id || (!vistos.has(m.id) && vistos.add(m.id))))
+      .sort((x, y) => String(x.fecha || "").localeCompare(String(y.fecha || "")))
+      .forEach((m) => {
+        if (m.a === tec && m.tipo === "retirado_parte") r[m.c] = red3((r[m.c] || 0) + (Number(m.cant) || 0));
+        else if (m.de === tec && r[m.c]) r[m.c] = Math.max(0, red3(r[m.c] - (Number(m.cant) || 0)));
+      });
+    const out = [];
+    new Set([...Object.keys(r), ...Object.keys(series)]).forEach((c) => {
+      const uni = series[c] || [], cant = Math.min(Number(tiene[c]) || 0, Math.max(r[c] || 0, uni.length));
+      if (cant > 0) out.push({ c, cant, unidades: uni.slice(0, cant) });
+    });
+    return out;
+  }
+  // Pedidos de material de los técnicos: lo que falta escanear de cada línea.
+  function avanceSolicitud(solicitud, items) {
+    const lleva = {};
+    (items || []).forEach((x) => { lleva[x.c] = red3((lleva[x.c] || 0) + (Number(x.cant) || 0)); });
+    const lineas = ((solicitud && solicitud.items) || []).map((x) => ({ c: x.c, pedido: Number(x.cant) || 0, lleva: lleva[x.c] || 0 }));
+    const pedidos = new Set(lineas.map((x) => x.c));
+    return { lineas, extras: Object.keys(lleva).filter((c) => !pedidos.has(c)), completo: lineas.every((x) => x.lleva >= x.pedido) };
+  }
+
   // ---------- Archivo para el sistema de Oficina ----------
   // Oficina cuenta «Depósito» (todo lo que está en poder de SAT: depósito, técnicos, vehículos, en
   // camino) y «Comodato». Los pases internos no le cambian nada; sí lo que sale a un cliente, lo que
@@ -791,7 +824,7 @@
     return mejor;
   }
 
-  const api = { codigoProveedor, nombreProveedor, STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, datosLimpios, buscarPorDatos, infoSerie, seriesEn, controlarSalidaConSerie, saludStock, esCodigoIgnorable, elegirCodigoDelCuadro, registrarUnidades, movimientoParaOficina, GARANTIA_ESTADOS, instalacionDeUnidad, abrirGarantias, moverStock, cerrarEnvio, stockDePersona, auditarStock, recalcularDesdeMovimientos, movimientosDeRegularizacion };
+  const api = { codigoProveedor, nombreProveedor, STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, datosLimpios, buscarPorDatos, infoSerie, seriesEn, controlarSalidaConSerie, saludStock, esCodigoIgnorable, elegirCodigoDelCuadro, registrarUnidades, movimientoParaOficina, GARANTIA_ESTADOS, instalacionDeUnidad, abrirGarantias, moverStock, cerrarEnvio, stockDePersona, auditarStock, recalcularDesdeMovimientos, movimientosDeRegularizacion, retiradosParaDevolver, avanceSolicitud };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else Object.assign(raiz, api);
 })(typeof window !== "undefined" ? window : globalThis);

@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.55.0";
+const APP_VERSION = "4.56.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -1054,7 +1054,7 @@ function dialogoApp(mensaje, op = {}) {
   return new Promise((resolver) => {
     const capa = document.createElement("div");
     capa.className = "modal-overlay dlg-app";
-    capa.innerHTML = `<div class="modal-caja" role="dialog" aria-modal="true"><p class="dlg-texto"></p>${op.conTexto ? '<input class="field-input dlg-input" type="text" autocomplete="off">' : ""}<div class="dlg-botones"><button type="button" class="dlg-no"></button><button type="button" class="dlg-si"></button></div></div>`;
+    capa.innerHTML = `<div class="modal-caja" role="dialog" aria-modal="true"><p class="dlg-texto"></p>${op.conTexto ? `<input class="field-input dlg-input" type="${op.clave ? "password" : "text"}" autocomplete="${op.clave ? "current-password" : "off"}">` : ""}<div class="dlg-botones"><button type="button" class="dlg-no"></button><button type="button" class="dlg-si"></button></div></div>`;
     capa.querySelector(".dlg-texto").textContent = String(mensaje == null ? "" : mensaje);
     capa.querySelector(".dlg-no").textContent = op.cancelar || "Cancelar";
     if (op.soloAceptar) capa.querySelector(".dlg-no").remove();
@@ -11411,6 +11411,8 @@ let irPendienteVehiculo = (() => {
 })();
 // El recordatorio de propuestas abre el tablero.
 let irPendienteMiStock = (() => { try { return new URLSearchParams(busquedaInicialApp).get("ir") === "mistock"; } catch (e) { return false; } })();
+let irPendienteDeposito = (() => { try { return new URLSearchParams(busquedaInicialApp).get("ir") === "deposito"; } catch (e) { return false; } })();
+const irAlDeposito = () => { const t = document.getElementById("tileDepositoBtn"); if (t && !t.classList.contains("hidden")) t.click(); };
 let irPendientePropuestas = (() => { try { return new URLSearchParams(busquedaInicialApp).get("ir") === "propuestas"; } catch (e) { return false; } })();
 // La notificación de un dato nuevo del equipo abre ese dato.
 let irPendienteDato = (() => {
@@ -11421,6 +11423,7 @@ function consumirIrPendiente() {
   if (irPendienteDato !== null) { const id = irPendienteDato; irPendienteDato = null; abrirDatoEquipo(id); return; }
   if (irPendientePropuestas) { irPendientePropuestas = false; cqAbrirLista(); cqAbrirPropuestas(); return; }
   if (irPendienteMiStock) { irPendienteMiStock = false; document.getElementById("tileMiStockBtn").click(); return; }
+  if (irPendienteDeposito) { irPendienteDeposito = false; irAlDeposito(); return; }
   if (!irPendienteVehiculo) return;
   irPendienteVehiculo = false;
   irADevolverVehiculo();
@@ -11431,6 +11434,7 @@ if (navigator.serviceWorker) {
     if (d.tipo === "abrir-url" && String(d.url || "").includes("ir=devolver-vehiculo") && tecnicoLogueado) irADevolverVehiculo();
     if (d.tipo === "abrir-url" && String(d.url || "").includes("ir=propuestas") && tecnicoLogueado) { cqAbrirLista(); cqAbrirPropuestas(); }
     if (d.tipo === "abrir-url" && String(d.url || "").includes("ir=mistock") && tecnicoLogueado) document.getElementById("tileMiStockBtn").click();
+    if (d.tipo === "abrir-url" && String(d.url || "").includes("ir=deposito") && tecnicoLogueado) irAlDeposito();
     if (d.tipo === "abrir-url" && String(d.url || "").includes("ir=dato-equipo") && tecnicoLogueado) {
       try { abrirDatoEquipo(new URL(d.url, location.href).searchParams.get("id") || ""); } catch (err) { /* nada */ }
     }
@@ -18159,6 +18163,8 @@ const STK_ICONOS = {
   cliente: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
   basura: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>',
   lista: '<path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01"/>',
+  qr: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3"/>',
+  mano: '<path d="M7 11V6a1.5 1.5 0 0 1 3 0v4M10 10V4.5a1.5 1.5 0 0 1 3 0V10M13 10V5.5a1.5 1.5 0 0 1 3 0V11M16 11V8a1.5 1.5 0 0 1 3 0v6a7 7 0 0 1-7 7h-1a6 6 0 0 1-5-2.7L3.5 14a1.5 1.5 0 0 1 2.5-1.6L7 14"/>',
 };
 const stkIco = (n, cls) => `<svg class="stk-ico${cls ? " " + cls : ""}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${STK_ICONOS[n] || ""}</svg>`;
 // Aviso abajo: verde si salió bien, rojo si no, neutro si es solo información.
@@ -18686,8 +18692,10 @@ function pintarMiStock() {
   const pa = miStock.porAprobar || [];
   document.getElementById("miStockDevueltos").dataset.aprobar = pa.length;
   const dev = miStock.devueltos || [];
-  document.getElementById("miStockDevueltos").innerHTML = (dev.length ? `<h3 class="stk-h">Devolviste (falta que el depósito confirme)</h3>` + dev.map((e) => `<div class="stk-envio"><small>${escapeHtml(cuando(e.fecha))}${e.motivo ? " · " + escapeHtml(e.motivo) : ""}</small>${items(e, false)}</div>`).join("") : "")
+  document.getElementById("miStockDevueltos").innerHTML = (dev.length ? `<h3 class="stk-h">Devolviste (falta que el depósito confirme)</h3>` + dev.map((e) => `<div class="stk-envio"><small>${escapeHtml(cuando(e.fecha))}${e.motivo ? " · " + escapeHtml(e.motivo) : ""}</small>${items(e, false)}<div class="stk-envio-btns"><button type="button" class="btn btn-secondary btn-small" data-qr-dev="${escapeHtml(e.id)}">${stkIco("qr")}Mostrar el código al depósito</button></div></div>`).join("") : "")
     + (pa.length ? `<h3 class="stk-h">Cargaste en partes y no estaba en tu stock (lo revisa el depósito)</h3>` + pa.map((x) => `<div class="stk-parte-item"><span>${escapeHtml(x.texto || x.c)} <b>x${stkFmtN(x.cant)}</b><small style="font-family:inherit;">${escapeHtml(x.cliente)}${x.parte ? ` · parte ${escapeHtml(x.parte)}` : ""}</small></span></div>`).join("") : "");
+  document.querySelectorAll("#miStockDevueltos [data-qr-dev]").forEach((b) => b.addEventListener("click", () => mostrarQrDevolucion(b.dataset.qrDev)));
+  pintarMisPedidos();
 }
 conectarCasilleroStock(document.getElementById("miStockCodigo"), null, miStockCanasta, miStockCatalogo);
 document.getElementById("miStockEscanearBtn").addEventListener("click", () => abrirEscanerStock({ titulo: "Devolver al depósito", leerCuadro: (t) => miStockCanasta.leerCuadro(t), estado: () => miStockCanasta.estado(), usar: (t, o) => miStockCanasta.agregarCodigo(t, o), describir: (t) => miStockCanasta.describir(t) }));
@@ -18703,10 +18711,11 @@ document.getElementById("miStockDevolverBtn").addEventListener("click", async (e
   if (!(await confirmarApp(`¿Devolver al depósito ${items.length} artículo${items.length === 1 ? "" : "s"}${fallado ? " FALLADO(S), para Garantía" : ""}?\n\n${items.map((x) => `• ${(a[x.c] || {}).d || x.c}: ${stkFmtN(x.cant)}${x.unidades.length ? " (" + x.unidades.join(", ") + ")" : ""}`).join("\n")}`, { aceptar: "Sí, devolver" }))) return;
   btn.disabled = true;
   try {
-    await stkApi("POST", "", { accion: "devolver", items, motivo: document.getElementById("miStockMotivo").value.trim() || undefined, ...(fallado ? { fallado: true, falla } : {}) });
+    const r = await stkApi("POST", "", { accion: "devolver", items, motivo: document.getElementById("miStockMotivo").value.trim() || undefined, ...(fallado ? { fallado: true, falla } : {}) });
     miStockCanasta.limpiar(); document.getElementById("miStockMotivo").value = "";
     document.getElementById("miStockFallado").checked = false; document.getElementById("miStockFalla").value = ""; document.getElementById("miStockFalla").classList.add("hidden");
     stkAviso("✓ Devuelto: queda en camino hasta que el depósito lo recibe");
+    if (r && r.envio && r.envio.id) mostrarQrDevolucion(r.envio.id);
   } catch (e) { stkAviso("No se pudo devolver: " + e.message); }
   btn.disabled = false;
   cargarMiStock();
@@ -18728,7 +18737,7 @@ async function actualizarBadgeStock(forzar) {
   try {
     const d = await stkApi("GET", "");
     depDatos = d;
-    const n = ((d.saldos || {}).envios || []).filter((e) => e.a === "dep").length + ((d.saldos || {}).aprobar || []).length, b = document.getElementById("depositoBadge");
+    const n = ((d.saldos || {}).envios || []).filter((e) => e.a === "dep").length + ((d.saldos || {}).aprobar || []).length + ((d.saldos || {}).solicitudes || []).filter((x) => x.estado === "pendiente").length, b = document.getElementById("depositoBadge");
     b.textContent = String(n); b.classList.toggle("hidden", !n);
   } catch (e) { /* nada */ }
 }
@@ -18750,6 +18759,7 @@ const depCanasta = crearCanastaStock({
   alCambiar: () => depBotonTexto(),
 });
 function depBotonTexto() {
+  depPintarAvance();
   const n = depCanasta.items().length, btn = document.getElementById("depConfirmarBtn");
   btn.disabled = !n;
   if (depModo === "inventario") { const u = depCanasta.items().reduce((t, x) => t + x.unidades.length, 0); btn.disabled = !u; btn.textContent = u ? `Registrar ${u} N° de serie` : "Registrar N° de serie"; return; }
@@ -18824,7 +18834,8 @@ function depMostrarModo() {
   }
   if (depModo === "consultar") depPintarEnCamino();
   if (depModo === "inventario") depPintarInventario();
-  if (depModo === "entregar") depPintarRecientes();
+  if (depModo === "entregar") { depPintarRecientes(); depPintarPase(); }
+  depPintarSolicitudes();
   depPintarCola();
   document.getElementById("depConfirmarBtn").classList.toggle("hidden", depModo === "consultar");
   depCanasta.render(); depBotonTexto();
@@ -18839,15 +18850,15 @@ document.querySelectorAll("#depFormas [data-forma]").forEach((b) => b.addEventLi
   try { localStorage.setItem("stock_forma", depForma); } catch (e) { /* nada */ }
   depMostrarModo();
 }));
-document.getElementById("depDestTipo").addEventListener("change", async () => { document.getElementById("depDestNombre").value = ""; document.getElementById("depDestSelect").value = ""; await depLlenarLista("depDestTipo"); depBotonTexto(); depPintarRecientes(); });
+document.getElementById("depDestTipo").addEventListener("change", async () => { document.getElementById("depDestNombre").value = ""; document.getElementById("depDestSelect").value = ""; await depLlenarLista("depDestTipo"); depBotonTexto(); depPintarRecientes(); depPintarPase(); });
 document.getElementById("depDestNombre").addEventListener("input", depBotonTexto);
-document.getElementById("depDestSelect").addEventListener("change", () => { depBotonTexto(); depPintarRecientes(); });
+document.getElementById("depDestSelect").addEventListener("change", () => { depBotonTexto(); depPintarRecientes(); depPintarPase(); });
 document.getElementById("depDestNombre").addEventListener("change", depPintarRecientes);
 document.getElementById("depRecibirTipo").addEventListener("change", async () => { document.getElementById("depRecibirDe").value = ""; document.getElementById("depRecibirSelect").value = ""; await depLlenarLista("depRecibirTipo"); depMostrarModo(); });
 document.getElementById("depRecibirDe").addEventListener("change", () => depCanasta.render());
 document.getElementById("depRecibirSelect").addEventListener("change", () => depCanasta.render());
 conectarCasilleroStock(document.getElementById("depCodigo"), document.getElementById("depBuscarResultados"), depCanasta, depCatalogo);
-document.getElementById("depEscanearBtn").addEventListener("click", () => abrirEscanerStock({ titulo: depModo === "inventario" ? "Inventario de N° de serie" : `${depModo === "entregar" ? "Baja" : "Alta"} · ${depForma === "lote" ? "en lote" : "individual"}`, leerCuadro: (t) => depCanasta.leerCuadro(t), estado: () => depCanasta.estado(), usar: (t, o) => depCanasta.agregarCodigo(t, o), describir: (t) => depCanasta.describir(t), cerrarSi: (r) => depModo !== "inventario" && depForma === "individual" && r.ok && r.completo }));
+document.getElementById("depEscanearBtn").addEventListener("click", () => abrirEscanerStock({ titulo: depModo === "inventario" ? "Inventario de N° de serie" : `${depModo === "entregar" ? "Baja" : "Alta"} · ${depForma === "lote" ? "en lote" : "individual"}`, leerCuadro: (t) => depLeerCuadro(t), estado: () => depCanasta.estado(), usar: (t, o) => depUsarCodigo(t, o), describir: (t) => (stkLeerEspecial(t) ? { texto: "código", util: true } : depCanasta.describir(t)), cerrarSi: (r) => !!r.cerrar || (depModo !== "inventario" && depForma === "individual" && r.ok && r.completo && !r.especial) }));
 document.getElementById("depConfirmarBtn").addEventListener("click", async (ev) => {
   const btn = ev.currentTarget, items = depCanasta.items(), a = depCatalogo().articulos;
   if (!items.length) return;
@@ -18881,6 +18892,7 @@ document.getElementById("depConfirmarBtn").addEventListener("click", async (ev) 
     const falta = items.find((x) => x.cant > (((depSaldos().ubic || {}).dep || {})[x.c] || 0));
     if (falta) { stkAviso(`${(a[falta.c] || {}).d}: en el depósito no alcanza`); return; }
     cuerpo = { accion: "mover", de: "dep", a: `${tipo}:${nombre}`, items };
+    if (tipo === "tec" && depSolicitudActiva && depSolicitudActiva.por === nombre) cuerpo.solicitud = depSolicitudActiva.id;
     const pres = document.getElementById("depPresupuesto").value.trim();
     if ((tipo === "cli" || tipo === "com") && pres) cuerpo.presupuesto = pres;
   } else {
@@ -18901,14 +18913,38 @@ document.getElementById("depConfirmarBtn").addEventListener("click", async (ev) 
   const sinN = items.filter((x) => (a[x.c] || {}).tipo === "unidad" && x.cant > x.unidades.length);
   const resumen = items.map((x) => `• ${(a[x.c] || {}).d || x.c}: ${stkFmtN(x.cant)}`).join("\n");
   const destino = depModo === "entregar" ? nombreUbicacion(cuerpo.a) + (cuerpo.presupuesto ? ` (presupuesto N° ${cuerpo.presupuesto})` : "") : cuerpo.a === "gar" ? "Garantía (fallado)" : "el depósito";
-  if (!(await confirmarApp(`¿Confirmar? Va a ${destino}:\n\n${resumen}${sinN.length ? `\n\nOjo: ${sinN.length} equipo(s) sin N° de serie escaneado.` : ""}${/^tec:/.test(cuerpo.a) ? "\n\nQueda en camino hasta que el técnico toque «Recibí»." : ""}`, { aceptar: "Sí, confirmar" }))) return;
+  const ojo = sinN.length ? `\n\nOjo: ${sinN.length} equipo(s) sin N° de serie escaneado.` : "";
+  const tecnicoDestino = depModo === "entregar" && /^tec:/.test(cuerpo.a) ? cuerpo.a.slice(4) : "";
+  if (tecnicoDestino && tecnicoDestino !== tecnicoLogueado && !depPaseVale(tecnicoDestino)) {
+    // A un técnico que no mostró su código: elegir cómo lo recibe es la confirmación.
+    const elec = await elegirOpcionApp(`Para ${tecnicoDestino}:\n\n${resumen}${ojo}\n\n¿Cómo lo recibe?`, [
+      { v: "qr", texto: `Escanear el código de ${tecnicoDestino}`, ayuda: "Está acá: lo abre en Mi stock → Mi código. Queda en su stock al instante.", icono: "qr", primario: true },
+      { v: "clave", texto: `${tecnicoDestino} pone su clave`, ayuda: "Está acá pero sin el celular: la clave de la APP.", icono: "teclado" },
+      { v: "camino", texto: "Mandar en camino", ayuda: "No está acá: lo confirma él después con «Recibí».", icono: "vehiculo" },
+    ]);
+    if (!elec) return;
+    if (elec === "qr" && !(await depEscanearPase(tecnicoDestino))) return;
+    if (elec === "clave") {
+      if (navigator.onLine === false) { stkAviso("Sin señal no se puede verificar la clave: escaneá su código o mandalo en camino"); return; }
+      const clave = await dialogoApp(`Clave de ${tecnicoDestino} (la que usa para entrar a la APP). Que la escriba él:`, { conTexto: true, clave: true, aceptar: "Confirmar" });
+      if (!clave) return;
+      cuerpo.en_mano = { clave };
+    }
+    if (depPaseVale(tecnicoDestino)) cuerpo.en_mano = { codigo: depPase.codigo, escaneado: depPase.escaneado };
+  } else {
+    if (tecnicoDestino && depPaseVale(tecnicoDestino)) cuerpo.en_mano = { codigo: depPase.codigo, escaneado: depPase.escaneado };
+    if (!(await confirmarApp(`¿Confirmar? Va a ${destino}:\n\n${resumen}${ojo}${cuerpo.en_mano ? `\n\nLo recibe ${tecnicoDestino} en mano: queda en su stock ahora.` : tecnicoDestino && tecnicoDestino !== tecnicoLogueado ? "\n\nQueda en camino hasta que el técnico toque «Recibí»." : ""}`, { aceptar: "Sí, confirmar" }))) return;
+  }
   btn.disabled = true;
   try {
-    const r = await depEnviar(cuerpo, `${depModo === "entregar" ? "Baja a" : "Alta desde"} ${depModo === "entregar" ? nombreUbicacion(cuerpo.a) : cuerpo.de === "proveedor" ? "proveedor" : nombreUbicacion(cuerpo.de)} (${items.length} artículo${items.length === 1 ? "" : "s"})`);
+    // Con la clave no se guarda nada en el celular: si no hay señal, no se hace.
+    const r = cuerpo.en_mano && cuerpo.en_mano.clave ? await stkApi("POST", "", { ...cuerpo, op_id: depOpId() }) : await depEnviar(cuerpo, `${depModo === "entregar" ? "Baja a" : "Alta desde"} ${depModo === "entregar" ? nombreUbicacion(cuerpo.a) : cuerpo.de === "proveedor" ? "proveedor" : nombreUbicacion(cuerpo.de)} (${items.length} artículo${items.length === 1 ? "" : "s"})`);
     if (depModo === "entregar") depRecordarDestino(cuerpo.a, items);
     depCanasta.limpiar(); document.getElementById("depMotivo").value = ""; document.getElementById("depPresupuesto").value = "";
     document.getElementById("depFallado").checked = false; document.getElementById("depFalla").value = ""; document.getElementById("depFalla").classList.add("hidden");
-    stkAviso(r.enCola ? "Sin señal: quedó guardado y se manda solo cuando vuelva" : /^tec:/.test(cuerpo.a) ? "✓ Enviado: le llegó el aviso para que confirme" : "✓ Listo");
+    const enMano = !!cuerpo.en_mano;
+    depPase = null; depSolicitudActiva = null;
+    stkAviso(r.enCola ? "Sin señal: quedó guardado y se manda solo cuando vuelva" : /^tec:/.test(cuerpo.a) ? (enMano ? `✓ Entregado en mano a ${cuerpo.a.slice(4)}` : "✓ Enviado: le llegó el aviso para que confirme") : "✓ Listo");
     if (!r.enCola) await depCargar(); else depMostrarModo();
   } catch (e) { stkAviso("No se pudo: " + e.message); }
   btn.disabled = false;
@@ -18934,7 +18970,10 @@ function depAplicarLocal(cuerpo) {
   if (!depDatos) return;
   try {
     if (cuerpo.accion === "mover") {
-      const x = moverStock(depDatos.saldos, cuerpo.items, { tipo: "local", de: cuerpo.de, a: cuerpo.a, confirmar: /^tec:/.test(cuerpo.a), deFlexible: /^(cli|com):/.test(cuerpo.de || "") }, depDatos.catalogo);
+      const x = moverStock(depDatos.saldos, cuerpo.items, { tipo: "local", de: cuerpo.de, a: cuerpo.a, confirmar: /^tec:/.test(cuerpo.a) && !cuerpo.en_mano, deFlexible: /^(cli|com):/.test(cuerpo.de || "") }, depDatos.catalogo);
+      if (!x.error) depDatos.saldos = x.saldos;
+    } else if (cuerpo.accion === "confirmar_envio") {
+      const x = cerrarEnvio(depDatos.saldos, cuerpo.id, { accion: "recibi", items: cuerpo.items, destino: cuerpo.destino });
       if (!x.error) depDatos.saldos = x.saldos;
     } else if (cuerpo.accion === "registrar_unidades") depDatos.saldos = registrarUnidades(depDatos.saldos, cuerpo.ubic, cuerpo.items).saldos;
   } catch (e) { /* solo es para ver; el servidor decide */ }
@@ -19084,7 +19123,8 @@ function depPintarDevoluciones() {
     ${e.fallado ? `<div class="stk-fallado">${stkIco("alerta")}Fallado: ${escapeHtml(e.falla || "")}</div>` : ""}
     ${htmlRecepcion(e, d)}
     <div class="field-group" style="margin:6px 0;"><label class="field-label">Va a</label><select class="field-input" data-destino><option value="dep" ${e.fallado ? "" : "selected"}>Depósito</option><option value="gar" ${e.fallado ? "selected" : ""}>Garantía (fallado)</option></select></div>
-    <div class="stk-envio-btns"><button type="button" class="btn btn-primary btn-small" data-recibi>${stkIco("check")}Recibido</button></div></div>`).join("") : "";
+    <div class="stk-envio-btns"><button type="button" class="btn btn-primary btn-small" data-recibi>${stkIco("check")}Recibido</button><button type="button" class="btn btn-secondary btn-small" data-controlar>${stkIco("camara")}Controlar escaneando</button></div></div>`).join("") : "";
+  cont.querySelectorAll(".stk-envio").forEach((div) => div.querySelector("[data-controlar]").addEventListener("click", () => depControlarDevolucion(div, lista.find((x) => x.id === div.dataset.id))));
   cont.querySelectorAll(".stk-envio").forEach((div) => div.querySelector("[data-recibi]").addEventListener("click", async (ev) => {
     const e = lista.find((x) => x.id === div.dataset.id), btn = ev.currentTarget;
     const items = leerRecepcion(div, e);
@@ -19092,7 +19132,7 @@ function depPintarDevoluciones() {
     if (items.some((x, i) => x.cant < e.items[i].cant)) { motivo = await pedirTextoApp("Llegó menos de lo que devolvió: lo que falta vuelve a figurar a su nombre. ¿Qué pasó?", ""); if (motivo === null) return; }
     btn.disabled = true;
     const destino = div.querySelector("[data-destino]").value;
-    try { await stkApi("POST", "", { accion: "confirmar_envio", id: e.id, items, motivo, destino }); stkAviso(destino === "gar" ? "✓ Recibido: quedó en Garantía" : "✓ Recibido"); }
+    try { const r = await depEnviar({ accion: "confirmar_envio", id: e.id, items, motivo, destino }, `Devolución de ${e.de.replace(/^tec:/, "")} recibida`); stkAviso(r.enCola ? "Sin señal: quedó guardado y se manda solo cuando vuelva" : destino === "gar" ? "✓ Recibido: quedó en Garantía" : "✓ Recibido"); }
     catch (err) { stkAviso("No se pudo: " + err.message); }
     await depCargar(); actualizarBadgeStock(true);
   }));
@@ -19145,6 +19185,382 @@ document.getElementById("tileDepositoBtn").addEventListener("click", () => {
 });
 document.getElementById("volverDeDepositoBtn").addEventListener("click", () => { if (stkEscanerAbierto) stkEscanerAbierto.cerrar(); showScreen("home"); actualizarBadgeStock(true); });
 
+
+// ---------- En mano: códigos QR del técnico y de las devoluciones ----------
+// «SATT1.…»: el código firmado de Mi stock (dura 15 minutos). «SATD1.<id>»: una devolución pendiente.
+function stkLeerEspecial(texto) {
+  const t = String(texto || "").trim();
+  if (/^SATT1\./.test(t)) {
+    try {
+      const b = t.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+      const d = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b + "===".slice((b.length + 3) % 4)), (c) => c.charCodeAt(0))));
+      if (d && d.n) return { tipo: "tecnico", codigo: t, nombre: String(d.n), vence: Number(d.e) || 0 };
+    } catch (e) { /* abajo */ }
+    return { tipo: "malo" };
+  }
+  if (/^SATD1\.[\w-]{3,80}$/.test(t)) return { tipo: "devolucion", id: t.slice(6) };
+  return null;
+}
+// Muestra un QR grande (y lo renueva solo si vence).
+function stkMostrarQr(op) {
+  const capa = document.createElement("div");
+  capa.className = "modal-overlay dlg-app stk-qr-capa";
+  capa.innerHTML = `<div class="modal-caja stk-qr-caja" role="dialog" aria-modal="true"><b class="stk-qr-titulo"></b><div class="stk-qr"></div><p class="stk-qr-estado"></p><p class="stk-ayuda stk-qr-ayuda"></p><div class="dlg-botones"><button type="button" class="dlg-si">Listo</button></div></div>`;
+  capa.querySelector(".stk-qr-titulo").textContent = op.titulo || "";
+  capa.querySelector(".stk-qr-ayuda").textContent = op.ayuda || "";
+  const qr = capa.querySelector(".stk-qr"), estado = capa.querySelector(".stk-qr-estado");
+  let vence = 0, cerrado = false, pidiendo = false;
+  const pintar = async () => {
+    if (pidiendo) return;
+    pidiendo = true;
+    try {
+      const r = await op.obtener();
+      if (cerrado) return;
+      qr.innerHTML = "";
+      new QRCode(qr, { text: r.texto, width: 240, height: 240, colorDark: "#101820", colorLight: "#FFFFFF", correctLevel: QRCode.CorrectLevel.M });
+      vence = r.vence || 0; reloj();
+    } catch (e) { if (!cerrado) { qr.innerHTML = ""; estado.textContent = "No se pudo generar el código: " + e.message; } }
+    finally { pidiendo = false; }
+  };
+  const reloj = () => {
+    if (!vence) { estado.textContent = ""; return; }
+    const min = Math.max(0, Math.ceil((vence - Date.now()) / 60000));
+    estado.textContent = `Vale ${min} minuto${min === 1 ? "" : "s"} (se renueva solo)`;
+    if (vence - Date.now() < 3 * 60000) pintar();
+  };
+  const timer = setInterval(reloj, 15000);
+  const cerrar = () => { cerrado = true; clearInterval(timer); capa.remove(); };
+  capa.querySelector(".dlg-si").addEventListener("click", cerrar);
+  capa.addEventListener("click", (e) => { if (e.target === capa) cerrar(); });
+  document.body.appendChild(capa);
+  pintar();
+  return { cerrar };
+}
+// Elegir una entre varias opciones grandes (con su explicación).
+function elegirOpcionApp(mensaje, opciones) {
+  return new Promise((resolver) => {
+    const capa = document.createElement("div");
+    capa.className = "modal-overlay dlg-app";
+    capa.innerHTML = `<div class="modal-caja" role="dialog" aria-modal="true"><p class="dlg-texto"></p><div class="stk-opciones">${opciones.map((o, i) => `<button type="button" class="stk-opcion${o.primario ? " primaria" : ""}" data-i="${i}">${o.icono ? stkIco(o.icono) : ""}<span><b>${escapeHtml(o.texto)}</b>${o.ayuda ? `<small>${escapeHtml(o.ayuda)}</small>` : ""}</span></button>`).join("")}</div><div class="dlg-botones"><button type="button" class="dlg-no">Cancelar</button></div></div>`;
+    capa.querySelector(".dlg-texto").textContent = mensaje;
+    const fin = (v) => { capa.remove(); resolver(v); };
+    capa.querySelectorAll("[data-i]").forEach((b) => b.addEventListener("click", () => fin(opciones[Number(b.dataset.i)].v)));
+    capa.querySelector(".dlg-no").addEventListener("click", () => fin(null));
+    capa.addEventListener("click", (e) => { if (e.target === capa) fin(null); });
+    document.body.appendChild(capa);
+  });
+}
+// Mi stock: mi código y el de cada devolución.
+function mostrarMiCodigo() {
+  stkMostrarQr({
+    titulo: `Mi código · ${tecnicoLogueado || ""}`,
+    ayuda: "Mostráselo a quien te entrega material: lo escanea y queda en tu stock en el momento.",
+    obtener: async () => {
+      try {
+        const r = await stkApi("GET", "mi_codigo=1");
+        try { localStorage.setItem("stock_mi_codigo", JSON.stringify(r)); } catch (e) { /* nada */ }
+        return { texto: r.codigo, vence: r.vence };
+      } catch (e) {
+        let c = null;
+        try { c = JSON.parse(localStorage.getItem("stock_mi_codigo") || "null"); } catch (err) { c = null; }
+        if (c && c.vence > Date.now() + 60000 && stkLeerEspecial(c.codigo) && stkLeerEspecial(c.codigo).nombre === tecnicoLogueado) return { texto: c.codigo, vence: c.vence };
+        throw new Error(e.sinSenal ? "sin señal (cuando vuelva, se genera)" : e.message);
+      }
+    },
+  });
+}
+function mostrarQrDevolucion(id) {
+  stkMostrarQr({ titulo: "Devolución al depósito", ayuda: "Mostráselo al depósito: lo escanea, ve todo lo que devolvés y lo recibe de una.", obtener: async () => ({ texto: `SATD1.${id}` }) });
+}
+document.getElementById("miStockCodigoBtn").addEventListener("click", mostrarMiCodigo);
+// «Cargar lo que retiré de clientes»: arma la devolución con lo retirado que todavía tiene.
+document.getElementById("miStockRetiradosBtn").addEventListener("click", async (ev) => {
+  const btn = ev.currentTarget;
+  btn.disabled = true;
+  try {
+    const r = await stkApi("GET", "retirados=1");
+    const items = r.items || [];
+    if (!items.length) { stkAviso("No tenés nada retirado de clientes para devolver"); return; }
+    items.forEach((x) => {
+      let l = miStockCanasta.lineas.find((y) => y.c === x.c);
+      if (!l) { l = { c: x.c, cant: 0, unidades: [] }; miStockCanasta.lineas.push(l); }
+      (x.unidades || []).forEach((t) => { if (!l.unidades.includes(t)) l.unidades.push(t); });
+      l.cant = Math.max(l.cant, x.cant, l.unidades.length);
+    });
+    miStockCanasta.actual = "";
+    miStockCanasta.cambio();
+    stkAviso(`Cargado: ${items.length} artículo${items.length === 1 ? "" : "s"} retirado${items.length === 1 ? "" : "s"}. Revisá y devolvé`, "info");
+  } catch (e) { stkAviso("No se pudo: " + e.message); }
+  finally { btn.disabled = false; }
+});
+
+// ---------- Pedir material al depósito ----------
+let miPedido = (() => { try { const x = JSON.parse(localStorage.getItem("stock_mi_pedido") || "[]"); return Array.isArray(x) ? x : []; } catch (e) { return []; } })();
+let miPedidoCatalogo = null;
+const miPedidoGuardar = () => { try { localStorage.setItem("stock_mi_pedido", JSON.stringify(miPedido)); } catch (e) { /* nada */ } };
+async function miPedidoCat() {
+  if (!miPedidoCatalogo) { try { miPedidoCatalogo = await stkApi("GET", "catalogo_basico=1"); } catch (e) { miPedidoCatalogo = null; throw e; } }
+  return miPedidoCatalogo;
+}
+function pintarMiPedido() {
+  const cont = document.getElementById("miStockPedirLista"), a = (miPedidoCatalogo && miPedidoCatalogo.articulos) || (miStock && miStock.articulos) || {};
+  cont.innerHTML = miPedido.map((x, i) => `<div class="stk-linea"><div class="stk-linea-top"><div><b>${escapeHtml((a[x.c] || {}).d || x.c)}</b><small>${escapeHtml(x.c)}${(a[x.c] || {}).medida === "metros" ? " · en metros" : ""}</small></div>
+    <div class="stk-cant"><button type="button" data-menos="${i}" aria-label="Uno menos">−</button><input class="field-input" inputmode="decimal" data-cant="${i}" value="${stkFmtN(x.cant)}" aria-label="Cantidad"><button type="button" data-mas="${i}" aria-label="Uno más">+</button></div></div>
+    <button type="button" class="stk-quitar" data-quitar="${i}">${stkIco("basura")}Sacar</button></div>`).join("");
+  const cambio = () => { miPedido = miPedido.filter((x) => x.cant > 0); miPedidoGuardar(); pintarMiPedido(); };
+  cont.querySelectorAll("[data-mas]").forEach((b) => b.addEventListener("click", () => { miPedido[Number(b.dataset.mas)].cant += 1; cambio(); }));
+  cont.querySelectorAll("[data-menos]").forEach((b) => b.addEventListener("click", () => { const x = miPedido[Number(b.dataset.menos)]; x.cant = Math.max(1, x.cant - 1); cambio(); }));
+  cont.querySelectorAll("[data-cant]").forEach((inp) => inp.addEventListener("change", () => { const n = stkNumApp(inp.value); if (n > 0) miPedido[Number(inp.dataset.cant)].cant = n; cambio(); }));
+  cont.querySelectorAll("[data-quitar]").forEach((b) => b.addEventListener("click", () => { miPedido.splice(Number(b.dataset.quitar), 1); cambio(); }));
+  document.getElementById("miStockPedirBtn").disabled = !miPedido.length;
+  document.getElementById("miStockPedirBtn").textContent = miPedido.length ? `Pedir ${miPedido.length} artículo${miPedido.length === 1 ? "" : "s"}` : "Pedir";
+}
+document.getElementById("miStockPedirCaja").addEventListener("toggle", async (e) => {
+  if (!e.currentTarget.open) return;
+  pintarMiPedido();
+  try { await miPedidoCat(); pintarMiPedido(); } catch (err) { stkAviso("No se pudo cargar el catálogo: " + err.message); }
+});
+document.getElementById("miStockPedirBuscar").addEventListener("input", async (e) => {
+  const texto = e.currentTarget.value.trim(), cont = document.getElementById("miStockPedirResultados");
+  if (texto.length < 2) { cont.innerHTML = ""; return; }
+  let cat;
+  try { cat = await miPedidoCat(); } catch (err) { cont.innerHTML = `<p class="stk-ayuda">No se pudo cargar el catálogo.</p>`; return; }
+  const r = interpretarCodigo(texto, cat, { ubic: {}, unidades: {} }, "");
+  const lista = r.tipo === "articulo" && cat.articulos[r.c] ? [cat.articulos[r.c]] : buscarArticulosStock(cat, texto, 8);
+  cont.innerHTML = lista.length ? lista.map((a) => `<button type="button" class="stk-res" data-c="${escapeHtml(a.c)}">${escapeHtml(a.d)}<small>${escapeHtml(a.c)}</small></button>`).join("") : '<p class="stk-ayuda">No encontré ese artículo.</p>';
+  cont.querySelectorAll("[data-c]").forEach((b) => b.addEventListener("click", () => {
+    const x = miPedido.find((y) => y.c === b.dataset.c);
+    if (x) x.cant += 1; else miPedido.push({ c: b.dataset.c, cant: 1 });
+    miPedidoGuardar(); pintarMiPedido();
+    cont.innerHTML = ""; document.getElementById("miStockPedirBuscar").value = ""; document.getElementById("miStockPedirBuscar").focus();
+  }));
+});
+document.getElementById("miStockPedirBtn").addEventListener("click", async (ev) => {
+  if (!miPedido.length) return;
+  const btn = ev.currentTarget, a = (miPedidoCatalogo && miPedidoCatalogo.articulos) || {};
+  if (!(await confirmarApp(`¿Pedir al depósito?\n\n${miPedido.map((x) => `• ${(a[x.c] || {}).d || x.c}: ${stkFmtN(x.cant)}`).join("\n")}`, { aceptar: "Sí, pedir" }))) return;
+  btn.disabled = true;
+  try {
+    await stkApi("POST", "", { accion: "pedir_material", items: miPedido, nota: document.getElementById("miStockPedirNota").value.trim(), op_id: depOpId() });
+    miPedido = []; miPedidoGuardar(); document.getElementById("miStockPedirNota").value = "";
+    document.getElementById("miStockPedirCaja").open = false;
+    stkAviso("✓ Pedido: le llegó al depósito");
+    cargarMiStock();
+  } catch (e) { stkAviso("No se pudo pedir: " + e.message); }
+  btn.disabled = false; pintarMiPedido();
+});
+const SOL_ESTADO = { pendiente: "Esperando al depósito", lista: "Listo para retirar", entregada: "Entregado", cancelada: "Cancelado" };
+function pintarMisPedidos() {
+  const cont = document.getElementById("miStockPedidos"); if (!cont || !miStock) return;
+  const a = miStock.articulos || {}, lista = (miStock.solicitudes || []).filter((x, i) => x.estado === "pendiente" || x.estado === "lista" || i < 2);
+  cont.innerHTML = lista.length ? `<h3 class="stk-h">Mis pedidos</h3>` + lista.map((x) => `<div class="stk-envio stk-sol ${escapeHtml(x.estado)}">
+    <div class="stk-sol-top"><b>${escapeHtml(SOL_ESTADO[x.estado] || x.estado)}</b><small>${escapeHtml(new Date(x.fecha).toLocaleString("es-AR", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }))}</small></div>
+    <div class="stk-envio-items">${x.items.map((y) => `<div class="stk-envio-item"><span>${escapeHtml((a[y.c] || {}).d || y.c)}</span><b>${stkFmtN(y.cant)}</b></div>`).join("")}</div>
+    ${x.nota ? `<small>${escapeHtml(x.nota)}</small>` : ""}
+    ${x.estado === "pendiente" || x.estado === "lista" ? `<div class="stk-envio-btns">${x.estado === "lista" ? `<button type="button" class="btn btn-primary btn-small" data-codigo>${stkIco("qr")}Mostrar mi código</button>` : ""}<button type="button" class="btn btn-secondary btn-small" data-cancelar="${escapeHtml(x.id)}">Cancelar el pedido</button></div>` : ""}</div>`).join("") : "";
+  cont.querySelectorAll("[data-codigo]").forEach((b) => b.addEventListener("click", mostrarMiCodigo));
+  cont.querySelectorAll("[data-cancelar]").forEach((b) => b.addEventListener("click", async () => {
+    if (!(await confirmarApp("¿Cancelar este pedido?", { aceptar: "Sí, cancelar" }))) return;
+    try { await stkApi("POST", "", { accion: "cancelar_pedido", id: b.dataset.cancelar }); stkAviso("Pedido cancelado", "info"); } catch (e) { stkAviso("No se pudo: " + e.message); }
+    cargarMiStock();
+  }));
+}
+
+// ---------- Depósito: entrega en mano, pedidos y escaneo único ----------
+let depPase = null; // { nombre, codigo, vence, escaneado }: el técnico mostró su código
+let depSolicitudActiva = null; // el pedido que se está preparando
+let depExtrasAvisados = 0;
+const depPaseVale = (nombre) => !!(depPase && depPase.nombre === nombre && Date.now() < depPase.vence + 60e3);
+const depSolicitudesAbiertas = () => (depSaldos().solicitudes || []).filter((x) => x.estado === "pendiente" || x.estado === "lista");
+function depPintarPase() {
+  const cont = document.getElementById("depPaseCaja"); if (!cont) return;
+  const nom = document.getElementById("depDestTipo").value === "tec" ? depNombreElegido("depDestTipo") : "";
+  if (depPase && depPase.nombre !== nom) depPase = null;
+  if (depSolicitudActiva && depSolicitudActiva.por !== nom) depSolicitudActiva = null;
+  cont.innerHTML = depPaseVale(nom) ? `<div class="stk-pase ok">${stkIco("mano")}<span><b>${escapeHtml(nom)} está acá</b><small>Escaneaste su código: lo recibe en mano, sin «en camino».</small></span><button type="button" class="stk-link" data-quitar-pase>Quitar</button></div>`
+    : nom && nom !== tecnicoLogueado ? `<div class="stk-pase">${stkIco("qr")}<span><b>¿${escapeHtml(nom)} está acá?</b><small>Escaneá su código (Mi stock → Mi código) y lo recibe en mano.</small></span></div>` : "";
+  const q = cont.querySelector("[data-quitar-pase]");
+  if (q) q.addEventListener("click", () => { depPase = null; depPintarPase(); });
+  depPintarAvance();
+}
+// El técnico mostró su código: la entrega es para él, en mano (y si tiene un pedido, se arma con esa lista).
+async function depUsarPase(esp) {
+  if (Date.now() > esp.vence + 60e3) return { ok: false, especial: true, texto: `El código de ${esp.nombre} venció: que lo vuelva a abrir en Mi stock` };
+  if (depModo !== "entregar") {
+    if (depCanasta.items().length && depModo !== "consultar") return { ok: false, especial: true, texto: "Primero terminá o vaciá la lista" };
+    depCanasta.actual = ""; depModo = "entregar"; depMostrarModo();
+  }
+  const tipoSel = document.getElementById("depDestTipo");
+  if (tipoSel.value !== "tec") { tipoSel.value = "tec"; await depLlenarLista("depDestTipo"); }
+  const sel = document.getElementById("depDestSelect");
+  if (![...sel.options].some((o) => o.value === esp.nombre)) { await depLlenarLista("depDestTipo"); if (![...sel.options].some((o) => o.value === esp.nombre)) sel.insertAdjacentHTML("beforeend", `<option value="${escapeHtml(esp.nombre)}">${escapeHtml(esp.nombre)}</option>`); }
+  sel.value = esp.nombre;
+  depPase = { nombre: esp.nombre, codigo: esp.codigo, vence: esp.vence, escaneado: new Date().toISOString() };
+  const sol = depSolicitudesAbiertas().find((x) => x.por === esp.nombre);
+  if (sol && (!depSolicitudActiva || depSolicitudActiva.por !== esp.nombre)) { depSolicitudActiva = sol; depExtrasAvisados = 0; }
+  depPintarRecientes(); depPintarPase(); depBotonTexto();
+  return { ok: true, especial: true, texto: `${esp.nombre} está acá: lo recibe en mano${sol ? ". Tiene un pedido: escaneá lo que lleva" : ". Escaneá lo que lleva"}` };
+}
+// Abre una devolución por su código: el depósito la ve y la recibe.
+async function depAbrirDevolucion(id) {
+  let e = (depSaldos().envios || []).find((x) => x.id === id);
+  if (!e) { await depCargar(); e = (depSaldos().envios || []).find((x) => x.id === id); }
+  if (!e || e.a !== "dep") return { ok: false, especial: true, texto: "Esa devolución ya se recibió o no existe" };
+  if (depModo !== "recibir") {
+    if (depCanasta.items().length && depModo !== "consultar") return { ok: false, especial: true, texto: "Primero terminá o vaciá la lista" };
+    depCanasta.actual = ""; depModo = "recibir"; depMostrarModo();
+  }
+  setTimeout(() => {
+    document.querySelectorAll("#depDevoluciones .stk-resaltado").forEach((x) => x.classList.remove("stk-resaltado"));
+    const div = [...document.querySelectorAll("#depDevoluciones .stk-envio")].find((x) => x.dataset.id === id);
+    if (div) { div.classList.add("stk-resaltado"); div.scrollIntoView({ behavior: "smooth", block: "center" }); }
+  }, 450);
+  return { ok: true, especial: true, cerrar: true, texto: `Devolución de ${e.de.replace(/^tec:/, "")}: revisala y tocá «Recibido»` };
+}
+async function depEspecial(esp) {
+  if (esp.tipo === "tecnico") return depUsarPase(esp);
+  if (esp.tipo === "devolucion") return depAbrirDevolucion(esp.id);
+  return { ok: false, especial: true, texto: "Ese código no es válido" };
+}
+async function depLeerCuadro(textos) {
+  for (const t of textos) { const esp = stkLeerEspecial(t); if (esp) return { ...(await depEspecial(esp)), usado: t }; }
+  return depCanasta.leerCuadro(textos);
+}
+async function depUsarCodigo(texto, otros) {
+  const esp = stkLeerEspecial(texto);
+  return esp ? depEspecial(esp) : depCanasta.agregarCodigo(texto, otros);
+}
+// Pide escanear el código de un técnico (al confirmar una entrega). Devuelve si quedó escaneado.
+function depEscanearPase(nombre) {
+  return new Promise((resolver) => {
+    const probar = async (t) => {
+      const esp = stkLeerEspecial(t);
+      if (!esp || esp.tipo !== "tecnico") return null;
+      if (esp.nombre !== nombre) return { ok: false, texto: `Es el código de ${esp.nombre}, no de ${nombre}` };
+      const r = await depUsarPase(esp);
+      return { ...r, cerrar: r.ok };
+    };
+    abrirEscanerStock({
+      titulo: `Código de ${nombre}`,
+      estado: () => ({ ahora: `Que ${nombre} abra Mi stock → Mi código` }),
+      leerCuadro: async (ts) => { for (const t of ts) { const r = await probar(t); if (r) return { ...r, usado: t }; } return null; },
+      usar: async (t) => (await probar(t)) || { ok: false, texto: "Eso no es el código de un técnico" },
+      cerrarSi: (r) => !!r.cerrar,
+      alCerrar: () => resolver(depPaseVale(nombre)),
+    }).then(() => { if (!stkEscanerAbierto) resolver(depPaseVale(nombre)); });
+  });
+}
+// Pedidos de los técnicos: arriba de todo en el depósito.
+function depPintarSolicitudes() {
+  const cont = document.getElementById("depSolicitudes"); if (!cont) return;
+  const a = depCatalogo().articulos || {}, lista = depSolicitudesAbiertas();
+  const hace = (f) => { const m = Math.round((Date.now() - new Date(f).getTime()) / 60000); return m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} día(s)`; };
+  cont.innerHTML = lista.length ? `<h3 class="stk-h">Pedidos de técnicos (${lista.length})</h3>` + lista.map((x) => `<div class="stk-envio stk-sol ${escapeHtml(x.estado)}${depSolicitudActiva && depSolicitudActiva.id === x.id ? " stk-resaltado" : ""}" data-id="${escapeHtml(x.id)}">
+    <div class="stk-sol-top"><b>${escapeHtml(x.por)}</b><small>${escapeHtml(hace(x.fecha))}${x.estado === "lista" ? " · ya le avisaste que está listo" : ""}</small></div>
+    <div class="stk-envio-items">${x.items.map((y) => `<div class="stk-envio-item"><span>${escapeHtml((a[y.c] || {}).d || y.c)}</span><b>${stkFmtN(y.cant)}</b></div>`).join("")}</div>
+    ${x.nota ? `<small>${escapeHtml(x.nota)}</small>` : ""}
+    <div class="stk-envio-btns"><button type="button" class="btn btn-primary btn-small" data-preparar>${stkIco("caja")}Preparar</button>${x.estado === "pendiente" ? `<button type="button" class="btn btn-secondary btn-small" data-listo>Avisar que está listo</button>` : ""}</div></div>`).join("") : "";
+  cont.querySelectorAll(".stk-sol").forEach((div) => {
+    const x = lista.find((y) => y.id === div.dataset.id);
+    div.querySelector("[data-preparar]").addEventListener("click", async () => {
+      if (depCanasta.items().length && !(depModo === "entregar" && depNombreElegido("depDestTipo") === x.por)) { stkAviso("Primero terminá o vaciá la lista"); return; }
+      depCanasta.actual = ""; depModo = "entregar"; depMostrarModo();
+      document.getElementById("depDestTipo").value = "tec"; await depLlenarLista("depDestTipo");
+      const sel = document.getElementById("depDestSelect");
+      if (![...sel.options].some((o) => o.value === x.por)) sel.insertAdjacentHTML("beforeend", `<option value="${escapeHtml(x.por)}">${escapeHtml(x.por)}</option>`);
+      sel.value = x.por;
+      depSolicitudActiva = x; depExtrasAvisados = 0;
+      depPintarRecientes(); depPintarPase(); depBotonTexto(); depPintarSolicitudes();
+      document.getElementById("depCanastaCaja").scrollIntoView({ behavior: "smooth", block: "start" });
+      stkAviso(`Escaneá lo que lleva ${x.por}; cuando llegue, escaneá su código`, "info");
+    });
+    const listo = div.querySelector("[data-listo]");
+    if (listo) listo.addEventListener("click", async (ev) => {
+      ev.currentTarget.disabled = true;
+      try { await stkApi("POST", "", { accion: "pedido_listo", id: x.id }); stkAviso(`✓ Le avisamos a ${x.por} que está listo`); } catch (e) { stkAviso("No se pudo: " + e.message); }
+      await depCargar();
+    });
+  });
+}
+// Cuánto falta de cada línea del pedido que se está preparando.
+function depPintarAvance() {
+  const cont = document.getElementById("depSolicitudAvance"); if (!cont) return;
+  const sol = depSolicitudActiva;
+  if (!sol || depModo !== "entregar") { cont.innerHTML = ""; return; }
+  const a = depCatalogo().articulos || {}, av = avanceSolicitud(sol, depCanasta.items());
+  if (av.extras.length > depExtrasAvisados) stkAviso(`${(a[av.extras[av.extras.length - 1]] || {}).d || "Eso"}: no estaba en el pedido de ${sol.por}`, "info");
+  depExtrasAvisados = av.extras.length;
+  cont.innerHTML = `<div class="stk-avance${av.completo ? " completo" : ""}"><div class="stk-sol-top"><b>Pedido de ${escapeHtml(sol.por)}</b><button type="button" class="stk-link" data-soltar>No usar el pedido</button></div>
+    ${av.lineas.map((x) => `<div class="stk-avance-item${x.lleva >= x.pedido ? " ok" : ""}">${x.lleva >= x.pedido ? stkIco("check") : '<span class="stk-avance-punto"></span>'}<span>${escapeHtml((a[x.c] || {}).d || x.c)}</span><b>${stkFmtN(x.lleva)} de ${stkFmtN(x.pedido)}</b></div>`).join("")}
+    ${av.extras.length ? `<div class="stk-avance-item extra">${stkIco("alerta")}<span>No estaba en el pedido: ${escapeHtml(av.extras.map((c) => (a[c] || {}).d || c).join(", "))}</span></div>` : ""}
+    ${sol.nota ? `<small>${escapeHtml(sol.nota)}</small>` : ""}</div>`;
+  cont.querySelector("[data-soltar]").addEventListener("click", () => { depSolicitudActiva = null; depPintarAvance(); depPintarSolicitudes(); });
+}
+// Controlar una devolución escaneando: empieza sin nada tildado y cada escaneo cuenta.
+function depControlarDevolucion(div, e) {
+  if (!e) return;
+  const a = depCatalogo().articulos || {}, d = (c) => (a[c] || {}).d || c;
+  div.querySelectorAll("input[data-serie]").forEach((c) => { c.checked = false; });
+  div.querySelectorAll("input[data-sin-n]").forEach((i) => { i.value = "0"; });
+  const total = e.items.reduce((t, x) => t + (Number(x.cant) || 0), 0);
+  const contados = () => [...div.querySelectorAll("input[data-serie]")].filter((c) => c.checked).length + [...div.querySelectorAll("input[data-sin-n]")].reduce((t, i) => t + (stkNumApp(i.value) || 0), 0);
+  const porSerie = (t) => {
+    const x = limpiarCodigo(t), caja = [...div.querySelectorAll("input[data-serie]")].find((c) => c.dataset.serie === x);
+    if (!caja) return null;
+    if (caja.checked) return { ok: false, texto: `${x}: ya estaba contado` };
+    caja.checked = true;
+    return { ok: true, texto: `${x}: contado` };
+  };
+  const porArticulo = (t) => {
+    const r = interpretarCodigo(t, depCatalogo(), depSaldos(), "");
+    if (r.tipo === "unidad") return { ok: false, texto: `${r.tracking}: no está en esta devolución` };
+    if (r.tipo !== "articulo") return null;
+    const i = e.items.findIndex((y) => y.c === r.c);
+    if (i < 0) return { ok: false, texto: `${d(r.c)}: no está en esta devolución` };
+    const inp = div.querySelector(`input[data-i="${i}"][data-sin-n]`);
+    if (!inp) return { ok: false, texto: `${d(r.c)}: escaneá el N° de serie de cada equipo` };
+    const x = e.items[i], max = Math.max(0, x.cant - (x.unidades || []).length), n = stkNumApp(inp.value) || 0;
+    if (n >= max) return { ok: false, texto: `${d(r.c)}: ya están todos (${stkFmtN(max)})` };
+    inp.value = stkFmtN(n + 1);
+    return { ok: true, texto: `${d(r.c)}: ${stkFmtN(n + 1)} de ${stkFmtN(max)}` };
+  };
+  abrirEscanerStock({
+    titulo: `Controlar la devolución de ${e.de.replace(/^tec:/, "")}`,
+    estado: () => ({ ahora: "Escaneá cada cosa que llegó", total: `${stkFmtN(contados())} de ${stkFmtN(total)}` }),
+    leerCuadro: async (ts) => { for (const t of ts) { const r = porSerie(t); if (r) return { ...r, usado: t }; } for (const t of ts) { const r = porArticulo(t); if (r) return { ...r, usado: t }; } return null; },
+    usar: async (t) => porSerie(t) || porArticulo(t) || { ok: false, texto: "No lo reconozco" },
+    alCerrar: () => { const n = contados(); if (n < total) stkAviso(`Contaste ${stkFmtN(n)} de ${stkFmtN(total)}: lo que falta vuelve a figurar a su nombre`, "info"); else stkAviso("✓ Está todo: tocá «Recibido»"); },
+  });
+}
+// Escaneo único: lo primero que se escanea decide qué se hace.
+document.getElementById("depEscaneoUnicoBtn").addEventListener("click", () => {
+  let entregando = depModo === "entregar" && depCanasta.items().length > 0;
+  const decidir = async (textos, otros, escrito) => {
+    const esp = textos.map(stkLeerEspecial).find(Boolean);
+    if (esp) {
+      const r = await depEspecial(esp);
+      if (esp.tipo === "tecnico" && r.ok) entregando = true;
+      return { ...r, usado: textos.find((t) => stkLeerEspecial(t)) };
+    }
+    if (entregando) return escrito ? depCanasta.agregarCodigo(textos[0], otros) : depCanasta.leerCuadro(textos);
+    // Un artículo, sin técnico: dónde está.
+    const d = elegirCodigoDelCuadro(textos, depCatalogo(), depSaldos(), "");
+    const cod = d.usar || (escrito ? textos[0] : "");
+    if (!cod) return null;
+    if (depModo !== "consultar") { if (depCanasta.items().length) return { ok: false, texto: "Primero terminá o vaciá la lista" }; depModo = "consultar"; depMostrarModo(); }
+    document.getElementById("depConsultarCodigo").value = cod;
+    const r = await depConsultar(cod);
+    return { ...r, usado: cod, cerrar: !!r.ok };
+  };
+  abrirEscanerStock({
+    titulo: "Escanear",
+    estado: () => (entregando ? depCanasta.estado() : { ahora: "Código del técnico, de una devolución o un artículo" }),
+    leerCuadro: (t) => decidir(t),
+    usar: (t, o) => decidir([t], o, true),
+    describir: (t) => (stkLeerEspecial(t) ? { texto: "código", util: true } : depCanasta.describir(t)),
+    cerrarSi: (r) => !!r.cerrar,
+  });
+});
 
 // ---------- El parte y el stock ----------
 // «Usé material de mi stock»: se elige de lo que tiene (o se escanea) y al mandar el parte pasa al
