@@ -3920,3 +3920,5 @@ html[data-theme="day"] .toast.info { background: #E7F1FB; border-color: #5B7A99;
 .ayuda-pop ul { margin: 12px 0 4px; padding-left: 20px; }
 .ayuda-pop li { margin: 5px 0; }
 .stk-h .ayuda-btn, .stk-cola b .ayuda-btn { margin-left: 6px; }
+.stk-escaner-zoom { position: absolute; right: 12%; top: calc(54% + 10px); min-width: 52px; height: 40px; padding: 0 12px; border-radius: 20px; border: 2px solid rgba(255,255,255,.85); background: rgba(16,24,32,.7); color: #fff; font: 700 15px/1 inherit; z-index: 2; }
+.stk-escaner-zoom.hidden { display: none; }

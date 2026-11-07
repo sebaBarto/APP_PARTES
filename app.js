@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.59.0";
+const APP_VERSION = "4.60.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -18227,22 +18227,53 @@ function stkCargarLectorPropio() {
   if (stkLectorPropio) return stkLectorPropio;
   stkLectorPropio = new Promise((ok, mal) => {
     const listo = () => {
-      const api = window.BarcodeDetectionAPI;
-      if (!api || !api.BarcodeDetector) { mal(new Error("sin lector")); return; }
+      const Z = window.ZXingWASM;
+      if (!Z || !Z.readBarcodes) { mal(new Error("sin lector")); return; }
       const overrides = { locateFile: (archivo, prefijo) => (archivo.endsWith(".wasm") ? new URL("vendor/zxing/" + archivo, document.baseURI).href : prefijo + archivo) };
-      try { api.setZXingModuleOverrides(overrides); } catch (e) { /* nada */ }
+      try { Z.setZXingModuleOverrides(overrides); } catch (e) { /* nada */ }
       // Carga el motor ya (y no en el primer cuadro): si no se puede, se avisa en vez de quedar mudo.
-      Promise.resolve(api.prepareZXingModule ? api.prepareZXingModule({ overrides, fireImmediately: true }) : null)
-        .then(() => ok(api.BarcodeDetector), mal);
+      Promise.resolve(Z.prepareZXingModule ? Z.prepareZXingModule({ overrides, fireImmediately: true }) : null).then(() => ok(Z), mal);
     };
-    if (window.BarcodeDetectionAPI) { listo(); return; }
+    if (window.ZXingWASM) { listo(); return; }
     const s = document.createElement("script");
-    s.src = "vendor/zxing/barcode-detector.js";
+    s.src = "vendor/zxing/zxing-reader.js";
     s.onload = listo;
     s.onerror = () => mal(new Error("no se pudo cargar el lector"));
     document.head.appendChild(s);
   }).catch((e) => { stkLectorPropio = null; throw e; });
   return stkLectorPropio;
+}
+// Qué parte del video se ve dentro del marco naranja (el video se muestra recortado, «cover»).
+function stkRecorteMarco(video, marco) {
+  const vw = video.videoWidth, vh = video.videoHeight, rv = video.getBoundingClientRect(), rm = marco && marco.getBoundingClientRect();
+  if (!rm || !rv.width || !rv.height) return { x: 0, y: vh * 0.2, w: vw, h: vh * 0.6 };
+  const k = Math.max(rv.width / vw, rv.height / vh), ox = (rv.width - vw * k) / 2, oy = (rv.height - vh * k) / 2;
+  const mx = rm.width * 0.2, my = rm.height * 0.45; // un poco de margen alrededor del marco
+  let x = (rm.left - rv.left - ox - mx) / k, y = (rm.top - rv.top - oy - my) / k, w = (rm.width + 2 * mx) / k, h = (rm.height + 2 * my) / k;
+  x = Math.max(0, x); y = Math.max(0, y); w = Math.min(vw - x, w); h = Math.min(vh - y, h);
+  return w > 40 && h > 40 ? { x, y, w, h } : { x: 0, y: 0, w: vw, h: vh };
+}
+// Lector ZXing afinado para la cámara: lee el marco a resolución completa (las barras finas de un
+// código de barras se pierden si se achica la imagen) y, uno de cada tres cuadros, la imagen entera
+// (por si el código está lejos, de costado o fuera del marco).
+function stkLectorZXing(Z) {
+  const cv = document.createElement("canvas"), g = cv.getContext("2d", { willReadFrequently: true });
+  const formats = ["Code128", "Code39", "Code93", "EAN13", "EAN8", "UPCA", "UPCE", "ITF", "Codabar", "DataMatrix", "QRCode"];
+  let vuelta = 0;
+  return {
+    propio: true,
+    async detect(video, marco) {
+      const vw = video.videoWidth, vh = video.videoHeight;
+      if (!vw || !vh) return [];
+      const entero = ++vuelta % 3 === 0;
+      const r = entero ? { x: 0, y: 0, w: vw, h: vh } : stkRecorteMarco(video, marco);
+      const k = Math.min(1, (entero ? 1280 : 1920) / Math.max(r.w, r.h));
+      cv.width = Math.max(1, Math.round(r.w * k)); cv.height = Math.max(1, Math.round(r.h * k));
+      g.drawImage(video, r.x, r.y, r.w, r.h, 0, 0, cv.width, cv.height);
+      const res = await Z.readBarcodes(g.getImageData(0, 0, cv.width, cv.height), { formats, tryHarder: true, tryRotate: entero, tryInvert: false, tryDownscale: entero, maxNumberOfSymbols: 6 });
+      return (res || []).filter((x) => x.isValid !== false && x.text).map((x) => ({ rawValue: x.text }));
+    },
+  };
 }
 // Al entrar a Depósito o Mi stock en un iPhone, deja el lector bajado y guardado (para usarlo sin señal).
 const stkPrepararLector = () => { if (!("BarcodeDetector" in window)) setTimeout(() => stkCargarLectorPropio().catch(() => {}), 300); };
@@ -18252,8 +18283,36 @@ async function stkCrearDetector() {
     // Algún navegador lo trae pero sin formatos (ej. Chrome en computadoras sin soporte).
     try { const f = await Clase.getSupportedFormats(); if (Array.isArray(f) && !f.length) Clase = null; } catch (e) { /* se usa igual */ }
   }
-  if (!Clase) Clase = await stkCargarLectorPropio();
+  if (!Clase) return stkLectorZXing(await stkCargarLectorPropio());
   try { return new Clase({ formats: STK_FORMATOS }); } catch (e) { return new Clase(); }
+}
+// Enfoque continuo y zoom (si la cámara lo permite; el iPhone desde iOS 17.4). Con zoom se puede
+// tener el código más lejos, donde la cámara sí enfoca, y verlo igual de grande. El zoom elegido
+// se recuerda en este teléfono.
+function stkAjustarCamara(stream, boton, propio) {
+  const pista = stream && stream.getVideoTracks && stream.getVideoTracks()[0];
+  if (!pista || !pista.getCapabilities) return;
+  let cap = {};
+  try { cap = pista.getCapabilities() || {}; } catch (e) { return; }
+  if (Array.isArray(cap.focusMode) && cap.focusMode.includes("continuous")) pista.applyConstraints({ advanced: [{ focusMode: "continuous" }] }).catch(() => {});
+  const z = cap.zoom;
+  if (!z || !(z.max > 1) || !boton) return;
+  const min = Math.max(1, z.min || 1), niveles = [1, 1.5, 2, 3].filter((n) => n >= min && n <= z.max);
+  if (niveles.length < 2) return;
+  let guardado = NaN;
+  try { guardado = parseFloat(localStorage.getItem("stock_zoom")); } catch (e) { /* nada */ }
+  let actual = niveles.includes(guardado) ? guardado : propio && niveles.includes(2) ? 2 : niveles[0];
+  const aplicar = () => {
+    boton.textContent = (Math.round(actual * 10) / 10).toString().replace(".", ",") + "x";
+    pista.applyConstraints({ advanced: [{ zoom: actual }] }).catch(() => {});
+  };
+  boton.classList.remove("hidden");
+  boton.addEventListener("click", () => {
+    actual = niveles[(niveles.indexOf(actual) + 1) % niveles.length];
+    try { localStorage.setItem("stock_zoom", String(actual)); } catch (e) { /* nada */ }
+    aplicar();
+  });
+  aplicar();
 }
 async function abrirEscanerStock(op) {
   if (stkEscanerAbierto) return;
@@ -18271,8 +18330,8 @@ async function abrirEscanerStock(op) {
   capa.className = "stk-escaner";
   capa.innerHTML = `<div class="stk-escaner-arriba"><b></b><span class="stk-escaner-total"></span></div>
     <div class="stk-escaner-ahora"></div>
-    <video playsinline muted autoplay></video><div class="stk-escaner-marco"></div>
-    <div class="stk-escaner-abajo"><div class="stk-escaner-ultimo">Apuntá al código de barras</div>
+    <video playsinline muted autoplay></video><div class="stk-escaner-marco"></div><button type="button" class="stk-escaner-zoom hidden" aria-label="Zoom de la cámara"></button>
+    <div class="stk-escaner-abajo"><div class="stk-escaner-ultimo">${detector.propio ? "Poné el código dentro del marco, a un palmo del teléfono (de muy cerca no enfoca)" : "Apuntá al código de barras"}</div>
       <div class="stk-escaner-ocr"></div>
       <div class="stk-escaner-extra"><button type="button" class="btn btn-secondary btn-small stk-escaner-numeros">${stkIco("numeros")}Leer los números</button><button type="button" class="btn btn-secondary btn-small stk-escaner-amano">${stkIco("teclado")}A mano</button></div>
       <button type="button" class="btn btn-primary stk-escaner-listo">Listo</button></div>`;
@@ -18344,9 +18403,12 @@ async function abrirEscanerStock(op) {
   stkEscanerAbierto = { cerrar };
   capa.querySelector(".stk-escaner-listo").addEventListener("click", cerrar);
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+    // Con el lector de la APP (iPhone) se pide más resolución: más píxeles por barra.
+    const res = detector.propio ? { width: { ideal: 1920 }, height: { ideal: 1080 } } : { width: { ideal: 1280 }, height: { ideal: 720 } };
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, ...res }, audio: false });
     video.srcObject = stream;
     await video.play().catch(() => {});
+    stkAjustarCamara(stream, capa.querySelector(".stk-escaner-zoom"), detector.propio);
   } catch (e) {
     cerrar();
     await dialogoApp("No se pudo abrir la cámara. Revisá que la APP tenga permiso de cámara, o escribí el código a mano.", { soloAceptar: true, aceptar: "Entendido" });
@@ -18356,7 +18418,7 @@ async function abrirEscanerStock(op) {
     if (ocupado || cerrado || video.readyState < 2) return;
     ocupado = true;
     try {
-      const codigos = await detector.detect(video);
+      const codigos = await detector.detect(video, capa.querySelector(".stk-escaner-marco"));
       const ahora = Date.now();
       const textos = [...new Set((codigos || []).map((c) => String(c.rawValue || "").trim()).filter(Boolean))];
       if (textos.length) { ultimaLectura = ahora; if (ocrCaja.querySelector(".stk-ocr-msj") && !ocrEnCurso && !ocrCaja.querySelector("[data-t]")) ocrCaja.innerHTML = ""; }
