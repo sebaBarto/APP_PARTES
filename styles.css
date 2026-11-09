@@ -3922,3 +3922,17 @@ html[data-theme="day"] .toast.info { background: #E7F1FB; border-color: #5B7A99;
 .stk-h .ayuda-btn, .stk-cola b .ayuda-btn { margin-left: 6px; }
 .stk-escaner-zoom { position: absolute; right: 12%; top: calc(54% + 10px); min-width: 52px; height: 40px; padding: 0 12px; border-radius: 20px; border: 2px solid rgba(255,255,255,.85); background: rgba(16,24,32,.7); color: #fff; font: 700 15px/1 inherit; z-index: 2; }
 .stk-escaner-zoom.hidden { display: none; }
+
+/* Dictado por voz */
+.dictado-caja { position: relative; }
+.dictado-caja > textarea { padding-right: 52px; }
+.dictado-btn { position: absolute; right: 6px; bottom: 8px; width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid var(--amber); background: var(--amber-soft); color: #101820; display: flex; align-items: center; justify-content: center; padding: 0; cursor: pointer; }
+.dictado-btn svg { width: 20px; height: 20px; }
+.dictado-btn.escuchando { background: #D93B2B; border-color: #D93B2B; color: #fff; animation: dictadoPulso 1.4s ease-in-out infinite; }
+@keyframes dictadoPulso { 0%, 100% { box-shadow: 0 0 0 0 rgba(217,59,43,.45); } 50% { box-shadow: 0 0 0 8px rgba(217,59,43,0); } }
+.dictado-aviso { display: flex; align-items: center; gap: 8px; margin-top: 6px; font-size: 13px; opacity: .85; }
+.dictado-punto { width: 9px; height: 9px; border-radius: 50%; background: #D93B2B; flex: none; animation: dictadoTitila 1s ease-in-out infinite; }
+@keyframes dictadoTitila { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .dictado-btn.escuchando, .dictado-punto { animation: none; } }
+html[data-theme="night"] .dictado-btn:not(.escuchando) { color: #F5A623; background: rgba(245,166,35,.12); }
+html[data-theme="contraste"] .dictado-btn:not(.escuchando) { color: #000; background: #fff; border-color: #000; border-width: 2px; }

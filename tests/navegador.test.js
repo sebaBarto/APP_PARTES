@@ -6534,3 +6534,75 @@ test("Tablero de stock: en la APP lo ven la oficina (permiso) y el responsable, 
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Dictado por voz: micrófono en los textos largos del parte; escribe lo dictado con puntuación por voz, sigue escuchando entre frases y se corta al tocar o al cambiar de pantalla", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 404, body: "" }));
+  await page.route("**/api/**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+  await page.addInitScript(() => {
+    window.__recs = [];
+    window.webkitSpeechRecognition = class {
+      constructor() { window.__recs.push(this); this.inicios = 0; this.parado = false; }
+      start() { this.inicios++; this.parado = false; }
+      stop() { this.parado = true; setTimeout(() => this.onend && this.onend(), 0); }
+      // simula lo que manda el celular
+      decir(partes) { const results = partes.map(([t, fin]) => Object.assign([{ transcript: t }], { isFinal: fin })); this.onresult({ results }); }
+    };
+    window.SpeechRecognition = window.webkitSpeechRecognition;
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(base + "/index.html");
+  await page.waitForTimeout(400);
+  // Unidad: puntuación por voz
+  const p = await page.evaluate(() => [
+    Dictado.prolijo("cambié la batería coma la central punto y aparte quedó funcionando punto", ""),
+    Dictado.prolijo("configuré el punto de acceso dos puntos red sat", "Llegué."),
+    Dictado.prolijo("sigue igual", "Probé la sirena"),
+  ]);
+  assert.deepStrictEqual(p, ["Cambié la batería, la central.\nQuedó funcionando.", "Configuré el punto de acceso: red sat", "sigue igual"]);
+  await page.evaluate(() => showScreen("form"));
+  for (const id of ["f_tarea", "f_observaciones", "f_materiales"]) assert.strictEqual(await page.locator(`#${id}`).locator("xpath=..").locator(".dictado-btn").count(), 1, id);
+  await page.fill("#f_tarea", "Revisé la central.");
+  const btn = page.locator("#f_tarea + .dictado-btn");
+  await btn.dispatchEvent("click");
+  assert.match(await btn.getAttribute("class"), /escuchando/);
+  assert.match(await page.textContent(".dictado-aviso"), /Escuchando/);
+  // Mientras habla se ve lo que va entendiendo; al cerrar la frase queda escrito
+  await page.evaluate(() => window.__recs[0].decir([["cambié la batería", false]]));
+  assert.strictEqual(await page.inputValue("#f_tarea"), "Revisé la central. Cambié la batería");
+  await page.evaluate(() => window.__recs[0].decir([["cambié la batería de la central punto", true]]));
+  // Silencio: el celular corta la frase; la APP sigue escuchando sola
+  await page.evaluate(() => window.__recs[0].onend());
+  assert.strictEqual(await page.evaluate(() => window.__recs[0].inicios), 2);
+  await page.evaluate(() => window.__recs[0].decir([["quedó andando", true]]));
+  assert.strictEqual(await page.inputValue("#f_tarea"), "Revisé la central. Cambié la batería de la central. Quedó andando");
+  // Tocar el micrófono termina
+  await btn.dispatchEvent("click");
+  assert.doesNotMatch(await btn.getAttribute("class"), /escuchando/);
+  assert.strictEqual(await page.locator(".dictado-aviso").count(), 0);
+  // Cambiar de pantalla también lo corta
+  await page.locator("#f_observaciones + .dictado-btn").dispatchEvent("click");
+  assert.ok(await page.evaluate(() => !!Dictado.activo()));
+  await page.evaluate(() => showScreen("home"));
+  assert.ok(await page.evaluate(() => !Dictado.activo() && window.__recs[1].parado));
+  // Sin permiso de micrófono: avisa
+  await page.evaluate(() => showScreen("form"));
+  await page.locator("#f_observaciones + .dictado-btn").dispatchEvent("click");
+  await page.evaluate(() => window.__recs[2].onerror({ error: "not-allowed" }));
+  await page.waitForTimeout(100);
+  assert.match(await page.textContent("body"), /permitir el micrófono/);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Dictado por voz: si el navegador no tiene reconocimiento de voz, no aparece el micrófono", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 404, body: "" }));
+  await page.route("**/api/**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+  await page.addInitScript(() => { delete window.webkitSpeechRecognition; delete window.SpeechRecognition; });
+  await page.goto(base + "/index.html");
+  await page.waitForTimeout(300);
+  assert.strictEqual(await page.locator(".dictado-btn").count(), 0);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

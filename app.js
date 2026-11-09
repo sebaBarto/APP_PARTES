@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.62.0";
+const APP_VERSION = "4.63.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -965,6 +965,7 @@ let fotoBase64 = null;
 let fotoMimeType = null;
 
 function showScreen(name) {
+  if (window.__pararDictado) window.__pararDictado();
   Object.entries(screens).forEach(([key, el]) => {
     if (el) el.dataset.active = key === name ? "true" : "false";
   });
@@ -19985,3 +19986,125 @@ function registrarStockDelParte(data, idParte) {
     if (r && r.paraAprobar) stkAviso(`${r.paraAprobar} material(es) que no estaban en tu stock quedan para que los apruebe el depósito.`);
   }).catch((e) => { console.error("No se pudo descontar el stock del parte:", e); });
 }
+
+// ---------- Dictado por voz en los textos largos ----------
+// Un micrófono en cada casillero de texto largo (tarea realizada, observaciones, materiales...).
+// Se habla y el texto se va escribiendo; se puede puntuar diciendo «punto», «coma», «dos puntos»
+// o «punto y aparte». Usa el reconocimiento de voz del celular (Chrome en Android, Safari en
+// iPhone): necesita señal. Sin señal queda el micrófono del teclado.
+const Dictado = (() => {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const esIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  let activo = null; // { ta, btn, rec, base, parcial, parar }
+
+  // Pasa lo dictado a texto prolijo: comandos de puntuación, mayúsculas y espacios.
+  function prolijo(dicho, antes) {
+    let t = " " + String(dicho || "").replace(/\s+/g, " ").trim() + " ";
+    t = t.replace(/ (punto y aparte|nuevo párrafo|nuevo parrafo|nueva línea|nueva linea|siguiente línea|siguiente linea) /gi, ".\n ");
+    t = t.replace(/ (dos puntos) /gi, ": ");
+    t = t.replace(/ (punto y coma) /gi, "; ");
+    t = t.replace(/ coma /gi, ", ");
+    // «punto» suelto (no «punto de acceso», «punto com»...)
+    t = t.replace(/ punto(?= (?!(?:de|del|a|al|en|com|ar|final|muerto|fijo|cero)\b)| $)/gi, ".");
+    t = t.replace(/ (signo de pregunta|cierra pregunta) /gi, "? ");
+    t = t.replace(/ +([.,:;?])/g, "$1").replace(/([.,:;?])(?=[^\s\n.,:;?])/g, "$1 ").replace(/\.{2,}/g, ".").replace(/\n /g, "\n").trim();
+    // Mayúscula al empezar y después de punto
+    const empieza = !String(antes || "").trim() || /[.?!]\s*$/.test(antes);
+    if (empieza) t = t.charAt(0).toLocaleUpperCase("es") + t.slice(1);
+    t = t.replace(/([.?!]\s+)(\p{Ll})/gu, (m, a, b) => a + b.toLocaleUpperCase("es"));
+    return t;
+  }
+  const unir = (base, nuevo) => (!nuevo ? base : !base ? nuevo : base + (/\s$/.test(base) ? "" : " ") + nuevo);
+
+  function escribir(final, parcial) {
+    const a = activo; if (!a) return;
+    const dicho = [final, parcial].filter(Boolean).join(" ");
+    a.ta.value = unir(a.base, prolijo(dicho, a.base));
+    a.ta.scrollTop = a.ta.scrollHeight;
+    a.ta.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  function parar(motivo) {
+    const a = activo; if (!a) return;
+    activo = null;
+    a.parando = true;
+    try { a.rec.stop(); } catch (e) { /* nada */ }
+    a.btn.classList.remove("escuchando");
+    a.btn.setAttribute("aria-label", "Dictar por voz");
+    a.btn.title = "Dictar por voz";
+    if (a.aviso) a.aviso.remove();
+    a.ta.dispatchEvent(new Event("change", { bubbles: true }));
+    if (motivo) stkAviso(motivo, "info");
+  }
+
+  function empezar(ta, btn) {
+    if (activo) { const era = activo.ta; parar(); if (era === ta) return; }
+    const rec = new SR();
+    rec.lang = "es-AR";
+    rec.interimResults = true;
+    // En Android el modo continuo repite palabras: se dicta frase por frase y se vuelve a arrancar solo.
+    rec.continuous = esIOS;
+    rec.maxAlternatives = 1;
+    const a = { ta, btn, rec, base: ta.value, final: "", ultimaVoz: Date.now() };
+    activo = a;
+    btn.classList.add("escuchando");
+    btn.setAttribute("aria-label", "Terminar el dictado");
+    btn.title = "Terminar el dictado";
+    a.aviso = document.createElement("div");
+    a.aviso.className = "dictado-aviso";
+    a.aviso.innerHTML = '<span class="dictado-punto"></span> Escuchando… Decí «punto», «coma» o «punto y aparte». Tocá el micrófono para terminar.';
+    (ta.closest(".dictado-caja") || ta).after(a.aviso);
+    rec.onresult = (ev) => {
+      if (activo !== a) return;
+      let fin = "", par = "";
+      for (let i = 0; i < ev.results.length; i++) {
+        const r = ev.results[i], t = (r[0] && r[0].transcript) || "";
+        if (r.isFinal) fin += " " + t; else par += " " + t;
+      }
+      a.final = fin.trim();
+      a.ultimaVoz = Date.now();
+      escribir(a.final, par.trim());
+    };
+    rec.onerror = (ev) => {
+      if (activo !== a) return;
+      const e = ev && ev.error;
+      if (e === "no-speech" || e === "aborted") return; // se vuelve a arrancar en onend
+      if (e === "not-allowed" || e === "service-not-allowed") parar("Para dictar hay que permitir el micrófono a la APP (en los permisos del navegador).");
+      else if (e === "network") parar("El dictado necesita señal. Sin señal, usá el micrófono del teclado.");
+      else if (e === "audio-capture") parar("No se encontró el micrófono.");
+      else parar("El dictado se cortó. Tocá el micrófono para seguir.");
+    };
+    rec.onend = () => {
+      if (activo !== a || a.parando) return;
+      // Terminó una frase (o un silencio): queda escrita y sigue escuchando.
+      a.base = a.ta.value; a.final = "";
+      if (Date.now() - a.ultimaVoz > 40000) { parar("El dictado se apagó porque no se escuchó nada. Tocá el micrófono para seguir."); return; }
+      try { rec.start(); } catch (e) { parar(); }
+    };
+    try { rec.start(); } catch (e) { parar("No se pudo empezar el dictado."); }
+  }
+
+  function poner(ta) {
+    if (!SR || !ta || ta.dataset.dictado) return;
+    ta.dataset.dictado = "1";
+    const caja = document.createElement("div");
+    caja.className = "dictado-caja";
+    ta.parentNode.insertBefore(caja, ta);
+    caja.appendChild(ta);
+    caja.style.marginTop = ta.style.marginTop; ta.style.marginTop = "";
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "dictado-btn";
+    btn.setAttribute("aria-label", "Dictar por voz");
+    btn.title = "Dictar por voz";
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3.5M8.5 21.5h7"/></svg>';
+    btn.addEventListener("click", (e) => { e.preventDefault(); empezar(ta, btn); });
+    caja.appendChild(btn);
+  }
+  function ponerEnTodos(raiz) { (raiz || document).querySelectorAll("textarea.field-textarea").forEach(poner); }
+  // Si la APP pasa a segundo plano, se corta (el micrófono no queda abierto).
+  document.addEventListener("visibilitychange", () => { if (document.hidden) parar(); });
+  return { disponible: !!SR, ponerEnTodos, parar, prolijo, activo: () => activo };
+})();
+Dictado.ponerEnTodos();
+window.__pararDictado = () => Dictado.parar();
