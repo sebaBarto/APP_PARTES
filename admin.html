@@ -1290,7 +1290,8 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
       <h1>Stock</h1>
       <p class="subtitle">Dónde está cada artículo: depósito, técnicos, vehículos y clientes. El sistema de Oficina sigue con precios y compras; acá se concilia contra lo que exporta y se arma el pedido de lo que falta.</p>
       <div class="stk-sub" id="stkSub">
-        <button type="button" class="btn-secondary-admin activo" data-stk="articulos">Artículos</button>
+        <button type="button" class="btn-secondary-admin activo" data-stk="tablero">Tablero</button>
+        <button type="button" class="btn-secondary-admin" data-stk="articulos">Artículos</button>
         <button type="button" class="btn-secondary-admin" data-stk="salud">Salud <span id="stkSaludBadge" class="stk-tag bajo hidden"></span></button>
         <button type="button" class="btn-secondary-admin" data-stk="conciliacion">Conciliación con Oficina</button>
         <button type="button" class="btn-secondary-admin" data-stk="pedidos">Pedidos</button>
@@ -1301,7 +1302,15 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
       </div>
       <p class="status" id="stkStatus"></p>
 
-      <div data-stk-vista="articulos">
+      <div data-stk-vista="tablero">
+        <div class="card">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;"><h3 style="margin:0;flex:1;">Tablero de control</h3><button type="button" class="btn-secondary-admin" id="stkTableroActualizar" style="width:auto;">Actualizar</button></div>
+          <p class="status" id="stkTableroStatus"></p>
+          <div id="stkTablero"></div>
+        </div>
+      </div>
+
+      <div data-stk-vista="articulos" class="hidden">
         <div class="card">
           <h3 style="margin-top:0;">Catálogo</h3>
           <div id="stkEstado" class="subtitle" style="margin:0 0 10px;"></div>
@@ -1949,6 +1958,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
 
 <script src="sims-utils.js"></script>
 <script src="stock-utils.js"></script>
+<script src="tablero-stock.js"></script>
 <script src="croquis-utils.js"></script>
 <script>
 // ==== CONFIGURACIÓN ====
@@ -2487,6 +2497,7 @@ const PERMISOS_TECNICO = [
   { clave: "dash_vehiculos", etiqueta: "Dashboard de vehículos" },
   { clave: "dash_herramientas", etiqueta: "Dashboard de herramientas" },
   { clave: "dash_sims", etiqueta: "Dashboard de SIMs" },
+  { clave: "dash_deposito", etiqueta: "Tablero de stock (control del depósito y los movimientos, para la oficina)" },
   { clave: "historial_todos", etiqueta: "Ver historial de todo el equipo" },
   { clave: "dash_stock", etiqueta: "Ver historial de Stock (materiales instalados/retirados)" },
   { clave: "stock_responsable", etiqueta: "Responsable de stock (escanear, entregar y recibir material del depósito)" },
@@ -5365,6 +5376,7 @@ const AYUDAS_SIMS = {
   stk_proveedores: { titulo: "Códigos de proveedor", gif: "assets/ayuda/stock-adm-proveedores.gif", texto: [
     "La etiqueta de SAT trae al final el código del proveedor (4 dígitos). Acá le ponés el nombre a cada código.",
     "Los códigos que se escanearon y todavía no tienen nombre aparecen para completar." ] },
+  ...((window.TableroStock && window.TableroStock.AYUDAS) || {}),
 };
 const LUGARES_AYUDA_SIMS = [
   ["#panelStock > h1", "stk_resumen"], ['[data-stk-vista="articulos"] h3', "stk_catalogo"], ["#stkTipoVariosBtn", "stk_lista", "after"],
@@ -5441,21 +5453,25 @@ function ponerAyudasSims() {
     const lista = document.querySelectorAll(sel);
     const el = lista[indice || 0];
     if (!el || document.querySelector(`.ayuda-btn[data-ayuda="${clave}"]`)) return;
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "ayuda-btn";
-    b.dataset.ayuda = clave;
-    b.textContent = "?";
-    b.title = "";
-    b.setAttribute("aria-label", "Ayuda: " + AYUDAS_SIMS[clave].titulo);
-    b.setAttribute("aria-expanded", "false");
+    const b = nuevoAyudaBtn(clave);
     if (donde === "after") el.after(b); else el.appendChild(b);
-    // Solo el mouse abre al pasar por arriba; con el dedo se abre al tocar (y queda fijo).
-    b.addEventListener("pointerenter", (e) => { if (e.pointerType === "mouse" && !ayudaFijada) mostrarAyuda(b, false); });
-    b.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse" && !ayudaFijada) ayudaTimer = setTimeout(ocultarAyuda, 250); });
-    b.addEventListener("focus", () => { if (!ayudaFijada && b.matches(":focus-visible")) mostrarAyuda(b, false); });
-    b.addEventListener("click", (e) => { e.stopPropagation(); if (ayudaAbierta === b && ayudaFijada) ocultarAyuda(); else mostrarAyuda(b, true); });
   });
+}
+function nuevoAyudaBtn(clave) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "ayuda-btn";
+  b.dataset.ayuda = clave;
+  b.textContent = "?";
+  b.title = "";
+  b.setAttribute("aria-label", "Ayuda: " + AYUDAS_SIMS[clave].titulo);
+  b.setAttribute("aria-expanded", "false");
+  // Solo el mouse abre al pasar por arriba; con el dedo se abre al tocar (y queda fijo).
+  b.addEventListener("pointerenter", (e) => { if (e.pointerType === "mouse" && !ayudaFijada) mostrarAyuda(b, false); });
+  b.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse" && !ayudaFijada) ayudaTimer = setTimeout(ocultarAyuda, 250); });
+  b.addEventListener("focus", () => { if (!ayudaFijada && b.matches(":focus-visible")) mostrarAyuda(b, false); });
+  b.addEventListener("click", (e) => { e.stopPropagation(); if (ayudaAbierta === b && ayudaFijada) ocultarAyuda(); else mostrarAyuda(b, true); });
+  return b;
 }
 ayudaPop.addEventListener("mouseenter", () => clearTimeout(ayudaTimer));
 ayudaPop.addEventListener("mouseleave", () => { if (!ayudaFijada) ayudaTimer = setTimeout(ocultarAyuda, 250); });
@@ -6306,7 +6322,7 @@ document.getElementById("recParteGuardarBtn").addEventListener("click", async (e
 
 // ---------- Stock (etapa 1: catálogo, saldo inicial, conciliación con Oficina, pedidos) ----------
 let stk = null;                 // { catalogo, saldos, conc: { marcas, corridas } }
-let stkVista = "articulos";
+let stkVista = "tablero";
 let stkVistaPedida = "";        // la pide la tarjeta del Inicio
 let stkUltimoListado = null;    // último listado de Oficina subido (para el saldo inicial)
 let stkConc = null;             // { listado, archivo, id }
@@ -6339,6 +6355,8 @@ async function stkCargar() {
     // Pedidos que ya llegaron (el depósito volvió a estar por encima del mínimo): salen solos.
     const cumplidos = pedidosCumplidos(stk.catalogo, stk.saldos);
     if (cumplidos.length) { try { await stkPost({ accion: "quitar_pedido", items: cumplidos.map((c) => ({ c })) }); await stkLeer(); } catch (e) { /* se reintenta la próxima vez */ } }
+    // Sin catálogo todavía no hay nada que controlar: arranca en Artículos para cargarlo.
+    if (stkVista === "tablero" && !Object.keys((stk.catalogo && stk.catalogo.articulos) || {}).length) stkVista = "articulos";
     stkMostrarVista();
   } catch (err) { st.className = "status err"; st.textContent = "No se pudo cargar el stock: " + err.message; }
 }
@@ -6347,7 +6365,8 @@ function stkMostrarVista() {
   document.querySelectorAll("#panelStock [data-stk-vista]").forEach((d) => d.classList.toggle("hidden", d.dataset.stkVista !== stkVista));
   if (!stk) return;
   stkPintarBadgeSalud();
-  if (stkVista === "articulos") { stkRenderEstado(); stkPintarFiltros(); stkRenderArticulos(); }
+  if (stkVista === "tablero") stkCargarTablero();
+  else if (stkVista === "articulos") { stkRenderEstado(); stkPintarFiltros(); stkRenderArticulos(); }
   else if (stkVista === "conciliacion") stkRenderConciliacion();
   else if (stkVista === "pedidos") stkRenderPedidos();
   else if (stkVista === "movimientos") stkCargarMovimientos();
@@ -6357,6 +6376,20 @@ function stkMostrarVista() {
   else if (stkVista === "salud") stkRenderSalud();
 }
 document.querySelectorAll("#stkSub [data-stk]").forEach((b) => b.addEventListener("click", () => { stkVista = b.dataset.stk; stkMostrarVista(); }));
+// Tablero de control (el mismo de la APP → Dashboards): lo arma el servidor con el historial.
+async function stkCargarTablero() {
+  const st = document.getElementById("stkTableroStatus"), cont = document.getElementById("stkTablero");
+  st.className = "status"; st.textContent = "Cargando...";
+  try {
+    const r = await fetch("/api/datos?coleccion=stock&tablero=1", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+    const d = await r.json().catch(() => null);
+    if (!r.ok || !d || !d.alertas) throw new Error((d && d.error) || "Error " + r.status);
+    TableroStock.pintar(cont, d, { ir: (v) => { stkVista = v; stkMostrarVista(); window.scrollTo(0, 0); }, ayuda: (k) => `<span data-ayuda-lugar="tablero_${k}"></span>` });
+    cont.querySelectorAll("[data-ayuda-lugar]").forEach((el) => el.replaceWith(nuevoAyudaBtn(el.dataset.ayudaLugar)));
+    st.textContent = "";
+  } catch (err) { st.className = "status err"; st.textContent = "No se pudo cargar el tablero: " + err.message; }
+}
+document.getElementById("stkTableroActualizar").addEventListener("click", stkCargarTablero);
 
 // --- Catálogo y saldo inicial ---
 function stkRenderEstado() {

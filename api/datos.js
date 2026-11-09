@@ -1303,6 +1303,19 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
       res.status(200).json({ articulos: arts, proveedores: (cat && cat.proveedores) || {} });
       return;
     }
+    if (req.method === "GET" && q.tablero) {
+      // Tablero de control del stock: para la oficina (permiso «Tablero de stock») y el responsable.
+      // Los técnicos e instaladores no lo ven.
+      let puedeVer = esAdmin;
+      if (!puedeVer) { const t = (await tecnicos()).find((x) => x.nombre === autorizacion.nombre); const p = (t && t.permisos) || {}; puedeVer = !!(p.dash_deposito || p.stock_responsable || p.admin); }
+      if (!puedeVer) { res.status(403).json({ error: "El tablero de stock es para la oficina" }); return; }
+      const hoy = new Date(), meses = [0, 1, 2].map((i) => new Date(hoy.getFullYear(), hoy.getMonth() - i, 15).toISOString());
+      const [cat, sal, cua, ...ms] = await Promise.all([leerArchivoDatos(STOCK_CAT, { articulos: {} }), leerArchivoDatos(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }), leerArchivoDatos("stock/cuadre.json", {}).catch(() => ({ data: {} })), ...meses.map((f) => leerArchivoDatos(stockMovRuta(f), []))]);
+      if (cat.corrupto || sal.corrupto) { res.status(500).json({ error: "Un archivo del stock no se pudo leer: hay que restaurarlo desde una copia de seguridad." }); return; }
+      const movs = ms.flatMap((m) => (Array.isArray(m.data) ? m.data : []));
+      res.status(200).json(S.tableroStock(sal.data, movs, cat.data, { ahora: hoy, cuadre: cua.data || {} }));
+      return;
+    }
     if (!esResp) {
       const accion = cuerpo && cuerpo.accion;
       if (req.method !== "POST" || !["confirmar_envio", "devolver", "leer_codigo_foto", "consumo_parte", "pedir_material", "cancelar_pedido"].includes(accion)) { res.status(403).json({ error: "Necesitás el permiso «Responsable de stock»" }); return; }

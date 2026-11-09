@@ -1855,3 +1855,78 @@ test("Stock: vuelve de un presupuesto (no se usó): sale al cliente con N° de p
     assert.ok(cu.ok, cu.errores.map((e) => e.texto).join("\n"));
   } finally { global.fetch = fetchViejo; }
 });
+
+test("Stock: tablero de control para la oficina: semáforo (envíos trabados, pedidos, para aprobar, retirados sin devolver, garantías, ajustes, cuadre), movimientos, por técnico y reposición; los técnicos no lo ven", async () => {
+  const fetchViejo = global.fetch;
+  const ahora = Date.now(), hace = (d) => new Date(ahora - d * 864e5).toISOString(), mes = (d) => hace(d).slice(0, 7);
+  const movs = [
+    { id: "m1", fecha: hace(2), tipo: "entrega", c: "20208", cant: 6, de: "dep", a: "cam:Juan", por: "Melina" },
+    { id: "m1r", fecha: hace(2), tipo: "recibido", c: "20208", cant: 6, de: "cam:Juan", a: "tec:Juan" },
+    { id: "m2", fecha: hace(1), tipo: "instalado_parte", c: "20208", cant: 2, de: "tec:Juan", a: "cli:Kiosco", por: "Juan" },
+    { id: "m3", fecha: hace(10), tipo: "retirado_parte", c: "23940", cant: 1, de: "cli:Bar", a: "tec:Juan", unidades: ["R1"], por: "Juan" },
+    { id: "m4", fecha: hace(3), tipo: "devolucion", c: "20208", cant: 1, de: "tec:Pedro", a: "cam:dev:Pedro", por: "Pedro" },
+    { id: "m5", fecha: hace(2), tipo: "regularizacion", c: "20208", cant: 1, a: "dep", por: "Seba", motivo: "Conteo" },
+    { id: "m6", fecha: hace(20), tipo: "entrega_mano", c: "20208", cant: 30, de: "dep", a: "tec:Pedro", por: "Melina" },
+  ];
+  const repo = {
+    "tecnicos.json": [{ nombre: "Melina", permisos: { stock_responsable: true } }, { nombre: "Brenda", permisos: { dash_deposito: true } }, { nombre: "Juan", permisos: {} }],
+    "stock/catalogo.json": { articulos: { 23940: { c: "23940", d: "INFRARROJO AJAX", tipo: "unidad" }, 20208: { c: "20208", d: "SIRENA", tipo: "cantidad", min: 10 }, 99: { c: "99", d: "SIM CLARO", tipo: "sim" } } },
+    "stock/saldos.json": {
+      inicializado: "2026-10-01",
+      ubic: { dep: { 20208: 3, 99: 50 }, "tec:Juan": { 20208: 4, 23940: 1 }, "tec:Pedro": { 20208: 29 }, "cam:dev:Pedro": { 20208: 1 } },
+      unidades: { R1: { c: "23940", u: "tec:Juan", h: [{ tipo: "retirado_parte", a: "tec:Juan", f: hace(10) }] }, G1: { c: "23940", u: "gar", garantia: { estado: "por_enviar", desde: hace(12) } } },
+      envios: [{ id: "e1", fecha: hace(3), de: "tec:Pedro", a: "dep", camino: "cam:dev:Pedro", items: [{ c: "20208", cant: 1 }] }],
+      solicitudes: [{ id: "s1", fecha: hace(2), por: "Juan", estado: "pendiente", items: [{ c: "20208", cant: 2 }] }],
+      aprobar: [{ id: "a1", fecha: hace(1), por: "Juan", c: "20208", cant: 1, cliente: "Kiosco", parte: "P-9" }],
+      pedidos: {},
+    },
+    "stock/cuadre.json": { ultimo: { fecha: hace(0.2), ok: true, errores: [], totalErrores: 0 }, historial: [{ fecha: hace(0.2), ok: true, errores: 0 }] },
+  };
+  movs.forEach((m) => { const k = `stock/movimientos-${m.fecha.slice(0, 7)}.json`; (repo[k] = repo[k] || []).push(m); });
+  global.fetch = async (url, op = {}) => {
+    const m = String(url).match(/contents\/([^?]+)/);
+    if (m) {
+      const ruta = decodeURIComponent(m[1]);
+      if ((op.method || "GET") === "PUT") { repo[ruta] = JSON.parse(Buffer.from(JSON.parse(op.body).content, "base64").toString()); return new Response("{}", { status: 200 }); }
+      if (!(ruta in repo)) return new Response("{}", { status: 404 });
+      return new Response(JSON.stringify({ sha: "s", encoding: "base64", content: Buffer.from(JSON.stringify(repo[ruta])).toString("base64") }));
+    }
+    return new Response("[]");
+  };
+  try {
+    const ver = async (ses) => { const r = resFalso(); await datos(pedido("GET", { coleccion: "stock", tablero: "1" }, null, ses), r); return r; };
+    // Un técnico no lo ve
+    let r = await ver(crearSesion({ nombre: "Juan", rol: "tecnico" }));
+    assert.strictEqual(r.statusCode, 403);
+    // Brenda (oficina, con el permiso), Melina (responsable) y el panel sí
+    r = await ver(crearSesion({ nombre: "Melina", rol: "tecnico" }));
+    assert.strictEqual(r.statusCode, 200, JSON.stringify(r.cuerpo));
+    r = await ver(crearSesion({ nombre: "Admin", rol: "admin" }));
+    assert.strictEqual(r.statusCode, 200);
+    r = await ver(crearSesion({ nombre: "Brenda", rol: "tecnico" }));
+    assert.strictEqual(r.statusCode, 200);
+    const d = r.cuerpo, al = Object.fromEntries(d.alertas.map((a) => [a.k, a]));
+    assert.strictEqual(al.cuadre.nivel, "ok");
+    assert.strictEqual(al.camino.cantidad, 1); assert.match(al.camino.items[0].texto, /Pedro.*Depósito/);
+    assert.strictEqual(al.pedidos.nivel, "rojo", "pedido sin preparar hace 2 días");
+    assert.strictEqual(al.aprobar.cantidad, 1); assert.match(al.aprobar.items[0].sub, /Kiosco · parte P-9/);
+    assert.strictEqual(al.retirados.cantidad, 1); assert.match(al.retirados.items[0].texto, /Juan: 1 INFRARROJO AJAX/);
+    assert.strictEqual(al.garantias.cantidad, 1); assert.match(al.garantias.items[0].sub, /Sin mandar al proveedor/);
+    assert.strictEqual(al.ajustes.cantidad, 1); assert.match(al.ajustes.items[0].sub, /Seba · Conteo/);
+    assert.strictEqual(al.reponer.cantidad, 1); assert.match(al.reponer.items[0].sub, /Hay 3 en el depósito \(mínimo 10\)/);
+    assert.ok(d.semaforo.rojo >= 1 && d.alertas[0].nivel === "rojo", "lo rojo va primero");
+    // Dónde está (sin SIMs)
+    assert.deepStrictEqual(d.donde, { dep: 3, tecnicos: 34, vehiculos: 0, camino: 1, garantia: 0 });
+    // Movimientos de la semana: entrega 6 (no cuenta la recepción), instalado 2, devuelto 1, ajuste 1
+    assert.deepStrictEqual([d.semana.entrega, d.semana.instalado, d.semana.devolucion, d.semana.ajuste], [6, 2, 1, 1]);
+    assert.strictEqual(d.mes.entrega, 36);
+    assert.strictEqual(d.dias.length, 14);
+    const juan = d.personas.find((p) => p.quien === "Juan"), pedro = d.personas.find((p) => p.quien === "Pedro");
+    assert.deepStrictEqual([juan.tiene, juan.recibio, juan.instalo, juan.retiro, juan.pedidos], [5, 6, 2, 1, 1]);
+    assert.deepStrictEqual([pedro.tiene, pedro.recibio, pedro.devolvio], [29, 30, 1]);
+    assert.deepStrictEqual(d.masUsados.map((x) => [x.d, x.cant]), [["SIRENA", 2]]);
+    const sir = d.reponer.find((x) => x.c === "20208");
+    assert.ok(sir && sir.bajo && sir.salio60 === 36 && sir.dias === 5, JSON.stringify(sir));
+    assert.ok(!d.reponer.some((x) => x.c === "99"), "los SIM no se reponen desde acá");
+  } finally { global.fetch = fetchViejo; }
+});

@@ -742,6 +742,156 @@
     });
     return out;
   }
+  // ---------- Tablero de control (para la oficina) ----------
+  // Junta en un solo lugar lo que hay que resolver (semáforo), cómo se mueve el material y qué hay
+  // que reponer. Solo lee: saldos, el historial de los últimos meses y el último cuadre.
+  // op: { ahora: Date, cuadre: { ultimo, historial } }
+  function claseMovimiento(m) {
+    const de = m.de || "", a = m.a || "", t = m.tipo || "";
+    if (t === "inicial" || t === "inventario_series" || t === "recibido" || t === "rechazado" || t === "diferencia") return "";
+    if (t === "ajuste" || t === "regularizacion") return "ajuste";
+    if (a === "gar" || /^garantia/.test(t)) return "garantia";
+    if (t === "devuelto_sin_usar") return "sinUsar";
+    if (de === "dep" && /^(tec:|veh:|cam:(?!dev:))/.test(a)) return "entrega";
+    if ((a === "dep" && /^(tec:|veh:)/.test(de)) || (/^cam:dev:/.test(a) && /^(tec:|veh:)/.test(de))) return "devolucion";
+    if (/^(cli|com):/.test(a)) return "instalado";
+    if (/^(cli|com):/.test(de)) return "retirado";
+    if (a === "dep" && (!de || de === "proveedor" || t === "ingreso")) return "ingreso";
+    return "";
+  }
+  // De quién es el movimiento (técnico o vehículo), para la tabla por persona.
+  function quienDelMovimiento(m, clase) {
+    const u = clase === "entrega" || clase === "retirado" ? m.a : clase === "devolucion" || clase === "instalado" ? m.de : "";
+    const x = String(u || "").replace(/^cam:dev:/, "tec:").replace(/^cam:/, "tec:");
+    return /^(tec|veh):/.test(x) ? x : "";
+  }
+  function tableroStock(saldos, movimientos, catalogo, op) {
+    const s = saldos || {}, arts = (catalogo && catalogo.articulos) || {}, o = op || {};
+    const ahora = o.ahora ? new Date(o.ahora) : new Date(), hoyMs = ahora.getTime(), DIA = 864e5;
+    const edad = (f) => { const t = new Date(f || 0).getTime(); return t ? (hoyMs - t) / DIA : Infinity; };
+    const nom = (c) => ((arts[c] || {}).d || c);
+    const ubicN = (u) => String(u || "").replace(/^(tec|veh):/, "");
+    const vistos = new Set();
+    const movs = [...(movimientos || []), ...(s.movsPend || [])].filter((m) => m && m.c && (!m.id || (!vistos.has(m.id) && vistos.add(m.id))));
+    const alertas = [];
+    // okTexto: cómo se dice cuando no hay nada (en verde).
+    const alerta = (k, titulo, nivel, items, okTexto) => alertas.push({ k, titulo: items.length ? titulo : okTexto, nivel: items.length ? nivel : "ok", cantidad: items.length, items: items.slice(0, 40) });
+    const hace = (d) => (d < 1 / 24 ? "recién" : d < 1 ? `hace ${Math.max(1, Math.round(d * 24))} h` : `hace ${Math.round(d)} día${Math.round(d) === 1 ? "" : "s"}`);
+    const resumirItems = (items) => (items || []).slice(0, 4).map((x) => `${red3(Number(x.cant) || 0)} ${nom(x.c)}`).join(", ") + ((items || []).length > 4 ? ` y ${(items || []).length - 4} más` : "");
+
+    // 1) El control del stock (cuadre).
+    const cu = o.cuadre && o.cuadre.ultimo;
+    if (!cu) alertas.push({ k: "cuadre", titulo: "Control del stock", nivel: "amarillo", cantidad: 1, items: [{ texto: "Todavía no se hizo ningún control", sub: "Se hace solo dos veces por día; también con «Controlar ahora» en Stock → Salud" }] });
+    else if (!cu.ok) alertas.push({ k: "cuadre", titulo: "El stock no cuadra", nivel: "rojo", cantidad: cu.totalErrores || (cu.errores || []).length || 1, items: (cu.errores || []).slice(0, 40).map((e) => ({ texto: e.texto, sub: `Control ${hace(edad(cu.fecha))}` })) });
+    else if (edad(cu.fecha) > 1.5) alertas.push({ k: "cuadre", titulo: "Control del stock", nivel: "amarillo", cantidad: 1, items: [{ texto: `El último control fue ${hace(edad(cu.fecha))}`, sub: "Debería hacerse solo dos veces por día" }] });
+    else alertas.push({ k: "cuadre", titulo: "El stock cuadra", nivel: "ok", cantidad: 0, items: [], sub: `Último control ${hace(edad(cu.fecha))}` });
+
+    // 2) Envíos que nadie confirmó.
+    const envios = (Array.isArray(s.envios) ? s.envios : []).map((e) => ({ e, d: edad(e.fecha) })).filter((x) => x.d > 1).sort((x, y) => y.d - x.d);
+    alerta("camino", "En camino sin confirmar (más de 24 h)", envios.some((x) => x.d > 3) ? "rojo" : "amarillo",
+      envios.map(({ e, d }) => ({ texto: `${nombreUbicacion(e.de || "dep")} → ${nombreUbicacion(e.a)}`, sub: `${resumirItems(e.items)} · ${hace(d)}`, quien: ubicN(e.a === "dep" ? e.de : e.a), dias: Math.round(d) })), "Envíos confirmados");
+
+    // 3) Pedidos de los técnicos.
+    const sols = (Array.isArray(s.solicitudes) ? s.solicitudes : []).filter((x) => x.estado === "pendiente" || x.estado === "lista").map((x) => ({ x, d: edad(x.fecha) })).sort((a, b) => b.d - a.d);
+    alerta("pedidos", "Pedidos de técnicos sin entregar", sols.some((y) => y.d > 1) ? "rojo" : "amarillo",
+      sols.map(({ x, d }) => ({ texto: `${x.por}: ${resumirItems(x.items) || x.nota || "pedido"}`, sub: `${x.estado === "lista" ? "Preparado, falta entregar" : "Sin preparar"} · ${hace(d)}`, quien: x.por, dias: Math.round(d) })), "Sin pedidos pendientes");
+
+    // 4) Material usado en partes que el técnico no tenía (para aprobar).
+    const apr = (Array.isArray(s.aprobar) ? s.aprobar : []).map((x) => ({ x, d: edad(x.fecha) })).sort((a, b) => b.d - a.d);
+    alerta("aprobar", "Usado en partes sin tenerlo en su stock (para aprobar)", apr.some((y) => y.d > 3) ? "rojo" : "amarillo",
+      apr.map(({ x, d }) => ({ texto: `${x.por}: ${red3(Number(x.cant) || 0)} ${x.c ? nom(x.c) : x.texto || "sin identificar"}`, sub: `${x.cliente ? x.cliente + " · " : ""}${x.parte ? "parte " + x.parte + " · " : ""}${hace(d)}`, quien: x.por, dias: Math.round(d) })), "Nada para aprobar");
+
+    // 5) Equipos retirados de clientes que el técnico todavía no devolvió.
+    const personas = new Set(Object.keys(s.ubic || {}).filter((u) => /^tec:/.test(u)).map((u) => u.slice(4)));
+    const ret = [];
+    personas.forEach((n) => {
+      const items = retiradosParaDevolver(s, movs, n);
+      if (!items.length) return;
+      const fechas = movs.filter((m) => m.a === `tec:${n}` && m.tipo === "retirado_parte" && items.some((x) => x.c === m.c)).map((m) => edad(m.fecha));
+      const d = fechas.length ? Math.max(...fechas.filter((x) => x !== Infinity), 0) : 0;
+      if (d > 7) ret.push({ texto: `${n}: ${resumirItems(items)}`, sub: `Retirado ${hace(d)} y todavía no volvió al depósito`, quien: n, dias: Math.round(d) });
+    });
+    alerta("retirados", "Retirados de clientes sin devolver (más de 7 días)", ret.some((x) => x.dias > 15) ? "rojo" : "amarillo", ret.sort((a, b) => b.dias - a.dias), "Retirados devueltos");
+
+    // 6) Garantías trabadas.
+    const gar = [];
+    Object.entries(s.unidades || {}).forEach(([t, u]) => {
+      const g = u && u.garantia;
+      if (!g || g.cerrada || !/^(por_enviar|enviado)$/.test(g.estado)) return;
+      const ult = (g.historial || []).length ? g.historial[g.historial.length - 1].fecha : g.desde, d = edad(ult || g.desde);
+      if ((g.estado === "por_enviar" && d > 7) || (g.estado === "enviado" && d > 30)) gar.push({ texto: `${nom(u.c)} · N° ${t}`, sub: `${g.estado === "por_enviar" ? "Sin mandar al proveedor" : "El proveedor todavía no lo devolvió"} · ${hace(d)}`, dias: Math.round(d) });
+    });
+    alerta("garantias", "Garantías demoradas", "amarillo", gar.sort((a, b) => b.dias - a.dias), "Garantías al día");
+
+    // 7) Ajustes de la última semana (cambios a mano del stock: conviene que la oficina los vea).
+    const aj = movs.filter((m) => claseMovimiento(m) === "ajuste" && edad(m.fecha) <= 7).sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)));
+    alerta("ajustes", "Ajustes a mano en los últimos 7 días", "amarillo",
+      aj.map((m) => ({ texto: `${red3(Number(m.cant) || 0)} ${nom(m.c)}${m.de || m.a ? " · " + (m.a ? nombreUbicacion(m.a) : nombreUbicacion(m.de)) : ""}`, sub: `${m.por || ""}${m.motivo ? " · " + m.motivo : ""} · ${hace(edad(m.fecha))}` })), "Sin ajustes a mano esta semana");
+
+    // Movimientos: últimos 14 días por día y totales de 7 y 30 días.
+    const CLASES = ["entrega", "devolucion", "instalado", "retirado", "ingreso", "sinUsar", "garantia", "ajuste"];
+    const vacio = () => Object.fromEntries(CLASES.map((k) => [k, 0]));
+    const dias = [];
+    const AR = 3 * 3600e3; // los días se cuentan con la hora de Argentina
+    for (let i = 13; i >= 0; i--) { const d = new Date(hoyMs - AR - i * DIA); dias.push({ fecha: d.toISOString().slice(0, 10), ...vacio() }); }
+    const diaDe = (f) => dias.find((x) => x.fecha === String(f || "").slice(0, 10));
+    const sem = vacio(), mes = vacio(), porQuien = {}, usados = {}, salidas60 = {};
+    movs.forEach((m) => {
+      const k = claseMovimiento(m), d = edad(m.fecha), cant = Number(m.cant) || 0;
+      if (de60(m, d)) salidas60[m.c] = red3((salidas60[m.c] || 0) + cant);
+      if (!k || d > 30 || d < -1) return;
+      mes[k] = red3(mes[k] + cant);
+      if (d <= 7) sem[k] = red3(sem[k] + cant);
+      const dia = diaDe(new Date(new Date(m.fecha).getTime() - AR).toISOString());
+      if (dia) dia[k] = red3(dia[k] + cant);
+      if (k === "instalado") usados[m.c] = red3((usados[m.c] || 0) + cant);
+      const q = quienDelMovimiento(m, k);
+      if (q) { const p = (porQuien[q] = porQuien[q] || { ...vacio(), ultimo: "" }); p[k] = red3(p[k] + cant); if (String(m.fecha) > p.ultimo) p.ultimo = m.fecha; }
+    });
+    function de60(m, d) { return d <= 60 && m.de === "dep" && /^(tec:|veh:|cam:(?!dev:)|cli:|com:)/.test(m.a || "") && m.tipo !== "recibido"; }
+    // Por técnico/vehículo: lo que tiene ahora, más lo que movió en 30 días.
+    Object.entries(s.ubic || {}).forEach(([u, cs]) => {
+      if (!/^(tec|veh):/.test(u)) return;
+      const n = Object.values(cs || {}).reduce((t, x) => t + (Number(x) || 0), 0);
+      if (n > 0 || porQuien[u]) (porQuien[u] = porQuien[u] || { ...vacio(), ultimo: "" }).tiene = red3(n);
+    });
+    const pendientesPorQuien = {};
+    sols.forEach(({ x }) => { pendientesPorQuien[x.por] = (pendientesPorQuien[x.por] || 0) + 1; });
+    const personasTabla = Object.entries(porQuien).map(([u, p]) => ({ quien: ubicN(u), vehiculo: /^veh:/.test(u), tiene: p.tiene || 0, recibio: p.entrega, devolvio: p.devolucion, instalo: p.instalado, retiro: p.retirado, pedidos: pendientesPorQuien[ubicN(u)] || 0, ultimo: p.ultimo }))
+      .sort((a, b) => Number(a.vehiculo) - Number(b.vehiculo) || b.tiene - a.tiene || a.quien.localeCompare(b.quien, "es"));
+    const masUsados = Object.entries(usados).map(([c, cant]) => ({ c, d: nom(c), cant, medida: (arts[c] || {}).medida || "unidades" })).sort((a, b) => b.cant - a.cant).slice(0, 10);
+
+    // Reposición: bajo el mínimo y para cuántos días alcanza según lo que salió en 60 días.
+    const tot = totalesPorArticulo(s), ped = s.pedidos || {}, repo = [];
+    Object.values(arts).forEach((a) => {
+      if (!a || a.baja || /^(sim|herramienta|no)$/.test(a.tipo)) return;
+      const dep = (tot[a.c] || {}).dep || 0, min = Number(a.min) || 0, diario = (salidas60[a.c] || 0) / 60;
+      const diasAlcanza = diario > 0 ? Math.floor(dep / diario) : null;
+      const bajo = min > 0 && dep <= min, corto = diasAlcanza !== null && diasAlcanza < 15;
+      if (!bajo && !corto) return;
+      repo.push({ c: a.c, d: a.d, dep, min, dias: diasAlcanza, salio60: salidas60[a.c] || 0, medida: a.medida || "unidades", prov: a.prov || "", pedido: !!ped[a.c], bajo, sinMinimo: !min });
+    });
+    repo.sort((x, y) => (x.pedido - y.pedido) || ((x.dias === null ? 1e9 : x.dias) - (y.dias === null ? 1e9 : y.dias)) || (x.dep - x.min) - (y.dep - y.min));
+    alerta("reponer", "Para reponer (bajo el mínimo o alcanza para menos de 15 días)", "amarillo",
+      repo.filter((x) => !x.pedido).map((x) => ({ texto: x.d, sub: `Hay ${red3(x.dep)} en el depósito${x.min ? ` (mínimo ${x.min})` : ""}${x.dias !== null ? ` · alcanza para ${x.dias} día${x.dias === 1 ? "" : "s"}` : ""}`, c: x.c })), "Nada para reponer");
+
+    // Dónde está el material ahora.
+    const donde = { dep: 0, tecnicos: 0, vehiculos: 0, camino: 0, garantia: 0 };
+    Object.entries(s.ubic || {}).forEach(([u, cs]) => {
+      const n = Object.entries(cs || {}).filter(([c]) => !/^(sim|herramienta|no)$/.test((arts[c] || {}).tipo)).reduce((t, [, x]) => t + (Number(x) || 0), 0);
+      if (u === "dep") donde.dep += n; else if (/^tec:/.test(u)) donde.tecnicos += n; else if (/^veh:/.test(u)) donde.vehiculos += n; else if (/^cam:/.test(u)) donde.camino += n; else if (u === "gar") donde.garantia += n;
+    });
+    Object.keys(donde).forEach((k) => { donde[k] = red3(donde[k]); });
+
+    const orden = { rojo: 0, amarillo: 1, ok: 2 };
+    alertas.sort((a, b) => orden[a.nivel] - orden[b.nivel]);
+    return {
+      fecha: ahora.toISOString(),
+      semaforo: { rojo: alertas.filter((a) => a.nivel === "rojo").length, amarillo: alertas.filter((a) => a.nivel === "amarillo").length },
+      alertas, donde, semana: sem, mes, dias, personas: personasTabla, masUsados, reponer: repo.slice(0, 60),
+      historialCuadre: ((o.cuadre && o.cuadre.historial) || []).slice(0, 14).map((h) => ({ fecha: h.fecha, ok: h.ok, errores: h.errores || 0 })),
+    };
+  }
   // Pedidos de material de los técnicos: lo que falta escanear de cada línea.
   function avanceSolicitud(solicitud, items) {
     const lleva = {};
@@ -860,7 +1010,7 @@
     return mejor;
   }
 
-  const api = { codigoProveedor, nombreProveedor, STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, datosLimpios, buscarPorDatos, infoSerie, seriesEn, controlarSalidaConSerie, saludStock, esCodigoIgnorable, elegirCodigoDelCuadro, registrarUnidades, movimientoParaOficina, GARANTIA_ESTADOS, instalacionDeUnidad, abrirGarantias, moverStock, cerrarEnvio, stockDePersona, auditarStock, recalcularDesdeMovimientos, movimientosDeRegularizacion, retiradosParaDevolver, avanceSolicitud, anotarPresupuestos, pendienteDePresupuesto };
+  const api = { codigoProveedor, nombreProveedor, STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, datosLimpios, buscarPorDatos, infoSerie, seriesEn, controlarSalidaConSerie, saludStock, esCodigoIgnorable, elegirCodigoDelCuadro, registrarUnidades, movimientoParaOficina, GARANTIA_ESTADOS, instalacionDeUnidad, abrirGarantias, moverStock, cerrarEnvio, stockDePersona, auditarStock, recalcularDesdeMovimientos, movimientosDeRegularizacion, retiradosParaDevolver, avanceSolicitud, anotarPresupuestos, pendienteDePresupuesto, tableroStock, claseMovimiento };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else Object.assign(raiz, api);
 })(typeof window !== "undefined" ? window : globalThis);

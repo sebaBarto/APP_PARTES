@@ -8,7 +8,7 @@ const raiz = path.join(__dirname, "..");
 const leer = (f) => fs.readFileSync(path.join(raiz, f), "utf8");
 
 test("sintaxis de los JS principales", () => {
-  const archivos = ["app.js", "sw.js", "sims-utils.js", "stock-utils.js", "middleware.js", ...fs.readdirSync(path.join(raiz, "api")).filter((f) => f.endsWith(".js")).map((f) => "api/" + f)];
+  const archivos = ["app.js", "sw.js", "sims-utils.js", "stock-utils.js", "tablero-stock.js", "middleware.js", ...fs.readdirSync(path.join(raiz, "api")).filter((f) => f.endsWith(".js")).map((f) => "api/" + f)];
   for (const f of archivos) {
     execFileSync(process.execPath, ["--check", path.join(raiz, f)], { stdio: "pipe" });
   }
@@ -43,7 +43,7 @@ test("sin librerías externas y vendor/ completo", () => {
 test("Ayudas: cada video (GIF) que nombran el panel y la APP existe y no pesa de más", () => {
   const fs = require("fs"), path = require("path"), raiz = path.join(__dirname, "..");
   const nombrados = new Set();
-  for (const f of ["admin.html", "app.js"]) (fs.readFileSync(path.join(raiz, f), "utf8").match(/assets\/ayuda\/[\w-]+\.gif/g) || []).forEach((g) => nombrados.add(g));
+  for (const f of ["admin.html", "app.js", "tablero-stock.js"]) (fs.readFileSync(path.join(raiz, f), "utf8").match(/assets\/ayuda\/[\w-]+\.gif/g) || []).forEach((g) => nombrados.add(g));
   assert.ok(nombrados.size >= 30, `hay ${nombrados.size}`);
   for (const g of nombrados) {
     const p = path.join(raiz, g);

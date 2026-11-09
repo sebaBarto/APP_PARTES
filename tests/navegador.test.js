@@ -6469,3 +6469,68 @@ test("Escáner: cada código leído suena un «pip» de confirmación (y un tono
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Tablero de stock: en la APP lo ven la oficina (permiso) y el responsable, no los técnicos; en el panel es la primera pestaña de Stock y «Ver» lleva a la sección", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  const S = require(require("path").join(__dirname, "..", "stock-utils.js"));
+  const ahora = Date.now(), hace = (d) => new Date(ahora - d * 864e5).toISOString();
+  const catalogo = { articulos: { 20208: { c: "20208", d: "SIRENA MP100", tipo: "cantidad", min: 10 }, 23940: { c: "23940", d: "INFRARROJO AJAX", tipo: "unidad" } } };
+  const saldos = { inicializado: "2026-10-01", ubic: { dep: { 20208: 3, 23940: 8 }, "tec:Juan": { 20208: 14 } }, unidades: {}, pedidos: {},
+    envios: [{ id: "e1", fecha: hace(4), de: "dep", a: "tec:Pedro", camino: "cam:Pedro", items: [{ c: "23940", cant: 2 }] }],
+    solicitudes: [{ id: "s1", fecha: hace(0.1), por: "Juan", estado: "pendiente", items: [{ c: "20208", cant: 2 }] }] };
+  const movs = [];
+  for (let i = 0; i < 12; i++) movs.push({ id: "e" + i, fecha: hace(i), tipo: "entrega", c: "20208", cant: 3, de: "dep", a: "tec:Juan" }, { id: "i" + i, fecha: hace(i), tipo: "instalado_parte", c: "20208", cant: 1, de: "tec:Juan", a: "cli:X" });
+  const tablero = S.tableroStock(saldos, movs, catalogo, { ahora: new Date(), cuadre: { ultimo: { fecha: hace(0.3), ok: false, totalErrores: 1, errores: [{ texto: "SIRENA MP100: el depósito dice 3 y los movimientos dan 4" }] }, historial: [{ fecha: hace(0.3), ok: false, errores: 1 }, { fecha: hace(0.8), ok: true }] } });
+  let pidio = 0;
+  await page.route("**/api/**", (route) => {
+    const u = route.request().url(), json = (o, st) => route.fulfill({ status: st || 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("tablero=1")) { pidio++; return json(tablero); }
+    if (u.includes("coleccion=stock")) return json({ catalogo, saldos, conciliacion: { marcas: [], corridas: [] }, cuadre: null });
+    return json([]);
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(base + "/index.html");
+  await page.waitForTimeout(400);
+  // Un técnico: no lo ve
+  await page.evaluate(() => { tecnicoLogueado = "Juan"; tecnicosPasswords = { Juan: "" }; tecnicosPermisos = { Juan: { dash_general: true } }; refrescarAccesosPorPermisos(); showScreen("dashboardsMenu"); });
+  assert.ok(await page.isHidden("#verTableroStockBtn"));
+  // Oficina con el permiso: sí
+  await page.evaluate(() => { tecnicoLogueado = "Brenda"; tecnicosPasswords = { Brenda: "" }; tecnicosPermisos = { Brenda: { dash_deposito: true } }; refrescarAccesosPorPermisos(); showScreen("home"); });
+  assert.ok(await page.isVisible("#tileDashboardsBtn"), "el menú de dashboards aparece con solo este permiso");
+  await page.evaluate(() => showScreen("dashboardsMenu"));
+  await page.click("#verTableroStockBtn");
+  await page.waitForSelector("#tableroStock .tbs");
+  const txt = await page.textContent("#tableroStock");
+  assert.match(txt, /2 temas para resolvery 2 para mirar/);
+  assert.match(txt, /El stock no cuadra.*SIRENA MP100: el depósito dice 3/s);
+  assert.match(txt, /En camino sin confirmar.*Depósito → Técnico: Pedro/s);
+  assert.match(txt, /Pedidos de técnicos sin entregar/);
+  assert.match(txt, /Para reponer.*SIRENA MP100/s);
+  assert.match(await page.textContent("#tableroStock .tbs-tabla"), /Juan/);
+  assert.strictEqual(await page.locator("#tableroStock .tbs-ver").count(), 0, "en la APP no hay «Ver» del panel");
+  const ancho = await page.evaluate(() => document.documentElement.scrollWidth);
+  assert.ok(ancho <= 390, "no se sale de la pantalla del celular: " + ancho);
+  // El «?» del tablero abre su ayuda
+  await page.click('#tableroStock .ayuda-btn[data-ayuda="tablero_semaforo"]');
+  await page.waitForSelector(".ayuda-pop:not(.hidden)");
+  assert.match(await page.textContent(".ayuda-pop"), /rojo es para resolver ya/);
+  if (process.env.FOTOS_TABLERO) { await page.click(".ayuda-pop-cerrar"); await page.screenshot({ path: process.env.FOTOS_TABLERO + "/app.png", fullPage: true }); }
+  // Responsable de stock (Melina): también
+  await page.evaluate(() => { tecnicoLogueado = "Melina"; tecnicosPasswords = { Melina: "" }; tecnicosPermisos = { Melina: { stock_responsable: true } }; refrescarAccesosPorPermisos(); });
+  assert.ok(await page.isVisible("#verTableroStockBtn") || (await page.evaluate(() => !document.getElementById("verTableroStockBtn").classList.contains("hidden"))));
+  // Panel: primera pestaña de Stock
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { document.getElementById("mainCard").classList.remove("hidden"); document.getElementById("tabStockBtn").click(); });
+  await page.waitForSelector("#stkTablero .tbs");
+  assert.match(await page.textContent("#stkSub .activo"), /Tablero/);
+  assert.match(await page.textContent("#stkTablero"), /El stock no cuadra/);
+  if (process.env.FOTOS_TABLERO) await page.screenshot({ path: process.env.FOTOS_TABLERO + "/admin.png", fullPage: true });
+  await page.click('#stkTablero .tbs-al[open] .tbs-ver[data-ir="cuadre"]');
+  assert.match(await page.textContent("#stkSub .activo"), /Salud/);
+  assert.ok(pidio >= 2);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

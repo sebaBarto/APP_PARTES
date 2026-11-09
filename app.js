@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.61.0";
+const APP_VERSION = "4.62.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -310,6 +310,7 @@ const screens = {
   dashboardVehiculos: document.getElementById("screen-dashboard-vehiculos"),
   dashboardHerramientas: document.getElementById("screen-dashboard-herramientas"),
   dashboardSims: document.getElementById("screen-dashboard-sims"),
+  tableroStock: document.getElementById("screen-tablero-stock"),
   consultas: document.getElementById("screen-consultas"),
   guardias: document.getElementById("screen-guardias"),
   historial: document.getElementById("screen-historial"),
@@ -748,6 +749,7 @@ const descargarExcelHerramientasBtn = document.getElementById("descargarExcelHer
 const dashHerramientasStatus = document.getElementById("dashHerramientasStatus");
 const dashHerramientasList = document.getElementById("dashHerramientasList");
 const verDashboardSimsBtn = document.getElementById("verDashboardSimsBtn");
+const verTableroStockBtn = document.getElementById("verTableroStockBtn");
 const volverDeDashboardSimsBtn = document.getElementById("volverDeDashboardSimsBtn");
 const refreshDashSimsBtn = document.getElementById("refreshDashSimsBtn");
 const dashSimsSyncLabel = document.getElementById("dashSimsSyncLabel");
@@ -1016,7 +1018,7 @@ function actualizarBarraSuperior(name) {
     const otros = Array.from(bar.querySelectorAll("button, a")).filter((b) => b !== volver && !b.classList.contains("hidden") && getComputedStyle(b).display !== "none");
     if (otros.length === 0) bar.classList.add("solo-volver");
   }
-  const nombresCortos = { consultas: "Manuales", dashboard: "Dashboard", dashboardFinanciero: "Financiero", dashboardVehiculos: "Vehículos", dashboardHerramientas: "Herramientas", dashboardSims: "SIMs", simDetalle: "Ficha de la SIM", fichaCliente: "Ficha del cliente", sign: "Firma del cliente", simRegistro: "SIMs instaladas" };
+  const nombresCortos = { consultas: "Manuales", dashboard: "Dashboard", dashboardFinanciero: "Financiero", dashboardVehiculos: "Vehículos", dashboardHerramientas: "Herramientas", dashboardSims: "SIMs", tableroStock: "Tablero de stock", simDetalle: "Ficha de la SIM", fichaCliente: "Ficha del cliente", sign: "Firma del cliente", simRegistro: "SIMs instaladas" };
   if (seccion) seccion.textContent = name === "home" ? "Servicio técnico" : (nombresCortos[name] || nombreDePantalla(pantalla) || "Servicio técnico");
   document.querySelector(".topbar")?.classList.toggle("en-seccion", name !== "home" && name !== "login");
 }
@@ -1158,7 +1160,7 @@ function permisosDelTecnico(nombre) {
     // Login general de oficina (sin técnico en particular): acceso
     // total, como ya era antes de este sistema.
     return {
-      dash_general: true, dash_financiero: true, dash_vehiculos: true, dash_herramientas: true, dash_sims: true, dash_stock: true, instalador: true,
+      dash_general: true, dash_financiero: true, dash_vehiculos: true, dash_herramientas: true, dash_sims: true, dash_stock: true, dash_deposito: true, instalador: true,
       historial_todos: true, vehiculos: true, sims: true, herramientas: true, marcar_pasado_sistema: true,
       comodato: true, admin: true, agendar_emergencia: true, sims_ver_todas: true, presupuesto_express: true, croquis: true, stock_responsable: true,
     };
@@ -1176,6 +1178,7 @@ function permisosDelTecnico(nombre) {
     dash_financiero: nombre === "Sebastian Bartolozzi",
     marcar_pasado_sistema: nombre === "Sebastian Bartolozzi",
     dash_stock: nombre === "Sebastian Bartolozzi",
+    dash_deposito: nombre === "Sebastian Bartolozzi",
     dash_vehiculos: true,
     dash_herramientas: true,
     dash_sims: true,
@@ -1691,7 +1694,8 @@ document.addEventListener("visibilitychange", () => {
 
 function actualizarAccesoSeccionesPanel() {
   const permisos = permisosDelTecnico(tecnicoLogueado);
-  tileDashboardsBtn.classList.toggle("hidden", !(permisos.dash_general || permisos.dash_financiero || permisos.dash_vehiculos || permisos.dash_herramientas || permisos.dash_sims || permisos.dash_stock));
+  tileDashboardsBtn.classList.toggle("hidden", !(permisos.dash_general || permisos.dash_financiero || permisos.dash_vehiculos || permisos.dash_herramientas || permisos.dash_sims || permisos.dash_stock || permisos.dash_deposito || permisos.stock_responsable));
+  verTableroStockBtn.classList.toggle("hidden", !(permisos.dash_deposito || permisos.stock_responsable));
   verDashboardBtn.classList.toggle("hidden", !permisos.dash_general);
   verDashboardVehiculosBtn.classList.toggle("hidden", !permisos.dash_vehiculos);
   verDashboardHerramientasBtn.classList.toggle("hidden", !permisos.dash_herramientas);
@@ -12509,6 +12513,19 @@ const COLORES_COMPANIA_SIM = { Movistar: "#2E9E4F", Personal: "#29ABE2", Claro: 
 let dashSimsPeriodoActivo = "mes";
 let dashSimsGruposExpandidos = new Set(); // técnicos que el usuario dejó desplegados
 
+// ---------- Tablero de stock (oficina y responsable de stock; los técnicos no lo ven) ----------
+async function cargarTableroStock() {
+  const st = document.getElementById("tableroStockStatus"), cont = document.getElementById("tableroStock");
+  st.textContent = "Cargando...";
+  try {
+    const d = await stkApi("GET", "tablero=1");
+    TableroStock.pintar(cont, d, { ayuda: (k) => ayudaBtn("tablero_" + k) });
+    st.textContent = "";
+  } catch (e) { st.textContent = "No se pudo cargar: " + e.message; }
+}
+verTableroStockBtn.addEventListener("click", () => { showScreen("tableroStock"); cargarTableroStock(); });
+document.getElementById("refreshTableroStockBtn").addEventListener("click", cargarTableroStock);
+document.getElementById("volverDeTableroStockBtn").addEventListener("click", () => showScreen("dashboardsMenu"));
 verDashboardSimsBtn.addEventListener("click", () => {
   showScreen("dashboardSims");
   fetchDashSims();
@@ -18809,6 +18826,7 @@ const AYUDAS_STOCK = {
     "«Usé material de mi stock»: elegí de lo que tenés (o escaneá). Al mandar el parte pasa al cliente, con su N° de serie.",
     "«Retiré equipos»: escanealos y entran a tu stock (si está fallado, va marcado).",
     "Lo que cargues en la lista de abajo y no estaba en tu stock lo revisa el depósito." ] },
+  ...((window.TableroStock && window.TableroStock.AYUDAS) || {}),
 };
 const ayudaBtn = (clave) => `<button type="button" class="ayuda-btn" data-ayuda="${clave}" aria-label="Ayuda: ${escapeHtml((AYUDAS_STOCK[clave] || {}).titulo || "")}" aria-expanded="false">?</button>`;
 const ayudaPopApp = document.createElement("div");
