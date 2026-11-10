@@ -943,7 +943,7 @@
   // vuelve de un cliente, los ajustes y las compras.
   const grupoOficina = (u) => (!u ? "afuera" : /^(dep|gar|tec:|veh:|cam:)/.test(u) ? "sat" : /^com:/.test(u) ? "comodato" : /^cli:/.test(u) ? "cliente" : "otro");
   function movimientoParaOficina(m) {
-    if (!m || !m.c || !(Number(m.cant) > 0) || m.tipo === "inicial" || m.tipo === "inventario_series" || m.tipo === "garantia_reemplazo") return null;
+    if (!m || !m.c || !(Number(m.cant) > 0) || m.tipo === "inicial" || m.tipo === "inicial_tecnico" || m.tipo === "inventario_series" || m.tipo === "garantia_reemplazo") return null;
     const de = grupoOficina(m.de), a = grupoOficina(m.a);
     if (de === a) return null;
     const cliente = (u) => String(u || "").replace(/^(cli|com):/, "");

@@ -6852,3 +6852,60 @@ test("Proveedores: se importan desde el Excel de la oficina (hoja con encabezado
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Stock de técnicos (panel): se elige el técnico, parte de lo que tiene, se carga desde Excel o a mano, se revisan los cambios y se guarda sin tocar el depósito", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: route.request().url().includes("xlsx.full.min.js") ? require("fs").readFileSync(require("path").join(__dirname, "..", "vendor", "xlsx.full.min.js"), "utf8") : "" }));
+  const catalogo = { articulos: { 20208: { c: "20208", d: "SIRENA", tipo: "cantidad" }, 23940: { c: "23940", d: "INFRARROJO", tipo: "unidad" }, 50001: { c: "50001", d: "CABLE", tipo: "cantidad" } }, proveedores: {} };
+  const saldos = { inicializado: "2026-10-01", ubic: { dep: { 20208: 10 }, "tec:Juan": { 50001: 30 } }, unidades: {}, pedidos: {} };
+  const posts = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url(), j = (o, st) => route.fulfill({ status: st || 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("coleccion=tecnicos")) return j([{ nombre: "Juan" }, { nombre: "Luis" }]);
+    if (req.method() === "POST" && u.includes("coleccion=stock")) {
+      const b = JSON.parse(req.postData()); posts.push(b);
+      saldos.ubic["tec:" + b.tecnico] = Object.fromEntries(b.items.filter((x) => x.cant).map((x) => [x.c, x.cant]));
+      b.items.forEach((x) => (x.series || []).forEach((t) => { saldos.unidades[t] = { c: x.c, u: "tec:" + b.tecnico }; }));
+      saldos.stockInicialTec = { ["tec:" + b.tecnico]: { fecha: new Date().toISOString(), por: "Admin" } };
+      return j({ ok: true, cambios: [1, 2, 3] });
+    }
+    if (u.includes("coleccion=stock")) return j({ catalogo, saldos, conciliacion: { marcas: [], corridas: [] } });
+    return j([]);
+  });
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { document.getElementById("loginCard").classList.add("hidden"); document.getElementById("mainCard").classList.remove("hidden"); document.getElementById("tabStockBtn").click(); });
+  await page.click('#stkSub [data-stk="tecnicos"]');
+  await page.waitForSelector('#stkTecQuien option[value="tec:Luis"]', { state: "attached" });
+  await page.selectOption("#stkTecQuien", "tec:Juan");
+  await page.waitForSelector("#stkTecTabla .stk-tec-art");
+  assert.match(await page.textContent("#stkTecInfo"), /Tiene ahora 1 artículo \(30 en total\)\. Todavía no se le cargó/);
+  assert.strictEqual(await page.inputValue("#stkTecTabla .stk-tec-art"), "50001 · CABLE", "arranca con lo que tiene");
+  // Excel con código, cantidad y N° de serie (una fila con la etiqueta de SAT)
+  const xlsx = await page.evaluate(() => {
+    const lb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(lb, XLSX.utils.aoa_to_sheet([["Código", "Descripción", "Cantidad", "N° de serie"], ["000202082779", "Sirena", 4, ""], ["23940", "Infrarrojo", 2, "GH1, GH2"], ["sirena", "", 1, ""]]), "Juan");
+    return Array.from(new Uint8Array(XLSX.write(lb, { type: "array", bookType: "xlsx" })));
+  });
+  await page.setInputFiles("#stkTecExcel", { name: "stock juan.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer: Buffer.from(xlsx) });
+  await page.waitForFunction(() => document.querySelectorAll("#stkTecTabla tr[data-i]").length === 2);
+  assert.deepStrictEqual(await page.$$eval("#stkTecTabla .stk-tec-cant", (l) => l.map((x) => x.value)), ["5", "2"], "la etiqueta de SAT y el nombre se reconocen y se suman");
+  assert.strictEqual(await page.inputValue("#stkTecTabla .stk-tec-ser"), "GH1, GH2");
+  // Revisión: la sirena +5, el infrarrojo +2 (2 N°), el cable -30
+  await page.click("#stkTecRevisar");
+  await page.waitForSelector("#stkTecConfirmar");
+  const rev = (await page.textContent("#stkTecRevision")).replace(/\s+/g, " ");
+  assert.match(rev, /3 cambios/); assert.match(rev, /El depósito no cambia/);
+  assert.deepStrictEqual(await page.$$eval("#stkTecRevision tbody tr", (l) => l.map((tr) => [...tr.children].map((td) => td.textContent.trim()).join("|"))), ["SIRENA|0|5|+5|", "INFRARROJO|0|2|+2|2", "CABLE|30|0|-30|"]);
+  if (process.env.FOTO) await page.screenshot({ path: process.env.FOTO, fullPage: true });
+  await page.click("#stkTecConfirmar");
+  await page.waitForFunction(() => /Stock inicial cargado el/.test(document.getElementById("stkTecInfo").textContent));
+  assert.deepStrictEqual(posts[0], { accion: "stock_inicial_tecnico", tecnico: "Juan", vehiculo: false, items: [{ c: "20208", cant: 5, series: [] }, { c: "23940", cant: 2, series: ["GH1", "GH2"] }], reemplazar: true });
+  // Errores a mano: más N° que cantidad
+  await page.fill("#stkTecTabla tr[data-i='1'] .stk-tec-cant", "1");
+  await page.click("#stkTecRevisar");
+  await page.waitForTimeout(200);
+  assert.match(await page.textContent("body"), /hay más N° de serie que cantidad/);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

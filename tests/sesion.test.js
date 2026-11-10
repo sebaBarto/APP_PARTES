@@ -1938,3 +1938,62 @@ test("Stock: tablero de control para la oficina: semáforo (envíos trabados, pe
     assert.ok(!d.reponer.some((x) => x.c === "99"), "los SIM no se reponen desde acá");
   } finally { global.fetch = fetchViejo; }
 });
+
+test("Stock: stock inicial de un técnico desde el panel: queda con lo de la lista sin tocar el depósito, registra N° de serie, no va a Oficina y el control nocturno cuadra", async () => {
+  const fetchViejo = global.fetch;
+  const S = require(path.join(raiz, "stock-utils.js"));
+  const ahora = new Date().toISOString(), mes = ahora.slice(0, 7);
+  const repo = {
+    "tecnicos.json": [{ nombre: "Juan", permisos: {} }, { nombre: "Melina", permisos: { stock_responsable: true } }],
+    "stock/catalogo.json": { articulos: { 20208: { c: "20208", d: "SIRENA", tipo: "cantidad" }, 23940: { c: "23940", d: "INFRARROJO", tipo: "unidad" }, 50001: { c: "50001", d: "CABLE", tipo: "cantidad", medida: "metros" }, 99: { c: "99", d: "SIM", tipo: "sim" } } },
+    "stock/saldos.json": { inicializado: "2026-10-01", ubic: { dep: { 20208: 10, 23940: 2 }, "tec:Juan": { 50001: 30 } }, unidades: { D1: { c: "23940", u: "dep" } }, pedidos: {} },
+  };
+  repo[`stock/movimientos-${mes}.json`] = [
+    { id: "i1", fecha: "2026-10-01T00:00:00Z", tipo: "inicial", c: "20208", cant: 10, a: "dep" },
+    { id: "i2", fecha: "2026-10-01T00:00:00Z", tipo: "inicial", c: "23940", cant: 2, a: "dep", unidades: ["D1"] },
+    { id: "i3", fecha: "2026-10-02T00:00:00Z", tipo: "entrega_mano", c: "50001", cant: 30, de: "dep", a: "tec:Juan" },
+  ];
+  repo["stock/saldos.json"].ubic.dep[50001] = 0; delete repo["stock/saldos.json"].ubic.dep[50001];
+  // (el depósito tenía 30 de cable antes de entregarlos: el inicial del depósito no lo incluye para simplificar)
+  repo[`stock/movimientos-${mes}.json`].unshift({ id: "i0", fecha: "2026-10-01T00:00:00Z", tipo: "inicial", c: "50001", cant: 30, a: "dep" });
+  global.fetch = async (url, op = {}) => {
+    const m = String(url).match(/contents\/([^?]+)/);
+    if (m) {
+      const ruta = decodeURIComponent(m[1]);
+      if ((op.method || "GET") === "PUT") { repo[ruta] = JSON.parse(Buffer.from(JSON.parse(op.body).content, "base64").toString()); return new Response(JSON.stringify({ content: { sha: "n" } }), { status: 200 }); }
+      if (!(ruta in repo)) return new Response("{}", { status: 404 });
+      return new Response(JSON.stringify({ sha: "s", encoding: "base64", content: Buffer.from(JSON.stringify(repo[ruta])).toString("base64") }));
+    }
+    return new Response("[]");
+  };
+  const post = async (cuerpo, ses) => { const r = resFalso(); await datos(pedido("POST", { coleccion: "stock" }, cuerpo, ses), r); return r; };
+  const admin = crearSesion({ nombre: "Admin", rol: "admin" }), melina = crearSesion({ nombre: "Melina", rol: "tecnico" });
+  try {
+    const cuerpo = { accion: "stock_inicial_tecnico", tecnico: "Juan", items: [{ c: "20208", cant: 3 }, { c: "23940", cant: 2, series: ["gh1", "GH2"] }, { c: "99", cant: 5 }] };
+    assert.strictEqual((await post(cuerpo, melina)).statusCode, 403, "solo desde el panel");
+    assert.strictEqual((await post({ ...cuerpo, tecnico: "Nadie" }, admin)).statusCode, 400);
+    // Un N° que está en el depósito no se puede asignar
+    let r = await post({ ...cuerpo, items: [{ c: "23940", cant: 1, series: ["D1"] }] }, admin);
+    assert.strictEqual(r.statusCode, 409); assert.match(r.cuerpo.error, /D1 figura en Depósito/);
+    r = await post(cuerpo, admin);
+    assert.strictEqual(r.statusCode, 200, JSON.stringify(r.cuerpo));
+    const sal = repo["stock/saldos.json"];
+    assert.deepStrictEqual(sal.ubic["tec:Juan"], { 20208: 3, 23940: 2 }, "queda lo de la lista; el cable (no estaba en la lista) a 0; el SIM no se controla");
+    assert.deepStrictEqual(sal.ubic.dep, { 20208: 10, 23940: 2 }, "el depósito no cambia");
+    assert.deepStrictEqual([sal.unidades.GH1.u, sal.unidades.GH2.u], ["tec:Juan", "tec:Juan"]);
+    assert.ok(sal.stockInicialTec["tec:Juan"].fecha);
+    const movs = repo[`stock/movimientos-${mes}.json`].filter((x) => x.tipo === "inicial_tecnico");
+    assert.deepStrictEqual(movs.map((x) => [x.c, x.cant, x.de || "", x.a || ""]).sort(), [["20208", 3, "", "tec:Juan"], ["23940", 2, "", "tec:Juan"], ["50001", 30, "tec:Juan", ""]].sort());
+    assert.deepStrictEqual(movs.map(S.movimientoParaOficina).filter(Boolean), [], "no va a Oficina");
+    const au = S.auditarStock(sal, repo[`stock/movimientos-${mes}.json`], repo["stock/catalogo.json"], { ahora: new Date() });
+    assert.deepStrictEqual(au.errores, [], "el control nocturno cuadra");
+    // Se vuelve a cargar con un N° más y uno menos de cantidad: sin la opción de reemplazar, lo demás queda
+    r = await post({ accion: "stock_inicial_tecnico", tecnico: "Juan", items: [{ c: "20208", cant: 1 }], reemplazar: false }, admin);
+    assert.strictEqual(r.statusCode, 200);
+    assert.deepStrictEqual(repo["stock/saldos.json"].ubic["tec:Juan"], { 20208: 1, 23940: 2 });
+    // No puede quedar menos cantidad que equipos con N°
+    r = await post({ accion: "stock_inicial_tecnico", tecnico: "Juan", items: [{ c: "23940", cant: 1 }] }, admin);
+    assert.strictEqual(r.statusCode, 409); assert.match(r.cuerpo.error, /quedarían 1 pero tiene 2 con N° de serie/);
+    assert.deepStrictEqual(S.auditarStock(repo["stock/saldos.json"], repo[`stock/movimientos-${mes}.json`], repo["stock/catalogo.json"], { ahora: new Date() }).errores, []);
+  } finally { global.fetch = fetchViejo; }
+});

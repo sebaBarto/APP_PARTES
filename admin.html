@@ -1299,6 +1299,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
         <button type="button" class="btn-secondary-admin" data-stk="oficina">Para Oficina</button>
         <button type="button" class="btn-secondary-admin" data-stk="garantia">Garantía</button>
         <button type="button" class="btn-secondary-admin" data-stk="proveedores">Proveedores</button>
+        <button type="button" class="btn-secondary-admin" data-stk="tecnicos">Stock de técnicos</button>
       </div>
       <p class="status" id="stkStatus"></p>
 
@@ -1389,6 +1390,32 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
           </div>
           <div id="stkGarFicha"></div>
           <div id="stkGarLista"></div>
+        </div>
+      </div>
+
+      <div data-stk-vista="tecnicos" class="hidden">
+        <div class="card">
+          <h3 style="margin-top:0;">Stock inicial de un técnico</h3>
+          <p class="subtitle" style="margin-top:0;">Para arrancar: cargá lo que cada técnico (o vehículo) tiene hoy. Queda como su punto de partida <b>sin mover el depósito</b>, y desde ahí la APP lleva la cuenta con cada entrega, parte y devolución. Se puede volver a cargar si hace falta corregir.</p>
+          <div class="field-row" style="flex-wrap:wrap;gap:10px;align-items:flex-end;">
+            <div style="min-width:220px;"><label>¿De quién?</label><select id="stkTecQuien"><option value="">Elegí…</option></select></div>
+            <p class="stk-det" id="stkTecInfo" style="margin:0 0 8px;flex:1;"></p>
+          </div>
+          <div id="stkTecEditor" class="hidden">
+            <datalist id="stkTecArts"></datalist>
+            <div id="stkTecTabla"></div>
+            <div class="field-row" style="flex-wrap:wrap;gap:8px;margin-top:10px;align-items:center;">
+              <button type="button" class="btn-secondary-admin" id="stkTecAgregar" style="width:auto;">+ Agregar artículo</button>
+              <label class="btn-secondary-admin" style="width:auto;cursor:pointer;margin:0;">Importar desde Excel<input type="file" id="stkTecExcel" accept=".xlsx,.xls,.csv" style="display:none;"></label>
+              <button type="button" class="btn-secondary-admin" id="stkTecVaciar" style="width:auto;">Vaciar la lista</button>
+              <label style="display:flex;align-items:center;gap:6px;margin:0 0 0 auto;font-weight:400;"><input type="checkbox" id="stkTecReemplazar" checked style="width:auto;"> Lo que no está en la lista queda en 0</label>
+            </div>
+            <p class="stk-det" style="margin:8px 0 0;">Excel: una fila por artículo con las columnas <b>Código</b> (o artículo), <b>Cantidad</b> y, para los equipos, <b>N° de serie</b> (varios separados por coma).</p>
+            <div id="stkTecRevision" style="margin-top:12px;"></div>
+            <div class="field-row" style="gap:8px;margin-top:10px;">
+              <button type="button" id="stkTecRevisar" style="width:auto;">Revisar los cambios</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -5378,6 +5405,10 @@ const AYUDAS_SIMS = {
     "Los equipos que vuelven fallados quedan acá con su N° de serie, a qué cliente se instalaron, cuándo, con qué presupuesto y de qué proveedor vinieron.",
     "Seguí cada uno: mandado al proveedor (con N° de RMA), volvió reparado, reemplazado (se carga el N° del nuevo) o garantía rechazada.",
     "Buscá cualquier N° de serie para ver toda su historia. El Excel sirve para mandárselo al proveedor." ] },
+  stk_tecnicos: { titulo: "Stock inicial de un técnico", texto: [
+    "Para arrancar con el stock real: elegís el técnico (o vehículo) y cargás lo que tiene hoy, a mano o desde un Excel (Código, Cantidad y N° de serie).",
+    "Antes de guardar muestra qué cambia. El depósito no se toca: queda como el punto de partida del técnico y desde ahí la APP lleva la cuenta.",
+    "Si se marca «Lo que no está en la lista queda en 0», lo que tenía y no está en la lista se le saca." ] },
   stk_proveedores: { titulo: "Códigos de proveedor", gif: "assets/ayuda/stock-adm-proveedores.gif", texto: [
     "La etiqueta de SAT trae al final el código del proveedor (4 dígitos). Acá le ponés el nombre a cada código.",
     "Los códigos que se escanearon y todavía no tienen nombre aparecen para completar." ] },
@@ -5388,6 +5419,7 @@ const LUGARES_AYUDA_SIMS = [
   ['[data-stk-vista="salud"] h3', "stk_salud"], ['[data-stk-vista="conciliacion"] h3', "stk_conciliacion"], ['[data-stk-vista="pedidos"] h3', "stk_pedidos"],
   ["#stkMovExcelBtn", "stk_movimientos", "after"], ['[data-stk-vista="oficina"] h3', "stk_oficina"], ['[data-stk-vista="garantia"] h3', "stk_garantia"],
   ['[data-stk-vista="proveedores"] h3', "stk_proveedores"],
+  ['[data-stk-vista="tecnicos"] h3', "stk_tecnicos"],
   ["#panelSims > h1", "resumen"], ["#simsAltaBtn", "alta", "after"], ["#elegirExcelSimsBtn", "excel", "after"],
   ["#simsPendientesCard > h3", "pendientes"], ["#simsTabla thead th:nth-child(7)", "fila"], ["#simsLoteLimpiarBtn", "lote", "after"],
   ["#simsTabla thead th:nth-child(2)", "ficha"], ["#panelSimsInstaladas > h1", "instaladas"],
@@ -6377,6 +6409,7 @@ function stkMostrarVista() {
   else if (stkVista === "movimientos") stkCargarMovimientos();
   else if (stkVista === "oficina") stkCargarOficina();
   else if (stkVista === "proveedores") stkRenderProveedores();
+  else if (stkVista === "tecnicos") stkTecPreparar();
   else if (stkVista === "garantia") stkRenderGarantia();
   else if (stkVista === "salud") stkRenderSalud();
 }
@@ -7058,6 +7091,135 @@ document.getElementById("stkGarExcelBtn").addEventListener("click", () => {
   const libro = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filas.length ? filas : [{ "N° de serie": "Sin equipos en garantía" }]), "Garantía");
   XLSX.writeFile(libro, `stock_garantia_${new Date().toISOString().slice(0, 10)}.xlsx`);
+});
+
+// --- Stock inicial de cada técnico (punto de partida, sin mover el depósito) ---
+let stkTecFilas = null, stkTecUbic = "", stkTecNombres = null;
+const stkTecControla = (a) => a && !["sim", "herramienta", "no"].includes(a.tipo) && !a.baja;
+async function stkTecPreparar() {
+  const sel = document.getElementById("stkTecQuien");
+  if (!stkTecNombres) {
+    try { const r = await fetch("/api/datos?coleccion=tecnicos", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" }); const d = await r.json(); stkTecNombres = Array.isArray(d) ? d.map((t) => t.nombre).filter(Boolean) : []; } catch (e) { stkTecNombres = []; }
+  }
+  const ubics = new Set([...stkTecNombres.map((n) => "tec:" + n), ...Object.keys(stk.saldos.ubic || {}).filter((u) => /^(tec|veh):/.test(u))]);
+  const actual = sel.value;
+  sel.innerHTML = '<option value="">Elegí…</option>' + [...ubics].sort((a, b) => a.localeCompare(b, "es")).map((u) => `<option value="${escapeHtmlAdmin(u)}">${escapeHtmlAdmin(u.startsWith("veh:") ? "Vehículo: " + u.slice(4) : u.slice(4))}</option>`).join("");
+  if (actual && ubics.has(actual)) sel.value = actual;
+  document.getElementById("stkTecArts").innerHTML = Object.values(stk.catalogo.articulos || {}).filter(stkTecControla).map((a) => `<option value="${escapeHtmlAdmin(a.c)} · ${escapeHtmlAdmin(a.d || "")}"></option>`).join("");
+  stkTecCargar();
+}
+function stkTecCargar() {
+  const u = document.getElementById("stkTecQuien").value;
+  document.getElementById("stkTecEditor").classList.toggle("hidden", !u);
+  document.getElementById("stkTecRevision").innerHTML = "";
+  if (!u) { document.getElementById("stkTecInfo").textContent = ""; return; }
+  if (u !== stkTecUbic || !stkTecFilas) {
+    stkTecUbic = u;
+    const caja = (stk.saldos.ubic || {})[u] || {};
+    stkTecFilas = Object.entries(caja).map(([c, cant]) => ({ c, cant, series: seriesEn(stk.saldos, u, c).join(", ") }));
+  }
+  const caja = (stk.saldos.ubic || {})[u] || {}, ini = (stk.saldos.stockInicialTec || {})[u];
+  const total = Object.values(caja).reduce((t, x) => t + (Number(x) || 0), 0);
+  document.getElementById("stkTecInfo").textContent = `Tiene ahora ${Object.keys(caja).length} artículo${Object.keys(caja).length === 1 ? "" : "s"} (${total} en total).${ini ? ` Stock inicial cargado el ${new Date(ini.fecha).toLocaleString("es-AR", { day: "numeric", month: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })} por ${ini.por}.` : " Todavía no se le cargó el stock inicial."}`;
+  stkTecPintar();
+}
+function stkTecPintar() {
+  const arts = stk.catalogo.articulos || {};
+  document.getElementById("stkTecTabla").innerHTML = stkTecFilas.length ? `<div style="overflow-x:auto;"><table class="sims-tabla stk-tabla"><thead><tr><th>Artículo</th><th class="num">Cantidad</th><th>N° de serie (equipos)</th><th></th></tr></thead><tbody>${stkTecFilas.map((f, i) => {
+    const a = arts[f.c], esU = a && a.tipo === "unidad";
+    return `<tr data-i="${i}"><td><input class="field-input stk-tec-art" list="stkTecArts" placeholder="Código o nombre" style="padding:4px 6px;min-width:240px;" value="${escapeHtmlAdmin(a ? `${a.c} · ${a.d || ""}` : f.c)}">${f.c && !a ? '<div class="stk-det" style="color:#c0392b;">No está en el catálogo</div>' : ""}</td>
+      <td class="num"><input class="field-input stk-tec-cant" type="number" min="0" step="any" style="width:80px;padding:4px 6px;text-align:right;" value="${escapeHtmlAdmin(f.cant)}"></td>
+      <td>${esU ? `<input class="field-input stk-tec-ser" placeholder="Opcional: GH120FF156, GH120FF157…" style="padding:4px 6px;min-width:220px;" value="${escapeHtmlAdmin(f.series || "")}">` : '<span class="stk-det">—</span>'}</td>
+      <td class="stk-btns"><button type="button" class="btn-secondary-admin" data-quitar>Quitar</button></td></tr>`;
+  }).join("")}</tbody></table></div>` : '<p class="subtitle">La lista está vacía. Agregá artículos o importalos desde un Excel.</p>';
+  document.querySelectorAll("#stkTecTabla tr[data-i]").forEach((tr) => {
+    const f = stkTecFilas[Number(tr.dataset.i)];
+    tr.querySelector(".stk-tec-art").addEventListener("change", (e) => { f.c = stkTecCodigo(e.target.value); stkTecPintar(); });
+    tr.querySelector(".stk-tec-cant").addEventListener("input", (e) => { f.cant = e.target.value; });
+    const ser = tr.querySelector(".stk-tec-ser"); if (ser) ser.addEventListener("input", (e) => { f.series = e.target.value; });
+    tr.querySelector("[data-quitar]").addEventListener("click", () => { stkTecFilas.splice(Number(tr.dataset.i), 1); stkTecPintar(); });
+  });
+  document.getElementById("stkTecRevision").innerHTML = "";
+}
+// Lo que se escribió («20825 · TECLADO…», «20825», una descripción o la etiqueta de SAT) -> código.
+function stkTecCodigo(t) {
+  const arts = stk.catalogo.articulos || {}, x = String(t || "").trim();
+  const c0 = x.split(" · ")[0].trim();
+  if (arts[codigoArticulo(c0)]) return codigoArticulo(c0);
+  const sat = leerEtiquetaSat(x); if (sat && arts[sat.codigo]) return sat.codigo;
+  const n = normalizeTextAdmin(x), por = Object.values(arts).filter((a) => normalizeTextAdmin(a.d) === n);
+  return por.length === 1 ? por[0].c : c0;
+}
+const stkTecSeries = (t) => String(t || "").split(/[\s,;]+/).map((x) => x.trim().toUpperCase()).filter(Boolean);
+document.getElementById("stkTecQuien").addEventListener("change", () => { stkTecFilas = null; stkTecCargar(); });
+document.getElementById("stkTecAgregar").addEventListener("click", () => { stkTecFilas.push({ c: "", cant: 1, series: "" }); stkTecPintar(); const l = document.querySelectorAll("#stkTecTabla .stk-tec-art"); if (l.length) l[l.length - 1].focus(); });
+document.getElementById("stkTecVaciar").addEventListener("click", () => { stkTecFilas = []; stkTecPintar(); });
+document.getElementById("stkTecExcel").addEventListener("change", async (e) => {
+  const archivo = e.target.files && e.target.files[0]; e.target.value = "";
+  if (!archivo) return;
+  try {
+    const libro = XLSX.read(await archivo.arrayBuffer(), { type: "array" });
+    const norm = (t) => normalizeTextAdmin(String(t == null ? "" : t)).replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+    let filas = null, col = null;
+    for (const nom of libro.SheetNames) {
+      const f = XLSX.utils.sheet_to_json(libro.Sheets[nom], { header: 1, defval: "", raw: false });
+      for (let h = 0; h < Math.min(f.length, 15); h++) {
+        const cab = f[h].map(norm), idx = (re) => cab.findIndex((c) => re.test(c));
+        const k = { c: idx(/^(codigo|cod|articulo|art|producto|descripcion)/), cant: idx(/^(cantidad|cant|stock|unidades)/), ser: idx(/serie|^n ?s$|serial/) };
+        if (k.c >= 0 && k.cant >= 0) { filas = f.slice(h + 1); col = k; break; }
+      }
+      if (filas) break;
+    }
+    if (!filas) { avisoAdmin("No encontré las columnas Código y Cantidad en ese Excel.", "err"); return; }
+    const nuevas = [], faltan = [];
+    filas.forEach((f) => {
+      const t = String(f[col.c] || "").trim(); if (!t) return;
+      const c = stkTecCodigo(t), cant = numStock(f[col.cant]);
+      if (!(stk.catalogo.articulos || {})[c]) faltan.push(t);
+      const prev = nuevas.find((x) => x.c === c);
+      const ser = col.ser >= 0 ? stkTecSeries(f[col.ser]) : [];
+      if (prev) { prev.cant = (Number(prev.cant) || 0) + (cant || 0); prev.series = [...stkTecSeries(prev.series), ...ser].join(", "); }
+      else nuevas.push({ c, cant: cant || 0, series: ser.join(", ") });
+    });
+    stkTecFilas = nuevas;
+    stkTecPintar();
+    avisoAdmin(`Se cargaron ${nuevas.length} artículo${nuevas.length === 1 ? "" : "s"} del Excel${faltan.length ? `. Ojo: ${faltan.length} no están en el catálogo (${faltan.slice(0, 4).join(", ")}${faltan.length > 4 ? "…" : ""})` : ""}. Revisá y confirmá.`, faltan.length ? "err" : "ok");
+  } catch (err) { avisoAdmin("No se pudo leer el Excel: " + err.message, "err"); }
+});
+document.getElementById("stkTecRevisar").addEventListener("click", () => {
+  const u = stkTecUbic, arts = stk.catalogo.articulos || {}, caja = (stk.saldos.ubic || {})[u] || {};
+  const reemplazar = document.getElementById("stkTecReemplazar").checked;
+  const items = stkTecFilas.filter((f) => f.c || String(f.cant).trim()).map((f) => ({ c: f.c, cant: Number(String(f.cant).replace(",", ".")), series: stkTecSeries(f.series) }));
+  const mal = items.find((x) => !arts[x.c]) || items.find((x) => !Number.isFinite(x.cant) || x.cant < 0) || items.find((x) => x.series.length > x.cant);
+  if (mal) { avisoAdmin(!arts[mal.c] ? `«${mal.c || "(vacío)"}» no está en el catálogo.` : mal.series.length > mal.cant ? `${arts[mal.c].d}: hay más N° de serie que cantidad.` : `Cantidad inválida en ${arts[mal.c].d}.`, "err"); return; }
+  const rep = items.find((x, i) => items.findIndex((y) => y.c === x.c) !== i);
+  if (rep) { avisoAdmin(`${arts[rep.c].d} está dos veces en la lista.`, "err"); return; }
+  const codigos = [...new Set([...items.map((x) => x.c), ...(reemplazar ? Object.keys(caja) : [])])];
+  const cambios = codigos.map((c) => { const x = items.find((y) => y.c === c); const antes = Number(caja[c]) || 0, despues = x ? x.cant : 0; const tiene = seriesEn(stk.saldos, u, c); return { c, antes, despues, nuevas: x ? x.series.filter((t) => !tiene.includes(t)).length : 0 }; }).filter((x) => x.antes !== x.despues || x.nuevas);
+  const caja2 = document.getElementById("stkTecRevision");
+  if (!cambios.length) { caja2.innerHTML = '<p class="status ok">No hay cambios: ya tiene exactamente eso.</p>'; return; }
+  const nombre = u.startsWith("veh:") ? "el vehículo " + u.slice(4) : u.slice(4);
+  caja2.innerHTML = `<div class="card" style="border:2px solid var(--amber,#F5A623);margin:0;">
+    <h4 style="margin:0 0 6px;">Así queda el stock de ${escapeHtmlAdmin(nombre)} (${cambios.length} cambio${cambios.length === 1 ? "" : "s"})</h4>
+    <div style="overflow-x:auto;max-height:340px;"><table class="sims-tabla stk-tabla"><thead><tr><th>Artículo</th><th class="num">Tiene ahora</th><th class="num">Queda</th><th class="num">Diferencia</th><th class="num">N° de serie nuevos</th></tr></thead><tbody>
+      ${cambios.map((x) => `<tr><td>${escapeHtmlAdmin((arts[x.c] || {}).d || x.c)}</td><td class="num">${x.antes}</td><td class="num"><b>${x.despues}</b></td><td class="num" style="color:${x.despues > x.antes ? "#2E9E5B" : x.despues < x.antes ? "#c0392b" : "inherit"}">${x.despues > x.antes ? "+" : ""}${Math.round((x.despues - x.antes) * 1000) / 1000 || ""}</td><td class="num">${x.nuevas || ""}</td></tr>`).join("")}
+    </tbody></table></div>
+    <p class="stk-det" style="margin:8px 0;">El depósito <b>no cambia</b>. Queda registrado como «stock inicial del técnico» (no se pasa a Oficina).</p>
+    <div class="field-row" style="gap:8px;"><button type="button" id="stkTecConfirmar" style="width:auto;">Confirmar y guardar</button><button type="button" class="btn-secondary-admin" id="stkTecCancelar" style="width:auto;">Seguir editando</button></div></div>`;
+  document.getElementById("stkTecCancelar").addEventListener("click", () => { caja2.innerHTML = ""; });
+  document.getElementById("stkTecConfirmar").addEventListener("click", async (ev) => {
+    await simsConBoton(ev.currentTarget, async () => {
+      try {
+        const r = await stkPost({ accion: "stock_inicial_tecnico", tecnico: u.slice(4), vehiculo: u.startsWith("veh:"), items, reemplazar });
+        await stkLeer();
+        stkTecFilas = null;
+        stkTecCargar();
+        const caja3 = (stk.saldos.ubic || {})[u] || {};
+        const ok = items.every((x) => (Number(caja3[x.c]) || 0) === x.cant);
+        avisoAdmin(ok ? `Listo: stock de ${nombre} cargado (${(r.cambios || []).length} cambio${(r.cambios || []).length === 1 ? "" : "s"}).` : "Ojo: después de guardar no coincide. Revisá la lista.", ok ? "ok" : "err");
+      } catch (err) { avisoAdmin("No se pudo guardar: " + err.message, "err"); }
+    });
+  });
 });
 
 // --- Proveedores: código de la etiqueta de SAT -> nombre ---

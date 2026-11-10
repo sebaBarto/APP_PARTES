@@ -1255,7 +1255,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
   let esResp = esAdmin, tecnicosGuardados = null;
   const tecnicos = async () => (tecnicosGuardados = tecnicosGuardados || (await leerTecnicosGuardados().catch(() => [])));
   if (!esAdmin) { const t = (await tecnicos()).find((x) => x.nombre === autorizacion.nombre); esResp = !!(t && t.permisos && (t.permisos.stock_responsable || t.permisos.admin)); }
-  const SOLO_ADMIN = ["cuadrar", "regularizar_cuadre", "baja_serie", "salud_revisado", "configurar_varios", "proveedores", "marcar_oficina", "importar_catalogo", "configurar", "saldo_inicial", "ajustar", "conc_marcar", "conc_reactivar", "conc_corrida"];
+  const SOLO_ADMIN = ["stock_inicial_tecnico", "cuadrar", "regularizar_cuadre", "baja_serie", "salud_revisado", "configurar_varios", "proveedores", "marcar_oficina", "importar_catalogo", "configurar", "saldo_inicial", "ajustar", "conc_marcar", "conc_reactivar", "conc_corrida"];
   try {
     if (req.method === "GET" && q.serie) {
       // Ficha de un equipo por su N° de serie: dónde está, a qué cliente fue y su garantía.
@@ -1660,6 +1660,64 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
         return { data: nuevo, respuesta: { articulos: new Set(movs.map((m) => m.c)).size }, movs };
       }, `Stock: saldo inicial desde el listado de Oficina (por ${quien})`);
       if (!r.error) await stockConfirmarMovs(movs, `Stock: movimientos del saldo inicial (por ${quien})`);
+      responder(r);
+      return;
+    }
+    if (b.accion === "stock_inicial_tecnico") {
+      // Punto de partida del stock de un técnico (o vehículo): queda con lo que dice la lista, SIN tocar el
+      // depósito. Cada diferencia queda como movimiento «inicial_tecnico» (el control nocturno lo reproduce)
+      // y no se pasa a Oficina.
+      const nombre = String(b.tecnico || "").trim(), esVeh = b.vehiculo === true;
+      const ubic = `${esVeh ? "veh" : "tec"}:${nombre}`;
+      if (!nombre || nombre.length > 60) { res.status(400).json({ error: "Falta el técnico" }); return; }
+      if (!esVeh && !(await tecnicos()).some((t) => t.nombre === nombre)) { res.status(400).json({ error: `«${nombre}» no está en la lista de técnicos` }); return; }
+      const items = Array.isArray(b.items) ? b.items.slice(0, 800) : [];
+      const reemplazar = b.reemplazar !== false;
+      const { data: cat } = await leerArchivoDatos(STOCK_CAT, { articulos: {} });
+      const arts = (cat && cat.articulos) || {};
+      const lista = {};
+      for (const x of items) {
+        const c = S.codigoArticulo(x && x.c), cant = Number(x && x.cant);
+        if (!c || !arts[c]) { res.status(400).json({ error: `El artículo ${x && x.c} no está en el catálogo` }); return; }
+        if (["sim", "herramienta", "no"].includes(arts[c].tipo)) continue;
+        if (!Number.isFinite(cant) || cant < 0 || cant > 100000) { res.status(400).json({ error: `Cantidad inválida en ${arts[c].d || c}` }); return; }
+        const series = [...new Set((Array.isArray(x.series) ? x.series : []).map(S.limpiarCodigo).filter(Boolean))];
+        if (series.length && arts[c].tipo !== "unidad") { res.status(400).json({ error: `${arts[c].d || c} no lleva N° de serie` }); return; }
+        if (lista[c]) { res.status(400).json({ error: `${arts[c].d || c} está dos veces en la lista` }); return; }
+        lista[c] = { cant: Math.round(cant * 1000) / 1000, series };
+      }
+      const motivo = String(b.motivo || "").trim().slice(0, 160) || "Stock inicial del técnico (punto de partida)";
+      let movs = [];
+      const r = await stockActualizar(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }, (sal) => {
+        movs = [];
+        const actual = (sal.ubic || {})[ubic] || {};
+        const codigos = new Set([...Object.keys(lista), ...(reemplazar ? Object.keys(actual) : [])]);
+        const problemas = [], cambios = [];
+        let nuevo = sal, n = 0;
+        codigos.forEach((c) => {
+          const objetivo = lista[c] ? lista[c].cant : 0, antes = Number(actual[c]) || 0;
+          const tiene = S.seriesEn(sal, ubic, c), dadas = lista[c] ? lista[c].series : [];
+          const nuevas = dadas.filter((t) => !tiene.includes(t));
+          nuevas.forEach((t) => { const u = (sal.unidades || {})[t]; if (u && u.u && u.u !== "baja") problemas.push(`El N° ${t} figura en ${S.nombreUbicacion(u.u)}${u.c !== c ? ` (como ${(arts[u.c] || {}).d || u.c})` : ""}`); });
+          // Los N° que ya tenía y no vienen en la lista se mantienen (si la cantidad alcanza); si no alcanza, avisa.
+          if (tiene.length + nuevas.length > objetivo) problemas.push(`${(arts[c] || {}).d || c}: quedarían ${objetivo} pero tiene ${tiene.length + nuevas.length} con N° de serie (${[...tiene, ...nuevas].slice(0, 4).join(", ")}${tiene.length + nuevas.length > 4 ? "…" : ""}). Sacá primero los N° que ya no tiene (Stock › Salud).`);
+          const dif = Math.round((objetivo - antes) * 1000) / 1000;
+          if (!dif && !nuevas.length) return;
+          const base = () => ({ id: `${Date.now().toString(36)}-${(n++).toString(36)}${Math.random().toString(36).slice(2, 5)}`, fecha: ahora, por: quien, tipo: "inicial_tecnico", c, motivo, antes, despues: objetivo });
+          if (dif > 0) movs.push({ ...base(), cant: dif, a: ubic, ...(nuevas.length ? { unidades: nuevas } : {}) });
+          else {
+            if (dif < 0) movs.push({ ...base(), cant: -dif, de: ubic });
+            // Solo ubica los N° de serie (no cambia la cantidad).
+            if (nuevas.length) movs.push({ ...base(), cant: 0, a: ubic, unidades: nuevas });
+          }
+          cambios.push({ c, antes, despues: objetivo, series: nuevas.length });
+        });
+        if (problemas.length) return { error: problemas.slice(0, 8).join(" · "), status: 409 };
+        movs.forEach((m) => { nuevo = S.aplicarMovimiento(nuevo, m); });
+        nuevo = { ...nuevo, stockInicialTec: { ...(sal.stockInicialTec || {}), [ubic]: { fecha: ahora, por: quien, articulos: Object.keys(lista).length } } };
+        return { data: nuevo, respuesta: { cambios, ubic }, movs };
+      }, `Stock: stock inicial de ${nombre} (por ${quien})`);
+      if (!r.error && movs.length) await stockConfirmarMovs(movs, `Stock: movimientos del stock inicial de ${nombre} (por ${quien})`);
       responder(r);
       return;
     }
