@@ -6923,3 +6923,60 @@ test("Stock de técnicos (panel): se elige el técnico, parte de lo que tiene, s
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Camionetas (depósito móvil): el técnico ve qué hay en la camioneta, toma material (pasa a su stock en el momento) y deja lo que sobra", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  const S = require(require("path").join(__dirname, "..", "stock-utils.js"));
+  const catalogo = { articulos: { 20825: { c: "20825", d: "TECLADO", tipo: "unidad" }, 20208: { c: "20208", d: "SIRENA", tipo: "cantidad" } } };
+  let saldos = { inicializado: "2026-11-01", ubic: { dep: {}, "veh:Kangoo gris": { 20208: 5, 20825: 1 }, "veh:Kangoo blanca": { 20208: 2 }, "tec:Juan": { 20208: 1 } }, unidades: { GH9: { c: "20825", u: "veh:Kangoo gris" } }, pedidos: {}, envios: [] };
+  const posts = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url(), json = (o, st) => route.fulfill({ status: st || 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (!u.includes("coleccion=stock")) return json([]);
+    if (req.method() === "GET") {
+      const camionetas = Object.fromEntries(Object.keys(saldos.ubic).filter((x) => /^veh:/.test(x)).map((x) => [x.slice(4), { tiene: saldos.ubic[x], unidades: Object.entries(saldos.unidades).filter(([, y]) => y.u === x).map(([tracking, y]) => ({ tracking, c: y.c })) }]));
+      return json({ nombre: "Juan", ...S.stockDePersona(saldos, "Juan"), articulos: catalogo.articulos, camionetas });
+    }
+    const b = JSON.parse(req.postData()); posts.push(b);
+    const v = "veh:" + b.vehiculo, tomar = b.sentido === "tomar";
+    const x = S.moverStock(saldos, b.items, { tipo: tomar ? "de_camioneta" : "a_camioneta", de: tomar ? v : "tec:Juan", a: tomar ? "tec:Juan" : v, por: "Juan", confirmar: false }, catalogo);
+    if (x.error) return json({ error: x.error }, 409);
+    saldos = x.saldos; return json({ ok: true });
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(base + "/index.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { tecnicoLogueado = "Juan"; tecnicosPasswords = { Juan: "" }; tecnicosPermisos = { Juan: {} }; refrescarAccesosPorPermisos(); showScreen("home"); });
+  await page.click("#tileMiStockBtn");
+  await page.waitForSelector("#miCamCaja:not(.hidden)");
+  await page.click("#miCamCaja summary");
+  assert.deepStrictEqual(await page.$$eval("#miCamSelect option", (l) => l.map((o) => o.value)), ["Kangoo blanca", "Kangoo gris"]);
+  await page.selectOption("#miCamSelect", "Kangoo gris");
+  await page.waitForFunction(() => /TECLADO.*GH9/s.test(document.getElementById("miCamTiene").textContent));
+  // Toma 2 sirenas y el teclado (con su N°)
+  await page.click('#miCamTiene [data-tomar="20208"]'); await page.click('#miCamTiene [data-tomar="20208"]');
+  await page.click('#miCamTiene [data-tomar="20825"]');
+  await page.evaluate(() => miCamCanasta.agregarCodigo("GH9"));
+  await page.waitForFunction(() => miCamCanasta.items().length === 2);
+  await page.click("#miCamTomarBtn");
+  await page.click(".dlg-app .dlg-si");
+  await page.waitForFunction(() => /Listo: ya está en tu stock/.test(document.body.textContent));
+  assert.deepStrictEqual(posts[0].items.map((x) => [x.c, x.cant, x.unidades]).sort(), [["20208", 2, []], ["20825", 1, ["GH9"]]]);
+  assert.deepStrictEqual([posts[0].accion, posts[0].sentido, posts[0].vehiculo], ["camioneta", "tomar", "Kangoo gris"]);
+  assert.deepStrictEqual(saldos.ubic["tec:Juan"], { 20208: 3, 20825: 1 });
+  await page.waitForFunction(() => !/TECLADO/.test(document.getElementById("miCamTiene").textContent));
+  // Deja 1 sirena en la Kangoo blanca (desde «Devolver», eligiendo adónde)
+  await page.waitForSelector("#miStockAdondeCaja:not(.hidden)");
+  await page.selectOption("#miStockAdonde", "Kangoo blanca");
+  assert.strictEqual(await page.textContent("#miStockDevolverBtn"), "Dejar en la camioneta");
+  await page.click('#miStockTengo [data-devolver="20208"]');
+  await page.waitForFunction(() => miStockCanasta.items().length === 1);
+  await page.click("#miStockDevolverBtn");
+  await page.click(".dlg-app .dlg-si");
+  await page.waitForFunction(() => /quedó en la camioneta Kangoo blanca/.test(document.body.textContent));
+  assert.deepStrictEqual([posts[1].sentido, posts[1].vehiculo, posts[1].items[0].c, posts[1].items[0].cant], ["dejar", "Kangoo blanca", "20208", 1]);
+  assert.deepStrictEqual(saldos.ubic["veh:Kangoo blanca"], { 20208: 3 });
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

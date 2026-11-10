@@ -1276,7 +1276,15 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
       const porAprobar = (((sal.data || {}).aprobar) || []).filter((x) => x.por === quien);
       const solicitudes = (((sal.data || {}).solicitudes) || []).filter((x) => x.por === quien).slice(0, 10);
       solicitudes.forEach((x) => x.items.forEach((y) => { const a = arts[y.c]; if (a && !sub[y.c]) sub[y.c] = { c: y.c, d: a.d, tipo: a.tipo, medida: a.medida || "unidades", alias: a.alias || [], formatos: a.formatos || [] }; }));
-      res.status(200).json({ nombre: quien, responsable: esResp, ...yo, articulos: sub, porAprobar, solicitudes });
+      // Las camionetas son depósitos móviles: cualquier técnico ve qué tienen, para tomar o dejar material.
+      const camionetas = {}, sd = sal.data || {};
+      Object.keys(sd.ubic || {}).concat(Object.keys(sd.stockInicialTec || {})).filter((u) => /^veh:/.test(u)).forEach((u) => {
+        const tiene = Object.fromEntries(Object.entries((sd.ubic || {})[u] || {}).filter(([, n]) => n > 0));
+        const unidades = Object.entries(sd.unidades || {}).filter(([, x]) => x && x.u === u).map(([tracking, x]) => ({ tracking, c: x.c }));
+        camionetas[u.slice(4)] = { tiene, unidades };
+        Object.keys(tiene).forEach((c) => { const a = arts[c]; if (a && !sub[c]) sub[c] = { c, d: a.d, tipo: a.tipo, medida: a.medida || "unidades", alias: a.alias || [], formatos: a.formatos || [] }; });
+      });
+      res.status(200).json({ nombre: quien, responsable: esResp, ...yo, articulos: sub, porAprobar, solicitudes, camionetas });
       return;
     }
     if (req.method === "GET" && q.mi_codigo) {
@@ -1318,7 +1326,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
     }
     if (!esResp) {
       const accion = cuerpo && cuerpo.accion;
-      if (req.method !== "POST" || !["confirmar_envio", "devolver", "leer_codigo_foto", "consumo_parte", "pedir_material", "cancelar_pedido"].includes(accion)) { res.status(403).json({ error: "Necesitás el permiso «Responsable de stock»" }); return; }
+      if (req.method !== "POST" || !["confirmar_envio", "devolver", "camioneta", "leer_codigo_foto", "consumo_parte", "pedir_material", "cancelar_pedido"].includes(accion)) { res.status(403).json({ error: "Necesitás el permiso «Responsable de stock»" }); return; }
     }
     if (req.method === "POST" && cuerpo && !esAdmin && SOLO_ADMIN.includes(cuerpo.accion)) { res.status(403).json({ error: "Solo desde el panel de administración" }); return; }
     if (req.method === "GET") {
@@ -1871,6 +1879,28 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
         arts[c] = { ...arts[c], alias: [...new Set([...(arts[c].alias || []), ean])].slice(-20) };
         return { data: { ...cat, articulos: arts }, respuesta: { articulo: arts[c] } };
       }, `Stock: código ${ean} asociado a ${c} (por ${quien})`);
+      responder(r);
+      return;
+    }
+    if (b.accion === "camioneta") {
+      // Camioneta = depósito móvil: el técnico toma material (pasa a su stock) o lo deja (vuelve a la
+      // camioneta). Es en el momento, sin confirmar: lo hace el mismo que lo tiene en la mano.
+      const veh = String(b.vehiculo || "").replace(/\s+/g, " ").trim().slice(0, 60), ubicVeh = `veh:${veh}`, ubicTec = `tec:${quien}`;
+      const tomar = b.sentido !== "dejar";
+      const { data: cat } = await leerArchivoDatos(STOCK_CAT, { articulos: {} });
+      let resultado = null, duplicado = false;
+      const opId = String(b.op_id || "").slice(0, 60);
+      const r = await stockActualizar(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }, (sal) => {
+        if (opId && (sal.ops || []).includes(opId)) { duplicado = true; return { error: "duplicado", status: 200 }; }
+        if (!veh || !(((sal.ubic || {})[ubicVeh]) || ((sal.stockInicialTec || {})[ubicVeh]))) return { error: "Esa camioneta no tiene stock cargado (se carga desde el panel)", status: 400 };
+        const x = S.moverStock(sal, Array.isArray(b.items) ? b.items.slice(0, 500) : [], { tipo: tomar ? "de_camioneta" : "a_camioneta", de: tomar ? ubicVeh : ubicTec, a: tomar ? ubicTec : ubicVeh, por: quien, fecha: ahora, motivo: String(b.motivo || "").slice(0, 200), confirmar: false }, cat);
+        if (x.error) return { error: x.error, status: 409 };
+        resultado = x;
+        if (opId) x.saldos.ops = [opId, ...(sal.ops || [])].slice(0, 300);
+        return { data: x.saldos, respuesta: { movimientos: x.movs.length }, movs: x.movs };
+      }, `Stock: ${quien} ${tomar ? "toma de" : "deja en"} ${veh}`);
+      if (duplicado) { res.status(200).json({ ok: true, duplicado: true }); return; }
+      if (!r.error && resultado) { await stockConfirmarMovs(resultado.movs, `Stock: movimientos de camioneta (${quien})`); await stockAprender(resultado.movs, quien); }
       responder(r);
       return;
     }

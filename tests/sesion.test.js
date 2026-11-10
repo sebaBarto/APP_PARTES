@@ -1999,6 +1999,20 @@ test("Stock: stock inicial de un técnico desde el panel: queda con lo de la lis
     assert.strictEqual(r.statusCode, 200, JSON.stringify(r.cuerpo));
     assert.deepStrictEqual(repo["stock/saldos.json"].ubic["veh:Kangoo gris"], { 20208: 4 });
     assert.strictEqual(repo["stock/saldos.json"].ubic.dep[20208], 10);
+    // Camioneta (depósito móvil): Juan toma y deja, en el momento
+    const juan = crearSesion({ nombre: "Juan", rol: "tecnico" });
+    r = await post({ accion: "camioneta", sentido: "tomar", vehiculo: "Kangoo gris", items: [{ c: "20208", cant: 3 }] }, juan);
+    assert.strictEqual(r.statusCode, 200, JSON.stringify(r.cuerpo));
+    assert.deepStrictEqual([repo["stock/saldos.json"].ubic["veh:Kangoo gris"][20208], repo["stock/saldos.json"].ubic["tec:Juan"][20208]], [1, 4]);
+    r = await post({ accion: "camioneta", sentido: "dejar", vehiculo: "Kangoo gris", items: [{ c: "20208", cant: 2 }], op_id: "x1" }, juan);
+    assert.strictEqual(r.statusCode, 200);
+    r = await post({ accion: "camioneta", sentido: "dejar", vehiculo: "Kangoo gris", items: [{ c: "20208", cant: 2 }], op_id: "x1" }, juan);
+    assert.ok(r.cuerpo.duplicado, "no se aplica dos veces");
+    assert.deepStrictEqual([repo["stock/saldos.json"].ubic["veh:Kangoo gris"][20208], repo["stock/saldos.json"].ubic["tec:Juan"][20208]], [3, 2]);
+    assert.strictEqual((await post({ accion: "camioneta", sentido: "tomar", vehiculo: "Kangoo gris", items: [{ c: "20208", cant: 9 }] }, juan)).statusCode, 409);
+    assert.strictEqual((await post({ accion: "camioneta", sentido: "tomar", vehiculo: "Fiat", items: [{ c: "20208", cant: 1 }] }, juan)).statusCode, 400);
+    assert.strictEqual(repo["stock/saldos.json"].ubic.dep[20208], 10, "el depósito no se toca");
+    assert.deepStrictEqual(S.auditarStock(repo["stock/saldos.json"], repo[`stock/movimientos-${mes}.json`], repo["stock/catalogo.json"], { ahora: new Date() }).errores, []);
     assert.deepStrictEqual(S.auditarStock(repo["stock/saldos.json"], repo[`stock/movimientos-${mes}.json`], repo["stock/catalogo.json"], { ahora: new Date() }).errores, []);
   } finally { global.fetch = fetchViejo; }
 });

@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.67.1";
+const APP_VERSION = "4.68.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -18900,6 +18900,10 @@ const AYUDAS_STOCK = {
     "«Usé material de mi stock»: elegí de lo que tenés (o escaneá). Al mandar el parte pasa al cliente, con su N° de serie.",
     "«Retiré equipos»: escanealos y entran a tu stock (si está fallado, va marcado).",
     "Lo que cargues en la lista de abajo y no estaba en tu stock lo revisa el depósito." ] },
+  mi_camioneta: { titulo: "Camionetas (depósito móvil)", texto: [
+    "Cada camioneta tiene su propio stock (lo carga la oficina). Acá ves qué hay en la que elegís.",
+    "«Tomar» (o escanear la etiqueta) y «Tomar de la camioneta»: pasa a tu stock en el momento, sin que nadie confirme.",
+    "Para dejar lo que sobra: en «Devolver», elegí «A la camioneta…». Lo fallado va siempre al depósito." ] },
   ...((window.TableroStock && window.TableroStock.AYUDAS) || {}),
 };
 const ayudaBtn = (clave) => `<button type="button" class="ayuda-btn" data-ayuda="${clave}" aria-label="Ayuda: ${escapeHtml((AYUDAS_STOCK[clave] || {}).titulo || "")}" aria-expanded="false">?</button>`;
@@ -18969,7 +18973,7 @@ ayudaPopApp.addEventListener("mouseleave", () => { if (!ayudaAppFijada) ayudaApp
 // Los «?» fijos de las pantallas (los de las listas se dibujan con ayudaBtn()).
 [["#screen-deposito .stk-unico .stk-ayuda", "dep_escanear"], ['label[for="depDestTipo"]', "dep_entregar"], ['label[for="depRecibirTipo"]', "dep_alta"],
   ['#screen-deposito [data-dep="inventario"] > .stk-ayuda', "dep_inventario"], ["#depConsultarAyuda", "dep_consultar"],
-  ["#screen-mistock .stk-mi-codigo .stk-ayuda", "mi_codigo"], ["#miStockPedirCaja summary", "mi_pedir"], ["#miStockDevolverCaja > .stk-h", "mi_devolver"],
+  ["#screen-mistock .stk-mi-codigo .stk-ayuda", "mi_codigo"], ["#miStockPedirCaja summary", "mi_pedir"], ["#miCamCaja summary", "mi_camioneta"], ["#miStockDevolverCaja > .stk-h", "mi_devolver"],
   ['label[for="f_materiales"]', "parte_stock"]].forEach(([sel, clave]) => { const el = document.querySelector(sel); if (el && !el.querySelector(".ayuda-btn")) el.insertAdjacentHTML("beforeend", " " + ayudaBtn(clave)); });
 
 // ---------- Mi stock ----------
@@ -18987,6 +18991,75 @@ const miStockCanasta = crearCanastaStock({
   catalogo: miStockCatalogo, saldos: miStockSaldos,
   origen: () => (miStock ? `tec:${miStock.nombre}` : ""),
   alCambiar: () => { document.getElementById("miStockDevolverBtn").disabled = !miStockCanasta.items().length; },
+});
+// ---------- Camionetas (depósitos móviles) ----------
+const miCamElegida = () => document.getElementById("miCamSelect").value;
+const miCamSaldos = () => {
+  const v = miCamElegida(), cam = (miStock && miStock.camionetas && miStock.camionetas[v]) || { tiene: {}, unidades: [] };
+  const u = {};
+  (cam.unidades || []).forEach((x) => { u[x.tracking] = { c: x.c, u: `veh:${v}` }; });
+  return { ubic: { [`veh:${v}`]: cam.tiene || {} }, unidades: u };
+};
+const miCamCanasta = crearCanastaStock({
+  cont: document.getElementById("miCamCanasta"),
+  catalogo: miStockCatalogo, saldos: miCamSaldos,
+  origen: () => (miCamElegida() ? `veh:${miCamElegida()}` : ""),
+  alCambiar: () => { document.getElementById("miCamTomarBtn").disabled = !miCamCanasta.items().length; },
+});
+function pintarCamionetas() {
+  const cams = Object.keys((miStock && miStock.camionetas) || {}).sort((a, b) => a.localeCompare(b, "es"));
+  const caja = document.getElementById("miCamCaja"), sel = document.getElementById("miCamSelect");
+  caja.classList.toggle("hidden", !cams.length);
+  // ¿Adónde vuelve lo que devuelvo? Depósito o una camioneta.
+  const ad = document.getElementById("miStockAdonde"), adPrevio = ad.value;
+  ad.innerHTML = '<option value="">Al depósito (lo confirma el depósito)</option>' + cams.map((v) => `<option value="${escapeHtml(v)}">A la camioneta ${escapeHtml(v)} (en el momento)</option>`).join("");
+  if (cams.includes(adPrevio)) ad.value = adPrevio;
+  document.getElementById("miStockAdondeCaja").classList.toggle("hidden", !cams.length);
+  if (!cams.length) return;
+  let previa = sel.value;
+  if (!previa) { try { previa = localStorage.getItem("stock_mi_camioneta") || ""; } catch (e) { previa = ""; } }
+  sel.innerHTML = cams.map((v) => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("");
+  sel.value = cams.includes(previa) ? previa : cams[0];
+  const a = miStock.articulos || {}, d = (c) => (a[c] || {}).d || c, cam = miStock.camionetas[sel.value] || { tiene: {}, unidades: [] };
+  const tiene = Object.entries(cam.tiene || {}).filter(([, n]) => n > 0).sort((x, y) => d(x[0]).localeCompare(d(y[0]), "es"));
+  const serDe = (c) => (cam.unidades || []).filter((u) => u.c === c).map((u) => u.tracking);
+  document.getElementById("miCamTiene").innerHTML = tiene.length ? tiene.map(([c, n]) => `<div class="stk-linea stk-linea-cant"><div class="stk-linea-top"><div><b>${escapeHtml(d(c))}</b><small>${escapeHtml(c)}${serDe(c).length ? " · " + serDe(c).map(escapeHtml).join(" · ") : ""}</small></div><div class="stk-cant"><b style="font-size:16px;">${stkFmtN(n)}</b><button type="button" class="btn btn-secondary btn-small" style="width:auto;height:auto;padding:8px 10px;font-size:13px;" data-tomar="${escapeHtml(c)}">Tomar</button></div></div></div>`).join("")
+    : '<p class="stk-ayuda">La camioneta está vacía.</p>';
+  document.querySelectorAll("#miCamTiene [data-tomar]").forEach((b) => b.addEventListener("click", () => {
+    const c = b.dataset.tomar, art = a[c] || {};
+    if (art.tipo === "unidad" && serDe(c).length) { miCamCanasta.actual = c; miCamCanasta.cambio(); stkAviso("Escaneá el N° de serie de cada equipo que tomás"); return; }
+    const l = miCamCanasta.lineas.find((x) => x.c === c);
+    if (!l || l.cant < (cam.tiene[c] || 0)) miCamCanasta.agregarArticulo(c).then(() => {});
+  }));
+  miCamCanasta.render();
+  document.getElementById("miCamTomarBtn").disabled = !miCamCanasta.items().length;
+}
+document.getElementById("miCamSelect").addEventListener("change", (e) => {
+  try { localStorage.setItem("stock_mi_camioneta", e.target.value); } catch (err) { /* nada */ }
+  miCamCanasta.limpiar(); pintarCamionetas();
+});
+document.getElementById("miCamEscanearBtn").addEventListener("click", () => abrirEscanerStock({ titulo: `Tomar de ${miCamElegida()}`, leerCuadro: (t) => miCamCanasta.leerCuadro(t), estado: () => miCamCanasta.estado(), usar: (t, o) => miCamCanasta.agregarCodigo(t, o), describir: (t) => miCamCanasta.describir(t) }));
+document.getElementById("miCamTomarBtn").addEventListener("click", async (ev) => {
+  const btn = ev.currentTarget, items = miCamCanasta.items(), v = miCamElegida();
+  if (!items.length || !v) return;
+  const faltanN = miCamCanasta.faltanSeries();
+  if (faltanN.length) { await dialogoApp(`Decí cuáles tomás:
+
+${faltanN.map((f) => `• ${f.d}: faltan ${f.faltan} N° de serie (escanealos o elegilos de la lista)`).join("\n")}`, { soloAceptar: true, aceptar: "Entendido" }); return; }
+  const a = miStock.articulos || {};
+  if (!(await confirmarApp(`¿Tomar de la camioneta ${v}?
+
+${items.map((x) => `• ${(a[x.c] || {}).d || x.c}: ${stkFmtN(x.cant)}${x.unidades.length ? " (" + x.unidades.join(", ") + ")" : ""}`).join("\n")}
+
+Pasa a tu stock en el momento.`, { aceptar: "Sí, lo tomo" }))) return;
+  btn.disabled = true;
+  try {
+    await stkApi("POST", "", { accion: "camioneta", sentido: "tomar", vehiculo: v, items, op_id: `cam-${Date.now().toString(36)}` });
+    miCamCanasta.limpiar();
+    stkAviso("✓ Listo: ya está en tu stock", "ok");
+  } catch (e) { stkAviso("No se pudo: " + e.message); }
+  btn.disabled = false;
+  cargarMiStock();
 });
 async function cargarMiStock() {
   const st = document.getElementById("miStockStatus");
@@ -19049,6 +19122,7 @@ function pintarMiStock() {
   document.getElementById("miStockDevolverCaja").classList.toggle("hidden", !tengo.length);
   miStockCanasta.render();
   document.getElementById("miStockDevolverBtn").disabled = !miStockCanasta.items().length;
+  pintarCamionetas();
   const pa = miStock.porAprobar || [];
   document.getElementById("miStockDevueltos").dataset.aprobar = pa.length;
   const dev = miStock.devueltos || [];
@@ -19066,6 +19140,23 @@ document.getElementById("miStockDevolverBtn").addEventListener("click", async (e
   const faltanN = miStockCanasta.faltanSeries();
   if (faltanN.length) { await dialogoApp(`Decí cuáles devolvés:\n\n${faltanN.map((f) => `• ${f.d}: faltan ${f.faltan} N° de serie (escanealos o tocá «Elegir el N° de serie de la lista»)`).join("\n")}`, { soloAceptar: true, aceptar: "Entendido" }); return; }
   const fallado = document.getElementById("miStockFallado").checked, falla = document.getElementById("miStockFalla").value.trim();
+  const camioneta = document.getElementById("miStockAdonde").value;
+  if (camioneta) {
+    // Dejar en la camioneta: en el momento (los fallados van siempre al depósito, para la garantía).
+    if (fallado) { stkAviso("Lo fallado va al depósito (para la garantía): elegí «Al depósito»"); return; }
+    if (!(await confirmarApp(`¿Dejar en la camioneta ${camioneta}?
+
+${items.map((x) => `• ${(a[x.c] || {}).d || x.c}: ${stkFmtN(x.cant)}${x.unidades.length ? " (" + x.unidades.join(", ") + ")" : ""}`).join("\n")}`, { aceptar: "Sí, lo dejo" }))) return;
+    btn.disabled = true;
+    try {
+      await stkApi("POST", "", { accion: "camioneta", sentido: "dejar", vehiculo: camioneta, items, motivo: document.getElementById("miStockMotivo").value.trim() || undefined, op_id: `cam-${Date.now().toString(36)}` });
+      miStockCanasta.limpiar(); document.getElementById("miStockMotivo").value = "";
+      stkAviso(`✓ Listo: quedó en la camioneta ${camioneta}`, "ok");
+    } catch (e) { stkAviso("No se pudo: " + e.message); }
+    btn.disabled = false;
+    cargarMiStock();
+    return;
+  }
   if (fallado && !falla) { stkAviso("Escribí qué falla tiene"); document.getElementById("miStockFalla").focus(); return; }
   if (fallado && items.some((x) => (a[x.c] || {}).tipo === "unidad" && x.unidades.length < x.cant)) { stkAviso("Para la garantía escaneá el N° de serie de cada equipo fallado"); return; }
   if (!(await confirmarApp(`¿Devolver al depósito ${items.length} artículo${items.length === 1 ? "" : "s"}${fallado ? " FALLADO(S), para Garantía" : ""}?\n\n${items.map((x) => `• ${(a[x.c] || {}).d || x.c}: ${stkFmtN(x.cant)}${x.unidades.length ? " (" + x.unidades.join(", ") + ")" : ""}`).join("\n")}`, { aceptar: "Sí, devolver" }))) return;
@@ -19080,7 +19171,12 @@ document.getElementById("miStockDevolverBtn").addEventListener("click", async (e
   btn.disabled = false;
   cargarMiStock();
 });
-document.getElementById("tileMiStockBtn").addEventListener("click", () => { stkPrepararLector(); showScreen("miStock"); miStockCanasta.limpiar(); cargarMiStock(); });
+document.getElementById("miStockAdonde").addEventListener("change", (e) => {
+  const cam = e.target.value;
+  document.getElementById("miStockDevolverTitulo").textContent = cam ? `Dejar en la camioneta ${cam}` : "Devolver al depósito";
+  document.getElementById("miStockDevolverBtn").textContent = cam ? "Dejar en la camioneta" : "Devolver al depósito";
+});
+document.getElementById("tileMiStockBtn").addEventListener("click", () => { stkPrepararLector(); showScreen("miStock"); miStockCanasta.limpiar(); miCamCanasta.limpiar(); cargarMiStock(); });
 document.getElementById("volverDeMiStockBtn").addEventListener("click", () => showScreen("home"));
 
 // Globito con lo que falta confirmar (Mi stock: lo que te mandaron; Depósito: devoluciones).
