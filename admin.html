@@ -1395,10 +1395,10 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
 
       <div data-stk-vista="tecnicos" class="hidden">
         <div class="card">
-          <h3 style="margin-top:0;">Stock inicial de un técnico</h3>
+          <h3 style="margin-top:0;">Stock inicial de un técnico o vehículo</h3>
           <p class="subtitle" style="margin-top:0;">Para arrancar: cargá lo que cada técnico (o vehículo) tiene hoy. Queda como su punto de partida <b>sin mover el depósito</b>, y desde ahí la APP lleva la cuenta con cada entrega, parte y devolución. Se puede volver a cargar si hace falta corregir.</p>
           <div class="field-row" style="flex-wrap:wrap;gap:10px;align-items:flex-end;">
-            <div style="min-width:220px;"><label>¿De quién?</label><select id="stkTecQuien"><option value="">Elegí…</option></select></div>
+            <div style="min-width:220px;"><label>¿Técnico o vehículo?</label><select id="stkTecQuien"><option value="">Elegí…</option></select></div>
             <p class="stk-det" id="stkTecInfo" style="margin:0 0 8px;flex:1;"></p>
           </div>
           <div id="stkTecEditor" class="hidden">
@@ -7094,16 +7094,24 @@ document.getElementById("stkGarExcelBtn").addEventListener("click", () => {
 });
 
 // --- Stock inicial de cada técnico (punto de partida, sin mover el depósito) ---
-let stkTecFilas = null, stkTecUbic = "", stkTecNombres = null;
+let stkTecFilas = null, stkTecUbic = "", stkTecNombres = null, stkTecVehiculos = null;
 const stkTecControla = (a) => a && !["sim", "herramienta", "no"].includes(a.tipo) && !a.baja;
 async function stkTecPreparar() {
   const sel = document.getElementById("stkTecQuien");
   if (!stkTecNombres) {
     try { const r = await fetch("/api/datos?coleccion=tecnicos", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" }); const d = await r.json(); stkTecNombres = Array.isArray(d) ? d.map((t) => t.nombre).filter(Boolean) : []; } catch (e) { stkTecNombres = []; }
   }
-  const ubics = new Set([...stkTecNombres.map((n) => "tec:" + n), ...Object.keys(stk.saldos.ubic || {}).filter((u) => /^(tec|veh):/.test(u))]);
+  // Los vehículos salen de Flota → Vehículos (los mismos que elige el depósito en la APP).
+  if (!stkTecVehiculos) {
+    try { const r = await fetch("/api/datos?coleccion=vehiculos", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" }); const d = await r.json(); stkTecVehiculos = Array.isArray(d) ? d.map((v) => v && v.nombre).filter(Boolean) : []; } catch (e) { stkTecVehiculos = []; }
+  }
+  const enSaldos = Object.keys(stk.saldos.ubic || {});
+  const tecs = [...new Set([...stkTecNombres.map((n) => "tec:" + n), ...enSaldos.filter((u) => /^tec:/.test(u))])].sort((a, b) => a.localeCompare(b, "es"));
+  const vehs = [...new Set([...stkTecVehiculos.map((n) => "veh:" + n), ...enSaldos.filter((u) => /^veh:/.test(u))])].sort((a, b) => a.localeCompare(b, "es"));
+  const ubics = new Set([...tecs, ...vehs]);
   const actual = sel.value;
-  sel.innerHTML = '<option value="">Elegí…</option>' + [...ubics].sort((a, b) => a.localeCompare(b, "es")).map((u) => `<option value="${escapeHtmlAdmin(u)}">${escapeHtmlAdmin(u.startsWith("veh:") ? "Vehículo: " + u.slice(4) : u.slice(4))}</option>`).join("");
+  const opc = (u) => `<option value="${escapeHtmlAdmin(u)}">${escapeHtmlAdmin(u.slice(4))}</option>`;
+  sel.innerHTML = '<option value="">Elegí…</option>' + (tecs.length ? `<optgroup label="Técnicos">${tecs.map(opc).join("")}</optgroup>` : "") + (vehs.length ? `<optgroup label="Vehículos">${vehs.map(opc).join("")}</optgroup>` : '<optgroup label="Vehículos"><option value="" disabled>No hay vehículos cargados (Flota → Vehículos)</option></optgroup>');
   if (actual && ubics.has(actual)) sel.value = actual;
   document.getElementById("stkTecArts").innerHTML = Object.values(stk.catalogo.articulos || {}).filter(stkTecControla).map((a) => `<option value="${escapeHtmlAdmin(a.c)} · ${escapeHtmlAdmin(a.d || "")}"></option>`).join("");
   stkTecCargar();
@@ -7134,7 +7142,8 @@ function stkTecPintar() {
   }).join("")}</tbody></table></div>` : '<p class="subtitle">La lista está vacía. Agregá artículos o importalos desde un Excel.</p>';
   document.querySelectorAll("#stkTecTabla tr[data-i]").forEach((tr) => {
     const f = stkTecFilas[Number(tr.dataset.i)];
-    tr.querySelector(".stk-tec-art").addEventListener("change", (e) => { f.c = stkTecCodigo(e.target.value); stkTecPintar(); });
+    // Se vuelve a dibujar después del evento (si se redibuja en medio del «change», el navegador se queja).
+    tr.querySelector(".stk-tec-art").addEventListener("change", (e) => { const c = stkTecCodigo(e.target.value); if (c === f.c) return; f.c = c; setTimeout(stkTecPintar, 0); });
     tr.querySelector(".stk-tec-cant").addEventListener("input", (e) => { f.cant = e.target.value; });
     const ser = tr.querySelector(".stk-tec-ser"); if (ser) ser.addEventListener("input", (e) => { f.series = e.target.value; });
     tr.querySelector("[data-quitar]").addEventListener("click", () => { stkTecFilas.splice(Number(tr.dataset.i), 1); stkTecPintar(); });

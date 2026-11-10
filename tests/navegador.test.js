@@ -6862,11 +6862,12 @@ test("Stock de técnicos (panel): se elige el técnico, parte de lo que tiene, s
   await page.route("**/api/**", (route) => {
     const req = route.request(), u = req.url(), j = (o, st) => route.fulfill({ status: st || 200, contentType: "application/json", body: JSON.stringify(o) });
     if (u.includes("coleccion=tecnicos")) return j([{ nombre: "Juan" }, { nombre: "Luis" }]);
+    if (u.includes("coleccion=vehiculos")) return j([{ nombre: "Kangoo gris" }, { nombre: "Kangoo blanca" }]);
     if (req.method() === "POST" && u.includes("coleccion=stock")) {
       const b = JSON.parse(req.postData()); posts.push(b);
-      saldos.ubic["tec:" + b.tecnico] = Object.fromEntries(b.items.filter((x) => x.cant).map((x) => [x.c, x.cant]));
+      saldos.ubic[(b.vehiculo ? "veh:" : "tec:") + b.tecnico] = Object.fromEntries(b.items.filter((x) => x.cant).map((x) => [x.c, x.cant]));
       b.items.forEach((x) => (x.series || []).forEach((t) => { saldos.unidades[t] = { c: x.c, u: "tec:" + b.tecnico }; }));
-      saldos.stockInicialTec = { ["tec:" + b.tecnico]: { fecha: new Date().toISOString(), por: "Admin" } };
+      saldos.stockInicialTec = { ...(saldos.stockInicialTec || {}), [(b.vehiculo ? "veh:" : "tec:") + b.tecnico]: { fecha: new Date().toISOString(), por: "Admin" } };
       return j({ ok: true, cambios: [1, 2, 3] });
     }
     if (u.includes("coleccion=stock")) return j({ catalogo, saldos, conciliacion: { marcas: [], corridas: [] } });
@@ -6906,6 +6907,19 @@ test("Stock de técnicos (panel): se elige el técnico, parte de lo que tiene, s
   await page.click("#stkTecRevisar");
   await page.waitForTimeout(200);
   assert.match(await page.textContent("body"), /hay más N° de serie que cantidad/);
+  // Vehículos (de Flota → Vehículos): se les carga stock igual
+  assert.deepStrictEqual(await page.$$eval('#stkTecQuien optgroup[label="Vehículos"] option', (l) => l.map((o) => o.value + "=" + o.textContent)), ["veh:Kangoo blanca=Kangoo blanca", "veh:Kangoo gris=Kangoo gris"]);
+  await page.selectOption("#stkTecQuien", "veh:Kangoo gris");
+  await page.waitForFunction(() => /Tiene ahora 0 artículos/.test(document.getElementById("stkTecInfo").textContent));
+  await page.click("#stkTecAgregar");
+  await page.fill("#stkTecTabla tr[data-i='0'] .stk-tec-art", "20208 · SIRENA"); await page.dispatchEvent("#stkTecTabla tr[data-i='0'] .stk-tec-art", "change");
+  await page.fill("#stkTecTabla tr[data-i='0'] .stk-tec-cant", "6");
+  await page.click("#stkTecRevisar");
+  await page.waitForSelector("#stkTecConfirmar");
+  assert.match(await page.textContent("#stkTecRevision"), /Así queda el stock de el vehículo Kangoo gris/);
+  await page.click("#stkTecConfirmar");
+  await page.waitForFunction(() => /Stock inicial cargado el/.test(document.getElementById("stkTecInfo").textContent));
+  assert.deepStrictEqual(posts[posts.length - 1], { accion: "stock_inicial_tecnico", tecnico: "Kangoo gris", vehiculo: true, items: [{ c: "20208", cant: 6, series: [] }], reemplazar: true });
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });

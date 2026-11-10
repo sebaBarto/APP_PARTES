@@ -1994,6 +1994,11 @@ test("Stock: stock inicial de un técnico desde el panel: queda con lo de la lis
     // No puede quedar menos cantidad que equipos con N°
     r = await post({ accion: "stock_inicial_tecnico", tecnico: "Juan", items: [{ c: "23940", cant: 1 }] }, admin);
     assert.strictEqual(r.statusCode, 409); assert.match(r.cuerpo.error, /quedarían 1 pero tiene 2 con N° de serie/);
+    // Vehículo
+    r = await post({ accion: "stock_inicial_tecnico", tecnico: "Kangoo gris", vehiculo: true, items: [{ c: "20208", cant: 4 }] }, admin);
+    assert.strictEqual(r.statusCode, 200, JSON.stringify(r.cuerpo));
+    assert.deepStrictEqual(repo["stock/saldos.json"].ubic["veh:Kangoo gris"], { 20208: 4 });
+    assert.strictEqual(repo["stock/saldos.json"].ubic.dep[20208], 10);
     assert.deepStrictEqual(S.auditarStock(repo["stock/saldos.json"], repo[`stock/movimientos-${mes}.json`], repo["stock/catalogo.json"], { ahora: new Date() }).errores, []);
   } finally { global.fetch = fetchViejo; }
 });
