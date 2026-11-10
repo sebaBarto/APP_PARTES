@@ -6717,3 +6717,82 @@ test("Pastilla de conexión: sin señal (late), vuelve la señal, «Enviando 1 d
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Escáner (gráfico): marco verde al leer y rojo si no sirve, historial de lecturas, paso del N° de serie en azul, contador que salta y linterna si la cámara la tiene", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 404, body: "" }));
+  await page.route("**/api/**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+  await page.goto(base + "/index.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => {
+    const cv = document.createElement("canvas"); cv.width = 64; cv.height = 64; const g = cv.getContext("2d");
+    setInterval(() => { g.fillStyle = "#" + Math.floor(Math.random() * 999); g.fillRect(0, 0, 64, 64); }, 50);
+    window.__luz = [];
+    navigator.mediaDevices.getUserMedia = async () => { const st = cv.captureStream(20), t = st.getVideoTracks()[0]; t.getCapabilities = () => ({ torch: true }); t.applyConstraints = async (c) => { window.__luz.push(JSON.stringify(c)); }; return st; };
+    window.__cuadros = [];
+    window.BarcodeDetector = class { async detect() { const c = window.__cuadros.shift(); return (c || []).map((rawValue) => ({ rawValue })); } };
+    let paso = 0, n = 0;
+    abrirEscanerStock({ titulo: "Prueba", estado: () => ({ ahora: paso === 1 ? "Ahora: N° de serie de TECLADO" : "Escaneá la etiqueta de SAT", total: n ? `${n} en la lista` : "" }),
+      leerCuadro: (t) => { if (t[0] === "MALO") return { ok: false, texto: "No es de SAT" }; paso = paso ? 0 : 1; n++; return { ok: true, texto: "Tomé " + t[0] }; } });
+  });
+  await page.waitForSelector(".stk-escaner .stk-escaner-marco .stk-escaner-laser");
+  assert.strictEqual(await page.locator(".stk-escaner-marco .esq").count(), 4);
+  // Linterna
+  await page.waitForSelector(".stk-escaner-linterna:not(.hidden)");
+  await page.click(".stk-escaner-linterna");
+  assert.match(await page.getAttribute(".stk-escaner-linterna", "class"), /\bon\b/);
+  assert.ok((await page.evaluate(() => window.__luz)).some((c) => /"torch":true/.test(c)));
+  // Lee una etiqueta: marco verde, contador salta, pasa al N° de serie (azul)
+  await page.evaluate(() => window.__cuadros.push(["A1"]));
+  await page.waitForFunction(() => /Tomé A1/.test(document.querySelector(".stk-escaner-ultimo").textContent));
+  assert.match(await page.getAttribute(".stk-escaner-marco", "class"), /\bok\b/);
+  assert.match(await page.getAttribute(".stk-escaner-total", "class"), /pop/);
+  assert.strictEqual(await page.textContent(".stk-escaner-total"), "1 en la lista");
+  assert.match(await page.getAttribute(".stk-escaner", "class"), /modo-serie/);
+  // Un código que no sirve: rojo, y lo anterior baja al historial
+  await page.evaluate(() => window.__cuadros.push(["MALO"]));
+  await page.waitForFunction(() => /No es de SAT/.test(document.querySelector(".stk-escaner-ultimo").textContent));
+  assert.match(await page.getAttribute(".stk-escaner-marco", "class"), /\berr\b/);
+  assert.match(await page.textContent(".stk-escaner-hist"), /Tomé A1/);
+  // La cruz de arriba cierra
+  await page.click(".stk-escaner-cerrar");
+  assert.strictEqual(await page.locator(".stk-escaner").count(), 0);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Depósito (gráfico): bandeja de pendientes con acceso directo, modos con ícono y color, y la lista marca lo nuevo", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 404, body: "" }));
+  const catalogo = { articulos: { 20208: { c: "20208", d: "SIRENA", tipo: "cantidad" } }, proveedores: {} };
+  const saldos = { inicializado: "2026-10-01", ubic: { dep: { 20208: 9 } }, unidades: {}, pedidos: {},
+    envios: [{ id: "e1", fecha: new Date().toISOString(), de: "tec:Juan", a: "dep", camino: "cam:dev:Juan", items: [{ c: "20208", cant: 1 }] }, { id: "e2", fecha: new Date().toISOString(), de: "dep", a: "tec:Luis", camino: "cam:Luis", items: [{ c: "20208", cant: 2 }] }],
+    solicitudes: [], aprobar: [] };
+  await page.route("**/api/**", (route) => {
+    const u = route.request().url(), j = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("coleccion=stock")) return j({ catalogo, saldos, conciliacion: { marcas: [], corridas: [] } });
+    return j([]);
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(base + "/index.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { tecnicoLogueado = "Melina"; tecnicosPasswords = { Melina: "" }; tecnicosPermisos = { Melina: { stock_responsable: true } }; refrescarAccesosPorPermisos(); showScreen("home"); });
+  await page.click("#tileDepositoBtn");
+  await page.waitForSelector("#depBandeja .stk-bandeja-item");
+  assert.deepStrictEqual(await page.$$eval("#depBandeja .stk-bandeja-item", (l) => l.map((x) => x.textContent.replace(/\s+/g, " ").trim())), ["1Devoluciones", "1En camino"]);
+  assert.strictEqual(await page.getAttribute("#screen-deposito", "data-modo"), "entregar");
+  assert.strictEqual(await page.locator("#depModos .stk-modo-ico").count(), 4);
+  // Devoluciones: pasa a Alta y lleva a la lista de devoluciones
+  await page.click("#depBandeja .b-devoluciones");
+  assert.strictEqual(await page.getAttribute("#screen-deposito", "data-modo"), "recibir");
+  assert.match(await page.getAttribute("#depDevoluciones", "class"), /stk-resalta/);
+  // La lista: lo nuevo entra animado; al sumar, la línea destella
+  await page.click('#depModos [data-modo="entregar"]');
+  await page.fill("#depCodigo", "20208"); await page.press("#depCodigo", "Enter");
+  await page.waitForSelector("#depCanasta .stk-linea");
+  await page.fill("#depCodigo", "20208"); await page.press("#depCodigo", "Enter");
+  await page.waitForFunction(() => /stk-linea-flash/.test(document.querySelector("#depCanasta .stk-linea").className));
+  assert.match(await page.getAttribute("#depCanasta .stk-linea", "class"), /stk-linea-cant/);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

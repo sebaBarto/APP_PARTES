@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.64.0";
+const APP_VERSION = "4.65.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -18369,11 +18369,21 @@ async function stkCrearDetector() {
 // Enfoque continuo y zoom (si la cámara lo permite; el iPhone desde iOS 17.4). Con zoom se puede
 // tener el código más lejos, donde la cámara sí enfoca, y verlo igual de grande. El zoom elegido
 // se recuerda en este teléfono.
-function stkAjustarCamara(stream, boton, propio) {
+function stkAjustarCamara(stream, boton, propio, linterna) {
   const pista = stream && stream.getVideoTracks && stream.getVideoTracks()[0];
   if (!pista || !pista.getCapabilities) return;
   let cap = {};
   try { cap = pista.getCapabilities() || {}; } catch (e) { return; }
+  // Linterna (en los Android que la permiten): para depósitos oscuros o etiquetas con reflejo.
+  if (cap.torch && linterna) {
+    let prendida = false;
+    linterna.classList.remove("hidden");
+    linterna.addEventListener("click", () => {
+      prendida = !prendida;
+      linterna.classList.toggle("on", prendida); linterna.setAttribute("aria-pressed", String(prendida));
+      pista.applyConstraints({ advanced: [{ torch: prendida }] }).catch(() => { prendida = false; linterna.classList.remove("on"); });
+    });
+  }
   if (Array.isArray(cap.focusMode) && cap.focusMode.includes("continuous")) pista.applyConstraints({ advanced: [{ focusMode: "continuous" }] }).catch(() => {});
   const z = cap.zoom;
   if (!z || !(z.max > 1) || !boton) return;
@@ -18409,16 +18419,28 @@ async function abrirEscanerStock(op) {
   if (!detector) { await sinLector(); return; }
   const capa = document.createElement("div");
   capa.className = "stk-escaner";
-  capa.innerHTML = `<div class="stk-escaner-arriba"><b></b><span class="stk-escaner-total"></span></div>
+  capa.innerHTML = `<div class="stk-escaner-arriba"><button type="button" class="stk-escaner-cerrar" aria-label="Cerrar">${stkIco("x")}</button><b></b><span class="stk-escaner-total"></span></div>
     <div class="stk-escaner-ahora"></div>
-    <video playsinline muted autoplay></video><div class="stk-escaner-marco"></div><button type="button" class="stk-escaner-zoom hidden" aria-label="Zoom de la cámara"></button>
-    <div class="stk-escaner-abajo"><div class="stk-escaner-ultimo">${detector.propio ? "Poné el código dentro del marco, a un palmo del teléfono (de muy cerca no enfoca)" : "Apuntá al código de barras"}</div>
+    <div class="stk-escaner-vista">
+      <video playsinline muted autoplay></video>
+      <div class="stk-escaner-marco"><i class="esq a"></i><i class="esq b"></i><i class="esq c"></i><i class="esq d"></i><span class="stk-escaner-laser"></span></div>
+      <div class="stk-escaner-camara"><button type="button" class="stk-escaner-linterna hidden" aria-label="Linterna" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h10v4l-3 4v11a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V10L7 6z"/><path d="M12 13v2"/></svg></button><button type="button" class="stk-escaner-zoom hidden" aria-label="Zoom de la cámara"></button></div>
+    </div>
+    <div class="stk-escaner-abajo"><div class="stk-escaner-ultimo">${detector.propio ? "Poné el código dentro del marco, a un palmo del teléfono (de muy cerca no enfoca)" : "Poné el código dentro del marco"}</div>
+      <div class="stk-escaner-hist"></div>
       <div class="stk-escaner-ocr"></div>
       <div class="stk-escaner-extra"><button type="button" class="btn btn-secondary btn-small stk-escaner-numeros">${stkIco("numeros")}Leer los números</button><button type="button" class="btn btn-secondary btn-small stk-escaner-amano">${stkIco("teclado")}A mano</button></div>
       <button type="button" class="btn btn-primary stk-escaner-listo">Listo</button></div>`;
   capa.querySelector("b").textContent = op.titulo || "Escanear";
   const ultimo = capa.querySelector(".stk-escaner-ultimo"), video = capa.querySelector("video"), ahoraEl = capa.querySelector(".stk-escaner-ahora"), totalEl = capa.querySelector(".stk-escaner-total");
-  const pintarEstado = () => { const e = op.estado ? op.estado() : {}; ahoraEl.textContent = e.ahora || ""; totalEl.textContent = e.total || ""; };
+  const marco = capa.querySelector(".stk-escaner-marco"), histEl = capa.querySelector(".stk-escaner-hist"), historial = [];
+  const pintarEstado = () => {
+    const e = op.estado ? op.estado() : {};
+    ahoraEl.textContent = e.ahora || "";
+    // Paso del N° de serie: todo en azul, para que se note que ahora va otro código.
+    capa.classList.toggle("modo-serie", /N° de serie/i.test(e.ahora || ""));
+    if (totalEl.textContent !== (e.total || "")) { totalEl.textContent = e.total || ""; totalEl.classList.remove("pop"); void totalEl.offsetWidth; if (e.total) totalEl.classList.add("pop"); }
+  };
   pintarEstado();
   document.body.appendChild(capa);
   let stream = null, timer = null, ocupado = false, cerrado = false;
@@ -18428,10 +18450,21 @@ async function abrirEscanerStock(op) {
   const mostrarResultado = (r, texto) => {
     if (!r) return;
     stkPitido(!!r.ok);
+    // Lo anterior baja al historial (las últimas 3 lecturas, más tenues).
+    if (ultimo.classList.contains("ok") || ultimo.classList.contains("err")) {
+      historial.unshift({ ok: ultimo.classList.contains("ok"), texto: ultimo.textContent });
+      historial.length = Math.min(historial.length, 3);
+      histEl.innerHTML = historial.map((h) => `<div class="${h.ok ? "ok" : "err"}">${stkIco(h.ok ? "check" : "x")}<span>${escapeHtml(h.texto)}</span></div>`).join("");
+    }
     ultimo.className = "stk-escaner-ultimo " + (r.ok ? "ok" : "err");
     ultimo.innerHTML = stkIco(r.ok ? "check" : "x") + escapeHtml(r.texto || texto || "");
+    void ultimo.offsetWidth; ultimo.classList.add("nuevo");
+    // El marco se pone verde (o rojo y tiembla) un momento.
+    marco.classList.remove("ok", "err"); void marco.offsetWidth; marco.classList.add(r.ok ? "ok" : "err");
+    clearTimeout(marcoTimer); marcoTimer = setTimeout(() => marco.classList.remove("ok", "err"), 900);
     pintarEstado();
   };
+  let marcoTimer = null;
   // Usar un código que no vino del lector (de la foto o escrito): pausa la lectura mientras tanto.
   const usarCodigo = async (texto, otros) => {
     while (ocupado) await new Promise((ok) => setTimeout(ok, 50));
@@ -18483,13 +18516,14 @@ async function abrirEscanerStock(op) {
   };
   stkEscanerAbierto = { cerrar };
   capa.querySelector(".stk-escaner-listo").addEventListener("click", cerrar);
+  capa.querySelector(".stk-escaner-cerrar").addEventListener("click", cerrar);
   try {
     // Con el lector de la APP (iPhone) se pide más resolución: más píxeles por barra.
     const res = detector.propio ? { width: { ideal: 1920 }, height: { ideal: 1080 } } : { width: { ideal: 1280 }, height: { ideal: 720 } };
     stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, ...res }, audio: false });
     video.srcObject = stream;
     await video.play().catch(() => {});
-    stkAjustarCamara(stream, capa.querySelector(".stk-escaner-zoom"), detector.propio);
+    stkAjustarCamara(stream, capa.querySelector(".stk-escaner-zoom"), detector.propio, capa.querySelector(".stk-escaner-linterna"));
   } catch (e) {
     cerrar();
     await dialogoApp("No se pudo abrir la cámara. Revisá que la APP tenga permiso de cámara, o escribí el código a mano.", { soloAceptar: true, aceptar: "Entendido" });
@@ -18563,12 +18597,16 @@ function crearCanastaStock(op) {
   const forma = () => (op.forma ? op.forma() : "individual");
   const disponible = (c) => { const o = op.origen(); return o ? (((op.saldos() || {}).ubic || {})[o] || {})[c] || 0 : Infinity; };
   const linea = (c) => { let l = can.lineas.find((x) => x.c === c); if (!l) { l = { c, cant: 0, unidades: [] }; can.lineas.push(l); } return l; };
+  // Para animar: qué línea es nueva y cuál cambió desde el dibujo anterior.
+  let antes = null;
   can.render = () => {
     const a = arts();
+    const ahora = new Map(can.lineas.map((l) => [l.c, `${l.cant}|${l.unidades.length}`]));
+    const anim = (l) => (!antes ? "" : !antes.has(l.c) ? " stk-linea-nueva" : antes.get(l.c) !== ahora.get(l.c) ? " stk-linea-flash" : "");
     op.cont.innerHTML = can.lineas.length ? can.lineas.map((l, i) => {
       const art = a[l.c] || { d: l.c }, esU = art.tipo === "unidad", disp = disponible(l.c);
       const sinN = esU ? Math.max(0, l.cant - l.unidades.length) : 0;
-      return `<div class="stk-linea${can.actual === l.c ? " stk-linea-actual" : ""}" data-i="${i}">
+      return `<div class="stk-linea ${esU ? "stk-linea-equipo" : "stk-linea-cant"}${esU && sinN ? " stk-linea-falta" : ""}${can.actual === l.c ? " stk-linea-actual" : ""}${anim(l)}" data-i="${i}">
         <div class="stk-linea-top"><div><b>${escapeHtml(art.d)}</b><small>${escapeHtml(l.c)}${l.prov ? ` · ${escapeHtml(nombreProveedor(op.catalogo(), l.prov) || "proveedor " + l.prov)}` : ""}${disp !== Infinity ? ` · hay ${stkFmtN(disp)}` : ""}${art.medida === "metros" ? " · en metros" : ""}</small></div>
         <div class="stk-cant"><button type="button" data-menos aria-label="Uno menos">−</button><input class="field-input" inputmode="decimal" value="${stkFmtN(l.cant)}" aria-label="Cantidad"><button type="button" data-mas aria-label="Uno más">+</button></div></div>
         ${l.unidades.length ? `<div class="stk-chips">${l.unidades.map((t, j) => { const info = infoSerie(t, { datos: (l.extras || {})[t] ? datosLimpios(l.extras[t]) : (((op.saldos() || {}).unidades || {})[t] || {}).datos }); return `<span class="stk-chip">${escapeHtml(t)}${info ? ` <small style="opacity:.75;">${escapeHtml(info)}</small>` : ""}<button type="button" data-quitar-u="${j}" aria-label="Sacar">${stkIco("x")}</button></span>`; }).join("")}</div>` : ""}
@@ -18577,6 +18615,7 @@ function crearCanastaStock(op) {
         ${l.cant > disp ? `<div class="stk-falta">Hay ${stkFmtN(disp)}: no alcanza.</div>` : ""}
         <button type="button" class="stk-quitar" data-quitar>${stkIco("basura")}Sacar</button></div>`;
     }).join("") : "";
+    antes = ahora;
     op.cont.querySelectorAll(".stk-linea").forEach((div) => {
       const l = can.lineas[Number(div.dataset.i)];
       const inp = div.querySelector(".stk-cant input");
@@ -18893,8 +18932,13 @@ function ubicarAyudaApp(boton) {
   const r = boton.getBoundingClientRect(), ancho = Math.min(460, window.innerWidth - 24);
   p.style.width = ancho + "px";
   p.style.left = Math.max(12, Math.min(r.left + r.width / 2 - ancho / 2, window.innerWidth - ancho - 12)) + "px";
-  const alto = p.offsetHeight || 420, abajo = window.innerHeight - r.bottom - 16;
-  p.style.top = Math.max(12, alto <= abajo ? r.bottom + 8 : Math.min(r.top - alto - 8, window.innerHeight - alto - 12)) + "px";
+  // Nunca tapa su propio «?»: va abajo o arriba (donde haya más lugar) y, si no entra, se achica con scroll.
+  p.style.maxHeight = ""; p.style.overflowY = "";
+  const alto = p.offsetHeight || 420, abajo = window.innerHeight - r.bottom - 16, arriba = r.top - 16;
+  if (alto <= abajo) p.style.top = r.bottom + 8 + "px";
+  else if (alto <= arriba) p.style.top = r.top - alto - 8 + "px";
+  else if (abajo >= arriba) { p.style.maxHeight = Math.max(120, abajo) + "px"; p.style.overflowY = "auto"; p.style.top = r.bottom + 8 + "px"; }
+  else { const h = Math.max(120, arriba); p.style.maxHeight = h + "px"; p.style.overflowY = "auto"; p.style.top = Math.max(8, r.top - h - 8) + "px"; }
 }
 function ocultarAyudaApp() {
   ayudaPopApp.classList.add("hidden");
@@ -19162,7 +19206,47 @@ async function depLlenarLista(tipoId) {
     if (nombres.includes(actual)) sel.value = actual;
   } else document.getElementById(listaId).innerHTML = nombres.map((n) => `<option value="${escapeHtml(n)}">`).join("");
 }
+// Íconos y color de cada modo: la pantalla entera toma el color (botón de confirmar, escanear),
+// así no se confunde una baja con un alta.
+const DEP_MODO_ICO = {
+  entregar: '<path d="M12 15V3M7 8l5-5 5 5"/><path d="M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/>',
+  recibir: '<path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 14v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/>',
+  inventario: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8h6M9 12h6M9 16h4"/>',
+  consultar: '<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>',
+};
+document.querySelectorAll("#depModos [data-modo]").forEach((b) => {
+  if (b.querySelector(".stk-modo-ico")) return;
+  b.innerHTML = `<svg class="stk-modo-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${DEP_MODO_ICO[b.dataset.modo] || ""}</svg><span>${escapeHtml(b.textContent.trim())}</span>`;
+});
+// Bandeja: lo que está esperando al depósito, con acceso directo a cada cosa.
+function depPintarBandeja() {
+  const cont = document.getElementById("depBandeja"); if (!cont) return;
+  const sal = depSaldos() || {};
+  if (!sal.inicializado && !(sal.envios || []).length) { cont.innerHTML = ""; return; }
+  const env = sal.envios || [];
+  const items = [
+    { k: "pedidos", n: depSolicitudesAbiertas().length, t: "Pedidos", modo: null, ir: "depSolicitudes", ico: '<path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/>' },
+    { k: "devoluciones", n: env.filter((e) => e.a === "dep").length, t: "Devoluciones", modo: "recibir", ir: "depDevoluciones", ico: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>' },
+    { k: "aprobar", n: (sal.aprobar || []).length, t: "Para aprobar", modo: "recibir", ir: "depAprobar", ico: '<path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/>' },
+    { k: "camino", n: env.filter((e) => e.a !== "dep").length, t: "En camino", modo: "consultar", ir: "depEnCamino", ico: '<path d="M3 7h11v9H3zM14 10h4l3 3v3h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/>' },
+  ];
+  const hay = items.filter((x) => x.n);
+  const html = hay.length ? hay.map((x) => `<button type="button" class="stk-bandeja-item b-${x.k}" data-k="${x.k}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${x.ico}</svg><b>${x.n}</b><span>${x.t}</span></button>`).join("")
+    : '<div class="stk-bandeja-ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="5 12.5 10 17.5 19 7"/></svg>Nada pendiente: sin pedidos, devoluciones ni envíos sin confirmar</div>';
+  if (cont.dataset.html === html) return; // sin cambios: no se vuelve a dibujar (ni a animar)
+  cont.dataset.html = html; cont.innerHTML = html;
+  cont.querySelectorAll("[data-k]").forEach((b) => b.addEventListener("click", () => {
+    const x = items.find((y) => y.k === b.dataset.k);
+    if (x.modo && x.modo !== depModo) {
+      if (depCanasta.items().length && depModo !== "consultar") { stkAviso("Primero terminá o vaciá la lista"); return; }
+      depCanasta.actual = ""; depModo = x.modo; depMostrarModo();
+    }
+    const el = document.getElementById(x.ir);
+    if (el) { el.scrollIntoView({ behavior: "smooth", block: "start" }); el.classList.remove("stk-resalta"); void el.offsetWidth; el.classList.add("stk-resalta"); }
+  }));
+}
 function depMostrarModo() {
+  document.getElementById("screen-deposito").dataset.modo = depModo;
   document.querySelectorAll("#depModos [data-modo]").forEach((b) => b.classList.toggle("activo", b.dataset.modo === depModo));
   document.querySelectorAll("#depFormas [data-forma]").forEach((b) => b.classList.toggle("activo", b.dataset.forma === depForma));
   document.getElementById("depFormaAyuda").innerHTML = escapeHtml(depForma === "lote"
@@ -19183,6 +19267,7 @@ function depMostrarModo() {
   if (depModo === "entregar") { depPintarRecientes(); depPintarPase(); }
   depPintarSolicitudes();
   depPintarCola();
+  depPintarBandeja();
   document.getElementById("depConfirmarBtn").classList.toggle("hidden", depModo === "consultar");
   depCanasta.render(); depBotonTexto();
 }
