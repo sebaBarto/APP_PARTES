@@ -6606,3 +6606,114 @@ test("Dictado por voz: si el navegador no tiene reconocimiento de voz, no aparec
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Carga: barrita arriba mientras espera algo que pidió el usuario, aviso si tarda y «Reintentar» que repite la consulta trabada; lo de segundo plano no muestra nada", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 404, body: "" }));
+  let pedidos = 0;
+  await page.route("**/api/**", async (route) => {
+    if (route.request().url().includes("/api/lento?x=fondo")) return;
+    if (route.request().url().includes("/api/lento")) {
+      pedidos++;
+      if (pedidos === 1) return; // el primero queda trabado
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: "segundo" }) });
+    }
+    route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+  });
+  await page.addInitScript(() => { window.__cargaTiempos = { aviso: 700, reintentar: 1500 }; });
+  await page.goto(base + "/index.html");
+  await page.waitForTimeout(400);
+  // En segundo plano (sin toque): nada
+  await page.evaluate(() => { window.__fondo = fetch("/api/lento?x=fondo").catch(() => {}); });
+  await page.waitForTimeout(500);
+  assert.strictEqual(await page.evaluate(() => document.getElementById("cargaBarra").classList.contains("on")), false);
+  // Pedido por el usuario
+  await page.mouse.click(5, 300);
+  await page.evaluate(() => { window.__res = fetch("/api/lento?x=1").then((r) => r.json()); });
+  await page.waitForSelector("#cargaBarra.on");
+  await page.waitForSelector("#cargaAviso.on");
+  assert.match(await page.textContent("#cargaAviso"), /tardando más de lo normal/);
+  await page.waitForSelector("#cargaAviso .carga-aviso-btn:not(.hidden)");
+  assert.match(await page.textContent("#cargaAviso"), /Podés reintentar/);
+  await page.click("#cargaAviso .carga-aviso-btn");
+  assert.deepStrictEqual(await page.evaluate(() => window.__res), { ok: "segundo" }, "la pantalla recibe la respuesta del reintento");
+  await page.waitForFunction(() => !document.getElementById("cargaBarra").classList.contains("on"));
+  assert.ok(!(await page.evaluate(() => document.getElementById("cargaAviso").classList.contains("on"))));
+  // «Cargando...» lleva ruedita
+  await page.evaluate(() => { const el = document.createElement("p"); el.className = "list-status"; el.id = "pruebaEstado"; el.textContent = "Cargando..."; document.body.appendChild(el); });
+  await page.waitForSelector("#pruebaEstado.cargando-txt");
+  await page.evaluate(() => { document.getElementById("pruebaEstado").textContent = "3 servicios"; });
+  await page.waitForFunction(() => !document.getElementById("pruebaEstado").classList.contains("cargando-txt"));
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Envío del parte: pasos con avance (la foto con su porcentaje real) y pantalla de resultado clara (verde, con avisos o guardado en el celular)", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 404, body: "" }));
+  const vistos = [];
+  await page.route("**/api/**", async (route) => {
+    const u = route.request().url(), j = (o, st) => route.fulfill({ status: st || 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("/api/foto")) { vistos.push("foto"); await new Promise((r) => setTimeout(r, 300)); return j({ id: "F" + vistos.length }); }
+    if (u.includes("/api/enviar-mail")) {
+      const tipo = JSON.parse(route.request().postData()).tipo; vistos.push(tipo);
+      // Captura de la pantalla en medio del envío
+      if (tipo === "oficina") await new Promise((r) => setTimeout(r, 400));
+      return tipo === "cliente" ? j({ error: "rebotó" }, 500) : j({ ok: true });
+    }
+    return j({ ok: true });
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(base + "/index.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { showScreen("sending"); });
+  const enviar = page.evaluate(() => intentarEnviarParte({ idParte: "P-1", data: { cliente: "Kiosco", cliente_email: "k@x.com", tarea: "x", fecha: "2026-11-09" }, signatureImgTag: "", signatureDataUrl: "data:image/png;base64,AAAA", fotoBase64: "A".repeat(400000), fotoMimeType: "image/jpeg" }, true));
+  await page.waitForSelector('#envioPasos .ep-paso[data-k="oficina"].activo');
+  const enMedio = await page.evaluate(() => ({ pasos: [...document.querySelectorAll("#envioPasos .ep-paso")].map((p) => p.dataset.k + ":" + p.className.replace("ep-paso ", "")), barra: parseInt(document.getElementById("envioBarra").style.width) }));
+  assert.deepStrictEqual(enMedio.pasos, ["foto:ok", "firma:ok", "oficina:activo", "cliente:espera"]);
+  assert.ok(enMedio.barra >= 50 && enMedio.barra < 100, "la barra avanzó: " + enMedio.barra);
+  const r = await enviar;
+  assert.deepStrictEqual([r.oficinaOk, r.clienteOk], [true, false]);
+  assert.deepStrictEqual(await page.evaluate(() => [...document.querySelectorAll("#envioPasos .ep-paso")].map((p) => p.dataset.k + ":" + p.className.replace("ep-paso ", ""))), ["foto:ok", "firma:ok", "oficina:ok", "cliente:error"]);
+  // El porcentaje de la foto se fue mostrando (subida real por XHR)
+  // Resultado: con avisos
+  await page.evaluate(() => { mostrarResultadoEnvio("aviso", [["ok", "Llegó a la oficina"], ["aviso", "No salió la copia al cliente"]]); showScreen("done"); });
+  assert.match(await page.getAttribute("#screen-done .done-mark", "class"), /estado-aviso animar/);
+  assert.strictEqual(await page.textContent("#screen-done > .hint-eyebrow"), "ENVIADO CON AVISOS");
+  assert.deepStrictEqual(await page.$$eval("#doneDetalle li", (l) => l.map((x) => x.className + ":" + x.textContent)), ["dd-ok:Llegó a la oficina", "dd-aviso:No salió la copia al cliente"]);
+  // Guardado sin señal: reloj, no tilde
+  await page.evaluate(() => mostrarResultadoEnvio("cola", [["cola", "Guardado en este celular"]]));
+  assert.strictEqual(await page.textContent("#screen-done > .hint-eyebrow"), "GUARDADO");
+  assert.ok(await page.$("#screen-done .done-mark.estado-cola .aguja"));
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Pastilla de conexión: sin señal (late), vuelve la señal, «Enviando 1 de 2…» mientras salen los pendientes y «Conectado»", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 404, body: "" }));
+  let soltar;
+  const espera = new Promise((r) => { soltar = r; });
+  await page.route("**/api/**", async (route) => {
+    if (route.request().url().includes("/api/historial") && route.request().method() === "POST") { await espera; return route.fulfill({ status: 200, contentType: "application/json", body: "{}" }); }
+    route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+  });
+  await page.goto(base + "/index.html");
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { document.documentElement.setAttribute("data-inicio", "nuevo"); setStatus(""); });
+  await ctx.setOffline(true);
+  await page.waitForFunction(() => document.getElementById("statusPill").classList.contains("sin-senal"));
+  assert.strictEqual(await page.textContent("#statusPill"), "Sin señal");
+  await page.evaluate(() => guardarColaEnvios([{ tipo: "historial", idParte: "A", cuerpo: {} }, { tipo: "historial", idParte: "B", cuerpo: {} }]));
+  await page.evaluate(() => actualizarPillConexion());
+  assert.strictEqual(await page.textContent("#statusPill"), "Sin señal · 2 por enviar");
+  await ctx.setOffline(false);
+  await page.waitForFunction(() => /Enviando 1 de 2/.test(document.getElementById("statusPill").textContent));
+  assert.match(await page.getAttribute("#statusPill", "class"), /enviando/);
+  soltar();
+  await page.waitForFunction(() => !/Enviando/.test(document.getElementById("statusPill").textContent));
+  assert.match(await page.textContent("#statusPill"), /^(Volvió la señal|Conectado)$/);
+  assert.match(await page.getAttribute("#statusPill", "class"), /conectado/);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

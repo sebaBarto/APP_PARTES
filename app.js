@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.63.0";
+const APP_VERSION = "4.64.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -1529,10 +1529,13 @@ function actualizarResumenDelDia() {
 // unas tarjetas grises animadas con la forma de la lista. Se detecta solo,
 // mirando los textos de estado (.list-status), sin tocar cada pantalla.
 (function activarEsqueletos() {
-  const SEL = ".list-status";
+  const SEL = ".list-status, .list-sync-label";
   const CARGANDO = /^(Cargando|Buscando servicios|Buscando cronograma)/;
   function sincronizar(el) {
-    if (!el || !el.matches || !el.matches(SEL) || /^dash/.test(el.id)) return;
+    if (!el || !el.matches || !el.matches(SEL)) return;
+    // Ruedita girando delante del «Cargando...» (en todos los estilos).
+    el.classList.toggle("cargando-txt", !el.classList.contains("hidden") && CARGANDO.test((el.textContent || "").trim()));
+    if (/^dash/.test(el.id) || !el.matches(".list-status")) return;
     // Si el texto de estado se oculta (ya cargó) aunque siga diciendo "Cargando...", el esqueleto se va.
     const quiere = document.documentElement.getAttribute("data-inicio") === "nuevo" && !el.classList.contains("hidden") && CARGANDO.test((el.textContent || "").trim());
     const sig = el.nextElementSibling;
@@ -1551,6 +1554,7 @@ function actualizarResumenDelDia() {
     for (const m of muts) {
       const base = m.target.nodeType === 3 ? m.target.parentElement : m.target;
       if (base && base.closest) sincronizar(base.closest(SEL));
+      if (m.addedNodes && m.addedNodes.length) m.addedNodes.forEach((n) => { if (n.nodeType === 1 && n.matches && n.matches(SEL)) sincronizar(n); });
     }
   });
   const iniciar = () => {
@@ -2472,16 +2476,26 @@ document.getElementById("tileRendicionBtn").addEventListener("click", () => {
 });
 
 // Estado de conexión en la barra (en vez de "LISTO" fijo)
+// Cada estado tiene su color y su puntito (rojo que late sin señal, ámbar con cosas por enviar,
+// giratorio mientras envía, verde conectado); al cambiar de estado la pastilla hace un pequeño «pop».
+let pillEstadoPrevio = "", pillEnviando = null, pillRecuperada = 0;
 function actualizarPillConexion() {
   if (!esSkinNuevo() || statusPill.classList.contains("busy")) return;
   const cola = typeof obtenerColaEnvios === "function" ? obtenerColaEnvios().length : 0;
   const sinSenal = navigator.onLine === false;
-  statusPill.classList.toggle("sin-senal", sinSenal);
-  statusPill.classList.toggle("por-enviar", !sinSenal && cola > 0);
-  statusPill.textContent = sinSenal ? (cola ? `Sin señal · ${cola} por enviar` : "Sin señal") : (cola ? `${cola} por enviar` : "Conectado");
+  const recuperada = !sinSenal && Date.now() - pillRecuperada < 3500;
+  const estado = sinSenal ? "sin-senal" : pillEnviando ? "enviando" : cola ? "por-enviar" : "conectado";
+  ["sin-senal", "por-enviar", "enviando", "conectado"].forEach((c) => statusPill.classList.toggle(c, c === estado));
+  statusPill.textContent = sinSenal ? (cola ? `Sin señal · ${cola} por enviar` : "Sin señal")
+    : pillEnviando ? `Enviando ${pillEnviando.va} de ${pillEnviando.total}…`
+    : recuperada ? (cola ? `Volvió la señal · ${cola} por enviar` : "Volvió la señal")
+    : cola ? `${cola} por enviar` : "Conectado";
+  if (pillEstadoPrevio && pillEstadoPrevio !== estado) { statusPill.classList.remove("cambio"); void statusPill.offsetWidth; statusPill.classList.add("cambio"); }
+  pillEstadoPrevio = estado;
 }
-window.addEventListener("online", actualizarPillConexion);
+window.addEventListener("online", () => { pillRecuperada = Date.now(); actualizarPillConexion(); setTimeout(actualizarPillConexion, 3600); });
 window.addEventListener("offline", actualizarPillConexion);
+statusPill.addEventListener("animationend", () => statusPill.classList.remove("cambio"));
 setInterval(actualizarPillConexion, 15000);
 
 // Botón/gesto "atrás" de Android: no hace nada (para que no se cierre
@@ -4599,31 +4613,30 @@ async function intentarEnviarParte(payload, interactivo) {
 
   let fotoLink = "";
   let fotoError = "";
+  const P = interactivo ? EnvioPasos : null;
+  if (P) P.iniciar([...(fb64 ? [{ k: "foto", texto: "Foto" }] : []), ...(signatureDataUrl ? [{ k: "firma", texto: "Firma" }] : []), { k: "oficina", texto: "Parte a la oficina" }, ...(data.cliente_email ? [{ k: "cliente", texto: "Copia al cliente" }] : [])]);
   if (fb64) {
     try {
       if (interactivo) sendingLabel.textContent = "Subiendo foto...";
-      const fotoRes = await fetch("/api/foto", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: "Bearer " + SERVICIOS_API_TOKEN,
-        },
-        body: JSON.stringify({
-          filename: `${idParte}.jpg`,
-          mimeType: fmt || "image/jpeg",
-          base64: fb64,
-        }),
-      });
-      const fotoData = await fotoRes.json();
+      if (P) P.paso("foto", "activo");
+      const cuerpoFoto = { filename: `${idParte}.jpg`, mimeType: fmt || "image/jpeg", base64: fb64 };
+      // Con la pantalla a la vista, la foto sube mostrando el porcentaje real.
+      const fotoRes = P
+        ? await postJsonConAvance("/api/foto", cuerpoFoto, (f) => P.avance("foto", f))
+        : await (async () => { const r = await fetch("/api/foto", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify(cuerpoFoto) }); return { ok: r.ok, status: r.status, data: await r.json() }; })();
+      const fotoData = fotoRes.data || {};
       if (fotoRes.ok && fotoData.id) {
         fotoLink = `${window.location.origin}/api/foto?id=${fotoData.id}`;
+        if (P) P.paso("foto", "ok", "");
       } else {
         fotoError = fotoData.detail || fotoData.error || `Error HTTP ${fotoRes.status}`;
         console.error("Error subiendo foto:", fotoData);
+        if (P) P.paso("foto", "error", "No se pudo subir");
       }
     } catch (err) {
       fotoError = err.message || String(err);
       console.error("Error subiendo foto:", err);
+      if (P) P.paso("foto", "error", "No se pudo subir");
     }
   }
 
@@ -4632,6 +4645,7 @@ async function intentarEnviarParte(payload, interactivo) {
   // que se pudiera volver a abrir después desde la app.
   let firmaLink = "";
   if (signatureDataUrl) {
+    if (P) P.paso("firma", "activo");
     try {
       const firmaRes = await fetch("/api/foto", {
         method: "POST",
@@ -4641,11 +4655,14 @@ async function intentarEnviarParte(payload, interactivo) {
       const firmaData = await firmaRes.json();
       if (firmaRes.ok && firmaData.id) {
         firmaLink = `${window.location.origin}/api/foto?id=${firmaData.id}`;
+        if (P) P.paso("firma", "ok", "");
       } else {
         console.error("Error subiendo firma:", firmaData);
+        if (P) P.paso("firma", "error", "Va dentro del mail");
       }
     } catch (err) {
       console.error("Error subiendo firma:", err);
+      if (P) P.paso("firma", "error", "Va dentro del mail");
     }
   }
 
@@ -4683,6 +4700,7 @@ async function intentarEnviarParte(payload, interactivo) {
 
   try {
     if (interactivo) sendingLabel.textContent = "Enviando copia a la oficina…";
+    if (P) P.paso("oficina", "activo");
     await enviarMail("oficina", {
       ...basePayload,
       foto_link: fotoLink,
@@ -4690,6 +4708,7 @@ async function intentarEnviarParte(payload, interactivo) {
       imprevisto: data.imprevisto,
     });
     oficinaOk = true;
+    if (P) P.paso("oficina", "ok", "");
     // Stock: lo usado de Mi stock pasa al cliente (si no hay señal, queda en cola y se manda solo).
     try { registrarStockDelParte(data, idParte); } catch (e) { console.error("Stock del parte:", e); }
     // Se anota en la memoria local del historial, así el inicio pasa
@@ -4779,18 +4798,22 @@ async function intentarEnviarParte(payload, interactivo) {
     }
   } catch (err) {
     console.error("Error enviando a oficina:", err);
+    if (P) P.paso("oficina", "error", "No salió");
   }
 
   if (oficinaOk && clienteIntentado) {
     try {
       if (interactivo) sendingLabel.textContent = "Enviando copia al cliente…";
+      if (P) P.paso("cliente", "activo");
       await enviarMail("cliente", {
         ...basePayload,
         cliente_email: data.cliente_email,
       });
       clienteOk = true;
+      if (P) P.paso("cliente", "ok", "");
     } catch (err) {
       console.error("Error enviando al cliente:", err);
+      if (P) P.paso("cliente", "error", "No salió");
     }
   }
 
@@ -4902,7 +4925,11 @@ async function procesarColaEnvios() {
   let enviadosOk = 0;
   let vehiculoTrabado = false;
   const vehiculoDescartados = [];
+  // La pastilla de arriba muestra «Enviando 1 de 3…» mientras salen.
+  pillEnviando = { va: 0, total: cola.length };
   for (const item of cola) {
+    pillEnviando.va++;
+    try { actualizarPillConexion(); } catch (e) { /* nada */ }
     if (item.tipo === "vehiculo") {
       // Van en orden: si uno no sale por señal, los que siguen esperan.
       if (vehiculoTrabado) { restantes.push(item); continue; }
@@ -4943,6 +4970,8 @@ async function procesarColaEnvios() {
   }
   guardarColaEnvios(restantes);
   procesandoColaEnvios = false;
+  pillEnviando = null;
+  try { actualizarPillConexion(); } catch (e) { /* nada */ }
   if (vehiculoDescartados.length) {
     alert("No se pudo registrar en el sistema:\n\n" + vehiculoDescartados.join("\n") + "\n\nRevisalo en Vehículos.");
   }
@@ -5019,6 +5048,7 @@ confirmSignBtn.addEventListener("click", async () => {
     setStatus("");
     doneId.textContent = `N° de parte: ${idParte}`;
     doneMessage.textContent = "Sin conexión — el parte se guardó en el celular y se va a enviar solo apenas vuelva la señal.";
+    mostrarResultadoEnvio("cola", [["cola", "Guardado en este celular"], ["cola", "Sale solo apenas haya señal (lo ves arriba, en «por enviar»)"]]);
     showScreen("done");
     sonarError();
     registrarTestPendienteDeQuitar(data.cliente);
@@ -5053,14 +5083,17 @@ confirmSignBtn.addEventListener("click", async () => {
     mensajeFoto = ` (la foto no se pudo subir: ${fotoError})`;
   }
 
+  const lineaFoto = fotoBase64 ? (fotoError ? [["aviso", "La foto no se pudo subir"]] : [["ok", "Foto subida"]]) : [];
   if (oficinaOk && (clienteOk || !clienteIntentado)) {
     doneMessage.textContent = (clienteIntentado
       ? "Copia enviada a la oficina y al cliente"
       : "Copia enviada a la oficina (sin mail de cliente)") + mensajeFoto;
+    mostrarResultadoEnvio(fotoError ? "aviso" : "ok", [["ok", "Llegó a la oficina"], clienteIntentado ? ["ok", `Copia al cliente: ${data.cliente_email}`] : ["info", "Sin mail del cliente: no se mandó copia"], ...lineaFoto]);
     showScreen("done");
     sonarExito();
   } else if (oficinaOk && clienteIntentado && !clienteOk) {
     doneMessage.textContent = "Enviado a la oficina, pero falló el envío al cliente" + mensajeFoto;
+    mostrarResultadoEnvio("aviso", [["ok", "Llegó a la oficina"], ["aviso", `No salió la copia al cliente (${data.cliente_email}). Avisale a la oficina para reenviarla.`], ...lineaFoto]);
     showScreen("done");
     sonarExito();
   } else {
@@ -5068,6 +5101,7 @@ confirmSignBtn.addEventListener("click", async () => {
     // solo automáticamente en vez de perder el parte.
     agregarAColaEnvios(payload);
     doneMessage.textContent = "No se pudo enviar en este momento — el parte quedó guardado y se va a reintentar solo cuando vuelva la conexión.";
+    mostrarResultadoEnvio("cola", [["cola", "No llegó a la oficina: quedó guardado en este celular"], ["cola", "Se reintenta solo cuando vuelva la señal"]]);
     showScreen("done");
     sonarError();
   }
@@ -20108,3 +20142,166 @@ const Dictado = (() => {
 })();
 Dictado.ponerEnTodos();
 window.__pararDictado = () => Dictado.parar();
+
+// ---------- Indicador de carga general ----------
+// Cuando el usuario toca algo que va al servidor, aparece una barrita animada arriba. Si tarda,
+// lo dice («la señal está débil») y, si es una consulta (no un envío), ofrece «Reintentar»: corta
+// el pedido trabado y lo hace de nuevo sin que la pantalla se entere. Los pedidos que la APP hace
+// sola en segundo plano no muestran nada.
+const CargaGlobal = (() => {
+  const T = window.__cargaTiempos || {}; // (las pruebas acortan las esperas)
+  const ESPERA_AVISO = T.aviso || 8000, ESPERA_REINTENTAR = T.reintentar || 20000;
+  const barra = document.createElement("div");
+  barra.id = "cargaBarra"; barra.setAttribute("aria-hidden", "true"); barra.innerHTML = "<i></i>";
+  const aviso = document.createElement("div");
+  aviso.id = "cargaAviso"; aviso.setAttribute("role", "status");
+  aviso.innerHTML = '<span class="carga-aviso-ico"></span><span class="carga-aviso-txt"></span><button type="button" class="carga-aviso-btn hidden">Reintentar</button>';
+  const montar = () => { document.body.appendChild(barra); document.body.appendChild(aviso); };
+  if (document.body) montar(); else document.addEventListener("DOMContentLoaded", montar);
+  let ultimoToque = 0;
+  ["pointerdown", "keydown"].forEach((ev) => document.addEventListener(ev, () => { ultimoToque = Date.now(); }, true));
+  const activas = new Set();
+  let reloj = null, mostrarTimer = null;
+  const fetchOriginal = window.fetch.bind(window);
+
+  function actualizar() {
+    const hay = activas.size > 0;
+    if (hay && !barra.classList.contains("on") && !mostrarTimer) mostrarTimer = setTimeout(() => { mostrarTimer = null; if (activas.size) barra.classList.add("on"); }, 250);
+    if (!hay) {
+      clearTimeout(mostrarTimer); mostrarTimer = null;
+      if (barra.classList.contains("on")) { barra.classList.add("fin"); setTimeout(() => barra.classList.remove("on", "fin"), 420); }
+      aviso.classList.remove("on");
+      clearInterval(reloj); reloj = null;
+      return;
+    }
+    if (!reloj) reloj = setInterval(revisar, 500);
+  }
+  function revisar() {
+    const ahora = Date.now(), lista = [...activas];
+    const lento = lista.filter((r) => ahora - r.inicio > ESPERA_AVISO);
+    if (!lento.length) { aviso.classList.remove("on"); return; }
+    const consultas = lento.filter((r) => r.reintentar && ahora - r.inicio > ESPERA_REINTENTAR);
+    const envio = lento.some((r) => !r.reintentar);
+    const sinSenal = navigator.onLine === false;
+    aviso.querySelector(".carga-aviso-txt").textContent = sinSenal ? "Sin señal: esperando que vuelva…"
+      : consultas.length ? "Está tardando mucho. Podés reintentar."
+      : envio ? "Está tardando más de lo normal (señal débil). No cierres la APP."
+      : "Está tardando más de lo normal (señal débil)…";
+    aviso.querySelector(".carga-aviso-btn").classList.toggle("hidden", !consultas.length);
+    aviso.classList.add("on");
+  }
+  aviso.querySelector(".carga-aviso-btn").addEventListener("click", () => {
+    [...activas].forEach((r) => r.reintentar && r.reintentar());
+    aviso.classList.remove("on");
+  });
+
+  window.fetch = function (input, init) {
+    const url = typeof input === "string" ? input : (input && input.url) || "";
+    let mismo = false;
+    try { const u = new URL(url, location.href); mismo = u.origin === location.origin && u.pathname.startsWith("/api/"); } catch (e) { mismo = false; }
+    if (!mismo || Date.now() - ultimoToque > 2500) return fetchOriginal(input, init);
+    const metodo = String((init && init.method) || (input && input.method) || "GET").toUpperCase();
+    const req = { inicio: Date.now(), reintentar: null };
+    activas.add(req); actualizar();
+    let p;
+    if (metodo === "GET" && !(init && init.signal) && typeof AbortController !== "undefined") {
+      // Las consultas se pueden repetir: si se traba, «Reintentar» lanza otra igual.
+      p = new Promise((ok, mal) => {
+        let intento = 0, ctrl = null;
+        const lanzar = () => {
+          const mio = ++intento; ctrl = new AbortController();
+          fetchOriginal(input, { ...(init || {}), signal: ctrl.signal }).then(
+            (r) => { if (mio === intento) ok(r); },
+            (e) => { if (mio === intento) mal(e); });
+        };
+        req.reintentar = () => { const viejo = ctrl; req.inicio = Date.now(); lanzar(); try { viejo.abort(); } catch (e) { /* nada */ } };
+        lanzar();
+      });
+    } else p = fetchOriginal(input, init);
+    const fin = () => { activas.delete(req); actualizar(); };
+    p.then(fin, fin);
+    return p;
+  };
+  return { activas: () => activas.size };
+})();
+
+// ---------- Envío del parte: pasos con su avance ----------
+// En la pantalla «Enviando» se ven los pasos (foto, firma, oficina, cliente) con su estado y una
+// barra de avance. La foto muestra el porcentaje real de lo que ya subió.
+const EnvioPasos = (() => {
+  const PESO = { foto: 45, firma: 10, oficina: 30, cliente: 15 };
+  let pasos = [];
+  const caja = () => document.getElementById("envioPasos");
+  const ICO = {
+    espera: '<span class="ep-ico espera"></span>',
+    activo: '<span class="ep-ico activo"></span>',
+    ok: '<span class="ep-ico ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 12.5 10 17.5 19 7"/></svg></span>',
+    error: '<span class="ep-ico error"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 7v6M12 17h.01"/></svg></span>',
+  };
+  // Las filas se arman una vez (con su animación de entrada) y después solo se actualizan.
+  function pintar(armar) {
+    const c = caja(); if (!c) return;
+    if (armar || c.children.length !== pasos.length) c.innerHTML = pasos.map((p) => `<div class="ep-paso" data-k="${p.k}" data-estado=""><span class="ep-ico-lugar"></span><span class="ep-txt">${escapeHtml(p.texto)}</span><span class="ep-det"></span></div>`).join("");
+    pasos.forEach((p, i) => {
+      const fila = c.children[i];
+      if (fila.dataset.estado !== p.estado) {
+        fila.dataset.estado = p.estado;
+        fila.className = "ep-paso " + p.estado;
+        fila.querySelector(".ep-ico-lugar").innerHTML = ICO[p.estado];
+      }
+      const det = fila.querySelector(".ep-det");
+      if (det.textContent !== (p.detalle || "")) det.textContent = p.detalle || "";
+    });
+    const total = pasos.reduce((t, p) => t + p.peso, 0) || 1;
+    const hecho = pasos.reduce((t, p) => t + (p.estado === "ok" || p.estado === "error" ? p.peso : p.estado === "activo" ? p.peso * (p.frac || 0) : 0), 0);
+    const b = document.getElementById("envioBarra");
+    if (b) b.style.width = Math.min(100, Math.round((hecho / total) * 100)) + "%";
+    const bc = b && b.parentElement;
+    if (bc) bc.classList.toggle("indeterminado", pasos.some((p) => p.estado === "activo" && !p.frac));
+  }
+  return {
+    iniciar(lista) { pasos = lista.map((p) => ({ ...p, estado: "espera", peso: PESO[p.k] || 10, frac: 0, detalle: "" })); pintar(true); },
+    paso(k, estado, detalle) { const p = pasos.find((x) => x.k === k); if (!p) return; p.estado = estado; if (detalle !== undefined) p.detalle = detalle; if (estado !== "activo") p.frac = 0; pintar(); },
+    avance(k, frac) { const p = pasos.find((x) => x.k === k); if (!p) return; p.frac = Math.max(0, Math.min(1, frac)); p.detalle = Math.round(p.frac * 100) + " %"; pintar(); },
+  };
+})();
+// POST con avance de subida (para la foto). Devuelve { ok, status, data } como fetch + json.
+function postJsonConAvance(url, cuerpo, alAvanzar) {
+  return new Promise((ok, mal) => {
+    const x = new XMLHttpRequest();
+    x.open("POST", url);
+    x.setRequestHeader("Content-Type", "application/json");
+    x.setRequestHeader("Authorization", "Bearer " + SERVICIOS_API_TOKEN);
+    x.timeout = 180000;
+    if (x.upload) x.upload.onprogress = (e) => { if (e.lengthComputable && alAvanzar) alAvanzar(e.loaded / e.total); };
+    x.onload = () => { let data = {}; try { data = JSON.parse(x.responseText || "{}"); } catch (e) { data = {}; } ok({ ok: x.status >= 200 && x.status < 300, status: x.status, data }); };
+    x.onerror = () => mal(new TypeError("Failed to fetch"));
+    x.ontimeout = () => mal(new TypeError("Se cortó: tardó demasiado"));
+    x.send(JSON.stringify(cuerpo));
+  });
+}
+
+// ---------- Resultado del envío ----------
+// La pantalla «Enviado» muestra un estado claro: verde (llegó todo), ámbar (llegó a la oficina pero
+// algo falló) o reloj (quedó guardado en el celular y sale solo con señal), con el detalle de cada parte.
+const ICONOS_RESULTADO = {
+  ok: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline class="trazo" points="4 12.5 9.5 18 20 6"/></svg>',
+  aviso: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline class="trazo" points="4 12.5 9.5 18 20 6"/></svg>',
+  cola: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path class="aguja" d="M12 7.5V12l3 2"/></svg>',
+};
+function mostrarResultadoEnvio(estado, lineas) {
+  const marca = document.querySelector("#screen-done .done-mark");
+  const eyebrow = document.querySelector("#screen-done > .hint-eyebrow");
+  if (marca) {
+    marca.className = "done-mark estado-" + estado;
+    marca.innerHTML = ICONOS_RESULTADO[estado] || ICONOS_RESULTADO.ok;
+    void marca.offsetWidth; marca.classList.add("animar");
+  }
+  if (eyebrow) eyebrow.textContent = estado === "cola" ? "GUARDADO" : estado === "aviso" ? "ENVIADO CON AVISOS" : "ENVIADO";
+  let det = document.getElementById("doneDetalle");
+  if (!det) {
+    det = document.createElement("ul"); det.id = "doneDetalle"; det.className = "done-detalle";
+    const id = document.getElementById("doneId"); if (id) id.after(det);
+  }
+  det.innerHTML = (lineas || []).map(([tipo, texto], i) => `<li class="dd-${tipo}" style="animation-delay:${0.35 + i * 0.12}s"><span class="dd-ico"></span>${escapeHtml(texto)}</li>`).join("");
+}
