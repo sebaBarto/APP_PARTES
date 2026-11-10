@@ -1459,6 +1459,14 @@ test("Stock: Melina entrega con escaneo, el técnico confirma «Recibí» (o con
     assert.strictEqual(cat.articulos["20825"].prov, "Propiedad Protegida", "el artículo visto con ese código toma el proveedor");
     assert.deepStrictEqual(cat.provVistos, { "0815": 1 });
     assert.strictEqual(r.cuerpo.completados, 1);
+    // Datos de contacto (del Excel): se guardan, y si después se guarda sin datos se mantienen
+    await post({ accion: "proveedores", lista: [{ codigo: "2779", nombre: "Propiedad Protegida", datos: { razon: "PP SRL", loc: "Rosario", tel: "341 555", cuit: "30-1-2", dir: "" } }, { codigo: "2842", nombre: "Deitres", datos: { loc: "Mar del Plata" } }] }, admin);
+    cat = repo["stock/catalogo.json"];
+    assert.deepStrictEqual(cat.proveedoresDatos, { 2779: { razon: "PP SRL", loc: "Rosario", tel: "341 555", cuit: "30-1-2" }, 2842: { loc: "Mar del Plata" } });
+    await post({ accion: "proveedores", lista: [{ codigo: "2779", nombre: "Propiedad Protegida" }] }, admin);
+    cat = repo["stock/catalogo.json"];
+    assert.deepStrictEqual(cat.proveedoresDatos, { 2779: { razon: "PP SRL", loc: "Rosario", tel: "341 555", cuit: "30-1-2" } }, "se mantienen los datos; el que se quitó se va");
+    await post({ accion: "proveedores", lista: [{ codigo: "2779", nombre: "Propiedad Protegida" }] }, admin);
     // Para Oficina: solo lo que cambia el stock de Oficina, y se marca para no pasarlo dos veces
     const movsMes = repo[`stock/movimientos-${mes}.json`];
     const S = require(path.join(raiz, "stock-utils.js"));

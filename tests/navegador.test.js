@@ -6796,3 +6796,59 @@ test("Depósito (gráfico): bandeja de pendientes con acceso directo, modos con 
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Proveedores: se importan desde el Excel de la oficina (hoja con encabezados, contacto incluido), con resumen antes de cargar y opción de dejar los nombres que ya estaban", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: route.request().url().includes("xlsx.full.min.js") ? require("fs").readFileSync(require("path").join(__dirname, "..", "vendor", "xlsx.full.min.js"), "utf8") : "" }));
+  const catalogo = { articulos: { 1: { c: "1", d: "SIRENA", tipo: "cantidad" } }, proveedores: { 4001: "Marca Uno" }, proveedoresDatos: {} };
+  const posts = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url(), j = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (req.method() === "POST" && u.includes("coleccion=stock")) {
+      const b = JSON.parse(req.postData()); posts.push(b);
+      if (b.accion === "proveedores") { catalogo.proveedores = Object.fromEntries(b.lista.map((x) => [x.codigo, x.nombre])); catalogo.proveedoresDatos = Object.fromEntries(b.lista.filter((x) => x.datos).map((x) => [x.codigo, x.datos])); }
+      return j({ proveedores: catalogo.proveedores, completados: 0 });
+    }
+    if (u.includes("coleccion=stock")) return j({ catalogo, saldos: { inicializado: "2026-10-01", ubic: {}, unidades: {} }, conciliacion: { marcas: [], corridas: [] } });
+    return j([]);
+  });
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { document.getElementById("loginCard").classList.add("hidden"); document.getElementById("mainCard").classList.remove("hidden"); document.getElementById("tabStockBtn").click(); });
+  await page.click('#stkSub [data-stk="proveedores"]');
+  await page.waitForSelector("#stkProvTabla .stk-prov-cod");
+  // Excel como el de la oficina: primera hoja vacía, la lista en «Hoja2»
+  const xlsx = await page.evaluate(() => {
+    const lb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(lb, XLSX.utils.aoa_to_sheet([[""]]), "Hoja1");
+    XLSX.utils.book_append_sheet(lb, XLSX.utils.aoa_to_sheet([
+      ["Nº Proveedor", "Nombre Fantasía", "Dirección", "Localidad", "Teléfono", "Razón Social", "CUIT"],
+      [4001, "Marca Uno SA", "Calle 1", "Rosario", "341 111", "Uno SRL", "30-1-1"],
+      [4002, "Baterías Dos", "", "Funes", 3412222, "", ""],
+      [4003, "", "", "", "", "Cables Tres SRL", "30-3-3"],
+      [0, "Sin código", "", "", "", "", ""],
+      [4002, "Repetido", "", "", "", "", ""],
+    ]), "Hoja2");
+    return Array.from(new Uint8Array(XLSX.write(lb, { type: "array", bookType: "xlsx" })));
+  });
+  await page.setInputFiles("#stkProvExcel", { name: "Listado_Proveedores.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer: Buffer.from(xlsx) });
+  await page.waitForSelector("#stkProvImpSi");
+  const txt = (await page.textContent("#stkProvImport")).replace(/\s+/g, " ");
+  assert.match(txt, /3 proveedores/);
+  assert.match(txt, /2 nuevos/);
+  assert.match(txt, /1 con otro nombre en el Excel: ?4001: «Marca Uno» → «Marca Uno SA»/);
+  assert.match(txt, /1 fila sin N° de proveedor válido/);
+  assert.match(txt, /repetidos en el Excel .*4002/);
+  await page.click("#stkProvImpMantener");
+  await page.waitForFunction(() => !document.getElementById("stkProvImport").textContent.trim());
+  const p = posts.find((x) => x.accion === "proveedores");
+  assert.deepStrictEqual(p.lista.map((x) => [x.codigo, x.nombre]).sort(), [["4001", "Marca Uno"], ["4002", "Baterías Dos"], ["4003", "Cables Tres SRL"]], "el sin nombre toma la razón social; el que ya estaba mantiene su nombre");
+  assert.deepStrictEqual(p.lista.find((x) => x.codigo === "4001").datos, { dir: "Calle 1", loc: "Rosario", tel: "341 111", razon: "Uno SRL", cuit: "30-1-1" });
+  // La tabla muestra el contacto y se puede buscar
+  await page.waitForFunction(() => document.querySelectorAll("#stkProvTabla tr[data-i]").length === 3);
+  assert.match(await page.textContent("#stkProvTabla"), /Funes · 3412222/);
+  await page.fill("#stkProvBuscar", "funes");
+  assert.strictEqual(await page.locator("#stkProvTabla tr[data-i]").count(), 1);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

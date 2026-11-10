@@ -1568,20 +1568,31 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
     if (b.accion === "proveedores") {
       // Tabla código de proveedor (los 4 dígitos de la etiqueta de SAT) -> nombre.
       const lista = Array.isArray(b.lista) ? b.lista.slice(0, 500) : [];
-      const mapa = {};
+      const mapa = {}, datosNuevos = {};
+      const limpio = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
       for (const x of lista) {
-        const c = S.codigoProveedor(x && x.codigo), n = String((x && x.nombre) || "").replace(/\s+/g, " ").trim().slice(0, 60);
+        const c = S.codigoProveedor(x && x.codigo), n = limpio(x && x.nombre, 60);
         if (!c || !n) continue;
         mapa[c] = n;
+        // Datos de contacto (vienen del Excel de proveedores): razón social, dirección, localidad, teléfono, CUIT.
+        const d = x.datos && typeof x.datos === "object" ? x.datos : null;
+        if (d) {
+          const dd = { razon: limpio(d.razon, 80), dir: limpio(d.dir, 80), loc: limpio(d.loc, 60), tel: limpio(d.tel, 60), cuit: limpio(d.cuit, 20) };
+          Object.keys(dd).forEach((k) => { if (!dd[k]) delete dd[k]; });
+          datosNuevos[c] = dd;
+        }
       }
       const r = await stockActualizar(STOCK_CAT, { articulos: {} }, (cat) => {
+        // Los datos de contacto: los que vienen ahora o, si no vienen, los que ya tenía ese código.
+        const datos = {};
+        Object.keys(mapa).forEach((c) => { const d = datosNuevos[c] || (cat.proveedoresDatos || {})[c]; if (d && Object.keys(d).length) datos[c] = d; });
         const provVistos = { ...(cat.provVistos || {}) };
         Object.keys(mapa).forEach((c) => delete provVistos[c]);
         // Los artículos que ya se vieron con ese código y no tienen proveedor, lo toman.
         const arts = { ...(cat.articulos || {}) };
         let completados = 0;
         Object.values(arts).forEach((a) => { if (!a.prov && (a.provCodigos || []).some((c) => mapa[c])) { arts[a.c] = { ...a, prov: mapa[(a.provCodigos || []).find((c) => mapa[c])] }; completados++; } });
-        return { data: { ...cat, articulos: arts, proveedores: mapa, provVistos }, respuesta: { proveedores: mapa, completados } };
+        return { data: { ...cat, articulos: arts, proveedores: mapa, proveedoresDatos: datos, provVistos }, respuesta: { proveedores: mapa, completados } };
       }, `Stock: tabla de proveedores (por ${quien})`);
       responder(r);
       return;

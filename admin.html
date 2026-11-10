@@ -1396,6 +1396,11 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
         <div class="card">
           <h3 style="margin-top:0;">Códigos de proveedor</h3>
           <p class="subtitle" style="margin-top:0;">La etiqueta de SAT trae el código del artículo (8 dígitos) y el del proveedor (los 4 últimos): 000208252779 = artículo 20825, proveedor 2779. Acá se relaciona cada código con el nombre del proveedor. Así cada movimiento y cada N° de serie queda con el proveedor del que vino, y los artículos que todavía no tienen proveedor lo toman solos.</p>
+          <div class="field-row" style="flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;">
+            <input type="search" class="field-input" id="stkProvBuscar" placeholder="Buscar por código, nombre, localidad…" style="flex:1;min-width:200px;">
+            <label class="btn-secondary-admin" style="width:auto;cursor:pointer;margin:0;">Importar desde Excel<input type="file" id="stkProvExcel" accept=".xlsx,.xls,.csv" style="display:none;"></label>
+          </div>
+          <div id="stkProvImport"></div>
           <div id="stkProvTabla"></div>
           <div class="field-row" style="flex-wrap:wrap;gap:8px;margin-top:10px;">
             <button type="button" class="btn-secondary-admin" id="stkProvAgregarBtn" style="width:auto;">+ Agregar proveedor</button>
@@ -7059,11 +7064,14 @@ document.getElementById("stkGarExcelBtn").addEventListener("click", () => {
 let stkProvFilas = null;
 function stkRenderProveedores() {
   const cat = stk.catalogo, arts = Object.values(cat.articulos || {});
-  if (!stkProvFilas) stkProvFilas = Object.entries(cat.proveedores || {}).map(([codigo, nombre]) => ({ codigo, nombre })).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  if (!stkProvFilas) stkProvFilas = Object.entries(cat.proveedores || {}).map(([codigo, nombre]) => ({ codigo, nombre, datos: (cat.proveedoresDatos || {})[codigo] || null })).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
   const cuantos = (c) => arts.filter((a) => (a.provCodigos || []).includes(c)).length;
-  document.getElementById("stkProvTabla").innerHTML = stkProvFilas.length ? `<table class="sims-tabla stk-tabla"><thead><tr><th>Código</th><th>Proveedor</th><th class="num">Artículos vistos</th><th></th></tr></thead><tbody>
-    ${stkProvFilas.map((p, i) => `<tr data-i="${i}"><td><input class="field-input stk-prov-cod" inputmode="numeric" maxlength="6" style="width:90px;padding:4px 6px;" value="${escapeHtmlAdmin(p.codigo)}"></td><td><input class="field-input stk-prov-nom" style="padding:4px 6px;min-width:200px;" value="${escapeHtmlAdmin(p.nombre)}"></td><td class="num">${cuantos(p.codigo) || ""}</td><td class="stk-btns"><button type="button" class="btn-secondary-admin" data-quitar>Quitar</button></td></tr>`).join("")}</tbody></table>`
-    : '<p class="subtitle">Todavía no hay proveedores cargados.</p>';
+  const q = normalizeTextAdmin(document.getElementById("stkProvBuscar").value || "").trim();
+  const contacto = (d) => (d ? [d.loc, d.tel].filter(Boolean).join(" · ") : "");
+  const visibles = stkProvFilas.map((p, i) => [p, i]).filter(([p]) => !q || !p.codigo || normalizeTextAdmin([p.codigo, p.nombre, p.datos && p.datos.razon, p.datos && p.datos.loc, p.datos && p.datos.cuit].join(" ")).includes(q));
+  document.getElementById("stkProvTabla").innerHTML = stkProvFilas.length ? `<p class="stk-det" style="margin:0 0 6px;">${q ? `${visibles.length} de ` : ""}${stkProvFilas.length} proveedor${stkProvFilas.length === 1 ? "" : "es"}</p><div style="overflow-x:auto;"><table class="sims-tabla stk-tabla"><thead><tr><th>Código</th><th>Proveedor</th><th>Contacto</th><th class="num">Artículos vistos</th><th></th></tr></thead><tbody>
+    ${visibles.slice(0, 600).map(([p, i]) => `<tr data-i="${i}"><td><input class="field-input stk-prov-cod" inputmode="numeric" maxlength="6" style="width:90px;padding:4px 6px;" value="${escapeHtmlAdmin(p.codigo)}"></td><td><input class="field-input stk-prov-nom" style="padding:4px 6px;min-width:200px;" value="${escapeHtmlAdmin(p.nombre)}"></td><td class="stk-det" title="${escapeHtmlAdmin(p.datos ? [p.datos.razon, p.datos.dir, p.datos.loc, p.datos.tel, p.datos.cuit && "CUIT " + p.datos.cuit].filter(Boolean).join(" · ") : "")}">${escapeHtmlAdmin(contacto(p.datos))}</td><td class="num">${cuantos(p.codigo) || ""}</td><td class="stk-btns"><button type="button" class="btn-secondary-admin" data-quitar>Quitar</button></td></tr>`).join("")}</tbody></table></div>`
+    : '<p class="subtitle">Todavía no hay proveedores cargados. Podés importarlos desde el Excel de proveedores.</p>';
   document.querySelectorAll("#stkProvTabla tr[data-i]").forEach((tr) => {
     const p = stkProvFilas[Number(tr.dataset.i)];
     tr.querySelector(".stk-prov-cod").addEventListener("input", (e) => { p.codigo = e.target.value.replace(/\D/g, ""); });
@@ -7075,9 +7083,80 @@ function stkRenderProveedores() {
   document.querySelectorAll("#stkProvVistos [data-codigo]").forEach((b) => b.addEventListener("click", () => { stkProvFilas.push({ codigo: b.dataset.codigo, nombre: "" }); stkRenderProveedores(); const ult = document.querySelectorAll("#stkProvTabla .stk-prov-nom"); if (ult.length) ult[ult.length - 1].focus(); }));
 }
 document.getElementById("stkProvAgregarBtn").addEventListener("click", () => { stkProvFilas.push({ codigo: "", nombre: "" }); stkRenderProveedores(); const c = document.querySelectorAll("#stkProvTabla .stk-prov-cod"); if (c.length) c[c.length - 1].focus(); });
-document.getElementById("stkProvGuardarBtn").addEventListener("click", async (e) => {
-  const btn = e.currentTarget;
-  const filas = stkProvFilas.map((p) => ({ codigo: String(p.codigo || "").trim(), nombre: String(p.nombre || "").trim() })).filter((p) => p.codigo || p.nombre);
+document.getElementById("stkProvBuscar").addEventListener("input", () => stkRenderProveedores());
+// Importar el listado de proveedores desde Excel (el que sale del sistema de la oficina:
+// Nº Proveedor, Nombre Fantasía, Dirección, Localidad, Teléfono, Razón Social, CUIT).
+function stkLeerExcelProveedores(libro) {
+  const norm = (t) => normalizeTextAdmin(String(t == null ? "" : t)).replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+  let mejor = null;
+  libro.SheetNames.forEach((nom) => {
+    const filas = XLSX.utils.sheet_to_json(libro.Sheets[nom], { header: 1, defval: "", raw: false });
+    for (let h = 0; h < Math.min(filas.length, 15); h++) {
+      const cab = filas[h].map(norm), idx = (re) => cab.findIndex((c) => re.test(c));
+      const col = { codigo: idx(/^(n|no|nro|numero|cod|codigo)? ?(de )?prov|^codigo$|^cod$/), nombre: idx(/fantasia|^nombre|^proveedor$/), razon: idx(/razon/), dir: idx(/direccion|domicilio/), loc: idx(/localidad|ciudad/), tel: idx(/tel|celular/), cuit: idx(/cuit/) };
+      if (col.codigo < 0 || (col.nombre < 0 && col.razon < 0)) continue;
+      const datos = filas.slice(h + 1).filter((f) => f.some((v) => String(v).trim()));
+      if (!mejor || datos.length > mejor.filas.length) mejor = { hoja: nom, col, filas: datos };
+      break;
+    }
+  });
+  if (!mejor) return null;
+  const v = (f, k) => (mejor.col[k] >= 0 ? String(f[mejor.col[k]] == null ? "" : f[mejor.col[k]]).replace(/\s+/g, " ").trim() : "");
+  const lista = [], sinCodigo = [], repetidos = [];
+  mejor.filas.forEach((f) => {
+    const codigo = codigoProveedor(v(f, "codigo")), nombre = (v(f, "nombre") || v(f, "razon")).slice(0, 60);
+    if (!codigo || !nombre) { sinCodigo.push(v(f, "nombre") || v(f, "razon") || v(f, "codigo") || "(fila vacía)"); return; }
+    if (lista.some((x) => x.codigo === codigo)) { repetidos.push(codigo); return; }
+    const datos = { razon: v(f, "razon"), dir: v(f, "dir"), loc: v(f, "loc"), tel: v(f, "tel"), cuit: v(f, "cuit") };
+    Object.keys(datos).forEach((k) => { if (!datos[k]) delete datos[k]; });
+    lista.push({ codigo, nombre, datos });
+  });
+  return { hoja: mejor.hoja, lista, sinCodigo, repetidos };
+}
+document.getElementById("stkProvExcel").addEventListener("change", async (e) => {
+  const archivo = e.target.files && e.target.files[0]; e.target.value = "";
+  const caja = document.getElementById("stkProvImport");
+  if (!archivo) return;
+  let r;
+  try { r = stkLeerExcelProveedores(XLSX.read(await archivo.arrayBuffer(), { type: "array" })); } catch (err) { r = null; }
+  if (!r || !r.lista.length) { avisoAdmin("No encontré la lista en ese Excel: tiene que tener una columna con el N° de proveedor y otra con el nombre.", "err"); return; }
+  if (!stkProvFilas) stkRenderProveedores();
+  const actual = new Map(stkProvFilas.filter((p) => p.codigo).map((p) => [codigoProveedor(p.codigo), p]));
+  const nuevos = r.lista.filter((x) => !actual.has(x.codigo));
+  const cambian = r.lista.filter((x) => actual.has(x.codigo) && actual.get(x.codigo).nombre !== x.nombre);
+  const iguales = r.lista.length - nuevos.length - cambian.length;
+  caja.innerHTML = `<div class="card" style="border:2px solid var(--amber,#F5A623);margin:0 0 12px;">
+    <h4 style="margin:0 0 6px;">Excel «${escapeHtmlAdmin(archivo.name)}»: ${r.lista.length} proveedores</h4>
+    <ul style="margin:0 0 8px;padding-left:18px;line-height:1.6;">
+      <li><b>${nuevos.length}</b> nuevo${nuevos.length === 1 ? "" : "s"}</li>
+      ${iguales ? `<li><b>${iguales}</b> ya estaba${iguales === 1 ? "" : "n"} igual</li>` : ""}
+      ${cambian.length ? `<li><b>${cambian.length}</b> con otro nombre en el Excel:<div class="stk-det" style="max-height:140px;overflow:auto;">${cambian.map((x) => `${escapeHtmlAdmin(x.codigo)}: «${escapeHtmlAdmin(actual.get(x.codigo).nombre)}» → «${escapeHtmlAdmin(x.nombre)}»`).join("<br>")}</div></li>` : ""}
+      ${r.sinCodigo.length ? `<li class="stk-det">${r.sinCodigo.length} fila${r.sinCodigo.length === 1 ? "" : "s"} sin N° de proveedor válido (no se cargan): ${escapeHtmlAdmin(r.sinCodigo.slice(0, 5).join(", "))}${r.sinCodigo.length > 5 ? "…" : ""}</li>` : ""}
+      ${r.repetidos.length ? `<li class="stk-det">Códigos repetidos en el Excel (se usa el primero): ${escapeHtmlAdmin(r.repetidos.join(", "))}</li>` : ""}
+    </ul>
+    <p class="stk-det" style="margin:0 0 8px;">Los proveedores que ya estaban y no vienen en el Excel se mantienen. También se guardan dirección, localidad, teléfono, razón social y CUIT.</p>
+    <div class="field-row" style="flex-wrap:wrap;gap:8px;">
+      <button type="button" id="stkProvImpSi" style="width:auto;">Cargar${cambian.length ? " y usar los nombres del Excel" : ""}</button>
+      ${cambian.length ? '<button type="button" class="btn-secondary-admin" id="stkProvImpMantener" style="width:auto;">Cargar, pero dejar los nombres que ya tenía</button>' : ""}
+      <button type="button" class="btn-secondary-admin" id="stkProvImpNo" style="width:auto;">Cancelar</button>
+    </div></div>`;
+  const aplicar = async (usarNombres, btn) => {
+    r.lista.forEach((x) => {
+      const p = actual.get(x.codigo);
+      if (!p) stkProvFilas.push({ codigo: x.codigo, nombre: x.nombre, datos: x.datos });
+      else { if (usarNombres) p.nombre = x.nombre; p.datos = x.datos; }
+    });
+    stkProvFilas.sort((a, b) => String(a.nombre).localeCompare(String(b.nombre), "es"));
+    caja.innerHTML = "";
+    await stkProvGuardar(btn || document.getElementById("stkProvGuardarBtn"));
+  };
+  document.getElementById("stkProvImpSi").addEventListener("click", (ev) => aplicar(true, ev.currentTarget));
+  const m = document.getElementById("stkProvImpMantener"); if (m) m.addEventListener("click", (ev) => aplicar(false, ev.currentTarget));
+  document.getElementById("stkProvImpNo").addEventListener("click", () => { caja.innerHTML = ""; });
+});
+document.getElementById("stkProvGuardarBtn").addEventListener("click", (e) => stkProvGuardar(e.currentTarget));
+async function stkProvGuardar(btn) {
+  const filas = stkProvFilas.map((p) => ({ codigo: String(p.codigo || "").trim(), nombre: String(p.nombre || "").trim(), ...(p.datos ? { datos: p.datos } : {}) })).filter((p) => p.codigo || p.nombre);
   const mal = filas.find((p) => !/^\d{1,6}$/.test(p.codigo) || !p.nombre);
   if (mal) { avisoAdmin("Cada proveedor necesita un código de números y un nombre.", "err"); return; }
   const rep = filas.find((p, i) => filas.findIndex((q) => Number(q.codigo) === Number(p.codigo)) !== i);
@@ -7092,7 +7171,7 @@ document.getElementById("stkProvGuardarBtn").addEventListener("click", async (e)
       stkRenderProveedores();
     } catch (err) { avisoAdmin("No se pudo guardar: " + err.message, "err"); }
   });
-});
+}
 
 // ---------- Vencimientos ----------
 // Junta en una lista lo de los vehículos (umbrales por fecha y avisos por km),
