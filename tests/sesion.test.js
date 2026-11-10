@@ -2016,3 +2016,69 @@ test("Stock: stock inicial de un técnico desde el panel: queda con lo de la lis
     assert.deepStrictEqual(S.auditarStock(repo["stock/saldos.json"], repo[`stock/movimientos-${mes}.json`], repo["stock/catalogo.json"], { ahora: new Date() }).errores, []);
   } finally { global.fetch = fetchViejo; }
 });
+
+test("Claves del cliente cargadas por la oficina: solo el panel las carga; se guardan cifradas; se suman a las de los partes (ficha y lista) y el registro no anota la clave", async () => {
+  const fetchViejo = global.fetch;
+  // historial.js usa nodemailer (para otro mail); acá no hace falta: se reemplaza por uno vacío.
+  const Module = require("module"), cargarViejo = Module._load;
+  Module._load = function (pedido, ...resto) { return pedido === "nodemailer" ? { createTransport: () => ({ sendMail: async () => ({}) }) } : cargarViejo.call(this, pedido, ...resto); };
+  const historial = require(path.join(raiz, "api/historial.js"));
+  Module._load = cargarViejo;
+  const repo = {};
+  const backend = [{ numero_cliente: "1234", cliente: "Kiosco Pérez", claves: [{ titulo: "Código maestro", codigo: "1111" }] }];
+  global.fetch = async (url, op = {}) => {
+    const u = String(url);
+    const m = u.match(/contents\/([^?]+)/);
+    if (m) {
+      const ruta = decodeURIComponent(m[1]);
+      if ((op.method || "GET") === "PUT") { repo[ruta] = Buffer.from(JSON.parse(op.body).content, "base64").toString(); return new Response("{}", { status: 200 }); }
+      if (!(ruta in repo)) return new Response("{}", { status: 404 });
+      return new Response(JSON.stringify({ sha: "s", encoding: "base64", content: Buffer.from(repo[ruta]).toString("base64") }));
+    }
+    if (u.includes("/api/partes/claves-cliente")) {
+      const n = new URL(u).searchParams.get("numero_cliente");
+      return new Response(JSON.stringify(n ? (backend.find((x) => x.numero_cliente === n) || { claves: [] }) : backend));
+    }
+    return new Response("[]");
+  };
+  const llamar = async (metodo, query, cuerpo, ses) => { const r = resFalso(); await historial(pedido(metodo, query, cuerpo, ses), r); return r; };
+  const admin = crearSesion({ nombre: "Brenda", rol: "admin" }), tec = crearSesion({ nombre: "Juan", rol: "tecnico" });
+  try {
+    const nueva = { accion: "claves_admin", operacion: "agregar", numero_cliente: "1234", cliente: "Kiosco Pérez", titulo: "Wi-Fi", usuario: "KIOSCO_5G", clave: "secreta-Wifi-2026", nota: "router en el depósito" };
+    assert.strictEqual((await llamar("POST", {}, nueva, tec)).statusCode, 403, "un técnico no carga claves en la ficha");
+    assert.strictEqual((await llamar("POST", {}, { ...nueva, titulo: "" }, admin)).statusCode, 400);
+    let r = await llamar("POST", {}, nueva, admin);
+    assert.strictEqual(r.statusCode, 200, JSON.stringify(r.cuerpo));
+    r = await llamar("POST", {}, { ...nueva, numero_cliente: "999", cliente: "Sin partes", titulo: "Código maestro", clave: "", codigo: "4321" }, admin);
+    assert.strictEqual(r.statusCode, 200);
+    // En el archivo no está la clave en texto
+    assert.ok(!/secreta-Wifi-2026|KIOSCO_5G|4321|router en el/.test(repo["claves-clientes.json"]), "cifradas");
+    assert.match(repo["claves-clientes.json"], /"Wi-Fi"/);
+    // La ficha de un cliente: primero las de la oficina, después las de los partes
+    r = await llamar("GET", { tipo: "claves_cliente", numero_cliente: "1234" }, null, tec);
+    assert.deepStrictEqual(r.cuerpo.claves.map((k) => [k.titulo, k.usuario || "", k.clave || "", k.codigo || "", k.origen || "parte"]), [["Wi-Fi", "KIOSCO_5G", "secreta-Wifi-2026", "", "oficina"], ["Código maestro", "", "", "1111", "parte"]]);
+    // La lista completa suma el cliente que solo tiene claves de la oficina
+    r = await llamar("GET", { tipo: "claves_cliente" }, null, admin);
+    assert.deepStrictEqual(r.cuerpo.map((x) => [x.numero_cliente, x.claves.length]).sort(), [["1234", 2], ["999", 1]]);
+    // Editar y borrar
+    const id = r.cuerpo.find((x) => x.numero_cliente === "1234").claves.find((k) => k.origen === "oficina").id;
+    assert.strictEqual((await llamar("POST", {}, { ...nueva, operacion: "editar", id, clave: "nueva-2027" }, admin)).statusCode, 200);
+    r = await llamar("GET", { tipo: "claves_cliente", numero_cliente: "1234" }, null, tec);
+    assert.strictEqual(r.cuerpo.claves[0].clave, "nueva-2027");
+    assert.strictEqual(r.cuerpo.claves[0].por, "Brenda");
+    assert.strictEqual((await llamar("POST", {}, { accion: "claves_admin", operacion: "borrar", id, numero_cliente: "1234" }, admin)).statusCode, 200);
+    r = await llamar("GET", { tipo: "claves_cliente", numero_cliente: "1234" }, null, tec);
+    assert.deepStrictEqual(r.cuerpo.claves.map((k) => k.titulo), ["Código maestro"]);
+    // El registro de cambios anota para qué es, nunca la clave
+    const log = repo["auditoria.json"] || "";
+    assert.match(log, /Cargó claves de un cliente/);
+    assert.ok(!/secreta-Wifi|nueva-2027|KIOSCO_5G/.test(log), "el registro no tiene la clave");
+    // Si cambia la llave del servidor: no se muestran (ni se rompe la ficha) y no se puede modificar
+    process.env.CLAVES_CLIENTES_SECRET = "otra-llave";
+    r = await llamar("GET", { tipo: "claves_cliente", numero_cliente: "999" }, null, tec);
+    assert.strictEqual(r.statusCode, 200);
+    assert.deepStrictEqual(r.cuerpo.claves, []);
+    assert.strictEqual((await llamar("POST", {}, { ...nueva, numero_cliente: "999" }, admin)).statusCode, 409);
+    delete process.env.CLAVES_CLIENTES_SECRET;
+  } finally { global.fetch = fetchViejo; delete process.env.CLAVES_CLIENTES_SECRET; }
+});

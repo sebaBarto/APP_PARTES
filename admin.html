@@ -463,6 +463,13 @@
 .ficha-adm .fa-vacio { color: var(--steel); font-size: 13px; }
 .ficha-adm .fa-claves { display: none; }
 .ficha-adm .fa-claves.visible { display: block; }
+.fa-claves li { margin-bottom: 8px; }
+.fa-claves code { background: rgba(127,127,127,.12); padding: 1px 5px; border-radius: 4px; }
+.fa-clave-origen { display: inline-block; margin-left: 6px; font-size: 11px; color: #6B7680; background: rgba(127,127,127,.1); border-radius: 999px; padding: 1px 8px; }
+.fa-clave-nota { font-size: 12.5px; color: #6B7680; margin-top: 2px; }
+.fa-clave-btns { display: inline-flex; gap: 6px; margin-left: 6px; vertical-align: middle; }
+.fa-clave-btns button { width: auto !important; padding: 3px 10px !important; font-size: 12px !important; }
+.fa-clave-form { margin-top: 10px; border: 2px solid var(--amber, #F5A623); }
 
 /* ---------- Identidad SAT y legibilidad (v3.148) ---------- */
 :root { --ink: #191816; --osc: #191816; --amber: #FFC033; --paper: #F1F0EC; --border: #D6D3CB; --steel: #5E5A52;
@@ -2493,6 +2500,71 @@ async function buscarClienteInicio() {
     : '<p class="status">No hay ningún cliente con eso en la base.</p>';
   res.querySelectorAll(".ib-item").forEach((b) => b.addEventListener("click", () => { res.innerHTML = ""; mostrarFichaClienteAdmin(encontrados[Number(b.dataset.i)]); }));
 }
+// ---------- Claves del cliente cargadas por la oficina ----------
+// Lista de claves (de los partes y de la oficina) con «Agregar clave» y, en las de la oficina,
+// editar y borrar. Se guardan cifradas en el servidor; el registro de cambios anota para qué es,
+// nunca la clave.
+const CLAVE_TITULOS = ["Código maestro", "Código de instalador", "Código de usuario", "Coacción", "App (usuario y clave)", "Wi-Fi", "DVR / NVR", "Cámaras (app)", "Comunicador", "Control de acceso", "Portero / videoportero", "Router"];
+function htmlListaClaves(claves) {
+  return (claves || []).map((x) => `<li data-id="${escapeHtmlAdmin(x.id || "")}"${x.origen === "oficina" ? ' data-oficina="1"' : ""}><b>${escapeHtmlAdmin(x.titulo || "Clave")}</b>${x.usuario ? ` — Usuario: <code>${escapeHtmlAdmin(x.usuario)}</code>` : ""}${x.clave ? ` · Clave: <code>${escapeHtmlAdmin(x.clave)}</code>` : ""}${x.codigo ? ` · Código: <code>${escapeHtmlAdmin(x.codigo)}</code>` : ""}${x.nota ? `<div class="fa-clave-nota">${escapeHtmlAdmin(x.nota)}</div>` : ""}
+    <span class="fa-clave-origen">${x.origen === "oficina" ? `Oficina${x.por ? " · " + escapeHtmlAdmin(x.por) : ""}${x.fecha ? " · " + fechaAR(String(x.fecha).slice(0, 10)) : ""}` : "De un parte"}</span>
+    ${x.origen === "oficina" ? '<span class="fa-clave-btns"><button type="button" class="btn-secondary-admin" data-editar>Editar</button><button type="button" class="btn-secondary-admin" data-borrar>Borrar</button></span>' : ""}</li>`).join("");
+}
+function formClaveAdmin(valor) {
+  const v = valor || {};
+  return `<form class="fa-clave-form card" autocomplete="off">
+    <div class="field-row" style="flex-wrap:wrap;gap:8px;">
+      <div style="flex:1;min-width:180px;"><label>¿Para qué es?</label><input class="field-input" name="titulo" list="claveTitulosLista" maxlength="80" required placeholder="Ej: Código maestro, Wi-Fi, App Ajax" value="${escapeHtmlAdmin(v.titulo || "")}"></div>
+      <div style="flex:1;min-width:140px;"><label>Usuario</label><input class="field-input" name="usuario" maxlength="120" autocomplete="off" value="${escapeHtmlAdmin(v.usuario || "")}"></div>
+      <div style="flex:1;min-width:140px;"><label>Clave</label><input class="field-input" name="clave" maxlength="160" autocomplete="new-password" value="${escapeHtmlAdmin(v.clave || "")}"></div>
+      <div style="flex:1;min-width:120px;"><label>Código</label><input class="field-input" name="codigo" maxlength="120" autocomplete="off" value="${escapeHtmlAdmin(v.codigo || "")}"></div>
+    </div>
+    <label>Nota (opcional)</label><input class="field-input" name="nota" maxlength="300" placeholder="Ej: la cambió el cliente en marzo" value="${escapeHtmlAdmin(v.nota || "")}">
+    <div class="field-row" style="gap:8px;margin-top:8px;"><button type="submit" style="width:auto;">${v.id ? "Guardar cambios" : "Guardar clave"}</button><button type="button" class="btn-secondary-admin" data-cancelar style="width:auto;">Cancelar</button></div>
+  </form>`;
+}
+if (!document.getElementById("claveTitulosLista")) { const dl = document.createElement("datalist"); dl.id = "claveTitulosLista"; dl.innerHTML = CLAVE_TITULOS.map((t) => `<option value="${t}"></option>`).join(""); document.body.appendChild(dl); }
+async function guardarClaveOficina(cuerpo) {
+  const r = await fetch("/api/historial", { method: "POST", headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN, "Content-Type": "application/json" }, body: JSON.stringify({ accion: "claves_admin", ...cuerpo }) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || "Error " + r.status);
+  fichaDatosAdmin = null; // que la ficha vuelva a leer
+  return d;
+}
+// Conecta la lista y el botón «Agregar clave» de una caja. cliente: { numero_cliente, nombre }.
+function conectarClavesAdmin(caja, cliente, claves, alGuardar) {
+  const num = String(cliente.numero_cliente || "").trim();
+  const zona = caja.querySelector(".fa-clave-zona");
+  const abrir = (valor) => {
+    zona.innerHTML = formClaveAdmin(valor);
+    const f = zona.querySelector("form");
+    f.querySelector('[name="titulo"]').focus();
+    f.querySelector("[data-cancelar]").addEventListener("click", () => { zona.innerHTML = ""; });
+    f.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const datos = Object.fromEntries(new FormData(f).entries());
+      if (!datos.usuario && !datos.clave && !datos.codigo) { avisoAdmin("Cargá al menos el usuario, la clave o el código.", "err"); return; }
+      const btn = f.querySelector('[type="submit"]'); btn.disabled = true;
+      try {
+        await guardarClaveOficina({ operacion: valor && valor.id ? "editar" : "agregar", ...(valor && valor.id ? { id: valor.id } : {}), numero_cliente: num, cliente: cliente.nombre || "", ...datos });
+        avisoAdmin(valor && valor.id ? "Clave actualizada." : "Clave guardada en la ficha del cliente.", "ok");
+        await alGuardar();
+      } catch (err) { avisoAdmin("No se pudo guardar: " + err.message, "err"); btn.disabled = false; }
+    });
+  };
+  const ag = caja.querySelector(".fa-clave-agregar");
+  if (ag) ag.addEventListener("click", () => { if (!num) { avisoAdmin("Este cliente no tiene N° de cliente: las claves se guardan por N° de cliente.", "err"); return; } abrir(null); });
+  caja.querySelectorAll('li[data-oficina]').forEach((li) => {
+    const k = (claves || []).find((x) => x.id === li.dataset.id); if (!k) return;
+    li.querySelector("[data-editar]").addEventListener("click", () => { abrir(k); const ul = caja.querySelector(".fa-claves"); if (ul) ul.classList.add("visible"); });
+    li.querySelector("[data-borrar]").addEventListener("click", async (e) => {
+      if (!confirm(`¿Borrar la clave «${k.titulo}» de ${cliente.nombre || "este cliente"}?`)) return;
+      e.currentTarget.disabled = true;
+      try { await guardarClaveOficina({ operacion: "borrar", id: k.id, numero_cliente: num }); avisoAdmin("Clave borrada.", "ok"); await alGuardar(); }
+      catch (err) { avisoAdmin("No se pudo borrar: " + err.message, "err"); e.currentTarget.disabled = false; }
+    });
+  });
+}
 function mostrarFichaClienteAdmin(c) {
   const d = fichaDatosAdmin;
   const num = String(c.numero_cliente || "");
@@ -2505,13 +2577,14 @@ function mostrarFichaClienteAdmin(c) {
   const planos = d.planos.filter((p) => (num && String(p.nombre || "").includes(num)) || (nom && normalizeText(p.nombre || "").includes(nom)));
   const emerg = d.emerg.filter((e) => nom && normalizeText(e.cliente || "") === nom);
   const sec = (titulo, items, vacio) => `<div class="fa-sec"><h4>${titulo} (${items.length})</h4>${items.length ? `<ul>${items.join("")}</ul>` : `<p class="fa-vacio">${vacio}</p>`}</div>`;
-  const totalClaves = claves.reduce((a, k) => a + (Array.isArray(k.claves) ? k.claves.length : 0), 0);
+  const listaClaves = claves.flatMap((k) => k.claves || []);
+  const totalClaves = listaClaves.length;
   document.getElementById("inicioFichaCliente").innerHTML = `<div class="ficha-adm">
     <h3>${escapeHtmlAdmin(c.nombre || "")}</h3>
     <div class="fa-sub">Cliente N° ${escapeHtmlAdmin(num || "?")}${c.numero_abonado ? ` · Abonado ${escapeHtmlAdmin(c.numero_abonado)}` : ""} · ${escapeHtmlAdmin([c.direccion, c.localidad].filter(Boolean).join(", "))}${c.telefono ? ` · Tel. ${escapeHtmlAdmin(c.telefono)}` : ""}</div>
     ${sec("Últimas visitas", partes.slice(0, 8).map((p) => `<li><b>${fechaAR(p.fecha)}</b> — ${escapeHtmlAdmin(p.tecnico || "")}: ${escapeHtmlAdmin(String(p.tarea || p.observaciones || "").slice(0, 120))}${p.numero_servicio ? ` <span style="color:#6B7680;">(N° ${escapeHtmlAdmin(p.numero_servicio)})</span>` : ""}</li>`), "Sin partes registrados.")}
     ${sec("SIMs instaladas", sims.map((s) => `<li><button type="button" class="sim-num-link" data-ficha="${escapeHtmlAdmin(s.numero)}">${escapeHtmlAdmin(s.numero)}</button> · ${escapeHtmlAdmin(s.empresa || "")} · ${escapeHtmlAdmin(s.estado_linea || "Activo")}${s.fecha_activacion ? ` · desde ${fechaAR(s.fecha_activacion)}` : ""}</li>`), "No tiene SIMs instaladas.")}
-    <div class="fa-sec"><h4>Claves (${totalClaves})</h4>${totalClaves ? `<button type="button" class="btn-secondary-admin fa-ver-claves" style="width:auto; padding:6px 12px;">Mostrar claves</button><ul class="fa-claves">${claves.flatMap((k) => (k.claves || []).map((x) => `<li><b>${escapeHtmlAdmin(x.titulo || "")}</b>${x.usuario ? ` — Usuario: ${escapeHtmlAdmin(x.usuario)}` : ""}${x.clave ? ` · Clave: ${escapeHtmlAdmin(x.clave)}` : ""}${x.codigo ? ` · Código: ${escapeHtmlAdmin(x.codigo)}` : ""}</li>`)).join("")}</ul>` : '<p class="fa-vacio">No hay claves guardadas.</p>'}</div>
+    <div class="fa-sec fa-sec-claves"><h4>Claves (${totalClaves})</h4><div class="field-row" style="gap:8px;flex-wrap:wrap;">${totalClaves ? '<button type="button" class="btn-secondary-admin fa-ver-claves" style="width:auto; padding:6px 12px;">Mostrar claves</button>' : ""}<button type="button" class="btn-secondary-admin fa-clave-agregar" style="width:auto; padding:6px 12px;">+ Agregar clave</button></div>${totalClaves ? `<ul class="fa-claves">${htmlListaClaves(listaClaves)}</ul>` : '<p class="fa-vacio">No hay claves guardadas.</p>'}<div class="fa-clave-zona"></div></div>
     ${sec("Comodatos", comodatos.map((k) => `<li>${fechaAR(k.fecha || k.creado_en)} — ${escapeHtmlAdmin(k.comodatario || "")} · ${escapeHtmlAdmin(k.tecnico || "")}</li>`), "Sin comodatos.")}
     ${sec("Planos", planos.map((p) => `<li>${escapeHtmlAdmin(p.nombre || "")}</li>`), "Sin planos cargados.")}
     ${sec("Emergencias", emerg.map((e) => `<li>${fechaAR(e.fecha_carga || e.fecha_deseada)} — ${escapeHtmlAdmin(String(e.tarea || "").slice(0, 100))}${e.revisado ? "" : " <b style='color:#B3261E;'>(sin revisar)</b>"}</li>`), "Sin emergencias.")}
@@ -2519,6 +2592,12 @@ function mostrarFichaClienteAdmin(c) {
   const cont = document.getElementById("inicioFichaCliente");
   const bc = cont.querySelector(".fa-ver-claves");
   if (bc) bc.addEventListener("click", () => { const ul = cont.querySelector(".fa-claves"); ul.classList.toggle("visible"); bc.textContent = ul.classList.contains("visible") ? "Ocultar claves" : "Mostrar claves"; });
+  conectarClavesAdmin(cont.querySelector(".fa-sec-claves"), { numero_cliente: num, nombre: c.nombre }, listaClaves, async () => {
+    await datosParaFichaAdmin();
+    mostrarFichaClienteAdmin(c);
+    const ul = document.querySelector("#inicioFichaCliente .fa-claves"), b2 = document.querySelector("#inicioFichaCliente .fa-ver-claves");
+    if (ul) ul.classList.add("visible"); if (b2) b2.textContent = "Ocultar claves";
+  });
   cont.querySelectorAll("[data-ficha]").forEach((b) => b.addEventListener("click", () => abrirFichaLineaSim(b.dataset.ficha)));
 }
 
@@ -8841,15 +8920,16 @@ document.getElementById("clavesClienteVolverListaBtn").addEventListener("click",
 function mostrarDetalleClavesClienteAdmin(numeroCliente) {
   const c = clavesClienteCacheAdmin.find((x) => x.numero_cliente === numeroCliente);
   if (!c) return;
-  const filas = c.claves.map((k) => {
-    const detalle = [k.usuario && `Usuario: ${escapeHtmlAdmin(k.usuario)}`, k.clave && `Clave: ${escapeHtmlAdmin(k.clave)}`, k.codigo && `Código: ${escapeHtmlAdmin(k.codigo)}`].filter(Boolean).join(" · ");
-    return `<li><b>${escapeHtmlAdmin(k.titulo)}</b>${detalle ? " — " + detalle : ""}</li>`;
-  }).join("") || "<li style='color:#6B7680;'>Sin claves.</li>";
   clavesClienteDetalleContenido.innerHTML = `
     <h2 style="margin-top:0;">${escapeHtmlAdmin(c.cliente || c.numero_cliente)}</h2>
     <p style="color:#6B7680;">Cliente N° ${escapeHtmlAdmin(c.numero_cliente)}</p>
-    <ul>${filas}</ul>
+    <div class="ficha-adm fa-sec-claves"><ul class="fa-claves visible">${htmlListaClaves(c.claves) || "<li style='color:#6B7680;'>Sin claves.</li>"}</ul>
+    <button type="button" class="btn-secondary-admin fa-clave-agregar" style="width:auto; padding:6px 12px;">+ Agregar clave</button><div class="fa-clave-zona"></div></div>
   `;
+  conectarClavesAdmin(clavesClienteDetalleContenido.querySelector(".fa-sec-claves"), { numero_cliente: c.numero_cliente, nombre: c.cliente }, c.claves, async () => {
+    await cargarClavesClienteAdmin();
+    if (clavesClienteCacheAdmin.some((x) => x.numero_cliente === numeroCliente)) mostrarDetalleClavesClienteAdmin(numeroCliente); else clavesClienteDetalle.classList.add("hidden");
+  });
   clavesClienteDetalle.classList.remove("hidden");
 }
 

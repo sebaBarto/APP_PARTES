@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.68.0";
+const APP_VERSION = "4.69.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -2389,12 +2389,30 @@ async function abrirFichaCliente(c) {
   const bloques = [];
   bloques.push(`<div class="ficha-bloque"><p class="dash-subtitulo">Pendientes</p>${pendientes.length ? pendientes.map((sv) => `<button type="button" class="ficha-pend" data-num="${escapeHtml(sv.numero_servicio || "")}"><b>N° ${escapeHtml(sv.numero_servicio || "")}</b> ${escapeHtml(sv.tarea || "")}</button>`).join("") : '<p class="list-status">No tiene servicios pendientes.</p>'}</div>`);
   bloques.push(`<div class="ficha-bloque"><p class="dash-subtitulo">Últimas visitas${visitas.length ? ` <span class="ficha-cuenta">(${visitas.length})</span>` : ""}</p>${visitas.length ? visitas.slice(0, 5).map((h) => `<div class="ficha-visita"><div class="ficha-visita-top"><b>${fecha(h.fecha)}</b> · ${escapeHtml(h.tecnico || "")}${h.es_instalacion ? ' · <span class="ficha-tag">Instalación</span>' : ""}</div>${h.tarea ? `<div class="ficha-visita-tarea">${escapeHtml(h.tarea)}</div>` : ""}${h.observaciones ? `<div class="ficha-visita-obs">${escapeHtml(h.observaciones)}</div>` : ""}${h.materiales ? `<div class="ficha-visita-obs">Materiales: ${escapeHtml(h.materiales)}</div>` : ""}</div>`).join("") : '<p class="list-status">Sin visitas registradas en la app.</p>'}</div>`);
-  bloques.push(`<div class="ficha-bloque"><p class="dash-subtitulo">Claves y códigos</p>${claves.length ? `<button type="button" class="btn btn-ghost btn-small" id="fichaVerClavesBtn">Mostrar ${claves.length} clave${claves.length === 1 ? "" : "s"} guardada${claves.length === 1 ? "" : "s"}</button><div id="fichaClaves" hidden>${claves.map((k) => `<div class="ficha-clave"><b>${escapeHtml(k.titulo || "Clave")}</b>${k.usuario ? `<span>Usuario: <code>${escapeHtml(k.usuario)}</code></span>` : ""}${k.clave ? `<span>Clave: <code>${escapeHtml(k.clave)}</code></span>` : ""}${k.codigo ? `<span>Código: <code>${escapeHtml(k.codigo)}</code></span>` : ""}<small>del ${fecha(k.fecha)}</small></div>`).join("")}</div>` : '<p class="list-status">No hay claves cargadas en los partes.</p>'}</div>`);
+  // Claves: las de los partes + las que cargó la oficina en la ficha (se traen aparte).
+  const htmlClaves = (lista) => `<p class="dash-subtitulo">Claves y códigos</p>${lista.length ? `<button type="button" class="btn btn-ghost btn-small" id="fichaVerClavesBtn">Mostrar ${lista.length} clave${lista.length === 1 ? "" : "s"} guardada${lista.length === 1 ? "" : "s"}</button><div id="fichaClaves" hidden>${lista.map((k) => `<div class="ficha-clave"><b>${escapeHtml(k.titulo || "Clave")}</b>${k.usuario ? `<span>Usuario: <code>${escapeHtml(k.usuario)}</code></span>` : ""}${k.clave ? `<span>Clave: <code>${escapeHtml(k.clave)}</code></span>` : ""}${k.codigo ? `<span>Código: <code>${escapeHtml(k.codigo)}</code></span>` : ""}${k.nota ? `<span>${escapeHtml(k.nota)}</span>` : ""}<small>${k.origen === "oficina" ? "cargada por la oficina" : "del " + fecha(k.fecha)}</small></div>`).join("")}</div>` : '<p class="list-status">No hay claves cargadas.</p>'}`;
+  bloques.push(`<div class="ficha-bloque" id="fichaClavesBloque">${htmlClaves(claves)}</div>`);
   bloques.push(`<div class="ficha-bloque" id="fichaSimBloque"><p class="dash-subtitulo">SIM instalada</p><p class="list-status">Buscando...</p></div>`);
   bloques.push(`<div class="ficha-bloque" id="fichaPlanoBloque"><p class="dash-subtitulo">Plano</p><p class="list-status">Buscando...</p></div>`);
   cont.innerHTML = bloques.join("");
-  const verClaves = document.getElementById("fichaVerClavesBtn");
-  if (verClaves) verClaves.addEventListener("click", () => { document.getElementById("fichaClaves").hidden = false; verClaves.remove(); });
+  const conectarVerClaves = () => {
+    const verClaves = document.getElementById("fichaVerClavesBtn");
+    if (verClaves) verClaves.addEventListener("click", () => { document.getElementById("fichaClaves").hidden = false; verClaves.remove(); });
+  };
+  conectarVerClaves();
+  if (c.numero_cliente) (async () => {
+    try {
+      const r = await fetch(`/api/historial?tipo=claves_cliente&numero_cliente=${encodeURIComponent(c.numero_cliente)}`, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+      const d = await r.json();
+      const oficina = (d && Array.isArray(d.claves) ? d.claves : []).filter((k) => k.origen === "oficina");
+      const bloque = document.getElementById("fichaClavesBloque");
+      if (!oficina.length || fichaClienteActual !== c || !bloque) return;
+      const abierto = document.getElementById("fichaClaves") && !document.getElementById("fichaClaves").hidden;
+      bloque.innerHTML = htmlClaves([...oficina, ...claves]);
+      conectarVerClaves();
+      if (abierto) { const btn = document.getElementById("fichaVerClavesBtn"); if (btn) btn.click(); }
+    } catch (e) { /* sin señal: quedan las de los partes */ }
+  })();
   cont.querySelectorAll(".ficha-pend").forEach((b) => b.addEventListener("click", () => {
     const sv = pendientes.find((x) => String(x.numero_servicio || "") === b.dataset.num);
     if (sv) seleccionarServicio(sv);

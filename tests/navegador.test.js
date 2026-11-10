@@ -6980,3 +6980,65 @@ test("Camionetas (depósito móvil): el técnico ve qué hay en la camioneta, to
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Claves en la ficha del cliente (panel): se agregan desde la ficha, se muestran con su origen y las de la oficina se editan o borran", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  let claves = [{ numero_cliente: "1203", cliente: "Panadería Sur", claves: [{ titulo: "Código maestro", codigo: "1111" }] }];
+  const posts = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url(), json = (o, st) => route.fulfill({ status: st || 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("coleccion=clientes")) return json([{ nombre: "Panadería Sur", numero_cliente: "1203", direccion: "Mitre 10", localidad: "Rosario" }]);
+    if (u.includes("tipo=claves_cliente")) return json(claves);
+    if (req.method() === "POST" && u.includes("/api/historial")) {
+      const b = JSON.parse(req.postData()); posts.push(b);
+      const c = claves[0];
+      if (b.operacion === "agregar") c.claves.unshift({ id: "k1", titulo: b.titulo, usuario: b.usuario, clave: b.clave, codigo: b.codigo, nota: b.nota, origen: "oficina", por: "Brenda", fecha: "2026-11-10T12:00:00Z" });
+      if (b.operacion === "editar") Object.assign(c.claves.find((k) => k.id === b.id), { clave: b.clave });
+      if (b.operacion === "borrar") c.claves = c.claves.filter((k) => k.id !== b.id);
+      return json({ ok: true });
+    }
+    return json([]);
+  });
+  page.on("dialog", (d) => d.accept());
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { document.getElementById("loginCard").classList.add("hidden"); document.getElementById("mainCard").classList.remove("hidden"); document.getElementById("tabInicioBtn").click(); });
+  await page.fill("#inicioBuscarCliente", "panad");
+  await page.waitForSelector(".ib-item");
+  await page.click(".ib-item");
+  await page.waitForSelector(".fa-sec-claves .fa-clave-agregar");
+  assert.match(await page.textContent(".fa-sec-claves h4"), /Claves \(1\)/);
+  // Agregar una
+  await page.click(".fa-sec-claves .fa-clave-agregar");
+  await page.fill('.fa-clave-form [name="titulo"]', "Wi-Fi");
+  await page.fill('.fa-clave-form [name="usuario"]', "PANAD_5G");
+  await page.fill('.fa-clave-form [name="clave"]', "pan2026");
+  await page.fill('.fa-clave-form [name="nota"]', "router en la cocina");
+  await page.click('.fa-clave-form [type="submit"]');
+  await page.waitForFunction(() => /Claves \(2\)/.test((document.querySelector(".fa-sec-claves h4") || {}).textContent || ""));
+  assert.deepStrictEqual(posts[0], { accion: "claves_admin", operacion: "agregar", numero_cliente: "1203", cliente: "Panadería Sur", titulo: "Wi-Fi", usuario: "PANAD_5G", clave: "pan2026", codigo: "", nota: "router en la cocina" });
+  assert.ok(await page.isVisible(".fa-claves"), "queda abierta para ver la que se cargó");
+  const lis = await page.$$eval(".fa-claves li", (l) => l.map((x) => x.textContent.replace(/\s+/g, " ").trim()));
+  assert.match(lis[0], /Wi-Fi — Usuario: PANAD_5G · Clave: pan2026 ?router en la cocina Oficina · Brenda · 10\/11\/2026 Editar ?Borrar/);
+  assert.match(lis[1], /Código maestro · Código: 1111 De un parte$/, "las de los partes no se editan desde acá");
+  // Editar
+  await page.click(".fa-claves li[data-oficina] [data-editar]");
+  assert.strictEqual(await page.inputValue('.fa-clave-form [name="clave"]'), "pan2026");
+  await page.fill('.fa-clave-form [name="clave"]', "pan2027");
+  await page.click('.fa-clave-form [type="submit"]');
+  await page.waitForFunction(() => /pan2027/.test(document.querySelector(".fa-claves").textContent));
+  assert.deepStrictEqual([posts[1].operacion, posts[1].id], ["editar", "k1"]);
+  // Borrar
+  await page.click(".fa-claves li[data-oficina] [data-borrar]");
+  await page.waitForFunction(() => /Claves \(1\)/.test(document.querySelector(".fa-sec-claves h4").textContent));
+  assert.deepStrictEqual([posts[2].operacion, posts[2].id], ["borrar", "k1"]);
+  // Hace falta algo para guardar
+  await page.click(".fa-sec-claves .fa-clave-agregar");
+  await page.fill('.fa-clave-form [name="titulo"]', "Nada");
+  await page.click('.fa-clave-form [type="submit"]');
+  await page.waitForTimeout(200);
+  assert.strictEqual(posts.length, 3);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

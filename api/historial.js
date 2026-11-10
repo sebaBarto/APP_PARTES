@@ -345,7 +345,8 @@ module.exports = require("../lib/auditoria").conAuditoria("historial", async (re
 
   const authHeader = req.headers["authorization"] || "";
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();
-  if (!require("../lib/sesion").autorizar(req)) {
+  const quienAuth = require("../lib/sesion").autorizar(req);
+  if (!quienAuth) {
     res.status(401).json({ error: "No autorizado" });
     return;
   }
@@ -473,8 +474,13 @@ module.exports = require("../lib/auditoria").conAuditoria("historial", async (re
       if (req.query && req.query.tipo === "claves_cliente") {
         const qs = req.query.numero_cliente ? `?numero_cliente=${encodeURIComponent(req.query.numero_cliente)}` : "";
         const r = await fetch(`${BACKEND_NUEVO_URL}/api/partes/claves-cliente${qs}`, { headers: headersBackendNuevo });
-        const data = await r.json();
-        res.status(r.status).json(data);
+        const data = await r.json().catch(() => null);
+        // Se suman las que cargó la oficina desde el panel (si no se pueden leer, quedan las de los partes).
+        const CA = require("../lib/claves-admin");
+        let admin = { clientes: {} };
+        try { admin = await CA.leerClavesAdmin(); } catch (e) { admin = { clientes: {} }; }
+        if (!r.ok && !Object.keys(admin.clientes).length) { res.status(r.status).json(data || { error: "No se pudieron leer las claves" }); return; }
+        res.status(200).json(CA.unirClaves(r.ok ? data : (req.query.numero_cliente ? {} : []), admin.clientes, req.query.numero_cliente));
         return;
       }
       const r = await fetch(`${BACKEND_NUEVO_URL}/api/partes`, { headers: headersBackendNuevo });
@@ -496,6 +502,17 @@ module.exports = require("../lib/auditoria").conAuditoria("historial", async (re
       if (typeof body === "string") body = JSON.parse(body);
       if (!body || typeof body !== "object") {
         res.status(400).json({ error: "Falta el registro a guardar" });
+        return;
+      }
+
+      // Claves de un cliente cargadas por la oficina (solo desde el panel de administración).
+      if (body.accion === "claves_admin") {
+        if (quienAuth.rol !== "admin") { res.status(403).json({ error: "Solo desde el panel de administración" }); return; }
+        if (!["agregar", "editar", "borrar"].includes(body.operacion)) { res.status(400).json({ error: "Operación inválida" }); return; }
+        try {
+          await require("../lib/claves-admin").guardarClaveAdmin({ ...body, accion: body.operacion }, quienAuth.nombre || "Oficina");
+          res.status(200).json({ ok: true });
+        } catch (err) { res.status(err.status || 500).json({ error: err.message }); }
         return;
       }
 
