@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.65.0";
+const APP_VERSION = "4.65.1";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -19226,7 +19226,7 @@ function depPintarBandeja() {
   const env = sal.envios || [];
   const items = [
     { k: "pedidos", n: depSolicitudesAbiertas().length, t: "Pedidos", modo: null, ir: "depSolicitudes", ico: '<path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/>' },
-    { k: "devoluciones", n: env.filter((e) => e.a === "dep").length, t: "Devoluciones", modo: "recibir", ir: "depDevoluciones", ico: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>' },
+    { k: "devoluciones", n: env.filter((e) => e.a === "dep").length, t: "Por recibir", modo: "recibir", ir: "depDevoluciones", ico: '<path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>' },
     { k: "aprobar", n: (sal.aprobar || []).length, t: "Para aprobar", modo: "recibir", ir: "depAprobar", ico: '<path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/>' },
     { k: "camino", n: env.filter((e) => e.a !== "dep").length, t: "En camino", modo: "consultar", ir: "depEnCamino", ico: '<path d="M3 7h11v9H3zM14 10h4l3 3v3h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/>' },
   ];

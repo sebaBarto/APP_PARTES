@@ -6779,7 +6779,7 @@ test("Depósito (gráfico): bandeja de pendientes con acceso directo, modos con 
   await page.evaluate(() => { tecnicoLogueado = "Melina"; tecnicosPasswords = { Melina: "" }; tecnicosPermisos = { Melina: { stock_responsable: true } }; refrescarAccesosPorPermisos(); showScreen("home"); });
   await page.click("#tileDepositoBtn");
   await page.waitForSelector("#depBandeja .stk-bandeja-item");
-  assert.deepStrictEqual(await page.$$eval("#depBandeja .stk-bandeja-item", (l) => l.map((x) => x.textContent.replace(/\s+/g, " ").trim())), ["1Devoluciones", "1En camino"]);
+  assert.deepStrictEqual(await page.$$eval("#depBandeja .stk-bandeja-item", (l) => l.map((x) => x.textContent.replace(/\s+/g, " ").trim())), ["1Por recibir", "1En camino"]);
   assert.strictEqual(await page.getAttribute("#screen-deposito", "data-modo"), "entregar");
   assert.strictEqual(await page.locator("#depModos .stk-modo-ico").count(), 4);
   // Devoluciones: pasa a Alta y lleva a la lista de devoluciones
