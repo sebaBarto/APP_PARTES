@@ -249,6 +249,14 @@
   .stk-tipos label:has(input:checked) { background: #101820; color: #F5A623; border-color: #101820; }
   .stk-tipos input { width: auto; margin: 0; accent-color: #F5A623; }
   .stk-tipos .n { opacity: .7; font-size: 12px; }
+  .stk-marca-sug { border: 1px solid rgba(128,128,128,.25); border-radius: 10px; margin: 6px 0; }
+  .stk-marca-sug > summary { display: flex; align-items: center; gap: 10px; padding: 8px 10px; cursor: pointer; flex-wrap: wrap; }
+  .stk-marca-sug > summary input[type="checkbox"] { width: auto; margin: 0; accent-color: #F5A623; }
+  .stk-marca-sug .stk-marca-sug-nombre { width: 160px; padding: 4px 8px; font-weight: 700; }
+  .stk-marca-sug > summary .stk-det { flex: 1; min-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .stk-marca-sug-arts { padding: 0 12px 10px 38px; display: grid; gap: 4px; max-height: 260px; overflow: auto; }
+  .stk-marca-sug-arts label { display: flex; gap: 8px; align-items: baseline; margin: 0; font-weight: 400; font-size: 13px; cursor: pointer; }
+  .stk-marca-sug-arts input { width: auto; margin: 0; accent-color: #F5A623; }
   .rend-matriz { width: 100%; border-collapse: collapse; font-size: 13px; }
   .rend-matriz th, .rend-matriz td { padding: 6px 8px; border-bottom: 1px solid rgba(128,128,128,.2); text-align: right; white-space: nowrap; }
   .rend-matriz th:first-child, .rend-matriz td:first-child { text-align: left; }
@@ -1327,6 +1335,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
       <div class="stk-sub" id="stkSub">
         <button type="button" class="btn-secondary-admin activo" data-stk="tablero">Tablero</button>
         <button type="button" class="btn-secondary-admin" data-stk="articulos">Artículos</button>
+        <button type="button" class="btn-secondary-admin" data-stk="marcas">Marcas</button>
         <button type="button" class="btn-secondary-admin" data-stk="salud">Salud <span id="stkSaludBadge" class="stk-tag bajo hidden"></span></button>
         <button type="button" class="btn-secondary-admin" data-stk="conciliacion">Conciliación con Oficina</button>
         <button type="button" class="btn-secondary-admin" data-stk="pedidos">Pedidos</button>
@@ -1361,12 +1370,31 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
             <div style="flex:2 1 220px;"><label>Buscar</label><input type="text" class="field-input" id="stkBuscar" placeholder="Código o parte de la descripción"></div>
             <div><label>Mostrar</label><select id="stkFiltro" style="min-width:190px;"><option value="constock">Con stock</option><option value="bajo">En el mínimo o por debajo</option><option value="sinmin">Con stock y sin mínimo</option><option value="sinstock">Sin stock</option><option value="baja">Deshabilitados en Oficina</option><option value="todos">Todos</option></select></div>
             <div><label>Dónde</label><select id="stkDonde" style="min-width:170px;"><option value="">En cualquier lado</option><option value="dep">En el depósito</option><option value="tec">En técnicos</option><option value="veh">En vehículos</option><option value="cam">En camino</option><option value="cli">En clientes (instalado)</option><option value="com">En comodato</option></select></div>
+            <div><label>Marca</label><select id="stkMarca" style="min-width:140px;"><option value="">Todas</option></select></div>
             <div><label>Proveedor</label><select id="stkProv" style="min-width:150px;"><option value="">Todos</option></select></div>
             <button type="button" class="btn-secondary-admin" id="stkExcelBtn" style="width:auto;"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg> Excel</button>
             <button type="button" class="btn-secondary-admin" id="stkTipoVariosBtn" style="width:auto;">Cambiar el tipo de los que se ven</button>
+            <button type="button" class="btn-secondary-admin" id="stkMarcaVariosBtn" style="width:auto;">Poner marca a los que se ven</button>
           </div>
+          <datalist id="stkMarcasLista"></datalist><datalist id="stkProvLista"></datalist>
           <div class="stk-tipos" id="stkTipos" role="group" aria-label="Tipos de artículo"></div>
           <div id="stkLista"></div>
+        </div>
+      </div>
+
+      <div data-stk-vista="marcas" class="hidden">
+        <div class="card" id="stkMarcasSugCard">
+          <h3 style="margin-top:0;">Marcas sugeridas</h3>
+          <p class="subtitle" style="margin-top:0;">Artículos sin marca en los que la descripción dice cuál es (o el modelo la delata, ej. PMD75 → Paradox). Revisá, corregí el nombre si hace falta, destildá lo que no va y tocá «Aplicar».</p>
+          <div id="stkMarcasSug"></div>
+        </div>
+        <div class="card">
+          <h3 style="margin-top:0;">Marcas y proveedores</h3>
+          <p class="subtitle" style="margin-top:0;">Cada marca con sus artículos. Escribí el proveedor y tocá «Poner» para asignárselo a todos los artículos de esa marca. «Ver» abre la lista de Artículos filtrada por esa marca (para cambiar uno por uno, o el tipo de todos).</p>
+          <div class="field-row" style="flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;">
+            <input type="search" class="field-input" id="stkMarcasBuscar" placeholder="Buscar una marca…" style="flex:1;min-width:200px;">
+          </div>
+          <div id="stkMarcasTabla"></div>
         </div>
       </div>
 
@@ -5519,6 +5547,11 @@ const AYUDAS_SIMS = {
   stk_proveedores: { titulo: "Códigos de proveedor", gif: "assets/ayuda/stock-adm-proveedores.gif", texto: [
     "La etiqueta de SAT trae al final el código del proveedor (4 dígitos). Acá le ponés el nombre a cada código.",
     "Los códigos que se escanearon y todavía no tienen nombre aparecen para completar." ] },
+  stk_marcas: { titulo: "Marcas", texto: [
+    "Agrupa los artículos por marca para configurarlos juntos: el proveedor de toda una marca en un paso.",
+    "Arriba, las marcas que la APP encontró en la descripción (o por el modelo, ej. PMD75 → Paradox). Revisalas, destildá lo que no va y aplicá.",
+    "Abajo, cada marca con su proveedor de hoy. Escribís el proveedor y «Poner». Si algunos ya tenían otro proveedor, pregunta si cambiarlos también.",
+    "Los artículos nuevos que llegan del listado de Oficina ya entran con su marca sugerida. En Artículos podés filtrar por marca o cambiarla de a uno." ] },
   ...((window.TableroStock && window.TableroStock.AYUDAS) || {}),
 };
 const LUGARES_AYUDA_SIMS = [
@@ -5526,6 +5559,7 @@ const LUGARES_AYUDA_SIMS = [
   ['[data-stk-vista="salud"] h3', "stk_salud"], ['[data-stk-vista="conciliacion"] h3', "stk_conciliacion"], ['[data-stk-vista="pedidos"] h3', "stk_pedidos"],
   ["#stkMovExcelBtn", "stk_movimientos", "after"], ['[data-stk-vista="oficina"] h3', "stk_oficina"], ['[data-stk-vista="garantia"] h3', "stk_garantia"],
   ['[data-stk-vista="proveedores"] h3', "stk_proveedores"],
+  ['#stkMarcasSugCard > h3', "stk_marcas"],
   ['[data-stk-vista="tecnicos"] h3', "stk_tecnicos"],
   ["#panelSims > h1", "resumen"], ["#simsAltaBtn", "alta", "after"], ["#elegirExcelSimsBtn", "excel", "after"],
   ["#simsPendientesCard > h3", "pendientes"], ["#simsTabla thead th:nth-child(7)", "fila"], ["#simsLoteLimpiarBtn", "lote", "after"],
@@ -6511,6 +6545,7 @@ function stkMostrarVista() {
   stkPintarBadgeSalud();
   if (stkVista === "tablero") stkCargarTablero();
   else if (stkVista === "articulos") { stkRenderEstado(); stkPintarFiltros(); stkRenderArticulos(); }
+  else if (stkVista === "marcas") stkRenderMarcas();
   else if (stkVista === "conciliacion") stkRenderConciliacion();
   else if (stkVista === "pedidos") stkRenderPedidos();
   else if (stkVista === "movimientos") stkCargarMovimientos();
@@ -6611,15 +6646,34 @@ function stkPintarFiltros() {
   const provs = [...new Set(arts.map((a) => a.prov).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es"));
   sel.innerHTML = '<option value="">Todos</option><option value="-">Sin proveedor</option>' + provs.map((p) => `<option>${escapeHtmlAdmin(p)}</option>`).join("");
   sel.value = actual === "-" || provs.includes(actual) ? actual : "";
+  const selM = document.getElementById("stkMarca"), actualM = selM.value;
+  const marcas = stkMarcasConocidas();
+  selM.innerHTML = '<option value="">Todas</option><option value="-">Sin marca</option>' + marcas.map((m) => `<option>${escapeHtmlAdmin(m)}</option>`).join("");
+  selM.value = actualM === "-" || marcas.includes(actualM) ? actualM : "";
+  stkPintarListas();
+}
+// Marcas y proveedores que ya existen (para sugerir al escribir).
+function stkMarcasConocidas() {
+  const vistas = new Map();
+  Object.values((stk && stk.catalogo.articulos) || {}).forEach((a) => { const m = limpiarMarca(a.marca); if (m && !vistas.has(claveMarca(m))) vistas.set(claveMarca(m), m); });
+  return [...vistas.values()].sort((a, b) => a.localeCompare(b, "es"));
+}
+function stkProvConocidos() {
+  return [...new Set([...Object.values((stk && stk.catalogo.proveedores) || {}), ...Object.values((stk && stk.catalogo.articulos) || {}).map((a) => a.prov)].map((x) => String(x || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es"));
+}
+function stkPintarListas() {
+  document.getElementById("stkMarcasLista").innerHTML = stkMarcasConocidas().map((m) => `<option value="${escapeHtmlAdmin(m)}">`).join("");
+  document.getElementById("stkProvLista").innerHTML = stkProvConocidos().map((m) => `<option value="${escapeHtmlAdmin(m)}">`).join("");
 }
 function stkFiltrados() {
   const q = normalizeText(document.getElementById("stkBuscar").value || "");
-  const f = document.getElementById("stkFiltro").value, donde = document.getElementById("stkDonde").value, prov = document.getElementById("stkProv").value;
+  const f = document.getElementById("stkFiltro").value, donde = document.getElementById("stkDonde").value, prov = document.getElementById("stkProv").value, marca = document.getElementById("stkMarca").value;
   const tot = totalesPorArticulo(stk.saldos);
   return Object.values(stk.catalogo.articulos || {}).map((a) => ({ a, t: tot[a.c] || { sat: 0, dep: 0, tec: 0, veh: 0, cam: 0, cli: 0, com: 0, detalle: {} } })).filter(({ a, t }) => {
     if (!stkTiposVisibles.has(a.tipo)) return false;
-    if (q && !normalizeText(`${a.c} ${a.d} ${a.prov || ""}`).includes(q)) return false;
+    if (q && !normalizeText(`${a.c} ${a.d} ${a.prov || ""} ${a.marca || ""}`).includes(q)) return false;
     if (prov && (prov === "-" ? a.prov : a.prov !== prov)) return false;
+    if (marca && (marca === "-" ? limpiarMarca(a.marca) : claveMarca(a.marca) !== claveMarca(marca))) return false;
     if (donde && !t[donde]) return false;
     const conStock = t.sat || t.com || t.cli;
     if (f === "constock") return conStock;
@@ -6636,7 +6690,7 @@ function stkRenderArticulos() {
   if (!filas.length) { cont.innerHTML = `<p class="subtitle">${Object.keys(stk.catalogo.articulos || {}).length ? "No hay artículos con ese filtro." : "Todavía no hay catálogo."}</p>`; return; }
   const opTipo = (t) => Object.entries(STOCK_TIPOS).map(([k, v]) => `<option value="${k}" ${k === t ? "selected" : ""}>${escapeHtmlAdmin(v)}</option>`).join("");
   cont.innerHTML = `<p class="subtitle" style="margin:8px 0;">${filas.length.toLocaleString("es-AR")} artículos.</p>
-    <div style="overflow-x:auto;"><table class="sims-tabla stk-tabla"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Depósito</th><th class="num">Técnicos / vehículos</th><th class="num">Clientes</th><th>Cómo se controla</th><th class="num">Mínimo</th><th class="num">A pedir</th><th>Proveedor</th><th></th></tr></thead><tbody>
+    <div style="overflow-x:auto;"><table class="sims-tabla stk-tabla"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Depósito</th><th class="num">Técnicos / vehículos</th><th class="num">Clientes</th><th>Cómo se controla</th><th class="num">Mínimo</th><th class="num">A pedir</th><th>Marca</th><th>Proveedor</th><th></th></tr></thead><tbody>
     ${filas.slice(0, stkLimite).map(({ a, t }) => {
       const bajo = Number(a.min) > 0 && t.dep <= Number(a.min);
       const med = a.medida === "metros" ? " m" : "";
@@ -6649,7 +6703,8 @@ function stkRenderArticulos() {
         <td><select class="stk-tipo" data-campo="tipo">${opTipo(a.tipo)}</select></td>
         <td class="num"><input class="stk-min" data-campo="min" inputmode="decimal" value="${a.min == null ? "" : escapeHtmlAdmin(String(a.min))}"></td>
         <td class="num"><input class="stk-min" data-campo="pedir" inputmode="decimal" value="${a.pedir == null ? "" : escapeHtmlAdmin(String(a.pedir))}"></td>
-        <td><input class="field-input" data-campo="prov" style="padding:4px 6px;min-width:120px;" value="${escapeHtmlAdmin(a.prov || "")}"></td>
+        <td><input class="field-input" data-campo="marca" list="stkMarcasLista" style="padding:4px 6px;min-width:100px;" value="${escapeHtmlAdmin(a.marca || "")}"></td>
+        <td><input class="field-input" data-campo="prov" list="stkProvLista" style="padding:4px 6px;min-width:120px;" value="${escapeHtmlAdmin(a.prov || "")}"></td>
         <td class="stk-btns"><button type="button" class="btn-secondary-admin" data-ajustar>Ajustar</button></td></tr>`;
     }).join("")}</tbody></table></div>
     ${filas.length > stkLimite ? `<button type="button" class="btn-secondary-admin" id="stkMasBtn" style="width:auto;margin-top:10px;">Mostrar ${Math.min(200, filas.length - stkLimite)} más</button>` : ""}`;
@@ -6664,13 +6719,14 @@ function stkRenderArticulos() {
       const r = await stkPost({ accion: "configurar", c, campos: { [campo]: v } });
       stk.catalogo.articulos[c] = r.articulo;
       avisoAdmin(`Guardado: ${r.articulo.d}`, "ok");
+      if (campo === "marca" || campo === "prov") stkPintarListas();
     } catch (err) { avisoAdmin("No se pudo guardar: " + err.message, "err"); }
     el.disabled = false;
   }));
   cont.querySelectorAll("[data-ajustar]").forEach((b) => b.addEventListener("click", () => stkAjustarDialogo(b.closest("tr").dataset.c, "dep")));
 }
 document.getElementById("stkBuscar").addEventListener("input", () => { stkLimite = 200; stkRenderArticulos(); });
-["stkFiltro", "stkDonde", "stkProv"].forEach((id) => document.getElementById(id).addEventListener("change", () => { stkLimite = 200; stkRenderArticulos(); }));
+["stkFiltro", "stkDonde", "stkProv", "stkMarca"].forEach((id) => document.getElementById(id).addEventListener("change", () => { stkLimite = 200; stkRenderArticulos(); }));
 async function stkAjustarDialogo(c, ubic) {
   const a = stk.catalogo.articulos[c] || { d: c };
   const actual = ((stk.saldos.ubic || {})[ubic] || {})[c] || 0;
@@ -6709,9 +6765,159 @@ document.getElementById("stkTipoVariosBtn").addEventListener("click", async (e) 
     } catch (err) { avisoAdmin("No se pudo: " + err.message, "err"); }
   });
 });
+document.getElementById("stkMarcaVariosBtn").addEventListener("click", async (e) => {
+  const btn = e.currentTarget, lista = stkFiltrados();
+  if (!lista.length) { avisoAdmin("No hay artículos con ese filtro.", "aviso"); return; }
+  const v = await pedirTextoAdmin(`Marca para los ${lista.length} artículos que se ven (usá el buscador y los filtros para elegirlos; ej. buscá «PMD»). Vacío = sin marca.\n\nMarcas que ya hay: ${stkMarcasConocidas().slice(0, 30).join(", ") || "ninguna"}`, "");
+  if (v === null) return;
+  const marca = stkMarcaExistente(v);
+  if (!(await confirmarAdmin(`¿Poner la marca «${marca || "(ninguna)"}» a ${lista.length} artículos?\n\n${lista.slice(0, 8).map((x) => "• " + x.a.d).join("\n")}${lista.length > 8 ? `\n… y ${lista.length - 8} más` : ""}`))) return;
+  await simsConBoton(btn, async () => {
+    try {
+      const r = await stkPost({ accion: "configurar_varios", codigos: lista.map((x) => x.a.c), campos: { marca } });
+      await stkLeer();
+      avisoAdmin(`Listo: ${r.cambiados} artículo(s) con marca «${marca || "(ninguna)"}».`, "ok");
+      stkMostrarVista();
+    } catch (err) { avisoAdmin("No se pudo: " + err.message, "err"); }
+  });
+});
+// Si la marca ya existe escrita de otra forma («paradox», «PARADOX»), se usa la que ya está.
+function stkMarcaExistente(v) {
+  const m = limpiarMarca(v);
+  return stkMarcasConocidas().find((x) => claveMarca(x) === claveMarca(m)) || m;
+}
+
+// --- Marcas: agrupar artículos por marca y poner el proveedor a todos juntos ---
+let stkMarcasSugQuitadas = new Set(), stkMarcasSugNombre = {};
+function stkMarcasArticulos() { return Object.values(stk.catalogo.articulos || {}).filter((a) => a.tipo !== "sim"); }
+function stkRenderMarcas() {
+  stkPintarListas();
+  // 1) Sugerencias para los que no tienen marca
+  const grupos = {};
+  stkMarcasArticulos().filter((a) => !limpiarMarca(a.marca)).forEach((a) => {
+    const m = sugerirMarca(a.d);
+    if (!m) return;
+    const sug = stkMarcaExistente(m), k = claveMarca(sug);
+    (grupos[k] = grupos[k] || { k, marca: sug, arts: [] }).arts.push(a);
+  });
+  const lista = Object.values(grupos).sort((x, y) => y.arts.length - x.arts.length || x.marca.localeCompare(y.marca, "es"));
+  const sugCont = document.getElementById("stkMarcasSug");
+  const totalSug = lista.reduce((n, g) => n + g.arts.length, 0);
+  sugCont.innerHTML = !lista.length ? '<p class="status ok">No hay sugerencias pendientes: los artículos sin marca no la dicen en la descripción. Se les pone desde Artículos (filtro Marca → «Sin marca»).</p>'
+    : `<p class="subtitle" style="margin:0 0 8px;">${totalSug.toLocaleString("es-AR")} artículos en ${lista.length} marcas.</p>
+    ${lista.map((g) => `<details class="stk-marca-sug" data-k="${escapeHtmlAdmin(g.k)}">
+      <summary><input type="checkbox" class="stk-marca-sug-ok" ${stkMarcasSugQuitadas.has("g:" + g.k) ? "" : "checked"} aria-label="Aplicar ${escapeHtmlAdmin(g.marca)}">
+        <input class="field-input stk-marca-sug-nombre" list="stkMarcasLista" value="${escapeHtmlAdmin(stkMarcasSugNombre[g.k] ?? g.marca)}" aria-label="Nombre de la marca">
+        <span class="stk-det">${g.arts.length} artículo${g.arts.length === 1 ? "" : "s"} · ${escapeHtmlAdmin(g.arts.slice(0, 2).map((a) => a.d).join(" · "))}${g.arts.length > 2 ? " …" : ""}</span></summary>
+      <div class="stk-marca-sug-arts">${g.arts.sort((x, y) => String(x.d).localeCompare(String(y.d), "es")).map((a) => `<label><input type="checkbox" data-c="${escapeHtmlAdmin(a.c)}" ${stkMarcasSugQuitadas.has(a.c) ? "" : "checked"}> <span class="stk-det">${escapeHtmlAdmin(a.c)}</span> ${escapeHtmlAdmin(a.d)}</label>`).join("")}</div>
+    </details>`).join("")}
+    <div class="field-row" style="gap:8px;margin-top:10px;"><button type="button" id="stkMarcasSugAplicar" style="width:auto;">Aplicar las marcas tildadas</button></div>`;
+  sugCont.querySelectorAll(".stk-marca-sug-ok").forEach((i) => {
+    i.addEventListener("click", (e) => e.stopPropagation());
+    i.addEventListener("change", () => { const k = i.closest("details").dataset.k; if (i.checked) stkMarcasSugQuitadas.delete("g:" + k); else stkMarcasSugQuitadas.add("g:" + k); });
+  });
+  sugCont.querySelectorAll(".stk-marca-sug-nombre").forEach((i) => {
+    i.addEventListener("click", (e) => e.stopPropagation());
+    i.addEventListener("keydown", (e) => { if (e.key === " " || e.key === "Enter") e.stopPropagation(); if (e.key === "Enter") e.preventDefault(); });
+    i.addEventListener("input", () => { stkMarcasSugNombre[i.closest("details").dataset.k] = i.value; });
+  });
+  sugCont.querySelectorAll(".stk-marca-sug-arts input[data-c]").forEach((i) => i.addEventListener("change", () => { if (i.checked) stkMarcasSugQuitadas.delete(i.dataset.c); else stkMarcasSugQuitadas.add(i.dataset.c); }));
+  const aplicar = document.getElementById("stkMarcasSugAplicar");
+  if (aplicar) aplicar.addEventListener("click", async (e) => {
+    const items = [];
+    lista.forEach((g) => {
+      if (stkMarcasSugQuitadas.has("g:" + g.k)) return;
+      const marca = stkMarcaExistente(stkMarcasSugNombre[g.k] ?? g.marca);
+      if (!marca) return;
+      g.arts.forEach((a) => { if (!stkMarcasSugQuitadas.has(a.c)) items.push({ c: a.c, marca }); });
+    });
+    if (!items.length) { avisoAdmin("No hay nada tildado.", "aviso"); return; }
+    const porMarca = {}; items.forEach((x) => { porMarca[x.marca] = (porMarca[x.marca] || 0) + 1; });
+    if (!(await confirmarAdmin(`¿Poner la marca a ${items.length} artículos?\n\n${Object.entries(porMarca).slice(0, 12).map(([m, n]) => `• ${m}: ${n}`).join("\n")}${Object.keys(porMarca).length > 12 ? `\n… y ${Object.keys(porMarca).length - 12} marcas más` : ""}`))) return;
+    await simsConBoton(e.currentTarget, async () => {
+      try {
+        const r = await stkPost({ accion: "configurar_varios", items });
+        await stkLeer();
+        stkMarcasSugNombre = {};
+        avisoAdmin(`Listo: ${r.cambiados} artículo(s) con su marca.`, "ok");
+      } catch (err) { avisoAdmin("No se pudo: " + err.message, "err"); }
+      stkMostrarVista();
+    });
+  });
+  // 2) Marcas con su proveedor
+  const q = normalizeText(document.getElementById("stkMarcasBuscar").value || "");
+  const tot = totalesPorArticulo(stk.saldos);
+  const resumen = resumenMarcas(Object.fromEntries(stkMarcasArticulos().map((a) => [a.c, a]))).filter((g) => !q || normalizeText(g.marca || "sin marca").includes(q));
+  const tabla = document.getElementById("stkMarcasTabla");
+  if (!resumen.length) { tabla.innerHTML = '<p class="subtitle">No hay marcas con ese nombre.</p>'; return; }
+  const provTexto = (g) => {
+    const ps = Object.entries(g.provs).sort((a, b) => b[1] - a[1]);
+    const con = ps.filter(([p]) => p);
+    if (!con.length) return '<span class="stk-tag bajo">Sin proveedor</span>';
+    const sin = g.provs[""] || 0;
+    return con.slice(0, 3).map(([p, n]) => `${escapeHtmlAdmin(p)} <span class="stk-det">(${n})</span>`).join(", ") + (con.length > 3 ? ` <span class="stk-det">y ${con.length - 3} más</span>` : "") + (sin ? ` · <span class="stk-tag bajo">${sin} sin proveedor</span>` : "");
+  };
+  tabla.innerHTML = `<div style="overflow-x:auto;"><table class="sims-tabla stk-tabla"><thead><tr><th>Marca</th><th class="num">Artículos</th><th class="num">Con stock</th><th>Proveedor hoy</th><th>Poner proveedor a todos</th><th></th></tr></thead><tbody>
+    ${resumen.map((g) => {
+      const conStock = g.codigos.filter((c) => { const t = tot[c]; return t && (t.sat || t.com || t.cli); }).length;
+      const unico = Object.keys(g.provs).filter(Boolean);
+      return `<tr data-k="${escapeHtmlAdmin(claveMarca(g.marca))}">
+        <td><b>${g.marca ? escapeHtmlAdmin(g.marca) : '<i>Sin marca</i>'}</b></td>
+        <td class="num">${g.codigos.length}</td><td class="num">${conStock}</td>
+        <td>${provTexto(g)}</td>
+        <td>${g.marca ? `<div style="display:flex;gap:6px;"><input class="field-input stk-marca-prov" list="stkProvLista" style="padding:4px 6px;min-width:150px;" placeholder="Proveedor" value="${unico.length === 1 ? escapeHtmlAdmin(unico[0]) : ""}"><button type="button" class="btn-secondary-admin" data-marca-prov style="width:auto;">Poner</button></div>` : ""}</td>
+        <td class="stk-btns"><button type="button" class="btn-secondary-admin" data-marca-ver>Ver</button>${g.marca ? '<button type="button" class="btn-secondary-admin" data-marca-renombrar>Renombrar</button>' : ""}</td></tr>`;
+    }).join("")}</tbody></table></div>`;
+  const grupo = (tr) => resumen.find((g) => claveMarca(g.marca) === tr.dataset.k);
+  tabla.querySelectorAll("[data-marca-ver]").forEach((b) => b.addEventListener("click", () => {
+    const g = grupo(b.closest("tr"));
+    stkVista = "articulos"; stkMostrarVista();
+    document.getElementById("stkMarca").value = g.marca || "-";
+    document.getElementById("stkFiltro").value = "todos";
+    document.getElementById("stkBuscar").value = "";
+    stkLimite = 200; stkRenderArticulos();
+    window.scrollTo(0, 0);
+  }));
+  tabla.querySelectorAll("[data-marca-prov]").forEach((b) => b.addEventListener("click", async (e) => {
+    const tr = b.closest("tr"), g = grupo(tr), prov = String(tr.querySelector(".stk-marca-prov").value || "").replace(/\s+/g, " ").trim();
+    if (!prov) { avisoAdmin("Escribí el proveedor.", "aviso"); return; }
+    const arts = g.codigos.map((c) => stk.catalogo.articulos[c]).filter(Boolean);
+    const otros = arts.filter((a) => a.prov && a.prov !== prov);
+    let codigos = arts.filter((a) => a.prov !== prov).map((a) => a.c);
+    if (!codigos.length) { avisoAdmin(`Todos los ${g.marca} ya tienen «${prov}».`, "aviso"); return; }
+    if (otros.length && !(await confirmarAdmin(`${otros.length} artículo(s) de ${g.marca} ya tienen otro proveedor (${[...new Set(otros.map((a) => a.prov))].slice(0, 4).join(", ")}).\n\n¿Cambiarlos también a «${prov}»?`, { aceptar: "Sí, cambiar todos", cancelar: "No" }))) {
+      codigos = arts.filter((a) => !a.prov).map((a) => a.c);
+      if (!codigos.length) { avisoAdmin("Todos ya tienen proveedor: no se cambió nada.", "aviso"); return; }
+      if (!(await confirmarAdmin(`¿Poner «${prov}» solo a los ${codigos.length} artículo(s) de ${g.marca} que no tienen proveedor?`))) return;
+    } else if (!otros.length && !(await confirmarAdmin(`¿Poner «${prov}» a ${codigos.length} artículo(s) de ${g.marca}?`))) return;
+    await simsConBoton(e.currentTarget, async () => {
+      try {
+        const r = await stkPost({ accion: "configurar_varios", codigos, campos: { prov } });
+        await stkLeer();
+        avisoAdmin(`Listo: ${r.cambiados} artículo(s) de ${g.marca} con proveedor «${prov}».`, "ok");
+      } catch (err) { avisoAdmin("No se pudo: " + err.message, "err"); }
+      stkMostrarVista();
+    });
+  }));
+  tabla.querySelectorAll("[data-marca-renombrar]").forEach((b) => b.addEventListener("click", async (e) => {
+    const g = grupo(b.closest("tr"));
+    const v = await pedirTextoAdmin(`Nuevo nombre para «${g.marca}» (${g.codigos.length} artículos). Si ponés el de otra marca, se juntan.`, g.marca);
+    if (v === null || limpiarMarca(v) === g.marca) return;
+    const marca = stkMarcaExistente(v);
+    await simsConBoton(e.currentTarget, async () => {
+      try {
+        const r = await stkPost({ accion: "configurar_varios", codigos: g.codigos, campos: { marca } });
+        await stkLeer();
+        avisoAdmin(`Listo: ${r.cambiados} artículo(s) ahora son «${marca || "(sin marca)"}».`, "ok");
+      } catch (err) { avisoAdmin("No se pudo: " + err.message, "err"); }
+      stkMostrarVista();
+    });
+  }));
+}
+document.getElementById("stkMarcasBuscar").addEventListener("input", () => stkRenderMarcas());
 document.getElementById("stkExcelBtn").addEventListener("click", () => {
   if (!stk) return;
-  const filas = stkFiltrados().map(({ a, t }) => ({ Código: a.c, Descripción: a.d, "Cómo se controla": STOCK_TIPOS[a.tipo] || a.tipo, Unidad: a.medida || "unidades", Depósito: t.dep, "Técnicos": t.tec, "Vehículos": t.veh, "En camino": t.cam, "Comodato": t.com, "Instalado en clientes": t.cli, "Stock mínimo": a.min ?? "", "Cantidad a pedir": a.pedir ?? "", Proveedor: a.prov || "", "Dónde está": stkUbicTexto(t.detalle) }));
+  const filas = stkFiltrados().map(({ a, t }) => ({ Código: a.c, Descripción: a.d, "Cómo se controla": STOCK_TIPOS[a.tipo] || a.tipo, Unidad: a.medida || "unidades", Depósito: t.dep, "Técnicos": t.tec, "Vehículos": t.veh, "En camino": t.cam, "Comodato": t.com, "Instalado en clientes": t.cli, "Stock mínimo": a.min ?? "", "Cantidad a pedir": a.pedir ?? "", Marca: a.marca || "", Proveedor: a.prov || "", "Dónde está": stkUbicTexto(t.detalle) }));
   const libro = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filas), "Stock");
   XLSX.writeFile(libro, `stock_${new Date().toISOString().slice(0, 10)}.xlsx`);

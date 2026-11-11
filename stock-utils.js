@@ -61,6 +61,57 @@
     return palabras.length > 0 && palabras.length <= 5 && palabras.every((w) => CHIP.test(w)) && palabras.some((w) => EMPRESA.test(w));
   }
   // Propuesta de cómo controlar un artículo según su descripción (después se revisa a mano).
+  // ---------- Marcas ----------
+  // Marca de un artículo a partir de su descripción (una sugerencia: la oficina la confirma o corrige).
+  const MARCAS = {
+    PARADOX: "Paradox", HIKVISION: "Hikvision", HIK: "Hikvision", HILOOK: "Hikvision", COLORVU: "Hikvision", HIKMICRO: "Hikvision",
+    DAHUA: "Dahua", DSC: "DSC", NEXO: "Nexo", SELENIA: "Nexo", AJAX: "Ajax", AXPRO: "Ajax", EZVIZ: "Ezviz", IMOU: "Imou",
+    ALONSO: "Alonso", TAKEX: "Takex", FIESA: "Fiesa", DMA: "DMA", PANASONIC: "Panasonic", BOSCH: "Bosch", GARNET: "Garnet",
+    X28: "X-28", VAPEX: "Vapex", INTERLOGIX: "Interlogix", ARITECH: "Aritech", SAMSUNG: "Samsung", TPLINK: "TP-Link", UBIQUITI: "Ubiquiti",
+    MIKROTIK: "MikroTik", CITYMESH: "Citymesh", NETCORE: "Netcore", FEXA: "Fexa", DLUX: "Dlux", KALOP: "Kalop", FOCUS: "Focus",
+    EPCOM: "Epcom", ZKTECO: "ZKTeco", HONEYWELL: "Honeywell", RISCO: "Risco", OPTEX: "Optex", CROW: "Crow", PYRONIX: "Pyronix",
+    TEXECOM: "Texecom", ALEPH: "Aleph", HIVOX: "Hivox", NEC: "NEC", VICTRON: "Victron", AXIS: "Axis", VIVOTEK: "Vivotek",
+    PERSONAL: "Personal", MOVISTAR: "Movistar", CLARO: "Claro", JASPER: "Jasper", TRV: "TRV", LUMINOSA: "Luminosa",
+  };
+  // Modelos que delatan la marca aunque la descripción no la diga.
+  const MARCA_MODELOS = [
+    [/\b(PMD\d+\w*|IP1[05]0\w*|PCS2\d\d\w*|ESPRIT|MAGELLAN|SPECTRA|DIGIPLEX|MG\d{4}\w*|SP\d{4}\w*|EVO\d+\w*|K32\w*|REM\d+\w*|DCT\d+\w*|NV\d{2,}\w*)\b/, "Paradox"],
+    [/\bDS-\d|\bDS-K\w/, "Hikvision"],
+  ];
+  const limpiarMarca = (m) => String(m == null ? "" : m).replace(/\s+/g, " ").trim().slice(0, 40);
+  const claveMarca = (m) => limpiarMarca(m).toUpperCase().replace(/[^A-Z0-9]/g, "");
+  function sugerirMarca(desc) {
+    const d = sinAcentos(desc).toUpperCase();
+    if (!d) return "";
+    // «MARCA: X» / «MARCA X» manda (salvo que lo que sigue sea un modelo con números).
+    const m = d.match(/\bMARCA\s*:?\s*([A-Z0-9][A-Z0-9]*(?:-[A-Z0-9]+)*(?: (?:LINK|WIDE))?)/);
+    if (m) {
+      const k = m[1].replace(/[^A-Z0-9]/g, "");
+      if (MARCAS[k]) return MARCAS[k];
+      if (!/\d/.test(m[1]) && m[1].length >= 2) return m[1].toLowerCase().replace(/(^|[ -])\w/g, (x) => x.toUpperCase());
+    }
+    const palabras = d.match(/[A-Z0-9]+(?:-[A-Z0-9]+)*/g) || [];
+    for (let i = 0; i < palabras.length; i++) {
+      const w = palabras[i];
+      for (const p of [w.replace(/-/g, ""), ...w.split("-")]) if (MARCAS[p]) return MARCAS[p];
+      if (MARCAS[w + (palabras[i + 1] || "")]) return MARCAS[w + palabras[i + 1]]; // «TP LINK»
+    }
+    for (const [re, marca] of MARCA_MODELOS) if (re.test(d)) return marca;
+    return "";
+  }
+  // Resumen por marca: [{ marca, codigos, provs: { nombre: n } }] (+ «» = sin marca), ordenado por cantidad.
+  function resumenMarcas(articulos) {
+    const r = {};
+    Object.values(articulos || {}).forEach((a) => {
+      const k = claveMarca(a.marca);
+      const x = (r[k] = r[k] || { marca: limpiarMarca(a.marca), codigos: [], provs: {} });
+      x.codigos.push(a.c);
+      const p = String(a.prov || "").trim();
+      x.provs[p] = (x.provs[p] || 0) + 1;
+    });
+    return Object.values(r).sort((x, y) => (!x.marca) - (!y.marca) || y.codigos.length - x.codigos.length || x.marca.localeCompare(y.marca, "es"));
+  }
+
   function clasificarArticulo(desc) {
     const D = String(desc || "").toUpperCase();
     if (esDescripcionSim(D)) return "sim";
@@ -101,6 +152,7 @@
       minimo: buscar(/minimo/),
       pedir: buscar(/cantidad a pedir|a pedir|lote/),
       proveedor: buscar(/proveedor/),
+      marca: buscar(/^marca$/),
     };
   }
   function tipoDesdeTexto(t) {
@@ -135,6 +187,7 @@
       if (col.minimo && String(f[col.minimo] ?? "").trim() !== "") it.min = Math.max(0, num(f[col.minimo]));
       if (col.pedir && String(f[col.pedir] ?? "").trim() !== "") it.pedir = Math.max(0, num(f[col.pedir]));
       if (col.proveedor && String(f[col.proveedor] || "").trim()) it.prov = String(f[col.proveedor]).trim().slice(0, 60);
+      if (col.marca && String(f[col.marca] || "").trim()) it.marca = limpiarMarca(f[col.marca]);
       salida.push(it);
     });
     return { articulos: salida, columnas: col, esRevisada: !!col.tipo };
@@ -1042,7 +1095,7 @@
     return mejor;
   }
 
-  const api = { codigoProveedor, nombreProveedor, STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, datosLimpios, buscarPorDatos, infoSerie, seriesEn, controlarSalidaConSerie, saludStock, esCodigoIgnorable, elegirCodigoDelCuadro, pareceModelo, registrarUnidades, movimientoParaOficina, GARANTIA_ESTADOS, instalacionDeUnidad, abrirGarantias, moverStock, cerrarEnvio, stockDePersona, auditarStock, recalcularDesdeMovimientos, movimientosDeRegularizacion, retiradosParaDevolver, avanceSolicitud, anotarPresupuestos, pendienteDePresupuesto, tableroStock, claseMovimiento };
+  const api = { codigoProveedor, nombreProveedor, STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, datosLimpios, buscarPorDatos, infoSerie, seriesEn, controlarSalidaConSerie, saludStock, esCodigoIgnorable, elegirCodigoDelCuadro, pareceModelo, sugerirMarca, resumenMarcas, limpiarMarca, claveMarca, registrarUnidades, movimientoParaOficina, GARANTIA_ESTADOS, instalacionDeUnidad, abrirGarantias, moverStock, cerrarEnvio, stockDePersona, auditarStock, recalcularDesdeMovimientos, movimientosDeRegularizacion, retiradosParaDevolver, avanceSolicitud, anotarPresupuestos, pendienteDePresupuesto, tableroStock, claseMovimiento };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else Object.assign(raiz, api);
 })(typeof window !== "undefined" ? window : globalThis);

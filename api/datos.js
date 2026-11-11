@@ -1579,7 +1579,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
           if (!c || !/^[\w.-]{1,20}$/.test(c)) return;
           const d = String(x.d || "").slice(0, 160);
           const previo = arts[c];
-          const a = previo ? { ...previo } : { c, d, tipo: S.clasificarArticulo(d), medida: S.medidaArticulo(d), min: null, pedir: null, prov: "", alias: [] };
+          const a = previo ? { ...previo } : { c, d, tipo: S.clasificarArticulo(d), medida: S.medidaArticulo(d), min: null, pedir: null, prov: "", alias: [], marca: S.sugerirMarca(d) };
           if (previo) actualizados++; else nuevos++;
           if (d) a.d = d;
           if (!b.revisada) { a.precio = Number(x.precio) || 0; a.moneda = x.moneda || a.moneda || ""; a.baja = !!x.baja; }
@@ -1590,6 +1590,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
             if (x.min != null && Number.isFinite(Number(x.min))) { a.min = Math.max(0, Number(x.min)); cambio = true; }
             if (x.pedir != null && Number.isFinite(Number(x.pedir))) { a.pedir = Math.max(0, Number(x.pedir)); cambio = true; }
             if (x.prov) { a.prov = String(x.prov).slice(0, 60); cambio = true; }
+            if (x.marca) { a.marca = S.limpiarMarca(x.marca); cambio = true; }
             if (cambio) configurados++;
           }
           arts[c] = a;
@@ -1645,15 +1646,29 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
       return;
     }
     if (b.accion === "configurar_varios") {
-      // Cambia el tipo de muchos artículos juntos (ej. todos los sensores a «Equipo con N° de serie»).
-      const codigos = new Set((Array.isArray(b.codigos) ? b.codigos.slice(0, 5000) : []).map(S.codigoArticulo));
-      if (!S.STOCK_TIPOS[b.tipo] || !codigos.size) { res.status(400).json({ error: "Faltan los artículos o el tipo" }); return; }
+      // Cambia muchos artículos juntos: el tipo (ej. todos los sensores a «Equipo con N° de serie»),
+      // el proveedor o la marca. O «items»: a cada artículo su marca (las sugerencias de marca).
+      const campos = { ...(b.campos && typeof b.campos === "object" ? b.campos : {}), ...(b.tipo ? { tipo: b.tipo } : {}) };
+      const valores = {};
+      if ("tipo" in campos) { if (!S.STOCK_TIPOS[campos.tipo]) { res.status(400).json({ error: "Tipo inválido" }); return; } valores.tipo = campos.tipo; }
+      if ("prov" in campos) valores.prov = String(campos.prov || "").replace(/\s+/g, " ").trim().slice(0, 60);
+      if ("marca" in campos) valores.marca = S.limpiarMarca(campos.marca);
+      const porArticulo = new Map();
+      (Array.isArray(b.codigos) ? b.codigos.slice(0, 5000) : []).forEach((c) => porArticulo.set(S.codigoArticulo(c), valores));
+      (Array.isArray(b.items) ? b.items.slice(0, 5000) : []).forEach((x) => { if (x && x.c && "marca" in x) porArticulo.set(S.codigoArticulo(x.c), { marca: S.limpiarMarca(x.marca) }); });
+      porArticulo.delete("");
+      if (!porArticulo.size || [...porArticulo.values()].every((v) => !Object.keys(v).length)) { res.status(400).json({ error: "Faltan los artículos o qué cambiar" }); return; }
+      const que = Object.keys(valores).map((k) => k === "tipo" ? `tipo «${S.STOCK_TIPOS[valores.tipo]}»` : k === "prov" ? `proveedor «${valores.prov || "(ninguno)"}»` : `marca «${valores.marca || "(ninguna)"}»`).join(", ") || "marcas";
       const r = await stockActualizar(STOCK_CAT, { articulos: {} }, (cat) => {
         const arts = { ...(cat.articulos || {}) };
         let cambiados = 0;
-        codigos.forEach((c) => { if (arts[c] && arts[c].tipo !== b.tipo) { arts[c] = { ...arts[c], tipo: b.tipo }; cambiados++; } });
-        return { data: { ...cat, articulos: arts }, respuesta: { cambiados } };
-      }, `Stock: ${codigos.size} artículo(s) pasados a «${S.STOCK_TIPOS[b.tipo]}» (por ${quien})`);
+        porArticulo.forEach((v, c) => {
+          if (!arts[c]) return;
+          const n = { ...arts[c], ...v };
+          if (JSON.stringify(n) !== JSON.stringify(arts[c])) { arts[c] = n; cambiados++; }
+        });
+        return cambiados ? { data: { ...cat, articulos: arts }, respuesta: { cambiados } } : { data: cat, respuesta: { cambiados } };
+      }, `Stock: ${porArticulo.size} artículo(s): ${que} (por ${quien})`);
       responder(r);
       return;
     }
@@ -1667,6 +1682,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
         if ("medida" in campos && /^(metros|unidades)$/.test(campos.medida)) n.medida = campos.medida;
         ["min", "pedir"].forEach((k) => { if (k in campos) n[k] = campos[k] === "" || campos[k] == null ? null : Math.max(0, Number(campos[k]) || 0); });
         if ("prov" in campos) n.prov = String(campos.prov || "").slice(0, 60);
+        if ("marca" in campos) n.marca = S.limpiarMarca(campos.marca);
         return { data: { ...cat, articulos: { ...cat.articulos, [c]: n } }, respuesta: { articulo: n } };
       }, `Stock: configuró el artículo ${c} (por ${quien})`);
       responder(r);

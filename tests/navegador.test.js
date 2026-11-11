@@ -6853,6 +6853,73 @@ test("Proveedores: se importan desde el Excel de la oficina (hoja con encabezado
   await ctx.close();
 });
 
+test("Marcas (panel): sugiere la marca por la descripción o el modelo, se revisa y aplica, y se pone el proveedor a toda una marca", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  const catalogo = { articulos: {
+    1: { c: "1", d: "PIR PMD75 INALAMBRICO", tipo: "unidad", prov: "" },
+    2: { c: "2", d: "TECLADO K32LCD MARCA PARADOX", tipo: "unidad", prov: "" },
+    3: { c: "3", d: "W-AJAX HUB 2", tipo: "unidad", prov: "" },
+    4: { c: "4", d: "CABLE TPR 3X1", tipo: "cantidad", prov: "" },
+    5: { c: "5", d: "SIRENA EXTERIOR", tipo: "cantidad", prov: "Norte", marca: "Paradox" },
+    6: { c: "6", d: "SIM PERSONAL", tipo: "sim", prov: "" },
+  }, proveedores: { 4001: "Sur" } };
+  const posts = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url(), j = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (req.method() === "POST" && u.includes("coleccion=stock")) {
+      const b = JSON.parse(req.postData()); posts.push(b);
+      let n = 0;
+      if (b.accion === "configurar_varios") {
+        (b.items || []).forEach((x) => { catalogo.articulos[x.c].marca = x.marca; n++; });
+        (b.codigos || []).forEach((c) => { Object.assign(catalogo.articulos[c], b.campos); n++; });
+      }
+      return j({ cambiados: n });
+    }
+    if (u.includes("coleccion=stock")) return j({ catalogo, saldos: { inicializado: "2026-10-01", ubic: { dep: { 1: 2 } }, unidades: {} }, conciliacion: { marcas: [], corridas: [] } });
+    return j([]);
+  });
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { document.getElementById("loginCard").classList.add("hidden"); document.getElementById("mainCard").classList.remove("hidden"); document.getElementById("tabStockBtn").click(); });
+  await page.click('#stkSub [data-stk="marcas"]');
+  await page.waitForSelector("#stkMarcasSug .stk-marca-sug");
+  // Sugerencias: Paradox (por la descripción y por el modelo PMD75) y Ajax; el cable y el SIM no
+  const sug = await page.$$eval("#stkMarcasSug .stk-marca-sug", (d) => d.map((x) => [x.querySelector(".stk-marca-sug-nombre").value, x.querySelectorAll("[data-c]").length]));
+  assert.deepStrictEqual(sug, [["Paradox", 2], ["Ajax", 1]]);
+  // Se destilda Ajax y se aplica
+  await page.click('#stkMarcasSug details:nth-of-type(2) .stk-marca-sug-ok');
+  await page.click("#stkMarcasSugAplicar");
+  assert.match(await page.textContent(".cartel-admin-texto"), /2 artículos[\s\S]*Paradox: 2/);
+  await page.click(".cartel-admin .cartel-si");
+  await page.waitForFunction(() => /Listo: 2/.test(document.body.textContent));
+  assert.deepStrictEqual(posts.at(-1), { accion: "configurar_varios", items: [{ c: "1", marca: "Paradox" }, { c: "2", marca: "Paradox" }] });
+  // Tabla de marcas: Paradox 3 artículos (uno con Norte); se pone «Sur» solo a los que no tienen
+  await page.waitForFunction(() => /Paradox/.test(document.getElementById("stkMarcasTabla").textContent));
+  const fila = page.locator('#stkMarcasTabla tr[data-k="PARADOX"]');
+  assert.match((await fila.textContent()).replace(/\s+/g, " "), /Paradox ?3 ?1 Norte \(1\) · 2 sin proveedor/);
+  await fila.locator(".stk-marca-prov").fill("Sur");
+  await fila.locator("[data-marca-prov]").click();
+  assert.match(await page.textContent(".cartel-admin-texto"), /1 artículo\(s\) de Paradox ya tienen otro proveedor \(Norte\)/);
+  await page.click(".cartel-admin .cartel-no");
+  assert.match(await page.textContent(".cartel-admin-texto"), /solo a los 2 artículo\(s\) de Paradox que no tienen proveedor/);
+  await page.click(".cartel-admin .cartel-si");
+  await page.waitForFunction(() => /con proveedor «Sur»/.test(document.body.textContent));
+  assert.deepStrictEqual(posts.at(-1), { accion: "configurar_varios", codigos: ["1", "2"], campos: { prov: "Sur" } });
+  assert.strictEqual(catalogo.articulos["5"].prov, "Norte");
+  // «Ver» lleva a Artículos filtrado por la marca, con la columna Marca
+  await page.click('#stkMarcasTabla tr[data-k="PARADOX"] [data-marca-ver]');
+  await page.waitForSelector('[data-stk-vista="articulos"]:not(.hidden) #stkLista tr[data-c]');
+  assert.strictEqual(await page.inputValue("#stkMarca"), "Paradox");
+  assert.deepStrictEqual(await page.$$eval("#stkLista tr[data-c]", (f) => f.map((x) => x.dataset.c).sort()), ["1", "2", "5"]);
+  assert.strictEqual(await page.inputValue('#stkLista tr[data-c="3"] [data-campo="marca"]').catch(() => "no está"), "no está");
+  // Sin marca: el cable y el hub de Ajax (destildado)
+  await page.selectOption("#stkMarca", "-");
+  assert.deepStrictEqual(await page.$$eval("#stkLista tr[data-c]", (f) => f.map((x) => x.dataset.c).sort()), ["3", "4"]);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
 test("Stock de técnicos (panel): se elige el técnico, parte de lo que tiene, se carga desde Excel o a mano, se revisan los cambios y se guarda sin tocar el depósito", async () => {
   const { ctx, page, erroresPagina } = await nuevaPagina();
   await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: route.request().url().includes("xlsx.full.min.js") ? require("fs").readFileSync(require("path").join(__dirname, "..", "vendor", "xlsx.full.min.js"), "utf8") : "" }));

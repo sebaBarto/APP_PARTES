@@ -1326,6 +1326,21 @@ test("Stock: de una caja con varios códigos (etiqueta SAT, modelo, N° de serie
   assert.strictEqual(S.infoSerie("1GB000FFA9", m.saldos.unidades["1GB000FFA9"]), "Serial 72075101 · MAC 00:19:BA:1D:3F:DB");
 });
 
+test("Stock: la marca sale de la descripción (o del modelo) y se resume por marca", () => {
+  const S = require(path.join(raiz, "stock-utils.js"));
+  const casos = {
+    "TECLADO DE ICONOS K321 LCD MARCA PARADOX": "Paradox", "PIR PMD75 INALAMBRICO ANTI-MASCOTAS": "Paradox", "CONTROL REMOTO BIDIRECCIONAL REM25": "Paradox",
+    "W-AJAX HUB 2 PLUS": "Ajax", "DOMO MARCA: HIKVISION MOD: DS-2AE7168-A": "Hikvision", "CAMARA HILOOK THC-T110-P": "Hikvision",
+    "BATERIA 12 V 24 AH.  MARCA: VAPEX": "Vapex", "TP LINK DECO E4": "TP-Link", "GPRS GS2060 MARCA:DSC MODELO:GS2060": "DSC",
+    "PLACA PORTERO SELENIA 2 HILOS MARCA NEXO": "Nexo", "CABLE TPR 3X1": "", "CAMARA COLOR  MARCA: TWD-ID004-W": "",
+    "PIR PARA LUCES 180º MARCA ZURICH": "Zurich", "MONITOR 17 LED MARCA: CX WIDE": "Cx Wide",
+  };
+  Object.entries(casos).forEach(([d, m]) => assert.strictEqual(S.sugerirMarca(d), m, d));
+  const r = S.resumenMarcas({ 1: { c: "1", marca: "Paradox", prov: "Sur" }, 2: { c: "2", marca: "PARADOX", prov: "" }, 3: { c: "3" } });
+  assert.deepStrictEqual(r.map((x) => [x.marca, x.codigos.length, x.provs]), [["Paradox", 2, { Sur: 1, "": 1 }], ["", 1, { "": 1 }]]);
+  assert.deepStrictEqual(S.leerListadoOficina([["Código", "Descripción", "Cómo se controla", "Marca"], ["20825", "TECLADO", "Equipo", "Paradox"]].map((f, i, t) => i ? Object.fromEntries(t[0].map((k, j) => [k, f[j]])) : null).filter(Boolean)).articulos[0].marca, "Paradox");
+});
+
 test("Stock: Paradox REM25 — la cámara nunca toma el código del modelo (REM25-7SG) como N° de serie", () => {
   const S = require(path.join(raiz, "stock-utils.js"));
   // Etiqueta real: Code 39 «REM25-7SG» (modelo, igual en todas las cajas) y «AI200158A2» (Tracking)
@@ -1514,6 +1529,14 @@ test("Stock: Melina entrega con escaneo, el técnico confirma «Recibí» (o con
     r = await post({ accion: "configurar_varios", codigos: ["20208", "999"], tipo: "unidad" }, admin);
     assert.deepStrictEqual([r.cuerpo.cambiados, repo["stock/catalogo.json"].articulos["20208"].tipo], [1, "unidad"]);
     await post({ accion: "configurar_varios", codigos: ["20208"], tipo: "cantidad" }, admin);
+    // Marcas: a cada artículo la suya (sugerencias) y el proveedor de toda una marca junto
+    r = await post({ accion: "configurar_varios", items: [{ c: "20208", marca: "  Paradox " }, { c: "20825", marca: "Paradox" }] }, admin);
+    assert.deepStrictEqual([r.cuerpo.cambiados, repo["stock/catalogo.json"].articulos["20208"].marca], [2, "Paradox"]);
+    r = await post({ accion: "configurar_varios", codigos: ["20208", "20825"], campos: { prov: "Distribuidora Sur" } }, admin);
+    assert.deepStrictEqual(["20208", "20825"].map((c) => repo["stock/catalogo.json"].articulos[c].prov), ["Distribuidora Sur", "Distribuidora Sur"]);
+    assert.strictEqual(repo["stock/catalogo.json"].articulos["20825"].tipo, "unidad", "no toca lo que no se pidió");
+    assert.strictEqual((await post({ accion: "configurar_varios", codigos: ["20208"], campos: { marca: "X" } }, melina)).statusCode, 403);
+    assert.strictEqual((await post({ accion: "configurar_varios", codigos: ["20208"] }, admin)).statusCode, 400);
     // Garantía: los 4 iguales tienen la misma etiqueta pero cada uno su N° de serie; vuelve uno fallado
     const dep0 = repo["stock/saldos.json"].ubic.dep["20825"];
     r = await post({ accion: "mover", de: "dep", a: "cli:Kiosco Pérez", presupuesto: "4521", items: [{ c: "20825", cant: 1, unidades: ["GH600AA001"] }] }, melina);
