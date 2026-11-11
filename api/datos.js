@@ -1206,7 +1206,7 @@ async function stockAprender(movs, quien) {
     utiles.forEach((m) => {
       const art = arts[m.c]; if (!art) return;
       const n = { ...art };
-      if (art.tipo === "unidad" && m.unidades && m.unidades.length) n.formatos = m.unidades.reduce((acc, t) => S.agregarFormato(acc, t), art.formatos || []);
+      if (art.tipo === "unidad" && m.unidades && m.unidades.length) n.formatos = m.unidades.reduce((acc, t) => S.agregarFormato(acc, t, art), art.formatos || []);
       if (m.prov) {
         n.provCodigos = [...new Set([...(art.provCodigos || []), m.prov])].slice(-10);
         if (!n.prov && S.nombreProveedor(c2, m.prov)) n.prov = S.nombreProveedor(c2, m.prov);
@@ -1255,7 +1255,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
   let esResp = esAdmin, tecnicosGuardados = null;
   const tecnicos = async () => (tecnicosGuardados = tecnicosGuardados || (await leerTecnicosGuardados().catch(() => [])));
   if (!esAdmin) { const t = (await tecnicos()).find((x) => x.nombre === autorizacion.nombre); esResp = !!(t && t.permisos && (t.permisos.stock_responsable || t.permisos.admin)); }
-  const SOLO_ADMIN = ["stock_inicial_tecnico", "cuadrar", "regularizar_cuadre", "baja_serie", "salud_revisado", "configurar_varios", "proveedores", "marcar_oficina", "importar_catalogo", "configurar", "saldo_inicial", "ajustar", "conc_marcar", "conc_reactivar", "conc_corrida"];
+  const SOLO_ADMIN = ["stock_inicial_tecnico", "quitar_serie_modelo", "cuadrar", "regularizar_cuadre", "baja_serie", "salud_revisado", "configurar_varios", "proveedores", "marcar_oficina", "importar_catalogo", "configurar", "saldo_inicial", "ajustar", "conc_marcar", "conc_reactivar", "conc_corrida"];
   try {
     if (req.method === "GET" && q.serie) {
       // Ficha de un equipo por su N° de serie: dónde está, a qué cliente fue y su garantía.
@@ -1532,6 +1532,32 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
         return { data: s2, respuesta: { de: u.u }, movs };
       }, `Stock: baja del N° ${t} (por ${quien}): ${motivo}`);
       if (!r.error) await stockConfirmarMovs(movs, `Stock: baja de un N° de serie (por ${quien})`);
+      responder(r);
+      return;
+    }
+    if (b.accion === "quitar_serie_modelo") {
+      // El código del modelo quedó registrado como N° de serie: se saca el N° (la cantidad no cambia)
+      // y el código queda aprendido como modelo de ese artículo.
+      const t = S.limpiarCodigo(b.serie);
+      if (!t) { res.status(400).json({ error: "Falta el N° de serie" }); return; }
+      let art = "";
+      const r = await stockActualizar(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }, (sal) => {
+        const u = (sal.unidades || {})[t];
+        if (!u || !u.c) return { error: "Ese N° de serie no está registrado", status: 404 };
+        if (/^cam:/.test(u.u || "")) return { error: "Está en camino: primero que se confirme el envío", status: 409 };
+        art = u.c;
+        const unidades = { ...(sal.unidades || {}) };
+        delete unidades[t];
+        return { data: { ...sal, unidades }, respuesta: { c: u.c, de: u.u } };
+      }, `Stock: ${t} no era un N° de serie (código del modelo), se quitó (por ${quien})`);
+      if (!r.error && art && t.length >= 6) {
+        await stockActualizar(STOCK_CAT, { articulos: {} }, (cat) => {
+          const arts = { ...(cat.articulos || {}) };
+          if (!arts[art] || (arts[art].alias || []).includes(t)) return { error: "sin cambios" };
+          arts[art] = { ...arts[art], alias: [...new Set([...(arts[art].alias || []), t])].slice(-20), formatos: (arts[art].formatos || []).filter((f) => f !== S.formaCodigo(t)) };
+          return { data: { ...cat, articulos: arts } };
+        }, `Stock: ${t} es el código del modelo de ${art} (por ${quien})`).catch(() => {});
+      }
       responder(r);
       return;
     }
@@ -1876,7 +1902,8 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
         if (!arts[c]) return { error: "No existe ese artículo", status: 404 };
         const otro = Object.values(arts).find((a) => a.c !== c && (a.alias || []).includes(ean));
         if (otro) return { error: `Ese código ya está asociado a ${otro.d}`, status: 409 };
-        arts[c] = { ...arts[c], alias: [...new Set([...(arts[c].alias || []), ean])].slice(-20) };
+        // Si ese código se había tomado como N° de serie, su forma deja de contar como formato de N°.
+        arts[c] = { ...arts[c], alias: [...new Set([...(arts[c].alias || []), ean])].slice(-20), ...(arts[c].formatos ? { formatos: arts[c].formatos.filter((f) => f !== S.formaCodigo(ean)) } : {}) };
         return { data: { ...cat, articulos: arts }, respuesta: { articulo: arts[c] } };
       }, `Stock: código ${ean} asociado a ${c} (por ${quien})`);
       responder(r);

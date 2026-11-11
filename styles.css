@@ -4043,6 +4043,7 @@ html[data-inicio="nuevo"] .topbar-status.cambio { animation: pillPop 420ms var(-
 .stk-escaner-ultimo.ok { background: rgba(63,208,122,.16); color: #9BF0BC; font-weight: 600; }
 .stk-escaner-ultimo.err { background: rgba(255,107,91,.16); color: #FFB3A8; font-weight: 600; }
 .stk-escaner-ultimo.nuevo { animation: escTarjeta 380ms var(--ease-press); }
+.stk-escaner-ultimo.pista { background: rgba(80,160,255,.16); color: #BFD9FF; font-weight: 600; }
 .stk-escaner-ultimo .stk-ico { width: 20px; height: 20px; flex: none; margin: 0; }
 .stk-escaner-hist { display: flex; flex-direction: column; gap: 3px; }
 .stk-escaner-hist:empty { display: none; }

@@ -1298,7 +1298,7 @@ test("Stock: de una caja con varios códigos (etiqueta SAT, modelo, N° de serie
   const cat = { articulos: { 20825: { c: "20825", d: "TECLADO", tipo: "unidad", formatos: [] }, 20208: { c: "20208", d: "SIRENA", tipo: "cantidad", alias: ["7798164500049"] } } };
   const caja = ["K10H-J9B", "GH120FF156", "https://www.paradox.com/manual"];
   assert.deepStrictEqual(S.elegirCodigoDelCuadro(["000208252779", ...caja], cat, {}, ""), { usar: "000208252779" }, "la etiqueta de SAT primero");
-  assert.deepStrictEqual(S.elegirCodigoDelCuadro(caja, cat, {}, "20825"), { elegir: ["K10H-J9B", "GH120FF156"] }, "primera vez: que elija");
+  assert.deepStrictEqual(S.elegirCodigoDelCuadro(caja, cat, {}, "20825"), { elegir: ["GH120FF156"], modelos: ["K10H-J9B"] }, "primera vez: confirma el N° (el código con guion es el modelo)");
   cat.articulos["20825"].alias = ["K10H-J9B"];
   assert.deepStrictEqual(S.elegirCodigoDelCuadro(caja, cat, {}, "20825"), { usar: "GH120FF156" }, "el modelo aprendido se ignora");
   cat.articulos["20825"].alias = []; cat.articulos["20825"].formatos = ["AA999AA999"];
@@ -1324,6 +1324,35 @@ test("Stock: de una caja con varios códigos (etiqueta SAT, modelo, N° de serie
   assert.deepStrictEqual(m.saldos.unidades["1GB000FFA9"].datos, { serial: "72075101", mac: "00:19:BA:1D:3F:DB" });
   assert.deepStrictEqual([S.interpretarCodigo("72075101", cat3, m.saldos, "").tracking, S.interpretarCodigo("0019BA1D3FDB", cat3, m.saldos, "").tracking], ["1GB000FFA9", "1GB000FFA9"]);
   assert.strictEqual(S.infoSerie("1GB000FFA9", m.saldos.unidades["1GB000FFA9"]), "Serial 72075101 · MAC 00:19:BA:1D:3F:DB");
+});
+
+test("Stock: Paradox REM25 — la cámara nunca toma el código del modelo (REM25-7SG) como N° de serie", () => {
+  const S = require(path.join(raiz, "stock-utils.js"));
+  // Etiqueta real: Code 39 «REM25-7SG» (modelo, igual en todas las cajas) y «AI200158A2» (Tracking)
+  const cat = { articulos: { 40250: { c: "40250", d: "CONTROL REMOTO 2 VIAS REM25 PARADOX", tipo: "unidad", formatos: [] } } };
+  assert.strictEqual(S.pareceModelo("REM25-7SG", cat.articulos["40250"]), "seguro", "lleva el modelo de la descripción");
+  assert.strictEqual(S.pareceModelo("AI200158A2", cat.articulos["40250"]), "");
+  assert.deepStrictEqual(S.interpretarCodigo("REM25-7SG", cat, {}, "40250"), { tipo: "articulo", c: "40250", via: "modelo" });
+  // Solo el modelo en el cuadro: no entra (y avisa sin pitido)
+  assert.strictEqual(S.elegirCodigoDelCuadro(["REM25-7SG"], cat, {}, "40250", true).usar, null);
+  assert.deepStrictEqual(S.elegirCodigoDelCuadro(["REM25-7SG", "AI200158A2"], cat, {}, "40250", true), { usar: "AI200158A2" }, "primera caja: junto al modelo, el otro es el Tracking");
+  assert.deepStrictEqual(S.elegirCodigoDelCuadro(["AI200158A2"], cat, {}, "40250", true), { elegir: ["AI200158A2"] }, "primera caja, solo: que lo confirme");
+  // Ya aprendido el formato del Tracking, aunque el modelo se haya colado en los formatos
+  cat.articulos["40250"].formatos = [S.formaCodigo("AI200158A2"), S.formaCodigo("REM25-7SG")];
+  assert.deepStrictEqual(S.elegirCodigoDelCuadro(["REM25-7SG", "AI200158A2"], cat, {}, "40250", true), { usar: "AI200158A2" });
+  assert.strictEqual(S.elegirCodigoDelCuadro(["REM25-7SG"], cat, {}, "40250", true).usar, null);
+  assert.deepStrictEqual(S.elegirCodigoDelCuadro(["AI200158B7"], cat, {}, "40250", true), { usar: "AI200158B7" });
+  // Sin el modelo en la descripción: un código con guion tampoco entra solo
+  const cat2 = { articulos: { 1: { c: "1", d: "CONTROL REMOTO", tipo: "unidad", formatos: ["AA999999A9"] } } };
+  assert.strictEqual(S.elegirCodigoDelCuadro(["XX25-7SG"], cat2, {}, "1", true).usar, null);
+  assert.ok(S.interpretarCodigo("XX25-7SG", cat2, {}, "1").aviso, "escrito a mano: pregunta");
+  // No aprende la forma del modelo
+  assert.deepStrictEqual(S.agregarFormato([], "REM25-7SG", cat.articulos["40250"]), []);
+  // Si ya quedó registrado como N° de serie: sigue siendo el modelo y la Salud lo marca para quitarlo
+  const sal = { ubic: { dep: { 40250: 2 } }, unidades: { "REM25-7SG": { c: "40250", u: "dep" } } };
+  assert.strictEqual(S.interpretarCodigo("REM25-7SG", cat, sal, "").via, "modelo");
+  const g = S.saludStock(cat, sal).find((x) => x.k === "serieModelo");
+  assert.ok(g && g.items[0].serie === "REM25-7SG");
 });
 
 test("Stock: si el código de barras no se lee, el servidor lee los números de la foto (y descarta links y lo dudoso)", async () => {

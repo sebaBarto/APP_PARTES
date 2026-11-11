@@ -290,10 +290,26 @@
     if (!lista.length) return null; // todavía no se aprendió nada: no se puede decir
     return lista.some((y) => y === f || (y[0] !== "H" && f[0] !== "H" && y.length === f.length && y.slice(0, 2) === f.slice(0, 2)) || (y === `H${x.length}` && /^[0-9A-F]+$/.test(x)));
   }
-  function agregarFormato(formatos, tracking) {
+  function agregarFormato(formatos, tracking, art) {
     const f = formaCodigo(tracking), lista = Array.isArray(formatos) ? formatos.slice() : [];
+    if (art && pareceModelo(tracking, art)) return lista;
     if (!f || f.length < 4 || lista.includes(f)) return lista;
     return [...lista, f].slice(-10);
+  }
+  // ¿Es el código del modelo (igual en todas las cajas) y no un N° de serie?
+  //  "seguro": ya se aprendió como modelo, o lleva el modelo que figura en la descripción
+  //            (ej. «REM25-7SG» en el artículo «CONTROL REMOTO REM25»).
+  //  "quizas": tiene guion (los modelos lo usan: «K10H-J9B»; los Tracking/N° de serie no).
+  //  "":       puede ser un N° de serie.
+  function modelosDeDescripcion(d) {
+    return [...new Set(String(d || "").toUpperCase().split(/[^A-Z0-9]+/).filter((x) => x.length >= 4 && /[A-Z]/.test(x) && /\d/.test(x)))];
+  }
+  function pareceModelo(texto, art) {
+    const t = limpiarCodigo(texto);
+    if (!t || !art) return "";
+    if ((art.alias || []).includes(t)) return "seguro";
+    if (modelosDeDescripcion(art.d).some((m) => t.includes(m))) return "seguro";
+    return /-/.test(t) ? "quizas" : "";
   }
   // Devuelve qué se escaneó:
   //  { tipo: "articulo", c, via: "etiqueta"|"ean"|"codigo" }   -> un artículo (si es por unidad, después va su N° de serie)
@@ -311,6 +327,8 @@
       return { tipo: "desconocido", texto: t, aviso: `La etiqueta es del artículo ${sat.codigo}, que no está en el catálogo de la APP.` };
     }
     const u = ((saldos && saldos.unidades) || {})[t];
+    // Un código del modelo que quedó registrado como N° de serie por error sigue siendo el modelo.
+    if (u && u.c && pareceModelo(t, arts[u.c]) === "seguro") return { tipo: "articulo", c: u.c, via: "modelo", serieErronea: true };
     if (u && u.c) return { tipo: "unidad", c: u.c, tracking: t, ubic: u.u, nuevo: false };
     // También por los otros datos del equipo (Serial o MAC de Paradox, guardados junto al Tracking).
     const otro = buscarPorDatos(saldos, t);
@@ -326,6 +344,9 @@
     if (/^\d{1,8}$/.test(t) && arts[codigoArticulo(t)]) return { tipo: "articulo", c: codigoArticulo(t), via: "codigo" };
     if (actual && arts[actual] && arts[actual].tipo === "unidad") {
       if (t.length < 4) return { tipo: "desconocido", texto: t, aviso: "Ese código es muy corto para ser un N° de serie." };
+      const pm = pareceModelo(t, arts[actual]);
+      if (pm === "seguro") return { tipo: "articulo", c: actual, via: "modelo" };
+      if (pm === "quizas") return { tipo: "unidad", c: actual, tracking: t, nuevo: true, modelo: true, aviso: "Parece el código del modelo (tiene guion), no un N° de serie. ¿Seguro que es el N° de serie de esta caja?" };
       const ok = coincideFormato(t, arts[actual].formatos);
       return { tipo: "unidad", c: actual, tracking: t, nuevo: true, aviso: ok === false ? `No se parece a los N° de serie que ya vi de este artículo (${arts[actual].formatos.join(", ")}). ¿Seguro que es de esta caja?` : "" };
     }
@@ -356,16 +377,24 @@
     const utiles = info.filter((x) => !(x.r.tipo === "articulo" && x.r.c === actual && (x.r.via === "modelo" || (x.r.via === "ean" && pendiente && (arts[actual] || {}).tipo === "unidad"))));
     const a = arts[actual];
     if (a && a.tipo === "unidad") {
-      const candidatos = utiles.filter((x) => x.r.tipo === "unidad" && x.r.c === actual);
+      // Con la cámara, un código que parece el del modelo nunca entra solo como N° de serie
+      // (la cámara a veces lee un código de barras y a veces el otro).
+      const nuevos = utiles.filter((x) => x.r.tipo === "unidad" && x.r.c === actual);
+      const candidatos = nuevos.filter((x) => !x.r.modelo);
       const conFormato = candidatos.filter((x) => coincideFormato(x.t, a.formatos) === true);
       if (conFormato.length) return { usar: conFormato[0].t };
-      if (candidatos.length > 1 && !(a.formatos || []).length) return { elegir: candidatos.map((x) => x.t) };
-      if (candidatos.length && (pendiente !== false || !(a.formatos || []).length)) return { usar: candidatos[0].t };
-      if (candidatos.length) return { usar: null };
+      // Junto al código del modelo ya aprendido, el único otro código de la caja es el N° de serie.
+      const vioModelo = info.some((x) => x.r.tipo === "articulo" && x.r.c === actual && x.r.via === "modelo");
+      if (candidatos.length === 1 && vioModelo && !(a.formatos || []).length) return { usar: candidatos[0].t };
+      // Sin un formato que coincida: que la persona confirme cuál es (una vez; el resto se aprende).
+      // (los que parecen el modelo van aparte: al confirmar el N°, quedan aprendidos como modelo)
+      const modelos = nuevos.filter((x) => x.r.modelo).map((x) => x.t);
+      if (candidatos.length && (pendiente !== false || !(a.formatos || []).length)) return { elegir: candidatos.map((x) => x.t), ...(modelos.length ? { modelos } : {}) };
+      if (candidatos.length || nuevos.length) return { usar: null, pista: nuevos.length && !candidatos.length ? "Ese es el código del modelo: apuntá al N° de serie (Tracking)" : "" };
     }
     // Con la cámara, lo que no se reconoce no hace ruido (el N° de serie suelto antes de la etiqueta,
     // el código del modelo que todavía no se aprendió): arriba se indica qué escanear.
-    const art = utiles.find((x) => x.r.tipo !== "desconocido" && !x.r.adivinado);
+    const art = utiles.find((x) => x.r.tipo !== "desconocido" && !x.r.adivinado && !(x.r.tipo === "unidad" && x.r.modelo));
     return { usar: art ? art.t : null };
   }
 
@@ -406,6 +435,9 @@
     Object.entries(uni).forEach(([t, u]) => { if (!u || !u.c || !u.u || u.u === "baja") return; const k2 = `${u.u}|${u.c}`; (cuenta[k2] = cuenta[k2] || []).push(t); });
     grupo("seriesDeMas", "error", "Más N° de serie que cantidad", "En ese lugar figuran más equipos identificados que la cantidad. Hay que dar de baja el N° que ya no está, o corregir la cantidad.",
       Object.entries(cuenta).filter(([k2, ts]) => { const [u, c] = k2.split("|"); return ts.length > ((ubic[u] || {})[c] || 0); }).map(([k2, ts]) => { const [u, c] = k2.split("|"); return { texto: `${d(c)} en ${nombreUbicacion(u)}: ${ts.length} N° de serie y cantidad ${(ubic[u] || {})[c] || 0}`, c, ubic: u, series: ts }; }));
+    // 1b) Códigos del modelo registrados como N° de serie (la cámara leyó el otro código de la caja)
+    grupo("serieModelo", "error", "Códigos del modelo cargados como N° de serie", "La cámara leyó el código del modelo (igual en todas las cajas) en vez del N° de serie. «Quitar el N°» lo saca sin cambiar la cantidad; después se vuelve a escanear el N° de serie (Tracking) con el Inventario.",
+      Object.entries(uni).filter(([t, u]) => u && u.c && u.u && u.u !== "baja" && pareceModelo(t, arts[u.c]) === "seguro").map(([t, u]) => ({ texto: `${d(u.c)} en ${nombreUbicacion(u.u)}: «${t}»`, c: u.c, ubic: u.u, serie: t })));
     // 2) Cantidades negativas
     const neg = [];
     Object.entries(ubic).forEach(([u, items]) => Object.entries(items || {}).forEach(([c, n]) => { if (n < 0) neg.push({ texto: `${d(c)} en ${nombreUbicacion(u)}: ${n}`, c, ubic: u }); }));
@@ -1010,7 +1042,7 @@
     return mejor;
   }
 
-  const api = { codigoProveedor, nombreProveedor, STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, datosLimpios, buscarPorDatos, infoSerie, seriesEn, controlarSalidaConSerie, saludStock, esCodigoIgnorable, elegirCodigoDelCuadro, registrarUnidades, movimientoParaOficina, GARANTIA_ESTADOS, instalacionDeUnidad, abrirGarantias, moverStock, cerrarEnvio, stockDePersona, auditarStock, recalcularDesdeMovimientos, movimientosDeRegularizacion, retiradosParaDevolver, avanceSolicitud, anotarPresupuestos, pendienteDePresupuesto, tableroStock, claseMovimiento };
+  const api = { codigoProveedor, nombreProveedor, STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, datosLimpios, buscarPorDatos, infoSerie, seriesEn, controlarSalidaConSerie, saludStock, esCodigoIgnorable, elegirCodigoDelCuadro, pareceModelo, registrarUnidades, movimientoParaOficina, GARANTIA_ESTADOS, instalacionDeUnidad, abrirGarantias, moverStock, cerrarEnvio, stockDePersona, auditarStock, recalcularDesdeMovimientos, movimientosDeRegularizacion, retiradosParaDevolver, avanceSolicitud, anotarPresupuestos, pendienteDePresupuesto, tableroStock, claseMovimiento };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else Object.assign(raiz, api);
 })(typeof window !== "undefined" ? window : globalThis);

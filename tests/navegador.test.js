@@ -5734,7 +5734,7 @@ test("Stock en la APP: el depósito entrega escaneando (etiqueta SAT + N° de un
   await page.click("#depEscanearBtn");
   // Primera caja: no se sabe cuál es el N° de serie -> se elige una vez
   await page.waitForSelector(".stk-elegir-serie [data-t]");
-  assert.deepStrictEqual(await page.$$eval(".stk-elegir-serie [data-t]", (b) => b.map((x) => x.dataset.t)), ["K10H-J9B", "GH200AA001"], "el link del QR no se ofrece");
+  assert.deepStrictEqual(await page.$$eval(".stk-elegir-serie [data-t]", (b) => b.map((x) => x.dataset.t)), ["GH200AA001"], "ni el link del QR ni el código del modelo (con guion) se ofrecen");
   await page.click('.stk-elegir-serie [data-t="GH200AA001"]');
   await page.waitForFunction(() => document.querySelectorAll("#depCanasta .stk-chip").length === 3);
   assert.deepStrictEqual(catalogo.articulos["20825"].alias, ["K10H-J9B"], "el código del modelo se ignora de ahora en más");

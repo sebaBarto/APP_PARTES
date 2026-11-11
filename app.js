@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.70.1";
+const APP_VERSION = "4.71.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -18565,7 +18565,11 @@ async function abrirEscanerStock(op) {
       if (nuevos.length) {
         const r = await op.leerCuadro(nuevos);
         const fin = Date.now();
-        if (r) {
+        if (r && r.pista) {
+          // Solo un aviso (sin pitido ni color): leyó el código del modelo y espera el N° de serie.
+          ultimo.className = "stk-escaner-ultimo pista"; ultimo.textContent = r.pista;
+          [].concat(r.usado || nuevos).forEach((t) => vistos.set(t, fin));
+        } else if (r) {
           mostrarResultado(r, nuevos[0]);
           [].concat(r.usado || nuevos[0]).forEach((t) => vistos.set(t, fin));
           if (r.ok) ocrCaja.innerHTML = "";
@@ -18595,8 +18599,11 @@ function elegirSerieStock(desc, opciones) {
   return new Promise((resolver) => {
     const capa = document.createElement("div");
     capa.className = "modal-overlay dlg-app";
-    capa.innerHTML = `<div class="modal-caja" role="dialog" aria-modal="true"><p class="dlg-texto"></p><div class="stk-elegir-serie"></div><div class="dlg-botones"><button type="button" class="dlg-no">Ninguno</button></div></div>`;
-    capa.querySelector(".dlg-texto").textContent = `${desc}: la caja tiene ${opciones.length} códigos. Tocá el N° de serie (el que cambia en cada caja). Los otros se van a ignorar de ahora en más en este artículo.`;
+    const uno = opciones.length === 1;
+    capa.innerHTML = `<div class="modal-caja" role="dialog" aria-modal="true"><p class="dlg-texto"></p><div class="stk-elegir-serie"></div><div class="dlg-botones"><button type="button" class="dlg-no">${uno ? "No, es el del modelo" : "Ninguno"}</button></div></div>`;
+    capa.querySelector(".dlg-texto").textContent = uno
+      ? `${desc}: ¿este código es el N° de serie (el que cambia en cada caja)? Si es el del modelo (igual en todas las cajas), tocá «No» y no se vuelve a tomar.`
+      : `${desc}: la caja tiene ${opciones.length} códigos. Tocá el N° de serie (el que cambia en cada caja). Los otros se van a ignorar de ahora en más en este artículo.`;
     capa.querySelector(".stk-elegir-serie").innerHTML = opciones.map((t) => `<button type="button" class="stk-res" data-t="${escapeHtml(t)}" style="font-family:'IBM Plex Mono',monospace;">${escapeHtml(t)}</button>`).join("");
     const fin = (t) => { capa.remove(); resolver(t || ""); };
     capa.querySelectorAll("[data-t]").forEach((b) => b.addEventListener("click", () => fin(b.dataset.t)));
@@ -18695,6 +18702,7 @@ function crearCanastaStock(op) {
     const art = arts()[c];
     if (!art || !op.puedeAsociar) return;
     art.alias = [...new Set([...(art.alias || []), codigo])];
+    art.formatos = (art.formatos || []).filter((f) => f !== formaCodigo(codigo)); // si se había aprendido como N° de serie
     try { await stkApi("POST", "", { accion: "alias", c, ean: codigo }); } catch (e) { /* queda en este celular por ahora */ }
   };
   const agregarUnidad = async (c, tracking, r) => {
@@ -18718,7 +18726,7 @@ function crearCanastaStock(op) {
     const l = linea(c);
     l.unidades.push(tracking); // completa una caja que esperaba su N° de serie, o suma una más igual
     if (l.cant < l.unidades.length) l.cant = l.unidades.length;
-    if (art.tipo === "unidad") art.formatos = agregarFormato(art.formatos, tracking); // aprende ya, sin esperar al servidor
+    if (art.tipo === "unidad") art.formatos = agregarFormato(art.formatos, tracking, art); // aprende ya, sin esperar al servidor
     can.actual = c;
     can.cambio();
     return { ok: true, texto: `${art.d} · ${tracking} (${l.unidades.length})`, completo: true };
@@ -18762,11 +18770,12 @@ function crearCanastaStock(op) {
     if (d.elegir) {
       const art = arts()[can.actual] || { d: can.actual };
       const t = await elegirSerieStock(art.d, d.elegir);
+      if (!t && d.elegir.length === 1) { await aprenderModelo(can.actual, d.elegir[0]); return { ok: true, texto: `${d.elegir[0]}: código del modelo, ignorado`, completo: false, usado: d.elegir }; }
       if (!t) return { ok: false, texto: "No se agregó", usado: d.elegir };
-      for (const otro of d.elegir.filter((x) => x !== t)) await aprenderModelo(can.actual, limpiarCodigo(otro));
+      for (const otro of [...d.elegir.filter((x) => x !== t), ...(d.modelos || [])]) await aprenderModelo(can.actual, limpiarCodigo(otro));
       return { ...(await agregarUnidad(can.actual, t, interpretarCodigo(t, op.catalogo(), op.saldos(), can.actual))), usado: d.elegir };
     }
-    if (!d.usar) return null; // nada útil en el cuadro (un link, el código del modelo): no hace ruido
+    if (!d.usar) return d.pista ? { pista: d.pista, usado: textos } : null; // nada útil (un link, el código del modelo): no hace ruido
     return { ...(await can.agregarCodigo(d.usar)), usado: d.usar };
   };
   can.interpretar = (t) => interpretarCodigo(t, op.catalogo(), op.saldos(), can.actual);
