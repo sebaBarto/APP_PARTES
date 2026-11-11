@@ -1383,6 +1383,10 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
       </div>
 
       <div data-stk-vista="marcas" class="hidden">
+        <div class="card" style="padding-bottom:14px;">
+          <label for="stkMarcasBuscar">Buscar una marca</label>
+          <input type="search" class="field-input" id="stkMarcasBuscar" placeholder="Ej: Paradox (busca en las sugeridas y en las ya confirmadas)">
+        </div>
         <div class="card" id="stkMarcasSugCard">
           <h3 style="margin-top:0;">Marcas sugeridas</h3>
           <p class="subtitle" style="margin-top:0;">Artículos sin marca en los que la descripción dice cuál es (o el modelo la delata, ej. PMD75 → Paradox). Revisá, corregí el nombre si hace falta, destildá lo que no va y tocá «Aplicar».</p>
@@ -1390,10 +1394,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
         </div>
         <div class="card">
           <h3 style="margin-top:0;">Marcas y proveedores</h3>
-          <p class="subtitle" style="margin-top:0;">Cada marca con sus artículos. Escribí el proveedor y tocá «Poner» para asignárselo a todos los artículos de esa marca. «Ver» abre la lista de Artículos filtrada por esa marca (para cambiar uno por uno, o el tipo de todos).</p>
-          <div class="field-row" style="flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;">
-            <input type="search" class="field-input" id="stkMarcasBuscar" placeholder="Buscar una marca…" style="flex:1;min-width:200px;">
-          </div>
+          <p class="subtitle" style="margin-top:0;">Cada marca con sus artículos, también las sugeridas que todavía no confirmaste. Escribí el proveedor y tocá «Poner» para asignárselo a todos los artículos de esa marca (si la marca era sugerida, queda confirmada en el mismo paso). «Ver» abre la lista de Artículos filtrada por esa marca (para cambiar uno por uno, o el tipo de todos).</p>
           <div id="stkMarcasTabla"></div>
         </div>
       </div>
@@ -6800,10 +6801,12 @@ function stkRenderMarcas() {
     const sug = stkMarcaExistente(m), k = claveMarca(sug);
     (grupos[k] = grupos[k] || { k, marca: sug, arts: [] }).arts.push(a);
   });
-  const lista = Object.values(grupos).sort((x, y) => y.arts.length - x.arts.length || x.marca.localeCompare(y.marca, "es"));
+  const q = normalizeText(document.getElementById("stkMarcasBuscar").value || "");
+  const todas = Object.values(grupos).sort((x, y) => y.arts.length - x.arts.length || x.marca.localeCompare(y.marca, "es"));
+  const lista = todas.filter((g) => !q || normalizeText(stkMarcasSugNombre[g.k] ?? g.marca).includes(q));
   const sugCont = document.getElementById("stkMarcasSug");
   const totalSug = lista.reduce((n, g) => n + g.arts.length, 0);
-  sugCont.innerHTML = !lista.length ? '<p class="status ok">No hay sugerencias pendientes: los artículos sin marca no la dicen en la descripción. Se les pone desde Artículos (filtro Marca → «Sin marca»).</p>'
+  sugCont.innerHTML = !lista.length ? todas.length ? '<p class="subtitle">Ninguna marca sugerida con ese nombre.</p>' : '<p class="status ok">No hay sugerencias pendientes: los artículos sin marca no la dicen en la descripción. Se les pone desde Artículos (filtro Marca → «Sin marca»).</p>'
     : `<p class="subtitle" style="margin:0 0 8px;">${totalSug.toLocaleString("es-AR")} artículos en ${lista.length} marcas.</p>
     ${lista.map((g) => `<details class="stk-marca-sug" data-k="${escapeHtmlAdmin(g.k)}">
       <summary><input type="checkbox" class="stk-marca-sug-ok" ${stkMarcasSugQuitadas.has("g:" + g.k) ? "" : "checked"} aria-label="Aplicar ${escapeHtmlAdmin(g.marca)}">
@@ -6819,6 +6822,7 @@ function stkRenderMarcas() {
   sugCont.querySelectorAll(".stk-marca-sug-nombre").forEach((i) => {
     i.addEventListener("click", (e) => e.stopPropagation());
     i.addEventListener("keydown", (e) => { if (e.key === " " || e.key === "Enter") e.stopPropagation(); if (e.key === "Enter") e.preventDefault(); });
+    i.addEventListener("keyup", (e) => { if (e.key === " ") e.preventDefault(); }); // el espacio no pliega el grupo
     i.addEventListener("input", () => { stkMarcasSugNombre[i.closest("details").dataset.k] = i.value; });
   });
   sugCont.querySelectorAll(".stk-marca-sug-arts input[data-c]").forEach((i) => i.addEventListener("change", () => { if (i.checked) stkMarcasSugQuitadas.delete(i.dataset.c); else stkMarcasSugQuitadas.add(i.dataset.c); }));
@@ -6845,9 +6849,12 @@ function stkRenderMarcas() {
     });
   });
   // 2) Marcas con su proveedor
-  const q = normalizeText(document.getElementById("stkMarcasBuscar").value || "");
   const tot = totalesPorArticulo(stk.saldos);
-  const resumen = resumenMarcas(Object.fromEntries(stkMarcasArticulos().map((a) => [a.c, a]))).filter((g) => !q || normalizeText(g.marca || "sin marca").includes(q));
+  // Las sugeridas (sin confirmar) también cuentan en su marca: se puede trabajar con ellas directamente.
+  const sugerida = {};
+  todas.forEach((g) => { const marca = stkMarcaExistente(stkMarcasSugNombre[g.k] ?? g.marca); if (marca) g.arts.forEach((a) => { if (!stkMarcasSugQuitadas.has(a.c)) sugerida[a.c] = marca; }); });
+  const resumen = resumenMarcas(Object.fromEntries(stkMarcasArticulos().map((a) => [a.c, limpiarMarca(a.marca) ? a : { ...a, marca: sugerida[a.c] || "" }]))).filter((g) => !q || normalizeText(g.marca || "sin marca").includes(q));
+  resumen.forEach((g) => { g.sugeridos = g.codigos.filter((c) => sugerida[c]); });
   const tabla = document.getElementById("stkMarcasTabla");
   if (!resumen.length) { tabla.innerHTML = '<p class="subtitle">No hay marcas con ese nombre.</p>'; return; }
   const provTexto = (g) => {
@@ -6863,12 +6870,18 @@ function stkRenderMarcas() {
       const unico = Object.keys(g.provs).filter(Boolean);
       return `<tr data-k="${escapeHtmlAdmin(claveMarca(g.marca))}">
         <td><b>${g.marca ? escapeHtmlAdmin(g.marca) : '<i>Sin marca</i>'}</b></td>
-        <td class="num">${g.codigos.length}</td><td class="num">${conStock}</td>
+        <td class="num">${g.codigos.length}${g.sugeridos.length ? `<div><span class="stk-tag unidad">${g.sugeridos.length === g.codigos.length ? "sugerida" : g.sugeridos.length + " sugeridos"}</span></div>` : ""}</td><td class="num">${conStock}</td>
         <td>${provTexto(g)}</td>
         <td>${g.marca ? `<div style="display:flex;gap:6px;"><input class="field-input stk-marca-prov" list="stkProvLista" style="padding:4px 6px;min-width:150px;" placeholder="Proveedor" value="${unico.length === 1 ? escapeHtmlAdmin(unico[0]) : ""}"><button type="button" class="btn-secondary-admin" data-marca-prov style="width:auto;">Poner</button></div>` : ""}</td>
-        <td class="stk-btns"><button type="button" class="btn-secondary-admin" data-marca-ver>Ver</button>${g.marca ? '<button type="button" class="btn-secondary-admin" data-marca-renombrar>Renombrar</button>' : ""}</td></tr>`;
+        <td class="stk-btns">${g.sugeridos.length ? '<button type="button" class="btn-secondary-admin" data-marca-confirmar>Confirmar marca</button>' : ""}${g.sugeridos.length < g.codigos.length || !g.marca ? '<button type="button" class="btn-secondary-admin" data-marca-ver>Ver</button>' : ""}${g.marca && g.sugeridos.length < g.codigos.length ? '<button type="button" class="btn-secondary-admin" data-marca-renombrar>Renombrar</button>' : ""}</td></tr>`;
     }).join("")}</tbody></table></div>`;
   const grupo = (tr) => resumen.find((g) => claveMarca(g.marca) === tr.dataset.k);
+  const confirmarSugeridos = (g) => stkPost({ accion: "configurar_varios", items: g.sugeridos.map((c) => ({ c, marca: g.marca })) });
+  tabla.querySelectorAll("[data-marca-confirmar]").forEach((b) => b.addEventListener("click", (e) => simsConBoton(e.currentTarget, async () => {
+    const g = grupo(b.closest("tr"));
+    try { const r = await confirmarSugeridos(g); await stkLeer(); avisoAdmin(`Listo: ${r.cambiados} artículo(s) con marca «${g.marca}».`, "ok"); } catch (err) { avisoAdmin("No se pudo: " + err.message, "err"); }
+    stkMostrarVista();
+  })));
   tabla.querySelectorAll("[data-marca-ver]").forEach((b) => b.addEventListener("click", () => {
     const g = grupo(b.closest("tr"));
     stkVista = "articulos"; stkMostrarVista();
@@ -6892,6 +6905,7 @@ function stkRenderMarcas() {
     } else if (!otros.length && !(await confirmarAdmin(`¿Poner «${prov}» a ${codigos.length} artículo(s) de ${g.marca}?`))) return;
     await simsConBoton(e.currentTarget, async () => {
       try {
+        if (g.sugeridos.length) await confirmarSugeridos(g); // la marca sugerida queda confirmada
         const r = await stkPost({ accion: "configurar_varios", codigos, campos: { prov } });
         await stkLeer();
         avisoAdmin(`Listo: ${r.cambiados} artículo(s) de ${g.marca} con proveedor «${prov}».`, "ok");

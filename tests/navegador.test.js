@@ -6887,6 +6887,12 @@ test("Marcas (panel): sugiere la marca por la descripción o el modelo, se revis
   // Sugerencias: Paradox (por la descripción y por el modelo PMD75) y Ajax; el cable y el SIM no
   const sug = await page.$$eval("#stkMarcasSug .stk-marca-sug", (d) => d.map((x) => [x.querySelector(".stk-marca-sug-nombre").value, x.querySelectorAll("[data-c]").length]));
   assert.deepStrictEqual(sug, [["Paradox", 2], ["Ajax", 1]]);
+  // La tabla de abajo ya muestra las sugeridas (sin confirmar) y el buscador encuentra en las dos
+  assert.match((await page.textContent('#stkMarcasTabla tr[data-k="AJAX"]')).replace(/\s+/g, " "), /Ajax ?1 ?sugerida/);
+  await page.fill("#stkMarcasBuscar", "parad");
+  assert.deepStrictEqual([await page.locator("#stkMarcasSug .stk-marca-sug").count(), await page.$$eval("#stkMarcasTabla tr[data-k]", (f) => f.map((x) => x.dataset.k))], [1, ["PARADOX"]]);
+  assert.match((await page.textContent('#stkMarcasTabla tr[data-k="PARADOX"]')).replace(/\s+/g, " "), /Paradox ?3 ?2 sugeridos/);
+  await page.fill("#stkMarcasBuscar", "");
   // Se destilda Ajax y se aplica
   await page.click('#stkMarcasSug details:nth-of-type(2) .stk-marca-sug-ok');
   await page.click("#stkMarcasSugAplicar");
@@ -6913,9 +6919,19 @@ test("Marcas (panel): sugiere la marca por la descripción o el modelo, se revis
   assert.strictEqual(await page.inputValue("#stkMarca"), "Paradox");
   assert.deepStrictEqual(await page.$$eval("#stkLista tr[data-c]", (f) => f.map((x) => x.dataset.c).sort()), ["1", "2", "5"]);
   assert.strictEqual(await page.inputValue('#stkLista tr[data-c="3"] [data-campo="marca"]').catch(() => "no está"), "no está");
-  // Sin marca: el cable y el hub de Ajax (destildado)
+  // Desde la tabla, a una marca sugerida se le pone el proveedor y queda confirmada en el mismo paso
+  await page.click('#stkSub [data-stk="marcas"]');
+  const ajax = page.locator('#stkMarcasTabla tr[data-k="AJAX"]');
+  await ajax.locator(".stk-marca-prov").fill("Sur");
+  await ajax.locator("[data-marca-prov]").click();
+  await page.click(".cartel-admin .cartel-si");
+  await page.waitForFunction(() => /de Ajax con proveedor «Sur»/.test(document.body.textContent));
+  assert.deepStrictEqual(posts.slice(-2), [{ accion: "configurar_varios", items: [{ c: "3", marca: "Ajax" }] }, { accion: "configurar_varios", codigos: ["3"], campos: { prov: "Sur" } }]);
+  await page.click('#stkSub [data-stk="articulos"]');
+  await page.selectOption("#stkFiltro", "todos");
+  // Sin marca: solo el cable
   await page.selectOption("#stkMarca", "-");
-  assert.deepStrictEqual(await page.$$eval("#stkLista tr[data-c]", (f) => f.map((x) => x.dataset.c).sort()), ["3", "4"]);
+  assert.deepStrictEqual(await page.$$eval("#stkLista tr[data-c]", (f) => f.map((x) => x.dataset.c).sort()), ["4"]);
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
