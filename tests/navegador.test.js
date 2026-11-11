@@ -7042,3 +7042,45 @@ test("Claves en la ficha del cliente (panel): se agregan desde la ficha, se mues
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
+
+test("Stock (panel): «¿Dónde está?» busca por nombre, código, etiqueta o N° de serie y detalla cuánto hay en cada lugar", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  const catalogo = { articulos: { 10012: { c: "10012", d: "BATERÍA 12 V 7 AH", tipo: "cantidad" }, 10013: { c: "10013", d: "BATERÍA 12V 4A", tipo: "cantidad" }, 23940: { c: "23940", d: "INFRARROJO AJAX", tipo: "unidad" } }, proveedores: {} };
+  const saldos = { inicializado: "2026-10-01", ubic: { dep: { 10012: 14, 23940: 1 }, "tec:Juan": { 10012: 3, 23940: 2 }, "tec:Luis": { 10012: 1 }, "veh:Kangoo gris": { 10012: 5 }, "cam:Pedro": { 10012: 2 }, "com:Kiosco Pérez": { 10012: 1 }, "cli:Bar Sol": { 23940: 1 } },
+    unidades: { GH1: { c: "23940", u: "tec:Juan" }, GH2: { c: "23940", u: "tec:Juan" }, GH3: { c: "23940", u: "dep" }, GH4: { c: "23940", u: "cli:Bar Sol" } }, pedidos: {} };
+  await page.route("**/api/**", (route) => {
+    const u = route.request().url(), j = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("coleccion=stock")) return j({ catalogo, saldos, conciliacion: { marcas: [], corridas: [] } });
+    return j([]);
+  });
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { document.getElementById("loginCard").classList.add("hidden"); document.getElementById("mainCard").classList.remove("hidden"); document.getElementById("tabStockBtn").click(); });
+  await page.waitForFunction(() => stk && stk.catalogo && Object.keys(stk.catalogo.articulos).length);
+  // Por nombre como lo escribe la gente: «bateria 12v 7a» encuentra «BATERÍA 12 V 7 AH» (y no la de 4 A)
+  await page.fill("#stkDondeBuscar", "bateria 12v 7a");
+  await page.waitForSelector(".stk-donde-res");
+  const filas = await page.$$eval(".stk-donde-fila", (l) => l.map((x) => x.querySelector(".sdf-nom").textContent + "=" + x.querySelector(".sdf-n").textContent));
+  assert.deepStrictEqual(filas, ["Depósito=14", "Juan=3", "Luis=1", "Kangoo gris=5", "En camino a Pedro=2", "Kiosco Pérez=1"]);
+  assert.match(await page.textContent(".sdr-total"), /25\s*en poder de SAT/);
+  assert.deepStrictEqual(await page.$$eval(".sdg-tit", (l) => l.map((x) => x.textContent)), ["Depósito14", "Técnicos4", "Vehículos5", "En camino2", "Comodato en clientes1"]);
+  if (process.env.FOTO) { await page.waitForTimeout(500); await page.locator(".stk-donde-caja").screenshot({ path: process.env.FOTO }); }
+  // Varias coincidencias: elige de la lista
+  await page.fill("#stkDondeBuscar", "bateria 12");
+  await page.waitForSelector("#stkDondeSugerencias:not(.hidden) button");
+  assert.strictEqual(await page.locator("#stkDondeSugerencias button").count(), 2);
+  await page.click('#stkDondeSugerencias button[data-c="10013"]');
+  assert.match(await page.textContent(".stk-donde-res"), /No hay en ningún lado/);
+  // Por N° de serie: marca dónde está ese equipo y muestra los N° de cada lugar
+  await page.fill("#stkDondeBuscar", "gh2");
+  await page.waitForFunction(() => /INFRARROJO AJAX/.test(document.querySelector(".stk-donde-res") && document.querySelector(".stk-donde-res").textContent));
+  assert.match(await page.textContent(".sdr-cab"), /N° GH2: Juan/);
+  assert.match(await page.textContent(".stk-donde-fila.marcada"), /Juan.*GH1.*GH2/s);
+  assert.strictEqual(await page.textContent(".sdf-series code.marcada"), "GH2");
+  // Por código
+  await page.fill("#stkDondeBuscar", "10012");
+  await page.waitForFunction(() => /BATERÍA 12 V 7 AH/.test(document.querySelector(".sdr-cab").textContent));
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});

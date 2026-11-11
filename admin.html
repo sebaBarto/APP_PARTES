@@ -470,6 +470,29 @@
 .fa-clave-btns { display: inline-flex; gap: 6px; margin-left: 6px; vertical-align: middle; }
 .fa-clave-btns button { width: auto !important; padding: 3px 10px !important; font-size: 12px !important; }
 .fa-clave-form { margin-top: 10px; border: 2px solid var(--amber, #F5A623); }
+.stk-donde-caja { margin-bottom: 14px; }
+.stk-donde-sug { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 20; background: #fff; border: 1px solid #DDD; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.12); max-height: 340px; overflow: auto; }
+.stk-donde-sug button { display: flex; justify-content: space-between; gap: 10px; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid #F0F0F0; padding: 9px 12px; color: inherit; cursor: pointer; font-size: 14px; border-radius: 0; }
+.stk-donde-sug button:hover { background: #FFF6E5; }
+.stk-donde-sug small { color: #6B7680; white-space: nowrap; }
+.stk-donde-res { margin-top: 12px; animation: sdrEntra 260ms ease-out; }
+@keyframes sdrEntra { from { opacity: 0; transform: translateY(6px); } }
+.sdr-cab { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding-bottom: 10px; border-bottom: 1px solid #EEE; }
+.sdr-cab b { font-size: 16px; } .sdr-cab small { display: block; color: #6B7680; margin-top: 2px; }
+.sdr-total { text-align: right; } .sdr-total b { font-size: 26px; line-height: 1; display: block; color: #C97F00; }
+.stk-donde-grupo { margin-top: 10px; }
+.sdg-tit { display: flex; justify-content: space-between; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #6B7680; font-weight: 700; margin-bottom: 4px; }
+.stk-donde-fila { display: grid; grid-template-columns: minmax(120px, 1.2fr) 2fr auto; align-items: center; gap: 4px 10px; padding: 6px 8px; border-radius: 8px; }
+.stk-donde-fila:nth-child(even) { background: rgba(127,127,127,.05); }
+.stk-donde-fila.marcada { background: #FFF1D6; }
+.sdf-bar { height: 8px; border-radius: 4px; background: rgba(127,127,127,.12); overflow: hidden; }
+.sdf-bar i { display: block; height: 100%; border-radius: 4px; background: #F5A623; transition: width 400ms ease; }
+.g-tec .sdf-bar i { background: #3E86D6; } .g-veh .sdf-bar i { background: #7D6BD1; } .g-cam .sdf-bar i { background: #5AA9F0; } .g-gar .sdf-bar i { background: #E5674F; }
+.sdf-n { min-width: 40px; text-align: right; font-size: 15px; }
+.sdf-series { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px; }
+.sdf-series code { font-size: 11.5px; background: rgba(127,127,127,.12); padding: 1px 6px; border-radius: 4px; }
+.sdf-series code.marcada { background: #F5A623; color: #101820; }
+.stk-donde-grupo details summary { cursor: pointer; font-size: 13px; padding: 4px 8px; }
 
 /* ---------- Identidad SAT y legibilidad (v3.148) ---------- */
 :root { --ink: #191816; --osc: #191816; --amber: #FFC033; --paper: #F1F0EC; --border: #D6D3CB; --steel: #5E5A52;
@@ -1296,6 +1319,14 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
     <div id="panelStock" class="hidden">
       <h1>Stock</h1>
       <p class="subtitle">Dónde está cada artículo: depósito, técnicos, vehículos y clientes. El sistema de Oficina sigue con precios y compras; acá se concilia contra lo que exporta y se arma el pedido de lo que falta.</p>
+      <div class="card stk-donde-caja">
+        <label for="stkDondeBuscar" style="font-weight:700;">¿Dónde está?</label>
+        <div style="position:relative;">
+          <input type="search" class="field-input" id="stkDondeBuscar" placeholder="Código, etiqueta, N° de serie o nombre (ej: batería 12v 7a)" autocomplete="off">
+          <div id="stkDondeSugerencias" class="stk-donde-sug hidden" role="listbox"></div>
+        </div>
+        <div id="stkDondeResultado"></div>
+      </div>
       <div class="stk-sub" id="stkSub">
         <button type="button" class="btn-secondary-admin activo" data-stk="tablero">Tablero</button>
         <button type="button" class="btn-secondary-admin" data-stk="articulos">Artículos</button>
@@ -7171,6 +7202,67 @@ document.getElementById("stkGarExcelBtn").addEventListener("click", () => {
   XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filas.length ? filas : [{ "N° de serie": "Sin equipos en garantía" }]), "Garantía");
   XLSX.writeFile(libro, `stock_garantia_${new Date().toISOString().slice(0, 10)}.xlsx`);
 });
+
+// --- ¿Dónde está? Busca un artículo (código, etiqueta, N° de serie o nombre) y detalla cuánto hay en cada lugar ---
+function stkDondeBuscarArticulos(texto) {
+  const arts = Object.values((stk.catalogo && stk.catalogo.articulos) || {}).filter((a) => a && !a.baja);
+  const t = String(texto || "").trim();
+  if (!t) return { lista: [] };
+  const porCod = (stk.catalogo.articulos || {})[codigoArticulo(t)];
+  if (porCod) return { lista: [porCod], exacto: true };
+  const sat = leerEtiquetaSat(t);
+  if (sat && stk.catalogo.articulos[sat.codigo]) return { lista: [stk.catalogo.articulos[sat.codigo]], exacto: true };
+  const serie = limpiarCodigo(t), u = (stk.saldos.unidades || {})[serie];
+  if (u && stk.catalogo.articulos[u.c]) return { lista: [stk.catalogo.articulos[u.c]], exacto: true, serie, unidad: u };
+  // Por nombre: todas las palabras tienen que estar (sin acentos ni mayúsculas; «12v» encuentra «12 V»).
+  const norm = (x) => normalizeTextAdmin(String(x || "")).replace(/(\d)\s+(?=[a-z])/g, "$1").replace(/[^a-z0-9.,]+/g, " ").trim();
+  const palabras = norm(t).split(" ").filter(Boolean);
+  const tot = totalesPorArticulo(stk.saldos);
+  const lista = arts.filter((a) => { const d = norm([a.d, a.c, ...(a.alias || [])].join(" ")); return palabras.every((p) => d.includes(p)); })
+    .sort((a, b) => ((tot[b.c] || {}).sat || 0) - ((tot[a.c] || {}).sat || 0) || String(a.d).localeCompare(String(b.d), "es"));
+  return { lista };
+}
+function stkDondePintar(a, extra) {
+  const cont = document.getElementById("stkDondeResultado");
+  const det = (totalesPorArticulo(stk.saldos)[a.c] || { detalle: {} }).detalle, med = a.medida || "unidades", esU = a.tipo === "unidad";
+  const unidades = Object.entries(stk.saldos.unidades || {}).filter(([, x]) => x && x.c === a.c);
+  const seriesDe = (u) => unidades.filter(([, x]) => x.u === u).map(([t]) => t);
+  const nombre = (u) => u === "dep" ? "Depósito" : /^tec:/.test(u) ? u.slice(4) : /^veh:/.test(u) ? u.slice(4) : /^cam:dev:/.test(u) ? `Volviendo de ${u.slice(8)}` : /^cam:/.test(u) ? `En camino a ${u.slice(4)}` : u === "gar" ? "En garantía (proveedor)" : /^(cli|com):/.test(u) ? u.slice(4) : nombreUbicacion(u);
+  const GRUPOS = [["dep", "Depósito", (u) => u === "dep"], ["tec", "Técnicos", (u) => /^tec:/.test(u)], ["veh", "Vehículos", (u) => /^veh:/.test(u)], ["cam", "En camino", (u) => /^cam:/.test(u)], ["gar", "Garantía", (u) => u === "gar"], ["com", "Comodato en clientes", (u) => /^com:/.test(u)], ["cli", "Instalado en clientes", (u) => /^cli:/.test(u)]];
+  const ubics = Object.entries(det).filter(([, n]) => n);
+  const sat = ubics.filter(([u]) => !/^(cli|com):/.test(u)).reduce((t, [, n]) => t + n, 0);
+  const max = Math.max(1, ...ubics.filter(([u]) => !/^(cli|com):/.test(u)).map(([, n]) => n));
+  const filaHtml = (u, n) => { const sers = esU ? seriesDe(u) : []; return `<div class="stk-donde-fila${extra && extra.unidad && extra.unidad.u === u ? " marcada" : ""}"><span class="sdf-nom">${escapeHtmlAdmin(nombre(u))}</span><span class="sdf-bar"><i style="width:${/^(cli|com):/.test(u) ? 0 : Math.max(4, (n / max) * 100)}%"></i></span><b class="sdf-n">${stkFmt(n)}</b>${sers.length ? `<div class="sdf-series">${sers.map((t) => `<code${extra && extra.serie === t ? ' class="marcada"' : ""}>${escapeHtmlAdmin(t)}</code>`).join("")}</div>` : ""}</div>`; };
+  const bloques = GRUPOS.map(([k, tit, f]) => {
+    const filas = ubics.filter(([u]) => f(u)).sort((x, y) => y[1] - x[1]);
+    if (!filas.length) return "";
+    const suma = filas.reduce((t, [, n]) => t + n, 0), muchos = /^(com|cli)$/.test(k) && filas.length > 6;
+    return `<div class="stk-donde-grupo g-${k}"><div class="sdg-tit">${tit}<span>${stkFmt(suma)}</span></div>${muchos ? `<details><summary>${filas.length} clientes</summary>${filas.map(([u, n]) => filaHtml(u, n)).join("")}</details>` : filas.map(([u, n]) => filaHtml(u, n)).join("")}</div>`;
+  }).join("");
+  const baja = esU && extra && extra.unidad && extra.unidad.u === "baja";
+  cont.innerHTML = `<div class="stk-donde-res">
+    <div class="sdr-cab"><div><b>${escapeHtmlAdmin(a.d || a.c)}</b><small>Código ${escapeHtmlAdmin(a.c)} · ${escapeHtmlAdmin(med)}${extra && extra.serie ? ` · N° ${escapeHtmlAdmin(extra.serie)}: <b>${escapeHtmlAdmin(baja ? "dado de baja" : nombre(extra.unidad.u))}</b>` : ""}</small></div><div class="sdr-total"><b>${stkFmt(sat)}</b><small>en poder de SAT</small></div></div>
+    ${bloques || '<p class="stk-det" style="margin:8px 0 0;">No hay en ningún lado: está en 0.</p>'}
+  </div>`;
+}
+(() => {
+  const inp = document.getElementById("stkDondeBuscar"), sug = document.getElementById("stkDondeSugerencias"), res = document.getElementById("stkDondeResultado");
+  let t = null;
+  const buscar = () => {
+    if (!stk || !stk.catalogo) return;
+    const r = stkDondeBuscarArticulos(inp.value);
+    if (!inp.value.trim()) { sug.classList.add("hidden"); res.innerHTML = ""; return; }
+    if (r.exacto || r.lista.length === 1) { sug.classList.add("hidden"); stkDondePintar(r.lista[0], r); return; }
+    res.innerHTML = r.lista.length ? "" : '<p class="stk-det" style="margin:8px 0 0;">No encontré ese artículo.</p>';
+    const tot = totalesPorArticulo(stk.saldos);
+    sug.innerHTML = r.lista.slice(0, 12).map((a) => `<button type="button" data-c="${escapeHtmlAdmin(a.c)}"><span>${escapeHtmlAdmin(a.d)}</span><small>${escapeHtmlAdmin(a.c)} · ${stkFmt((tot[a.c] || {}).sat || 0)}</small></button>`).join("") + (r.lista.length > 12 ? `<div class="stk-det" style="padding:6px 10px;">y ${r.lista.length - 12} más: escribí algo más preciso</div>` : "");
+    sug.classList.toggle("hidden", !r.lista.length);
+  };
+  inp.addEventListener("input", () => { clearTimeout(t); t = setTimeout(buscar, 150); });
+  inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); const b = sug.querySelector("button"); if (!sug.classList.contains("hidden") && b) b.click(); else buscar(); } if (e.key === "Escape") sug.classList.add("hidden"); });
+  sug.addEventListener("click", (e) => { const b = e.target.closest("[data-c]"); if (!b) return; const a = stk.catalogo.articulos[b.dataset.c]; inp.value = a.d; sug.classList.add("hidden"); stkDondePintar(a); });
+  document.addEventListener("click", (e) => { if (!e.target.closest(".stk-donde-caja")) sug.classList.add("hidden"); });
+})();
 
 // --- Stock inicial de cada técnico (punto de partida, sin mover el depósito) ---
 let stkTecFilas = null, stkTecUbic = "", stkTecNombres = null, stkTecVehiculos = null;
