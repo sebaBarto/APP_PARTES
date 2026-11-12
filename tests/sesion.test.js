@@ -1683,17 +1683,20 @@ test("Stock: catálogo desde el listado de Oficina y la planilla revisada, saldo
     r = await post({ accion: "saldo_inicial", items: listado.map((x) => ({ c: x.c, dep: x.dep, com: x.com })) });
     assert.ok(r.cuerpo.ok);
     const sal = repo["stock/saldos.json"];
-    assert.deepStrictEqual(sal.ubic.dep, { 20825: 8, 10350: 30175 });
-    assert.deepStrictEqual(sal.ubic["com:Sin asignar"], { 20825: 1, 20208: 7 });
+    // El stock de comodato de Oficina está en el depósito: entra al depósito.
+    assert.deepStrictEqual(sal.ubic.dep, { 20825: 9, 10350: 30175, 20208: 7 });
+    assert.strictEqual(sal.ubic["com:Sin asignar"], undefined);
     assert.strictEqual((await post({ accion: "saldo_inicial", items: [] })).statusCode, 409, "una sola vez");
     const mes = new Date().toISOString().slice(0, 7);
     assert.strictEqual(repo[`stock/movimientos-${mes}.json`].length, 4);
     // Ajuste con motivo
     assert.strictEqual((await post({ accion: "ajustar", c: "20825", ubic: "dep", cantidad: 6 })).statusCode, 400, "sin motivo no");
     r = await post({ accion: "ajustar", c: "20825", ubic: "dep", cantidad: 6, motivo: "Conteo: había 6" });
-    assert.deepStrictEqual([r.cuerpo.antes, r.cuerpo.despues], [8, 6]);
+    assert.deepStrictEqual([r.cuerpo.antes, r.cuerpo.despues], [9, 6]);
     const mov = repo[`stock/movimientos-${mes}.json`].slice(-1)[0];
-    assert.deepStrictEqual([mov.tipo, mov.c, mov.cant, mov.de, mov.por], ["ajuste", "20825", 2, "dep", "Seba"]);
+    assert.deepStrictEqual([mov.tipo, mov.c, mov.cant, mov.de, mov.por], ["ajuste", "20825", 3, "dep", "Seba"]);
+    // Las 7 sirenas del comodato se usaron: quedan en 0
+    await post({ accion: "ajustar", c: "20208", ubic: "dep", cantidad: 0, motivo: "Conteo: no quedan" });
     // Pedidos: la sirena tiene 0 en depósito y mínimo 5 -> pedir 10
     const datosStock = await get();
     let p = S.articulosParaPedir(datosStock.catalogo, datosStock.saldos);
@@ -1705,10 +1708,10 @@ test("Stock: catálogo desde el listado de Oficina y la planilla revisada, saldo
     // Conciliación contra un listado nuevo de Oficina
     const nuevo = [{ c: "20825", d: "TECLADO K10LH", dep: 8, com: 1 }, { c: "20208", dep: 0, com: 7 }, { c: "10350", dep: 30175, com: 0 }, { c: "99999", d: "CAMARA NUEVA", dep: 2, com: 0 }];
     const conc = S.conciliarStock(nuevo, d2.catalogo, d2.saldos, []);
-    assert.deepStrictEqual(conc.cantidadDistinta.map((x) => [x.c, x.dif]), [["20825", -2]]);
+    // Oficina: depósito + comodato (los dos en el depósito)
+    assert.deepStrictEqual(conc.cantidadDistinta.map((x) => [x.c, x.dif]).sort(), [["20208", -7], ["20825", -3]]);
     assert.deepStrictEqual(conc.noEnCatalogo.map((x) => x.c), ["99999"]);
     assert.deepStrictEqual(conc.unidadesSinRegistrar.map((x) => x.c), ["20825"], "faltan escanear los teclados");
-    assert.strictEqual(conc.comodatoDistinto.length, 0);
     r = await post({ accion: "conc_marcar", estado: "ignorada", items: [{ codigo: "99999", categoria: "noEnCatalogo" }] });
     const conc2 = S.conciliarStock(nuevo, d2.catalogo, d2.saldos, r.cuerpo.marcas);
     assert.strictEqual(conc2.noEnCatalogo.length, 0);
@@ -1792,6 +1795,58 @@ test("Stock: control del cuadre (servidor y cron): todo lo hecho por la API cuad
     assert.ok(r.cuerpo.cuadre.errores.some((e) => e.k === "serieLugar" && e.serie === "GH12000001"));
     r = await post({ accion: "regularizar_cuadre", motivo: "El teclado está en el depósito" });
     assert.ok(r.cuerpo.cuadre.ok, JSON.stringify(r.cuerpo.cuadre.errores));
+  } finally { global.fetch = fetchViejo; }
+});
+
+test("Stock: el stock de comodato de Oficina está en el depósito: lo cargado antes como «comodato sin asignar» pasa al depósito (con movimiento) y se puede entregar escaneando", async () => {
+  const S = require(path.join(raiz, "stock-utils.js"));
+  const fetchViejo = global.fetch;
+  const mes = new Date().toISOString().slice(0, 7), fi = `${mes}-01T10:00:00.000Z`;
+  const repo = {
+    "tecnicos.json": [{ nombre: "Seba", permisos: { admin: true } }, { nombre: "Melina", permisos: { stock_responsable: true } }, { nombre: "Juan", permisos: {} }],
+    "stock/catalogo.json": { articulos: { 20868: { c: "20868", d: "RX1 RECEPTOR 2 PGM PARADOX INALAMBRICO", tipo: "unidad" }, 20208: { c: "20208", d: "SIRENA MP100 INTERIOR" } } },
+    "stock/saldos.json": { inicializado: fi, ubic: { dep: { 20208: 2 }, "com:Sin asignar": { 20868: 3, 20208: 1 } }, unidades: {}, envios: [] },
+    [`stock/movimientos-${mes}.json`]: [
+      { id: "i1", fecha: fi, tipo: "inicial", c: "20208", cant: 2, a: "dep" },
+      { id: "i2", fecha: fi, tipo: "inicial", c: "20868", cant: 3, a: "com:Sin asignar" },
+      { id: "i3", fecha: fi, tipo: "inicial", c: "20208", cant: 1, a: "com:Sin asignar" },
+    ],
+  };
+  let version = 0;
+  global.fetch = async (url, op = {}) => {
+    const u = String(url), metodo = op.method || "GET";
+    const m = u.match(/contents\/([^?]+)/);
+    if (m) {
+      const ruta = decodeURIComponent(m[1]);
+      if (metodo === "PUT") { repo[ruta] = JSON.parse(Buffer.from(JSON.parse(op.body).content, "base64").toString()); version++; return new Response("{}", { status: 200 }); }
+      if (!/\.json$/.test(ruta)) { const hijos = Object.keys(repo).filter((k) => k.startsWith(ruta + "/")).map((k) => ({ name: k.slice(ruta.length + 1), type: "file" })); return new Response(JSON.stringify(hijos), { status: hijos.length ? 200 : 404 }); }
+      if (!(ruta in repo)) return new Response("{}", { status: 404 });
+      return new Response(JSON.stringify({ sha: `s${version}`, encoding: "base64", content: Buffer.from(JSON.stringify(repo[ruta])).toString("base64") }));
+    }
+    return new Response("[]");
+  };
+  try {
+    const admin = crearSesion({ nombre: "Seba", rol: "admin" }), melina = crearSesion({ nombre: "Melina", rol: "tecnico" });
+    const post = async (body, t = admin) => { const r = resFalso(); await datos(pedido("POST", { coleccion: "stock" }, body, t), r); return r; };
+    const get = async (t = admin) => { const r = resFalso(); await datos(pedido("GET", { coleccion: "stock" }, null, t), r); return r.cuerpo; };
+    // Antes de tocar nada, la APP ya lo muestra en el depósito
+    const d = await get(melina);
+    assert.deepStrictEqual([d.saldos.ubic.dep["20868"], d.saldos.ubic.dep["20208"], d.saldos.ubic["com:Sin asignar"]], [3, 3, undefined]);
+    assert.ok(repo["stock/saldos.json"].ubic["com:Sin asignar"], "leer no escribe");
+    // Melina escanea dos RX1 y se los da a Juan
+    const r = await post({ accion: "mover", de: "dep", a: "tec:Juan", items: [{ c: "20868", cant: 2, unidades: ["AI200158A2", "AI200158A3"] }] }, melina);
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    const sal = repo["stock/saldos.json"];
+    assert.deepStrictEqual([sal.ubic.dep["20868"], sal.ubic.dep["20208"], sal.ubic["com:Sin asignar"]], [1, 3, undefined]);
+    const hist = repo[`stock/movimientos-${mes}.json`], pasaron = hist.filter((m) => m.tipo === "comodato_deposito");
+    assert.deepStrictEqual(pasaron.map((m) => [m.c, m.cant, m.de, m.a]).sort(), [["20208", 1, "com:Sin asignar", "dep"], ["20868", 3, "com:Sin asignar", "dep"]]);
+    assert.deepStrictEqual(sal.movsPend || [], [], "quedan en el historial");
+    assert.ok(pasaron.every((m) => S.movimientoParaOficina(m) === null && S.claseMovimiento(m) === ""), "es interno: ni Oficina ni el tablero lo cuentan");
+    // Una sola vez, y el control nocturno cuadra
+    await post({ accion: "mover", de: "dep", a: "tec:Juan", items: [{ c: "20208", cant: 1 }] }, melina);
+    assert.strictEqual(repo[`stock/movimientos-${mes}.json`].filter((m) => m.tipo === "comodato_deposito").length, 2);
+    const c = await post({ accion: "cuadrar" });
+    assert.ok(c.cuerpo.cuadre.ok, JSON.stringify(c.cuerpo.cuadre.errores));
   } finally { global.fetch = fetchViejo; }
 });
 

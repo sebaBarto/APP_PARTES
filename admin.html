@@ -5525,7 +5525,7 @@ const AYUDAS_SIMS = {
     "Si verificaste que lo guardado es lo real, «Regularizar» agrega al historial lo que faltaba, a tu nombre y sin tocar cantidades. Si el conteo da otra cosa, después ajustá.",
     "Abajo, lo que rompe una regla y qué hacer: materiales de partes para aprobar, retiros que no figuraban, N° de serie de más, cantidades negativas." ] },
   stk_conciliacion: { titulo: "Conciliación con Oficina", gif: "assets/ayuda/stock-adm-conciliacion.gif", texto: [
-    "Subí el listado que exporta Oficina (el de siempre). Se compara artículo por artículo con todo lo que está en poder de SAT y en comodato.",
+    "Subí el listado que exporta Oficina (el de siempre). Se compara artículo por artículo con todo lo que está en poder de SAT (el stock de comodato de Oficina cuenta como depósito).",
     "Cada grupo de diferencias tiene su explicación y su arreglo: agregar al catálogo, dejar la APP como Oficina, o marcar Resuelto / Ignorar si el error es de Oficina. Se puede de a uno o tildando varios.",
     "«Excel con todas las diferencias» para revisarlas con tiempo." ] },
   stk_pedidos: { titulo: "Pedidos a proveedores", gif: "assets/ayuda/stock-adm-pedidos.gif", texto: [
@@ -6586,7 +6586,7 @@ function stkRenderEstado() {
   if (!stk.saldos.inicializado && stkUltimoListado && arts.length) {
     const items = stkUltimoListado.articulos.filter((x) => (x.dep || x.com) && stk.catalogo.articulos[x.c] && !["sim", "herramienta", "no"].includes(stk.catalogo.articulos[x.c].tipo));
     ini.innerHTML = `<div class="card" style="margin:12px 0 0;background:#FFF8EA;border-color:#F5D38A;">
-      <p style="margin:0 0 8px;"><b>Saldo inicial.</b> La APP arranca con lo que dice este listado: ${items.length} artículos con cantidad en depósito o comodato (no se cuentan los SIM, las herramientas ni lo marcado «no controlar»). Se hace una sola vez; después las diferencias se corrigen desde la conciliación.</p>
+      <p style="margin:0 0 8px;"><b>Saldo inicial.</b> La APP arranca con lo que dice este listado: ${items.length} artículos con cantidad en depósito o comodato; el stock de comodato entra al depósito, porque está ahí (no se cuentan los SIM, las herramientas ni lo marcado «no controlar»). Se hace una sola vez; después las diferencias se corrigen desde la conciliación.</p>
       <button type="button" id="stkInicialBtn" style="width:auto;">Cargar el saldo inicial con estas cantidades</button></div>`;
     document.getElementById("stkInicialBtn").addEventListener("click", async (e) => {
       const btn = e.currentTarget;
@@ -6975,8 +6975,10 @@ async function stkRenderConciliacion(registrar) {
     let oficina = "", app = "", dif = "";
     if (cat.k === "comodatoDistinto") { oficina = stkFmt(of.com); app = stkFmt(t.com); dif = it.dif; }
     else if (cat.k === "negativo") { oficina = "—"; app = `${escapeHtmlAdmin(nombreUbicacion(it.u))}: ${stkFmt(it.n)}`; }
-    else if (cat.k === "unidadesSinRegistrar") { oficina = stkFmt(of.dep); app = `${stkFmt(t.sat)} (${it.registradas} con N° de serie)`; }
-    else { oficina = stkFmt(of.dep); app = stkFmt(t.sat); dif = it.dif != null ? it.dif : (t.sat || 0) - (of.dep || 0); }
+    // Oficina: depósito + stock de comodato (los dos están en el depósito)
+    const ofSat = (of.dep || 0) + (of.com || 0), ofTxt = of.com ? `${stkFmt(ofSat)} <span class="stk-det">(${stkFmt(of.dep || 0)} + ${stkFmt(of.com)} comodato)</span>` : stkFmt(ofSat);
+    if (cat.k === "unidadesSinRegistrar") { oficina = ofTxt; app = `${stkFmt(t.sat)} (${it.registradas} con N° de serie)`; }
+    else { oficina = ofTxt; app = stkFmt(t.sat); dif = it.dif != null ? it.dif : (t.sat || 0) - ofSat; }
     const difTxt = dif === "" ? "" : `<b style="color:${dif > 0 ? "#8A5A00" : "#B3261E"}">${dif > 0 ? "+" : ""}${stkFmt(dif)}</b>`;
     return `<tr data-c="${escapeHtmlAdmin(it.c)}" data-u="${escapeHtmlAdmin(it.u || "")}">
       <td><input type="checkbox" class="stk-conc-sel"></td><td>${escapeHtmlAdmin(it.c)}</td>
@@ -7055,7 +7057,7 @@ async function stkConcAccion(cat, accion, elegidos) {
       const u = "com:Sin asignar", nuevo = caja(u) - it.dif;
       if (nuevo < 0) problemas.push(`${it.d}: el comodato está asignado a clientes; corregilo en cada cliente.`); else planes.push({ it, ubic: u, cantidad: nuevo });
     } else {
-      const dif = it.dif != null ? it.dif : (it.t.sat || 0) - (it.of.dep || 0), nuevo = caja("dep") - dif;
+      const dif = it.dif != null ? it.dif : (it.t.sat || 0) - ((it.of.dep || 0) + (it.of.com || 0)), nuevo = caja("dep") - dif;
       if (nuevo < 0) problemas.push(`${it.d}: la diferencia está en técnicos o vehículos (${stkUbicTexto(it.t.detalle)}); ajustalo ahí.`); else planes.push({ it, ubic: "dep", cantidad: nuevo });
     }
   });

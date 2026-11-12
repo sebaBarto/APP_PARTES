@@ -257,9 +257,8 @@
   // ---------- Conciliación: listado de Oficina contra la APP ----------
   const STOCK_CONC_CATEGORIAS = [
     { k: "noEnCatalogo", corto: "No está en la APP", titulo: "Con stock en Oficina, pero no están en el catálogo de la APP", ayuda: "Artículos nuevos o que nunca se cargaron. Agregalos al catálogo para controlarlos." },
-    { k: "cantidadDistinta", corto: "Cantidad distinta", titulo: "Cantidad distinta (en poder de SAT)", ayuda: "Oficina cuenta el depósito; la APP suma depósito + técnicos + vehículos + en camino. Abajo de cada uno, dónde está según la APP." },
+    { k: "cantidadDistinta", corto: "Cantidad distinta", titulo: "Cantidad distinta (en poder de SAT)", ayuda: "Oficina: depósito + stock de comodato (los dos están en el depósito). La APP: depósito + técnicos + vehículos + en camino. Abajo de cada uno, dónde está según la APP." },
     { k: "soloEnApp", corto: "Solo en la APP", titulo: "La APP tiene stock y Oficina dice 0", ayuda: "Puede faltar cargar una compra en Oficina, o se usó/vendió sin registrarlo en la APP." },
-    { k: "comodatoDistinto", corto: "Comodato distinto", titulo: "Cantidad en comodato distinta", ayuda: "Oficina y la APP no cuentan lo mismo en comodato en clientes." },
     { k: "unidadesSinRegistrar", corto: "Sin N° de serie", titulo: "Equipos sin todos sus N° de serie registrados", ayuda: "Hay más equipos que N° de serie registrados: falta escanearlos (inventario)." },
     { k: "deshabilitado", corto: "Deshabilitado en Oficina", titulo: "Deshabilitados en Oficina, con stock en la APP", ayuda: "Oficina ya no los usa, pero la APP tiene stock." },
     { k: "negativo", corto: "Negativo en la APP", titulo: "Stock negativo en la APP", ayuda: "Salió más de lo que entró: falta registrar una entrada o se cargó mal una salida." },
@@ -282,9 +281,10 @@
       const it = { c, of, t, d: a.d || of.d, a };
       Object.entries(t.detalle || {}).forEach(([u, n]) => { if (n < 0) { r.negativo.push({ ...it, u, n }); ok = false; } });
       if (of.baja && (t.sat || t.com)) { r.deshabilitado.push(it); ok = false; }
-      if (!of.dep && t.sat > 0) { r.soloEnApp.push(it); ok = false; }
-      else if (Math.abs((of.dep || 0) - (t.sat || 0)) > 1e-9) { r.cantidadDistinta.push({ ...it, dif: (t.sat || 0) - (of.dep || 0) }); ok = false; }
-      if (Math.abs((of.com || 0) - (t.com || 0)) > 1e-9) { r.comodatoDistinto.push({ ...it, dif: (t.com || 0) - (of.com || 0) }); ok = false; }
+      // El stock de comodato de Oficina está físicamente en el depósito: para la APP es depósito.
+      const ofSat = (of.dep || 0) + (of.com || 0);
+      if (!ofSat && t.sat > 0) { r.soloEnApp.push(it); ok = false; }
+      else if (Math.abs(ofSat - (t.sat || 0)) > 1e-9) { r.cantidadDistinta.push({ ...it, dif: (t.sat || 0) - ofSat }); ok = false; }
       if (a.tipo === "unidad" && (uni[c] || 0) < Math.max(0, t.sat || 0)) { r.unidadesSinRegistrar.push({ ...it, registradas: uni[c] || 0 }); ok = false; }
       if (ok) r.coinciden++;
     });
@@ -584,6 +584,22 @@
   // el que recibe confirma. Los envíos pendientes se guardan en saldos.envios.
   const camino = (a, de) => (/^dep$/.test(a) && /^tec:/.test(de || "") ? `cam:dev:${de.slice(4)}` : `cam:${String(a).replace(/^tec:/, "")}`);
   const idMov = (i) => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}${i == null ? "" : "-" + i}`;
+  // El stock de comodato del listado de Oficina está en el depósito (no en clientes). Lo que una versión
+  // anterior cargó como «comodato sin cliente asignado» pasa al depósito, con un movimiento por artículo
+  // (el control nocturno lo reproduce). Devuelve { saldos, movs } (movs vacío si no había nada).
+  function comodatoAlDeposito(saldos, fecha) {
+    const caja = ((saldos && saldos.ubic) || {})["com:Sin asignar"] || {};
+    const items = Object.entries(caja).filter(([, n]) => Number(n) > 0);
+    if (!items.length) return { saldos, movs: [] };
+    const f = fecha || new Date().toISOString(), dia = f.slice(0, 10).replace(/-/g, "");
+    let s = saldos;
+    const movs = items.map(([c, n]) => {
+      const uni = Object.entries((s && s.unidades) || {}).filter(([, u]) => u && u.c === c && u.u === "com:Sin asignar").map(([t]) => t);
+      return { id: `comdep-${dia}-${c}`, fecha: f, por: "APP", tipo: "comodato_deposito", c, cant: Number(n), de: "com:Sin asignar", a: "dep", ...(uni.length ? { unidades: uni } : {}), motivo: "Stock de comodato de Oficina: está en el depósito" };
+    });
+    movs.forEach((m) => { s = aplicarMovimiento(s, m); });
+    return { saldos: s, movs };
+  }
   // items: [{ c, cant, unidades?: [tracking] }]. op: { tipo, de?, a, por, fecha, motivo?, confirmar? }
   // Devuelve { saldos, movs, envio } o { error }.
   function moverStock(saldos, items, op, catalogo) {
@@ -857,7 +873,7 @@
   // op: { ahora: Date, cuadre: { ultimo, historial } }
   function claseMovimiento(m) {
     const de = m.de || "", a = m.a || "", t = m.tipo || "";
-    if (t === "inicial" || t === "inventario_series" || t === "recibido" || t === "rechazado" || t === "diferencia") return "";
+    if (t === "inicial" || t === "inventario_series" || t === "recibido" || t === "rechazado" || t === "diferencia" || t === "comodato_deposito") return "";
     if (t === "ajuste" || t === "regularizacion") return "ajuste";
     if (a === "gar" || /^garantia/.test(t)) return "garantia";
     if (t === "devuelto_sin_usar") return "sinUsar";
@@ -1094,7 +1110,7 @@
   // vuelve de un cliente, los ajustes y las compras.
   const grupoOficina = (u) => (!u ? "afuera" : /^(dep|gar|tec:|veh:|cam:)/.test(u) ? "sat" : /^com:/.test(u) ? "comodato" : /^cli:/.test(u) ? "cliente" : "otro");
   function movimientoParaOficina(m) {
-    if (!m || !m.c || !(Number(m.cant) > 0) || m.tipo === "inicial" || m.tipo === "inicial_tecnico" || m.tipo === "inventario_series" || m.tipo === "garantia_reemplazo") return null;
+    if (!m || !m.c || !(Number(m.cant) > 0) || m.tipo === "inicial" || m.tipo === "inicial_tecnico" || m.tipo === "comodato_deposito" || m.tipo === "inventario_series" || m.tipo === "garantia_reemplazo") return null;
     const de = grupoOficina(m.de), a = grupoOficina(m.a);
     if (de === a) return null;
     const cliente = (u) => String(u || "").replace(/^(cli|com):/, "");
@@ -1163,7 +1179,7 @@
     return mejor;
   }
 
-  const api = { codigoProveedor, nombreProveedor, STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, datosLimpios, buscarPorDatos, infoSerie, seriesEn, controlarSalidaConSerie, saludStock, esCodigoIgnorable, elegirCodigoDelCuadro, pareceModelo, buscarArticuloPorTexto, sugerirMarca, resumenMarcas, limpiarMarca, claveMarca, registrarUnidades, movimientoParaOficina, GARANTIA_ESTADOS, instalacionDeUnidad, abrirGarantias, moverStock, cerrarEnvio, stockDePersona, auditarStock, recalcularDesdeMovimientos, movimientosDeRegularizacion, retiradosParaDevolver, avanceSolicitud, anotarPresupuestos, pendienteDePresupuesto, anotarServicios, pendienteDeServicio, serviciosConMaterial, tableroStock, claseMovimiento };
+  const api = { codigoProveedor, nombreProveedor, STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, datosLimpios, buscarPorDatos, infoSerie, seriesEn, controlarSalidaConSerie, saludStock, esCodigoIgnorable, elegirCodigoDelCuadro, pareceModelo, buscarArticuloPorTexto, sugerirMarca, resumenMarcas, limpiarMarca, claveMarca, registrarUnidades, movimientoParaOficina, GARANTIA_ESTADOS, instalacionDeUnidad, abrirGarantias, comodatoAlDeposito, moverStock, cerrarEnvio, stockDePersona, auditarStock, recalcularDesdeMovimientos, movimientosDeRegularizacion, retiradosParaDevolver, avanceSolicitud, anotarPresupuestos, pendienteDePresupuesto, anotarServicios, pendienteDeServicio, serviciosConMaterial, tableroStock, claseMovimiento };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else Object.assign(raiz, api);
 })(typeof window !== "undefined" ? window : globalThis);

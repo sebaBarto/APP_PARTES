@@ -133,6 +133,12 @@ async function leerArchivoDatos(ruta, porDefecto) {
   }
   let data = porDefecto, corrupto = false;
   try { data = JSON.parse(texto); } catch (e) { data = porDefecto; corrupto = true; }
+  // El stock de comodato de Oficina está en el depósito: lo que quedó como «comodato sin asignar» se ve
+  // (y en la próxima escritura se guarda, con su movimiento) en el depósito.
+  if (ruta === STOCK_SAL && !corrupto && data && typeof data === "object") {
+    const m = require("../stock-utils.js").comodatoAlDeposito(data);
+    if (m.movs.length) return { data: m.saldos, sha: meta.sha, corrupto, migracion: m.movs };
+  }
   return { data, sha: meta.sha, corrupto };
 }
 async function escribirArchivoDatos(ruta, data, sha, mensaje) {
@@ -1180,16 +1186,17 @@ const STOCK_CAT = "stock/catalogo.json", STOCK_SAL = "stock/saldos.json", STOCK_
 const stockMovRuta = (d) => `stock/movimientos-${(d || new Date().toISOString()).slice(0, 7)}.json`;
 async function stockActualizar(ruta, porDefecto, cambiar, mensaje) {
   for (let i = 0; i < 5; i++) {
-    const { data, sha, corrupto } = await leerArchivoDatos(ruta, porDefecto);
+    const { data, sha, corrupto, migracion } = await leerArchivoDatos(ruta, porDefecto);
     // Nunca escribir sobre un archivo que existe pero no se pudo leer: se perderían los datos.
     if (corrupto) return { error: `El archivo ${ruta} no se pudo leer. No se guardó nada para no perder datos: hay que restaurarlo desde una copia de seguridad.`, status: 500 };
     const res = cambiar(data && typeof data === "object" ? data : porDefecto);
     if (res && res.error) return res;
+    if (migracion && migracion.length && res && res.data) res.movs = [...migracion, ...(Array.isArray(res.movs) ? res.movs : [])];
     // Saldo y movimiento en la misma escritura: los movimientos quedan en «movsPend» del archivo de
     // saldos hasta que se pasan al historial del mes (si eso falla, se pasan en la próxima operación).
     if (ruta === STOCK_SAL && Array.isArray(res.movs) && res.movs.length) res.data = { ...require("../stock-utils.js").anotarServicios(require("../stock-utils.js").anotarPresupuestos(res.data, res.movs), res.movs, res.servicio), movsPend: [...((res.data && res.data.movsPend) || []), ...res.movs].slice(-2000) };
     const r = await escribirArchivoDatos(ruta, res.data, sha, mensaje);
-    if (r.ok) return res;
+    if (r.ok) { if (migracion && migracion.length) await stockConfirmarMovs(migracion, "Stock: el comodato de Oficina pasa al depósito").catch(() => {}); return res; }
     if (r.status !== 409 && r.status !== 422) break;
   }
   return { error: "No se pudo guardar (probá de nuevo)", status: 502 };
@@ -1731,13 +1738,14 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
         if (sal.inicializado && !b.forzar) return { error: `El stock ya se inicializó el ${String(sal.inicializado).slice(0, 10)}. Para corregir diferencias usá la conciliación.`, status: 409 };
         const nuevo = { ...sal, ubic: { ...(sal.ubic || {}) }, inicializado: ahora, unidades: sal.unidades || {}, pedidos: sal.pedidos || {} };
         nuevo.ubic.dep = {}; delete nuevo.ubic["com:Sin asignar"];
+        // El stock de comodato de Oficina está físicamente en el depósito: entra al depósito.
         movs = [];
         items.forEach((x) => {
           const c = S.codigoArticulo(x.c);
           if (!controla(c)) return;
           const dep = Number(x.dep) || 0, com = Number(x.com) || 0;
           if (dep) { nuevo.ubic.dep[c] = dep; movs.push({ id: `${Date.now().toString(36)}-${movs.length}`, fecha: ahora, por: quien, tipo: "inicial", c, cant: dep, a: "dep", motivo: "Saldo inicial desde el listado de Oficina" }); }
-          if (com) { (nuevo.ubic["com:Sin asignar"] = nuevo.ubic["com:Sin asignar"] || {})[c] = com; movs.push({ id: `${Date.now().toString(36)}-${movs.length}`, fecha: ahora, por: quien, tipo: "inicial", c, cant: com, a: "com:Sin asignar", motivo: "Comodato inicial desde el listado de Oficina (falta asignar el cliente)" }); }
+          if (com) { nuevo.ubic.dep[c] = Math.round(((nuevo.ubic.dep[c] || 0) + com) * 1000) / 1000; movs.push({ id: `${Date.now().toString(36)}-${movs.length}`, fecha: ahora, por: quien, tipo: "inicial", c, cant: com, a: "dep", motivo: "Saldo inicial: stock de comodato de Oficina (está en el depósito)" }); }
         });
         return { data: nuevo, respuesta: { articulos: new Set(movs.map((m) => m.c)).size }, movs };
       }, `Stock: saldo inicial desde el listado de Oficina (por ${quien})`);
