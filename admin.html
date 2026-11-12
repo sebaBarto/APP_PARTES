@@ -810,7 +810,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
       <button type="button" class="tab-btn" id="tabCoordinacionBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>Coordinación</button>
       <button type="button" class="tab-btn" id="tabSemaforoBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="20" rx="3"/><circle cx="12" cy="7" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="12" cy="17" r="1.2"/></svg></span>Semáforo visitas</button>
       <button type="button" class="tab-btn" id="tabClavesClienteBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>Claves por cliente</button>
-      <button type="button" class="tab-btn" id="tabRegistroLlavesBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2 2M14 9l2 2"/></svg></span>Registro de llaves</button>
+      <button type="button" class="tab-btn" id="tabRegistroLlavesBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2 2M14 9l2 2"/></svg></span>Llaves de edificios<span class="tab-badge hidden" id="rllTabBadge">0</span></button>
       <button type="button" class="tab-btn" id="tabEmergenciaBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.29 3.86l-8.18 14.18A2 2 0 0 0 3.82 21h16.36a2 2 0 0 0 1.71-3l-8.18-14.14a2 2 0 0 0-3.42 0z"/></svg></span>Emergencias<span class="tab-badge hidden" id="emergenciasBadge">0</span></button>
     </div>
 
@@ -1766,9 +1766,9 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
     </div>
 
     <div id="panelRegistroLlaves" class="hidden">
-      <h1>Registro de llaves por edificio</h1>
+      <h1>Llaves de edificios</h1>
       <p class="subtitle">
-        Lo que cargan los vecinos al escanear el QR del hall. Usalo para conciliar con la estación
+        Lo que cargan los vecinos al escanear el QR del hall y lo que piden los administradores de consorcio desde su portal. Usalo para conciliar con la estación
         de monitoreo: marcá cada llave como <b>conciliada</b> cuando coincide, y las que hay que sacar
         como <b>dar de baja</b>. Las que la estación tiene y nadie registró son las candidatas a borrar.
       </p>
@@ -1790,6 +1790,49 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
             <button type="button" class="btn-secondary-admin hidden" id="rllEdCancelarBtn" style="width:auto;">Cancelar</button>
           </div>
           <p class="status" id="rllEdStatus"></p>
+        </details>
+      </div>
+
+      <div class="card" id="rllGestCard">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between;">
+          <h3 style="margin:0;">Gestiones de administradores de consorcio <span class="hidden" id="rllGestBadge" style="display:inline-block;margin-left:6px;padding:1px 9px;border-radius:999px;background:#C0392B;color:#fff;font-size:13px;vertical-align:middle;">0</span></h3>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" class="btn-secondary-admin" id="rllGestRecargarBtn" style="width:auto;">↻ Actualizar</button>
+            <button type="button" class="btn-secondary-admin" id="rllGestExcelBtn" style="width:auto;">⬇ Excel</button>
+          </div>
+        </div>
+        <p class="subtitle" style="margin:6px 0 10px;">Lo que piden los administradores desde <b>pedido.sat365.com.ar/consorcio.html</b>: nuevos tags, reemplazos, bajas y cambios de titularidad. El estado y la nota que pongas acá los ve el administrador.</p>
+        <div class="sims-filtros" style="margin-bottom:8px;">
+          <input type="text" class="field-input" id="rllGestBuscar" placeholder="Buscar por titular, unidad, N° de llave o administrador...">
+          <select id="rllGestEstado"><option value="abiertas">Pendientes y en curso</option><option value="">Todas</option><option value="hecha">Hechas</option><option value="rechazada">Rechazadas</option></select>
+          <select id="rllGestEdificio"><option value="">Todos los edificios</option></select>
+        </div>
+        <p class="status" id="rllGestStatus">Cargando...</p>
+        <div id="rllGestTabla" style="overflow-x:auto;"></div>
+      </div>
+
+      <div class="card" id="rllAdmCard">
+        <h3 style="margin-top:0;">Administradores de consorcio</h3>
+        <p class="subtitle" style="margin:0 0 10px;">Cada administrador entra al portal con su mail y una clave, y ve solo los edificios que le asignes acá.</p>
+        <p class="status" id="rllAdmStatus">Cargando...</p>
+        <div id="rllAdmLista" style="overflow-x:auto;"></div>
+        <div id="rllAdmClaveBox" class="hidden" style="margin-top:12px;padding:14px;border-radius:var(--r-md);background:#FFF6DD;border:1.5px solid #F1D99A;"></div>
+        <details id="rllAdmForm" style="margin-top:12px;">
+          <summary style="cursor:pointer;font-weight:600;" id="rllAdmFormTit">+ Agregar un administrador</summary>
+          <input type="hidden" id="rllAdmId">
+          <div class="field-row" style="flex-wrap:wrap;margin-top:10px;">
+            <div style="flex:1 1 200px;"><label>Nombre (persona o administración)</label><input type="text" class="field-input" id="rllAdmNombre" placeholder="Ej. Cristian Pizzi"></div>
+            <div style="flex:1 1 220px;"><label>Mail (con esto entra)</label><input type="email" class="field-input" id="rllAdmEmail" placeholder="nombre@administracion.com"></div>
+            <div style="flex:1 1 160px;"><label>Teléfono</label><input type="tel" class="field-input" id="rllAdmTel"></div>
+          </div>
+          <label style="margin-top:8px;">Edificios a su cargo</label>
+          <div id="rllAdmEdificios" style="display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:4px;"></div>
+          <div id="rllAdmActivoWrap" class="hidden"><label style="display:flex;align-items:center;gap:8px;margin-top:10px;"><input type="checkbox" id="rllAdmActivo" style="width:auto;margin:0;"> Puede entrar al portal</label></div>
+          <div class="field-row" style="gap:8px;margin-top:10px;">
+            <button type="button" id="rllAdmGuardarBtn" style="width:auto;">Guardar administrador</button>
+            <button type="button" class="btn-secondary-admin hidden" id="rllAdmCancelarBtn" style="width:auto;">Cancelar</button>
+          </div>
+          <p class="status" id="rllAdmFormStatus"></p>
         </details>
       </div>
 
@@ -9503,6 +9546,7 @@ async function cargarRegistroLlavesAdmin() {
     rllEdificios = Array.isArray(d) ? d : [];
     st.textContent = rllEdificios.length ? "" : "Todavía no hay edificios. Agregá el primero abajo.";
     renderRllEdificios();
+    cargarConsorcioAdmin();
     if (!rllEdificioActual && rllEdificios.length === 1) rllAbrirEdificio(rllEdificios[0].codigo);
     else if (rllEdificioActual) rllAbrirEdificio(rllEdificioActual.codigo);
   } catch (e) {
@@ -10211,6 +10255,228 @@ document.getElementById("rllConcExcelBtn").addEventListener("click", async () =>
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   } catch (e) { alert("No se pudo armar el Excel: " + e.message); }
   btn.disabled = false; btn.textContent = txtOriginal;
+});
+
+// ---------- Portal de administradores de consorcio (lib/consorcio.js) ----------
+const RLL_PORTAL_URL = "https://pedido.sat365.com.ar/consorcio.html";
+const RLL_GEST_TIPOS = { nuevo: "Nuevo tag", reemplazo: "Reemplazo de tag", baja: "Baja de tag", titularidad: "Cambio de titularidad" };
+const RLL_GEST_MOTIVOS = { no_funciona: "No funciona", rotura: "Se rompió", desgaste: "Desgaste", extravio: "Extravío", robo: "Robo", ya_no_vive: "Ya no vive / no corresponde", otro: "Otro" };
+const RLL_GEST_ESTADOS = { pendiente: { txt: "Pendiente", color: "#8A5A00", bg: "#FFF1D6" }, en_curso: { txt: "En curso", color: "#2C4E9A", bg: "#E8EEFB" }, hecha: { txt: "Hecha", color: "#1F6B34", bg: "#E6F4EA" }, rechazada: { txt: "Rechazada", color: "#B3261E", bg: "#FDE2E0" } };
+let rllGestiones = [];
+let rllAdmins = [];
+
+async function cargarConsorcioAdmin() {
+  // Los edificios hacen falta para los filtros y para asignar administradores.
+  const sel = document.getElementById("rllGestEdificio");
+  const previo = sel.value;
+  sel.innerHTML = '<option value="">Todos los edificios</option>' + rllEdificios.map((e) => `<option value="${rllEsc(e.codigo)}">${rllEsc(e.nombre)}</option>`).join("");
+  sel.value = previo;
+  await Promise.all([rllCargarGestiones(), rllCargarAdmins()]);
+}
+async function rllCargarGestiones() {
+  const st = document.getElementById("rllGestStatus");
+  try {
+    const r = await fetch("/api/datos?coleccion=consorcio&gestiones=1", { headers: rllHeaders(), cache: "no-store" });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Error");
+    rllGestiones = Array.isArray(d) ? d : [];
+    st.textContent = "";
+    renderRllGestiones();
+  } catch (e) { st.className = "status err"; st.textContent = "No se pudieron cargar las gestiones: " + e.message; }
+}
+function rllGestUnidad(g) {
+  const p = [];
+  if (g.piso || g.unidad) p.push(`${g.piso ? g.piso + "°" : ""} ${g.unidad || ""}`.trim());
+  if (g.cochera) p.push("Cochera " + g.cochera);
+  return p.join(" · ") || "—";
+}
+function renderRllGestiones() {
+  const abiertas = rllGestiones.filter((g) => g.estado === "pendiente" || g.estado === "en_curso").length;
+  const badge = document.getElementById("rllGestBadge");
+  badge.textContent = abiertas + (abiertas === 1 ? " abierta" : " abiertas"); badge.classList.toggle("hidden", !abiertas);
+  const tabBadge = document.getElementById("rllTabBadge");
+  if (tabBadge) { tabBadge.textContent = abiertas; tabBadge.classList.toggle("hidden", !abiertas); }
+  const est = document.getElementById("rllGestEstado").value;
+  const ed = document.getElementById("rllGestEdificio").value;
+  const q = document.getElementById("rllGestBuscar").value.trim().toLowerCase();
+  const filas = rllGestiones.filter((g) => {
+    if (est === "abiertas" && !(g.estado === "pendiente" || g.estado === "en_curso")) return false;
+    if (est && est !== "abiertas" && g.estado !== est) return false;
+    if (ed && g.edificio !== ed) return false;
+    return !q || [g.titular, g.nuevo_titular, g.admin_nombre, g.edificio_nombre, rllGestUnidad(g), g.tag, g.usuario, g.telefono, g.observaciones].join(" ").toLowerCase().includes(q);
+  });
+  const cont = document.getElementById("rllGestTabla");
+  if (!rllGestiones.length) { cont.innerHTML = '<p class="status">Todavía no hay gestiones de administradores.</p>'; return; }
+  if (!filas.length) { cont.innerHTML = '<p class="status">No hay gestiones con ese filtro.</p>'; return; }
+  cont.innerHTML = `<table class="ven-tabla"><thead><tr><th>Fecha</th><th>Edificio · Administrador</th><th>Gestión</th><th>Unidad · Titular</th><th>Detalle</th><th>Estado</th><th>Nota para el administrador</th></tr></thead><tbody>${filas.map((g) => {
+    const E = RLL_GEST_ESTADOS[g.estado] || RLL_GEST_ESTADOS.pendiente;
+    const det = [];
+    if (g.tipo === "nuevo") det.push(`${g.cantidad} × ${g.dispositivo === "control" ? "control" : "tag"}`);
+    if (g.tag || g.usuario) det.push(`${g.dispositivo === "control" ? "📟" : "🔑"} <span style="font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:14px;">${rllEsc(g.tag || "s/n")}</span>${g.usuario ? " · usuario " + rllEsc(g.usuario) : ""}`);
+    if (g.motivo) det.push(`Motivo: <b${g.motivo === "robo" ? ' style="color:#B3261E;"' : ""}>${rllEsc(RLL_GEST_MOTIVOS[g.motivo] || g.motivo)}</b>`);
+    if (g.tipo === "titularidad") det.push(`Nuevo: <b>${rllEsc(g.nuevo_titular)}</b> · ${rllEsc(g.nuevo_telefono)}${g.nuevo_email ? " · " + rllEsc(g.nuevo_email) : ""}<br>${g.llaves_titularidad === "transferir" ? "Se queda con las llaves" : "Bajar las anteriores y entregar nuevas"}`);
+    if (g.observaciones) det.push(`<span style="color:#34495E;">💬 ${rllEsc(g.observaciones)}</span>`);
+    return `<tr${g.motivo === "robo" && g.estado === "pendiente" ? ' style="background:#FFF4F3;"' : ""}>
+      <td style="white-space:nowrap;">${rllFecha(g.fecha)}</td>
+      <td><b>${rllEsc(g.edificio_nombre || g.edificio)}</b><br><span style="color:#6B7680;">${rllEsc(g.admin_nombre)}</span></td>
+      <td><b>${rllEsc(RLL_GEST_TIPOS[g.tipo] || g.tipo)}</b></td>
+      <td><b>${rllEsc(rllGestUnidad(g))}</b><br>${rllEsc(g.titular)}${g.telefono ? `<br><a href="tel:${rllEsc(String(g.telefono).replace(/[^0-9+]/g, ""))}">${rllEsc(g.telefono)}</a>` : ""}${g.email ? `<br><span style="color:#6B7680;">${rllEsc(g.email)}</span>` : ""}</td>
+      <td>${det.join("<br>")}</td>
+      <td><select class="rll-gest-estado" data-ed="${rllEsc(g.edificio)}" data-id="${rllEsc(g.id)}" style="margin:0;width:auto;padding:6px 8px;font-weight:700;color:${E.color};background:${E.bg};border-color:${E.bg};">${Object.entries(RLL_GEST_ESTADOS).map(([k, v]) => `<option value="${k}"${k === g.estado ? " selected" : ""}>${v.txt}</option>`).join("")}</select>${g.actualizado_por ? `<br><span style="font-size:11px;color:#6B7680;">${rllEsc(g.actualizado_por)}</span>` : ""}</td>
+      <td><input type="text" class="field-input rll-gest-nota" data-ed="${rllEsc(g.edificio)}" data-id="${rllEsc(g.id)}" value="${rllEsc(g.nota_sat || "")}" placeholder="Ej. Llave lista para retirar" style="min-width:170px;margin:0;padding:6px 8px;"></td>
+    </tr>`;
+  }).join("")}</tbody></table>`;
+  cont.querySelectorAll(".rll-gest-estado").forEach((s) => s.addEventListener("change", () => rllGuardarGestion(s, { estado: s.value })));
+  cont.querySelectorAll(".rll-gest-nota").forEach((i) => i.addEventListener("change", () => rllGuardarGestion(i, { nota_sat: i.value })));
+}
+async function rllGuardarGestion(el, cambios) {
+  const g = rllGestiones.find((x) => x.id === el.dataset.id && x.edificio === el.dataset.ed);
+  if (!g) return;
+  el.disabled = true;
+  try {
+    const r = await fetch("/api/datos?coleccion=consorcio", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "estado_gestion", edificio: g.edificio, id: g.id, ...cambios }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Error");
+    Object.assign(g, cambios, { actualizado_por: adminNombre || "vos" });
+  } catch (e) { alert("No se pudo guardar: " + e.message); }
+  renderRllGestiones();
+}
+["rllGestEstado", "rllGestEdificio"].forEach((id) => document.getElementById(id).addEventListener("change", renderRllGestiones));
+document.getElementById("rllGestBuscar").addEventListener("input", renderRllGestiones);
+document.getElementById("rllGestRecargarBtn").addEventListener("click", rllCargarGestiones);
+document.getElementById("rllGestExcelBtn").addEventListener("click", () => {
+  const filas = rllGestiones.map((g) => ({
+    "Fecha": rllFecha(g.fecha), "Edificio": g.edificio_nombre || g.edificio, "Administrador": g.admin_nombre,
+    "Gestión": RLL_GEST_TIPOS[g.tipo] || g.tipo, "Estado": (RLL_GEST_ESTADOS[g.estado] || {}).txt || g.estado,
+    "Piso": g.piso, "Depto": g.unidad, "Cochera": g.cochera, "Titular": g.titular, "Teléfono": g.telefono, "Mail": g.email,
+    "Relación": g.relacion, "Dispositivo": g.dispositivo === "control" ? "Control" : "Tag", "Cantidad": g.tipo === "nuevo" ? g.cantidad : "",
+    "N° de llave": g.tag, "N° de usuario": g.usuario, "Motivo": RLL_GEST_MOTIVOS[g.motivo] || "",
+    "Nuevo titular": g.nuevo_titular, "Tel. nuevo titular": g.nuevo_telefono, "Mail nuevo titular": g.nuevo_email,
+    "Llaves (titularidad)": g.llaves_titularidad === "transferir" ? "Se las queda" : g.llaves_titularidad === "reemplazar" ? "Nuevas, bajar anteriores" : "",
+    "Observaciones": g.observaciones, "Nota de SAT": g.nota_sat, "Actualizado por": g.actualizado_por || "",
+  }));
+  const hoja = XLSX.utils.json_to_sheet(filas);
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, "Gestiones");
+  XLSX.writeFile(libro, `gestiones_consorcio_${new Date().toISOString().slice(0, 10)}.xlsx`);
+});
+
+// Administradores
+async function rllCargarAdmins() {
+  const st = document.getElementById("rllAdmStatus");
+  try {
+    const r = await fetch("/api/datos?coleccion=consorcio", { headers: rllHeaders(), cache: "no-store" });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Error");
+    rllAdmins = Array.isArray(d) ? d : [];
+    st.className = "status"; st.textContent = rllAdmins.length ? "" : "Todavía no hay administradores. Agregá el primero abajo.";
+    renderRllAdmins();
+  } catch (e) { st.className = "status err"; st.textContent = "No se pudieron cargar: " + e.message; }
+  rllArmarCheckEdificios([]);
+}
+function rllNombreEdificio(c) { const e = rllEdificios.find((x) => x.codigo === c); return e ? e.nombre : c; }
+function renderRllAdmins() {
+  const cont = document.getElementById("rllAdmLista");
+  if (!rllAdmins.length) { cont.innerHTML = ""; return; }
+  cont.innerHTML = `<table class="ven-tabla"><thead><tr><th>Administrador</th><th>Edificios</th><th>Acceso</th><th></th></tr></thead><tbody>${rllAdmins.map((a) => `<tr>
+    <td><b>${rllEsc(a.nombre)}</b><br><span style="color:#6B7680;">${rllEsc(a.email)}${a.telefono ? " · " + rllEsc(a.telefono) : ""}</span></td>
+    <td>${(a.edificios || []).map((c) => `<span class="ven-estado sin" style="margin:1px;">${rllEsc(rllNombreEdificio(c))}</span>`).join(" ") || '<span style="color:#B3261E;">Sin edificios</span>'}</td>
+    <td>${a.activo ? '<span class="ven-estado ok">Activo</span>' : '<span class="ven-estado vencido">Sin acceso</span>'}<br><span style="font-size:11.5px;color:#6B7680;">${a.cambio_clave_propia ? "Ya puso su propia clave" : "Usa la clave de SAT"}</span></td>
+    <td class="ven-btns">
+      <button type="button" class="btn-secondary-admin rll-adm-editar" data-id="${rllEsc(a.id)}">Editar</button>
+      <button type="button" class="btn-secondary-admin rll-adm-clave" data-id="${rllEsc(a.id)}">Nueva clave</button>
+      <button type="button" class="btn-secondary-admin rll-adm-borrar" data-id="${rllEsc(a.id)}" style="color:#B3261E;">Borrar</button>
+    </td></tr>`).join("")}</tbody></table>`;
+  cont.querySelectorAll(".rll-adm-editar").forEach((b) => b.addEventListener("click", () => {
+    const a = rllAdmins.find((x) => x.id === b.dataset.id);
+    document.getElementById("rllAdmId").value = a.id;
+    document.getElementById("rllAdmNombre").value = a.nombre;
+    document.getElementById("rllAdmEmail").value = a.email;
+    document.getElementById("rllAdmTel").value = a.telefono || "";
+    document.getElementById("rllAdmActivo").checked = a.activo;
+    document.getElementById("rllAdmActivoWrap").classList.remove("hidden");
+    document.getElementById("rllAdmCancelarBtn").classList.remove("hidden");
+    document.getElementById("rllAdmFormTit").textContent = "Editar " + a.nombre;
+    rllArmarCheckEdificios(a.edificios || []);
+    document.getElementById("rllAdmForm").open = true;
+  }));
+  cont.querySelectorAll(".rll-adm-clave").forEach((b) => b.addEventListener("click", async () => {
+    const a = rllAdmins.find((x) => x.id === b.dataset.id);
+    if (!confirm(`¿Generar una clave nueva para ${a.nombre}? La anterior deja de servir y se le cierra la sesión.`)) return;
+    try {
+      const r = await fetch("/api/datos?coleccion=consorcio", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "nueva_clave", id: a.id }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Error");
+      a.cambio_clave_propia = false;
+      rllMostrarClave(a, d.clave);
+      renderRllAdmins();
+    } catch (e) { alert("No se pudo: " + e.message); }
+  }));
+  cont.querySelectorAll(".rll-adm-borrar").forEach((b) => b.addEventListener("click", async () => {
+    const a = rllAdmins.find((x) => x.id === b.dataset.id);
+    if (!confirm(`¿Borrar a ${a.nombre}? Ya no va a poder entrar. Sus gestiones quedan guardadas.`)) return;
+    try {
+      const r = await fetch("/api/datos?coleccion=consorcio", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "borrar_admin", id: a.id }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Error");
+      rllAdmins = rllAdmins.filter((x) => x.id !== a.id);
+      renderRllAdmins();
+    } catch (e) { alert("No se pudo borrar: " + e.message); }
+  }));
+}
+// La clave se muestra UNA sola vez (en el servidor queda cifrada): con el mensaje listo para mandar.
+function rllMostrarClave(a, clave) {
+  const box = document.getElementById("rllAdmClaveBox");
+  const msg = `Hola ${a.nombre}, te paso el acceso al portal de llaves de SAT:\n${RLL_PORTAL_URL}\nMail: ${a.email}\nClave: ${clave}\nAl entrar te recomendamos cambiar la clave por una tuya.`;
+  box.innerHTML = `<b>Clave de ${rllEsc(a.nombre)}:</b> <span style="font-family:'IBM Plex Mono',monospace;font-size:18px;font-weight:700;letter-spacing:1px;">${rllEsc(clave)}</span>
+    <p style="margin:6px 0 10px;font-size:13px;color:#6B7680;">Anotala o mandala ahora: por seguridad no se vuelve a mostrar (si se pierde, generás otra).</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button type="button" class="btn-secondary-admin" id="rllAdmCopiarBtn" style="width:auto;">Copiar mensaje con el acceso</button>
+      <a class="btn-secondary-admin" style="width:auto;display:inline-flex;align-items:center;padding:10px 14px;border-radius:var(--r-sm);text-decoration:none;font-weight:600;" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(msg)}">Mandar por WhatsApp</a>
+      <button type="button" class="btn-secondary-admin" id="rllAdmCerrarClaveBtn" style="width:auto;border-color:transparent;text-decoration:underline;">Listo, cerrar</button>
+    </div>`;
+  box.classList.remove("hidden");
+  document.getElementById("rllAdmCopiarBtn").addEventListener("click", async (ev) => {
+    try { await navigator.clipboard.writeText(msg); ev.target.textContent = "✓ Copiado"; } catch (e) { prompt("Copiá el mensaje:", msg); }
+  });
+  document.getElementById("rllAdmCerrarClaveBtn").addEventListener("click", () => { box.classList.add("hidden"); box.innerHTML = ""; });
+  box.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+function rllArmarCheckEdificios(marcados) {
+  document.getElementById("rllAdmEdificios").innerHTML = rllEdificios.map((e) => `<label style="display:flex;align-items:center;gap:6px;margin:0;font-weight:500;"><input type="checkbox" value="${rllEsc(e.codigo)}" ${marcados.includes(e.codigo) ? "checked" : ""} style="width:auto;margin:0;"> ${rllEsc(e.nombre)}</label>`).join("") || '<span style="color:#6B7680;">Primero agregá los edificios arriba.</span>';
+}
+function rllLimpiarFormAdmin() {
+  ["rllAdmId", "rllAdmNombre", "rllAdmEmail", "rllAdmTel"].forEach((id) => { document.getElementById(id).value = ""; });
+  document.getElementById("rllAdmActivoWrap").classList.add("hidden");
+  document.getElementById("rllAdmCancelarBtn").classList.add("hidden");
+  document.getElementById("rllAdmFormTit").textContent = "+ Agregar un administrador";
+  rllArmarCheckEdificios([]);
+}
+document.getElementById("rllAdmCancelarBtn").addEventListener("click", () => { rllLimpiarFormAdmin(); document.getElementById("rllAdmForm").open = false; });
+document.getElementById("rllAdmGuardarBtn").addEventListener("click", async () => {
+  const st = document.getElementById("rllAdmFormStatus");
+  const id = document.getElementById("rllAdmId").value;
+  const cuerpo = {
+    accion: "guardar_admin", id: id || undefined,
+    nombre: document.getElementById("rllAdmNombre").value.trim(),
+    email: document.getElementById("rllAdmEmail").value.trim(),
+    telefono: document.getElementById("rllAdmTel").value.trim(),
+    edificios: [...document.querySelectorAll("#rllAdmEdificios input:checked")].map((i) => i.value),
+    activo: id ? document.getElementById("rllAdmActivo").checked : true,
+  };
+  st.className = "status"; st.textContent = "Guardando...";
+  try {
+    const r = await fetch("/api/datos?coleccion=consorcio", { method: "POST", headers: rllHeaders(true), body: JSON.stringify(cuerpo) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Error");
+    st.className = "status ok"; st.textContent = "Guardado.";
+    const i = rllAdmins.findIndex((x) => x.id === d.admin.id);
+    if (i >= 0) rllAdmins[i] = d.admin; else rllAdmins.push(d.admin);
+    renderRllAdmins();
+    if (d.clave) rllMostrarClave(d.admin, d.clave);
+    rllLimpiarFormAdmin();
+    document.getElementById("rllAdmForm").open = false;
+  } catch (e) { st.className = "status err"; st.textContent = "No se pudo guardar: " + e.message; }
 });
 
 async function cargarNotasAdmin() {

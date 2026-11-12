@@ -1,0 +1,88 @@
+const test = require("node:test");
+const assert = require("node:assert");
+process.env.GITHUB_DATA_TOKEN = process.env.GITHUB_DATA_TOKEN || "x";
+process.env.GITHUB_DATA_REPO = process.env.GITHUB_DATA_REPO || "x/y";
+process.env.SESION_SECRET = process.env.SESION_SECRET || "secreto-de-prueba";
+const consorcio = require("../lib/consorcio");
+const llaves = require("../lib/registro-llaves");
+const { autorizar } = require("../lib/sesion");
+
+function ghFalso() {
+  const store = {}; let n = 0;
+  return {
+    store,
+    leer: async (ruta, def) => (store[ruta] ? { data: JSON.parse(store[ruta].t), sha: store[ruta].sha } : { data: def, sha: undefined }),
+    escribir: async (ruta, data, sha) => {
+      if ((store[ruta] && store[ruta].sha !== sha) || (!store[ruta] && sha)) return { ok: false, status: 409 };
+      store[ruta] = { t: JSON.stringify(data), sha: "s" + ++n };
+      return { ok: true, status: 200 };
+    },
+  };
+}
+function llamar(fn, req, ...extra) {
+  return new Promise((ok) => {
+    const res = { statusCode: 200, setHeader() {}, status(c) { this.statusCode = c; return this; }, json(d) { ok({ status: this.statusCode, data: d }); } };
+    fn({ query: {}, headers: { "x-real-ip": "10.1." + Math.floor(Math.random() * 250) + "." + Math.floor(Math.random() * 250), ...(req.headers || {}) }, ...req, headers: { "x-real-ip": "10.1." + Math.floor(Math.random() * 250) + ".1", ...(req.headers || {}) } }, res, ...extra);
+  });
+}
+const SAT = { nombre: "Seba", rol: "admin" };
+
+async function preparar() {
+  consorcio._reiniciar(); llaves._reiniciarTopes();
+  const gh = ghFalso();
+  await llamar(llaves.manejarAdmin, { method: "POST", body: { accion: "guardar_edificio", nombre: "MUELLE 12" } }, SAT, gh);
+  const eds = (await llamar(llaves.manejarAdmin, { method: "GET", query: {} }, SAT, gh)).data;
+  const m11 = eds.find((e) => e.nombre === "MUELLE 11").codigo, m12 = eds.find((e) => e.nombre === "MUELLE 12").codigo;
+  const a = await llamar(consorcio.manejarAdmin, { method: "POST", body: { accion: "guardar_admin", nombre: "Cristian Pizzi", email: "CP@admin.com", edificios: [m12] } }, SAT, gh);
+  return { gh, m11, m12, clave: a.data.clave, adminId: a.data.admin.id };
+}
+const login = (gh, email, clave) => llamar(consorcio.manejarPortal, { method: "POST", body: { accion: "login", email, clave } }, gh);
+
+test("consorcio: entra con mail y clave, y su pase NO sirve para el resto de la APP", async () => {
+  const { gh, clave } = await preparar();
+  assert.match(clave, /^[a-z2-9]{5}-[a-z2-9]{5}$/);
+  const mal = await login(gh, "cp@admin.com", "otra-clave");
+  assert.strictEqual(mal.status, 401);
+  const ok = await login(gh, "cp@admin.com", clave);
+  assert.strictEqual(ok.status, 200);
+  assert.ok(ok.data.pase.startsWith("c1."));
+  // El pase del administrador no autoriza en la API de la APP.
+  assert.strictEqual(autorizar({ headers: { authorization: "Bearer " + ok.data.pase } }), null);
+  // La clave nunca se guarda en claro.
+  assert.ok(!gh.store["registro-llaves/administradores.json"].t.includes(clave));
+});
+
+test("consorcio: solo ve y gestiona SUS edificios", async () => {
+  const { gh, m11, m12, clave } = await preparar();
+  const { pase } = (await login(gh, "cp@admin.com", clave)).data;
+  const h = { "x-consorcio": pase };
+  const inicio = await llamar(consorcio.manejarPortal, { method: "GET", headers: h, query: {} }, gh);
+  assert.deepStrictEqual(inicio.data.edificios.map((e) => e.nombre), ["MUELLE 12"]);
+  assert.strictEqual((await llamar(consorcio.manejarPortal, { method: "GET", headers: h, query: { que: "edificio", e: m11 } }, gh)).status, 403);
+  const gestion = { accion: "gestion", tipo: "baja", piso: "3", unidad: "A", titular: "Juan", motivo: "robo", tag: "69,2561" };
+  assert.strictEqual((await llamar(consorcio.manejarPortal, { method: "POST", headers: h, body: { ...gestion, edificio: m11 } }, gh)).status, 403);
+  const g = await llamar(consorcio.manejarPortal, { method: "POST", headers: h, body: { ...gestion, edificio: m12 } }, gh);
+  assert.strictEqual(g.status, 200);
+  assert.strictEqual(g.data.gestion.tag, "069:02561");
+  // Sin pase, o con un pase inventado, no entra.
+  assert.strictEqual((await llamar(consorcio.manejarPortal, { method: "GET", headers: { "x-consorcio": "c1.e30.xxx" }, query: {} }, gh)).status, 401);
+  // SAT ve la gestión y la marca hecha.
+  const lista = (await llamar(consorcio.manejarAdmin, { method: "GET", query: { gestiones: "1" } }, SAT, gh)).data;
+  assert.strictEqual(lista.length, 1);
+  assert.strictEqual((await llamar(consorcio.manejarAdmin, { method: "POST", body: { accion: "estado_gestion", edificio: m12, id: lista[0].id, estado: "hecha", nota_sat: "Dada de baja en la estación" } }, SAT, gh)).status, 200);
+  const vista = await llamar(consorcio.manejarPortal, { method: "GET", headers: h, query: { que: "edificio", e: m12 } }, gh);
+  assert.strictEqual(vista.data.gestiones[0].estado, "hecha");
+  assert.strictEqual(vista.data.gestiones[0].historial[1].por, undefined, "no ve quién de SAT la tocó");
+});
+
+test("consorcio: nueva clave o desactivar cierra la sesión; fuerza bruta frenada", async () => {
+  const { gh, clave, adminId } = await preparar();
+  const { pase } = (await login(gh, "cp@admin.com", clave)).data;
+  await llamar(consorcio.manejarAdmin, { method: "POST", body: { accion: "nueva_clave", id: adminId } }, SAT, gh);
+  consorcio._reiniciar();
+  assert.strictEqual((await llamar(consorcio.manejarPortal, { method: "GET", headers: { "x-consorcio": pase }, query: {} }, gh)).status, 401);
+  consorcio._reiniciar(); llaves._reiniciarTopes();
+  const estados = [];
+  for (let i = 0; i < 8; i++) estados.push((await login(gh, "cp@admin.com", "mal" + i)).status);
+  assert.deepStrictEqual(estados, [401, 401, 401, 401, 401, 401, 429, 429]);
+});

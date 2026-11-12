@@ -24,8 +24,8 @@ export default function middleware(request) {
   // pasar sin tocarlo — si no, hasta el logo del formulario se
   // redirige a sí mismo en vez de cargar la imagen real.
   const esPagina = path === "/" || path.endsWith(".html");
-  // El registro de llaves (QR del hall de los edificios) también es público.
-  if (!esPagina || path === "/solicitar-servicio.html" || path === "/registro-llaves.html") return;
+  // El registro de llaves (QR del hall) y el portal de administradores de consorcio también son públicos.
+  if (!esPagina || path === "/solicitar-servicio.html" || path === "/registro-llaves.html" || path === "/consorcio.html") return;
 
   url.pathname = "/solicitar-servicio.html";
   return Response.redirect(url, 302);

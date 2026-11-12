@@ -3214,3 +3214,29 @@ Excel con colores (hojas Conciliación, Por persona y Resumen) usando
 Se guarda en el repo de datos (`registro-llaves/`), sin función nueva
 en `/api` (ver `lib/registro-llaves.js`). MUELLE 11 viene precargado
 con el código `muelle11-k7p3`.
+
+## Portal de administradores de consorcio
+
+`consorcio.html` (en `pedido.sat365.com.ar`): cada administrador de
+consorcio entra con su mail y una clave que le da SAT, y ve solo los
+edificios que tiene asignados. Puede:
+
+- ver los vecinos y llaves registrados en cada edificio (y descargarlos);
+- cargar gestiones: **nuevo tag**, **reemplazo**, **baja** (extravío,
+  robo, ya no vive) y **cambio de titularidad** — puede elegir la persona
+  de la lista del edificio y se completan los datos;
+- seguir el estado de cada gestión y la nota que le deja SAT;
+- cambiar su clave.
+
+En `admin.html` → **Llaves de edificios**: alta de administradores (la
+clave se muestra una sola vez, con el mensaje listo para mandar por
+WhatsApp), nueva clave, desactivar o borrar; y la lista de gestiones de
+todos los edificios con estado (pendiente / en curso / hecha /
+rechazada), nota para el administrador y Excel.
+
+Seguridad (ver `lib/consorcio.js`): clave guardada con PBKDF2 (nunca en
+claro); pase de sesión propio (`c1.`, 12 h) que no sirve para el resto de
+la API; cada pedido comprueba que el administrador siga activo, con la
+misma clave y que el edificio sea suyo; topes de intentos de ingreso por
+IP y por mail. Datos en `registro-llaves/administradores.json` y
+`registro-llaves/<código>.gestiones.json` del repo privado.

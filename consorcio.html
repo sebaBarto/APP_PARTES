@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Portal de administradores — SAT</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0E0F10">
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="stylesheet" href="/vendor/fonts.css">
+<style>
+  :root {
+    --ink: #0E0F10; --paper: #F2F1EC; --card: #FFFFFF; --line: #DEDCD4; --muted: #6E6C66;
+    --amber: #F6B828; --amber-dark: #B9850A; --ok: #1F7A44; --err: #B3261E; --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: 'Barlow', -apple-system, 'Segoe UI', Roboto, sans-serif; font-size: 16px; background: var(--paper); color: var(--ink); min-height: 100vh; }
+  .oculto { display: none !important; }
+  .mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; letter-spacing: .4px; }
+
+  header { background: var(--ink); color: #fff; padding: 16px 20px 54px; position: relative; overflow: hidden; }
+  header::after { content: ""; position: absolute; inset: 0; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='48' viewBox='0 0 56 48'%3E%3Cpath d='M14 1h28l13 23-13 23H14L1 24z' fill='none' stroke='%23F6B828' stroke-opacity='.07' stroke-width='1.5'/%3E%3C/svg%3E"); background-size: 56px 48px; -webkit-mask-image: linear-gradient(120deg, transparent 30%, #000 100%); mask-image: linear-gradient(120deg, transparent 30%, #000 100%); pointer-events: none; }
+  .h-in { max-width: 980px; margin: 0 auto; position: relative; z-index: 1; }
+  .h-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .h-top img { height: 32px; display: block; }
+  .h-usuario { display: flex; align-items: center; gap: 10px; font-size: 14px; color: #C9C6BC; flex-wrap: wrap; justify-content: flex-end; }
+  .h-usuario button { background: transparent; border: 1px solid rgba(255,255,255,.3); color: #fff; border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+  header h1 { font-family: 'Barlow Semi Condensed', sans-serif; font-weight: 800; font-style: italic; text-transform: uppercase; font-size: clamp(28px, 6vw, 38px); line-height: 1; margin: 22px 0 6px; }
+  header h1 em { color: var(--amber); }
+  header p { margin: 0; color: #C9C6BC; max-width: 620px; line-height: 1.45; }
+
+  main { max-width: 980px; margin: -32px auto 0; padding: 0 14px 40px; position: relative; z-index: 2; }
+  .card { background: var(--card); border-radius: var(--radius); box-shadow: 0 1px 2px rgba(14,15,16,.06), 0 8px 24px rgba(14,15,16,.07); padding: 20px 18px; margin-bottom: 14px; }
+  .card h2 { margin: 0 0 4px; font-family: 'Barlow Semi Condensed', sans-serif; font-size: 22px; }
+  .sub { color: var(--muted); font-size: 14.5px; margin: 0 0 6px; line-height: 1.4; }
+
+  label, .lbl { display: block; font-weight: 600; font-size: 14.5px; margin: 14px 0 6px; }
+  .opc { font-weight: 500; color: var(--muted); font-size: 13px; }
+  input[type=text], input[type=tel], input[type=email], input[type=password], input[type=number], select, textarea {
+    width: 100%; padding: 12px 13px; font: inherit; font-size: 16px; color: var(--ink); background: #FAFAF7; border: 1.5px solid var(--line); border-radius: 11px;
+  }
+  textarea { min-height: 72px; resize: vertical; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--ink); background: #fff; box-shadow: 0 0 0 3px rgba(246,184,40,.35); }
+  .fila { display: flex; gap: 10px; flex-wrap: wrap; }
+  .fila > * { flex: 1 1 140px; min-width: 0; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 13px 18px; border: none; border-radius: 11px; background: var(--amber); color: var(--ink); font-family: 'Barlow Semi Condensed', sans-serif; font-weight: 700; font-size: 17px; cursor: pointer; }
+  .btn:disabled { opacity: .6; cursor: default; }
+  .btn-sec { background: #fff; border: 1.5px solid var(--ink); }
+  .btn-full { width: 100%; }
+  .status { min-height: 1em; margin: 10px 0 0; font-size: 14.5px; }
+  .status.err { color: var(--err); }
+  .status.ok { color: var(--ok); }
+
+  /* Edificios */
+  .edificios { display: flex; gap: 8px; flex-wrap: wrap; }
+  .ed-chip { border: 1.5px solid var(--line); background: #fff; border-radius: 12px; padding: 10px 14px; cursor: pointer; font: inherit; text-align: left; min-width: 150px; }
+  .ed-chip b { display: block; font-family: 'Barlow Semi Condensed', sans-serif; font-size: 17px; letter-spacing: .3px; }
+  .ed-chip span { font-size: 13px; color: var(--muted); }
+  .ed-chip.activo { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .ed-chip.activo b { color: var(--amber); }
+  .ed-chip.activo span { color: #A9A69C; }
+
+  /* Pestañas */
+  .tabs { display: flex; gap: 6px; margin: 4px 0 14px; border-bottom: 1.5px solid var(--line); overflow-x: auto; }
+  .tab { border: none; background: none; padding: 10px 14px; font: inherit; font-weight: 600; color: var(--muted); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -1.5px; white-space: nowrap; }
+  .tab.activo { color: var(--ink); border-bottom-color: var(--amber); }
+  .tab .n { display: inline-block; min-width: 20px; padding: 0 6px; border-radius: 999px; background: #EEEDE6; font-size: 12px; margin-left: 4px; }
+
+  /* Tipos de gestión */
+  .tipos { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+  .tipo { position: relative; border: 1.5px solid var(--line); border-radius: 13px; padding: 14px; cursor: pointer; background: #FAFAF7; display: flex; gap: 12px; align-items: flex-start; }
+  .tipo input { position: absolute; opacity: 0; }
+  .tipo .ic { width: 38px; height: 34px; flex: none; display: grid; place-items: center; background: var(--ink); color: var(--amber); clip-path: polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%); }
+  .tipo .ic svg { width: 18px; height: 18px; }
+  .tipo b { display: block; font-size: 15.5px; }
+  .tipo small { color: var(--muted); font-size: 13px; line-height: 1.35; }
+  .tipo:has(input:checked) { border-color: var(--ink); background: #fff; box-shadow: 0 0 0 2px var(--amber); }
+  .opciones { display: flex; gap: 8px; flex-wrap: wrap; }
+  .opcion { position: relative; }
+  .opcion input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+  .opcion span { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 14px; border-radius: 10px; border: 1.5px solid var(--line); background: #FAFAF7; font-weight: 600; font-size: 14.5px; }
+  .opcion input:checked + span { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .elegir { background: #FFF8E6; border: 1px solid #F1D99A; border-radius: 12px; padding: 12px 14px; margin-top: 14px; }
+  .elegir label { margin-top: 0; }
+  .aviso-robo { background: #FDE2E0; color: #8C1D18; border-radius: 10px; padding: 10px 12px; font-size: 14px; margin-top: 10px; }
+
+  /* Listados */
+  .buscar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+  .buscar input { flex: 1 1 240px; }
+  .unidad { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+  .unidad-tit { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; margin-bottom: 6px; }
+  .unidad-tit b { font-family: 'Barlow Semi Condensed', sans-serif; font-size: 18px; }
+  .persona { padding: 8px 0; border-top: 1px dashed var(--line); }
+  .persona:first-of-type { border-top: 0; }
+  .persona .dat { font-size: 14px; color: var(--muted); }
+  .llaves { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .llave { display: inline-flex; align-items: center; gap: 6px; border-radius: 8px; padding: 4px 8px; font-size: 13px; background: #F6F5F0; }
+  .llave b { font-family: 'IBM Plex Mono', monospace; font-size: 14px; }
+  .est { border-radius: 999px; padding: 1px 8px; font-size: 11.5px; font-weight: 700; }
+  .est-ok { background: #E6F4EA; color: #1F6B34; } .est-pend { background: #FFF1D6; color: #8A5A00; } .est-baja { background: #FDE2E0; color: #B3261E; } .est-gris { background: #EEF0F2; color: #6B7680; }
+  .gestion { border: 1px solid var(--line); border-left: 4px solid var(--amber); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+  .gestion.hecha { border-left-color: var(--ok); } .gestion.rechazada { border-left-color: var(--err); } .gestion.en_curso { border-left-color: #3A5BA8; }
+  .gestion-tit { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+  .gestion-tit b { font-size: 16px; }
+  .gestion .dat { font-size: 14px; color: #3D3B37; margin-top: 4px; line-height: 1.45; }
+  .nota-sat { margin-top: 8px; background: #F6F5F0; border-radius: 8px; padding: 8px 10px; font-size: 14px; }
+  .vacio { color: var(--muted); text-align: center; padding: 26px 10px; }
+
+  /* Modal */
+  .capa { position: fixed; inset: 0; background: rgba(14,15,16,.55); display: grid; place-items: center; padding: 16px; z-index: 50; }
+  .modal { background: #fff; border-radius: 16px; padding: 20px; width: 100%; max-width: 420px; }
+  .banner { background: #FFF1D6; border: 1px solid #F1D99A; border-radius: 12px; padding: 12px 14px; display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 14px; font-size: 14.5px; }
+  .pie { text-align: center; color: var(--muted); font-size: 13px; padding: 4px 16px 30px; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="h-in">
+      <div class="h-top">
+        <img src="/icons/logo.png" alt="SAT">
+        <div class="h-usuario oculto" id="hUsuario">
+          <span id="hNombre"></span>
+          <button type="button" id="cambiarClaveBtn">Cambiar clave</button>
+          <button type="button" id="salirBtn">Salir</button>
+        </div>
+      </div>
+      <h1>Portal de <em>administradores</em></h1>
+      <p>Gestioná las llaves de acceso de tus edificios: altas, reemplazos, bajas y cambios de titularidad, y consultá quién tiene llave en cada unidad.</p>
+    </div>
+  </header>
+
+  <main>
+    <!-- Ingreso -->
+    <section class="card oculto" id="pantallaLogin" style="max-width:440px;margin-left:auto;margin-right:auto;">
+      <h2>Ingresar</h2>
+      <p class="sub">Con el mail y la clave que te dio SAT.</p>
+      <form id="loginForm" autocomplete="on">
+        <label for="loginEmail">Mail</label>
+        <input type="email" id="loginEmail" autocomplete="username" inputmode="email" required>
+        <label for="loginClave">Clave</label>
+        <input type="password" id="loginClave" autocomplete="current-password" required>
+        <button type="submit" class="btn btn-full" id="loginBtn" style="margin-top:16px;">Entrar</button>
+        <p class="status" id="loginStatus" role="status"></p>
+      </form>
+      <p class="sub" style="margin-top:10px;font-size:13px;">¿No tenés clave o la olvidaste? Pedila a SAT.</p>
+    </section>
+
+    <!-- Panel -->
+    <div class="oculto" id="pantallaPanel">
+      <div class="banner oculto" id="bannerClave">
+        <span>🔒 Estás usando la clave que te dio SAT. Te recomendamos cambiarla por una tuya.</span>
+        <button type="button" class="btn btn-sec" id="bannerClaveBtn" style="padding:8px 14px;font-size:15px;">Cambiar clave</button>
+      </div>
+      <section class="card">
+        <h2>Tus edificios</h2>
+        <div class="edificios" id="edificios"></div>
+        <p class="vacio oculto" id="sinEdificios">Todavía no tenés edificios asignados. Comunicate con SAT.</p>
+      </section>
+
+      <section class="card oculto" id="edificioCard">
+        <div class="tabs" role="tablist">
+          <button type="button" class="tab activo" data-tab="nueva">Nueva gestión</button>
+          <button type="button" class="tab" data-tab="vecinos">Vecinos y llaves <span class="n" id="nVecinos">0</span></button>
+          <button type="button" class="tab" data-tab="gestiones">Gestiones <span class="n" id="nGestiones">0</span></button>
+        </div>
+        <p class="status" id="edificioStatus"></p>
+
+        <!-- Nueva gestión -->
+        <div data-panel="nueva">
+          <form id="gestionForm" novalidate>
+            <span class="lbl" style="margin-top:0;">¿Qué necesitás?</span>
+            <div class="tipos">
+              <label class="tipo"><input type="radio" name="tipo" value="nuevo"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span><span><b>Nuevo tag</b><small>Llave para un usuario nuevo</small></span></label>
+              <label class="tipo"><input type="radio" name="tipo" value="reemplazo"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 14-5.3L20 9"/><path d="M20 4v5h-5"/><path d="M20 12a8 8 0 0 1-14 5.3L4 15"/><path d="M4 20v-5h5"/></svg></span><span><b>Reemplazo de tag</b><small>No funciona o se rompió</small></span></label>
+              <label class="tipo"><input type="radio" name="tipo" value="baja"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M8 12h8"/></svg></span><span><b>Baja de tag</b><small>Extravío, robo o ya no vive</small></span></label>
+              <label class="tipo"><input type="radio" name="tipo" value="titularidad"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="16" r="3"/><path d="M11 8h5a2 2 0 0 1 2 2v3"/><path d="M13 16H8a2 2 0 0 1-2-2v-3"/></svg></span><span><b>Cambio de titularidad</b><small>La unidad pasa a otra persona</small></span></label>
+            </div>
+
+            <div id="camposGestion" class="oculto">
+              <div class="elegir" id="elegirBox">
+                <label for="elegirLlave">Elegir de los registrados en el edificio <span class="opc">(opcional, completa los datos)</span></label>
+                <select id="elegirLlave"><option value="">— Elegir —</option></select>
+              </div>
+
+              <div class="fila">
+                <div><label for="gPiso">Piso</label><input type="text" id="gPiso" maxlength="10" placeholder="Ej. 4"></div>
+                <div><label for="gUnidad">Depto</label><input type="text" id="gUnidad" maxlength="10" placeholder="Ej. B"></div>
+                <div><label for="gCochera">Cochera <span class="opc">(si corresponde)</span></label><input type="text" id="gCochera" maxlength="15"></div>
+              </div>
+
+              <div class="fila">
+                <div><label for="gTitular" id="gTitularLbl">Nombre y apellido del titular</label><input type="text" id="gTitular" maxlength="80"></div>
+                <div><label for="gTelefono" id="gTelefonoLbl">Teléfono</label><input type="tel" id="gTelefono" maxlength="30" inputmode="tel"></div>
+              </div>
+              <div class="fila" id="filaMailRel">
+                <div><label for="gEmail">Mail <span class="opc">(opcional)</span></label><input type="email" id="gEmail" maxlength="80" inputmode="email"></div>
+                <div><span class="lbl">Es…</span>
+                  <div class="opciones">
+                    <label class="opcion"><input type="radio" name="relacion" value="propietario"><span>Propietario</span></label>
+                    <label class="opcion"><input type="radio" name="relacion" value="inquilino"><span>Inquilino</span></label>
+                    <label class="opcion"><input type="radio" name="relacion" value="otro"><span>Otro</span></label>
+                  </div>
+                </div>
+              </div>
+
+              <div class="fila">
+                <div><span class="lbl">Dispositivo</span>
+                  <div class="opciones">
+                    <label class="opcion"><input type="radio" name="dispositivo" value="tag" checked><span>Tag (llave)</span></label>
+                    <label class="opcion"><input type="radio" name="dispositivo" value="control"><span>Control de cochera</span></label>
+                  </div>
+                </div>
+                <div id="bloqueCantidad"><label for="gCantidad">Cantidad</label><input type="number" id="gCantidad" min="1" max="10" value="1"></div>
+              </div>
+
+              <div class="fila" id="bloqueTag">
+                <div><label for="gTag">N° de la llave <span class="opc">(si lo sabés)</span></label><input type="text" id="gTag" class="mono" maxlength="40" placeholder="Ej. 069:02561"></div>
+                <div><label for="gUsuario">N° de usuario <span class="opc">(si lo sabés)</span></label><input type="text" id="gUsuario" class="mono" maxlength="15" inputmode="numeric"></div>
+              </div>
+
+              <div id="bloqueMotivo">
+                <span class="lbl">Motivo</span>
+                <div class="opciones" id="motivos"></div>
+                <div class="aviso-robo oculto" id="avisoRobo">Por seguridad, las bajas por <b>robo</b> se procesan con prioridad. Si es urgente, además llamá a SAT.</div>
+              </div>
+
+              <div id="bloqueTitularidad">
+                <div class="fila">
+                  <div><label for="gNuevoTitular">Nuevo titular</label><input type="text" id="gNuevoTitular" maxlength="80"></div>
+                  <div><label for="gNuevoTelefono">Teléfono del nuevo titular</label><input type="tel" id="gNuevoTelefono" maxlength="30" inputmode="tel"></div>
+                </div>
+                <label for="gNuevoEmail">Mail del nuevo titular <span class="opc">(opcional)</span></label>
+                <input type="email" id="gNuevoEmail" maxlength="80" inputmode="email">
+                <span class="lbl">¿Qué pasa con las llaves?</span>
+                <div class="opciones">
+                  <label class="opcion"><input type="radio" name="llaves_titularidad" value="transferir"><span>Se las queda el nuevo titular</span></label>
+                  <label class="opcion"><input type="radio" name="llaves_titularidad" value="reemplazar"><span>Dar de baja las anteriores y entregar nuevas</span></label>
+                </div>
+              </div>
+
+              <label for="gObs">Observaciones <span class="opc">(opcional)</span></label>
+              <textarea id="gObs" maxlength="600" placeholder="Cualquier dato que nos ayude"></textarea>
+
+              <button type="submit" class="btn btn-full" id="gEnviarBtn" style="margin-top:16px;">Enviar gestión a SAT</button>
+              <p class="status" id="gStatus" role="status"></p>
+            </div>
+          </form>
+        </div>
+
+        <!-- Vecinos y llaves -->
+        <div data-panel="vecinos" class="oculto">
+          <div class="buscar">
+            <input type="text" id="buscarVecino" placeholder="Buscar por nombre, piso, depto o N° de llave">
+            <button type="button" class="btn btn-sec" id="csvBtn" style="padding:10px 14px;font-size:15px;">⬇ Descargar listado</button>
+          </div>
+          <div id="listaVecinos"></div>
+        </div>
+
+        <!-- Gestiones -->
+        <div data-panel="gestiones" class="oculto">
+          <div id="listaGestiones"></div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div class="capa oculto" id="modalClave">
+    <form class="modal" id="claveForm">
+      <h2 style="margin:0 0 6px;font-family:'Barlow Semi Condensed',sans-serif;">Cambiar clave</h2>
+      <label for="claveActual">Clave actual</label><input type="password" id="claveActual" autocomplete="current-password">
+      <label for="claveNueva">Clave nueva <span class="opc">(mínimo 8 caracteres)</span></label><input type="password" id="claveNueva" autocomplete="new-password" minlength="8">
+      <label for="claveNueva2">Repetir clave nueva</label><input type="password" id="claveNueva2" autocomplete="new-password">
+      <div class="fila" style="margin-top:16px;"><button type="button" class="btn btn-sec" id="claveCancelar">Cancelar</button><button type="submit" class="btn">Guardar</button></div>
+      <p class="status" id="claveStatus"></p>
+    </form>
+  </div>
+
+  <div class="pie">SAT · Seguridad electrónica · <a href="https://www.sat365.com.ar" target="_blank" rel="noopener" style="color:inherit;">www.sat365.com.ar</a></div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"'`]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;", "`": "&#96;" }[c]));
+  const API = "/api/datos?publico=consorcio";
+  const TIPOS = { nuevo: "Nuevo tag", reemplazo: "Reemplazo de tag", baja: "Baja de tag", titularidad: "Cambio de titularidad" };
+  const MOTIVOS = {
+    reemplazo: { no_funciona: "No funciona", rotura: "Se rompió", desgaste: "Desgaste", otro: "Otro" },
+    baja: { extravio: "Extravío", robo: "Robo", ya_no_vive: "Ya no vive / no corresponde", otro: "Otro" },
+  };
+  const ESTADOS = { pendiente: ["Pendiente", "est-pend"], en_curso: ["En curso", "est-pend"], hecha: ["Hecha", "est-ok"], rechazada: ["Rechazada", "est-baja"] };
+  const EST_LLAVE = { pendiente: ["Registrada", "est-gris"], conciliada: ["Activa", "est-ok"], baja: ["Para dar de baja", "est-baja"], dada_de_baja: ["Dada de baja", "est-baja"] };
+  let pase = "";
+  let edificios = [], actual = null, datos = { registros: [], gestiones: [] };
+
+  try { const g = JSON.parse(localStorage.getItem("consorcio_pase") || "null"); if (g && g.v > Date.now()) pase = g.p; } catch (e) {}
+  function guardarPase(p) { pase = p; try { localStorage.setItem("consorcio_pase", JSON.stringify({ p, v: Date.now() + 11.5 * 3600e3 })); } catch (e) {} }
+  function salir() { pase = ""; try { localStorage.removeItem("consorcio_pase"); } catch (e) {} mostrarLogin(); }
+
+  async function api(metodo, extra, cuerpo) {
+    const r = await fetch(API + (extra || ""), { method: metodo, cache: "no-store", headers: { "Content-Type": "application/json", "X-Consorcio": pase }, body: cuerpo ? JSON.stringify(cuerpo) : undefined });
+    const d = await r.json().catch(() => ({}));
+    if (r.status === 401 && d.sesion_vencida) { salir(); throw new Error("La sesión venció, volvé a entrar"); }
+    if (!r.ok) throw new Error(d.error || "No se pudo completar");
+    return d;
+  }
+
+  function mostrarLogin() {
+    $("pantallaLogin").classList.remove("oculto");
+    $("pantallaPanel").classList.add("oculto");
+    $("hUsuario").classList.add("oculto");
+  }
+
+  $("loginForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const st = $("loginStatus");
+    st.className = "status"; st.textContent = "Entrando…";
+    $("loginBtn").disabled = true;
+    try {
+      const r = await fetch(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accion: "login", email: $("loginEmail").value.trim(), clave: $("loginClave").value }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "No se pudo entrar");
+      guardarPase(d.pase);
+      $("loginClave").value = "";
+      st.textContent = "";
+      await iniciarPanel();
+    } catch (err) { st.className = "status err"; st.textContent = err.message; }
+    $("loginBtn").disabled = false;
+  });
+
+  async function iniciarPanel() {
+    try {
+      const d = await api("GET");
+      $("pantallaLogin").classList.add("oculto");
+      $("pantallaPanel").classList.remove("oculto");
+      $("hUsuario").classList.remove("oculto");
+      $("hNombre").textContent = d.nombre;
+      $("bannerClave").classList.toggle("oculto", !d.debe_cambiar_clave);
+      edificios = d.edificios || [];
+      $("sinEdificios").classList.toggle("oculto", edificios.length > 0);
+      $("edificios").innerHTML = edificios.map((e) => `<button type="button" class="ed-chip" data-c="${esc(e.codigo)}"><b>${esc(e.nombre)}</b><span>${esc(e.direccion || "")}</span></button>`).join("");
+      $("edificios").querySelectorAll(".ed-chip").forEach((b) => b.addEventListener("click", () => abrirEdificio(b.dataset.c)));
+      const ultimo = (() => { try { return localStorage.getItem("consorcio_edificio"); } catch (e) { return ""; } })();
+      const elegir = edificios.find((e) => e.codigo === ultimo) || (edificios.length === 1 ? edificios[0] : null);
+      if (elegir) abrirEdificio(elegir.codigo);
+    } catch (e) { if (pase) { $("loginStatus").className = "status err"; $("loginStatus").textContent = e.message; } mostrarLogin(); }
+  }
+
+  async function abrirEdificio(codigo) {
+    actual = edificios.find((e) => e.codigo === codigo);
+    if (!actual) return;
+    try { localStorage.setItem("consorcio_edificio", codigo); } catch (e) {}
+    $("edificios").querySelectorAll(".ed-chip").forEach((b) => b.classList.toggle("activo", b.dataset.c === codigo));
+    $("edificioCard").classList.remove("oculto");
+    const st = $("edificioStatus");
+    st.className = "status"; st.textContent = "Cargando " + actual.nombre + "…";
+    try {
+      datos = await api("GET", "&que=edificio&e=" + encodeURIComponent(codigo));
+      st.textContent = "";
+      renderTodo();
+    } catch (e) { st.className = "status err"; st.textContent = e.message; }
+  }
+
+  // ---------- Pestañas ----------
+  document.querySelectorAll(".tab").forEach((t) => t.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach((x) => x.classList.toggle("activo", x === t));
+    document.querySelectorAll("[data-panel]").forEach((p) => p.classList.toggle("oculto", p.dataset.panel !== t.dataset.tab));
+  }));
+  function irA(tab) { document.querySelector(`.tab[data-tab="${tab}"]`).click(); }
+
+  function unidadTxt(r) {
+    const p = [];
+    if (r.piso || r.unidad) p.push(`${r.piso ? r.piso + "°" : ""} ${r.unidad || ""}`.trim());
+    if (r.cochera) p.push("Cochera " + r.cochera);
+    return p.join(" · ") || (r.tipo === "cochera" ? "Cochera" : "—");
+  }
+  function renderTodo() {
+    $("nVecinos").textContent = datos.registros.length;
+    $("nGestiones").textContent = datos.gestiones.length;
+    renderVecinos(); renderGestiones(); armarElegir();
+  }
+
+  // ---------- Vecinos y llaves ----------
+  function renderVecinos() {
+    const q = $("buscarVecino").value.trim().toLowerCase();
+    const regs = datos.registros.filter((r) => !q || [r.nombre, r.piso, r.unidad, `${r.piso}${r.unidad}`, `${r.piso} ${r.unidad}`, r.cochera, r.telefono, ...(r.llaves || []).map((l) => l.tag + " " + l.usuario)].join(" ").toLowerCase().includes(q));
+    const cont = $("listaVecinos");
+    if (!datos.registros.length) { cont.innerHTML = '<p class="vacio">Todavía no hay vecinos registrados en este edificio. Cuando escaneen el QR del hall, aparecen acá.</p>'; return; }
+    if (!regs.length) { cont.innerHTML = '<p class="vacio">No hay resultados.</p>'; return; }
+    const grupos = new Map();
+    regs.forEach((r) => { const k = unidadTxt(r); if (!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(r); });
+    const num = (s) => { const m = String(s).match(/\d+/); return m ? Number(m[0]) : (/pb/i.test(s) ? 0 : 999); };
+    const rel = { titular: "Titular", inquilino: "Inquilino", otro: "Otro" };
+    cont.innerHTML = [...grupos.entries()].sort((a, b) => num(a[0]) - num(b[0]) || a[0].localeCompare(b[0], "es", { numeric: true })).map(([u, rs]) => `
+      <div class="unidad">
+        <div class="unidad-tit"><b>${esc(u)}</b><span class="dat">${rs.length} ${rs.length === 1 ? "persona" : "personas"}</span></div>
+        ${rs.map((r) => `<div class="persona">
+          <div><b>${esc(r.nombre)}</b> <span class="dat">· ${esc(rel[r.relacion] || "")}${r.relacion_otro ? " (" + esc(r.relacion_otro) + ")" : ""}</span></div>
+          <div class="dat">${esc(r.telefono)}${r.email ? " · " + esc(r.email) : ""}</div>
+          <div class="llaves">${(r.llaves || []).map((l) => { const e = EST_LLAVE[l.estado] || EST_LLAVE.pendiente; return `<span class="llave">${l.tipo === "control" ? "📟" : "🔑"} <b>${esc(l.tag || "s/n")}</b>${l.usuario ? ` <span class="dat">usuario ${esc(l.usuario)}</span>` : ""} <span class="est ${e[1]}">${e[0]}</span></span>`; }).join("")}
+          ${(r.perdidas || []).map((l) => `<span class="llave">⚠ <b>${esc(l.tag || "s/n")}</b> <span class="est est-baja">Reportada perdida</span></span>`).join("")}</div>
+        </div>`).join("")}
+      </div>`).join("");
+  }
+  $("buscarVecino").addEventListener("input", renderVecinos);
+  $("csvBtn").addEventListener("click", () => {
+    // Evita que Excel interprete un dato como fórmula (=, +, -, @).
+    const celda = (v) => { let s = String(v ?? ""); if (/^[=+\-@\t\r]/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"'; };
+    const filas = [["Piso", "Depto", "Cochera", "Nombre", "Relación", "Teléfono", "Mail", "Dispositivo", "N° de llave", "N° de usuario", "Estado"]];
+    datos.registros.forEach((r) => {
+      const ll = (r.llaves || []).length ? r.llaves : [{}];
+      ll.forEach((l) => filas.push([r.piso, r.unidad, r.cochera, r.nombre, r.relacion, r.telefono, r.email, l.tipo === "control" ? "Control" : l.tag ? "Tag" : "", l.tag, l.usuario, l.estado ? (EST_LLAVE[l.estado] || [""])[0] : ""]));
+    });
+    const blob = new Blob(["﻿" + filas.map((f) => f.map(celda).join(";")).join("\r\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `llaves_${actual.nombre.replace(/[^\w]+/g, "_")}.csv`;
+    document.body.appendChild(a); a.click(); a.remove();
+  });
+
+  // ---------- Gestiones ----------
+  function renderGestiones() {
+    const cont = $("listaGestiones");
+    if (!datos.gestiones.length) { cont.innerHTML = '<p class="vacio">Todavía no cargaste gestiones para este edificio.</p>'; return; }
+    cont.innerHTML = datos.gestiones.map((g) => {
+      const e = ESTADOS[g.estado] || ESTADOS.pendiente;
+      const det = [];
+      det.push(`Unidad: <b>${esc(unidadTxt(g))}</b>`);
+      det.push(`${g.tipo === "titularidad" ? "Titular actual" : "Titular"}: <b>${esc(g.titular)}</b>${g.telefono ? " · " + esc(g.telefono) : ""}`);
+      if (g.tipo === "titularidad") det.push(`Nuevo titular: <b>${esc(g.nuevo_titular)}</b> · ${esc(g.nuevo_telefono)} · ${g.llaves_titularidad === "transferir" ? "se queda con las llaves" : "nuevas llaves, bajar las anteriores"}`);
+      if (g.tipo === "nuevo") det.push(`${g.cantidad} × ${g.dispositivo === "control" ? "control de cochera" : "tag"}`);
+      if (g.tag || g.usuario) det.push(`${g.dispositivo === "control" ? "Control" : "Llave"} <span class="mono">${esc(g.tag || "")}</span>${g.usuario ? " · usuario " + esc(g.usuario) : ""}`);
+      if (g.motivo) det.push(`Motivo: ${esc((MOTIVOS[g.tipo] || {})[g.motivo] || g.motivo)}`);
+      if (g.observaciones) det.push(`“${esc(g.observaciones)}”`);
+      return `<div class="gestion ${esc(g.estado)}">
+        <div class="gestion-tit"><b>${esc(TIPOS[g.tipo] || g.tipo)}</b><span><span class="est ${e[1]}">${e[0]}</span> <span class="dat" style="color:var(--muted);font-size:13px;">${new Date(g.fecha).toLocaleDateString("es-AR")}</span></span></div>
+        <div class="dat">${det.join("<br>")}</div>
+        ${g.nota_sat ? `<div class="nota-sat"><b>SAT:</b> ${esc(g.nota_sat)}</div>` : ""}
+      </div>`;
+    }).join("");
+  }
+
+  // ---------- Nueva gestión ----------
+  const form = $("gestionForm");
+  const valor = (n) => { const el = form.querySelector(`input[name="${n}"]:checked`); return el ? el.value : ""; };
+  function armarElegir() {
+    const ops = ['<option value="">— Elegir —</option>'];
+    datos.registros.forEach((r, i) => {
+      (r.llaves || []).forEach((l, j) => ops.push(`<option value="${i}|${j}">${esc(unidadTxt(r))} — ${esc(r.nombre)} — ${l.tipo === "control" ? "control" : "tag"} ${esc(l.tag || "s/n")}</option>`));
+      if (!(r.llaves || []).length) ops.push(`<option value="${i}|">${esc(unidadTxt(r))} — ${esc(r.nombre)}</option>`);
+    });
+    $("elegirLlave").innerHTML = ops.join("");
+  }
+  $("elegirLlave").addEventListener("change", () => {
+    const [i, j] = $("elegirLlave").value.split("|");
+    const r = datos.registros[Number(i)];
+    if (!r) return;
+    const l = j !== "" && j !== undefined ? (r.llaves || [])[Number(j)] : null;
+    $("gPiso").value = r.piso || ""; $("gUnidad").value = r.unidad || ""; $("gCochera").value = r.cochera || "";
+    $("gTitular").value = r.nombre || ""; $("gTelefono").value = r.telefono || ""; $("gEmail").value = r.email || "";
+    const rel = { titular: "propietario", inquilino: "inquilino", otro: "otro" }[r.relacion];
+    if (rel) form.querySelector(`input[name="relacion"][value="${rel}"]`).checked = true;
+    if (l) {
+      form.querySelector(`input[name="dispositivo"][value="${l.tipo === "control" ? "control" : "tag"}"]`).checked = true;
+      $("gTag").value = l.tag || ""; $("gUsuario").value = l.usuario || "";
+    }
+    form.dataset.registro = r.id || "";
+  });
+  form.querySelectorAll('input[name="tipo"]').forEach((r) => r.addEventListener("change", ajustarForm));
+  function ajustarForm() {
+    const t = valor("tipo");
+    $("camposGestion").classList.toggle("oculto", !t);
+    $("elegirBox").classList.toggle("oculto", t === "nuevo" || !datos.registros.length);
+    $("bloqueCantidad").classList.toggle("oculto", t !== "nuevo");
+    $("bloqueTag").classList.toggle("oculto", t === "nuevo");
+    $("bloqueTitularidad").classList.toggle("oculto", t !== "titularidad");
+    $("filaMailRel").classList.toggle("oculto", t === "baja");
+    $("bloqueMotivo").classList.toggle("oculto", !MOTIVOS[t]);
+    $("motivos").innerHTML = Object.entries(MOTIVOS[t] || {}).map(([k, v]) => `<label class="opcion"><input type="radio" name="motivo" value="${k}"><span>${v}</span></label>`).join("");
+    $("motivos").querySelectorAll("input").forEach((i) => i.addEventListener("change", () => $("avisoRobo").classList.toggle("oculto", valor("motivo") !== "robo")));
+    $("avisoRobo").classList.add("oculto");
+    $("gTitularLbl").textContent = t === "titularidad" ? "Titular actual" : "Nombre y apellido del titular";
+    $("gTelefonoLbl").innerHTML = t === "nuevo" ? "Teléfono" : 'Teléfono <span class="opc">(opcional)</span>';
+  }
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const st = $("gStatus");
+    const t = valor("tipo");
+    const g = {
+      accion: "gestion", edificio: actual.codigo, tipo: t,
+      piso: $("gPiso").value.trim(), unidad: $("gUnidad").value.trim(), cochera: $("gCochera").value.trim(),
+      titular: $("gTitular").value.trim(), telefono: $("gTelefono").value.trim(), email: t === "baja" ? "" : $("gEmail").value.trim(),
+      relacion: t === "baja" ? "" : valor("relacion"), dispositivo: valor("dispositivo"), cantidad: Number($("gCantidad").value) || 1,
+      tag: t === "nuevo" ? "" : $("gTag").value.trim(), usuario: t === "nuevo" ? "" : $("gUsuario").value.trim(), motivo: valor("motivo"),
+      nuevo_titular: $("gNuevoTitular").value.trim(), nuevo_telefono: $("gNuevoTelefono").value.trim(), nuevo_email: $("gNuevoEmail").value.trim(),
+      llaves_titularidad: valor("llaves_titularidad"), registro_id: form.dataset.registro || "", observaciones: $("gObs").value.trim(),
+    };
+    $("gEnviarBtn").disabled = true;
+    st.className = "status"; st.textContent = "Enviando…";
+    try {
+      const d = await api("POST", "", g);
+      datos.gestiones.unshift(d.gestion);
+      form.reset(); delete form.dataset.registro; ajustarForm();
+      $("camposGestion").classList.add("oculto");
+      st.className = "status ok"; st.textContent = "✓ Gestión enviada. Podés seguirla en la pestaña Gestiones.";
+      renderTodo();
+    } catch (err) { st.className = "status err"; st.textContent = err.message; }
+    $("gEnviarBtn").disabled = false;
+  });
+
+  // ---------- Clave ----------
+  function abrirClave() { $("modalClave").classList.remove("oculto"); $("claveStatus").textContent = ""; $("claveActual").focus(); }
+  $("cambiarClaveBtn").addEventListener("click", abrirClave);
+  $("bannerClaveBtn").addEventListener("click", abrirClave);
+  $("claveCancelar").addEventListener("click", () => { $("modalClave").classList.add("oculto"); $("claveForm").reset(); });
+  $("claveForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const st = $("claveStatus");
+    if ($("claveNueva").value.length < 8) { st.className = "status err"; st.textContent = "La clave nueva tiene que tener al menos 8 caracteres."; return; }
+    if ($("claveNueva").value !== $("claveNueva2").value) { st.className = "status err"; st.textContent = "Las claves nuevas no coinciden."; return; }
+    try {
+      const d = await api("POST", "", { accion: "cambiar_clave", actual: $("claveActual").value, nueva: $("claveNueva").value });
+      if (d.pase) guardarPase(d.pase);
+      $("claveForm").reset();
+      $("modalClave").classList.add("oculto");
+      $("bannerClave").classList.add("oculto");
+    } catch (err) { st.className = "status err"; st.textContent = err.message; }
+  });
+  $("salirBtn").addEventListener("click", salir);
+
+  if (pase) iniciarPanel(); else mostrarLogin();
+})();
+</script>
+</body>
+</html>
