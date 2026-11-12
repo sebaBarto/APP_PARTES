@@ -3272,3 +3272,18 @@ IP y por mail. Datos en `registro-llaves/administradores.json` y
 - Cuando SAT cambia el estado de un pedido, al administrador (y al vecino que
   lo cargó con link, si dejó su mail) le llega un **mail** con el estado y la
   nota (tipo `aviso_gestion`, por Resend si está `RESEND_API_KEY`).
+
+### Mejoras de uso (vecino y administrador)
+
+- **Vecino:** si vuelve a registrarse (misma unidad y mismo nombre, o mismo
+  teléfono y mismo primer nombre) se actualiza su registro en vez de
+  duplicarlo; cada registro tiene **N° de registro**; puede pedir una
+  **copia por mail** (QR y link); botón flotante de **WhatsApp** a SAT.
+- **Administrador:** "**Olvidé mi clave**" (link por mail, 1 hora, un solo
+  uso); **cancelar** un pedido mientras está pendiente (avisa a SAT por
+  mail); **resumen** de cada edificio al entrar; **links en lote** pegando
+  una lista (nombre, piso, depto o solo la unidad), con copiar todo y CSV;
+  **reporte para asamblea** imprimible/PDF por período (sin números de
+  llave).
+- Los mails a vecinos y administradores salen por Resend (tipos
+  `constancia_registro`, `constancia_pedido`, `restablecer_clave`, `aviso_gestion`).

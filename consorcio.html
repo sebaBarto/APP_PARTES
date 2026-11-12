@@ -53,7 +53,16 @@
 
   /* Edificios */
   .edificios { display: flex; gap: 8px; flex-wrap: wrap; }
-  .ed-chip { border: 1.5px solid var(--line); background: #fff; border-radius: 12px; padding: 10px 14px; cursor: pointer; font: inherit; text-align: left; min-width: 150px; }
+  .ed-chip { border: 1.5px solid var(--line); background: #fff; border-radius: 12px; padding: 12px 14px; cursor: pointer; font: inherit; text-align: left; min-width: 220px; flex: 1 1 220px; max-width: 320px; }
+  .ed-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 10px; margin-top: 10px; }
+  .ed-stats div { font-size: 12px; color: var(--muted); line-height: 1.2; }
+  .ed-stats div b { display: block; font-family: 'Barlow Semi Condensed', sans-serif; font-size: 20px; color: var(--ink); }
+  .ed-chip.activo .ed-stats div { color: #A9A69C; } .ed-chip.activo .ed-stats div b { color: #fff; }
+  .ed-stats .alerta b { color: #B3261E !important; }
+  .barra-ed { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: flex-end; margin-bottom: 6px; }
+  .barra-ed select { width: auto; padding: 8px 10px; font-size: 14px; }
+  .lote-tabla { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; }
+  .lote-tabla td { padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
   .ed-chip b { display: block; font-family: 'Barlow Semi Condensed', sans-serif; font-size: 17px; letter-spacing: .3px; }
   .ed-chip span { font-size: 13px; color: var(--muted); }
   .ed-chip.activo { background: var(--ink); color: #fff; border-color: var(--ink); }
@@ -120,6 +129,8 @@
   .visor { position: fixed; inset: 0; background: rgba(14,15,16,.85); display: grid; place-items: center; padding: 16px; z-index: 60; }
   .visor img { max-width: 100%; max-height: 82vh; border-radius: 10px; background: #fff; }
   .visor button { position: absolute; top: 14px; right: 14px; }
+  .ayuda-wa { position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 40; display: inline-flex; align-items: center; gap: 8px; background: #1FA855; color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; padding: 11px 15px 11px 12px; border-radius: 999px; box-shadow: 0 6px 18px rgba(0,0,0,.25); font-family: 'Barlow', sans-serif; }
+  .ayuda-wa svg { width: 22px; height: 22px; }
   .pie { text-align: center; color: var(--muted); font-size: 13px; padding: 4px 16px 30px; }
 </style>
 </head>
@@ -152,7 +163,24 @@
         <button type="submit" class="btn btn-full" id="loginBtn" style="margin-top:16px;">Entrar</button>
         <p class="status" id="loginStatus" role="status"></p>
       </form>
-      <p class="sub" style="margin-top:10px;font-size:13px;">¿No tenés clave o la olvidaste? Pedila a SAT.</p>
+      <button type="button" class="ver-foto" id="olvideBtn" style="margin-top:12px;border:none;text-decoration:underline;padding:0;color:var(--muted);">Olvidé mi clave</button>
+      <form id="olvideForm" class="oculto" style="margin-top:10px;">
+        <p class="sub">Escribí tu mail y te mandamos un link para crear una clave nueva.</p>
+        <input type="email" id="olvideEmail" inputmode="email" autocomplete="username" required placeholder="tu mail">
+        <button type="submit" class="btn btn-sec btn-full" style="margin-top:10px;">Mandarme el link</button>
+        <p class="status" id="olvideStatus"></p>
+      </form>
+    </section>
+
+    <!-- Crear clave nueva (link del mail) -->
+    <section class="card oculto" id="pantallaReset" style="max-width:440px;margin-left:auto;margin-right:auto;">
+      <h2>Crear clave nueva</h2>
+      <form id="resetForm">
+        <label for="resetClave">Clave nueva <span class="opc">(mínimo 8 caracteres)</span></label><input type="password" id="resetClave" autocomplete="new-password" minlength="8" required>
+        <label for="resetClave2">Repetila</label><input type="password" id="resetClave2" autocomplete="new-password" required>
+        <button type="submit" class="btn btn-full" style="margin-top:16px;">Guardar y entrar</button>
+        <p class="status" id="resetStatus"></p>
+      </form>
     </section>
 
     <!-- Pedido por link (vecino) -->
@@ -179,6 +207,10 @@
       </section>
 
       <section class="card oculto" id="edificioCard">
+        <div class="barra-ed" id="barraEdificio">
+          <select id="repPeriodo" aria-label="Período del reporte"><option value="30">Últimos 30 días</option><option value="90">Últimos 3 meses</option><option value="365" selected>Último año</option><option value="0">Todo</option></select>
+          <button type="button" class="btn btn-sec" id="reporteBtn" style="padding:8px 14px;font-size:15px;">📄 Reporte para asamblea (PDF)</button>
+        </div>
         <div class="tabs" role="tablist">
           <button type="button" class="tab activo" data-tab="nueva">Nueva gestión</button>
           <button type="button" class="tab" data-tab="vecinos">Vecinos y llaves <span class="n" id="nVecinos">0</span></button>
@@ -215,7 +247,8 @@
                 <div><label for="gTelefono" id="gTelefonoLbl">Teléfono</label><input type="tel" id="gTelefono" maxlength="30" inputmode="tel"></div>
               </div>
               <div class="fila" id="filaMailRel">
-                <div><label for="gEmail">Mail <span class="opc">(opcional)</span></label><input type="email" id="gEmail" maxlength="80" inputmode="email"></div>
+                <div><label for="gEmail">Mail <span class="opc">(opcional)</span></label><input type="email" id="gEmail" maxlength="80" inputmode="email">
+                  <label class="oculto" id="copiaWrap" style="display:flex;gap:8px;align-items:center;font-weight:500;margin:8px 0 0;"><input type="checkbox" id="copia" checked style="width:18px;height:18px;"> Mandarme una copia por mail</label></div>
                 <div><span class="lbl">Es…</span>
                   <div class="opciones">
                     <label class="opcion"><input type="radio" name="relacion" value="propietario"><span>Propietario</span></label>
@@ -294,12 +327,21 @@
         <div data-panel="links" class="oculto">
           <p class="sub">Generá un link y mandáselo al vecino: él completa el pedido (con foto del tag) y le llega <b>directo a SAT</b> con su número de pedido — el link ya es tu autorización. Lo vas a ver en la pestaña Gestiones. Cada link sirve <b>una sola vez</b> y vence a los 15 días. El vecino no ve ningún otro dato del edificio.</p>
           <form id="linkForm" class="elegir" style="margin-top:10px;">
-            <div class="fila">
+            <div class="opciones" style="margin-bottom:6px;">
+              <label class="opcion"><input type="radio" name="lModo" value="uno" checked><span>Un vecino</span></label>
+              <label class="opcion"><input type="radio" name="lModo" value="varios"><span>Varios a la vez</span></label>
+            </div>
+            <div id="lVarios" class="oculto">
+              <label for="lLista">Una línea por vecino: <span class="opc">nombre, piso, depto — o solo la unidad (ej. «4B» o «PB 1»)</span></label>
+              <textarea id="lLista" rows="6" placeholder="Laura Gómez, 4, B&#10;Martín Ruiz, 7, D&#10;2A&#10;PB 1"></textarea>
+              <p class="sub" id="lListaCuenta" style="margin-top:4px;"></p>
+            </div>
+            <div class="fila" id="lUnoA">
               <div><label for="lTipo">Gestión</label>
                 <select id="lTipo"><option value="">Que elija el vecino</option><option value="nuevo">Nuevo tag</option><option value="reemplazo">Reemplazo de tag</option><option value="baja">Baja de tag</option><option value="titularidad">Cambio de titularidad</option></select></div>
               <div><label for="lDest">Nombre del vecino <span class="opc">(opcional)</span></label><input type="text" id="lDest" maxlength="80"></div>
             </div>
-            <div class="fila">
+            <div class="fila" id="lUnoB">
               <div><label for="lPiso">Piso <span class="opc">(opcional)</span></label><input type="text" id="lPiso" maxlength="10"></div>
               <div><label for="lUnidad">Depto <span class="opc">(opcional)</span></label><input type="text" id="lUnidad" maxlength="10"></div>
             </div>
@@ -327,6 +369,10 @@
 
   <div class="visor oculto" id="visor"><button type="button" class="btn btn-sec" id="visorCerrar" style="padding:8px 14px;font-size:15px;">Cerrar ✕</button><img id="visorImg" alt="Foto de la llave"></div>
 
+  <a class="ayuda-wa" id="ayudaWa" style="display:none;" href="https://wa.me/5493413782085" target="_blank" rel="noopener" aria-label="Pedir ayuda por WhatsApp">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.4.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 2.9 2.9 0 0 0-.9 2.2 5 5 0 0 0 1 2.7 11.5 11.5 0 0 0 4.4 3.9c1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg>
+    ¿Ayuda?
+  </a>
   <div class="pie">SAT · Seguridad electrónica · <a href="https://www.sat365.com.ar" target="_blank" rel="noopener" style="color:inherit;">www.sat365.com.ar</a></div>
 
 <script>
@@ -339,7 +385,7 @@
     reemplazo: { no_funciona: "No funciona", rotura: "Se rompió", desgaste: "Desgaste", otro: "Otro" },
     baja: { extravio: "Extravío", robo: "Robo", ya_no_vive: "Ya no vive / no corresponde", otro: "Otro" },
   };
-  const ESTADOS = { pendiente: ["Pendiente", "est-pend"], en_curso: ["En curso", "est-pend"], hecha: ["Hecha", "est-ok"], rechazada: ["Rechazada", "est-baja"] };
+  const ESTADOS = { pendiente: ["Pendiente", "est-pend"], en_curso: ["En curso", "est-pend"], hecha: ["Hecha", "est-ok"], rechazada: ["Rechazada", "est-baja"], cancelada: ["Cancelada", "est-gris"] };
   const EST_LLAVE = { pendiente: ["Registrada", "est-gris"], conciliada: ["Activa", "est-ok"], baja: ["Para dar de baja", "est-baja"], dada_de_baja: ["Dada de baja", "est-baja"] };
   let pase = "";
   const codigoLink = (new URLSearchParams(location.search).get("i") || "").trim();
@@ -391,7 +437,12 @@
       $("bannerClave").classList.toggle("oculto", !d.debe_cambiar_clave);
       edificios = d.edificios || [];
       $("sinEdificios").classList.toggle("oculto", edificios.length > 0);
-      $("edificios").innerHTML = edificios.map((e) => `<button type="button" class="ed-chip" data-c="${esc(e.codigo)}"><b>${esc(e.nombre)}</b><span>${esc(e.direccion || "")}</span></button>`).join("");
+      $("edificios").innerHTML = edificios.map((e) => {
+        const r = e.resumen;
+        return `<button type="button" class="ed-chip" data-c="${esc(e.codigo)}"><b>${esc(e.nombre)}</b><span>${esc(e.direccion || "")}</span>${r ? `<div class="ed-stats">
+          <div><b>${r.personas}</b>vecinos registrados</div><div><b>${r.unidades}</b>unidades con registro</div><div class="${r.abiertos ? "alerta" : ""}"><b>${r.abiertos}</b>pedidos abiertos</div>
+          <div><b>${r.tags}</b>tags activos</div><div><b>${r.controles}</b>controles activos</div><div><b>${r.hechos_30}</b>resueltos (30 días)</div></div>` : ""}</button>`;
+      }).join("");
       $("edificios").querySelectorAll(".ed-chip").forEach((b) => b.addEventListener("click", () => abrirEdificio(b.dataset.c)));
       const ultimo = (() => { try { return localStorage.getItem("consorcio_edificio"); } catch (e) { return ""; } })();
       const elegir = edificios.find((e) => e.codigo === ultimo) || (edificios.length === 1 ? edificios[0] : null);
@@ -491,8 +542,21 @@
         <div class="dat">${det.join("<br>")}</div>
         ${(g.fotos || []).length ? `<div style="margin-top:6px;display:flex;gap:6px;">${g.fotos.map((f, i) => `<button type="button" class="ver-foto" data-foto="${esc(f)}">📷 Foto ${i + 1}</button>`).join("")}</div>` : ""}
         ${g.nota_sat ? `<div class="nota-sat"><b>SAT:</b> ${esc(g.nota_sat)}</div>` : ""}
+        ${g.estado === "cancelada" && g.motivo_cancelacion ? `<div class="nota-sat">Cancelado: ${esc(g.motivo_cancelacion)}</div>` : ""}
+        ${g.estado === "pendiente" ? `<button type="button" class="ver-foto cancelar-g" data-id="${esc(g.id)}" style="margin-top:8px;color:var(--err);border-color:#E9B4AF;">Cancelar pedido</button>` : ""}
       </div>`;
     }).join("");
+    cont.querySelectorAll(".cancelar-g").forEach((b) => b.addEventListener("click", async () => {
+      const motivo = prompt("¿Cancelar este pedido? Contanos el motivo (opcional):");
+      if (motivo === null) return;
+      b.disabled = true;
+      try {
+        await api("POST", "", { accion: "cancelar_gestion", edificio: actual.codigo, id: b.dataset.id, motivo });
+        const g = datos.gestiones.find((x) => x.id === b.dataset.id);
+        if (g) { g.estado = "cancelada"; g.motivo_cancelacion = motivo; }
+        renderTodo();
+      } catch (e) { alert(e.message); b.disabled = false; }
+    }));
   }
 
   // ---------- Nueva gestión ----------
@@ -555,11 +619,11 @@
     st.className = "status"; st.textContent = g.fotos.length ? "Enviando (con fotos, puede tardar unos segundos)…" : "Enviando…";
     if (modoLink) {
       try {
-        const r = await fetch("/api/datos?publico=consorcio_link", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...g, accion: undefined, edificio: undefined, i: codigoLink }) });
+        const r = await fetch("/api/datos?publico=consorcio_link", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...g, accion: undefined, edificio: undefined, i: codigoLink, copia: !!g.email && $("copia").checked }) });
         const d = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(d.error || "No se pudo enviar");
         $("pantallaPanel").classList.add("oculto");
-        $("linkFinTxt").innerHTML = `Tu pedido <b>N° ${esc(d.numero)}</b> le llegó a SAT, que lo va a gestionar. Tu administración (${esc(d.administrador)}) también lo puede seguir.`;
+        $("linkFinTxt").innerHTML = `Tu pedido <b>N° ${esc(d.numero)}</b> le llegó a SAT, que lo va a gestionar. Tu administración (${esc(d.administrador)}) también lo puede seguir.${d.copia ? " Te mandamos una copia por mail." : ""}`;
         $("pantallaLinkFin").classList.remove("oculto");
         window.scrollTo({ top: 0, behavior: "smooth" });
       } catch (err) { st.className = "status err"; st.textContent = err.message; $("gEnviarBtn").disabled = false; }
@@ -671,7 +735,19 @@
     $("lCrearBtn").disabled = true;
     st.className = "status"; st.textContent = "Generando…";
     try {
-      const d = await api("POST", "", { accion: "crear_invitacion", edificio: actual.codigo, tipo: $("lTipo").value, destinatario: $("lDest").value.trim(), piso: $("lPiso").value.trim(), unidad: $("lUnidad").value.trim(), });
+      const varios = document.querySelector('input[name="lModo"]:checked').value === "varios";
+      const lote = varios ? leerLista() : null;
+      if (varios && !lote.length) throw new Error("Pegá al menos una línea en la lista");
+      const d = await api("POST", "", varios ? { accion: "crear_invitacion", edificio: actual.codigo, tipo: $("lTipo").value, lote } : { accion: "crear_invitacion", edificio: actual.codigo, tipo: $("lTipo").value, destinatario: $("lDest").value.trim(), piso: $("lPiso").value.trim(), unidad: $("lUnidad").value.trim() });
+      if (varios) {
+        datos.invitaciones = [...d.invitaciones.slice().reverse(), ...(datos.invitaciones || [])];
+        $("lLista").value = ""; $("lListaCuenta").textContent = "";
+        st.textContent = "";
+        renderLote(d.invitaciones);
+        renderLinks();
+        $("lCrearBtn").disabled = false;
+        return;
+      }
       const inv = { ...d.invitacion, codigo: d.codigo };
       datos.invitaciones = [inv, ...(datos.invitaciones || [])];
       $("linkForm").reset();
@@ -708,12 +784,154 @@
       if (d.unidad) $("gUnidad").value = d.unidad;
       if (d.destinatario) $("gTitular").value = d.destinatario;
       $("gEnviarBtn").textContent = "Enviar pedido";
+      $("barraEdificio").classList.add("oculto");
+      $("gEmail").addEventListener("input", () => $("copiaWrap").classList.toggle("oculto", !$("gEmail").value.trim()));
+      $("ayudaWa").style.display = "";
+      $("ayudaWa").href = "https://wa.me/5493413782085?text=" + encodeURIComponent("Hola SAT, necesito ayuda con un pedido de llave de " + d.edificio + ".");
       ajustarForm();
     } catch (e) {
       $("linkErrorTxt").textContent = e.message;
       $("pantallaLinkError").classList.remove("oculto");
     }
   }
+
+  // ---------- Olvidé mi clave ----------
+  $("olvideBtn").addEventListener("click", () => { $("olvideForm").classList.toggle("oculto"); $("olvideEmail").value = $("loginEmail").value; $("olvideEmail").focus(); });
+  $("olvideForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const st = $("olvideStatus");
+    st.className = "status"; st.textContent = "Enviando…";
+    try {
+      const r = await fetch(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accion: "olvide_clave", email: $("olvideEmail").value.trim() }) });
+      const d = await r.json().catch(() => ({}));
+      st.className = "status ok"; st.textContent = d.mensaje || "Listo, revisá tu mail.";
+    } catch (err) { st.className = "status err"; st.textContent = "No se pudo, probá de nuevo."; }
+  });
+  const codigoReset = (new URLSearchParams(location.search).get("r") || "").trim();
+  $("resetForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const st = $("resetStatus");
+    if ($("resetClave").value.length < 8) { st.className = "status err"; st.textContent = "Tiene que tener al menos 8 caracteres."; return; }
+    if ($("resetClave").value !== $("resetClave2").value) { st.className = "status err"; st.textContent = "Las claves no coinciden."; return; }
+    try {
+      const r = await fetch(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ accion: "restablecer_clave", codigo: codigoReset, nueva: $("resetClave").value }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "No se pudo");
+      guardarPase(d.pase);
+      history.replaceState(null, "", location.pathname);
+      $("pantallaReset").classList.add("oculto");
+      iniciarPanel();
+    } catch (err) { st.className = "status err"; st.textContent = err.message; }
+  });
+
+  // ---------- Links para varios vecinos ----------
+  document.querySelectorAll('input[name="lModo"]').forEach((r) => r.addEventListener("change", () => {
+    const varios = document.querySelector('input[name="lModo"]:checked').value === "varios";
+    $("lVarios").classList.toggle("oculto", !varios);
+    $("lUnoA").querySelector("div:nth-child(2)").classList.toggle("oculto", varios);
+    $("lUnoB").classList.toggle("oculto", varios);
+    $("lCrearBtn").textContent = varios ? "Generar links" : "Generar link";
+  }));
+  function partirUnidad(t) {
+    const m = String(t || "").trim().match(/^(pb|\d{1,3})\s*°?\s*[-/]?\s*([a-z0-9]{1,4})$/i);
+    return m ? { piso: m[1].toUpperCase(), unidad: m[2].toUpperCase() } : null;
+  }
+  function leerLista() {
+    return $("lLista").value.split(/\r?\n/).map((l) => l.trim()).filter(Boolean).slice(0, 60).map((l) => {
+      const c = l.split(/\s*[,;\t]\s*/).filter((x) => x !== "");
+      if (c.length >= 3) return { destinatario: c[0], piso: c[1], unidad: c[2] };
+      if (c.length === 2) { const u = partirUnidad(c[1]); if (u && /[a-záéíóúñ]{3,}/i.test(c[0])) return { destinatario: c[0], ...u }; return { piso: c[0], unidad: c[1] }; }
+      const u = partirUnidad(c[0]);
+      return u ? u : { destinatario: c[0] };
+    });
+  }
+  $("lLista").addEventListener("input", () => { const n = leerLista().length; $("lListaCuenta").textContent = n ? `${n} ${n === 1 ? "link" : "links"} para generar${n >= 60 ? " (máximo 60 por vez)" : ""}` : ""; });
+  function renderLote(invs) {
+    const filasTxt = invs.map((i) => `${i.destinatario || "Vecino"}${i.piso || i.unidad ? " (" + `${i.piso ? i.piso + "°" : ""} ${i.unidad}`.trim() + ")" : ""}: ${urlLink(i.codigo)}`);
+    $("linkNuevo").innerHTML = `<div class="banner" style="background:#E6F4EA;border-color:#B7DFC4;display:block;">
+      <b>${invs.length} links listos.</b> Mandale a cada uno el suyo (cada link sirve una sola vez).
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px;"><button type="button" class="btn btn-sec" id="loteCopiar" style="padding:8px 12px;font-size:14px;">Copiar toda la lista</button><button type="button" class="btn btn-sec" id="loteCsv" style="padding:8px 12px;font-size:14px;">⬇ Descargar lista</button></div>
+      <table class="lote-tabla">${invs.map((i) => `<tr><td><b>${esc(i.destinatario || "Vecino")}</b>${i.piso || i.unidad ? `<br><span class="dat" style="color:var(--muted);">${esc(`${i.piso ? i.piso + "°" : ""} ${i.unidad}`.trim())}</span>` : ""}</td><td style="text-align:right;white-space:nowrap;">${botonesCompartir(i)}</td></tr>`).join("")}</table></div>`;
+    $("linkNuevo").classList.remove("oculto");
+    $("loteCopiar").addEventListener("click", async (e) => { try { await navigator.clipboard.writeText(filasTxt.join("\n")); e.target.textContent = "✓ Copiada"; } catch (err) { prompt("Copiá la lista:", filasTxt.join(" | ")); } });
+    $("loteCsv").addEventListener("click", () => {
+      const celda = (v) => '"' + String(v ?? "").replace(/"/g, '""') + '"';
+      const csv = [["Vecino", "Piso", "Depto", "Link", "Vence"], ...invs.map((i) => [i.destinatario, i.piso, i.unidad, urlLink(i.codigo), new Date(i.vence).toLocaleDateString("es-AR")])].map((f) => f.map(celda).join(";")).join("\r\n");
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" }));
+      a.download = `links_${actual.nombre.replace(/[^\w]+/g, "_")}.csv`;
+      document.body.appendChild(a); a.click(); a.remove();
+    });
+  }
+
+  // ---------- Reporte para asamblea (se imprime / guarda como PDF) ----------
+  $("reporteBtn").addEventListener("click", () => {
+    const dias = Number($("repPeriodo").value);
+    const desde = dias ? Date.now() - dias * 864e5 : 0;
+    const periodoTxt = $("repPeriodo").selectedOptions[0].textContent.toLowerCase();
+    const regs = datos.registros;
+    const activas = regs.flatMap((r) => (r.llaves || []).filter((l) => l.estado !== "dada_de_baja"));
+    const gs = datos.gestiones.filter((g) => Date.parse(g.fecha) >= desde);
+    const porTipo = Object.keys(TIPOS).map((t) => [TIPOS[t], gs.filter((g) => g.tipo === t).length]);
+    const porEstado = Object.keys(ESTADOS).map((k) => [ESTADOS[k][0], gs.filter((g) => g.estado === k).length]).filter(([, n]) => n);
+    const unidades = new Map();
+    regs.forEach((r) => { const k = unidadTxt(r); if (!unidades.has(k)) unidades.set(k, []); unidades.get(k).push(r); });
+    const num = (s) => { const m = String(s).match(/\d+/); return m ? Number(m[0]) : (/pb/i.test(s) ? 0 : 999); };
+    const rel = { titular: "Titular", inquilino: "Inquilino", otro: "Otro" };
+    const hoy = new Date().toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" });
+    const w = window.open("", "_blank");
+    if (!w) { alert("El navegador bloqueó la ventana del reporte: permití las ventanas emergentes."); return; }
+    w.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Reporte de llaves — ${esc(actual.nombre)}</title>
+<link rel="stylesheet" href="${location.origin}/vendor/fonts.css">
+<style>
+  @page { size: A4; margin: 14mm 14mm 16mm; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Barlow', sans-serif; color: #0E0F10; margin: 0; font-size: 11pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .barra { position: sticky; top: 0; background: #0E0F10; color: #fff; padding: 10px; text-align: center; font-size: 14px; }
+  .barra button { background: #F6B828; border: 0; border-radius: 8px; padding: 8px 14px; font: inherit; font-weight: 700; cursor: pointer; margin-left: 8px; }
+  .hoja { max-width: 190mm; margin: 0 auto; padding: 8mm 0; }
+  header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 3px solid #F6B828; padding-bottom: 8px; margin-bottom: 14px; }
+  header img { height: 13mm; background: #0E0F10; padding: 4px 10px; border-radius: 6px; }
+  h1 { font-family: 'Barlow Semi Condensed', sans-serif; font-size: 22pt; margin: 0; }
+  h2 { font-family: 'Barlow Semi Condensed', sans-serif; font-size: 14pt; margin: 18px 0 6px; border-left: 4px solid #F6B828; padding-left: 8px; }
+  .sub { color: #6E6C66; font-size: 10pt; }
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .kpi { border: 1px solid #DEDCD4; border-radius: 8px; padding: 8px 10px; }
+  .kpi b { display: block; font-family: 'Barlow Semi Condensed', sans-serif; font-size: 22pt; line-height: 1; }
+  .kpi span { font-size: 9.5pt; color: #6E6C66; }
+  table { width: 100%; border-collapse: collapse; font-size: 10pt; }
+  th { text-align: left; font-size: 8.5pt; text-transform: uppercase; letter-spacing: .04em; color: #6E6C66; border-bottom: 1.5px solid #0E0F10; padding: 5px 6px; }
+  td { padding: 5px 6px; border-bottom: 1px solid #EEEDE6; vertical-align: top; }
+  tr { break-inside: avoid; }
+  .dos { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .pie { margin-top: 18px; font-size: 9pt; color: #6E6C66; border-top: 1px solid #DEDCD4; padding-top: 6px; }
+  @media print { .barra { display: none; } .hoja { padding: 0; } }
+</style></head><body>
+<div class="barra">Revisalo y guardalo como PDF desde imprimir. <button onclick="window.print()">🖨 Imprimir / Guardar PDF</button></div>
+<div class="hoja">
+  <header><div><h1>Llaves de acceso · ${esc(actual.nombre)}</h1><div class="sub">${esc([actual.direccion, "Reporte del " + hoy, "Período: " + periodoTxt, "Administración: " + $("hNombre").textContent].filter(Boolean).join(" · "))}</div></div><img src="${location.origin}/icons/logo.png" alt="SAT"></header>
+  <div class="kpis">
+    <div class="kpi"><b>${regs.length}</b><span>vecinos en el padrón</span></div>
+    <div class="kpi"><b>${unidades.size}</b><span>unidades con registro</span></div>
+    <div class="kpi"><b>${activas.filter((l) => (l.tipo || "tag") === "tag").length}</b><span>tags activos</span></div>
+    <div class="kpi"><b>${activas.filter((l) => l.tipo === "control").length}</b><span>controles de cochera activos</span></div>
+  </div>
+  <h2>Pedidos del período (${gs.length})</h2>
+  <div class="dos">
+    <table><tr><th>Tipo</th><th style="text-align:right;">Cantidad</th></tr>${porTipo.map(([t, n]) => `<tr><td>${esc(t)}</td><td style="text-align:right;">${n}</td></tr>`).join("")}</table>
+    <table><tr><th>Estado</th><th style="text-align:right;">Cantidad</th></tr>${porEstado.map(([t, n]) => `<tr><td>${esc(t)}</td><td style="text-align:right;">${n}</td></tr>`).join("") || '<tr><td colspan="2">Sin pedidos en el período</td></tr>'}</table>
+  </div>
+  ${gs.length ? `<table style="margin-top:10px;"><tr><th>N°</th><th>Fecha</th><th>Pedido</th><th>Unidad</th><th>Titular</th><th>Estado</th></tr>${gs.slice().sort((a, b) => (a.numero || 0) - (b.numero || 0)).map((g) => `<tr><td>${esc(g.numero || "")}</td><td>${new Date(g.fecha).toLocaleDateString("es-AR")}</td><td>${esc(TIPOS[g.tipo] || g.tipo)}${g.motivo ? " · " + esc((MOTIVOS[g.tipo] || {})[g.motivo] || "") : ""}</td><td>${esc(unidadTxt(g))}</td><td>${esc(g.tipo === "titularidad" ? g.titular + " → " + g.nuevo_titular : g.titular)}</td><td>${esc((ESTADOS[g.estado] || ["?"])[0])}</td></tr>`).join("")}</table>` : ""}
+  <h2>Padrón por unidad</h2>
+  <table><tr><th>Unidad</th><th>Vecino</th><th>Relación</th><th style="text-align:right;">Tags</th><th style="text-align:right;">Controles</th></tr>
+  ${[...unidades.entries()].sort((a, b) => num(a[0]) - num(b[0]) || a[0].localeCompare(b[0], "es", { numeric: true })).map(([u, rs]) => rs.map((r, i) => {
+    const act = (r.llaves || []).filter((l) => l.estado !== "dada_de_baja");
+    return `<tr><td>${i === 0 ? `<b>${esc(u)}</b>` : ""}</td><td>${esc(r.nombre)}</td><td>${esc(rel[r.relacion] || "")}</td><td style="text-align:right;">${act.filter((l) => (l.tipo || "tag") === "tag").length}</td><td style="text-align:right;">${act.filter((l) => l.tipo === "control").length}</td></tr>`;
+  }).join("")).join("") || '<tr><td colspan="5">Todavía no hay vecinos registrados.</td></tr>'}</table>
+  <div class="pie">Los números de las llaves no se incluyen en este reporte por seguridad. Generado desde el portal de administradores de SAT · Seguridad electrónica · www.sat365.com.ar</div>
+</div></body></html>`);
+    w.document.close();
+  });
 
   // ---------- Clave ----------
   function abrirClave() { $("modalClave").classList.remove("oculto"); $("claveStatus").textContent = ""; $("claveActual").focus(); }
@@ -735,7 +953,8 @@
   });
   $("salirBtn").addEventListener("click", salir);
 
-  if (codigoLink) iniciarModoLink();
+  if (codigoReset) { $("pantallaReset").classList.remove("oculto"); }
+  else if (codigoLink) iniciarModoLink();
   else if (pase) iniciarPanel(); else mostrarLogin();
 })();
 </script>

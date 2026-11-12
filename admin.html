@@ -1804,7 +1804,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
         <p class="subtitle" style="margin:6px 0 10px;">Lo que piden los administradores desde <b>pedido.sat365.com.ar/consorcio.html</b> (o sus vecinos con un link): nuevos tags, reemplazos, bajas y cambios de titularidad. Cuando cambiás el estado, al administrador le llega un mail con la nota. Al marcar <b>Hecha</b> se actualiza solo el padrón del edificio.</p>
         <div class="sims-filtros" style="margin-bottom:8px;">
           <input type="text" class="field-input" id="rllGestBuscar" placeholder="Buscar por titular, unidad, N° de llave o administrador...">
-          <select id="rllGestEstado"><option value="abiertas">Pendientes y en curso</option><option value="">Todas</option><option value="hecha">Hechas</option><option value="rechazada">Rechazadas</option></select>
+          <select id="rllGestEstado"><option value="abiertas">Pendientes y en curso</option><option value="">Todas</option><option value="hecha">Hechas</option><option value="rechazada">Rechazadas</option><option value="cancelada">Canceladas</option></select>
           <select id="rllGestEdificio"><option value="">Todos los edificios</option></select>
         </div>
         <p class="status" id="rllGestStatus">Cargando...</p>
@@ -10354,7 +10354,7 @@ document.getElementById("rllConcExcelBtn").addEventListener("click", async () =>
 const RLL_PORTAL_URL = "https://pedido.sat365.com.ar/consorcio.html";
 const RLL_GEST_TIPOS = { nuevo: "Nuevo tag", reemplazo: "Reemplazo de tag", baja: "Baja de tag", titularidad: "Cambio de titularidad" };
 const RLL_GEST_MOTIVOS = { no_funciona: "No funciona", rotura: "Se rompió", desgaste: "Desgaste", extravio: "Extravío", robo: "Robo", ya_no_vive: "Ya no vive / no corresponde", otro: "Otro" };
-const RLL_GEST_ESTADOS = { pendiente: { txt: "Pendiente", color: "#8A5A00", bg: "#FFF1D6" }, en_curso: { txt: "En curso", color: "#2C4E9A", bg: "#E8EEFB" }, hecha: { txt: "Hecha", color: "#1F6B34", bg: "#E6F4EA" }, rechazada: { txt: "Rechazada", color: "#B3261E", bg: "#FDE2E0" } };
+const RLL_GEST_ESTADOS = { pendiente: { txt: "Pendiente", color: "#8A5A00", bg: "#FFF1D6" }, en_curso: { txt: "En curso", color: "#2C4E9A", bg: "#E8EEFB" }, hecha: { txt: "Hecha", color: "#1F6B34", bg: "#E6F4EA" }, rechazada: { txt: "Rechazada", color: "#B3261E", bg: "#FDE2E0" }, cancelada: { txt: "Cancelada por el administrador", color: "#6B7680", bg: "#EEF0F2" } };
 let rllGestiones = [];
 let rllAdmins = [];
 

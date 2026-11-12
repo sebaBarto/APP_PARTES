@@ -160,3 +160,28 @@ test("registro de llaves: foto del número (privada, solo JPEG, sirve en lugar d
   await llamar(manejarAdmin, { method: "POST", body: { accion: "borrar_registro", edificio: "muelle11-k7p3", id: reg.id } }, admin, gh);
   assert.strictEqual(Object.keys(guardadas).length, 0);
 });
+
+test("registro de llaves: si el mismo vecino vuelve a registrarse, se actualiza (no se duplica) y puede pedir copia por mail", async () => {
+  const { _reiniciarTopes } = require("../lib/registro-llaves");
+  _reiniciarTopes();
+  const path = require("path");
+  const enviados = [];
+  process.env.SERVICIOS_API_TOKEN = process.env.SERVICIOS_API_TOKEN || "token-de-prueba";
+  require.cache[path.join(__dirname, "..", "api", "enviar-mail.js")] = { id: "x", loaded: true, exports: async (req, res) => { enviados.push(req.body); res.status(200).json({ ok: true }); } };
+  const gh = ghFalso();
+  const a = await llamar(manejarPublico, { method: "POST", body: { ...valido, nombre: "Ana Pérez", llaves: [{ tag: "069:02561" }] } }, gh);
+  assert.strictEqual(a.data.numero, 1);
+  // Vuelve con otro celular, el nombre sin tilde y una llave más; pide copia.
+  const b = await llamar(manejarPublico, { method: "POST", body: { ...valido, nombre: "ana perez", telefono: "341 600 0000", email: "ana@mail.com", copia: true, llaves: [{ tag: "69,2561", usuario: "125" }, { tag: "070:11111" }] } }, gh);
+  assert.deepStrictEqual([b.data.numero, b.data.actualizado, b.data.copia], [1, true, true]);
+  let regs = JSON.parse(gh.store["registro-llaves/muelle11-k7p3.json"].t);
+  assert.strictEqual(regs.length, 1);
+  assert.deepStrictEqual(regs[0].llaves.map((l) => [l.tag, l.usuario]), [["069:02561", "125"], ["070:11111", ""]]);
+  assert.strictEqual(regs[0].telefono, "341 600 0000");
+  assert.deepStrictEqual(enviados.map((m) => [m.tipo, m.datos.para, m.datos.numero]), [["constancia_registro", "ana@mail.com", 1]]);
+  // Otra persona de la misma unidad que comparte el teléfono: es otra persona.
+  const c = await llamar(manejarPublico, { method: "POST", body: { ...valido, nombre: "Pablo Pérez", telefono: "341 600 0000", llaves: [{ tag: "080:22222" }] } }, gh);
+  assert.deepStrictEqual([c.data.numero, c.data.actualizado], [2, false]);
+  regs = JSON.parse(gh.store["registro-llaves/muelle11-k7p3.json"].t);
+  assert.strictEqual(regs.length, 2);
+});

@@ -200,3 +200,39 @@ test("padrón: al marcar Hecha, las gestiones actualizan solas la lista de llave
   await hecha(g4, { llaves_nuevas: [{ tag: "080:22222" }] });
   assert.strictEqual((await padron()).length, 2);
 });
+
+test("consorcio: olvidé mi clave, cancelar pedido, links en lote y resumen al entrar", async () => {
+  const path = require("path");
+  const enviados = [];
+  process.env.SERVICIOS_API_TOKEN = process.env.SERVICIOS_API_TOKEN || "token-de-prueba";
+  require.cache[path.join(__dirname, "..", "api", "enviar-mail.js")] = { id: "x", loaded: true, exports: async (req, res) => { enviados.push(req.body); res.status(200).json({ ok: true }); } };
+  const { gh, m12, clave } = await preparar();
+  // Olvidé mi clave: misma respuesta exista o no el mail; el link llega por mail y sirve una vez.
+  const r1 = await llamar(consorcio.manejarPortal, { method: "POST", body: { accion: "olvide_clave", email: "nadie@x.com" } }, gh);
+  const r2 = await llamar(consorcio.manejarPortal, { method: "POST", body: { accion: "olvide_clave", email: "CP@admin.com" } }, gh);
+  assert.deepStrictEqual(r1.data, r2.data);
+  const mail = enviados.find((m) => m.tipo === "restablecer_clave");
+  assert.ok(mail && mail.datos.para === "cp@admin.com");
+  const codigo = mail.datos.link.split("?r=")[1];
+  assert.ok(!gh.store["registro-llaves/administradores.json"].t.includes(codigo.split(".")[1]), "el token no se guarda en claro");
+  const nueva = await llamar(consorcio.manejarPortal, { method: "POST", body: { accion: "restablecer_clave", codigo, nueva: "mi-clave-nueva-1" } }, gh);
+  assert.strictEqual(nueva.status, 200);
+  assert.strictEqual((await llamar(consorcio.manejarPortal, { method: "POST", body: { accion: "restablecer_clave", codigo, nueva: "otra-clave-22" } }, gh)).status, 400, "sirve una sola vez");
+  consorcio._reiniciar();
+  assert.strictEqual((await login(gh, "cp@admin.com", clave)).status, 401, "la clave vieja ya no sirve");
+  const { pase } = (await login(gh, "cp@admin.com", "mi-clave-nueva-1")).data;
+  const h = { "x-consorcio": pase };
+  // Cancelar: solo si está pendiente; avisa a SAT.
+  const g = (await llamar(consorcio.manejarPortal, { method: "POST", headers: h, body: { accion: "gestion", edificio: m12, tipo: "nuevo", piso: "1", unidad: "A", titular: "Juan", telefono: "341 555 5555" } }, gh)).data.gestion;
+  enviados.length = 0;
+  assert.strictEqual((await llamar(consorcio.manejarPortal, { method: "POST", headers: h, body: { accion: "cancelar_gestion", edificio: m12, id: g.id, motivo: "Se mudó" } }, gh)).status, 200);
+  assert.ok(enviados[0].datos.cancelado);
+  assert.strictEqual((await llamar(consorcio.manejarPortal, { method: "POST", headers: h, body: { accion: "cancelar_gestion", edificio: m12, id: g.id } }, gh)).status, 409);
+  // Links en lote.
+  const lote = await llamar(consorcio.manejarPortal, { method: "POST", headers: h, body: { accion: "crear_invitacion", edificio: m12, tipo: "nuevo", lote: [{ destinatario: "A", piso: "1", unidad: "A" }, { destinatario: "B", piso: "1", unidad: "B" }, { piso: "2", unidad: "A" }] } }, gh);
+  assert.strictEqual(lote.data.invitaciones.length, 3);
+  assert.strictEqual(new Set(lote.data.invitaciones.map((i) => i.codigo)).size, 3);
+  // Resumen al entrar.
+  const inicio = (await llamar(consorcio.manejarPortal, { method: "GET", headers: h, query: {} }, gh)).data;
+  assert.deepStrictEqual(Object.keys(inicio.edificios[0].resumen).sort(), ["abiertos", "controles", "hechos_30", "personas", "tags", "unidades"]);
+});

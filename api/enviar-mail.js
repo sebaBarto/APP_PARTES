@@ -416,7 +416,7 @@ module.exports = async (req, res) => {
       // si algún día se configura en Vercel, lo reemplaza.
       destinatario = process.env.LLAVES_AVISO_EMAIL || "administracion@sat365.com.ar,edificios@sat365.com.ar";
       const fila = (k, v) => (v ? `<tr><td style="padding:4px 12px 4px 0;color:#6B7680;vertical-align:top;">${escapeHtml(k)}</td><td style="padding:4px 0;"><b>${escapeHtml(v)}</b></td></tr>` : "");
-      asunto = `🔑 Pedido N° ${datos.numero || "?"} — ${datos.tipo_txt || "Gestión de llaves"} — ${datos.edificio || ""}`;
+      asunto = `${datos.cancelado ? "❌ CANCELADO — " : "🔑 "}Pedido N° ${datos.numero || "?"} — ${datos.tipo_txt || "Gestión de llaves"} — ${datos.edificio || ""}`;
       html = envolverDocumento(`
         <h2 style="margin-top:0;">${escapeHtml(datos.tipo_txt || "Nueva gestión de llaves")}${datos.motivo_txt === "Robo" ? " — ⚠ ROBO" : ""}</h2>
         <p style="margin:0 0 12px;color:#6B7680;">${escapeHtml(datos.origen_txt || "")}</p>
@@ -441,6 +441,33 @@ module.exports = async (req, res) => {
         </table>
         <p style="color:#6B7680; font-size:13px;margin-top:16px;">Ya quedó cargado en el panel de administración → Llaves de edificios. Este mail es solo un aviso.</p>
       `);
+    } else if (tipo === "constancia_registro" || tipo === "constancia_pedido" || tipo === "restablecer_clave") {
+      // Mails a vecinos y administradores de consorcio (externos: van por Resend).
+      destinatario = datos.para;
+      if (!destinatario || !esEmailValido(destinatario)) { res.status(400).json({ error: "Falta un mail válido" }); return; }
+      const lista = (xs) => (Array.isArray(xs) && xs.length ? `<ul style="margin:6px 0 12px;padding-left:18px;">${xs.map((x) => `<li>${escapeHtml(x)}</li>`).join("")}</ul>` : "");
+      const pie = `<p style="color:#6B7680;font-size:13px;margin-top:18px;">SAT · Seguridad electrónica · www.sat365.com.ar — Mail automático, no hace falta responderlo.</p>`;
+      if (tipo === "constancia_registro") {
+        asunto = `Tu registro de llaves en ${datos.edificio || ""} — N° ${datos.numero || ""}`;
+        html = `<h2 style="margin-top:0;">¡Listo, ${escapeHtml(datos.nombre || "")}!</h2>
+          <p>${datos.actualizado ? "Actualizamos tu registro" : "Quedó guardado tu registro"} de llaves de acceso de <b>${escapeHtml(datos.edificio || "")}</b>.</p>
+          <p><b>N° de registro:</b> ${escapeHtml(String(datos.numero || ""))}<br><b>Unidad:</b> ${escapeHtml(datos.unidad || "")}</p>
+          <b>Tus llaves y controles:</b>${lista(datos.llaves)}
+          ${(datos.perdidas || []).length ? `<b>Reportaste para dar de baja:</b>${lista(datos.perdidas)}` : ""}
+          <p>Si algo está mal, volvé a escanear el QR del hall y cargalo de nuevo: se actualiza solo.</p>${pie}`;
+      } else if (tipo === "constancia_pedido") {
+        asunto = `Tu pedido de llaves N° ${datos.numero || ""} — ${datos.edificio || ""}`;
+        html = `<h2 style="margin-top:0;">Recibimos tu pedido, ${escapeHtml(datos.nombre || "")}</h2>
+          <p><b>Pedido N° ${escapeHtml(String(datos.numero || ""))}</b> — ${escapeHtml(datos.tipo_txt || "")}<br><b>Edificio:</b> ${escapeHtml(datos.edificio || "")}<br><b>Unidad:</b> ${escapeHtml(datos.unidad || "")}</p>
+          ${lista(datos.detalle)}
+          <p>Lo gestiona SAT. Tu administración (${escapeHtml(datos.administrador || "")}) también lo puede seguir. Si tenés dudas, mencioná el N° de pedido.</p>${pie}`;
+      } else {
+        asunto = "Crear una clave nueva — Portal de administradores SAT";
+        html = `<h2 style="margin-top:0;">Hola ${escapeHtml(datos.nombre || "")}</h2>
+          <p>Pediste crear una clave nueva para el portal de administradores de SAT. Entrá desde este botón (vale por 1 hora y sirve una sola vez):</p>
+          <p><a href="${escapeHtml(datos.link || "")}" style="display:inline-block;background:#F6B828;color:#101820;font-weight:700;padding:12px 20px;border-radius:10px;text-decoration:none;">Crear clave nueva</a></p>
+          <p style="color:#6B7680;font-size:13px;">Si no lo pediste vos, ignorá este mail: tu clave actual sigue funcionando.</p>${pie}`;
+      }
     } else if (tipo === "aviso_gestion") {
       // Aviso al administrador de consorcio (o al vecino del link) de que SAT cambió
       // el estado de su pedido de llaves. Es un mail externo: va por Resend como el del cliente.
@@ -479,7 +506,7 @@ module.exports = async (req, res) => {
     // cuando el origen es una IP externa (Vercel/AWS). Resend tiene
     // buena reputación con Gmail y otros proveedores. El de oficina
     // sigue por SMTP porque es entrega interna (no sale de Ferozo).
-    if ((tipo === "cliente" || tipo === "aviso_gestion") && process.env.RESEND_API_KEY) {
+    if (["cliente", "aviso_gestion", "constancia_registro", "constancia_pedido", "restablecer_clave"].includes(tipo) && process.env.RESEND_API_KEY) {
       const resendRes = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
