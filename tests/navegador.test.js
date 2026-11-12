@@ -7376,7 +7376,7 @@ test("Stock (panel): «¿Dónde está?» busca por nombre, código, etiqueta o N
   const { ctx, page, erroresPagina } = await nuevaPagina();
   await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
   const catalogo = { articulos: { 10012: { c: "10012", d: "BATERÍA 12 V 7 AH", tipo: "cantidad" }, 10013: { c: "10013", d: "BATERÍA 12V 4A", tipo: "cantidad" }, 23940: { c: "23940", d: "INFRARROJO AJAX", tipo: "unidad" } }, proveedores: {} };
-  const saldos = { inicializado: "2026-10-01", ubic: { dep: { 10012: 14, 23940: 1 }, "tec:Juan": { 10012: 3, 23940: 2 }, "tec:Luis": { 10012: 1 }, "veh:Kangoo gris": { 10012: 5 }, "cam:Pedro": { 10012: 2 }, "com:Kiosco Pérez": { 10012: 1 }, "cli:Bar Sol": { 23940: 1 } },
+  const saldos = { inicializado: "2026-10-01", ubic: { dep: { 10012: 14, 23940: 1 }, dcm: { 10012: 3 }, "tec:Juan": { 10012: 3, 23940: 2 }, "tec:Luis": { 10012: 1 }, "veh:Kangoo gris": { 10012: 5 }, "cam:Pedro": { 10012: 2 }, "com:Kiosco Pérez": { 10012: 1 }, "cli:Bar Sol": { 23940: 1 } },
     unidades: { GH1: { c: "23940", u: "tec:Juan" }, GH2: { c: "23940", u: "tec:Juan" }, GH3: { c: "23940", u: "dep" }, GH4: { c: "23940", u: "cli:Bar Sol" } }, pedidos: {} };
   await page.route("**/api/**", (route) => {
     const u = route.request().url(), j = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
@@ -7391,9 +7391,9 @@ test("Stock (panel): «¿Dónde está?» busca por nombre, código, etiqueta o N
   await page.fill("#stkDondeBuscar", "bateria 12v 7a");
   await page.waitForSelector(".stk-donde-res");
   const filas = await page.$$eval(".stk-donde-fila", (l) => l.map((x) => x.querySelector(".sdf-nom").textContent + "=" + x.querySelector(".sdf-n").textContent));
-  assert.deepStrictEqual(filas, ["Depósito=14", "Juan=3", "Luis=1", "Kangoo gris=5", "En camino a Pedro=2", "Kiosco Pérez=1"]);
-  assert.match(await page.textContent(".sdr-total"), /25\s*en poder de SAT/);
-  assert.deepStrictEqual(await page.$$eval(".sdg-tit", (l) => l.map((x) => x.textContent)), ["Depósito14", "Técnicos4", "Vehículos5", "En camino2", "Comodato en clientes1"]);
+  assert.deepStrictEqual(filas, ["Nuevo=14", "Comodato (usados o reparados)=3", "Juan=3", "Luis=1", "Kangoo gris=5", "En camino a Pedro=2", "Kiosco Pérez=1"]);
+  assert.match(await page.textContent(".sdr-total"), /28\s*en poder de SAT\s*Depósito: 14 nuevos · 3 comodato/);
+  assert.deepStrictEqual(await page.$$eval(".sdg-tit", (l) => l.map((x) => x.textContent)), ["Depósito17", "Técnicos4", "Vehículos5", "En camino2", "Comodato en clientes1"]);
   if (process.env.FOTO) { await page.waitForTimeout(500); await page.locator(".stk-donde-caja").screenshot({ path: process.env.FOTO }); }
   // Varias coincidencias: elige de la lista
   await page.fill("#stkDondeBuscar", "bateria 12");

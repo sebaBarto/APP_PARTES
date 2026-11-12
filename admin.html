@@ -487,7 +487,7 @@
 @keyframes sdrEntra { from { opacity: 0; transform: translateY(6px); } }
 .sdr-cab { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
 .sdr-cab b { font-size: 16px; } .sdr-cab small { display: block; color: var(--steel); margin-top: 2px; }
-.sdr-total { text-align: right; } .sdr-total b { font-size: 26px; line-height: 1; display: block; color: var(--amber); }
+.sdr-total { text-align: right; } .sdr-total .sdr-dep { display: block; margin-top: 4px; } .sdr-total b { font-size: 26px; line-height: 1; display: block; color: var(--amber); }
 .stk-donde-grupo { margin-top: 12px; }
 .sdg-tit { display: flex; justify-content: space-between; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--steel); font-weight: 700; margin-bottom: 4px; }
 .stk-donde-fila { display: grid; grid-template-columns: minmax(120px, 1.2fr) 2fr auto; align-items: center; gap: 4px 10px; padding: 7px 10px; border-radius: var(--r-sm); background: var(--paper); margin-bottom: 4px; }
@@ -1369,7 +1369,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
           <div class="field-row" style="flex-wrap:wrap;align-items:flex-end;">
             <div style="flex:2 1 220px;"><label>Buscar</label><input type="text" class="field-input" id="stkBuscar" placeholder="Código o parte de la descripción"></div>
             <div><label>Mostrar</label><select id="stkFiltro" style="min-width:190px;"><option value="constock">Con stock</option><option value="bajo">En el mínimo o por debajo</option><option value="sinmin">Con stock y sin mínimo</option><option value="sinstock">Sin stock</option><option value="baja">Deshabilitados en Oficina</option><option value="todos">Todos</option></select></div>
-            <div><label>Dónde</label><select id="stkDonde" style="min-width:170px;"><option value="">En cualquier lado</option><option value="dep">En el depósito</option><option value="dcm">En el depósito de comodatos</option><option value="tec">En técnicos</option><option value="veh">En vehículos</option><option value="cam">En camino</option><option value="cli">En clientes (instalado)</option><option value="com">En comodato</option></select></div>
+            <div><label>Dónde</label><select id="stkDonde" style="min-width:170px;"><option value="">En cualquier lado</option><option value="dep">En el depósito nuevo</option><option value="dcm">En el depósito comodato</option><option value="tec">En técnicos</option><option value="veh">En vehículos</option><option value="cam">En camino</option><option value="cli">En clientes (instalado)</option><option value="com">En comodato</option></select></div>
             <div><label>Marca</label><select id="stkMarca" style="min-width:140px;"><option value="">Todas</option></select></div>
             <div><label>Proveedor</label><select id="stkProv" style="min-width:150px;"><option value="">Todos</option></select></div>
             <button type="button" class="btn-secondary-admin" id="stkExcelBtn" style="width:auto;"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg> Excel</button>
@@ -6509,7 +6509,9 @@ let stkLimite = 200;
 const stkFmt = (n) => (Number(n) || 0).toLocaleString("es-AR", { maximumFractionDigits: 3 });
 // Número escrito a mano: "12", "3,5", "1.250". Devuelve NaN si no es un número.
 const stkNum = (v) => { const t = String(v == null ? "" : v).trim(); return /^-?[\d.,\s]+$/.test(t) && /\d/.test(t) ? numStock(t) : NaN; };
-const stkUbicTexto = (detalle) => Object.entries(detalle || {}).filter(([, n]) => n).map(([u, n]) => `${nombreUbicacion(u)}: ${stkFmt(n)}`).join(" · ");
+// En el panel, los dos depósitos con nombre claro: «Depósito nuevo» y «Depósito comodato».
+const stkLugar = (u) => (u === "dep" ? "Depósito nuevo" : u === "dcm" ? "Depósito comodato" : nombreUbicacion(u));
+const stkUbicTexto = (detalle) => Object.entries(detalle || {}).filter(([, n]) => n).map(([u, n]) => `${stkLugar(u)}: ${stkFmt(n)}`).join(" · ");
 
 async function stkPost(cuerpo) {
   const r = await fetch("/api/datos?coleccion=stock", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify(cuerpo) });
@@ -6691,7 +6693,7 @@ function stkRenderArticulos() {
   if (!filas.length) { cont.innerHTML = `<p class="subtitle">${Object.keys(stk.catalogo.articulos || {}).length ? "No hay artículos con ese filtro." : "Todavía no hay catálogo."}</p>`; return; }
   const opTipo = (t) => Object.entries(STOCK_TIPOS).map(([k, v]) => `<option value="${k}" ${k === t ? "selected" : ""}>${escapeHtmlAdmin(v)}</option>`).join("");
   cont.innerHTML = `<p class="subtitle" style="margin:8px 0;">${filas.length.toLocaleString("es-AR")} artículos.</p>
-    <div style="overflow-x:auto;"><table class="sims-tabla stk-tabla"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Depósito</th><th class="num">Dep. comodatos</th><th class="num">Técnicos / vehículos</th><th class="num">Clientes</th><th>Cómo se controla</th><th class="num">Mínimo</th><th class="num">A pedir</th><th>Marca</th><th>Proveedor</th><th></th></tr></thead><tbody>
+    <div style="overflow-x:auto;"><table class="sims-tabla stk-tabla"><thead><tr><th>Código</th><th>Descripción</th><th class="num">Dep. nuevo</th><th class="num">Dep. comodato</th><th class="num">Técnicos / vehículos</th><th class="num">Clientes</th><th>Cómo se controla</th><th class="num">Mínimo</th><th class="num">A pedir</th><th>Marca</th><th>Proveedor</th><th></th></tr></thead><tbody>
     ${filas.slice(0, stkLimite).map(({ a, t }) => {
       const bajo = Number(a.min) > 0 && t.dep <= Number(a.min);
       const med = a.medida === "metros" ? " m" : "";
@@ -6699,7 +6701,7 @@ function stkRenderArticulos() {
         <td>${escapeHtmlAdmin(a.c)}</td>
         <td>${escapeHtmlAdmin(a.d)}${a.baja ? ' <span class="stk-tag">Deshabilitado</span>' : ""}${bajo ? ' <span class="stk-tag bajo">Para pedir</span>' : ""}${stkUbicTexto(t.detalle) ? `<div class="stk-det">${escapeHtmlAdmin(stkUbicTexto(t.detalle))}</div>` : ""}</td>
         <td class="num"><b>${stkFmt(t.dep)}</b>${med}</td>
-        <td class="num">${stkFmt(t.dcm || 0)}</td>
+        <td class="num"><b>${stkFmt(t.dcm || 0)}</b></td>
         <td class="num">${stkFmt(t.tec + t.veh + t.cam)}</td>
         <td class="num">${stkFmt(t.com + t.cli)}</td>
         <td><select class="stk-tipo" data-campo="tipo">${opTipo(a.tipo)}</select></td>
@@ -6707,7 +6709,7 @@ function stkRenderArticulos() {
         <td class="num"><input class="stk-min" data-campo="pedir" inputmode="decimal" value="${a.pedir == null ? "" : escapeHtmlAdmin(String(a.pedir))}"></td>
         <td><input class="field-input" data-campo="marca" list="stkMarcasLista" style="padding:4px 6px;min-width:100px;" value="${escapeHtmlAdmin(a.marca || "")}"></td>
         <td><input class="field-input" data-campo="prov" list="stkProvLista" style="padding:4px 6px;min-width:120px;" value="${escapeHtmlAdmin(a.prov || "")}"></td>
-        <td class="stk-btns"><button type="button" class="btn-secondary-admin" data-ajustar>Ajustar</button></td></tr>`;
+        <td class="stk-btns"><button type="button" class="btn-secondary-admin" data-ajustar="dep">Ajustar nuevo</button><button type="button" class="btn-secondary-admin" data-ajustar="dcm">Ajustar comodato</button></td></tr>`;
     }).join("")}</tbody></table></div>
     ${filas.length > stkLimite ? `<button type="button" class="btn-secondary-admin" id="stkMasBtn" style="width:auto;margin-top:10px;">Mostrar ${Math.min(200, filas.length - stkLimite)} más</button>` : ""}`;
   const mas = document.getElementById("stkMasBtn");
@@ -6725,14 +6727,14 @@ function stkRenderArticulos() {
     } catch (err) { avisoAdmin("No se pudo guardar: " + err.message, "err"); }
     el.disabled = false;
   }));
-  cont.querySelectorAll("[data-ajustar]").forEach((b) => b.addEventListener("click", () => stkAjustarDialogo(b.closest("tr").dataset.c, "dep")));
+  cont.querySelectorAll("[data-ajustar]").forEach((b) => b.addEventListener("click", () => stkAjustarDialogo(b.closest("tr").dataset.c, b.dataset.ajustar || "dep")));
 }
 document.getElementById("stkBuscar").addEventListener("input", () => { stkLimite = 200; stkRenderArticulos(); });
 ["stkFiltro", "stkDonde", "stkProv", "stkMarca"].forEach((id) => document.getElementById(id).addEventListener("change", () => { stkLimite = 200; stkRenderArticulos(); }));
 async function stkAjustarDialogo(c, ubic) {
   const a = stk.catalogo.articulos[c] || { d: c };
   const actual = ((stk.saldos.ubic || {})[ubic] || {})[c] || 0;
-  const v = await pedirTextoAdmin(`${a.d}\n${nombreUbicacion(ubic)}: hoy la APP tiene ${stkFmt(actual)}.\n¿Cuántos hay realmente?`, String(actual));
+  const v = await pedirTextoAdmin(`${a.d}\n${stkLugar(ubic)}: hoy la APP tiene ${stkFmt(actual)}.\n¿Cuántos hay realmente?`, String(actual));
   if (v == null || String(v).trim() === "") return;
   const cant = stkNum(v);
   if (!(cant >= 0)) { avisoAdmin("Poné un número igual o mayor a 0.", "err"); return; }
@@ -6744,7 +6746,7 @@ async function stkAjustarDialogo(c, ubic) {
     await stkLeer();
     const ahora = ((stk.saldos.ubic || {})[ubic] || {})[c] || 0;
     if (ahora !== cant) throw new Error(`después de guardar quedó en ${stkFmt(ahora)}`);
-    avisoAdmin(`Ajustado: ${a.d} — ${nombreUbicacion(ubic)} ${stkFmt(actual)} → ${stkFmt(cant)}.`, "ok");
+    avisoAdmin(`Ajustado: ${a.d} — ${stkLugar(ubic)} ${stkFmt(actual)} → ${stkFmt(cant)}.`, "ok");
   } catch (err) { avisoAdmin("No se pudo ajustar: " + err.message, "err"); }
   stkMostrarVista();
 }
@@ -6932,7 +6934,7 @@ function stkRenderMarcas() {
 document.getElementById("stkMarcasBuscar").addEventListener("input", () => stkRenderMarcas());
 document.getElementById("stkExcelBtn").addEventListener("click", () => {
   if (!stk) return;
-  const filas = stkFiltrados().map(({ a, t }) => ({ Código: a.c, Descripción: a.d, "Cómo se controla": STOCK_TIPOS[a.tipo] || a.tipo, Unidad: a.medida || "unidades", Depósito: t.dep, "Técnicos": t.tec, "Vehículos": t.veh, "En camino": t.cam, "Comodato": t.com, "Instalado en clientes": t.cli, "Stock mínimo": a.min ?? "", "Cantidad a pedir": a.pedir ?? "", Marca: a.marca || "", Proveedor: a.prov || "", "Dónde está": stkUbicTexto(t.detalle) }));
+  const filas = stkFiltrados().map(({ a, t }) => ({ Código: a.c, Descripción: a.d, "Cómo se controla": STOCK_TIPOS[a.tipo] || a.tipo, Unidad: a.medida || "unidades", "Depósito nuevo": t.dep, "Depósito comodato": t.dcm || 0, "Técnicos": t.tec, "Vehículos": t.veh, "En camino": t.cam, "Comodato": t.com, "Instalado en clientes": t.cli, "Stock mínimo": a.min ?? "", "Cantidad a pedir": a.pedir ?? "", Marca: a.marca || "", Proveedor: a.prov || "", "Dónde está": stkUbicTexto(t.detalle) }));
   const libro = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filas), "Stock");
   XLSX.writeFile(libro, `stock_${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -6975,7 +6977,7 @@ async function stkRenderConciliacion(registrar) {
     const of = it.of || {}, t = it.t || {};
     let oficina = "", app = "", dif = "";
     if (cat.k === "comodatoDistinto") { oficina = stkFmt(of.com); app = stkFmt(t.dcm || 0); dif = it.dif; }
-    else if (cat.k === "negativo") { oficina = "—"; app = `${escapeHtmlAdmin(nombreUbicacion(it.u))}: ${stkFmt(it.n)}`; }
+    else if (cat.k === "negativo") { oficina = "—"; app = `${escapeHtmlAdmin(stkLugar(it.u))}: ${stkFmt(it.n)}`; }
     else if (cat.k === "unidadesSinRegistrar") { oficina = stkFmt(of.dep); app = `${stkFmt(t.sat)} (${it.registradas} con N° de serie)`; }
     else { oficina = stkFmt(of.dep); app = stkFmt(t.sat); dif = it.dif != null ? it.dif : (t.sat || 0) - (of.dep || 0); }
     const difTxt = dif === "" ? "" : `<b style="color:${dif > 0 ? "#8A5A00" : "#B3261E"}">${dif > 0 ? "+" : ""}${stkFmt(dif)}</b>`;
@@ -7195,13 +7197,13 @@ function stkRenderMovimientos() {
   const cont = document.getElementById("stkMovLista"), lista = stkMovFiltrados();
   cont.innerHTML = !lista.length ? '<p class="subtitle">No hay movimientos en ese mes.</p>'
     : `<p class="subtitle" style="margin:8px 0;">${lista.length} movimientos.</p><div style="overflow-x:auto;"><table class="sims-tabla stk-tabla"><thead><tr><th>Fecha</th><th>Tipo</th><th>Artículo</th><th class="num">Cantidad</th><th>De → A</th><th>Por</th><th>Motivo</th></tr></thead><tbody>
-      ${lista.slice(0, 500).map((m) => `<tr><td>${escapeHtmlAdmin(new Date(m.fecha).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }))}${m.oficina ? '<div class="stk-det"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg> En Oficina</div>' : ""}</td><td>${escapeHtmlAdmin(STK_MOV_TIPO[m.tipo] || m.tipo)}</td><td>${escapeHtmlAdmin(m.c)} ${escapeHtmlAdmin(m.d)}${m.prov ? `<div class="stk-det">${escapeHtmlAdmin(nombreProveedor(stk.catalogo, m.prov) || "Proveedor " + m.prov)}</div>` : ""}</td><td class="num">${stkFmt(m.cant)}</td><td>${escapeHtmlAdmin(m.de ? nombreUbicacion(m.de) : "—")} → ${escapeHtmlAdmin(m.a ? nombreUbicacion(m.a) : "—")}</td><td>${escapeHtmlAdmin(m.por || "")}</td><td>${m.presupuesto ? `<b>Presupuesto N° ${escapeHtmlAdmin(m.presupuesto)}</b> ` : ""}${escapeHtmlAdmin(m.motivo || "")}${m.unidades && m.unidades.length ? `<div class="stk-det">${m.unidades.map(escapeHtmlAdmin).join(" · ")}</div>` : ""}${m.antes != null ? `<div class="stk-det">${stkFmt(m.antes)} → ${stkFmt(m.despues)}</div>` : ""}</td></tr>`).join("")}</tbody></table></div>`;
+      ${lista.slice(0, 500).map((m) => `<tr><td>${escapeHtmlAdmin(new Date(m.fecha).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }))}${m.oficina ? '<div class="stk-det"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg> En Oficina</div>' : ""}</td><td>${escapeHtmlAdmin(STK_MOV_TIPO[m.tipo] || m.tipo)}</td><td>${escapeHtmlAdmin(m.c)} ${escapeHtmlAdmin(m.d)}${m.prov ? `<div class="stk-det">${escapeHtmlAdmin(nombreProveedor(stk.catalogo, m.prov) || "Proveedor " + m.prov)}</div>` : ""}</td><td class="num">${stkFmt(m.cant)}</td><td>${escapeHtmlAdmin(m.de ? stkLugar(m.de) : "—")} → ${escapeHtmlAdmin(m.a ? stkLugar(m.a) : "—")}</td><td>${escapeHtmlAdmin(m.por || "")}</td><td>${m.presupuesto ? `<b>Presupuesto N° ${escapeHtmlAdmin(m.presupuesto)}</b> ` : ""}${escapeHtmlAdmin(m.motivo || "")}${m.unidades && m.unidades.length ? `<div class="stk-det">${m.unidades.map(escapeHtmlAdmin).join(" · ")}</div>` : ""}${m.antes != null ? `<div class="stk-det">${stkFmt(m.antes)} → ${stkFmt(m.despues)}</div>` : ""}</td></tr>`).join("")}</tbody></table></div>`;
 }
 document.getElementById("stkMovMes").addEventListener("change", stkCargarMovimientos);
 document.getElementById("stkMovBuscar").addEventListener("input", stkRenderMovimientos);
 document.getElementById("stkMovTipo").addEventListener("change", stkRenderMovimientos);
 document.getElementById("stkMovExcelBtn").addEventListener("click", () => {
-  const filas = stkMovFiltrados().map((m) => ({ Fecha: new Date(m.fecha).toLocaleString("es-AR"), Tipo: STK_MOV_TIPO[m.tipo] || m.tipo, Código: m.c, Descripción: m.d, Cantidad: m.cant, De: m.de ? nombreUbicacion(m.de) : "", A: m.a ? nombreUbicacion(m.a) : "", Por: m.por || "", Presupuesto: m.presupuesto || "", Proveedor: m.prov ? nombreProveedor(stk.catalogo, m.prov) || m.prov : "", "N° de serie": (m.unidades || []).join(", "), Motivo: m.motivo || "", "Pasado a Oficina": m.oficina ? new Date(m.oficina).toLocaleDateString("es-AR") : "" }));
+  const filas = stkMovFiltrados().map((m) => ({ Fecha: new Date(m.fecha).toLocaleString("es-AR"), Tipo: STK_MOV_TIPO[m.tipo] || m.tipo, Código: m.c, Descripción: m.d, Cantidad: m.cant, De: m.de ? stkLugar(m.de) : "", A: m.a ? stkLugar(m.a) : "", Por: m.por || "", Presupuesto: m.presupuesto || "", Proveedor: m.prov ? nombreProveedor(stk.catalogo, m.prov) || m.prov : "", "N° de serie": (m.unidades || []).join(", "), Motivo: m.motivo || "", "Pasado a Oficina": m.oficina ? new Date(m.oficina).toLocaleDateString("es-AR") : "" }));
   const libro = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filas.length ? filas : [{ Fecha: "Sin movimientos" }]), "Movimientos");
   XLSX.writeFile(libro, `stock_movimientos_${document.getElementById("stkMovMes").value}.xlsx`);
@@ -7363,7 +7365,7 @@ async function stkBajaSerie(t) {
     const r = await stkPost({ accion: "baja_serie", serie: t, motivo: motivo.trim() });
     await stkLeer();
     const u = (stk.saldos.unidades || {})[t] || {};
-    avisoAdmin(u.u === "baja" ? `Listo: ${t} dado de baja (estaba en ${nombreUbicacion(r.de)}).` : "Ojo: después de guardar no quedó dado de baja.", u.u === "baja" ? "ok" : "err");
+    avisoAdmin(u.u === "baja" ? `Listo: ${t} dado de baja (estaba en ${stkLugar(r.de)}).` : "Ojo: después de guardar no quedó dado de baja.", u.u === "baja" ? "ok" : "err");
   } catch (err) { avisoAdmin("No se pudo: " + err.message, "err"); }
   stkMostrarVista();
 }
@@ -7410,10 +7412,10 @@ function stkFichaSerie() {
   const a = (stk.catalogo.articulos || {})[u.c] || {}, inst = instalacionDeUnidad(u);
   cont.innerHTML = `<div class="sims-resumen" style="display:block;margin:12px 0;padding:12px;border:1px solid #D6D9DC;border-radius:10px;">
     <b style="font-family:'IBM Plex Mono',monospace;">${escapeHtmlAdmin(t)}</b>${infoSerie(t, u) ? ` <span class="stk-det">(${escapeHtmlAdmin(infoSerie(t, u))})</span>` : ""} · ${escapeHtmlAdmin(u.c)} ${escapeHtmlAdmin(a.d || "")}${u.prov ? ` · ${escapeHtmlAdmin(nombreProveedor(stk.catalogo, u.prov) || "Proveedor " + u.prov)}` : ""}<br>
-    Ahora: <b>${escapeHtmlAdmin(nombreUbicacion(u.u))}</b>${inst ? ` · ${inst.fecha ? "Instalado en" : "Retirado de"} <b>${escapeHtmlAdmin(inst.cliente)}</b> el ${escapeHtmlAdmin(stkFecha(inst.fecha || inst.retirado))}${inst.presupuesto ? ` (presupuesto ${escapeHtmlAdmin(inst.presupuesto)})` : ""}` : ""}
+    Ahora: <b>${escapeHtmlAdmin(stkLugar(u.u))}</b>${inst ? ` · ${inst.fecha ? "Instalado en" : "Retirado de"} <b>${escapeHtmlAdmin(inst.cliente)}</b> el ${escapeHtmlAdmin(stkFecha(inst.fecha || inst.retirado))}${inst.presupuesto ? ` (presupuesto ${escapeHtmlAdmin(inst.presupuesto)})` : ""}` : ""}
     ${u.garantia ? `<br>Garantía: ${escapeHtmlAdmin(GARANTIA_ESTADOS[u.garantia.estado] || "")}${u.garantia.falla ? " · " + escapeHtmlAdmin(u.garantia.falla) : ""}` : ""}${u.reemplaza ? `<br>Reemplaza en garantía a ${escapeHtmlAdmin(u.reemplaza)}` : ""}
     ${u.u !== "baja" && !/^cam:/.test(u.u || "") ? `<br><button type="button" class="btn-secondary-admin" id="stkFichaBajaBtn" style="width:auto;margin-top:6px;">Dar de baja este equipo</button>` : ""}
-    ${(u.h || []).length ? `<div class="stk-det" style="margin-top:8px;">${u.h.slice().reverse().map((x) => `${escapeHtmlAdmin(stkFecha(x.f))}: ${escapeHtmlAdmin(x.de ? nombreUbicacion(x.de) + " → " : "")}${escapeHtmlAdmin(nombreUbicacion(x.a))}${x.presupuesto ? ` · presup. ${escapeHtmlAdmin(x.presupuesto)}` : ""}${x.por ? ` · ${escapeHtmlAdmin(x.por)}` : ""}${x.motivo ? ` · ${escapeHtmlAdmin(x.motivo)}` : ""}`).join("<br>")}</div>` : ""}</div>`;
+    ${(u.h || []).length ? `<div class="stk-det" style="margin-top:8px;">${u.h.slice().reverse().map((x) => `${escapeHtmlAdmin(stkFecha(x.f))}: ${escapeHtmlAdmin(x.de ? stkLugar(x.de) + " → " : "")}${escapeHtmlAdmin(stkLugar(x.a))}${x.presupuesto ? ` · presup. ${escapeHtmlAdmin(x.presupuesto)}` : ""}${x.por ? ` · ${escapeHtmlAdmin(x.por)}` : ""}${x.motivo ? ` · ${escapeHtmlAdmin(x.motivo)}` : ""}`).join("<br>")}</div>` : ""}</div>`;
 }
 document.getElementById("stkGarBuscar").addEventListener("input", stkFichaSerie);
 document.getElementById("stkGarFicha").addEventListener("click", (e) => { if (e.target && e.target.id === "stkFichaBajaBtn") stkBajaSerie(document.getElementById("stkGarFicha").dataset.serie); });
@@ -7449,21 +7451,22 @@ function stkDondePintar(a, extra) {
   const det = (totalesPorArticulo(stk.saldos)[a.c] || { detalle: {} }).detalle, med = a.medida || "unidades", esU = a.tipo === "unidad";
   const unidades = Object.entries(stk.saldos.unidades || {}).filter(([, x]) => x && x.c === a.c);
   const seriesDe = (u) => unidades.filter(([, x]) => x.u === u).map(([t]) => t);
-  const nombre = (u) => u === "dep" ? "Depósito" : u === "dcm" ? "Depósito de comodatos" : /^tec:/.test(u) ? u.slice(4) : /^veh:/.test(u) ? u.slice(4) : /^cam:dev:/.test(u) ? `Volviendo de ${u.slice(8)}` : /^cam:/.test(u) ? `En camino a ${u.slice(4)}` : u === "gar" ? "En garantía (proveedor)" : /^(cli|com):/.test(u) ? u.slice(4) : nombreUbicacion(u);
-  const GRUPOS = [["dep", "Depósito", (u) => u === "dep"], ["dcm", "Depósito de comodatos", (u) => u === "dcm"], ["tec", "Técnicos", (u) => /^tec:/.test(u)], ["veh", "Vehículos", (u) => /^veh:/.test(u)], ["cam", "En camino", (u) => /^cam:/.test(u)], ["gar", "Garantía", (u) => u === "gar"], ["com", "Comodato en clientes", (u) => /^com:/.test(u)], ["cli", "Instalado en clientes", (u) => /^cli:/.test(u)]];
+  // Dentro del grupo «Depósito», cada uno con su nombre: nuevo o comodato (usados o reparados).
+  const nombre = (u) => u === "dep" ? "Nuevo" : u === "dcm" ? "Comodato (usados o reparados)" : /^tec:/.test(u) ? u.slice(4) : /^veh:/.test(u) ? u.slice(4) : /^cam:dev:/.test(u) ? `Volviendo de ${u.slice(8)}` : /^cam:/.test(u) ? `En camino a ${u.slice(4)}` : u === "gar" ? "En garantía (proveedor)" : /^(cli|com):/.test(u) ? u.slice(4) : stkLugar(u);
+  const GRUPOS = [["dep", "Depósito", (u) => u === "dep" || u === "dcm"], ["tec", "Técnicos", (u) => /^tec:/.test(u)], ["veh", "Vehículos", (u) => /^veh:/.test(u)], ["cam", "En camino", (u) => /^cam:/.test(u)], ["gar", "Garantía", (u) => u === "gar"], ["com", "Comodato en clientes", (u) => /^com:/.test(u)], ["cli", "Instalado en clientes", (u) => /^cli:/.test(u)]];
   const ubics = Object.entries(det).filter(([, n]) => n);
   const sat = ubics.filter(([u]) => !/^(cli|com):/.test(u)).reduce((t, [, n]) => t + n, 0);
   const max = Math.max(1, ...ubics.filter(([u]) => !/^(cli|com):/.test(u)).map(([, n]) => n));
   const filaHtml = (u, n) => { const sers = esU ? seriesDe(u) : []; return `<div class="stk-donde-fila${extra && extra.unidad && extra.unidad.u === u ? " marcada" : ""}"><span class="sdf-nom">${escapeHtmlAdmin(nombre(u))}</span><span class="sdf-bar"><i style="width:${/^(cli|com):/.test(u) ? 0 : Math.max(4, (n / max) * 100)}%"></i></span><b class="sdf-n">${stkFmt(n)}</b>${sers.length ? `<div class="sdf-series">${sers.map((t) => `<code${extra && extra.serie === t ? ' class="marcada"' : ""}>${escapeHtmlAdmin(t)}</code>`).join("")}</div>` : ""}</div>`; };
   const bloques = GRUPOS.map(([k, tit, f]) => {
-    const filas = ubics.filter(([u]) => f(u)).sort((x, y) => y[1] - x[1]);
+    const filas = ubics.filter(([u]) => f(u)).sort((x, y) => (k === "dep" ? (x[0] === "dep" ? -1 : 1) : y[1] - x[1]));
     if (!filas.length) return "";
     const suma = filas.reduce((t, [, n]) => t + n, 0), muchos = /^(com|cli)$/.test(k) && filas.length > 6;
     return `<div class="stk-donde-grupo g-${k}"><div class="sdg-tit">${tit}<span>${stkFmt(suma)}</span></div>${muchos ? `<details><summary>${filas.length} clientes</summary>${filas.map(([u, n]) => filaHtml(u, n)).join("")}</details>` : filas.map(([u, n]) => filaHtml(u, n)).join("")}</div>`;
   }).join("");
   const baja = esU && extra && extra.unidad && extra.unidad.u === "baja";
   cont.innerHTML = `<div class="stk-donde-res">
-    <div class="sdr-cab"><div><b>${escapeHtmlAdmin(a.d || a.c)}</b><small>Código ${escapeHtmlAdmin(a.c)} · ${escapeHtmlAdmin(med)}${extra && extra.serie ? ` · N° ${escapeHtmlAdmin(extra.serie)}: <b>${escapeHtmlAdmin(baja ? "dado de baja" : nombre(extra.unidad.u))}</b>` : ""}</small></div><div class="sdr-total"><b>${stkFmt(sat)}</b><small>en poder de SAT</small></div></div>
+    <div class="sdr-cab"><div><b>${escapeHtmlAdmin(a.d || a.c)}</b><small>Código ${escapeHtmlAdmin(a.c)} · ${escapeHtmlAdmin(med)}${extra && extra.serie ? ` · N° ${escapeHtmlAdmin(extra.serie)}: <b>${escapeHtmlAdmin(baja ? "dado de baja" : /^(dep|dcm)$/.test(extra.unidad.u) ? stkLugar(extra.unidad.u) : nombre(extra.unidad.u))}</b>` : ""}</small></div><div class="sdr-total"><b>${stkFmt(sat)}</b><small>en poder de SAT</small>${det.dep || det.dcm ? `<small class="sdr-dep">Depósito: ${stkFmt(det.dep || 0)} nuevo${det.dep === 1 ? "" : "s"} · ${stkFmt(det.dcm || 0)} comodato</small>` : ""}</div></div>
     ${bloques || '<p class="stk-det" style="margin:8px 0 0;">No hay en ningún lado: está en 0.</p>'}
   </div>`;
 }
@@ -7477,7 +7480,7 @@ function stkDondePintar(a, extra) {
     if (r.exacto || r.lista.length === 1) { sug.classList.add("hidden"); stkDondePintar(r.lista[0], r); return; }
     res.innerHTML = r.lista.length ? "" : '<p class="stk-det" style="margin:8px 0 0;">No encontré ese artículo.</p>';
     const tot = totalesPorArticulo(stk.saldos);
-    sug.innerHTML = r.lista.slice(0, 12).map((a) => `<button type="button" data-c="${escapeHtmlAdmin(a.c)}"><span>${escapeHtmlAdmin(a.d)}</span><small>${escapeHtmlAdmin(a.c)} · ${stkFmt((tot[a.c] || {}).sat || 0)}</small></button>`).join("") + (r.lista.length > 12 ? `<div class="stk-det" style="padding:6px 10px;">y ${r.lista.length - 12} más: escribí algo más preciso</div>` : "");
+    sug.innerHTML = r.lista.slice(0, 12).map((a) => `<button type="button" data-c="${escapeHtmlAdmin(a.c)}"><span>${escapeHtmlAdmin(a.d)}</span><small>${escapeHtmlAdmin(a.c)} · ${stkFmt((tot[a.c] || {}).sat || 0)}${(tot[a.c] || {}).dep || (tot[a.c] || {}).dcm ? ` · depósito: ${stkFmt((tot[a.c] || {}).dep || 0)} nuevo · ${stkFmt((tot[a.c] || {}).dcm || 0)} comodato` : ""}</small></button>`).join("") + (r.lista.length > 12 ? `<div class="stk-det" style="padding:6px 10px;">y ${r.lista.length - 12} más: escribí algo más preciso</div>` : "");
     sug.classList.toggle("hidden", !r.lista.length);
   };
   inp.addEventListener("input", () => { clearTimeout(t); t = setTimeout(buscar, 150); });
