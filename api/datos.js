@@ -2200,6 +2200,12 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
     res.status(200).json({ ok: true });
     return;
   }
+  // QR del hall de cada edificio: el vecino registra sus datos y su llave
+  // electrónica, sin login (ver lib/registro-llaves.js).
+  if (req.query && req.query.publico === "registro_llaves") {
+    await require("../lib/registro-llaves").manejarPublico(req, res, { leer: leerArchivoDatos, escribir: escribirArchivoDatos });
+    return;
+  }
   if (req.method === "POST" && req.query && req.query.publico === "solicitud_emergencia") {
     let body = req.body;
     if (typeof body === "string") { try { body = JSON.parse(body); } catch (e) { body = {}; } }
@@ -2305,6 +2311,11 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
   }
   // El registro de cambios solo lo ve la oficina, y nadie lo escribe a mano.
   // ---------- Presupuesto express: lista de precios y numeración ----------
+  if (req.query && req.query.coleccion === "registro_llaves") {
+    if (!autorizacion) { res.status(401).json({ error: "No autorizado", sesion_vencida: true }); return; }
+    await require("../lib/registro-llaves").manejarAdmin(req, res, autorizacion, { leer: leerArchivoDatos, escribir: escribirArchivoDatos });
+    return;
+  }
   if (req.query && req.query.coleccion === "croquis") {
     if (!autorizacion) { res.status(401).json({ error: "No autorizado", sesion_vencida: true }); return; }
     await manejarCroquis(req, res, autorizacion, cuerpoAccion);

@@ -3183,3 +3183,23 @@ liberar una función (ver más abajo).
   creciendo con el tiempo — para un uso de varios años podría convenir
   archivarlo o rotarlo periódicamente, aunque para el volumen actual de
   la empresa no debería ser un problema en el corto/mediano plazo.
+
+## Registro de llaves por edificio (QR del hall)
+
+Cada edificio tiene un QR que abre `registro-llaves.html?e=<código>`
+(en `pedido.sat365.com.ar`, igual que el formulario de pedir servicio).
+El vecino carga nombre, teléfono, mail, titular/inquilino, vivienda o
+cochera, piso y depto, control remoto de cochera y el número de cada
+llave (más el número de usuario si lo sabe). También puede avisar de
+una llave perdida para darla de baja.
+
+En `admin.html` → Clientes → **Registro de llaves** se ve todo por
+edificio, una fila por llave, para conciliar con la estación de
+monitoreo (Pendiente / Conciliada / Dar de baja / Dada de baja), con
+aviso de números repetidos, Excel y el botón **Cartel QR** que arma la
+hoja A4 lista para imprimir. Desde ahí también se agregan edificios
+nuevos (cada uno con su código y su QR).
+
+Se guarda en el repo de datos (`registro-llaves/`), sin función nueva
+en `/api` (ver `lib/registro-llaves.js`). MUELLE 11 viene precargado
+con el código `muelle11-k7p3`.

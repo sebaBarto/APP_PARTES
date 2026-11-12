@@ -297,6 +297,7 @@
   #tabEncuestasBtn:not(.active) .tab-icon { color: var(--acc-lime); }
   #tabComodatosBtn:not(.active) .tab-icon { color: var(--acc-purple); }
   #tabNotasBtn:not(.active) .tab-icon { color: var(--acc-magenta); }
+  #tabRegistroLlavesBtn:not(.active) .tab-icon { color: var(--acc-goldenrod); }
   #tabSeguimientosBtn:not(.active) .tab-icon { color: var(--acc-slate); }
   #tabErroresBtn:not(.active) .tab-icon { color: var(--acc-slate); }
   #tabAuditoriaBtn:not(.active) .tab-icon { color: var(--acc-slate); }
@@ -809,6 +810,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
       <button type="button" class="tab-btn" id="tabCoordinacionBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>Coordinación</button>
       <button type="button" class="tab-btn" id="tabSemaforoBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="20" rx="3"/><circle cx="12" cy="7" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="12" cy="17" r="1.2"/></svg></span>Semáforo visitas</button>
       <button type="button" class="tab-btn" id="tabClavesClienteBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>Claves por cliente</button>
+      <button type="button" class="tab-btn" id="tabRegistroLlavesBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2 2M14 9l2 2"/></svg></span>Registro de llaves</button>
       <button type="button" class="tab-btn" id="tabEmergenciaBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.29 3.86l-8.18 14.18A2 2 0 0 0 3.82 21h16.36a2 2 0 0 0 1.71-3l-8.18-14.14a2 2 0 0 0-3.42 0z"/></svg></span>Emergencias<span class="tab-badge hidden" id="emergenciasBadge">0</span></button>
     </div>
 
@@ -1763,6 +1765,52 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
       </div>
     </div>
 
+    <div id="panelRegistroLlaves" class="hidden">
+      <h1>Registro de llaves por edificio</h1>
+      <p class="subtitle">
+        Lo que cargan los vecinos al escanear el QR del hall. Usalo para conciliar con la estación
+        de monitoreo: marcá cada llave como <b>conciliada</b> cuando coincide, y las que hay que sacar
+        como <b>dar de baja</b>. Las que la estación tiene y nadie registró son las candidatas a borrar.
+      </p>
+
+      <div class="card">
+        <h3 style="margin-top:0;">Edificios</h3>
+        <p class="status" id="rllEdificiosStatus">Cargando...</p>
+        <div id="rllEdificiosLista"></div>
+        <details id="rllEdificioForm" style="margin-top:12px;">
+          <summary style="cursor:pointer;font-weight:600;" id="rllEdificioFormTit">+ Agregar un edificio</summary>
+          <input type="hidden" id="rllEdCodigo">
+          <div class="field-row" style="flex-wrap:wrap;margin-top:10px;">
+            <div style="flex:1 1 200px;"><label>Nombre</label><input type="text" class="field-input" id="rllEdNombre" placeholder="Ej. MUELLE 11"></div>
+            <div style="flex:2 1 260px;"><label>Dirección (aparece en el formulario)</label><input type="text" class="field-input" id="rllEdDireccion" placeholder="Ej. Av. Ejemplo 1234"></div>
+          </div>
+          <div class="hidden" id="rllEdActivoWrap"><label style="display:flex;align-items:center;gap:8px;margin-top:8px;"><input type="checkbox" id="rllEdActivo" style="width:auto;margin:0;"> QR habilitado (si lo apagás, el QR deja de aceptar registros)</label></div>
+          <div class="field-row" style="gap:8px;margin-top:10px;">
+            <button type="button" id="rllEdGuardarBtn" style="width:auto;">Guardar edificio</button>
+            <button type="button" class="btn-secondary-admin hidden" id="rllEdCancelarBtn" style="width:auto;">Cancelar</button>
+          </div>
+          <p class="status" id="rllEdStatus"></p>
+        </details>
+      </div>
+
+      <div class="card hidden" id="rllRegistrosCard">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between;">
+          <h3 style="margin:0;" id="rllRegistrosTit">Registros</h3>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" class="btn-secondary-admin" id="rllRecargarBtn" style="width:auto;">↻ Actualizar</button>
+            <button type="button" class="btn-secondary-admin" id="rllExcelBtn" style="width:auto;">⬇ Excel</button>
+          </div>
+        </div>
+        <div class="sims-resumen" id="rllResumen" style="margin-top:12px;"></div>
+        <div class="sims-filtros" style="margin-bottom:6px;">
+          <input type="text" class="field-input" id="rllBuscar" placeholder="Buscar por nombre, piso, depto, teléfono o número de llave...">
+          <select id="rllOrden"><option value="unidad">Ordenar por piso y depto</option><option value="fecha">Más nuevos primero</option><option value="tag">Por número de llave</option></select>
+        </div>
+        <p class="status" id="rllRegistrosStatus"></p>
+        <div id="rllTabla" style="overflow-x:auto;"></div>
+      </div>
+    </div>
+
     <div id="panelVencimientos" class="hidden">
       <h1>Vencimientos</h1>
       <p class="subtitle">Todo lo que vence, en un solo lugar: lo de los vehículos (VTV, seguro, service por fecha), las credenciales de los técnicos y lo de la oficina que cargues acá (matafuegos, seguros, habilitaciones, calibraciones, licencias...). Lo que entra en el plazo de aviso aparece en Inicio y, si tiene responsable, le llega un aviso al celular.</p>
@@ -2052,6 +2100,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
 
 </div>
 
+<script src="vendor/qrcode.js"></script>
 <script src="sims-utils.js"></script>
 <script src="stock-utils.js"></script>
 <script src="tablero-stock.js"></script>
@@ -2363,6 +2412,7 @@ const TABS = [
   { btn: tabSemaforoBtn, panel: panelSemaforo, onShow: () => cargarSemaforoVisitas() },
   { btn: tabClavesClienteBtn, panel: panelClavesCliente, onShow: () => cargarClavesClienteAdmin() },
   { btn: tabEmergenciaBtn, panel: panelEmergencia, onShow: () => cargarEmergenciasAdmin() },
+  { btn: document.getElementById("tabRegistroLlavesBtn"), panel: document.getElementById("panelRegistroLlaves"), onShow: () => cargarRegistroLlavesAdmin() },
 ];
 
 TABS.forEach(({ btn, panel, onShow }) => {
@@ -2381,7 +2431,7 @@ const GRUPOS_MENU = [
   ["Administración", ["tabRendicionesBtn", "tabVencimientosBtn", "tabComodatosBtn", "tabInstalacionesBtn", "tabEncuestasBtn"]],
   ["SIMs", ["tabSimsBtn", "tabSimsInstaladasBtn", "tabSimsControlBtn"]],
   ["Flota y herramientas", ["tabStockBtn", "tabVehiculosBtn", "tabHerramientasBtn"]],
-  ["Clientes", ["tabClientesBtn", "tabClavesClienteBtn", "tabPlanosBtn"]],
+  ["Clientes", ["tabClientesBtn", "tabClavesClienteBtn", "tabRegistroLlavesBtn", "tabPlanosBtn"]],
   ["Equipo y configuración", ["tabTecnicosBtn", "tabCredencialesBtn", "tabGuardiasBtn", "tabMaterialesBtn", "tabConsultasBtn", "tabErroresBtn", "tabAuditoriaBtn", "tabBackupBtn"]],
 ];
 (function armarMenuAgrupado() {
@@ -9384,6 +9434,349 @@ function renderComodatosAdmin() {
 let notasAdminCache = []; // filas planas (nota, destinatario) — se agrupan por id acá abajo
 
 notasAdminBuscarInput.addEventListener("input", renderNotasAdmin);
+
+// ---------- Registro de llaves por edificio (QR del hall) ----------
+// Lo que cargan los vecinos desde registro-llaves.html?e=<codigo>. Se
+// guarda en el repo de datos (lib/registro-llaves.js); acá se concilia
+// llave por llave con lo que tiene la estación de monitoreo.
+const RLL_URL_PUBLICA = "https://pedido.sat365.com.ar/registro-llaves.html?e=";
+const RLL_ESTADOS = {
+  pendiente: { txt: "Pendiente", color: "#8A5A00", bg: "#FFF1D6" },
+  conciliada: { txt: "Conciliada", color: "#1F6B34", bg: "#E6F4EA" },
+  baja: { txt: "Dar de baja", color: "#B3261E", bg: "#FDE2E0" },
+  dada_de_baja: { txt: "Dada de baja", color: "#6B7680", bg: "#EEF0F2" },
+};
+let rllEdificios = [];
+let rllEdificioActual = null;
+let rllRegistros = [];
+let rllFiltroEstado = "";
+
+function rllHeaders(json) {
+  const h = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+  if (json) h["Content-Type"] = "application/json";
+  return h;
+}
+function rllFecha(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return d.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "2-digit" }) + " " + d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+}
+async function cargarRegistroLlavesAdmin() {
+  const st = document.getElementById("rllEdificiosStatus");
+  st.className = "status";
+  st.textContent = "Cargando...";
+  try {
+    const r = await fetch("/api/datos?coleccion=registro_llaves", { headers: rllHeaders(), cache: "no-store" });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Error desconocido");
+    rllEdificios = Array.isArray(d) ? d : [];
+    st.textContent = rllEdificios.length ? "" : "Todavía no hay edificios. Agregá el primero abajo.";
+    renderRllEdificios();
+    if (!rllEdificioActual && rllEdificios.length === 1) rllAbrirEdificio(rllEdificios[0].codigo);
+    else if (rllEdificioActual) rllAbrirEdificio(rllEdificioActual.codigo);
+  } catch (e) {
+    st.className = "status err";
+    st.textContent = "No se pudo cargar: " + e.message;
+  }
+}
+function renderRllEdificios() {
+  const cont = document.getElementById("rllEdificiosLista");
+  if (!rllEdificios.length) { cont.innerHTML = ""; return; }
+  cont.innerHTML = `<table><thead><tr><th>Edificio</th><th>Registros</th><th>Por revisar</th><th>Último</th><th>QR</th><th></th></tr></thead><tbody>${rllEdificios.map((e) => `
+    <tr${rllEdificioActual && rllEdificioActual.codigo === e.codigo ? ' style="background:rgba(245,166,35,0.10);"' : ""}>
+      <td><b>${escapeHtmlAdmin(e.nombre)}</b>${e.direccion ? `<br><span style="color:#6B7680;">${escapeHtmlAdmin(e.direccion)}</span>` : ""}<br><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6B7680;">${escapeHtmlAdmin(e.codigo)}</span></td>
+      <td>${e.registros == null ? "—" : e.registros}</td>
+      <td>${e.pendientes ? `<b style="color:#B5772A;">${e.pendientes}</b>` : "0"}</td>
+      <td>${e.ultimo ? rllFecha(e.ultimo) : "—"}</td>
+      <td>${e.activo === false ? '<span class="ven-estado sin">Apagado</span>' : '<span class="ven-estado ok">Activo</span>'}</td>
+      <td style="white-space:nowrap;text-align:right;">
+        <button type="button" class="rll-ver" data-c="${e.codigo}" style="width:auto;padding:6px 10px;font-size:13px;margin:2px;">Ver registros</button>
+        <button type="button" class="btn-secondary-admin rll-cartel" data-c="${e.codigo}" style="width:auto;padding:6px 10px;font-size:13px;margin:2px;">🖨 Cartel QR</button>
+        <button type="button" class="btn-secondary-admin rll-link" data-c="${e.codigo}" style="width:auto;padding:6px 10px;font-size:13px;margin:2px;">Copiar link</button>
+        <button type="button" class="btn-secondary-admin rll-editar" data-c="${e.codigo}" style="width:auto;padding:6px 10px;font-size:13px;margin:2px;">Editar</button>
+      </td>
+    </tr>`).join("")}</tbody></table>`;
+  cont.querySelectorAll(".rll-ver").forEach((b) => b.addEventListener("click", () => rllAbrirEdificio(b.dataset.c)));
+  cont.querySelectorAll(".rll-cartel").forEach((b) => b.addEventListener("click", () => rllImprimirCartel(rllEdificios.find((x) => x.codigo === b.dataset.c))));
+  cont.querySelectorAll(".rll-link").forEach((b) => b.addEventListener("click", async () => {
+    const url = RLL_URL_PUBLICA + b.dataset.c;
+    try { await navigator.clipboard.writeText(url); b.textContent = "✓ Copiado"; } catch (e) { prompt("Copiá el link:", url); }
+    setTimeout(() => { b.textContent = "Copiar link"; }, 1800);
+  }));
+  cont.querySelectorAll(".rll-editar").forEach((b) => b.addEventListener("click", () => {
+    const e = rllEdificios.find((x) => x.codigo === b.dataset.c);
+    document.getElementById("rllEdCodigo").value = e.codigo;
+    document.getElementById("rllEdNombre").value = e.nombre;
+    document.getElementById("rllEdDireccion").value = e.direccion || "";
+    document.getElementById("rllEdActivo").checked = e.activo !== false;
+    document.getElementById("rllEdActivoWrap").classList.remove("hidden");
+    document.getElementById("rllEdCancelarBtn").classList.remove("hidden");
+    document.getElementById("rllEdificioFormTit").textContent = "Editar " + e.nombre;
+    document.getElementById("rllEdificioForm").open = true;
+    document.getElementById("rllEdNombre").focus();
+  }));
+}
+function rllLimpiarFormEdificio() {
+  ["rllEdCodigo", "rllEdNombre", "rllEdDireccion"].forEach((id) => { document.getElementById(id).value = ""; });
+  document.getElementById("rllEdActivoWrap").classList.add("hidden");
+  document.getElementById("rllEdCancelarBtn").classList.add("hidden");
+  document.getElementById("rllEdificioFormTit").textContent = "+ Agregar un edificio";
+}
+document.getElementById("rllEdCancelarBtn").addEventListener("click", () => { rllLimpiarFormEdificio(); document.getElementById("rllEdificioForm").open = false; });
+document.getElementById("rllEdGuardarBtn").addEventListener("click", async () => {
+  const st = document.getElementById("rllEdStatus");
+  const codigo = document.getElementById("rllEdCodigo").value;
+  const nombre = document.getElementById("rllEdNombre").value.trim();
+  if (!nombre) { st.className = "status err"; st.textContent = "Falta el nombre."; return; }
+  st.className = "status"; st.textContent = "Guardando...";
+  try {
+    const r = await fetch("/api/datos?coleccion=registro_llaves", {
+      method: "POST", headers: rllHeaders(true),
+      body: JSON.stringify({ accion: "guardar_edificio", codigo: codigo || undefined, nombre, direccion: document.getElementById("rllEdDireccion").value.trim(), activo: codigo ? document.getElementById("rllEdActivo").checked : true }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Error desconocido");
+    st.className = "status ok"; st.textContent = codigo ? "Guardado." : "Edificio creado. Ya podés imprimir su cartel QR.";
+    rllLimpiarFormEdificio();
+    await cargarRegistroLlavesAdmin();
+  } catch (e) { st.className = "status err"; st.textContent = "No se pudo guardar: " + e.message; }
+});
+
+async function rllAbrirEdificio(codigo) {
+  rllEdificioActual = rllEdificios.find((x) => x.codigo === codigo) || null;
+  renderRllEdificios();
+  const card = document.getElementById("rllRegistrosCard");
+  if (!rllEdificioActual) { card.classList.add("hidden"); return; }
+  card.classList.remove("hidden");
+  document.getElementById("rllRegistrosTit").textContent = "Registros de " + rllEdificioActual.nombre;
+  const st = document.getElementById("rllRegistrosStatus");
+  st.className = "status"; st.textContent = "Cargando...";
+  try {
+    const r = await fetch("/api/datos?coleccion=registro_llaves&edificio=" + encodeURIComponent(codigo), { headers: rllHeaders(), cache: "no-store" });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Error desconocido");
+    rllRegistros = Array.isArray(d) ? d : [];
+    st.textContent = "";
+    renderRllRegistros();
+  } catch (e) { st.className = "status err"; st.textContent = "No se pudo cargar: " + e.message; }
+}
+
+// Una fila por llave (la conciliación se hace llave por llave).
+function rllFilas() {
+  const filas = [];
+  rllRegistros.forEach((r) => {
+    (r.llaves || []).forEach((l, i) => filas.push({ r, l, i, perdida: false }));
+    (r.perdidas || []).forEach((l, i) => filas.push({ r, l, i, perdida: true }));
+  });
+  // Mismo número de llave cargado por más de un registro: hay que mirarlo.
+  const normal = (t) => String(t || "").replace(/\D/g, "").replace(/^0+/, "") || String(t || "").trim().toLowerCase();
+  const cuenta = {};
+  filas.forEach((f) => { if (!f.perdida && f.l.tag) { const k = normal(f.l.tag); cuenta[k] = (cuenta[k] || 0) + 1; } });
+  const perdidas = new Set(filas.filter((f) => f.perdida && f.l.tag).map((f) => normal(f.l.tag)));
+  filas.forEach((f) => {
+    const k = normal(f.l.tag);
+    f.repetida = !f.perdida && f.l.tag && cuenta[k] > 1;
+    f.reportadaPerdida = !f.perdida && f.l.tag && perdidas.has(k);
+  });
+  return filas;
+}
+function rllUnidad(r) {
+  const p = [];
+  if (r.piso || r.unidad) p.push(`${r.piso || "?"}° ${r.unidad || ""}`.trim());
+  if (r.cochera) p.push("Coch. " + r.cochera);
+  if (!p.length && r.tipo === "cochera") p.push("Cochera");
+  return p.join(" · ") || "—";
+}
+function renderRllRegistros() {
+  const todas = rllFilas();
+  const n = (fn) => todas.filter(fn).length;
+  const chips = [
+    ["", "Todas las llaves", todas.length, ""],
+    ["pendiente", "Pendientes", n((f) => f.l.estado === "pendiente"), "pend"],
+    ["conciliada", "Conciliadas", n((f) => f.l.estado === "conciliada"), ""],
+    ["baja", "Dar de baja", n((f) => f.l.estado === "baja"), "alerta"],
+    ["dada_de_baja", "Dadas de baja", n((f) => f.l.estado === "dada_de_baja"), ""],
+    ["repetida", "Número repetido", n((f) => f.repetida || f.reportadaPerdida), "alerta"],
+  ];
+  const personas = rllRegistros.length;
+  document.getElementById("rllResumen").innerHTML = `<span class="sims-chip" style="cursor:default;"><b>${personas}</b> ${personas === 1 ? "persona" : "personas"}</span>` + chips.map(([k, t, c, cls]) => `<button type="button" class="sims-chip ${cls} ${rllFiltroEstado === k ? "activo" : ""}" data-k="${k}"><b>${c}</b> ${t}</button>`).join("");
+  document.querySelectorAll("#rllResumen button").forEach((b) => b.addEventListener("click", () => { rllFiltroEstado = b.dataset.k; renderRllRegistros(); }));
+
+  const q = document.getElementById("rllBuscar").value.trim().toLowerCase();
+  let filas = todas.filter((f) => {
+    if (rllFiltroEstado === "repetida" && !(f.repetida || f.reportadaPerdida)) return false;
+    if (rllFiltroEstado && rllFiltroEstado !== "repetida" && f.l.estado !== rllFiltroEstado) return false;
+    if (!q) return true;
+    const r = f.r;
+    return [r.nombre, r.telefono, r.email, r.piso, r.unidad, r.cochera, `${r.piso} ${r.unidad}`, `${r.piso}${r.unidad}`, f.l.tag, f.l.usuario, f.l.nota, f.l.detalle].join(" ").toLowerCase().includes(q);
+  });
+  const orden = document.getElementById("rllOrden").value;
+  const pisoNum = (r) => { const m = String(r.piso || "").match(/\d+/); return m ? Number(m[0]) : (/pb/i.test(r.piso || "") ? 0 : 999); };
+  filas.sort((a, b) => {
+    if (orden === "fecha") return String(b.r.fecha).localeCompare(String(a.r.fecha));
+    if (orden === "tag") return String(a.l.tag).localeCompare(String(b.l.tag), "es", { numeric: true });
+    return pisoNum(a.r) - pisoNum(b.r) || String(a.r.unidad || "").localeCompare(String(b.r.unidad || ""), "es", { numeric: true }) || String(a.r.fecha).localeCompare(String(b.r.fecha));
+  });
+
+  const cont = document.getElementById("rllTabla");
+  if (!todas.length) { cont.innerHTML = '<p class="status">Todavía nadie se registró en este edificio. Imprimí el cartel QR y pegalo en el hall.</p>'; return; }
+  if (!filas.length) { cont.innerHTML = '<p class="status">No hay llaves con ese filtro.</p>'; return; }
+  const rel = { titular: "Titular", inquilino: "Inquilino", otro: "Otro" };
+  const tipo = { vivienda: "Vivienda", cochera: "Cochera", ambas: "Viv. + cochera" };
+  cont.innerHTML = `<table class="ven-tabla"><thead><tr><th>Unidad</th><th>Persona</th><th>Contacto</th><th>N° de llave</th><th>N° usuario</th><th>Estado</th><th>Nota</th><th></th></tr></thead><tbody>${filas.map((f) => {
+    const r = f.r, l = f.l, est = RLL_ESTADOS[l.estado] || RLL_ESTADOS.pendiente;
+    const avisos = [];
+    if (f.perdida) avisos.push('<span class="ven-estado vencido">Reportada perdida / no se usa</span>');
+    if (f.repetida) avisos.push('<span class="ven-estado pronto">Número repetido</span>');
+    if (f.reportadaPerdida) avisos.push('<span class="ven-estado vencido">Otro la reportó perdida</span>');
+    return `<tr>
+      <td><b>${escapeHtmlAdmin(rllUnidad(r))}</b><br><span style="color:#6B7680;">${tipo[r.tipo] || ""}${r.control_remoto ? ` · Control: ${r.control_remoto === "si" ? "sí" : "no"}` : ""}</span></td>
+      <td>${escapeHtmlAdmin(r.nombre)}<br><span style="color:#6B7680;">${rel[r.relacion] || ""}${r.relacion_otro ? " (" + escapeHtmlAdmin(r.relacion_otro) + ")" : ""} · ${rllFecha(r.fecha)}</span>${r.comentario ? `<br><span style="color:#34495E;">💬 ${escapeHtmlAdmin(r.comentario)}</span>` : ""}</td>
+      <td><a href="tel:${escapeHtmlAdmin(r.telefono)}">${escapeHtmlAdmin(r.telefono)}</a>${r.email ? `<br><a href="mailto:${escapeHtmlAdmin(r.email)}" style="color:#6B7680;">${escapeHtmlAdmin(r.email)}</a>` : ""}</td>
+      <td><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;">${escapeHtmlAdmin(l.tag || "(sin número)")}</span>${f.perdida && l.detalle ? `<br><span style="color:#6B7680;">${escapeHtmlAdmin(l.detalle)}</span>` : ""}${avisos.length ? "<br>" + avisos.join(" ") : ""}</td>
+      <td><input type="text" class="field-input rll-usuario" data-id="${r.id}" data-i="${f.i}" data-p="${f.perdida ? 1 : ""}" value="${escapeHtmlAdmin(l.usuario || "")}" style="width:80px;margin:0;padding:6px 8px;font-family:'IBM Plex Mono',monospace;" placeholder="—"></td>
+      <td><select class="rll-estado" data-id="${r.id}" data-i="${f.i}" data-p="${f.perdida ? 1 : ""}" style="margin:0;width:auto;padding:6px 8px;font-weight:700;color:${est.color};background:${est.bg};border-color:${est.bg};">${Object.entries(RLL_ESTADOS).map(([k, v]) => `<option value="${k}"${k === l.estado ? " selected" : ""}>${v.txt}</option>`).join("")}</select>${l.revisado_por ? `<br><span style="font-size:11px;color:#6B7680;">${escapeHtmlAdmin(l.revisado_por)}</span>` : ""}</td>
+      <td><input type="text" class="field-input rll-nota" data-id="${r.id}" data-i="${f.i}" data-p="${f.perdida ? 1 : ""}" value="${escapeHtmlAdmin(l.nota || "")}" style="min-width:140px;margin:0;padding:6px 8px;" placeholder="Nota..."></td>
+      <td class="ven-btns"><button type="button" class="btn-secondary-admin rll-borrar" data-id="${r.id}" style="color:#B3261E;" title="Borra todo el registro de esta persona">Borrar</button></td>
+    </tr>`;
+  }).join("")}</tbody></table>`;
+
+  cont.querySelectorAll(".rll-estado").forEach((s) => s.addEventListener("change", () => rllGuardarLlave(s, { estado: s.value })));
+  cont.querySelectorAll(".rll-nota").forEach((inp) => inp.addEventListener("change", () => rllGuardarLlave(inp, { nota: inp.value })));
+  cont.querySelectorAll(".rll-usuario").forEach((inp) => inp.addEventListener("change", () => rllGuardarLlave(inp, { usuario: inp.value })));
+  cont.querySelectorAll(".rll-borrar").forEach((b) => b.addEventListener("click", async () => {
+    const reg = rllRegistros.find((x) => x.id === b.dataset.id);
+    if (!reg || !confirm(`¿Borrar el registro de ${reg.nombre} (${rllUnidad(reg)})? Se borran todas sus llaves y no se puede deshacer.`)) return;
+    try {
+      const r = await fetch("/api/datos?coleccion=registro_llaves", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "borrar_registro", edificio: rllEdificioActual.codigo, id: reg.id }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Error");
+      rllRegistros = rllRegistros.filter((x) => x.id !== reg.id);
+      renderRllRegistros();
+    } catch (e) { alert("No se pudo borrar: " + e.message); }
+  }));
+}
+async function rllGuardarLlave(el, cambios) {
+  const reg = rllRegistros.find((x) => x.id === el.dataset.id);
+  const lista = reg && (el.dataset.p ? reg.perdidas : reg.llaves);
+  const llave = lista && lista[Number(el.dataset.i)];
+  if (!llave) return;
+  const antes = { ...llave };
+  Object.assign(llave, cambios);
+  el.disabled = true;
+  try {
+    const r = await fetch("/api/datos?coleccion=registro_llaves", {
+      method: "POST", headers: rllHeaders(true),
+      body: JSON.stringify({ accion: "estado_llave", edificio: rllEdificioActual.codigo, id: reg.id, indice: Number(el.dataset.i), perdida: !!el.dataset.p, ...cambios }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Error");
+    llave.revisado_por = adminNombre || "vos";
+  } catch (e) {
+    Object.assign(llave, antes);
+    alert("No se pudo guardar: " + e.message);
+  }
+  renderRllRegistros();
+}
+document.getElementById("rllBuscar").addEventListener("input", () => renderRllRegistros());
+document.getElementById("rllOrden").addEventListener("change", () => renderRllRegistros());
+document.getElementById("rllRecargarBtn").addEventListener("click", () => cargarRegistroLlavesAdmin());
+document.getElementById("rllExcelBtn").addEventListener("click", () => {
+  if (!rllEdificioActual) return;
+  const rel = { titular: "Titular", inquilino: "Inquilino", otro: "Otro" };
+  const filas = rllFilas().map((f) => ({
+    "Fecha": rllFecha(f.r.fecha), "Piso": f.r.piso || "", "Depto": f.r.unidad || "", "Cochera": f.r.cochera || "",
+    "Tipo": f.r.tipo || "", "Control remoto": f.r.control_remoto || "",
+    "Nombre": f.r.nombre, "Relación": (rel[f.r.relacion] || "") + (f.r.relacion_otro ? ` (${f.r.relacion_otro})` : ""),
+    "Teléfono": f.r.telefono, "Mail": f.r.email || "",
+    "N° de llave": f.l.tag || "", "N° de usuario": f.l.usuario || "",
+    "Tipo de registro": f.perdida ? "Reportada perdida" : "En uso",
+    "Estado": (RLL_ESTADOS[f.l.estado] || RLL_ESTADOS.pendiente).txt,
+    "Avisos": [f.repetida ? "Número repetido" : "", f.reportadaPerdida ? "Otro la reportó perdida" : ""].filter(Boolean).join(", "),
+    "Nota": f.l.nota || "", "Detalle": f.l.detalle || "", "Comentario del vecino": f.r.comentario || "",
+  }));
+  const hoja = XLSX.utils.json_to_sheet(filas);
+  hoja["!cols"] = [14, 6, 6, 8, 9, 8, 24, 14, 16, 24, 16, 10, 16, 12, 18, 24, 24, 30].map((w) => ({ wch: w }));
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, "Llaves");
+  XLSX.writeFile(libro, `llaves_${rllEdificioActual.nombre.replace(/[^\w]+/g, "_")}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+});
+
+// Cartel A4 para pegar en el hall, con el QR del edificio.
+function rllImprimirCartel(ed) {
+  if (!ed) return;
+  const url = RLL_URL_PUBLICA + ed.codigo;
+  const tmp = document.createElement("div");
+  new QRCode(tmp, { text: url, width: 720, height: 720, colorDark: "#0E0F10", colorLight: "#FFFFFF", correctLevel: QRCode.CorrectLevel.M });
+  const canvas = tmp.querySelector("canvas");
+  const qr = canvas ? canvas.toDataURL("image/png") : (tmp.querySelector("img") || {}).src;
+  const logo = new URL("icons/logo.png", location.href).href;
+  const fuentes = new URL("vendor/fonts.css", location.href).href;
+  const w = window.open("", "_blank");
+  if (!w) { alert("El navegador bloqueó la ventana del cartel: permití las ventanas emergentes para este sitio."); return; }
+  const e = escapeHtmlAdmin;
+  w.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Cartel QR — ${e(ed.nombre)}</title>
+<link rel="stylesheet" href="${fuentes}">
+<style>
+  @page { size: A4; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #E9E8E3; }
+  body { font-family: 'Barlow', sans-serif; color: #0E0F10; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .barra { position: sticky; top: 0; background: #0E0F10; color: #fff; padding: 10px 16px; display: flex; gap: 12px; align-items: center; justify-content: center; font-size: 14px; z-index: 5; }
+  .barra button { background: #F6B828; border: 0; border-radius: 8px; padding: 9px 16px; font: inherit; font-weight: 700; cursor: pointer; }
+  .hoja { width: 210mm; height: 297mm; margin: 14px auto; background: #fff; position: relative; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 6px 30px rgba(0,0,0,.15); }
+  .top { background: #0E0F10; color: #fff; padding: 11mm 16mm 22mm; position: relative; }
+  .top::after { content: ""; position: absolute; inset: 0; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='48' viewBox='0 0 56 48'%3E%3Cpath d='M14 1h28l13 23-13 23H14L1 24z' fill='none' stroke='%23F6B828' stroke-opacity='.10' stroke-width='1.5'/%3E%3C/svg%3E"); background-size: 56px 48px; -webkit-mask-image: linear-gradient(110deg, transparent 35%, #000 100%); mask-image: linear-gradient(110deg, transparent 35%, #000 100%); }
+  .top > * { position: relative; z-index: 1; }
+  .fila-logo { display: flex; justify-content: space-between; align-items: center; }
+  .fila-logo img { height: 13mm; }
+  .fila-logo span { font-family: 'Barlow Semi Condensed', sans-serif; font-weight: 600; letter-spacing: 2.5px; text-transform: uppercase; font-size: 11pt; color: #A9A69C; }
+  .edificio { display: inline-block; margin-top: 8mm; border: 1.5px solid rgba(246,184,40,.5); color: #F6B828; border-radius: 999px; padding: 1.6mm 5mm; font-family: 'Barlow Semi Condensed', sans-serif; font-weight: 700; font-size: 15pt; letter-spacing: 2px; text-transform: uppercase; }
+  h1 { font-family: 'Barlow Semi Condensed', sans-serif; font-style: italic; font-weight: 800; text-transform: uppercase; font-size: 44pt; line-height: .95; margin: 4mm 0 3mm; }
+  h1 em { color: #F6B828; }
+  .bajada { font-size: 14pt; line-height: 1.35; color: #D2CFC6; margin: 0; max-width: 165mm; }
+  .qr-zona { margin: -15mm auto 0; position: relative; z-index: 2; text-align: center; }
+  .qr-marco { display: inline-block; background: #fff; padding: 5mm; border-radius: 6mm; box-shadow: 0 0 0 2.2mm #F6B828, 0 8mm 20mm rgba(0,0,0,.12); }
+  .qr-marco img { width: 80mm; height: 80mm; display: block; image-rendering: pixelated; }
+  .escanea { margin-top: 5mm; font-family: 'Barlow Semi Condensed', sans-serif; font-weight: 700; font-size: 20pt; letter-spacing: .5px; }
+  .pasos { display: flex; gap: 6mm; padding: 7mm 16mm 0; }
+  .paso { flex: 1; text-align: center; }
+  .num { width: 13mm; height: 11.3mm; margin: 0 auto 3mm; display: grid; place-items: center; background: #0E0F10; color: #F6B828; clip-path: polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%); font-family: 'Barlow Semi Condensed', sans-serif; font-weight: 700; font-size: 16pt; }
+  .paso b { display: block; font-size: 14pt; margin-bottom: 1mm; }
+  .paso span { font-size: 11.5pt; color: #55534D; line-height: 1.35; }
+  .aviso { margin: 7mm 16mm 0; padding: 5mm 6mm; background: #FFF6DD; border-left: 2mm solid #F6B828; border-radius: 2mm; font-size: 13pt; line-height: 1.4; }
+  .aviso [contenteditable] { outline: none; border-bottom: 1px dashed #C9A23A; }
+  .pie { margin-top: auto; padding: 6mm 16mm 9mm; display: flex; justify-content: space-between; align-items: flex-end; font-size: 10.5pt; color: #6E6C66; }
+  .pie b { color: #0E0F10; font-size: 12pt; }
+  .url { font-family: 'IBM Plex Mono', monospace; font-size: 8.5pt; word-break: break-all; text-align: right; max-width: 95mm; }
+  @media print { .barra { display: none; } body { background: #fff; } .hoja { margin: 0; box-shadow: none; } .aviso [contenteditable] { border-bottom: 0; } }
+</style></head><body>
+<div class="barra">Podés tocar el texto amarillo para cambiar la fecha límite. <button onclick="window.print()">🖨 Imprimir</button></div>
+<div class="hoja">
+  <div class="top">
+    <div class="fila-logo"><img src="${logo}" alt="SAT"><span>Control de acceso</span></div>
+    <div class="edificio">${e(ed.nombre)}</div>
+    <h1>Registrá tu <em>llave</em><br>de acceso</h1>
+    <p class="bajada">Estamos actualizando los datos de acceso del edificio. Escaneá el código con la cámara de tu celular y completá el formulario: lleva 2 minutos.</p>
+  </div>
+  <div class="qr-zona">
+    <div class="qr-marco"><img src="${qr}" alt="QR"></div>
+    <div class="escanea">Escaneá con la cámara de tu celular</div>
+  </div>
+  <div class="pasos">
+    <div class="paso"><div class="num">1</div><b>Escaneá</b><span>Abrí la cámara y apuntá al código</span></div>
+    <div class="paso"><div class="num">2</div><b>Completá</b><span>Tus datos, tu unidad y el número de tu llave</span></div>
+    <div class="paso"><div class="num">3</div><b>Listo</b><span>Repetilo por cada persona que use una llave</span></div>
+  </div>
+  <div class="aviso"><b>Importante:</b> <span contenteditable="true">completalo antes del ___/___/______</span>. Las llaves que no se registren podrán ser dadas de baja por seguridad.</div>
+  <div class="pie">
+    <div><b>SAT</b> · Seguridad electrónica<br>www.sat365.com.ar</div>
+    <div class="url">${e(url)}</div>
+  </div>
+</div>
+</body></html>`);
+  w.document.close();
+}
 
 async function cargarNotasAdmin() {
   notasAdminStatus.className = "status";

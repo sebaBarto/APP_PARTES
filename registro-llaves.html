@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Registro de llaves de acceso — SAT</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0E0F10">
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="stylesheet" href="/vendor/fonts.css">
+<style>
+  :root {
+    --ink: #0E0F10;
+    --ink-2: #1C1E21;
+    --paper: #F2F1EC;
+    --card: #FFFFFF;
+    --line: #DEDCD4;
+    --muted: #6E6C66;
+    --amber: #F6B828;
+    --amber-dark: #B9850A;
+    --ok: #1F7A44;
+    --err: #B3261E;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    font-family: 'Barlow', -apple-system, 'Segoe UI', Roboto, sans-serif;
+    font-size: 16px;
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 100vh;
+  }
+
+  /* ---------- Encabezado ---------- */
+  .hero {
+    background: var(--ink);
+    color: #fff;
+    padding: 22px 20px 64px;
+    position: relative;
+    overflow: hidden;
+  }
+  .hero::after {
+    /* Panal de hexágonos muy tenue, como el del logo */
+    content: "";
+    position: absolute; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='48' viewBox='0 0 56 48'%3E%3Cpath d='M14 1h28l13 23-13 23H14L1 24z' fill='none' stroke='%23F6B828' stroke-opacity='.07' stroke-width='1.5'/%3E%3C/svg%3E");
+    background-size: 56px 48px;
+    mask-image: linear-gradient(120deg, transparent 30%, #000 100%);
+    -webkit-mask-image: linear-gradient(120deg, transparent 30%, #000 100%);
+    pointer-events: none;
+  }
+  .hero-inner { max-width: 520px; margin: 0 auto; position: relative; z-index: 1; }
+  .hero-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 26px; }
+  .hero-top img { height: 34px; width: auto; display: block; }
+  .hero-top .tag-seg {
+    font-family: 'Barlow Semi Condensed', sans-serif; font-weight: 600;
+    font-size: 12px; letter-spacing: 1.6px; text-transform: uppercase; color: #A9A69C;
+  }
+  .edificio-chip {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(246,184,40,.12); color: var(--amber);
+    border: 1px solid rgba(246,184,40,.35);
+    padding: 5px 12px 5px 10px; border-radius: 999px;
+    font-family: 'Barlow Semi Condensed', sans-serif; font-weight: 700;
+    font-size: 13px; letter-spacing: 1.2px; text-transform: uppercase;
+  }
+  .edificio-chip svg { width: 15px; height: 15px; }
+  .hero h1 {
+    font-family: 'Barlow Semi Condensed', sans-serif; font-weight: 800; font-style: italic;
+    font-size: clamp(34px, 9vw, 44px); line-height: .98; letter-spacing: -.3px;
+    margin: 14px 0 12px; text-transform: uppercase;
+  }
+  .hero h1 em { font-style: italic; color: var(--amber); }
+  .hero p { margin: 0; color: #C9C6BC; font-size: 15.5px; line-height: 1.5; max-width: 440px; }
+  .hero .direccion { color: #8F8C83; font-size: 14px; margin-top: 6px; }
+
+  /* ---------- Contenido ---------- */
+  main { max-width: 520px; margin: -40px auto 0; padding: 0 14px 40px; position: relative; z-index: 2; }
+  .card {
+    background: var(--card); border-radius: var(--radius);
+    box-shadow: 0 1px 2px rgba(14,15,16,.06), 0 8px 24px rgba(14,15,16,.07);
+    padding: 22px 18px 20px; margin-bottom: 14px;
+  }
+  .paso { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+  .paso-num {
+    width: 32px; height: 28px; flex: none;
+    display: grid; place-items: center;
+    background: var(--ink); color: var(--amber);
+    clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+    font-family: 'Barlow Semi Condensed', sans-serif; font-weight: 700; font-size: 15px;
+  }
+  .paso h2 {
+    margin: 0; font-family: 'Barlow Semi Condensed', sans-serif; font-weight: 700;
+    font-size: 21px; letter-spacing: .2px;
+  }
+  .paso-sub { margin: 0 0 6px 44px; color: var(--muted); font-size: 14px; line-height: 1.4; }
+
+  .campo { margin-top: 16px; }
+  .campo > label, .grupo-label {
+    display: block; font-weight: 600; font-size: 14.5px; margin-bottom: 7px;
+  }
+  .opcional { font-weight: 500; color: var(--muted); font-size: 13px; }
+  input[type=text], input[type=tel], input[type=email], textarea {
+    width: 100%; padding: 13px 14px; font: inherit; font-size: 16px; color: var(--ink);
+    background: #FAFAF7; border: 1.5px solid var(--line); border-radius: 11px;
+    transition: border-color .15s, box-shadow .15s, background .15s;
+    -webkit-appearance: none; appearance: none;
+  }
+  textarea { min-height: 76px; resize: vertical; }
+  input:focus, textarea:focus { outline: none; border-color: var(--ink); background: #fff; box-shadow: 0 0 0 3px rgba(246,184,40,.35); }
+  .invalido input, input.invalido { border-color: var(--err); background: #FFF6F5; }
+  .fila { display: flex; gap: 10px; }
+  .fila > * { flex: 1; min-width: 0; }
+  .ayuda-campo { font-size: 13px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+  .error-campo { font-size: 13px; color: var(--err); margin-top: 6px; display: none; }
+  .invalido .error-campo { display: block; }
+
+  /* Opciones tipo botón */
+  .opciones { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 8px; }
+  .opcion { position: relative; }
+  .opcion input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+  .opcion span {
+    display: flex; align-items: center; justify-content: center; gap: 7px; text-align: center;
+    min-height: 50px; padding: 8px 10px; border-radius: 11px;
+    border: 1.5px solid var(--line); background: #FAFAF7;
+    font-weight: 600; font-size: 15px; transition: all .15s; user-select: none;
+  }
+  .opcion span svg { width: 19px; height: 19px; flex: none; }
+  .opcion input:checked + span { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .opcion input:checked + span svg { color: var(--amber); }
+  .opcion input:focus-visible + span { box-shadow: 0 0 0 3px rgba(246,184,40,.5); }
+  .invalido .opcion span { border-color: #E9B4AF; }
+
+  /* Llaves */
+  .llave {
+    border: 1.5px solid var(--line); border-radius: 12px; padding: 14px 14px 12px;
+    margin-top: 12px; background: linear-gradient(#FFFDF6, #FFFFFF);
+    position: relative;
+  }
+  .llave-tit { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .llave-tit b { font-family: 'Barlow Semi Condensed', sans-serif; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+  .llave-tit b svg { width: 20px; height: 20px; color: var(--amber-dark); }
+  .quitar {
+    border: none; background: none; color: var(--muted); font: inherit; font-size: 14px;
+    padding: 6px 4px; cursor: pointer; text-decoration: underline;
+  }
+  .llave .campo { margin-top: 10px; }
+  .llave .campo:first-of-type { margin-top: 0; }
+  .mono { font-family: 'IBM Plex Mono', ui-monospace, monospace !important; letter-spacing: .5px; }
+  .btn-agregar {
+    width: 100%; margin-top: 12px; padding: 13px; border-radius: 11px;
+    border: 1.5px dashed #C9C6BC; background: transparent; color: var(--ink);
+    font: inherit; font-weight: 600; font-size: 15px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn-agregar:hover { border-color: var(--ink); }
+
+  .donde {
+    margin-top: 14px; border-radius: 12px; background: #F6F5F0; overflow: hidden;
+  }
+  .donde summary {
+    list-style: none; cursor: pointer; padding: 13px 14px; font-weight: 600; font-size: 14.5px;
+    display: flex; align-items: center; gap: 9px;
+  }
+  .donde summary::-webkit-details-marker { display: none; }
+  .donde summary .flecha { margin-left: auto; transition: transform .2s; }
+  .donde[open] summary .flecha { transform: rotate(180deg); }
+  .donde summary svg { width: 18px; height: 18px; flex: none; }
+  .donde-cuerpo { padding: 0 14px 16px; font-size: 14px; color: #3D3B37; line-height: 1.5; }
+  .donde-cuerpo svg.ilustracion { width: 100%; height: auto; display: block; margin: 4px 0 10px; }
+
+  .switch-linea { display: flex; align-items: flex-start; gap: 12px; cursor: pointer; margin-top: 4px; }
+  .switch-linea input { width: 22px; height: 22px; margin: 1px 0 0; accent-color: var(--ink); flex: none; }
+  .switch-linea span { font-size: 15px; line-height: 1.45; }
+  .switch-linea small { display: block; color: var(--muted); font-size: 13.5px; margin-top: 2px; }
+
+  .perdida-box { margin-top: 12px; display: none; }
+  .perdida-box.visible { display: block; }
+
+  .legal { font-size: 13px; color: var(--muted); line-height: 1.45; margin: 14px 0 0; }
+
+  .enviar {
+    width: 100%; margin-top: 18px; padding: 17px; border: none; border-radius: 12px;
+    background: var(--amber); color: var(--ink);
+    font-family: 'Barlow Semi Condensed', sans-serif; font-weight: 700; font-size: 19px; letter-spacing: .4px;
+    cursor: pointer; box-shadow: 0 6px 18px rgba(246,184,40,.35);
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+  }
+  .enviar:active { transform: translateY(1px); }
+  .enviar:disabled { opacity: .6; cursor: default; }
+  .status { margin: 12px 0 0; font-size: 14.5px; text-align: center; min-height: 1em; }
+  .status.err { color: var(--err); }
+
+  .oculto { display: none !important; }
+  .pie { text-align: center; color: var(--muted); font-size: 13px; padding: 4px 16px 30px; line-height: 1.6; }
+  .pie a { color: var(--ink); font-weight: 600; }
+
+  /* Gracias / error de código */
+  .final { text-align: center; padding: 34px 22px 28px; }
+  .final .sello {
+    width: 74px; height: 64px; margin: 0 auto 16px; display: grid; place-items: center;
+    background: var(--ink); color: var(--amber);
+    clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+  }
+  .final .sello svg { width: 32px; height: 32px; }
+  .final h2 { font-family: 'Barlow Semi Condensed', sans-serif; font-size: 26px; margin: 0 0 8px; }
+  .final p { color: #4A4843; line-height: 1.55; margin: 0 0 6px; }
+  .resumen { text-align: left; background: #F6F5F0; border-radius: 12px; padding: 12px 14px; margin: 16px 0 6px; font-size: 14.5px; }
+  .resumen div { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; }
+  .resumen div span:first-child { color: var(--muted); }
+  .resumen div span:last-child { font-weight: 600; text-align: right; }
+  .btn-sec {
+    margin-top: 14px; padding: 12px 18px; border-radius: 11px; border: 1.5px solid var(--ink);
+    background: #fff; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  .cargando { text-align: center; padding: 40px 0; color: var(--muted); }
+</style>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <div class="hero-top">
+        <img src="/icons/logo.png" alt="SAT">
+        <span class="tag-seg">Control de acceso</span>
+      </div>
+      <span class="edificio-chip" id="edificioChip">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 7h1M14 7h1M9 11h1M14 11h1M9 15h1M14 15h1M11 21v-3h2v3"/></svg>
+        <span id="edificioNombre">Edificio</span>
+      </span>
+      <h1>Registrá tu <em>llave</em> de acceso</h1>
+      <p>Estamos actualizando los datos de acceso del edificio. Completarlo te lleva 2 minutos y nos ayuda a mantener el ingreso seguro: las llaves que nadie registre podrán ser dadas de baja.</p>
+      <p class="direccion" id="edificioDireccion"></p>
+    </div>
+  </header>
+
+  <main>
+    <div class="card cargando" id="cargando">Cargando…</div>
+
+    <!-- Código inválido -->
+    <div class="card final oculto" id="pantallaInvalida">
+      <div class="sello"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 8v5M12 16.5v.01"/><circle cx="12" cy="12" r="9"/></svg></div>
+      <h2>Este código no está habilitado</h2>
+      <p>Escaneá de nuevo el QR que está en el hall de tu edificio. Si el problema sigue, comunicate con SAT.</p>
+    </div>
+
+    <form id="formulario" class="oculto" novalidate autocomplete="on">
+      <!-- 1. Datos -->
+      <section class="card">
+        <div class="paso"><span class="paso-num">1</span><h2>Tus datos</h2></div>
+        <p class="paso-sub">De la persona que usa la llave.</p>
+
+        <div class="campo" data-campo="nombre">
+          <label for="nombre">Nombre y apellido</label>
+          <input type="text" id="nombre" autocomplete="name" maxlength="80" placeholder="Ej. María González">
+          <div class="error-campo">Escribí tu nombre y apellido.</div>
+        </div>
+        <div class="campo" data-campo="telefono">
+          <label for="telefono">Teléfono celular</label>
+          <input type="tel" id="telefono" autocomplete="tel" inputmode="tel" maxlength="30" placeholder="Ej. 341 555-1234">
+          <div class="error-campo">Escribí un teléfono para poder contactarte.</div>
+        </div>
+        <div class="campo" data-campo="email">
+          <label for="email">Mail <span class="opcional">(opcional)</span></label>
+          <input type="email" id="email" autocomplete="email" inputmode="email" maxlength="80" placeholder="nombre@correo.com">
+          <div class="error-campo">Revisá el mail, no parece válido.</div>
+        </div>
+        <div class="campo" data-campo="relacion">
+          <span class="grupo-label">¿Sos titular o inquilino?</span>
+          <div class="opciones">
+            <label class="opcion"><input type="radio" name="relacion" value="titular"><span>Titular</span></label>
+            <label class="opcion"><input type="radio" name="relacion" value="inquilino"><span>Inquilino</span></label>
+            <label class="opcion"><input type="radio" name="relacion" value="otro"><span>Otro</span></label>
+          </div>
+          <input type="text" id="relacionOtro" class="oculto" style="margin-top:8px;" maxlength="40" placeholder="Ej. familiar, encargado, empleada…">
+          <div class="error-campo">Elegí una opción.</div>
+        </div>
+      </section>
+
+      <!-- 2. Unidad -->
+      <section class="card">
+        <div class="paso"><span class="paso-num">2</span><h2>Tu unidad</h2></div>
+        <div class="campo" data-campo="tipo">
+          <span class="grupo-label">¿La llave es para…?</span>
+          <div class="opciones">
+            <label class="opcion"><input type="radio" name="tipo" value="vivienda"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>Vivienda</span></label>
+            <label class="opcion"><input type="radio" name="tipo" value="cochera"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17h14M6 17l1.5-5h9L18 17"/><circle cx="8.5" cy="17.5" r="1.5"/><circle cx="15.5" cy="17.5" r="1.5"/></svg>Cochera</span></label>
+            <label class="opcion"><input type="radio" name="tipo" value="ambas"><span>Ambas</span></label>
+          </div>
+          <div class="error-campo">Elegí una opción.</div>
+        </div>
+        <div class="fila" id="filaDepto">
+          <div class="campo" data-campo="piso">
+            <label for="piso">Piso</label>
+            <input type="text" id="piso" maxlength="10" placeholder="Ej. 4" inputmode="text">
+            <div class="error-campo">Falta el piso.</div>
+          </div>
+          <div class="campo" data-campo="unidad">
+            <label for="unidad">Departamento</label>
+            <input type="text" id="unidad" maxlength="10" placeholder="Ej. B">
+            <div class="error-campo">Falta el depto.</div>
+          </div>
+        </div>
+        <div id="bloqueCochera" class="oculto">
+          <div class="campo">
+            <label for="cochera">Número de cochera <span class="opcional">(si tiene)</span></label>
+            <input type="text" id="cochera" maxlength="15" placeholder="Ej. 12">
+          </div>
+          <div class="campo">
+            <span class="grupo-label">¿Tenés control remoto para la cochera?</span>
+            <div class="opciones">
+              <label class="opcion"><input type="radio" name="control_remoto" value="si"><span>Sí</span></label>
+              <label class="opcion"><input type="radio" name="control_remoto" value="no"><span>No</span></label>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. Llaves -->
+      <section class="card">
+        <div class="paso"><span class="paso-num">3</span><h2>Tu llave electrónica</h2></div>
+        <p class="paso-sub">Si en tu casa usan varias, agregalas todas.</p>
+        <div id="llaves"></div>
+        <button type="button" class="btn-agregar" id="agregarLlaveBtn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+          Agregar otra llave
+        </button>
+
+        <details class="donde">
+          <summary>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.7M12 17v.01"/></svg>
+            ¿Dónde veo el número de la llave?
+            <svg class="flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+          </summary>
+          <div class="donde-cuerpo">
+            <svg class="ilustracion" viewBox="0 0 330 150" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Llavero de acceso con el número impreso en una de sus caras">
+              <defs>
+                <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3B3E43"/><stop offset="1" stop-color="#1A1C1F"/></linearGradient>
+              </defs>
+              <!-- llavero (gota) -->
+              <g transform="translate(40 12)">
+                <circle cx="62" cy="14" r="9" fill="none" stroke="#9A978E" stroke-width="3"/>
+                <path d="M62 24 C 98 24 122 52 122 82 C 122 110 96 128 62 128 C 28 128 2 110 2 82 C 2 52 26 24 62 24 Z" fill="url(#g1)"/>
+                <circle cx="62" cy="38" r="5" fill="#F2F1EC"/>
+                <rect x="20" y="84" width="84" height="24" rx="4" fill="#F2F1EC"/>
+                <text x="62" y="101" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="600" fill="#0E0F10">0004521873</text>
+                <rect x="16" y="80" width="92" height="32" rx="6" fill="none" stroke="#F6B828" stroke-width="3"/>
+              </g>
+              <!-- flecha y texto -->
+              <path d="M150 108 C 172 108 180 90 198 82" fill="none" stroke="#B9850A" stroke-width="2.2" stroke-dasharray="4 4"/>
+              <path d="M192 76 l9 5 -8 7" fill="none" stroke="#B9850A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+              <text x="208" y="76" font-family="Barlow, sans-serif" font-size="14" font-weight="600" fill="#0E0F10">Este número</text>
+              <text x="208" y="94" font-family="Barlow, sans-serif" font-size="13" fill="#6E6C66">va en el</text><text x="208" y="110" font-family="Barlow, sans-serif" font-size="13" fill="#6E6C66">formulario</text>
+            </svg>
+            Está impreso en el llavero o tarjeta, generalmente en la parte de atrás (puede estar en letra chica, a veces con dos grupos de números como <span class="mono">0004521873 069,02561</span>). Copialo tal cual se ve.<br><br>
+            El <b>número de usuario</b> es el que te asignaron al darte la llave; si no lo sabés, dejalo vacío.
+          </div>
+        </details>
+
+        <div class="campo" style="margin-top:18px;">
+          <label class="switch-linea">
+            <input type="checkbox" id="tienePerdida">
+            <span>Perdí una llave o ya no la uso
+              <small>Así la damos de baja y nadie más puede entrar con ella.</small></span>
+          </label>
+          <div class="perdida-box" id="perdidaBox">
+            <div class="campo">
+              <label for="perdidaTag">Número de esa llave <span class="opcional">(si lo sabés)</span></label>
+              <input type="text" id="perdidaTag" class="mono" maxlength="40" placeholder="Ej. 0004521873">
+            </div>
+            <div class="campo">
+              <label for="perdidaDetalle">Contanos qué pasó <span class="opcional">(opcional)</span></label>
+              <input type="text" id="perdidaDetalle" maxlength="200" placeholder="Ej. la perdí en marzo / era de un inquilino anterior">
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Envío -->
+      <section class="card">
+        <div class="campo" style="margin-top:0;">
+          <label for="comentario">¿Algo más que quieras contarnos? <span class="opcional">(opcional)</span></label>
+          <textarea id="comentario" maxlength="400" placeholder="Ej. la llave a veces no abre la puerta de la cochera"></textarea>
+        </div>
+        <!-- Trampa para robots: una persona nunca ve este campo -->
+        <input type="text" id="sitioWeb" name="sitio_web" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px;width:1px;height:1px;" aria-hidden="true">
+
+        <div class="campo" data-campo="acepta" style="margin-top:18px;">
+          <label class="switch-linea">
+            <input type="checkbox" id="acepta">
+            <span>Acepto que SAT use estos datos solo para administrar el control de acceso del edificio.</span>
+          </label>
+          <div class="error-campo">Para continuar tenés que aceptar.</div>
+        </div>
+
+        <button type="submit" class="enviar" id="enviarBtn">
+          Enviar registro
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+        <p class="status" id="statusMsg" role="status"></p>
+        <p class="legal">Tus datos se guardan de forma privada y no se comparten con terceros. Podés pedir que los corrijamos o borremos cuando quieras (Ley 25.326).</p>
+      </section>
+    </form>
+
+    <!-- Gracias -->
+    <div class="card final oculto" id="pantallaGracias">
+      <div class="sello"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+      <h2>¡Listo, gracias!</h2>
+      <p>Tu registro quedó guardado. Si hace falta algo más, te vamos a contactar.</p>
+      <div class="resumen" id="resumen"></div>
+      <button type="button" class="btn-sec" id="otroBtn">Registrar a otra persona</button>
+    </div>
+  </main>
+
+  <div class="pie">
+    SAT · Seguridad electrónica<br>
+    <a href="https://www.sat365.com.ar" target="_blank" rel="noopener">www.sat365.com.ar</a>
+  </div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const codigo = (new URLSearchParams(location.search).get("e") || "").toLowerCase().trim();
+  const form = $("formulario");
+  const llavesCont = $("llaves");
+  const MAX_LLAVES = 6;
+  let nombreEdificio = "";
+
+  function mostrar(id) {
+    ["cargando", "pantallaInvalida", "formulario", "pantallaGracias"].forEach((x) => $(x).classList.toggle("oculto", x !== id));
+  }
+
+  async function iniciar() {
+    if (!/^[a-z0-9-]{3,40}$/.test(codigo)) { mostrar("pantallaInvalida"); $("edificioChip").classList.add("oculto"); return; }
+    try {
+      const r = await fetch("/api/datos?publico=registro_llaves&e=" + encodeURIComponent(codigo), { cache: "no-store" });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "");
+      nombreEdificio = d.nombre;
+      $("edificioNombre").textContent = d.nombre;
+      $("edificioDireccion").textContent = d.direccion || "";
+      document.title = "Registro de llaves — " + d.nombre;
+      agregarLlave();
+      mostrar("formulario");
+    } catch (e) {
+      $("edificioChip").classList.add("oculto");
+      mostrar("pantallaInvalida");
+    }
+  }
+
+  // ---------- Llaves (una o varias) ----------
+  function agregarLlave() {
+    const n = llavesCont.children.length;
+    if (n >= MAX_LLAVES) return;
+    const div = document.createElement("div");
+    div.className = "llave";
+    div.innerHTML = `
+      <div class="llave-tit">
+        <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2 2M14 9l2 2"/></svg><span class="llave-num"></span></b>
+        <button type="button" class="quitar">Quitar</button>
+      </div>
+      <div class="campo" data-campo="tag">
+        <label>Número impreso en la llave</label>
+        <input type="text" class="mono in-tag" maxlength="40" placeholder="Ej. 0004521873" autocomplete="off" autocapitalize="characters" spellcheck="false">
+        <div class="error-campo">Escribí el número que figura en la llave.</div>
+      </div>
+      <div class="campo">
+        <label>Número de usuario <span class="opcional">(si lo conocés)</span></label>
+        <input type="text" class="mono in-usuario" maxlength="15" inputmode="numeric" placeholder="Ej. 125" autocomplete="off">
+      </div>`;
+    div.querySelector(".quitar").addEventListener("click", () => { div.remove(); renumerar(); });
+    llavesCont.appendChild(div);
+    renumerar();
+    if (n > 0) div.querySelector(".in-tag").focus();
+  }
+  function renumerar() {
+    const items = [...llavesCont.children];
+    items.forEach((el, i) => {
+      el.querySelector(".llave-num").textContent = items.length > 1 ? "Llave " + (i + 1) : "Llave";
+      el.querySelector(".quitar").classList.toggle("oculto", items.length === 1);
+    });
+    $("agregarLlaveBtn").classList.toggle("oculto", items.length >= MAX_LLAVES);
+  }
+  $("agregarLlaveBtn").addEventListener("click", agregarLlave);
+
+  // ---------- Mostrar / ocultar según lo elegido ----------
+  function valorRadio(nombre) { const el = form.querySelector(`input[name="${nombre}"]:checked`); return el ? el.value : ""; }
+  form.querySelectorAll('input[name="relacion"]').forEach((r) => r.addEventListener("change", () => {
+    $("relacionOtro").classList.toggle("oculto", valorRadio("relacion") !== "otro");
+    if (valorRadio("relacion") === "otro") $("relacionOtro").focus();
+  }));
+  form.querySelectorAll('input[name="tipo"]').forEach((r) => r.addEventListener("change", () => {
+    const t = valorRadio("tipo");
+    $("bloqueCochera").classList.toggle("oculto", t === "vivienda");
+    $("filaDepto").classList.toggle("oculto", t === "cochera");
+  }));
+  $("tienePerdida").addEventListener("change", (e) => {
+    $("perdidaBox").classList.toggle("visible", e.target.checked);
+  });
+
+  // Al corregir un campo, se le saca la marca de error.
+  form.addEventListener("input", (e) => { const c = e.target.closest(".campo"); if (c) c.classList.remove("invalido"); if (!form.querySelector(".invalido")) $("statusMsg").textContent = ""; });
+  form.addEventListener("change", (e) => { const c = e.target.closest(".campo"); if (c) c.classList.remove("invalido"); if (!form.querySelector(".invalido")) $("statusMsg").textContent = ""; });
+
+  // ---------- Envío ----------
+  function validar() {
+    form.querySelectorAll(".invalido").forEach((x) => x.classList.remove("invalido"));
+    const malos = [];
+    const marcar = (el) => { const c = el.closest(".campo"); if (c) { c.classList.add("invalido"); malos.push(c); } };
+    if (!$("nombre").value.trim()) marcar($("nombre"));
+    if ($("telefono").value.replace(/\D/g, "").length < 6) marcar($("telefono"));
+    const mail = $("email").value.trim();
+    if (mail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) marcar($("email"));
+    if (!valorRadio("relacion")) marcar(form.querySelector('[data-campo="relacion"] input'));
+    const tipo = valorRadio("tipo");
+    if (!tipo) marcar(form.querySelector('[data-campo="tipo"] input'));
+    if (tipo && tipo !== "cochera") {
+      if (!$("piso").value.trim()) marcar($("piso"));
+      if (!$("unidad").value.trim()) marcar($("unidad"));
+    }
+    const llaves = [...llavesCont.querySelectorAll(".llave")];
+    const soloPerdida = $("tienePerdida").checked && ($("perdidaTag").value.trim() || $("perdidaDetalle").value.trim());
+    llaves.forEach((l, i) => {
+      const tag = l.querySelector(".in-tag");
+      const vacia = !tag.value.trim() && !l.querySelector(".in-usuario").value.trim();
+      // Una llave vacía se acepta solo si es la única y viene a reportar una pérdida.
+      if (!tag.value.trim() && !(vacia && soloPerdida && llaves.length === 1)) marcar(tag);
+    });
+    if (!$("acepta").checked) marcar($("acepta"));
+    return malos;
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const st = $("statusMsg");
+    const malos = validar();
+    if (malos.length) {
+      st.className = "status err";
+      st.textContent = malos.length === 1 ? "Revisá el campo marcado en rojo." : `Revisá los ${malos.length} campos marcados en rojo.`;
+      malos[0].scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    const tipo = valorRadio("tipo");
+    const datos = {
+      edificio: codigo,
+      nombre: $("nombre").value.trim(),
+      telefono: $("telefono").value.trim(),
+      email: $("email").value.trim(),
+      relacion: valorRadio("relacion"),
+      relacion_otro: $("relacionOtro").value.trim(),
+      tipo,
+      piso: tipo === "cochera" ? "" : $("piso").value.trim(),
+      unidad: tipo === "cochera" ? "" : $("unidad").value.trim(),
+      cochera: tipo === "vivienda" ? "" : $("cochera").value.trim(),
+      control_remoto: tipo === "vivienda" ? "" : valorRadio("control_remoto"),
+      llaves: [...llavesCont.querySelectorAll(".llave")].map((l) => ({ tag: l.querySelector(".in-tag").value.trim(), usuario: l.querySelector(".in-usuario").value.trim() })).filter((l) => l.tag),
+      perdidas: $("tienePerdida").checked && ($("perdidaTag").value.trim() || $("perdidaDetalle").value.trim()) ? [{ tag: $("perdidaTag").value.trim(), detalle: $("perdidaDetalle").value.trim() }] : [],
+      comentario: $("comentario").value.trim(),
+      acepta: $("acepta").checked,
+      sitio_web: $("sitioWeb").value,
+    };
+    const btn = $("enviarBtn");
+    btn.disabled = true;
+    st.className = "status";
+    st.textContent = "Enviando…";
+    try {
+      const r = await fetch("/api/datos?publico=registro_llaves", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(datos) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "No se pudo enviar");
+      armarResumen(datos);
+      st.textContent = "";
+      mostrar("pantallaGracias");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (err) {
+      st.className = "status err";
+      st.textContent = (err.message || "No se pudo enviar") + ". Probá de nuevo en un momento.";
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  function armarResumen(d) {
+    const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const filas = [["Edificio", nombreEdificio], ["Nombre", d.nombre]];
+    if (d.piso || d.unidad) filas.push(["Unidad", `Piso ${d.piso} · Depto ${d.unidad}`]);
+    if (d.cochera) filas.push(["Cochera", d.cochera]);
+    d.llaves.forEach((l, i) => filas.push([d.llaves.length > 1 ? "Llave " + (i + 1) : "Llave", l.tag]));
+    if (d.perdidas.length) filas.push(["Para dar de baja", d.perdidas[0].tag || "1 llave"]);
+    $("resumen").innerHTML = filas.map(([a, b]) => `<div><span>${esc(a)}</span><span>${esc(b)}</span></div>`).join("");
+  }
+
+  $("otroBtn").addEventListener("click", () => {
+    form.reset();
+    llavesCont.innerHTML = "";
+    agregarLlave();
+    $("relacionOtro").classList.add("oculto");
+    $("bloqueCochera").classList.add("oculto");
+    $("filaDepto").classList.remove("oculto");
+    $("perdidaBox").classList.remove("visible");
+    mostrar("formulario");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+
+  iniciar();
+})();
+</script>
+</body>
+</html>
