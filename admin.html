@@ -9465,6 +9465,11 @@ notasAdminBuscarInput.addEventListener("input", renderNotasAdmin);
 // Lo que cargan los vecinos desde registro-llaves.html?e=<codigo>. Se
 // guarda en el repo de datos (lib/registro-llaves.js); acá se concilia
 // llave por llave con lo que tiene la estación de monitoreo.
+// Escape completo (también comillas): lo que muestra esta sección lo escribió
+// cualquiera desde el formulario público, y va dentro de atributos HTML.
+function rllEsc(s) {
+  return String(s ?? "").replace(/[&<>"'`]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;", "`": "&#96;" }[c]));
+}
 const RLL_URL_PUBLICA = "https://pedido.sat365.com.ar/registro-llaves.html?e=";
 const RLL_ESTADOS = {
   pendiente: { txt: "Pendiente", color: "#8A5A00", bg: "#FFF1D6" },
@@ -9510,7 +9515,7 @@ function renderRllEdificios() {
   if (!rllEdificios.length) { cont.innerHTML = ""; return; }
   cont.innerHTML = `<table><thead><tr><th>Edificio</th><th>Registros</th><th>Por revisar</th><th>Último</th><th>QR</th><th></th></tr></thead><tbody>${rllEdificios.map((e) => `
     <tr${rllEdificioActual && rllEdificioActual.codigo === e.codigo ? ' style="background:rgba(245,166,35,0.10);"' : ""}>
-      <td><b>${escapeHtmlAdmin(e.nombre)}</b>${e.direccion ? `<br><span style="color:#6B7680;">${escapeHtmlAdmin(e.direccion)}</span>` : ""}<br><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6B7680;">${escapeHtmlAdmin(e.codigo)}</span></td>
+      <td><b>${rllEsc(e.nombre)}</b>${e.direccion ? `<br><span style="color:#6B7680;">${rllEsc(e.direccion)}</span>` : ""}<br><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6B7680;">${rllEsc(e.codigo)}</span></td>
       <td>${e.registros == null ? "—" : e.registros}</td>
       <td>${e.pendientes ? `<b style="color:#B5772A;">${e.pendientes}</b>` : "0"}</td>
       <td>${e.ultimo ? rllFecha(e.ultimo) : "—"}</td>
@@ -9676,13 +9681,13 @@ function renderRllRegistros() {
     if (f.repetida) avisos.push('<span class="ven-estado pronto">Número repetido</span>');
     if (f.reportadaPerdida) avisos.push('<span class="ven-estado vencido">Otro la reportó perdida</span>');
     return `<tr>
-      <td><b>${escapeHtmlAdmin(rllUnidad(r))}</b><br><span style="color:#6B7680;">${tipo[r.tipo] || ""}</span></td>
-      <td>${escapeHtmlAdmin(r.nombre)}<br><span style="color:#6B7680;">${rel[r.relacion] || ""}${r.relacion_otro ? " (" + escapeHtmlAdmin(r.relacion_otro) + ")" : ""} · ${rllFecha(r.fecha)}</span>${r.comentario ? `<br><span style="color:#34495E;">💬 ${escapeHtmlAdmin(r.comentario)}</span>` : ""}</td>
-      <td><a href="tel:${escapeHtmlAdmin(r.telefono)}">${escapeHtmlAdmin(r.telefono)}</a>${r.email ? `<br><a href="mailto:${escapeHtmlAdmin(r.email)}" style="color:#6B7680;">${escapeHtmlAdmin(r.email)}</a>` : ""}</td>
-      <td>${rllCeldaDispositivo(l)}${f.perdida && l.detalle ? `<br><span style="color:#6B7680;">${escapeHtmlAdmin(l.detalle)}</span>` : ""}${avisos.length ? "<br>" + avisos.join(" ") : ""}</td>
-      <td><input type="text" class="field-input rll-usuario" data-id="${r.id}" data-i="${f.i}" data-p="${f.perdida ? 1 : ""}" value="${escapeHtmlAdmin(l.usuario || "")}" style="width:80px;margin:0;padding:6px 8px;font-family:'IBM Plex Mono',monospace;" placeholder="—"></td>
-      <td><select class="rll-estado" data-id="${r.id}" data-i="${f.i}" data-p="${f.perdida ? 1 : ""}" style="margin:0;width:auto;padding:6px 8px;font-weight:700;color:${est.color};background:${est.bg};border-color:${est.bg};">${Object.entries(RLL_ESTADOS).map(([k, v]) => `<option value="${k}"${k === l.estado ? " selected" : ""}>${v.txt}</option>`).join("")}</select>${l.revisado_por ? `<br><span style="font-size:11px;color:#6B7680;">${escapeHtmlAdmin(l.revisado_por)}</span>` : ""}</td>
-      <td><input type="text" class="field-input rll-nota" data-id="${r.id}" data-i="${f.i}" data-p="${f.perdida ? 1 : ""}" value="${escapeHtmlAdmin(l.nota || "")}" style="min-width:140px;margin:0;padding:6px 8px;" placeholder="Nota..."></td>
+      <td><b>${rllEsc(rllUnidad(r))}</b><br><span style="color:#6B7680;">${tipo[r.tipo] || ""}</span></td>
+      <td>${rllEsc(r.nombre)}<br><span style="color:#6B7680;">${rel[r.relacion] || ""}${r.relacion_otro ? " (" + rllEsc(r.relacion_otro) + ")" : ""} · ${rllFecha(r.fecha)}</span>${r.comentario ? `<br><span style="color:#34495E;">💬 ${rllEsc(r.comentario)}</span>` : ""}</td>
+      <td><a href="tel:${rllEsc(String(r.telefono || "").replace(/[^0-9+]/g, ""))}">${rllEsc(r.telefono)}</a>${r.email ? `<br><a href="mailto:${rllEsc(r.email)}" style="color:#6B7680;">${rllEsc(r.email)}</a>` : ""}</td>
+      <td>${rllCeldaDispositivo(l)}${f.perdida && l.detalle ? `<br><span style="color:#6B7680;">${rllEsc(l.detalle)}</span>` : ""}${avisos.length ? "<br>" + avisos.join(" ") : ""}</td>
+      <td><input type="text" class="field-input rll-usuario" data-id="${r.id}" data-i="${f.i}" data-p="${f.perdida ? 1 : ""}" value="${rllEsc(l.usuario || "")}" style="width:80px;margin:0;padding:6px 8px;font-family:'IBM Plex Mono',monospace;" placeholder="—"></td>
+      <td><select class="rll-estado" data-id="${r.id}" data-i="${f.i}" data-p="${f.perdida ? 1 : ""}" style="margin:0;width:auto;padding:6px 8px;font-weight:700;color:${est.color};background:${est.bg};border-color:${est.bg};">${Object.entries(RLL_ESTADOS).map(([k, v]) => `<option value="${k}"${k === l.estado ? " selected" : ""}>${v.txt}</option>`).join("")}</select>${l.revisado_por ? `<br><span style="font-size:11px;color:#6B7680;">${rllEsc(l.revisado_por)}</span>` : ""}</td>
+      <td><input type="text" class="field-input rll-nota" data-id="${r.id}" data-i="${f.i}" data-p="${f.perdida ? 1 : ""}" value="${rllEsc(l.nota || "")}" style="min-width:140px;margin:0;padding:6px 8px;" placeholder="Nota..."></td>
       <td class="ven-btns"><button type="button" class="btn-secondary-admin rll-borrar" data-id="${r.id}" style="color:#B3261E;" title="Borra todo el registro de esta persona">Borrar</button></td>
     </tr>`;
   }).join("")}</tbody></table>`;
@@ -9707,11 +9712,11 @@ function rllCeldaDispositivo(l) {
   const etiqueta = control
     ? '<span style="display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#3A5BA8;background:#E8EEFB;border-radius:999px;padding:1px 8px;">📟 Control cochera</span>'
     : '<span style="display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#8A5A00;background:#FFF1D6;border-radius:999px;padding:1px 8px;">🔑 Tag</span>';
-  const num = (t) => `<div style="font-family:'IBM Plex Mono',monospace;font-size:17px;font-weight:600;letter-spacing:.5px;margin-top:3px;">${escapeHtmlAdmin(t)}</div>`;
+  const num = (t) => `<div style="font-family:'IBM Plex Mono',monospace;font-size:17px;font-weight:600;letter-spacing:.5px;margin-top:3px;">${rllEsc(t)}</div>`;
   if (!l.tag) return etiqueta + `<div style="color:#6B7680;margin-top:3px;">${control ? "Sin número en el control" : "(sin número)"}</div>`;
   if (control || RLL_FORMATO_TAG.test(l.tag)) return etiqueta + num(l.tag);
   const calc = rllTagCalculado(l.tag);
-  return etiqueta + (calc ? num(calc) + `<div style="font-size:11px;color:#6B7680;">calculado de ${escapeHtmlAdmin(l.tag)}</div>` : num(l.tag) + '<div style="font-size:11px;color:#B5772A;">no tiene el formato 000:00000</div>');
+  return etiqueta + (calc ? num(calc) + `<div style="font-size:11px;color:#6B7680;">calculado de ${rllEsc(l.tag)}</div>` : num(l.tag) + '<div style="font-size:11px;color:#B5772A;">no tiene el formato 000:00000</div>');
 }
 async function rllGuardarLlave(el, cambios) {
   const reg = rllRegistros.find((x) => x.id === el.dataset.id);
@@ -9773,7 +9778,7 @@ function rllImprimirCartel(ed) {
   const fuentes = new URL("vendor/fonts.css", location.href).href;
   const w = window.open("", "_blank");
   if (!w) { alert("El navegador bloqueó la ventana del cartel: permití las ventanas emergentes para este sitio."); return; }
-  const e = escapeHtmlAdmin;
+  const e = rllEsc;
   w.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Cartel QR — ${e(ed.nombre)}</title>
 <link rel="stylesheet" href="${fuentes}">
 <style>
@@ -9935,9 +9940,9 @@ function rllArmarMapeo() {
     elegido[k] = i;
   });
   if (elegido.apellido >= 0 && elegido.apellido === elegido.nombre) elegido.apellido = -1;
-  const opciones = (sel) => `<option value="-1">— no está —</option>` + encabezados.map((h, j) => `<option value="${j}"${j === sel ? " selected" : ""}>${escapeHtmlAdmin(h)}</option>`).join("");
+  const opciones = (sel) => `<option value="-1">— no está —</option>` + encabezados.map((h, j) => `<option value="${j}"${j === sel ? " selected" : ""}>${rllEsc(h)}</option>`).join("");
   document.getElementById("rllConcColumnas").innerHTML = RLL_CONC_CAMPOS.map(([k, t]) => `<div style="flex:1 1 170px;"><label>${t}</label><select data-k="${k}" style="margin:0;">${opciones(elegido[k])}</select></div>`).join("");
-  document.getElementById("rllConcVista").innerHTML = `<table><thead><tr>${encabezados.map((h) => `<th>${escapeHtmlAdmin(h)}</th>`).join("")}</tr></thead><tbody>${filas.slice(0, 4).map((f) => `<tr>${encabezados.map((_, j) => `<td>${escapeHtmlAdmin(f[j] ?? "")}</td>`).join("")}</tr>`).join("")}</tbody></table><p style="font-size:12px;color:#6B7680;margin:4px 0 0;">Primeras filas del archivo.</p>`;
+  document.getElementById("rllConcVista").innerHTML = `<table><thead><tr>${encabezados.map((h) => `<th>${rllEsc(h)}</th>`).join("")}</tr></thead><tbody>${filas.slice(0, 4).map((f) => `<tr>${encabezados.map((_, j) => `<td>${rllEsc(f[j] ?? "")}</td>`).join("")}</tr>`).join("")}</tbody></table><p style="font-size:12px;color:#6B7680;margin:4px 0 0;">Primeras filas del archivo.</p>`;
   document.getElementById("rllConcMapeo").classList.remove("hidden");
 }
 
@@ -10053,8 +10058,8 @@ function renderRllConciliacion() {
   tabla.innerHTML = `<table class="ven-tabla"><thead><tr><th>Resultado</th><th>En la estación</th><th>Registrado por el vecino</th><th>Qué hacer</th></tr></thead><tbody>${vis.map((f) => {
     const R = RLL_CONC_RES[f.res];
     const e = f.est, d = f.d;
-    const enEst = e ? `<span style="font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:14px;">${escapeHtmlAdmin(e.tag ? (rllEsControlEstacion(e) ? e.tag : (rllClaveTag(e.tag).includes(":") ? rllClaveTag(e.tag) : e.tag)) : "—")}</span>${e.usuario ? ` · usuario <b>${escapeHtmlAdmin(e.usuario)}</b>` : ""}<br><span style="color:#55595F;">${escapeHtmlAdmin([[e.nombre, e.apellido].filter(Boolean).join(" "), [e.piso ? e.piso + "°" : "", e.depto].filter(Boolean).join(" "), e.tipo].filter(Boolean).join(" · "))}</span>` : '<span style="color:#8A5A00;">No está en la estación</span>';
-    const reg = d ? `${disp(d.l)} <span style="font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:14px;">${escapeHtmlAdmin(d.l.tag ? (rllEsControl(d.l) ? d.l.tag : (rllTagCalculado(d.l.tag) && !RLL_FORMATO_TAG.test(d.l.tag) ? rllTagCalculado(d.l.tag) : d.l.tag)) : "s/n")}</span>${d.l.usuario ? ` · usuario <b>${escapeHtmlAdmin(d.l.usuario)}</b>` : ""}<br><span style="color:#55595F;">${escapeHtmlAdmin(d.r.nombre)} · ${escapeHtmlAdmin(rllUnidad(d.r))} · ${escapeHtmlAdmin(d.r.telefono)}</span>${d.perdida ? `<br><span style="color:#8C1D18;">La reportó perdida${d.l.detalle ? ": “" + escapeHtmlAdmin(d.l.detalle) + "”" : ""}</span>` : ""}` : '<span style="color:#B3261E;">Nadie la registró</span>';
+    const enEst = e ? `<span style="font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:14px;">${rllEsc(e.tag ? (rllEsControlEstacion(e) ? e.tag : (rllClaveTag(e.tag).includes(":") ? rllClaveTag(e.tag) : e.tag)) : "—")}</span>${e.usuario ? ` · usuario <b>${rllEsc(e.usuario)}</b>` : ""}<br><span style="color:#55595F;">${rllEsc([[e.nombre, e.apellido].filter(Boolean).join(" "), [e.piso ? e.piso + "°" : "", e.depto].filter(Boolean).join(" "), e.tipo].filter(Boolean).join(" · "))}</span>` : '<span style="color:#8A5A00;">No está en la estación</span>';
+    const reg = d ? `${disp(d.l)} <span style="font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:14px;">${rllEsc(d.l.tag ? (rllEsControl(d.l) ? d.l.tag : (rllTagCalculado(d.l.tag) && !RLL_FORMATO_TAG.test(d.l.tag) ? rllTagCalculado(d.l.tag) : d.l.tag)) : "s/n")}</span>${d.l.usuario ? ` · usuario <b>${rllEsc(d.l.usuario)}</b>` : ""}<br><span style="color:#55595F;">${rllEsc(d.r.nombre)} · ${rllEsc(rllUnidad(d.r))} · ${rllEsc(d.r.telefono)}</span>${d.perdida ? `<br><span style="color:#8C1D18;">La reportó perdida${d.l.detalle ? ": “" + rllEsc(d.l.detalle) + "”" : ""}</span>` : ""}` : '<span style="color:#B3261E;">Nadie la registró</span>';
     let accion = "";
     if (f.res === "encontrada") accion = `<span style="color:#1F6B34;">${d.l.estado === "conciliada" ? "✓ Conciliada" : "Coincide"}${f.por === "usuario" ? " (por N° de usuario)" : ""}</span>`;
     else if (f.res === "falta") accion = '<span style="color:#8A5A00;">Cargarla en la estación (o revisar el número)</span>';
@@ -10065,7 +10070,7 @@ function renderRllConciliacion() {
         : `<button type="button" class="rll-dec" data-i="${f.i}" data-d="dar_de_baja" style="width:auto;padding:5px 10px;font-size:12px;background:#B3261E;">Dar de baja</button> <button type="button" class="btn-secondary-admin rll-dec" data-i="${f.i}" data-d="borrar" style="width:auto;padding:5px 10px;font-size:12px;color:#B3261E;border-color:#B3261E;">Borrar</button> <button type="button" class="btn-secondary-admin rll-dec" data-i="${f.i}" data-d="mantener" style="width:auto;padding:5px 10px;font-size:12px;">Mantener</button>`;
     }
     return `<tr style="background:${R.fondo};">
-      <td style="border-left:4px solid ${R.color};"><b style="color:${R.color};">${R.txt}</b>${f.nota ? `<br><span style="font-size:11.5px;color:#55595F;">⚠ ${escapeHtmlAdmin(f.nota)}</span>` : ""}</td>
+      <td style="border-left:4px solid ${R.color};"><b style="color:${R.color};">${R.txt}</b>${f.nota ? `<br><span style="font-size:11.5px;color:#55595F;">⚠ ${rllEsc(f.nota)}</span>` : ""}</td>
       <td>${enEst}</td><td>${reg}</td><td style="white-space:nowrap;">${accion}</td></tr>`;
   }).join("")}</tbody></table>`;
   tabla.querySelectorAll(".rll-dec").forEach((b) => b.addEventListener("click", () => rllDecidir([Number(b.dataset.i)], b.dataset.d)));

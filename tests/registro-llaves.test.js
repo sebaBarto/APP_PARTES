@@ -21,7 +21,7 @@ function ghFalso() {
 function llamar(fn, req, ...extra) {
   return new Promise((ok) => {
     const res = { statusCode: 200, setHeader() {}, status(c) { this.statusCode = c; return this; }, json(d) { ok({ status: this.statusCode, data: d }); } };
-    fn({ query: {}, ...req }, res, ...extra);
+    fn({ query: {}, headers: { "x-real-ip": "10.0." + Math.floor(Math.random() * 250) + "." + Math.floor(Math.random() * 250) }, ...req }, res, ...extra);
   });
 }
 const valido = { edificio: "muelle11-k7p3", nombre: "Ana", telefono: "341 555 1234", relacion: "titular", tipo: "vivienda", piso: "4", unidad: "B", llaves: [{ tag: "0004521873" }], acepta: true };
@@ -101,4 +101,26 @@ test("registro de llaves: conciliación guarda el listado de la estación y las 
   const regs = (await llamar(manejarAdmin, { method: "GET", query: { edificio: "muelle11-k7p3" } }, admin, gh)).data;
   const l = await llamar(manejarAdmin, { method: "POST", body: { accion: "estado_lote", edificio: "muelle11-k7p3", cambios: [{ id: regs[0].id, indice: 0, estado: "conciliada" }] } }, admin, gh);
   assert.strictEqual(l.data.aplicados, 1);
+});
+
+test("registro de llaves: no acepta caracteres para inyectar código y frena a un robot", async () => {
+  const { _reiniciarTopes } = require("../lib/registro-llaves");
+  _reiniciarTopes();
+  const gh = ghFalso();
+  const malo = { ...valido, nombre: 'Ana <img src=x onerror=alert(1)>', telefono: '341" onmouseover="x', email: 'x"onmouseover="alert(1)"@a.co', llaves: [{ tag: "001:00001", usuario: '12"x' }] };
+  assert.strictEqual((await llamar(manejarPublico, { method: "POST", body: malo }, gh)).status, 400); // mail inválido
+  const r = await llamar(manejarPublico, { method: "POST", body: { ...malo, email: "" } }, gh);
+  assert.strictEqual(r.status, 400); // el teléfono queda con menos de 6 números
+  const ok = await llamar(manejarPublico, { method: "POST", body: { ...malo, email: "", telefono: '341 555 "1234' } }, gh);
+  assert.strictEqual(ok.status, 200);
+  const reg = JSON.parse(gh.store["registro-llaves/muelle11-k7p3.json"].t)[0];
+  for (const v of [reg.nombre, reg.telefono, reg.llaves[0].usuario]) assert.ok(!/[<>"]/.test(v), v);
+  assert.strictEqual(reg.llaves[0].usuario, "12x");
+  assert.ok(reg.ip && !reg.ip.includes("."), "se guarda la huella, no la IP");
+  // Mismo IP mandando sin parar: a partir del 7° en 10 minutos se corta sin tocar GitHub.
+  _reiniciarTopes();
+  const ip = { "x-real-ip": "200.1.1.1" };
+  const estados = [];
+  for (let i = 0; i < 8; i++) estados.push((await llamar(manejarPublico, { method: "POST", headers: ip, body: { ...valido, nombre: "Robot " + i } }, gh)).status);
+  assert.deepStrictEqual(estados, [200, 200, 200, 200, 200, 200, 429, 429]);
 });

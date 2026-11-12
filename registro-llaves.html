@@ -595,7 +595,7 @@
     if (!$("nombre").value.trim()) marcar($("nombre"));
     if ($("telefono").value.replace(/\D/g, "").length < 6) marcar($("telefono"));
     const mail = $("email").value.trim();
-    if (mail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) marcar($("email"));
+    if (mail && !/^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$/.test(mail)) marcar($("email"));
     if (!valorRadio("relacion")) marcar(form.querySelector('[data-campo="relacion"] input'));
     const tipo = valorRadio("tipo");
     if (!tipo) marcar(form.querySelector('[data-campo="tipo"] input'));
@@ -653,7 +653,7 @@
     try {
       const r = await fetch("/api/datos?publico=registro_llaves", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(datos) });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.error || "No se pudo enviar");
+      if (!r.ok) throw new Error(d.error || (r.status === 429 ? "Se mandaron muchos registros seguidos, esperá unos minutos" : "No se pudo enviar"));
       armarResumen(datos);
       st.textContent = "";
       mostrar("pantallaGracias");
