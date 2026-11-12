@@ -441,6 +441,20 @@ module.exports = async (req, res) => {
         </table>
         <p style="color:#6B7680; font-size:13px;margin-top:16px;">Ya quedó cargado en el panel de administración → Llaves de edificios. Este mail es solo un aviso.</p>
       `);
+    } else if (tipo === "aviso_gestion") {
+      // Aviso al administrador de consorcio (o al vecino del link) de que SAT cambió
+      // el estado de su pedido de llaves. Es un mail externo: va por Resend como el del cliente.
+      destinatario = datos.para;
+      if (!destinatario || !esEmailValido(destinatario)) { res.status(400).json({ error: "Falta un mail válido" }); return; }
+      const colores = { en_curso: "#2C4E9A", hecha: "#1F6B34", rechazada: "#B3261E" };
+      asunto = `Pedido N° ${datos.numero || ""} — ${datos.estado_txt || ""} — ${datos.edificio || ""}`;
+      html = `
+        <h2 style="margin-top:0;">Hola ${escapeHtml(datos.nombre || "")}</h2>
+        <p>Tu pedido de llaves <b>N° ${escapeHtml(String(datos.numero || ""))}</b> (${escapeHtml(datos.tipo_txt || "")}) de <b>${escapeHtml(datos.edificio || "")}</b>${datos.unidad ? `, unidad ${escapeHtml(datos.unidad)}` : ""}${datos.titular ? `, a nombre de ${escapeHtml(datos.titular)}` : ""} ahora está:</p>
+        <p style="font-size:20px;font-weight:700;color:${colores[datos.estado] || "#101820"};margin:6px 0 14px;">${escapeHtml(datos.estado_txt || "")}</p>
+        ${datos.nota ? `<p style="background:#F4F5F0;border-radius:8px;padding:10px 12px;"><b>Nota de SAT:</b> ${escapeHtml(datos.nota)}</p>` : ""}
+        ${datos.portal ? `<p><a href="${escapeHtml(datos.portal)}" style="color:#B9850A;font-weight:700;">Ver tus pedidos en el portal</a></p>` : ""}
+        <p style="color:#6B7680;font-size:13px;">SAT · Seguridad electrónica · www.sat365.com.ar — Este es un aviso automático, no hace falta responderlo.</p>`;
     } else if (tipo === "cliente") {
       destinatario = datos.cliente_email;
       if (!destinatario) {
@@ -465,7 +479,7 @@ module.exports = async (req, res) => {
     // cuando el origen es una IP externa (Vercel/AWS). Resend tiene
     // buena reputación con Gmail y otros proveedores. El de oficina
     // sigue por SMTP porque es entrega interna (no sale de Ferozo).
-    if (tipo === "cliente" && process.env.RESEND_API_KEY) {
+    if ((tipo === "cliente" || tipo === "aviso_gestion") && process.env.RESEND_API_KEY) {
       const resendRes = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },

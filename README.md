@@ -3256,3 +3256,19 @@ IP y por mail. Datos en `registro-llaves/administradores.json` y
   `api/enviar-mail.js`) a administracion@sat365.com.ar y
   edificios@sat365.com.ar (si se configura `LLAVES_AVISO_EMAIL` en Vercel,
   va a esa lista en su lugar).
+
+### Padrón de llaves y avisos de estado
+
+- El **padrón** de cada edificio es una sola lista (`registro-llaves/<código>.json`):
+  lo que cargan los vecinos con el QR, lo que entra por los pedidos y lo que
+  SAT carga a mano ("+ Agregar persona"). Cada persona tiene su origen (QR /
+  Pedido / SAT) y un **historial**.
+- Al marcar un pedido como **Hecha** se cargan las llaves entregadas y, antes
+  de confirmar, se ve qué cambia en el padrón (`lib/padron.js`): alta suma la
+  llave, reemplazo da de baja la vieja y suma la nueva, baja la marca dada de
+  baja, titularidad pasa las llaves al nuevo titular o da de baja las
+  anteriores. Se aplica una sola vez por pedido. También se puede marcar
+  hecha sin tocar el padrón.
+- Cuando SAT cambia el estado de un pedido, al administrador (y al vecino que
+  lo cargó con link, si dejó su mail) le llega un **mail** con el estado y la
+  nota (tipo `aviso_gestion`, por Resend si está `RESEND_API_KEY`).

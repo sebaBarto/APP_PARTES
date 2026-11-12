@@ -1801,7 +1801,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
             <button type="button" class="btn-secondary-admin" id="rllGestExcelBtn" style="width:auto;">⬇ Excel</button>
           </div>
         </div>
-        <p class="subtitle" style="margin:6px 0 10px;">Lo que piden los administradores desde <b>pedido.sat365.com.ar/consorcio.html</b>: nuevos tags, reemplazos, bajas y cambios de titularidad. El estado y la nota que pongas acá los ve el administrador.</p>
+        <p class="subtitle" style="margin:6px 0 10px;">Lo que piden los administradores desde <b>pedido.sat365.com.ar/consorcio.html</b> (o sus vecinos con un link): nuevos tags, reemplazos, bajas y cambios de titularidad. Cuando cambiás el estado, al administrador le llega un mail con la nota. Al marcar <b>Hecha</b> se actualiza solo el padrón del edificio.</p>
         <div class="sims-filtros" style="margin-bottom:8px;">
           <input type="text" class="field-input" id="rllGestBuscar" placeholder="Buscar por titular, unidad, N° de llave o administrador...">
           <select id="rllGestEstado"><option value="abiertas">Pendientes y en curso</option><option value="">Todas</option><option value="hecha">Hechas</option><option value="rechazada">Rechazadas</option></select>
@@ -1838,11 +1838,30 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
 
       <div class="card hidden" id="rllRegistrosCard">
         <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between;">
-          <h3 style="margin:0;" id="rllRegistrosTit">Registros</h3>
+          <h3 style="margin:0;" id="rllRegistrosTit">Padrón de llaves</h3>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" class="btn-secondary-admin" id="rllAgregarPersonaBtn" style="width:auto;">+ Agregar persona</button>
             <button type="button" class="btn-secondary-admin" id="rllRecargarBtn" style="width:auto;">↻ Actualizar</button>
             <button type="button" class="btn-secondary-admin" id="rllExcelBtn" style="width:auto;">⬇ Excel</button>
           </div>
+        </div>
+        <p class="subtitle" style="margin:6px 0 0;">Una sola lista por edificio: lo que cargan los vecinos con el QR, lo que entra por los pedidos de los administradores (al marcarlos <b>Hecha</b>) y lo que cargues a mano.</p>
+        <div id="rllAgregarPersona" class="hidden" style="margin-top:12px;padding:14px;border:1.5px dashed var(--border);border-radius:var(--r-md);">
+          <div class="field-row" style="flex-wrap:wrap;">
+            <div style="flex:2 1 200px;"><label>Nombre y apellido</label><input type="text" class="field-input" id="rllApNombre"></div>
+            <div style="flex:1 1 140px;"><label>Teléfono</label><input type="tel" class="field-input" id="rllApTel"></div>
+            <div style="flex:1 1 130px;"><label>Es</label><select id="rllApRel"><option value="titular">Titular</option><option value="inquilino">Inquilino</option><option value="otro">Otro</option></select></div>
+          </div>
+          <div class="field-row" style="flex-wrap:wrap;">
+            <div style="flex:1 1 80px;"><label>Piso</label><input type="text" class="field-input" id="rllApPiso"></div>
+            <div style="flex:1 1 80px;"><label>Depto</label><input type="text" class="field-input" id="rllApUnidad"></div>
+            <div style="flex:1 1 90px;"><label>Cochera</label><input type="text" class="field-input" id="rllApCochera"></div>
+            <div style="flex:1 1 120px;"><label>Dispositivo</label><select id="rllApDisp"><option value="tag">Tag</option><option value="control">Control</option></select></div>
+            <div style="flex:1 1 130px;"><label>N° de llave</label><input type="text" class="field-input" id="rllApTag" placeholder="000:00000" style="font-family:'IBM Plex Mono',monospace;"></div>
+            <div style="flex:1 1 100px;"><label>N° usuario</label><input type="text" class="field-input" id="rllApUsuario"></div>
+          </div>
+          <div class="field-row" style="gap:8px;margin-top:10px;"><button type="button" id="rllApGuardarBtn" style="width:auto;">Agregar al padrón</button><button type="button" class="btn-secondary-admin" id="rllApCancelarBtn" style="width:auto;">Cancelar</button></div>
+          <p class="status" id="rllApStatus"></p>
         </div>
         <div class="sims-resumen" id="rllResumen" style="margin-top:12px;"></div>
         <div class="sims-filtros" style="margin-bottom:6px;">
@@ -9629,7 +9648,7 @@ async function rllAbrirEdificio(codigo) {
   if (!rllEdificioActual) { card.classList.add("hidden"); document.getElementById("rllConcCard").classList.add("hidden"); return; }
   rllConc = null; // la conciliación es de cada edificio: se vuelve a pedir abajo
   card.classList.remove("hidden");
-  document.getElementById("rllRegistrosTit").textContent = "Registros de " + rllEdificioActual.nombre;
+  document.getElementById("rllRegistrosTit").textContent = "Padrón de llaves de " + rllEdificioActual.nombre;
   const st = document.getElementById("rllRegistrosStatus");
   st.className = "status"; st.textContent = "Cargando...";
   try {
@@ -9644,11 +9663,13 @@ async function rllAbrirEdificio(codigo) {
 }
 
 // Una fila por llave (la conciliación se hace llave por llave).
-function rllFilas() {
+function rllFilas(conSinLlave) {
   const filas = [];
   rllRegistros.forEach((r) => {
     (r.llaves || []).forEach((l, i) => filas.push({ r, l, i, perdida: false }));
     (r.perdidas || []).forEach((l, i) => filas.push({ r, l, i, perdida: true }));
+    // Persona sin llaves (p. ej. nuevo titular que todavía no retiró la suya): igual se muestra en el padrón.
+    if (conSinLlave && !(r.llaves || []).length && !(r.perdidas || []).length) filas.push({ r, l: { tipo: "tag", tag: "", estado: "" }, i: -1, perdida: false, sinLlave: true });
   });
   // Mismo número de llave cargado por más de un registro: hay que mirarlo.
   const normal = (t) => String(t || "").replace(/\D/g, "").replace(/^0+/, "") || String(t || "").trim().toLowerCase();
@@ -9676,6 +9697,21 @@ function rllTagCalculado(tag) {
   if (!(n < 2 ** 32)) return "";
   return String(Math.floor(n / 65536) % 256).padStart(3, "0") + ":" + String(n % 65536).padStart(5, "0");
 }
+function rllOrigen(r) {
+  const o = r.origen === "pedido" ? ["Pedido", "#2C4E9A", "#E8EEFB"] : r.origen === "sat" ? ["SAT", "#55595F", "#EEF0F2"] : ["QR", "#8A5A00", "#FFF1D6"];
+  return `<span title="Cómo entró al padrón" style="display:inline-block;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:${o[1]};background:${o[2]};border-radius:999px;padding:0 7px;vertical-align:middle;">${o[0]}</span>`;
+}
+// Ventana simple (la usan el historial y "marcar hecha").
+function rllModal(titulo, cuerpoHtml) {
+  document.getElementById("rllModal")?.remove();
+  const capa = document.createElement("div");
+  capa.id = "rllModal";
+  capa.style.cssText = "position:fixed;inset:0;z-index:9998;background:rgba(16,24,32,.55);display:flex;align-items:center;justify-content:center;padding:16px;";
+  capa.innerHTML = `<div style="background:#fff;border-radius:16px;max-width:640px;width:100%;max-height:88vh;overflow:auto;padding:20px 22px;box-shadow:0 20px 60px rgba(0,0,0,.25);"><div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;"><h3 style="margin:0 0 10px;">${titulo}</h3><button type="button" class="btn-secondary-admin" data-cerrar style="width:auto;padding:4px 10px;">✕</button></div><div class="rll-modal-cuerpo">${cuerpoHtml}</div></div>`;
+  capa.addEventListener("click", (e) => { if (e.target === capa || e.target.closest("[data-cerrar]")) capa.remove(); });
+  document.body.appendChild(capa);
+  return capa;
+}
 function rllUnidad(r) {
   const p = [];
   if (r.piso || r.unidad) p.push(`${r.piso || "?"}° ${r.unidad || ""}`.trim());
@@ -9684,7 +9720,7 @@ function rllUnidad(r) {
   return p.join(" · ") || "—";
 }
 function renderRllRegistros() {
-  const todas = rllFilas();
+  const todas = rllFilas(true);
   const n = (fn) => todas.filter(fn).length;
   const chips = [
     ["", "Todos", todas.length, ""],
@@ -9729,9 +9765,16 @@ function renderRllRegistros() {
     if (f.perdida) avisos.push('<span class="ven-estado vencido">Reportada perdida / no se usa</span>');
     if (f.repetida) avisos.push('<span class="ven-estado pronto">Número repetido</span>');
     if (f.reportadaPerdida) avisos.push('<span class="ven-estado vencido">Otro la reportó perdida</span>');
+    if (f.sinLlave) return `<tr>
+      <td><b>${rllEsc(rllUnidad(r))}</b><br><span style="color:#6B7680;">${tipo[r.tipo] || ""}</span></td>
+      <td>${rllEsc(r.nombre)} ${rllOrigen(r)}<br><span style="color:#6B7680;">${rel[r.relacion] || ""} · ${rllFecha(r.fecha)}</span>${(r.historial || []).length ? `<br><button type="button" class="btn-secondary-admin rll-historial" data-id="${rllEsc(r.id)}" style="width:auto;padding:2px 8px;font-size:11.5px;margin-top:3px;">🕓 Historial (${r.historial.length})</button>` : ""}</td>
+      <td><a href="tel:${rllEsc(String(r.telefono || "").replace(/[^0-9+]/g, ""))}">${rllEsc(r.telefono)}</a></td>
+      <td colspan="4" style="color:#6B7680;">Sin llaves en el padrón</td>
+      <td class="ven-btns"><button type="button" class="btn-secondary-admin rll-borrar" data-id="${rllEsc(r.id)}" style="color:#B3261E;">Borrar</button></td>
+    </tr>`;
     return `<tr>
       <td><b>${rllEsc(rllUnidad(r))}</b><br><span style="color:#6B7680;">${tipo[r.tipo] || ""}</span></td>
-      <td>${rllEsc(r.nombre)}<br><span style="color:#6B7680;">${rel[r.relacion] || ""}${r.relacion_otro ? " (" + rllEsc(r.relacion_otro) + ")" : ""} · ${rllFecha(r.fecha)}</span>${r.comentario ? `<br><span style="color:#34495E;">💬 ${rllEsc(r.comentario)}</span>` : ""}</td>
+      <td>${rllEsc(r.nombre)} ${rllOrigen(r)}<br><span style="color:#6B7680;">${rel[r.relacion] || ""}${r.relacion_otro ? " (" + rllEsc(r.relacion_otro) + ")" : ""} · ${rllFecha(r.fecha)}</span>${(r.historial || []).length ? `<br><button type="button" class="btn-secondary-admin rll-historial" data-id="${rllEsc(r.id)}" style="width:auto;padding:2px 8px;font-size:11.5px;margin-top:3px;">🕓 Historial (${r.historial.length})</button>` : ""}${r.comentario ? `<br><span style="color:#34495E;">💬 ${rllEsc(r.comentario)}</span>` : ""}</td>
       <td><a href="tel:${rllEsc(String(r.telefono || "").replace(/[^0-9+]/g, ""))}">${rllEsc(r.telefono)}</a>${r.email ? `<br><a href="mailto:${rllEsc(r.email)}" style="color:#6B7680;">${rllEsc(r.email)}</a>` : ""}</td>
       <td>${rllCeldaDispositivo(l)}${l.foto ? `<br><button type="button" class="btn-secondary-admin rll-ver-foto" data-foto="${rllEsc(l.foto)}" data-id="${rllEsc(r.id)}" data-i="${f.i}" data-p="${f.perdida ? 1 : ""}" style="width:auto;padding:4px 10px;font-size:12px;margin-top:4px;">📷 Ver foto</button>` : ""}${f.perdida && l.detalle ? `<br><span style="color:#6B7680;">${rllEsc(l.detalle)}</span>` : ""}${avisos.length ? "<br>" + avisos.join(" ") : ""}</td>
       <td><input type="text" class="field-input rll-usuario" data-id="${r.id}" data-i="${f.i}" data-p="${f.perdida ? 1 : ""}" value="${rllEsc(l.usuario || "")}" style="width:80px;margin:0;padding:6px 8px;font-family:'IBM Plex Mono',monospace;" placeholder="—"></td>
@@ -9742,6 +9785,10 @@ function renderRllRegistros() {
   }).join("")}</tbody></table>`;
 
   cont.querySelectorAll(".rll-estado").forEach((s) => s.addEventListener("change", () => rllGuardarLlave(s, { estado: s.value })));
+  cont.querySelectorAll(".rll-historial").forEach((b) => b.addEventListener("click", () => {
+    const reg = rllRegistros.find((x) => x.id === b.dataset.id);
+    if (reg) rllModal(`Historial de ${rllEsc(reg.nombre)} · ${rllEsc(rllUnidad(reg))}`, `<ul style="margin:0;padding-left:18px;line-height:1.6;">${(reg.historial || []).slice().reverse().map((h) => `<li><b>${rllFecha(h.fecha)}</b> — ${rllEsc(h.que)}${h.pedido ? ` <span style="color:#6B7680;">(pedido N° ${rllEsc(h.pedido)})</span>` : ""}${h.por ? ` <span style="color:#6B7680;">· ${rllEsc(h.por)}</span>` : ""}</li>`).join("")}</ul>`);
+  }));
   cont.querySelectorAll(".rll-ver-foto").forEach((b) => b.addEventListener("click", () => {
     const reg = rllRegistros.find((x) => x.id === b.dataset.id);
     const lista = reg && (b.dataset.p ? reg.perdidas : reg.llaves);
@@ -10362,6 +10409,7 @@ function renderRllGestiones() {
     if (g.motivo) det.push(`Motivo: <b${g.motivo === "robo" ? ' style="color:#B3261E;"' : ""}>${rllEsc(RLL_GEST_MOTIVOS[g.motivo] || g.motivo)}</b>`);
     if (g.tipo === "titularidad") det.push(`Nuevo: <b>${rllEsc(g.nuevo_titular)}</b> · ${rllEsc(g.nuevo_telefono)}${g.nuevo_email ? " · " + rllEsc(g.nuevo_email) : ""}<br>${g.llaves_titularidad === "transferir" ? "Se queda con las llaves" : "Bajar las anteriores y entregar nuevas"}`);
     if (g.observaciones) det.push(`<span style="color:#34495E;">💬 ${rllEsc(g.observaciones)}</span>`);
+    if (g.aplicada && (g.aplicada.acciones || []).length) det.push(`<span style="color:#1F6B34;font-size:12px;">✓ Padrón: ${g.aplicada.acciones.map(rllEsc).join(" · ")}</span>`);
     if ((g.fotos || []).length) det.push(g.fotos.map((fid, n) => `<button type="button" class="btn-secondary-admin rll-gest-foto" data-ed="${rllEsc(g.edificio)}" data-foto="${rllEsc(fid)}" style="width:auto;padding:4px 10px;font-size:12px;">📷 Foto ${n + 1}</button>`).join(" "));
     return `<tr${g.motivo === "robo" && g.estado === "pendiente" ? ' style="background:#FFF4F3;"' : ""}>
       <td style="white-space:nowrap;"><b style="font-size:15px;">${g.numero ? "N° " + rllEsc(g.numero) : ""}</b><br>${rllFecha(g.fecha)}</td>
@@ -10373,9 +10421,87 @@ function renderRllGestiones() {
       <td><input type="text" class="field-input rll-gest-nota" data-ed="${rllEsc(g.edificio)}" data-id="${rllEsc(g.id)}" value="${rllEsc(g.nota_sat || "")}" placeholder="Ej. Llave lista para retirar" style="min-width:170px;margin:0;padding:6px 8px;"></td>
     </tr>`;
   }).join("")}</tbody></table>`;
-  cont.querySelectorAll(".rll-gest-estado").forEach((s) => s.addEventListener("change", () => rllGuardarGestion(s, { estado: s.value })));
+  cont.querySelectorAll(".rll-gest-estado").forEach((s) => s.addEventListener("change", () => {
+    const g = rllGestiones.find((x) => x.id === s.dataset.id && x.edificio === s.dataset.ed);
+    if (s.value === "hecha" && g && !g.aplicada) { rllMarcarHecha(g, () => renderRllGestiones()); return; }
+    rllGuardarGestion(s, { estado: s.value });
+  }));
   cont.querySelectorAll(".rll-gest-nota").forEach((i) => i.addEventListener("change", () => rllGuardarGestion(i, { nota_sat: i.value })));
   cont.querySelectorAll(".rll-gest-foto").forEach((b) => b.addEventListener("click", () => rllVerFoto("/api/datos?coleccion=consorcio&edificio=" + encodeURIComponent(b.dataset.ed) + "&foto=" + encodeURIComponent(b.dataset.foto), null)));
+}
+document.getElementById("rllAgregarPersonaBtn").addEventListener("click", () => { document.getElementById("rllAgregarPersona").classList.toggle("hidden"); document.getElementById("rllApNombre").focus(); });
+document.getElementById("rllApCancelarBtn").addEventListener("click", () => document.getElementById("rllAgregarPersona").classList.add("hidden"));
+document.getElementById("rllApGuardarBtn").addEventListener("click", async () => {
+  const st = document.getElementById("rllApStatus");
+  const v = (id) => document.getElementById(id).value.trim();
+  st.className = "status"; st.textContent = "Guardando...";
+  try {
+    const r = await fetch("/api/datos?coleccion=registro_llaves", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "agregar_registro", edificio: rllEdificioActual.codigo, nombre: v("rllApNombre"), telefono: v("rllApTel"), relacion: v("rllApRel"), piso: v("rllApPiso"), unidad: v("rllApUnidad"), cochera: v("rllApCochera"), dispositivo: v("rllApDisp"), tag: v("rllApTag"), usuario: v("rllApUsuario") }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Error");
+    ["rllApNombre", "rllApTel", "rllApPiso", "rllApUnidad", "rllApCochera", "rllApTag", "rllApUsuario"].forEach((id) => { document.getElementById(id).value = ""; });
+    st.className = "status ok"; st.textContent = "Agregado.";
+    rllAbrirEdificio(rllEdificioActual.codigo);
+  } catch (e) { st.className = "status err"; st.textContent = "No se pudo: " + e.message; }
+});
+
+// Marcar un pedido como "Hecha": se cargan las llaves entregadas y se ve, antes de
+// confirmar, qué cambia en el padrón del edificio. Al administrador le llega un mail.
+function rllMarcarHecha(g, alCancelar) {
+  const filasIniciales = g.tipo === "nuevo" ? Math.max(1, Number(g.cantidad) || 1) : g.tipo === "reemplazo" ? 1 : g.tipo === "titularidad" && g.llaves_titularidad === "reemplazar" ? 1 : 0;
+  const fila = () => `<div class="field-row rll-hecha-fila" style="gap:8px;margin-top:6px;align-items:flex-end;">
+      <div style="flex:0 0 110px;"><label style="margin:0 0 4px;">Dispositivo</label><select class="rll-h-tipo" style="margin:0;"><option value="tag"${g.dispositivo !== "control" ? " selected" : ""}>Tag</option><option value="control"${g.dispositivo === "control" ? " selected" : ""}>Control</option></select></div>
+      <div style="flex:1 1 130px;"><label style="margin:0 0 4px;">N° de llave entregada</label><input type="text" class="field-input rll-h-tag" placeholder="000:00000" style="margin:0;font-family:'IBM Plex Mono',monospace;"></div>
+      <div style="flex:1 1 90px;"><label style="margin:0 0 4px;">N° usuario</label><input type="text" class="field-input rll-h-usuario" style="margin:0;"></div>
+    </div>`;
+  const capa = rllModal(`Pedido N° ${rllEsc(g.numero || "")} · ${rllEsc(RLL_GEST_TIPOS[g.tipo] || g.tipo)} → Hecha`, `
+    <p style="margin:0 0 6px;color:#55595F;">${rllEsc(g.edificio_nombre || "")} · ${rllEsc(rllGestUnidad(g))} · ${rllEsc(g.titular)}${g.tipo === "titularidad" ? " → " + rllEsc(g.nuevo_titular) : ""}</p>
+    ${g.tipo === "baja" ? "" : `<b>Llaves entregadas</b> <span style="color:#6B7680;font-size:13px;">(si todavía no tenés el número, dejalo vacío y lo completás después en el padrón)</span><div id="rllHechaFilas">${Array.from({ length: filasIniciales }, fila).join("")}</div><button type="button" class="btn-secondary-admin" id="rllHechaMas" style="width:auto;padding:4px 10px;font-size:12px;margin-top:6px;">+ Otra llave</button>`}
+    <div style="margin-top:14px;padding:10px 12px;border-radius:10px;background:#F4F5F0;"><b>Qué cambia en el padrón:</b><ul id="rllHechaPrev" style="margin:6px 0 0;padding-left:18px;line-height:1.55;"><li>Calculando…</li></ul></div>
+    <label style="margin-top:12px;">Nota para el administrador <span style="color:#6B7680;font-weight:400;">(le llega por mail)</span></label>
+    <input type="text" class="field-input" id="rllHechaNota" value="${rllEsc(g.nota_sat || "")}" placeholder="Ej. La llave está lista para retirar en portería">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">
+      <button type="button" id="rllHechaOk" style="width:auto;">✓ Marcar hecha y actualizar el padrón</button>
+      <button type="button" class="btn-secondary-admin" id="rllHechaSinPadron" style="width:auto;">Marcar hecha sin tocar el padrón</button>
+    </div>
+    <p class="status" id="rllHechaStatus"></p>`);
+  const llaves = () => [...capa.querySelectorAll(".rll-hecha-fila")].map((f) => ({ tipo: f.querySelector(".rll-h-tipo").value, tag: f.querySelector(".rll-h-tag").value.trim(), usuario: f.querySelector(".rll-h-usuario").value.trim() })).filter((l) => l.tag || l.usuario);
+  let t = null;
+  const previsualizar = async () => {
+    const ul = capa.querySelector("#rllHechaPrev");
+    try {
+      const r = await fetch("/api/datos?coleccion=consorcio", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "previsualizar_gestion", edificio: g.edificio, id: g.id, llaves_nuevas: llaves() }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Error");
+      ul.innerHTML = d.ya_aplicada ? "<li>Este pedido ya se aplicó al padrón antes: no se vuelve a aplicar.</li>" : (d.acciones.map((a) => `<li>${rllEsc(a)}</li>`).join("") || "<li>Nada</li>");
+    } catch (e) { ul.innerHTML = `<li style="color:#B3261E;">No se pudo calcular: ${rllEsc(e.message)}</li>`; }
+  };
+  capa.addEventListener("input", () => { clearTimeout(t); t = setTimeout(previsualizar, 450); });
+  capa.addEventListener("change", (e) => { if (e.target.matches(".rll-h-tipo")) previsualizar(); });
+  const mas = capa.querySelector("#rllHechaMas");
+  if (mas) mas.addEventListener("click", () => capa.querySelector("#rllHechaFilas").insertAdjacentHTML("beforeend", fila()));
+  let guardado = false;
+  const guardar = async (aplicar) => {
+    const st = capa.querySelector("#rllHechaStatus");
+    st.className = "status"; st.textContent = "Guardando...";
+    capa.querySelectorAll("button").forEach((b) => { b.disabled = true; });
+    try {
+      const nota = capa.querySelector("#rllHechaNota").value;
+      const r = await fetch("/api/datos?coleccion=consorcio", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "estado_gestion", edificio: g.edificio, id: g.id, estado: "hecha", nota_sat: nota, aplicar, llaves_nuevas: llaves() }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Error");
+      Object.assign(g, { estado: "hecha", nota_sat: nota, actualizado_por: adminNombre || "vos" }, d.aplicada ? { aplicada: d.aplicada } : {});
+      guardado = true;
+      capa.remove();
+      renderRllGestiones();
+      if (rllEdificioActual && rllEdificioActual.codigo === g.edificio) rllAbrirEdificio(g.edificio);
+    } catch (e) { st.className = "status err"; st.textContent = "No se pudo: " + e.message; capa.querySelectorAll("button").forEach((b) => { b.disabled = false; }); }
+  };
+  capa.querySelector("#rllHechaOk").addEventListener("click", () => guardar(true));
+  capa.querySelector("#rllHechaSinPadron").addEventListener("click", () => guardar(false));
+  const obs = new MutationObserver(() => { if (!document.body.contains(capa)) { obs.disconnect(); if (!guardado) alCancelar(); } });
+  obs.observe(document.body, { childList: true });
+  previsualizar();
 }
 async function rllGuardarGestion(el, cambios) {
   const g = rllGestiones.find((x) => x.id === el.dataset.id && x.edificio === el.dataset.ed);

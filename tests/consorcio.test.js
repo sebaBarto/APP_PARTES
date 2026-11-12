@@ -150,3 +150,53 @@ test("consorcio: link único — el vecino carga el pedido, va directo a SAT con
   await llamar(consorcio.manejarPortal, { method: "POST", headers: h, body: { accion: "cancelar_invitacion", edificio: m12, id: c2.data.invitacion.id } }, gh);
   assert.strictEqual((await llamar(consorcio.manejarLink, { method: "GET", query: { i: c2.data.codigo } }, gh)).status, 410);
 });
+
+test("padrón: al marcar Hecha, las gestiones actualizan solas la lista de llaves y se avisa al administrador", async () => {
+  const path = require("path");
+  const enviados = [];
+  process.env.SERVICIOS_API_TOKEN = process.env.SERVICIOS_API_TOKEN || "token-de-prueba";
+  require.cache[path.join(__dirname, "..", "api", "enviar-mail.js")] = { id: "x", loaded: true, exports: async (req, res) => { enviados.push(req.body); res.status(200).json({ ok: true }); } };
+  const { gh, m12, clave } = await preparar();
+  const { pase } = (await login(gh, "cp@admin.com", clave)).data;
+  const h = { "x-consorcio": pase };
+  const gestion = async (body) => (await llamar(consorcio.manejarPortal, { method: "POST", headers: h, body: { accion: "gestion", edificio: m12, ...body } }, gh)).data.gestion;
+  const hecha = (g, extra) => llamar(consorcio.manejarAdmin, { method: "POST", body: { accion: "estado_gestion", edificio: m12, id: g.id, estado: "hecha", ...extra } }, SAT, gh);
+  const padron = async () => JSON.parse(gh.store[`registro-llaves/${m12}.json`].t);
+
+  // 1) Nuevo tag para Ana (4° B): SAT carga el número entregado.
+  const g1 = await gestion({ tipo: "nuevo", piso: "4", unidad: "B", titular: "Ana Pérez", telefono: "341 555 1234", cantidad: 1 });
+  const prev = await llamar(consorcio.manejarAdmin, { method: "POST", body: { accion: "previsualizar_gestion", edificio: m12, id: g1.id, llaves_nuevas: [{ tag: "69,2561", usuario: "125" }] } }, SAT, gh);
+  assert.ok(prev.data.acciones.some((a) => a.includes("069:02561")), prev.data.acciones.join(" | "));
+  assert.ok(!gh.store[`registro-llaves/${m12}.json`], "la vista previa no guarda nada");
+  enviados.length = 0;
+  assert.strictEqual((await hecha(g1, { llaves_nuevas: [{ tag: "69,2561", usuario: "125" }], nota_sat: "Retirala por portería" })).status, 200);
+  let p = await padron();
+  assert.deepStrictEqual(p.map((r) => [r.nombre, r.llaves.map((l) => [l.tag, l.estado])]), [["Ana Pérez", [["069:02561", "conciliada"]]]]);
+  assert.deepStrictEqual(enviados.map((m) => [m.tipo, m.datos.para, m.datos.estado, m.datos.nota]), [["aviso_gestion", "cp@admin.com", "hecha", "Retirala por portería"]]);
+
+  // 2) Reemplazo: la vieja queda dada de baja y se suma la nueva.
+  const g2 = await gestion({ tipo: "reemplazo", piso: "4", unidad: "B", titular: "Ana Pérez", motivo: "rotura", tag: "069:02561" });
+  await hecha(g2, { llaves_nuevas: [{ tag: "070:11111" }] });
+  p = await padron();
+  assert.deepStrictEqual(p[0].llaves.map((l) => [l.tag, l.estado]), [["069:02561", "dada_de_baja"], ["070:11111", "conciliada"]]);
+
+  // 3) Baja por robo, sin número: es la única llave activa de Ana.
+  const g3 = await gestion({ tipo: "baja", piso: "4", unidad: "B", titular: "Ana Pérez", motivo: "robo" });
+  await hecha(g3);
+  p = await padron();
+  assert.strictEqual(p[0].llaves[1].estado, "dada_de_baja");
+  assert.match(p[0].llaves[1].nota, /Robo/);
+
+  // 4) Titularidad con llaves nuevas: Ana deja de ser titular, Pablo entra con su llave.
+  const g4 = await gestion({ tipo: "titularidad", piso: "4", unidad: "B", titular: "ana perez", nuevo_titular: "Pablo Gómez", nuevo_telefono: "341 111 2222", llaves_titularidad: "reemplazar" });
+  await hecha(g4, { llaves_nuevas: [{ tag: "080:22222" }] });
+  p = await padron();
+  assert.deepStrictEqual(p.map((r) => r.nombre), ["Ana Pérez", "Pablo Gómez"]);
+  assert.deepStrictEqual(p[1].llaves.map((l) => l.tag), ["080:22222"]);
+  assert.ok(p[0].historial.length >= 4, "queda el historial");
+
+  // Marcarla hecha dos veces no la aplica dos veces.
+  await llamar(consorcio.manejarAdmin, { method: "POST", body: { accion: "estado_gestion", edificio: m12, id: g4.id, estado: "en_curso" } }, SAT, gh);
+  await hecha(g4, { llaves_nuevas: [{ tag: "080:22222" }] });
+  assert.strictEqual((await padron()).length, 2);
+});
