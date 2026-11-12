@@ -1187,7 +1187,7 @@ async function stockActualizar(ruta, porDefecto, cambiar, mensaje) {
     if (res && res.error) return res;
     // Saldo y movimiento en la misma escritura: los movimientos quedan en «movsPend» del archivo de
     // saldos hasta que se pasan al historial del mes (si eso falla, se pasan en la próxima operación).
-    if (ruta === STOCK_SAL && Array.isArray(res.movs) && res.movs.length) res.data = { ...require("../stock-utils.js").anotarPresupuestos(res.data, res.movs), movsPend: [...((res.data && res.data.movsPend) || []), ...res.movs].slice(-2000) };
+    if (ruta === STOCK_SAL && Array.isArray(res.movs) && res.movs.length) res.data = { ...require("../stock-utils.js").anotarServicios(require("../stock-utils.js").anotarPresupuestos(res.data, res.movs), res.movs, res.servicio), movsPend: [...((res.data && res.data.movsPend) || []), ...res.movs].slice(-2000) };
     const r = await escribirArchivoDatos(ruta, res.data, sha, mensaje);
     if (r.ok) return res;
     if (r.status !== 409 && r.status !== 422) break;
@@ -1450,12 +1450,13 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
       const r = await stockActualizar(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }, (sal) => {
         if (opId && (sal.ops || []).includes(opId)) { duplicado = true; return { error: "duplicado", status: 200 }; }
         let s2 = sal;
-        const movs = [], aprobar = [], instalados = [], retirados = [], noRetirados = [];
+        const movs = [], aprobar = [], instalados = [], retirados = [], noRetirados = [], descontados = [];
         const motivo = `Parte${parte ? " N° " + parte : ""}`;
+        const yaUsados = new Set((Array.isArray(b.usados) ? b.usados : []).map((x) => S.codigoArticulo(x.c)));
         // 1) Usados de Mi stock: de a uno, así lo que no se pueda (ya no lo tiene) queda para aprobar.
         (Array.isArray(b.usados) ? b.usados.slice(0, 200) : []).forEach((x) => {
           const it = { c: S.codigoArticulo(x.c), cant: Number(x.cant) || 0, unidades: x.unidades || [] };
-          const m = S.moverStock(s2, [it], { tipo: "instalado_parte", de: tec, a: destino, por: quien, fecha: ahora, motivo, presupuesto }, cat);
+          const m = S.moverStock(s2, [it], { tipo: "instalado_parte", de: tec, a: destino, por: quien, fecha: ahora, motivo, presupuesto, servicio: parte || undefined }, cat);
           if (m.error) aprobar.push({ c: it.c, cant: it.cant, unidades: it.unidades, texto: ((cat.articulos || {})[it.c] || {}).d || it.c, error: m.error });
           else { s2 = m.saldos; movs.push(...m.movs); instalados.push(it.c); }
         });
@@ -1466,21 +1467,40 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
           if (!m.error) { s2 = m.saldos; movs.push(...m.movs); retirados.push(it.c); }
           else noRetirados.push(`${((cat.articulos || {})[it.c] || {}).d || it.c}: ${m.error}`);
         });
-        // 3) Lo que no estaba en su stock: para aprobar.
-        // (se propone el artículo que corresponde al texto, mirando primero lo que tiene el técnico y las
-        // camionetas: así el depósito solo confirma de dónde salió)
+        // 3) Lo cargado con el catálogo de materiales (texto libre):
+        //    - si el técnico lo tiene en su stock, se descuenta solo (hasta lo que tiene);
+        //    - lo que no tiene (o no se sabe qué artículo es) queda para aprobar, con el artículo propuesto.
         const cerca = Object.keys({ ...((s2.ubic || {})[tec] || {}), ...Object.assign({}, ...Object.entries(s2.ubic || {}).filter(([u]) => /^veh:/.test(u)).map(([, v]) => v)) });
         if (sal.inicializado) (Array.isArray(b.sinStock) ? b.sinStock.slice(0, 200) : []).forEach((x) => {
           const texto = String(x.texto || "").slice(0, 160);
-          let c = S.codigoArticulo(x.c) || "", sugerido = false;
-          if (!c || !(cat.articulos || {})[c]) { c = S.buscarArticuloPorTexto(cat, texto, cerca); sugerido = !!c; }
-          aprobar.push({ c, cant: Number(x.cant) || 1, unidades: x.unidades || [], texto, ...(sugerido ? { sugerido: true } : {}) });
+          let cant = Number(x.cant) || 1;
+          const arts = cat.articulos || {}, mio = (s2.ubic || {})[tec] || {};
+          const dado = S.codigoArticulo(x.c) || "";
+          // ¿Cuál de lo que tiene es? (el código que vino, o el único de su stock que coincide con el texto)
+          const cMio = dado && arts[dado] ? dado : S.buscarArticuloPorTexto({ articulos: Object.fromEntries(Object.keys(mio).filter((k) => mio[k] > 0 && arts[k]).map((k) => [k, arts[k]])) }, texto);
+          const tengo = cMio ? mio[cMio] || 0 : 0;
+          if (cMio && tengo > 0 && !yaUsados.has(cMio) && /^(cantidad|unidad)$/.test(arts[cMio].tipo)) {
+            const usa = Math.min(cant, tengo), series = S.seriesEn(s2, tec, cMio);
+            // Equipos con N° de serie: solo si se lleva todos los que tiene (si no, no se sabe cuál fue).
+            const unidades = arts[cMio].tipo === "unidad" && series.length ? (usa >= tengo ? series : null) : [];
+            const m = unidades ? S.moverStock(s2, [{ c: cMio, cant: usa, unidades }], { tipo: "instalado_parte", de: tec, a: destino, por: quien, fecha: ahora, motivo: `${motivo} · descontado solo de su stock («${texto.slice(0, 60)}»)`, presupuesto, servicio: parte || undefined }, cat) : { error: "no se sabe qué N° de serie" };
+            if (!m.error) {
+              s2 = m.saldos; movs.push(...m.movs); yaUsados.add(cMio);
+              descontados.push({ c: cMio, d: arts[cMio].d, cant: usa });
+              cant = Math.round((cant - usa) * 1000) / 1000;
+              if (cant <= 0) return;
+            }
+          }
+          let c = dado && arts[dado] ? dado : cMio, sugerido = false;
+          if (!c) { c = S.buscarArticuloPorTexto(cat, texto, cerca); }
+          if (c && c !== dado) sugerido = true;
+          aprobar.push({ c: c || "", cant, unidades: x.unidades || [], texto, ...(sugerido ? { sugerido: true } : {}) });
         });
         const nuevos = aprobar.map((x, i) => ({ id: `${Date.now().toString(36)}-a${i}`, fecha: ahora, por: quien, parte, cliente, destino, presupuesto, ...x }));
         s2 = { ...s2, aprobar: [...nuevos, ...(sal.aprobar || [])].slice(0, 1000) };
         if (opId) s2.ops = [opId, ...(sal.ops || [])].slice(0, 300);
         movsTodos = movs;
-        resumen = { instalados: instalados.length, retirados: retirados.length, paraAprobar: nuevos.length, ...(noRetirados.length ? { noRetirados } : {}) };
+        resumen = { instalados: instalados.length, retirados: retirados.length, paraAprobar: nuevos.length, ...(descontados.length ? { descontados } : {}), ...(noRetirados.length ? { noRetirados } : {}) };
         return { data: s2, respuesta: resumen, movs };
       }, `Stock: materiales del parte ${parte} (por ${quien})`);
       if (duplicado) { res.status(200).json({ ok: true, duplicado: true }); return; }
@@ -1994,13 +2014,17 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
       const confirmar = (/^tec:/.test(a) && a !== `tec:${quien}` && !enMano) || (b.accion === "devolver" && !esResp);
       if (enMano && b.motivo == null) b.motivo = "";
       const motivoMano = enMano ? `Recibido en mano por ${a.slice(4)} (${enMano})` : "";
+      // Para un servicio del cronograma: el material queda anotado a ese N° de servicio (y su cliente).
+      const limpioSv = (v, n) => String(v == null ? "" : v).replace(/\s+/g, " ").trim().slice(0, n);
+      const servicio = b.servicio && typeof b.servicio === "object" ? { numero: limpioSv(b.servicio.numero, 30), cliente: limpioSv(b.servicio.cliente, 120) } : null;
+      const motivoSv = servicio && (servicio.numero || servicio.cliente) ? `Servicio${servicio.numero ? " N° " + servicio.numero : ""}${servicio.cliente ? " · " + servicio.cliente : ""}` : "";
       const { data: cat } = await leerArchivoDatos(STOCK_CAT, { articulos: {} });
       let resultado = null, duplicado = false;
       const opId = String(b.op_id || "").slice(0, 60);
       const r = await stockActualizar(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }, (sal) => {
         // Lo que se mandó sin señal se reintenta: si ya llegó, no se aplica dos veces.
         if (opId && (sal.ops || []).includes(opId)) { duplicado = true; return { error: "duplicado", status: 200 }; }
-        const x = S.moverStock(sal, Array.isArray(b.items) ? b.items.slice(0, 500) : [], { tipo: enMano ? "entrega_mano" : tipo, de, a, por: quien, fecha: ahora, motivo: [motivoMano, String(b.motivo || "").slice(0, 200)].filter(Boolean).join(" · "), confirmar, fallado: fallado && b.accion === "devolver", falla, deFlexible: /^(cli|com):/.test(de) && (a === "dep" || a === "gar"), presupuesto: /^(cli|com):/.test(a) || noUsado ? String(b.presupuesto || "").trim().slice(0, 30) : "" }, cat);
+        const x = S.moverStock(sal, Array.isArray(b.items) ? b.items.slice(0, 500) : [], { tipo: enMano ? "entrega_mano" : tipo, de, a, por: quien, fecha: ahora, motivo: [motivoSv, motivoMano, String(b.motivo || "").slice(0, 200)].filter(Boolean).join(" · "), servicio: servicio && servicio.numero ? servicio.numero : undefined, confirmar, fallado: fallado && b.accion === "devolver", falla, deFlexible: /^(cli|com):/.test(de) && (a === "dep" || a === "gar"), presupuesto: /^(cli|com):/.test(a) || noUsado ? String(b.presupuesto || "").trim().slice(0, 30) : "" }, cat);
         if (x.error) return { error: x.error, status: 409 };
         resultado = x;
         // Un vehículo que recibe (o entrega) stock queda en la lista de camionetas aunque después quede vacío.
@@ -2013,7 +2037,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
         if (sinRegistro.length) x.saldos.revisar = [...sinRegistro.map((m) => ({ id: m.id, fecha: m.fecha, c: m.c, cant: m.cant, de, por: quien })), ...(sal.revisar || [])].slice(0, 300);
         // Si era un pedido del técnico, queda entregado (con lo que se llevó).
         if (b.solicitud && Array.isArray(sal.solicitudes)) x.saldos.solicitudes = sal.solicitudes.map((y) => (y.id === b.solicitud && (y.estado === "pendiente" || y.estado === "lista") ? { ...y, estado: "entregada", cerrada: ahora, cerrada_por: quien, entregado: x.movs.map((m) => ({ c: m.c, cant: m.cant })), ...(enMano ? { en_mano: enMano } : {}) } : y));
-        return { data: x.saldos, respuesta: { envio: x.envio, movimientos: x.movs.length, ...(enMano ? { en_mano: enMano } : {}) }, movs: x.movs };
+        return { data: x.saldos, respuesta: { envio: x.envio, movimientos: x.movs.length, ...(enMano ? { en_mano: enMano } : {}) }, movs: x.movs, servicio: servicio || undefined };
       }, `Stock: ${tipo} ${de} → ${a} (por ${quien})`);
       if (duplicado) { res.status(200).json({ ok: true, duplicado: true }); return; }
       if (!r.error && resultado) {

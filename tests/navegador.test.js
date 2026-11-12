@@ -5779,6 +5779,75 @@ test("Stock en la APP: el depósito entrega escaneando (etiqueta SAT + N° de un
   await ctx.close();
 });
 
+test("Depósito: la baja se anota a un servicio del cronograma (va al técnico agendado) y lo que no se usó vuelve con «Vuelve de un servicio»", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
+  const S = require(require("path").join(__dirname, "..", "stock-utils.js"));
+  const catalogo = { articulos: { 20208: { c: "20208", d: "SIRENA MP100", tipo: "cantidad" }, 40001: { c: "40001", d: "BATERIA 12V 7AH", tipo: "cantidad" } } };
+  let saldos = { inicializado: "2026-11-01", ubic: { dep: { 20208: 10, 40001: 20 }, "tec:Luis": { 40001: 3 } }, unidades: {}, pedidos: {}, envios: [],
+    servicios: { 37000: { cliente: "Farmacia Central", tecnico: "tec:Luis", fecha: "2026-11-10T12:00:00.000Z", salio: { 40001: 4 }, usado: { 40001: 1 }, volvio: {} } } };
+  const hoy = await page.evaluate(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; });
+  const posts = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    const json = (o, st) => route.fulfill({ status: st || 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("/api/cronograma")) return json({ tecnicos: ["Juan", "Luis"], tareas: [
+      { fecha: hoy, dia_label: "Hoy", tecnico: "Juan", hora_inicio: "09:00", hora_fin: "10:00", tarea: "Servicio: Kiosco Pérez\nAv. Colón 123  -  Córdoba" },
+      { fecha: hoy, dia_label: "Hoy", tecnico: "Juan", hora_inicio: "13:00", hora_fin: "14:00", tarea: "ALMUERZO" },
+      { fecha: "2020-01-01", dia_label: "Viejo", tecnico: "Juan", hora_inicio: "09:00", hora_fin: "10:00", tarea: "Servicio: Cliente Viejo\nCalle 1  -  Córdoba" } ] });
+    if (u.includes("/api/servicios")) return json([{ numero_servicio: "37895", cliente: "Kiosco Pérez", direccion: "Av. Colón 123", tarea: "Cambio de batería" }, { numero_servicio: "37950", cliente: "Ferretería Norte", direccion: "Rivadavia 10", tarea: "Falla zona 3", tecnico_asignado: "Luis" }]);
+    if (u.includes("coleccion=tecnicos")) return json([{ nombre: "Melina", permisos: { stock_responsable: true } }, { nombre: "Juan", permisos: {} }, { nombre: "Luis", permisos: {} }]);
+    if (!u.includes("coleccion=stock")) return json([]);
+    if (req.method() === "GET") return json({ catalogo, saldos, conciliacion: { marcas: [], corridas: [] } });
+    const b = JSON.parse(req.postData()); posts.push(b);
+    if (b.accion === "mover") { const x = S.moverStock(saldos, b.items, { tipo: "mover", de: b.de, a: b.a, servicio: b.servicio && b.servicio.numero }, catalogo); if (x.error) return json({ error: x.error }, 409); saldos = S.anotarServicios(x.saldos, x.movs, b.servicio); return json({ ok: true }); }
+    return json({ error: "?" }, 400);
+  });
+  await page.goto(base + "/index.html");
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { localStorage.removeItem("stock_destinos"); localStorage.removeItem("stock_cola"); localStorage.removeItem("servicios_cache"); serviciosCache = []; cronogramaCache = []; cronogramaCargadoOk = false; tecnicoLogueado = "Melina"; tecnicosPasswords = { Melina: "", Juan: "", Luis: "" }; tecnicosPermisos = { Melina: { stock_responsable: true } }; refrescarAccesosPorPermisos(); showScreen("home"); });
+  await page.click("#tileDepositoBtn");
+  await page.waitForFunction(() => depDatos && depDatos.catalogo);
+  // El servicio de hoy de Juan, con su N° (lo saca de los pendientes); ni el almuerzo ni lo de días pasados
+  await page.click("#depServicioBtn");
+  await page.waitForSelector(".dep-sv-lista .dep-sv");
+  assert.deepStrictEqual(await page.$$eval(".dep-sv-lista .dep-sv", (b) => b.map((x) => x.textContent.replace(/\s+/g, " ").trim())), ["Kiosco PérezN° 37895 · Juan · 09:00Cambio de batería"]);
+  // Buscando aparece también un pendiente sin agendar
+  await page.fill(".dlg-app input", "ferret");
+  await page.waitForFunction(() => /Ferretería Norte/.test(document.querySelector(".dep-sv-lista").textContent));
+  assert.match(await page.textContent(".dep-sv-lista"), /Pendientes sin agendar[\s\S]*Ferretería Norte[\s\S]*N° 37950 · Luis/);
+  await page.fill(".dlg-app input", "");
+  await page.click(".dep-sv-lista .dep-sv");
+  await page.waitForFunction(() => !document.querySelector(".dlg-app"));
+  assert.deepStrictEqual([await page.inputValue("#depDestTipo"), await page.inputValue("#depDestSelect")], ["tec", "Juan"], "va al técnico que lo tiene agendado");
+  assert.match(await page.textContent("#depServicioChip"), /Para el servicio\s*N° 37895 · Kiosco Pérez/);
+  await page.fill("#depCodigo", "bateria");
+  await page.keyboard.press("Enter");
+  await page.waitForSelector("#depCanasta .stk-linea");
+  await page.click("#depConfirmarBtn");
+  await page.click("text=Mandar en camino");
+  await page.waitForFunction(() => !document.querySelector("#depCanasta .stk-linea"));
+  const p1 = posts.at(-1);
+  assert.deepStrictEqual([p1.a, p1.servicio, p1.items], ["tec:Juan", { numero: "37895", cliente: "Kiosco Pérez" }, [{ c: "40001", cant: 1, unidades: [] }]]);
+  assert.strictEqual(await page.evaluate(() => document.getElementById("depServicioChip").classList.contains("hidden")), true, "la próxima baja no queda atada al servicio anterior");
+  // Alta: vuelve de un servicio lo que no se usó (lo que le queda a Luis de lo de la Farmacia)
+  await page.click('#depModos [data-modo="recibir"]');
+  await page.selectOption("#depRecibirTipo", "servicio");
+  assert.deepStrictEqual(await page.$$eval("#depServicioVuelve option", (o) => o.map((x) => x.textContent)), ["Elegí el servicio…", "N° 37895 · Kiosco Pérez (Juan)", "N° 37000 · Farmacia Central (Luis)"]);
+  await page.selectOption("#depServicioVuelve", "37000");
+  assert.match((await page.textContent("#depServicioVuelveItems")).replace(/\s+/g, " "), /Se le entregó a Luis.*BATERIA 12V 7AH ?entregado 4 · usado 1 ?3/);
+  await page.click("#depServicioVuelveItems [data-vuelve]");
+  await page.click("#depConfirmarBtn");
+  assert.match(await page.textContent(".dlg-app .dlg-texto"), /Va al depósito \(viene de Técnico: Luis\)[\s\S]*BATERIA 12V 7AH: 3/);
+  await page.click(".dlg-app .dlg-si");
+  await page.waitForFunction(() => !document.querySelector("#depCanasta .stk-linea"));
+  const p2 = posts.at(-1);
+  assert.deepStrictEqual([p2.de, p2.a, p2.servicio.numero, p2.items[0].cant], ["tec:Luis", "dep", "37000", 3]);
+  assert.deepStrictEqual([saldos.ubic.dep[40001], saldos.servicios["37000"].volvio], [22, { 40001: 3 }]);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
 test("Depósito (revisión): confirmar aparece al salir de Consultar, búsqueda por nombre en vivo, «lo deja un técnico», pedido que no se prepara, cámara abierta hasta completar el pedido y cola de otra persona", async () => {
   const { ctx, page, erroresPagina } = await nuevaPagina();
   await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));

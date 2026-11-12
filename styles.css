@@ -3821,6 +3821,19 @@ html .app .equipo-acciones .btn.eq-util.activo, .equipo-acciones .eq-util.activo
 .stk-cola .err { color: #E4402C; }
 .stk-cola-item { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 4px 0; }
 .stk-cola-btns { display: flex; gap: 12px; flex: 0 0 auto; }
+.dep-servicio { margin: 2px 0 12px; }
+.dep-servicio .btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.dep-servicio-chip { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(245,166,35,.55); background: rgba(245,166,35,.12); font-size: 14px; line-height: 1.3; }
+.dep-servicio-chip.hidden { display: none; }
+.dep-servicio-chip span { display: flex; align-items: flex-start; gap: 8px; min-width: 0; }
+.dep-servicio-chip .stk-ico { flex: 0 0 auto; margin-top: 2px; }
+.dep-sv-lista { max-height: 52vh; overflow: auto; margin: 8px 0; }
+.dep-sv-dia { margin: 12px 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; opacity: .7; }
+.dep-sv-dia:first-child { margin-top: 2px; }
+.dep-sv { font-family: inherit; }
+.dep-sv b { display: block; font-size: 15px; }
+.dep-sv small { display: block; }
+.dep-sv .dep-sv-tarea { opacity: .75; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .stk-serie-unica { font-family: 'IBM Plex Mono', monospace; font-size: 20px; font-weight: 700; text-align: center; letter-spacing: .04em; padding: 12px 8px; margin: 4px 0 2px; border-radius: 10px; background: rgba(127,127,127,.14); word-break: break-all; }
 .stk-linea-pie { display: flex; justify-content: flex-end; margin-top: 4px; }
 .stk-linea .stk-elegir-n { width: 100%; margin-top: 8px; height: auto; min-height: 40px; padding: 8px 12px; font-size: 13.5px; }

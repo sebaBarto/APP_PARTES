@@ -1884,10 +1884,52 @@ test("Stock: entrega en mano (código QR firmado del técnico o su clave), pedid
     assert.strictEqual((await post({ accion: "cancelar_pedido", id: idSol }, juan)).statusCode, 403);
     r = await post({ accion: "cancelar_pedido", id: idSol, motivo: "No hay stock hasta el lunes" }, melina);
     assert.deepStrictEqual([r.cuerpo.solicitud.estado, r.cuerpo.solicitud.cerrada_por, r.cuerpo.solicitud.motivo_cierre], ["cancelada", "Melina", "No hay stock hasta el lunes"]);
-    // 7) Lo cargado con el catálogo de materiales (texto libre) queda para aprobar con el artículo ya propuesto
-    r = await post({ accion: "consumo_parte", op_id: "p-10", cliente: "Kiosco", sinStock: [{ texto: "Sirena mp100", cant: 1 }, { texto: "Tornillos", cant: 4 }] }, juan);
-    assert.strictEqual(r.cuerpo.paraAprobar, 2, JSON.stringify(r.cuerpo));
-    assert.deepStrictEqual(repo["stock/saldos.json"].aprobar.slice(0, 2).map((x) => [x.texto, x.c, !!x.sugerido]), [["Sirena mp100", "20208", true], ["Tornillos", "", false]]);
+    // 7) Lo cargado con el catálogo de materiales (texto libre): si el técnico lo tiene, se descuenta solo de su
+    //    stock; lo que no tiene queda para aprobar (con el artículo ya propuesto si se reconoce)
+    const S = require(path.join(raiz, "stock-utils.js"));
+    const sirJ = repo["stock/saldos.json"].ubic["tec:Juan"]["20208"], sirCli = (repo["stock/saldos.json"].ubic["cli:Kiosco"] || {})["20208"] || 0;
+    assert.ok(sirJ >= 2, "Juan tiene sirenas");
+    r = await post({ accion: "consumo_parte", op_id: "p-10", parte: "777", cliente: "Kiosco", sinStock: [{ texto: "Sirena mp100", cant: 1 }, { texto: "Tornillos", cant: 4 }] }, juan);
+    assert.deepStrictEqual([r.cuerpo.paraAprobar, r.cuerpo.descontados], [1, [{ c: "20208", d: "SIRENA MP100", cant: 1 }]], JSON.stringify(r.cuerpo));
+    assert.deepStrictEqual([repo["stock/saldos.json"].ubic["tec:Juan"]["20208"], repo["stock/saldos.json"].ubic["cli:Kiosco"]["20208"]], [sirJ - 1, sirCli + 1]);
+    assert.deepStrictEqual(repo["stock/saldos.json"].aprobar.slice(0, 1).map((x) => [x.texto, x.c, x.cant]), [["Tornillos", "", 4]]);
+    assert.ok(repo[`stock/movimientos-${mes}.json`].some((m) => m.tipo === "instalado_parte" && /Parte N° 777 · descontado solo de su stock \(«Sirena mp100»\)/.test(m.motivo)));
+    //    Pide más de lo que tiene: se descuenta lo que tiene y el resto va a aprobar
+    r = await post({ accion: "consumo_parte", op_id: "p-11", cliente: "Kiosco", sinStock: [{ texto: "SIRENA MP100", cant: sirJ + 2 }] }, juan);
+    assert.deepStrictEqual([r.cuerpo.descontados[0].cant, r.cuerpo.paraAprobar], [sirJ - 1, 1], JSON.stringify(r.cuerpo));
+    assert.deepStrictEqual([repo["stock/saldos.json"].ubic["tec:Juan"]["20208"] || 0, repo["stock/saldos.json"].aprobar[0].cant, repo["stock/saldos.json"].aprobar[0].c], [0, 3, "20208"]);
+    //    Un equipo con N° de serie del que tiene varios: no se sabe cuál usó, lo decide el depósito
+    await post({ accion: "mover", de: "dep", a: "tec:Juan", items: [{ c: "20825", cant: 2, unidades: S.seriesEn(repo["stock/saldos.json"], "dep", "20825").slice(0, 2) }], en_mano: { clave: "clave-juan" } }, melina);
+    const tecJ = repo["stock/saldos.json"].ubic["tec:Juan"]["20825"];
+    assert.ok(tecJ >= 2 && S.seriesEn(repo["stock/saldos.json"], "tec:Juan", "20825").length >= 2);
+    r = await post({ accion: "consumo_parte", op_id: "p-12", cliente: "Kiosco", sinStock: [{ texto: "Teclado K10LH/V", cant: 1 }] }, juan);
+    assert.deepStrictEqual([r.cuerpo.descontados, r.cuerpo.paraAprobar, repo["stock/saldos.json"].ubic["tec:Juan"]["20825"]], [undefined, 1, tecJ], JSON.stringify(r.cuerpo));
+    //    Si ya lo marcó en «Usé material de mi stock», lo mismo escrito abajo no se descuenta dos veces
+    await post({ accion: "mover", de: "dep", a: "tec:Juan", items: [{ c: "20208", cant: 3 }], en_mano: { clave: "clave-juan" } }, melina);
+    r = await post({ accion: "consumo_parte", op_id: "p-13", cliente: "Kiosco", usados: [{ c: "20208", cant: 1 }], sinStock: [{ texto: "Sirena MP100", cant: 1 }] }, juan);
+    assert.deepStrictEqual([r.cuerpo.instalados, r.cuerpo.descontados, r.cuerpo.paraAprobar, repo["stock/saldos.json"].ubic["tec:Juan"]["20208"]], [1, undefined, 1, 2], JSON.stringify(r.cuerpo));
+    // 8) Material para un servicio del cronograma: queda anotado al N° de servicio; el parte de ese servicio
+    //    cuenta como usado y lo que no se usó vuelve con «Vuelve de un servicio»
+    r = await post({ accion: "mover", de: "dep", a: "tec:Juan", items: [{ c: "20208", cant: 2 }], en_mano: { clave: "clave-juan" }, servicio: { numero: "37895", cliente: "Kiosco Pérez" } }, melina);
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    let sv = repo["stock/saldos.json"].servicios["37895"];
+    assert.deepStrictEqual([sv.cliente, sv.tecnico, sv.salio], ["Kiosco Pérez", "tec:Juan", { 20208: 2 }]);
+    assert.ok(repo[`stock/movimientos-${mes}.json`].some((m) => m.servicio === "37895" && /^Servicio N° 37895 · Kiosco Pérez · Recibido en mano por Juan/.test(m.motivo)));
+    r = await post({ accion: "consumo_parte", op_id: "p-20", parte: "37895", cliente: "Kiosco Pérez", sinStock: [{ texto: "Sirena MP100", cant: 1 }] }, juan);
+    assert.strictEqual(r.cuerpo.descontados[0].cant, 1, JSON.stringify(r.cuerpo));
+    assert.deepStrictEqual(S.pendienteDeServicio(repo["stock/saldos.json"], "37895").pendientes.map((x) => [x.c, x.cant, x.salio, x.usado]), [["20208", 1, 2, 1]]);
+    // (el parte de otro servicio no toca este)
+    r = await post({ accion: "consumo_parte", op_id: "p-21", parte: "40000", cliente: "Otro", usados: [{ c: "20208", cant: 1 }] }, juan);
+    assert.deepStrictEqual([repo["stock/saldos.json"].servicios["37895"].usado, repo["stock/saldos.json"].servicios["40000"]], [{ 20208: 1 }, undefined]);
+    r = await post({ accion: "mover", de: "tec:Juan", a: "dep", items: [{ c: "20208", cant: 1 }], servicio: { numero: "37895", cliente: "Kiosco Pérez" } }, melina);
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    assert.deepStrictEqual([repo["stock/saldos.json"].servicios["37895"].volvio, S.serviciosConMaterial(repo["stock/saldos.json"]).length], [{ 20208: 1 }, 0]);
+    // En camino y rechazado: lo que no recibió no cuenta como entregado para el servicio
+    r = await post({ accion: "mover", de: "dep", a: "tec:Luis", items: [{ c: "20208", cant: 2 }], servicio: { numero: "38000", cliente: "Farmacia" } }, melina);
+    assert.deepStrictEqual([r.cuerpo.envio.servicio, repo["stock/saldos.json"].servicios["38000"].salio], ["38000", { 20208: 2 }]);
+    r = await post({ accion: "confirmar_envio", id: r.cuerpo.envio.id, accion_envio: "rechazar", motivo: "No era para mí" }, luis);
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    assert.deepStrictEqual(repo["stock/saldos.json"].servicios["38000"].salio, { 20208: 0 });
   } finally { global.fetch = fetchViejo; if (viejoPush) require.cache[rutaPush] = viejoPush; else delete require.cache[rutaPush]; }
 });
 

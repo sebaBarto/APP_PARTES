@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#101820">
-<meta name="app-version" content="4.73.0">
+<meta name="app-version" content="4.74.0">
 <meta name="description" content="Digitalizador de partes técnicos de servicio">
 <title>Servicio Técnico SAT</title>
 <link rel="manifest" href="manifest.json">
@@ -1412,6 +1412,10 @@
             <select class="field-input" id="depDestSelect"></select>
             <input class="field-input hidden" type="text" id="depDestNombre" list="depDestLista" autocomplete="off" placeholder="Nombre del cliente"><datalist id="depDestLista"></datalist></div>
         </div>
+        <div class="dep-servicio" id="depServicioCaja">
+          <button type="button" class="btn btn-secondary btn-small" id="depServicioBtn"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>Es para un servicio del cronograma</button>
+          <div class="dep-servicio-chip hidden" id="depServicioChip"></div>
+        </div>
         <div class="field-group hidden" id="depPresupuestoCaja"><label class="field-label" for="depPresupuesto">N° de presupuesto (opcional)</label>
           <input class="field-input" type="text" inputmode="numeric" id="depPresupuesto" autocomplete="off" placeholder="Ej: 4521"></div>
         <button type="button" class="btn btn-secondary btn-small hidden" id="depRepetirBtn"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 0 1 14-5.3L20 9"/><path d="M20 4v5h-5"/><path d="M20 12a8 8 0 0 1-14 5.3L4 15"/><path d="M4 20v-5h5"/></svg>Repetir la última entrega</button>
@@ -1421,7 +1425,12 @@
         <div id="depDevoluciones"></div>
         <div id="depAprobar"></div>
         <div class="field-group"><label class="field-label" for="depRecibirTipo">¿Qué entra al depósito?</label>
-          <select class="field-input" id="depRecibirTipo"><option value="proveedor">Compra que llegó del proveedor</option><option value="presupuesto">Vuelve de un presupuesto (no se usó)</option><option value="cli">Retiro de un cliente (instalado)</option><option value="com">Retiro de un cliente (comodato)</option><option value="veh">Vuelve de un vehículo</option><option value="tec">Lo deja un técnico (sin su celular)</option></select></div>
+          <select class="field-input" id="depRecibirTipo"><option value="proveedor">Compra que llegó del proveedor</option><option value="servicio">Vuelve de un servicio (no se usó)</option><option value="presupuesto">Vuelve de un presupuesto (no se usó)</option><option value="cli">Retiro de un cliente (instalado)</option><option value="com">Retiro de un cliente (comodato)</option><option value="veh">Vuelve de un vehículo</option><option value="tec">Lo deja un técnico (sin su celular)</option></select></div>
+        <div class="field-group hidden" id="depServicioVuelveCaja">
+          <label class="field-label" for="depServicioVuelve">¿De qué servicio?</label>
+          <select class="field-input" id="depServicioVuelve"></select>
+          <div id="depServicioVuelveItems"></div>
+        </div>
         <div class="field-group hidden" id="depPresupVuelveCaja">
           <label class="field-label" for="depPresupVuelve">N° de presupuesto</label>
           <input class="field-input" type="text" id="depPresupVuelve" list="depPresupVuelveLista" inputmode="numeric" autocomplete="off" placeholder="Ej: 4521">
@@ -2517,7 +2526,7 @@
         <div class="stk-parte">
           <button type="button" class="btn btn-secondary btn-small" id="parteStockUsadosBtn"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/></svg>Usé material de mi stock</button>
           <div id="parteStockUsadosLista"></div>
-          <p class="stk-ayuda" style="margin:4px 0 0;">Lo de tu stock se descuenta solo. Lo que cargues abajo (no estaba en tu stock) lo revisa el depósito.</p>
+          <p class="stk-ayuda" style="margin:4px 0 0;">Lo de tu stock se descuenta solo, también si lo cargás abajo con el buscador. Lo que no tenías lo revisa el depósito.</p>
         </div>
 
         <div class="mat-rapidos-wrap hidden" id="matRapidosUsadosWrap">

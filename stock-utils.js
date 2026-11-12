@@ -616,7 +616,7 @@
     }
     const de = op.de === "proveedor" ? null : op.de || null;
     const destino = op.confirmar ? camino(op.a, de) : op.a;
-    const base = (x, i, cant, desde, extra) => ({ id: idMov(i), fecha, por: op.por || "", tipo: op.tipo || "movimiento", c: x.c, cant, ...(desde ? { de: desde } : {}), a: destino, ...(op.motivo ? { motivo: op.motivo } : {}), ...(op.presupuesto ? { presupuesto: op.presupuesto } : {}), ...(extra || {}) });
+    const base = (x, i, cant, desde, extra) => ({ id: idMov(i), fecha, por: op.por || "", tipo: op.tipo || "movimiento", c: x.c, cant, ...(desde ? { de: desde } : {}), a: destino, ...(op.motivo ? { motivo: op.motivo } : {}), ...(op.presupuesto ? { presupuesto: op.presupuesto } : {}), ...(op.servicio ? { servicio: op.servicio } : {}), ...(extra || {}) });
     const movs = [];
     lista.forEach((x, i) => {
       const uni = { ...(x.unidades.length ? { unidades: x.unidades } : {}), ...(x.prov ? { prov: x.prov } : {}) };
@@ -646,7 +646,7 @@
     }));
     let envio = null;
     if (op.confirmar) {
-      envio = { id: idMov(), tipo: op.tipo || "entrega", fecha, por: op.por || "", de: de || "dep", a: op.a, camino: destino, items: lista, ...(op.motivo ? { motivo: op.motivo } : {}), ...(op.fallado ? { fallado: true, falla: String(op.falla || "").slice(0, 200) } : {}) };
+      envio = { id: idMov(), tipo: op.tipo || "entrega", fecha, por: op.por || "", de: de || "dep", a: op.a, camino: destino, items: lista, ...(op.motivo ? { motivo: op.motivo } : {}), ...(op.servicio ? { servicio: op.servicio } : {}), ...(op.fallado ? { fallado: true, falla: String(op.falla || "").slice(0, 200) } : {}) };
       s.envios = [...s.envios, envio];
       movs.forEach((m) => { m.envio = envio.id; });
     }
@@ -680,7 +680,7 @@
       if (cant > 0) movs.push({ id: idMov(`r${i}`), fecha, por: resp.por || "", tipo: "recibido", c: x.c, cant, de: envio.camino, a: final, envio: envio.id, ...(uniRec.length ? { unidades: uniRec } : {}) });
       if (cant < x.cant) {
         diferencias.push({ c: x.c, enviado: x.cant, recibido: cant });
-        movs.push({ id: idMov(`v${i}`), fecha, por: resp.por || "", tipo: resp.accion === "rechazar" ? "rechazado" : "diferencia", c: x.c, cant: Math.round((x.cant - cant) * 1000) / 1000, de: envio.camino, a: envio.de, envio: envio.id, motivo: resp.motivo || (resp.accion === "rechazar" ? "Rechazado" : "No llegó todo"), ...(uniVuelven.length ? { unidades: uniVuelven } : {}) });
+        movs.push({ id: idMov(`v${i}`), fecha, por: resp.por || "", tipo: resp.accion === "rechazar" ? "rechazado" : "diferencia", c: x.c, cant: Math.round((x.cant - cant) * 1000) / 1000, de: envio.camino, a: envio.de, envio: envio.id, motivo: resp.motivo || (resp.accion === "rechazar" ? "Rechazado" : "No llegó todo"), ...(envio.servicio ? { servicio: envio.servicio } : {}), ...(uniVuelven.length ? { unidades: uniVuelven } : {}) });
       }
     });
     movs.forEach((m) => { s = aplicarMovimiento(s, m); });
@@ -1033,6 +1033,48 @@
     const claves = Object.keys(idx).sort((x, y) => String(idx[y].fecha || "").localeCompare(String(idx[x].fecha || ""))).slice(0, 400);
     return { ...saldos, presupuestos: Object.fromEntries(claves.map((k) => [k, idx[k]])) };
   }
+  // Servicios del cronograma: qué material se le entregó a un técnico para un servicio (N°), qué usó
+  // en el parte de ese servicio y qué devolvió. Solo un índice: no cambia cantidades.
+  //   op: { cliente } al entregar (dep -> técnico). El parte y la devolución solo suman si el servicio ya existe.
+  function anotarServicios(saldos, movs, op) {
+    const idx = { ...((saldos && saldos.servicios) || {}) };
+    let cambio = false;
+    const tecDe = (u) => /^tec:/.test(u || "") ? u : /^cam:(?!dev:)/.test(u || "") ? "tec:" + u.slice(4) : "";
+    (movs || []).forEach((m) => {
+      const n = String((m && m.servicio) || "").trim();
+      if (!n || !m.c || !(Number(m.cant) > 0)) return;
+      const sale = !/^(tec|cam|cli|com):/.test(m.de || "") && tecDe(m.a);
+      const usa = /^tec:/.test(m.de || "") && /^(cli|com):/.test(m.a || "");
+      const vuelve = /^tec:/.test(m.de || "") && /^(dep|gar|cam:dev:)/.test(m.a || "");
+      // No lo recibió (rechazó el envío o llegó menos): eso no salió para el servicio.
+      const rebote = /^cam:(?!dev:)/.test(m.de || "") && !tecDe(m.a);
+      if (!sale && !((usa || vuelve || rebote) && idx[n])) return;
+      const p = { cliente: "", tecnico: "", fecha: m.fecha, salio: {}, usado: {}, volvio: {}, ...(idx[n] || {}) };
+      const suma = (k, signo) => { p[k] = { ...p[k], [m.c]: Math.max(0, red3((p[k][m.c] || 0) + (signo || 1) * (Number(m.cant) || 0))) }; };
+      if (rebote) { if (tecDe(m.de) !== p.tecnico) return; suma("salio", -1); }
+      else if (sale) { p.tecnico = tecDe(m.a); p.fecha = m.fecha; if (op && op.cliente) p.cliente = op.cliente; suma("salio"); }
+      else if (m.de !== p.tecnico) return; // lo usó o devolvió otra persona: no es de esta entrega
+      else suma(usa ? "usado" : "volvio");
+      idx[n] = p; cambio = true;
+    });
+    if (!cambio) return saldos;
+    const claves = Object.keys(idx).sort((x, y) => String(idx[y].fecha || "").localeCompare(String(idx[x].fecha || ""))).slice(0, 300);
+    return { ...saldos, servicios: Object.fromEntries(claves.map((k) => [k, idx[k]])) };
+  }
+  // Lo que le queda al técnico de lo entregado para un servicio (lo que puede volver sin usar).
+  function pendienteDeServicio(saldos, numero) {
+    const p = ((saldos && saldos.servicios) || {})[String(numero || "").trim()];
+    if (!p) return null;
+    const tiene = ((saldos.ubic || {})[p.tecnico]) || {};
+    const items = Object.entries(p.salio || {}).map(([c, n]) => {
+      const cant = Math.max(0, Math.min(red3(n - ((p.usado || {})[c] || 0) - ((p.volvio || {})[c] || 0)), Number(tiene[c]) || 0));
+      return { c, cant, salio: n, usado: (p.usado || {})[c] || 0, volvio: (p.volvio || {})[c] || 0, series: seriesEn(saldos, p.tecnico, c) };
+    });
+    return { numero: String(numero).trim(), cliente: p.cliente, tecnico: p.tecnico, fecha: p.fecha, items, pendientes: items.filter((x) => x.cant > 0) };
+  }
+  // Los servicios que todavía tienen material sin usar ni devolver.
+  const serviciosConMaterial = (saldos) => Object.keys((saldos && saldos.servicios) || {}).map((n) => pendienteDeServicio(saldos, n)).filter((p) => p && p.pendientes.length).sort((x, y) => String(y.fecha || "").localeCompare(String(x.fecha || "")));
+
   // Lo que todavía puede volver de un presupuesto: lo que salió, menos lo que ya volvió, sin pasar de lo que hay en el cliente.
   function pendienteDePresupuesto(saldos, numero) {
     const p = ((saldos && saldos.presupuestos) || {})[String(numero || "").trim()];
@@ -1121,7 +1163,7 @@
     return mejor;
   }
 
-  const api = { codigoProveedor, nombreProveedor, STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, datosLimpios, buscarPorDatos, infoSerie, seriesEn, controlarSalidaConSerie, saludStock, esCodigoIgnorable, elegirCodigoDelCuadro, pareceModelo, buscarArticuloPorTexto, sugerirMarca, resumenMarcas, limpiarMarca, claveMarca, registrarUnidades, movimientoParaOficina, GARANTIA_ESTADOS, instalacionDeUnidad, abrirGarantias, moverStock, cerrarEnvio, stockDePersona, auditarStock, recalcularDesdeMovimientos, movimientosDeRegularizacion, retiradosParaDevolver, avanceSolicitud, anotarPresupuestos, pendienteDePresupuesto, tableroStock, claseMovimiento };
+  const api = { codigoProveedor, nombreProveedor, STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, datosLimpios, buscarPorDatos, infoSerie, seriesEn, controlarSalidaConSerie, saludStock, esCodigoIgnorable, elegirCodigoDelCuadro, pareceModelo, buscarArticuloPorTexto, sugerirMarca, resumenMarcas, limpiarMarca, claveMarca, registrarUnidades, movimientoParaOficina, GARANTIA_ESTADOS, instalacionDeUnidad, abrirGarantias, moverStock, cerrarEnvio, stockDePersona, auditarStock, recalcularDesdeMovimientos, movimientosDeRegularizacion, retiradosParaDevolver, avanceSolicitud, anotarPresupuestos, pendienteDePresupuesto, anotarServicios, pendienteDeServicio, serviciosConMaterial, tableroStock, claseMovimiento };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else Object.assign(raiz, api);
 })(typeof window !== "undefined" ? window : globalThis);

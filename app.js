@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.73.0";
+const APP_VERSION = "4.74.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -18972,7 +18972,7 @@ const AYUDAS_STOCK = {
   parte_stock: { titulo: "El parte y tu stock", gif: "assets/ayuda/stock-app-parte.gif", texto: [
     "«Usé material de mi stock»: elegí de lo que tenés (o escaneá). Al mandar el parte pasa al cliente, con su N° de serie.",
     "«Retiré equipos»: escanealos y entran a tu stock (si está fallado, va marcado).",
-    "Lo que cargues en la lista de abajo y no estaba en tu stock lo revisa el depósito." ] },
+    "Lo que cargues en la lista de abajo con el buscador de materiales: si lo tenés en tu stock, se descuenta solo; si no lo tenés, lo revisa el depósito." ] },
   mi_camioneta: { titulo: "Camionetas (depósito móvil)", texto: [
     "Cada camioneta tiene su propio stock (lo carga la oficina). Acá ves qué hay en la que elegís.",
     "«Tomar» (o escanear la etiqueta) y «Tomar de la camioneta»: pasa a tu stock en el momento, sin que nadie confirme.",
@@ -19294,8 +19294,119 @@ const depOrigen = () => {
   if (depModo === "inventario") return depInvUbic() || "dep";
   const t = document.getElementById("depRecibirTipo").value, n = depNombreElegido("depRecibirTipo");
   if (t === "presupuesto") { const p = depPresupElegido(); return p && p.cliente.replace(/^(cli|com):/, "") === n ? p.cliente : ""; }
+  if (t === "servicio") { const p = depServicioVuelveElegido(); return p ? p.tecnico : ""; }
   return t === "proveedor" || !n ? "" : t === "veh" || t === "tec" ? `${t}:${n}` : ""; // de clientes: la APP puede no tenerlo registrado
 };
+// ---------- Depósito: material para un servicio del cronograma ----------
+// La baja se anota al servicio (N° y cliente) y va al stock del técnico que lo tiene agendado. Cuando
+// hace el parte de ese servicio se descuenta solo; lo que no usó vuelve con «Vuelve de un servicio».
+let depServicio = null; // { numero, cliente, tecnico }
+async function depCargarServicios() {
+  if (!cronogramaCargadoOk || !cronogramaCache.length) await precargarCronogramaParaSugerencias();
+  if (!serviciosCache.length) {
+    try {
+      const res = await fetch(SERVICIOS_URL, { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const data = await res.json();
+      serviciosCache = Array.isArray(data) ? data : [];
+    } catch (e) { try { serviciosCache = JSON.parse(localStorage.getItem("servicios_cache") || "[]") || []; } catch (e2) { serviciosCache = []; } }
+  }
+}
+// Los servicios agendados de hoy en adelante (del cronograma), cada uno con su N° si está en los pendientes.
+function depServiciosAgendados() {
+  const hoy = fechaLocalISO(), nombres = Object.keys(tecnicosPasswords || {});
+  const tecnicoDe = (n) => nombres.find((x) => coincideNombreTecnico(n, x)) || "";
+  return (cronogramaCache || []).filter((t) => t.fecha && t.fecha >= hoy).map((t) => {
+    const sv = encontrarServicioPorTarea(t.tarea), libre = sv ? null : parsearTareaCronograma(t.tarea);
+    // Sin pendiente que coincida: vale si parece un trabajo en un cliente («Instalación: Farmacia» o
+    // cliente + dirección en dos renglones); «ALMUERZO» o «TALLER» no son servicios.
+    const lineas = String(t.tarea || "").split("\n").map((l) => l.trim()).filter(Boolean), prefijo = /^[A-Za-zÁÉÍÓÚáéíóúñÑ ]{3,22}:\s*/;
+    const esTrabajo = !!sv || prefijo.test(lineas[0] || "") || lineas.length >= 2;
+    const cliente = sv ? sv.cliente : esTrabajo ? String((libre && libre.cliente) || "").replace(prefijo, "").trim() : "";
+    return { numero: sv ? String(sv.numero_servicio || "").trim() : "", cliente, tecnico: tecnicoDe(t.tecnico), tecnicoCrono: t.tecnico, fecha: t.fecha, hora: t.hora_inicio || "", tarea: sv ? sv.tarea || t.tarea : t.tarea, agendado: true };
+  }).filter((x) => x.cliente)
+    .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.hora.localeCompare(b.hora) || a.cliente.localeCompare(b.cliente, "es"));
+}
+function elegirServicioDeposito() {
+  return new Promise((resolver) => {
+    const capa = document.createElement("div");
+    capa.className = "modal-overlay dlg-app";
+    capa.innerHTML = `<div class="modal-caja" role="dialog" aria-modal="true"><p class="dlg-texto">¿Para qué servicio es el material? Se anota a ese servicio y va al stock del técnico que lo tiene agendado.</p><input class="field-input dlg-input" type="search" placeholder="Buscar por cliente, N° de servicio o técnico" autocomplete="off"><div class="dep-sv-lista"></div><div class="dlg-botones"><button type="button" class="dlg-no">Cancelar</button></div></div>`;
+    const inp = capa.querySelector("input"), lista = capa.querySelector(".dep-sv-lista");
+    const fin = (x) => { capa.remove(); resolver(x || null); };
+    const agendados = depServiciosAgendados(), hoy = fechaLocalISO();
+    const dia = (f) => f === hoy ? "Hoy" : new Date(f + "T12:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "numeric" });
+    const pintar = () => {
+      const q = normalizeText(inp.value || "").trim();
+      const ok = (x) => !q || normalizeText(`${x.cliente} ${x.numero} ${x.tecnico} ${x.tecnicoCrono || ""} ${x.tarea || ""}`).includes(q);
+      const vistos = agendados.filter(ok);
+      // Buscando, también los pendientes que todavía no están en el cronograma.
+      const sueltos = q ? (serviciosCache || []).filter((sv) => sv.cliente && !agendados.some((a) => a.numero && a.numero === String(sv.numero_servicio || "").trim()))
+        .map((sv) => ({ numero: String(sv.numero_servicio || "").trim(), cliente: sv.cliente, tecnico: Object.keys(tecnicosPasswords || {}).find((n) => sv.tecnico_asignado && coincideNombreTecnico(sv.tecnico_asignado, n)) || "", tecnicoCrono: sv.tecnico_asignado || "", tarea: sv.tarea || "", agendado: false })).filter(ok).slice(0, 15) : [];
+      const todos = [...vistos, ...sueltos];
+      let html = "", ultimo = null;
+      todos.forEach((x, i) => {
+        const grupo = x.agendado ? dia(x.fecha) : "Pendientes sin agendar";
+        if (grupo !== ultimo) { html += `<h4 class="dep-sv-dia">${escapeHtml(grupo)}</h4>`; ultimo = grupo; }
+        html += `<button type="button" class="stk-res dep-sv" data-i="${i}"><b>${escapeHtml(x.cliente)}</b><small>${[x.numero ? "N° " + x.numero : "sin N° de servicio", x.tecnico || x.tecnicoCrono || "sin técnico", x.hora].filter(Boolean).map(escapeHtml).join(" · ")}</small>${x.tarea && normalizeText(x.tarea) !== normalizeText(x.cliente) ? `<small class="dep-sv-tarea">${escapeHtml(String(x.tarea).replace(/\s+/g, " ").slice(0, 90))}</small>` : ""}</button>`;
+      });
+      lista.innerHTML = html || `<p class="stk-ayuda">${q ? "No encontré ningún servicio con eso." : "No hay servicios agendados de hoy en adelante. Escribí el cliente o el N° para buscar en los pendientes."}</p>`;
+      lista.querySelectorAll("[data-i]").forEach((b) => b.addEventListener("click", () => fin(todos[Number(b.dataset.i)])));
+    };
+    inp.addEventListener("input", pintar);
+    capa.querySelector(".dlg-no").addEventListener("click", () => fin(null));
+    document.body.appendChild(capa);
+    pintar();
+  });
+}
+function depPintarServicio() {
+  const chip = document.getElementById("depServicioChip"), btn = document.getElementById("depServicioBtn");
+  chip.classList.toggle("hidden", !depServicio); btn.classList.toggle("hidden", !!depServicio);
+  if (!depServicio) return;
+  chip.innerHTML = `<span>${stkIco("check")}Para el servicio <b>${depServicio.numero ? "N° " + escapeHtml(depServicio.numero) + " · " : ""}${escapeHtml(depServicio.cliente)}</b></span><button type="button" class="stk-link" data-quitar-servicio>Quitar</button>`;
+  chip.querySelector("[data-quitar-servicio]").addEventListener("click", () => { depServicio = null; depPintarServicio(); });
+}
+document.getElementById("depServicioBtn").addEventListener("click", async (e) => {
+  const btn = e.currentTarget; btn.disabled = true;
+  try { await depCargarServicios(); } finally { btn.disabled = false; }
+  const x = await elegirServicioDeposito();
+  if (!x) return;
+  depServicio = { numero: x.numero, cliente: x.cliente, tecnico: x.tecnico };
+  // Va al técnico que lo tiene agendado (se puede cambiar después).
+  if (x.tecnico) {
+    document.getElementById("depDestTipo").value = "tec";
+    await depLlenarLista("depDestTipo");
+    document.getElementById("depDestSelect").value = x.tecnico;
+    depBotonTexto(); depPintarRecientes(); depPintarPase();
+  } else stkAviso("Ese servicio no tiene técnico en el cronograma: elegí a quién se lo das.", "info");
+  depPintarServicio();
+});
+// «Vuelve de un servicio (no se usó)»: lo que se entregó para un servicio y el técnico todavía tiene.
+const depServicioVuelveElegido = () => pendienteDeServicio(depSaldos(), document.getElementById("depServicioVuelve").value);
+function depPintarServicioVuelve() {
+  const sel = document.getElementById("depServicioVuelve"), cont = document.getElementById("depServicioVuelveItems"), a = depCatalogo().articulos || {};
+  const lista = serviciosConMaterial(depSaldos()), actual = sel.value;
+  sel.innerHTML = '<option value="">Elegí el servicio…</option>' + lista.map((p) => `<option value="${escapeHtml(p.numero)}">N° ${escapeHtml(p.numero)} · ${escapeHtml(p.cliente || "sin cliente")} (${escapeHtml(p.tecnico.replace(/^tec:/, ""))})</option>`).join("");
+  if (lista.some((p) => p.numero === actual)) sel.value = actual;
+  const p = depServicioVuelveElegido();
+  if (!lista.length) { cont.innerHTML = '<p class="stk-ayuda">No hay material entregado para un servicio que esté sin usar. (Se anota cuando en Baja tocás «Es para un servicio del cronograma».)</p>'; return; }
+  if (!p) { cont.innerHTML = '<p class="stk-ayuda">Elegí el servicio: te muestro lo que se entregó, lo que se usó en el parte y lo que le queda al técnico.</p>'; return; }
+  cont.innerHTML = `<div class="stk-envio"><small>Se le entregó a <b>${escapeHtml(p.tecnico.replace(/^tec:/, ""))}</b> el ${escapeHtml(new Date(p.fecha).toLocaleDateString("es-AR"))}. Tocá lo que vuelve (o escanealo):</small>
+    ${p.items.map((x) => `<div class="stk-envio-item"><span>${escapeHtml((a[x.c] || {}).d || x.c)}<small>entregado ${stkFmtN(x.salio)}${x.usado ? ` · usado ${stkFmtN(x.usado)}` : ""}${x.volvio ? ` · ya volvió ${stkFmtN(x.volvio)}` : ""}</small></span><b>${x.cant ? stkFmtN(x.cant) : "—"}</b>${x.cant ? `<button type="button" class="btn btn-secondary btn-small" data-vuelve="${escapeHtml(x.c)}">Vuelve</button>` : ""}</div>`).join("")}
+    ${p.pendientes.length > 1 ? `<div class="stk-envio-btns"><button type="button" class="btn btn-secondary btn-small" data-vuelve-todo>${stkIco("repetir")}Vuelve todo</button></div>` : ""}</div>`;
+  const sumar = (x) => {
+    let l = depCanasta.lineas.find((y) => y.c === x.c);
+    if (!l) { l = { c: x.c, cant: 0, unidades: [] }; depCanasta.lineas.push(l); }
+    // Con N° de serie: si vuelven todos los que tiene, se sabe cuáles son; si no, los elige.
+    if (x.series.length && x.series.length <= x.cant) x.series.forEach((t) => { if (!l.unidades.includes(t)) l.unidades.push(t); });
+    l.cant = Math.max(l.cant, x.cant, l.unidades.length);
+  };
+  cont.querySelectorAll("[data-vuelve]").forEach((b) => b.addEventListener("click", () => { sumar(p.items.find((x) => x.c === b.dataset.vuelve)); depCanasta.actual = ""; depCanasta.cambio(); }));
+  const todo = cont.querySelector("[data-vuelve-todo]");
+  if (todo) todo.addEventListener("click", () => { p.pendientes.forEach(sumar); depCanasta.actual = ""; depCanasta.cambio(); });
+}
+document.getElementById("depServicioVuelve").addEventListener("change", () => { depCanasta.limpiar(); depPintarServicioVuelve(); });
+
 // «Vuelve de un presupuesto (no se usó)»: lo que salió a un cliente con ese N° y no se instaló.
 const depPresupElegido = () => pendienteDePresupuesto(depSaldos(), document.getElementById("depPresupVuelve").value);
 function depPintarPresupuesto() {
@@ -19369,6 +19480,7 @@ async function depListaNombres(tipo) {
 const DEP_CAMPOS = { depDestTipo: ["depDestSelect", "depDestNombre", "depDestLista"], depRecibirTipo: ["depRecibirSelect", "depRecibirDe", "depRecibirLista"] };
 function depNombreElegido(tipoId) {
   const [sel, inp] = DEP_CAMPOS[tipoId], tipo = document.getElementById(tipoId).value;
+  if (tipo === "servicio") { const p = depServicioVuelveElegido(); return p ? p.tecnico.replace(/^tec:/, "") : ""; }
   return (tipo === "tec" || tipo === "veh" ? document.getElementById(sel).value : document.getElementById(inp).value).trim();
 }
 async function depLlenarLista(tipoId) {
@@ -19436,7 +19548,9 @@ function depMostrarModo() {
   document.querySelectorAll("#screen-deposito [data-dep]").forEach((d) => d.classList.toggle("hidden", !d.dataset.dep.split(" ").includes(depModo)));
   if (depModo === "recibir") {
     const t = document.getElementById("depRecibirTipo").value;
-    document.getElementById("depRecibirDeCaja").classList.toggle("hidden", t === "proveedor");
+    document.getElementById("depRecibirDeCaja").classList.toggle("hidden", t === "proveedor" || t === "servicio");
+    document.getElementById("depServicioVuelveCaja").classList.toggle("hidden", t !== "servicio");
+    if (t === "servicio") depPintarServicioVuelve();
     document.getElementById("depFalladoCaja").classList.toggle("hidden", t === "proveedor" || t === "presupuesto");
     document.getElementById("depPresupVuelveCaja").classList.toggle("hidden", t !== "presupuesto");
     if (t === "presupuesto") depPintarPresupuesto();
@@ -19445,7 +19559,7 @@ function depMostrarModo() {
   }
   if (depModo === "consultar") depPintarEnCamino();
   if (depModo === "inventario") depPintarInventario();
-  if (depModo === "entregar") { depPintarRecientes(); depPintarPase(); }
+  if (depModo === "entregar") { depPintarRecientes(); depPintarPase(); depPintarServicio(); }
   depPintarSolicitudes();
   depPintarCola();
   depPintarBandeja();
@@ -19510,10 +19624,13 @@ document.getElementById("depConfirmarBtn").addEventListener("click", async (ev) 
     if (tipo === "tec" && depSolicitudActiva && depSolicitudActiva.por === nombre) cuerpo.solicitud = depSolicitudActiva.id;
     const pres = document.getElementById("depPresupuesto").value.trim();
     if ((tipo === "cli" || tipo === "com") && pres) cuerpo.presupuesto = pres;
+    if (depServicio && (tipo === "tec" || tipo === "veh")) cuerpo.servicio = { numero: depServicio.numero, cliente: depServicio.cliente };
+    else if (depServicio && !cuerpo.presupuesto && depServicio.numero) cuerpo.presupuesto = depServicio.numero; // directo al cliente: el N° de servicio hace de presupuesto
   } else {
     const tipo = document.getElementById("depRecibirTipo").value, nombre = depNombreElegido("depRecibirTipo");
-    if (tipo !== "proveedor" && !nombre) { stkAviso(tipo === "presupuesto" ? "Poné el N° de presupuesto o el cliente" : "Elegí de dónde viene"); return; }
-    cuerpo = { accion: "mover", de: tipo === "proveedor" ? "proveedor" : `${tipo}:${nombre}`, a: "dep", items };
+    if (tipo !== "proveedor" && !nombre) { stkAviso(tipo === "presupuesto" ? "Poné el N° de presupuesto o el cliente" : tipo === "servicio" ? "Elegí el servicio" : "Elegí de dónde viene"); return; }
+    cuerpo = { accion: "mover", de: tipo === "proveedor" ? "proveedor" : tipo === "servicio" ? `tec:${nombre}` : `${tipo}:${nombre}`, a: "dep", items };
+    if (tipo === "servicio") { const p = depServicioVuelveElegido(); cuerpo.servicio = { numero: p.numero, cliente: p.cliente }; }
     if (tipo === "presupuesto") {
       const p = depPresupElegido(), num = document.getElementById("depPresupVuelve").value.trim();
       cuerpo.de = p && p.cliente.replace(/^(cli|com):/, "") === nombre ? p.cliente : `cli:${nombre}`;
@@ -19563,6 +19680,7 @@ document.getElementById("depConfirmarBtn").addEventListener("click", async (ev) 
     const r = cuerpo.en_mano && cuerpo.en_mano.clave ? await stkApi("POST", "", { ...cuerpo, op_id: depOpId() }) : await depEnviar(cuerpo, `${depModo === "entregar" ? "Baja a" : "Alta desde"} ${depModo === "entregar" ? nombreUbicacion(cuerpo.a) : cuerpo.de === "proveedor" ? "proveedor" : nombreUbicacion(cuerpo.de)} (${items.length} artículo${items.length === 1 ? "" : "s"})`);
     if (depModo === "entregar") depRecordarDestino(cuerpo.a, items);
     depCanasta.limpiar(); document.getElementById("depMotivo").value = ""; document.getElementById("depPresupuesto").value = ""; document.getElementById("depPresupVuelve").value = "";
+    if (depModo === "entregar") { depServicio = null; depPintarServicio(); }
     if (depModo === "recibir") { document.getElementById("depRecibirDe").value = ""; document.getElementById("depRecibirSelect").value = ""; }
     document.getElementById("depFallado").checked = false; document.getElementById("depFalla").value = ""; document.getElementById("depFalla").classList.add("hidden");
     const enMano = !!cuerpo.en_mano;
@@ -20285,7 +20403,7 @@ function pintarPanelTengo() {
   const sal = stkPanelSaldos(), tiene = sal.ubic[`tec:${stkPanelMio.nombre}`] || {}, a = stkPanelMio.articulos || {};
   const lista = Object.entries(tiene).filter(([, n]) => n > 0).sort((x, y) => String((a[x[0]] || {}).d).localeCompare(String((a[y[0]] || {}).d), "es"));
   cont.innerHTML = lista.length ? lista.map(([c, n]) => `<div class="stk-parte-item"><span>${escapeHtml((a[c] || {}).d || c)}<small>${escapeHtml(c)} · tenés ${stkFmtN(n)}</small></span><button type="button" class="btn btn-secondary btn-small" style="font-size:13px;padding:6px 12px;border:1px solid rgba(127,127,127,.5);border-radius:10px;" data-usar="${escapeHtml(c)}">Usar</button></div>`).join("")
-    : '<p class="stk-ayuda">No tenés nada a tu cargo. Si usaste material que no figura, cargalo abajo con el catálogo de materiales: lo revisa el depósito.</p>';
+    : '<p class="stk-ayuda">No tenés nada a tu cargo. Si usaste material, cargalo abajo con el catálogo de materiales: lo revisa el depósito.</p>';
   cont.querySelectorAll("[data-usar]").forEach((b) => b.addEventListener("click", async () => {
     const r = await stkPanelCanasta.sumarUno(b.dataset.usar, tiene[b.dataset.usar] || 0);
     stkAviso(r.texto, r.ok ? (r.completo === false ? "info" : "ok") : "err");
@@ -20334,7 +20452,10 @@ function registrarStockDelParte(data, idParte) {
   const cuerpo = { accion: "consumo_parte", op_id: `parte-${idParte}`, parte: data.numero_servicio || idParte, cliente: data.cliente, presupuesto: data.numero_presupuesto || "", usados: sp.usados, retirados: sp.retirados, sinStock: sp.sinStock };
   depEnviar(cuerpo, `Materiales del parte ${data.numero_servicio || idParte} (${data.cliente})`).then((r) => {
     if (r && r.noRetirados && r.noRetirados.length) stkAviso(`No se pudo registrar lo retirado: ${r.noRetirados.join(" · ")}. Avisale al depósito.`, "err");
-    else if (r && r.paraAprobar) stkAviso(`${r.paraAprobar} material(es) que no estaban en tu stock quedan para que los apruebe el depósito.`);
+    else if (r && (r.paraAprobar || (r.descontados && r.descontados.length))) {
+      const desc = (r.descontados || []).map((x) => `${x.d} ×${stkFmtN(x.cant)}`).join(", ");
+      stkAviso(`${desc ? `Se descontó de tu stock: ${desc}. ` : ""}${r.paraAprobar ? `${r.paraAprobar} material(es) que no tenías en tu stock quedan para que los apruebe el depósito.` : ""}`.trim(), r.paraAprobar ? "info" : "ok");
+    }
   }).catch((e) => {
     // El servidor lo rechazó (no es falta de señal): queda a la vista en Mi stock para avisar al depósito.
     console.error("No se pudo descontar el stock del parte:", e);
