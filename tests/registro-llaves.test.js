@@ -67,3 +67,18 @@ test("registro de llaves: solo admin concilia, y el estado queda guardado", asyn
   const eds = await llamar(manejarAdmin, { method: "GET", query: {} }, admin, gh);
   assert.deepStrictEqual(eds.data.map((e) => e.nombre), ["MUELLE 11", "Torre Sur"]);
 });
+
+test("registro de llaves: una persona carga tag y control de cochera; el número queda 000:00000", async () => {
+  const gh = ghFalso();
+  const { normalizarTag } = require("../lib/registro-llaves");
+  assert.strictEqual(normalizarTag("069,02561"), "069:02561");
+  assert.strictEqual(normalizarTag("69:2561"), "069:02561");
+  assert.strictEqual(normalizarTag("06902561"), "069:02561");
+  const r = await llamar(manejarPublico, { method: "POST", body: { ...valido, tipo: "ambas", llaves: [{ tipo: "tag", tag: "069 02561" }, { tipo: "control", tag: "" }] } }, gh);
+  assert.strictEqual(r.status, 200);
+  const reg = JSON.parse(gh.store["registro-llaves/muelle11-k7p3.json"].t)[0];
+  assert.deepStrictEqual(reg.llaves.map((l) => [l.tipo, l.tag]), [["tag", "069:02561"], ["control", ""]]);
+  assert.strictEqual(reg.control_remoto, "si");
+  // Un control sin cochera no tiene sentido
+  assert.strictEqual((await llamar(manejarPublico, { method: "POST", body: { ...valido, llaves: [{ tipo: "control", tag: "" }] } }, gh)).status, 400);
+});

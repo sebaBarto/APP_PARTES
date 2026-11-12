@@ -9571,19 +9571,33 @@ function rllFilas() {
   // Mismo número de llave cargado por más de un registro: hay que mirarlo.
   const normal = (t) => String(t || "").replace(/\D/g, "").replace(/^0+/, "") || String(t || "").trim().toLowerCase();
   const cuenta = {};
-  filas.forEach((f) => { if (!f.perdida && f.l.tag) { const k = normal(f.l.tag); cuenta[k] = (cuenta[k] || 0) + 1; } });
-  const perdidas = new Set(filas.filter((f) => f.perdida && f.l.tag).map((f) => normal(f.l.tag)));
+  const clave = (f) => (rllEsControl(f.l) ? "c" : "t") + normal(rllEsControl(f.l) ? f.l.tag : (rllTagCalculado(f.l.tag) || f.l.tag));
+  filas.forEach((f) => { if (!f.perdida && f.l.tag) { const k = clave(f); cuenta[k] = (cuenta[k] || 0) + 1; } });
+  const perdidas = new Set(filas.filter((f) => f.perdida && f.l.tag).map(clave));
   filas.forEach((f) => {
-    const k = normal(f.l.tag);
+    const k = clave(f);
     f.repetida = !f.perdida && f.l.tag && cuenta[k] > 1;
     f.reportadaPerdida = !f.perdida && f.l.tag && perdidas.has(k);
   });
   return filas;
 }
+// N° de tag: "3 números : 5 números" (ej. 069:02561).
+const RLL_FORMATO_TAG = /^\d{3}:\d{5}$/;
+function rllEsControl(l) { return l && l.tipo === "control"; }
+// Si alguien escribió el número largo de 10 cifras que traen algunos llaveros,
+// se muestra también cómo queda en 000:00000 (es el mismo código, en otra forma).
+function rllTagCalculado(tag) {
+  const d = String(tag || "").replace(/\s/g, "");
+  if (/^\d{8}$/.test(d)) return d.slice(0, 3) + ":" + d.slice(3); // escrito sin los dos puntos
+  if (!/^\d{10}$/.test(d)) return "";
+  const n = Number(d);
+  if (!(n < 2 ** 32)) return "";
+  return String(Math.floor(n / 65536) % 256).padStart(3, "0") + ":" + String(n % 65536).padStart(5, "0");
+}
 function rllUnidad(r) {
   const p = [];
   if (r.piso || r.unidad) p.push(`${r.piso || "?"}° ${r.unidad || ""}`.trim());
-  if (r.cochera) p.push("Coch. " + r.cochera);
+  if (r.cochera) p.push("Cochera " + r.cochera);
   if (!p.length && r.tipo === "cochera") p.push("Cochera");
   return p.join(" · ") || "—";
 }
@@ -9591,7 +9605,9 @@ function renderRllRegistros() {
   const todas = rllFilas();
   const n = (fn) => todas.filter(fn).length;
   const chips = [
-    ["", "Todas las llaves", todas.length, ""],
+    ["", "Todos", todas.length, ""],
+    ["tag", "Llaves (tag)", n((f) => !rllEsControl(f.l)), ""],
+    ["control", "Controles", n((f) => rllEsControl(f.l)), ""],
     ["pendiente", "Pendientes", n((f) => f.l.estado === "pendiente"), "pend"],
     ["conciliada", "Conciliadas", n((f) => f.l.estado === "conciliada"), ""],
     ["baja", "Dar de baja", n((f) => f.l.estado === "baja"), "alerta"],
@@ -9605,10 +9621,12 @@ function renderRllRegistros() {
   const q = document.getElementById("rllBuscar").value.trim().toLowerCase();
   let filas = todas.filter((f) => {
     if (rllFiltroEstado === "repetida" && !(f.repetida || f.reportadaPerdida)) return false;
-    if (rllFiltroEstado && rllFiltroEstado !== "repetida" && f.l.estado !== rllFiltroEstado) return false;
+    if (rllFiltroEstado === "tag" && rllEsControl(f.l)) return false;
+    if (rllFiltroEstado === "control" && !rllEsControl(f.l)) return false;
+    if (rllFiltroEstado && !["repetida", "tag", "control"].includes(rllFiltroEstado) && f.l.estado !== rllFiltroEstado) return false;
     if (!q) return true;
     const r = f.r;
-    return [r.nombre, r.telefono, r.email, r.piso, r.unidad, r.cochera, `${r.piso} ${r.unidad}`, `${r.piso}${r.unidad}`, f.l.tag, f.l.usuario, f.l.nota, f.l.detalle].join(" ").toLowerCase().includes(q);
+    return [r.nombre, r.telefono, r.email, r.piso, r.unidad, r.cochera, `${r.piso} ${r.unidad}`, `${r.piso}${r.unidad}`, f.l.tag, String(f.l.tag || "").replace(/\D/g, ""), rllTagCalculado(f.l.tag), f.l.usuario, f.l.nota, f.l.detalle].join(" ").toLowerCase().includes(q);
   });
   const orden = document.getElementById("rllOrden").value;
   const pisoNum = (r) => { const m = String(r.piso || "").match(/\d+/); return m ? Number(m[0]) : (/pb/i.test(r.piso || "") ? 0 : 999); };
@@ -9623,17 +9641,17 @@ function renderRllRegistros() {
   if (!filas.length) { cont.innerHTML = '<p class="status">No hay llaves con ese filtro.</p>'; return; }
   const rel = { titular: "Titular", inquilino: "Inquilino", otro: "Otro" };
   const tipo = { vivienda: "Vivienda", cochera: "Cochera", ambas: "Viv. + cochera" };
-  cont.innerHTML = `<table class="ven-tabla"><thead><tr><th>Unidad</th><th>Persona</th><th>Contacto</th><th>N° de llave</th><th>N° usuario</th><th>Estado</th><th>Nota</th><th></th></tr></thead><tbody>${filas.map((f) => {
+  cont.innerHTML = `<table class="ven-tabla"><thead><tr><th>Unidad</th><th>Persona</th><th>Contacto</th><th>Dispositivo · N° de llave</th><th>N° usuario</th><th>Estado</th><th>Nota</th><th></th></tr></thead><tbody>${filas.map((f) => {
     const r = f.r, l = f.l, est = RLL_ESTADOS[l.estado] || RLL_ESTADOS.pendiente;
     const avisos = [];
     if (f.perdida) avisos.push('<span class="ven-estado vencido">Reportada perdida / no se usa</span>');
     if (f.repetida) avisos.push('<span class="ven-estado pronto">Número repetido</span>');
     if (f.reportadaPerdida) avisos.push('<span class="ven-estado vencido">Otro la reportó perdida</span>');
     return `<tr>
-      <td><b>${escapeHtmlAdmin(rllUnidad(r))}</b><br><span style="color:#6B7680;">${tipo[r.tipo] || ""}${r.control_remoto ? ` · Control: ${r.control_remoto === "si" ? "sí" : "no"}` : ""}</span></td>
+      <td><b>${escapeHtmlAdmin(rllUnidad(r))}</b><br><span style="color:#6B7680;">${tipo[r.tipo] || ""}</span></td>
       <td>${escapeHtmlAdmin(r.nombre)}<br><span style="color:#6B7680;">${rel[r.relacion] || ""}${r.relacion_otro ? " (" + escapeHtmlAdmin(r.relacion_otro) + ")" : ""} · ${rllFecha(r.fecha)}</span>${r.comentario ? `<br><span style="color:#34495E;">💬 ${escapeHtmlAdmin(r.comentario)}</span>` : ""}</td>
       <td><a href="tel:${escapeHtmlAdmin(r.telefono)}">${escapeHtmlAdmin(r.telefono)}</a>${r.email ? `<br><a href="mailto:${escapeHtmlAdmin(r.email)}" style="color:#6B7680;">${escapeHtmlAdmin(r.email)}</a>` : ""}</td>
-      <td><span style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;">${escapeHtmlAdmin(l.tag || "(sin número)")}</span>${f.perdida && l.detalle ? `<br><span style="color:#6B7680;">${escapeHtmlAdmin(l.detalle)}</span>` : ""}${avisos.length ? "<br>" + avisos.join(" ") : ""}</td>
+      <td>${rllCeldaDispositivo(l)}${f.perdida && l.detalle ? `<br><span style="color:#6B7680;">${escapeHtmlAdmin(l.detalle)}</span>` : ""}${avisos.length ? "<br>" + avisos.join(" ") : ""}</td>
       <td><input type="text" class="field-input rll-usuario" data-id="${r.id}" data-i="${f.i}" data-p="${f.perdida ? 1 : ""}" value="${escapeHtmlAdmin(l.usuario || "")}" style="width:80px;margin:0;padding:6px 8px;font-family:'IBM Plex Mono',monospace;" placeholder="—"></td>
       <td><select class="rll-estado" data-id="${r.id}" data-i="${f.i}" data-p="${f.perdida ? 1 : ""}" style="margin:0;width:auto;padding:6px 8px;font-weight:700;color:${est.color};background:${est.bg};border-color:${est.bg};">${Object.entries(RLL_ESTADOS).map(([k, v]) => `<option value="${k}"${k === l.estado ? " selected" : ""}>${v.txt}</option>`).join("")}</select>${l.revisado_por ? `<br><span style="font-size:11px;color:#6B7680;">${escapeHtmlAdmin(l.revisado_por)}</span>` : ""}</td>
       <td><input type="text" class="field-input rll-nota" data-id="${r.id}" data-i="${f.i}" data-p="${f.perdida ? 1 : ""}" value="${escapeHtmlAdmin(l.nota || "")}" style="min-width:140px;margin:0;padding:6px 8px;" placeholder="Nota..."></td>
@@ -9655,6 +9673,17 @@ function renderRllRegistros() {
       renderRllRegistros();
     } catch (e) { alert("No se pudo borrar: " + e.message); }
   }));
+}
+function rllCeldaDispositivo(l) {
+  const control = rllEsControl(l);
+  const etiqueta = control
+    ? '<span style="display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#3A5BA8;background:#E8EEFB;border-radius:999px;padding:1px 8px;">📟 Control cochera</span>'
+    : '<span style="display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#8A5A00;background:#FFF1D6;border-radius:999px;padding:1px 8px;">🔑 Tag</span>';
+  const num = (t) => `<div style="font-family:'IBM Plex Mono',monospace;font-size:17px;font-weight:600;letter-spacing:.5px;margin-top:3px;">${escapeHtmlAdmin(t)}</div>`;
+  if (!l.tag) return etiqueta + `<div style="color:#6B7680;margin-top:3px;">${control ? "Sin número en el control" : "(sin número)"}</div>`;
+  if (control || RLL_FORMATO_TAG.test(l.tag)) return etiqueta + num(l.tag);
+  const calc = rllTagCalculado(l.tag);
+  return etiqueta + (calc ? num(calc) + `<div style="font-size:11px;color:#6B7680;">calculado de ${escapeHtmlAdmin(l.tag)}</div>` : num(l.tag) + '<div style="font-size:11px;color:#B5772A;">no tiene el formato 000:00000</div>');
 }
 async function rllGuardarLlave(el, cambios) {
   const reg = rllRegistros.find((x) => x.id === el.dataset.id);
@@ -9686,17 +9715,19 @@ document.getElementById("rllExcelBtn").addEventListener("click", () => {
   const rel = { titular: "Titular", inquilino: "Inquilino", otro: "Otro" };
   const filas = rllFilas().map((f) => ({
     "Fecha": rllFecha(f.r.fecha), "Piso": f.r.piso || "", "Depto": f.r.unidad || "", "Cochera": f.r.cochera || "",
-    "Tipo": f.r.tipo || "", "Control remoto": f.r.control_remoto || "",
+    "Tipo": f.r.tipo || "",
     "Nombre": f.r.nombre, "Relación": (rel[f.r.relacion] || "") + (f.r.relacion_otro ? ` (${f.r.relacion_otro})` : ""),
     "Teléfono": f.r.telefono, "Mail": f.r.email || "",
-    "N° de llave": f.l.tag || "", "N° de usuario": f.l.usuario || "",
+    "Dispositivo": rllEsControl(f.l) ? "Control remoto cochera" : "Tag",
+    "N° de llave": rllEsControl(f.l) || RLL_FORMATO_TAG.test(f.l.tag || "") ? (f.l.tag || "") : (rllTagCalculado(f.l.tag) || f.l.tag || ""),
+    "N° como lo escribió": f.l.tag || "", "N° de usuario": f.l.usuario || "",
     "Tipo de registro": f.perdida ? "Reportada perdida" : "En uso",
     "Estado": (RLL_ESTADOS[f.l.estado] || RLL_ESTADOS.pendiente).txt,
     "Avisos": [f.repetida ? "Número repetido" : "", f.reportadaPerdida ? "Otro la reportó perdida" : ""].filter(Boolean).join(", "),
     "Nota": f.l.nota || "", "Detalle": f.l.detalle || "", "Comentario del vecino": f.r.comentario || "",
   }));
   const hoja = XLSX.utils.json_to_sheet(filas);
-  hoja["!cols"] = [14, 6, 6, 8, 9, 8, 24, 14, 16, 24, 16, 10, 16, 12, 18, 24, 24, 30].map((w) => ({ wch: w }));
+  hoja["!cols"] = [14, 6, 6, 8, 9, 24, 14, 16, 24, 20, 12, 16, 10, 16, 12, 18, 24, 24, 30].map((w) => ({ wch: w }));
   const libro = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(libro, hoja, "Llaves");
   XLSX.writeFile(libro, `llaves_${rllEdificioActual.nombre.replace(/[^\w]+/g, "_")}_${new Date().toISOString().slice(0, 10)}.xlsx`);

@@ -156,6 +156,9 @@
     display: flex; align-items: center; justify-content: center; gap: 8px;
   }
   .btn-agregar:hover { border-color: var(--ink); }
+  .llave.control { background: linear-gradient(#F5F8FF, #FFFFFF); }
+  .llave.control .llave-tit b svg { color: #3A5BA8; }
+  .otro-formato { border: none; background: none; padding: 6px 0 0; font: inherit; font-size: 13.5px; color: var(--muted); text-decoration: underline; cursor: pointer; }
 
   .donde {
     margin-top: 14px; border-radius: 12px; background: #F6F5F0; overflow: hidden;
@@ -309,6 +312,7 @@
           </div>
           <div class="campo">
             <span class="grupo-label">¿Tenés control remoto para la cochera?</span>
+            <p class="ayuda-campo" style="margin:-2px 0 8px;">Si decís que sí, lo cargás abajo junto con tus llaves.</p>
             <div class="opciones">
               <label class="opcion"><input type="radio" name="control_remoto" value="si"><span>Sí</span></label>
               <label class="opcion"><input type="radio" name="control_remoto" value="no"><span>No</span></label>
@@ -319,13 +323,19 @@
 
       <!-- 3. Llaves -->
       <section class="card">
-        <div class="paso"><span class="paso-num">3</span><h2>Tu llave electrónica</h2></div>
-        <p class="paso-sub">Si en tu casa usan varias, agregalas todas.</p>
+        <div class="paso"><span class="paso-num">3</span><h2>Tus llaves y controles</h2></div>
+        <p class="paso-sub">Cargá todo lo que usás para entrar: la llave (tag) de la puerta y, si tenés, el control de la cochera.</p>
         <div id="llaves"></div>
-        <button type="button" class="btn-agregar" id="agregarLlaveBtn">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-          Agregar otra llave
-        </button>
+        <div class="fila" style="gap:8px;">
+          <button type="button" class="btn-agregar" id="agregarLlaveBtn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            Otra llave
+          </button>
+          <button type="button" class="btn-agregar oculto" id="agregarControlBtn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            Otro control
+          </button>
+        </div>
 
         <details class="donde">
           <summary>
@@ -334,40 +344,40 @@
             <svg class="flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
           </summary>
           <div class="donde-cuerpo">
-            <svg class="ilustracion" viewBox="0 0 330 150" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Llavero de acceso con el número impreso en una de sus caras">
+            <svg class="ilustracion" viewBox="0 0 330 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Llavero de acceso con el número grabado: tres números, dos puntos y cinco números">
               <defs>
-                <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3B3E43"/><stop offset="1" stop-color="#1A1C1F"/></linearGradient>
+                <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#43464B"/><stop offset="1" stop-color="#1A1C1F"/></linearGradient>
               </defs>
-              <!-- llavero (gota) -->
-              <g transform="translate(40 12)">
-                <circle cx="62" cy="14" r="9" fill="none" stroke="#9A978E" stroke-width="3"/>
-                <path d="M62 24 C 98 24 122 52 122 82 C 122 110 96 128 62 128 C 28 128 2 110 2 82 C 2 52 26 24 62 24 Z" fill="url(#g1)"/>
-                <circle cx="62" cy="38" r="5" fill="#F2F1EC"/>
-                <rect x="20" y="84" width="84" height="24" rx="4" fill="#F2F1EC"/>
-                <text x="62" y="101" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="600" fill="#0E0F10">0004521873</text>
-                <rect x="16" y="80" width="92" height="32" rx="6" fill="none" stroke="#F6B828" stroke-width="3"/>
+              <g transform="translate(26 8)">
+                <circle cx="68" cy="14" r="9" fill="none" stroke="#9A978E" stroke-width="3"/>
+                <path d="M68 24 C 106 24 134 54 134 88 C 134 122 106 144 68 144 C 30 144 2 122 2 88 C 2 54 30 24 68 24 Z" fill="url(#g1)"/>
+                <circle cx="68" cy="40" r="5.5" fill="#F2F1EC"/>
+                <text x="68" y="99" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="17" font-weight="600" fill="#C9C6BC" letter-spacing=".5">069:02561</text>
+                <rect x="14" y="80" width="108" height="28" rx="7" fill="none" stroke="#F6B828" stroke-width="3"/>
               </g>
-              <!-- flecha y texto -->
-              <path d="M150 108 C 172 108 180 90 198 82" fill="none" stroke="#B9850A" stroke-width="2.2" stroke-dasharray="4 4"/>
-              <path d="M192 76 l9 5 -8 7" fill="none" stroke="#B9850A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-              <text x="208" y="76" font-family="Barlow, sans-serif" font-size="14" font-weight="600" fill="#0E0F10">Este número</text>
-              <text x="208" y="94" font-family="Barlow, sans-serif" font-size="13" fill="#6E6C66">va en el</text><text x="208" y="110" font-family="Barlow, sans-serif" font-size="13" fill="#6E6C66">formulario</text>
+              <path d="M152 100 C 172 100 180 84 196 78" fill="none" stroke="#B9850A" stroke-width="2.2" stroke-dasharray="4 4"/>
+              <path d="M190 72 l9 5 -8 7" fill="none" stroke="#B9850A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+              <text x="206" y="64" font-family="Barlow, sans-serif" font-size="14" font-weight="600" fill="#0E0F10">Este número</text>
+              <text x="206" y="82" font-family="Barlow, sans-serif" font-size="13" fill="#6E6C66">3 números</text>
+              <text x="206" y="98" font-family="Barlow, sans-serif" font-size="13" fill="#6E6C66">dos puntos (:)</text>
+              <text x="206" y="114" font-family="Barlow, sans-serif" font-size="13" fill="#6E6C66">5 números</text>
             </svg>
-            Está impreso en el llavero o tarjeta, generalmente en la parte de atrás (puede estar en letra chica, a veces con dos grupos de números como <span class="mono">0004521873 069,02561</span>). Copialo tal cual se ve.<br><br>
-            El <b>número de usuario</b> es el que te asignaron al darte la llave; si no lo sabés, dejalo vacío.
+            Está <b>grabado en el llavero</b>: son <b>3 números, dos puntos y 5 números</b>, por ejemplo <span class="mono">069:02561</span>. Escribí solo los números: los dos puntos se ponen solos.<br><br>
+            Si tu llave tiene el número escrito de otra forma, tocá <i>"Mi llave tiene el número de otra forma"</i> y copialo tal cual se ve.<br><br>
+            El <b>número de usuario</b> es el que te asignaron al darte la llave o el control; si no lo sabés, dejalo vacío.
           </div>
         </details>
 
         <div class="campo" style="margin-top:18px;">
           <label class="switch-linea">
             <input type="checkbox" id="tienePerdida">
-            <span>Perdí una llave o ya no la uso
+            <span>Perdí una llave o un control, o ya no lo uso
               <small>Así la damos de baja y nadie más puede entrar con ella.</small></span>
           </label>
           <div class="perdida-box" id="perdidaBox">
             <div class="campo">
-              <label for="perdidaTag">Número de esa llave <span class="opcional">(si lo sabés)</span></label>
-              <input type="text" id="perdidaTag" class="mono" maxlength="40" placeholder="Ej. 0004521873">
+              <label for="perdidaTag">Número <span class="opcional">(si lo sabés)</span></label>
+              <input type="text" id="perdidaTag" class="mono" maxlength="40" placeholder="Ej. 069:02561">
             </div>
             <div class="campo">
               <label for="perdidaDetalle">Contanos qué pasó <span class="opcional">(opcional)</span></label>
@@ -441,7 +451,7 @@
       $("edificioNombre").textContent = d.nombre;
       $("edificioDireccion").textContent = d.direccion || "";
       document.title = "Registro de llaves — " + d.nombre;
-      agregarLlave();
+      agregarDispositivo("tag");
       mostrar("formulario");
     } catch (e) {
       $("edificioChip").classList.add("oculto");
@@ -449,40 +459,97 @@
     }
   }
 
-  // ---------- Llaves (una o varias) ----------
-  function agregarLlave() {
-    const n = llavesCont.children.length;
-    if (n >= MAX_LLAVES) return;
+  // ---------- Dispositivos: llaves (tag) y controles de cochera ----------
+  const ICONO = {
+    tag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2 2M14 9l2 2"/></svg>',
+    control: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="3"/><circle cx="12" cy="8" r="1.6"/><path d="M10 13h4M10 16.5h4"/></svg>',
+  };
+  const FORMATO_TAG = /^\d{3}:\d{5}$/;
+  // "06902561" -> "069:02561" mientras escribe (los dos puntos se ponen solos).
+  function formatearTag(inp) {
+    if (inp.dataset.libre) return;
+    // Se respeta dónde estaba el cursor (por si corrige un número del medio).
+    const enFoco = document.activeElement === inp;
+    const antes = enFoco ? inp.value.slice(0, inp.selectionStart).replace(/\D/g, "").length : null;
+    const d = inp.value.replace(/\D/g, "").slice(0, 8);
+    inp.value = d.length > 3 ? d.slice(0, 3) + ":" + d.slice(3) : d;
+    if (enFoco) { const pos = Math.min(inp.value.length, antes > 3 ? antes + 1 : antes); inp.setSelectionRange(pos, pos); }
+  }
+  function agregarDispositivo(tipo, enfocar) {
+    if (llavesCont.children.length >= MAX_LLAVES) return;
     const div = document.createElement("div");
-    div.className = "llave";
-    div.innerHTML = `
+    div.className = "llave" + (tipo === "control" ? " control" : "");
+    div.dataset.tipo = tipo;
+    div.innerHTML = tipo === "tag" ? `
       <div class="llave-tit">
-        <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2 2M14 9l2 2"/></svg><span class="llave-num"></span></b>
+        <b>${ICONO.tag}<span class="llave-num"></span></b>
         <button type="button" class="quitar">Quitar</button>
       </div>
       <div class="campo" data-campo="tag">
-        <label>Número impreso en la llave</label>
-        <input type="text" class="mono in-tag" maxlength="40" placeholder="Ej. 0004521873" autocomplete="off" autocapitalize="characters" spellcheck="false">
-        <div class="error-campo">Escribí el número que figura en la llave.</div>
+        <label>Número grabado en la llave</label>
+        <input type="text" class="mono in-tag" maxlength="9" inputmode="numeric" placeholder="Ej. 069:02561" autocomplete="off" spellcheck="false">
+        <div class="error-campo">Tiene que tener 3 números, dos puntos y 5 números (ej. 069:02561).</div>
+        <button type="button" class="otro-formato">Mi llave tiene el número de otra forma</button>
+      </div>
+      <div class="campo">
+        <label>Número de usuario <span class="opcional">(si lo conocés)</span></label>
+        <input type="text" class="mono in-usuario" maxlength="15" inputmode="numeric" placeholder="Ej. 125" autocomplete="off">
+      </div>` : `
+      <div class="llave-tit">
+        <b>${ICONO.control}<span class="llave-num"></span></b>
+        <button type="button" class="quitar">Quitar</button>
+      </div>
+      <div class="campo">
+        <label>Número o código del control <span class="opcional">(si figura)</span></label>
+        <input type="text" class="mono in-tag" maxlength="40" placeholder="El de la etiqueta, si tiene" autocomplete="off" spellcheck="false">
       </div>
       <div class="campo">
         <label>Número de usuario <span class="opcional">(si lo conocés)</span></label>
         <input type="text" class="mono in-usuario" maxlength="15" inputmode="numeric" placeholder="Ej. 125" autocomplete="off">
       </div>`;
-    div.querySelector(".quitar").addEventListener("click", () => { div.remove(); renumerar(); });
-    llavesCont.appendChild(div);
+    div.querySelector(".quitar").addEventListener("click", () => {
+      div.remove();
+      // Si saca el último control, la respuesta "¿tenés control?" pasa a "No".
+      if (tipo === "control" && !llavesCont.querySelector('[data-tipo="control"]')) {
+        const no = form.querySelector('input[name="control_remoto"][value="no"]'); if (no) no.checked = true;
+      }
+      if (!llavesCont.children.length) agregarDispositivo("tag");
+      renumerar();
+    });
+    if (tipo === "tag") {
+      const inp = div.querySelector(".in-tag");
+      inp.addEventListener("input", () => formatearTag(inp));
+      const btnOtro = div.querySelector(".otro-formato");
+      btnOtro.addEventListener("click", () => {
+        if (!inp.dataset.libre) { inp.dataset.libre = "1"; inp.maxLength = 40; inp.inputMode = "text"; inp.placeholder = "Copialo tal cual se ve en la llave"; btnOtro.textContent = "Volver al formato 000:00000"; }
+        else { delete inp.dataset.libre; inp.maxLength = 9; inp.inputMode = "numeric"; inp.placeholder = "Ej. 069:02561"; btnOtro.textContent = "Mi llave tiene el número de otra forma"; formatearTag(inp); }
+        div.querySelector('[data-campo="tag"]').classList.remove("invalido");
+        inp.focus();
+      });
+    }
+    // Los controles van siempre después de las llaves.
+    if (tipo === "tag") llavesCont.insertBefore(div, llavesCont.querySelector('[data-tipo="control"]'));
+    else llavesCont.appendChild(div);
     renumerar();
-    if (n > 0) div.querySelector(".in-tag").focus();
+    if (enfocar) div.querySelector(".in-tag").focus();
   }
   function renumerar() {
-    const items = [...llavesCont.children];
-    items.forEach((el, i) => {
-      el.querySelector(".llave-num").textContent = items.length > 1 ? "Llave " + (i + 1) : "Llave";
-      el.querySelector(".quitar").classList.toggle("oculto", items.length === 1);
+    ["tag", "control"].forEach((t) => {
+      const items = [...llavesCont.querySelectorAll(`[data-tipo="${t}"]`)];
+      const base = t === "tag" ? "Llave (tag)" : "Control remoto de cochera";
+      items.forEach((el, i) => { el.querySelector(".llave-num").textContent = items.length > 1 ? `${base} ${i + 1}` : base; });
     });
-    $("agregarLlaveBtn").classList.toggle("oculto", items.length >= MAX_LLAVES);
+    const total = llavesCont.children.length;
+    llavesCont.querySelectorAll(".quitar").forEach((b) => b.classList.toggle("oculto", total === 1));
+    $("agregarLlaveBtn").classList.toggle("oculto", total >= MAX_LLAVES);
+    const tipoUnidad = valorRadio("tipo");
+    $("agregarControlBtn").classList.toggle("oculto", total >= MAX_LLAVES || !tipoUnidad || tipoUnidad === "vivienda");
   }
-  $("agregarLlaveBtn").addEventListener("click", agregarLlave);
+  $("agregarLlaveBtn").addEventListener("click", () => agregarDispositivo("tag", true));
+  $("agregarControlBtn").addEventListener("click", () => {
+    agregarDispositivo("control", true);
+    const si = form.querySelector('input[name="control_remoto"][value="si"]'); if (si) si.checked = true;
+  });
 
   // ---------- Mostrar / ocultar según lo elegido ----------
   function valorRadio(nombre) { const el = form.querySelector(`input[name="${nombre}"]:checked`); return el ? el.value : ""; }
@@ -494,7 +561,24 @@
     const t = valorRadio("tipo");
     $("bloqueCochera").classList.toggle("oculto", t === "vivienda");
     $("filaDepto").classList.toggle("oculto", t === "cochera");
+    // Sin cochera no hay control: se sacan los que hubiera cargado.
+    if (t === "vivienda") {
+      llavesCont.querySelectorAll('[data-tipo="control"]').forEach((el) => el.remove());
+      form.querySelectorAll('input[name="control_remoto"]').forEach((r) => { r.checked = false; });
+      if (!llavesCont.children.length) agregarDispositivo("tag");
+    }
+    renumerar();
   }));
+  // "¿Tenés control remoto?" Sí -> aparece la tarjeta del control para cargarlo; No -> se saca.
+  form.querySelectorAll('input[name="control_remoto"]').forEach((r) => r.addEventListener("change", () => {
+    if (valorRadio("control_remoto") === "si" && !llavesCont.querySelector('[data-tipo="control"]')) agregarDispositivo("control");
+    if (valorRadio("control_remoto") === "no") {
+      llavesCont.querySelectorAll('[data-tipo="control"]').forEach((el) => el.remove());
+      if (!llavesCont.children.length) agregarDispositivo("tag");
+      renumerar();
+    }
+  }));
+
   $("tienePerdida").addEventListener("change", (e) => {
     $("perdidaBox").classList.toggle("visible", e.target.checked);
   });
@@ -519,13 +603,15 @@
       if (!$("piso").value.trim()) marcar($("piso"));
       if (!$("unidad").value.trim()) marcar($("unidad"));
     }
-    const llaves = [...llavesCont.querySelectorAll(".llave")];
     const soloPerdida = $("tienePerdida").checked && ($("perdidaTag").value.trim() || $("perdidaDetalle").value.trim());
-    llaves.forEach((l, i) => {
-      const tag = l.querySelector(".in-tag");
-      const vacia = !tag.value.trim() && !l.querySelector(".in-usuario").value.trim();
-      // Una llave vacía se acepta solo si es la única y viene a reportar una pérdida.
-      if (!tag.value.trim() && !(vacia && soloPerdida && llaves.length === 1)) marcar(tag);
+    const hayControl = !!llavesCont.querySelector('[data-tipo="control"]');
+    [...llavesCont.querySelectorAll('[data-tipo="tag"]')].forEach((l) => {
+      const inp = l.querySelector(".in-tag");
+      const v = inp.value.trim();
+      const vacia = !v && !l.querySelector(".in-usuario").value.trim();
+      // Una llave vacía se acepta si además cargó un control, o si solo viene a reportar una pérdida.
+      if (!v) { if (!(vacia && (hayControl || (soloPerdida && llavesCont.children.length === 1)))) marcar(inp); return; }
+      if (!inp.dataset.libre && !FORMATO_TAG.test(v)) marcar(inp);
     });
     if (!$("acepta").checked) marcar($("acepta"));
     return malos;
@@ -554,7 +640,7 @@
       unidad: tipo === "cochera" ? "" : $("unidad").value.trim(),
       cochera: tipo === "vivienda" ? "" : $("cochera").value.trim(),
       control_remoto: tipo === "vivienda" ? "" : valorRadio("control_remoto"),
-      llaves: [...llavesCont.querySelectorAll(".llave")].map((l) => ({ tag: l.querySelector(".in-tag").value.trim(), usuario: l.querySelector(".in-usuario").value.trim() })).filter((l) => l.tag),
+      llaves: [...llavesCont.querySelectorAll(".llave")].map((l) => ({ tipo: l.dataset.tipo, tag: l.querySelector(".in-tag").value.trim(), usuario: l.querySelector(".in-usuario").value.trim() })).filter((l) => l.tag || (l.tipo === "control")),
       perdidas: $("tienePerdida").checked && ($("perdidaTag").value.trim() || $("perdidaDetalle").value.trim()) ? [{ tag: $("perdidaTag").value.trim(), detalle: $("perdidaDetalle").value.trim() }] : [],
       comentario: $("comentario").value.trim(),
       acepta: $("acepta").checked,
@@ -585,7 +671,12 @@
     const filas = [["Edificio", nombreEdificio], ["Nombre", d.nombre]];
     if (d.piso || d.unidad) filas.push(["Unidad", `Piso ${d.piso} · Depto ${d.unidad}`]);
     if (d.cochera) filas.push(["Cochera", d.cochera]);
-    d.llaves.forEach((l, i) => filas.push([d.llaves.length > 1 ? "Llave " + (i + 1) : "Llave", l.tag]));
+    const nTag = d.llaves.filter((l) => l.tipo === "tag").length, nCtl = d.llaves.length - nTag;
+    let iTag = 0, iCtl = 0;
+    d.llaves.forEach((l) => {
+      if (l.tipo === "control") filas.push([nCtl > 1 ? "Control " + ++iCtl : "Control de cochera", l.tag || "sin número"]);
+      else filas.push([nTag > 1 ? "Llave " + ++iTag : "Llave", l.tag]);
+    });
     if (d.perdidas.length) filas.push(["Para dar de baja", d.perdidas[0].tag || "1 llave"]);
     $("resumen").innerHTML = filas.map(([a, b]) => `<div><span>${esc(a)}</span><span>${esc(b)}</span></div>`).join("");
   }
@@ -593,7 +684,7 @@
   $("otroBtn").addEventListener("click", () => {
     form.reset();
     llavesCont.innerHTML = "";
-    agregarLlave();
+    agregarDispositivo("tag");
     $("relacionOtro").classList.add("oculto");
     $("bloqueCochera").classList.add("oculto");
     $("filaDepto").classList.remove("oculto");
