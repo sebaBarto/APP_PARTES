@@ -5458,7 +5458,7 @@ test("Stock: catálogo desde el listado de Oficina, saldo inicial, mínimos, con
       b.articulos.forEach((x) => { if (!catalogo.articulos[x.c]) { nuevos++; catalogo.articulos[x.c] = { c: x.c, d: x.d, tipo: S.clasificarArticulo(x.d), medida: S.medidaArticulo(x.d), min: null, pedir: null, prov: "" }; } });
       return json({ ok: true, nuevos, actualizados: b.articulos.length - nuevos, configurados: 0, total: Object.keys(catalogo.articulos).length });
     }
-    if (b.accion === "saldo_inicial") { saldos = { ...saldos, inicializado: new Date().toISOString(), ubic: { dep: {} } }; b.items.forEach((x) => { if (x.dep || x.com) saldos.ubic.dep[x.c] = (x.dep || 0) + (x.com || 0); }); return json({ ok: true, articulos: b.items.length }); }
+    if (b.accion === "saldo_inicial") { saldos = { ...saldos, inicializado: new Date().toISOString(), ubic: { dep: {} } }; b.items.forEach((x) => { if (x.dep) saldos.ubic.dep[x.c] = x.dep; if (x.com) (saldos.ubic.dcm = saldos.ubic.dcm || {})[x.c] = x.com; }); return json({ ok: true, articulos: b.items.length }); }
     if (b.accion === "configurar") { catalogo.articulos[b.c] = { ...catalogo.articulos[b.c], ...b.campos }; return json({ ok: true, articulo: catalogo.articulos[b.c] }); }
     if (b.accion === "ajustar") {
       const antes = ((saldos.ubic || {})[b.ubic] || {})[b.c] || 0, dif = b.cantidad - antes;
@@ -5491,7 +5491,7 @@ test("Stock: catálogo desde el listado de Oficina, saldo inicial, mínimos, con
   await page.click("#stkInicialBtn");
   await page.click(".cartel-admin .cartel-si");
   await page.waitForFunction(() => /Saldo inicial cargado/.test(document.getElementById("stkEstado").textContent));
-  assert.deepStrictEqual(saldos.ubic.dep, { 20825: 9, 20208: 7, 300: 300 }, "el stock de comodato entra al depósito");
+  assert.deepStrictEqual([saldos.ubic.dep, saldos.ubic.dcm], [{ 20825: 8, 300: 300 }, { 20825: 1, 20208: 7 }], "el comodato va al depósito de comodatos");
   // Mínimo del teclado = 10: queda para pedir
   await page.fill('#stkLista tr[data-c="20825"] input[data-campo="min"]', "10");
   await page.press('#stkLista tr[data-c="20825"] input[data-campo="min"]', "Tab");
@@ -5523,7 +5523,7 @@ test("Stock: catálogo desde el listado de Oficina, saldo inicial, mínimos, con
   await page.setInputFiles("#stkConcArchivo", { name: "Stock noviembre.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer: Buffer.from(await xlsx(lis)) });
   await page.waitForSelector('#stkConcResultado details[data-cat="cantidadDistinta"]');
   const txt = await page.textContent("#stkConcResultado");
-  assert.match(txt, /No está en la APP: 1 · Cantidad distinta: 3 · Solo en la APP: 0 · Sin N° de serie: 1/);
+  assert.match(txt, /No está en la APP: 1 · Cantidad distinta: 3 · Solo en la APP: 0 · Comodato distinto: 0 · Sin N° de serie: 1/);
   assert.ok(!/MOVISTAR/.test(txt), "los SIM se concilian en Control de SIMs");
   assert.strictEqual(posts.filter((p) => p.accion === "conc_corrida").length, 1);
   // Dejar el teclado y el cable como Oficina
@@ -5533,7 +5533,7 @@ test("Stock: catálogo desde el listado de Oficina, saldo inicial, mínimos, con
   await det.locator('[data-accion="arreglar"]').click();
   await page.click(".cartel-admin .cartel-si");
   await page.waitForFunction(() => /Verificado/.test((document.getElementById("avisoFlotanteAdmin") || {}).textContent || ""));
-  assert.strictEqual(saldos.ubic.dep["20825"], 7, "6 en depósito + 1 de comodato");
+  assert.strictEqual(saldos.ubic.dep["20825"], 6);
   assert.strictEqual(saldos.ubic.dep["300"], 300);
   assert.ok(movs.every((m) => /Conciliación con Oficina|Recuento/.test(m.motivo)));
   // La sirena: Ignorar con motivo
@@ -5543,13 +5543,13 @@ test("Stock: catálogo desde el listado de Oficina, saldo inicial, mínimos, con
   await page.click(".cartel-admin .cartel-si");
   await page.waitForFunction(() => !document.querySelector('#stkConcResultado details[data-cat="cantidadDistinta"]'));
   assert.match(await page.textContent("#stkConcResultado"), /Ocultas por Resuelto \/ Ignorar \(1\)/);
-  // Pedidos: el teclado (7 ≤ 10) aparece con el proveedor y lo sugerido (2×10 − 7 = 13)
+  // Pedidos: el teclado (6 ≤ 10) aparece con el proveedor y lo sugerido (2×10 − 6 = 14)
   await page.click('#stkSub [data-stk="pedidos"]');
   await page.waitForSelector('#stkPedidos [data-prov="Propiedad Protegida"]');
-  assert.strictEqual(await page.inputValue('#stkPedidos tr[data-c="20825"] .stk-ped-cant'), "13");
+  assert.strictEqual(await page.inputValue('#stkPedidos tr[data-c="20825"] .stk-ped-cant'), "14");
   await page.locator('#stkPedidos [data-prov="Propiedad Protegida"] [data-ped="marcar"]').click();
   await page.waitForFunction(() => /Marcados como pedidos: 1/.test((document.getElementById("avisoFlotanteAdmin") || {}).textContent || ""));
-  assert.match(await page.textContent("#stkPedidosHechos"), /Propiedad Protegida.*20825.*13/s);
+  assert.match(await page.textContent("#stkPedidosHechos"), /Propiedad Protegida.*20825.*14/s);
   assert.match(await page.textContent("#stkPedidos"), /No hay nada para pedir/);
   // Movimientos
   await page.click('#stkSub [data-stk="movimientos"]');
@@ -5775,6 +5775,69 @@ test("Stock en la APP: el depósito entrega escaneando (etiqueta SAT + N° de un
   assert.deepStrictEqual(await page.evaluate(() => depCanasta.items()[0].extras), { GH300AA001: { serial: "72075101", mac: "00:19:BA:1D:3F:DB" } });
   assert.match(await page.textContent("#depCanasta .stk-chip"), /Serial 72075101 · MAC 00:19:BA:1D:3F:DB/);
   assert.deepStrictEqual(await page.$$eval("#depCanasta .stk-chip", (c) => c.map((x) => x.textContent.replace("✕", "").split(" ")[0])), ["GH300AA001"]);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Depósito de comodatos: al entregar se sabe si salió nuevo o del depósito de comodatos (pregunta solo si hay de los dos), y al recibir se elige adónde va", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  const S = require(require("path").join(__dirname, "..", "stock-utils.js"));
+  const catalogo = { articulos: { 20868: { c: "20868", d: "RX1 RECEPTOR PARADOX", tipo: "unidad", formatos: [] }, 20208: { c: "20208", d: "SIRENA MP100", tipo: "cantidad" } }, proveedores: {} };
+  let saldos = { inicializado: "2026-11-01", ubic: { dep: { 20208: 1 }, dcm: { 20208: 2, 20868: 3 } }, unidades: {}, pedidos: {}, envios: [] };
+  const posts = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    const json = (o, st) => route.fulfill({ status: st || 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("coleccion=tecnicos")) return json([{ nombre: "Melina", permisos: { stock_responsable: true } }, { nombre: "Juan", permisos: {} }]);
+    if (!u.includes("coleccion=stock")) return json([]);
+    if (req.method() === "GET") return json({ catalogo, saldos, conciliacion: { marcas: [], corridas: [] } });
+    const b = JSON.parse(req.postData()); posts.push(b);
+    if (b.accion === "mover") {
+      const x = S.moverStock(saldos, b.items, { tipo: "entrega", de: b.de, a: b.a, por: "Melina", confirmar: /^tec:/.test(b.a), deFlexible: /^(cli|com):/.test(b.de) }, catalogo);
+      if (x.error) return json({ error: x.error }, 409);
+      saldos = x.saldos; return json({ ok: true, envio: x.envio, movs: x.movs });
+    }
+    return json({ ok: true });
+  });
+  await page.goto(base + "/index.html");
+  await page.waitForTimeout(400);
+  await page.evaluate(() => { tecnicoLogueado = "Melina"; tecnicosPasswords = { Melina: "", Juan: "" }; tecnicosPermisos = { Melina: { stock_responsable: true }, Juan: {} }; refrescarAccesosPorPermisos(); showScreen("home"); });
+  await page.click("#tileDepositoBtn");
+  await page.waitForFunction(() => depDatos && depDatos.catalogo);
+  await page.selectOption("#depDestSelect", "Juan");
+  // RX1: nuevos no hay, solo en el depósito de comodatos -> sale de ahí sin preguntar
+  await page.fill("#depCodigo", "000208680000"); await page.press("#depCodigo", "Enter");
+  await page.waitForSelector("#depCanasta .stk-linea");
+  assert.ok(!(await page.$(".dlg-app")), "no pregunta");
+  assert.match(await page.textContent('#depCanasta .stk-de-dep button.activo'), /Comodato · hay 3/);
+  await page.fill("#depCodigo", "AI200158A2"); await page.press("#depCodigo", "Enter");
+  await page.waitForSelector("#depCanasta .stk-chip");
+  // Sirena: hay de los dos -> pregunta
+  await page.fill("#depCodigo", "000202080000"); await page.press("#depCodigo", "Enter");
+  await page.waitForSelector(".dlg-app .stk-opcion");
+  assert.match(await page.textContent(".dlg-app"), /¿De dónde sale\?[\s\S]*Nuevo \(hay 1\)[\s\S]*Del depósito de comodatos \(hay 2\)/);
+  await page.click('.dlg-app .stk-opcion:has-text("Del depósito de comodatos")');
+  await page.waitForFunction(() => document.querySelectorAll("#depCanasta .stk-linea").length === 2);
+  // Se puede cambiar con los botones de la línea
+  const sirena = page.locator("#depCanasta .stk-linea").nth(1);
+  assert.match(await sirena.locator(".stk-de-dep button.activo").textContent(), /Comodato/);
+  await sirena.locator('[data-de="dep"]').click();
+  assert.match(await page.locator("#depCanasta .stk-linea").nth(1).locator(".stk-de-dep button.activo").textContent(), /Nuevo/);
+  await page.locator("#depCanasta .stk-linea").nth(1).locator('[data-de="dcm"]').click();
+  await page.click("#depConfirmarBtn");
+  await page.click('.stk-opcion:has-text("Mandar en camino")');
+  await page.waitForFunction(() => !document.querySelector("#depCanasta .stk-linea"));
+  const mov = posts.find((p) => p.accion === "mover");
+  assert.deepStrictEqual(mov.items.map((x) => [x.c, x.cant, x.de]), [["20868", 1, "dcm"], ["20208", 1, "dcm"]]);
+  assert.deepStrictEqual([saldos.ubic.dep, saldos.ubic.dcm], [{ 20208: 1 }, { 20208: 1, 20868: 2 }]);
+  assert.deepStrictEqual(saldos.envios[0].items.map((x) => x.de), ["dcm", "dcm"]);
+  // Recibir: un retiro de cliente va por defecto al depósito de comodatos; una compra, al depósito
+  await page.click('#depModos [data-modo="recibir"]');
+  await page.selectOption("#depRecibirTipo", "proveedor");
+  assert.strictEqual(await page.inputValue("#depRecibirA"), "dep");
+  await page.selectOption("#depRecibirTipo", "cli");
+  assert.strictEqual(await page.inputValue("#depRecibirA"), "dcm");
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });

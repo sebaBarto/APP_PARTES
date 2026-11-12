@@ -216,9 +216,10 @@
   }
 
   // ---------- Saldos ----------
-  const UBIC_TEXTO = { gar: "Garantía (fallados)", dep: "Depósito", tec: "Técnico", veh: "Vehículo", cli: "Cliente (instalado)", com: "Cliente (comodato)", cam: "En camino" };
+  const UBIC_TEXTO = { gar: "Garantía (fallados)", dep: "Depósito", dcm: "Depósito de comodatos", tec: "Técnico", veh: "Vehículo", cli: "Cliente (instalado)", com: "Cliente (comodato)", cam: "En camino" };
   function nombreUbicacion(u) {
     if (u === "dep") return "Depósito";
+    if (u === "dcm") return "Depósito de comodatos";
     if (u === "gar") return "Garantía (fallados)";
     if (u === "baja") return "Dado de baja";
     if (/^cam:dev:/.test(u || "")) return `En camino al depósito (devuelve ${u.slice(8)})`;
@@ -227,17 +228,18 @@
     return `${UBIC_TEXTO[t] || t}${r.length ? ": " + r.join(":") : ""}`;
   }
   // Totales por artículo, separados como los ve el sistema de Oficina:
-  // en poder de SAT (depósito + técnicos + vehículos + en camino) y en comodato.
+  // en poder de SAT (depósito + técnicos + vehículos + en camino) y en comodato (depósito de comodatos + clientes).
   function totalesPorArticulo(saldos) {
     const tot = {};
     Object.entries((saldos && saldos.ubic) || {}).forEach(([u, items]) => {
       const t = u.split(":")[0];
       Object.entries(items || {}).forEach(([c, cant]) => {
-        const x = (tot[c] = tot[c] || { sat: 0, dep: 0, tec: 0, veh: 0, cam: 0, gar: 0, cli: 0, com: 0, detalle: {} });
+        const x = (tot[c] = tot[c] || { sat: 0, dep: 0, dcm: 0, tec: 0, veh: 0, cam: 0, gar: 0, cli: 0, com: 0, detalle: {} });
         const n = Number(cant) || 0;
         if (!n) return;
         x.detalle[u] = n;
         if (t === "dep") { x.dep += n; x.sat += n; }
+        else if (t === "dcm") x.dcm += n; // depósito de comodatos: para Oficina es «Comodato»
         else if (t === "tec") { x.tec += n; x.sat += n; }
         else if (t === "veh") { x.veh += n; x.sat += n; }
         else if (t === "cam") { x.cam += n; x.sat += n; }
@@ -257,8 +259,9 @@
   // ---------- Conciliación: listado de Oficina contra la APP ----------
   const STOCK_CONC_CATEGORIAS = [
     { k: "noEnCatalogo", corto: "No está en la APP", titulo: "Con stock en Oficina, pero no están en el catálogo de la APP", ayuda: "Artículos nuevos o que nunca se cargaron. Agregalos al catálogo para controlarlos." },
-    { k: "cantidadDistinta", corto: "Cantidad distinta", titulo: "Cantidad distinta (en poder de SAT)", ayuda: "Oficina: depósito + stock de comodato (los dos están en el depósito). La APP: depósito + técnicos + vehículos + en camino. Abajo de cada uno, dónde está según la APP." },
+    { k: "cantidadDistinta", corto: "Cantidad distinta", titulo: "Cantidad distinta (en poder de SAT)", ayuda: "Oficina cuenta el depósito; la APP suma depósito + técnicos + vehículos + en camino. Abajo de cada uno, dónde está según la APP." },
     { k: "soloEnApp", corto: "Solo en la APP", titulo: "La APP tiene stock y Oficina dice 0", ayuda: "Puede faltar cargar una compra en Oficina, o se usó/vendió sin registrarlo en la APP." },
+    { k: "comodatoDistinto", corto: "Comodato distinto", titulo: "Cantidad en comodato distinta", ayuda: "Oficina cuenta en «Comodato» el depósito de comodatos y lo que está en comodato en clientes." },
     { k: "unidadesSinRegistrar", corto: "Sin N° de serie", titulo: "Equipos sin todos sus N° de serie registrados", ayuda: "Hay más equipos que N° de serie registrados: falta escanearlos (inventario)." },
     { k: "deshabilitado", corto: "Deshabilitado en Oficina", titulo: "Deshabilitados en Oficina, con stock en la APP", ayuda: "Oficina ya no los usa, pero la APP tiene stock." },
     { k: "negativo", corto: "Negativo en la APP", titulo: "Stock negativo en la APP", ayuda: "Salió más de lo que entró: falta registrar una entrada o se cargó mal una salida." },
@@ -280,11 +283,11 @@
       let ok = true;
       const it = { c, of, t, d: a.d || of.d, a };
       Object.entries(t.detalle || {}).forEach(([u, n]) => { if (n < 0) { r.negativo.push({ ...it, u, n }); ok = false; } });
-      if (of.baja && (t.sat || t.com)) { r.deshabilitado.push(it); ok = false; }
-      // El stock de comodato de Oficina está físicamente en el depósito: para la APP es depósito.
-      const ofSat = (of.dep || 0) + (of.com || 0);
-      if (!ofSat && t.sat > 0) { r.soloEnApp.push(it); ok = false; }
-      else if (Math.abs(ofSat - (t.sat || 0)) > 1e-9) { r.cantidadDistinta.push({ ...it, dif: (t.sat || 0) - ofSat }); ok = false; }
+      if (of.baja && (t.sat || t.com || t.dcm)) { r.deshabilitado.push(it); ok = false; }
+      if (!of.dep && t.sat > 0) { r.soloEnApp.push(it); ok = false; }
+      else if (Math.abs((of.dep || 0) - (t.sat || 0)) > 1e-9) { r.cantidadDistinta.push({ ...it, dif: (t.sat || 0) - (of.dep || 0) }); ok = false; }
+      const appCom = (t.com || 0) + (t.dcm || 0);
+      if (Math.abs((of.com || 0) - appCom) > 1e-9) { r.comodatoDistinto.push({ ...it, dif: appCom - (of.com || 0) }); ok = false; }
       if (a.tipo === "unidad" && (uni[c] || 0) < Math.max(0, t.sat || 0)) { r.unidadesSinRegistrar.push({ ...it, registradas: uni[c] || 0 }); ok = false; }
       if (ok) r.coinciden++;
     });
@@ -499,6 +502,15 @@
     });
     return r;
   }
+  // Lo mismo, para una salida «del depósito» (nuevos + depósito de comodatos, repartido como moverStock).
+  function faltanSerieAlSalir(saldos, de, items, catalogo) {
+    if (de !== "dep") return controlarSalidaConSerie(saldos, de, items, catalogo);
+    const s = { ...(saldos || {}), ubic: (saldos && saldos.ubic) || {}, unidades: (saldos && saldos.unidades) || {} }, arts = (catalogo && catalogo.articulos) || {};
+    const lista = (items || []).map((x) => ({ c: codigoArticulo(x.c), cant: Number(x.cant) || 0, unidades: (x.unidades || []).map(limpiarCodigo), ...(x.de ? { de: x.de } : {}) })).filter((x) => x.c && x.cant > 0);
+    const r = repartirDeposito(s, lista, arts);
+    if (r.error) return [];
+    return ["dep", "dcm"].flatMap((o) => controlarSalidaConSerie(s, o, r.lista.filter((x) => x.de === o), catalogo).map((f) => ({ ...f, de: o })));
+  }
   // Salud del stock: todo lo que rompe una regla, con qué hacer.
   // Devuelve [{ k, nivel: "error"|"aviso"|"info", titulo, ayuda, items: [{ texto, c?, ubic?, serie?, id? }] }]
   function saludStock(catalogo, saldos, ahora) {
@@ -537,7 +549,7 @@
     // 7) Equipos sin N° de serie todavía (en poder de SAT)
     const sinN = [];
     Object.entries(ubic).forEach(([u, items]) => {
-      if (!/^(dep|gar|tec:|veh:)/.test(u)) return;
+      if (!/^(dep|dcm|gar|tec:|veh:)/.test(u)) return;
       Object.entries(items || {}).forEach(([c, n]) => { if ((arts[c] || {}).tipo !== "unidad") return; const f = n - ((cuenta[`${u}|${c}`] || []).length); if (f > 0) sinN.push({ texto: `${d(c)} en ${nombreUbicacion(u)}: ${f} sin N°`, c, ubic: u, n: f }); });
     });
     grupo("sinSerie", "info", "Equipos sin N° de serie todavía", "Se registran con el Inventario del Depósito (escanear etiqueta y N° de cada caja).", sinN);
@@ -584,9 +596,9 @@
   // el que recibe confirma. Los envíos pendientes se guardan en saldos.envios.
   const camino = (a, de) => (/^dep$/.test(a) && /^tec:/.test(de || "") ? `cam:dev:${de.slice(4)}` : `cam:${String(a).replace(/^tec:/, "")}`);
   const idMov = (i) => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}${i == null ? "" : "-" + i}`;
-  // El stock de comodato del listado de Oficina está en el depósito (no en clientes). Lo que una versión
-  // anterior cargó como «comodato sin cliente asignado» pasa al depósito, con un movimiento por artículo
-  // (el control nocturno lo reproduce). Devuelve { saldos, movs } (movs vacío si no había nada).
+  // El stock de comodato del listado de Oficina está en el depósito de comodatos (usados o reparados), no
+  // en clientes. Lo que una versión anterior cargó como «comodato sin cliente asignado» pasa ahí, con un
+  // movimiento por artículo (el control nocturno lo reproduce). Devuelve { saldos, movs }.
   function comodatoAlDeposito(saldos, fecha) {
     const caja = ((saldos && saldos.ubic) || {})["com:Sin asignar"] || {};
     const items = Object.entries(caja).filter(([, n]) => Number(n) > 0);
@@ -595,10 +607,53 @@
     let s = saldos;
     const movs = items.map(([c, n]) => {
       const uni = Object.entries((s && s.unidades) || {}).filter(([, u]) => u && u.c === c && u.u === "com:Sin asignar").map(([t]) => t);
-      return { id: `comdep-${dia}-${c}`, fecha: f, por: "APP", tipo: "comodato_deposito", c, cant: Number(n), de: "com:Sin asignar", a: "dep", ...(uni.length ? { unidades: uni } : {}), motivo: "Stock de comodato de Oficina: está en el depósito" };
+      return { id: `comdcm-${dia}-${c}`, fecha: f, por: "APP", tipo: "comodato_deposito", c, cant: Number(n), de: "com:Sin asignar", a: "dcm", ...(uni.length ? { unidades: uni } : {}), motivo: "Stock de comodato de Oficina: está en el depósito de comodatos" };
     });
     movs.forEach((m) => { s = aplicarMovimiento(s, m); });
     return { saldos: s, movs };
+  }
+  // Por un rato (v4.75.0) el comodato pasó al depósito general. Lo vuelve al depósito de comodatos (lo que
+  // todavía esté en el depósito; lo que ya salió queda con su movimiento). historial: los movimientos.
+  function separarComodato(saldos, historial, fecha) {
+    const f = fecha || new Date().toISOString(), dia = f.slice(0, 10).replace(/-/g, "");
+    const pasaron = {};
+    (historial || []).forEach((m) => { if (m && m.tipo === "comodato_deposito" && m.a === "dep" && m.c) pasaron[m.c] = red3((pasaron[m.c] || 0) + (Number(m.cant) || 0)); });
+    let s = saldos;
+    const movs = [];
+    Object.entries(pasaron).forEach(([c, n]) => {
+      const libres = red3((((s.ubic || {}).dep || {})[c] || 0) - seriesEn(s, "dep", c).length);
+      const cant = Math.min(n, libres);
+      if (!(cant > 0)) return;
+      const m = { id: `comsep-${dia}-${c}`, fecha: f, por: "APP", tipo: "comodato_deposito", c, cant, de: "dep", a: "dcm", motivo: "Stock de comodato de Oficina: vuelve al depósito de comodatos" };
+      s = aplicarMovimiento(s, m); movs.push(m);
+    });
+    return { saldos: { ...s, comodatoSeparado: true }, movs };
+  }
+  // El depósito son dos lugares: «dep» (nuevos) y «dcm» (depósito de comodatos: usados o reparados). Lo que
+  // sale «del depósito» se reparte: cada equipo con N° sale de donde está; el resto, de donde se eligió
+  // (x.de) o, si no se eligió, primero de los nuevos y lo que falte del depósito de comodatos.
+  function repartirDeposito(s, lista, arts) {
+    const salida = [];
+    for (const x of lista) {
+      const esUnidad = (arts[x.c] || {}).tipo === "unidad";
+      const hay = (d) => ((s.ubic[d] || {})[x.c] || 0);
+      const parte = { dep: { ...x, de: "dep", cant: 0, unidades: [] }, dcm: { ...x, de: "dcm", cant: 0, unidades: [] } };
+      const sueltas = [];
+      x.unidades.forEach((t) => { const u = s.unidades[t]; if (u && u.c === x.c && (u.u === "dep" || u.u === "dcm")) { parte[u.u].unidades.push(t); parte[u.u].cant++; } else sueltas.push(t); });
+      let resto = red3(x.cant - parte.dep.cant - parte.dcm.cant);
+      const libre = (d) => Math.max(0, red3(hay(d) - (esUnidad ? seriesEn(s, d, x.c).length : 0)));
+      if (resto > 0) {
+        if (x.de === "dcm" || x.de === "dep") parte[x.de].cant = red3(parte[x.de].cant + resto);
+        else if (resto > libre("dep") + libre("dcm") && !(libre("dcm") > 0)) parte.dep.cant = red3(parte.dep.cant + resto); // el error dice lo del depósito
+        else if (resto > libre("dep") + libre("dcm")) return { error: `${(arts[x.c] || {}).d || x.c}: en el depósito hay ${red3(hay("dep"))} nuevos y ${red3(hay("dcm"))} en el depósito de comodatos, y querés mover ${x.cant}.` };
+        else { const n = Math.min(resto, libre("dep")); parte.dep.cant = red3(parte.dep.cant + n); parte.dcm.cant = red3(parte.dcm.cant + resto - n); }
+      }
+      // Los N° nuevos (sin registrar) van con la cantidad sin N° de cada lado.
+      ["dep", "dcm"].forEach((d) => { const p = parte[d]; while (sueltas.length && p.unidades.length < p.cant) p.unidades.push(sueltas.shift()); });
+      if (sueltas.length) parte[x.de === "dcm" ? "dcm" : "dep"].unidades.push(...sueltas);
+      ["dep", "dcm"].forEach((d) => { const p = parte[d]; p.cant = Math.max(p.cant, p.unidades.length); if (p.cant > 0) salida.push(p); });
+    }
+    return { lista: salida };
   }
   // items: [{ c, cant, unidades?: [tracking] }]. op: { tipo, de?, a, por, fecha, motivo?, confirmar? }
   // Devuelve { saldos, movs, envio } o { error }.
@@ -607,34 +662,41 @@
     let s = JSON.parse(JSON.stringify(saldos || {}));
     s.ubic = s.ubic || {}; s.unidades = s.unidades || {}; s.envios = Array.isArray(s.envios) ? s.envios : [];
     const fecha = op.fecha || new Date().toISOString();
-    const lista = (items || []).map((x) => ({ c: codigoArticulo(x.c), cant: Math.round((Number(x.cant) || 0) * 1000) / 1000, unidades: [...new Set((x.unidades || []).map(limpiarCodigo).filter(Boolean))], prov: codigoProveedor(x.prov) }))
+    let lista = (items || []).map((x) => ({ c: codigoArticulo(x.c), cant: Math.round((Number(x.cant) || 0) * 1000) / 1000, unidades: [...new Set((x.unidades || []).map(limpiarCodigo).filter(Boolean))], prov: codigoProveedor(x.prov), ...(x.de === "dep" || x.de === "dcm" ? { de: x.de } : {}) }))
       .map((x) => ({ ...x, cant: x.unidades.length > x.cant ? x.unidades.length : x.cant })).filter((x) => x.c && x.cant > 0);
     if (!lista.length) return { error: "No hay nada para mover" };
     if (!op.a && !op.de) return { error: "Falta el destino" };
     if (op.a && op.a === op.de) return { error: "El origen y el destino son el mismo" };
+    if (lista.some((x) => !arts[x.c])) return { error: `El artículo ${lista.find((x) => !arts[x.c]).c} no está en el catálogo` };
+    // «Del depósito»: nuevos y depósito de comodatos (cada renglón queda con su origen en x.de).
+    if (op.de === "dep" && !op.deFlexible) { const r = repartirDeposito(s, lista, arts); if (r.error) return r; lista = r.lista; if (lista.some((x) => x.de === op.a)) return { error: "El origen y el destino son el mismo" }; }
+    else lista = lista.map(({ de, ...x }) => x);
+    const origen = (x) => x.de || op.de;
     for (const x of lista) {
       if (!arts[x.c]) return { error: `El artículo ${x.c} no está en el catálogo` };
       if (!op.permitirOtros && /^(sim|herramienta|no)$/.test(arts[x.c].tipo)) return { error: `${arts[x.c].d}: ${arts[x.c].tipo === "sim" ? "es un SIM, se maneja en Control de SIMs" : arts[x.c].tipo === "herramienta" ? "es una herramienta, se maneja en Herramientas" : "está marcado «No controlar»"}.` };
-      if (op.de && op.de !== "proveedor" && !op.deFlexible) {
-        const hay = (s.ubic[op.de] || {})[x.c] || 0;
-        if (hay < x.cant) return { error: `${arts[x.c].d}: en ${nombreUbicacion(op.de)} hay ${hay} y querés mover ${x.cant}.` };
+      const ox = origen(x);
+      if (ox && ox !== "proveedor" && !op.deFlexible) {
+        const hay = (s.ubic[ox] || {})[x.c] || 0;
+        if (hay < x.cant) return { error: `${arts[x.c].d}: en ${nombreUbicacion(ox)} hay ${hay} y querés mover ${x.cant}.` };
       }
       for (const t of x.unidades) {
         const u = s.unidades[t];
         if (u && u.c !== x.c) return { error: `El N° de serie ${t} es de otro artículo (${(arts[u.c] || {}).d || u.c}).` };
-        if (u && op.de && op.de !== "proveedor" && !op.deFlexible && u.u !== op.de) return { error: `El equipo ${t} figura en ${nombreUbicacion(u.u)}, no en ${nombreUbicacion(op.de)}.` };
+        if (u && ox && ox !== "proveedor" && !op.deFlexible && u.u !== ox) return { error: `El equipo ${t} figura en ${nombreUbicacion(u.u)}, no en ${nombreUbicacion(ox)}.` };
       }
     }
     // Regla de un solo lugar: si en el origen hay equipos con N° de serie, se dice cuáles salen.
     if (op.de && op.de !== "proveedor" && !op.deFlexible) {
-      const faltan = controlarSalidaConSerie(s, op.de, lista, catalogo);
-      if (faltan.length) return { error: faltan.map((f) => `${f.d}: en ${nombreUbicacion(op.de)} hay ${f.conSerie.length} con N° de serie; escaneá o elegí cuál${f.faltan > 1 ? "es" : ""} sale${f.faltan > 1 ? "n" : ""} (faltan ${f.faltan}).`).join(" "), faltanSerie: faltan };
+      const faltan = [...new Set(lista.map(origen))].flatMap((o) => controlarSalidaConSerie(s, o, lista.filter((x) => origen(x) === o), catalogo).map((f) => ({ ...f, de: o })));
+      if (faltan.length) return { error: faltan.map((f) => `${f.d}: en ${nombreUbicacion(f.de)} hay ${f.conSerie.length} con N° de serie; escaneá o elegí cuál${f.faltan > 1 ? "es" : ""} sale${f.faltan > 1 ? "n" : ""} (faltan ${f.faltan}).`).join(" "), faltanSerie: faltan };
     }
-    const de = op.de === "proveedor" ? null : op.de || null;
-    const destino = op.confirmar ? camino(op.a, de) : op.a;
+    const deOp = op.de === "proveedor" ? null : op.de || null;
+    const destino = op.confirmar ? camino(op.a, deOp) : op.a;
     const base = (x, i, cant, desde, extra) => ({ id: idMov(i), fecha, por: op.por || "", tipo: op.tipo || "movimiento", c: x.c, cant, ...(desde ? { de: desde } : {}), a: destino, ...(op.motivo ? { motivo: op.motivo } : {}), ...(op.presupuesto ? { presupuesto: op.presupuesto } : {}), ...(op.servicio ? { servicio: op.servicio } : {}), ...(extra || {}) });
     const movs = [];
     lista.forEach((x, i) => {
+      const de = deOp && x.de ? x.de : deOp;
       const uni = { ...(x.unidades.length ? { unidades: x.unidades } : {}), ...(x.prov ? { prov: x.prov } : {}) };
       // Retiro de un cliente que la APP no tenía registrado (o con menos): lo que falta sale del
       // comodato «Sin asignar» si es comodato, y si no, entra igual (no figuraba en la APP).
@@ -662,7 +724,7 @@
     }));
     let envio = null;
     if (op.confirmar) {
-      envio = { id: idMov(), tipo: op.tipo || "entrega", fecha, por: op.por || "", de: de || "dep", a: op.a, camino: destino, items: lista, ...(op.motivo ? { motivo: op.motivo } : {}), ...(op.servicio ? { servicio: op.servicio } : {}), ...(op.fallado ? { fallado: true, falla: String(op.falla || "").slice(0, 200) } : {}) };
+      envio = { id: idMov(), tipo: op.tipo || "entrega", fecha, por: op.por || "", de: deOp || "dep", a: op.a, camino: destino, items: lista, ...(op.motivo ? { motivo: op.motivo } : {}), ...(op.servicio ? { servicio: op.servicio } : {}), ...(op.fallado ? { fallado: true, falla: String(op.falla || "").slice(0, 200) } : {}) };
       s.envios = [...s.envios, envio];
       movs.forEach((m) => { m.envio = envio.id; });
     }
@@ -675,7 +737,7 @@
     const envio = (s.envios || []).find((e) => e.id === id);
     if (!envio) return { error: "Ese envío ya se confirmó o no existe" };
     const fecha = resp.fecha || new Date().toISOString(), movs = [];
-    const final = resp.destino && envio.a === "dep" ? resp.destino : envio.a;
+    const final = resp.destino && envio.a === "dep" && /^(dep|dcm|gar)$/.test(resp.destino) ? resp.destino : envio.a;
     const recibidos = new Map();
     if (resp.accion === "recibi") {
       if (Array.isArray(resp.items)) resp.items.forEach((x) => recibidos.set(codigoArticulo(x.c), { cant: Number(x.cant) || 0, unidades: x.unidades }));
@@ -696,7 +758,7 @@
       if (cant > 0) movs.push({ id: idMov(`r${i}`), fecha, por: resp.por || "", tipo: "recibido", c: x.c, cant, de: envio.camino, a: final, envio: envio.id, ...(uniRec.length ? { unidades: uniRec } : {}) });
       if (cant < x.cant) {
         diferencias.push({ c: x.c, enviado: x.cant, recibido: cant });
-        movs.push({ id: idMov(`v${i}`), fecha, por: resp.por || "", tipo: resp.accion === "rechazar" ? "rechazado" : "diferencia", c: x.c, cant: Math.round((x.cant - cant) * 1000) / 1000, de: envio.camino, a: envio.de, envio: envio.id, motivo: resp.motivo || (resp.accion === "rechazar" ? "Rechazado" : "No llegó todo"), ...(envio.servicio ? { servicio: envio.servicio } : {}), ...(uniVuelven.length ? { unidades: uniVuelven } : {}) });
+        movs.push({ id: idMov(`v${i}`), fecha, por: resp.por || "", tipo: resp.accion === "rechazar" ? "rechazado" : "diferencia", c: x.c, cant: Math.round((x.cant - cant) * 1000) / 1000, de: envio.camino, a: x.de || envio.de, envio: envio.id, motivo: resp.motivo || (resp.accion === "rechazar" ? "Rechazado" : "No llegó todo"), ...(envio.servicio ? { servicio: envio.servicio } : {}), ...(uniVuelven.length ? { unidades: uniVuelven } : {}) });
       }
     });
     movs.forEach((m) => { s = aplicarMovimiento(s, m); });
@@ -877,8 +939,8 @@
     if (t === "ajuste" || t === "regularizacion") return "ajuste";
     if (a === "gar" || /^garantia/.test(t)) return "garantia";
     if (t === "devuelto_sin_usar") return "sinUsar";
-    if (de === "dep" && /^(tec:|veh:|cam:(?!dev:))/.test(a)) return "entrega";
-    if ((a === "dep" && /^(tec:|veh:)/.test(de)) || (/^cam:dev:/.test(a) && /^(tec:|veh:)/.test(de))) return "devolucion";
+    if ((de === "dep" || de === "dcm") && /^(tec:|veh:|cam:(?!dev:))/.test(a)) return "entrega";
+    if (((a === "dep" || a === "dcm") && /^(tec:|veh:)/.test(de)) || (/^cam:dev:/.test(a) && /^(tec:|veh:)/.test(de))) return "devolucion";
     if (/^(cli|com):/.test(a)) return "instalado";
     if (/^(cli|com):/.test(de)) return "retirado";
     if (a === "dep" && (!de || de === "proveedor" || t === "ingreso")) return "ingreso";
@@ -973,7 +1035,7 @@
       const q = quienDelMovimiento(m, k);
       if (q) { const p = (porQuien[q] = porQuien[q] || { ...vacio(), ultimo: "" }); p[k] = red3(p[k] + cant); if (String(m.fecha) > p.ultimo) p.ultimo = m.fecha; }
     });
-    function de60(m, d) { return d <= 60 && m.de === "dep" && /^(tec:|veh:|cam:(?!dev:)|cli:|com:)/.test(m.a || "") && m.tipo !== "recibido"; }
+    function de60(m, d) { return d <= 60 && (m.de === "dep" || m.de === "dcm") && /^(tec:|veh:|cam:(?!dev:)|cli:|com:)/.test(m.a || "") && m.tipo !== "recibido"; }
     // Por técnico/vehículo: lo que tiene ahora, más lo que movió en 30 días.
     Object.entries(s.ubic || {}).forEach(([u, cs]) => {
       if (!/^(tec|veh):/.test(u)) return;
@@ -1004,7 +1066,7 @@
     const donde = { dep: 0, tecnicos: 0, vehiculos: 0, camino: 0, garantia: 0 };
     Object.entries(s.ubic || {}).forEach(([u, cs]) => {
       const n = Object.entries(cs || {}).filter(([c]) => !/^(sim|herramienta|no)$/.test((arts[c] || {}).tipo)).reduce((t, [, x]) => t + (Number(x) || 0), 0);
-      if (u === "dep") donde.dep += n; else if (/^tec:/.test(u)) donde.tecnicos += n; else if (/^veh:/.test(u)) donde.vehiculos += n; else if (/^cam:/.test(u)) donde.camino += n; else if (u === "gar") donde.garantia += n;
+      if (u === "dep" || u === "dcm") donde.dep += n; else if (/^tec:/.test(u)) donde.tecnicos += n; else if (/^veh:/.test(u)) donde.vehiculos += n; else if (/^cam:/.test(u)) donde.camino += n; else if (u === "gar") donde.garantia += n;
     });
     Object.keys(donde).forEach((k) => { donde[k] = red3(donde[k]); });
 
@@ -1061,7 +1123,7 @@
       if (!n || !m.c || !(Number(m.cant) > 0)) return;
       const sale = !/^(tec|cam|cli|com):/.test(m.de || "") && tecDe(m.a);
       const usa = /^tec:/.test(m.de || "") && /^(cli|com):/.test(m.a || "");
-      const vuelve = /^tec:/.test(m.de || "") && /^(dep|gar|cam:dev:)/.test(m.a || "");
+      const vuelve = /^tec:/.test(m.de || "") && /^(dep|dcm|gar|cam:dev:)/.test(m.a || "");
       // No lo recibió (rechazó el envío o llegó menos): eso no salió para el servicio.
       const rebote = /^cam:(?!dev:)/.test(m.de || "") && !tecDe(m.a);
       if (!sale && !((usa || vuelve || rebote) && idx[n])) return;
@@ -1108,21 +1170,24 @@
   // Oficina cuenta «Depósito» (todo lo que está en poder de SAT: depósito, técnicos, vehículos, en
   // camino) y «Comodato». Los pases internos no le cambian nada; sí lo que sale a un cliente, lo que
   // vuelve de un cliente, los ajustes y las compras.
-  const grupoOficina = (u) => (!u ? "afuera" : /^(dep|gar|tec:|veh:|cam:)/.test(u) ? "sat" : /^com:/.test(u) ? "comodato" : /^cli:/.test(u) ? "cliente" : "otro");
+  // El depósito de comodatos (dcm) es «Comodato» para Oficina: de ahí a un técnico es «sale del depósito
+  // de comodatos»; de ahí a un cliente en comodato no le cambia nada (sigue en Comodato).
+  const grupoOficina = (u) => (!u ? "afuera" : /^(dep|gar|tec:|veh:|cam:)/.test(u) ? "sat" : u === "dcm" || /^com:/.test(u) ? "comodato" : /^cli:/.test(u) ? "cliente" : "otro");
   function movimientoParaOficina(m) {
     if (!m || !m.c || !(Number(m.cant) > 0) || m.tipo === "inicial" || m.tipo === "inicial_tecnico" || m.tipo === "comodato_deposito" || m.tipo === "inventario_series" || m.tipo === "garantia_reemplazo") return null;
-    const de = grupoOficina(m.de), a = grupoOficina(m.a);
+    // Lo retirado de un cliente que la APP no tenía registrado (sin «de», con «origen») viene de ese cliente.
+    const de = grupoOficina(m.de || m.origen), a = grupoOficina(m.a);
     if (de === a) return null;
     const cliente = (u) => String(u || "").replace(/^(cli|com):/, "");
     let operacion = "", deposito = 0, comodato = 0, quien = "";
     if (de === "sat" && a === "cliente") { operacion = "SALIDA A CLIENTE"; deposito = -m.cant; quien = cliente(m.a); }
-    else if (de === "sat" && a === "comodato") { operacion = "PASE A COMODATO"; deposito = -m.cant; comodato = m.cant; quien = cliente(m.a); }
-    else if (de === "comodato" && a === "sat") { operacion = m.tipo === "devuelto_sin_usar" ? "VUELVE SIN USAR (PRESUPUESTO)" : "DEVOLUCION DE COMODATO"; deposito = m.cant; comodato = -m.cant; quien = cliente(m.de); }
-    else if (de === "cliente" && a === "sat") { operacion = m.tipo === "devuelto_sin_usar" ? "VUELVE SIN USAR (PRESUPUESTO)" : "RETIRO DE CLIENTE"; deposito = m.cant; quien = cliente(m.de); }
+    else if (de === "sat" && a === "comodato") { operacion = m.a === "dcm" ? "PASE AL DEPOSITO DE COMODATOS" : "PASE A COMODATO"; deposito = -m.cant; comodato = m.cant; quien = m.a === "dcm" ? "" : cliente(m.a); }
+    else if (de === "comodato" && a === "sat") { operacion = m.de === "dcm" ? "SALE DEL DEPOSITO DE COMODATOS" : m.tipo === "devuelto_sin_usar" ? "VUELVE SIN USAR (PRESUPUESTO)" : "DEVOLUCION DE COMODATO"; deposito = m.cant; comodato = -m.cant; quien = m.de === "dcm" ? "" : cliente(m.de || m.origen); }
+    else if (de === "cliente" && a === "sat") { operacion = m.tipo === "devuelto_sin_usar" ? "VUELVE SIN USAR (PRESUPUESTO)" : "RETIRO DE CLIENTE"; deposito = m.cant; quien = cliente(m.de || m.origen); }
     else if (de === "afuera" && a === "sat") { operacion = m.tipo === "ajuste" || m.tipo === "regularizacion" ? "AJUSTE" : "INGRESO"; deposito = m.cant; }
     else if (de === "sat" && a === "afuera") { operacion = "AJUSTE"; deposito = -m.cant; }
-    else if (de === "afuera" && a === "comodato") { operacion = "AJUSTE"; comodato = m.cant; quien = cliente(m.a); }
-    else if (de === "comodato" && a === "afuera") { operacion = "AJUSTE"; comodato = -m.cant; quien = cliente(m.de); }
+    else if (de === "afuera" && a === "comodato") { operacion = m.a === "dcm" && m.tipo !== "ajuste" && m.tipo !== "regularizacion" ? "INGRESO" : "AJUSTE"; comodato = m.cant; quien = m.a === "dcm" ? "" : cliente(m.a); }
+    else if (de === "comodato" && a === "afuera") { operacion = "AJUSTE"; comodato = -m.cant; quien = m.de === "dcm" ? "" : cliente(m.de || m.origen); }
     else if (de === "comodato" && a === "cliente") { operacion = "COMODATO A VENTA"; comodato = -m.cant; quien = cliente(m.a); }
     else return null;
     return { id: m.id, fecha: m.fecha, operacion, c: m.c, deposito, comodato, cliente: quien, presupuesto: m.presupuesto || "", series: (m.unidades || []).join(" "), prov: m.prov || "", por: m.por || "", motivo: m.motivo || "" };
@@ -1179,7 +1244,7 @@
     return mejor;
   }
 
-  const api = { codigoProveedor, nombreProveedor, STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, datosLimpios, buscarPorDatos, infoSerie, seriesEn, controlarSalidaConSerie, saludStock, esCodigoIgnorable, elegirCodigoDelCuadro, pareceModelo, buscarArticuloPorTexto, sugerirMarca, resumenMarcas, limpiarMarca, claveMarca, registrarUnidades, movimientoParaOficina, GARANTIA_ESTADOS, instalacionDeUnidad, abrirGarantias, comodatoAlDeposito, moverStock, cerrarEnvio, stockDePersona, auditarStock, recalcularDesdeMovimientos, movimientosDeRegularizacion, retiradosParaDevolver, avanceSolicitud, anotarPresupuestos, pendienteDePresupuesto, anotarServicios, pendienteDeServicio, serviciosConMaterial, tableroStock, claseMovimiento };
+  const api = { codigoProveedor, nombreProveedor, STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, datosLimpios, buscarPorDatos, infoSerie, seriesEn, controlarSalidaConSerie, faltanSerieAlSalir, saludStock, esCodigoIgnorable, elegirCodigoDelCuadro, pareceModelo, buscarArticuloPorTexto, sugerirMarca, resumenMarcas, limpiarMarca, claveMarca, registrarUnidades, movimientoParaOficina, GARANTIA_ESTADOS, instalacionDeUnidad, abrirGarantias, comodatoAlDeposito, separarComodato, repartirDeposito, moverStock, cerrarEnvio, stockDePersona, auditarStock, recalcularDesdeMovimientos, movimientosDeRegularizacion, retiradosParaDevolver, avanceSolicitud, anotarPresupuestos, pendienteDePresupuesto, anotarServicios, pendienteDeServicio, serviciosConMaterial, tableroStock, claseMovimiento };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else Object.assign(raiz, api);
 })(typeof window !== "undefined" ? window : globalThis);

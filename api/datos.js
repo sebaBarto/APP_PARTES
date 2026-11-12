@@ -1186,9 +1186,17 @@ const STOCK_CAT = "stock/catalogo.json", STOCK_SAL = "stock/saldos.json", STOCK_
 const stockMovRuta = (d) => `stock/movimientos-${(d || new Date().toISOString()).slice(0, 7)}.json`;
 async function stockActualizar(ruta, porDefecto, cambiar, mensaje) {
   for (let i = 0; i < 5; i++) {
-    const { data, sha, corrupto, migracion } = await leerArchivoDatos(ruta, porDefecto);
+    let { data, sha, corrupto, migracion } = await leerArchivoDatos(ruta, porDefecto);
     // Nunca escribir sobre un archivo que existe pero no se pudo leer: se perderían los datos.
     if (corrupto) return { error: `El archivo ${ruta} no se pudo leer. No se guardó nada para no perder datos: hay que restaurarlo desde una copia de seguridad.`, status: 500 };
+    // Una sola vez: el comodato que la v4.75.0 pasó al depósito general vuelve al depósito de comodatos.
+    if (ruta === STOCK_SAL && data && typeof data === "object" && !data.comodatoSeparado) {
+      try {
+        const { data: h } = await leerArchivoDatos(stockMovRuta("2026-11-01"), []);
+        const x = require("../stock-utils.js").separarComodato(data, [...(Array.isArray(h) ? h : []), ...(data.movsPend || [])]);
+        data = x.saldos; migracion = [...(migracion || []), ...x.movs];
+      } catch (e) { /* se intenta en la próxima escritura */ }
+    }
     const res = cambiar(data && typeof data === "object" ? data : porDefecto);
     if (res && res.error) return res;
     if (migracion && migracion.length && res && res.data) res.movs = [...migracion, ...(Array.isArray(res.movs) ? res.movs : [])];
@@ -1196,7 +1204,7 @@ async function stockActualizar(ruta, porDefecto, cambiar, mensaje) {
     // saldos hasta que se pasan al historial del mes (si eso falla, se pasan en la próxima operación).
     if (ruta === STOCK_SAL && Array.isArray(res.movs) && res.movs.length) res.data = { ...require("../stock-utils.js").anotarServicios(require("../stock-utils.js").anotarPresupuestos(res.data, res.movs), res.movs, res.servicio), movsPend: [...((res.data && res.data.movsPend) || []), ...res.movs].slice(-2000) };
     const r = await escribirArchivoDatos(ruta, res.data, sha, mensaje);
-    if (r.ok) { if (migracion && migracion.length) await stockConfirmarMovs(migracion, "Stock: el comodato de Oficina pasa al depósito").catch(() => {}); return res; }
+    if (r.ok) { if (migracion && migracion.length) await stockConfirmarMovs(migracion, "Stock: el comodato de Oficina pasa al depósito de comodatos").catch(() => {}); return res; }
     if (r.status !== 409 && r.status !== 422) break;
   }
   return { error: "No se pudo guardar (probá de nuevo)", status: 502 };
@@ -1526,7 +1534,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
       // El responsable decide de dónde sale lo que el técnico usó y no estaba en su stock.
       const decision = b.decision === "rechazar" ? "rechazar" : "aprobar";
       const de = String(b.de || "ninguno"), motivo = String(b.motivo || "").replace(/\s+/g, " ").trim().slice(0, 200);
-      if (decision === "aprobar" && de !== "ninguno" && !/^(dep|tec:.{1,60}|veh:.{1,60})$/.test(de)) { res.status(400).json({ error: "Origen inválido" }); return; }
+      if (decision === "aprobar" && de !== "ninguno" && !/^(dep|dcm|tec:.{1,60}|veh:.{1,60})$/.test(de)) { res.status(400).json({ error: "Origen inválido" }); return; }
       if (decision === "rechazar" && !motivo) { res.status(400).json({ error: "Falta el motivo del rechazo" }); return; }
       const { data: cat } = await leerArchivoDatos(STOCK_CAT, { articulos: {} });
       let movs = [];
@@ -1538,7 +1546,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
         const c = S.codigoArticulo(b.c || x.c), cant = Number(b.cant) > 0 ? Number(b.cant) : x.cant;
         if (decision === "aprobar" && de !== "ninguno") {
           if (!c) return { error: "Elegí de qué artículo es", status: 400 };
-          const m = S.moverStock(sal, [{ c, cant, unidades: Array.isArray(b.unidades) ? b.unidades : x.unidades }], { tipo: "instalado_parte", de, a: x.destino, por: quien, fecha: ahora, motivo: `Aprobado: parte${x.parte ? " N° " + x.parte : ""} de ${x.por}${motivo ? " · " + motivo : ""}`, presupuesto: x.presupuesto }, cat);
+          const m = S.moverStock(sal, [{ c, cant, unidades: Array.isArray(b.unidades) ? b.unidades : x.unidades, ...(de === "dep" ? { de: "dep" } : {}) }], { tipo: "instalado_parte", de, a: x.destino, por: quien, fecha: ahora, motivo: `Aprobado: parte${x.parte ? " N° " + x.parte : ""} de ${x.por}${motivo ? " · " + motivo : ""}`, presupuesto: x.presupuesto }, cat);
           if (m.error) return { error: m.error, status: 409 };
           s2 = m.saldos; movs = m.movs;
         }
@@ -1737,16 +1745,17 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
       const r = await stockActualizar(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }, (sal) => {
         if (sal.inicializado && !b.forzar) return { error: `El stock ya se inicializó el ${String(sal.inicializado).slice(0, 10)}. Para corregir diferencias usá la conciliación.`, status: 409 };
         const nuevo = { ...sal, ubic: { ...(sal.ubic || {}) }, inicializado: ahora, unidades: sal.unidades || {}, pedidos: sal.pedidos || {} };
-        nuevo.ubic.dep = {}; delete nuevo.ubic["com:Sin asignar"];
-        // El stock de comodato de Oficina está físicamente en el depósito: entra al depósito.
+        nuevo.ubic.dep = {}; nuevo.ubic.dcm = {}; delete nuevo.ubic["com:Sin asignar"]; nuevo.comodatoSeparado = true;
+        // El stock de comodato de Oficina está en el depósito de comodatos (usados o reparados).
         movs = [];
         items.forEach((x) => {
           const c = S.codigoArticulo(x.c);
           if (!controla(c)) return;
           const dep = Number(x.dep) || 0, com = Number(x.com) || 0;
           if (dep) { nuevo.ubic.dep[c] = dep; movs.push({ id: `${Date.now().toString(36)}-${movs.length}`, fecha: ahora, por: quien, tipo: "inicial", c, cant: dep, a: "dep", motivo: "Saldo inicial desde el listado de Oficina" }); }
-          if (com) { nuevo.ubic.dep[c] = Math.round(((nuevo.ubic.dep[c] || 0) + com) * 1000) / 1000; movs.push({ id: `${Date.now().toString(36)}-${movs.length}`, fecha: ahora, por: quien, tipo: "inicial", c, cant: com, a: "dep", motivo: "Saldo inicial: stock de comodato de Oficina (está en el depósito)" }); }
+          if (com) { nuevo.ubic.dcm[c] = com; movs.push({ id: `${Date.now().toString(36)}-${movs.length}`, fecha: ahora, por: quien, tipo: "inicial", c, cant: com, a: "dcm", motivo: "Saldo inicial: depósito de comodatos desde el listado de Oficina" }); }
         });
+        if (!Object.keys(nuevo.ubic.dcm).length) delete nuevo.ubic.dcm;
         return { data: nuevo, respuesta: { articulos: new Set(movs.map((m) => m.c)).size }, movs };
       }, `Stock: saldo inicial desde el listado de Oficina (por ${quien})`);
       if (!r.error) await stockConfirmarMovs(movs, `Stock: movimientos del saldo inicial (por ${quien})`);
@@ -1815,7 +1824,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
       // Deja la cantidad de un artículo en una ubicación como se indica (inventario o conciliación).
       const c = S.codigoArticulo(b.c), ubic = String(b.ubic || "dep").slice(0, 80), motivo = String(b.motivo || "").trim().slice(0, 200);
       if (!c) { res.status(400).json({ error: "Falta el artículo" }); return; }
-      if (!/^(dep|gar|tec:.+|veh:.+|cli:.+|com:.+)$/.test(ubic)) { res.status(400).json({ error: "Ubicación inválida" }); return; }
+      if (!/^(dep|dcm|gar|tec:.+|veh:.+|cli:.+|com:.+)$/.test(ubic)) { res.status(400).json({ error: "Ubicación inválida" }); return; }
       if (!motivo) { res.status(400).json({ error: "Falta el motivo del ajuste" }); return; }
       const cantidad = Number(b.cantidad);
       if (!Number.isFinite(cantidad) || cantidad < 0) { res.status(400).json({ error: "Cantidad inválida" }); return; }
@@ -1930,7 +1939,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
     if (b.accion === "registrar_unidades") {
       // Inventario de N° de serie de lo que ya está en una ubicación (no mueve cantidades).
       const ubic = String(b.ubic || "dep");
-      if (!/^(dep|tec:.{1,60}|veh:.{1,60})$/.test(ubic)) { res.status(400).json({ error: "Ubicación inválida" }); return; }
+      if (!/^(dep|dcm|tec:.{1,60}|veh:.{1,60})$/.test(ubic)) { res.status(400).json({ error: "Ubicación inválida" }); return; }
       const opId = String(b.op_id || "").slice(0, 60);
       let resultado = null, duplicado = false;
       const r = await stockActualizar(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }, (sal) => {
@@ -1991,7 +2000,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
     if (b.accion === "mover" || b.accion === "devolver") {
       // mover (responsable): del depósito a un técnico, vehículo o cliente; compras que llegan; retiros.
       // devolver (técnico): de lo suyo al depósito; queda en camino hasta que el responsable lo recibe.
-      const UB = /^(dep|gar|tec:.{1,60}|veh:.{1,60}|cli:.{1,120}|com:.{1,120})$/;
+      const UB = /^(dep|dcm|gar|tec:.{1,60}|veh:.{1,60}|cli:.{1,120}|com:.{1,120})$/;
       let de = b.accion === "devolver" ? (esResp && b.de ? String(b.de) : `tec:${quien}`) : String(b.de || "dep");
       const a = b.accion === "devolver" ? "dep" : String(b.a || "");
       if (!(de === "proveedor" || UB.test(de)) || !UB.test(a)) { res.status(400).json({ error: "Origen o destino inválido" }); return; }
@@ -1999,8 +2008,8 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
       const fallado = !!b.fallado || a === "gar", falla = String(b.falla || "").replace(/\s+/g, " ").trim().slice(0, 200);
       if (b.motivo == null && fallado && falla) b.motivo = `Fallado: ${falla}`;
       // «Vuelve de un presupuesto (no se usó)»: salió para instalar y el cliente no lo quiso; no es un retiro.
-      const noUsado = !!b.no_usado && b.accion === "mover" && /^(cli|com):/.test(de) && a === "dep";
-      const tipo = a === "gar" ? "falla" : b.accion === "devolver" ? "devolucion" : de === "proveedor" ? "ingreso" : /^tec:/.test(a) ? "entrega" : /^(cli|com):/.test(a) ? "a_cliente" : noUsado ? "devuelto_sin_usar" : /^(cli|com):/.test(de) ? "retiro" : a === "dep" ? "devolucion" : "traspaso";
+      const noUsado = !!b.no_usado && b.accion === "mover" && /^(cli|com):/.test(de) && (a === "dep" || a === "dcm");
+      const tipo = a === "gar" ? "falla" : b.accion === "devolver" ? "devolucion" : de === "proveedor" ? "ingreso" : /^tec:/.test(a) ? "entrega" : /^(cli|com):/.test(a) ? "a_cliente" : noUsado ? "devuelto_sin_usar" : /^(cli|com):/.test(de) ? "retiro" : a === "dep" || a === "dcm" ? "devolucion" : "traspaso";
       // Confirma el que recibe, salvo que sea el mismo que registra (Melina recibiendo en el depósito)
       // o que lo reciba en mano: escaneó su código (QR de Mi stock) o puso su clave.
       let enMano = "";
@@ -2032,7 +2041,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
       const r = await stockActualizar(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }, (sal) => {
         // Lo que se mandó sin señal se reintenta: si ya llegó, no se aplica dos veces.
         if (opId && (sal.ops || []).includes(opId)) { duplicado = true; return { error: "duplicado", status: 200 }; }
-        const x = S.moverStock(sal, Array.isArray(b.items) ? b.items.slice(0, 500) : [], { tipo: enMano ? "entrega_mano" : tipo, de, a, por: quien, fecha: ahora, motivo: [motivoSv, motivoMano, String(b.motivo || "").slice(0, 200)].filter(Boolean).join(" · "), servicio: servicio && servicio.numero ? servicio.numero : undefined, confirmar, fallado: fallado && b.accion === "devolver", falla, deFlexible: /^(cli|com):/.test(de) && (a === "dep" || a === "gar"), presupuesto: /^(cli|com):/.test(a) || noUsado ? String(b.presupuesto || "").trim().slice(0, 30) : "" }, cat);
+        const x = S.moverStock(sal, Array.isArray(b.items) ? b.items.slice(0, 500) : [], { tipo: enMano ? "entrega_mano" : tipo, de, a, por: quien, fecha: ahora, motivo: [motivoSv, motivoMano, String(b.motivo || "").slice(0, 200)].filter(Boolean).join(" · "), servicio: servicio && servicio.numero ? servicio.numero : undefined, confirmar, fallado: fallado && b.accion === "devolver", falla, deFlexible: /^(cli|com):/.test(de) && (a === "dep" || a === "dcm" || a === "gar"), presupuesto: /^(cli|com):/.test(a) || noUsado ? String(b.presupuesto || "").trim().slice(0, 30) : "" }, cat);
         if (x.error) return { error: x.error, status: 409 };
         resultado = x;
         // Un vehículo que recibe (o entrega) stock queda en la lista de camionetas aunque después quede vacío.
@@ -2075,7 +2084,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
         const mio = e.a === `tec:${quien}`;
         if (!mio && !esResp) return { error: "Este envío no es para vos", status: 403 };
         // Una devolución de un equipo fallado va a Garantía (salvo que el depósito elija otra cosa).
-        const destino = e.a === "dep" ? (b.destino === "dep" || b.destino === "gar" ? b.destino : e.fallado ? "gar" : undefined) : undefined;
+        const destino = e.a === "dep" ? (b.destino === "dep" || b.destino === "dcm" || b.destino === "gar" ? b.destino : e.fallado ? "gar" : undefined) : undefined;
         const x = S.cerrarEnvio(sal, b.id, { accion: b.accion_envio === "rechazar" ? "rechazar" : "recibi", items: Array.isArray(b.items) ? b.items : undefined, por: mio || e.a === "dep" ? quien : `${quien} (por ${e.a.replace(/^tec:/, "")})`, fecha: ahora, motivo: String(b.motivo || "").slice(0, 200), destino });
         if (x.error) return { error: x.error, status: 409 };
         S.abrirGarantias(x.saldos, x.movs, { falla: e.falla || e.motivo || "", por: quien });

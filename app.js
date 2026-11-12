@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.75.0";
+const APP_VERSION = "4.76.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -18630,8 +18630,25 @@ function crearCanastaStock(op) {
   const can = { lineas: [], actual: "" };
   const arts = () => (op.catalogo() || {}).articulos || {};
   const forma = () => (op.forma ? op.forma() : "individual");
-  const disponible = (c) => { const o = op.origen(); return o ? (((op.saldos() || {}).ubic || {})[o] || {})[c] || 0 : Infinity; };
+  const hayEn = (u, c) => (((op.saldos() || {}).ubic || {})[u] || {})[c] || 0;
+  // «Del depósito» son dos: nuevos (dep) y el depósito de comodatos (dcm, usados o reparados).
+  const esDeposito = () => op.origen() === "dep";
+  const disponible = (c, l) => { const o = op.origen(); if (!o) return Infinity; if (o === "dep") return l && l.de ? hayEn(l.de, c) : hayEn("dep", c) + hayEn("dcm", c); return hayEn(o, c); };
   const linea = (c) => { let l = can.lineas.find((x) => x.c === c); if (!l) { l = { c, cant: 0, unidades: [] }; can.lineas.push(l); } return l; };
+  // De cuál de los dos sale: si hay de los dos, se pregunta (una vez por artículo); si hay de uno solo, de ese.
+  const elegirDeposito = async (c, l) => {
+    if (!esDeposito() || l.de) return true;
+    const nuevos = hayEn("dep", c), com = hayEn("dcm", c);
+    if (!(com > 0)) { l.de = "dep"; return true; }
+    if (!(nuevos > 0)) { l.de = "dcm"; return true; }
+    const art = arts()[c] || { d: c };
+    const v = await elegirOpcionApp(`${art.d}\n¿De dónde sale?`, [
+      { v: "dep", texto: `Nuevo (hay ${stkFmtN(nuevos)})`, ayuda: "Del depósito.", primario: true },
+      { v: "dcm", texto: `Del depósito de comodatos (hay ${stkFmtN(com)})`, ayuda: "Usado o reparado." },
+    ]);
+    if (!v) return false;
+    l.de = v; return true;
+  };
   // Para animar: qué línea es nueva y cuál cambió desde el dibujo anterior.
   let antes = null;
   can.render = () => {
@@ -18639,11 +18656,13 @@ function crearCanastaStock(op) {
     const ahora = new Map(can.lineas.map((l) => [l.c, `${l.cant}|${l.unidades.length}`]));
     const anim = (l) => (!antes ? "" : !antes.has(l.c) ? " stk-linea-nueva" : antes.get(l.c) !== ahora.get(l.c) ? " stk-linea-flash" : "");
     op.cont.innerHTML = can.lineas.length ? can.lineas.map((l, i) => {
-      const art = a[l.c] || { d: l.c }, esU = art.tipo === "unidad", disp = disponible(l.c);
+      const art = a[l.c] || { d: l.c }, esU = art.tipo === "unidad", disp = disponible(l.c, l);
+      const dosDep = esDeposito() && (l.de === "dcm" || hayEn("dcm", l.c) > 0);
       const sinN = esU ? Math.max(0, l.cant - l.unidades.length) : 0;
       return `<div class="stk-linea ${esU ? "stk-linea-equipo" : "stk-linea-cant"}${esU && sinN ? " stk-linea-falta" : ""}${can.actual === l.c ? " stk-linea-actual" : ""}${anim(l)}" data-i="${i}">
         <div class="stk-linea-top"><div><b>${escapeHtml(art.d)}</b><small>${escapeHtml(l.c)}${l.prov ? ` · ${escapeHtml(nombreProveedor(op.catalogo(), l.prov) || "proveedor " + l.prov)}` : ""}${disp !== Infinity ? ` · hay ${stkFmtN(disp)}` : ""}${art.medida === "metros" ? " · en metros" : ""}</small></div>
         <div class="stk-cant"><button type="button" data-menos aria-label="Uno menos">−</button><input class="field-input" inputmode="decimal" value="${stkFmtN(l.cant)}" aria-label="Cantidad"><button type="button" data-mas aria-label="Uno más">+</button></div></div>
+        ${dosDep ? `<div class="stk-de-dep" role="group" aria-label="De dónde sale"><button type="button" data-de="dep" class="${l.de !== "dcm" ? "activo" : ""}">Nuevo · hay ${stkFmtN(hayEn("dep", l.c))}</button><button type="button" data-de="dcm" class="${l.de === "dcm" ? "activo" : ""}">Comodato · hay ${stkFmtN(hayEn("dcm", l.c))}</button></div>` : ""}
         ${l.unidades.length ? `<div class="stk-chips">${l.unidades.map((t, j) => { const info = infoSerie(t, { datos: (l.extras || {})[t] ? datosLimpios(l.extras[t]) : (((op.saldos() || {}).unidades || {})[t] || {}).datos }); return `<span class="stk-chip">${escapeHtml(t)}${info ? ` <small style="opacity:.75;">${escapeHtml(info)}</small>` : ""}<button type="button" data-quitar-u="${j}" aria-label="Sacar">${stkIco("x")}</button></span>`; }).join("")}</div>` : ""}
         ${esU && sinN ? `<div class="stk-falta">${can.actual === l.c ? `Falta${sinN > 1 ? "n" : ""} ${sinN} N° de serie: escanealo${sinN > 1 ? "s" : ""} ahora.` : `${sinN} sin N° de serie.`}</div>` : ""}
         ${esU && sinN && can.seriesLibres(l.c).length ? `<button type="button" class="btn btn-secondary btn-small stk-elegir-n" data-elegir-n>${stkIco("lista")}Elegir el N° de serie de la lista (${can.seriesLibres(l.c).length})</button>` : ""}
@@ -18657,6 +18676,13 @@ function crearCanastaStock(op) {
       const enMetros = (arts()[l.c] || {}).medida === "metros";
       const sacar = () => { can.lineas = can.lineas.filter((x) => x !== l); if (can.actual === l.c) can.actual = ""; };
       div.querySelector("[data-mas]").addEventListener("click", () => { l.cant = Math.round((l.cant + 1) * 1000) / 1000; can.cambio(); });
+      div.querySelectorAll("[data-de]").forEach((b) => b.addEventListener("click", () => {
+        const d = b.dataset.de, sal = op.saldos() || {};
+        // Un equipo con N° registrado sale de donde está.
+        const otro = l.unidades.find((t) => { const u = (sal.unidades || {})[t]; return u && (u.u === "dep" || u.u === "dcm") && u.u !== d; });
+        if (otro) { stkAviso(`${otro} está en ${nombreUbicacion(sal.unidades[otro].u)}`); return; }
+        l.de = d; can.cambio();
+      }));
       div.querySelector("[data-menos]").addEventListener("click", () => { l.cant = Math.max(l.unidades.length, Math.round((l.cant - 1) * 1000) / 1000); if (l.cant <= 0) sacar(); can.cambio(); });
       // Lo que no va en metros se cuenta por unidades enteras.
       inp.addEventListener("change", () => { const n = stkNumApp(inp.value); if (n >= 0) l.cant = Math.max(l.unidades.length, enMetros ? n : Math.round(n)); if (l.cant <= 0) sacar(); can.cambio(); });
@@ -18701,14 +18727,17 @@ function crearCanastaStock(op) {
       cuanto = stkNumApp(v);
       if (!(cuanto > 0)) return { ok: false, texto: "Cantidad inválida" };
     }
+    const nueva = !can.lineas.some((x) => x.c === c);
     const l = linea(c);
+    if (!(await elegirDeposito(c, l))) { if (nueva) can.lineas = can.lineas.filter((x) => x !== l); return { ok: false, texto: "No se agregó" }; }
     l.cant = Math.round((l.cant + cuanto) * 1000) / 1000;
     if (prov) l.prov = prov;
     can.actual = c;
     can.cambio();
     const pn = prov ? ` · ${nombreProveedor(op.catalogo(), prov) || "proveedor " + prov}` : "";
-    if (art.tipo === "unidad") return { ok: true, texto: `${art.d}${pn} (${stkFmtN(l.cant)}): ahora su N° de serie`, completo: false };
-    return { ok: true, texto: `${art.d}${pn} (${stkFmtN(l.cant)})`, completo: true };
+    const dc = esDeposito() && l.de === "dcm" ? " · del depósito de comodatos" : "";
+    if (art.tipo === "unidad") return { ok: true, texto: `${art.d}${pn}${dc} (${stkFmtN(l.cant)}): ahora su N° de serie`, completo: false };
+    return { ok: true, texto: `${art.d}${pn}${dc} (${stkFmtN(l.cant)})`, completo: true };
   };
   // El código del modelo (igual en todas las cajas) se guarda para ignorarlo como N° de serie.
   const aprenderModelo = async (c, codigo) => {
@@ -18731,12 +18760,20 @@ function crearCanastaStock(op) {
       return { ok: false, texto: `${tracking} ya está en la lista` };
     }
     const o = op.origen();
-    if (r && !r.nuevo && o && r.ubic !== o) return { ok: false, texto: `${tracking} figura en ${nombreUbicacion(r.ubic)}` };
+    const enDeposito = o === "dep" && r && !r.nuevo && (r.ubic === "dep" || r.ubic === "dcm");
+    if (r && !r.nuevo && o && r.ubic !== o && !enDeposito) return { ok: false, texto: `${tracking} figura en ${nombreUbicacion(r.ubic)}` };
+    if (enDeposito) {
+      const l0 = can.lineas.find((x) => x.c === c);
+      // El equipo registrado dice de cuál de los dos sale; si la línea ya salía del otro, no se mezclan.
+      if (l0 && l0.de && l0.de !== r.ubic && l0.unidades.some((t) => { const u = ((op.saldos() || {}).unidades || {})[t]; return u && u.u === l0.de; })) return { ok: false, texto: `${tracking} está en ${nombreUbicacion(r.ubic)}: entregalo aparte` };
+      linea(c).de = r.ubic;
+    }
     if (r && r.aviso && !(await confirmarApp(`${art.d}\n${tracking}\n\n${r.aviso}`, { aceptar: "Sí, es el N° de serie", cancelar: op.puedeAsociar ? "No, ignorar este código" : "No" }))) {
       if (op.puedeAsociar && art.tipo === "unidad") await aprenderModelo(c, tracking); // no vuelve a preguntar por este código
       return { ok: false, texto: "No se agregó" };
     }
     const l = linea(c);
+    if (!(await elegirDeposito(c, l))) return { ok: false, texto: "No se agregó" };
     l.unidades.push(tracking); // completa una caja que esperaba su N° de serie, o suma una más igual
     if (l.cant < l.unidades.length) l.cant = l.unidades.length;
     if (art.tipo === "unidad") art.formatos = agregarFormato(art.formatos, tracking, art); // aprende ya, sin esperar al servidor
@@ -18806,9 +18843,14 @@ function crearCanastaStock(op) {
     return { ok: true, texto: `${art.d}: escaneá su N° de serie o elegilo de la lista`, completo: false };
   };
   // N° de serie registrados en el origen que todavía no están en la lista.
-  can.seriesLibres = (c) => { const o = op.origen(); if (!o) return []; const usados = new Set(can.lineas.flatMap((x) => x.unidades)); return seriesEn(op.saldos(), o, c).filter((t) => !usados.has(t)).sort(); };
+  can.seriesLibres = (c) => {
+    const o = op.origen(); if (!o) return [];
+    const usados = new Set(can.lineas.flatMap((x) => x.unidades)), l = can.lineas.find((x) => x.c === c);
+    const lugares = o === "dep" ? (l && l.de ? [l.de] : ["dep", "dcm"]) : [o];
+    return lugares.flatMap((u) => seriesEn(op.saldos(), u, c)).filter((t) => !usados.has(t)).sort();
+  };
   // Regla de un solo lugar: lo que sale sin N° no puede ser más que lo que hay sin N° en el origen.
-  can.faltanSeries = () => { const o = op.origen(); return o ? controlarSalidaConSerie(op.saldos(), o, can.items(), op.catalogo()) : []; };
+  can.faltanSeries = () => { const o = op.origen(); return o ? faltanSerieAlSalir(op.saldos(), o, can.items(), op.catalogo()) : []; };
   // Para los números leídos de una foto: qué es cada uno (y si sirve).
   can.describir = (t) => {
     const r = can.interpretar(t), a = arts();
@@ -18817,7 +18859,7 @@ function crearCanastaStock(op) {
     if (r.tipo === "ean_nuevo") return { util: true, texto: "Código de fabricante" };
     return { util: false, texto: /^\d{12}$/.test(t) ? "Etiqueta SAT de un artículo que no está en el catálogo" : can.actual ? "" : "Primero la etiqueta de SAT" };
   };
-  can.items = () => can.lineas.filter((l) => l.cant > 0).map((l) => ({ c: l.c, cant: l.cant, unidades: l.unidades, ...(l.prov ? { prov: l.prov } : {}), ...(l.extras && Object.keys(l.extras).length ? { extras: l.extras } : {}) }));
+  can.items = () => can.lineas.filter((l) => l.cant > 0).map((l) => ({ c: l.c, cant: l.cant, unidades: l.unidades, ...(esDeposito() && l.de && (l.de === "dcm" || hayEn("dcm", l.c) > 0) ? { de: l.de } : {}), ...(l.prov ? { prov: l.prov } : {}), ...(l.extras && Object.keys(l.extras).length ? { extras: l.extras } : {}) }));
   return can;
 }
 
@@ -19288,7 +19330,7 @@ let depDatos = null, depModo = "entregar", depVehiculos = null;
 let depForma = (() => { try { return localStorage.getItem("stock_forma") === "lote" ? "lote" : "individual"; } catch (e) { return "individual"; } })();
 const depCatalogo = () => (depDatos && depDatos.catalogo) || { articulos: {} };
 const depSaldos = () => (depDatos && depDatos.saldos) || { ubic: {}, unidades: {} };
-const depInvUbic = () => { const t = document.getElementById("depInvTipo").value, n = document.getElementById("depInvSelect").value; return t === "dep" ? "dep" : n ? `${t}:${n}` : ""; };
+const depInvUbic = () => { const t = document.getElementById("depInvTipo").value, n = document.getElementById("depInvSelect").value; return t === "dep" || t === "dcm" ? t : n ? `${t}:${n}` : ""; };
 const depOrigen = () => {
   if (depModo === "entregar") return "dep";
   if (depModo === "inventario") return depInvUbic() || "dep";
@@ -19583,6 +19625,9 @@ document.getElementById("depDestTipo").addEventListener("change", async () => { 
 document.getElementById("depDestNombre").addEventListener("input", depBotonTexto);
 document.getElementById("depDestSelect").addEventListener("change", () => { depBotonTexto(); depPintarRecientes(); depPintarPase(); });
 document.getElementById("depDestNombre").addEventListener("change", depPintarRecientes);
+// Lo nuevo va al depósito; lo que vuelve de un cliente (retiro o comodato), al depósito de comodatos. Se puede cambiar.
+const depRecibirADefecto = () => { const t = document.getElementById("depRecibirTipo").value; document.getElementById("depRecibirA").value = t === "cli" || t === "com" ? "dcm" : "dep"; };
+document.getElementById("depRecibirTipo").addEventListener("change", () => depRecibirADefecto());
 document.getElementById("depRecibirTipo").addEventListener("change", async () => { document.getElementById("depRecibirDe").value = ""; document.getElementById("depRecibirSelect").value = ""; await depLlenarLista("depRecibirTipo"); depMostrarModo(); });
 document.getElementById("depRecibirDe").addEventListener("change", () => depCanasta.render());
 document.getElementById("depRecibirSelect").addEventListener("change", () => depCanasta.render());
@@ -19618,8 +19663,9 @@ document.getElementById("depConfirmarBtn").addEventListener("click", async (ev) 
   if (depModo === "entregar") {
     const tipo = document.getElementById("depDestTipo").value, nombre = depNombreElegido("depDestTipo");
     if (!nombre) { stkAviso(tipo === "veh" ? "Elegí a qué vehículo va" : tipo === "tec" ? "Elegí a qué técnico va" : "Escribí el cliente"); document.getElementById(tipo === "tec" || tipo === "veh" ? "depDestSelect" : "depDestNombre").focus(); return; }
-    const falta = items.find((x) => x.cant > (((depSaldos().ubic || {}).dep || {})[x.c] || 0));
-    if (falta) { stkAviso(`${(a[falta.c] || {}).d}: en el depósito no alcanza`); return; }
+    const ub = depSaldos().ubic || {}, hayDe = (u, c) => (ub[u] || {})[c] || 0;
+    const falta = items.find((x) => x.cant > (x.de ? hayDe(x.de, x.c) : hayDe("dep", x.c) + hayDe("dcm", x.c)));
+    if (falta) { stkAviso(`${(a[falta.c] || {}).d}: en ${falta.de === "dcm" ? "el depósito de comodatos" : "el depósito"} no alcanza`); return; }
     cuerpo = { accion: "mover", de: "dep", a: `${tipo}:${nombre}`, items };
     if (tipo === "tec" && depSolicitudActiva && depSolicitudActiva.por === nombre) cuerpo.solicitud = depSolicitudActiva.id;
     const pres = document.getElementById("depPresupuesto").value.trim();
@@ -19629,7 +19675,7 @@ document.getElementById("depConfirmarBtn").addEventListener("click", async (ev) 
   } else {
     const tipo = document.getElementById("depRecibirTipo").value, nombre = depNombreElegido("depRecibirTipo");
     if (tipo !== "proveedor" && !nombre) { stkAviso(tipo === "presupuesto" ? "Poné el N° de presupuesto o el cliente" : tipo === "servicio" ? "Elegí el servicio" : "Elegí de dónde viene"); return; }
-    cuerpo = { accion: "mover", de: tipo === "proveedor" ? "proveedor" : tipo === "servicio" ? `tec:${nombre}` : `${tipo}:${nombre}`, a: "dep", items };
+    cuerpo = { accion: "mover", de: tipo === "proveedor" ? "proveedor" : tipo === "servicio" ? `tec:${nombre}` : `${tipo}:${nombre}`, a: document.getElementById("depRecibirA").value === "dcm" ? "dcm" : "dep", items };
     if (tipo === "servicio") { const p = depServicioVuelveElegido(); cuerpo.servicio = { numero: p.numero, cliente: p.cliente }; }
     if (tipo === "presupuesto") {
       const p = depPresupElegido(), num = document.getElementById("depPresupVuelve").value.trim();
@@ -19646,7 +19692,7 @@ document.getElementById("depConfirmarBtn").addEventListener("click", async (ev) 
     }
   }
   cuerpo.motivo = document.getElementById("depMotivo").value.trim();
-  const faltanN = cuerpo.de && cuerpo.de !== "proveedor" && !/^(cli|com):/.test(cuerpo.de) ? controlarSalidaConSerie(depSaldos(), cuerpo.de, items, depCatalogo()) : [];
+  const faltanN = cuerpo.de && cuerpo.de !== "proveedor" && !/^(cli|com):/.test(cuerpo.de) ? faltanSerieAlSalir(depSaldos(), cuerpo.de, items, depCatalogo()) : [];
   if (faltanN.length) { await dialogoApp(`Antes de confirmar, decí cuáles salen:\n\n${faltanN.map((f) => `• ${f.d}: faltan ${f.faltan} N° de serie (escanealos o tocá «Elegir el N° de serie de la lista»)`).join("\n")}`, { soloAceptar: true, aceptar: "Entendido" }); return; }
   const sinN = items.filter((x) => (a[x.c] || {}).tipo === "unidad" && x.cant > x.unidades.length);
   const resumen = items.map((x) => `• ${(a[x.c] || {}).d || x.c}: ${stkFmtN(x.cant)}`).join("\n");
@@ -19804,8 +19850,8 @@ document.getElementById("depRepetirBtn").addEventListener("click", () => {
 // ---- Inventario de N° de serie ----
 async function depPintarInventario() {
   const t = document.getElementById("depInvTipo").value;
-  document.getElementById("depInvNombreCaja").classList.toggle("hidden", t === "dep");
-  if (t !== "dep") {
+  document.getElementById("depInvNombreCaja").classList.toggle("hidden", t === "dep" || t === "dcm");
+  if (t !== "dep" && t !== "dcm") {
     const sel = document.getElementById("depInvSelect"), actual = sel.value, nombres = await depListaNombres(t);
     sel.innerHTML = `<option value="">Elegí…</option>` + nombres.map((n) => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
     if (nombres.includes(actual)) sel.value = actual;
@@ -19819,7 +19865,7 @@ async function depPintarInventario() {
   cont.innerHTML = faltan.length ? `<h3 class="stk-h">Equipos sin N° de serie en ${escapeHtml(nombreUbicacion(ubic))} (${faltan.reduce((t2, x) => t2 + x.n - x.con, 0)})</h3>` + faltan.map((x) => `<div class="stk-envio-item"><span>${escapeHtml(x.d)}<small>${x.con} de ${stkFmtN(x.n)} ya tienen N°</small></span><b>faltan ${stkFmtN(x.n - x.con)}</b></div>`).join("")
     : `<p class="stk-ayuda">${stkIco("check")}Todos los equipos de ${escapeHtml(nombreUbicacion(ubic))} tienen su N° de serie.</p>`;
 }
-document.getElementById("depFallado").addEventListener("change", (e) => { document.getElementById("depFalla").classList.toggle("hidden", !e.target.checked); if (e.target.checked) document.getElementById("depFalla").focus(); depBotonTexto(); });
+document.getElementById("depFallado").addEventListener("change", (e) => { document.getElementById("depFalla").classList.toggle("hidden", !e.target.checked); document.getElementById("depRecibirACaja").classList.toggle("hidden", e.target.checked); if (e.target.checked) document.getElementById("depFalla").focus(); depBotonTexto(); });
 document.getElementById("miStockFallado").addEventListener("change", (e) => { document.getElementById("miStockFalla").classList.toggle("hidden", !e.target.checked); if (e.target.checked) document.getElementById("miStockFalla").focus(); });
 document.getElementById("depInvTipo").addEventListener("change", () => { document.getElementById("depInvSelect").value = ""; depPintarInventario(); depCanasta.render(); });
 document.getElementById("depInvSelect").addEventListener("change", () => { depPintarInventario(); depCanasta.render(); });
@@ -19843,11 +19889,11 @@ function depPintarAprobar() {
       const ubic = depSaldos().ubic || {}, hay = (u) => (c ? (ubic[u] || {})[c] || 0 : 0), n = (u) => (c ? ` (hay ${stkFmtN(hay(u))})` : "");
       const vehs = Object.keys(ubic).filter((u) => /^veh:/.test(u) && hay(u) > 0).sort();
       const previo = selOrigen.value, tec = `tec:${x.por}`;
-      selOrigen.innerHTML = `<option value="dep">Del depósito${n("dep")}</option><option value="${escapeHtml(tec)}">Del stock de ${escapeHtml(x.por)}${c ? ` (tiene ${stkFmtN(hay(tec))})` : ""}</option>`
+      selOrigen.innerHTML = `<option value="dep">Del depósito (nuevo)${n("dep")}</option>${hay("dcm") > 0 ? `<option value="dcm">Del depósito de comodatos${n("dcm")}</option>` : ""}<option value="${escapeHtml(tec)}">Del stock de ${escapeHtml(x.por)}${c ? ` (tiene ${stkFmtN(hay(tec))})` : ""}</option>`
         + vehs.map((u) => `<option value="${escapeHtml(u)}">De la camioneta ${escapeHtml(u.slice(4))}${n(u)}</option>`).join("")
         + '<option value="ninguno">No descontar (consumible o no era de SAT)</option>';
       // Por defecto, de donde alcanza: su stock, una camioneta o el depósito.
-      const alcanza = [tec, ...vehs, "dep"].find((u) => hay(u) >= x.cant);
+      const alcanza = [tec, ...vehs, "dep", "dcm"].find((u) => hay(u) >= x.cant);
       selOrigen.value = previo && [...selOrigen.options].some((o) => o.value === previo) ? previo : alcanza || "dep";
     };
     pintarOrigenes();
@@ -19887,7 +19933,7 @@ function depPintarDevoluciones() {
     <b>${escapeHtml(e.de.replace(/^tec:/, ""))}</b><small>${escapeHtml(new Date(e.fecha).toLocaleString("es-AR", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" }))}${e.motivo && !e.fallado ? " · " + escapeHtml(e.motivo) : ""}</small>
     ${e.fallado ? `<div class="stk-fallado">${stkIco("alerta")}Fallado: ${escapeHtml(e.falla || "")}</div>` : ""}
     ${htmlRecepcion(e, d)}
-    <div class="field-group" style="margin:6px 0;"><label class="field-label">Va a</label><select class="field-input" data-destino><option value="dep" ${e.fallado ? "" : "selected"}>Depósito</option><option value="gar" ${e.fallado ? "selected" : ""}>Garantía (fallado)</option></select></div>
+    <div class="field-group" style="margin:6px 0;"><label class="field-label">Va a</label><select class="field-input" data-destino><option value="dep" ${e.fallado ? "" : "selected"}>Depósito (nuevo)</option><option value="dcm">Depósito de comodatos (usado o reparado)</option><option value="gar" ${e.fallado ? "selected" : ""}>Garantía (fallado)</option></select></div>
     <div class="stk-envio-btns"><button type="button" class="btn btn-primary btn-small" data-recibi>${stkIco("check")}Recibido</button><button type="button" class="btn btn-secondary btn-small" data-controlar>${stkIco("camara")}Controlar escaneando</button></div></div>`).join("") : "";
   cont.querySelectorAll(".stk-envio").forEach((div) => div.querySelector("[data-controlar]").addEventListener("click", () => depControlarDevolucion(div, lista.find((x) => x.id === div.dataset.id))));
   cont.querySelectorAll(".stk-envio").forEach((div) => div.querySelector("[data-recibi]").addEventListener("click", async (ev) => {

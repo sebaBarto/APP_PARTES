@@ -1683,8 +1683,9 @@ test("Stock: catálogo desde el listado de Oficina y la planilla revisada, saldo
     r = await post({ accion: "saldo_inicial", items: listado.map((x) => ({ c: x.c, dep: x.dep, com: x.com })) });
     assert.ok(r.cuerpo.ok);
     const sal = repo["stock/saldos.json"];
-    // El stock de comodato de Oficina está en el depósito: entra al depósito.
-    assert.deepStrictEqual(sal.ubic.dep, { 20825: 9, 10350: 30175, 20208: 7 });
+    // El comodato de Oficina está en el depósito de comodatos (usados o reparados).
+    assert.deepStrictEqual(sal.ubic.dep, { 20825: 8, 10350: 30175 });
+    assert.deepStrictEqual(sal.ubic.dcm, { 20825: 1, 20208: 7 });
     assert.strictEqual(sal.ubic["com:Sin asignar"], undefined);
     assert.strictEqual((await post({ accion: "saldo_inicial", items: [] })).statusCode, 409, "una sola vez");
     const mes = new Date().toISOString().slice(0, 7);
@@ -1692,11 +1693,9 @@ test("Stock: catálogo desde el listado de Oficina y la planilla revisada, saldo
     // Ajuste con motivo
     assert.strictEqual((await post({ accion: "ajustar", c: "20825", ubic: "dep", cantidad: 6 })).statusCode, 400, "sin motivo no");
     r = await post({ accion: "ajustar", c: "20825", ubic: "dep", cantidad: 6, motivo: "Conteo: había 6" });
-    assert.deepStrictEqual([r.cuerpo.antes, r.cuerpo.despues], [9, 6]);
+    assert.deepStrictEqual([r.cuerpo.antes, r.cuerpo.despues], [8, 6]);
     const mov = repo[`stock/movimientos-${mes}.json`].slice(-1)[0];
-    assert.deepStrictEqual([mov.tipo, mov.c, mov.cant, mov.de, mov.por], ["ajuste", "20825", 3, "dep", "Seba"]);
-    // Las 7 sirenas del comodato se usaron: quedan en 0
-    await post({ accion: "ajustar", c: "20208", ubic: "dep", cantidad: 0, motivo: "Conteo: no quedan" });
+    assert.deepStrictEqual([mov.tipo, mov.c, mov.cant, mov.de, mov.por], ["ajuste", "20825", 2, "dep", "Seba"]);
     // Pedidos: la sirena tiene 0 en depósito y mínimo 5 -> pedir 10
     const datosStock = await get();
     let p = S.articulosParaPedir(datosStock.catalogo, datosStock.saldos);
@@ -1708,8 +1707,8 @@ test("Stock: catálogo desde el listado de Oficina y la planilla revisada, saldo
     // Conciliación contra un listado nuevo de Oficina
     const nuevo = [{ c: "20825", d: "TECLADO K10LH", dep: 8, com: 1 }, { c: "20208", dep: 0, com: 7 }, { c: "10350", dep: 30175, com: 0 }, { c: "99999", d: "CAMARA NUEVA", dep: 2, com: 0 }];
     const conc = S.conciliarStock(nuevo, d2.catalogo, d2.saldos, []);
-    // Oficina: depósito + comodato (los dos en el depósito)
-    assert.deepStrictEqual(conc.cantidadDistinta.map((x) => [x.c, x.dif]).sort(), [["20208", -7], ["20825", -3]]);
+    assert.deepStrictEqual(conc.cantidadDistinta.map((x) => [x.c, x.dif]), [["20825", -2]]);
+    assert.strictEqual(conc.comodatoDistinto.length, 0, "Oficina «Comodato» = depósito de comodatos + clientes");
     assert.deepStrictEqual(conc.noEnCatalogo.map((x) => x.c), ["99999"]);
     assert.deepStrictEqual(conc.unidadesSinRegistrar.map((x) => x.c), ["20825"], "faltan escanear los teclados");
     r = await post({ accion: "conc_marcar", estado: "ignorada", items: [{ codigo: "99999", categoria: "noEnCatalogo" }] });
@@ -1798,21 +1797,18 @@ test("Stock: control del cuadre (servidor y cron): todo lo hecho por la API cuad
   } finally { global.fetch = fetchViejo; }
 });
 
-test("Stock: el stock de comodato de Oficina está en el depósito: lo cargado antes como «comodato sin asignar» pasa al depósito (con movimiento) y se puede entregar escaneando", async () => {
+test("Stock: depósito de comodatos (usados o reparados) separado de los nuevos: el comodato de Oficina va ahí, al entregar se sabe de cuál salió, y lo que la v4.75.0 pasó al depósito vuelve", async () => {
   const S = require(path.join(raiz, "stock-utils.js"));
   const fetchViejo = global.fetch;
   const mes = new Date().toISOString().slice(0, 7), fi = `${mes}-01T10:00:00.000Z`;
-  const repo = {
+  const armar = (saldos, hist) => ({
     "tecnicos.json": [{ nombre: "Seba", permisos: { admin: true } }, { nombre: "Melina", permisos: { stock_responsable: true } }, { nombre: "Juan", permisos: {} }],
     "stock/catalogo.json": { articulos: { 20868: { c: "20868", d: "RX1 RECEPTOR 2 PGM PARADOX INALAMBRICO", tipo: "unidad" }, 20208: { c: "20208", d: "SIRENA MP100 INTERIOR" } } },
-    "stock/saldos.json": { inicializado: fi, ubic: { dep: { 20208: 2 }, "com:Sin asignar": { 20868: 3, 20208: 1 } }, unidades: {}, envios: [] },
-    [`stock/movimientos-${mes}.json`]: [
-      { id: "i1", fecha: fi, tipo: "inicial", c: "20208", cant: 2, a: "dep" },
-      { id: "i2", fecha: fi, tipo: "inicial", c: "20868", cant: 3, a: "com:Sin asignar" },
-      { id: "i3", fecha: fi, tipo: "inicial", c: "20208", cant: 1, a: "com:Sin asignar" },
-    ],
-  };
-  let version = 0;
+    "stock/saldos.json": saldos,
+    [`stock/movimientos-${mes}.json`]: hist,
+    ...(mes !== "2026-11" ? { "stock/movimientos-2026-11.json": hist } : {}),
+  });
+  let repo = {}, version = 0;
   global.fetch = async (url, op = {}) => {
     const u = String(url), metodo = op.method || "GET";
     const m = u.match(/contents\/([^?]+)/);
@@ -1826,26 +1822,66 @@ test("Stock: el stock de comodato de Oficina está en el depósito: lo cargado a
     return new Response("[]");
   };
   try {
-    const admin = crearSesion({ nombre: "Seba", rol: "admin" }), melina = crearSesion({ nombre: "Melina", rol: "tecnico" });
+    const admin = crearSesion({ nombre: "Seba", rol: "admin" }), melina = crearSesion({ nombre: "Melina", rol: "tecnico" }), juan = crearSesion({ nombre: "Juan", rol: "tecnico" });
     const post = async (body, t = admin) => { const r = resFalso(); await datos(pedido("POST", { coleccion: "stock" }, body, t), r); return r; };
     const get = async (t = admin) => { const r = resFalso(); await datos(pedido("GET", { coleccion: "stock" }, null, t), r); return r.cuerpo; };
-    // Antes de tocar nada, la APP ya lo muestra en el depósito
+    const hist = () => repo[`stock/movimientos-${mes}.json`];
+    // 1) Cargado antes como «comodato sin asignar»: se ve (y al escribir queda) en el depósito de comodatos
+    repo = armar({ inicializado: fi, ubic: { dep: { 20208: 2 }, "com:Sin asignar": { 20868: 3, 20208: 1 } }, unidades: {}, envios: [] }, [
+      { id: "i1", fecha: fi, tipo: "inicial", c: "20208", cant: 2, a: "dep" },
+      { id: "i2", fecha: fi, tipo: "inicial", c: "20868", cant: 3, a: "com:Sin asignar" },
+      { id: "i3", fecha: fi, tipo: "inicial", c: "20208", cant: 1, a: "com:Sin asignar" },
+    ]);
     const d = await get(melina);
-    assert.deepStrictEqual([d.saldos.ubic.dep["20868"], d.saldos.ubic.dep["20208"], d.saldos.ubic["com:Sin asignar"]], [3, 3, undefined]);
+    assert.deepStrictEqual([d.saldos.ubic.dcm, d.saldos.ubic.dep, d.saldos.ubic["com:Sin asignar"]], [{ 20868: 3, 20208: 1 }, { 20208: 2 }, undefined]);
     assert.ok(repo["stock/saldos.json"].ubic["com:Sin asignar"], "leer no escribe");
-    // Melina escanea dos RX1 y se los da a Juan
-    const r = await post({ accion: "mover", de: "dep", a: "tec:Juan", items: [{ c: "20868", cant: 2, unidades: ["AI200158A2", "AI200158A3"] }] }, melina);
+    // Melina escanea dos RX1: no hay nuevos, salen del depósito de comodatos (y queda dicho)
+    let r = await post({ accion: "mover", de: "dep", a: "tec:Juan", items: [{ c: "20868", cant: 2, unidades: ["AI200158A2", "AI200158A3"] }] }, melina);
     assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
-    const sal = repo["stock/saldos.json"];
-    assert.deepStrictEqual([sal.ubic.dep["20868"], sal.ubic.dep["20208"], sal.ubic["com:Sin asignar"]], [1, 3, undefined]);
-    const hist = repo[`stock/movimientos-${mes}.json`], pasaron = hist.filter((m) => m.tipo === "comodato_deposito");
-    assert.deepStrictEqual(pasaron.map((m) => [m.c, m.cant, m.de, m.a]).sort(), [["20208", 1, "com:Sin asignar", "dep"], ["20868", 3, "com:Sin asignar", "dep"]]);
-    assert.deepStrictEqual(sal.movsPend || [], [], "quedan en el historial");
-    assert.ok(pasaron.every((m) => S.movimientoParaOficina(m) === null && S.claseMovimiento(m) === ""), "es interno: ni Oficina ni el tablero lo cuentan");
-    // Una sola vez, y el control nocturno cuadra
-    await post({ accion: "mover", de: "dep", a: "tec:Juan", items: [{ c: "20208", cant: 1 }] }, melina);
-    assert.strictEqual(repo[`stock/movimientos-${mes}.json`].filter((m) => m.tipo === "comodato_deposito").length, 2);
-    const c = await post({ accion: "cuadrar" });
+    let sal = repo["stock/saldos.json"];
+    assert.deepStrictEqual([sal.ubic.dcm, sal.ubic.dep, sal.ubic["com:Sin asignar"], sal.comodatoSeparado], [{ 20868: 1, 20208: 1 }, { 20208: 2 }, undefined, true]);
+    const salida = hist().find((m) => m.tipo === "entrega" && m.c === "20868");
+    assert.deepStrictEqual([salida.de, salida.cant, salida.unidades], ["dcm", 2, ["AI200158A2", "AI200158A3"]]);
+    assert.deepStrictEqual(S.movimientoParaOficina(salida) && [S.movimientoParaOficina(salida).operacion, S.movimientoParaOficina(salida).deposito, S.movimientoParaOficina(salida).comodato], ["SALE DEL DEPOSITO DE COMODATOS", 2, -2]);
+    const pasaron = hist().filter((m) => m.tipo === "comodato_deposito");
+    assert.deepStrictEqual(pasaron.map((m) => [m.c, m.cant, m.de, m.a]).sort(), [["20208", 1, "com:Sin asignar", "dcm"], ["20868", 3, "com:Sin asignar", "dcm"]]);
+    assert.ok(pasaron.every((m) => S.movimientoParaOficina(m) === null && S.claseMovimiento(m) === ""), "es interno");
+    assert.deepStrictEqual(sal.movsPend || [], []);
+    // Sirenas: 2 nuevas + 1 de comodato. Sin elegir, primero las nuevas; elegido «comodato», de ahí.
+    r = await post({ accion: "mover", de: "dep", a: "tec:Juan", items: [{ c: "20208", cant: 1, de: "dcm" }] }, melina);
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    assert.strictEqual(hist().slice(-1)[0].de, "dcm");
+    assert.match((await post({ accion: "mover", de: "dep", a: "tec:Juan", items: [{ c: "20208", cant: 1, de: "dcm" }] }, melina)).cuerpo.error, /Depósito de comodatos hay 0/);
+    assert.match((await post({ accion: "mover", de: "dep", a: "tec:Juan", items: [{ c: "20208", cant: 3 }] }, melina)).cuerpo.error, /en Depósito hay 2 y querés mover 3/);
+    // Lo que el técnico no recibe vuelve a donde estaba
+    const env = (await get()).saldos.envios.find((e) => e.items.some((x) => x.c === "20208"));
+    r = await post({ accion: "confirmar_envio", id: env.id, accion_envio: "rechazar", motivo: "No era" }, juan);
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    assert.strictEqual(repo["stock/saldos.json"].ubic.dcm["20208"], 1, "volvió al depósito de comodatos");
+    // Recibir de un cliente directo al depósito de comodatos
+    r = await post({ accion: "mover", de: "com:Kiosco Pérez", a: "dcm", items: [{ c: "20208", cant: 1 }] }, melina);
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    assert.strictEqual(repo["stock/saldos.json"].ubic.dcm["20208"], 2);
+    assert.strictEqual(S.movimientoParaOficina(hist().slice(-1)[0]), null, "de comodato a comodato: para Oficina no cambia");
+    let c = await post({ accion: "cuadrar" });
+    assert.ok(c.cuerpo.cuadre.ok, JSON.stringify(c.cuerpo.cuadre.errores));
+    // 2) Lo que la v4.75.0 pasó al depósito general vuelve al depósito de comodatos (lo que sigue ahí)
+    repo = armar({ inicializado: fi, ubic: { dep: { 20868: 2, 20208: 3 } }, unidades: {}, envios: [] }, [
+      { id: "i1", fecha: fi, tipo: "inicial", c: "20208", cant: 2, a: "dep" },
+      { id: "i2", fecha: fi, tipo: "inicial", c: "20868", cant: 3, a: "com:Sin asignar" },
+      { id: "i3", fecha: fi, tipo: "inicial", c: "20208", cant: 1, a: "com:Sin asignar" },
+      { id: "comdep-1", fecha: fi, tipo: "comodato_deposito", c: "20868", cant: 3, de: "com:Sin asignar", a: "dep" },
+      { id: "comdep-2", fecha: fi, tipo: "comodato_deposito", c: "20208", cant: 1, de: "com:Sin asignar", a: "dep" },
+      { id: "e1", fecha: fi, tipo: "entrega", c: "20868", cant: 1, de: "dep", a: "tec:Juan" },
+    ]);
+    repo["stock/saldos.json"].ubic["tec:Juan"] = { 20868: 1 };
+    r = await post({ accion: "ajustar", c: "20208", ubic: "dep", cantidad: 3, motivo: "Conteo" }); // (el ajuste deja 3 nuevos)
+    sal = repo["stock/saldos.json"];
+    assert.deepStrictEqual([sal.ubic.dep, sal.ubic.dcm, sal.comodatoSeparado], [{ 20208: 3 }, { 20868: 2, 20208: 1 }, true]);
+    assert.strictEqual(hist().filter((m) => /^comsep-/.test(m.id)).length, 2);
+    await post({ accion: "ajustar", c: "20208", ubic: "dep", cantidad: 2, motivo: "Conteo" });
+    assert.strictEqual(hist().filter((m) => /^comsep-/.test(m.id)).length, 2, "una sola vez");
+    c = await post({ accion: "cuadrar" });
     assert.ok(c.cuerpo.cuadre.ok, JSON.stringify(c.cuerpo.cuadre.errores));
   } finally { global.fetch = fetchViejo; }
 });
