@@ -1209,6 +1209,41 @@ async function stockActualizar(ruta, porDefecto, cambiar, mensaje) {
   }
   return { error: "No se pudo guardar (probá de nuevo)", status: 502 };
 }
+// Entrega de llaves de edificios (lib/entregas-llaves.js): sale del stock de quien
+// entrega (si es un técnico y no lo tiene, de una camioneta) hacia el edificio.
+// Lo que no se pueda descontar queda "para aprobar" del responsable de stock,
+// igual que el material de un parte que no estaba en el stock del técnico.
+async function descontarStockEntrega({ items, de, cliente, motivo, quien, parte }) {
+  const S = require("../stock-utils.js");
+  const { data: cat } = await leerArchivoDatos(STOCK_CAT, { articulos: {} });
+  const ahora = new Date().toISOString();
+  let movsTodos = [], resultado = null;
+  const r = await stockActualizar(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }, (sal) => {
+    let s2 = sal;
+    const movs = [], aprobar = [], descontados = [];
+    const destino = `cli:${cliente}`;
+    (items || []).forEach((it, i) => {
+      const arts = (cat && cat.articulos) || {};
+      const candidatos = [de, ...(/^tec:/.test(de) ? Object.keys(s2.ubic || {}).filter((u) => /^veh:/.test(u)) : [])];
+      let hecho = false;
+      if (sal.inicializado && it.c && arts[it.c]) {
+        for (const u of candidatos) {
+          const m = S.moverStock(s2, [{ c: it.c, cant: it.cant }], { tipo: "entrega_llave", de: u, a: destino, por: quien, fecha: ahora, motivo, servicio: parte }, cat);
+          if (!m.error) { s2 = m.saldos; movs.push(...m.movs); descontados.push({ c: it.c, d: arts[it.c].d, cant: it.cant, de: u }); hecho = true; break; }
+        }
+      }
+      if (!hecho) aprobar.push({ id: `${Date.now().toString(36)}-l${i}`, fecha: ahora, por: quien, parte, cliente, destino, presupuesto: "", c: it.c && arts[it.c] ? it.c : "", cant: it.cant, unidades: [], texto: it.texto, ...(it.c && arts[it.c] ? { sugerido: true } : {}) });
+    });
+    if (aprobar.length) s2 = { ...s2, aprobar: [...aprobar, ...(sal.aprobar || [])].slice(0, 1000) };
+    movsTodos = movs;
+    resultado = { descontados, paraAprobar: aprobar.length };
+    if (!movs.length && !aprobar.length) return { error: "Nada para descontar", status: 200 };
+    return { data: s2, movs };
+  }, `Stock: ${motivo} (por ${quien})`);
+  if (r.error) return { ok: false, error: r.error };
+  if (movsTodos.length) await stockConfirmarMovs(movsTodos, `Stock: ${motivo} (por ${quien})`).catch(() => {});
+  return { ok: true, ...resultado };
+}
 // Lo que se aprende de cada escaneo: la forma de los N° de serie de cada artículo y de qué
 // proveedores viene (el código de 4 dígitos de la etiqueta de SAT).
 async function stockAprender(movs, quien) {
@@ -2321,6 +2356,11 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
   }
   // El registro de cambios solo lo ve la oficina, y nadie lo escribe a mano.
   // ---------- Presupuesto express: lista de precios y numeración ----------
+  if (req.query && req.query.coleccion === "entregas_llaves") {
+    if (!autorizacion) { res.status(401).json({ error: "No autorizado", sesion_vencida: true }); return; }
+    await require("../lib/entregas-llaves").manejar(req, res, autorizacion, { gh: { leer: leerArchivoDatos, escribir: escribirArchivoDatos }, descontarStock: descontarStockEntrega });
+    return;
+  }
   if (req.query && req.query.coleccion === "consorcio") {
     if (!autorizacion) { res.status(401).json({ error: "No autorizado", sesion_vencida: true }); return; }
     await require("../lib/consorcio").manejarAdmin(req, res, autorizacion, { leer: leerArchivoDatos, escribir: escribirArchivoDatos });

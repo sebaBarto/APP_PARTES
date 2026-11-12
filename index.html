@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#101820">
-<meta name="app-version" content="4.77.1">
+<meta name="app-version" content="4.78.0">
 <meta name="description" content="Digitalizador de partes técnicos de servicio">
 <title>Servicio Técnico SAT</title>
 <link rel="manifest" href="manifest.json">
@@ -199,6 +199,13 @@
           </span>
           <span class="panel-tile-label">Historial</span>
           <span class="panel-tile-count hidden" id="historialPendientesBadge">0</span>
+        </button>
+        <button type="button" class="panel-tile panel-tile-grid tile-entregas" id="tileEntregasBtn">
+          <span class="panel-tile-icon-badge">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2 2M14 9l2 2"/></svg>
+          </span>
+          <span class="panel-tile-label">Entregas de llaves</span>
+          <span class="panel-tile-count hidden" id="entregasPendientesBadge">0</span>
         </button>
         <button type="button" class="panel-tile panel-tile-grid tile-credencial hidden" id="tileCredencialBtn">
           <span class="panel-tile-icon-badge">
@@ -2121,6 +2128,48 @@
     </div>
   </section>
 
+  <!-- Entregas de llaves de edificios (entregas-llaves.js) -->
+  <section class="screen" id="screen-entregas">
+    <div class="review-scroll">
+      <p class="hint-eyebrow review-eyebrow">ENTREGAS DE LLAVES</p>
+      <p class="subtitle-consultas">Llaves de edificios ya programadas por la oficina, para entregar al vecino. Al entregar, el vecino firma y el tag se descuenta de tu stock.</p>
+      <div class="list-toolbar">
+        <button class="btn btn-ghost btn-small" id="entregasRecargarBtn" type="button">↻ Actualizar</button>
+        <span class="list-sync-label" id="entregasStatus"></span>
+      </div>
+      <div id="entregasLista"></div>
+
+      <div id="entregaForm" class="hidden">
+        <div id="entregaResumen" class="entrega-resumen"></div>
+        <div id="entregaNumeros"></div>
+        <div class="field-group">
+          <label class="field-label" for="entregaRecibio">Quién recibe</label>
+          <input type="text" class="field-input" id="entregaRecibio" maxlength="80" autocomplete="off">
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="entregaDni">DNI <span style="font-weight:400;opacity:.7;">(opcional)</span></label>
+          <input type="text" class="field-input" id="entregaDni" maxlength="20" inputmode="numeric" autocomplete="off">
+        </div>
+        <label class="field-label">Firma de quien recibe</label>
+        <div class="sign-pad-wrap" style="flex:none;height:200px;">
+          <canvas id="entregaFirma" style="width:100%;height:100%;touch-action:none;display:block;"></canvas>
+          <span class="sign-line-hint">Firma</span>
+        </div>
+        <button type="button" class="btn btn-ghost btn-small" id="entregaBorrarFirma" style="margin-top:6px;">Borrar firma</button>
+        <div class="field-group" style="margin-top:12px;">
+          <label class="field-label" for="entregaObs">Observaciones <span style="font-weight:400;opacity:.7;">(opcional)</span></label>
+          <input type="text" class="field-input" id="entregaObs" maxlength="300" autocomplete="off">
+        </div>
+        <button class="btn btn-primary hidden" id="entregaConfirmarBtn" type="button" style="width:100%;margin-top:6px;">✓ Entregar y registrar la firma</button>
+        <p class="status" id="entregaFormStatus"></p>
+      </div>
+    </div>
+
+    <div class="action-bar">
+      <button class="btn btn-secondary" id="volverDeEntregasBtn" type="button">Volver</button>
+    </div>
+  </section>
+
   <section class="screen" id="screen-notas">
     <div class="review-scroll">
       <p class="hint-eyebrow review-eyebrow">NOTAS</p>
@@ -2959,5 +3008,6 @@
 <script src="croquis-utils.js"></script>
 <script src="croquis-3d.js"></script>
 <script src="app.js"></script>
+<script src="entregas-llaves.js"></script>
 </body>
 </html>

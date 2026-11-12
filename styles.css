@@ -264,6 +264,13 @@ html, body {
 .tile-dashboards .panel-tile-icon-badge { background: var(--acc-teal); }
 .tile-guardias .panel-tile-icon-badge { background: var(--acc-guardia); }
 .tile-historial .panel-tile-icon-badge { background: var(--acc-slate); }
+.tile-entregas .panel-tile-icon-badge { background: var(--acc-gold, #C9932E); }
+.entrega-item { display: block; width: 100%; text-align: left; background: rgba(127,127,127,.08); border: 1.5px solid rgba(127,127,127,.35); border-radius: 14px; padding: 12px 14px; margin-bottom: 10px; font: inherit; color: inherit; cursor: pointer; }
+.entrega-item:active { background: rgba(127,127,127,.16); }
+.entrega-resumen { padding: 14px; border-radius: 14px; background: rgba(246,184,40,.10); border: 1.5px solid rgba(246,184,40,.45); margin-bottom: 14px; line-height: 1.5; }
+.entrega-item b { font-size: 16px; }
+.entrega-item .entrega-sub { font-size: 13.5px; opacity: .75; margin-top: 2px; }
+.entrega-item .entrega-llaves { margin-top: 6px; font-family: 'IBM Plex Mono', monospace; font-size: 14px; }
 .tile-credencial .panel-tile-icon-badge { background: var(--acc-gold); }
 .tile-vehiculos .panel-tile-icon-badge { background: var(--acc-green); }
 .tile-sims .panel-tile-icon-badge { background: var(--acc-blue); }
@@ -2133,6 +2140,7 @@ html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dash
 html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-guardias { --ic: #7FA6E0; }
 html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-notas { --ic: #FF7A66; }
 html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-historial { --ic: #9FB7C6; }
+html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-entregas { --ic: #E8B85A; }
 html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-credencial { --ic: #E0B455; }
 html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-vehiculos { --ic: #5FD08A; }
 html[data-inicio="nuevo"] :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-sims { --ic: #5BA8F0; }
@@ -2162,6 +2170,7 @@ html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#s
 html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-guardias { --ic: var(--acc-guardia); }
 html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-notas { --ic: var(--acc-coral); }
 html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-historial { --ic: var(--acc-slate); }
+html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-entregas { --ic: var(--acc-gold, #C9932E); }
 html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-credencial { --ic: var(--acc-gold); }
 html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-vehiculos { --ic: var(--acc-green); }
 html[data-inicio="nuevo"]:is([data-theme="day"],[data-theme="contraste"]) :is(#screen-home, #screen-servicios-menu, #screen-dashboards-menu, #screen-vehiculos, #screen-herramientas) .tile-sims { --ic: var(--acc-blue); }

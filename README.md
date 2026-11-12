@@ -3287,3 +3287,22 @@ IP y por mail. Datos en `registro-llaves/administradores.json` y
   llave).
 - Los mails a vecinos y administradores salen por Resend (tipos
   `constancia_registro`, `constancia_pedido`, `restablecer_clave`, `aviso_gestion`).
+
+### Entrega de llaves (cierra el ciclo)
+
+- Un pedido de **nuevo tag**, **reemplazo** o **titularidad con llaves nuevas**
+  marcado *Hecha* queda **pendiente de entrega** (se ve en el Inicio del
+  admin y en el tile **Entregas de llaves** de la APP, con contador).
+- Al entregar (técnico desde la APP u oficina desde el admin): quién recibe,
+  DNI opcional y **firma en pantalla**. La firma queda privada como
+  constancia (botón *Constancia*, imprimible).
+- **Stock**: se descuenta el artículo configurado (*Entregas de llaves y
+  stock* en la pestaña Llaves de edificios) del stock del técnico; si no le
+  alcanza, de una camioneta; si la entrega la oficina, del depósito (o de
+  quien elija). Lo que no se pueda descontar queda **para aprobar** del
+  responsable de stock, como el material de los partes. Destino:
+  `cli:<edificio> <unidad>`.
+- El **padrón** anota quién recibió cada llave y al administrador de
+  consorcio le llega un mail "Entregada a …".
+- Código: `lib/entregas-llaves.js`, `descontarStockEntrega` en `api/datos.js`,
+  `entregas-llaves.js` (APP).

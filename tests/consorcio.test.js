@@ -236,3 +236,46 @@ test("consorcio: olvidé mi clave, cancelar pedido, links en lote y resumen al e
   const inicio = (await llamar(consorcio.manejarPortal, { method: "GET", headers: h, query: {} }, gh)).data;
   assert.deepStrictEqual(Object.keys(inicio.edificios[0].resumen).sort(), ["abiertos", "controles", "hechos_30", "personas", "tags", "unidades"]);
 });
+
+test("entrega de llaves: con firma, descuenta stock, anota en el padrón y no se entrega dos veces", async () => {
+  const entregas = require("../lib/entregas-llaves");
+  const { fotos } = llaves;
+  fotos.fotosGh.subir = async () => {};
+  const path = require("path");
+  const enviados = [];
+  process.env.SERVICIOS_API_TOKEN = process.env.SERVICIOS_API_TOKEN || "token-de-prueba";
+  require.cache[path.join(__dirname, "..", "api", "enviar-mail.js")] = { id: "x", loaded: true, exports: async (req, res) => { enviados.push(req.body); res.status(200).json({ ok: true }); } };
+  const { gh, m12, clave } = await preparar();
+  const { pase } = (await login(gh, "cp@admin.com", clave)).data;
+  const g = (await llamar(consorcio.manejarPortal, { method: "POST", headers: { "x-consorcio": pase }, body: { accion: "gestion", edificio: m12, tipo: "nuevo", piso: "7", unidad: "D", titular: "Lucía Fernández", telefono: "341 999 0000", cantidad: 2 } }, gh)).data.gestion;
+  const tecnico = { nombre: "Cristian Rossetti", rol: "tecnico" };
+  const descuentos = [];
+  const deps = { gh, descontarStock: async (x) => { descuentos.push(x); return { ok: true, descontados: x.items.map((i) => ({ c: i.c, cant: i.cant, de: x.de })), paraAprobar: 0 }; } };
+  const llamarE = (req, aut) => llamar((rq, rs) => entregas.manejar(rq, rs, aut, deps), req);
+  // Todavía no está hecha: no aparece ni se puede entregar.
+  assert.deepStrictEqual((await llamarE({ method: "GET", query: {} }, tecnico)).data, []);
+  // SAT la marca hecha con las 2 llaves programadas.
+  await llamar(consorcio.manejarAdmin, { method: "POST", body: { accion: "estado_gestion", edificio: m12, id: g.id, estado: "hecha", llaves_nuevas: [{ tag: "090:12345" }, { tag: "090:12346" }] } }, SAT, gh);
+  const pend = (await llamarE({ method: "GET", query: {} }, tecnico)).data;
+  assert.strictEqual(pend.length, 1);
+  assert.deepStrictEqual(pend[0].llaves.map((l) => l.tag), ["090:12345", "090:12346"]);
+  // Configuración del artículo de stock (solo admin).
+  assert.strictEqual((await llamarE({ method: "POST", body: { accion: "config", articulo_tag: "9001" } }, tecnico)).status, 403);
+  await llamarE({ method: "POST", body: { accion: "config", articulo_tag: "9001", articulo_control: "9002" } }, SAT);
+  const firma = "data:image/jpeg;base64," + Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(3000, 9)]).toString("base64");
+  // Sin firma no se entrega.
+  assert.strictEqual((await llamarE({ method: "POST", body: { accion: "entregar", edificio: m12, id: g.id, recibio: "Lucía" } }, tecnico)).status, 400);
+  // El técnico no puede elegir sacarla del depósito: sale de su stock.
+  const ok = await llamarE({ method: "POST", body: { accion: "entregar", edificio: m12, id: g.id, recibio: "Lucía Fernández", dni: "30111222", firma, de: "dep" } }, tecnico);
+  assert.strictEqual(ok.status, 200);
+  assert.deepStrictEqual([descuentos[0].de, descuentos[0].items[0].c, descuentos[0].items[0].cant], ["tec:Cristian Rossetti", "9001", 2]);
+  assert.strictEqual(ok.data.entrega.stock.ok, true);
+  assert.strictEqual((await llamarE({ method: "POST", body: { accion: "entregar", edificio: m12, id: g.id, recibio: "Otra", firma } }, tecnico)).status, 409, "no se entrega dos veces");
+  assert.deepStrictEqual((await llamarE({ method: "GET", query: {} }, tecnico)).data, []);
+  // Padrón: las llaves figuran entregadas a Lucía.
+  const padron = JSON.parse(gh.store[`registro-llaves/${m12}.json`].t);
+  assert.ok(padron[0].llaves.every((l) => l.entregada && l.entregada.recibio === "Lucía Fernández"));
+  assert.ok(padron[0].historial.some((h) => /Recibió 2 llaves/.test(h.que)));
+  // Al administrador le llegó el aviso de entrega.
+  assert.ok(enviados.some((m) => m.tipo === "aviso_gestion" && /Entregada a Lucía/.test(m.datos.estado_txt)));
+});

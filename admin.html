@@ -1836,6 +1836,18 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
         </details>
       </div>
 
+      <div class="card" id="rllEntregaCfgCard">
+        <h3 style="margin-top:0;">Entregas de llaves y stock</h3>
+        <p class="subtitle" style="margin:0 0 10px;">Cuando un pedido queda <b>Hecha</b>, aparece en la APP de los técnicos (<i>Entregas de llaves</i>) y acá con el botón <b>Registrar entrega</b>: el vecino firma y el tag se descuenta del stock (del técnico, de una camioneta, o del depósito si la entrega la hace la oficina). Elegí qué artículo del stock es cada uno:</p>
+        <div class="field-row" style="flex-wrap:wrap;align-items:flex-end;">
+          <div style="flex:1 1 220px;"><label>Artículo del tag (llavero)</label><input type="text" class="field-input" id="rllCfgTag" list="rllCfgArts" placeholder="Código o descripción"></div>
+          <div style="flex:1 1 220px;"><label>Artículo del control de cochera</label><input type="text" class="field-input" id="rllCfgCtl" list="rllCfgArts" placeholder="Código o descripción"></div>
+          <button type="button" id="rllCfgGuardarBtn" style="width:auto;">Guardar</button>
+        </div>
+        <datalist id="rllCfgArts"></datalist>
+        <p class="status" id="rllCfgStatus"></p>
+      </div>
+
       <div class="card hidden" id="rllRegistrosCard">
         <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between;">
           <h3 style="margin:0;" id="rllRegistrosTit">Padrón de llaves</h3>
@@ -2591,6 +2603,8 @@ async function cargarInicioAdmin() {
   const gestNuevas = arr(gestLlaves).filter((g) => g.estado === "pendiente");
   const gestRobo = gestNuevas.some((g) => g.motivo === "robo");
   agregar(gestNuevas.length, "Pedidos de llaves de edificios", gestNuevas.slice(0, 2).map((g) => `N° ${g.numero || "?"} ${g.edificio_nombre || ""}: ${({ nuevo: "nuevo tag", reemplazo: "reemplazo", baja: g.motivo === "robo" ? "baja por ROBO" : "baja", titularidad: "titularidad" })[g.tipo] || g.tipo}`).join(" · "), "tabRegistroLlavesBtn", gestRobo ? "urgente" : "atencion", true);
+  const paraEntregar = arr(gestLlaves).filter((g) => rllPendienteEntrega(g));
+  agregar(paraEntregar.length, "Llaves programadas sin entregar", paraEntregar.slice(0, 2).map((g) => `N° ${g.numero || "?"} ${g.edificio_nombre || ""} · ${g.tipo === "titularidad" ? g.nuevo_titular : g.titular}`).join(" · "), "tabRegistroLlavesBtn", "atencion", false);
   const emergSin = arr(emerg).filter((e) => !e.revisado);
   agregar(emergSin.length, "Emergencias sin revisar", emergSin.slice(0, 2).map((e) => e.cliente || "sin cliente").join(" · "), "tabEmergenciaBtn", "urgente", true);
   const rendPend = arr(rend).filter((r) => r.estado === "pendiente");
@@ -9571,6 +9585,7 @@ async function cargarRegistroLlavesAdmin() {
     st.textContent = rllEdificios.length ? "" : "Todavía no hay edificios. Agregá el primero abajo.";
     renderRllEdificios();
     cargarConsorcioAdmin();
+    rllCargarCfgEntregas();
     if (!rllEdificioActual && rllEdificios.length === 1) rllAbrirEdificio(rllEdificios[0].codigo);
     else if (rllEdificioActual) rllAbrirEdificio(rllEdificioActual.codigo);
   } catch (e) {
@@ -10384,7 +10399,7 @@ function rllGestUnidad(g) {
   return p.join(" · ") || "—";
 }
 function renderRllGestiones() {
-  const abiertas = rllGestiones.filter((g) => g.estado === "pendiente" || g.estado === "en_curso").length;
+  const abiertas = rllGestiones.filter((g) => g.estado === "pendiente" || g.estado === "en_curso" || rllPendienteEntrega(g)).length;
   const badge = document.getElementById("rllGestBadge");
   badge.textContent = abiertas + (abiertas === 1 ? " abierta" : " abiertas"); badge.classList.toggle("hidden", !abiertas);
   const tabBadge = document.getElementById("rllTabBadge");
@@ -10393,7 +10408,7 @@ function renderRllGestiones() {
   const ed = document.getElementById("rllGestEdificio").value;
   const q = document.getElementById("rllGestBuscar").value.trim().toLowerCase();
   const filas = rllGestiones.filter((g) => {
-    if (est === "abiertas" && !(g.estado === "pendiente" || g.estado === "en_curso")) return false;
+    if (est === "abiertas" && !(g.estado === "pendiente" || g.estado === "en_curso" || rllPendienteEntrega(g))) return false;
     if (est && est !== "abiertas" && g.estado !== est) return false;
     if (ed && g.edificio !== ed) return false;
     return !q || [g.numero ? "N° " + g.numero : "", String(g.numero || ""), g.titular, g.nuevo_titular, g.admin_nombre, g.edificio_nombre, rllGestUnidad(g), g.tag, g.usuario, g.telefono, g.observaciones].join(" ").toLowerCase().includes(q);
@@ -10417,7 +10432,7 @@ function renderRllGestiones() {
       <td><b>${rllEsc(RLL_GEST_TIPOS[g.tipo] || g.tipo)}</b>${g.origen === "vecino" ? `<br><span style="font-size:11.5px;color:#2C4E9A;">📨 La cargó el vecino${g.cargada_por ? " (" + rllEsc(g.cargada_por) + ")" : ""} con link del administrador</span>` : ""}</td>
       <td><b>${rllEsc(rllGestUnidad(g))}</b><br>${rllEsc(g.titular)}${g.telefono ? `<br><a href="tel:${rllEsc(String(g.telefono).replace(/[^0-9+]/g, ""))}">${rllEsc(g.telefono)}</a>` : ""}${g.email ? `<br><span style="color:#6B7680;">${rllEsc(g.email)}</span>` : ""}</td>
       <td>${det.join("<br>")}</td>
-      <td><select class="rll-gest-estado" data-ed="${rllEsc(g.edificio)}" data-id="${rllEsc(g.id)}" style="margin:0;width:auto;padding:6px 8px;font-weight:700;color:${E.color};background:${E.bg};border-color:${E.bg};">${Object.entries(RLL_GEST_ESTADOS).map(([k, v]) => `<option value="${k}"${k === g.estado ? " selected" : ""}>${v.txt}</option>`).join("")}</select>${g.actualizado_por ? `<br><span style="font-size:11px;color:#6B7680;">${rllEsc(g.actualizado_por)}</span>` : ""}</td>
+      <td>${rllCeldaEntrega(g)}<select class="rll-gest-estado" data-ed="${rllEsc(g.edificio)}" data-id="${rllEsc(g.id)}" style="margin:0;width:auto;padding:6px 8px;font-weight:700;color:${E.color};background:${E.bg};border-color:${E.bg};">${Object.entries(RLL_GEST_ESTADOS).map(([k, v]) => `<option value="${k}"${k === g.estado ? " selected" : ""}>${v.txt}</option>`).join("")}</select>${g.actualizado_por ? `<br><span style="font-size:11px;color:#6B7680;">${rllEsc(g.actualizado_por)}</span>` : ""}</td>
       <td><input type="text" class="field-input rll-gest-nota" data-ed="${rllEsc(g.edificio)}" data-id="${rllEsc(g.id)}" value="${rllEsc(g.nota_sat || "")}" placeholder="Ej. Llave lista para retirar" style="min-width:170px;margin:0;padding:6px 8px;"></td>
     </tr>`;
   }).join("")}</tbody></table>`;
@@ -10427,6 +10442,8 @@ function renderRllGestiones() {
     rllGuardarGestion(s, { estado: s.value });
   }));
   cont.querySelectorAll(".rll-gest-nota").forEach((i) => i.addEventListener("change", () => rllGuardarGestion(i, { nota_sat: i.value })));
+  cont.querySelectorAll(".rll-entregar").forEach((b) => b.addEventListener("click", () => rllRegistrarEntrega(rllGestiones.find((x) => x.id === b.dataset.id && x.edificio === b.dataset.ed))));
+  cont.querySelectorAll(".rll-constancia").forEach((b) => b.addEventListener("click", () => rllConstancia(rllGestiones.find((x) => x.id === b.dataset.id && x.edificio === b.dataset.ed))));
   cont.querySelectorAll(".rll-gest-foto").forEach((b) => b.addEventListener("click", () => rllVerFoto("/api/datos?coleccion=consorcio&edificio=" + encodeURIComponent(b.dataset.ed) + "&foto=" + encodeURIComponent(b.dataset.foto), null)));
 }
 document.getElementById("rllAgregarPersonaBtn").addEventListener("click", () => { document.getElementById("rllAgregarPersona").classList.toggle("hidden"); document.getElementById("rllApNombre").focus(); });
@@ -10503,6 +10520,127 @@ function rllMarcarHecha(g, alCancelar) {
   obs.observe(document.body, { childList: true });
   previsualizar();
 }
+// ---------- Entrega de llaves (lib/entregas-llaves.js) ----------
+function rllNecesitaEntrega(g) { return g.tipo === "nuevo" || g.tipo === "reemplazo" || (g.tipo === "titularidad" && g.llaves_titularidad === "reemplazar"); }
+function rllPendienteEntrega(g) { return g.estado === "hecha" && rllNecesitaEntrega(g) && !g.entrega; }
+function rllCeldaEntrega(g) {
+  if (g.entrega) return `<div style="margin-bottom:6px;font-size:12px;color:#1F6B34;">✓ Entregada a <b>${rllEsc(g.entrega.recibio)}</b><br>${rllFecha(g.entrega.fecha)}${g.entrega.stock && !g.entrega.stock.ok ? '<br><span style="color:#B3261E;">Stock sin descontar</span>' : g.entrega.stock && g.entrega.stock.para_aprobar ? '<br><span style="color:#8A5A00;">Stock: para aprobar</span>' : ""}<br><button type="button" class="btn-secondary-admin rll-constancia" data-ed="${rllEsc(g.edificio)}" data-id="${rllEsc(g.id)}" style="width:auto;padding:3px 8px;font-size:11.5px;margin-top:3px;">Constancia</button></div>`;
+  if (rllPendienteEntrega(g)) return `<div style="margin-bottom:6px;"><span class="ven-estado pronto">Falta entregar</span><br><button type="button" class="rll-entregar" data-ed="${rllEsc(g.edificio)}" data-id="${rllEsc(g.id)}" style="width:auto;padding:4px 10px;font-size:12px;margin-top:4px;">Registrar entrega</button></div>`;
+  return "";
+}
+let rllTecnicosCache = null;
+async function rllRegistrarEntrega(g) {
+  if (!g) return;
+  if (!rllTecnicosCache) {
+    try { const r = await fetch("/api/datos?coleccion=tecnicos", { headers: rllHeaders(), cache: "no-store" }); rllTecnicosCache = r.ok ? (await r.json()).map((t) => t.nombre).filter(Boolean) : []; } catch (e) { rllTecnicosCache = []; }
+  }
+  const llaves = (g.llaves_entregadas && g.llaves_entregadas.length) ? g.llaves_entregadas : Array.from({ length: g.tipo === "nuevo" ? Math.max(1, Number(g.cantidad) || 1) : 1 }, () => ({ tipo: g.dispositivo === "control" ? "control" : "tag", tag: "" }));
+  const recibe = g.tipo === "titularidad" ? g.nuevo_titular : g.titular;
+  const capa = rllModal(`Entrega de llaves · pedido N° ${rllEsc(g.numero || "")}`, `
+    <p style="margin:0 0 8px;color:#55595F;">${rllEsc(g.edificio_nombre || "")} · ${rllEsc(rllGestUnidad(g))} · ${rllEsc(RLL_GEST_TIPOS[g.tipo] || g.tipo)}</p>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;margin-bottom:8px;">${llaves.map((l, i) => l.tag ? `${l.tipo === "control" ? "📟" : "🔑"} ${rllEsc(l.tag)}` : `${l.tipo === "control" ? "📟" : "🔑"} <input type="text" class="field-input rll-ent-num" data-i="${i}" placeholder="000:00000 (si lo tenés)" style="display:inline-block;width:190px;margin:2px 0;font-family:inherit;">`).join("<br>")}</div>
+    <div class="field-row" style="flex-wrap:wrap;">
+      <div style="flex:2 1 200px;"><label>Quién recibe</label><input type="text" class="field-input" id="rllEntRecibio" value="${rllEsc(recibe || "")}"></div>
+      <div style="flex:1 1 120px;"><label>DNI (opcional)</label><input type="text" class="field-input" id="rllEntDni"></div>
+    </div>
+    <label>Sale del stock de</label>
+    <select id="rllEntDe" style="margin:0 0 8px;"><option value="dep">Depósito (la entrega la oficina)</option>${rllTecnicosCache.map((t) => `<option value="tec:${rllEsc(t)}">${rllEsc(t)}</option>`).join("")}</select>
+    <label>Firma de quien recibe</label>
+    <div style="border:1.5px dashed #3A4753;border-radius:12px;background:#F4F5F0;height:180px;position:relative;"><canvas id="rllEntFirma" style="width:100%;height:100%;display:block;touch-action:none;cursor:crosshair;"></canvas></div>
+    <button type="button" class="btn-secondary-admin" id="rllEntBorrar" style="width:auto;padding:3px 10px;font-size:12px;margin-top:6px;">Borrar firma</button>
+    <label style="margin-top:8px;">Observaciones (opcional)</label><input type="text" class="field-input" id="rllEntObs">
+    <div style="display:flex;gap:8px;margin-top:12px;"><button type="button" id="rllEntOk" style="width:auto;">✓ Registrar entrega</button></div>
+    <p class="status" id="rllEntStatus"></p>`);
+  const lienzo = capa.querySelector("#rllEntFirma"), cx = lienzo.getContext("2d");
+  let hay = false, dib = false, ult = null;
+  setTimeout(() => {
+    const r = lienzo.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    lienzo.width = r.width * dpr; lienzo.height = r.height * dpr; cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    cx.lineWidth = 2.4; cx.lineCap = "round"; cx.lineJoin = "round"; cx.strokeStyle = "#101820";
+  }, 30);
+  const pt = (e) => { const r = lienzo.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+  lienzo.addEventListener("pointerdown", (e) => { dib = true; ult = pt(e); lienzo.setPointerCapture(e.pointerId); });
+  lienzo.addEventListener("pointermove", (e) => { if (!dib) return; const p = pt(e); cx.beginPath(); cx.moveTo(ult.x, ult.y); cx.lineTo(p.x, p.y); cx.stroke(); ult = p; hay = true; });
+  ["pointerup", "pointercancel", "pointerleave"].forEach((t) => lienzo.addEventListener(t, () => { dib = false; }));
+  capa.querySelector("#rllEntBorrar").addEventListener("click", () => { cx.clearRect(0, 0, lienzo.width, lienzo.height); hay = false; });
+  capa.querySelector("#rllEntOk").addEventListener("click", async () => {
+    const st = capa.querySelector("#rllEntStatus");
+    if (!capa.querySelector("#rllEntRecibio").value.trim()) { st.className = "status err"; st.textContent = "Falta quién recibe."; return; }
+    if (!hay) { st.className = "status err"; st.textContent = "Falta la firma."; return; }
+    const c = document.createElement("canvas"), k = Math.min(1, 900 / lienzo.width);
+    c.width = Math.round(lienzo.width * k); c.height = Math.round(lienzo.height * k);
+    const g2 = c.getContext("2d"); g2.fillStyle = "#FFFFFF"; g2.fillRect(0, 0, c.width, c.height); g2.drawImage(lienzo, 0, 0, c.width, c.height);
+    st.className = "status"; st.textContent = "Registrando...";
+    try {
+      const r = await fetch("/api/datos?coleccion=entregas_llaves", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "entregar", edificio: g.edificio, id: g.id, recibio: capa.querySelector("#rllEntRecibio").value.trim(), dni: capa.querySelector("#rllEntDni").value.trim(), de: capa.querySelector("#rllEntDe").value, observaciones: capa.querySelector("#rllEntObs").value.trim(), llaves: llaves.map((l, i) => { const inp = capa.querySelector(`.rll-ent-num[data-i="${i}"]`); return { tag: inp ? inp.value.trim() : "" }; }), firma: c.toDataURL("image/jpeg", 0.85) }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Error");
+      g.entrega = d.entrega;
+      capa.remove();
+      renderRllGestiones();
+      if (d.entrega.stock && !d.entrega.stock.ok) alert("La entrega quedó registrada, pero no se pudo descontar del stock: " + (d.entrega.stock.error || "") + ". Revisalo en Stock.");
+    } catch (e) { st.className = "status err"; st.textContent = "No se pudo: " + e.message; }
+  });
+}
+async function rllConstancia(g) {
+  if (!g || !g.entrega) return;
+  const e = g.entrega;
+  const stockTxt = e.stock && e.stock.ok ? ((e.stock.descontados || []).map((x) => `${x.cant} × ${x.d || x.c} (de ${String(x.de || "").replace(/^tec:/, "").replace(/^veh:/, "camioneta ").replace(/^dep$/, "depósito")})`).join(", ") || "—") + (e.stock.para_aprobar ? ` · ${e.stock.para_aprobar} renglón(es) para aprobar en Stock` : "") : `No se pudo descontar: ${e.stock ? e.stock.error : ""}`;
+  const capa = rllModal(`Constancia de entrega · pedido N° ${rllEsc(g.numero || "")}`, `<div id="rllConstCuerpo">
+    <p style="margin:0 0 6px;"><b>${rllEsc(g.edificio_nombre || "")}</b> · ${rllEsc(rllGestUnidad(g))} · ${rllEsc(RLL_GEST_TIPOS[g.tipo] || g.tipo)}</p>
+    <p style="margin:0 0 6px;">Entregado el <b>${rllFecha(e.fecha)}</b> por ${rllEsc(e.por)}</p>
+    <p style="margin:0 0 6px;">Recibió: <b>${rllEsc(e.recibio)}</b>${e.dni ? " · DNI " + rllEsc(e.dni) : ""}</p>
+    <p style="margin:0 0 6px;font-family:'IBM Plex Mono',monospace;">${(e.llaves || []).map((l) => `${l.tipo === "control" ? "📟" : "🔑"} ${rllEsc(l.tag || "s/n")}`).join(" &nbsp; ")}</p>
+    <p style="margin:0 0 6px;color:#55595F;font-size:13px;">Stock: ${rllEsc(stockTxt)}</p>
+    ${e.observaciones ? `<p style="margin:0 0 6px;">Obs.: ${rllEsc(e.observaciones)}</p>` : ""}
+    <img id="rllConstFirma" alt="Firma" style="display:block;max-width:100%;height:160px;object-fit:contain;border:1px solid #DDE1DA;border-radius:10px;background:#fff;margin-top:8px;">
+    </div><button type="button" id="rllConstImprimir" style="width:auto;margin-top:12px;">🖨 Imprimir</button>`);
+  try {
+    const r = await fetch(`/api/datos?coleccion=entregas_llaves&edificio=${encodeURIComponent(g.edificio)}&firma=${encodeURIComponent(e.firma)}`, { headers: rllHeaders(), cache: "no-store" });
+    if (r.ok) capa.querySelector("#rllConstFirma").src = URL.createObjectURL(await r.blob());
+  } catch (err) { /* sin firma visible */ }
+  capa.querySelector("#rllConstImprimir").addEventListener("click", () => {
+    const img = capa.querySelector("#rllConstFirma");
+    let firmaData = "";
+    try { const c = document.createElement("canvas"); c.width = img.naturalWidth; c.height = img.naturalHeight; c.getContext("2d").drawImage(img, 0, 0); firmaData = c.toDataURL("image/jpeg", 0.9); } catch (err) { /* nada */ }
+    const w = window.open("", "_blank");
+    if (!w) return;
+    const cuerpo = capa.querySelector("#rllConstCuerpo").cloneNode(true);
+    const f = cuerpo.querySelector("#rllConstFirma"); if (f) f.setAttribute("src", firmaData);
+    w.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Constancia de entrega</title><style>body{font-family:Arial,sans-serif;max-width:640px;margin:30px auto;color:#101820;} h2{border-bottom:3px solid #F6B828;padding-bottom:6px;} img{max-width:100%;height:160px;object-fit:contain;border:1px solid #ccc;border-radius:8px;}</style></head><body><h2>SAT · Constancia de entrega de llaves</h2>${cuerpo.innerHTML}<p style="margin-top:30px;color:#666;font-size:12px;">SAT · Seguridad electrónica · www.sat365.com.ar</p><script>setTimeout(()=>print(),300)<\/script></body></html>`);
+    w.document.close();
+  });
+}
+// Configuración: qué artículo del stock es el tag y cuál el control.
+let rllCfgArticulos = {};
+async function rllCargarCfgEntregas() {
+  try {
+    const [rc, ra] = await Promise.all([
+      fetch("/api/datos?coleccion=entregas_llaves&config=1", { headers: rllHeaders(), cache: "no-store" }),
+      fetch("/api/datos?coleccion=stock&catalogo_basico=1", { headers: rllHeaders(), cache: "no-store" }),
+    ]);
+    const cfg = rc.ok ? await rc.json() : {};
+    rllCfgArticulos = ra.ok ? ((await ra.json()).articulos || {}) : {};
+    document.getElementById("rllCfgArts").innerHTML = Object.values(rllCfgArticulos).map((a) => `<option value="${rllEsc(a.c)} — ${rllEsc(a.d)}"></option>`).join("");
+    const mostrar = (c) => (c ? `${c}${rllCfgArticulos[c] ? " — " + rllCfgArticulos[c].d : ""}` : "");
+    document.getElementById("rllCfgTag").value = mostrar(cfg.articulo_tag);
+    document.getElementById("rllCfgCtl").value = mostrar(cfg.articulo_control);
+    document.getElementById("rllCfgStatus").textContent = cfg.articulo_tag ? "" : "Todavía no elegiste el artículo del tag: las entregas van a quedar «para aprobar» en Stock.";
+  } catch (e) { /* se reintenta al abrir de nuevo */ }
+}
+document.getElementById("rllCfgGuardarBtn").addEventListener("click", async () => {
+  const st = document.getElementById("rllCfgStatus");
+  const codigo = (v) => String(v || "").split(" — ")[0].trim();
+  const tag = codigo(document.getElementById("rllCfgTag").value), ctl = codigo(document.getElementById("rllCfgCtl").value);
+  if (tag && !rllCfgArticulos[tag]) { st.className = "status err"; st.textContent = `El artículo ${tag} no está en el catálogo de stock.`; return; }
+  if (ctl && !rllCfgArticulos[ctl]) { st.className = "status err"; st.textContent = `El artículo ${ctl} no está en el catálogo de stock.`; return; }
+  try {
+    const r = await fetch("/api/datos?coleccion=entregas_llaves", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "config", articulo_tag: tag, articulo_control: ctl }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Error");
+    st.className = "status ok"; st.textContent = "Guardado.";
+  } catch (e) { st.className = "status err"; st.textContent = "No se pudo: " + e.message; }
+});
 async function rllGuardarGestion(el, cambios) {
   const g = rllGestiones.find((x) => x.id === el.dataset.id && x.edificio === el.dataset.ed);
   if (!g) return;
