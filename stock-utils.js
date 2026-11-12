@@ -228,7 +228,7 @@
     return `${UBIC_TEXTO[t] || t}${r.length ? ": " + r.join(":") : ""}`;
   }
   // Totales por artículo, separados como los ve el sistema de Oficina:
-  // en poder de SAT (depósito + técnicos + vehículos + en camino) y en comodato (depósito de comodatos + clientes).
+  // en poder de SAT (depósito + técnicos + vehículos + en camino) y en el depósito de comodatos.
   function totalesPorArticulo(saldos) {
     const tot = {};
     Object.entries((saldos && saldos.ubic) || {}).forEach(([u, items]) => {
@@ -261,7 +261,7 @@
     { k: "noEnCatalogo", corto: "No está en la APP", titulo: "Con stock en Oficina, pero no están en el catálogo de la APP", ayuda: "Artículos nuevos o que nunca se cargaron. Agregalos al catálogo para controlarlos." },
     { k: "cantidadDistinta", corto: "Cantidad distinta", titulo: "Cantidad distinta (en poder de SAT)", ayuda: "Oficina cuenta el depósito; la APP suma depósito + técnicos + vehículos + en camino. Abajo de cada uno, dónde está según la APP." },
     { k: "soloEnApp", corto: "Solo en la APP", titulo: "La APP tiene stock y Oficina dice 0", ayuda: "Puede faltar cargar una compra en Oficina, o se usó/vendió sin registrarlo en la APP." },
-    { k: "comodatoDistinto", corto: "Comodato distinto", titulo: "Cantidad en comodato distinta", ayuda: "Oficina cuenta en «Comodato» el depósito de comodatos y lo que está en comodato en clientes." },
+    { k: "comodatoDistinto", corto: "Comodato distinto", titulo: "Depósito de comodatos distinto", ayuda: "«Comodato» de Oficina contra el depósito de comodatos de la APP." },
     { k: "unidadesSinRegistrar", corto: "Sin N° de serie", titulo: "Equipos sin todos sus N° de serie registrados", ayuda: "Hay más equipos que N° de serie registrados: falta escanearlos (inventario)." },
     { k: "deshabilitado", corto: "Deshabilitado en Oficina", titulo: "Deshabilitados en Oficina, con stock en la APP", ayuda: "Oficina ya no los usa, pero la APP tiene stock." },
     { k: "negativo", corto: "Negativo en la APP", titulo: "Stock negativo en la APP", ayuda: "Salió más de lo que entró: falta registrar una entrada o se cargó mal una salida." },
@@ -286,7 +286,7 @@
       if (of.baja && (t.sat || t.com || t.dcm)) { r.deshabilitado.push(it); ok = false; }
       if (!of.dep && t.sat > 0) { r.soloEnApp.push(it); ok = false; }
       else if (Math.abs((of.dep || 0) - (t.sat || 0)) > 1e-9) { r.cantidadDistinta.push({ ...it, dif: (t.sat || 0) - (of.dep || 0) }); ok = false; }
-      const appCom = (t.com || 0) + (t.dcm || 0);
+      const appCom = t.dcm || 0;
       if (Math.abs((of.com || 0) - appCom) > 1e-9) { r.comodatoDistinto.push({ ...it, dif: appCom - (of.com || 0) }); ok = false; }
       if (a.tipo === "unidad" && (uni[c] || 0) < Math.max(0, t.sat || 0)) { r.unidadesSinRegistrar.push({ ...it, registradas: uni[c] || 0 }); ok = false; }
       if (ok) r.coinciden++;
@@ -631,9 +631,9 @@
   }
   // El depósito son dos lugares: «dep» (nuevos) y «dcm» (depósito de comodatos: usados o reparados). Lo que
   // sale «del depósito» se reparte: cada equipo con N° sale de donde está; el resto, de donde se eligió
-  // (x.de) o, si no se eligió, primero de los nuevos y lo que falte del depósito de comodatos.
+  // (x.de). Si no se eligió y hay de los dos, no se adivina: vuelve { error, elegirDeposito } para preguntar.
   function repartirDeposito(s, lista, arts) {
-    const salida = [];
+    const salida = [], elegir = [];
     for (const x of lista) {
       const esUnidad = (arts[x.c] || {}).tipo === "unidad";
       const hay = (d) => ((s.ubic[d] || {})[x.c] || 0);
@@ -644,6 +644,7 @@
       const libre = (d) => Math.max(0, red3(hay(d) - (esUnidad ? seriesEn(s, d, x.c).length : 0)));
       if (resto > 0) {
         if (x.de === "dcm" || x.de === "dep") parte[x.de].cant = red3(parte[x.de].cant + resto);
+        else if (libre("dep") > 0 && libre("dcm") > 0) { elegir.push({ c: x.c, d: (arts[x.c] || {}).d || x.c, nuevos: libre("dep"), comodato: libre("dcm") }); continue; }
         else if (resto > libre("dep") + libre("dcm") && !(libre("dcm") > 0)) parte.dep.cant = red3(parte.dep.cant + resto); // el error dice lo del depósito
         else if (resto > libre("dep") + libre("dcm")) return { error: `${(arts[x.c] || {}).d || x.c}: en el depósito hay ${red3(hay("dep"))} nuevos y ${red3(hay("dcm"))} en el depósito de comodatos, y querés mover ${x.cant}.` };
         else { const n = Math.min(resto, libre("dep")); parte.dep.cant = red3(parte.dep.cant + n); parte.dcm.cant = red3(parte.dcm.cant + resto - n); }
@@ -653,6 +654,7 @@
       if (sueltas.length) parte[x.de === "dcm" ? "dcm" : "dep"].unidades.push(...sueltas);
       ["dep", "dcm"].forEach((d) => { const p = parte[d]; p.cant = Math.max(p.cant, p.unidades.length); if (p.cant > 0) salida.push(p); });
     }
+    if (elegir.length) return { error: elegir.map((e) => `${e.d}: hay ${e.nuevos} nuevo${e.nuevos === 1 ? "" : "s"} y ${e.comodato} en el depósito de comodatos; elegí de cuál sale.`).join(" "), elegirDeposito: elegir };
     return { lista: salida };
   }
   // items: [{ c, cant, unidades?: [tracking] }]. op: { tipo, de?, a, por, fecha, motivo?, confirmar? }
@@ -1170,9 +1172,10 @@
   // Oficina cuenta «Depósito» (todo lo que está en poder de SAT: depósito, técnicos, vehículos, en
   // camino) y «Comodato». Los pases internos no le cambian nada; sí lo que sale a un cliente, lo que
   // vuelve de un cliente, los ajustes y las compras.
-  // El depósito de comodatos (dcm) es «Comodato» para Oficina: de ahí a un técnico es «sale del depósito
-  // de comodatos»; de ahí a un cliente en comodato no le cambia nada (sigue en Comodato).
-  const grupoOficina = (u) => (!u ? "afuera" : /^(dep|gar|tec:|veh:|cam:)/.test(u) ? "sat" : u === "dcm" || /^com:/.test(u) ? "comodato" : /^cli:/.test(u) ? "cliente" : "otro");
+  // «Comodato» de Oficina es el depósito de comodatos (dcm): lo instalado en un cliente (en comodato o no) ya
+  // no está en ninguna de las dos columnas. Lo que un técnico se lleva del depósito de comodatos pasa a
+  // «Depósito» (Oficina cuenta ahí lo que tienen los técnicos): sumado a la instalación, Comodato baja 1.
+  const grupoOficina = (u) => (!u ? "afuera" : /^(dep|gar|tec:|veh:|cam:)/.test(u) ? "sat" : u === "dcm" ? "comodato" : /^(cli|com):/.test(u) ? "cliente" : "otro");
   function movimientoParaOficina(m) {
     if (!m || !m.c || !(Number(m.cant) > 0) || m.tipo === "inicial" || m.tipo === "inicial_tecnico" || m.tipo === "comodato_deposito" || m.tipo === "inventario_series" || m.tipo === "garantia_reemplazo") return null;
     // Lo retirado de un cliente que la APP no tenía registrado (sin «de», con «origen») viene de ese cliente.
@@ -1180,15 +1183,19 @@
     if (de === a) return null;
     const cliente = (u) => String(u || "").replace(/^(cli|com):/, "");
     let operacion = "", deposito = 0, comodato = 0, quien = "";
-    if (de === "sat" && a === "cliente") { operacion = "SALIDA A CLIENTE"; deposito = -m.cant; quien = cliente(m.a); }
-    else if (de === "sat" && a === "comodato") { operacion = m.a === "dcm" ? "PASE AL DEPOSITO DE COMODATOS" : "PASE A COMODATO"; deposito = -m.cant; comodato = m.cant; quien = m.a === "dcm" ? "" : cliente(m.a); }
-    else if (de === "comodato" && a === "sat") { operacion = m.de === "dcm" ? "SALE DEL DEPOSITO DE COMODATOS" : m.tipo === "devuelto_sin_usar" ? "VUELVE SIN USAR (PRESUPUESTO)" : "DEVOLUCION DE COMODATO"; deposito = m.cant; comodato = -m.cant; quien = m.de === "dcm" ? "" : cliente(m.de || m.origen); }
-    else if (de === "cliente" && a === "sat") { operacion = m.tipo === "devuelto_sin_usar" ? "VUELVE SIN USAR (PRESUPUESTO)" : "RETIRO DE CLIENTE"; deposito = m.cant; quien = cliente(m.de || m.origen); }
+    const enComodato = (u) => /^com:/.test(u || "");
+    const salida = () => (enComodato(m.a) ? "SALIDA A CLIENTE EN COMODATO" : "SALIDA A CLIENTE");
+    const retiro = () => (m.tipo === "devuelto_sin_usar" ? "VUELVE SIN USAR (PRESUPUESTO)" : enComodato(m.de || m.origen) ? "RETIRO DE COMODATO" : "RETIRO DE CLIENTE");
+    if (de === "sat" && a === "cliente") { operacion = salida(); deposito = -m.cant; quien = cliente(m.a); }
+    else if (de === "comodato" && a === "cliente") { operacion = salida(); comodato = -m.cant; quien = cliente(m.a); }
+    else if (de === "sat" && a === "comodato") { operacion = "PASE AL DEPOSITO DE COMODATOS"; deposito = -m.cant; comodato = m.cant; }
+    else if (de === "comodato" && a === "sat") { operacion = "SALE DEL DEPOSITO DE COMODATOS"; deposito = m.cant; comodato = -m.cant; }
+    else if (de === "cliente" && a === "sat") { operacion = retiro(); deposito = m.cant; quien = cliente(m.de || m.origen); }
+    else if (de === "cliente" && a === "comodato") { operacion = retiro(); comodato = m.cant; quien = cliente(m.de || m.origen); }
     else if (de === "afuera" && a === "sat") { operacion = m.tipo === "ajuste" || m.tipo === "regularizacion" ? "AJUSTE" : "INGRESO"; deposito = m.cant; }
     else if (de === "sat" && a === "afuera") { operacion = "AJUSTE"; deposito = -m.cant; }
-    else if (de === "afuera" && a === "comodato") { operacion = m.a === "dcm" && m.tipo !== "ajuste" && m.tipo !== "regularizacion" ? "INGRESO" : "AJUSTE"; comodato = m.cant; quien = m.a === "dcm" ? "" : cliente(m.a); }
-    else if (de === "comodato" && a === "afuera") { operacion = "AJUSTE"; comodato = -m.cant; quien = m.de === "dcm" ? "" : cliente(m.de || m.origen); }
-    else if (de === "comodato" && a === "cliente") { operacion = "COMODATO A VENTA"; comodato = -m.cant; quien = cliente(m.a); }
+    else if (de === "afuera" && a === "comodato") { operacion = m.tipo === "ajuste" || m.tipo === "regularizacion" ? "AJUSTE" : "INGRESO"; comodato = m.cant; }
+    else if (de === "comodato" && a === "afuera") { operacion = "AJUSTE"; comodato = -m.cant; }
     else return null;
     return { id: m.id, fecha: m.fecha, operacion, c: m.c, deposito, comodato, cliente: quien, presupuesto: m.presupuesto || "", series: (m.unidades || []).join(" "), prov: m.prov || "", por: m.por || "", motivo: m.motivo || "" };
   }

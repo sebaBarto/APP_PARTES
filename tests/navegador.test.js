@@ -5811,8 +5811,6 @@ test("Depósito de comodatos: al entregar se sabe si salió nuevo o del depósit
   await page.waitForSelector("#depCanasta .stk-linea");
   assert.ok(!(await page.$(".dlg-app")), "no pregunta");
   assert.match(await page.textContent('#depCanasta .stk-de-dep button.activo'), /Comodato · hay 3/);
-  await page.fill("#depCodigo", "AI200158A2"); await page.press("#depCodigo", "Enter");
-  await page.waitForSelector("#depCanasta .stk-chip");
   // Sirena: hay de los dos -> pregunta
   await page.fill("#depCodigo", "000202080000"); await page.press("#depCodigo", "Enter");
   await page.waitForSelector(".dlg-app .stk-opcion");
@@ -5825,6 +5823,30 @@ test("Depósito de comodatos: al entregar se sabe si salió nuevo o del depósit
   await sirena.locator('[data-de="dep"]').click();
   assert.match(await page.locator("#depCanasta .stk-linea").nth(1).locator(".stk-de-dep button.activo").textContent(), /Nuevo/);
   await page.locator("#depCanasta .stk-linea").nth(1).locator('[data-de="dcm"]').click();
+  // Al RX1 le falta el N° de serie: tocando el artículo se escanea o se escribe
+  assert.match(await page.textContent("#depCanasta .stk-linea:nth-child(1) [data-poner-n]"), /1 sin N° de serie · tocá para cargarlo/);
+  await page.click("#depCanasta .stk-linea:nth-child(1) .stk-linea-top > div");
+  await page.waitForSelector(".dlg-app .stk-opcion");
+  assert.match(await page.textContent(".dlg-app"), /RX1 RECEPTOR PARADOX[\s\S]*Falta 1 N° de serie[\s\S]*Escanear con la cámara[\s\S]*Escribirlo/);
+  await page.click('.dlg-app .stk-opcion:has-text("Escribirlo")');
+  await page.fill(".dlg-app .dlg-input", "AI200158A2");
+  await page.click(".dlg-app .dlg-si");
+  await page.waitForSelector("#depCanasta .stk-chip");
+  assert.ok(!(await page.$("#depCanasta [data-poner-n]")), "ya no falta");
+  // También con la cámara: abre el escáner esperando el N° de ese equipo
+  await page.fill("#depCodigo", "000208680000"); await page.press("#depCodigo", "Enter");
+  await page.waitForSelector("#depCanasta [data-poner-n]");
+  await page.evaluate(() => {
+    const cv = document.createElement("canvas"); cv.width = 64; cv.height = 64;
+    navigator.mediaDevices.getUserMedia = async () => cv.captureStream(10);
+    window.BarcodeDetector = class { async detect() { return []; } };
+  });
+  await page.click("#depCanasta [data-poner-n]");
+  await page.click('.dlg-app .stk-opcion:has-text("Escanear con la cámara")');
+  await page.waitForSelector(".stk-escaner");
+  assert.match(await page.textContent(".stk-escaner-ahora"), /Ahora: N° de serie de RX1/);
+  await page.evaluate(() => stkEscanerAbierto.cerrar());
+  await page.click("#depCanasta .stk-linea:nth-child(1) [data-menos]");
   await page.click("#depConfirmarBtn");
   await page.click('.stk-opcion:has-text("Mandar en camino")');
   await page.waitForFunction(() => !document.querySelector("#depCanasta .stk-linea"));

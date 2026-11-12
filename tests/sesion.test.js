@@ -1528,7 +1528,7 @@ test("Stock: Melina entrega con escaneo, el técnico confirma «Recibí» (o con
     const S = require(path.join(raiz, "stock-utils.js"));
     const paraOficina = movsMes.map(S.movimientoParaOficina).filter(Boolean);
     assert.deepStrictEqual([...new Set(paraOficina.map((o) => o.operacion))].sort(), ["INGRESO"], "entregas a técnicos, vehículos y devoluciones no le cambian nada a Oficina");
-    assert.deepStrictEqual(S.movimientoParaOficina({ id: "x", c: "1", cant: 2, de: "dep", a: "com:Pérez", presupuesto: "45" }), { id: "x", fecha: undefined, operacion: "PASE A COMODATO", c: "1", deposito: -2, comodato: 2, cliente: "Pérez", presupuesto: "45", series: "", prov: "", por: "", motivo: "" });
+    assert.deepStrictEqual(S.movimientoParaOficina({ id: "x", c: "1", cant: 2, de: "dep", a: "com:Pérez", presupuesto: "45" }), { id: "x", fecha: undefined, operacion: "SALIDA A CLIENTE EN COMODATO", c: "1", deposito: -2, comodato: 0, cliente: "Pérez", presupuesto: "45", series: "", prov: "", por: "", motivo: "" });
     assert.strictEqual(S.movimientoParaOficina({ id: "y", c: "1", cant: 1, de: "tec:Juan", a: "cli:Kiosco" }).operacion, "SALIDA A CLIENTE");
     assert.strictEqual(S.movimientoParaOficina({ id: "z", c: "1", cant: 1, de: "dep", a: "veh:Kangoo" }), null);
     const ingreso = movsMes.find((m) => m.tipo === "ingreso");
@@ -1743,7 +1743,10 @@ test("Stock: control del cuadre (servidor y cron): todo lo hecho por la API cuad
     let r = await post({ accion: "saldo_inicial", items: [{ c: "20825", dep: 4 }, { c: "20208", dep: 10, com: 2 }] });
     assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
     // Un día normal: entrega, el técnico recibe con diferencia, usa en un parte, devuelve; ajuste del admin.
-    r = await post({ accion: "mover", de: "dep", a: "tec:Juan", items: [{ c: "20825", cant: 2, unidades: ["GH12000001", "GH12000002"] }, { c: "20208", cant: 3 }] }, melina);
+    // Hay sirenas nuevas y en el depósito de comodatos: sin decir de cuál, no adivina
+    r = await post({ accion: "mover", de: "dep", a: "tec:Juan", items: [{ c: "20208", cant: 3 }] }, melina);
+    assert.match(r.cuerpo.error || "", /hay 10 nuevos y 2 en el depósito de comodatos; elegí de cuál sale/);
+    r = await post({ accion: "mover", de: "dep", a: "tec:Juan", items: [{ c: "20825", cant: 2, unidades: ["GH12000001", "GH12000002"] }, { c: "20208", cant: 3, de: "dep" }] }, melina);
     assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
     r = await post({ accion: "confirmar_envio", id: r.cuerpo.envio.id, items: [{ c: "20825", cant: 2, unidades: ["GH12000001"] }, { c: "20208", cant: 2 }] }, juan);
     assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
@@ -1862,7 +1865,13 @@ test("Stock: depósito de comodatos (usados o reparados) separado de los nuevos:
     r = await post({ accion: "mover", de: "com:Kiosco Pérez", a: "dcm", items: [{ c: "20208", cant: 1 }] }, melina);
     assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
     assert.strictEqual(repo["stock/saldos.json"].ubic.dcm["20208"], 2);
-    assert.strictEqual(S.movimientoParaOficina(hist().slice(-1)[0]), null, "de comodato a comodato: para Oficina no cambia");
+    const ret = S.movimientoParaOficina(hist().slice(-1)[0]);
+    assert.deepStrictEqual([ret.operacion, ret.deposito, ret.comodato, ret.cliente], ["RETIRO DE COMODATO", 0, 1, "Kiosco Pérez"], "vuelve al Comodato de Oficina");
+    // Del depósito de comodatos a un cliente en comodato: se descuenta de Comodato
+    r = await post({ accion: "mover", de: "dep", a: "com:Kiosco Pérez", items: [{ c: "20208", cant: 1, de: "dcm" }] }, melina);
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    const sale = S.movimientoParaOficina(hist().slice(-1)[0]);
+    assert.deepStrictEqual([sale.operacion, sale.deposito, sale.comodato], ["SALIDA A CLIENTE EN COMODATO", 0, -1]);
     let c = await post({ accion: "cuadrar" });
     assert.ok(c.cuerpo.cuadre.ok, JSON.stringify(c.cuerpo.cuadre.errores));
     // 2) Lo que la v4.75.0 pasó al depósito general vuelve al depósito de comodatos (lo que sigue ahí)

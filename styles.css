@@ -3784,6 +3784,10 @@ html .app .equipo-acciones .btn.eq-util.activo, .equipo-acciones .eq-util.activo
 .stk-chip { display: inline-flex; align-items: center; gap: 4px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; padding: 3px 4px 3px 9px; border-radius: 999px; background: rgba(127,127,127,.16); }
 .stk-chip button { width: 22px; height: 22px; min-height: 0; padding: 0; border: 0; background: transparent; color: inherit; font-size: 14px; }
 .stk-falta { font-size: 12.5px; color: #B26A00; margin-top: 6px; }
+/* Equipo sin N° de serie: se toca para cargarlo */
+.stk-falta-tocar { display: flex; align-items: center; gap: 6px; width: 100%; min-height: 40px; padding: 6px 10px; border: 1px dashed rgba(178,106,0,.6); border-radius: 10px; background: rgba(255,192,51,.08); font: inherit; font-size: 13px; font-weight: 600; color: #B26A00; text-align: left; cursor: pointer; }
+.stk-falta-tocar .stk-ico { flex: 0 0 auto; width: 18px; height: 18px; }
+.stk-linea-tocable { cursor: pointer; }
 .stk-linea .stk-quitar, .stk-link { background: none; border: 0; padding: 4px 0; min-height: 0; color: inherit; text-decoration: underline; font-size: 12.5px; opacity: .8; width: auto; }
 .stk-res { display: block; width: 100%; text-align: left; padding: 10px 12px; margin: 0 0 6px; border-radius: 10px; border: 1px solid rgba(127,127,127,.35); background: transparent; color: inherit; font-size: 14px; min-height: 0; }
 .stk-res small { display: block; opacity: .7; font-size: 12px; }

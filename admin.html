@@ -1425,7 +1425,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
       <div data-stk-vista="oficina" class="hidden">
         <div class="card">
           <h3 style="margin-top:0;">Movimientos para pasar al sistema de Oficina</h3>
-          <p class="subtitle" style="margin-top:0;">Solo lo que le cambia el stock a Oficina: lo que sale a clientes (instalado o comodato), lo que vuelve de clientes, los ajustes y los ingresos. Los pases entre el depósito, los técnicos y los vehículos no cuentan (para Oficina todo eso es «Depósito»). El archivo tiene una hoja «Formato» que explica cada columna, para que el sistema de Oficina lo pueda importar.</p>
+          <p class="subtitle" style="margin-top:0;">Solo lo que le cambia el stock a Oficina: lo que sale a clientes (instalado o comodato), lo que vuelve de clientes, los ajustes y los ingresos. Los pases entre el depósito, los técnicos y los vehículos no cuentan (para Oficina todo eso es «Depósito»). «Comodato» es el depósito de comodatos: lo que sale de ahí (a un técnico o a un cliente) se descuenta de Comodato. El archivo tiene una hoja «Formato» que explica cada columna, para que el sistema de Oficina lo pueda importar.</p>
           <div class="field-row" style="flex-wrap:wrap;align-items:flex-end;">
             <div><label>Mes</label><input type="month" class="field-input" id="stkOfMes"></div>
             <label style="display:flex;align-items:center;gap:6px;margin:0;"><input type="checkbox" id="stkOfVerPasados" style="width:auto;"> Mostrar también los ya pasados</label>
@@ -5525,7 +5525,7 @@ const AYUDAS_SIMS = {
     "Si verificaste que lo guardado es lo real, «Regularizar» agrega al historial lo que faltaba, a tu nombre y sin tocar cantidades. Si el conteo da otra cosa, después ajustá.",
     "Abajo, lo que rompe una regla y qué hacer: materiales de partes para aprobar, retiros que no figuraban, N° de serie de más, cantidades negativas." ] },
   stk_conciliacion: { titulo: "Conciliación con Oficina", gif: "assets/ayuda/stock-adm-conciliacion.gif", texto: [
-    "Subí el listado que exporta Oficina (el de siempre). Se compara artículo por artículo: el depósito de Oficina con lo que está en poder de SAT, y el comodato con el depósito de comodatos más lo que está en comodato en clientes.",
+    "Subí el listado que exporta Oficina (el de siempre). Se compara artículo por artículo: el depósito de Oficina con lo que está en poder de SAT, y el comodato con el depósito de comodatos.",
     "Cada grupo de diferencias tiene su explicación y su arreglo: agregar al catálogo, dejar la APP como Oficina, o marcar Resuelto / Ignorar si el error es de Oficina. Se puede de a uno o tildando varios.",
     "«Excel con todas las diferencias» para revisarlas con tiempo." ] },
   stk_pedidos: { titulo: "Pedidos a proveedores", gif: "assets/ayuda/stock-adm-pedidos.gif", texto: [
@@ -6974,7 +6974,7 @@ async function stkRenderConciliacion(registrar) {
   const fila = (cat, it) => {
     const of = it.of || {}, t = it.t || {};
     let oficina = "", app = "", dif = "";
-    if (cat.k === "comodatoDistinto") { oficina = stkFmt(of.com); app = `${stkFmt((t.com || 0) + (t.dcm || 0))}${t.dcm ? ` <span class="stk-det">(${stkFmt(t.dcm)} en el depósito de comodatos + ${stkFmt(t.com || 0)} en clientes)</span>` : ""}`; dif = it.dif; }
+    if (cat.k === "comodatoDistinto") { oficina = stkFmt(of.com); app = stkFmt(t.dcm || 0); dif = it.dif; }
     else if (cat.k === "negativo") { oficina = "—"; app = `${escapeHtmlAdmin(nombreUbicacion(it.u))}: ${stkFmt(it.n)}`; }
     else if (cat.k === "unidadesSinRegistrar") { oficina = stkFmt(of.dep); app = `${stkFmt(t.sat)} (${it.registradas} con N° de serie)`; }
     else { oficina = stkFmt(of.dep); app = stkFmt(t.sat); dif = it.dif != null ? it.dif : (t.sat || 0) - (of.dep || 0); }
@@ -7054,7 +7054,7 @@ async function stkConcAccion(cat, accion, elegidos) {
     if (cat.k === "negativo") planes.push({ it, ubic: it.u, cantidad: 0 });
     else if (cat.k === "comodatoDistinto") {
       const u = "dcm", nuevo = caja(u) - it.dif;
-      if (nuevo < 0) problemas.push(`${it.d}: la diferencia está en el comodato de clientes; corregilo en cada cliente.`); else planes.push({ it, ubic: u, cantidad: nuevo });
+      planes.push({ it, ubic: u, cantidad: Math.max(0, nuevo) });
     } else {
       const dif = it.dif != null ? it.dif : (it.t.sat || 0) - (it.of.dep || 0), nuevo = caja("dep") - dif;
       if (nuevo < 0) problemas.push(`${it.d}: la diferencia está en técnicos o vehículos (${stkUbicTexto(it.t.detalle)}); ajustalo ahí.`); else planes.push({ it, ubic: "dep", cantidad: nuevo });
@@ -7091,7 +7091,7 @@ function stkConcExcel(r) {
   const filas = [];
   STOCK_CONC_CATEGORIAS.forEach((cat) => r[cat.k].forEach((it) => {
     const of = it.of || {}, t = it.t || {};
-    filas.push({ Diferencia: cat.corto, Código: it.c, Descripción: it.d || "", "Oficina depósito": of.dep || 0, "Oficina comodato": of.com || 0, "APP en poder de SAT": t.sat || 0, "APP comodato": (t.com || 0) + (t.dcm || 0), "Diferencia (APP − Oficina)": it.dif ?? (cat.k === "negativo" ? it.n : ""), "Dónde está según la APP": stkUbicTexto(t.detalle) });
+    filas.push({ Diferencia: cat.corto, Código: it.c, Descripción: it.d || "", "Oficina depósito": of.dep || 0, "Oficina comodato": of.com || 0, "APP en poder de SAT": t.sat || 0, "APP depósito de comodatos": t.dcm || 0, "APP en comodato en clientes": t.com || 0, "Diferencia (APP − Oficina)": it.dif ?? (cat.k === "negativo" ? it.n : ""), "Dónde está según la APP": stkUbicTexto(t.detalle) });
   }));
   const libro = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(filas.length ? filas : [{ Diferencia: "Sin diferencias" }]), "Diferencias");
