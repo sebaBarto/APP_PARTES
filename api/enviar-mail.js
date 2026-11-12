@@ -411,9 +411,10 @@ module.exports = async (req, res) => {
       `);
     } else if (tipo === "gestion_llaves") {
       // Aviso de una gestión nueva del portal de administradores de consorcio
-      // (lib/consorcio.js). Va a LLAVES_AVISO_EMAIL si está configurada; si no, a OFICINA_EMAIL.
-      destinatario = process.env.LLAVES_AVISO_EMAIL || process.env.OFICINA_EMAIL;
-      if (!destinatario) { res.status(500).json({ error: "Falta configurar LLAVES_AVISO_EMAIL u OFICINA_EMAIL en Vercel" }); return; }
+      // (lib/consorcio.js). Va fijo a administración y edificios (mismo criterio
+      // que el formulario de pedir servicio); la variable LLAVES_AVISO_EMAIL,
+      // si algún día se configura en Vercel, lo reemplaza.
+      destinatario = process.env.LLAVES_AVISO_EMAIL || "administracion@sat365.com.ar,edificios@sat365.com.ar";
       const fila = (k, v) => (v ? `<tr><td style="padding:4px 12px 4px 0;color:#6B7680;vertical-align:top;">${escapeHtml(k)}</td><td style="padding:4px 0;"><b>${escapeHtml(v)}</b></td></tr>` : "");
       asunto = `🔑 Pedido N° ${datos.numero || "?"} — ${datos.tipo_txt || "Gestión de llaves"} — ${datos.edificio || ""}`;
       html = envolverDocumento(`

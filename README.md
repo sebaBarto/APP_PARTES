@@ -3253,5 +3253,6 @@ IP y por mail. Datos en `registro-llaves/administradores.json` y
 - Los pedidos pendientes aparecen en el **Inicio** de `admin.html` (en rojo
   si hay una baja por robo).
 - Cada gestión nueva manda un **mail de aviso** (tipo `gestion_llaves` en
-  `api/enviar-mail.js`) a `LLAVES_AVISO_EMAIL`, o a `OFICINA_EMAIL` si esa
-  variable no está configurada en Vercel.
+  `api/enviar-mail.js`) a administracion@sat365.com.ar y
+  edificios@sat365.com.ar (si se configura `LLAVES_AVISO_EMAIL` en Vercel,
+  va a esa lista en su lugar).
