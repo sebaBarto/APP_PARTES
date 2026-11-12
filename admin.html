@@ -1809,6 +1809,32 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
         <p class="status" id="rllRegistrosStatus"></p>
         <div id="rllTabla" style="overflow-x:auto;"></div>
       </div>
+
+      <div class="card hidden" id="rllConcCard">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between;">
+          <h3 style="margin:0;">Conciliación con la estación de monitoreo</h3>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <label class="btn-secondary-admin" style="width:auto;display:inline-flex;align-items:center;gap:6px;cursor:pointer;margin:0;padding:10px 14px;border-radius:var(--r-sm);font-weight:600;font-size:14px;">
+              ⬆ Subir Excel de la estación<input type="file" id="rllConcArchivo" accept=".xlsx,.xls,.csv" style="display:none;">
+            </label>
+            <button type="button" class="btn-secondary-admin hidden" id="rllConcExcelBtn" style="width:auto;">⬇ Descargar resultado (Excel)</button>
+          </div>
+        </div>
+        <p class="subtitle" style="margin:8px 0 0;">Subí el listado de usuarios que tiene cargados la estación (Excel o CSV). Se compara llave por llave con lo que registraron los vecinos — por número de tag y, si no hay, por número de usuario.</p>
+        <p class="status" id="rllConcStatus"></p>
+        <div id="rllConcMapeo" class="hidden" style="margin-top:12px;padding:14px;border:1.5px dashed var(--border);border-radius:var(--r-md);">
+          <b>¿Qué columna es cada dato?</b> <span style="color:#6B7680;">Lo detecté solo; corregilo si hace falta.</span>
+          <div id="rllConcColumnas" class="field-row" style="flex-wrap:wrap;gap:10px;margin-top:10px;"></div>
+          <div id="rllConcVista" style="overflow-x:auto;margin-top:8px;"></div>
+          <button type="button" id="rllConcCompararBtn" style="width:auto;margin-top:10px;">Comparar con los registros</button>
+        </div>
+        <div id="rllConcResultado" class="hidden" style="margin-top:14px;">
+          <p style="color:#6B7680;font-size:13px;margin:0 0 8px;" id="rllConcInfo"></p>
+          <div class="sims-resumen" id="rllConcResumen"></div>
+          <div class="sims-lote-bar hidden" id="rllConcLote"></div>
+          <div id="rllConcTabla" style="overflow-x:auto;"></div>
+        </div>
+      </div>
     </div>
 
     <div id="panelVencimientos" class="hidden">
@@ -9546,7 +9572,8 @@ async function rllAbrirEdificio(codigo) {
   rllEdificioActual = rllEdificios.find((x) => x.codigo === codigo) || null;
   renderRllEdificios();
   const card = document.getElementById("rllRegistrosCard");
-  if (!rllEdificioActual) { card.classList.add("hidden"); return; }
+  if (!rllEdificioActual) { card.classList.add("hidden"); document.getElementById("rllConcCard").classList.add("hidden"); return; }
+  rllConc = null; // la conciliación es de cada edificio: se vuelve a pedir abajo
   card.classList.remove("hidden");
   document.getElementById("rllRegistrosTit").textContent = "Registros de " + rllEdificioActual.nombre;
   const st = document.getElementById("rllRegistrosStatus");
@@ -9558,6 +9585,7 @@ async function rllAbrirEdificio(codigo) {
     rllRegistros = Array.isArray(d) ? d : [];
     st.textContent = "";
     renderRllRegistros();
+    rllCargarConciliacion();
   } catch (e) { st.className = "status err"; st.textContent = "No se pudo cargar: " + e.message; }
 }
 
@@ -9808,6 +9836,377 @@ function rllImprimirCartel(ed) {
 </body></html>`);
   w.document.close();
 }
+
+// ---------- Conciliación con la estación de monitoreo ----------
+// Se sube el listado de la estación (Excel/CSV), se elige qué columna es
+// cada dato y se compara con lo que cargaron los vecinos. La comparación se
+// rehace cada vez que se abre (así suma a los vecinos que se registran
+// después); lo que se guarda es el listado y lo que se decidió de cada fila.
+let rllConc = null;          // { fecha, por, archivo, filas: [...] } guardado en el servidor
+let rllConcPendiente = null; // archivo recién leído, antes de comparar: { nombre, encabezados, filas }
+let rllConcFiltro = "";
+const RLL_CONC_CAMPOS = [
+  ["tag", "N° de llave (tag)", /(tag|llave|tarjeta|card|c[oó]digo|wiegand|credencial|n[uú]mero de llave)/i],
+  ["facility", "Facility / sitio (si viene aparte)", /(facility|sitio|site|fc\b|familia)/i],
+  ["usuario", "N° de usuario", /(usuario|user|n[°º]?\s*us|id\b|legajo)/i],
+  ["nombre", "Nombre", /(nombre|name|titular)/i],
+  ["apellido", "Apellido", /(apellido|surname|last)/i],
+  ["piso", "Piso", /(piso|floor)/i],
+  ["depto", "Depto", /(depto|dpto|departamento|unidad|uf\b|dto)/i],
+  ["telefono", "Teléfono", /(tel|cel|m[oó]vil|phone)/i],
+  ["tipo", "Tipo de dispositivo", /(tipo|dispositivo|device|medio)/i],
+];
+const RLL_CONC_RES = {
+  encontrada: { txt: "Encontrada", fondo: "#E6F4EA", color: "#1F6B34", argb: "FFD9F0E0" },
+  no_registrada: { txt: "No registrada → dar de baja", fondo: "#FDE2E0", color: "#B3261E", argb: "FFFAD4D0" },
+  perdida: { txt: "Reportada perdida → dar de baja", fondo: "#F9C9C4", color: "#8C1D18", argb: "FFF5B7B1" },
+  falta: { txt: "Falta cargar en la estación", fondo: "#FFF1D6", color: "#8A5A00", argb: "FFFFEBC2" },
+};
+const RLL_DECISIONES = { "": "", dar_de_baja: "Dar de baja", borrar: "Borrar", hecho: "Hecho en la estación", mantener: "Mantener" };
+
+// Clave comparable de un número de tag: "069:02561", "69,2561", "06902561",
+// el número largo de 10 cifras... todos terminan en la misma clave.
+function rllClaveTag(v, facility) {
+  let t = String(v == null ? "" : v).trim();
+  if (facility !== undefined && String(facility).trim() !== "" && /^\d+$/.test(String(facility).trim()) && /^\d+$/.test(t)) t = String(facility).trim() + ":" + t;
+  if (!t) return "";
+  const m = t.match(/^(\d{1,3})\s*[:.,;\s]\s*(\d{1,5})$/);
+  if (m) return m[1].padStart(3, "0") + ":" + m[2].padStart(5, "0");
+  const calc = rllTagCalculado(t);
+  if (calc) return calc;
+  const d = t.replace(/\D/g, "").replace(/^0+/, "");
+  return d ? "n" + d : t.toLowerCase();
+}
+function rllClaveUsuario(v) { const d = String(v == null ? "" : v).replace(/\D/g, "").replace(/^0+/, ""); return d; }
+function rllPartirNombre(n) {
+  const p = String(n || "").trim().split(/\s+/).filter(Boolean);
+  if (p.length < 2) return [p[0] || "", ""];
+  return [p.slice(0, -1).join(" "), p[p.length - 1]];
+}
+
+async function rllCargarConciliacion() {
+  if (!rllEdificioActual) return;
+  document.getElementById("rllConcCard").classList.remove("hidden");
+  rllConcPendiente = null;
+  document.getElementById("rllConcMapeo").classList.add("hidden");
+  try {
+    const r = await fetch("/api/datos?coleccion=registro_llaves&conciliacion=1&edificio=" + encodeURIComponent(rllEdificioActual.codigo), { headers: rllHeaders(), cache: "no-store" });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Error");
+    rllConc = d && Array.isArray(d.filas) ? d : null;
+  } catch (e) { rllConc = null; }
+  renderRllConciliacion();
+}
+
+document.getElementById("rllConcArchivo").addEventListener("change", async (ev) => {
+  const archivo = ev.target.files && ev.target.files[0];
+  ev.target.value = "";
+  if (!archivo) return;
+  const st = document.getElementById("rllConcStatus");
+  st.className = "status"; st.textContent = "Leyendo " + archivo.name + "...";
+  try {
+    const libro = XLSX.read(await archivo.arrayBuffer(), { type: "array" });
+    const hoja = libro.Sheets[libro.SheetNames[0]];
+    // raw:false = el texto tal como se ve en Excel (no pierde ceros ni los dos puntos)
+    const matriz = XLSX.utils.sheet_to_json(hoja, { header: 1, raw: false, defval: "" }).filter((f) => f.some((c) => String(c).trim() !== ""));
+    if (matriz.length < 2) throw new Error("el archivo no tiene filas");
+    // La fila de encabezados es la primera que tiene al menos 2 textos.
+    let iEnc = matriz.findIndex((f) => f.filter((c) => /[a-záéíóúñ]/i.test(String(c))).length >= 2);
+    if (iEnc < 0 || iEnc > 10) iEnc = 0;
+    const encabezados = matriz[iEnc].map((c, i) => String(c).trim() || "Columna " + (i + 1));
+    const filas = matriz.slice(iEnc + 1);
+    rllConcPendiente = { nombre: archivo.name, encabezados, filas };
+    st.textContent = `${filas.length} filas leídas de ${archivo.name}.`;
+    rllArmarMapeo();
+  } catch (e) { st.className = "status err"; st.textContent = "No se pudo leer el archivo: " + e.message; }
+});
+
+function rllArmarMapeo() {
+  const { encabezados, filas } = rllConcPendiente;
+  const usados = new Set();
+  const elegido = {};
+  RLL_CONC_CAMPOS.forEach(([k, , re]) => {
+    let i = encabezados.findIndex((h, j) => !usados.has(j) && re.test(h));
+    // Si ningún encabezado dice "tag", se busca la columna cuyos valores parecen tags.
+    if (i < 0 && k === "tag") {
+      i = encabezados.findIndex((h, j) => !usados.has(j) && filas.slice(0, 50).filter((f) => /^\s*\d{1,3}\s*[:.,]\s*\d{1,5}\s*$|^\s*\d{10}\s*$/.test(String(f[j] || ""))).length >= Math.min(3, filas.length));
+    }
+    if (i >= 0) usados.add(i);
+    elegido[k] = i;
+  });
+  if (elegido.apellido >= 0 && elegido.apellido === elegido.nombre) elegido.apellido = -1;
+  const opciones = (sel) => `<option value="-1">— no está —</option>` + encabezados.map((h, j) => `<option value="${j}"${j === sel ? " selected" : ""}>${escapeHtmlAdmin(h)}</option>`).join("");
+  document.getElementById("rllConcColumnas").innerHTML = RLL_CONC_CAMPOS.map(([k, t]) => `<div style="flex:1 1 170px;"><label>${t}</label><select data-k="${k}" style="margin:0;">${opciones(elegido[k])}</select></div>`).join("");
+  document.getElementById("rllConcVista").innerHTML = `<table><thead><tr>${encabezados.map((h) => `<th>${escapeHtmlAdmin(h)}</th>`).join("")}</tr></thead><tbody>${filas.slice(0, 4).map((f) => `<tr>${encabezados.map((_, j) => `<td>${escapeHtmlAdmin(f[j] ?? "")}</td>`).join("")}</tr>`).join("")}</tbody></table><p style="font-size:12px;color:#6B7680;margin:4px 0 0;">Primeras filas del archivo.</p>`;
+  document.getElementById("rllConcMapeo").classList.remove("hidden");
+}
+
+document.getElementById("rllConcCompararBtn").addEventListener("click", async () => {
+  if (!rllConcPendiente) return;
+  const st = document.getElementById("rllConcStatus");
+  const col = {};
+  document.querySelectorAll("#rllConcColumnas select").forEach((s) => { col[s.dataset.k] = Number(s.value); });
+  if (col.tag < 0 && col.usuario < 0) { st.className = "status err"; st.textContent = "Elegí al menos la columna del N° de llave o la del N° de usuario."; return; }
+  const v = (f, k) => (col[k] >= 0 ? String(f[col[k]] ?? "").trim() : "");
+  const filas = rllConcPendiente.filas.map((f) => {
+    const fac = v(f, "facility");
+    let tag = v(f, "tag");
+    if (fac && /^\d+$/.test(fac) && /^\d+$/.test(tag)) tag = fac + ":" + tag;
+    return { tag, usuario: v(f, "usuario"), nombre: v(f, "nombre"), apellido: v(f, "apellido"), piso: v(f, "piso"), depto: v(f, "depto"), telefono: v(f, "telefono"), tipo: v(f, "tipo") };
+  }).filter((f) => f.tag || f.usuario || f.nombre);
+  st.className = "status"; st.textContent = "Guardando y comparando...";
+  try {
+    const r = await fetch("/api/datos?coleccion=registro_llaves", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "guardar_conciliacion", edificio: rllEdificioActual.codigo, archivo: rllConcPendiente.nombre, filas }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Error");
+    rllConc = d;
+    rllConcPendiente = null;
+    rllConcFiltro = "";
+    document.getElementById("rllConcMapeo").classList.add("hidden");
+    st.className = "status ok"; st.textContent = `Listo: ${d.filas.length} filas de la estación comparadas.`;
+    renderRllConciliacion();
+  } catch (e) { st.className = "status err"; st.textContent = "No se pudo comparar: " + e.message; }
+});
+
+function rllEsControlEstacion(f) { return /control|remoto|\brf\b|\btx\b|cochera|garage/i.test(f.tipo || ""); }
+
+// Compara el listado guardado de la estación contra los registros actuales.
+function rllCompararConciliacion() {
+  const disp = rllFilas();
+  const porTag = {}, porUsuario = {}, perdidas = {};
+  disp.forEach((d) => {
+    const kt = d.l.tag ? (rllEsControl(d.l) ? "c" + rllClaveUsuario(d.l.tag) : rllClaveTag(d.l.tag)) : "";
+    if (d.perdida) { if (kt) (perdidas[kt] = perdidas[kt] || []).push(d); return; }
+    if (kt && kt !== "c") (porTag[kt] = porTag[kt] || []).push(d);
+    const ku = rllClaveUsuario(d.l.usuario);
+    if (ku) (porUsuario[ku] = porUsuario[ku] || []).push(d);
+  });
+  const usados = new Set();
+  const filas = rllConc.filas.map((est, i) => {
+    const control = rllEsControlEstacion(est);
+    const kt = est.tag ? (control ? "c" + rllClaveUsuario(est.tag) : rllClaveTag(est.tag)) : "";
+    const ku = rllClaveUsuario(est.usuario);
+    const fila = { origen: "estacion", i, est, d: null, res: "no_registrada", por: "", nota: "" };
+    if (kt && kt !== "c" && perdidas[kt]) { fila.res = "perdida"; fila.d = perdidas[kt][0]; fila.por = "tag"; return fila; }
+    const candTag = kt && kt !== "c" ? (porTag[kt] || []) : [];
+    const candUsu = ku ? (porUsuario[ku] || []).filter((d) => rllEsControl(d.l) === control || !est.tipo) : [];
+    const d = candTag.find((x) => !usados.has(x)) || candTag[0] || candUsu.find((x) => !usados.has(x)) || null;
+    if (d) {
+      fila.res = "encontrada"; fila.d = d; fila.por = candTag.includes(d) ? "tag" : "usuario";
+      usados.add(d);
+      const uReg = rllClaveUsuario(d.l.usuario);
+      if (ku && uReg && ku !== uReg) fila.nota = `N° de usuario distinto: estación ${est.usuario}, vecino ${d.l.usuario}`;
+      if (fila.por === "usuario" && kt && d.l.tag && rllClaveTag(d.l.tag) !== kt && !rllEsControl(d.l)) fila.nota = `Coincide el usuario pero no el tag (estación ${est.tag}, vecino ${d.l.tag})`;
+    }
+    return fila;
+  });
+  disp.filter((d) => !d.perdida && !usados.has(d)).forEach((d) => filas.push({ origen: "registro", i: -1, est: null, d, res: "falta", por: "", nota: "" }));
+  return filas;
+}
+
+function renderRllConciliacion() {
+  const cont = document.getElementById("rllConcResultado");
+  document.getElementById("rllConcExcelBtn").classList.toggle("hidden", !rllConc);
+  if (!rllConc) { cont.classList.add("hidden"); return; }
+  cont.classList.remove("hidden");
+  const filas = rllCompararConciliacion();
+  document.getElementById("rllConcInfo").textContent = `Archivo: ${rllConc.archivo || "(sin nombre)"} · subido ${rllFecha(rllConc.fecha)}${rllConc.por ? " por " + rllConc.por : ""} · ${rllConc.filas.length} filas de la estación. Se vuelve a comparar con los registros cada vez que abrís esta pestaña.`;
+  const n = (k) => filas.filter((f) => f.res === k).length;
+  const pendBaja = filas.filter((f) => (f.res === "no_registrada" || f.res === "perdida") && !rllConc.filas[f.i].decision).length;
+  const chips = [["", "Todas", filas.length], ["encontrada", "Encontradas", n("encontrada")], ["no_registrada", "No registradas → dar de baja", n("no_registrada")], ["perdida", "Reportadas perdidas", n("perdida")], ["falta", "Faltan en la estación", n("falta")]];
+  document.getElementById("rllConcResumen").innerHTML = chips.map(([k, t, c]) => {
+    const r = RLL_CONC_RES[k];
+    return `<button type="button" class="sims-chip ${rllConcFiltro === k ? "activo" : ""}" data-k="${k}" style="${r && rllConcFiltro !== k ? `background:${r.fondo};border-color:${r.fondo};color:${r.color};` : ""}"><b>${c}</b> ${t}</button>`;
+  }).join("");
+  document.querySelectorAll("#rllConcResumen button").forEach((b) => b.addEventListener("click", () => { rllConcFiltro = b.dataset.k; renderRllConciliacion(); }));
+
+  // Acciones en lote
+  const encPend = filas.filter((f) => f.res === "encontrada" && f.d && f.d.l.estado === "pendiente");
+  const lote = document.getElementById("rllConcLote");
+  const botones = [];
+  if (encPend.length) botones.push(`<button type="button" class="btn-secondary-admin" id="rllConcConciliarBtn">✓ Marcar las ${encPend.length} encontradas como conciliadas</button>`);
+  if (pendBaja) botones.push(`<button type="button" class="btn-secondary-admin" id="rllConcBajaTodasBtn">Marcar las ${pendBaja} sin decidir para dar de baja</button>`);
+  lote.innerHTML = botones.length ? `<b>Acciones rápidas</b>${botones.join("")}` : "";
+  lote.classList.toggle("hidden", !botones.length);
+  const bConc = document.getElementById("rllConcConciliarBtn");
+  if (bConc) bConc.addEventListener("click", async () => {
+    bConc.disabled = true;
+    try {
+      const cambios = encPend.map((f) => ({ id: f.d.r.id, indice: f.d.i, perdida: false, estado: "conciliada" }));
+      const r = await fetch("/api/datos?coleccion=registro_llaves", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "estado_lote", edificio: rllEdificioActual.codigo, cambios }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Error");
+      encPend.forEach((f) => { f.d.l.estado = "conciliada"; f.d.l.revisado_por = adminNombre || "vos"; });
+      renderRllRegistros();
+      renderRllConciliacion();
+    } catch (e) { alert("No se pudo guardar: " + e.message); bConc.disabled = false; }
+  });
+  const bBaja = document.getElementById("rllConcBajaTodasBtn");
+  if (bBaja) bBaja.addEventListener("click", () => rllDecidir(filas.filter((f) => (f.res === "no_registrada" || f.res === "perdida") && !rllConc.filas[f.i].decision).map((f) => f.i), "dar_de_baja"));
+
+  const vis = filas.filter((f) => !rllConcFiltro || f.res === rllConcFiltro);
+  const orden = { perdida: 0, no_registrada: 1, falta: 2, encontrada: 3 };
+  vis.sort((a, b) => orden[a.res] - orden[b.res]);
+  const tabla = document.getElementById("rllConcTabla");
+  if (!vis.length) { tabla.innerHTML = '<p class="status">No hay filas con ese filtro.</p>'; return; }
+  const disp = (l) => (rllEsControl(l) ? "📟 Control" : "🔑 Tag");
+  tabla.innerHTML = `<table class="ven-tabla"><thead><tr><th>Resultado</th><th>En la estación</th><th>Registrado por el vecino</th><th>Qué hacer</th></tr></thead><tbody>${vis.map((f) => {
+    const R = RLL_CONC_RES[f.res];
+    const e = f.est, d = f.d;
+    const enEst = e ? `<span style="font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:14px;">${escapeHtmlAdmin(e.tag ? (rllEsControlEstacion(e) ? e.tag : (rllClaveTag(e.tag).includes(":") ? rllClaveTag(e.tag) : e.tag)) : "—")}</span>${e.usuario ? ` · usuario <b>${escapeHtmlAdmin(e.usuario)}</b>` : ""}<br><span style="color:#55595F;">${escapeHtmlAdmin([[e.nombre, e.apellido].filter(Boolean).join(" "), [e.piso ? e.piso + "°" : "", e.depto].filter(Boolean).join(" "), e.tipo].filter(Boolean).join(" · "))}</span>` : '<span style="color:#8A5A00;">No está en la estación</span>';
+    const reg = d ? `${disp(d.l)} <span style="font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:14px;">${escapeHtmlAdmin(d.l.tag ? (rllEsControl(d.l) ? d.l.tag : (rllTagCalculado(d.l.tag) && !RLL_FORMATO_TAG.test(d.l.tag) ? rllTagCalculado(d.l.tag) : d.l.tag)) : "s/n")}</span>${d.l.usuario ? ` · usuario <b>${escapeHtmlAdmin(d.l.usuario)}</b>` : ""}<br><span style="color:#55595F;">${escapeHtmlAdmin(d.r.nombre)} · ${escapeHtmlAdmin(rllUnidad(d.r))} · ${escapeHtmlAdmin(d.r.telefono)}</span>${d.perdida ? `<br><span style="color:#8C1D18;">La reportó perdida${d.l.detalle ? ": “" + escapeHtmlAdmin(d.l.detalle) + "”" : ""}</span>` : ""}` : '<span style="color:#B3261E;">Nadie la registró</span>';
+    let accion = "";
+    if (f.res === "encontrada") accion = `<span style="color:#1F6B34;">${d.l.estado === "conciliada" ? "✓ Conciliada" : "Coincide"}${f.por === "usuario" ? " (por N° de usuario)" : ""}</span>`;
+    else if (f.res === "falta") accion = '<span style="color:#8A5A00;">Cargarla en la estación (o revisar el número)</span>';
+    else {
+      const dec = rllConc.filas[f.i].decision;
+      accion = dec
+        ? `<span class="ven-estado ${dec === "mantener" ? "sin" : dec === "hecho" ? "ok" : "vencido"}">${RLL_DECISIONES[dec]}</span>${dec === "dar_de_baja" || dec === "borrar" ? ` <button type="button" class="btn-secondary-admin rll-dec" data-i="${f.i}" data-d="hecho" style="width:auto;padding:4px 10px;font-size:12px;">✓ Ya lo hice</button>` : ""} <button type="button" class="btn-secondary-admin rll-dec" data-i="${f.i}" data-d="" style="width:auto;padding:4px 8px;font-size:12px;border-color:transparent;text-decoration:underline;">cambiar</button>`
+        : `<button type="button" class="rll-dec" data-i="${f.i}" data-d="dar_de_baja" style="width:auto;padding:5px 10px;font-size:12px;background:#B3261E;">Dar de baja</button> <button type="button" class="btn-secondary-admin rll-dec" data-i="${f.i}" data-d="borrar" style="width:auto;padding:5px 10px;font-size:12px;color:#B3261E;border-color:#B3261E;">Borrar</button> <button type="button" class="btn-secondary-admin rll-dec" data-i="${f.i}" data-d="mantener" style="width:auto;padding:5px 10px;font-size:12px;">Mantener</button>`;
+    }
+    return `<tr style="background:${R.fondo};">
+      <td style="border-left:4px solid ${R.color};"><b style="color:${R.color};">${R.txt}</b>${f.nota ? `<br><span style="font-size:11.5px;color:#55595F;">⚠ ${escapeHtmlAdmin(f.nota)}</span>` : ""}</td>
+      <td>${enEst}</td><td>${reg}</td><td style="white-space:nowrap;">${accion}</td></tr>`;
+  }).join("")}</tbody></table>`;
+  tabla.querySelectorAll(".rll-dec").forEach((b) => b.addEventListener("click", () => rllDecidir([Number(b.dataset.i)], b.dataset.d)));
+}
+
+async function rllDecidir(indices, decision) {
+  if (!indices.length) return;
+  try {
+    const r = await fetch("/api/datos?coleccion=registro_llaves", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "decision_conciliacion", edificio: rllEdificioActual.codigo, indices, decision }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Error");
+    indices.forEach((i) => { if (rllConc.filas[i]) rllConc.filas[i].decision = decision; });
+    renderRllConciliacion();
+  } catch (e) { alert("No se pudo guardar: " + e.message); }
+}
+
+// ExcelJS (para el Excel con colores) se carga recién cuando hace falta.
+function rllCargarExcelJS() {
+  if (window.ExcelJS) return Promise.resolve();
+  return new Promise((ok, mal) => {
+    const s = document.createElement("script");
+    s.src = "vendor/exceljs.min.js";
+    s.onload = () => ok(); s.onerror = () => mal(new Error("no se pudo cargar el generador de Excel"));
+    document.head.appendChild(s);
+  });
+}
+document.getElementById("rllConcExcelBtn").addEventListener("click", async () => {
+  const btn = document.getElementById("rllConcExcelBtn");
+  btn.disabled = true; const txtOriginal = btn.textContent; btn.textContent = "Armando el Excel...";
+  try {
+    await rllCargarExcelJS();
+    const filas = rllCompararConciliacion();
+    const libro = new ExcelJS.Workbook();
+    libro.creator = "SAT";
+    const encabezar = (hoja) => {
+      const h = hoja.getRow(1);
+      h.font = { bold: true, color: { argb: "FFF6B828" } };
+      h.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0E0F10" } };
+      h.alignment = { vertical: "middle", wrapText: true };
+      h.height = 30;
+      hoja.views = [{ state: "frozen", ySplit: 1 }];
+      hoja.autoFilter = { from: { row: 1, column: 1 }, to: { row: 1, column: hoja.columns.length } };
+    };
+    const siNo = (b) => (b ? "Sí" : "No");
+    const resumenPersona = (r) => {
+      const ll = r.llaves || [];
+      return { tags: ll.filter((l) => !rllEsControl(l)), controles: ll.filter(rllEsControl) };
+    };
+    const tagMostrar = (l) => (!l ? "" : rllEsControl(l) ? (l.tag || "") : (RLL_FORMATO_TAG.test(l.tag || "") ? l.tag : (rllTagCalculado(l.tag) || l.tag || "")));
+
+    // Hoja 1: una fila por llave/control, coloreada según el resultado.
+    const h1 = libro.addWorksheet("Conciliación");
+    h1.columns = [
+      { header: "Resultado", key: "res", width: 30 }, { header: "Qué hacer", key: "hacer", width: 26 },
+      { header: "Nombre", key: "nombre", width: 18 }, { header: "Apellido", key: "apellido", width: 18 },
+      { header: "Teléfono", key: "tel", width: 16 }, { header: "Mail", key: "mail", width: 24 },
+      { header: "Piso", key: "piso", width: 7 }, { header: "Depto", key: "depto", width: 8 }, { header: "Cochera", key: "cochera", width: 9 },
+      { header: "Dispositivo", key: "disp", width: 13 }, { header: "N° de tag / control", key: "tag", width: 18 }, { header: "N° de usuario", key: "usuario", width: 12 },
+      { header: "Tiene tag", key: "tieneTag", width: 10 }, { header: "Tiene control remoto", key: "tieneCtl", width: 12 }, { header: "Tag + control", key: "ambos", width: 11 },
+      { header: "Estación: nombre", key: "eNombre", width: 22 }, { header: "Estación: N° de llave", key: "eTag", width: 18 }, { header: "Estación: N° de usuario", key: "eUsuario", width: 12 },
+      { header: "Observaciones", key: "obs", width: 40 },
+    ];
+    const orden = { perdida: 0, no_registrada: 1, falta: 2, encontrada: 3 };
+    filas.slice().sort((a, b) => orden[a.res] - orden[b.res]).forEach((f) => {
+      const R = RLL_CONC_RES[f.res], d = f.d, e = f.est;
+      const dec = e && rllConc.filas[f.i] ? rllConc.filas[f.i].decision : "";
+      // En una llave reportada perdida, los datos de la fila son los de la estación
+      // (el dueño original); quién la reportó va en Observaciones.
+      const reg = d && !d.perdida ? d.r : null;
+      const [nom, ape] = reg ? rllPartirNombre(reg.nombre) : (e && e.apellido ? [e.nombre, e.apellido] : rllPartirNombre(e && e.nombre));
+      const pr = reg ? resumenPersona(reg) : null;
+      const hacer = f.res === "encontrada" ? (d.l.estado === "conciliada" ? "OK — conciliada" : "OK") : f.res === "falta" ? "Cargar en la estación" : (RLL_DECISIONES[dec] || "Dar de baja o borrar");
+      const fila = h1.addRow({
+        res: R.txt, hacer, nombre: nom, apellido: ape,
+        tel: reg ? reg.telefono : (e && e.telefono) || "", mail: reg ? reg.email || "" : "",
+        piso: reg ? reg.piso || "" : (e && e.piso) || "", depto: reg ? reg.unidad || "" : (e && e.depto) || "", cochera: reg ? reg.cochera || "" : "",
+        disp: d && !d.perdida ? (rllEsControl(d.l) ? "Control remoto" : "Tag") : (e && rllEsControlEstacion(e) ? "Control remoto" : "Tag"),
+        tag: d && !d.perdida ? tagMostrar(d.l) : (e ? (rllEsControlEstacion(e) ? e.tag : (rllClaveTag(e.tag).includes(":") ? rllClaveTag(e.tag) : e.tag)) : ""),
+        usuario: (d && !d.perdida && d.l.usuario) || (e && e.usuario) || "",
+        tieneTag: pr ? siNo(pr.tags.length) : "", tieneCtl: pr ? siNo(pr.controles.length) : "", ambos: pr ? siNo(pr.tags.length && pr.controles.length) : "",
+        eNombre: e ? [e.nombre, e.apellido].filter(Boolean).join(" ") : "", eTag: e ? e.tag : "", eUsuario: e ? e.usuario : "",
+        obs: [f.nota, d && d.perdida ? `Reportada perdida por ${d.r.nombre} (${rllUnidad(d.r)}, ${d.r.telefono})${d.l.detalle ? ": " + d.l.detalle : ""}` : "", d && d.l.nota ? "Nota: " + d.l.nota : ""].filter(Boolean).join(" · "),
+      });
+      fila.fill = { type: "pattern", pattern: "solid", fgColor: { argb: R.argb } };
+      fila.getCell("res").font = { bold: true };
+      ["tag", "eTag"].forEach((k) => { fila.getCell(k).font = { name: "Consolas" }; });
+    });
+    encabezar(h1);
+
+    // Hoja 2: una fila por persona registrada.
+    const h2 = libro.addWorksheet("Por persona");
+    h2.columns = [
+      { header: "Nombre", key: "nombre", width: 18 }, { header: "Apellido", key: "apellido", width: 18 }, { header: "Teléfono", key: "tel", width: 16 }, { header: "Mail", key: "mail", width: 24 },
+      { header: "Titular / inquilino", key: "rel", width: 14 }, { header: "Piso", key: "piso", width: 7 }, { header: "Depto", key: "depto", width: 8 }, { header: "Cochera", key: "cochera", width: 9 },
+      { header: "N° de tag", key: "tags", width: 22 }, { header: "N° de control", key: "ctls", width: 18 }, { header: "N° de usuario", key: "usuarios", width: 14 },
+      { header: "Tiene tag", key: "tieneTag", width: 10 }, { header: "Tiene control remoto", key: "tieneCtl", width: 12 }, { header: "Tag + control", key: "ambos", width: 11 },
+      { header: "En la estación", key: "enEst", width: 22 }, { header: "Registrado el", key: "fecha", width: 16 },
+    ];
+    const rel = { titular: "Titular", inquilino: "Inquilino", otro: "Otro" };
+    const resPorDisp = new Map(filas.filter((f) => f.d).map((f) => [f.d, f.res]));
+    rllRegistros.slice().sort((a, b) => String(a.piso).localeCompare(String(b.piso), "es", { numeric: true }) || String(a.unidad).localeCompare(String(b.unidad), "es", { numeric: true })).forEach((r) => {
+      const [nom, ape] = rllPartirNombre(r.nombre);
+      const pr = resumenPersona(r);
+      const suyos = rllFilas().filter((d) => d.r === r && !d.perdida);
+      const enc = suyos.filter((d) => [...resPorDisp.entries()].some(([k, v]) => k.r === r && k.i === d.i && !k.perdida && v === "encontrada")).length;
+      const fila = h2.addRow({
+        nombre: nom, apellido: ape, tel: r.telefono, mail: r.email || "", rel: (rel[r.relacion] || "") + (r.relacion_otro ? ` (${r.relacion_otro})` : ""),
+        piso: r.piso || "", depto: r.unidad || "", cochera: r.cochera || "",
+        tags: pr.tags.map(tagMostrar).join(", "), ctls: pr.controles.map((l) => l.tag || "s/n").join(", "),
+        usuarios: (r.llaves || []).map((l) => l.usuario).filter(Boolean).join(", "),
+        tieneTag: siNo(pr.tags.length), tieneCtl: siNo(pr.controles.length || r.control_remoto === "si"), ambos: siNo(pr.tags.length && (pr.controles.length || r.control_remoto === "si")),
+        enEst: suyos.length ? (enc === suyos.length ? "Todo encontrado" : `${enc} de ${suyos.length} encontrados`) : "",
+        fecha: rllFecha(r.fecha),
+      });
+      const argb = !suyos.length ? null : enc === suyos.length ? RLL_CONC_RES.encontrada.argb : RLL_CONC_RES.falta.argb;
+      if (argb) fila.getCell("enEst").fill = { type: "pattern", pattern: "solid", fgColor: { argb } };
+    });
+    encabezar(h2);
+
+    // Hoja 3: resumen
+    const h3 = libro.addWorksheet("Resumen");
+    h3.columns = [{ header: "Concepto", key: "c", width: 40 }, { header: "Cantidad", key: "n", width: 12 }];
+    h3.addRow({ c: "Edificio", n: rllEdificioActual.nombre });
+    h3.addRow({ c: "Archivo de la estación", n: rllConc.archivo || "" });
+    h3.addRow({ c: "Generado", n: rllFecha(new Date().toISOString()) });
+    h3.addRow({ c: "Personas registradas", n: rllRegistros.length });
+    Object.entries(RLL_CONC_RES).forEach(([k, R]) => {
+      const fila = h3.addRow({ c: R.txt, n: filas.filter((f) => f.res === k).length });
+      fila.fill = { type: "pattern", pattern: "solid", fgColor: { argb: R.argb } };
+    });
+    encabezar(h3);
+
+    const buf = await libro.xlsx.writeBuffer();
+    const url = URL.createObjectURL(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = `conciliacion_${rllEdificioActual.nombre.replace(/[^\w]+/g, "_")}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  } catch (e) { alert("No se pudo armar el Excel: " + e.message); }
+  btn.disabled = false; btn.textContent = txtOriginal;
+});
 
 async function cargarNotasAdmin() {
   notasAdminStatus.className = "status";

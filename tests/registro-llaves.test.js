@@ -82,3 +82,23 @@ test("registro de llaves: una persona carga tag y control de cochera; el número
   // Un control sin cochera no tiene sentido
   assert.strictEqual((await llamar(manejarPublico, { method: "POST", body: { ...valido, llaves: [{ tipo: "control", tag: "" }] } }, gh)).status, 400);
 });
+
+test("registro de llaves: conciliación guarda el listado de la estación y las decisiones (y las conserva al volver a subirlo)", async () => {
+  const gh = ghFalso();
+  const admin = { nombre: "Seba", rol: "admin" };
+  const filas = [{ tag: "069:02561", usuario: "125" }, { tag: "150:22222", usuario: "90" }];
+  const g = await llamar(manejarAdmin, { method: "POST", body: { accion: "guardar_conciliacion", edificio: "muelle11-k7p3", archivo: "est.xlsx", filas } }, admin, gh);
+  assert.strictEqual(g.status, 200);
+  assert.strictEqual(g.data.filas.length, 2);
+  const d = await llamar(manejarAdmin, { method: "POST", body: { accion: "decision_conciliacion", edificio: "muelle11-k7p3", indices: [1], decision: "borrar" } }, admin, gh);
+  assert.strictEqual(d.status, 200);
+  const g2 = await llamar(manejarAdmin, { method: "POST", body: { accion: "guardar_conciliacion", edificio: "muelle11-k7p3", archivo: "est2.xlsx", filas: [...filas, { tag: "151:33333" }] } }, admin, gh);
+  assert.deepStrictEqual(g2.data.filas.map((f) => f.decision), ["", "borrar", ""]);
+  const leido = await llamar(manejarAdmin, { method: "GET", query: { edificio: "muelle11-k7p3", conciliacion: "1" } }, admin, gh);
+  assert.strictEqual(leido.data.archivo, "est2.xlsx");
+  // estados en lote
+  await llamar(manejarPublico, { method: "POST", body: valido }, gh);
+  const regs = (await llamar(manejarAdmin, { method: "GET", query: { edificio: "muelle11-k7p3" } }, admin, gh)).data;
+  const l = await llamar(manejarAdmin, { method: "POST", body: { accion: "estado_lote", edificio: "muelle11-k7p3", cambios: [{ id: regs[0].id, indice: 0, estado: "conciliada" }] } }, admin, gh);
+  assert.strictEqual(l.data.aplicados, 1);
+});

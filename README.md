@@ -3200,6 +3200,17 @@ aviso de números repetidos, Excel y el botón **Cartel QR** que arma la
 hoja A4 lista para imprimir. Desde ahí también se agregan edificios
 nuevos (cada uno con su código y su QR).
 
+**Conciliación con la estación:** en la misma pestaña se sube el Excel
+(o CSV) con los usuarios que tiene la estación de monitoreo. Detecta qué
+columna es cada dato (se puede corregir) y compara por N° de tag —en
+cualquier forma: 069:02561, 069,02561, el número largo de 10 cifras— y,
+si no hay, por N° de usuario. Muestra en color: encontradas, no
+registradas (dar de baja / borrar / mantener), reportadas perdidas y las
+que faltan cargar en la estación. Lo decidido queda guardado y se
+conserva si se vuelve a subir el archivo. "Descargar resultado" arma un
+Excel con colores (hojas Conciliación, Por persona y Resumen) usando
+`vendor/exceljs.min.js` (MIT), que se carga solo al descargar.
+
 Se guarda en el repo de datos (`registro-llaves/`), sin función nueva
 en `/api` (ver `lib/registro-llaves.js`). MUELLE 11 viene precargado
 con el código `muelle11-k7p3`.
