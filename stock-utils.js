@@ -112,6 +112,28 @@
     return Object.values(r).sort((x, y) => (!x.marca) - (!y.marca) || y.codigos.length - x.codigos.length || x.marca.localeCompare(y.marca, "es"));
   }
 
+  // Artículo del catálogo que corresponde a un texto libre («Batería 12V 7A» -> BATERIA 12V 7AH).
+  // Solo si hay uno claro: todas las palabras del texto están en la descripción. Si hay varios,
+  // gana el único que esté entre los «preferidos» (ej. los que tiene el técnico). Si no, «».
+  const PALABRAS_VACIAS = new Set(["DE", "DEL", "LA", "EL", "LOS", "LAS", "PARA", "CON", "SIN", "POR", "X", "Y", "EN", "UN", "UNA", "MARCA", "MODELO", "MOD"]);
+  const palabrasDe = (t) => (sinAcentos(t).toUpperCase().match(/[A-Z0-9]+/g) || []).filter((x) => !PALABRAS_VACIAS.has(x));
+  function buscarArticuloPorTexto(catalogo, texto, preferidos) {
+    const q = palabrasDe(texto);
+    if (!q.length || q.join("").length < 4) return "";
+    const coincide = (a, b) => a === b || (Math.min(a.length, b.length) >= 2 && (a.startsWith(b) || b.startsWith(a)) && /\d/.test(a) === /\d/.test(b));
+    const candidatos = Object.values((catalogo && catalogo.articulos) || {}).filter((art) => {
+      if (/^(sim|herramienta|no)$/.test(art.tipo) || art.baja) return false;
+      const d = palabrasDe(art.d);
+      return q.every((x) => d.some((y) => coincide(x, y)));
+    });
+    if (candidatos.length === 1) return candidatos[0].c;
+    const pref = candidatos.filter((a) => (preferidos || []).includes(a.c));
+    if (pref.length === 1) return pref[0].c;
+    // Descripción idéntica (salvo mayúsculas y acentos)
+    const igual = candidatos.filter((a) => palabrasDe(a.d).join(" ") === q.join(" "));
+    return igual.length === 1 ? igual[0].c : "";
+  }
+
   function clasificarArticulo(desc) {
     const D = String(desc || "").toUpperCase();
     if (esDescripcionSim(D)) return "sim";
@@ -324,7 +346,7 @@
     (mov.unidades || []).forEach((t) => {
       const antes = s.unidades[t] || {}, f = mov.fecha || new Date().toISOString();
       // Historia del equipo (para garantía: a qué cliente fue, cuándo, con qué presupuesto).
-      const h = [...(antes.h || []), { f, a: mov.a || "baja", ...(mov.de ? { de: mov.de } : {}), tipo: mov.tipo || "", ...(mov.por ? { por: mov.por } : {}), ...(mov.presupuesto ? { presupuesto: mov.presupuesto } : {}), ...(mov.motivo ? { motivo: String(mov.motivo).slice(0, 120) } : {}) }].slice(-30);
+      const h = [...(antes.h || []), { f, a: mov.a || "baja", ...(mov.de ? { de: mov.de } : mov.origen ? { de: mov.origen } : {}), tipo: mov.tipo || "", ...(mov.por ? { por: mov.por } : {}), ...(mov.presupuesto ? { presupuesto: mov.presupuesto } : {}), ...(mov.motivo ? { motivo: String(mov.motivo).slice(0, 120) } : {}) }].slice(-30);
       s.unidades[t] = { ...antes, c: mov.c, u: mov.a || "baja", f, h, ...(mov.prov ? { prov: mov.prov } : {}) };
     });
     return s;
@@ -418,7 +440,8 @@
   //  { usar: null }             -> nada útil (links, el código del modelo de la caja que ya se está escaneando)
   // pendiente: el artículo actual tiene cajas esperando su N° de serie. Si no, un código que no tiene
   // el formato aprendido se ignora (es de otra caja que todavía no se identificó con su etiqueta).
-  function elegirCodigoDelCuadro(textos, catalogo, saldos, actual, pendiente) {
+  // enCuadro: todos los códigos a la vista en ese cuadro (los ya procesados también), como contexto.
+  function elegirCodigoDelCuadro(textos, catalogo, saldos, actual, pendiente, enCuadro) {
     const arts = (catalogo && catalogo.articulos) || {};
     const lista = [...new Set((textos || []).map(limpiarCodigo).filter(Boolean))];
     const info = lista.map((t) => ({ t, r: interpretarCodigo(t, catalogo, saldos, actual) })).filter((x) => x.r.tipo !== "ignorar");
@@ -437,7 +460,7 @@
       const conFormato = candidatos.filter((x) => coincideFormato(x.t, a.formatos) === true);
       if (conFormato.length) return { usar: conFormato[0].t };
       // Junto al código del modelo ya aprendido, el único otro código de la caja es el N° de serie.
-      const vioModelo = info.some((x) => x.r.tipo === "articulo" && x.r.c === actual && x.r.via === "modelo");
+      const vioModelo = [...lista, ...((enCuadro || []).map(limpiarCodigo))].some((t) => { const r = interpretarCodigo(t, catalogo, saldos, actual); return r.tipo === "articulo" && r.c === actual && r.via === "modelo"; });
       if (candidatos.length === 1 && vioModelo && !(a.formatos || []).length) return { usar: candidatos[0].t };
       // Sin un formato que coincida: que la persona confirme cuál es (una vez; el resto se aprende).
       // (los que parecen el modelo van aparte: al confirmar el N°, quedan aprendidos como modelo)
@@ -612,7 +635,8 @@
       if (hay > 0) { movs.push(base(x, `${i}a`, hay, de, pv)); resto -= hay; }
       const sinAsignar = /^com:/.test(de) ? (s.ubic["com:Sin asignar"] || {})[x.c] || 0 : 0;
       if (sinAsignar > 0) { const n = Math.min(sinAsignar, resto); movs.push(base(x, `${i}b`, n, "com:Sin asignar", pv)); resto -= n; }
-      if (resto > 0) movs.push(base(x, `${i}c`, Math.round(resto * 1000) / 1000, null, { ...pv, motivo: `${op.motivo ? op.motivo + " · " : ""}no figuraba en la APP en ${nombreUbicacion(de)}` }));
+      // (queda anotado de qué cliente vino, para la garantía, aunque no reste cantidad de ahí)
+      if (resto > 0) movs.push(base(x, `${i}c`, Math.round(resto * 1000) / 1000, null, { ...pv, origen: de, motivo: `${op.motivo ? op.motivo + " · " : ""}no figuraba en la APP en ${nombreUbicacion(de)}` }));
       if (x.unidades.length) movs[movs.length - 1].unidades = x.unidades;
     });
     movs.forEach((m) => { s = aplicarMovimiento(s, m); });
@@ -1069,6 +1093,8 @@
   function instalacionDeUnidad(u) {
     const h = (u && u.h) || [];
     for (let i = h.length - 1; i >= 0; i--) if (/^(cli|com):/.test(h[i].a)) return { cliente: h[i].a.replace(/^(cli|com):/, ""), comodato: /^com:/.test(h[i].a), fecha: h[i].f, presupuesto: h[i].presupuesto || "" };
+    // Instalado antes de que la APP llevara el stock: solo se sabe de qué cliente se retiró.
+    for (let i = h.length - 1; i >= 0; i--) if (/^(cli|com):/.test(h[i].de || "")) return { cliente: h[i].de.replace(/^(cli|com):/, ""), comodato: /^com:/.test(h[i].de), fecha: "", retirado: h[i].f, presupuesto: "" };
     return null;
   }
   // Lo que tiene una persona: su ubicación, lo que le llega y lo que devolvió y falta confirmar.
@@ -1095,7 +1121,7 @@
     return mejor;
   }
 
-  const api = { codigoProveedor, nombreProveedor, STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, datosLimpios, buscarPorDatos, infoSerie, seriesEn, controlarSalidaConSerie, saludStock, esCodigoIgnorable, elegirCodigoDelCuadro, pareceModelo, sugerirMarca, resumenMarcas, limpiarMarca, claveMarca, registrarUnidades, movimientoParaOficina, GARANTIA_ESTADOS, instalacionDeUnidad, abrirGarantias, moverStock, cerrarEnvio, stockDePersona, auditarStock, recalcularDesdeMovimientos, movimientosDeRegularizacion, retiradosParaDevolver, avanceSolicitud, anotarPresupuestos, pendienteDePresupuesto, tableroStock, claseMovimiento };
+  const api = { codigoProveedor, nombreProveedor, STOCK_TIPOS, esDescripcionSim, STOCK_CONC_CATEGORIAS, codigoArticulo, leerEtiquetaSat, esEanValido, clasificarArticulo, medidaArticulo, columnasOficina, leerListadoOficina, nombreUbicacion, totalesPorArticulo, unidadesPorArticulo, conciliarStock, articulosParaPedir, pedidosCumplidos, aplicarMovimiento, filasDelListado, numStock: num, limpiarCodigo, formaCodigo, coincideFormato, agregarFormato, interpretarCodigo, datosLimpios, buscarPorDatos, infoSerie, seriesEn, controlarSalidaConSerie, saludStock, esCodigoIgnorable, elegirCodigoDelCuadro, pareceModelo, buscarArticuloPorTexto, sugerirMarca, resumenMarcas, limpiarMarca, claveMarca, registrarUnidades, movimientoParaOficina, GARANTIA_ESTADOS, instalacionDeUnidad, abrirGarantias, moverStock, cerrarEnvio, stockDePersona, auditarStock, recalcularDesdeMovimientos, movimientosDeRegularizacion, retiradosParaDevolver, avanceSolicitud, anotarPresupuestos, pendienteDePresupuesto, tableroStock, claseMovimiento };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else Object.assign(raiz, api);
 })(typeof window !== "undefined" ? window : globalThis);

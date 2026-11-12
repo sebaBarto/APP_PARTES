@@ -1278,7 +1278,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
       solicitudes.forEach((x) => x.items.forEach((y) => { const a = arts[y.c]; if (a && !sub[y.c]) sub[y.c] = { c: y.c, d: a.d, tipo: a.tipo, medida: a.medida || "unidades", alias: a.alias || [], formatos: a.formatos || [] }; }));
       // Las camionetas son depósitos móviles: cualquier técnico ve qué tienen, para tomar o dejar material.
       const camionetas = {}, sd = sal.data || {};
-      Object.keys(sd.ubic || {}).concat(Object.keys(sd.stockInicialTec || {})).filter((u) => /^veh:/.test(u)).forEach((u) => {
+      [...new Set([...Object.keys(sd.ubic || {}), ...Object.keys(sd.stockInicialTec || {}), ...(sd.vehiculos || []).map((v) => `veh:${v}`)])].filter((u) => /^veh:/.test(u)).forEach((u) => {
         const tiene = Object.fromEntries(Object.entries((sd.ubic || {})[u] || {}).filter(([, n]) => n > 0));
         const unidades = Object.entries(sd.unidades || {}).filter(([, x]) => x && x.u === u).map(([tracking, x]) => ({ tracking, c: x.c }));
         camionetas[u.slice(4)] = { tiene, unidades };
@@ -1402,7 +1402,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
         if (!x || (x.estado !== "pendiente" && x.estado !== "lista")) return { error: "Ese pedido ya se cerró", status: 409 };
         if (b.accion === "cancelar_pedido") {
           if (x.por !== quien && !esResp) return { error: "Ese pedido no es tuyo", status: 403 };
-          Object.assign(x, { estado: "cancelada", cerrada: ahora, cerrada_por: quien });
+          Object.assign(x, { estado: "cancelada", cerrada: ahora, cerrada_por: quien, ...(b.motivo ? { motivo_cierre: String(b.motivo).replace(/\s+/g, " ").trim().slice(0, 200) } : {}) });
         } else {
           if (!esResp) return { error: "Necesitás el permiso «Responsable de stock»", status: 403 };
           Object.assign(x, { estado: "lista", lista: ahora, preparo: quien });
@@ -1410,6 +1410,9 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
         sol = x;
         return { data: { ...sal, solicitudes: lista }, respuesta: { solicitud: x } };
       }, `Stock: pedido de material ${b.accion === "cancelar_pedido" ? "cancelado" : "listo"} (por ${quien})`);
+      if (!r.error && sol && b.accion === "cancelar_pedido" && sol.por !== quien) {
+        try { const { enviarASeleccionados } = require("../lib/push-sender"); await enviarASeleccionados([sol.por], { titulo: "El depósito cerró tu pedido", cuerpo: `${quien}: ${sol.motivo_cierre || "no se va a preparar"}`.slice(0, 200), url: "/?ir=mistock" }); } catch (e) { /* opcional */ }
+      }
       if (!r.error && sol && b.accion === "pedido_listo") {
         try { const { enviarASeleccionados } = require("../lib/push-sender"); await enviarASeleccionados([sol.por], { titulo: "Tu material está listo", cuerpo: `${quien} preparó tu pedido: pasá por el depósito y mostrá tu código (Mi stock).`, url: "/?ir=mistock" }); } catch (e) { /* opcional */ }
       }
@@ -1447,7 +1450,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
       const r = await stockActualizar(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }, (sal) => {
         if (opId && (sal.ops || []).includes(opId)) { duplicado = true; return { error: "duplicado", status: 200 }; }
         let s2 = sal;
-        const movs = [], aprobar = [], instalados = [], retirados = [];
+        const movs = [], aprobar = [], instalados = [], retirados = [], noRetirados = [];
         const motivo = `Parte${parte ? " N° " + parte : ""}`;
         // 1) Usados de Mi stock: de a uno, así lo que no se pueda (ya no lo tiene) queda para aprobar.
         (Array.isArray(b.usados) ? b.usados.slice(0, 200) : []).forEach((x) => {
@@ -1461,14 +1464,23 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
           const it = { c: S.codigoArticulo(x.c), cant: Number(x.cant) || 0, unidades: x.unidades || [] };
           const m = S.moverStock(s2, [it], { tipo: "retirado_parte", de: destino, a: tec, por: quien, fecha: ahora, motivo: `${motivo}${x.fallado ? " · fallado: " + String(x.falla || "").slice(0, 120) : ""}`, deFlexible: true }, cat);
           if (!m.error) { s2 = m.saldos; movs.push(...m.movs); retirados.push(it.c); }
+          else noRetirados.push(`${((cat.articulos || {})[it.c] || {}).d || it.c}: ${m.error}`);
         });
         // 3) Lo que no estaba en su stock: para aprobar.
-        if (sal.inicializado) (Array.isArray(b.sinStock) ? b.sinStock.slice(0, 200) : []).forEach((x) => aprobar.push({ c: S.codigoArticulo(x.c) || "", cant: Number(x.cant) || 1, unidades: x.unidades || [], texto: String(x.texto || "").slice(0, 160) }));
+        // (se propone el artículo que corresponde al texto, mirando primero lo que tiene el técnico y las
+        // camionetas: así el depósito solo confirma de dónde salió)
+        const cerca = Object.keys({ ...((s2.ubic || {})[tec] || {}), ...Object.assign({}, ...Object.entries(s2.ubic || {}).filter(([u]) => /^veh:/.test(u)).map(([, v]) => v)) });
+        if (sal.inicializado) (Array.isArray(b.sinStock) ? b.sinStock.slice(0, 200) : []).forEach((x) => {
+          const texto = String(x.texto || "").slice(0, 160);
+          let c = S.codigoArticulo(x.c) || "", sugerido = false;
+          if (!c || !(cat.articulos || {})[c]) { c = S.buscarArticuloPorTexto(cat, texto, cerca); sugerido = !!c; }
+          aprobar.push({ c, cant: Number(x.cant) || 1, unidades: x.unidades || [], texto, ...(sugerido ? { sugerido: true } : {}) });
+        });
         const nuevos = aprobar.map((x, i) => ({ id: `${Date.now().toString(36)}-a${i}`, fecha: ahora, por: quien, parte, cliente, destino, presupuesto, ...x }));
         s2 = { ...s2, aprobar: [...nuevos, ...(sal.aprobar || [])].slice(0, 1000) };
         if (opId) s2.ops = [opId, ...(sal.ops || [])].slice(0, 300);
         movsTodos = movs;
-        resumen = { instalados: instalados.length, retirados: retirados.length, paraAprobar: nuevos.length };
+        resumen = { instalados: instalados.length, retirados: retirados.length, paraAprobar: nuevos.length, ...(noRetirados.length ? { noRetirados } : {}) };
         return { data: s2, respuesta: resumen, movs };
       }, `Stock: materiales del parte ${parte} (por ${quien})`);
       if (duplicado) { res.status(200).json({ ok: true, duplicado: true }); return; }
@@ -1935,10 +1947,11 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
       const opId = String(b.op_id || "").slice(0, 60);
       const r = await stockActualizar(STOCK_SAL, { ubic: {}, unidades: {}, pedidos: {} }, (sal) => {
         if (opId && (sal.ops || []).includes(opId)) { duplicado = true; return { error: "duplicado", status: 200 }; }
-        if (!veh || !(((sal.ubic || {})[ubicVeh]) || ((sal.stockInicialTec || {})[ubicVeh]))) return { error: "Esa camioneta no tiene stock cargado (se carga desde el panel)", status: 400 };
+        if (!veh || !(((sal.ubic || {})[ubicVeh]) || ((sal.stockInicialTec || {})[ubicVeh]) || (sal.vehiculos || []).includes(veh))) return { error: "Esa camioneta no tiene stock cargado (se carga desde el panel)", status: 400 };
         const x = S.moverStock(sal, Array.isArray(b.items) ? b.items.slice(0, 500) : [], { tipo: tomar ? "de_camioneta" : "a_camioneta", de: tomar ? ubicVeh : ubicTec, a: tomar ? ubicTec : ubicVeh, por: quien, fecha: ahora, motivo: String(b.motivo || "").slice(0, 200), confirmar: false }, cat);
         if (x.error) return { error: x.error, status: 409 };
         resultado = x;
+        x.saldos.vehiculos = [...new Set([...(sal.vehiculos || []), veh])].slice(-40); // sigue figurando aunque quede vacía
         if (opId) x.saldos.ops = [opId, ...(sal.ops || [])].slice(0, 300);
         return { data: x.saldos, respuesta: { movimientos: x.movs.length }, movs: x.movs };
       }, `Stock: ${quien} ${tomar ? "toma de" : "deja en"} ${veh}`);
@@ -1990,6 +2003,9 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
         const x = S.moverStock(sal, Array.isArray(b.items) ? b.items.slice(0, 500) : [], { tipo: enMano ? "entrega_mano" : tipo, de, a, por: quien, fecha: ahora, motivo: [motivoMano, String(b.motivo || "").slice(0, 200)].filter(Boolean).join(" · "), confirmar, fallado: fallado && b.accion === "devolver", falla, deFlexible: /^(cli|com):/.test(de) && (a === "dep" || a === "gar"), presupuesto: /^(cli|com):/.test(a) || noUsado ? String(b.presupuesto || "").trim().slice(0, 30) : "" }, cat);
         if (x.error) return { error: x.error, status: 409 };
         resultado = x;
+        // Un vehículo que recibe (o entrega) stock queda en la lista de camionetas aunque después quede vacío.
+        const vehs = [de, a].filter((u) => /^veh:/.test(u)).map((u) => u.slice(4));
+        if (vehs.length) x.saldos.vehiculos = [...new Set([...(sal.vehiculos || []), ...vehs])].slice(-40);
         S.abrirGarantias(x.saldos, x.movs, { falla, por: quien });
         if (opId) x.saldos.ops = [opId, ...(sal.ops || [])].slice(0, 300);
         // Retiros de clientes que la APP no tenía: quedan para revisar en Salud del stock.
@@ -2028,7 +2044,7 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
         if (!mio && !esResp) return { error: "Este envío no es para vos", status: 403 };
         // Una devolución de un equipo fallado va a Garantía (salvo que el depósito elija otra cosa).
         const destino = e.a === "dep" ? (b.destino === "dep" || b.destino === "gar" ? b.destino : e.fallado ? "gar" : undefined) : undefined;
-        const x = S.cerrarEnvio(sal, b.id, { accion: b.accion_envio === "rechazar" ? "rechazar" : "recibi", items: Array.isArray(b.items) ? b.items : undefined, por: mio ? quien : `${quien} (por ${e.a.replace(/^tec:/, "")})`, fecha: ahora, motivo: String(b.motivo || "").slice(0, 200), destino });
+        const x = S.cerrarEnvio(sal, b.id, { accion: b.accion_envio === "rechazar" ? "rechazar" : "recibi", items: Array.isArray(b.items) ? b.items : undefined, por: mio || e.a === "dep" ? quien : `${quien} (por ${e.a.replace(/^tec:/, "")})`, fecha: ahora, motivo: String(b.motivo || "").slice(0, 200), destino });
         if (x.error) return { error: x.error, status: 409 };
         S.abrirGarantias(x.saldos, x.movs, { falla: e.falla || e.motivo || "", por: quien });
         x.saldos.envios_cerrados = [x.envio, ...(Array.isArray(sal.envios_cerrados) ? sal.envios_cerrados : [])].slice(0, 300);
@@ -2039,7 +2055,16 @@ async function manejarStock(req, res, autorizacion, cuerpo) {
       if (duplicado) { res.status(200).json({ ok: true, duplicado: true }); return; }
       if (!r.error && resultado) {
         await stockConfirmarMovs(resultado.movs, `Stock: movimientos de confirmación (por ${quien})`);
-        if (resultado.envio.estado !== "recibido") {
+        const destinatario = /^tec:/.test(resultado.envio.a) ? resultado.envio.a.slice(4) : "";
+        if (destinatario && destinatario !== quien) {
+          // El depósito cerró por el técnico un envío que seguía «en camino»: que el técnico se entere.
+          try {
+            const { enviarASeleccionados } = require("../lib/push-sender");
+            await enviarASeleccionados([destinatario], resultado.envio.estado === "rechazado"
+              ? { titulo: "El depósito canceló un envío", cuerpo: `${quien} canceló lo que tenías en camino: volvió al depósito.`, url: "/?ir=mistock" }
+              : { titulo: "Material confirmado por el depósito", cuerpo: `${quien} confirmó por vos lo que tenías en camino: ya figura en tu stock. Si no lo tenés, avisale.`, url: "/?ir=mistock" });
+          } catch (e) { /* opcional */ }
+        } else if (resultado.envio.estado !== "recibido") {
           try {
             const { enviarASeleccionados } = require("../lib/push-sender");
             const avisar = resultado.envio.a === "dep" ? [resultado.envio.de.replace(/^tec:/, "")] : [resultado.envio.por];

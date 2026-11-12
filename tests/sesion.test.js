@@ -1341,6 +1341,18 @@ test("Stock: la marca sale de la descripción (o del modelo) y se resume por mar
   assert.deepStrictEqual(S.leerListadoOficina([["Código", "Descripción", "Cómo se controla", "Marca"], ["20825", "TECLADO", "Equipo", "Paradox"]].map((f, i, t) => i ? Object.fromEntries(t[0].map((k, j) => [k, f[j]])) : null).filter(Boolean)).articulos[0].marca, "Paradox");
 });
 
+test("Stock: un texto libre («Batería 12V 7A») encuentra su artículo solo si hay uno claro", () => {
+  const S = require(path.join(raiz, "stock-utils.js"));
+  const cat = { articulos: { 1: { c: "1", d: "BATERIA 12V 7AH", tipo: "cantidad" }, 2: { c: "2", d: "BATERIA 12V 4AH", tipo: "cantidad" }, 3: { c: "3", d: "SIRENA MP100 INTERIOR MONOTONAL", tipo: "cantidad" }, 4: { c: "4", d: "SIRENA EXTERIOR BR150", tipo: "cantidad" }, 5: { c: "5", d: "CABLE 4 HILOS (ROLLO)", tipo: "cantidad" }, 6: { c: "6", d: "SIRENA SIM", tipo: "sim" } } };
+  assert.strictEqual(S.buscarArticuloPorTexto(cat, "Batería 12V 7A"), "1");
+  assert.strictEqual(S.buscarArticuloPorTexto(cat, "Cable 4 hilos"), "5");
+  assert.strictEqual(S.buscarArticuloPorTexto(cat, "Sirena interior"), "3");
+  assert.strictEqual(S.buscarArticuloPorTexto(cat, "bateria"), "", "dos baterías: no se adivina");
+  assert.strictEqual(S.buscarArticuloPorTexto(cat, "bateria", ["2"]), "2", "salvo que el técnico tenga una sola de esas");
+  assert.strictEqual(S.buscarArticuloPorTexto(cat, "Tornillos"), "");
+  assert.strictEqual(S.buscarArticuloPorTexto(cat, "x"), "");
+});
+
 test("Stock: Paradox REM25 — la cámara nunca toma el código del modelo (REM25-7SG) como N° de serie", () => {
   const S = require(path.join(raiz, "stock-utils.js"));
   // Etiqueta real: Code 39 «REM25-7SG» (modelo, igual en todas las cajas) y «AI200158A2» (Tracking)
@@ -1591,6 +1603,9 @@ test("Stock: Melina entrega con escaneo, el técnico confirma «Recibí» (o con
     let salP = repo["stock/saldos.json"];
     assert.deepStrictEqual([salP.ubic["tec:Juan"]["20208"], salP.ubic["cli:Kiosco Pérez"]["20208"], salP.unidades.GH777AA001.u], [sirJuan - 1, 1, "tec:Juan"]);
     assert.deepStrictEqual(salP.aprobar.map((x) => [x.por, x.texto, x.cant, x.parte]).sort(), [["Juan", "Cable 4 hilos", 10, "P77"], ["Juan", "TECLADO K10LH/V", 1, "P77"]]);
+    // El equipo retirado no figuraba en la APP: igual queda anotado de qué cliente vino (para la garantía)
+    const instRet = require(path.join(raiz, "stock-utils.js")).instalacionDeUnidad(salP.unidades.GH777AA001);
+    assert.deepStrictEqual([instRet.cliente, instRet.fecha, !!instRet.retirado], ["Kiosco Pérez", "", true]);
     r = await post(cuerpoParte, juan);
     assert.ok(r.cuerpo.duplicado, "el mismo parte no descuenta dos veces");
     const mioJ = (await get({ mio: 1 }, juan)).cuerpo;
@@ -1863,6 +1878,16 @@ test("Stock: entrega en mano (código QR firmado del técnico o su clave), pedid
     r = await post({ accion: "pedir_material", items: [{ c: "20208", cant: 3 }] }, luis);
     r = await post({ accion: "cancelar_pedido", id: r.cuerpo.solicitud.id }, luis);
     assert.strictEqual(r.cuerpo.solicitud.estado, "cancelada");
+    // 6) El depósito cierra un pedido que no se va a preparar, con el motivo (el de otro técnico no puede)
+    r = await post({ accion: "pedir_material", items: [{ c: "20208", cant: 2 }] }, luis);
+    const idSol = r.cuerpo.solicitud.id;
+    assert.strictEqual((await post({ accion: "cancelar_pedido", id: idSol }, juan)).statusCode, 403);
+    r = await post({ accion: "cancelar_pedido", id: idSol, motivo: "No hay stock hasta el lunes" }, melina);
+    assert.deepStrictEqual([r.cuerpo.solicitud.estado, r.cuerpo.solicitud.cerrada_por, r.cuerpo.solicitud.motivo_cierre], ["cancelada", "Melina", "No hay stock hasta el lunes"]);
+    // 7) Lo cargado con el catálogo de materiales (texto libre) queda para aprobar con el artículo ya propuesto
+    r = await post({ accion: "consumo_parte", op_id: "p-10", cliente: "Kiosco", sinStock: [{ texto: "Sirena mp100", cant: 1 }, { texto: "Tornillos", cant: 4 }] }, juan);
+    assert.strictEqual(r.cuerpo.paraAprobar, 2, JSON.stringify(r.cuerpo));
+    assert.deepStrictEqual(repo["stock/saldos.json"].aprobar.slice(0, 2).map((x) => [x.texto, x.c, !!x.sugerido]), [["Sirena mp100", "20208", true], ["Tornillos", "", false]]);
   } finally { global.fetch = fetchViejo; if (viejoPush) require.cache[rutaPush] = viejoPush; else delete require.cache[rutaPush]; }
 });
 
@@ -2064,6 +2089,17 @@ test("Stock: stock inicial de un técnico desde el panel: queda con lo de la lis
     assert.strictEqual((await post({ accion: "camioneta", sentido: "tomar", vehiculo: "Kangoo gris", items: [{ c: "20208", cant: 9 }] }, juan)).statusCode, 409);
     assert.strictEqual((await post({ accion: "camioneta", sentido: "tomar", vehiculo: "Fiat", items: [{ c: "20208", cant: 1 }] }, juan)).statusCode, 400);
     assert.strictEqual(repo["stock/saldos.json"].ubic.dep[20208], 10, "el depósito no se toca");
+    // Una camioneta que recibió stock del depósito y quedó vacía sigue existiendo: se le puede dejar material
+    r = await post({ accion: "mover", de: "dep", a: "veh:Kangoo blanca", items: [{ c: "20208", cant: 1 }] }, admin);
+    assert.strictEqual(r.statusCode, 200, JSON.stringify(r.cuerpo));
+    r = await post({ accion: "camioneta", sentido: "tomar", vehiculo: "Kangoo blanca", items: [{ c: "20208", cant: 1 }] }, juan);
+    assert.strictEqual(r.statusCode, 200, JSON.stringify(r.cuerpo));
+    assert.strictEqual(repo["stock/saldos.json"].ubic["veh:Kangoo blanca"], undefined, "quedó vacía");
+    const getMio = resFalso(); await datos(pedido("GET", { coleccion: "stock", mio: 1 }, null, juan), getMio);
+    assert.deepStrictEqual(Object.keys(getMio.cuerpo.camionetas).sort(), ["Kangoo blanca", "Kangoo gris"]);
+    r = await post({ accion: "camioneta", sentido: "dejar", vehiculo: "Kangoo blanca", items: [{ c: "20208", cant: 1 }] }, juan);
+    assert.strictEqual(r.statusCode, 200, JSON.stringify(r.cuerpo));
+    assert.strictEqual(repo["stock/saldos.json"].ubic.dep[20208], 9);
     assert.deepStrictEqual(S.auditarStock(repo["stock/saldos.json"], repo[`stock/movimientos-${mes}.json`], repo["stock/catalogo.json"], { ahora: new Date() }).errores, []);
     assert.deepStrictEqual(S.auditarStock(repo["stock/saldos.json"], repo[`stock/movimientos-${mes}.json`], repo["stock/catalogo.json"], { ahora: new Date() }).errores, []);
   } finally { global.fetch = fetchViejo; }

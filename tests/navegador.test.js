@@ -5733,9 +5733,10 @@ test("Stock en la APP: el depósito entrega escaneando (etiqueta SAT + N° de un
   });
   await page.click("#depEscanearBtn");
   // Primera caja: no se sabe cuál es el N° de serie -> se elige una vez
-  await page.waitForSelector(".stk-elegir-serie [data-t]");
-  assert.deepStrictEqual(await page.$$eval(".stk-elegir-serie [data-t]", (b) => b.map((x) => x.dataset.t)), ["GH200AA001"], "ni el link del QR ni el código del modelo (con guion) se ofrecen");
-  await page.click('.stk-elegir-serie [data-t="GH200AA001"]');
+  await page.waitForSelector(".dlg-app .stk-serie-unica");
+  assert.strictEqual(await page.textContent(".dlg-app .stk-serie-unica"), "GH200AA001", "ni el link del QR ni el código del modelo (con guion) se ofrecen");
+  assert.deepStrictEqual(await page.$$eval(".dlg-app .dlg-botones button", (b) => b.map((x) => x.textContent)), ["No, es el del modelo", "Sí, es el N° de serie"]);
+  await page.click('.dlg-app .dlg-si[data-t="GH200AA001"]');
   await page.waitForFunction(() => document.querySelectorAll("#depCanasta .stk-chip").length === 3);
   assert.deepStrictEqual(catalogo.articulos["20825"].alias, ["K10H-J9B"], "el código del modelo se ignora de ahora en más");
   assert.match(await page.textContent(".stk-escaner-total"), /3 en la lista/);
@@ -5774,6 +5775,97 @@ test("Stock en la APP: el depósito entrega escaneando (etiqueta SAT + N° de un
   assert.deepStrictEqual(await page.evaluate(() => depCanasta.items()[0].extras), { GH300AA001: { serial: "72075101", mac: "00:19:BA:1D:3F:DB" } });
   assert.match(await page.textContent("#depCanasta .stk-chip"), /Serial 72075101 · MAC 00:19:BA:1D:3F:DB/);
   assert.deepStrictEqual(await page.$$eval("#depCanasta .stk-chip", (c) => c.map((x) => x.textContent.replace("✕", "").split(" ")[0])), ["GH300AA001"]);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Depósito (revisión): confirmar aparece al salir de Consultar, búsqueda por nombre en vivo, «lo deja un técnico», pedido que no se prepara, cámara abierta hasta completar el pedido y cola de otra persona", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  const S = require(require("path").join(__dirname, "..", "stock-utils.js"));
+  const catalogo = { articulos: {
+    20208: { c: "20208", d: "SIRENA MP100", tipo: "cantidad", alias: ["7798164500049"] },
+    40001: { c: "40001", d: "BATERIA 12V 7AH", tipo: "cantidad" },
+    40002: { c: "40002", d: "BATERIA 12V 4AH", tipo: "cantidad" },
+  } };
+  let saldos = { inicializado: "2026-11-01", ubic: { dep: { 20208: 10, 40001: 20, 40002: 5 }, "tec:Juan": { 20208: 2 } }, unidades: {}, pedidos: {}, envios: [],
+    solicitudes: [{ id: "s1", por: "Juan", fecha: new Date().toISOString(), estado: "pendiente", items: [{ c: "20208", cant: 1 }, { c: "40001", cant: 1 }] }, { id: "s2", por: "Juan", fecha: new Date().toISOString(), estado: "pendiente", items: [{ c: "40002", cant: 9 }] }] };
+  const posts = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    const json = (o, st) => route.fulfill({ status: st || 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("coleccion=tecnicos")) return json([{ nombre: "Melina", permisos: { stock_responsable: true } }, { nombre: "Juan", permisos: {} }]);
+    if (!u.includes("coleccion=stock")) return json([]);
+    if (req.method() === "GET") return json({ catalogo, saldos, conciliacion: { marcas: [], corridas: [] } });
+    const b = JSON.parse(req.postData()); posts.push(b);
+    if (b.accion === "mover") { const x = S.moverStock(saldos, b.items, { tipo: "mover", de: b.de, a: b.a }, catalogo); if (x.error) return json({ error: x.error }, 409); saldos = x.saldos; return json({ ok: true }); }
+    if (b.accion === "cancelar_pedido") { saldos = { ...saldos, solicitudes: saldos.solicitudes.map((x) => x.id === b.id ? { ...x, estado: "cancelada", motivo_cierre: b.motivo } : x) }; return json({ ok: true }); }
+    return json({ error: "?" }, 400);
+  });
+  await page.goto(base + "/index.html");
+  await page.waitForTimeout(400);
+  await page.evaluate(() => {
+    localStorage.removeItem("stock_destinos");
+    // En la cola quedó algo de otra persona (celular compartido): no se manda con el nombre de Melina
+    localStorage.setItem("stock_cola", JSON.stringify([{ cuerpo: { accion: "mover", de: "dep", a: "veh:Kangoo", items: [{ c: "40001", cant: 5 }], op_id: "Pedro-1" }, descripcion: "Baja de Pedro", fecha: new Date().toISOString(), por: "Pedro" }]));
+    tecnicoLogueado = "Melina"; tecnicosPasswords = { Melina: "", Juan: "" }; tecnicosPermisos = { Melina: { stock_responsable: true } }; refrescarAccesosPorPermisos(); showScreen("home");
+    const cv = document.createElement("canvas"); cv.width = 64; cv.height = 64; const g = cv.getContext("2d");
+    setInterval(() => { g.fillStyle = "#" + Math.floor(Math.random() * 999); g.fillRect(0, 0, 64, 64); }, 50);
+    navigator.mediaDevices.getUserMedia = async () => cv.captureStream(20);
+    window.__cuadros = [];
+    window.BarcodeDetector = class { async detect() { const c = window.__cuadros.shift(); return (c || []).map((rawValue) => ({ rawValue })); } };
+  });
+  const visible = () => page.evaluate(() => { const b = document.getElementById("depConfirmarBtn"); return b.offsetHeight > 0 && !b.classList.contains("hidden"); });
+  await page.click("#tileDepositoBtn");
+  await page.waitForFunction(() => depDatos && depDatos.catalogo);
+  // La cola de Pedro ni se ve ni se manda
+  await page.evaluate(() => depProcesarCola());
+  await page.waitForTimeout(300);
+  assert.deepStrictEqual([await page.locator("#depCola .stk-cola").count(), posts.length, await page.evaluate(() => depLeerCola().length)], [0, 0, 1]);
+  // Se va a Consultar, se sale y se vuelve a entrar: al pasar a Baja el botón de confirmar tiene que estar
+  await page.click('#depModos [data-modo="consultar"]');
+  assert.strictEqual(await visible(), false);
+  await page.evaluate(() => showScreen("home"));
+  await page.click("#tileDepositoBtn");
+  await page.waitForTimeout(300);
+  await page.click('#depModos [data-modo="recibir"]');
+  assert.strictEqual(await visible(), true, "el botón de confirmar no puede quedar escondido");
+  // «Lo deja un técnico (sin su celular)»: busca por nombre mientras escribe; con un solo resultado, Enter lo agrega
+  await page.selectOption("#depRecibirTipo", "tec");
+  await page.selectOption("#depRecibirSelect", "Juan");
+  await page.fill("#depCodigo", "bat");
+  await page.waitForSelector("#depBuscarResultados .stk-res");
+  assert.strictEqual(await page.locator("#depBuscarResultados .stk-res").count(), 2, "las dos baterías, sin apretar Enter");
+  await page.fill("#depCodigo", "sirena");
+  await page.keyboard.press("Enter");
+  await page.waitForSelector('#depCanasta .stk-linea');
+  assert.match(await page.textContent('#depCanasta .stk-linea'), /hay 2/, "muestra lo que tiene Juan");
+  await page.click("#depConfirmarBtn");
+  assert.match(await page.textContent(".dlg-app .dlg-texto"), /Va al depósito \(viene de Técnico: Juan\)/);
+  await page.click(".dlg-app .dlg-si");
+  await page.waitForFunction(() => document.getElementById("depCanasta").textContent.trim() === "" || !document.querySelector("#depCanasta .stk-linea"));
+  assert.deepStrictEqual(posts.at(-1).de + ">" + posts.at(-1).a, "tec:Juan>dep");
+  assert.deepStrictEqual([saldos.ubic["tec:Juan"][20208], saldos.ubic.dep[20208]], [1, 11]);
+  assert.strictEqual(await page.inputValue("#depRecibirSelect"), "", "no queda el técnico anterior elegido");
+  // Un pedido que no se va a preparar: se cierra con el motivo
+  await page.click('#depModos [data-modo="entregar"]');
+  await page.click('#depSolicitudes .stk-envio:nth-of-type(2) [data-no-preparar]');
+  await page.fill(".dlg-app input, .dlg-app textarea", "No hay stock hasta el lunes");
+  await page.click(".dlg-app .dlg-si");
+  await page.waitForFunction(() => document.querySelectorAll("#depSolicitudes .stk-envio").length === 1);
+  assert.deepStrictEqual({ accion: posts.at(-1).accion, id: posts.at(-1).id, motivo: posts.at(-1).motivo }, { accion: "cancelar_pedido", id: "s2", motivo: "No hay stock hasta el lunes" });
+  // Preparar el pedido de 2 cosas en «individual»: la cámara queda abierta hasta completarlo
+  await page.click('#depFormas [data-forma="individual"]');
+  await page.click("#depSolicitudes [data-preparar]");
+  await page.click("#depEscanearBtn");
+  await page.waitForSelector(".stk-escaner");
+  await page.evaluate(() => { window.__cuadros.push(["7798164500049"]); });
+  await page.waitForFunction(() => depCanasta.items().length === 1);
+  await page.waitForTimeout(700);
+  assert.strictEqual(await page.locator(".stk-escaner").count(), 1, "falta la batería: sigue abierta");
+  await page.evaluate(() => { window.__cuadros.push([], [], ["000400012779"]); });
+  await page.waitForFunction(() => depCanasta.items().length === 2);
+  await page.waitForFunction(() => !document.querySelector(".stk-escaner"), null, { timeout: 4000 });
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });
@@ -5998,7 +6090,7 @@ test("Un solo lugar: si hay equipos con N° en el depósito hay que decir cuál 
   await page.click(".dlg-app .dlg-si");
   assert.strictEqual(posts.length, 0);
   // Se eligen de la lista
-  assert.match(await page.textContent("#depCanasta"), /Elegir el N° de serie de la lista \(4 en Depósito\)/);
+  assert.match(await page.textContent("#depCanasta"), /Elegir el N° de serie de la lista \(4\)/);
   await page.click("#depCanasta [data-elegir-n]");
   await page.check('.stk-elegir-lista input[value="AJ0002"]');
   await page.check('.stk-elegir-lista input[value="AJ0004"]');

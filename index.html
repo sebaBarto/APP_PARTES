@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#101820">
-<meta name="app-version" content="4.72.1">
+<meta name="app-version" content="4.73.0">
 <meta name="description" content="Digitalizador de partes técnicos de servicio">
 <title>Servicio Técnico SAT</title>
 <link rel="manifest" href="manifest.json">
@@ -1330,6 +1330,7 @@
     <div class="review-scroll">
       <p class="hint-eyebrow review-eyebrow">MI STOCK</p>
       <p class="list-status" id="miStockStatus"></p>
+      <div id="miStockCola"></div>
       <div class="stk-mi-codigo">
         <button type="button" class="btn btn-primary" id="miStockCodigoBtn"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h4v-3"/></svg>Mi código para recibir en mano</button>
         <p class="stk-ayuda">En el depósito mostrá este código: lo que te entregan queda confirmado en el momento, sin tocar «Recibí».</p>
@@ -1361,9 +1362,10 @@
         <div class="field-group hidden" id="miStockAdondeCaja"><label class="field-label" for="miStockAdonde">¿Adónde vuelve?</label><select class="field-input" id="miStockAdonde"></select></div>
         <p class="stk-ayuda">Tocá «Devolver» en lo que vuelve, o escaneá la etiqueta (y el N° de serie de los equipos).</p>
         <button type="button" class="btn btn-secondary btn-small" id="miStockRetiradosBtn"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>Cargar lo que retiré de clientes</button>
-        <div class="stk-escanear-fila"><button type="button" class="btn btn-secondary btn-small" id="miStockEscanearBtn"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>Escanear</button><input class="field-input" type="text" id="miStockCodigo" placeholder="Código o N° de serie" autocomplete="off" enterkeyhint="done"></div>
+        <div class="stk-escanear-fila"><button type="button" class="btn btn-secondary btn-small" id="miStockEscanearBtn"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>Escanear</button><input class="field-input" type="text" id="miStockCodigo" placeholder="Código, N° de serie o nombre" autocomplete="off" enterkeyhint="done"></div>
+        <div id="miStockBuscarResultados"></div>
         <div id="miStockCanasta"></div>
-        <div class="field-group">
+        <div class="field-group" id="miStockFalladoCaja">
           <label class="stk-check"><input type="checkbox" id="miStockFallado"> Es un equipo fallado (va a Garantía)</label>
           <input class="field-input hidden" type="text" id="miStockFalla" placeholder="¿Qué falla tiene? Ej: no detecta, no enciende" autocomplete="off">
         </div>
@@ -1383,7 +1385,7 @@
       <p class="hint-eyebrow review-eyebrow">DEPÓSITO</p>
       <div class="stk-unico">
         <button type="button" class="btn btn-primary" id="depEscaneoUnicoBtn"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>Escanear</button>
-        <p class="stk-ayuda">El código del técnico (le entregás en mano), el de una devolución, o un artículo para ver dónde está.</p>
+        <p class="stk-ayuda">El código del técnico (le entregás en mano), el de una devolución, o la etiqueta de lo que sale o entra.</p>
       </div>
       <div class="stk-bandeja" id="depBandeja" aria-label="Pendientes del depósito"></div>
       <div id="depSolicitudes"></div>
@@ -1405,7 +1407,7 @@
         <div class="stk-recientes" id="depRecientes"></div>
         <div class="field-row stk-destino">
           <div class="field-group"><label class="field-label" for="depDestTipo">¿A dónde va?</label>
-            <select class="field-input" id="depDestTipo"><option value="tec">Técnico</option><option value="veh">Vehículo</option><option value="cli">Cliente (queda instalado)</option><option value="com">Cliente (en comodato)</option></select></div>
+            <select class="field-input" id="depDestTipo"><option value="tec">Técnico</option><option value="veh">Vehículo</option><option value="cli">Cliente (instalado)</option><option value="com">Cliente (comodato)</option></select></div>
           <div class="field-group"><label class="field-label" for="depDestNombre">¿Quién?</label>
             <select class="field-input" id="depDestSelect"></select>
             <input class="field-input hidden" type="text" id="depDestNombre" list="depDestLista" autocomplete="off" placeholder="Nombre del cliente"><datalist id="depDestLista"></datalist></div>
@@ -1419,7 +1421,7 @@
         <div id="depDevoluciones"></div>
         <div id="depAprobar"></div>
         <div class="field-group"><label class="field-label" for="depRecibirTipo">¿Qué entra al depósito?</label>
-          <select class="field-input" id="depRecibirTipo"><option value="proveedor">Compra que llegó del proveedor</option><option value="presupuesto">Vuelve de un presupuesto (no se usó)</option><option value="cli">Retiro de un cliente (instalado)</option><option value="com">Retiro de un cliente (comodato)</option><option value="veh">Vuelve de un vehículo</option></select></div>
+          <select class="field-input" id="depRecibirTipo"><option value="proveedor">Compra que llegó del proveedor</option><option value="presupuesto">Vuelve de un presupuesto (no se usó)</option><option value="cli">Retiro de un cliente (instalado)</option><option value="com">Retiro de un cliente (comodato)</option><option value="veh">Vuelve de un vehículo</option><option value="tec">Lo deja un técnico (sin su celular)</option></select></div>
         <div class="field-group hidden" id="depPresupVuelveCaja">
           <label class="field-label" for="depPresupVuelve">N° de presupuesto</label>
           <input class="field-input" type="text" id="depPresupVuelve" list="depPresupVuelveLista" inputmode="numeric" autocomplete="off" placeholder="Ej: 4521">
@@ -2928,7 +2930,7 @@
     <div class="stk-panel-arriba"><b id="stkPanelTitulo">Mi stock</b><button type="button" class="btn btn-primary btn-small" id="stkPanelListoBtn">Listo</button></div>
     <div class="stk-panel-cuerpo">
       <p class="stk-ayuda" id="stkPanelAyuda"></p>
-      <div class="stk-escanear-fila"><button type="button" class="btn btn-primary btn-small" id="stkPanelEscanearBtn"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>Escanear</button><input class="field-input" type="text" id="stkPanelCodigo" placeholder="Código o N° de serie" autocomplete="off" enterkeyhint="done"></div>
+      <div class="stk-escanear-fila"><button type="button" class="btn btn-primary btn-small" id="stkPanelEscanearBtn"><svg class="stk-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/></svg>Escanear</button><input class="field-input" type="text" id="stkPanelCodigo" placeholder="Código, N° de serie o nombre" autocomplete="off" enterkeyhint="done"></div>
       <div id="stkPanelResultados"></div>
       <div id="stkPanelCanasta"></div>
       <div id="stkPanelFalladoCaja" class="hidden">
