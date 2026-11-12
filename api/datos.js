@@ -2204,6 +2204,10 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
   // electrónica, sin login (ver lib/registro-llaves.js).
   // Portal de administradores de consorcio (consorcio.html): con su propio
   // pase, que no sirve para nada más de la API (ver lib/consorcio.js).
+  if (req.query && req.query.publico === "consorcio_link") {
+    await require("../lib/consorcio").manejarLink(req, res, { leer: leerArchivoDatos, escribir: escribirArchivoDatos });
+    return;
+  }
   if (req.query && req.query.publico === "consorcio") {
     await require("../lib/consorcio").manejarPortal(req, res, { leer: leerArchivoDatos, escribir: escribirArchivoDatos });
     return;

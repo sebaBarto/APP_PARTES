@@ -3240,3 +3240,18 @@ la API; cada pedido comprueba que el administrador siga activo, con la
 misma clave y que el edificio sea suyo; topes de intentos de ingreso por
 IP y por mail. Datos en `registro-llaves/administradores.json` y
 `registro-llaves/<código>.gestiones.json` del repo privado.
+
+### Links para vecinos y avisos
+
+- Desde la pestaña **Pedir datos al vecino** del portal, el administrador
+  genera un link único (`consorcio.html?i=<edificio>.<id>`) para un vecino,
+  con la gestión y la unidad ya elegidas si quiere. El vecino completa el
+  pedido (con fotos) sin ver ningún otro dato del edificio. El link es la
+  autorización del administrador: el pedido llega **directo a SAT**. Sirve
+  una sola vez, vence a los 15 días y se puede cancelar.
+- Cada gestión tiene **número de pedido** correlativo por edificio.
+- Los pedidos pendientes aparecen en el **Inicio** de `admin.html` (en rojo
+  si hay una baja por robo).
+- Cada gestión nueva manda un **mail de aviso** (tipo `gestion_llaves` en
+  `api/enviar-mail.js`) a `LLAVES_AVISO_EMAIL`, o a `OFICINA_EMAIL` si esa
+  variable no está configurada en Vercel.

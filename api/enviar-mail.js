@@ -409,6 +409,37 @@ module.exports = async (req, res) => {
         ${datos.tarea ? `<p><b>Qué necesita:</b> ${escapeHtml(datos.tarea)}</p>` : ""}
         <p style="color:#6B7680; font-size:13px;">Ya quedó registrado en Agenda de emergencia — este mail es solo un aviso, no hace falta cargarlo de nuevo.</p>
       `);
+    } else if (tipo === "gestion_llaves") {
+      // Aviso de una gestión nueva del portal de administradores de consorcio
+      // (lib/consorcio.js). Va a LLAVES_AVISO_EMAIL si está configurada; si no, a OFICINA_EMAIL.
+      destinatario = process.env.LLAVES_AVISO_EMAIL || process.env.OFICINA_EMAIL;
+      if (!destinatario) { res.status(500).json({ error: "Falta configurar LLAVES_AVISO_EMAIL u OFICINA_EMAIL en Vercel" }); return; }
+      const fila = (k, v) => (v ? `<tr><td style="padding:4px 12px 4px 0;color:#6B7680;vertical-align:top;">${escapeHtml(k)}</td><td style="padding:4px 0;"><b>${escapeHtml(v)}</b></td></tr>` : "");
+      asunto = `🔑 Pedido N° ${datos.numero || "?"} — ${datos.tipo_txt || "Gestión de llaves"} — ${datos.edificio || ""}`;
+      html = envolverDocumento(`
+        <h2 style="margin-top:0;">${escapeHtml(datos.tipo_txt || "Nueva gestión de llaves")}${datos.motivo_txt === "Robo" ? " — ⚠ ROBO" : ""}</h2>
+        <p style="margin:0 0 12px;color:#6B7680;">${escapeHtml(datos.origen_txt || "")}</p>
+        <table style="border-collapse:collapse;font-size:14px;">
+          ${fila("Pedido N°", String(datos.numero || ""))}
+          ${fila("Edificio", datos.edificio)}
+          ${fila("Administrador", datos.administrador)}
+          ${fila("Unidad", datos.unidad)}
+          ${fila(datos.tipo === "titularidad" ? "Titular actual" : "Titular", datos.titular)}
+          ${fila("Teléfono", datos.telefono)}
+          ${fila("Mail", datos.email)}
+          ${fila("Dispositivo", datos.dispositivo)}
+          ${fila("Cantidad", datos.cantidad)}
+          ${fila("N° de llave", datos.tag)}
+          ${fila("N° de usuario", datos.usuario)}
+          ${fila("Motivo", datos.motivo_txt)}
+          ${fila("Nuevo titular", datos.nuevo_titular)}
+          ${fila("Tel. nuevo titular", datos.nuevo_telefono)}
+          ${fila("Llaves", datos.llaves_titularidad)}
+          ${fila("Fotos", datos.fotos ? `${datos.fotos} (se ven en el panel)` : "")}
+          ${fila("Observaciones", datos.observaciones)}
+        </table>
+        <p style="color:#6B7680; font-size:13px;margin-top:16px;">Ya quedó cargado en el panel de administración → Llaves de edificios. Este mail es solo un aviso.</p>
+      `);
     } else if (tipo === "cliente") {
       destinatario = datos.cliente_email;
       if (!destinatario) {

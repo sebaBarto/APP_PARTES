@@ -107,3 +107,46 @@ test("consorcio: fotos en la gestión y solo de sus edificios", async () => {
   assert.strictEqual(await ver(m12), 200);
   assert.strictEqual(await ver(m11), 403);
 });
+
+test("consorcio: link único — el vecino carga el pedido, va directo a SAT con N° de pedido y avisa por mail", async () => {
+  const { fotos } = llaves;
+  fotos.fotosGh.subir = async () => {};
+  const path = require("path");
+  const enviados = [];
+  process.env.SERVICIOS_API_TOKEN = process.env.SERVICIOS_API_TOKEN || "token-de-prueba";
+  require.cache[path.join(__dirname, "..", "api", "enviar-mail.js")] = { id: "x", loaded: true, exports: async (req, res) => { enviados.push(req.body); res.status(200).json({ ok: true }); } };
+  const { gh, m11, m12, clave } = await preparar();
+  const { pase } = (await login(gh, "cp@admin.com", clave)).data;
+  const h = { "x-consorcio": pase };
+  // No puede crear links de edificios que no son suyos.
+  assert.strictEqual((await llamar(consorcio.manejarPortal, { method: "POST", headers: h, body: { accion: "crear_invitacion", edificio: m11 } }, gh)).status, 403);
+  // El administrador carga una gestión él mismo: N° 1 y mail.
+  const propia = await llamar(consorcio.manejarPortal, { method: "POST", headers: h, body: { accion: "gestion", edificio: m12, tipo: "baja", piso: "1", unidad: "A", titular: "Juan", motivo: "robo" } }, gh);
+  assert.strictEqual(propia.data.numero, 1);
+  const c = await llamar(consorcio.manejarPortal, { method: "POST", headers: h, body: { accion: "crear_invitacion", edificio: m12, tipo: "nuevo", destinatario: "Lucía", piso: "7", unidad: "D" } }, gh);
+  assert.strictEqual(c.status, 200);
+  const i = c.data.codigo;
+  assert.match(i, /\.[a-f0-9]{24}$/);
+  // El vecino ve solo lo mínimo: nada de otros vecinos.
+  const ver = await llamar(consorcio.manejarLink, { method: "GET", query: { i } }, gh);
+  assert.strictEqual(ver.status, 200);
+  assert.deepStrictEqual(Object.keys(ver.data).sort(), ["administrador", "destinatario", "direccion", "edificio", "piso", "tipo", "unidad", "vence"]);
+  assert.strictEqual((await llamar(consorcio.manejarLink, { method: "GET", query: { i: i.slice(0, -1) + (i.endsWith("0") ? "1" : "0") } }, gh)).status, 410);
+  // Manda el pedido (aunque intente cambiar la gestión, queda la que eligió el administrador).
+  const pedido = { i, tipo: "baja", piso: "7", unidad: "D", titular: "Lucía Fernández", telefono: "341 999 0000", cantidad: 1 };
+  const env = await llamar(consorcio.manejarLink, { method: "POST", body: pedido }, gh);
+  assert.strictEqual(env.status, 200);
+  assert.strictEqual(env.data.numero, 2);
+  assert.strictEqual((await llamar(consorcio.manejarLink, { method: "POST", body: pedido }, gh)).status, 410, "el link sirve una sola vez");
+  // Llega directo a SAT, pendiente, marcada como cargada por el vecino.
+  const sat = (await llamar(consorcio.manejarAdmin, { method: "GET", query: { gestiones: "1" } }, SAT, gh)).data;
+  const g = sat.find((x) => x.numero === 2);
+  assert.deepStrictEqual([g.tipo, g.estado, g.origen], ["nuevo", "pendiente", "vecino"]);
+  // Un mail por cada gestión nueva.
+  assert.deepStrictEqual(enviados.map((m) => [m.tipo, m.datos.numero, m.datos.tipo]), [["gestion_llaves", 1, "baja"], ["gestion_llaves", 2, "nuevo"]]);
+  assert.strictEqual(enviados[0].datos.motivo_txt, "Robo");
+  // Link cancelado no sirve.
+  const c2 = await llamar(consorcio.manejarPortal, { method: "POST", headers: h, body: { accion: "crear_invitacion", edificio: m12 } }, gh);
+  await llamar(consorcio.manejarPortal, { method: "POST", headers: h, body: { accion: "cancelar_invitacion", edificio: m12, id: c2.data.invitacion.id } }, gh);
+  assert.strictEqual((await llamar(consorcio.manejarLink, { method: "GET", query: { i: c2.data.codigo } }, gh)).status, 410);
+});

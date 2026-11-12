@@ -134,8 +134,8 @@
           <button type="button" id="salirBtn">Salir</button>
         </div>
       </div>
-      <h1>Portal de <em>administradores</em></h1>
-      <p>Gestioná las llaves de acceso de tus edificios: altas, reemplazos, bajas y cambios de titularidad, y consultá quién tiene llave en cada unidad.</p>
+      <h1 id="heroTitulo">Portal de <em>administradores</em></h1>
+      <p id="heroTexto">Gestioná las llaves de acceso de tus edificios: altas, reemplazos, bajas y cambios de titularidad, y consultá quién tiene llave en cada unidad.</p>
     </div>
   </header>
 
@@ -155,6 +155,17 @@
       <p class="sub" style="margin-top:10px;font-size:13px;">¿No tenés clave o la olvidaste? Pedila a SAT.</p>
     </section>
 
+    <!-- Pedido por link (vecino) -->
+    <section class="card oculto" id="pantallaLinkError" style="max-width:520px;margin:0 auto;text-align:center;">
+      <h2>Este link no está disponible</h2>
+      <p class="sub" id="linkErrorTxt"></p>
+    </section>
+    <section class="card oculto" id="pantallaLinkFin" style="max-width:520px;margin:0 auto;text-align:center;">
+      <div style="font-size:42px;">✅</div>
+      <h2>¡Listo, gracias!</h2>
+      <p class="sub" id="linkFinTxt"></p>
+    </section>
+
     <!-- Panel -->
     <div class="oculto" id="pantallaPanel">
       <div class="banner oculto" id="bannerClave">
@@ -172,6 +183,7 @@
           <button type="button" class="tab activo" data-tab="nueva">Nueva gestión</button>
           <button type="button" class="tab" data-tab="vecinos">Vecinos y llaves <span class="n" id="nVecinos">0</span></button>
           <button type="button" class="tab" data-tab="gestiones">Gestiones <span class="n" id="nGestiones">0</span></button>
+          <button type="button" class="tab" data-tab="links">Pedir datos al vecino</button>
         </div>
         <p class="status" id="edificioStatus"></p>
 
@@ -277,6 +289,27 @@
         <div data-panel="gestiones" class="oculto">
           <div id="listaGestiones"></div>
         </div>
+
+        <!-- Links para vecinos -->
+        <div data-panel="links" class="oculto">
+          <p class="sub">Generá un link y mandáselo al vecino: él completa el pedido (con foto del tag) y le llega <b>directo a SAT</b> con su número de pedido — el link ya es tu autorización. Lo vas a ver en la pestaña Gestiones. Cada link sirve <b>una sola vez</b> y vence a los 15 días. El vecino no ve ningún otro dato del edificio.</p>
+          <form id="linkForm" class="elegir" style="margin-top:10px;">
+            <div class="fila">
+              <div><label for="lTipo">Gestión</label>
+                <select id="lTipo"><option value="">Que elija el vecino</option><option value="nuevo">Nuevo tag</option><option value="reemplazo">Reemplazo de tag</option><option value="baja">Baja de tag</option><option value="titularidad">Cambio de titularidad</option></select></div>
+              <div><label for="lDest">Nombre del vecino <span class="opc">(opcional)</span></label><input type="text" id="lDest" maxlength="80"></div>
+            </div>
+            <div class="fila">
+              <div><label for="lPiso">Piso <span class="opc">(opcional)</span></label><input type="text" id="lPiso" maxlength="10"></div>
+              <div><label for="lUnidad">Depto <span class="opc">(opcional)</span></label><input type="text" id="lUnidad" maxlength="10"></div>
+            </div>
+            <button type="submit" class="btn" id="lCrearBtn" style="margin-top:12px;">Generar link</button>
+            <p class="status" id="lStatus"></p>
+          </form>
+          <div id="linkNuevo" class="oculto" style="margin-top:12px;"></div>
+          <h3 style="font-family:'Barlow Semi Condensed',sans-serif;margin:18px 0 8px;">Links generados</h3>
+          <div id="listaLinks"></div>
+        </div>
       </section>
     </div>
   </main>
@@ -309,6 +342,8 @@
   const ESTADOS = { pendiente: ["Pendiente", "est-pend"], en_curso: ["En curso", "est-pend"], hecha: ["Hecha", "est-ok"], rechazada: ["Rechazada", "est-baja"] };
   const EST_LLAVE = { pendiente: ["Registrada", "est-gris"], conciliada: ["Activa", "est-ok"], baja: ["Para dar de baja", "est-baja"], dada_de_baja: ["Dada de baja", "est-baja"] };
   let pase = "";
+  const codigoLink = (new URLSearchParams(location.search).get("i") || "").trim();
+  let modoLink = false;
   let edificios = [], actual = null, datos = { registros: [], gestiones: [] };
 
   try { const g = JSON.parse(localStorage.getItem("consorcio_pase") || "null"); if (g && g.v > Date.now()) pase = g.p; } catch (e) {}
@@ -395,7 +430,7 @@
   function renderTodo() {
     $("nVecinos").textContent = datos.registros.length;
     $("nGestiones").textContent = datos.gestiones.length;
-    renderVecinos(); renderGestiones(); armarElegir();
+    renderVecinos(); renderGestiones(); armarElegir(); renderLinks();
   }
 
   // ---------- Vecinos y llaves ----------
@@ -450,8 +485,9 @@
       if (g.tag || g.usuario) det.push(`${g.dispositivo === "control" ? "Control" : "Llave"} <span class="mono">${esc(g.tag || "")}</span>${g.usuario ? " · usuario " + esc(g.usuario) : ""}`);
       if (g.motivo) det.push(`Motivo: ${esc((MOTIVOS[g.tipo] || {})[g.motivo] || g.motivo)}`);
       if (g.observaciones) det.push(`“${esc(g.observaciones)}”`);
+      if (g.origen === "vecino") det.push(`<span style="color:#3A5BA8;">📨 La cargó el vecino con un link${g.cargada_por ? " (" + esc(g.cargada_por) + ")" : ""}</span>`);
       return `<div class="gestion ${esc(g.estado)}">
-        <div class="gestion-tit"><b>${esc(TIPOS[g.tipo] || g.tipo)}</b><span><span class="est ${e[1]}">${e[0]}</span> <span class="dat" style="color:var(--muted);font-size:13px;">${new Date(g.fecha).toLocaleDateString("es-AR")}</span></span></div>
+        <div class="gestion-tit"><b>${g.numero ? `<span style="color:var(--muted);font-weight:600;">N° ${esc(g.numero)} · </span>` : ""}${esc(TIPOS[g.tipo] || g.tipo)}</b><span><span class="est ${e[1]}">${e[0]}</span> <span class="dat" style="color:var(--muted);font-size:13px;">${new Date(g.fecha).toLocaleDateString("es-AR")}</span></span></div>
         <div class="dat">${det.join("<br>")}</div>
         ${(g.fotos || []).length ? `<div style="margin-top:6px;display:flex;gap:6px;">${g.fotos.map((f, i) => `<button type="button" class="ver-foto" data-foto="${esc(f)}">📷 Foto ${i + 1}</button>`).join("")}</div>` : ""}
         ${g.nota_sat ? `<div class="nota-sat"><b>SAT:</b> ${esc(g.nota_sat)}</div>` : ""}
@@ -489,7 +525,7 @@
   function ajustarForm() {
     const t = valor("tipo");
     $("camposGestion").classList.toggle("oculto", !t);
-    $("elegirBox").classList.toggle("oculto", t === "nuevo" || !datos.registros.length);
+    if ($("elegirBox")) $("elegirBox").classList.toggle("oculto", t === "nuevo" || !datos.registros.length);
     $("bloqueCantidad").classList.toggle("oculto", t !== "nuevo");
     $("bloqueTag").classList.toggle("oculto", t === "nuevo");
     $("bloqueTitularidad").classList.toggle("oculto", t !== "titularidad");
@@ -516,13 +552,25 @@
       fotos: fotosGestion.slice(0, 2),
     };
     $("gEnviarBtn").disabled = true;
-    st.className = "status"; st.textContent = "Enviando…";
+    st.className = "status"; st.textContent = g.fotos.length ? "Enviando (con fotos, puede tardar unos segundos)…" : "Enviando…";
+    if (modoLink) {
+      try {
+        const r = await fetch("/api/datos?publico=consorcio_link", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...g, accion: undefined, edificio: undefined, i: codigoLink }) });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.error || "No se pudo enviar");
+        $("pantallaPanel").classList.add("oculto");
+        $("linkFinTxt").innerHTML = `Tu pedido <b>N° ${esc(d.numero)}</b> le llegó a SAT, que lo va a gestionar. Tu administración (${esc(d.administrador)}) también lo puede seguir.`;
+        $("pantallaLinkFin").classList.remove("oculto");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } catch (err) { st.className = "status err"; st.textContent = err.message; $("gEnviarBtn").disabled = false; }
+      return;
+    }
     try {
       const d = await api("POST", "", g);
       datos.gestiones.unshift(d.gestion);
       form.reset(); delete form.dataset.registro; fotosGestion = []; renderFotosGestion(); ajustarForm();
       $("camposGestion").classList.add("oculto");
-      st.className = "status ok"; st.textContent = "✓ Gestión enviada. Podés seguirla en la pestaña Gestiones.";
+      st.className = "status ok"; st.textContent = `✓ Pedido N° ${d.numero} enviado a SAT. Podés seguirlo en la pestaña Gestiones.`;
       renderTodo();
     } catch (err) { st.className = "status err"; st.textContent = err.message; }
     $("gEnviarBtn").disabled = false;
@@ -583,6 +631,90 @@
   $("visor").addEventListener("click", (e) => { if (e.target.id === "visor") $("visor").classList.add("oculto"); });
   document.addEventListener("click", (e) => { const b = e.target.closest("[data-foto]"); if (b) verFoto(b.dataset.foto); });
 
+  // ---------- Links para vecinos ----------
+  const urlLink = (codigo) => location.origin + location.pathname + "?i=" + encodeURIComponent(codigo);
+  function mensajeLink(inv) {
+    return `Hola${inv.destinatario ? " " + inv.destinatario : ""}! Para ${inv.tipo ? "el pedido de " + TIPOS[inv.tipo].toLowerCase() : "tu pedido de llave"} de ${actual.nombre}, completá tus datos en este link (sirve una sola vez):\n${urlLink(inv.codigo)}`;
+  }
+  function botonesCompartir(inv) {
+    return `<button type="button" class="btn btn-sec copiar-link" data-c="${esc(inv.codigo)}" style="padding:8px 12px;font-size:14px;">Copiar link</button>
+      <a class="btn btn-sec" style="padding:8px 12px;font-size:14px;text-decoration:none;" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(mensajeLink(inv))}">Mandar por WhatsApp</a>`;
+  }
+  function renderLinks() {
+    const lista = datos.invitaciones || [];
+    const cont = $("listaLinks");
+    if (!lista.length) { cont.innerHTML = '<p class="vacio">Todavía no generaste links para este edificio.</p>'; return; }
+    cont.innerHTML = lista.map((i) => {
+      const vencido = Date.parse(i.vence) < Date.now();
+      const est = i.usada ? ["Usado", "est-ok"] : i.cancelada ? ["Cancelado", "est-gris"] : vencido ? ["Vencido", "est-gris"] : ["Sin usar", "est-pend"];
+      const abierto = !i.usada && !i.cancelada && !vencido;
+      return `<div class="gestion" style="border-left-color:${abierto ? "var(--amber)" : "#C9C6BC"};">
+        <div class="gestion-tit"><b>${esc(i.destinatario || "Vecino")}${i.piso || i.unidad ? " · " + esc(`${i.piso ? i.piso + "°" : ""} ${i.unidad}`.trim()) : ""}</b><span class="est ${est[1]}">${est[0]}</span></div>
+        <div class="dat">${esc(i.tipo ? TIPOS[i.tipo] : "Gestión a elección del vecino")} · creado ${new Date(i.creada).toLocaleDateString("es-AR")}${abierto ? " · vence " + new Date(i.vence).toLocaleDateString("es-AR") : ""}</div>
+        ${abierto ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">${botonesCompartir(i)}<button type="button" class="btn btn-sec cancelar-link" data-id="${esc(i.id)}" style="padding:8px 12px;font-size:14px;color:var(--err);border-color:var(--err);">Cancelar</button></div>` : ""}
+      </div>`;
+    }).join("");
+  }
+  document.addEventListener("click", async (e) => {
+    const c = e.target.closest(".copiar-link");
+    if (c) { try { await navigator.clipboard.writeText(urlLink(c.dataset.c)); c.textContent = "✓ Copiado"; } catch (err) { prompt("Copiá el link:", urlLink(c.dataset.c)); } return; }
+    const x = e.target.closest(".cancelar-link");
+    if (x) {
+      if (!confirm("¿Cancelar este link? El vecino ya no lo va a poder usar.")) return;
+      try { await api("POST", "", { accion: "cancelar_invitacion", edificio: actual.codigo, id: x.dataset.id }); const i = datos.invitaciones.find((v) => v.id === x.dataset.id); if (i) i.cancelada = new Date().toISOString(); renderLinks(); }
+      catch (err) { alert(err.message); }
+    }
+  });
+  $("linkForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const st = $("lStatus");
+    $("lCrearBtn").disabled = true;
+    st.className = "status"; st.textContent = "Generando…";
+    try {
+      const d = await api("POST", "", { accion: "crear_invitacion", edificio: actual.codigo, tipo: $("lTipo").value, destinatario: $("lDest").value.trim(), piso: $("lPiso").value.trim(), unidad: $("lUnidad").value.trim(), });
+      const inv = { ...d.invitacion, codigo: d.codigo };
+      datos.invitaciones = [inv, ...(datos.invitaciones || [])];
+      $("linkForm").reset();
+      st.textContent = "";
+      $("linkNuevo").innerHTML = `<div class="banner" style="background:#E6F4EA;border-color:#B7DFC4;display:block;"><b>Link listo${inv.destinatario ? " para " + esc(inv.destinatario) : ""}:</b><div class="mono" style="word-break:break-all;margin:6px 0 10px;font-size:13.5px;">${esc(urlLink(inv.codigo))}</div><div style="display:flex;gap:8px;flex-wrap:wrap;">${botonesCompartir(inv)}</div></div>`;
+      $("linkNuevo").classList.remove("oculto");
+      renderLinks();
+    } catch (err) { st.className = "status err"; st.textContent = err.message; }
+    $("lCrearBtn").disabled = false;
+  });
+
+  // ---------- Modo vecino: abrió el link que le mandó su administración ----------
+  async function iniciarModoLink() {
+    modoLink = true;
+    $("heroTitulo").innerHTML = "Pedido de <em>llave</em>";
+    $("pantallaLogin").classList.add("oculto");
+    try {
+      const r = await fetch("/api/datos?publico=consorcio_link&i=" + encodeURIComponent(codigoLink), { cache: "no-store" });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "Este link no es válido");
+      $("heroTexto").textContent = `${d.edificio}${d.direccion ? " · " + d.direccion : ""}. Tu administración (${d.administrador}) te pide que completes estos datos. Lleva un par de minutos.`;
+      actual = { codigo: codigoLink.split(".")[0], nombre: d.edificio };
+      $("pantallaPanel").classList.remove("oculto");
+      $("bannerClave").classList.add("oculto");
+      $("pantallaPanel").querySelector("section.card").classList.add("oculto"); // "Tus edificios"
+      $("edificioCard").classList.remove("oculto");
+      document.querySelector("#edificioCard .tabs").classList.add("oculto");
+      $("elegirBox").remove(); // el vecino no ve a nadie más del edificio
+      if (d.tipo) {
+        form.querySelectorAll('input[name="tipo"]').forEach((r) => { r.closest(".tipo").classList.toggle("oculto", r.value !== d.tipo); r.checked = r.value === d.tipo; });
+        document.querySelector(".lbl").textContent = "Tu pedido";
+      }
+      if (d.piso) $("gPiso").value = d.piso;
+      if (d.unidad) $("gUnidad").value = d.unidad;
+      if (d.destinatario) $("gTitular").value = d.destinatario;
+      $("gEnviarBtn").textContent = "Enviar pedido";
+      ajustarForm();
+    } catch (e) {
+      $("linkErrorTxt").textContent = e.message;
+      $("pantallaLinkError").classList.remove("oculto");
+    }
+  }
+
   // ---------- Clave ----------
   function abrirClave() { $("modalClave").classList.remove("oculto"); $("claveStatus").textContent = ""; $("claveActual").focus(); }
   $("cambiarClaveBtn").addEventListener("click", abrirClave);
@@ -603,7 +735,8 @@
   });
   $("salirBtn").addEventListener("click", salir);
 
-  if (pase) iniciarPanel(); else mostrarLogin();
+  if (codigoLink) iniciarModoLink();
+  else if (pase) iniciarPanel(); else mostrarLogin();
 })();
 </script>
 </body>
