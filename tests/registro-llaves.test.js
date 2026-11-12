@@ -124,3 +124,39 @@ test("registro de llaves: no acepta caracteres para inyectar código y frena a u
   for (let i = 0; i < 8; i++) estados.push((await llamar(manejarPublico, { method: "POST", headers: ip, body: { ...valido, nombre: "Robot " + i } }, gh)).status);
   assert.deepStrictEqual(estados, [200, 200, 200, 200, 200, 200, 429, 429]);
 });
+
+test("registro de llaves: foto del número (privada, solo JPEG, sirve en lugar del número)", async () => {
+  const { fotos, _reiniciarTopes } = require("../lib/registro-llaves");
+  _reiniciarTopes();
+  const guardadas = {};
+  fotos.fotosGh.subir = async (ruta, buf) => { guardadas[ruta] = buf; };
+  fotos.fotosGh.leer = async (ruta) => guardadas[ruta] || null;
+  fotos.fotosGh.borrar = async (ruta) => { delete guardadas[ruta]; };
+  const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(3000, 7)]).toString("base64");
+  const gh = ghFalso();
+  // Un PNG (u otra cosa) se rechaza.
+  const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47]), Buffer.alloc(3000)]).toString("base64");
+  assert.strictEqual((await llamar(manejarPublico, { method: "POST", body: { ...valido, llaves: [{ tipo: "tag", tag: "", foto: png }] } }, gh)).status, 400);
+  // Muy pesada, también.
+  const enorme = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff]), Buffer.alloc(700 * 1024)]).toString("base64");
+  assert.strictEqual((await llamar(manejarPublico, { method: "POST", body: { ...valido, llaves: [{ tipo: "tag", tag: "", foto: enorme }] } }, gh)).status, 400);
+  // Solo la foto, sin número: se acepta.
+  const ok = await llamar(manejarPublico, { method: "POST", body: { ...valido, llaves: [{ tipo: "tag", tag: "", foto: "data:image/jpeg;base64," + jpeg }] } }, gh);
+  assert.strictEqual(ok.status, 200);
+  const reg = JSON.parse(gh.store["registro-llaves/muelle11-k7p3.json"].t)[0];
+  assert.match(reg.llaves[0].foto, /^[a-f0-9]{20}$/);
+  assert.ok(guardadas[`registro-llaves/fotos/muelle11-k7p3/${reg.llaves[0].foto}.jpg`]);
+  // SAT la ve y completa el número mirándola.
+  const admin = { nombre: "Seba", rol: "admin" };
+  const vista = await new Promise((fin) => {
+    const res = { headers: {}, statusCode: 200, setHeader(k, v) { this.headers[k] = v; }, status(c) { this.statusCode = c; return this; }, send(b) { fin({ status: this.statusCode, tipo: this.headers["Content-Type"], largo: b.length }); }, json(d) { fin({ status: this.statusCode, d }); } };
+    manejarAdmin({ method: "GET", query: { edificio: "muelle11-k7p3", foto: reg.llaves[0].foto }, headers: {} }, res, admin, gh);
+  });
+  assert.deepStrictEqual([vista.status, vista.tipo], [200, "image/jpeg"]);
+  assert.strictEqual((await llamar(manejarAdmin, { method: "POST", body: { accion: "estado_llave", edificio: "muelle11-k7p3", id: reg.id, indice: 0, tag: "69 2561" } }, admin, gh)).status, 200);
+  assert.strictEqual(JSON.parse(gh.store["registro-llaves/muelle11-k7p3.json"].t)[0].llaves[0].tag, "069:02561");
+  // Un técnico no la ve; y al borrar el registro se borra la foto.
+  assert.strictEqual((await llamar(manejarAdmin, { method: "GET", query: { edificio: "muelle11-k7p3", foto: reg.llaves[0].foto } }, { rol: "tecnico" }, gh)).status, 403);
+  await llamar(manejarAdmin, { method: "POST", body: { accion: "borrar_registro", edificio: "muelle11-k7p3", id: reg.id } }, admin, gh);
+  assert.strictEqual(Object.keys(guardadas).length, 0);
+});

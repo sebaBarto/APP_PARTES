@@ -9728,7 +9728,7 @@ function renderRllRegistros() {
       <td><b>${rllEsc(rllUnidad(r))}</b><br><span style="color:#6B7680;">${tipo[r.tipo] || ""}</span></td>
       <td>${rllEsc(r.nombre)}<br><span style="color:#6B7680;">${rel[r.relacion] || ""}${r.relacion_otro ? " (" + rllEsc(r.relacion_otro) + ")" : ""} · ${rllFecha(r.fecha)}</span>${r.comentario ? `<br><span style="color:#34495E;">💬 ${rllEsc(r.comentario)}</span>` : ""}</td>
       <td><a href="tel:${rllEsc(String(r.telefono || "").replace(/[^0-9+]/g, ""))}">${rllEsc(r.telefono)}</a>${r.email ? `<br><a href="mailto:${rllEsc(r.email)}" style="color:#6B7680;">${rllEsc(r.email)}</a>` : ""}</td>
-      <td>${rllCeldaDispositivo(l)}${f.perdida && l.detalle ? `<br><span style="color:#6B7680;">${rllEsc(l.detalle)}</span>` : ""}${avisos.length ? "<br>" + avisos.join(" ") : ""}</td>
+      <td>${rllCeldaDispositivo(l)}${l.foto ? `<br><button type="button" class="btn-secondary-admin rll-ver-foto" data-foto="${rllEsc(l.foto)}" data-id="${rllEsc(r.id)}" data-i="${f.i}" data-p="${f.perdida ? 1 : ""}" style="width:auto;padding:4px 10px;font-size:12px;margin-top:4px;">📷 Ver foto</button>` : ""}${f.perdida && l.detalle ? `<br><span style="color:#6B7680;">${rllEsc(l.detalle)}</span>` : ""}${avisos.length ? "<br>" + avisos.join(" ") : ""}</td>
       <td><input type="text" class="field-input rll-usuario" data-id="${r.id}" data-i="${f.i}" data-p="${f.perdida ? 1 : ""}" value="${rllEsc(l.usuario || "")}" style="width:80px;margin:0;padding:6px 8px;font-family:'IBM Plex Mono',monospace;" placeholder="—"></td>
       <td><select class="rll-estado" data-id="${r.id}" data-i="${f.i}" data-p="${f.perdida ? 1 : ""}" style="margin:0;width:auto;padding:6px 8px;font-weight:700;color:${est.color};background:${est.bg};border-color:${est.bg};">${Object.entries(RLL_ESTADOS).map(([k, v]) => `<option value="${k}"${k === l.estado ? " selected" : ""}>${v.txt}</option>`).join("")}</select>${l.revisado_por ? `<br><span style="font-size:11px;color:#6B7680;">${rllEsc(l.revisado_por)}</span>` : ""}</td>
       <td><input type="text" class="field-input rll-nota" data-id="${r.id}" data-i="${f.i}" data-p="${f.perdida ? 1 : ""}" value="${rllEsc(l.nota || "")}" style="min-width:140px;margin:0;padding:6px 8px;" placeholder="Nota..."></td>
@@ -9737,6 +9737,12 @@ function renderRllRegistros() {
   }).join("")}</tbody></table>`;
 
   cont.querySelectorAll(".rll-estado").forEach((s) => s.addEventListener("change", () => rllGuardarLlave(s, { estado: s.value })));
+  cont.querySelectorAll(".rll-ver-foto").forEach((b) => b.addEventListener("click", () => {
+    const reg = rllRegistros.find((x) => x.id === b.dataset.id);
+    const lista = reg && (b.dataset.p ? reg.perdidas : reg.llaves);
+    const llave = lista && lista[Number(b.dataset.i)];
+    rllVerFoto("/api/datos?coleccion=registro_llaves&edificio=" + encodeURIComponent(rllEdificioActual.codigo) + "&foto=" + encodeURIComponent(b.dataset.foto), llave ? { reg, llave, i: b.dataset.i, p: b.dataset.p } : null);
+  }));
   cont.querySelectorAll(".rll-nota").forEach((inp) => inp.addEventListener("change", () => rllGuardarLlave(inp, { nota: inp.value })));
   cont.querySelectorAll(".rll-usuario").forEach((inp) => inp.addEventListener("change", () => rllGuardarLlave(inp, { usuario: inp.value })));
   cont.querySelectorAll(".rll-borrar").forEach((b) => b.addEventListener("click", async () => {
@@ -9757,10 +9763,45 @@ function rllCeldaDispositivo(l) {
     ? '<span style="display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#3A5BA8;background:#E8EEFB;border-radius:999px;padding:1px 8px;">📟 Control cochera</span>'
     : '<span style="display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#8A5A00;background:#FFF1D6;border-radius:999px;padding:1px 8px;">🔑 Tag</span>';
   const num = (t) => `<div style="font-family:'IBM Plex Mono',monospace;font-size:17px;font-weight:600;letter-spacing:.5px;margin-top:3px;">${rllEsc(t)}</div>`;
-  if (!l.tag) return etiqueta + `<div style="color:#6B7680;margin-top:3px;">${control ? "Sin número en el control" : "(sin número)"}</div>`;
+  if (!l.tag) return etiqueta + `<div style="color:${l.foto ? "#B5772A" : "#6B7680"};margin-top:3px;">${l.foto ? "Número en la foto: completalo" : control ? "Sin número en el control" : "(sin número)"}</div>`;
   if (control || RLL_FORMATO_TAG.test(l.tag)) return etiqueta + num(l.tag);
   const calc = rllTagCalculado(l.tag);
   return etiqueta + (calc ? num(calc) + `<div style="font-size:11px;color:#6B7680;">calculado de ${rllEsc(l.tag)}</div>` : num(l.tag) + '<div style="font-size:11px;color:#B5772A;">no tiene el formato 000:00000</div>');
+}
+// Visor de fotos de llaves: se piden con el pase (no hay link público). Si es
+// la foto de una llave registrada, deja escribir el número mirándola.
+async function rllVerFoto(url, ctx) {
+  let capa = document.getElementById("rllVisor");
+  if (!capa) {
+    capa = document.createElement("div");
+    capa.id = "rllVisor";
+    capa.style.cssText = "position:fixed;inset:0;z-index:9999;background:rgba(16,24,32,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;";
+    document.body.appendChild(capa);
+    capa.addEventListener("click", (e) => { if (e.target === capa) capa.remove(); });
+  }
+  capa.innerHTML = `<img id="rllVisorImg" alt="Foto de la llave" style="max-width:min(96vw,1100px);max-height:72vh;border-radius:10px;background:#fff;"><div id="rllVisorPie" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;justify-content:center;"></div>`;
+  const pie = capa.querySelector("#rllVisorPie");
+  if (ctx && ctx.llave && !ctx.p) {
+    pie.innerHTML = `<span style="color:#fff;font-weight:600;">N° de ${rllEsControl(ctx.llave) ? "control" : "llave"}:</span><input type="text" class="field-input" id="rllVisorTag" value="${rllEsc(ctx.llave.tag || "")}" placeholder="000:00000" style="width:170px;margin:0;font-family:'IBM Plex Mono',monospace;font-size:17px;"><button type="button" id="rllVisorGuardar" style="width:auto;">Guardar número</button>`;
+  }
+  pie.insertAdjacentHTML("beforeend", `<button type="button" class="btn-secondary-admin" id="rllVisorCerrar" style="width:auto;background:#fff;">Cerrar</button>`);
+  pie.querySelector("#rllVisorCerrar").addEventListener("click", () => capa.remove());
+  const g = pie.querySelector("#rllVisorGuardar");
+  if (g) g.addEventListener("click", async () => {
+    g.disabled = true;
+    try {
+      const r = await fetch("/api/datos?coleccion=registro_llaves", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "estado_llave", edificio: rllEdificioActual.codigo, id: ctx.reg.id, indice: Number(ctx.i), tag: pie.querySelector("#rllVisorTag").value }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Error");
+      capa.remove();
+      rllAbrirEdificio(rllEdificioActual.codigo);
+    } catch (e) { alert("No se pudo guardar: " + e.message); g.disabled = false; }
+  });
+  try {
+    const r = await fetch(url, { headers: rllHeaders(), cache: "no-store" });
+    if (!r.ok) throw new Error("No se encontró la foto");
+    capa.querySelector("#rllVisorImg").src = URL.createObjectURL(await r.blob());
+  } catch (e) { capa.remove(); alert("No se pudo abrir la foto: " + e.message); }
 }
 async function rllGuardarLlave(el, cambios) {
   const reg = rllRegistros.find((x) => x.id === el.dataset.id);
@@ -10316,6 +10357,7 @@ function renderRllGestiones() {
     if (g.motivo) det.push(`Motivo: <b${g.motivo === "robo" ? ' style="color:#B3261E;"' : ""}>${rllEsc(RLL_GEST_MOTIVOS[g.motivo] || g.motivo)}</b>`);
     if (g.tipo === "titularidad") det.push(`Nuevo: <b>${rllEsc(g.nuevo_titular)}</b> · ${rllEsc(g.nuevo_telefono)}${g.nuevo_email ? " · " + rllEsc(g.nuevo_email) : ""}<br>${g.llaves_titularidad === "transferir" ? "Se queda con las llaves" : "Bajar las anteriores y entregar nuevas"}`);
     if (g.observaciones) det.push(`<span style="color:#34495E;">💬 ${rllEsc(g.observaciones)}</span>`);
+    if ((g.fotos || []).length) det.push(g.fotos.map((fid, n) => `<button type="button" class="btn-secondary-admin rll-gest-foto" data-ed="${rllEsc(g.edificio)}" data-foto="${rllEsc(fid)}" style="width:auto;padding:4px 10px;font-size:12px;">📷 Foto ${n + 1}</button>`).join(" "));
     return `<tr${g.motivo === "robo" && g.estado === "pendiente" ? ' style="background:#FFF4F3;"' : ""}>
       <td style="white-space:nowrap;">${rllFecha(g.fecha)}</td>
       <td><b>${rllEsc(g.edificio_nombre || g.edificio)}</b><br><span style="color:#6B7680;">${rllEsc(g.admin_nombre)}</span></td>
@@ -10328,6 +10370,7 @@ function renderRllGestiones() {
   }).join("")}</tbody></table>`;
   cont.querySelectorAll(".rll-gest-estado").forEach((s) => s.addEventListener("change", () => rllGuardarGestion(s, { estado: s.value })));
   cont.querySelectorAll(".rll-gest-nota").forEach((i) => i.addEventListener("change", () => rllGuardarGestion(i, { nota_sat: i.value })));
+  cont.querySelectorAll(".rll-gest-foto").forEach((b) => b.addEventListener("click", () => rllVerFoto("/api/datos?coleccion=consorcio&edificio=" + encodeURIComponent(b.dataset.ed) + "&foto=" + encodeURIComponent(b.dataset.foto), null)));
 }
 async function rllGuardarGestion(el, cambios) {
   const g = rllGestiones.find((x) => x.id === el.dataset.id && x.edificio === el.dataset.ed);

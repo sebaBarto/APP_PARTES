@@ -86,3 +86,24 @@ test("consorcio: nueva clave o desactivar cierra la sesión; fuerza bruta frenad
   for (let i = 0; i < 8; i++) estados.push((await login(gh, "cp@admin.com", "mal" + i)).status);
   assert.deepStrictEqual(estados, [401, 401, 401, 401, 401, 401, 429, 429]);
 });
+
+test("consorcio: fotos en la gestión y solo de sus edificios", async () => {
+  const { fotos } = llaves;
+  const guardadas = {};
+  fotos.fotosGh.subir = async (ruta, buf) => { guardadas[ruta] = buf; };
+  fotos.fotosGh.leer = async (ruta) => guardadas[ruta] || null;
+  const { gh, m11, m12, clave } = await preparar();
+  const { pase } = (await login(gh, "cp@admin.com", clave)).data;
+  const h = { "x-consorcio": pase };
+  const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(3000, 7)]).toString("base64");
+  const g = await llamar(consorcio.manejarPortal, { method: "POST", headers: h, body: { accion: "gestion", edificio: m12, tipo: "reemplazo", piso: "1", unidad: "A", titular: "Juan", motivo: "rotura", fotos: [jpeg] } }, gh);
+  assert.strictEqual(g.status, 200);
+  const id = g.data.gestion.fotos[0];
+  assert.ok(guardadas[`registro-llaves/fotos/${m12}/${id}.jpg`]);
+  const ver = (e) => new Promise((fin) => {
+    const res = { headers: {}, statusCode: 200, setHeader(k, v) { this.headers[k] = v; }, status(c) { this.statusCode = c; return this; }, send() { fin(this.statusCode); }, json() { fin(this.statusCode); } };
+    consorcio.manejarPortal({ method: "GET", query: { foto: id, e }, headers: { ...h, "x-real-ip": "10.9.9.9" } }, res, gh);
+  });
+  assert.strictEqual(await ver(m12), 200);
+  assert.strictEqual(await ver(m11), 403);
+});

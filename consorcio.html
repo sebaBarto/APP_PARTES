@@ -110,6 +110,16 @@
   .capa { position: fixed; inset: 0; background: rgba(14,15,16,.55); display: grid; place-items: center; padding: 16px; z-index: 50; }
   .modal { background: #fff; border-radius: 16px; padding: 20px; width: 100%; max-width: 420px; }
   .banner { background: #FFF1D6; border: 1px solid #F1D99A; border-radius: 12px; padding: 12px 14px; display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 14px; font-size: 14.5px; }
+  .fotos-g { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .btn-foto { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 8px 14px; border-radius: 10px; border: 1.5px solid var(--line); background: #fff; font-weight: 600; font-size: 14.5px; cursor: pointer; }
+  .btn-foto input { display: none; }
+  .mini { position: relative; }
+  .mini img { width: 88px; height: 66px; object-fit: cover; border-radius: 9px; border: 1.5px solid var(--line); display: block; }
+  .mini button { position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; border-radius: 50%; border: none; background: var(--ink); color: #fff; font-size: 14px; line-height: 1; cursor: pointer; }
+  .ver-foto { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 3px 8px; font: inherit; font-size: 13px; cursor: pointer; }
+  .visor { position: fixed; inset: 0; background: rgba(14,15,16,.85); display: grid; place-items: center; padding: 16px; z-index: 60; }
+  .visor img { max-width: 100%; max-height: 82vh; border-radius: 10px; background: #fff; }
+  .visor button { position: absolute; top: 14px; right: 14px; }
   .pie { text-align: center; color: var(--muted); font-size: 13px; padding: 4px 16px 30px; }
 </style>
 </head>
@@ -238,6 +248,13 @@
                 </div>
               </div>
 
+              <span class="lbl" id="fotosLbl">Fotos del tag <span class="opc">(opcional, hasta 2 — del lado de los números)</span></span>
+              <div class="fotos-g" id="fotosG">
+                <label class="btn-foto" id="btnFotoCam">📷 Sacar foto<input type="file" accept="image/*" capture="environment" class="in-foto"></label>
+                <label class="btn-foto" id="btnFotoGal">🖼 De la galería<input type="file" accept="image/*" class="in-foto"></label>
+              </div>
+              <p class="sub" id="fotoEstado" style="margin-top:6px;"></p>
+
               <label for="gObs">Observaciones <span class="opc">(opcional)</span></label>
               <textarea id="gObs" maxlength="600" placeholder="Cualquier dato que nos ayude"></textarea>
 
@@ -274,6 +291,8 @@
       <p class="status" id="claveStatus"></p>
     </form>
   </div>
+
+  <div class="visor oculto" id="visor"><button type="button" class="btn btn-sec" id="visorCerrar" style="padding:8px 14px;font-size:15px;">Cerrar ✕</button><img id="visorImg" alt="Foto de la llave"></div>
 
   <div class="pie">SAT · Seguridad electrónica · <a href="https://www.sat365.com.ar" target="_blank" rel="noopener" style="color:inherit;">www.sat365.com.ar</a></div>
 
@@ -396,7 +415,7 @@
         ${rs.map((r) => `<div class="persona">
           <div><b>${esc(r.nombre)}</b> <span class="dat">· ${esc(rel[r.relacion] || "")}${r.relacion_otro ? " (" + esc(r.relacion_otro) + ")" : ""}</span></div>
           <div class="dat">${esc(r.telefono)}${r.email ? " · " + esc(r.email) : ""}</div>
-          <div class="llaves">${(r.llaves || []).map((l) => { const e = EST_LLAVE[l.estado] || EST_LLAVE.pendiente; return `<span class="llave">${l.tipo === "control" ? "📟" : "🔑"} <b>${esc(l.tag || "s/n")}</b>${l.usuario ? ` <span class="dat">usuario ${esc(l.usuario)}</span>` : ""} <span class="est ${e[1]}">${e[0]}</span></span>`; }).join("")}
+          <div class="llaves">${(r.llaves || []).map((l) => { const e = EST_LLAVE[l.estado] || EST_LLAVE.pendiente; return `<span class="llave">${l.tipo === "control" ? "📟" : "🔑"} <b>${esc(l.tag || "s/n")}</b>${l.usuario ? ` <span class="dat">usuario ${esc(l.usuario)}</span>` : ""} <span class="est ${e[1]}">${e[0]}</span>${l.foto ? ` <button type="button" class="ver-foto" data-foto="${esc(l.foto)}">📷</button>` : ""}</span>`; }).join("")}
           ${(r.perdidas || []).map((l) => `<span class="llave">⚠ <b>${esc(l.tag || "s/n")}</b> <span class="est est-baja">Reportada perdida</span></span>`).join("")}</div>
         </div>`).join("")}
       </div>`).join("");
@@ -434,6 +453,7 @@
       return `<div class="gestion ${esc(g.estado)}">
         <div class="gestion-tit"><b>${esc(TIPOS[g.tipo] || g.tipo)}</b><span><span class="est ${e[1]}">${e[0]}</span> <span class="dat" style="color:var(--muted);font-size:13px;">${new Date(g.fecha).toLocaleDateString("es-AR")}</span></span></div>
         <div class="dat">${det.join("<br>")}</div>
+        ${(g.fotos || []).length ? `<div style="margin-top:6px;display:flex;gap:6px;">${g.fotos.map((f, i) => `<button type="button" class="ver-foto" data-foto="${esc(f)}">📷 Foto ${i + 1}</button>`).join("")}</div>` : ""}
         ${g.nota_sat ? `<div class="nota-sat"><b>SAT:</b> ${esc(g.nota_sat)}</div>` : ""}
       </div>`;
     }).join("");
@@ -493,19 +513,75 @@
       tag: t === "nuevo" ? "" : $("gTag").value.trim(), usuario: t === "nuevo" ? "" : $("gUsuario").value.trim(), motivo: valor("motivo"),
       nuevo_titular: $("gNuevoTitular").value.trim(), nuevo_telefono: $("gNuevoTelefono").value.trim(), nuevo_email: $("gNuevoEmail").value.trim(),
       llaves_titularidad: valor("llaves_titularidad"), registro_id: form.dataset.registro || "", observaciones: $("gObs").value.trim(),
+      fotos: fotosGestion.slice(0, 2),
     };
     $("gEnviarBtn").disabled = true;
     st.className = "status"; st.textContent = "Enviando…";
     try {
       const d = await api("POST", "", g);
       datos.gestiones.unshift(d.gestion);
-      form.reset(); delete form.dataset.registro; ajustarForm();
+      form.reset(); delete form.dataset.registro; fotosGestion = []; renderFotosGestion(); ajustarForm();
       $("camposGestion").classList.add("oculto");
       st.className = "status ok"; st.textContent = "✓ Gestión enviada. Podés seguirla en la pestaña Gestiones.";
       renderTodo();
     } catch (err) { st.className = "status err"; st.textContent = err.message; }
     $("gEnviarBtn").disabled = false;
   });
+
+  // ---------- Fotos ----------
+  // Se achican y se vuelven a guardar como JPEG en el celular (pesan poco y pierden los metadatos).
+  async function comprimirFoto(archivo) {
+    const url = URL.createObjectURL(archivo);
+    try {
+      const img = await new Promise((ok, mal) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => mal(new Error("No se pudo abrir la foto")); i.src = url; });
+      let lado = 1600, calidad = 0.82;
+      for (let intento = 0; intento < 6; intento++) {
+        const escala = Math.min(1, lado / Math.max(img.naturalWidth, img.naturalHeight));
+        const c = document.createElement("canvas");
+        c.width = Math.round(img.naturalWidth * escala); c.height = Math.round(img.naturalHeight * escala);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        const d = c.toDataURL("image/jpeg", calidad);
+        if (d.length * 0.75 < 450 * 1024) return d;
+        if (calidad > 0.6) calidad -= 0.1; else lado = Math.round(lado * 0.8);
+      }
+      throw new Error("La foto es muy pesada, probá con otra");
+    } finally { URL.revokeObjectURL(url); }
+  }
+  let fotosGestion = [];
+  function renderFotosGestion() {
+    $("fotosG").querySelectorAll(".mini").forEach((m) => m.remove());
+    fotosGestion.forEach((f, i) => {
+      const m = document.createElement("div");
+      m.className = "mini";
+      m.innerHTML = `<img alt="Foto ${i + 1}"><button type="button" aria-label="Quitar foto">×</button>`;
+      m.querySelector("img").src = f;
+      m.querySelector("button").addEventListener("click", () => { fotosGestion.splice(i, 1); renderFotosGestion(); });
+      $("fotosG").insertBefore(m, $("btnFotoCam"));
+    });
+    const lleno = fotosGestion.length >= 2;
+    $("btnFotoCam").classList.toggle("oculto", lleno); $("btnFotoGal").classList.toggle("oculto", lleno);
+  }
+  document.querySelectorAll("#fotosG .in-foto").forEach((inp) => inp.addEventListener("change", async () => {
+    const archivo = inp.files && inp.files[0];
+    inp.value = "";
+    if (!archivo || fotosGestion.length >= 2) return;
+    $("fotoEstado").textContent = "Preparando la foto…";
+    try { fotosGestion.push(await comprimirFoto(archivo)); $("fotoEstado").textContent = ""; renderFotosGestion(); }
+    catch (e) { $("fotoEstado").textContent = e.message; }
+  }));
+  // Ver una foto guardada: se pide con el pase (no hay link público).
+  async function verFoto(id) {
+    $("visor").classList.remove("oculto");
+    $("visorImg").removeAttribute("src");
+    try {
+      const r = await fetch(API + "&foto=" + encodeURIComponent(id) + "&e=" + encodeURIComponent(actual.codigo), { headers: { "X-Consorcio": pase }, cache: "no-store" });
+      if (!r.ok) throw new Error();
+      $("visorImg").src = URL.createObjectURL(await r.blob());
+    } catch (e) { $("visor").classList.add("oculto"); alert("No se pudo abrir la foto"); }
+  }
+  $("visorCerrar").addEventListener("click", () => { $("visor").classList.add("oculto"); });
+  $("visor").addEventListener("click", (e) => { if (e.target.id === "visor") $("visor").classList.add("oculto"); });
+  document.addEventListener("click", (e) => { const b = e.target.closest("[data-foto]"); if (b) verFoto(b.dataset.foto); });
 
   // ---------- Clave ----------
   function abrirClave() { $("modalClave").classList.remove("oculto"); $("claveStatus").textContent = ""; $("claveActual").focus(); }

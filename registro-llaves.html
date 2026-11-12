@@ -158,6 +158,15 @@
   .btn-agregar:hover { border-color: var(--ink); }
   .llave.control { background: linear-gradient(#F5F8FF, #FFFFFF); }
   .llave.control .llave-tit b svg { color: #3A5BA8; }
+  .foto-campo { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line); }
+  .foto-tit { display: block; font-weight: 600; font-size: 14.5px; margin-bottom: 7px; }
+  .foto-btns { display: flex; gap: 8px; }
+  .btn-foto { flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 46px; padding: 8px 10px; border-radius: 11px; border: 1.5px solid var(--line); background: #fff; font-weight: 600; font-size: 14.5px; cursor: pointer; text-align: center; }
+  .btn-foto:active { background: #F6F5F0; }
+  .btn-foto input { display: none; }
+  .foto-prev { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+  .foto-prev img { width: 92px; height: 70px; object-fit: cover; border-radius: 9px; border: 1.5px solid var(--line); }
+  .foto-prev span { font-size: 14px; color: var(--ok); font-weight: 600; flex: 1; }
   .otro-formato { border: none; background: none; padding: 6px 0 0; font: inherit; font-size: 13.5px; color: var(--muted); text-decoration: underline; cursor: pointer; }
 
   .donde {
@@ -363,7 +372,7 @@
               <text x="206" y="114" font-family="Barlow, sans-serif" font-size="13" fill="#6E6C66">5 números</text>
             </svg>
             Está <b>grabado en el llavero</b>: son <b>3 números, dos puntos y 5 números</b>, por ejemplo <span class="mono">069:02561</span>. Escribí solo los números: los dos puntos se ponen solos.<br><br>
-            Si tu llave tiene el número escrito de otra forma, tocá <i>"Mi llave tiene el número de otra forma"</i> y copialo tal cual se ve.<br><br>
+            Si tu llave tiene el número escrito de otra forma, tocá <i>"Mi llave tiene el número de otra forma"</i> y copialo tal cual se ve. Si no lo podés leer, <b>sacale una foto</b> del lado de los números: con eso alcanza.<br><br>
             El <b>número de usuario</b> es el que te asignaron al darte la llave o el control; si no lo sabés, dejalo vacío.
           </div>
         </details>
@@ -488,12 +497,21 @@
       <div class="campo" data-campo="tag">
         <label>Número grabado en la llave</label>
         <input type="text" class="mono in-tag" maxlength="9" inputmode="numeric" placeholder="Ej. 069:02561" autocomplete="off" spellcheck="false">
-        <div class="error-campo">Tiene que tener 3 números, dos puntos y 5 números (ej. 069:02561).</div>
+        <div class="error-campo">Tiene que tener 3 números, dos puntos y 5 números (ej. 069:02561). Si no lo podés leer, sacale una foto abajo.</div>
         <button type="button" class="otro-formato">Mi llave tiene el número de otra forma</button>
       </div>
       <div class="campo">
         <label>Número de usuario <span class="opcional">(si lo conocés)</span></label>
         <input type="text" class="mono in-usuario" maxlength="15" inputmode="numeric" placeholder="Ej. 125" autocomplete="off">
+      </div>
+      <div class="foto-campo">
+        <span class="foto-tit">Foto del lado de los números <span class="opcional">(opcional)</span></span>
+        <div class="foto-btns">
+          <label class="btn-foto">📷 Sacar foto<input type="file" accept="image/*" capture="environment" class="in-foto"></label>
+          <label class="btn-foto">🖼 De la galería<input type="file" accept="image/*" class="in-foto"></label>
+        </div>
+        <div class="foto-prev oculto"><img alt="Foto de la llave"><span>✓ Foto lista</span><button type="button" class="quitar quitar-foto">Quitar</button></div>
+        <div class="ayuda-campo foto-estado"></div>
       </div>` : `
       <div class="llave-tit">
         <b>${ICONO.control}<span class="llave-num"></span></b>
@@ -506,6 +524,15 @@
       <div class="campo">
         <label>Número de usuario <span class="opcional">(si lo conocés)</span></label>
         <input type="text" class="mono in-usuario" maxlength="15" inputmode="numeric" placeholder="Ej. 125" autocomplete="off">
+      </div>
+      <div class="foto-campo">
+        <span class="foto-tit">Foto del lado de los números <span class="opcional">(opcional)</span></span>
+        <div class="foto-btns">
+          <label class="btn-foto">📷 Sacar foto<input type="file" accept="image/*" capture="environment" class="in-foto"></label>
+          <label class="btn-foto">🖼 De la galería<input type="file" accept="image/*" class="in-foto"></label>
+        </div>
+        <div class="foto-prev oculto"><img alt="Foto de la llave"><span>✓ Foto lista</span><button type="button" class="quitar quitar-foto">Quitar</button></div>
+        <div class="ayuda-campo foto-estado"></div>
       </div>`;
     div.querySelector(".quitar").addEventListener("click", () => {
       div.remove();
@@ -527,12 +554,56 @@
         inp.focus();
       });
     }
+    prepararFoto(div);
     // Los controles van siempre después de las llaves.
     if (tipo === "tag") llavesCont.insertBefore(div, llavesCont.querySelector('[data-tipo="control"]'));
     else llavesCont.appendChild(div);
     renumerar();
     if (enfocar) div.querySelector(".in-tag").focus();
   }
+  // ---------- Foto de la llave ----------
+  // Se achica en el celular y se vuelve a guardar como JPEG: pesa poco y se
+  // pierden los metadatos (ubicación, modelo del teléfono…).
+  async function comprimirFoto(archivo) {
+    const url = URL.createObjectURL(archivo);
+    try {
+      const img = await new Promise((ok, mal) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => mal(new Error("No se pudo abrir la foto")); i.src = url; });
+      let lado = 1600, calidad = 0.82, dataUrl = "";
+      for (let intento = 0; intento < 6; intento++) {
+        const escala = Math.min(1, lado / Math.max(img.naturalWidth, img.naturalHeight));
+        const c = document.createElement("canvas");
+        c.width = Math.round(img.naturalWidth * escala); c.height = Math.round(img.naturalHeight * escala);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        dataUrl = c.toDataURL("image/jpeg", calidad);
+        if (dataUrl.length * 0.75 < 450 * 1024) return dataUrl;
+        if (calidad > 0.6) calidad -= 0.1; else lado = Math.round(lado * 0.8);
+      }
+      throw new Error("La foto es muy pesada, probá con otra");
+    } finally { URL.revokeObjectURL(url); }
+  }
+  function prepararFoto(div) {
+    const prev = div.querySelector(".foto-prev"), estado = div.querySelector(".foto-estado");
+    div.querySelectorAll(".in-foto").forEach((inp) => inp.addEventListener("change", async () => {
+      const archivo = inp.files && inp.files[0];
+      inp.value = "";
+      if (!archivo) return;
+      estado.textContent = "Preparando la foto…";
+      try {
+        div._foto = await comprimirFoto(archivo);
+        prev.querySelector("img").src = div._foto;
+        prev.classList.remove("oculto");
+        div.querySelector(".foto-btns").classList.add("oculto");
+        estado.textContent = "";
+        const c = div.querySelector('[data-campo="tag"]'); if (c) c.classList.remove("invalido");
+      } catch (e) { estado.textContent = e.message; }
+    }));
+    div.querySelector(".quitar-foto").addEventListener("click", () => {
+      div._foto = null;
+      prev.classList.add("oculto");
+      div.querySelector(".foto-btns").classList.remove("oculto");
+    });
+  }
+
   function renumerar() {
     ["tag", "control"].forEach((t) => {
       const items = [...llavesCont.querySelectorAll(`[data-tipo="${t}"]`)];
@@ -540,7 +611,7 @@
       items.forEach((el, i) => { el.querySelector(".llave-num").textContent = items.length > 1 ? `${base} ${i + 1}` : base; });
     });
     const total = llavesCont.children.length;
-    llavesCont.querySelectorAll(".quitar").forEach((b) => b.classList.toggle("oculto", total === 1));
+    llavesCont.querySelectorAll(".quitar:not(.quitar-foto)").forEach((b) => b.classList.toggle("oculto", total === 1));
     $("agregarLlaveBtn").classList.toggle("oculto", total >= MAX_LLAVES);
     const tipoUnidad = valorRadio("tipo");
     $("agregarControlBtn").classList.toggle("oculto", total >= MAX_LLAVES || !tipoUnidad || tipoUnidad === "vivienda");
@@ -610,7 +681,7 @@
       const v = inp.value.trim();
       const vacia = !v && !l.querySelector(".in-usuario").value.trim();
       // Una llave vacía se acepta si además cargó un control, o si solo viene a reportar una pérdida.
-      if (!v) { if (!(vacia && (hayControl || (soloPerdida && llavesCont.children.length === 1)))) marcar(inp); return; }
+      if (!v) { if (!l._foto && !(vacia && (hayControl || (soloPerdida && llavesCont.children.length === 1)))) marcar(inp); return; }
       if (!inp.dataset.libre && !FORMATO_TAG.test(v)) marcar(inp);
     });
     if (!$("acepta").checked) marcar($("acepta"));
@@ -640,7 +711,7 @@
       unidad: tipo === "cochera" ? "" : $("unidad").value.trim(),
       cochera: tipo === "vivienda" ? "" : $("cochera").value.trim(),
       control_remoto: tipo === "vivienda" ? "" : valorRadio("control_remoto"),
-      llaves: [...llavesCont.querySelectorAll(".llave")].map((l) => ({ tipo: l.dataset.tipo, tag: l.querySelector(".in-tag").value.trim(), usuario: l.querySelector(".in-usuario").value.trim() })).filter((l) => l.tag || (l.tipo === "control")),
+      llaves: [...llavesCont.querySelectorAll(".llave")].map((l) => ({ tipo: l.dataset.tipo, tag: l.querySelector(".in-tag").value.trim(), usuario: l.querySelector(".in-usuario").value.trim(), foto: l._foto || undefined })).filter((l) => l.tag || l.foto || (l.tipo === "control")),
       perdidas: $("tienePerdida").checked && ($("perdidaTag").value.trim() || $("perdidaDetalle").value.trim()) ? [{ tag: $("perdidaTag").value.trim(), detalle: $("perdidaDetalle").value.trim() }] : [],
       comentario: $("comentario").value.trim(),
       acepta: $("acepta").checked,
@@ -649,7 +720,7 @@
     const btn = $("enviarBtn");
     btn.disabled = true;
     st.className = "status";
-    st.textContent = "Enviando…";
+    st.textContent = datos.llaves.some((l) => l.foto) ? "Enviando (con fotos, puede tardar unos segundos)…" : "Enviando…";
     try {
       const r = await fetch("/api/datos?publico=registro_llaves", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(datos) });
       const d = await r.json().catch(() => ({}));
@@ -674,8 +745,8 @@
     const nTag = d.llaves.filter((l) => l.tipo === "tag").length, nCtl = d.llaves.length - nTag;
     let iTag = 0, iCtl = 0;
     d.llaves.forEach((l) => {
-      if (l.tipo === "control") filas.push([nCtl > 1 ? "Control " + ++iCtl : "Control de cochera", l.tag || "sin número"]);
-      else filas.push([nTag > 1 ? "Llave " + ++iTag : "Llave", l.tag]);
+      if (l.tipo === "control") filas.push([nCtl > 1 ? "Control " + ++iCtl : "Control de cochera", (l.tag || "sin número") + (l.foto ? " · 📷" : "")]);
+      else filas.push([nTag > 1 ? "Llave " + ++iTag : "Llave", (l.tag || "") + (l.foto ? (l.tag ? " · 📷" : "📷 con foto") : "")]);
     });
     if (d.perdidas.length) filas.push(["Para dar de baja", d.perdidas[0].tag || "1 llave"]);
     $("resumen").innerHTML = filas.map(([a, b]) => `<div><span>${esc(a)}</span><span>${esc(b)}</span></div>`).join("");
