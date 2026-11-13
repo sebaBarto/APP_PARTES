@@ -468,6 +468,50 @@ module.exports = async (req, res) => {
           <p><a href="${escapeHtml(datos.link || "")}" style="display:inline-block;background:#F6B828;color:#101820;font-weight:700;padding:12px 20px;border-radius:10px;text-decoration:none;">Crear clave nueva</a></p>
           <p style="color:#6B7680;font-size:13px;">Si no lo pediste vos, ignorá este mail: tu clave actual sigue funcionando.</p>${pie}`;
       }
+    } else if (tipo === "campana_admin") {
+      // Campaña de registro de llaves (lib/campana-llaves.js): avisos al administrador de consorcio.
+      destinatario = datos.para;
+      if (!destinatario || !esEmailValido(destinatario)) { res.status(400).json({ error: "Falta un mail válido" }); return; }
+      const ed = escapeHtml(datos.edificio || "");
+      const boton = (href, txt) => `<p style="margin:18px 0;"><a href="${escapeHtml(href || "")}" style="display:inline-block;background:#F6B828;color:#101820;font-weight:700;padding:12px 20px;border-radius:10px;text-decoration:none;">${txt}</a></p>`;
+      const avance = datos.progreso_txt ? `<p style="background:#F4F5F0;border-radius:8px;padding:10px 12px;"><b>Cómo va:</b> ${escapeHtml(datos.progreso_txt)}</p>` : "";
+      const compartir = `<p>Podés reenviarles a los vecinos el link del registro (es el mismo del QR del hall):<br><a href="${escapeHtml(datos.link_registro || "")}" style="color:#B9850A;font-weight:700;">${escapeHtml(datos.link_registro || "")}</a></p>`;
+      const pie = `<p style="color:#6B7680;font-size:13px;margin-top:18px;">SAT · Seguridad electrónica · www.sat365.com.ar — Mail automático, no hace falta responderlo.</p>`;
+      const e = datos.etapa;
+      if (e === "inicio" || e === "nueva_fecha") {
+        asunto = `${e === "inicio" ? "Empezó el registro de llaves" : "Nueva fecha límite del registro de llaves"} — ${datos.edificio || ""}`;
+        html = `<h2 style="margin-top:0;">Hola ${escapeHtml(datos.nombre || "")}</h2>
+          <p>${e === "inicio" ? `Empezamos el registro de llaves de acceso de <b>${ed}</b>. Cada vecino escanea el QR del hall (o abre el link) y carga sus llaves en 2 minutos.` : `Cambiamos la fecha límite del registro de llaves de <b>${ed}</b>.`}</p>
+          <p style="font-size:18px;"><b>Fecha límite: ${escapeHtml(datos.limite_txt || "")}</b></p>
+          <p>Después de esa fecha te vamos a mandar la lista de llaves que nadie registró para que nos confirmes cuáles se dan de baja. Así nadie que ya no vive en el edificio puede seguir entrando.</p>
+          ${avance}${compartir}${boton(datos.portal, "Ver el avance en el portal")}${pie}`;
+      } else if (e === "recordatorio") {
+        asunto = `Faltan ${datos.dias} días para el cierre del registro de llaves — ${datos.edificio || ""}`;
+        html = `<h2 style="margin-top:0;">Hola ${escapeHtml(datos.nombre || "")}</h2>
+          <p>El registro de llaves de <b>${ed}</b> cierra el <b>${escapeHtml(datos.limite_txt || "")}</b> (faltan ${escapeHtml(String(datos.dias || ""))} días).</p>
+          ${avance}<p>Si podés, recordáselo a los vecinos: las llaves que nadie registre se van a proponer para dar de baja.</p>${compartir}${boton(datos.portal, "Ver quién falta en el portal")}${pie}`;
+      } else if (e === "revision" || e === "recordatorio_revision") {
+        asunto = `${e === "revision" ? "Revisá" : "Recordatorio: revisá"} las llaves sin dueño — ${datos.edificio || ""}`;
+        html = `<h2 style="margin-top:0;">Hola ${escapeHtml(datos.nombre || "")}</h2>
+          <p>Terminó el registro de llaves de <b>${ed}</b>. Hay <b>${escapeHtml(String(datos.cantidad || 0))} ${datos.cantidad === 1 ? "llave que nadie registró" : "llaves que nadie registró"}</b>.</p>
+          <p>Entrá al portal, revisá la lista y confirmá cuáles damos de baja. Si alguna es del encargado, de un proveedor o de alguien que sigue en el edificio, marcala para conservar.</p>
+          ${avance}${boton(datos.portal, "Revisar y aprobar las bajas")}${pie}`;
+      } else { res.status(400).json({ error: "Etapa desconocida" }); return; }
+    } else if (tipo === "campana_sat") {
+      // Avisos internos de la campaña de registro (van a administración/edificios, como las gestiones).
+      destinatario = process.env.LLAVES_AVISO_EMAIL || "administracion@sat365.com.ar,edificios@sat365.com.ar";
+      if (datos.etapa === "aprobada") {
+        asunto = `🔑 Bajas aprobadas por el administrador — ${datos.edificio || ""}`;
+        html = envolverDocumento(`<h2 style="margin-top:0;">${escapeHtml(datos.administrador || "")} aprobó ${escapeHtml(String(datos.bajas || 0))} ${datos.bajas === 1 ? "baja" : "bajas"}</h2>
+          <p>Campaña de registro de <b>${escapeHtml(datos.edificio || "")}</b>. Ya quedaron marcadas como <b>«Dar de baja»</b> en la conciliación (panel → Llaves de edificios): hay que hacerlas en la estación y marcarlas «Ya lo hice».</p>
+          ${(datos.conservar || []).length ? `<p><b>Pidió conservar:</b></p><ul>${datos.conservar.map((x) => `<li>${escapeHtml(x)}</li>`).join("")}</ul>` : ""}
+          <p style="color:#6B7680;font-size:13px;">Cuando estén hechas, cerrá la campaña desde el panel.</p>`);
+      } else if (datos.etapa === "vencida_sin_estacion") {
+        asunto = `⚠ Venció el registro de llaves y falta el Excel de la estación — ${datos.edificio || ""}`;
+        html = envolverDocumento(`<h2 style="margin-top:0;">Venció el registro de llaves de ${escapeHtml(datos.edificio || "")}</h2>
+          <p>La fecha límite era el ${escapeHtml(datos.limite_txt || "")}, pero no hay un Excel de la estación cargado en la conciliación, así que no se puede armar la lista de llaves sin dueño.</p>
+          <p>Subilo en el panel → Llaves de edificios → Conciliación y después tocá <b>«Armar propuesta de bajas»</b> en la campaña.</p>`);
+      } else { res.status(400).json({ error: "Etapa desconocida" }); return; }
     } else if (tipo === "aviso_gestion") {
       // Aviso al administrador de consorcio (o al vecino del link) de que SAT cambió
       // el estado de su pedido de llaves. Es un mail externo: va por Resend como el del cliente.
@@ -506,7 +550,7 @@ module.exports = async (req, res) => {
     // cuando el origen es una IP externa (Vercel/AWS). Resend tiene
     // buena reputación con Gmail y otros proveedores. El de oficina
     // sigue por SMTP porque es entrega interna (no sale de Ferozo).
-    if (["cliente", "aviso_gestion", "constancia_registro", "constancia_pedido", "restablecer_clave"].includes(tipo) && process.env.RESEND_API_KEY) {
+    if (["cliente", "aviso_gestion", "constancia_registro", "constancia_pedido", "restablecer_clave", "campana_admin"].includes(tipo) && process.env.RESEND_API_KEY) {
       const resendRes = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },

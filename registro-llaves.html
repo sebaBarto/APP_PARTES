@@ -57,6 +57,11 @@
   .intro h1 { font-family: var(--cond); font-weight: 800; font-style: italic; text-transform: uppercase; font-size: clamp(30px, 8.4vw, 40px); line-height: .98; letter-spacing: -.2px; margin: 16px 0 10px; }
   .intro h1 em { color: var(--amber); }
   .intro .bajada { margin: 0; color: #C9C6BC; font-size: 15.5px; line-height: 1.5; max-width: 460px; }
+  .limite { display: inline-flex; align-items: center; gap: 8px; margin-top: 14px; padding: 8px 12px; border-radius: 10px; background: var(--amber); color: var(--ink); font-size: 14.5px; font-weight: 500; }
+  .limite svg { width: 18px; height: 18px; }
+  body.fin .intro .limite { display: none; }
+  .captcha { margin-top: 16px; min-height: 0; display: flex; justify-content: center; }
+  .captcha:empty { display: none; }
   .meta { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 16px; font-size: 13.5px; color: #C9C6BC; }
   .meta span { display: inline-flex; align-items: center; gap: 6px; }
   .meta svg { width: 16px; height: 16px; color: var(--amber); }
@@ -282,6 +287,7 @@
         <span class="direccion" id="edificioDireccion"></span>
         <h1>Registrá tu <em>llave</em> de acceso</h1>
         <p class="bajada" id="introTxt">Estamos actualizando el registro de llaves del edificio. Las llaves que nadie registre podrán darse de baja.</p>
+        <div class="limite oculto" id="introLimite"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span>Registrate antes del <b id="introLimiteTxt"></b></span></div>
         <div class="meta" id="introMeta">
           <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 3h6"/></svg>2 minutos</span>
           <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Datos privados</span>
@@ -474,6 +480,7 @@
           <div class="error-campo">Para continuar tenés que aceptar.</div>
         </div>
 
+        <div class="captcha" id="captchaBox"></div>
         <button type="submit" class="enviar" id="enviarBtn">
           Enviar registro
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
@@ -556,6 +563,12 @@
       $("edificioDireccion").textContent = d.direccion || "";
       document.title = "Registro de llaves — " + d.nombre;
       document.querySelectorAll("[data-wa]").forEach((a) => { a.href = "https://wa.me/5493413782085?text=" + encodeURIComponent("Hola SAT, necesito ayuda con el registro de llaves de " + d.nombre + "."); });
+      if (d.limite) {
+        const [a, m, dia] = d.limite.split("-").map(Number);
+        $("introLimiteTxt").textContent = new Date(a, m - 1, dia).toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
+        $("introLimite").classList.remove("oculto");
+      }
+      if (d.captcha) prepararCaptcha(d.captcha);
       agregarDispositivo("tag");
       mostrar("formulario");
     } catch (e) {
@@ -563,6 +576,26 @@
       mostrar("pantallaInvalida");
     }
   }
+
+  // ---------- Anti-robots (Cloudflare Turnstile): solo si el servidor lo pide ----------
+  let captchaWidget = null, captchaToken = "", captchaClave = "", captchaFallo = false;
+  function prepararCaptcha(clave) {
+    captchaClave = clave;
+    window.alCargarTurnstile = () => {
+      captchaWidget = window.turnstile.render("#captchaBox", {
+        sitekey: captchaClave, language: "es", appearance: "interaction-only", action: "registro_llaves",
+        callback: (t) => { captchaToken = t; },
+        "expired-callback": () => { captchaToken = ""; },
+        "error-callback": () => { captchaToken = ""; },
+      });
+    };
+    const sc = document.createElement("script");
+    sc.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=alCargarTurnstile";
+    sc.async = true; sc.defer = true;
+    sc.onerror = () => { captchaFallo = true; };
+    document.head.appendChild(sc);
+  }
+  function reiniciarCaptcha() { captchaToken = ""; if (window.turnstile && captchaWidget !== null) { try { window.turnstile.reset(captchaWidget); } catch (e) {} } }
 
   // ---------- Dispositivos: llaves (tag) y controles de cochera ----------
   const ICONO = {
@@ -817,7 +850,15 @@
       acepta: $("acepta").checked,
       sitio_web: $("sitioWeb").value,
       copia: !!$("email").value.trim() && $("copia").checked,
+      captcha: captchaToken || undefined,
     };
+    if (captchaClave && !captchaToken) {
+      st.className = "status err";
+      st.textContent = captchaFallo
+        ? "No se pudo cargar la verificación anti-robots (puede ser un bloqueador de publicidad o la conexión). Recargá la página o escribinos por WhatsApp y te ayudamos."
+        : "Estamos verificando que no seas un robot. Esperá un par de segundos y tocá Enviar de nuevo.";
+      return;
+    }
     const btn = $("enviarBtn");
     btn.disabled = true;
     st.className = "status";
@@ -825,7 +866,8 @@
     try {
       const r = await fetch("/api/datos?publico=registro_llaves", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(datos) });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.error || (r.status === 429 ? "Se mandaron muchos registros seguidos, esperá unos minutos" : "No se pudo enviar"));
+      if (!r.ok) { if (d.captcha) reiniciarCaptcha(); throw new Error(d.error || (r.status === 429 ? "Se mandaron muchos registros seguidos, esperá unos minutos" : "No se pudo enviar")); }
+      reiniciarCaptcha(); // cada verificación sirve una sola vez
       armarResumen(datos, d);
       $("graciasTxt").textContent = (d.actualizado ? "Ya estabas registrado: actualizamos tus datos con lo que cargaste ahora." : "Tu registro quedó guardado. Si hace falta algo más, te vamos a contactar.") + (d.copia ? " Te mandamos una copia por mail." : "");
       st.textContent = "";

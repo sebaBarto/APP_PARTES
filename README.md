@@ -3306,3 +3306,37 @@ IP y por mail. Datos en `registro-llaves/administradores.json` y
   consorcio le llega un mail "Entregada a …".
 - Código: `lib/entregas-llaves.js`, `descontarStockEntrega` en `api/datos.js`,
   `entregas-llaves.js` (APP).
+- **Quién entrega**: solo la oficina (permiso *Entregar llaves de edificios*
+  en admin → Técnicos, o el admin desde la PC). Una entrega puntual se le
+  puede habilitar a un técnico (*Habilitar a un técnico* en la gestión): ve
+  solo ese pedido.
+
+### Campaña de registro (fecha límite y bajas aprobadas por el consorcio)
+
+- En la pestaña Llaves de edificios, con el edificio abierto: **Campaña de
+  registro** → fecha límite → *Abrir campaña*. Se le avisa por mail al
+  administrador y el formulario del QR muestra «Registrate antes del …».
+- Mientras está abierta, el administrador ve en su portal el avance (cuántas
+  llaves de la estación ya tienen dueño, si se subió el Excel de la estación)
+  y puede reenviar el link del registro por WhatsApp. 7 días antes le llega un
+  recordatorio.
+- Al vencer (cron diario) o antes con *Armar propuesta de bajas ahora*: las
+  llaves de la estación que **nadie registró** (y que SAT no decidió todavía)
+  se le mandan al administrador. Él marca cada una **Dar de baja** o
+  **Conservar** (con motivo) y confirma. Si no responde en 7 días, se le
+  recuerda. Si vence sin Excel de la estación, le llega un aviso a SAT.
+- Lo aprobado queda en la **conciliación** como *Dar de baja* (lo conservado,
+  *Mantener* con el motivo) y a SAT le llega un mail. Se hace en la estación,
+  se marca *Ya lo hice* y se cierra la campaña.
+- Código: `lib/campana-llaves.js` (cruce con la estación, estados, mails y
+  `chequearCampanas` que llama `api/cron-diario.js`). Datos:
+  `registro-llaves/<codigo>.campana.json`.
+
+### Anti-robots en el formulario del QR (Cloudflare Turnstile)
+
+- Se activa solo cuando están las variables **`TURNSTILE_SITE_KEY`** y
+  **`TURNSTILE_SECRET_KEY`** en Vercel (Cloudflare → Turnstile → *Add site*,
+  dominio `pedido.sat365.com.ar`, modo *Managed*; es gratis).
+- El vecino normalmente no ve nada (aparece un recuadro solo si Cloudflare
+  duda). El servidor verifica el token; si Cloudflare no responde, deja pasar
+  (siguen los topes por IP y por día) para no trabar a los vecinos.

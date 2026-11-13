@@ -1884,6 +1884,15 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
         <div id="rllTabla" style="overflow-x:auto;"></div>
       </div>
 
+      <div class="card hidden" id="rllCampanaCard">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between;">
+          <h3 style="margin:0;">Campaña de registro <span id="rllCampanaEstado"></span></h3>
+        </div>
+        <p class="subtitle" style="margin:8px 0 0;">Una fecha límite para que los vecinos registren sus llaves. Al vencer, las llaves de la estación que nadie registró se le mandan al administrador del consorcio para que apruebe la baja (o pida conservar alguna). Lo aprobado queda marcado en la conciliación como «Dar de baja».</p>
+        <div id="rllCampanaCuerpo" style="margin-top:12px;"></div>
+        <p class="status" id="rllCampanaStatus"></p>
+      </div>
+
       <div class="card hidden" id="rllConcCard">
         <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between;">
           <h3 style="margin:0;">Conciliación con la estación de monitoreo</h3>
@@ -9661,8 +9670,9 @@ async function rllAbrirEdificio(codigo) {
   rllEdificioActual = rllEdificios.find((x) => x.codigo === codigo) || null;
   renderRllEdificios();
   const card = document.getElementById("rllRegistrosCard");
-  if (!rllEdificioActual) { card.classList.add("hidden"); document.getElementById("rllConcCard").classList.add("hidden"); return; }
+  if (!rllEdificioActual) { card.classList.add("hidden"); document.getElementById("rllConcCard").classList.add("hidden"); document.getElementById("rllCampanaCard").classList.add("hidden"); return; }
   rllConc = null; // la conciliación es de cada edificio: se vuelve a pedir abajo
+  document.getElementById("rllCampanaStatus").textContent = "";
   card.classList.remove("hidden");
   document.getElementById("rllRegistrosTit").textContent = "Padrón de llaves de " + rllEdificioActual.nombre;
   const st = document.getElementById("rllRegistrosStatus");
@@ -9675,7 +9685,98 @@ async function rllAbrirEdificio(codigo) {
     st.textContent = "";
     renderRllRegistros();
     rllCargarConciliacion();
+    rllCargarCampana();
   } catch (e) { st.className = "status err"; st.textContent = "No se pudo cargar: " + e.message; }
+}
+
+// ---------- Campaña de registro (lib/campana-llaves.js) ----------
+let rllCampana = null;
+async function rllCargarCampana() {
+  const card = document.getElementById("rllCampanaCard");
+  if (!rllEdificioActual) { card.classList.add("hidden"); return; }
+  card.classList.remove("hidden");
+  const codigo = rllEdificioActual.codigo;
+  try {
+    const r = await fetch("/api/datos?coleccion=registro_llaves&campana=1&edificio=" + encodeURIComponent(codigo), { headers: rllHeaders(), cache: "no-store" });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Error");
+    if (!rllEdificioActual || rllEdificioActual.codigo !== codigo) return;
+    rllCampana = d;
+    renderRllCampana();
+  } catch (e) { document.getElementById("rllCampanaCuerpo").innerHTML = `<p class="status err">No se pudo cargar la campaña: ${rllEsc(e.message)}</p>`; }
+}
+function rllFechaLimiteTxt(f) { const [a, m, d] = String(f || "").split("-").map(Number); return a ? new Date(a, m - 1, d).toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" }) : ""; }
+function rllDiasHasta(f) { return Math.ceil((Date.parse(f + "T23:59:59-03:00") - Date.now()) / 864e5); }
+function renderRllCampana() {
+  const d = rllCampana || {};
+  const c = d.campana, p = d.progreso || {};
+  const cuerpo = document.getElementById("rllCampanaCuerpo");
+  const abierta = c && ["activa", "en_revision", "aprobada"].includes(c.estado);
+  const ESTADO = { activa: ["Registro abierto", "pronto"], en_revision: ["Esperando al administrador", "pronto"], aprobada: ["Bajas aprobadas", "ok"], cerrada: ["Cerrada", "sin"], cancelada: ["Cancelada", "sin"] };
+  document.getElementById("rllCampanaEstado").innerHTML = abierta ? `<span class="ven-estado ${ESTADO[c.estado][1]}" style="margin-left:6px;vertical-align:middle;">${ESTADO[c.estado][0]}</span>` : "";
+  const barra = p.estacion
+    ? `<div style="margin:10px 0 4px;font-size:14px;"><b>${p.estacion.con_dueno} de ${p.estacion.total}</b> llaves de la estación ya tienen dueño (${p.estacion.porcentaje}%) · <b style="color:#B3261E;">${p.estacion.sin_dueno} sin registrar</b></div>
+       <div style="height:10px;border-radius:999px;background:#ECEAE3;overflow:hidden;"><div style="height:100%;width:${p.estacion.porcentaje}%;background:#F6B828;"></div></div>`
+    : `<div style="margin:10px 0 4px;font-size:14px;"><b>${p.personas || 0}</b> vecinos registrados en <b>${p.unidades || 0}</b> unidades. <span style="color:#6B7680;">Subí el Excel de la estación (abajo) para ver cuántas llaves faltan.</span></div>`;
+  const hist = c && (c.historial || []).length ? `<details style="margin-top:12px;"><summary style="cursor:pointer;color:#55595F;font-size:13px;">Historial de la campaña</summary><ul style="margin:6px 0 0;padding-left:18px;font-size:13px;color:#55595F;">${c.historial.slice().reverse().map((h) => `<li>${rllFecha(h.fecha)} — ${rllEsc(h.que)}${h.por ? " (" + rllEsc(h.por) + ")" : ""}</li>`).join("")}</ul></details>` : "";
+  const manana = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
+  if (!abierta) {
+    cuerpo.innerHTML = `${c ? `<p style="margin:0 0 8px;color:#55595F;font-size:14px;">Última campaña: ${c.estado === "cerrada" ? "cerrada" : "cancelada"}${c.fin ? " el " + rllFecha(c.fin) : ""}.</p>` : ""}${barra}
+      <div class="field-row" style="flex-wrap:wrap;align-items:flex-end;gap:10px;margin-top:12px;">
+        <div style="flex:0 0 auto;"><label for="rllCampLimite">Fecha límite</label><input type="date" id="rllCampLimite" class="field-input" value="${manana}" style="width:auto;"></div>
+        <label style="display:flex;align-items:center;gap:8px;font-weight:500;margin:0 0 10px;"><input type="checkbox" id="rllCampAvisar" checked style="width:18px;height:18px;"> Avisarle al administrador por mail</label>
+        <button type="button" id="rllCampIniciarBtn" style="width:auto;margin-bottom:4px;">Abrir campaña de registro</button>
+      </div>${hist}`;
+    document.getElementById("rllCampIniciarBtn").addEventListener("click", () => rllAccionCampana({ accion: "campana_iniciar", limite: document.getElementById("rllCampLimite").value, avisar: document.getElementById("rllCampAvisar").checked }, "Campaña abierta."));
+    return;
+  }
+  if (c.estado === "activa") {
+    const dias = rllDiasHasta(c.limite);
+    cuerpo.innerHTML = `<p style="margin:0;font-size:15px;">Registro abierto hasta el <b>${rllEsc(rllFechaLimiteTxt(c.limite))}</b> ${dias > 0 ? `(faltan ${dias} ${dias === 1 ? "día" : "días"})` : "(venció: se arma la propuesta en la próxima corrida del día)"}.</p>${barra}
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-top:14px;">
+        <div><label for="rllCampLimite" style="font-size:13px;">Nueva fecha</label><input type="date" id="rllCampLimite" class="field-input" value="${rllEsc(c.limite)}" style="width:auto;margin:0;"></div>
+        <button type="button" class="btn-secondary-admin" id="rllCampFechaBtn" style="width:auto;">Cambiar fecha</button>
+        <button type="button" class="btn-secondary-admin" id="rllCampPropBtn" style="width:auto;" ${d.hay_estacion ? "" : "disabled title=\"Primero subí el Excel de la estación\""}>Armar propuesta de bajas ahora${d.hay_estacion ? ` (${d.sin_dueno})` : ""}</button>
+        <button type="button" class="btn-secondary-admin" id="rllCampCancelarBtn" style="width:auto;color:#B3261E;">Cancelar campaña</button>
+      </div>${hist}`;
+    document.getElementById("rllCampFechaBtn").addEventListener("click", () => rllAccionCampana({ accion: "campana_limite", limite: document.getElementById("rllCampLimite").value }, "Fecha cambiada y avisada al administrador."));
+    document.getElementById("rllCampPropBtn").addEventListener("click", () => { if (confirm(`¿Mandarle al administrador las ${d.sin_dueno} llaves sin dueño para que apruebe la baja? Se cierra el registro (los vecinos pueden seguir registrándose, pero la lista ya sale).`)) rllAccionCampana({ accion: "campana_propuesta" }, "Propuesta enviada al administrador."); });
+    document.getElementById("rllCampCancelarBtn").addEventListener("click", () => { if (confirm("¿Cancelar la campaña? No se le manda nada al administrador.")) rllAccionCampana({ accion: "campana_cancelar" }, "Campaña cancelada."); });
+    return;
+  }
+  if (c.estado === "en_revision") {
+    const filas = (c.propuesta && c.propuesta.filas) || [];
+    cuerpo.innerHTML = `<p style="margin:0;font-size:15px;">Le mandamos al administrador <b>${filas.length} ${filas.length === 1 ? "llave sin dueño" : "llaves sin dueño"}</b> el ${rllFecha(c.propuesta.fecha)}. Está esperando que apruebe las bajas desde su portal${c.avisos && c.avisos.recordatorio_revision ? " (ya se le mandó un recordatorio)" : " (si en 7 días no responde, se le recuerda solo)"}.</p>
+      <details style="margin-top:10px;"><summary style="cursor:pointer;font-weight:600;">Ver la lista</summary><div style="overflow-x:auto;"><table class="ven-tabla" style="margin-top:8px;"><thead><tr><th>Llave</th><th>Usuario</th><th>En la estación figura como</th></tr></thead><tbody>${filas.map((f) => `<tr><td style="font-family:'IBM Plex Mono',monospace;">${f.tipo === "control" ? "📟 " : ""}${rllEsc(f.tag || "—")}</td><td>${rllEsc(f.usuario || "")}</td><td>${rllEsc([f.nombre, f.unidad].filter(Boolean).join(" · "))}</td></tr>`).join("")}</tbody></table></div></details>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;">
+        <button type="button" class="btn-secondary-admin" id="rllCampPropBtn" style="width:auto;">Volver a armar la lista</button>
+        <button type="button" class="btn-secondary-admin" id="rllCampCancelarBtn" style="width:auto;color:#B3261E;">Cancelar campaña</button>
+      </div>${hist}`;
+    document.getElementById("rllCampPropBtn").addEventListener("click", () => { if (confirm("¿Volver a armar la lista con lo registrado hasta hoy y mandársela de nuevo al administrador?")) rllAccionCampana({ accion: "campana_propuesta" }, "Lista actualizada y enviada."); });
+    document.getElementById("rllCampCancelarBtn").addEventListener("click", () => { if (confirm("¿Cancelar la campaña?")) rllAccionCampana({ accion: "campana_cancelar" }, "Campaña cancelada."); });
+    return;
+  }
+  // aprobada
+  const resp = c.respuesta || { bajas: [], conservar: [] };
+  const porK = new Map(((c.propuesta && c.propuesta.filas) || []).map((f) => [f.k, f]));
+  cuerpo.innerHTML = `<p style="margin:0;font-size:15px;"><b>${rllEsc(resp.por || "El administrador")}</b> aprobó <b>${resp.bajas.length} ${resp.bajas.length === 1 ? "baja" : "bajas"}</b>${resp.conservar.length ? ` y pidió conservar <b>${resp.conservar.length}</b>` : ""} <span style="color:#6B7680;">(${rllFecha(resp.fecha)})</span>.</p>
+    <p style="margin:6px 0 0;color:#55595F;font-size:14px;">Ya están marcadas en la conciliación (abajo) como «Dar de baja»: hacelas en la estación y marcá «✓ Ya lo hice». Cuando termines, cerrá la campaña.</p>
+    ${resp.conservar.length ? `<p style="margin:10px 0 4px;font-weight:600;">Pidió conservar:</p><ul style="margin:0;padding-left:18px;font-size:14px;">${resp.conservar.map((x) => { const f = porK.get(x.k) || {}; return `<li><span style="font-family:'IBM Plex Mono',monospace;">${rllEsc(f.tag || f.usuario || "s/n")}</span>${f.nombre ? " · " + rllEsc(f.nombre) : ""}${x.motivo ? " — <i>" + rllEsc(x.motivo) + "</i>" : ""}</li>`; }).join("")}</ul>` : ""}
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;"><button type="button" id="rllCampCerrarBtn" style="width:auto;">✓ Cerrar campaña</button></div>${hist}`;
+  document.getElementById("rllCampCerrarBtn").addEventListener("click", () => rllAccionCampana({ accion: "campana_cerrar" }, "Campaña cerrada."));
+}
+async function rllAccionCampana(cuerpoAccion, okTxt) {
+  const st = document.getElementById("rllCampanaStatus");
+  st.className = "status"; st.textContent = "Guardando...";
+  document.querySelectorAll("#rllCampanaCuerpo button").forEach((b) => { b.disabled = true; });
+  try {
+    const r = await fetch("/api/datos?coleccion=registro_llaves", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ ...cuerpoAccion, edificio: rllEdificioActual.codigo }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Error");
+    st.className = "status ok"; st.textContent = okTxt + (d.avisados ? ` Se le avisó por mail a ${d.avisados} ${d.avisados === 1 ? "administrador" : "administradores"}.` : "");
+    await rllCargarCampana();
+    if (cuerpoAccion.accion === "campana_propuesta" || cuerpoAccion.accion === "campana_cerrar") rllCargarConciliacion();
+  } catch (e) { st.className = "status err"; st.textContent = e.message; document.querySelectorAll("#rllCampanaCuerpo button").forEach((b) => { b.disabled = false; }); }
 }
 
 // Una fila por llave (la conciliación se hace llave por llave).
@@ -10123,6 +10224,7 @@ document.getElementById("rllConcCompararBtn").addEventListener("click", async ()
     document.getElementById("rllConcMapeo").classList.add("hidden");
     st.className = "status ok"; st.textContent = `Listo: ${d.filas.length} filas de la estación comparadas.`;
     renderRllConciliacion();
+    rllCargarCampana();
   } catch (e) { st.className = "status err"; st.textContent = "No se pudo comparar: " + e.message; }
 });
 

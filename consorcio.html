@@ -177,6 +177,31 @@
   .kpi.alerta { background: var(--amber-soft); border-color: #F1D99A; }
   .kpi.alerta b { color: #8A5A00; }
 
+  /* Campaña de registro */
+  .campana { border-radius: 16px; padding: 16px 18px; margin: 16px 0 4px; border: 1px solid #F1D99A; background: var(--amber-soft); }
+  .campana.revision { background: #fff; border: 1.5px solid var(--ink); box-shadow: 0 0 0 4px rgba(246,184,40,.25); }
+  .campana.aprobada { background: var(--ok-soft); border-color: #B7DFC4; }
+  .campana-cab { display: flex; gap: 12px; align-items: flex-start; }
+  .campana-cab .hx { width: 40px; height: 35px; flex: none; display: grid; place-items: center; background: var(--ink); color: var(--amber); clip-path: polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%); }
+  .campana.aprobada .campana-cab .hx { background: var(--ok); color: #fff; }
+  .campana-cab .hx svg { width: 18px; height: 18px; }
+  .campana-cab > div > b { display: block; font-family: var(--cond); font-weight: 700; font-size: 20px; line-height: 1.15; }
+  .campana-cab > div > span { display: block; color: var(--text-2); font-size: 14.5px; margin-top: 2px; }
+  .barra-avance { height: 10px; border-radius: 999px; background: rgba(13,12,13,.08); overflow: hidden; margin: 14px 0 6px; }
+  .barra-avance div { height: 100%; background: var(--amber); border-radius: 999px; }
+  .campana .avance-txt { font-size: 14px; color: var(--text-2); }
+  .campana .acc { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .baja-fila { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 14px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line-2); }
+  .baja-fila .dat { font-size: 13.5px; color: var(--muted); }
+  .baja-fila .num { font-family: var(--mono); font-weight: 600; font-size: 15px; }
+  .baja-fila .motivo { grid-column: 1 / -1; }
+  .baja-fila .motivo input { padding: 9px 12px; font-size: 15px; }
+  .seg { display: inline-flex; padding: 3px; gap: 3px; background: var(--soft); border: 1px solid var(--line-2); border-radius: 11px; }
+  .seg button { border: 0; background: none; padding: 7px 11px; border-radius: 8px; font-size: 13.5px; font-weight: 600; color: var(--muted); cursor: pointer; white-space: nowrap; }
+  .seg button.activo.baja { background: var(--err); color: #fff; }
+  .seg button.activo.conservar { background: var(--ink); color: #fff; }
+  .resumen-bajas { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-top: 12px; padding-top: 14px; border-top: 1px solid var(--line-2); font-size: 14.5px; }
+
   /* Pestañas */
   .tabs { display: flex; gap: 4px; margin: 20px 0 22px; padding: 4px; background: var(--soft); border: 1px solid var(--line-2); border-radius: 14px; }
   .tab { flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: none; background: none; padding: 10px 12px; font-weight: 600; font-size: 15px; color: var(--muted); cursor: pointer; border-radius: 10px; white-space: nowrap; transition: background .15s, color .15s; }
@@ -365,6 +390,10 @@
     .fila.tres > :last-child { grid-column: 1 / -1; }
     .modal-acc .btn { flex: 1; }
     .link-item .acc { width: 100%; display: grid; grid-template-columns: 1fr 1fr auto; }
+    .baja-fila { grid-template-columns: 1fr; gap: 8px; }
+    .baja-fila .seg { display: flex; }
+    .baja-fila .seg button { flex: 1; padding: 9px 10px; }
+    .resumen-bajas .btn { width: 100%; }
     .link-item .txt-cancelar { display: none; }
     .gestion { padding: 14px; }
     .datos { grid-template-columns: 1fr 1fr; gap: 12px 14px; }
@@ -491,6 +520,7 @@
           </div>
         </div>
         <div class="kpis" id="edKpis"></div>
+        <div id="edCampana"></div>
         <div class="tabs" role="tablist" id="tabs">
           <button type="button" class="tab activo" data-tab="nueva" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span class="largo">Nueva gestión</span><span class="corto">Nueva</span></button>
           <button type="button" class="tab" data-tab="gestiones" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5h10M9 12h10M9 19h10M4 5h.01M4 12h.01M4 19h.01"/></svg><span class="largo">Pedidos</span><span class="corto">Pedidos</span><span class="n" id="nGestiones">0</span></button>
@@ -681,6 +711,14 @@
     </form>
   </div>
 
+  <div class="capa oculto" id="modalConfirmar">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="confirmarTit">
+      <h2 id="confirmarTit"></h2>
+      <p class="sub" id="confirmarTxt" style="font-size:15px;"></p>
+      <div class="modal-acc"><button type="button" class="btn btn-sec" id="confirmarNo">Volver</button><button type="button" class="btn" id="confirmarSi">Confirmar</button></div>
+    </div>
+  </div>
+
   <div class="visor oculto" id="visor"><button type="button" class="btn btn-sec btn-chico" id="visorCerrar">Cerrar ✕</button><img id="visorImg" alt="Foto de la llave"></div>
 
   <footer class="pie">SAT · Seguridad electrónica · <a href="https://www.sat365.com.ar" target="_blank" rel="noopener">sat365.com.ar</a></footer>
@@ -727,9 +765,22 @@
   // Menú del usuario
   $("menuUsuarioBtn").addEventListener("click", (e) => { e.stopPropagation(); const m = $("menuUsuario"); m.classList.toggle("oculto"); $("menuUsuarioBtn").setAttribute("aria-expanded", String(!m.classList.contains("oculto"))); });
   document.addEventListener("click", (e) => { if (!e.target.closest("#menuUsuario")) $("menuUsuario").classList.add("oculto"); });
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { $("menuUsuario").classList.add("oculto"); ["modalClave", "modalCancelar", "visor"].forEach((id) => $(id).classList.add("oculto")); } });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { $("menuUsuario").classList.add("oculto"); ["modalClave", "modalCancelar", "visor", "modalConfirmar"].forEach((id) => $(id).classList.add("oculto")); } });
   // Mostrar / ocultar la clave
   document.querySelectorAll(".ver-clave").forEach((b) => b.addEventListener("click", () => { const i = $(b.dataset.ver); i.type = i.type === "password" ? "text" : "password"; b.setAttribute("aria-label", i.type === "password" ? "Mostrar la clave" : "Ocultar la clave"); }));
+  function confirmar(titulo, texto, si, peligro) {
+    return new Promise((ok) => {
+      $("confirmarTit").textContent = titulo; $("confirmarTxt").textContent = texto;
+      $("confirmarSi").textContent = si || "Confirmar";
+      $("confirmarSi").className = "btn" + (peligro ? " btn-osc" : "");
+      $("modalConfirmar").classList.remove("oculto");
+      $("confirmarSi").focus();
+      const fin = (v) => { $("modalConfirmar").classList.add("oculto"); $("confirmarSi").onclick = $("confirmarNo").onclick = $("modalConfirmar").onclick = null; ok(v); };
+      $("confirmarSi").onclick = () => fin(true);
+      $("confirmarNo").onclick = () => fin(false);
+      $("modalConfirmar").onclick = (e) => { if (e.target.id === "modalConfirmar") fin(false); };
+    });
+  }
   function textoWa(t) { document.querySelectorAll("[data-wa]").forEach((a) => { a.href = "https://wa.me/5493413782085?text=" + encodeURIComponent(t); }); }
 
   let pase = "";
@@ -788,7 +839,7 @@
       $("sinEdificios").classList.toggle("oculto", edificios.length > 0);
       $("edificios").innerHTML = edificios.map((e) => {
         const r = e.resumen;
-        return `<button type="button" class="ed-chip" data-c="${esc(e.codigo)}"><span class="marca"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><b>${esc(e.nombre)}</b><span class="dir">${esc(e.direccion || "")}</span>${r ? `<span class="mini-stats"><span class="pill">${r.personas} ${r.personas === 1 ? "vecino" : "vecinos"}</span><span class="pill">${r.tags} tags · ${r.controles} ctrl.</span>${r.abiertos ? `<span class="pill alerta">${r.abiertos} ${r.abiertos === 1 ? "pedido abierto" : "pedidos abiertos"}</span>` : ""}</span>` : ""}</button>`;
+        return `<button type="button" class="ed-chip" data-c="${esc(e.codigo)}"><span class="marca"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><b>${esc(e.nombre)}</b><span class="dir">${esc(e.direccion || "")}</span>${r ? `<span class="mini-stats"><span class="pill">${r.personas} ${r.personas === 1 ? "vecino" : "vecinos"}</span><span class="pill">${r.tags} tags · ${r.controles} ctrl.</span>${r.abiertos ? `<span class="pill alerta">${r.abiertos} ${r.abiertos === 1 ? "pedido abierto" : "pedidos abiertos"}</span>` : ""}${e.campana && e.campana.estado === "en_revision" ? '<span class="pill alerta">⚠ Revisar bajas</span>' : e.campana && e.campana.estado === "activa" ? `<span class="pill">Registro hasta ${esc(fechaCorta(e.campana.limite + "T12:00:00-03:00"))}</span>` : ""}</span>` : ""}</button>`;
       }).join("");
       $("seccionEdificios").classList.toggle("oculto", edificios.length === 1);
       $("edificios").querySelectorAll(".ed-chip").forEach((b) => b.addEventListener("click", () => abrirEdificio(b.dataset.c)));
@@ -840,10 +891,65 @@
     ];
     $("edKpis").innerHTML = k.map(([n, t, c]) => `<div class="kpi ${c}"><b>${esc(n)}</b><span>${esc(t)}</span></div>`).join("");
   }
+  // ---------- Campaña de registro ----------
+  let decisionesBaja = {};
+  function renderCampana() {
+    const c = datos.campana, cont = $("edCampana");
+    if (!c) { cont.innerHTML = ""; return; }
+    const p = c.progreso || {};
+    const avance = p.estacion
+      ? `<div class="barra-avance"><div style="width:${Math.max(2, p.estacion.porcentaje)}%;"></div></div><div class="avance-txt"><b>${p.estacion.con_dueno} de ${p.estacion.total}</b> llaves ya tienen dueño (${p.estacion.porcentaje}%) · faltan <b>${p.estacion.sin_dueno}</b></div>`
+      : `<div class="avance-txt" style="margin-top:10px;"><b>${p.personas}</b> ${p.personas === 1 ? "vecino registrado" : "vecinos registrados"} en <b>${p.unidades}</b> ${p.unidades === 1 ? "unidad" : "unidades"}.</div>`;
+    if (c.estado === "activa") {
+      const msg = `Hola! Estamos actualizando el registro de llaves de acceso de ${actual.nombre}. Cada vecino tiene que registrar su llave (lleva 2 minutos) antes del ${c.limite_txt}: ${c.link_registro} — Las llaves que nadie registre se van a dar de baja.`;
+      cont.innerHTML = `<div class="campana"><div class="campana-cab"><span class="hx">${IC.tag}</span><div><b>Registro de llaves abierto</b><span>Hasta el <b>${esc(c.limite_txt)}</b>${c.dias > 0 ? ` · faltan ${c.dias} ${c.dias === 1 ? "día" : "días"}` : ""}. Las llaves que nadie registre se van a proponer para dar de baja.</span></div></div>
+        ${avance}
+        <div class="acc"><a class="btn btn-sec btn-chico" style="color:#178A45;" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(msg)}">${IC.wa}Mandar el link a los vecinos</a><button type="button" class="btn btn-sec btn-chico" id="copiarRegistro">${IC.copiar}Copiar link del registro</button></div></div>`;
+      $("copiarRegistro").addEventListener("click", async () => { try { await navigator.clipboard.writeText(c.link_registro); aviso("Link del registro copiado."); } catch (e) { prompt("Copiá el link:", c.link_registro); } });
+      return;
+    }
+    if (c.estado === "aprobada") {
+      const r = c.respuesta || {};
+      cont.innerHTML = `<div class="campana aprobada"><div class="campana-cab"><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><div><b>Revisión de llaves enviada</b><span>${esc(r.por || "Aprobaste")} aprobó ${r.bajas} ${r.bajas === 1 ? "baja" : "bajas"}${r.conservar ? ` y pidió conservar ${r.conservar}` : ""} el ${esc(fechaCorta(r.fecha, true))}. SAT las va a dar de baja en el sistema.</span></div></div></div>`;
+      return;
+    }
+    // En revisión: el administrador decide llave por llave.
+    const filas = (c.propuesta && c.propuesta.filas) || [];
+    filas.forEach((f) => { if (!decisionesBaja[f.k]) decisionesBaja[f.k] = { d: "baja", motivo: "" }; });
+    const n = (d) => filas.filter((f) => decisionesBaja[f.k].d === d).length;
+    cont.innerHTML = `<div class="campana revision"><div class="campana-cab"><span class="hx">${IC.alerta}</span><div><b>Revisá las llaves que nadie registró</b><span>Terminó el registro (${esc(c.limite_txt)}). Estas ${filas.length} ${filas.length === 1 ? "llave sigue" : "llaves siguen"} activas en el sistema pero nadie las reclamó. Si alguna es del encargado, de un proveedor o de alguien que sigue en el edificio, marcala para <b>conservar</b>.</span></div></div>
+      ${avance}
+      <div style="margin-top:12px;">${filas.map((f) => `<div class="baja-fila" data-k="${esc(f.k)}">
+        <div><span class="num">${f.tipo === "control" ? "📟 " : ""}${esc(f.tag || "s/n")}</span>${f.usuario ? ` <span class="dat">· usuario ${esc(f.usuario)}</span>` : ""}<div class="dat">${f.nombre || f.unidad ? "En el sistema figura como: " + esc([f.nombre, f.unidad].filter(Boolean).join(" · ")) : "Sin nombre en el sistema"}</div></div>
+        <div class="seg" role="group" aria-label="Qué hacer con esta llave"><button type="button" class="baja ${decisionesBaja[f.k].d === "baja" ? "activo" : ""}" data-d="baja">Dar de baja</button><button type="button" class="conservar ${decisionesBaja[f.k].d === "conservar" ? "activo" : ""}" data-d="conservar">Conservar</button></div>
+        ${decisionesBaja[f.k].d === "conservar" ? `<div class="motivo"><input type="text" maxlength="120" placeholder="¿De quién es? Ej. encargado, proveedor, 3° B" value="${esc(decisionesBaja[f.k].motivo)}" aria-label="Motivo para conservar"></div>` : ""}
+      </div>`).join("")}</div>
+      <div class="resumen-bajas"><span>Vas a dar de baja <b>${n("baja")}</b> y conservar <b>${n("conservar")}</b>.</span><button type="button" class="btn" id="enviarBajasBtn">Confirmar y mandar a SAT</button></div></div>`;
+    cont.querySelectorAll(".baja-fila").forEach((el) => {
+      const k = el.dataset.k;
+      el.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => { decisionesBaja[k].d = b.dataset.d; renderCampana(); if (b.dataset.d === "conservar") { const i = $("edCampana").querySelector(`.baja-fila[data-k="${CSS.escape(k)}"] input`); if (i) i.focus(); } }));
+      const inp = el.querySelector(".motivo input");
+      if (inp) inp.addEventListener("input", () => { decisionesBaja[k].motivo = inp.value; });
+    });
+    $("enviarBajasBtn").addEventListener("click", async () => {
+      const bajas = filas.filter((f) => decisionesBaja[f.k].d === "baja").map((f) => f.k);
+      const conservar = filas.filter((f) => decisionesBaja[f.k].d === "conservar").map((f) => ({ k: f.k, motivo: decisionesBaja[f.k].motivo.trim() }));
+      if (!(await confirmar("¿Confirmás la revisión?", `SAT va a dar de baja ${bajas.length} ${bajas.length === 1 ? "llave" : "llaves"}${conservar.length ? ` y conservar ${conservar.length}` : ""}. Las llaves dadas de baja dejan de abrir.`, "Confirmar", true))) return;
+      $("enviarBajasBtn").disabled = true;
+      try {
+        await api("POST", "", { accion: "campana_responder", edificio: actual.codigo, bajas, conservar });
+        decisionesBaja = {};
+        aviso("Listo: le mandamos la revisión a SAT.");
+        await abrirEdificio(actual.codigo);
+      } catch (err) { aviso(err.message, true); $("enviarBajasBtn").disabled = false; }
+    });
+  }
+
   function renderTodo() {
     $("nVecinos").textContent = datos.registros.length;
     $("nGestiones").textContent = datos.gestiones.length;
     renderKpis();
+    renderCampana();
     renderVecinos(); renderGestiones(); armarElegir(); renderLinks();
   }
 
@@ -1129,7 +1235,7 @@
     if (c) { try { await navigator.clipboard.writeText(urlLink(c.dataset.c)); aviso("Link copiado. Pegalo en un mensaje al vecino."); } catch (err) { prompt("Copiá el link:", urlLink(c.dataset.c)); } return; }
     const x = e.target.closest(".cancelar-link");
     if (x) {
-      if (!confirm("¿Cancelar este link? El vecino ya no lo va a poder usar.")) return;
+      if (!(await confirmar("¿Cancelar este link?", "El vecino ya no lo va a poder usar.", "Cancelar link", true))) return;
       try { await api("POST", "", { accion: "cancelar_invitacion", edificio: actual.codigo, id: x.dataset.id }); const i = datos.invitaciones.find((v) => v.id === x.dataset.id); if (i) i.cancelada = new Date().toISOString(); renderLinks(); }
       catch (err) { aviso(err.message, true); }
     }

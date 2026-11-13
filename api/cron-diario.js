@@ -774,10 +774,13 @@ module.exports = async (req, res) => {
     try { cuadreStock = await chequearCuadreStock(ghHeaders, Date.now()); } catch (e) { cuadreStock = "error: " + e.message; }
     let propuestasAvisadas = null;
     try { propuestasAvisadas = await chequearPropuestas3d(ghHeaders); } catch (e) { propuestasAvisadas = "error: " + e.message; }
+    // Campañas de registro de llaves de edificios: recordatorios y propuesta de bajas al vencer.
+    let campanasLlaves = null;
+    try { const C = require("../lib/campana-llaves"); campanasLlaves = await C.chequearCampanas(C.ghDirecto(), Date.now()); } catch (e) { campanasLlaves = "error: " + e.message; }
 
     await guardarJSON(ghHeaders, ESTADO_PATH, estado, shaEstado);
 
-    res.status(200).json({ ok: true, guardia_notificada: tecnicoDeGuardia || null, recordatorio_en_calle: tecnicosRecordados || null, felicitacion_semanal: ganadoresSemana || null, recordatorio_devolver: recordadosDevolver || null, resumen_semanal: resumenSemanal || null, instalaciones_avisadas: instalacionesAvisadas || null, propuestas_3d: propuestasAvisadas, vencimientos: vencimientosAvisados, stock_envios: enviosStock, stock_cuadre: cuadreStock });
+    res.status(200).json({ ok: true, guardia_notificada: tecnicoDeGuardia || null, recordatorio_en_calle: tecnicosRecordados || null, felicitacion_semanal: ganadoresSemana || null, recordatorio_devolver: recordadosDevolver || null, resumen_semanal: resumenSemanal || null, instalaciones_avisadas: instalacionesAvisadas || null, propuestas_3d: propuestasAvisadas, vencimientos: vencimientosAvisados, stock_envios: enviosStock, stock_cuadre: cuadreStock, campanas_llaves: campanasLlaves });
   } catch (err) {
     res.status(500).json({ error: "Error interno en el cron diario", detail: String(err.message || err) });
   }

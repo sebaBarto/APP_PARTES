@@ -304,3 +304,117 @@ test("entrega de llaves: con firma, descuenta stock, anota en el padrón y no se
   assert.strictEqual(ok2.status, 200);
   assert.strictEqual(descuentos[1].de, "dep");
 });
+
+test("campaña de registro: fecha límite, propuesta de llaves sin dueño, aprobación del administrador y conciliación marcada", async () => {
+  const campana = require("../lib/campana-llaves");
+  const path = require("path");
+  const enviados = [];
+  process.env.SERVICIOS_API_TOKEN = process.env.SERVICIOS_API_TOKEN || "token-de-prueba";
+  require.cache[path.join(__dirname, "..", "api", "enviar-mail.js")] = { id: "x", loaded: true, exports: async (req, res) => { enviados.push(req.body); res.status(200).json({ ok: true }); } };
+  const { gh, m12, clave } = await preparar();
+  const adm = (req) => llamar(llaves.manejarAdmin, req, SAT, gh);
+  // Padrón: un vecino con su tag; estación: ese tag + 2 que nadie registró (uno ya decidido por SAT).
+  await llamar(llaves.manejarPublico, { method: "POST", body: { edificio: m12, nombre: "Ana Pérez", telefono: "341 555 1234", relacion: "titular", tipo: "vivienda", piso: "4", unidad: "B", llaves: [{ tipo: "tag", tag: "069:02561" }], acepta: true } }, gh);
+  await adm({ method: "POST", body: { accion: "guardar_conciliacion", edificio: m12, archivo: "estacion.xlsx", filas: [
+    { tag: "69:2561", usuario: "125", nombre: "ANA PEREZ" },
+    { tag: "100:00001", usuario: "7", nombre: "VIEJO INQUILINO", piso: "2", depto: "A" },
+    { tag: "100:00002", usuario: "8", nombre: "ENCARGADO" },
+    { tag: "100:00003", usuario: "9", nombre: "YA DECIDIDO" },
+  ] } });
+  await adm({ method: "POST", body: { accion: "decision_conciliacion", edificio: m12, indices: [3], decision: "mantener" } });
+
+  // Sin campaña: no se puede armar la propuesta. Fecha inválida o pasada: rechazada.
+  assert.strictEqual((await adm({ method: "POST", body: { accion: "campana_propuesta", edificio: m12 } })).status, 409);
+  assert.strictEqual((await adm({ method: "POST", body: { accion: "campana_iniciar", edificio: m12, limite: "2020-01-01" } })).status, 400);
+  const limite = new Date(Date.now() + 20 * 864e5).toISOString().slice(0, 10);
+  const ini = await adm({ method: "POST", body: { accion: "campana_iniciar", edificio: m12, limite } });
+  assert.strictEqual(ini.status, 200);
+  assert.strictEqual(ini.data.avisados, 1, "le avisa al administrador");
+  assert.ok(enviados.some((m) => m.tipo === "campana_admin" && m.datos.etapa === "inicio" && m.datos.para === "cp@admin.com"));
+  assert.strictEqual((await adm({ method: "POST", body: { accion: "campana_iniciar", edificio: m12, limite } })).status, 409, "no hay dos campañas a la vez");
+  // El formulario público muestra la fecha límite.
+  llaves._reiniciarTopes();
+  const pub = await llamar(llaves.manejarPublico, { method: "GET", query: { e: m12 } }, gh);
+  assert.strictEqual(pub.data.limite, limite);
+  // Avance (SAT y portal): 1 de 3 llaves vivas de la estación con dueño.
+  const est = await adm({ method: "GET", query: { edificio: m12, campana: "1" } });
+  assert.deepStrictEqual([est.data.progreso.estacion.total, est.data.progreso.estacion.con_dueno, est.data.sin_dueno], [4, 1, 2]);
+  const { pase } = (await login(gh, "cp@admin.com", clave)).data;
+  const h = { "x-consorcio": pase };
+  const vista = (await llamar(consorcio.manejarPortal, { method: "GET", headers: h, query: { que: "edificio", e: m12 } }, gh)).data.campana;
+  assert.strictEqual(vista.estado, "activa");
+  assert.ok(vista.link_registro.includes(m12));
+  const inicio = (await llamar(consorcio.manejarPortal, { method: "GET", headers: h, query: {} }, gh)).data;
+  assert.strictEqual(inicio.edificios[0].campana.estado, "activa");
+
+  // Cron: 7 días antes, recordatorio (una sola vez).
+  const enSieteDias = Date.parse(`${limite}T12:00:00-03:00`) - 6 * 864e5;
+  await campana.chequearCampanas(gh, enSieteDias);
+  await campana.chequearCampanas(gh, enSieteDias + 3600e3);
+  assert.strictEqual(enviados.filter((m) => m.datos && m.datos.etapa === "recordatorio").length, 1);
+  // Cron: al vencer arma la propuesta solo con las llaves sin dueño y sin decidir.
+  await campana.chequearCampanas(gh, Date.parse(`${limite}T23:59:59-03:00`) + 3600e3);
+  const rev = (await llamar(consorcio.manejarPortal, { method: "GET", headers: h, query: { que: "edificio", e: m12 } }, gh)).data.campana;
+  assert.strictEqual(rev.estado, "en_revision");
+  assert.deepStrictEqual(rev.propuesta.filas.map((f) => f.tag).sort(), ["100:00001", "100:00002"]);
+  assert.ok(enviados.some((m) => m.datos && m.datos.etapa === "revision" && m.datos.cantidad === 2));
+  // El administrador tiene que decidir todas; otro administrador no puede responder.
+  const [viejo, encargado] = ["100:00001", "100:00002"].map((t) => rev.propuesta.filas.find((f) => f.tag === t).k);
+  assert.strictEqual((await llamar(consorcio.manejarPortal, { method: "POST", headers: h, body: { accion: "campana_responder", edificio: m12, bajas: [viejo] } }, gh)).status, 409);
+  const ok = await llamar(consorcio.manejarPortal, { method: "POST", headers: h, body: { accion: "campana_responder", edificio: m12, bajas: [viejo], conservar: [{ k: encargado, motivo: "Es del encargado" }] } }, gh);
+  assert.strictEqual(ok.status, 200);
+  assert.strictEqual((await llamar(consorcio.manejarPortal, { method: "POST", headers: h, body: { accion: "campana_responder", edificio: m12, bajas: [viejo, encargado] } }, gh)).status, 409, "no se responde dos veces");
+  // Conciliación: la aprobada queda «Dar de baja»; la conservada, «Mantener» con el motivo.
+  const conc = JSON.parse(gh.store[`registro-llaves/${m12}.conciliacion.json`].t);
+  assert.deepStrictEqual(conc.filas.map((f) => f.decision), ["", "dar_de_baja", "mantener", "mantener"]);
+  assert.match(conc.filas[2].nota, /encargado/);
+  assert.ok(enviados.some((m) => m.tipo === "campana_sat" && m.datos.etapa === "aprobada" && m.datos.bajas === 1));
+  // SAT cierra la campaña: el formulario ya no muestra fecha.
+  assert.strictEqual((await adm({ method: "POST", body: { accion: "campana_cerrar", edificio: m12 } })).status, 200);
+  llaves._reiniciarTopes();
+  assert.strictEqual((await llamar(llaves.manejarPublico, { method: "GET", query: { e: m12 } }, gh)).data.limite, undefined);
+});
+
+test("campaña: si vence sin Excel de la estación, avisa a SAT una sola vez", async () => {
+  const campana = require("../lib/campana-llaves");
+  const path = require("path");
+  const enviados = [];
+  process.env.SERVICIOS_API_TOKEN = process.env.SERVICIOS_API_TOKEN || "token-de-prueba";
+  require.cache[path.join(__dirname, "..", "api", "enviar-mail.js")] = { id: "x", loaded: true, exports: async (req, res) => { enviados.push(req.body); res.status(200).json({ ok: true }); } };
+  const { gh, m12 } = await preparar();
+  const limite = new Date(Date.now() + 2 * 864e5).toISOString().slice(0, 10);
+  await llamar(llaves.manejarAdmin, { method: "POST", body: { accion: "campana_iniciar", edificio: m12, limite, avisar: false } }, SAT, gh);
+  const despues = Date.parse(`${limite}T23:59:59-03:00`) + 864e5;
+  await campana.chequearCampanas(gh, despues);
+  await campana.chequearCampanas(gh, despues + 864e5);
+  assert.strictEqual(enviados.filter((m) => m.tipo === "campana_sat" && m.datos.etapa === "vencida_sin_estacion").length, 1);
+  assert.strictEqual(enviados.filter((m) => m.tipo === "campana_admin").length, 0, "avisar: false no manda mail");
+});
+
+test("captcha: sin claves no se pide; con claves se verifica con Cloudflare y si no responde se deja pasar", async () => {
+  const { gh, m12 } = await preparar();
+  const cuerpo = { edificio: m12, nombre: "Ana Pérez", telefono: "341 555 1234", relacion: "titular", tipo: "vivienda", piso: "4", unidad: "B", llaves: [{ tipo: "tag", tag: "069:02561" }], acepta: true };
+  assert.strictEqual((await llamar(llaves.manejarPublico, { method: "POST", body: cuerpo }, gh)).status, 200);
+  const fetchOriginal = global.fetch;
+  process.env.TURNSTILE_SITE_KEY = "0x4AAA"; process.env.TURNSTILE_SECRET_KEY = "0x4BBB";
+  const pedidos = [];
+  let respuesta = { success: false };
+  global.fetch = async (url, opt) => { pedidos.push({ url: String(url), body: String(opt && opt.body) }); if (respuesta === "caido") throw new Error("timeout"); return { ok: true, json: async () => respuesta }; };
+  try {
+    llaves._reiniciarTopes();
+    assert.strictEqual((await llamar(llaves.manejarPublico, { method: "GET", query: { e: m12 } }, gh)).data.captcha, "0x4AAA");
+    assert.strictEqual((await llamar(llaves.manejarPublico, { method: "POST", body: cuerpo }, gh)).status, 400, "sin token");
+    const malo = await llamar(llaves.manejarPublico, { method: "POST", body: { ...cuerpo, captcha: "token-malo" } }, gh);
+    assert.strictEqual(malo.status, 400);
+    assert.strictEqual(malo.data.captcha, true);
+    assert.ok(pedidos[0].url.includes("challenges.cloudflare.com") && pedidos[0].body.includes("secret=0x4BBB") && pedidos[0].body.includes("response=token-malo"));
+    respuesta = { success: true };
+    assert.strictEqual((await llamar(llaves.manejarPublico, { method: "POST", body: { ...cuerpo, captcha: "token-bueno" } }, gh)).status, 200);
+    respuesta = "caido";
+    llaves._reiniciarTopes();
+    assert.strictEqual((await llamar(llaves.manejarPublico, { method: "POST", body: { ...cuerpo, nombre: "Otro Vecino", piso: "5", captcha: "x" } }, gh)).status, 200, "Cloudflare caído: pasa");
+  } finally {
+    global.fetch = fetchOriginal;
+    delete process.env.TURNSTILE_SITE_KEY; delete process.env.TURNSTILE_SECRET_KEY;
+  }
+});
