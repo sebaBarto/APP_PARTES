@@ -103,6 +103,34 @@ test("registro de llaves: conciliación guarda el listado de la estación y las 
   assert.strictEqual(l.data.aplicados, 1);
 });
 
+test("registro de llaves: la placa (PDF de BabyWare) se cruza con el Excel de la estación y se conserva lo decidido", async () => {
+  const gh = ghFalso();
+  const admin = { nombre: "Seba", rol: "admin" };
+  const E = "muelle11-k7p3";
+  const post = (body) => llamar(manejarAdmin, { method: "POST", body: { edificio: E, ...body } }, admin, gh);
+  await post({ accion: "guardar_conciliacion", archivo: "est.xlsx", filas: [{ usuario: "010", nombre: "Nadia Lopez" }, { usuario: "020", nombre: "Ana Sosa" }] });
+  await post({ accion: "decision_conciliacion", indices: [1], decision: "mantener" });
+  const usuarios = [{ numero: 1010, etiqueta: "Lopez N.", tag: "003:20001" }, { numero: 1020, etiqueta: "Sosa A.", tag: "003:20002" }, { numero: 1030, etiqueta: "User 030", tag: "003:20003" }, { numero: 1001, etiqueta: "SAT", tag: "000:00000" }];
+  const g = await post({ accion: "guardar_placa", archivo: "placa.pdf", cuenta: "MUELLE 11", usuarios });
+  assert.strictEqual(g.status, 200);
+  assert.deepStrictEqual(g.data.filas.map((f) => [f.usuario, f.tag, f.fuente, f.decision]), [["010", "003:20001", "ambas", ""], ["020", "003:20002", "ambas", "mantener"], ["030", "003:20003", "placa", ""]]);
+  assert.strictEqual(g.data.estacion.length, 2);
+  // Otra cuenta: no se carga
+  const otra = await post({ accion: "guardar_placa", archivo: "x.pdf", cuenta: "TORRE PUERTO NORTE", usuarios });
+  const lista = (await llamar(manejarAdmin, { method: "POST", body: { accion: "guardar_edificio", nombre: "TORRE PUERTO NORTE" } }, admin, gh));
+  const otra2 = await post({ accion: "guardar_placa", archivo: "x.pdf", cuenta: "TORRE PUERTO NORTE", usuarios });
+  assert.strictEqual(lista.status, 200);
+  assert.strictEqual(otra2.status, 409);
+  assert.strictEqual(otra.status, 200, "antes de existir TORRE la cuenta no se reconoce como otro edificio");
+  // Al volver a subir el Excel, la placa sigue cruzada
+  const g2 = await post({ accion: "guardar_conciliacion", archivo: "est2.xlsx", filas: [{ usuario: "010", nombre: "Nadia Lopez" }, { usuario: "020", nombre: "Ana Sosa" }, { usuario: "040", nombre: "Juan Paz" }] });
+  assert.deepStrictEqual(g2.data.filas.map((f) => [f.usuario, f.fuente, f.decision]), [["010", "ambas", ""], ["020", "ambas", "mantener"], ["040", "estacion", ""], ["030", "placa", ""]]);
+  // Quitar la placa
+  const q = await post({ accion: "quitar_placa" });
+  assert.deepStrictEqual(q.data.filas.map((f) => [f.usuario, f.tag, f.fuente, f.decision]), [["010", "", undefined, ""], ["020", "", undefined, "mantener"], ["040", "", undefined, ""]]);
+  assert.strictEqual(q.data.placa, null);
+});
+
 test("registro de llaves: no acepta caracteres para inyectar código y frena a un robot", async () => {
   const { _reiniciarTopes } = require("../lib/registro-llaves");
   _reiniciarTopes();

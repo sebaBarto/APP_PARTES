@@ -20,6 +20,12 @@
 //   - "no_vecino":  personal de SAT, funciones del sistema, proveedores
 //     (según Observaciones o el nombre) → no se propone dar de baja.
 //   - "no_registrada": nadie la reclamó → candidata a baja.
+//
+// La placa (central de alarma Paradox) es una segunda fuente: el «User Report»
+// de BabyWare en PDF trae, por usuario, la etiqueta y el N° de tarjeta
+// (lote:número), que el Excel de Security24 no tiene. Se cruza con la estación
+// por N° de usuario (en BabyWare el 1049 es el usuario 049) y así cada fila
+// queda con su N° de llave; lo que está en un lado y no en el otro se marca.
 // ============================================================
 (function (raiz, fabrica) {
   if (typeof module === "object" && module.exports) module.exports = fabrica();
@@ -76,6 +82,14 @@
         fila[j] = Math.min(fila[j] + 1, fila[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1));
         prev = tmp;
       }
+    }
+    return fila[b.length];
+  }
+  function levenshtein(a, b) {
+    const fila = Array.from({ length: b.length + 1 }, (_, j) => j);
+    for (let i = 1; i <= a.length; i++) {
+      let prev = fila[0]; fila[0] = i;
+      for (let j = 1; j <= b.length; j++) { const tmp = fila[j]; fila[j] = Math.min(fila[j] + 1, fila[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = tmp; }
     }
     return fila[b.length];
   }
@@ -231,5 +245,100 @@
     return { veredicto: "dudoso", abonado: id.abonados[0] || "", id };
   }
 
-  return { identificarArchivo, verificarArchivo, normAbonado, cruzar, claveTag, tagCalculado, claveUsuario, esControl, esControlEstacion, esNoVecino, enComun, mismaPersona, palabras, claveUnidad, tel7 };
+  // ---------- Placa Paradox (BabyWare «User Report» en PDF) ----------
+  // pdf.js devuelve los textos de cada página sueltos y desordenados: se arman
+  // los renglones por altura (y) y se ordenan de izquierda a derecha (x).
+  function lineasPdf(paginas) {
+    const out = [];
+    (paginas || []).forEach((items) => {
+      const filas = [];
+      (items || []).filter((i) => i && String(i.str || "").trim()).forEach((i) => {
+        let f = filas.find((r) => Math.abs(r.y - i.y) <= 2.5);
+        if (!f) { f = { y: i.y, items: [] }; filas.push(f); }
+        f.items.push(i);
+      });
+      filas.sort((a, b) => b.y - a.y).forEach((f) => {
+        let txt = "", fin = null;
+        f.items.sort((a, b) => a.x - b.x).forEach((i) => {
+          if (fin != null) txt += i.x - fin > 3 ? "   " : (i.x - fin > 0.5 ? " " : "");
+          txt += String(i.str).trim();
+          fin = i.x + (i.w || 0);
+        });
+        out.push(txt);
+      });
+    });
+    return out.join("\n");
+  }
+  const RE_ETIQUETA_GENERICA = /^(user|usuario)\s*0*\d+$/i;
+  const etiquetaGenerica = (e) => !String(e || "").trim() || RE_ETIQUETA_GENERICA.test(String(e).trim());
+  // Devuelve null si el texto no es un reporte de usuarios de BabyWare.
+  function leerPlacaParadox(texto) {
+    const t = String(texto || "");
+    if (!/User Report/i.test(t) || !/Card\s*#/i.test(t)) return null;
+    const cuenta = ((t.match(/Account:\s*([^\n]+)/i) || [])[1] || "").replace(/\s{2,}.*$/, "").trim();
+    const usuarios = [];
+    const partes = t.split(/^\s*(?=\[\d{1,4}\])/m);
+    partes.forEach((b) => {
+      const m = b.match(/^\[(\d{1,4})\][ \t]*([^\n]*)/);
+      if (!m) return;
+      const numero = Number(m[1]);
+      const etiqueta = m[2].replace(/\s{2,}.*$/, "").trim();
+      const tras = b.slice(b.search(/Card\s*#/i) + 1);
+      const c = tras.match(/\b(\d{3}):(\d{5})\b(?:\s+(\d{6})\b)?/);
+      const tag = c && !/^0+$/.test(c[1] + c[2]) ? `${c[1]}:${c[2]}` : "";
+      const control = c && c[3] && !/^0+$/.test(c[3]) ? c[3] : "";
+      const tipo = (b.match(/\b(FullMaster|Master|Regular)\b/) || [])[1] || "";
+      usuarios.push({ numero, usuario: String(numero >= 1000 ? numero - 1000 : numero).padStart(3, "0"), etiqueta, generica: etiquetaGenerica(etiqueta), tag, control, tipo });
+    });
+    return usuarios.length ? { cuenta, usuarios } : null;
+  }
+  // Une las filas de la estación con los usuarios de la placa (por N° de usuario).
+  // Cada fila queda con fuente: "ambas" | "estacion" (no está en la placa) |
+  // "placa" (está programado en la placa y la estación no lo tiene).
+  // De la placa solo entran los usuarios que tienen tarjeta o control: los demás
+  // no son llaves (códigos de teclado, la cuenta de SAT, el instalador).
+  function combinarPlaca(estacion, placa) {
+    const filas = (estacion || []).map((f) => ({ ...f }));
+    const us = placa && Array.isArray(placa.usuarios) ? placa.usuarios : null;
+    if (!us) return filas.map((f) => { const g = { ...f }; delete g.fuente; delete g.placa_nombre; delete g.placa_tag; delete g.placa_control; return g; });
+    const porU = {};
+    us.forEach((u) => { const k = claveUsuario(u.usuario); if (k && !porU[k]) porU[k] = u; });
+    const usados = new Set();
+    filas.forEach((f) => {
+      const u = porU[claveUsuario(f.usuario)];
+      if (!u) { f.fuente = "estacion"; return; }
+      usados.add(u);
+      f.fuente = "ambas";
+      f.placa_nombre = u.generica ? "" : u.etiqueta;
+      f.placa_tag = u.tag || "";
+      f.placa_control = u.control || "";
+      if (!f.tag && u.tag) f.tag = u.tag;
+    });
+    us.forEach((u) => {
+      if (usados.has(u) || (!u.tag && !u.control)) return;
+      filas.push({ tag: u.tag || "", usuario: u.usuario, nombre: u.generica ? "" : u.etiqueta, apellido: "", piso: "", depto: "", telefono: "", tipo: !u.tag && u.control ? "control" : "", obs: u.control ? "Control remoto SN " + u.control : "", fuente: "placa", placa_nombre: u.generica ? "" : u.etiqueta, placa_tag: u.tag || "", placa_control: u.control || "" });
+    });
+    return filas;
+  }
+  // Diferencias entre la estación y la placa para una fila ya combinada.
+  function avisoPlaca(f) {
+    if (!f || !f.fuente) return "";
+    if (f.fuente === "placa") return "Programado en la placa pero no está en la estación";
+    if (f.fuente === "estacion") return "Está en la estación pero no en la placa";
+    const av = [];
+    if (f.placa_tag && f.tag && claveTag(f.placa_tag) !== claveTag(f.tag)) av.push(`N° de llave distinto: estación ${f.tag}, placa ${f.placa_tag}`);
+    else if (!f.placa_tag && !f.placa_control) av.push("En la placa no tiene tarjeta");
+    const nom = [f.nombre, f.apellido].filter(Boolean).join(" ");
+    // La placa suele tener «Apellido I.»: se avisa solo si el apellido no se parece a
+    // ninguna palabra del nombre de la estación (tolera errores de tipeo y palabras pegadas).
+    const pn = palabras(nom);
+    if (f.placa_nombre && pn.length >= 2) {
+      const ap = palabras(String(f.placa_nombre).replace(/([a-z])([A-Z])/g, "$1 $2")).filter((w) => w.length > 2);
+      const parecida = (w) => pn.some((x) => x === w || (Math.min(x.length, w.length) >= 4 && (x.includes(w) || w.includes(x))) || (Math.min(x.length, w.length) >= 5 && levenshtein(x, w) <= 2));
+      if (ap.length && !ap.some(parecida)) av.push(`En la placa figura «${f.placa_nombre}»`);
+    }
+    return av.join(" · ");
+  }
+
+  return { identificarArchivo, verificarArchivo, normAbonado, cruzar, claveTag, tagCalculado, claveUsuario, esControl, esControlEstacion, esNoVecino, enComun, mismaPersona, palabras, claveUnidad, tel7, lineasPdf, leerPlacaParadox, combinarPlaca, avisoPlaca, etiquetaGenerica };
 });

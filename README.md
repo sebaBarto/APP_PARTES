@@ -3211,6 +3211,24 @@ conserva si se vuelve a subir el archivo. "Descargar resultado" arma un
 Excel con colores (hojas Conciliación, Por persona y Resumen) usando
 `vendor/exceljs.min.js` (MIT), que se carga solo al descargar.
 
+**Placa de la central (Paradox):** además del Excel se puede subir el
+«User Report» de BabyWare exportado en PDF ("Subir PDF de la placa", o
+el mismo botón del Excel). El panel lo lee en el navegador con
+`vendor/pdfjs` (`CruceLlaves.lineasPdf` + `leerPlacaParadox`): por cada
+usuario, etiqueta, N° de tarjeta (lote:número) y SN del control remoto.
+Se cruza con el Excel por N° de usuario (en BabyWare el 1049 es el
+usuario 049): las filas de la estación toman el N° de tarjeta —el Excel
+de Security24 no lo trae— y así coinciden con el padrón por número. Se
+marcan los usuarios **solo en la placa** (programados en la central y
+no en la estación), los que **no están en la placa** y los que difieren
+(N° de tarjeta distinto o un apellido que no se parece al de la
+estación). De la placa entran solo los usuarios con tarjeta o control.
+Se verifica la cuenta del PDF («Account: MUELLE 11») contra el edificio
+abierto. En `<codigo>.conciliacion.json` quedan las dos fuentes por
+separado (`estacion` y `placa`) y `filas` es el cruce; al volver a subir
+cualquiera de las dos se recalcula sin perder lo decidido. "quitar la
+placa" la saca.
+
 Se guarda en el repo de datos (`registro-llaves/`), sin función nueva
 en `/api` (ver `lib/registro-llaves.js`). MUELLE 11 viene precargado
 con el código `muelle11-k7p3`.

@@ -73,3 +73,73 @@ test("persona registrada sin ninguna llave cargada: su llave de la estación no 
   assert.strictEqual(r.res, "otra_llave");
   assert.strictEqual(r.d.r, sinLlave);
 });
+
+// ---------- Placa Paradox (PDF «User Report» de BabyWare) — datos inventados ----------
+// Textos sueltos como los devuelve pdf.js: desordenados dentro del renglón y entre renglones.
+function itemsPlaca(usuarios) {
+  const it = [{ str: "User Report", x: 18, y: 583, w: 86 }, { str: "Account: EDIFICIO PRUEBA", x: 662, y: 585, w: 110 }];
+  let y = 560;
+  usuarios.forEach(([num, etiqueta, card, sn, tipo]) => {
+    it.push({ str: etiqueta, x: 74, y, w: 40 }, { str: `[${num}]`, x: 20, y, w: 31 });
+    it.push({ str: "Remote SN", x: 152, y: y - 13, w: 51 }, { str: "Card #", x: 44, y: y - 13, w: 30 });
+    it.push({ str: "Default Remote Profile", x: 230, y: y - 30, w: 103 }, { str: sn, x: 152, y: y - 30, w: 34 }, { str: card, x: 44, y: y - 30, w: 48 });
+    it.push({ str: "User Type", x: 44, y: y - 43, w: 40 }, { str: tipo, x: 44, y: y - 69, w: 40 });
+    y -= 120;
+  });
+  return [it];
+}
+const PLACA = [
+  [1001, "SAT", "000:00000", "000000", "FullMaster"],
+  [1010, "Lopez N.", "003:20001", "000000", "Regular"],
+  [1011, "User 011", "003:20002", "000000", "Regular"],
+  [1012, "Quiroga A.", "000:00000", "000000", "Regular"],
+  [1013, "Ramos T.", "000:00000", "045123", "Regular"],
+  [1050, "Vidal P.", "016:00099", "000000", "Regular"],
+];
+
+test("placa: arma los renglones del PDF y lee usuario, etiqueta, tarjeta y control", () => {
+  const texto = C.lineasPdf(itemsPlaca(PLACA));
+  assert.match(texto.split("\n")[1], /^\[1001\]\s+SAT$/);
+  const p = C.leerPlacaParadox(texto);
+  assert.strictEqual(p.cuenta, "EDIFICIO PRUEBA");
+  assert.deepStrictEqual(p.usuarios.map((u) => [u.usuario, u.etiqueta, u.generica, u.tag, u.control, u.tipo]), [
+    ["001", "SAT", false, "", "", "FullMaster"],
+    ["010", "Lopez N.", false, "003:20001", "", "Regular"],
+    ["011", "User 011", true, "003:20002", "", "Regular"],
+    ["012", "Quiroga A.", false, "", "", "Regular"],
+    ["013", "Ramos T.", false, "", "045123", "Regular"],
+    ["050", "Vidal P.", false, "016:00099", "", "Regular"],
+  ]);
+  assert.strictEqual(C.leerPlacaParadox("Un PDF cualquiera\n[1] hola"), null);
+});
+
+test("placa: se une con la estación por N° de usuario y marca lo que está de un solo lado", () => {
+  const p = C.leerPlacaParadox(C.lineasPdf(itemsPlaca(PLACA)));
+  const est = [
+    { usuario: "10", nombre: "Nadia Lopes", piso: "2", depto: "A" },
+    { usuario: "011", nombre: "Bruno Castro" },
+    { usuario: "050", tag: "016:00098", nombre: "Pablo Vidal" },
+    { usuario: "077", nombre: "Marta Suarez" },
+  ];
+  const c = C.combinarPlaca(est, p);
+  const por = (u) => c.find((f) => C.claveUsuario(f.usuario) === u);
+  assert.strictEqual(por("10").tag, "003:20001", "la fila de la estación toma la tarjeta de la placa");
+  assert.strictEqual(por("10").fuente, "ambas");
+  assert.strictEqual(C.avisoPlaca(por("10")), "", "Lopes ≈ Lopez: no avisa");
+  assert.strictEqual(por("11").placa_nombre, "", "etiqueta genérica de fábrica");
+  assert.match(C.avisoPlaca(por("50")), /N° de llave distinto: estación 016:00098, placa 016:00099/);
+  assert.strictEqual(por("50").tag, "016:00098", "el N° de la estación no se pisa");
+  assert.strictEqual(por("77").fuente, "estacion");
+  assert.match(C.avisoPlaca(por("77")), /no en la placa/);
+  // De la placa entran solo los que tienen tarjeta o control: no SAT (001) ni el 012.
+  assert.ok(!por("1") && !por("12"));
+  assert.strictEqual(por("13").fuente, "placa");
+  assert.strictEqual(por("13").tipo, "control");
+  assert.match(C.avisoPlaca(por("13")), /no está en la estación/);
+  // Apellido distinto de verdad
+  assert.match(C.avisoPlaca({ fuente: "ambas", nombre: "Agustina Herrera", placa_nombre: "Ponce M.", placa_tag: "001:00001", tag: "001:00001" }), /En la placa figura «Ponce M\.»/);
+  // Palabras pegadas y errores de tipeo no avisan
+  assert.strictEqual(C.avisoPlaca({ fuente: "ambas", nombre: "Carla Benedetti", placa_nombre: "BenedetiC", placa_tag: "001:00001", tag: "001:00001" }), "");
+  // Sin placa: vuelve a las filas de la estación tal cual
+  assert.deepStrictEqual(C.combinarPlaca(c.filter((f) => f.fuente !== "placa"), null).map((f) => f.fuente), [undefined, undefined, undefined, undefined]);
+});
