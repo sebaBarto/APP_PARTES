@@ -3419,7 +3419,13 @@ y la pantalla de gracias y el mail de constancia le dan el link para guardarlo.
   Permissions-Policy y CSP `frame-ancestors` (solo el propio sitio y
   sat365.com.ar pueden mostrar las páginas en un marco).
 - Comparaciones de tiempo constante para la clave general y el `CRON_SECRET`.
-- Pendientes recomendados: regla de **tope por IP en el firewall de Vercel**
-  para `/api/datos?publico=…`, cargar **`ADMIN_PASSWORD_HASH`** en vez de
-  `ADMIN_PASSWORD`, y borrar las claves de técnicos en texto plano de
-  `tecnicos.json` cuando todos tengan su hash en el backend nuevo.
+- **Claves de técnicos sin texto plano**: al guardar la lista desde el panel, las
+  claves van al backend nuevo (que guarda solo el hash PBKDF2) y en
+  `tecnicos.json` quedan vacías; las viejas que quedaban se migran solas en el
+  próximo guardado o ingreso de cada técnico. Si en el archivo hay una clave en
+  texto plano (porque el backend no respondió al guardar), esa es la vigente y la
+  anterior del backend ya no sirve. Un técnico que se saca de la lista no entra
+  más aunque el backend conserve su hash.
+- Pendientes: regla de **tope por IP en el firewall de Vercel** para
+  `/api/datos?publico=…` (se carga a mano en el panel de Vercel) y cargar
+  **`ADMIN_PASSWORD_HASH`** en vez de `ADMIN_PASSWORD`.

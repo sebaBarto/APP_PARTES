@@ -109,3 +109,76 @@ test("seguridad: claves fáciles no se aceptan en el portal de administradores",
   for (const mala of ["12345678", "11111111", "password", "modelo2026", "98765432109"]) assert.strictEqual((await cambiar(mala)).status, 400, mala);
   assert.strictEqual((await cambiar("Patio-Verde-48")).status, 200);
 });
+
+// Claves de técnicos: el texto plano de tecnicos.json se migra al hash del
+// backend nuevo, la clave vieja deja de servir y un técnico dado de baja no entra.
+function backendFalso(inicial) {
+  const estado = { archivo: inicial, hashes: {}, backendCaido: false, puts: 0 };
+  const b64 = (x) => Buffer.from(JSON.stringify(x)).toString("base64");
+  estado.fetch = async (url, op = {}) => {
+    const u = String(url);
+    if (u.includes("/api/admin-login/")) return new Response(JSON.stringify({ bloqueado: false }));
+    if (u.endsWith("/api/tecnicos/verificar")) {
+      const b = JSON.parse(op.body); const ok = estado.hashes[b.nombre] === "h:" + b.password;
+      return new Response(JSON.stringify({ ok }), { status: ok ? 200 : 401 });
+    }
+    if (u.endsWith("/api/tecnicos") && op.method === "POST") {
+      if (estado.backendCaido) return new Response("caído", { status: 503 });
+      JSON.parse(op.body).forEach((t) => { if (t.password) estado.hashes[t.nombre] = "h:" + t.password; });
+      return new Response(JSON.stringify({ ok: true }));
+    }
+    if (u.includes("contents/tecnicos.json")) {
+      if (op.method === "PUT") { estado.puts++; estado.archivo = JSON.parse(Buffer.from(JSON.parse(op.body).content, "base64").toString("utf-8")); return new Response("{}"); }
+      return new Response(JSON.stringify({ sha: "s" + estado.puts, content: b64(estado.archivo) }));
+    }
+    return new Response("[]");
+  };
+  return estado;
+}
+const login = (datos, nombre, password) => llamar(datos, { method: "POST", query: { coleccion: "tecnicos" }, body: { accion: "verificar_login", nombre, password } }).then((r) => r.data.ok);
+
+test("seguridad: las claves de técnicos dejan de estar en texto plano", async () => {
+  const datos = require("../api/datos");
+  const viejo = global.fetch;
+  const env = { u: process.env.BACKEND_NUEVO_URL, t: process.env.BACKEND_NUEVO_TOKEN };
+  process.env.BACKEND_NUEVO_URL = "https://backend.prueba"; process.env.BACKEND_NUEVO_TOKEN = "tk";
+  const st = backendFalso([{ nombre: "Ana", password: "vieja-ana", permisos: {} }, { nombre: "Beto", password: "", permisos: {} }]);
+  st.hashes.Beto = "h:clave-beto";
+  global.fetch = st.fetch;
+  try {
+    // 1) Entrar con la clave en texto plano la migra: queda el hash y se borra del archivo.
+    assert.strictEqual(await login(datos, "Ana", "vieja-ana"), true);
+    assert.strictEqual(st.hashes.Ana, "h:vieja-ana");
+    assert.strictEqual(st.archivo.find((t) => t.nombre === "Ana").password, "", "ya no queda en tecnicos.json");
+    assert.strictEqual(await login(datos, "Ana", "vieja-ana"), true, "sigue entrando, ahora por hash");
+    assert.strictEqual(await login(datos, "Ana", "otra"), false);
+
+    // 2) La oficina le cambia la clave: se guarda solo el hash y la anterior deja de servir.
+    let r = await llamar(datos, { method: "POST", query: { coleccion: "tecnicos" }, headers: { authorization: oficina }, body: [{ nombre: "Ana", password: "nueva-ana", permisos: {} }, { nombre: "Beto", password: "", permisos: {} }] });
+    assert.strictEqual(r.status, 200);
+    assert.ok(st.archivo.every((t) => t.password === ""), "ninguna clave en texto plano");
+    assert.strictEqual(await login(datos, "Ana", "nueva-ana"), true);
+    assert.strictEqual(await login(datos, "Ana", "vieja-ana"), false, "la clave anterior ya no entra");
+    assert.strictEqual(await login(datos, "Beto", "clave-beto"), true, "a quien no se le tocó la clave, la conserva");
+
+    // 3) Si el backend no responde al guardar, la clave nueva queda en el archivo y es la que vale.
+    st.backendCaido = true;
+    r = await llamar(datos, { method: "POST", query: { coleccion: "tecnicos" }, headers: { authorization: oficina }, body: [{ nombre: "Ana", password: "", permisos: {} }, { nombre: "Beto", password: "otra-beto", permisos: {} }] });
+    assert.strictEqual(r.status, 200);
+    assert.strictEqual(st.archivo.find((t) => t.nombre === "Beto").password, "otra-beto");
+    assert.strictEqual(await login(datos, "Beto", "clave-beto"), false, "la clave vieja del backend no le gana a la nueva");
+    assert.strictEqual(await login(datos, "Beto", "otra-beto"), true);
+    st.backendCaido = false;
+    assert.strictEqual(await login(datos, "Beto", "otra-beto"), true);
+    assert.strictEqual(st.archivo.find((t) => t.nombre === "Beto").password, "", "se migró en el siguiente ingreso");
+
+    // 4) Dado de baja de la lista: no entra aunque el backend conserve su hash.
+    r = await llamar(datos, { method: "POST", query: { coleccion: "tecnicos" }, headers: { authorization: oficina }, body: [{ nombre: "Beto", password: "", permisos: {} }] });
+    assert.ok(st.hashes.Ana);
+    assert.strictEqual(await login(datos, "Ana", "nueva-ana"), false, "Ana ya no está en la lista");
+  } finally {
+    global.fetch = viejo;
+    if (env.u === undefined) delete process.env.BACKEND_NUEVO_URL; else process.env.BACKEND_NUEVO_URL = env.u;
+    if (env.t === undefined) delete process.env.BACKEND_NUEVO_TOKEN; else process.env.BACKEND_NUEVO_TOKEN = env.t;
+  }
+});

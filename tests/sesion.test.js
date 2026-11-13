@@ -57,7 +57,7 @@ test("La API rechaza pedidos sin pase y el login entrega uno", async () => {
     if (u.includes("/api/admin-login/registrar")) return new Response(JSON.stringify({ bloqueado: false }));
     if (u.includes("/api/tecnicos/verificar")) return new Response(JSON.stringify({ ok: true }), { status: 200 });
     if (u.includes("/api/clientes")) return new Response(JSON.stringify([{ nombre: "Cliente secreto" }]));
-    if (u.includes("api.github.com")) return new Response(JSON.stringify({ content: Buffer.from(JSON.stringify([{ nombre: "Juan Pérez", password: "x", permisos: { admin: true } }])).toString("base64") }));
+    if (u.includes("api.github.com")) return new Response(JSON.stringify({ content: Buffer.from(JSON.stringify([{ nombre: "Juan Pérez", password: "", permisos: { admin: true } }])).toString("base64") }));
     return new Response("[]");
   };
   try {

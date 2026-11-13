@@ -47,53 +47,98 @@ async function verificarPasswordAdmin(intento) {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-// Lista de técnicos tal como está guardada (con claves y permisos). Solo
-// para usar del lado del servidor: nunca se devuelve así al navegador.
-async function leerTecnicosGuardados() {
+// Lista de técnicos tal como está guardada (con permisos y, solo hasta que
+// se migre, alguna clave vieja en texto plano). Solo del lado del servidor:
+// nunca se devuelve así al navegador. null = no se pudo leer (≠ lista vacía).
+async function leerTecnicosConSha() {
   const { GITHUB_DATA_TOKEN, GITHUB_DATA_REPO } = process.env;
   if (!GITHUB_DATA_TOKEN || !GITHUB_DATA_REPO) throw new Error("Faltan variables de entorno");
   const url = `https://api.github.com/repos/${GITHUB_DATA_REPO}/contents/tecnicos.json`;
   const r = await fetch(url, { headers: { Authorization: `Bearer ${GITHUB_DATA_TOKEN}`, Accept: "application/vnd.github+json" } });
-  if (!r.ok) return [];
+  if (r.status === 404) return { lista: [], sha: undefined };
+  if (!r.ok) return null;
   const data = await r.json();
   const lista = JSON.parse(Buffer.from(data.content, "base64").toString("utf-8"));
-  return Array.isArray(lista) ? lista : [];
+  return { lista: Array.isArray(lista) ? lista : [], sha: data.sha };
+}
+async function leerTecnicosGuardados() {
+  const x = await leerTecnicosConSha();
+  return x ? x.lista : [];
+}
+
+const igualSeguro = (a, b) => {
+  const x = Buffer.from(String(a)), y = Buffer.from(String(b));
+  return x.length === y.length && crypto.timingSafeEqual(x, y);
+};
+
+// Manda las claves al backend nuevo, que guarda solo el hash (PBKDF2). Es un
+// "upsert" por nombre: una clave vacía conserva el hash que ya tenía.
+async function sincronizarHashesTecnicos(lista) {
+  const { BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN } = process.env;
+  if (!BACKEND_NUEVO_URL || !BACKEND_NUEVO_TOKEN || !lista.length) return false;
+  try {
+    const r = await fetch(`${BACKEND_NUEVO_URL}/api/tecnicos`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${BACKEND_NUEVO_TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify(lista.map((t) => ({ nombre: t.nombre, password: t.password || "", permisos: t.permisos || {}, en_calle: !!t.en_calle }))),
+    });
+    if (!r.ok) return false;
+    const d = await r.json().catch(() => ({}));
+    return !!d.ok;
+  } catch (e) { return false; }
+}
+
+// Ya con el hash guardado en el backend, se borra la clave en texto plano de
+// tecnicos.json (solo si sigue siendo esa: si la oficina la cambió en el medio, no se toca).
+async function borrarClaveTextoPlano(nombre, password) {
+  try {
+    const actual = await leerTecnicosConSha();
+    if (!actual || !actual.sha) return;
+    let cambio = false;
+    const lista = actual.lista.map((t) => {
+      if (t.nombre === nombre && t.password && igualSeguro(t.password, password)) { cambio = true; return { ...t, password: "" }; }
+      return t;
+    });
+    if (!cambio) return;
+    const { GITHUB_DATA_TOKEN, GITHUB_DATA_REPO } = process.env;
+    await fetch(`https://api.github.com/repos/${GITHUB_DATA_REPO}/contents/tecnicos.json`, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${GITHUB_DATA_TOKEN}`, Accept: "application/vnd.github+json", "Content-Type": "application/json" },
+      body: JSON.stringify({ message: `Migra la clave de ${nombre} a hash (${new Date().toISOString()})`, content: Buffer.from(JSON.stringify(lista, null, 2)).toString("base64"), sha: actual.sha }),
+    });
+  } catch (e) { /* queda para el próximo ingreso */ }
 }
 
 // ¿La clave es la de ese técnico? (la misma verificación que el login de la app)
+//  - Tiene que seguir en la lista de técnicos: si la oficina lo sacó, no
+//    entra más aunque el backend nuevo todavía tenga su hash.
+//  - Si en la lista quedó una clave en texto plano, esa es la vigente (es la
+//    última que cargó la oficina): la vieja del backend ya no sirve.
+//  - Si no, se verifica contra el hash del backend nuevo.
 async function verificarClaveTecnico(nombre, password) {
   if (typeof nombre !== "string" || !nombre || typeof password !== "string" || !password) return false;
   const { BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN } = process.env;
-  // 1) Primero contra el backend nuevo (hash real, PBKDF2) — es lo que pasa
-  // siempre después de la primera vez que cada técnico entra.
-  if (BACKEND_NUEVO_URL && BACKEND_NUEVO_TOKEN) {
-    try {
-      const rNuevo = await fetch(`${BACKEND_NUEVO_URL}/api/tecnicos/verificar`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${BACKEND_NUEVO_TOKEN}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ nombre, password }),
-      });
-      if (rNuevo.status === 200) {
-        const dataNuevo = await rNuevo.json();
-        if (dataNuevo.ok) return true;
-      }
-      // 401 (no coincide o todavía no está ahí) -> sigue al paso 2.
-    } catch (errNuevo) { /* si el backend nuevo no responde, se sigue con el respaldo */ }
+  const guardados = await leerTecnicosConSha().catch(() => null);
+  const encontrado = guardados ? guardados.lista.find((t) => t.nombre === nombre) : null;
+  if (guardados && !encontrado) return false;
+  if (encontrado && encontrado.password) {
+    const ok = igualSeguro(encontrado.password, password);
+    // Coincidió: se guarda el hash en el backend y se borra el texto plano.
+    if (ok && (await sincronizarHashesTecnicos([{ ...encontrado, password }]))) await borrarClaveTextoPlano(nombre, password);
+    return ok;
   }
-  // 2) Respaldo: la lista guardada (texto plano) — cubre a quien cambió la
-  // clave después de la migración o es nuevo y no tiene hash todavía.
-  const tecnicos = await leerTecnicosGuardados();
-  const encontrado = tecnicos.find((t) => t.nombre === nombre);
-  const ok = !!encontrado && encontrado.password === password;
-  // 3) Si coincidió acá, de paso se guarda el hash en el backend nuevo.
-  if (ok && BACKEND_NUEVO_URL && BACKEND_NUEVO_TOKEN) {
-    fetch(`${BACKEND_NUEVO_URL}/api/tecnicos`, {
+  // Sin clave en texto plano (o GitHub no respondió): el hash del backend nuevo.
+  if (!BACKEND_NUEVO_URL || !BACKEND_NUEVO_TOKEN) return false;
+  try {
+    const rNuevo = await fetch(`${BACKEND_NUEVO_URL}/api/tecnicos/verificar`, {
       method: "POST",
       headers: { Authorization: `Bearer ${BACKEND_NUEVO_TOKEN}`, "Content-Type": "application/json" },
-      body: JSON.stringify([{ nombre, password, permisos: encontrado.permisos || {} }]),
-    }).catch(() => {});
-  }
-  return ok;
+      body: JSON.stringify({ nombre, password }),
+    });
+    if (rNuevo.status !== 200) return false;
+    const dataNuevo = await rNuevo.json();
+    return !!dataNuevo.ok;
+  } catch (errNuevo) { return false; }
 }
 
 // ¿Tiene tildado el permiso "Panel de Administración"?
@@ -2862,8 +2907,14 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
         contenidoAGuardar = body.map((t) => {
           if (t.password) return t; // se escribió una clave nueva -> se usa esa
           const previo = existentes.find((x) => x.nombre === t.nombre);
-          return { ...t, password: previo ? previo.password : "" };
+          return { ...t, password: previo ? previo.password || "" : "" };
         });
+        // Las claves no se guardan en texto plano: el backend nuevo se queda
+        // con el hash y en tecnicos.json la clave queda vacía. Si el backend no
+        // responde, se guardan como antes (y se migran en el próximo guardado o ingreso).
+        if (await sincronizarHashesTecnicos(contenidoAGuardar)) {
+          contenidoAGuardar = contenidoAGuardar.map((t) => ({ ...t, password: "" }));
+        }
       }
       if (nombreColeccion === "push-subscripciones") {
         const lista = Array.isArray(contenidoExistente) ? contenidoExistente : [];
