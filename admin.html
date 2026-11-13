@@ -652,6 +652,68 @@ input.campo-falta { border-color: #C0392B !important; box-shadow: 0 0 0 3px rgba
 }
 @media (max-width: 640px) { .admin-header-der .admin-usuario { display: none; } }
 
+/* ---------- Llaves de edificios: tarjetas y pantalla de cada edificio ---------- */
+#panelRegistroLlaves.vista-general :is(#rllEdVista, #rllRegistrosCard, #rllConcCard, #rllCampanaCard) { display: none !important; }
+#panelRegistroLlaves.vista-edificio :is(#rllEdificiosCard, #rllAdmCard, #rllEntregaCfgCard, #rllIntro) { display: none !important; }
+#panelRegistroLlaves.vista-edificio:not([data-sub="pedidos"]) #rllGestCard,
+#panelRegistroLlaves.vista-edificio:not([data-sub="padron"]) #rllRegistrosCard,
+#panelRegistroLlaves.vista-edificio:not([data-sub="conciliacion"]) #rllConcCard,
+#panelRegistroLlaves.vista-edificio:not([data-sub="campana"]) #rllCampanaCard { display: none !important; }
+#panelRegistroLlaves.vista-edificio #rllGestEdificio { display: none; }
+.rll-ed-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.rll-ed-tarjeta { text-align: left; width: 100%; margin: 0; padding: 16px 18px; border-radius: var(--r-md, 14px); border: 1.5px solid var(--border); background: var(--card, #fff); color: var(--ink); box-shadow: var(--shadow-card); cursor: pointer; display: flex; flex-direction: column; gap: 10px; font-family: inherit; transition: border-color .15s, transform .15s, box-shadow .15s; }
+.rll-ed-tarjeta:hover { border-color: var(--amber); transform: translateY(-1px); box-shadow: var(--shadow-card-hover); }
+.rll-ed-tarjeta .t-cab { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.rll-ed-tarjeta .t-nombre { font-size: 18px; font-weight: 800; letter-spacing: .2px; line-height: 1.15; }
+.rll-ed-tarjeta .t-dir { font-size: 13px; color: var(--steel); margin-top: 2px; font-weight: 500; }
+.rll-ed-tarjeta .t-ab { font-family: 'IBM Plex Mono', monospace; font-size: 12.5px; font-weight: 600; padding: 2px 8px; border-radius: 6px; background: rgba(245,166,35,0.16); white-space: nowrap; }
+.rll-ed-tarjeta .t-adm { font-size: 13.5px; font-weight: 500; display: flex; gap: 6px; align-items: baseline; }
+.rll-ed-tarjeta .t-adm span:first-child { color: var(--steel); font-size: 12px; text-transform: uppercase; letter-spacing: .5px; font-weight: 700; }
+.rll-ed-tarjeta .t-sin { color: #B3261E; }
+.rll-ed-tarjeta .t-nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.rll-ed-tarjeta .t-nums div { background: var(--paper); border-radius: 10px; padding: 8px 10px; }
+.rll-ed-tarjeta .t-nums b { display: block; font-size: 20px; line-height: 1.1; }
+.rll-ed-tarjeta .t-nums span { font-size: 11.5px; color: var(--steel); font-weight: 600; }
+.rll-ed-tarjeta .t-nums .alerta b { color: #B5772A; }
+.rll-ed-tarjeta .t-est { font-size: 12.5px; color: var(--steel); font-weight: 500; border-top: 1px solid var(--border); padding-top: 8px; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.rll-ed-tarjeta .t-est b { color: var(--ink); }
+.rll-ed-tarjeta .t-chip { font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--paper); color: var(--steel); white-space: nowrap; }
+.rll-ed-tarjeta .t-chip.amb { background: rgba(245,166,35,0.18); color: #8A5A00; }
+.rll-ed-tarjeta .t-chip.roj { background: rgba(179,38,30,0.12); color: #B3261E; }
+html[data-tema="noche"] .rll-ed-tarjeta { background: #1B1A17; }
+html[data-tema="noche"] .rll-ed-tarjeta .t-chip.amb { color: #FFC960; }
+html[data-tema="noche"] .rll-ed-tarjeta .t-chip.roj, html[data-tema="noche"] .rll-ed-tarjeta .t-sin { color: #FF9D8F; }
+.rll-volver { width: auto; margin: 0 0 12px; display: inline-flex; align-items: center; gap: 6px; }
+.rll-ed-cab h2 { margin: 0; font-size: 28px; line-height: 1.1; }
+.rll-ed-cab .c-sub { color: var(--steel); font-size: 14px; margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; }
+.rll-ed-cab .c-acc { display: flex; flex-wrap: wrap; gap: 8px; }
+.rll-ed-cab .c-acc button { width: auto; margin: 0; padding: 8px 12px; font-size: 13.5px; }
+.rll-ed-cab .c-adm { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 10px; }
+.rll-ed-cab .c-adm .a { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; min-width: 220px; font-size: 13.5px; background: var(--paper); }
+.rll-ed-cab .c-adm .a b { font-size: 15px; display: block; }
+.rll-ed-cab .c-adm .a a { color: inherit; }
+.rll-ed-cab .c-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 14px; }
+.rll-ed-cab .c-kpis div { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; }
+.rll-ed-cab .c-kpis b { display: block; font-size: 24px; line-height: 1.1; }
+.rll-ed-cab .c-kpis span { font-size: 12px; color: var(--steel); font-weight: 600; }
+.rll-subtabs { display: flex; gap: 4px; padding: 4px; border-radius: 14px; background: var(--paper); border: 1px solid var(--border); margin: 0 0 16px; overflow-x: auto; }
+.rll-subtabs button { flex: 1 1 0; width: auto; margin: 0; padding: 10px 14px; border-radius: 10px; background: transparent; color: var(--steel); box-shadow: none; font-weight: 700; font-size: 14.5px; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.rll-subtabs button:hover { color: var(--ink); background: transparent; }
+.rll-subtabs button.activo { background: var(--card, #fff); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 0 0 1px var(--border); }
+.rll-subtabs .n { font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--border); color: var(--ink); }
+.rll-subtabs .n.alerta { background: #C0392B; color: #fff; }
+html[data-tema="noche"] .rll-subtabs button.activo { background: #2B2924; }
+#rllGestBadge:not(.hidden) { display: inline-block; }
+.rll-subtabs .corto { display: none; }
+@media (max-width: 700px) {
+  .rll-subtabs { display: grid; grid-template-columns: 1fr 1fr; overflow: visible; }
+  .rll-subtabs .largo { display: none; }
+  .rll-subtabs .corto { display: inline; }
+  .rll-ed-cab h2 { font-size: 24px; }
+  .rll-ed-cab .c-kpis { grid-template-columns: 1fr 1fr; }
+  .rll-ed-cab .c-adm .a { min-width: 0; flex: 1 1 100%; }
+}
+
 /* ---------- Conciliación de llaves: colores por resultado, legibles en día y en noche ---------- */
 .rll-conc td { background: var(--r-bg); vertical-align: top; }
 .rll-conc td:first-child { border-left: 4px solid var(--r-c); }
@@ -1808,16 +1870,30 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
       </div>
     </div>
 
-    <div id="panelRegistroLlaves" class="hidden">
+    <div id="panelRegistroLlaves" class="hidden vista-general" data-sub="padron">
       <h1>Llaves de edificios</h1>
-      <p class="subtitle">
+      <p class="subtitle" id="rllIntro">
         Lo que cargan los vecinos al escanear el QR del hall y lo que piden los administradores de consorcio desde su portal. Usalo para conciliar con la estación
         de monitoreo: marcá cada llave como <b>conciliada</b> cuando coincide, y las que hay que sacar
         como <b>dar de baja</b>. Las que la estación tiene y nadie registró son las candidatas a borrar.
       </p>
 
-      <div class="card">
+      <!-- Pantalla de un edificio -->
+      <div id="rllEdVista">
+        <button type="button" class="btn-secondary-admin rll-volver" id="rllVolverBtn">← Todos los edificios</button>
+        <div class="card rll-ed-cab" id="rllEdCab"></div>
+        <div id="rllEdEditarSlot"></div>
+        <div class="rll-subtabs" role="tablist" id="rllSubtabs">
+          <button type="button" data-sub="pedidos">Pedidos <span class="n" id="rllSubPedidos">0</span></button>
+          <button type="button" data-sub="padron">Padrón<span class="largo">&nbsp;de llaves</span> <span class="n" id="rllSubPadron">0</span></button>
+          <button type="button" data-sub="conciliacion"><span class="largo">Conciliación con la estación</span><span class="corto">Conciliación</span></button>
+          <button type="button" data-sub="campana"><span class="largo">Campaña de registro</span><span class="corto">Campaña</span></button>
+        </div>
+      </div>
+
+      <div class="card" id="rllEdificiosCard">
         <h3 style="margin-top:0;">Edificios</h3>
+        <p class="subtitle" style="margin:-4px 0 12px;">Tocá un edificio para ver todo lo suyo: datos, administrador, pedidos, padrón, conciliación y campaña.</p>
         <p class="status" id="rllEdificiosStatus">Cargando...</p>
         <div id="rllEdificiosLista"></div>
         <details id="rllEdificioForm" style="margin-top:12px;">
@@ -1840,7 +1916,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
 
       <div class="card" id="rllGestCard">
         <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between;">
-          <h3 style="margin:0;">Gestiones de administradores de consorcio <span class="hidden" id="rllGestBadge" style="display:inline-block;margin-left:6px;padding:1px 9px;border-radius:999px;background:#C0392B;color:#fff;font-size:13px;vertical-align:middle;">0</span></h3>
+          <h3 style="margin:0;">Gestiones de administradores de consorcio <span class="hidden" id="rllGestBadge" style="margin-left:6px;padding:1px 9px;border-radius:999px;background:#C0392B;color:#fff;font-size:13px;vertical-align:middle;">0</span></h3>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <button type="button" class="btn-secondary-admin" id="rllGestRecargarBtn" style="width:auto;">↻ Actualizar</button>
             <button type="button" class="btn-secondary-admin" id="rllGestExcelBtn" style="width:auto;">⬇ Excel</button>
@@ -9683,58 +9759,149 @@ async function cargarRegistroLlavesAdmin() {
     renderRllEdificios();
     cargarConsorcioAdmin();
     rllCargarCfgEntregas();
-    if (!rllEdificioActual && rllEdificios.length === 1) rllAbrirEdificio(rllEdificios[0].codigo);
-    else if (rllEdificioActual) rllAbrirEdificio(rllEdificioActual.codigo);
+    if (rllEdificioActual) rllAbrirEdificio(rllEdificioActual.codigo);
   } catch (e) {
     st.className = "status err";
     st.textContent = "No se pudo cargar: " + e.message;
   }
 }
+function rllAdminsDe(codigo) { return (rllAdmins || []).filter((a) => (a.edificios || []).includes(codigo)); }
+function rllPedidosAbiertos(codigo) { return (rllGestiones || []).filter((g) => g.edificio === codigo && (g.estado === "pendiente" || g.estado === "en_curso" || rllPendienteEntrega(g))).length; }
 function renderRllEdificios() {
   const cont = document.getElementById("rllEdificiosLista");
   if (!rllEdificios.length) { cont.innerHTML = ""; return; }
-  const estacionTxt = (e) => {
-    const ab = e.abonado ? `<span style="font-family:'IBM Plex Mono',monospace;font-weight:600;">${rllEsc(e.abonado)}</span>` : '<span style="color:#6B7680;font-size:12px;">sin N° de abonado</span>';
-    const c = e.conciliacion;
-    if (!c) return `${ab}<br><span style="color:#6B7680;font-size:12px;">Sin Excel de la estación</span>`;
-    const p = c.estacion;
-    return `${ab}<br><span style="font-size:12px;">Excel del ${rllEsc(rllFecha(c.fecha).split(" ")[0])}${p ? ` · <b style="color:#1F6B34;">${p.con_dueno}</b> con dueño · <b style="color:#B3261E;">${p.sin_dueno}</b> sin dueño` : ""}${c.por_decidir ? ` · ${c.por_decidir} para dar de baja` : ""}</span>`;
-  };
-  cont.innerHTML = `<table><thead><tr><th>Edificio</th><th>Registros</th><th>Por revisar</th><th>Último</th><th>Estación</th><th>QR</th><th></th></tr></thead><tbody>${rllEdificios.map((e) => `
-    <tr${rllEdificioActual && rllEdificioActual.codigo === e.codigo ? ' style="background:rgba(245,166,35,0.10);"' : ""}>
-      <td><b>${rllEsc(e.nombre)}</b>${e.direccion ? `<br><span style="color:#6B7680;">${rllEsc(e.direccion)}</span>` : ""}<br><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6B7680;">${rllEsc(e.codigo)}</span></td>
-      <td>${e.registros == null ? "—" : e.registros}</td>
-      <td>${e.pendientes ? `<b style="color:#B5772A;">${e.pendientes}</b>` : "0"}</td>
-      <td>${e.ultimo ? rllFecha(e.ultimo) : "—"}</td>
-      <td>${estacionTxt(e)}</td>
-      <td>${e.activo === false ? '<span class="ven-estado sin">Apagado</span>' : '<span class="ven-estado ok">Activo</span>'}</td>
-      <td style="white-space:nowrap;text-align:right;">
-        <button type="button" class="rll-ver" data-c="${e.codigo}" style="width:auto;padding:6px 10px;font-size:13px;margin:2px;">Ver registros</button>
-        <button type="button" class="btn-secondary-admin rll-cartel" data-c="${e.codigo}" style="width:auto;padding:6px 10px;font-size:13px;margin:2px;">🖨 Cartel QR</button>
-        <button type="button" class="btn-secondary-admin rll-link" data-c="${e.codigo}" style="width:auto;padding:6px 10px;font-size:13px;margin:2px;">Copiar link</button>
-        <button type="button" class="btn-secondary-admin rll-editar" data-c="${e.codigo}" style="width:auto;padding:6px 10px;font-size:13px;margin:2px;">Editar</button>
-      </td>
-    </tr>`).join("")}</tbody></table>`;
-  cont.querySelectorAll(".rll-ver").forEach((b) => b.addEventListener("click", () => rllAbrirEdificio(b.dataset.c)));
-  cont.querySelectorAll(".rll-cartel").forEach((b) => b.addEventListener("click", () => rllImprimirCartel(rllEdificios.find((x) => x.codigo === b.dataset.c))));
-  cont.querySelectorAll(".rll-link").forEach((b) => b.addEventListener("click", async () => {
-    const url = RLL_URL_PUBLICA + b.dataset.c;
-    try { await navigator.clipboard.writeText(url); b.textContent = "✓ Copiado"; } catch (e) { prompt("Copiá el link:", url); }
-    setTimeout(() => { b.textContent = "Copiar link"; }, 1800);
-  }));
-  cont.querySelectorAll(".rll-editar").forEach((b) => b.addEventListener("click", () => {
-    const e = rllEdificios.find((x) => x.codigo === b.dataset.c);
-    document.getElementById("rllEdCodigo").value = e.codigo;
-    document.getElementById("rllEdNombre").value = e.nombre;
-    document.getElementById("rllEdDireccion").value = e.direccion || "";
-    document.getElementById("rllEdAbonado").value = e.abonado || "";
-    document.getElementById("rllEdActivo").checked = e.activo !== false;
-    document.getElementById("rllEdActivoWrap").classList.remove("hidden");
-    document.getElementById("rllEdCancelarBtn").classList.remove("hidden");
-    document.getElementById("rllEdificioFormTit").textContent = "Editar " + e.nombre;
-    document.getElementById("rllEdificioForm").open = true;
-    document.getElementById("rllEdNombre").focus();
-  }));
+  const CAMP = { activa: ["Campaña abierta", "amb"], en_revision: ["Esperando bajas del administrador", "amb"], aprobada: ["Bajas aprobadas", "amb"] };
+  cont.innerHTML = `<div class="rll-ed-grid">${rllEdificios.map((e) => {
+    const adms = rllAdminsDe(e.codigo);
+    const abiertos = rllPedidosAbiertos(e.codigo);
+    const c = e.conciliacion, p = c && c.estacion;
+    const camp = e.campana && CAMP[e.campana.estado];
+    return `<button type="button" class="rll-ed-tarjeta" data-c="${rllEsc(e.codigo)}">
+      <div class="t-cab"><div><div class="t-nombre">${rllEsc(e.nombre)}</div><div class="t-dir">${rllEsc(e.direccion || "Sin dirección")}</div></div>${e.abonado ? `<span class="t-ab">${rllEsc(e.abonado)}</span>` : ""}</div>
+      <div class="t-adm"><span>Administra</span>${adms.length ? `<span>${adms.map((a) => rllEsc(a.nombre)).join(", ")}</span>` : '<span class="t-sin">Sin administrador asignado</span>'}</div>
+      <div class="t-nums">
+        <div><b>${e.registros == null ? "—" : e.registros}</b><span>vecinos</span></div>
+        <div class="${e.pendientes ? "alerta" : ""}"><b>${e.pendientes || 0}</b><span>llaves por revisar</span></div>
+        <div class="${abiertos ? "alerta" : ""}"><b>${abiertos}</b><span>pedidos abiertos</span></div>
+      </div>
+      <div class="t-est">${c ? `<span>Estación: <b>${p ? p.con_dueno : "?"}</b> con dueño · <b>${p ? p.sin_dueno : "?"}</b> sin dueño</span>` : "<span>Sin Excel de la estación</span>"}
+        ${camp ? `<span class="t-chip ${camp[1]}">${camp[0]}</span>` : ""}${e.activo === false ? '<span class="t-chip roj">QR apagado</span>' : ""}</div>
+    </button>`;
+  }).join("")}</div>`;
+  cont.querySelectorAll(".rll-ed-tarjeta").forEach((b) => b.addEventListener("click", () => { rllAbrirEdificio(b.dataset.c); window.scrollTo({ top: 0, behavior: "smooth" }); }));
+}
+
+// ---------- Pantalla de un edificio ----------
+const rllPanel = document.getElementById("panelRegistroLlaves");
+const rllFormEd = document.getElementById("rllEdificioForm");
+const rllFormEdCasa = { padre: rllFormEd.parentNode, sig: rllFormEd.nextSibling };
+function rllDevolverFormEdificio() { if (rllFormEd.parentNode !== rllFormEdCasa.padre) rllFormEdCasa.padre.insertBefore(rllFormEd, rllFormEdCasa.sig); }
+function rllSubtab(sub) {
+  rllPanel.dataset.sub = sub;
+  document.querySelectorAll("#rllSubtabs button").forEach((b) => b.classList.toggle("activo", b.dataset.sub === sub));
+}
+document.querySelectorAll("#rllSubtabs button").forEach((b) => b.addEventListener("click", () => rllSubtab(b.dataset.sub)));
+document.getElementById("rllVolverBtn").addEventListener("click", () => {
+  rllEdificioActual = null;
+  rllConcPendiente = null;
+  rllPanel.classList.add("vista-general"); rllPanel.classList.remove("vista-edificio");
+  document.getElementById("rllGestEdificio").value = "";
+  rllDevolverFormEdificio(); rllLimpiarFormEdificio(); rllFormEd.open = false;
+  renderRllEdificios();
+  renderRllGestiones();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+});
+// Asignar un administrador desde la pantalla del edificio (o crear uno nuevo con el edificio ya marcado).
+function rllAsignarAdmHtml(e, adms) {
+  const libres = (rllAdmins || []).filter((a) => !(a.edificios || []).includes(e.codigo));
+  return `<div class="a" style="background:transparent;border-style:dashed;">
+    ${adms.length ? "" : '<b style="color:#B3261E;">Sin administrador asignado</b>'}
+    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:${adms.length ? 0 : 6}px;">
+      ${libres.length ? `<select id="rllCabAdmSel" style="width:auto;flex:1 1 160px;margin:0;padding:7px 10px;font-size:13.5px;"><option value="">Asignar un administrador…</option>${libres.map((a) => `<option value="${rllEsc(a.id)}">${rllEsc(a.nombre)}</option>`).join("")}</select>
+      <button type="button" id="rllCabAdmBtn" style="width:auto;margin:0;padding:7px 12px;font-size:13.5px;">Asignar</button>` : ""}
+      <button type="button" class="btn-secondary-admin" id="rllCabAdmNuevo" style="width:auto;margin:0;padding:7px 12px;font-size:13.5px;">+ Nuevo administrador</button>
+    </div><span id="rllCabAdmSt" class="status" style="margin:4px 0 0;"></span></div>`;
+}
+function rllAsignarAdmEventos(e) {
+  const btn = document.getElementById("rllCabAdmBtn");
+  if (btn) btn.addEventListener("click", async () => {
+    const st = document.getElementById("rllCabAdmSt");
+    const a = rllAdmins.find((x) => x.id === document.getElementById("rllCabAdmSel").value);
+    if (!a) { st.className = "status err"; st.textContent = "Elegí un administrador."; return; }
+    btn.disabled = true; st.className = "status"; st.textContent = "Guardando...";
+    try {
+      const r = await fetch("/api/datos?coleccion=consorcio", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "guardar_admin", id: a.id, nombre: a.nombre, email: a.email, telefono: a.telefono || "", edificios: [...(a.edificios || []), e.codigo], activo: a.activo !== false }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Error");
+      const i = rllAdmins.findIndex((x) => x.id === d.admin.id);
+      if (i >= 0) rllAdmins[i] = d.admin;
+      renderRllAdmins(); renderRllEdificios(); renderRllCabecera();
+    } catch (err) { st.className = "status err"; st.textContent = "No se pudo: " + err.message; btn.disabled = false; }
+  });
+  document.getElementById("rllCabAdmNuevo").addEventListener("click", () => {
+    document.getElementById("rllVolverBtn").click();
+    rllLimpiarFormAdmin();
+    rllArmarCheckEdificios([e.codigo]);
+    const f = document.getElementById("rllAdmForm");
+    f.open = true;
+    setTimeout(() => { f.scrollIntoView({ behavior: "smooth", block: "center" }); document.getElementById("rllAdmNombre").focus(); }, 50);
+  });
+}
+function renderRllCabecera() {
+  const e = rllEdificioActual;
+  if (!e) return;
+  const adms = rllAdminsDe(e.codigo);
+  const abiertos = rllPedidosAbiertos(e.codigo);
+  const c = e.conciliacion, p = c && c.estacion;
+  const CAMP = { activa: "Abierta", en_revision: "Esperando al administrador", aprobada: "Bajas aprobadas" };
+  document.getElementById("rllEdCab").innerHTML = `
+    <div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;align-items:flex-start;">
+      <div>
+        <h2>${rllEsc(e.nombre)}</h2>
+        <div class="c-sub">${e.direccion ? `<span>${rllEsc(e.direccion)}</span>` : ""}<span>Abonado: <b style="font-family:'IBM Plex Mono',monospace;">${rllEsc(e.abonado || "—")}</b></span><span>Código del QR: <span style="font-family:'IBM Plex Mono',monospace;">${rllEsc(e.codigo)}</span></span>${e.activo === false ? '<span class="ven-estado sin">QR apagado</span>' : '<span class="ven-estado ok">QR activo</span>'}</div>
+      </div>
+      <div class="c-acc">
+        <button type="button" class="btn-secondary-admin" id="rllCabCartel">🖨 Cartel QR</button>
+        <button type="button" class="btn-secondary-admin" id="rllCabLink">Copiar link del QR</button>
+        <button type="button" class="btn-secondary-admin" id="rllCabEditar">Editar datos</button>
+      </div>
+    </div>
+    <div class="c-adm">${adms.map((a) => `<div class="a"><span style="font-size:11.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--steel);">Administra</span><b>${rllEsc(a.nombre)}</b>${a.email ? `<a href="mailto:${rllEsc(a.email)}">${rllEsc(a.email)}</a>` : ""}${a.telefono ? ` · <a href="tel:${rllEsc(a.telefono)}">${rllEsc(a.telefono)}</a>` : ""}${a.activo === false ? '<br><span class="ven-estado sin">Acceso desactivado</span>' : ""}</div>`).join("")}
+      ${rllAsignarAdmHtml(e, adms)}</div>
+    <div class="c-kpis">
+      <div><b>${e.registros == null ? "—" : e.registros}</b><span>vecinos registrados</span></div>
+      <div><b style="${e.pendientes ? "color:#B5772A;" : ""}">${e.pendientes || 0}</b><span>llaves por revisar</span></div>
+      <div><b style="${abiertos ? "color:#B5772A;" : ""}">${abiertos}</b><span>pedidos abiertos</span></div>
+      <div><b>${p ? `${p.con_dueno}/${p.total}` : "—"}</b><span>${p ? "llaves de la estación con dueño" : "sin Excel de la estación"}</span></div>
+      <div><b style="font-size:16px;padding:4px 0;">${e.campana ? rllEsc(CAMP[e.campana.estado] || e.campana.estado) : "—"}</b><span>campaña de registro</span></div>
+    </div>`;
+  document.getElementById("rllCabCartel").addEventListener("click", () => rllImprimirCartel(e));
+  rllAsignarAdmEventos(e);
+  document.getElementById("rllCabLink").addEventListener("click", async (ev) => {
+    const url = RLL_URL_PUBLICA + e.codigo;
+    try { await navigator.clipboard.writeText(url); ev.target.textContent = "✓ Copiado"; } catch (err) { prompt("Copiá el link:", url); }
+    setTimeout(() => { ev.target.textContent = "Copiar link del QR"; }, 1800);
+  });
+  document.getElementById("rllCabEditar").addEventListener("click", () => {
+    document.getElementById("rllEdEditarSlot").appendChild(rllFormEd);
+    rllEditarEdificio(e);
+  });
+  const n = (id, v, alerta) => { const el = document.getElementById(id); el.textContent = v; el.classList.toggle("alerta", !!alerta); };
+  n("rllSubPedidos", abiertos || rllGestiones.filter((g) => g.edificio === e.codigo).length, abiertos);
+  n("rllSubPadron", e.registros || 0, false);
+}
+
+function rllEditarEdificio(e) {
+  document.getElementById("rllEdCodigo").value = e.codigo;
+  document.getElementById("rllEdNombre").value = e.nombre;
+  document.getElementById("rllEdDireccion").value = e.direccion || "";
+  document.getElementById("rllEdAbonado").value = e.abonado || "";
+  document.getElementById("rllEdActivo").checked = e.activo !== false;
+  document.getElementById("rllEdActivoWrap").classList.remove("hidden");
+  document.getElementById("rllEdCancelarBtn").classList.remove("hidden");
+  document.getElementById("rllEdificioFormTit").textContent = "Editar " + e.nombre;
+  rllFormEd.open = true;
+  document.getElementById("rllEdNombre").focus();
 }
 function rllLimpiarFormEdificio() {
   ["rllEdCodigo", "rllEdNombre", "rllEdDireccion", "rllEdAbonado"].forEach((id) => { document.getElementById(id).value = ""; });
@@ -9742,7 +9909,7 @@ function rllLimpiarFormEdificio() {
   document.getElementById("rllEdCancelarBtn").classList.add("hidden");
   document.getElementById("rllEdificioFormTit").textContent = "+ Agregar un edificio";
 }
-document.getElementById("rllEdCancelarBtn").addEventListener("click", () => { rllLimpiarFormEdificio(); document.getElementById("rllEdificioForm").open = false; });
+document.getElementById("rllEdCancelarBtn").addEventListener("click", () => { rllLimpiarFormEdificio(); rllFormEd.open = false; rllDevolverFormEdificio(); });
 document.getElementById("rllEdGuardarBtn").addEventListener("click", async () => {
   const st = document.getElementById("rllEdStatus");
   const codigo = document.getElementById("rllEdCodigo").value;
@@ -9758,15 +9925,23 @@ document.getElementById("rllEdGuardarBtn").addEventListener("click", async () =>
     if (!r.ok) throw new Error(d.error || "Error desconocido");
     st.className = "status ok"; st.textContent = codigo ? "Guardado." : "Edificio creado. Ya podés imprimir su cartel QR.";
     rllLimpiarFormEdificio();
+    if (codigo) { rllFormEd.open = false; rllDevolverFormEdificio(); }
     await cargarRegistroLlavesAdmin();
   } catch (e) { st.className = "status err"; st.textContent = "No se pudo guardar: " + e.message; }
 });
 
-async function rllAbrirEdificio(codigo) {
+async function rllAbrirEdificio(codigo, sub) {
+  const mismo = rllEdificioActual && rllEdificioActual.codigo === codigo && rllPanel.classList.contains("vista-edificio");
   rllEdificioActual = rllEdificios.find((x) => x.codigo === codigo) || null;
-  renderRllEdificios();
   const card = document.getElementById("rllRegistrosCard");
-  if (!rllEdificioActual) { card.classList.add("hidden"); document.getElementById("rllConcCard").classList.add("hidden"); document.getElementById("rllCampanaCard").classList.add("hidden"); return; }
+  if (!rllEdificioActual) { document.getElementById("rllVolverBtn").click(); return; }
+  // Pantalla exclusiva del edificio: cabecera + solapas (pedidos, padrón, conciliación, campaña).
+  rllPanel.classList.remove("vista-general"); rllPanel.classList.add("vista-edificio");
+  if (sub) rllSubtab(sub);
+  else if (!mismo) rllSubtab(rllPedidosAbiertos(codigo) ? "pedidos" : "padron");
+  document.getElementById("rllGestEdificio").value = codigo;
+  renderRllGestiones();
+  renderRllCabecera();
   rllConc = null; // la conciliación es de cada edificio: se vuelve a pedir abajo
   document.getElementById("rllCampanaStatus").textContent = "";
   card.classList.remove("hidden");
@@ -10257,6 +10432,7 @@ async function rllRefrescarListaEdificios() {
     rllEdificios = d;
     if (rllEdificioActual) rllEdificioActual = rllEdificios.find((x) => x.codigo === rllEdificioActual.codigo) || rllEdificioActual;
     renderRllEdificios();
+    renderRllCabecera();
     rllTitulosEdificio();
   } catch (e) { /* no es grave */ }
 }
@@ -10329,7 +10505,7 @@ function rllVerificarArchivo() {
     const ir = document.getElementById("rllConcIrOtro");
     if (ir) ir.addEventListener("click", async () => {
       const guardado = rllConcPendiente;
-      await rllAbrirEdificio(v.otro.codigo);
+      await rllAbrirEdificio(v.otro.codigo, "conciliacion");
       // Se reabre el mismo archivo en el edificio correcto, sin volver a elegirlo.
       rllConcPendiente = { ...guardado, edificio: v.otro.codigo };
       rllArmarMapeo();
@@ -10653,6 +10829,9 @@ async function cargarConsorcioAdmin() {
   sel.innerHTML = '<option value="">Todos los edificios</option>' + rllEdificios.map((e) => `<option value="${rllEsc(e.codigo)}">${rllEsc(e.nombre)}</option>`).join("");
   sel.value = previo;
   await Promise.all([rllCargarGestiones(), rllCargarAdmins()]);
+  // Las tarjetas muestran quién administra cada edificio y sus pedidos abiertos.
+  renderRllEdificios();
+  renderRllCabecera();
 }
 async function rllCargarGestiones() {
   const st = document.getElementById("rllGestStatus");
@@ -11086,6 +11265,7 @@ document.getElementById("rllAdmGuardarBtn").addEventListener("click", async () =
     const i = rllAdmins.findIndex((x) => x.id === d.admin.id);
     if (i >= 0) rllAdmins[i] = d.admin; else rllAdmins.push(d.admin);
     renderRllAdmins();
+    renderRllEdificios();
     if (d.clave) rllMostrarClave(d.admin, d.clave);
     rllLimpiarFormAdmin();
     document.getElementById("rllAdmForm").open = false;
