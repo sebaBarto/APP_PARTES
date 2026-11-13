@@ -114,6 +114,13 @@
   .foto-prev span { font-size: 14px; color: var(--ok); font-weight: 600; flex: 1; }
   .quitar { border: none; background: none; color: var(--muted); font-size: 13.5px; font-weight: 600; padding: 6px 8px; border-radius: 8px; cursor: pointer; }
 
+  .mi-edificio { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; border: 1.5px solid var(--ink); background: #fff; }
+  .mi-edificio svg { width: 22px; height: 22px; color: var(--amber-dark, #A87708); }
+  .mi-edificio div { flex: 1; min-width: 0; }
+  .mi-edificio b { display: block; font-family: var(--cond); font-size: 17px; text-transform: uppercase; letter-spacing: .3px; }
+  .mi-edificio small { color: var(--muted); font-size: 13.5px; }
+  .mi-edificio button { border: 1.5px solid var(--line); background: var(--field); border-radius: 10px; padding: 8px 12px; font-weight: 600; font-size: 14px; cursor: pointer; white-space: nowrap; }
+  .mi-edificio button:hover { border-color: var(--ink); }
   .resultados { display: grid; gap: 8px; margin-top: 12px; }
   .resultado { text-align: left; width: 100%; padding: 12px 14px; border-radius: 12px; border: 1.5px solid var(--line); background: #fff; cursor: pointer; }
   .resultado b { display: block; font-family: var(--cond); font-size: 17px; text-transform: uppercase; letter-spacing: .3px; }
@@ -194,6 +201,10 @@
     <form class="card oculto" id="pIdent" novalidate autocomplete="on">
       <h2><span class="num">1</span>Decinos quién sos</h2>
       <p class="sub">Con estos datos te buscamos en el registro de vecinos del edificio.</p>
+      <div class="campo">
+        <span class="grupo-label">Tu edificio</span>
+        <div class="mi-edificio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 7h1M14 7h1M9 11h1M14 11h1M9 15h1M14 15h1M11 21v-3h2v3"/></svg><div><b id="identEdNombre"></b><small id="identEdDir"></small></div><button type="button" class="cambiar-ed">No es el mío</button></div>
+      </div>
       <div class="aviso ojo oculto" id="linkInvalido"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l10 18H2z"/><path d="M12 10v4M12 17.5v.01"/></svg><span>Tu link personal no es válido o es viejo. Completá tus datos y seguimos igual.</span></div>
       <div class="fila">
         <div class="campo"><label for="piso">Piso</label><input type="text" id="piso" inputmode="text" maxlength="10" placeholder="Ej.: 4 o PB" autocomplete="off"></div>
@@ -211,6 +222,7 @@
     <!-- Paso 2: la denuncia -->
     <form class="card oculto" id="pDenuncia" novalidate>
       <h2><span class="num">2</span>Qué llave y qué pasó</h2>
+      <p class="sub" id="denEdificio"></p>
       <div class="aviso ok oculto" id="okRegistro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span id="okRegistroTxt"></span></div>
 
       <div id="bloqueDni" class="oculto">
@@ -293,6 +305,7 @@
   function mostrar(id) {
     PANTALLAS.forEach((x) => $(x).classList.toggle("oculto", x !== id));
     $("pasos3").classList.toggle("oculto", id === "pListo");
+    if (codigo) $("edificioBox").classList.toggle("oculto", id === "pIdent" || id === "pBuscar");
     window.scrollTo({ top: id === "pIdent" || id === "pBuscar" ? 0 : Math.max(0, $(id).getBoundingClientRect().top + scrollY - 12), behavior: "smooth" });
   }
   const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -308,6 +321,10 @@
     $("edNombre").textContent = d.nombre;
     $("edDireccion").textContent = d.direccion || "";
     $("edificioBox").classList.remove("oculto");
+    $("identEdNombre").textContent = d.nombre;
+    $("identEdDir").textContent = d.direccion || "";
+    $("denEdificio").innerHTML = "Edificio: <b>" + esc(d.nombre) + "</b>" + (d.direccion ? " · " + esc(d.direccion) : "") + ' · <button type="button" class="volver cambiar-ed" style="margin:0;">No es mi edificio</button>';
+    $("denEdificio").querySelector(".cambiar-ed").addEventListener("click", cambiarEdificio);
     document.title = "Denunciar llave robada o perdida — " + d.nombre;
     document.querySelectorAll("[data-wa]").forEach((a) => { a.href = "https://wa.me/5493413782085?text=" + encodeURIComponent("Hola SAT, me robaron/perdí la llave del edificio " + d.nombre + "."); });
   }
@@ -330,6 +347,17 @@
       mostrar("pIdent");
     } catch (e) { mostrar("pError"); }
   }
+
+  // ---------- Cambiar de edificio (si el link era de otro) ----------
+  function cambiarEdificio() {
+    codigo = ""; ticket = ""; verificado = false;
+    $("edificioBox").classList.add("oculto");
+    history.replaceState(null, "", location.pathname);
+    $("buscar").value = ""; $("resultados").innerHTML = ""; $("buscarAyuda").textContent = "";
+    mostrar("pBuscar");
+    setTimeout(() => $("buscar").focus(), 50);
+  }
+  document.querySelectorAll("#pIdent .cambiar-ed").forEach((b) => b.addEventListener("click", cambiarEdificio));
 
   // ---------- Buscar el edificio ----------
   let tBuscar = 0;
