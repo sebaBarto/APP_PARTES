@@ -925,6 +925,53 @@ test("Admin instalaciones: horas totales en la lista y por técnico en el detall
   await ctx.close();
 });
 
+test("Admin, instalaciones: las fotos se ven en un carrusel (flechas, teclado, miniaturas) sin abrir pestañas nuevas", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const png = require("fs").readFileSync(require("path").join(__dirname, "..", "icons", "icon-192.png"));
+  const pedidosFoto = [];
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  await page.route("**/api/**", (route) => {
+    const u = route.request().url();
+    const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("tipo=foto-instalacion")) { pedidosFoto.push(u); return route.fulfill({ status: 200, contentType: "image/png", body: png }); }
+    if (u.includes("tipo=instalaciones")) return json([{ id: 7, cliente: "Distribuidora Norte", tecnico: "Juan", fecha: "2026-10-20", estado: "cerrada" }]);
+    if (u.includes("tipo=instalacion&id=7")) return json({ id: 7, cliente: "Distribuidora Norte", tecnico: "Juan", estado: "cerrada", zonas: [], canales: [], dias: [], fotos: ["a.jpg", "b.jpg", "c.jpg"] });
+    json([]);
+  });
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { document.getElementById("mainCard").classList.remove("hidden"); document.getElementById("panelInstalaciones").classList.remove("hidden"); return cargarInstalacionesAdmin(); });
+  await page.click(".fila-lista-clickeable");
+  await page.waitForFunction(() => [...document.querySelectorAll("img.inst-foto-pase")].length === 3 && [...document.querySelectorAll("img.inst-foto-pase")].every((i) => i.src.startsWith("blob:")));
+  let pestanas = 0;
+  ctx.on("page", () => pestanas++);
+  await page.locator("img.inst-foto-pase").nth(1).click();
+  await page.waitForSelector(".carrusel-capa .carrusel-escena img[src^='blob:']");
+  assert.match(await page.textContent(".carrusel-cont"), /Distribuidora Norte · Foto 2 de 3/);
+  assert.strictEqual(await page.locator(".carrusel-tiras button").count(), 3);
+  await page.click(".carrusel-flecha.sig");
+  assert.match(await page.textContent(".carrusel-cont"), /Foto 3 de 3/);
+  await page.click(".carrusel-flecha.sig");
+  assert.match(await page.textContent(".carrusel-cont"), /Foto 1 de 3/, "da la vuelta");
+  await page.keyboard.press("ArrowLeft");
+  assert.match(await page.textContent(".carrusel-cont"), /Foto 3 de 3/);
+  await page.click('.carrusel-tiras button[data-k="1"]');
+  assert.match(await page.textContent(".carrusel-cont"), /Foto 2 de 3/);
+  assert.strictEqual(await page.locator(".carrusel-tiras button.activa").getAttribute("data-k"), "1");
+  assert.match(await page.getAttribute(".carrusel-bajar", "download"), /^instalacion-Distribuidora_Norte-2\.jpg$/);
+  await page.keyboard.press("Escape");
+  assert.strictEqual(await page.locator(".carrusel-capa").count(), 0);
+  assert.strictEqual(pestanas, 0, "no abre pestañas");
+  assert.strictEqual(pedidosFoto.length, 3, "cada foto se baja una sola vez");
+  if (process.env.FOTO) {
+    await page.locator("img.inst-foto-pase").nth(0).click();
+    await page.waitForSelector(".carrusel-capa .carrusel-escena img[src^='blob:']");
+    await page.screenshot({ path: process.env.FOTO });
+  }
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
 test("Manuales: preguntar sobre un manual puntual, respuesta con formato, consultas recientes, filtro y guardado sin señal", async () => {
   const { ctx, page, erroresPagina } = await nuevaPagina();
   const preguntas = [];
