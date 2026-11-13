@@ -1096,6 +1096,7 @@
   });
   form.querySelectorAll('input[name="tipo"]').forEach((r) => r.addEventListener("change", ajustarForm));
   function ajustarForm() {
+    if ($("edificioStatus").classList.contains("enviado") && valor("tipo")) { $("edificioStatus").textContent = ""; $("edificioStatus").className = "status"; }
     const t = valor("tipo");
     $("camposGestion").classList.toggle("oculto", !t);
     if ($("elegirBox")) $("elegirBox").classList.toggle("oculto", t === "nuevo" || !datos.registros.length);
@@ -1144,7 +1145,13 @@
       datos.gestiones.unshift(d.gestion);
       form.reset(); delete form.dataset.registro; fotosGestion = []; renderFotosGestion(); ajustarForm();
       $("camposGestion").classList.add("oculto");
-      st.className = "status ok"; st.textContent = `✓ Pedido N° ${d.numero} enviado a SAT. Lo podés seguir en «Pedidos».`;
+      st.textContent = "";
+      // El formulario se cierra al enviar: la confirmación va debajo de las pestañas (y como aviso).
+      const est = $("edificioStatus");
+      est.className = "status ok enviado";
+      est.innerHTML = `✓ Pedido <b>N° ${esc(d.numero)}</b> enviado a SAT. Lo podés seguir en <a href="#" id="verPedidoLink">Pedidos</a>.`;
+      $("verPedidoLink").addEventListener("click", (ev) => { ev.preventDefault(); irA("gestiones"); });
+      aviso(`Pedido N° ${d.numero} enviado a SAT.`);
       renderTodo();
     } catch (err) { st.className = "status err"; st.textContent = err.message; }
     $("gEnviarBtn").disabled = false;
