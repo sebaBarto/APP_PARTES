@@ -2247,6 +2247,10 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
     await require("../lib/consorcio").manejarPortal(req, res, { leer: leerArchivoDatos, escribir: escribirArchivoDatos });
     return;
   }
+  if (req.query && req.query.publico === "robo_llave") {
+    await require("../lib/robo-llaves").manejarPublico(req, res, { leer: leerArchivoDatos, escribir: escribirArchivoDatos });
+    return;
+  }
   if (req.query && req.query.publico === "registro_llaves") {
     await require("../lib/registro-llaves").manejarPublico(req, res, { leer: leerArchivoDatos, escribir: escribirArchivoDatos });
     return;

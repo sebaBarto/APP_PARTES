@@ -10360,6 +10360,11 @@ function rllImprimirCartel(ed) {
   .paso span { font-size: 11.5pt; color: #55534D; line-height: 1.35; }
   .aviso { margin: 7mm 16mm 0; padding: 5mm 6mm; background: #FFF6DD; border-left: 2mm solid #F6B828; border-radius: 2mm; font-size: 13pt; line-height: 1.4; }
   .aviso [contenteditable] { outline: none; border-bottom: 1px dashed #C9A23A; }
+  .robo { margin: 5mm 16mm 0; padding: 4mm 6mm; border-radius: 2mm; background: #0E0F10; color: #fff; display: flex; align-items: center; gap: 5mm; }
+  .robo .ic { width: 11mm; height: 11mm; flex: none; border-radius: 50%; background: #D93A2F; display: grid; place-items: center; font: 800 16pt 'Barlow Semi Condensed', sans-serif; }
+  .robo b { display: block; font-family: 'Barlow Semi Condensed', sans-serif; font-size: 15pt; letter-spacing: .3px; }
+  .robo span { font-size: 11.5pt; color: #D2CFC6; }
+  .robo .dir { margin-left: auto; font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 13pt; color: #F6B828; white-space: nowrap; }
   .pie { margin-top: auto; padding: 6mm 16mm 9mm; display: flex; justify-content: space-between; align-items: flex-end; font-size: 10.5pt; color: #6E6C66; }
   .pie b { color: #0E0F10; font-size: 12pt; }
   .url { font-family: 'IBM Plex Mono', monospace; font-size: 8.5pt; word-break: break-all; text-align: right; max-width: 95mm; }
@@ -10383,6 +10388,7 @@ function rllImprimirCartel(ed) {
     <div class="paso"><div class="num">3</div><b>Listo</b><span>Repetilo por cada persona que use una llave</span></div>
   </div>
   <div class="aviso"><b>Importante:</b> <span contenteditable="true">completalo antes del ___/___/______</span>. Las llaves que no se registren podrán ser dadas de baja por seguridad.</div>
+  <div class="robo"><div class="ic">!</div><div><b>¿Te robaron o perdiste la llave?</b><span>Denunciala a cualquier hora. Sacale una foto a este cartel.</span></div><div class="dir">pedido.sat365.com.ar/robo</div></div>
   <div class="pie">
     <div><b>SAT</b> · Seguridad electrónica<br>www.sat365.com.ar</div>
     <div class="url">${e(url)}</div>
@@ -11003,6 +11009,16 @@ function rllGestUnidad(g) {
   if (g.cochera) p.push("Cochera " + g.cochera);
   return p.join(" · ") || "—";
 }
+// Denuncia de llave robada/perdida hecha por el vecino (acceso de emergencia, robo-llave.html).
+const RLL_VERIF = { link: "✓ Verificado (link personal)", registro: "✓ Verificado (coincide con el padrón)", dni: "Con foto de DNI (no coincidía con el padrón)", sin_verificar: "⚠ Sin verificar (sin DNI)" };
+function rllCeldaDenuncia(g) {
+  const r = g.robo || {}, est = r.estacion, c = r.cierre;
+  const estTxt = !est ? "⏳ Avisando a la estación…" : !est.ok ? "⚠ No se pudo avisar a la estación: llamar" : est.prueba ? "Estación avisada (modo PRUEBA: fue a SAT, falta LLAVES_ROBO_EMAIL)" : "✓ Estación avisada " + rllFecha(est.fecha);
+  return `<div style="margin-top:6px;padding:6px 8px;border-radius:8px;background:#FDECEA;color:#8C1D18;font-size:11.5px;line-height:1.45;">
+    <b>🚨 Denuncia de emergencia</b>${g.cargada_por && g.cargada_por !== g.titular ? ` de ${rllEsc(g.cargada_por)}${g.contacto_vecino ? " · " + rllEsc(g.contacto_vecino) : ""}` : ""}<br>
+    ${rllEsc(RLL_VERIF[r.verificacion] || "")}<br>${rllEsc(estTxt)}
+    ${c ? `<br>${c.ok ? "✓" : "⚠"} Cierre enviado a la estación (${rllEsc(c.estado === "hecha" ? "dada de baja" : "anulada")})` : est && est.ok ? "<br>Al marcarla <b>Hecha</b> se le avisa a la estación que quite la alerta." : ""}</div>`;
+}
 function renderRllGestiones() {
   const abiertas = rllGestiones.filter((g) => g.estado === "pendiente" || g.estado === "en_curso" || rllPendienteEntrega(g)).length;
   const badge = document.getElementById("rllGestBadge");
@@ -11034,7 +11050,7 @@ function renderRllGestiones() {
     return `<tr${g.motivo === "robo" && g.estado === "pendiente" ? ' style="background:#FFF4F3;"' : ""}>
       <td style="white-space:nowrap;"><b style="font-size:15px;">${g.numero ? "N° " + rllEsc(g.numero) : ""}</b><br>${rllFecha(g.fecha)}</td>
       <td><b>${rllEsc(g.edificio_nombre || g.edificio)}</b><br><span style="color:#6B7680;">${rllEsc(g.admin_nombre)}</span></td>
-      <td><b>${rllEsc(RLL_GEST_TIPOS[g.tipo] || g.tipo)}</b>${g.origen === "vecino" ? `<br><span style="font-size:11.5px;color:#2C4E9A;">📨 La cargó el vecino${g.cargada_por ? " (" + rllEsc(g.cargada_por) + ")" : ""} con link del administrador</span>` : ""}</td>
+      <td><b>${rllEsc(RLL_GEST_TIPOS[g.tipo] || g.tipo)}</b>${g.origen === "vecino" ? `<br><span style="font-size:11.5px;color:#2C4E9A;">📨 La cargó el vecino${g.cargada_por ? " (" + rllEsc(g.cargada_por) + ")" : ""} con link del administrador</span>` : ""}${g.origen === "emergencia" ? rllCeldaDenuncia(g) : ""}</td>
       <td><b>${rllEsc(rllGestUnidad(g))}</b><br>${rllEsc(g.titular)}${g.telefono ? `<br><a href="tel:${rllEsc(String(g.telefono).replace(/[^0-9+]/g, ""))}">${rllEsc(g.telefono)}</a>` : ""}${g.email ? `<br><span style="color:#6B7680;">${rllEsc(g.email)}</span>` : ""}</td>
       <td>${det.join("<br>")}</td>
       <td>${rllCeldaEntrega(g)}<select class="rll-gest-estado" data-ed="${rllEsc(g.edificio)}" data-id="${rllEsc(g.id)}" style="margin:0;width:auto;padding:6px 8px;font-weight:700;color:${E.color};background:${E.bg};border-color:${E.bg};">${Object.entries(RLL_GEST_ESTADOS).map(([k, v]) => `<option value="${k}"${k === g.estado ? " selected" : ""}>${v.txt}</option>`).join("")}</select>${g.actualizado_por ? `<br><span style="font-size:11px;color:#6B7680;">${rllEsc(g.actualizado_por)}</span>` : ""}</td>
@@ -11291,7 +11307,7 @@ document.getElementById("rllGestBuscar").addEventListener("input", renderRllGest
 document.getElementById("rllGestRecargarBtn").addEventListener("click", rllCargarGestiones);
 document.getElementById("rllGestExcelBtn").addEventListener("click", () => {
   const filas = rllGestiones.map((g) => ({
-    "N° de pedido": g.numero || "", "Fecha": rllFecha(g.fecha), "Cargada por": g.origen === "vecino" ? "Vecino (link)" : "Administrador", "Edificio": g.edificio_nombre || g.edificio, "Administrador": g.admin_nombre,
+    "N° de pedido": g.numero || "", "Fecha": rllFecha(g.fecha), "Cargada por": g.origen === "vecino" ? "Vecino (link)" : g.origen === "emergencia" ? "Vecino (denuncia de emergencia)" : "Administrador", "Edificio": g.edificio_nombre || g.edificio, "Administrador": g.admin_nombre,
     "Gestión": RLL_GEST_TIPOS[g.tipo] || g.tipo, "Estado": (RLL_GEST_ESTADOS[g.estado] || {}).txt || g.estado,
     "Piso": g.piso, "Depto": g.unidad, "Cochera": g.cochera, "Titular": g.titular, "Teléfono": g.telefono, "Mail": g.email,
     "Relación": g.relacion, "Dispositivo": g.dispositivo === "control" ? "Control" : "Tag", "Cantidad": g.tipo === "nuevo" ? g.cantidad : "",

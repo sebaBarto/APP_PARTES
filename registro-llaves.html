@@ -187,6 +187,17 @@
   .legal svg { width: 16px; height: 16px; margin-top: 1px; color: var(--muted); }
 
   .ayuda-lado { display: none; }
+  /* Acceso de emergencia: denunciar llave robada o perdida */
+  .robo-link { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 10px 12px; border-radius: 12px; background: rgba(217,58,47,.14); border: 1px solid rgba(217,58,47,.4); color: #FFB3AC; text-decoration: none; font-size: 14.5px; font-weight: 600; }
+  .robo-link svg { width: 18px; height: 18px; color: #FF6A5E; }
+  .robo-link span { flex: 1; }
+  .robo-link small { display: block; color: #C9C6BC; font-weight: 500; font-size: 12.5px; }
+  .emergencia { text-align: left; margin: 18px 0 4px; padding: 14px; border-radius: 14px; background: #FDECEA; border: 1px solid #F3C4BE; }
+  .emergencia b { display: block; font-size: 15.5px; color: #8C1D18; }
+  .emergencia p { font-size: 14px; color: #5E2420; margin: 4px 0 10px; max-width: none; }
+  .emergencia .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .emergencia button, .emergencia a { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 11px 10px; border-radius: 10px; border: 1.5px solid #C0261C; background: #fff; color: #8C1D18; font-weight: 600; font-size: 14px; text-decoration: none; cursor: pointer; }
+  .emergencia a { background: #C0261C; color: #fff; }
   .pie { text-align: center; color: var(--muted); font-size: 13px; padding: 8px 16px 40px; line-height: 1.6; }
   .pie a { color: var(--text); font-weight: 600; text-decoration: none; }
   .pie img { height: 22px; display: block; margin: 0 auto 8px; opacity: .9; }
@@ -293,6 +304,7 @@
           <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Datos privados</span>
           <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6z"/></svg>Lo administra SAT</span>
         </div>
+        <a class="robo-link" id="roboLink" href="/robo-llave.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l10 18H2z"/><path d="M12 10v4M12 17.5v.01"/></svg><span>¿Te robaron o perdiste la llave?<small>Denunciala acá, a cualquier hora</small></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></a>
       </section>
       <nav class="pasos-nav" id="pasosNav" aria-label="Pasos del registro">
         <ol>
@@ -497,6 +509,11 @@
       <h2>¡Listo, gracias!</h2>
       <p id="graciasTxt">Tu registro quedó guardado. Si hace falta algo más, te vamos a contactar.</p>
       <div class="resumen" id="resumen"></div>
+      <div class="emergencia oculto" id="emergenciaBox">
+        <b>Guardá tu link de emergencia</b>
+        <p>Si un día te roban o perdés la llave, con este link la denunciás a cualquier hora y le avisamos a la central de monitoreo. Es personal: no lo compartas.</p>
+        <div class="btns"><button type="button" id="emergenciaCopiar">Copiar link</button><a id="emergenciaWa" href="#" target="_blank" rel="noopener">Mandármelo por WhatsApp</a></div>
+      </div>
       <button type="button" class="btn-sec" id="otroBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M18 8v6M15 11h6"/></svg>Registrar a otra persona</button>
       <a class="ayuda-inline" data-wa href="https://wa.me/5493413782085" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.4.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 2.9 2.9 0 0 0-.9 2.2 5 5 0 0 0 1 2.7 11.5 11.5 0 0 0 4.4 3.9c1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg>¿Algo no quedó bien? Escribinos</a>
     </div>
@@ -559,6 +576,7 @@
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "");
       nombreEdificio = d.nombre;
+      $("roboLink").href = "/robo-llave.html?e=" + encodeURIComponent(codigo);
       $("edificioNombre").textContent = d.nombre;
       $("edificioDireccion").textContent = d.direccion || "";
       document.title = "Registro de llaves — " + d.nombre;
@@ -869,6 +887,11 @@
       if (!r.ok) { if (d.captcha) reiniciarCaptcha(); throw new Error(d.error || (r.status === 429 ? "Se mandaron muchos registros seguidos, esperá unos minutos" : "No se pudo enviar")); }
       reiniciarCaptcha(); // cada verificación sirve una sola vez
       armarResumen(datos, d);
+      if (d.emergencia) {
+        $("emergenciaBox").classList.remove("oculto");
+        $("emergenciaWa").href = "https://wa.me/?text=" + encodeURIComponent("Mi link de emergencia para denunciar la llave de " + nombreEdificio + " si me la roban o la pierdo: " + d.emergencia);
+        $("emergenciaCopiar").onclick = async () => { try { await navigator.clipboard.writeText(d.emergencia); $("emergenciaCopiar").textContent = "✓ Copiado"; } catch (e) { prompt("Copiá tu link:", d.emergencia); } };
+      } else $("emergenciaBox").classList.add("oculto");
       $("graciasTxt").textContent = (d.actualizado ? "Ya estabas registrado: actualizamos tus datos con lo que cargaste ahora." : "Tu registro quedó guardado. Si hace falta algo más, te vamos a contactar.") + (d.copia ? " Te mandamos una copia por mail." : "");
       st.textContent = "";
       mostrar("pantallaGracias");

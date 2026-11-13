@@ -37,5 +37,12 @@
         }
       ]
     }
+  ],
+  "redirects": [
+    {
+      "source": "/robo",
+      "destination": "/robo-llave.html",
+      "permanent": false
+    }
   ]
 }

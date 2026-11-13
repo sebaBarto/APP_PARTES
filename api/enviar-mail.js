@@ -454,7 +454,8 @@ module.exports = async (req, res) => {
           <p><b>N° de registro:</b> ${escapeHtml(String(datos.numero || ""))}<br><b>Unidad:</b> ${escapeHtml(datos.unidad || "")}</p>
           <b>Tus llaves y controles:</b>${lista(datos.llaves)}
           ${(datos.perdidas || []).length ? `<b>Reportaste para dar de baja:</b>${lista(datos.perdidas)}` : ""}
-          <p>Si algo está mal, volvé a escanear el QR del hall y cargalo de nuevo: se actualiza solo.</p>${pie}`;
+          <p>Si algo está mal, volvé a escanear el QR del hall y cargalo de nuevo: se actualiza solo.</p>
+          ${datos.emergencia ? `<div style="margin-top:16px;padding:14px;border-radius:12px;background:#FDECEA;border:1px solid #F3C4BE;"><b>¿Te roban o perdés la llave?</b><br>Denunciala a cualquier hora desde tu link personal (guardá este mail):<br><a href="${escapeHtml(datos.emergencia)}" style="display:inline-block;margin-top:8px;background:#B3261E;color:#fff;font-weight:700;padding:10px 16px;border-radius:10px;text-decoration:none;">Denunciar llave robada o perdida</a></div>` : ""}${pie}`;
       } else if (tipo === "constancia_pedido") {
         asunto = `Tu pedido de llaves N° ${datos.numero || ""} — ${datos.edificio || ""}`;
         html = `<h2 style="margin-top:0;">Recibimos tu pedido, ${escapeHtml(datos.nombre || "")}</h2>
@@ -512,6 +513,59 @@ module.exports = async (req, res) => {
           <p>La fecha límite era el ${escapeHtml(datos.limite_txt || "")}, pero no hay un Excel de la estación cargado en la conciliación, así que no se puede armar la lista de llaves sin dueño.</p>
           <p>Subilo en el panel → Llaves de edificios → Conciliación y después tocá <b>«Armar propuesta de bajas»</b> en la campaña.</p>`);
       } else { res.status(400).json({ error: "Etapa desconocida" }); return; }
+    } else if (tipo === "robo_llave_estacion" || tipo === "robo_llave_cierre" || tipo === "robo_llave_admin" || tipo === "robo_llave_titular") {
+      // Denuncia de llave robada/perdida del vecino (lib/robo-llaves.js). A la estación de
+      // monitoreo (atiende las 24 h) van el aviso y, cuando SAT la da de baja, el cierre.
+      destinatario = datos.para;
+      const lista = String(destinatario || "").split(",").map((x) => x.trim()).filter(Boolean);
+      if (!lista.length || !lista.every(esEmailValido)) { res.status(400).json({ error: "Falta un mail válido" }); return; }
+      const fila = (k, v, fuerte) => (v ? `<tr><td style="padding:6px 14px 6px 0;color:#6B7680;vertical-align:top;white-space:nowrap;">${escapeHtml(k)}</td><td style="padding:6px 0;${fuerte ? "font-size:17px;" : ""}"><b>${escapeHtml(v)}</b></td></tr>` : "");
+      const disp = datos.dispositivo === "control" ? "CONTROL" : "TAG";
+      const adj = datos.motivo === "robo" ? "ROBADO" : "PERDIDO";
+      const prueba = datos.prueba ? "[PRUEBA — no le llegó a Security24: falta configurar LLAVES_ROBO_EMAIL] " : "";
+      const pie = `<p style="color:#6B7680;font-size:13px;margin-top:18px;">SAT · Seguridad electrónica · www.sat365.com.ar · WhatsApp +54 9 341 378-2085</p>`;
+      if (tipo === "robo_llave_estacion") {
+        asunto = `${prueba}🚨 ${disp} ${adj} — ${datos.edificio || ""}${datos.abonado ? " (" + datos.abonado + ")" : ""} — Usuario ${datos.usuario || "s/d"} — ${datos.tag || "sin número"}`;
+        const sinVerif = datos.verificacion === "sin_verificar";
+        html = `${datos.prueba ? `<p style="background:#FFF1D6;border:1px solid #F1D99A;border-radius:10px;padding:10px 12px;color:#8A5A00;"><b>Modo prueba:</b> este aviso iría a la estación de monitoreo. Cuando esté configurada la variable LLAVES_ROBO_EMAIL en Vercel, le llega directo a Security24.</p>` : ""}
+          <h2 style="margin-top:0;">Denuncia de ${disp.toLowerCase()} ${adj.toLowerCase()} — ${escapeHtml(datos.edificio || "")}</h2>
+          <div style="background:#FDECEA;border:1px solid #F3C4BE;border-radius:10px;padding:12px 14px;font-size:15px;">
+            <b>Pedido:</b> si se registra un acceso con esta tarjeta${datos.usuario ? ` (<b>usuario ${escapeHtml(datos.usuario)}</b>)` : ""}, despachen un móvil al edificio y llamen al titular.
+            ${sinVerif ? "<br><b>Ojo: la denuncia no está verificada.</b> Antes de despachar, llamen al titular registrado para confirmarla." : ""}
+          </div>
+          <table style="border-collapse:collapse;margin-top:12px;font-size:14.5px;">
+            ${fila("N° de usuario en la central", datos.usuario || "No lo tenemos: identificar por el N° de tarjeta", true)}
+            ${fila("N° de tarjeta", datos.tag || "No lo sabe", true)}
+            ${fila("Dispositivo", datos.dispositivo === "control" ? "Control remoto de cochera" : "Tag / llavero de acceso")}
+            ${fila("Edificio", datos.edificio)}${fila("Abonado", datos.abonado)}${fila("Dirección", datos.direccion)}
+            ${fila("Titular", datos.titular)}${fila("Unidad", datos.unidad)}${fila("Teléfono del titular", datos.telefono_titular)}
+            ${datos.mismo ? "" : fila("Hizo la denuncia", [datos.declarante, datos.telefono_declarante].filter(Boolean).join(" · "))}
+            ${fila("Motivo", datos.motivo_txt)}${fila("Cuándo", datos.cuando)}${fila("Dónde", datos.donde)}${fila("Observaciones", datos.observaciones)}
+            ${fila("Verificación", datos.verificacion_txt)}
+            ${fila("Pedido SAT", datos.numero ? "N° " + datos.numero : "")}
+          </table>
+          ${(datos.adjuntos || []).length ? `<p>📎 Adjunta: foto del DNI que mandó quien hizo la denuncia.</p>` : ""}
+          <p>SAT va a dar de baja la tarjeta en la central en el próximo horario hábil y les va a mandar otro mail para que <b>quiten la alerta</b>.</p>${pie}`;
+      } else if (tipo === "robo_llave_cierre") {
+        const hecha = datos.estado === "hecha";
+        asunto = `${prueba}${hecha ? "✓ Quitar alerta" : "Anular alerta"} — ${disp} ${datos.tag || "sin número"} — ${datos.edificio || ""}${datos.abonado ? " (" + datos.abonado + ")" : ""} — Usuario ${datos.usuario || "s/d"}`;
+        html = `<h2 style="margin-top:0;">${hecha ? "Ya se dio de baja: pueden quitar la alerta" : "Denuncia anulada: quiten la alerta"}</h2>
+          <p>${hecha ? `${datos.dispositivo === "control" ? "El control" : "La tarjeta"} <b>${escapeHtml(datos.tag || "sin número")}</b>${datos.usuario ? ` (usuario ${escapeHtml(datos.usuario)})` : ""} de <b>${escapeHtml(datos.edificio || "")}</b> ya fue dada de baja en la central. Ya no abre.` : `SAT anuló la denuncia de la tarjeta <b>${escapeHtml(datos.tag || "sin número")}</b>${datos.usuario ? ` (usuario ${escapeHtml(datos.usuario)})` : ""} de <b>${escapeHtml(datos.edificio || "")}</b>.`}</p>
+          <p>Pueden quitar la alerta de la denuncia <b>N° ${escapeHtml(String(datos.numero || ""))}</b>.</p>
+          ${(datos.llaves_nuevas || []).length ? `<p>Se le entregó al titular: ${datos.llaves_nuevas.map(escapeHtml).join(", ")}.</p>` : ""}
+          ${datos.nota ? `<p style="color:#6B7680;">Nota de SAT: ${escapeHtml(datos.nota)}</p>` : ""}${pie}`;
+      } else if (tipo === "robo_llave_admin") {
+        asunto = `🚨 Denuncia de llave ${datos.motivo_txt === "Robo" ? "robada" : "perdida"} — ${datos.edificio || ""} — Pedido N° ${datos.numero || ""}`;
+        html = `<h2 style="margin-top:0;">Hola ${escapeHtml(datos.nombre || "")}</h2>
+          <p>Un vecino de <b>${escapeHtml(datos.edificio || "")}</b> denunció una llave ${datos.motivo_txt === "Robo" ? "robada" : "perdida"} desde el acceso de emergencia.</p>
+          <table style="border-collapse:collapse;font-size:14.5px;">${fila("Pedido", "N° " + (datos.numero || ""))}${fila("Unidad", datos.unidad)}${fila("Titular", datos.titular)}${fila("Motivo", datos.motivo_txt)}${fila("Verificación", datos.verificacion_txt)}</table>
+          <p>Ya se avisó a la central de monitoreo (si alguien usa esa llave, despachan un móvil) y SAT la va a dar de baja. <b>No hace falta que hagas nada.</b> Lo podés seguir en <a href="${escapeHtml(datos.portal || "")}">Pedidos</a> del portal.</p>${pie}`;
+      } else {
+        asunto = `Se denunció como ${datos.motivo_txt || "perdida"} tu llave de ${datos.edificio || ""}`;
+        html = `<h2 style="margin-top:0;">Hola ${escapeHtml(datos.nombre || "")}</h2>
+          <p><b>${escapeHtml(datos.declarante || "Alguien")}</b> denunció como <b>${escapeHtml(datos.motivo_txt || "")}</b> tu llave ${escapeHtml(datos.fin || "")} de <b>${escapeHtml(datos.edificio || "")}</b> (pedido N° ${escapeHtml(String(datos.numero || ""))}). Se avisó a la central de monitoreo y SAT la va a dar de baja.</p>
+          <p><b>Si no sabías nada, comunicate con SAT ahora</b> por WhatsApp al +54 9 341 378-2085.</p>${pie}`;
+      }
     } else if (tipo === "aviso_gestion") {
       // Aviso al administrador de consorcio (o al vecino del link) de que SAT cambió
       // el estado de su pedido de llaves. Es un mail externo: va por Resend como el del cliente.
@@ -550,15 +604,20 @@ module.exports = async (req, res) => {
     // cuando el origen es una IP externa (Vercel/AWS). Resend tiene
     // buena reputación con Gmail y otros proveedores. El de oficina
     // sigue por SMTP porque es entrega interna (no sale de Ferozo).
-    if (["cliente", "aviso_gestion", "constancia_registro", "constancia_pedido", "restablecer_clave", "campana_admin"].includes(tipo) && process.env.RESEND_API_KEY) {
+    // Adjuntos (por ahora, la foto del DNI de una denuncia de llave robada).
+    const adjuntos = (Array.isArray(datos.adjuntos) ? datos.adjuntos : []).filter((a) => a && a.nombre && a.base64).slice(0, 2);
+    const externo = ["cliente", "aviso_gestion", "constancia_registro", "constancia_pedido", "restablecer_clave", "campana_admin", "robo_llave_admin", "robo_llave_titular"].includes(tipo)
+      || ((tipo === "robo_llave_estacion" || tipo === "robo_llave_cierre") && !datos.prueba);
+    if (externo && process.env.RESEND_API_KEY) {
       const resendRes = await fetch("https://api.resend.com/emails", {
         method: "POST",
         headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
         body: JSON.stringify({
           from: process.env.EMAIL_FROM || `Servicio Técnico SAT <no-responder@sat365.com.ar>`,
-          to: [destinatario],
+          to: String(destinatario).split(",").map((x) => x.trim()).filter(Boolean),
           subject: asunto,
           html: envolverDocumento(html),
+          ...(adjuntos.length ? { attachments: adjuntos.map((a) => ({ filename: a.nombre, content: a.base64 })) } : {}),
         }),
       });
       if (!resendRes.ok) {
@@ -574,6 +633,7 @@ module.exports = async (req, res) => {
       to: destinatario,
       subject: asunto,
       html: envolverDocumento(html),
+      ...(adjuntos.length ? { attachments: adjuntos.map((a) => ({ filename: a.nombre, content: Buffer.from(a.base64, "base64"), contentType: "image/jpeg" })) } : {}),
     });
 
     res.status(200).json({ ok: true });

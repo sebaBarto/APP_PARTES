@@ -299,6 +299,7 @@
   .nota-sat svg { width: 18px; height: 18px; color: var(--amber-dark); margin-top: 1px; }
   .gestion-pie { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
   .origen { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--blue); font-weight: 600; }
+  .origen.emergencia { color: #B3261E; background: #FDECEA; border-radius: 8px; padding: 3px 8px; }
   .origen svg { width: 15px; height: 15px; }
   .vacio { text-align: center; padding: 34px 16px; color: var(--muted); border: 1.5px dashed var(--line); border-radius: 16px; }
   .vacio svg { width: 34px; height: 34px; color: #C9C6BC; display: block; margin: 0 auto 8px; }
@@ -1035,8 +1036,9 @@
         ${g.estado === "cancelada" && g.motivo_cancelacion ? `<div class="nota-sat">${IC.x}<span>Cancelado: ${esc(g.motivo_cancelacion)}</span></div>` : ""}
         ${(g.fotos || []).length || g.origen === "vecino" || g.estado === "pendiente" ? `<div class="gestion-pie">
           ${g.origen === "vecino" ? `<span class="origen">${IC.link}Lo cargó el vecino con un link${g.cargada_por ? " (" + esc(g.cargada_por) + ")" : ""}</span>` : ""}
+          ${g.origen === "emergencia" ? `<span class="origen emergencia">🚨 Denuncia de emergencia${g.cargada_por ? " de " + esc(g.cargada_por) : ""} · ya se avisó a la central de monitoreo</span>` : ""}
           ${(g.fotos || []).map((f, i) => `<button type="button" class="ver-foto" data-foto="${esc(f)}">${IC.foto}Foto ${i + 1}</button>`).join("")}
-          ${g.estado === "pendiente" ? `<button type="button" class="btn btn-sec btn-chico btn-peligro cancelar-g" data-id="${esc(g.id)}" style="margin-left:auto;">Cancelar pedido</button>` : ""}
+          ${g.estado === "pendiente" && g.origen !== "emergencia" ? `<button type="button" class="btn btn-sec btn-chico btn-peligro cancelar-g" data-id="${esc(g.id)}" style="margin-left:auto;">Cancelar pedido</button>` : ""}
         </div>` : ""}
       </article>`;
     }).join("");

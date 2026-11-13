@@ -3358,3 +3358,35 @@ IP y por mail. Datos en `registro-llaves/administradores.json` y
 - El vecino normalmente no ve nada (aparece un recuadro solo si Cloudflare
   duda). El servidor verifica el token; si Cloudflare no responde, deja pasar
   (siguen los topes por IP y por día) para no trabar a los vecinos.
+
+### Denuncia de llave robada o perdida (acceso de emergencia, 24 h)
+
+El vecino no tiene usuario, pero puede denunciar a cualquier hora sin depender
+del administrador ni de SAT: **`robo-llave.html`** (`pedido.sat365.com.ar/robo`).
+Llega desde el QR del hall (link "¿Te robaron o perdiste la llave?"), el cartel
+(la dirección corta está impresa), la web de SAT o su **link personal**: al
+registrarse por el QR se le genera una clave (`clave_emergencia` en su registro)
+y la pantalla de gracias y el mail de constancia le dan el link para guardarlo.
+
+- **Quién es** (`lib/robo-llaves.js`): con el link personal entra ya
+  identificado; si no, unidad + teléfono contra el padrón (el nombre solo no
+  alcanza). Si no coincide, sube la foto del DNI del titular (va adjunta en el
+  mail y **no se guarda**) o marca que no lo tiene a mano: se manda igual
+  como "sin verificar" y la estación llama al titular antes de despachar.
+  Entre "identificar" y "reportar" viaja un ticket firmado (30 min).
+- **Qué se dispara**: mail a la estación de monitoreo con el N° de usuario de
+  la placa (sale de la conciliación), el N° de tarjeta, el titular, quién
+  denunció y cómo se verificó → "si hay un acceso con esa tarjeta, despachen un
+  móvil". Además un pedido de baja con prioridad (`origen: "emergencia"`) en el
+  panel, la llave queda "Para dar de baja" en el padrón, y avisos a SAT, al
+  administrador, al vecino (si dejó mail) y al titular si la denunció otro.
+  El administrador no la puede cancelar desde su portal.
+- **Cierre**: cuando SAT marca el pedido Hecho (o lo rechaza) sale un segundo
+  mail a la estación para que **quite la alerta** (una sola vez).
+- **Variables**: `LLAVES_ROBO_EMAIL` = casilla de la estación que se lee las
+  24 h (p. ej. `actualizaciondedatos@security24.com.ar`). **Mientras no esté,
+  los avisos van a SAT marcados PRUEBA** y nunca a Security24.
+  `LLAVES_ROBO_TELEFONO` (opcional) = teléfono de la central que se le muestra
+  al vecino al terminar.
+- Topes por IP, captcha (si está Turnstile) y no duplica la misma denuncia
+  dentro de 48 h.
