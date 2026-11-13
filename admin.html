@@ -10149,8 +10149,7 @@ let rllConc = null;          // { fecha, por, archivo, filas: [...] } guardado e
 let rllConcPendiente = null; // archivo recién leído, antes de comparar: { nombre, encabezados, filas }
 let rllConcFiltro = "";
 const RLL_CONC_CAMPOS = [
-  ["tag", "N° de llave (tag)", /(tag|llave|tarjeta|card|c[oó]digo|wiegand|credencial|n[uú]mero de llave)/i],
-  ["facility", "Facility / sitio (si viene aparte)", /(facility|sitio|site|fc\b|familia)/i],
+  ["tag", "N° de llave (lote:número, ej. 069:02561)", /(tag|llave|tarjeta|card|c[oó]digo|wiegand|credencial|n[uú]mero de llave)/i],
   ["usuario", "N° de usuario", /(usuario|user|n[°º]?\s*us|id\b|legajo)/i],
   ["nombre", "Nombre", /(nombre|name|titular)/i],
   ["apellido", "Apellido", /(apellido|surname|last)/i],
@@ -10255,9 +10254,7 @@ document.getElementById("rllConcCompararBtn").addEventListener("click", async ()
   if (col.tag < 0 && col.usuario < 0) { st.className = "status err"; st.textContent = "Elegí al menos la columna del N° de llave o la del N° de usuario."; return; }
   const v = (f, k) => (col[k] >= 0 ? String(f[col[k]] ?? "").trim() : "");
   const filas = rllConcPendiente.filas.map((f) => {
-    const fac = v(f, "facility");
-    let tag = v(f, "tag");
-    if (fac && /^\d+$/.test(fac) && /^\d+$/.test(tag)) tag = fac + ":" + tag;
+    const tag = v(f, "tag");
     return { tag, usuario: v(f, "usuario"), nombre: v(f, "nombre"), apellido: v(f, "apellido"), piso: v(f, "piso"), depto: v(f, "depto"), telefono: v(f, "telefono"), tipo: v(f, "tipo"), obs: v(f, "obs") };
   }).filter((f) => f.tag || f.usuario || f.nombre);
   st.className = "status"; st.textContent = "Guardando y comparando...";
