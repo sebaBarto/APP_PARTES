@@ -1600,6 +1600,12 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
       <h1>SIMs instaladas en clientes</h1>
       <p class="subtitle">Todas las líneas que están en un cliente. Se corrigen de a una (cada cambio queda en el historial de la línea) y se pueden retirar para devolverlas al stock.</p>
 
+      <div id="simsAvisosCaja" class="card hidden" style="border-left:4px solid #E0A000;">
+        <h3 style="margin:0 0 4px;">Para revisar: SIMs de instalaciones</h3>
+        <p class="stk-det" style="margin:0 0 10px;">Las cargó un instalador al cerrar la instalación, pero la SIM no estaba en su stock, el cliente no está en la base o no se pudo registrar. Cargala bien (en SIMs o en Clientes) y marcala como resuelta.</p>
+        <div id="simsAvisosLista"></div>
+      </div>
+
       <div id="simsInstResumen" class="sims-resumen"></div>
 
       <div class="card sims-filtros">
@@ -2582,7 +2588,7 @@ async function cargarInicioAdmin() {
   st.textContent = "Revisando...";
   const h = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
   const leer = (url) => fetch(url, { headers: h, cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-  const [emerg, rend, pend, sims, vehs, vehHist, errores, partes, clientes, instalaciones, presencias, historicas, simsInst, registroCopias, venPropios, venCreds, stockDatos, gestLlaves] = await Promise.all([
+  const [emerg, rend, pend, sims, vehs, vehHist, errores, partes, clientes, instalaciones, presencias, historicas, simsInst, registroCopias, venPropios, venCreds, stockDatos, gestLlaves, simsAvisos] = await Promise.all([
     leer("/api/datos?coleccion=servicios_emergencia"),
     leer("/api/recurso-uso?recurso=rendicion"),
     leer("/api/recurso-uso?recurso=sim&pendientes=1&todas=1"),
@@ -2601,6 +2607,7 @@ async function cargarInicioAdmin() {
     leer("/api/datos?coleccion=credenciales"),
     leer("/api/datos?coleccion=stock"),
     leer("/api/datos?coleccion=consorcio&gestiones=1"),
+    leer("/api/datos?coleccion=sims_avisos"),
   ]);
   const arr = (x) => (Array.isArray(x) ? x : []);
   const hoyISO = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
@@ -2639,6 +2646,8 @@ async function cargarInicioAdmin() {
       agregar(pp.length, "Artículos para pedir", pp.slice(0, 3).map((x) => x.d).join(" · ") + (pp.length > 3 ? ` y ${pp.length - 3} más` : ""), "tabStockBtn", "atencion");
     }
   } catch (e) { /* nada */ }
+  const simsAvisosPend = arr(simsAvisos).filter((a) => a.estado === "pendiente");
+  agregar(simsAvisosPend.length, "SIMs de instalaciones para revisar", simsAvisosPend.slice(0, 2).map((a) => `${a.numero} en ${a.cliente} (${a.tecnico}): ${simsAvisoResumen(a)}`).join(" · "), "tabSimsInstaladasBtn", "atencion");
   agregar(arr(pend).length, "SIMs por aceptar", arr(pend).slice(0, 2).map((p) => `${p.numero} → ${p.tecnico_destino}`).join(" · "), "tabSimsBtn", "atencion");
   const simsProb = arr(sims).filter((s) => s.ubicacion_tipo !== "cliente" && s.estado_fisico && s.estado_fisico !== "Disponible");
   agregar(simsProb.length, "SIMs con problema", "Defectuosas o extraviadas para reclamar o dar de baja", "tabSimsControlBtn", "atencion");
@@ -9039,7 +9048,41 @@ let simsInstaladasCache = [];
 let simsInstLimite = 100;
 const simsInstFiltros = ["simsInstFiltroEmpresa", "simsInstFiltroEstado", "simsInstFiltroInstalador", "simsInstFiltroDesde", "simsInstFiltroHasta"].map((id) => document.getElementById(id));
 
+// ---------- Avisos de SIMs instaladas al cerrar una instalación ----------
+const SIMS_AVISO_MOTIVO = { sim_no_en_stock: "No estaba en su stock", sim_no_registrada: "La SIM no está en el sistema", cliente_no_existe: "El cliente no está en la base", no_se_pudo_registrar: "No se pudo registrar" };
+const simsAvisoResumen = (a) => (a.motivos || []).map((m) => SIMS_AVISO_MOTIVO[m] || m).join(" · ");
+async function simsAvisosCargar() {
+  const caja = document.getElementById("simsAvisosCaja"), cont = document.getElementById("simsAvisosLista");
+  let lista = [];
+  try {
+    const r = await fetch("/api/datos?coleccion=sims_avisos", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+    lista = r.ok ? await r.json() : [];
+  } catch (e) { lista = []; }
+  const pend = (Array.isArray(lista) ? lista : []).filter((a) => a.estado === "pendiente");
+  caja.classList.toggle("hidden", !pend.length);
+  if (!pend.length) { cont.innerHTML = ""; return; }
+  const fecha = (f) => (f ? new Date(f).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" }) : "");
+  cont.innerHTML = `<div style="overflow-x:auto;"><table class="sims-tabla"><thead><tr><th>Fecha</th><th>SIM</th><th>Cliente</th><th>Instalador</th><th>Qué pasó</th><th></th></tr></thead><tbody>${pend.map((a) => `<tr data-id="${escapeHtmlAdmin(a.id)}">
+      <td>${escapeHtmlAdmin(fecha(a.fecha))}</td>
+      <td><b>${escapeHtmlAdmin(a.numero)}</b>${a.empresa ? `<div class="stk-det">${escapeHtmlAdmin(a.empresa)}</div>` : ""}</td>
+      <td>${escapeHtmlAdmin(a.cliente)}${a.numero_cliente ? ` <span class="stk-det">N° ${escapeHtmlAdmin(a.numero_cliente)}</span>` : ""}${a.direccion ? `<div class="stk-det">${escapeHtmlAdmin(a.direccion)}</div>` : ""}</td>
+      <td>${escapeHtmlAdmin(a.tecnico || "")}</td>
+      <td>${escapeHtmlAdmin(simsAvisoResumen(a))}${a.registrada ? '<div class="stk-det">La SIM quedó registrada en el cliente.</div>' : ""}${a.detalle ? `<div class="stk-det">${escapeHtmlAdmin(a.detalle)}</div>` : ""}</td>
+      <td><button type="button" class="btn-secondary-admin" data-resolver>Resuelto</button></td></tr>`).join("")}</tbody></table></div>`;
+  cont.querySelectorAll("[data-resolver]").forEach((b) => b.addEventListener("click", async () => {
+    const a = pend.find((x) => x.id === b.closest("tr").dataset.id);
+    if (!(await confirmarAdmin(`¿Ya cargaste bien la SIM ${a.numero} de ${a.cliente}? El aviso deja de aparecer.`, { aceptar: "Sí, está resuelto" }))) return;
+    b.disabled = true;
+    try {
+      const r = await fetch("/api/datos?coleccion=sims_avisos", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ accion: "resolver", id: a.id }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "HTTP " + r.status);
+      simsAvisosCargar();
+    } catch (e) { b.disabled = false; cartelAdmin("No se pudo marcar: " + e.message); }
+  }));
+}
 async function cargarSimsInstaladasAdmin() {
+  simsAvisosCargar();
   simsInstaladasStatus.className = "status";
   simsInstaladasStatus.textContent = "Cargando el registro...";
   try {

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#101820">
-<meta name="app-version" content="4.78.1">
+<meta name="app-version" content="4.79.0">
 <meta name="description" content="Digitalizador de partes técnicos de servicio">
 <title>Servicio Técnico SAT</title>
 <link rel="manifest" href="manifest.json">
@@ -1305,6 +1305,24 @@
           <input type="file" id="instPlanoArchivoInput" accept="image/*,application/pdf,.pdf,.svg" class="hidden">
           <p class="status" id="instPlanoEstado"></p>
           <div id="instPlanoLista"></div>
+        </div>
+
+        <div class="card" style="margin-top:16px;" id="instSimCard">
+          <label class="check-inline">
+            <input type="checkbox" id="instSimCheck">
+            <span>Instalé una SIM en esta instalación</span>
+          </label>
+          <div id="instSimCaja" class="hidden" style="margin-top:10px;">
+            <label class="field-label" for="instSimSelect">¿Qué SIM?</label>
+            <select class="field-input" id="instSimSelect"><option value="" disabled selected>Elegí la SIM</option></select>
+            <div id="instSimOtraCaja" class="hidden" style="margin-top:8px;">
+              <label class="field-label" for="instSimNumero">Número de la SIM</label>
+              <input class="field-input" id="instSimNumero" inputmode="numeric" autocomplete="off" placeholder="Ej.: 1155558888">
+              <label class="field-label" for="instSimEmpresa" style="margin-top:8px;">Empresa</label>
+              <select class="field-input" id="instSimEmpresa"><option value="" disabled selected>Elegí la empresa</option><option>Claro</option><option>Movistar</option><option>Personal</option><option value="Otra">Otra</option></select>
+            </div>
+            <p class="hint-text" id="instSimInfo" style="margin-top:8px;"></p>
+          </div>
         </div>
 
         <div class="card" style="margin-top:16px;">

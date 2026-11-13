@@ -2312,3 +2312,42 @@ test("Claves del cliente cargadas por la oficina: solo el panel las carga; se gu
     delete process.env.CLAVES_CLIENTES_SECRET;
   } finally { global.fetch = fetchViejo; delete process.env.CLAVES_CLIENTES_SECRET; }
 });
+
+test("SIMs de instalaciones para revisar: el instalador deja el aviso (sin duplicar), ve solo los suyos y solo la oficina los resuelve", async () => {
+  const fetchViejo = global.fetch;
+  const repo = {};
+  let version = 0;
+  global.fetch = async (url, op = {}) => {
+    const u = String(url), metodo = op.method || "GET";
+    const m = u.match(/contents\/([^?]+)/);
+    if (m) {
+      const ruta = decodeURIComponent(m[1]);
+      if (metodo === "PUT") { repo[ruta] = JSON.parse(Buffer.from(JSON.parse(op.body).content, "base64").toString()); version++; return new Response("{}", { status: 200 }); }
+      if (!(ruta in repo)) return new Response("{}", { status: 404 });
+      return new Response(JSON.stringify({ sha: `s${version}`, encoding: "base64", content: Buffer.from(JSON.stringify(repo[ruta])).toString("base64") }));
+    }
+    return new Response("[]");
+  };
+  try {
+    const juan = crearSesion({ nombre: "Juan", rol: "tecnico" }), luis = crearSesion({ nombre: "Luis", rol: "tecnico" }), admin = crearSesion({ nombre: "Seba", rol: "admin" });
+    const post = async (body, t) => { const r = resFalso(); await datos(pedido("POST", { coleccion: "sims_avisos" }, body, t), r); return r; };
+    const get = async (t) => { const r = resFalso(); await datos(pedido("GET", { coleccion: "sims_avisos" }, null, t), r); return r.cuerpo; };
+    const aviso = { accion: "agregar", numero: "11 5000-1111", empresa: "Personal", cliente: "Lara Silvano", instalacion_id: "7", motivos: ["cliente_no_existe", "inventado"], registrada: true, tecnico: "Otro" };
+    let r = await post(aviso, juan);
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    const a = repo["sims-avisos.json"][0];
+    assert.deepStrictEqual([a.numero, a.tecnico, a.motivos, a.registrada, a.estado], ["1150001111", "Juan", ["cliente_no_existe"], true, "pendiente"], "el técnico sale de la sesión y los motivos se limpian");
+    r = await post({ ...aviso, motivos: ["sim_no_en_stock"] }, juan);
+    assert.strictEqual(repo["sims-avisos.json"].length, 1, "reintento: no se duplica");
+    assert.deepStrictEqual(repo["sims-avisos.json"][0].motivos, ["sim_no_en_stock"]);
+    assert.strictEqual((await post({ ...aviso, motivos: [] }, juan)).statusCode, 400);
+    assert.strictEqual((await post({ ...aviso, numero: "12" }, juan)).statusCode, 400);
+    assert.deepStrictEqual(await get(luis), []);
+    assert.strictEqual((await get(juan)).length, 1);
+    assert.strictEqual((await post({ accion: "resolver", id: a.id }, juan)).statusCode, 403);
+    r = await post({ accion: "resolver", id: a.id, nota: "Cargada" }, admin);
+    assert.ok(r.cuerpo.ok);
+    assert.deepStrictEqual([repo["sims-avisos.json"][0].estado, repo["sims-avisos.json"][0].resuelto_por], ["resuelto", "Seba"]);
+    assert.strictEqual((await get(admin)).length, 1);
+  } finally { global.fetch = fetchViejo; }
+});

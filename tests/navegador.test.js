@@ -1786,6 +1786,7 @@ test("Admin: portada con pendientes, buscador de cliente, menú agrupado, sesió
     ]);
     if (u.includes("tipo=instalaciones")) return json([{ id: 9, cliente: "Escuela 45", tecnico: "Luis", fecha: ayer, estado: "abierta" }, { id: 8, cliente: "Vieja", tecnico: "Juan", fecha: "2026-01-01", estado: "cerrada" }]);
     if (req.method() === "POST" && u.includes("coleccion=")) { guardados[u.match(/coleccion=([a-z_-]+)/)[1]] = JSON.parse(body); return json({ ok: true }); }
+    if (u.includes("coleccion=sims_avisos")) return json(guardados.sims_avisos ? [] : [{ id: "av1", estado: "pendiente", numero: "1150001111", empresa: "Personal", cliente: "Lara Silvano", tecnico: "Juan", motivos: ["sim_no_en_stock", "cliente_no_existe"], fecha: new Date().toISOString() }, { id: "av0", estado: "resuelto", numero: "1", cliente: "X", tecnico: "Juan", motivos: ["sim_no_registrada"] }]);
     if (u.includes("coleccion=servicios_emergencia")) return json([{ id: 1, cliente: "Kiosco Norte", revisado: 0 }, { id: 2, cliente: "Otro", revisado: 1 }]);
     if (u.includes("recurso=rendicion")) return json([{ id: 1, estado: "pendiente", monto: 1500, tecnico: "Juan" }]);
     if (u.includes("pendientes=1")) return json([]);
@@ -1826,6 +1827,16 @@ test("Admin: portada con pendientes, buscador de cliente, menú agrupado, sesió
   assert.ok(tarjetas.some((x) => /^1\s*Instalaciones abiertas[\s\S]*Escuela 45 \(Luis, hace 1 día\)/.test(x.trim())), "instalaciones abiertas con cliente y técnico");
   assert.ok(tarjetas.some((x) => /^1\s*Clientes activos en rojo[\s\S]*Ferretería Oeste/.test(x.trim())), "cuenta solo los activos en rojo");
   assert.strictEqual(await page.locator("#emergenciasBadge").textContent(), "1");
+  // SIM que dejó un instalador al cerrar la instalación: tarjeta -> lista en SIMs instaladas -> resuelto
+  assert.ok(tarjetas.some((x) => /^1\s*SIMs de instalaciones para revisar[\s\S]*1150001111 en Lara Silvano \(Juan\): No estaba en su stock · El cliente no está en la base/.test(x.trim())), tarjetas.join("|"));
+  await page.locator(".inicio-tarjeta", { hasText: "SIMs de instalaciones para revisar" }).click();
+  await page.waitForSelector("#simsAvisosCaja:not(.hidden) tr[data-id]");
+  assert.match(await page.textContent("#simsAvisosLista"), /1150001111[\s\S]*Personal[\s\S]*Lara Silvano[\s\S]*Juan[\s\S]*No estaba en su stock/);
+  await page.click("#simsAvisosLista [data-resolver]");
+  await page.click(".cartel-si");
+  await page.waitForSelector("#simsAvisosCaja.hidden", { state: "attached" });
+  assert.deepStrictEqual(guardados.sims_avisos, { accion: "resolver", id: "av1" });
+  await page.click("#tabInicioBtn");
   // Menú agrupado
   assert.deepStrictEqual((await page.locator(".menu-grupo-tit").allTextContents()).slice(0, 3), ["Día a día", "Administración", "SIMs"]);
   // Buscador de cliente
@@ -2947,6 +2958,66 @@ test("Croquis en celular (táctil): abrir uno guardado y agregar/modificar; ambi
   // Medidas de las habitaciones
   await page.evaluate(() => { cq.medidas = true; cqRender(); });
   assert.match(await page.evaluate(() => croquisSvgDocumento(cqDibujo())), />5 m</);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Instalación: al cerrarla se asigna una SIM del stock del instalador, o se escribe otra; si la SIM o el cliente no existen se guarda igual y queda un aviso para la oficina", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const posts = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    const json = (o, st) => route.fulfill({ status: st || 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (req.method() === "POST") {
+      const b = JSON.parse(req.postData() || "{}");
+      posts.push({ u, ...b });
+      if (u.includes("coleccion=sims_avisos")) return json({ ok: true, aviso: { id: "a1" } });
+      return json({ ok: true });
+    }
+    if (u.includes("tipo=instalacion_abierta")) return json({ abierta: { id: 7, cliente: "Lara Silvano", numero_cliente: "", direccion: "Mitre 100" } });
+    if (u.includes("tipo=instalacion&id=7")) return json({ id: 7, cliente: "Lara Silvano", zonas: [], canales: [], fotos: [] });
+    if (u.includes("recurso=presencia")) return json({ activa: null });
+    if (u.includes("coleccion=sims")) return json([
+      { numero: "1150001111", empresa: "Personal", tecnico_actual: "Juan Pérez", estado: "stock" },
+      { numero: "1150002222", empresa: "Claro", tecnico_actual: "Luis", estado: "stock" },
+    ]);
+    if (u.includes("coleccion=clientes")) return json([{ nombre: "Kiosco Pérez", numero_cliente: "900" }]);
+    return json([]);
+  });
+  await page.goto(base + "/");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { tecnicoLogueado = "Juan Pérez"; showScreen("instalacion"); return verificarInstalacionAbierta(); });
+  await page.waitForFunction(() => document.querySelectorAll("#instSimSelect option").length === 3);
+  await page.check("#instSimCheck");
+  assert.deepStrictEqual(await page.$$eval("#instSimSelect option", (l) => l.map((o) => o.textContent)), ["Elegí la SIM de tu stock", "Personal — 1150001111", "Otra SIM (escribir el número)"]);
+  // Sin elegir no deja cerrar
+  await page.click("#instalacionGuardarYCerrarBtn");
+  await page.click(".dlg-si"); // ¿cerrar sin plano?
+  await page.waitForFunction(() => /Elegí la SIM que instalaste/.test(document.getElementById("toast").textContent));
+  assert.ok(!posts.some((p) => p.accion === "cerrar_instalacion"));
+  // Una de su stock; el cliente no está en la base -> se registra y queda el aviso del cliente
+  await page.selectOption("#instSimSelect", "1150001111");
+  assert.match(await page.textContent("#instSimInfo"), /«Lara Silvano» no está en la base de clientes: se carga igual y la oficina recibe un aviso/);
+  await page.click("#instalacionGuardarYCerrarBtn");
+  await page.click(".dlg-si");
+  await page.waitForFunction(() => /Instalación cerrada/.test(document.getElementById("toast").textContent), null, { timeout: 20000 });
+  const usar = posts.find((p) => p.u.includes("/api/recurso-uso"));
+  assert.deepStrictEqual([usar.recurso, usar.accion, usar.numero, usar.cliente, usar.tecnico], ["sim", "usar", "1150001111", "Lara Silvano", "Juan Pérez"]);
+  let aviso = posts.find((p) => p.u.includes("coleccion=sims_avisos"));
+  assert.deepStrictEqual([aviso.accion, aviso.numero, aviso.cliente, aviso.motivos, aviso.registrada, aviso.instalacion_id], ["agregar", "1150001111", "Lara Silvano", ["cliente_no_existe"], true, "7"]);
+  assert.match(await page.textContent("#toast"), /SIM 1150001111 instalada\. La oficina revisa el cliente/);
+  // Otra SIM escrita a mano: no se toca el stock, queda el aviso (con dónde figura si existe)
+  const r = await page.evaluate(async () => {
+    instSimClienteReal = { nombre: "Kiosco Pérez" };
+    return instSimRegistrar({ tipo: "otra", numero: "1150002222", empresa: "Claro" }, { cliente: "Kiosco Pérez", numero_cliente: "900" }, "8");
+  });
+  assert.match(r, /cargada: la oficina la revisa/);
+  aviso = posts.filter((p) => p.u.includes("coleccion=sims_avisos")).pop();
+  assert.deepStrictEqual([aviso.numero, aviso.empresa, aviso.motivos, aviso.registrada, aviso.detalle], ["1150002222", "Claro", ["sim_no_en_stock"], false, "En el sistema figura en el stock de Luis"]);
+  await page.evaluate(() => instSimRegistrar({ tipo: "otra", numero: "1159999999", empresa: "Movistar" }, { cliente: "Kiosco Pérez" }, "8"));
+  aviso = posts.filter((p) => p.u.includes("coleccion=sims_avisos")).pop();
+  assert.deepStrictEqual(aviso.motivos, ["sim_no_en_stock", "sim_no_registrada"]);
+  assert.strictEqual(posts.filter((p) => p.u.includes("/api/recurso-uso")).length, 1, "las escritas a mano no se registran solas");
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });

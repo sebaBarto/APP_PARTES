@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.78.1";
+const APP_VERSION = "4.79.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -10025,6 +10025,7 @@ volverDeInstalacionBtn.addEventListener("click", () => showScreen("home"));
 
 function resetearPantallaInstalacion() {
   instalacionActivaId = null;
+  try { instSimPreparadaPara = null; } catch (e) { /* aún no cargó */ }
   try { instDetalleCargado = false; } catch (e) { /* aún no cargó */ }
   instalacionActivaEstado = null;
   instZonasAgregadas = [];
@@ -10116,6 +10117,7 @@ function mostrarInstalacionAbierta(inst) {
   instalacionDetalleWrap.classList.remove("hidden");
   actualizarEstadoDiaInstalacion();
   cargarDetalleInstalacion();
+  instSimPreparar();
   instPlanoCargar();
 }
 
@@ -10271,6 +10273,7 @@ instalacionIniciarBtn.addEventListener("click", async () => {
     instalacionAbiertaWrap.classList.remove("hidden");
     instalacionDetalleWrap.classList.remove("hidden");
     instDetalleCargado = true;
+    setTimeout(instSimPreparar, 0);
     instDiaLlegadaWrap.classList.remove("hidden");
     instDiaSalidaWrap.classList.add("hidden");
     renderInstDias([]);
@@ -10413,7 +10416,112 @@ instalacionSalidaBtn.addEventListener("click", async () => {
 instalacionCerrarBtn.addEventListener("click", () => {
   instalacionAbiertaWrap.classList.add("hidden");
   instalacionDetalleWrap.classList.remove("hidden");
+  instSimPreparar();
 });
+
+// ---------- SIM instalada al cerrar la instalación ----------
+// El instalador elige una SIM de su stock (queda registrada en el cliente) o escribe
+// una que no está en su stock. Si la SIM no está en el sistema, el cliente no está en
+// la base o no se pudo registrar, el dato se guarda igual y la oficina ve un aviso
+// en el Inicio del panel para cargarlo bien.
+const instSimCheck = document.getElementById("instSimCheck");
+const instSimSelect = document.getElementById("instSimSelect");
+const instSimInfo = document.getElementById("instSimInfo");
+let instSimPropias = [], instSimTodas = [], instSimClienteReal = null, instSimPreparadaPara = null;
+// Cliente de la instalación (recién creada todavía no tiene instalacionActivaDatos).
+const instSimDatos = () => instalacionActivaDatos || { cliente: instalacionClienteInput.value.trim(), numero_cliente: "", direccion: instalacionDireccionInput.value.trim() };
+const instSimOpcionTexto = (x) => `${x.empresa || ""}${x.tipo ? " " + x.tipo : ""} — ${x.numero}`;
+function instSimBuscarCliente(dat) {
+  const lista = clientesGeneralCache || [];
+  const num = limpiarNumeroClienteParaComparar(dat.numero_cliente || "");
+  return (num && lista.find((c) => limpiarNumeroClienteParaComparar(c.numero_cliente || "") === num)) || buscarClientePorNombre(dat.cliente || "") || null;
+}
+async function instSimPreparar() {
+  // Una vez por instalación (no se borra lo que ya eligió al volver a esta pantalla).
+  if (!instalacionActivaId || instSimPreparadaPara === String(instalacionActivaId)) return;
+  instSimPreparadaPara = String(instalacionActivaId);
+  instSimCheck.checked = false;
+  document.getElementById("instSimCaja").classList.add("hidden");
+  document.getElementById("instSimOtraCaja").classList.add("hidden");
+  document.getElementById("instSimNumero").value = "";
+  document.getElementById("instSimEmpresa").value = "";
+  instSimInfo.textContent = "";
+  let sims = null;
+  try {
+    const r = await fetch("/api/datos?coleccion=sims", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    sims = await r.json();
+    try { localStorage.setItem("sims_cache", JSON.stringify(sims)); } catch (e) { /* sin espacio */ }
+  } catch (e) { try { sims = JSON.parse(localStorage.getItem("sims_cache") || "null"); } catch (e2) { sims = null; } }
+  instSimTodas = Array.isArray(sims) ? sims : [];
+  instSimPropias = instSimTodas.filter((x) => x.tecnico_actual === tecnicoLogueado && x.estado === "stock" && x.ubicacion_tipo !== "cliente" && (!x.estado_fisico || x.estado_fisico === "Disponible"));
+  instSimSelect.innerHTML = `<option value="" disabled selected>${instSimPropias.length ? "Elegí la SIM de tu stock" : "No tenés SIMs en tu stock"}</option>`
+    + instSimPropias.map((x) => `<option value="${escapeHtml(x.numero)}">${escapeHtml(instSimOpcionTexto(x))}</option>`).join("")
+    + '<option value="__otra__">Otra SIM (escribir el número)</option>';
+  await cargarClientesGeneral();
+  instSimClienteReal = instSimBuscarCliente(instSimDatos());
+  instSimAvisoCliente();
+}
+function instSimAvisoCliente() {
+  const dat = instSimDatos();
+  const otra = instSimSelect.value === "__otra__";
+  const avisos = [];
+  if (!instSimClienteReal) avisos.push(`«${dat.cliente || "Sin cliente"}» no está en la base de clientes`);
+  if (otra) avisos.push("la SIM no está en tu stock");
+  instSimInfo.textContent = avisos.length ? `${avisos.join(" y ").replace(/^./, (c) => c.toUpperCase())}: se carga igual y la oficina recibe un aviso para revisarlo.` : instSimSelect.value ? `Queda instalada en ${dat.cliente} al cerrar.` : "";
+}
+instSimCheck.addEventListener("change", () => {
+  document.getElementById("instSimCaja").classList.toggle("hidden", !instSimCheck.checked);
+  if (instSimCheck.checked && !instSimPropias.length) { instSimSelect.value = "__otra__"; instSimSelect.dispatchEvent(new Event("change")); }
+});
+instSimSelect.addEventListener("change", () => {
+  const otra = instSimSelect.value === "__otra__";
+  document.getElementById("instSimOtraCaja").classList.toggle("hidden", !otra);
+  if (otra) document.getElementById("instSimNumero").focus();
+  instSimAvisoCliente();
+});
+// Lo elegido (o { error } si falta algo). null = no instaló SIM.
+function instSimElegida() {
+  if (!instSimCheck.checked) return null;
+  const v = instSimSelect.value;
+  if (!v) return { error: "Elegí la SIM que instalaste (o destildá «Instalé una SIM»)." };
+  if (v !== "__otra__") { const sim = instSimPropias.find((x) => x.numero === v); return sim ? { tipo: "stock", numero: sim.numero, empresa: sim.empresa || "" } : { error: "Elegí la SIM de nuevo." }; }
+  const numero = document.getElementById("instSimNumero").value.replace(/\D/g, "");
+  const empresa = document.getElementById("instSimEmpresa").value;
+  if (numero.length < 6) return { error: "Escribí el número completo de la SIM." };
+  if (!empresa) return { error: "Elegí la empresa de la SIM." };
+  // ¿Es una de su stock que escribió a mano?
+  const propia = instSimPropias.find((x) => String(x.numero).replace(/\D/g, "") === numero);
+  if (propia) return { tipo: "stock", numero: propia.numero, empresa: propia.empresa || empresa };
+  return { tipo: "otra", numero, empresa };
+}
+// Después de cerrar: registra la SIM en el cliente y, si hace falta, deja el aviso a la oficina.
+async function instSimRegistrar(elegida, dat, idInst) {
+  if (!elegida) return "";
+  const motivos = [], detalles = [];
+  let registrada = false;
+  if (!instSimClienteReal) motivos.push("cliente_no_existe");
+  if (elegida.tipo === "stock") {
+    try {
+      await enviarAccionSimConRespaldo({ recurso: "sim", accion: "usar", numero: elegida.numero, tecnico: tecnicoLogueado || "", cliente: dat.cliente || "", direccion: dat.direccion || "", numero_servicio: "", numero_cliente: (instSimClienteReal && instSimClienteReal.numero_cliente) || dat.numero_cliente || "" }, SERVICIOS_API_TOKEN);
+      registrada = true;
+    } catch (e) { motivos.push("no_se_pudo_registrar"); detalles.push(String(e.message || e)); }
+  } else {
+    motivos.push("sim_no_en_stock");
+    const enSistema = instSimTodas.find((x) => String(x.numero).replace(/\D/g, "") === elegida.numero);
+    if (!enSistema) motivos.push("sim_no_registrada");
+    else detalles.push(`En el sistema figura ${enSistema.estado === "uso" ? `instalada en ${enSistema.cliente || "un cliente"}` : `en el stock de ${enSistema.tecnico_actual || "la oficina"}`}`);
+  }
+  if (!motivos.length) return `SIM ${elegida.numero} instalada en ${dat.cliente}.`;
+  try {
+    const r = await fetch("/api/datos?coleccion=sims_avisos", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ accion: "agregar", numero: elegida.numero, empresa: elegida.empresa, cliente: dat.cliente || "", numero_cliente: dat.numero_cliente || "", direccion: dat.direccion || "", instalacion_id: String(idInst || ""), motivos, detalle: detalles.join(" · "), registrada }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || "HTTP " + r.status);
+    return registrada ? `SIM ${elegida.numero} instalada. La oficina revisa el cliente.` : `SIM ${elegida.numero} cargada: la oficina la revisa y la registra.`;
+  } catch (e) {
+    return `No se pudo avisar a la oficina de la SIM ${elegida.numero} (${e.message}): avisales vos.`;
+  }
+}
 
 function renderInstZonas() {
   instZonasList.innerHTML = "";
@@ -10659,6 +10767,9 @@ instalacionGuardarYCerrarBtn.addEventListener("click", async () => {
       planosPdf = await instPlanosPdf(planos);
       instalacionGuardarYCerrarBtn.textContent = "Guardando...";
     }
+    const simElegida = instSimElegida();
+    if (simElegida && simElegida.error) { showToast(simElegida.error); document.getElementById("instSimCard").scrollIntoView({ behavior: "smooth", block: "center" }); return; }
+    const datosSim = { ...instSimDatos() };
     const res = await fetch("/api/historial", { method: "POST", headers, body: JSON.stringify({ accion: "cerrar_instalacion", instalacion_id: instalacionActivaId, observaciones: instObservacionesInput.value.trim(), planos_pdf: planosPdf }) });
     const data = await res.json();
     if (!res.ok || !data.ok) {
@@ -10676,7 +10787,8 @@ instalacionGuardarYCerrarBtn.addEventListener("click", async () => {
       }
       throw new Error(data.error || "No se pudo cerrar");
     }
-    showToast("Instalación cerrada correctamente.");
+    const textoSim = await instSimRegistrar(simElegida, datosSim, idInst);
+    showToast(textoSim ? `Instalación cerrada. ${textoSim}` : "Instalación cerrada correctamente.");
     // Sus planos quedan como registro (el servidor igual lo controla solo).
     try {
       await fetch("/api/datos?coleccion=croquis", { method: "POST", headers, body: JSON.stringify({ accion: "cerrar_instalacion", instalacion_id: String(instalacionActivaId) }) });
