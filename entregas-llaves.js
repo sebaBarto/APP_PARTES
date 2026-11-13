@@ -13,6 +13,20 @@
 
   let pendientes = [];
   let actual = null;
+  // Las entregas son de la oficina (permiso "entrega_llaves"). Un técnico sin el
+  // permiso solo ve el ícono si la oficina le habilitó alguna entrega puntual.
+  const nombreLogueado = () => (typeof tecnicoLogueado !== "undefined" ? tecnicoLogueado : "") || "";
+  const esDeOficina = () => {
+    try { return !!(typeof permisosDelTecnico === "function" && (permisosDelTecnico(nombreLogueado()) || {}).entrega_llaves); } catch (e) { return false; }
+  };
+  let nombreDeLaLista = null;
+  function actualizarTile() {
+    // Si cambió quién está logueado, la lista anterior no vale: se vuelve a pedir.
+    if (nombreDeLaLista !== null && nombreDeLaLista !== nombreLogueado()) { pendientes = []; nombreDeLaLista = null; setTimeout(actualizarContador, 300); }
+    const tile = $("tileEntregasBtn");
+    if (tile) tile.classList.toggle("hidden", !(esDeOficina() || pendientes.length));
+  }
+  window.actualizarTileEntregas = actualizarTile;
   const cabeceras = (json) => ({ Authorization: "Bearer " + SERVICIOS_API_TOKEN, ...(json ? { "Content-Type": "application/json" } : {}) });
 
   // ---------- Contador en el inicio ----------
@@ -21,10 +35,13 @@
     try {
       const r = await fetch(URL_API, { headers: cabeceras(), cache: "no-store" });
       if (!r.ok) return;
-      pendientes = await r.json();
+      const d = await r.json();
+      pendientes = Array.isArray(d) ? d : [];
+      nombreDeLaLista = nombreLogueado();
       const b = $("entregasPendientesBadge");
       b.textContent = pendientes.length;
       b.classList.toggle("hidden", !pendientes.length);
+      actualizarTile();
     } catch (e) { /* sin conexión: queda el número anterior */ }
   }
   const showScreenOriginal = window.showScreen;
@@ -42,7 +59,7 @@
       const r = await fetch(URL_API, { headers: cabeceras(), cache: "no-store" });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "No se pudo cargar");
-      pendientes = d;
+      pendientes = Array.isArray(d) ? d : [];
       $("entregasStatus").textContent = "";
       renderLista();
       const b = $("entregasPendientesBadge");
@@ -54,6 +71,7 @@
     if (!pendientes.length) { cont.innerHTML = '<p class="subtitle-consultas" style="text-align:center;padding:24px 0;">No hay llaves para entregar. 🎉</p>'; return; }
     cont.innerHTML = pendientes.map((p, i) => `<button type="button" class="entrega-item" data-i="${i}">
       <b>${esc(p.edificio_nombre)} · ${esc(p.unidad || "")}</b>
+      ${p.habilitada_a ? `<div class="entrega-sub">🔓 ${p.habilitada_a === nombreLogueado() ? "Habilitada para vos" : "Habilitada a " + esc(p.habilitada_a)}</div>` : ""}
       <div class="entrega-sub">Pedido N° ${esc(p.numero || "")} · ${esc(TIPOS[p.tipo] || p.tipo)} · para <b>${esc(p.recibe)}</b>${p.recibe_telefono ? " · " + esc(p.recibe_telefono) : ""}</div>
       ${p.direccion ? `<div class="entrega-sub">📍 ${esc(p.direccion)}</div>` : ""}
       <div class="entrega-llaves">${p.llaves.map((l) => `${l.tipo === "control" ? "📟" : "🔑"} ${esc(l.tag || "s/n")}${l.usuario ? " · usuario " + esc(l.usuario) : ""}`).join("<br>")}</div>
@@ -76,6 +94,9 @@
       : `<div class="field-group"><label class="field-label">N° de ${l.tipo === "control" ? "control" : "llave"} ${p.llaves.length > 1 ? i + 1 : ""} <span style="font-weight:400;opacity:.7;">(si lo tenés)</span></label><input type="text" class="field-input entrega-num" data-i="${i}" placeholder="000:00000" inputmode="numeric" style="font-family:'IBM Plex Mono',monospace;"></div>`).join("");
     $("entregaRecibio").value = p.recibe || "";
     $("entregaDni").value = ""; $("entregaObs").value = "";
+    // La oficina elige si sale del depósito o de su propio stock; el técnico habilitado, de su stock.
+    $("entregaDeWrap").classList.toggle("hidden", !esDeOficina());
+    $("entregaDe").value = "dep";
     $("entregaFormStatus").textContent = "";
     setTimeout(prepararFirma, 50);
     window.scrollTo({ top: 0 });
@@ -129,11 +150,11 @@
     btn.disabled = true; st.textContent = "Registrando la entrega…";
     try {
       const llaves = actual.llaves.map((l, i) => { const inp = document.querySelector(`.entrega-num[data-i="${i}"]`); return { tag: inp ? inp.value.trim() : "" }; });
-      const r = await fetch(URL_API, { method: "POST", headers: cabeceras(true), body: JSON.stringify({ accion: "entregar", edificio: actual.edificio, id: actual.id, recibio: $("entregaRecibio").value.trim(), dni: $("entregaDni").value.trim(), observaciones: $("entregaObs").value.trim(), llaves, firma: firmaJpeg() }) });
+      const r = await fetch(URL_API, { method: "POST", headers: cabeceras(true), body: JSON.stringify({ accion: "entregar", edificio: actual.edificio, id: actual.id, recibio: $("entregaRecibio").value.trim(), dni: $("entregaDni").value.trim(), observaciones: $("entregaObs").value.trim(), llaves, firma: firmaJpeg(), de: esDeOficina() && $("entregaDe").value === "yo" ? "tec:" + nombreLogueado() : "dep" }) });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || "No se pudo registrar");
       const s = d.entrega && d.entrega.stock;
-      const txtStock = s && s.ok ? (s.para_aprobar ? " Parte del material quedó para que lo apruebe el responsable de stock." : " Se descontó de tu stock.") : " Ojo: no se pudo descontar del stock, avisá a la oficina.";
+      const txtStock = s && s.ok ? (s.para_aprobar ? " Parte del material quedó para que lo apruebe el responsable de stock." : d.entrega.de === "dep" ? " Se descontó del depósito." : " Se descontó de tu stock.") : " Ojo: no se pudo descontar del stock, avisá a la oficina.";
       if (typeof showToast === "function") showToast("✓ Entrega registrada." + txtStock); else alert("✓ Entrega registrada." + txtStock);
       cerrar();
       await cargar();

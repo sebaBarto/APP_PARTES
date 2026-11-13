@@ -2826,6 +2826,7 @@ const PERMISOS_TECNICO = [
   { clave: "historial_todos", etiqueta: "Ver historial de todo el equipo" },
   { clave: "dash_stock", etiqueta: "Ver historial de Stock (materiales instalados/retirados)" },
   { clave: "stock_responsable", etiqueta: "Responsable de stock (escanear, entregar y recibir material del depósito)" },
+  { clave: "entrega_llaves", etiqueta: "Entregar llaves de edificios a los vecinos (oficina: ve todas las entregas y puede habilitar una a un técnico)" },
   { clave: "marcar_pasado_sistema", etiqueta: "Marcar partes y stock como \"pasado a mi sistema\" (uso de oficina)" },
   { clave: "instalador", etiqueta: "Instalador (Presencia en obra + Instalación)" },
   { clave: "vehiculos", etiqueta: "Sección Vehículos" },
@@ -10444,6 +10445,7 @@ function renderRllGestiones() {
   cont.querySelectorAll(".rll-gest-nota").forEach((i) => i.addEventListener("change", () => rllGuardarGestion(i, { nota_sat: i.value })));
   cont.querySelectorAll(".rll-entregar").forEach((b) => b.addEventListener("click", () => rllRegistrarEntrega(rllGestiones.find((x) => x.id === b.dataset.id && x.edificio === b.dataset.ed))));
   cont.querySelectorAll(".rll-constancia").forEach((b) => b.addEventListener("click", () => rllConstancia(rllGestiones.find((x) => x.id === b.dataset.id && x.edificio === b.dataset.ed))));
+  cont.querySelectorAll(".rll-habilitar").forEach((b) => b.addEventListener("click", () => rllHabilitarEntrega(rllGestiones.find((x) => x.id === b.dataset.id && x.edificio === b.dataset.ed))));
   cont.querySelectorAll(".rll-gest-foto").forEach((b) => b.addEventListener("click", () => rllVerFoto("/api/datos?coleccion=consorcio&edificio=" + encodeURIComponent(b.dataset.ed) + "&foto=" + encodeURIComponent(b.dataset.foto), null)));
 }
 document.getElementById("rllAgregarPersonaBtn").addEventListener("click", () => { document.getElementById("rllAgregarPersona").classList.toggle("hidden"); document.getElementById("rllApNombre").focus(); });
@@ -10525,15 +10527,42 @@ function rllNecesitaEntrega(g) { return g.tipo === "nuevo" || g.tipo === "reempl
 function rllPendienteEntrega(g) { return g.estado === "hecha" && rllNecesitaEntrega(g) && !g.entrega; }
 function rllCeldaEntrega(g) {
   if (g.entrega) return `<div style="margin-bottom:6px;font-size:12px;color:#1F6B34;">✓ Entregada a <b>${rllEsc(g.entrega.recibio)}</b><br>${rllFecha(g.entrega.fecha)}${g.entrega.stock && !g.entrega.stock.ok ? '<br><span style="color:#B3261E;">Stock sin descontar</span>' : g.entrega.stock && g.entrega.stock.para_aprobar ? '<br><span style="color:#8A5A00;">Stock: para aprobar</span>' : ""}<br><button type="button" class="btn-secondary-admin rll-constancia" data-ed="${rllEsc(g.edificio)}" data-id="${rllEsc(g.id)}" style="width:auto;padding:3px 8px;font-size:11.5px;margin-top:3px;">Constancia</button></div>`;
-  if (rllPendienteEntrega(g)) return `<div style="margin-bottom:6px;"><span class="ven-estado pronto">Falta entregar</span><br><button type="button" class="rll-entregar" data-ed="${rllEsc(g.edificio)}" data-id="${rllEsc(g.id)}" style="width:auto;padding:4px 10px;font-size:12px;margin-top:4px;">Registrar entrega</button></div>`;
+  if (rllPendienteEntrega(g)) return `<div style="margin-bottom:6px;"><span class="ven-estado pronto">Falta entregar</span>${g.entrega_habilitada ? `<br><span style="font-size:11.5px;color:#55595F;">🔓 Habilitada a <b>${rllEsc(g.entrega_habilitada.tecnico)}</b></span>` : ""}<br><button type="button" class="rll-entregar" data-ed="${rllEsc(g.edificio)}" data-id="${rllEsc(g.id)}" style="width:auto;padding:4px 10px;font-size:12px;margin-top:4px;">Registrar entrega</button> <button type="button" class="btn-secondary-admin rll-habilitar" data-ed="${rllEsc(g.edificio)}" data-id="${rllEsc(g.id)}" style="width:auto;padding:3px 8px;font-size:11.5px;margin-top:4px;" title="Para que un técnico la entregue desde la APP">${g.entrega_habilitada ? "Cambiar técnico" : "Habilitar a un técnico"}</button></div>`;
   return "";
 }
 let rllTecnicosCache = null;
-async function rllRegistrarEntrega(g) {
-  if (!g) return;
+async function rllCargarTecnicos() {
   if (!rllTecnicosCache) {
     try { const r = await fetch("/api/datos?coleccion=tecnicos", { headers: rllHeaders(), cache: "no-store" }); rllTecnicosCache = r.ok ? (await r.json()).map((t) => t.nombre).filter(Boolean) : []; } catch (e) { rllTecnicosCache = []; }
   }
+  return rllTecnicosCache;
+}
+// Entrega puntual a un técnico: le aparece solo ese pedido en la APP (las entregas son de la oficina).
+async function rllHabilitarEntrega(g) {
+  if (!g) return;
+  const tecnicos = await rllCargarTecnicos();
+  const actual = g.entrega_habilitada ? g.entrega_habilitada.tecnico : "";
+  const capa = rllModal(`Habilitar la entrega · pedido N° ${rllEsc(g.numero || "")}`, `
+    <p style="margin:0 0 10px;color:#55595F;">${rllEsc(g.edificio_nombre || "")} · ${rllEsc(rllGestUnidad(g))}. Las entregas de llaves las hace la oficina; si un técnico tiene que llevar esta, habilitásela: le va a aparecer <b>solo este pedido</b> en «Entregas de llaves» de la APP, y el tag se descuenta de su stock.</p>
+    <label>Técnico</label>
+    <select id="rllHabTec" style="margin:0 0 10px;"><option value="">— Nadie (la entrega la hace la oficina) —</option>${tecnicos.map((t) => `<option value="${rllEsc(t)}"${t === actual ? " selected" : ""}>${rllEsc(t)}</option>`).join("")}</select>
+    <div style="display:flex;gap:8px;"><button type="button" id="rllHabOk" style="width:auto;">Guardar</button></div>
+    <p class="status" id="rllHabStatus"></p>`);
+  capa.querySelector("#rllHabOk").addEventListener("click", async () => {
+    const st = capa.querySelector("#rllHabStatus");
+    st.className = "status"; st.textContent = "Guardando…";
+    try {
+      const r = await fetch("/api/datos?coleccion=entregas_llaves", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "habilitar", edificio: g.edificio, id: g.id, tecnico: capa.querySelector("#rllHabTec").value }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "No se pudo guardar");
+      capa.remove();
+      await rllCargarGestiones();
+    } catch (e) { st.className = "status err"; st.textContent = e.message; }
+  });
+}
+async function rllRegistrarEntrega(g) {
+  if (!g) return;
+  await rllCargarTecnicos();
   const llaves = (g.llaves_entregadas && g.llaves_entregadas.length) ? g.llaves_entregadas : Array.from({ length: g.tipo === "nuevo" ? Math.max(1, Number(g.cantidad) || 1) : 1 }, () => ({ tipo: g.dispositivo === "control" ? "control" : "tag", tag: "" }));
   const recibe = g.tipo === "titularidad" ? g.nuevo_titular : g.titular;
   const capa = rllModal(`Entrega de llaves · pedido N° ${rllEsc(g.numero || "")}`, `
@@ -10544,7 +10573,7 @@ async function rllRegistrarEntrega(g) {
       <div style="flex:1 1 120px;"><label>DNI (opcional)</label><input type="text" class="field-input" id="rllEntDni"></div>
     </div>
     <label>Sale del stock de</label>
-    <select id="rllEntDe" style="margin:0 0 8px;"><option value="dep">Depósito (la entrega la oficina)</option>${rllTecnicosCache.map((t) => `<option value="tec:${rllEsc(t)}">${rllEsc(t)}</option>`).join("")}</select>
+    <select id="rllEntDe" style="margin:0 0 8px;"><option value="dep">Depósito (la entrega la oficina)</option>${rllTecnicosCache.map((t) => `<option value="tec:${rllEsc(t)}"${g.entrega_habilitada && g.entrega_habilitada.tecnico === t ? " selected" : ""}>${rllEsc(t)}</option>`).join("")}</select>
     <label>Firma de quien recibe</label>
     <div style="border:1.5px dashed #3A4753;border-radius:12px;background:#F4F5F0;height:180px;position:relative;"><canvas id="rllEntFirma" style="width:100%;height:100%;display:block;touch-action:none;cursor:crosshair;"></canvas></div>
     <button type="button" class="btn-secondary-admin" id="rllEntBorrar" style="width:auto;padding:3px 10px;font-size:12px;margin-top:6px;">Borrar firma</button>

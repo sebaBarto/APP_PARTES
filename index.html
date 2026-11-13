@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#101820">
-<meta name="app-version" content="4.78.0">
+<meta name="app-version" content="4.78.1">
 <meta name="description" content="Digitalizador de partes técnicos de servicio">
 <title>Servicio Técnico SAT</title>
 <link rel="manifest" href="manifest.json">
@@ -200,7 +200,7 @@
           <span class="panel-tile-label">Historial</span>
           <span class="panel-tile-count hidden" id="historialPendientesBadge">0</span>
         </button>
-        <button type="button" class="panel-tile panel-tile-grid tile-entregas" id="tileEntregasBtn">
+        <button type="button" class="panel-tile panel-tile-grid tile-entregas hidden" id="tileEntregasBtn">
           <span class="panel-tile-icon-badge">
             <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2 2M14 9l2 2"/></svg>
           </span>
@@ -2132,7 +2132,7 @@
   <section class="screen" id="screen-entregas">
     <div class="review-scroll">
       <p class="hint-eyebrow review-eyebrow">ENTREGAS DE LLAVES</p>
-      <p class="subtitle-consultas">Llaves de edificios ya programadas por la oficina, para entregar al vecino. Al entregar, el vecino firma y el tag se descuenta de tu stock.</p>
+      <p class="subtitle-consultas">Llaves de edificios ya programadas por la oficina, para entregar al vecino. Al entregar, el vecino firma y el tag se descuenta del stock.</p>
       <div class="list-toolbar">
         <button class="btn btn-ghost btn-small" id="entregasRecargarBtn" type="button">↻ Actualizar</button>
         <span class="list-sync-label" id="entregasStatus"></span>
@@ -2149,6 +2149,13 @@
         <div class="field-group">
           <label class="field-label" for="entregaDni">DNI <span style="font-weight:400;opacity:.7;">(opcional)</span></label>
           <input type="text" class="field-input" id="entregaDni" maxlength="20" inputmode="numeric" autocomplete="off">
+        </div>
+        <div class="field-group hidden" id="entregaDeWrap">
+          <label class="field-label" for="entregaDe">Sale del stock de</label>
+          <select class="field-input" id="entregaDe">
+            <option value="dep">Depósito (oficina)</option>
+            <option value="yo">Mi stock</option>
+          </select>
         </div>
         <label class="field-label">Firma de quien recibe</label>
         <div class="sign-pad-wrap" style="flex:none;height:200px;">

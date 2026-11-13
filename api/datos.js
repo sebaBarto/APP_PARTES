@@ -2358,7 +2358,7 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
   // ---------- Presupuesto express: lista de precios y numeración ----------
   if (req.query && req.query.coleccion === "entregas_llaves") {
     if (!autorizacion) { res.status(401).json({ error: "No autorizado", sesion_vencida: true }); return; }
-    await require("../lib/entregas-llaves").manejar(req, res, autorizacion, { gh: { leer: leerArchivoDatos, escribir: escribirArchivoDatos }, descontarStock: descontarStockEntrega });
+    await require("../lib/entregas-llaves").manejar(req, res, autorizacion, { gh: { leer: leerArchivoDatos, escribir: escribirArchivoDatos }, descontarStock: descontarStockEntrega, leerTecnicos: leerTecnicosGuardados });
     return;
   }
   if (req.query && req.query.coleccion === "consorcio") {

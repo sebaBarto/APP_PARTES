@@ -249,20 +249,36 @@ test("entrega de llaves: con firma, descuenta stock, anota en el padrón y no se
   const { pase } = (await login(gh, "cp@admin.com", clave)).data;
   const g = (await llamar(consorcio.manejarPortal, { method: "POST", headers: { "x-consorcio": pase }, body: { accion: "gestion", edificio: m12, tipo: "nuevo", piso: "7", unidad: "D", titular: "Lucía Fernández", telefono: "341 999 0000", cantidad: 2 } }, gh)).data.gestion;
   const tecnico = { nombre: "Cristian Rossetti", rol: "tecnico" };
+  const oficina = { nombre: "Brenda", rol: "tecnico" };
   const descuentos = [];
-  const deps = { gh, descontarStock: async (x) => { descuentos.push(x); return { ok: true, descontados: x.items.map((i) => ({ c: i.c, cant: i.cant, de: x.de })), paraAprobar: 0 }; } };
+  const deps = {
+    gh,
+    descontarStock: async (x) => { descuentos.push(x); return { ok: true, descontados: x.items.map((i) => ({ c: i.c, cant: i.cant, de: x.de })), paraAprobar: 0 }; },
+    leerTecnicos: async () => [{ nombre: "Cristian Rossetti", permisos: { stock_responsable: true, admin: true } }, { nombre: "Brenda", permisos: { entrega_llaves: true } }],
+  };
   const llamarE = (req, aut) => llamar((rq, rs) => entregas.manejar(rq, rs, aut, deps), req);
   // Todavía no está hecha: no aparece ni se puede entregar.
-  assert.deepStrictEqual((await llamarE({ method: "GET", query: {} }, tecnico)).data, []);
+  assert.deepStrictEqual((await llamarE({ method: "GET", query: {} }, oficina)).data, []);
   // SAT la marca hecha con las 2 llaves programadas.
   await llamar(consorcio.manejarAdmin, { method: "POST", body: { accion: "estado_gestion", edificio: m12, id: g.id, estado: "hecha", llaves_nuevas: [{ tag: "090:12345" }, { tag: "090:12346" }] } }, SAT, gh);
-  const pend = (await llamarE({ method: "GET", query: {} }, tecnico)).data;
+  const pend = (await llamarE({ method: "GET", query: {} }, oficina)).data;
   assert.strictEqual(pend.length, 1);
   assert.deepStrictEqual(pend[0].llaves.map((l) => l.tag), ["090:12345", "090:12346"]);
+  // Un técnico sin el permiso de oficina no la ve ni la puede entregar ni habilitarse.
+  assert.deepStrictEqual((await llamarE({ method: "GET", query: {} }, tecnico)).data, []);
+  const firma = "data:image/jpeg;base64," + Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(3000, 9)]).toString("base64");
+  assert.strictEqual((await llamarE({ method: "POST", body: { accion: "entregar", edificio: m12, id: g.id, recibio: "Lucía", firma } }, tecnico)).status, 403);
+  assert.strictEqual((await llamarE({ method: "POST", body: { accion: "habilitar", edificio: m12, id: g.id, tecnico: "Cristian Rossetti" } }, tecnico)).status, 403);
+  assert.strictEqual((await llamarE({ method: "GET", query: { firma: "x", edificio: m12 } }, tecnico)).status, 403);
+  // La oficina se la habilita (solo a técnicos que existen).
+  assert.strictEqual((await llamarE({ method: "POST", body: { accion: "habilitar", edificio: m12, id: g.id, tecnico: "Fulano" } }, oficina)).status, 400);
+  assert.strictEqual((await llamarE({ method: "POST", body: { accion: "habilitar", edificio: m12, id: g.id, tecnico: "Cristian Rossetti" } }, oficina)).status, 200);
+  const suya = (await llamarE({ method: "GET", query: {} }, tecnico)).data;
+  assert.strictEqual(suya.length, 1);
+  assert.strictEqual(suya[0].habilitada_a, "Cristian Rossetti");
   // Configuración del artículo de stock (solo admin).
   assert.strictEqual((await llamarE({ method: "POST", body: { accion: "config", articulo_tag: "9001" } }, tecnico)).status, 403);
   await llamarE({ method: "POST", body: { accion: "config", articulo_tag: "9001", articulo_control: "9002" } }, SAT);
-  const firma = "data:image/jpeg;base64," + Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(3000, 9)]).toString("base64");
   // Sin firma no se entrega.
   assert.strictEqual((await llamarE({ method: "POST", body: { accion: "entregar", edificio: m12, id: g.id, recibio: "Lucía" } }, tecnico)).status, 400);
   // El técnico no puede elegir sacarla del depósito: sale de su stock.
@@ -278,4 +294,13 @@ test("entrega de llaves: con firma, descuenta stock, anota en el padrón y no se
   assert.ok(padron[0].historial.some((h) => /Recibió 2 llaves/.test(h.que)));
   // Al administrador le llegó el aviso de entrega.
   assert.ok(enviados.some((m) => m.tipo === "aviso_gestion" && /Entregada a Lucía/.test(m.datos.estado_txt)));
+  // Otro pedido: lo entrega Brenda (oficina) desde la APP, sale del depósito; se puede habilitar y quitar.
+  const g2 = (await llamar(consorcio.manejarPortal, { method: "POST", headers: { "x-consorcio": pase }, body: { accion: "gestion", edificio: m12, tipo: "nuevo", piso: "3", unidad: "A", titular: "Juan Pérez", telefono: "341 555 0000", cantidad: 1 } }, gh)).data.gestion;
+  await llamar(consorcio.manejarAdmin, { method: "POST", body: { accion: "estado_gestion", edificio: m12, id: g2.id, estado: "hecha", llaves_nuevas: [{ tag: "090:12347" }] } }, SAT, gh);
+  await llamarE({ method: "POST", body: { accion: "habilitar", edificio: m12, id: g2.id, tecnico: "Cristian Rossetti" } }, SAT);
+  await llamarE({ method: "POST", body: { accion: "habilitar", edificio: m12, id: g2.id, tecnico: "" } }, SAT);
+  assert.deepStrictEqual((await llamarE({ method: "GET", query: {} }, tecnico)).data, [], "sin habilitación ya no la ve");
+  const ok2 = await llamarE({ method: "POST", body: { accion: "entregar", edificio: m12, id: g2.id, recibio: "Juan Pérez", firma } }, oficina);
+  assert.strictEqual(ok2.status, 200);
+  assert.strictEqual(descuentos[1].de, "dep");
 });

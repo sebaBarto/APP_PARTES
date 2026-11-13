@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.78.0";
+const APP_VERSION = "4.78.1";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -1164,6 +1164,7 @@ function permisosDelTecnico(nombre) {
       dash_general: true, dash_financiero: true, dash_vehiculos: true, dash_herramientas: true, dash_sims: true, dash_stock: true, dash_deposito: true, instalador: true,
       historial_todos: true, vehiculos: true, sims: true, herramientas: true, marcar_pasado_sistema: true,
       comodato: true, admin: true, agendar_emergencia: true, sims_ver_todas: true, presupuesto_express: true, croquis: true, stock_responsable: true,
+      entrega_llaves: true,
     };
   }
   if (tecnicosPermisos[nombre]) {
@@ -1710,6 +1711,7 @@ function actualizarAccesoSeccionesPanel() {
   tileSimsBtn.classList.toggle("hidden", !permisos.sims);
   tileHerramientasBtn.classList.toggle("hidden", !permisos.herramientas);
   document.getElementById("tileDepositoBtn").classList.toggle("hidden", !permisos.stock_responsable);
+  if (typeof window.actualizarTileEntregas === "function") window.actualizarTileEntregas();
   tileInstaladorBtn.classList.toggle("hidden", !permisos.instalador);
   tileComodatoBtn.classList.toggle("hidden", !permisos.comodato);
   tileEmergenciaBtn.classList.toggle("hidden", !permisos.agendar_emergencia);
