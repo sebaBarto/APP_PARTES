@@ -3427,5 +3427,6 @@ y la pantalla de gracias y el mail de constancia le dan el link para guardarlo.
   anterior del backend ya no sirve. Un técnico que se saca de la lista no entra
   más aunque el backend conserve su hash.
 - Pendientes: regla de **tope por IP en el firewall de Vercel** para
-  `/api/datos?publico=…` (se carga a mano en el panel de Vercel) y cargar
-  **`ADMIN_PASSWORD_HASH`** en vez de `ADMIN_PASSWORD`.
+  `/api/datos?publico=…` (se carga a mano en el panel de Vercel).
+- **Clave general** (13/11/2026): ya se verifica con `ADMIN_PASSWORD_HASH`
+  (scrypt); `ADMIN_PASSWORD` quedó con un valor al azar que no sirve para entrar.
