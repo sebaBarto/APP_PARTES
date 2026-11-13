@@ -5,336 +5,637 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Portal de administradores — SAT</title>
 <meta name="robots" content="noindex">
-<meta name="theme-color" content="#0E0F10">
+<meta name="theme-color" content="#0D0C0D">
 <link rel="icon" href="/icons/icon-192.png">
 <link rel="stylesheet" href="/vendor/fonts.css">
 <style>
   :root {
-    --ink: #0E0F10; --paper: #F2F1EC; --card: #FFFFFF; --line: #DEDCD4; --muted: #6E6C66;
-    --amber: #F6B828; --amber-dark: #B9850A; --ok: #1F7A44; --err: #B3261E; --radius: 14px;
+    --ink: #0D0C0D; --ink-2: #1B1B1D;
+    --paper: #F3F2ED; --card: #FFFFFF; --field: #FAFAF7; --soft: #F6F5F0;
+    --line: #E1DFD7; --line-2: #ECEAE3;
+    --text: #141416; --text-2: #4A4843; --muted: #75726B;
+    --amber: #F6B828; --amber-2: #FFC94A; --amber-dark: #A87708; --amber-soft: #FFF6DE;
+    --ok: #1F7A44; --ok-soft: #E7F4EC; --err: #B3261E; --err-soft: #FFF3F2; --blue: #3557A6; --blue-soft: #EEF3FD;
+    --r-sm: 10px; --r: 14px; --r-lg: 20px;
+    --sh-1: 0 1px 2px rgba(13,12,13,.05), 0 1px 1px rgba(13,12,13,.03);
+    --sh-2: 0 1px 2px rgba(13,12,13,.05), 0 10px 30px -12px rgba(13,12,13,.16);
+    --sh-3: 0 24px 60px -12px rgba(13,12,13,.35);
+    --ring: 0 0 0 3px rgba(246,184,40,.45);
+    --cond: 'Barlow Semi Condensed', 'Barlow', sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, monospace;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: 'Barlow', -apple-system, 'Segoe UI', Roboto, sans-serif; font-size: 16px; background: var(--paper); color: var(--ink); min-height: 100vh; }
+  html { -webkit-text-size-adjust: 100%; }
+  html, body { overflow-x: hidden; }
+  body { margin: 0; font-family: 'Barlow', -apple-system, 'Segoe UI', Roboto, sans-serif; font-size: 16px; line-height: 1.45; background: var(--paper); color: var(--text); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+  svg { flex: none; }
+  button { font: inherit; color: inherit; }
   .oculto { display: none !important; }
-  .mono { font-family: 'IBM Plex Mono', ui-monospace, monospace; letter-spacing: .4px; }
+  .mono { font-family: var(--mono); letter-spacing: .3px; }
+  .mono::placeholder { font-family: 'Barlow', sans-serif; letter-spacing: 0; }
+  :focus-visible { outline: none; box-shadow: var(--ring); }
+  .ic { width: 18px; height: 18px; }
 
-  header { background: var(--ink); color: #fff; padding: 16px 20px 54px; position: relative; overflow: hidden; }
-  header::after { content: ""; position: absolute; inset: 0; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='48' viewBox='0 0 56 48'%3E%3Cpath d='M14 1h28l13 23-13 23H14L1 24z' fill='none' stroke='%23F6B828' stroke-opacity='.07' stroke-width='1.5'/%3E%3C/svg%3E"); background-size: 56px 48px; -webkit-mask-image: linear-gradient(120deg, transparent 30%, #000 100%); mask-image: linear-gradient(120deg, transparent 30%, #000 100%); pointer-events: none; }
-  .h-in { max-width: 980px; margin: 0 auto; position: relative; z-index: 1; }
-  .h-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-  .h-top img { height: 32px; display: block; }
-  .h-usuario { display: flex; align-items: center; gap: 10px; font-size: 14px; color: #C9C6BC; flex-wrap: wrap; justify-content: flex-end; }
-  .h-usuario button { background: transparent; border: 1px solid rgba(255,255,255,.3); color: #fff; border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 13px; cursor: pointer; }
-  header h1 { font-family: 'Barlow Semi Condensed', sans-serif; font-weight: 800; font-style: italic; text-transform: uppercase; font-size: clamp(28px, 6vw, 38px); line-height: 1; margin: 22px 0 6px; }
-  header h1 em { color: var(--amber); }
-  header p { margin: 0; color: #C9C6BC; max-width: 620px; line-height: 1.45; }
+  /* ---------- Barra superior ---------- */
+  .barra { background: var(--ink); color: #fff; position: relative; z-index: 20; }
+  .barra-in { max-width: 1120px; margin: 0 auto; padding: 12px 20px; display: flex; align-items: center; gap: 14px; min-height: 60px; }
+  .barra img { height: 28px; display: block; }
+  .barra .sep { width: 1px; height: 22px; background: rgba(255,255,255,.16); }
+  .barra .seccion { font-family: var(--cond); font-weight: 600; font-size: 13px; letter-spacing: 1.4px; text-transform: uppercase; color: #A9A69C; }
+  .barra-der { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .ayuda-top { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px 7px 10px; border-radius: 999px; border: 1px solid rgba(31,168,85,.55); color: #6FDB9C; text-decoration: none; font-size: 14px; font-weight: 600; }
+  .ayuda-top svg { width: 17px; height: 17px; }
+  .usuario { position: relative; }
+  .usuario-btn { display: inline-flex; align-items: center; gap: 10px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14); color: #fff; border-radius: 999px; padding: 4px 12px 4px 4px; cursor: pointer; }
+  .usuario-btn:hover { background: rgba(255,255,255,.1); }
+  .avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--amber); color: var(--ink); display: grid; place-items: center; font-family: var(--cond); font-weight: 700; font-size: 14px; }
+  .usuario-btn .nombre { font-size: 14px; font-weight: 600; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .usuario-btn svg { width: 16px; height: 16px; color: #A9A69C; }
+  .menu { position: absolute; right: 0; top: calc(100% + 8px); min-width: 220px; background: #fff; color: var(--text); border-radius: 14px; box-shadow: var(--sh-3); border: 1px solid var(--line); padding: 6px; }
+  .menu .menu-cab { padding: 10px 12px 8px; font-size: 13px; color: var(--muted); border-bottom: 1px solid var(--line-2); margin-bottom: 4px; }
+  .menu .menu-cab b { display: block; color: var(--text); font-size: 14.5px; }
+  .menu button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border: 0; background: none; border-radius: 9px; cursor: pointer; text-align: left; font-size: 15px; font-weight: 500; }
+  .menu button:hover { background: var(--soft); }
+  .menu button svg { width: 18px; height: 18px; color: var(--muted); }
 
-  main { max-width: 980px; margin: -32px auto 0; padding: 0 14px 40px; position: relative; z-index: 2; }
-  .card { background: var(--card); border-radius: var(--radius); box-shadow: 0 1px 2px rgba(14,15,16,.06), 0 8px 24px rgba(14,15,16,.07); padding: 20px 18px; margin-bottom: 14px; }
-  .card h2 { margin: 0 0 4px; font-family: 'Barlow Semi Condensed', sans-serif; font-size: 22px; }
-  .sub { color: var(--muted); font-size: 14.5px; margin: 0 0 6px; line-height: 1.4; }
+  /* ---------- Intro (link del vecino) ---------- */
+  .intro { background: var(--ink); color: #fff; position: relative; overflow: hidden; }
+  .intro::after, .acceso-info::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='48' viewBox='0 0 56 48'%3E%3Cpath d='M14 1h28l13 23-13 23H14L1 24z' fill='none' stroke='%23F6B828' stroke-opacity='.08' stroke-width='1.5'/%3E%3C/svg%3E");
+    background-size: 56px 48px; -webkit-mask-image: linear-gradient(115deg, transparent 35%, #000 100%); mask-image: linear-gradient(115deg, transparent 35%, #000 100%); }
+  .intro-in { max-width: 720px; margin: 0 auto; padding: 8px 20px 30px; position: relative; z-index: 1; }
+  .intro h1, .acceso-info h1 { font-family: var(--cond); font-weight: 800; font-style: italic; text-transform: uppercase; font-size: clamp(30px, 8vw, 40px); line-height: .98; margin: 14px 0 10px; }
+  .intro h1 em, .acceso-info h1 em { color: var(--amber); }
+  .intro p { margin: 0; color: #C9C6BC; font-size: 15.5px; line-height: 1.5; }
+  .chip-ed { display: inline-flex; align-items: center; gap: 8px; background: rgba(246,184,40,.12); color: var(--amber); border: 1px solid rgba(246,184,40,.32); padding: 5px 12px 5px 10px; border-radius: 999px; font-family: var(--cond); font-weight: 700; font-size: 13px; letter-spacing: 1.1px; text-transform: uppercase; }
+  .chip-ed svg { width: 15px; height: 15px; }
 
-  label, .lbl { display: block; font-weight: 600; font-size: 14.5px; margin: 14px 0 6px; }
+  main { max-width: 1120px; margin: 0 auto; padding: 24px 20px 40px; }
+  body.modo-link main { max-width: 720px; padding-top: 18px; }
+
+  /* ---------- Tarjetas y formularios ---------- */
+  .card { background: var(--card); border-radius: var(--r-lg); box-shadow: var(--sh-2); border: 1px solid rgba(13,12,13,.04); padding: 24px; margin-bottom: 16px; }
+  .card h2 { margin: 0 0 4px; font-family: var(--cond); font-weight: 700; font-size: 24px; line-height: 1.15; }
+  .sub { color: var(--muted); font-size: 14.5px; margin: 0 0 6px; line-height: 1.45; }
+  label, .lbl { display: block; font-weight: 600; font-size: 14.5px; margin: 16px 0 8px; }
   .opc { font-weight: 500; color: var(--muted); font-size: 13px; }
   input[type=text], input[type=tel], input[type=email], input[type=password], input[type=number], select, textarea {
-    width: 100%; padding: 12px 13px; font: inherit; font-size: 16px; color: var(--ink); background: #FAFAF7; border: 1.5px solid var(--line); border-radius: 11px;
-  }
-  textarea { min-height: 72px; resize: vertical; }
-  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--ink); background: #fff; box-shadow: 0 0 0 3px rgba(246,184,40,.35); }
-  .fila { display: flex; gap: 10px; flex-wrap: wrap; }
-  .fila > * { flex: 1 1 140px; min-width: 0; }
-  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 13px 18px; border: none; border-radius: 11px; background: var(--amber); color: var(--ink); font-family: 'Barlow Semi Condensed', sans-serif; font-weight: 700; font-size: 17px; cursor: pointer; }
+    width: 100%; padding: 12px 14px; font: inherit; font-size: 16px; color: var(--text); background: var(--field); border: 1.5px solid var(--line); border-radius: 12px; transition: border-color .15s, box-shadow .15s, background .15s; }
+  select { -webkit-appearance: none; appearance: none; padding-right: 40px; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2375726B' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; background-size: 18px; }
+  input::placeholder, textarea::placeholder { color: #A6A398; }
+  textarea { min-height: 84px; resize: vertical; line-height: 1.45; }
+  input:hover, select:hover, textarea:hover { border-color: #CFCCC2; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--ink); background-color: #fff; box-shadow: var(--ring); }
+  .fila { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0 14px; }
+  .fila.tres { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .fila > * { min-width: 0; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 12px 18px; border: none; border-radius: 12px; background: var(--amber); color: var(--ink); font-family: var(--cond); font-weight: 700; font-size: 17px; letter-spacing: .2px; cursor: pointer; text-decoration: none; transition: background .15s, transform .1s, border-color .15s; white-space: nowrap; }
+  .btn:hover { background: var(--amber-2); }
+  .btn:active { transform: translateY(1px); }
   .btn:disabled { opacity: .6; cursor: default; }
-  .btn-sec { background: #fff; border: 1.5px solid var(--ink); }
+  .btn svg { width: 18px; height: 18px; }
+  .btn-sec { background: #fff; border: 1.5px solid var(--line); font-family: 'Barlow', sans-serif; font-weight: 600; font-size: 15px; }
+  .btn-sec:hover { background: #fff; border-color: var(--ink); }
+  .btn-osc { background: var(--ink); color: #fff; }
+  .btn-osc:hover { background: #2A2A2D; }
+  .btn-chico { padding: 8px 12px; font-size: 14px; border-radius: 10px; }
+  .btn-chico svg { width: 16px; height: 16px; }
+  .btn-peligro { color: var(--err); }
+  .btn-peligro:hover { border-color: var(--err); background: var(--err-soft); }
   .btn-full { width: 100%; }
-  .status { min-height: 1em; margin: 10px 0 0; font-size: 14.5px; }
-  .status.err { color: var(--err); }
-  .status.ok { color: var(--ok); }
+  .btn-grande { padding: 15px 20px; font-size: 18px; border-radius: 14px; box-shadow: 0 10px 24px -12px rgba(246,184,40,.9), inset 0 -2px 0 rgba(0,0,0,.08); }
+  .enlace { border: 0; background: none; padding: 0; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; font-size: 14.5px; }
+  .enlace:hover { color: var(--text); }
+  .status { min-height: 1em; margin: 12px 0 0; font-size: 14.5px; color: var(--text-2); }
+  .status:empty { display: none; }
+  .status.err { color: var(--err); background: var(--err-soft); border-radius: 10px; padding: 10px 12px; font-weight: 500; }
+  .status.ok { color: var(--ok); background: var(--ok-soft); border-radius: 10px; padding: 10px 12px; font-weight: 600; }
 
-  /* Edificios */
-  .edificios { display: flex; gap: 8px; flex-wrap: wrap; }
-  .ed-chip { border: 1.5px solid var(--line); background: #fff; border-radius: 12px; padding: 12px 14px; cursor: pointer; font: inherit; text-align: left; min-width: 220px; flex: 1 1 220px; max-width: 320px; }
-  .ed-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 10px; margin-top: 10px; }
-  .ed-stats div { font-size: 12px; color: var(--muted); line-height: 1.2; }
-  .ed-stats div b { display: block; font-family: 'Barlow Semi Condensed', sans-serif; font-size: 20px; color: var(--ink); }
-  .ed-chip.activo .ed-stats div { color: #A9A69C; } .ed-chip.activo .ed-stats div b { color: #fff; }
-  .ed-stats .alerta b { color: #B3261E !important; }
-  .barra-ed { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; justify-content: flex-end; margin-bottom: 6px; }
-  .barra-ed select { width: auto; padding: 8px 10px; font-size: 14px; }
-  .lote-tabla { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; }
-  .lote-tabla td { padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
-  .ed-chip b { display: block; font-family: 'Barlow Semi Condensed', sans-serif; font-size: 17px; letter-spacing: .3px; }
-  .ed-chip span { font-size: 13px; color: var(--muted); }
-  .ed-chip.activo { background: var(--ink); color: #fff; border-color: var(--ink); }
-  .ed-chip.activo b { color: var(--amber); }
-  .ed-chip.activo span { color: #A9A69C; }
+  /* Opciones tipo botón */
+  .opciones { display: flex; gap: 8px; flex-wrap: wrap; }
+  .opcion { position: relative; margin: 0; }
+  .opcion input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; z-index: 1; }
+  .opcion span { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 14px; border-radius: 11px; border: 1.5px solid var(--line); background: var(--field); font-weight: 600; font-size: 14.5px; transition: background .15s, border-color .15s, color .15s; }
+  .opcion:hover span { border-color: #CFCCC2; }
+  .opcion input:checked + span { background: var(--ink); color: #fff; border-color: var(--ink); }
+  .opcion input:focus-visible + span { box-shadow: var(--ring); }
+  label.check { display: flex; align-items: flex-start; gap: 10px; font-weight: 500; cursor: pointer; }
+  .check input { -webkit-appearance: none; appearance: none; width: 20px; height: 20px; margin: 1px 0 0; flex: none; border: 1.5px solid #BDBAB0; border-radius: 6px; background: #fff; display: grid; place-content: center; cursor: pointer; }
+  .check input::before { content: ""; width: 11px; height: 11px; clip-path: polygon(14% 52%, 0 66%, 40% 100%, 100% 22%, 86% 8%, 39% 70%); background: var(--amber); transform: scale(0); transition: transform .12s; }
+  .check input:checked { background: var(--ink); border-color: var(--ink); }
+  .check input:checked::before { transform: scale(1); }
+
+  /* ---------- Ingreso ---------- */
+  .acceso { display: grid; grid-template-columns: 1fr; gap: 0; max-width: 980px; margin: 0 auto; border-radius: 24px; overflow: hidden; box-shadow: var(--sh-2); background: #fff; }
+  .acceso-info { background: var(--ink); color: #fff; padding: 30px 26px; position: relative; overflow: hidden; }
+  .acceso-info > * { position: relative; z-index: 1; }
+  .acceso-info .eyebrow { font-family: var(--cond); font-weight: 600; font-size: 13px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--amber); }
+  .acceso-info p { color: #C9C6BC; margin: 0; line-height: 1.5; }
+  .beneficios { list-style: none; margin: 22px 0 0; padding: 0; display: grid; gap: 14px; }
+  .beneficios li { display: flex; gap: 12px; align-items: flex-start; color: #E4E1D8; font-size: 15px; line-height: 1.4; }
+  .beneficios .hx { width: 30px; height: 26px; flex: none; display: grid; place-items: center; background: rgba(246,184,40,.14); color: var(--amber); clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%); }
+  .beneficios .hx svg { width: 15px; height: 15px; }
+  .acceso-form { padding: 30px 26px; }
+  .acceso-form h2 { font-family: var(--cond); font-weight: 700; font-size: 26px; margin: 0 0 4px; }
+  .campo-clave { position: relative; }
+  .campo-clave input { padding-right: 48px; }
+  .ver-clave { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 38px; height: 38px; border: 0; background: none; border-radius: 9px; cursor: pointer; color: var(--muted); display: grid; place-items: center; }
+  .ver-clave:hover { background: var(--soft); color: var(--text); }
+  .ver-clave svg { width: 20px; height: 20px; }
+  .olvide { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line-2); }
+  .solo { max-width: 460px; margin: 0 auto; }
+
+  /* ---------- Panel ---------- */
+  .banner { background: var(--amber-soft); border: 1px solid #F1D99A; border-radius: 14px; padding: 12px 14px 12px 16px; display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 16px; font-size: 14.5px; }
+  .banner > span { display: inline-flex; align-items: center; gap: 10px; }
+  .banner > span svg { width: 20px; height: 20px; color: var(--amber-dark); }
+  .sec-tit { font-family: var(--cond); font-weight: 600; font-size: 13px; letter-spacing: 1.3px; text-transform: uppercase; color: var(--muted); margin: 0 0 10px 2px; }
+  .edificios { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .ed-chip { position: relative; display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch; border: 1.5px solid var(--line); background: #fff; border-radius: 16px; padding: 14px 16px; cursor: pointer; text-align: left; box-shadow: var(--sh-1); transition: border-color .15s, box-shadow .15s, transform .15s; }
+  .ed-chip:hover { border-color: #C9C6BC; transform: translateY(-1px); }
+  .ed-chip b { display: block; font-family: var(--cond); font-weight: 700; font-size: 18px; letter-spacing: .3px; padding-right: 26px; }
+  .ed-chip .dir { display: block; font-size: 13.5px; color: var(--muted); margin-top: 1px; }
+  .ed-chip .mini-stats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 3px 10px; font-size: 12.5px; font-weight: 600; background: var(--soft); color: var(--text-2); white-space: nowrap; }
+  .pill.alerta { background: var(--amber-soft); color: #8A5A00; }
+  .ed-chip .marca { position: absolute; top: 14px; right: 14px; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--line); display: grid; place-items: center; }
+  .ed-chip .marca svg { width: 13px; height: 13px; opacity: 0; }
+  .ed-chip.activo { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink), var(--sh-2); }
+  .ed-chip.activo .marca { background: var(--ink); border-color: var(--ink); color: var(--amber); }
+  .ed-chip.activo .marca svg { opacity: 1; }
+
+  .ed-cab { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+  .ed-cab .eyebrow { font-family: var(--cond); font-weight: 600; font-size: 12.5px; letter-spacing: 1.3px; text-transform: uppercase; color: var(--amber-dark); }
+  .ed-cab h2 { font-size: 30px; margin: 2px 0 0; letter-spacing: .2px; }
+  .ed-cab .dir { color: var(--muted); font-size: 14.5px; margin-top: 2px; }
+  .reporte { display: flex; gap: 8px; align-items: center; }
+  .reporte select { width: auto; padding: 9px 38px 9px 12px; font-size: 14.5px; border-radius: 10px; }
+  .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 20px 0 6px; }
+  .kpi { border: 1px solid var(--line-2); background: var(--soft); border-radius: 14px; padding: 12px 14px; }
+  .kpi b { display: block; font-family: var(--cond); font-weight: 700; font-size: 28px; line-height: 1; }
+  .kpi span { display: block; font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .kpi.alerta { background: var(--amber-soft); border-color: #F1D99A; }
+  .kpi.alerta b { color: #8A5A00; }
 
   /* Pestañas */
-  .tabs { display: flex; gap: 6px; margin: 4px 0 14px; border-bottom: 1.5px solid var(--line); overflow-x: auto; }
-  .tab { border: none; background: none; padding: 10px 14px; font: inherit; font-weight: 600; color: var(--muted); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -1.5px; white-space: nowrap; }
-  .tab.activo { color: var(--ink); border-bottom-color: var(--amber); }
-  .tab .n { display: inline-block; min-width: 20px; padding: 0 6px; border-radius: 999px; background: #EEEDE6; font-size: 12px; margin-left: 4px; }
+  .tabs { display: flex; gap: 4px; margin: 20px 0 22px; padding: 4px; background: var(--soft); border: 1px solid var(--line-2); border-radius: 14px; }
+  .tab { flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: none; background: none; padding: 10px 12px; font-weight: 600; font-size: 15px; color: var(--muted); cursor: pointer; border-radius: 10px; white-space: nowrap; transition: background .15s, color .15s; }
+  .tab svg { width: 18px; height: 18px; }
+  .tab:hover { color: var(--text); }
+  .tab.activo { background: #fff; color: var(--text); box-shadow: var(--sh-1), 0 0 0 1px var(--line-2); }
+  .tab.activo svg { color: var(--amber-dark); }
+  .tab .n { display: inline-grid; place-items: center; min-width: 22px; height: 20px; padding: 0 6px; border-radius: 999px; background: #E6E4DC; font-size: 12px; color: var(--text-2); }
+  .tab.activo .n { background: var(--ink); color: #fff; }
+  .tab .corto, .reporte .corto { display: none; }
 
-  /* Tipos de gestión */
-  .tipos { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
-  .tipo { position: relative; border: 1.5px solid var(--line); border-radius: 13px; padding: 14px; cursor: pointer; background: #FAFAF7; display: flex; gap: 12px; align-items: flex-start; }
+  /* Nueva gestión */
+  .tipos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .tipo { position: relative; border: 1.5px solid var(--line); border-radius: 16px; padding: 14px; cursor: pointer; background: #fff; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; margin: 0; font-weight: 400; transition: border-color .15s, box-shadow .15s, transform .15s; }
+  .tipo:hover { border-color: #C9C6BC; transform: translateY(-1px); }
   .tipo input { position: absolute; opacity: 0; }
-  .tipo .ic { width: 38px; height: 34px; flex: none; display: grid; place-items: center; background: var(--ink); color: var(--amber); clip-path: polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%); }
-  .tipo .ic svg { width: 18px; height: 18px; }
-  .tipo b { display: block; font-size: 15.5px; }
-  .tipo small { color: var(--muted); font-size: 13px; line-height: 1.35; }
-  .tipo:has(input:checked) { border-color: var(--ink); background: #fff; box-shadow: 0 0 0 2px var(--amber); }
-  .opciones { display: flex; gap: 8px; flex-wrap: wrap; }
-  .opcion { position: relative; }
-  .opcion input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
-  .opcion span { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 14px; border-radius: 10px; border: 1.5px solid var(--line); background: #FAFAF7; font-weight: 600; font-size: 14.5px; }
-  .opcion input:checked + span { background: var(--ink); color: #fff; border-color: var(--ink); }
-  .elegir { background: #FFF8E6; border: 1px solid #F1D99A; border-radius: 12px; padding: 12px 14px; margin-top: 14px; }
-  .elegir label { margin-top: 0; }
-  .aviso-robo { background: #FDE2E0; color: #8C1D18; border-radius: 10px; padding: 10px 12px; font-size: 14px; margin-top: 10px; }
-
-  /* Listados */
-  .buscar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
-  .buscar input { flex: 1 1 240px; }
-  .unidad { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
-  .unidad-tit { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; margin-bottom: 6px; }
-  .unidad-tit b { font-family: 'Barlow Semi Condensed', sans-serif; font-size: 18px; }
-  .persona { padding: 8px 0; border-top: 1px dashed var(--line); }
-  .persona:first-of-type { border-top: 0; }
-  .persona .dat { font-size: 14px; color: var(--muted); }
-  .llaves { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
-  .llave { display: inline-flex; align-items: center; gap: 6px; border-radius: 8px; padding: 4px 8px; font-size: 13px; background: #F6F5F0; }
-  .llave b { font-family: 'IBM Plex Mono', monospace; font-size: 14px; }
-  .est { border-radius: 999px; padding: 1px 8px; font-size: 11.5px; font-weight: 700; }
-  .est-ok { background: #E6F4EA; color: #1F6B34; } .est-pend { background: #FFF1D6; color: #8A5A00; } .est-baja { background: #FDE2E0; color: #B3261E; } .est-gris { background: #EEF0F2; color: #6B7680; }
-  .gestion { border: 1px solid var(--line); border-left: 4px solid var(--amber); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
-  .gestion.hecha { border-left-color: var(--ok); } .gestion.rechazada { border-left-color: var(--err); } .gestion.en_curso { border-left-color: #3A5BA8; }
-  .gestion-tit { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-  .gestion-tit b { font-size: 16px; }
-  .gestion .dat { font-size: 14px; color: #3D3B37; margin-top: 4px; line-height: 1.45; }
-  .nota-sat { margin-top: 8px; background: #F6F5F0; border-radius: 8px; padding: 8px 10px; font-size: 14px; }
-  .vacio { color: var(--muted); text-align: center; padding: 26px 10px; }
-
-  /* Modal */
-  .capa { position: fixed; inset: 0; background: rgba(14,15,16,.55); display: grid; place-items: center; padding: 16px; z-index: 50; }
-  .modal { background: #fff; border-radius: 16px; padding: 20px; width: 100%; max-width: 420px; }
-  .banner { background: #FFF1D6; border: 1px solid #F1D99A; border-radius: 12px; padding: 12px 14px; display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 14px; font-size: 14.5px; }
+  .tipo .hx { width: 38px; height: 34px; flex: none; display: grid; place-items: center; background: var(--ink); color: var(--amber); clip-path: polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%); }
+  .tipo .hx svg { width: 18px; height: 18px; }
+  .tipo b { display: block; font-size: 16px; font-weight: 600; }
+  .tipo small { display: block; color: var(--muted); font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+  .tipo:has(input:checked) { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink), 0 0 0 5px rgba(246,184,40,.35); }
+  .tipo:has(input:checked) .hx { background: var(--amber); color: var(--ink); }
+  .tipo:has(input:focus-visible) { box-shadow: var(--ring); }
+  .grupo { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line-2); }
+  .grupo-tit { display: flex; align-items: center; gap: 8px; font-family: var(--cond); font-weight: 700; font-size: 17px; letter-spacing: .2px; margin: 0 0 2px; }
+  .grupo-tit svg { width: 18px; height: 18px; color: var(--amber-dark); }
+  .elegir { background: var(--amber-soft); border: 1px solid #F1D99A; border-radius: 14px; padding: 12px 14px 14px; margin-top: 20px; }
+  .elegir label { margin-top: 0; display: flex; align-items: center; gap: 8px; }
+  .elegir label svg { width: 18px; height: 18px; color: var(--amber-dark); }
+  .aviso-robo { display: flex; gap: 10px; align-items: flex-start; background: var(--err-soft); color: #8C1D18; border: 1px solid #F3C9C5; border-radius: 12px; padding: 10px 12px; font-size: 14px; margin-top: 12px; }
+  .aviso-robo svg { width: 18px; height: 18px; margin-top: 1px; }
   .fotos-g { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-  .btn-foto { display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding: 8px 14px; border-radius: 10px; border: 1.5px solid var(--line); background: #fff; font-weight: 600; font-size: 14.5px; cursor: pointer; }
+  .btn-foto { display: inline-flex; align-items: center; gap: 8px; min-height: 46px; padding: 8px 14px; border-radius: 12px; border: 1.5px solid var(--line); background: #fff; font-weight: 600; font-size: 14.5px; cursor: pointer; margin: 0; }
+  .btn-foto:hover { border-color: var(--ink); }
+  .btn-foto svg { width: 18px; height: 18px; color: var(--muted); }
   .btn-foto input { display: none; }
   .mini { position: relative; }
-  .mini img { width: 88px; height: 66px; object-fit: cover; border-radius: 9px; border: 1.5px solid var(--line); display: block; }
-  .mini button { position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; border-radius: 50%; border: none; background: var(--ink); color: #fff; font-size: 14px; line-height: 1; cursor: pointer; }
-  .ver-foto { border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 3px 8px; font: inherit; font-size: 13px; cursor: pointer; }
-  .visor { position: fixed; inset: 0; background: rgba(14,15,16,.85); display: grid; place-items: center; padding: 16px; z-index: 60; }
-  .visor img { max-width: 100%; max-height: 82vh; border-radius: 10px; background: #fff; }
+  .mini img { width: 92px; height: 70px; object-fit: cover; border-radius: 10px; border: 1.5px solid var(--line); display: block; }
+  .mini button { position: absolute; top: -8px; right: -8px; width: 24px; height: 24px; border-radius: 50%; border: 2px solid #fff; background: var(--ink); color: #fff; font-size: 14px; line-height: 1; cursor: pointer; }
+  .enviar-fila { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line-2); }
+
+  /* Listados */
+  .herramientas { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+  .buscar { position: relative; flex: 1 1 260px; }
+  .buscar svg { position: absolute; left: 13px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--muted); pointer-events: none; }
+  .buscar input { padding-left: 40px; }
+  .filtros { display: inline-flex; gap: 4px; padding: 4px; background: var(--soft); border: 1px solid var(--line-2); border-radius: 12px; }
+  .filtros button { border: 0; background: none; padding: 7px 12px; border-radius: 9px; font-size: 14px; font-weight: 600; color: var(--muted); cursor: pointer; }
+  .filtros button.activo { background: #fff; color: var(--text); box-shadow: var(--sh-1); }
+  .unidad { display: grid; grid-template-columns: 150px 1fr; border: 1px solid var(--line); border-radius: 16px; margin-bottom: 10px; overflow: hidden; background: #fff; }
+  .unidad-tit { background: var(--soft); padding: 14px 16px; border-right: 1px solid var(--line-2); }
+  .unidad-tit b { display: block; font-family: var(--cond); font-weight: 700; font-size: 22px; line-height: 1.1; }
+  .unidad-tit span { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .personas { min-width: 0; }
+  .persona { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 4px 18px; padding: 14px 16px; border-top: 1px solid var(--line-2); align-items: start; }
+  .persona:first-child { border-top: 0; }
+  .persona .quien b { font-weight: 600; font-size: 15.5px; }
+  .persona .dat { font-size: 13.5px; color: var(--muted); line-height: 1.45; word-break: break-word; }
+  .rel { display: inline-block; font-size: 11.5px; font-weight: 600; letter-spacing: .3px; text-transform: uppercase; color: var(--text-2); background: var(--soft); border-radius: 6px; padding: 1px 6px; margin-left: 6px; vertical-align: 2px; }
+  .llaves { display: flex; gap: 6px; flex-wrap: wrap; }
+  .llave { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 10px; padding: 5px 8px 5px 7px; font-size: 13px; background: #fff; }
+  .llave .tico { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; background: var(--ink); color: var(--amber); }
+  .llave .tico.ctl { background: var(--blue); color: #fff; }
+  .llave .tico.warn { background: var(--err-soft); color: var(--err); }
+  .llave .tico svg { width: 13px; height: 13px; }
+  .llave b { font-family: var(--mono); font-size: 13.5px; font-weight: 600; }
+  .sin-llaves { font-size: 13.5px; color: var(--muted); }
+  .est { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 2px 9px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .est::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .est-ok { background: #E6F4EA; color: #1F6B34; } .est-pend { background: #FFF1D6; color: #8A5A00; } .est-curso { background: var(--blue-soft); color: var(--blue); } .est-baja { background: #FDE2E0; color: #B3261E; } .est-gris { background: #EEF0F2; color: #5F6A73; }
+  .ver-foto { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); background: #fff; border-radius: 8px; padding: 3px 8px; font-size: 12.5px; font-weight: 600; cursor: pointer; color: var(--text-2); }
+  .ver-foto:hover { border-color: var(--ink); color: var(--text); }
+  .ver-foto svg { width: 14px; height: 14px; }
+
+  .gestion { border: 1px solid var(--line); border-radius: 16px; padding: 16px 18px; margin-bottom: 12px; background: #fff; }
+  .gestion-cab { display: flex; gap: 14px; align-items: flex-start; }
+  .gestion-cab .hx { width: 40px; height: 35px; flex: none; display: grid; place-items: center; background: var(--ink); color: var(--amber); clip-path: polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%); }
+  .gestion-cab .hx svg { width: 18px; height: 18px; }
+  .gestion-cab .tit { flex: 1; min-width: 0; }
+  .gestion-cab .tit b { font-size: 17px; font-weight: 600; }
+  .gestion-cab .tit .num { color: var(--muted); font-weight: 500; font-size: 14px; margin-right: 6px; }
+  .gestion-cab .tit .fecha { display: block; font-size: 13px; color: var(--muted); margin-top: 1px; }
+  .datos { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px 18px; margin: 14px 0 0; padding: 14px 0 0; border-top: 1px solid var(--line-2); }
+  .datos div { min-width: 0; }
+  .datos dt { font-size: 12px; font-weight: 600; letter-spacing: .4px; text-transform: uppercase; color: var(--muted); }
+  .datos dd { margin: 2px 0 0; font-size: 14.5px; line-height: 1.4; word-break: break-word; }
+  .progreso { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 14px; }
+  .progreso div { font-size: 12px; font-weight: 600; color: var(--muted); }
+  .progreso div::before { content: ""; display: block; height: 4px; border-radius: 4px; background: var(--line); margin-bottom: 5px; }
+  .progreso div.ok { color: var(--text-2); }
+  .progreso div.ok::before { background: var(--amber); }
+  .progreso div.actual { color: var(--text); }
+  .progreso div.actual::before { background: var(--ink); }
+  .nota-sat { display: flex; gap: 10px; margin-top: 12px; background: var(--soft); border-radius: 12px; padding: 10px 12px; font-size: 14px; line-height: 1.45; }
+  .nota-sat svg { width: 18px; height: 18px; color: var(--amber-dark); margin-top: 1px; }
+  .gestion-pie { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+  .origen { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--blue); font-weight: 600; }
+  .origen svg { width: 15px; height: 15px; }
+  .vacio { text-align: center; padding: 34px 16px; color: var(--muted); border: 1.5px dashed var(--line); border-radius: 16px; }
+  .vacio svg { width: 34px; height: 34px; color: #C9C6BC; display: block; margin: 0 auto 8px; }
+  .vacio b { display: block; color: var(--text); font-size: 16px; margin-bottom: 2px; }
+
+  .link-form { border: 1px solid var(--line); background: var(--soft); border-radius: 16px; padding: 16px; margin-top: 14px; }
+  .link-item { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin-bottom: 8px; background: #fff; }
+  .link-item .quien { flex: 1 1 220px; min-width: 0; }
+  .link-item .quien b { font-weight: 600; }
+  .quien-tit { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .link-item .quien .dat { font-size: 13.5px; color: var(--muted); }
+  .link-item .acc { display: flex; gap: 6px; flex-wrap: wrap; }
+  .link-item.cerrado { background: var(--field); }
+  .link-item.cerrado .quien b { color: var(--text-2); }
+  .listo-box { background: var(--ok-soft); border: 1px solid #B7DFC4; border-radius: 14px; padding: 14px 16px; }
+  .listo-box .url { font-family: var(--mono); font-size: 13px; word-break: break-all; background: #fff; border: 1px solid #CFE7D7; border-radius: 10px; padding: 8px 10px; margin: 8px 0 10px; }
+  .lote-tabla { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; background: #fff; border-radius: 10px; overflow: hidden; }
+  .lote-tabla td { padding: 9px 10px; border-bottom: 1px solid var(--line-2); vertical-align: middle; }
+  .h3 { font-family: var(--cond); font-weight: 700; font-size: 18px; margin: 24px 0 10px; }
+
+  /* Fin del pedido / errores del link */
+  .final { text-align: center; padding: 36px 24px 30px; }
+  .sello { width: 76px; height: 66px; margin: 0 auto 18px; display: grid; place-items: center; background: var(--amber); color: var(--ink); clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%); }
+  .sello.mal { background: var(--ink); color: var(--amber); }
+  .sello svg { width: 32px; height: 32px; }
+  .final h2 { font-size: 28px; }
+  .final .sub { max-width: 440px; margin: 8px auto 0; font-size: 15.5px; color: var(--text-2); }
+
+  /* Modales, visor y avisos */
+  .capa { position: fixed; inset: 0; background: rgba(13,12,13,.55); display: grid; place-items: center; padding: 16px; z-index: 50; animation: aparecer .15s ease-out; }
+  .modal { background: #fff; border-radius: 20px; padding: 24px; width: 100%; max-width: 440px; box-shadow: var(--sh-3); animation: subir .2s cubic-bezier(.2,.9,.3,1); }
+  .modal h2 { margin: 0 0 4px; font-family: var(--cond); font-weight: 700; font-size: 24px; }
+  .modal-acc { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+  @keyframes aparecer { from { opacity: 0; } }
+  @keyframes subir { from { opacity: 0; transform: translateY(10px) scale(.98); } }
+  .visor { position: fixed; inset: 0; background: rgba(13,12,13,.88); display: grid; place-items: center; padding: 16px; z-index: 60; }
+  .visor img { max-width: 100%; max-height: 82vh; border-radius: 12px; background: #fff; }
   .visor button { position: absolute; top: 14px; right: 14px; }
-  .ayuda-wa { position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 40; display: inline-flex; align-items: center; gap: 8px; background: #1FA855; color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; padding: 11px 15px 11px 12px; border-radius: 999px; box-shadow: 0 6px 18px rgba(0,0,0,.25); font-family: 'Barlow', sans-serif; }
-  .ayuda-wa svg { width: 22px; height: 22px; }
-  .pie { text-align: center; color: var(--muted); font-size: 13px; padding: 4px 16px 30px; }
+  .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 70; background: var(--ink); color: #fff; padding: 12px 18px; border-radius: 12px; box-shadow: var(--sh-3); font-size: 14.5px; max-width: calc(100% - 32px); animation: subir .2s ease-out; }
+  .toast.err { background: var(--err); }
+  .ayuda-inline { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 16px auto 0; font-size: 14.5px; font-weight: 600; color: #178A45; text-decoration: none; }
+  .ayuda-inline svg { width: 18px; height: 18px; }
+  .ayuda-inline:hover { text-decoration: underline; }
+  .pie { text-align: center; color: var(--muted); font-size: 13px; padding: 4px 16px 32px; }
+  .pie a { color: var(--text); font-weight: 600; text-decoration: none; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+  @media (min-width: 860px) {
+    .acceso { grid-template-columns: 1.05fr 1fr; margin-top: 24px; }
+    .acceso-info { padding: 44px 40px; }
+    .acceso-form { padding: 44px 40px; align-self: center; }
+    .acceso-info h1 { font-size: 44px; margin-top: 18px; }
+  }
+  @media (max-width: 859px) {
+    main { padding: 16px 14px 32px; }
+    .card { padding: 20px 16px; border-radius: 18px; }
+    .acceso { border-radius: 20px; }
+    .beneficios { display: none; }
+    .acceso-info { padding: 24px 20px 22px; }
+    .acceso-form { padding: 24px 20px; }
+    .tipos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ed-cab h2 { font-size: 26px; }
+    .unidad { grid-template-columns: 1fr; }
+    .unidad-tit { border-right: 0; border-bottom: 1px solid var(--line-2); padding: 10px 14px; display: flex; align-items: baseline; gap: 10px; }
+    .unidad-tit span { margin: 0; }
+    .persona { grid-template-columns: 1fr; padding: 12px 14px; }
+    .tab { padding: 9px 6px; font-size: 14px; gap: 6px; }
+    .tab svg { display: none; }
+    .tab .largo { display: none; }
+    .tab .corto, .reporte .corto { display: inline; }
+    .usuario-btn .nombre { display: none; }
+    .usuario-btn { padding: 3px; }
+    .usuario-btn svg { display: none; }
+    .barra .seccion { display: none; }
+    .barra .sep { display: none; }
+    .reporte { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+    .reporte select { width: 100%; }
+    .reporte .largo { display: none; }
+    .edificios { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 10px; margin: 0 -14px 16px; padding: 2px 14px 6px; scrollbar-width: none; }
+    .edificios::-webkit-scrollbar { display: none; }
+    .ed-chip { flex: 0 0 82%; scroll-snap-align: start; }
+    .ed-chip:hover { transform: none; }
+  }
+  @media (max-width: 520px) {
+    .tipos { grid-template-columns: 1fr; }
+    .tipo { flex-direction: row; align-items: center; padding: 12px 14px; }
+    .fila.tres { grid-template-columns: 1fr 1fr; }
+    .fila.tres > :last-child { grid-column: 1 / -1; }
+    .modal-acc .btn { flex: 1; }
+    .link-item .acc { width: 100%; display: grid; grid-template-columns: 1fr 1fr auto; }
+    .link-item .txt-cancelar { display: none; }
+    .gestion { padding: 14px; }
+    .datos { grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+    .gestion-cab .tit b { font-size: 16px; }
+    .gestion-cab .hx { width: 34px; height: 30px; }
+  }
 </style>
 </head>
 <body>
-  <header>
-    <div class="h-in">
-      <div class="h-top">
-        <img src="/icons/logo.png" alt="SAT">
-        <div class="h-usuario oculto" id="hUsuario">
-          <span id="hNombre"></span>
-          <button type="button" id="cambiarClaveBtn">Cambiar clave</button>
-          <button type="button" id="salirBtn">Salir</button>
+  <header class="barra">
+    <div class="barra-in">
+      <img src="/icons/logo.png" alt="SAT">
+      <span class="sep" aria-hidden="true"></span>
+      <span class="seccion" id="barraSeccion">Administradores de consorcio</span>
+      <div class="barra-der">
+        <a class="ayuda-top" data-wa href="https://wa.me/5493413782085" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.4.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 2.9 2.9 0 0 0-.9 2.2 5 5 0 0 0 1 2.7 11.5 11.5 0 0 0 4.4 3.9c1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg>Ayuda</a>
+        <div class="usuario oculto" id="hUsuario">
+          <button type="button" class="usuario-btn" id="menuUsuarioBtn" aria-haspopup="true" aria-expanded="false"><span class="avatar" id="hAvatar">A</span><span class="nombre" id="hNombre"></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+          <div class="menu oculto" id="menuUsuario" role="menu">
+            <div class="menu-cab">Ingresaste como<b id="hNombreMenu"></b></div>
+            <button type="button" id="cambiarClaveBtn" role="menuitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2 2M14 9l2 2"/></svg>Cambiar clave</button>
+            <button type="button" id="salirBtn" role="menuitem"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg>Salir</button>
+          </div>
         </div>
       </div>
-      <h1 id="heroTitulo">Portal de <em>administradores</em></h1>
-      <p id="heroTexto">Gestioná las llaves de acceso de tus edificios: altas, reemplazos, bajas y cambios de titularidad, y consultá quién tiene llave en cada unidad.</p>
     </div>
   </header>
 
+  <!-- Encabezado del link del vecino -->
+  <section class="intro oculto" id="heroIntro">
+    <div class="intro-in">
+      <span class="chip-ed" id="heroChip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 7h1M14 7h1M9 11h1M14 11h1M9 15h1M14 15h1M11 21v-3h2v3"/></svg><span id="heroEdificio">Edificio</span></span>
+      <h1 id="heroTitulo">Pedido de <em>llave</em></h1>
+      <p id="heroTexto"></p>
+    </div>
+  </section>
+
   <main>
     <!-- Ingreso -->
-    <section class="card oculto" id="pantallaLogin" style="max-width:440px;margin-left:auto;margin-right:auto;">
-      <h2>Ingresar</h2>
-      <p class="sub">Con el mail y la clave que te dio SAT.</p>
-      <form id="loginForm" autocomplete="on">
-        <label for="loginEmail">Mail</label>
-        <input type="email" id="loginEmail" autocomplete="username" inputmode="email" required>
-        <label for="loginClave">Clave</label>
-        <input type="password" id="loginClave" autocomplete="current-password" required>
-        <button type="submit" class="btn btn-full" id="loginBtn" style="margin-top:16px;">Entrar</button>
-        <p class="status" id="loginStatus" role="status"></p>
-      </form>
-      <button type="button" class="ver-foto" id="olvideBtn" style="margin-top:12px;border:none;text-decoration:underline;padding:0;color:var(--muted);">Olvidé mi clave</button>
-      <form id="olvideForm" class="oculto" style="margin-top:10px;">
-        <p class="sub">Escribí tu mail y te mandamos un link para crear una clave nueva.</p>
-        <input type="email" id="olvideEmail" inputmode="email" autocomplete="username" required placeholder="tu mail">
-        <button type="submit" class="btn btn-sec btn-full" style="margin-top:10px;">Mandarme el link</button>
-        <p class="status" id="olvideStatus"></p>
-      </form>
-    </section>
+    <div class="acceso oculto" id="pantallaLogin">
+      <div class="acceso-info">
+        <span class="eyebrow">SAT · Control de acceso</span>
+        <h1>Portal de <em>administradores</em></h1>
+        <p>Gestioná las llaves de acceso de tus edificios desde un solo lugar.</p>
+        <ul class="beneficios">
+          <li><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>Pedí tags nuevos, reemplazos, bajas y cambios de titularidad.</li>
+          <li><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 4.5a3.5 3.5 0 0 1 0 7M21 20c0-2.6-1.6-4.8-4-5.6"/></svg></span>Consultá quién tiene llave en cada unidad.</li>
+          <li><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></span>Mandá un link al vecino para que cargue su pedido.</li>
+          <li><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6"/></svg></span>Seguí cada pedido y descargá el reporte para la asamblea.</li>
+        </ul>
+      </div>
+      <section class="acceso-form">
+        <h2>Ingresar</h2>
+        <p class="sub">Con el mail y la clave que te dio SAT.</p>
+        <form id="loginForm" autocomplete="on">
+          <label for="loginEmail">Mail</label>
+          <input type="email" id="loginEmail" autocomplete="username" inputmode="email" required placeholder="nombre@administracion.com">
+          <label for="loginClave">Clave</label>
+          <div class="campo-clave"><input type="password" id="loginClave" autocomplete="current-password" required><button type="button" class="ver-clave" data-ver="loginClave" aria-label="Mostrar la clave"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+          <button type="submit" class="btn btn-full btn-grande" id="loginBtn" style="margin-top:20px;">Entrar</button>
+          <p class="status" id="loginStatus" role="status"></p>
+        </form>
+        <div class="olvide">
+          <button type="button" class="enlace" id="olvideBtn">Olvidé mi clave</button>
+          <form id="olvideForm" class="oculto" style="margin-top:10px;">
+            <p class="sub">Escribí tu mail y te mandamos un link para crear una clave nueva.</p>
+            <input type="email" id="olvideEmail" inputmode="email" autocomplete="username" required placeholder="Tu mail" aria-label="Tu mail">
+            <button type="submit" class="btn btn-sec btn-full" style="margin-top:10px;">Mandarme el link</button>
+            <p class="status" id="olvideStatus"></p>
+          </form>
+        </div>
+      </section>
+    </div>
 
     <!-- Crear clave nueva (link del mail) -->
-    <section class="card oculto" id="pantallaReset" style="max-width:440px;margin-left:auto;margin-right:auto;">
+    <section class="card solo oculto" id="pantallaReset">
       <h2>Crear clave nueva</h2>
+      <p class="sub">Elegí una clave que no uses en otros lados.</p>
       <form id="resetForm">
+        <input type="text" autocomplete="username" hidden aria-hidden="true">
         <label for="resetClave">Clave nueva <span class="opc">(mínimo 8 caracteres)</span></label><input type="password" id="resetClave" autocomplete="new-password" minlength="8" required>
         <label for="resetClave2">Repetila</label><input type="password" id="resetClave2" autocomplete="new-password" required>
-        <button type="submit" class="btn btn-full" style="margin-top:16px;">Guardar y entrar</button>
+        <button type="submit" class="btn btn-full btn-grande" style="margin-top:20px;">Guardar y entrar</button>
         <p class="status" id="resetStatus"></p>
       </form>
     </section>
 
     <!-- Pedido por link (vecino) -->
-    <section class="card oculto" id="pantallaLinkError" style="max-width:520px;margin:0 auto;text-align:center;">
+    <section class="card final solo oculto" id="pantallaLinkError">
+      <div class="sello mal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 8v5M12 16.5v.01"/><circle cx="12" cy="12" r="9"/></svg></div>
       <h2>Este link no está disponible</h2>
       <p class="sub" id="linkErrorTxt"></p>
+      <p class="sub">Pedile a tu administración que te mande uno nuevo.</p>
     </section>
-    <section class="card oculto" id="pantallaLinkFin" style="max-width:520px;margin:0 auto;text-align:center;">
-      <div style="font-size:42px;">✅</div>
+    <section class="card final solo oculto" id="pantallaLinkFin">
+      <div class="sello"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
       <h2>¡Listo, gracias!</h2>
       <p class="sub" id="linkFinTxt"></p>
+      <a class="ayuda-inline" data-wa href="https://wa.me/5493413782085" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.4.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 2.9 2.9 0 0 0-.9 2.2 5 5 0 0 0 1 2.7 11.5 11.5 0 0 0 4.4 3.9c1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg>¿Dudas? Escribinos por WhatsApp</a>
     </section>
 
     <!-- Panel -->
     <div class="oculto" id="pantallaPanel">
       <div class="banner oculto" id="bannerClave">
-        <span>🔒 Estás usando la clave que te dio SAT. Te recomendamos cambiarla por una tuya.</span>
-        <button type="button" class="btn btn-sec" id="bannerClaveBtn" style="padding:8px 14px;font-size:15px;">Cambiar clave</button>
+        <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Estás usando la clave que te dio SAT. Te recomendamos cambiarla por una tuya.</span>
+        <button type="button" class="btn btn-sec btn-chico" id="bannerClaveBtn">Cambiar clave</button>
       </div>
-      <section class="card">
-        <h2>Tus edificios</h2>
+      <section id="seccionEdificios">
+        <h2 class="sec-tit">Tus edificios</h2>
         <div class="edificios" id="edificios"></div>
         <p class="vacio oculto" id="sinEdificios">Todavía no tenés edificios asignados. Comunicate con SAT.</p>
       </section>
 
       <section class="card oculto" id="edificioCard">
-        <div class="barra-ed" id="barraEdificio">
-          <select id="repPeriodo" aria-label="Período del reporte"><option value="30">Últimos 30 días</option><option value="90">Últimos 3 meses</option><option value="365" selected>Último año</option><option value="0">Todo</option></select>
-          <button type="button" class="btn btn-sec" id="reporteBtn" style="padding:8px 14px;font-size:15px;">📄 Reporte para asamblea (PDF)</button>
+        <div class="ed-cab" id="edCab">
+          <div>
+            <span class="eyebrow">Edificio</span>
+            <h2 id="edNombre"></h2>
+            <div class="dir" id="edDireccion"></div>
+          </div>
+          <div class="reporte" id="barraEdificio">
+            <select id="repPeriodo" aria-label="Período del reporte"><option value="30">Últimos 30 días</option><option value="90">Últimos 3 meses</option><option value="365" selected>Último año</option><option value="0">Todo</option></select>
+            <button type="button" class="btn btn-sec" id="reporteBtn" style="padding:9px 14px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6"/></svg><span class="largo">Reporte para asamblea</span><span class="corto">Reporte PDF</span></button>
+          </div>
         </div>
-        <div class="tabs" role="tablist">
-          <button type="button" class="tab activo" data-tab="nueva">Nueva gestión</button>
-          <button type="button" class="tab" data-tab="vecinos">Vecinos y llaves <span class="n" id="nVecinos">0</span></button>
-          <button type="button" class="tab" data-tab="gestiones">Gestiones <span class="n" id="nGestiones">0</span></button>
-          <button type="button" class="tab" data-tab="links">Pedir datos al vecino</button>
+        <div class="kpis" id="edKpis"></div>
+        <div class="tabs" role="tablist" id="tabs">
+          <button type="button" class="tab activo" data-tab="nueva" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span class="largo">Nueva gestión</span><span class="corto">Nueva</span></button>
+          <button type="button" class="tab" data-tab="gestiones" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5h10M9 12h10M9 19h10M4 5h.01M4 12h.01M4 19h.01"/></svg><span class="largo">Pedidos</span><span class="corto">Pedidos</span><span class="n" id="nGestiones">0</span></button>
+          <button type="button" class="tab" data-tab="vecinos" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 4.5a3.5 3.5 0 0 1 0 7M21 20c0-2.6-1.6-4.8-4-5.6"/></svg><span class="largo">Vecinos y llaves</span><span class="corto">Vecinos</span><span class="n" id="nVecinos">0</span></button>
+          <button type="button" class="tab" data-tab="links" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg><span class="largo">Links para vecinos</span><span class="corto">Links</span></button>
         </div>
         <p class="status" id="edificioStatus"></p>
 
         <!-- Nueva gestión -->
         <div data-panel="nueva">
           <form id="gestionForm" novalidate>
-            <span class="lbl" style="margin-top:0;">¿Qué necesitás?</span>
+            <span class="lbl" id="lblTipo" style="margin-top:0;">¿Qué necesitás?</span>
             <div class="tipos">
-              <label class="tipo"><input type="radio" name="tipo" value="nuevo"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span><span><b>Nuevo tag</b><small>Llave para un usuario nuevo</small></span></label>
-              <label class="tipo"><input type="radio" name="tipo" value="reemplazo"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 14-5.3L20 9"/><path d="M20 4v5h-5"/><path d="M20 12a8 8 0 0 1-14 5.3L4 15"/><path d="M4 20v-5h5"/></svg></span><span><b>Reemplazo de tag</b><small>No funciona o se rompió</small></span></label>
-              <label class="tipo"><input type="radio" name="tipo" value="baja"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M8 12h8"/></svg></span><span><b>Baja de tag</b><small>Extravío, robo o ya no vive</small></span></label>
-              <label class="tipo"><input type="radio" name="tipo" value="titularidad"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="16" r="3"/><path d="M11 8h5a2 2 0 0 1 2 2v3"/><path d="M13 16H8a2 2 0 0 1-2-2v-3"/></svg></span><span><b>Cambio de titularidad</b><small>La unidad pasa a otra persona</small></span></label>
+              <label class="tipo"><input type="radio" name="tipo" value="nuevo"><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span><span><b>Nuevo tag</b><small>Llave para un usuario nuevo</small></span></label>
+              <label class="tipo"><input type="radio" name="tipo" value="reemplazo"><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 14-5.3L20 9"/><path d="M20 4v5h-5"/><path d="M20 12a8 8 0 0 1-14 5.3L4 15"/><path d="M4 20v-5h5"/></svg></span><span><b>Reemplazo de tag</b><small>No funciona o se rompió</small></span></label>
+              <label class="tipo"><input type="radio" name="tipo" value="baja"><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M8 12h8"/></svg></span><span><b>Baja de tag</b><small>Extravío, robo o ya no vive</small></span></label>
+              <label class="tipo"><input type="radio" name="tipo" value="titularidad"><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="16" r="3"/><path d="M11 8h5a2 2 0 0 1 2 2v3"/><path d="M13 16H8a2 2 0 0 1-2-2v-3"/></svg></span><span><b>Cambio de titularidad</b><small>La unidad pasa a otra persona</small></span></label>
             </div>
 
             <div id="camposGestion" class="oculto">
               <div class="elegir" id="elegirBox">
-                <label for="elegirLlave">Elegir de los registrados en el edificio <span class="opc">(opcional, completa los datos)</span></label>
+                <label for="elegirLlave"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>Completar con un vecino registrado <span class="opc">(opcional)</span></label>
                 <select id="elegirLlave"><option value="">— Elegir —</option></select>
               </div>
 
-              <div class="fila">
-                <div><label for="gPiso">Piso</label><input type="text" id="gPiso" maxlength="10" placeholder="Ej. 4"></div>
-                <div><label for="gUnidad">Depto</label><input type="text" id="gUnidad" maxlength="10" placeholder="Ej. B"></div>
-                <div><label for="gCochera">Cochera <span class="opc">(si corresponde)</span></label><input type="text" id="gCochera" maxlength="15"></div>
-              </div>
-
-              <div class="fila">
-                <div><label for="gTitular" id="gTitularLbl">Nombre y apellido del titular</label><input type="text" id="gTitular" maxlength="80"></div>
-                <div><label for="gTelefono" id="gTelefonoLbl">Teléfono</label><input type="tel" id="gTelefono" maxlength="30" inputmode="tel"></div>
-              </div>
-              <div class="fila" id="filaMailRel">
-                <div><label for="gEmail">Mail <span class="opc">(opcional)</span></label><input type="email" id="gEmail" maxlength="80" inputmode="email">
-                  <label class="oculto" id="copiaWrap" style="display:flex;gap:8px;align-items:center;font-weight:500;margin:8px 0 0;"><input type="checkbox" id="copia" checked style="width:18px;height:18px;"> Mandarme una copia por mail</label></div>
-                <div><span class="lbl">Es…</span>
-                  <div class="opciones">
-                    <label class="opcion"><input type="radio" name="relacion" value="propietario"><span>Propietario</span></label>
-                    <label class="opcion"><input type="radio" name="relacion" value="inquilino"><span>Inquilino</span></label>
-                    <label class="opcion"><input type="radio" name="relacion" value="otro"><span>Otro</span></label>
-                  </div>
+              <div class="grupo">
+                <h3 class="grupo-tit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>Unidad</h3>
+                <div class="fila tres">
+                  <div><label for="gPiso">Piso</label><input type="text" id="gPiso" maxlength="10" placeholder="Ej. 4"></div>
+                  <div><label for="gUnidad">Depto</label><input type="text" id="gUnidad" maxlength="10" placeholder="Ej. B"></div>
+                  <div><label for="gCochera">Cochera <span class="opc">(si corresponde)</span></label><input type="text" id="gCochera" maxlength="15"></div>
                 </div>
               </div>
 
-              <div class="fila">
-                <div><span class="lbl">Dispositivo</span>
-                  <div class="opciones">
-                    <label class="opcion"><input type="radio" name="dispositivo" value="tag" checked><span>Tag (llave)</span></label>
-                    <label class="opcion"><input type="radio" name="dispositivo" value="control"><span>Control de cochera</span></label>
-                  </div>
-                </div>
-                <div id="bloqueCantidad"><label for="gCantidad">Cantidad</label><input type="number" id="gCantidad" min="1" max="10" value="1"></div>
-              </div>
-
-              <div class="fila" id="bloqueTag">
-                <div><label for="gTag">N° de la llave <span class="opc">(si lo sabés)</span></label><input type="text" id="gTag" class="mono" maxlength="40" placeholder="Ej. 069:02561"></div>
-                <div><label for="gUsuario">N° de usuario <span class="opc">(si lo sabés)</span></label><input type="text" id="gUsuario" class="mono" maxlength="15" inputmode="numeric"></div>
-              </div>
-
-              <div id="bloqueMotivo">
-                <span class="lbl">Motivo</span>
-                <div class="opciones" id="motivos"></div>
-                <div class="aviso-robo oculto" id="avisoRobo">Por seguridad, las bajas por <b>robo</b> se procesan con prioridad. Si es urgente, además llamá a SAT.</div>
-              </div>
-
-              <div id="bloqueTitularidad">
+              <div class="grupo">
+                <h3 class="grupo-tit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg><span id="grupoTitularTit">Titular</span></h3>
                 <div class="fila">
-                  <div><label for="gNuevoTitular">Nuevo titular</label><input type="text" id="gNuevoTitular" maxlength="80"></div>
-                  <div><label for="gNuevoTelefono">Teléfono del nuevo titular</label><input type="tel" id="gNuevoTelefono" maxlength="30" inputmode="tel"></div>
+                  <div><label for="gTitular" id="gTitularLbl">Nombre y apellido del titular</label><input type="text" id="gTitular" maxlength="80"></div>
+                  <div><label for="gTelefono" id="gTelefonoLbl">Teléfono</label><input type="tel" id="gTelefono" maxlength="30" inputmode="tel"></div>
                 </div>
-                <label for="gNuevoEmail">Mail del nuevo titular <span class="opc">(opcional)</span></label>
-                <input type="email" id="gNuevoEmail" maxlength="80" inputmode="email">
-                <span class="lbl">¿Qué pasa con las llaves?</span>
-                <div class="opciones">
-                  <label class="opcion"><input type="radio" name="llaves_titularidad" value="transferir"><span>Se las queda el nuevo titular</span></label>
-                  <label class="opcion"><input type="radio" name="llaves_titularidad" value="reemplazar"><span>Dar de baja las anteriores y entregar nuevas</span></label>
+                <div class="fila" id="filaMailRel">
+                  <div><label for="gEmail">Mail <span class="opc">(opcional)</span></label><input type="email" id="gEmail" maxlength="80" inputmode="email">
+                    <label class="check oculto" id="copiaWrap" style="margin:10px 0 0;"><input type="checkbox" id="copia" checked> Mandarme una copia por mail</label></div>
+                  <div><span class="lbl">Es…</span>
+                    <div class="opciones">
+                      <label class="opcion"><input type="radio" name="relacion" value="propietario"><span>Propietario</span></label>
+                      <label class="opcion"><input type="radio" name="relacion" value="inquilino"><span>Inquilino</span></label>
+                      <label class="opcion"><input type="radio" name="relacion" value="otro"><span>Otro</span></label>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <span class="lbl" id="fotosLbl">Fotos del tag <span class="opc">(opcional, hasta 2 — del lado de los números)</span></span>
-              <div class="fotos-g" id="fotosG">
-                <label class="btn-foto" id="btnFotoCam">📷 Sacar foto<input type="file" accept="image/*" capture="environment" class="in-foto"></label>
-                <label class="btn-foto" id="btnFotoGal">🖼 De la galería<input type="file" accept="image/*" class="in-foto"></label>
+              <div class="grupo">
+                <h3 class="grupo-tit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2 2M14 9l2 2"/></svg>Llave</h3>
+                <div class="fila">
+                  <div><span class="lbl">Dispositivo</span>
+                    <div class="opciones">
+                      <label class="opcion"><input type="radio" name="dispositivo" value="tag" checked><span>Tag (llave)</span></label>
+                      <label class="opcion"><input type="radio" name="dispositivo" value="control"><span>Control de cochera</span></label>
+                    </div>
+                  </div>
+                  <div id="bloqueCantidad"><label for="gCantidad">Cantidad</label><input type="number" id="gCantidad" min="1" max="10" value="1"></div>
+                </div>
+
+                <div class="fila" id="bloqueTag">
+                  <div><label for="gTag">N° de la llave <span class="opc">(si lo sabés)</span></label><input type="text" id="gTag" class="mono" maxlength="40" placeholder="Ej. 069:02561"></div>
+                  <div><label for="gUsuario">N° de usuario <span class="opc">(si lo sabés)</span></label><input type="text" id="gUsuario" class="mono" maxlength="15" inputmode="numeric"></div>
+                </div>
+
+                <div id="bloqueMotivo">
+                  <span class="lbl">Motivo</span>
+                  <div class="opciones" id="motivos"></div>
+                  <div class="aviso-robo oculto" id="avisoRobo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l10 18H2z"/><path d="M12 10v4M12 17.5v.01"/></svg><span>Por seguridad, las bajas por <b>robo</b> se procesan con prioridad. Si es urgente, además llamá a SAT.</span></div>
+                </div>
+
+                <div id="bloqueTitularidad">
+                  <div class="fila">
+                    <div><label for="gNuevoTitular">Nuevo titular</label><input type="text" id="gNuevoTitular" maxlength="80"></div>
+                    <div><label for="gNuevoTelefono">Teléfono del nuevo titular</label><input type="tel" id="gNuevoTelefono" maxlength="30" inputmode="tel"></div>
+                  </div>
+                  <label for="gNuevoEmail">Mail del nuevo titular <span class="opc">(opcional)</span></label>
+                  <input type="email" id="gNuevoEmail" maxlength="80" inputmode="email">
+                  <span class="lbl">¿Qué pasa con las llaves?</span>
+                  <div class="opciones">
+                    <label class="opcion"><input type="radio" name="llaves_titularidad" value="transferir"><span>Se las queda el nuevo titular</span></label>
+                    <label class="opcion"><input type="radio" name="llaves_titularidad" value="reemplazar"><span>Dar de baja las anteriores y entregar nuevas</span></label>
+                  </div>
+                </div>
               </div>
-              <p class="sub" id="fotoEstado" style="margin-top:6px;"></p>
 
-              <label for="gObs">Observaciones <span class="opc">(opcional)</span></label>
-              <textarea id="gObs" maxlength="600" placeholder="Cualquier dato que nos ayude"></textarea>
+              <div class="grupo">
+                <h3 class="grupo-tit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Fotos y observaciones</h3>
+                <span class="lbl" id="fotosLbl">Fotos del tag <span class="opc">(opcional, hasta 2 — del lado de los números)</span></span>
+                <div class="fotos-g" id="fotosG">
+                  <label class="btn-foto" id="btnFotoCam"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Sacar foto<input type="file" accept="image/*" capture="environment" class="in-foto"></label>
+                  <label class="btn-foto" id="btnFotoGal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>De la galería<input type="file" accept="image/*" class="in-foto"></label>
+                </div>
+                <p class="sub" id="fotoEstado" style="margin-top:6px;"></p>
+                <label for="gObs">Observaciones <span class="opc">(opcional)</span></label>
+                <textarea id="gObs" maxlength="600" placeholder="Cualquier dato que nos ayude"></textarea>
+              </div>
 
-              <button type="submit" class="btn btn-full" id="gEnviarBtn" style="margin-top:16px;">Enviar gestión a SAT</button>
-              <p class="status" id="gStatus" role="status"></p>
+              <div class="enviar-fila">
+                <button type="submit" class="btn btn-full btn-grande" id="gEnviarBtn">Enviar gestión a SAT</button>
+                <p class="status" id="gStatus" role="status"></p>
+                <a class="ayuda-inline oculto" id="ayudaLink" data-wa href="https://wa.me/5493413782085" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.4.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 2.9 2.9 0 0 0-.9 2.2 5 5 0 0 0 1 2.7 11.5 11.5 0 0 0 4.4 3.9c1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg>¿Dudas? Escribinos por WhatsApp</a>
+              </div>
             </div>
           </form>
         </div>
 
         <!-- Vecinos y llaves -->
         <div data-panel="vecinos" class="oculto">
-          <div class="buscar">
-            <input type="text" id="buscarVecino" placeholder="Buscar por nombre, piso, depto o N° de llave">
-            <button type="button" class="btn btn-sec" id="csvBtn" style="padding:10px 14px;font-size:15px;">⬇ Descargar listado</button>
+          <div class="herramientas">
+            <div class="buscar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input type="text" id="buscarVecino" placeholder="Buscar nombre, unidad o N° de llave" aria-label="Buscar vecino"></div>
+            <button type="button" class="btn btn-sec" id="csvBtn" style="padding:11px 14px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Descargar listado</button>
           </div>
           <div id="listaVecinos"></div>
         </div>
 
         <!-- Gestiones -->
         <div data-panel="gestiones" class="oculto">
+          <div class="herramientas">
+            <div class="filtros" id="filtroGestiones" role="group" aria-label="Filtrar pedidos">
+              <button type="button" class="activo" data-f="">Todos</button>
+              <button type="button" data-f="abiertos">Abiertos</button>
+              <button type="button" data-f="cerrados">Cerrados</button>
+            </div>
+          </div>
           <div id="listaGestiones"></div>
         </div>
 
         <!-- Links para vecinos -->
         <div data-panel="links" class="oculto">
-          <p class="sub">Generá un link y mandáselo al vecino: él completa el pedido (con foto del tag) y le llega <b>directo a SAT</b> con su número de pedido — el link ya es tu autorización. Lo vas a ver en la pestaña Gestiones. Cada link sirve <b>una sola vez</b> y vence a los 15 días. El vecino no ve ningún otro dato del edificio.</p>
-          <form id="linkForm" class="elegir" style="margin-top:10px;">
-            <div class="opciones" style="margin-bottom:6px;">
-              <label class="opcion"><input type="radio" name="lModo" value="uno" checked><span>Un vecino</span></label>
-              <label class="opcion"><input type="radio" name="lModo" value="varios"><span>Varios a la vez</span></label>
+          <p class="sub" style="font-size:15px;">Generá un link y mandáselo al vecino: él completa el pedido (con foto del tag) y le llega <b>directo a SAT</b> con su número de pedido — el link ya es tu autorización. Cada link sirve <b>una sola vez</b> y vence a los 15 días. El vecino no ve ningún otro dato del edificio.</p>
+          <form id="linkForm" class="link-form">
+            <div class="filtros" style="margin-bottom:4px;">
+              <label class="opcion" style="margin:0;"><input type="radio" name="lModo" value="uno" checked><span>Un vecino</span></label>
+              <label class="opcion" style="margin:0;"><input type="radio" name="lModo" value="varios"><span>Varios a la vez</span></label>
             </div>
             <div id="lVarios" class="oculto">
               <label for="lLista">Una línea por vecino: <span class="opc">nombre, piso, depto — o solo la unidad (ej. «4B» o «PB 1»)</span></label>
               <textarea id="lLista" rows="6" placeholder="Laura Gómez, 4, B&#10;Martín Ruiz, 7, D&#10;2A&#10;PB 1"></textarea>
-              <p class="sub" id="lListaCuenta" style="margin-top:4px;"></p>
+              <p class="sub" id="lListaCuenta" style="margin-top:6px;"></p>
             </div>
             <div class="fila" id="lUnoA">
               <div><label for="lTipo">Gestión</label>
@@ -345,11 +646,11 @@
               <div><label for="lPiso">Piso <span class="opc">(opcional)</span></label><input type="text" id="lPiso" maxlength="10"></div>
               <div><label for="lUnidad">Depto <span class="opc">(opcional)</span></label><input type="text" id="lUnidad" maxlength="10"></div>
             </div>
-            <button type="submit" class="btn" id="lCrearBtn" style="margin-top:12px;">Generar link</button>
+            <button type="submit" class="btn" id="lCrearBtn" style="margin-top:16px;">Generar link</button>
             <p class="status" id="lStatus"></p>
           </form>
-          <div id="linkNuevo" class="oculto" style="margin-top:12px;"></div>
-          <h3 style="font-family:'Barlow Semi Condensed',sans-serif;margin:18px 0 8px;">Links generados</h3>
+          <div id="linkNuevo" class="oculto" style="margin-top:14px;"></div>
+          <h3 class="h3">Links generados</h3>
           <div id="listaLinks"></div>
         </div>
       </section>
@@ -358,22 +659,31 @@
 
   <div class="capa oculto" id="modalClave">
     <form class="modal" id="claveForm">
-      <h2 style="margin:0 0 6px;font-family:'Barlow Semi Condensed',sans-serif;">Cambiar clave</h2>
+      <input type="text" autocomplete="username" hidden aria-hidden="true">
+      <h2>Cambiar clave</h2>
+      <p class="sub">Usá al menos 8 caracteres.</p>
       <label for="claveActual">Clave actual</label><input type="password" id="claveActual" autocomplete="current-password">
-      <label for="claveNueva">Clave nueva <span class="opc">(mínimo 8 caracteres)</span></label><input type="password" id="claveNueva" autocomplete="new-password" minlength="8">
+      <label for="claveNueva">Clave nueva</label><input type="password" id="claveNueva" autocomplete="new-password" minlength="8">
       <label for="claveNueva2">Repetir clave nueva</label><input type="password" id="claveNueva2" autocomplete="new-password">
-      <div class="fila" style="margin-top:16px;"><button type="button" class="btn btn-sec" id="claveCancelar">Cancelar</button><button type="submit" class="btn">Guardar</button></div>
       <p class="status" id="claveStatus"></p>
+      <div class="modal-acc"><button type="button" class="btn btn-sec" id="claveCancelar">Cancelar</button><button type="submit" class="btn">Guardar</button></div>
     </form>
   </div>
 
-  <div class="visor oculto" id="visor"><button type="button" class="btn btn-sec" id="visorCerrar" style="padding:8px 14px;font-size:15px;">Cerrar ✕</button><img id="visorImg" alt="Foto de la llave"></div>
+  <div class="capa oculto" id="modalCancelar">
+    <form class="modal" id="cancelarForm">
+      <h2>Cancelar pedido <span id="cancelarNum"></span></h2>
+      <p class="sub">SAT deja de procesarlo. Si después lo necesitás, cargás uno nuevo.</p>
+      <label for="cancelarMotivo">Motivo <span class="opc">(opcional)</span></label>
+      <textarea id="cancelarMotivo" maxlength="200" placeholder="Ej. lo cargué por error"></textarea>
+      <p class="status" id="cancelarStatus"></p>
+      <div class="modal-acc"><button type="button" class="btn btn-sec" id="cancelarVolver">Volver</button><button type="submit" class="btn btn-osc" id="cancelarOk">Cancelar pedido</button></div>
+    </form>
+  </div>
 
-  <a class="ayuda-wa" id="ayudaWa" style="display:none;" href="https://wa.me/5493413782085" target="_blank" rel="noopener" aria-label="Pedir ayuda por WhatsApp">
-    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.4.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 2.9 2.9 0 0 0-.9 2.2 5 5 0 0 0 1 2.7 11.5 11.5 0 0 0 4.4 3.9c1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg>
-    ¿Ayuda?
-  </a>
-  <div class="pie">SAT · Seguridad electrónica · <a href="https://www.sat365.com.ar" target="_blank" rel="noopener" style="color:inherit;">www.sat365.com.ar</a></div>
+  <div class="visor oculto" id="visor"><button type="button" class="btn btn-sec btn-chico" id="visorCerrar">Cerrar ✕</button><img id="visorImg" alt="Foto de la llave"></div>
+
+  <footer class="pie">SAT · Seguridad electrónica · <a href="https://www.sat365.com.ar" target="_blank" rel="noopener">sat365.com.ar</a></footer>
 
 <script>
 (function () {
@@ -385,8 +695,43 @@
     reemplazo: { no_funciona: "No funciona", rotura: "Se rompió", desgaste: "Desgaste", otro: "Otro" },
     baja: { extravio: "Extravío", robo: "Robo", ya_no_vive: "Ya no vive / no corresponde", otro: "Otro" },
   };
-  const ESTADOS = { pendiente: ["Pendiente", "est-pend"], en_curso: ["En curso", "est-pend"], hecha: ["Hecha", "est-ok"], rechazada: ["Rechazada", "est-baja"], cancelada: ["Cancelada", "est-gris"] };
+  const ESTADOS = { pendiente: ["Pendiente", "est-pend"], en_curso: ["En curso", "est-curso"], hecha: ["Hecha", "est-ok"], rechazada: ["Rechazada", "est-baja"], cancelada: ["Cancelada", "est-gris"] };
   const EST_LLAVE = { pendiente: ["Registrada", "est-gris"], conciliada: ["Activa", "est-ok"], baja: ["Para dar de baja", "est-baja"], dada_de_baja: ["Dada de baja", "est-baja"] };
+  const IC = {
+    nuevo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+    reemplazo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 14-5.3L20 9"/><path d="M20 4v5h-5"/><path d="M20 12a8 8 0 0 1-14 5.3L4 15"/><path d="M4 20v-5h5"/></svg>',
+    baja: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M8 12h8"/></svg>',
+    titularidad: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="16" r="3"/><path d="M11 8h5a2 2 0 0 1 2 2v3"/><path d="M13 16H8a2 2 0 0 1-2-2v-3"/></svg>',
+    tag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2 2M14 9l2 2"/></svg>',
+    control: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="3"/><circle cx="12" cy="8" r="1.6"/><path d="M10 13h4M10 16.5h4"/></svg>',
+    alerta: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l10 18H2z"/><path d="M12 10v4M12 17.5v.01"/></svg>',
+    foto: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+    sat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z"/></svg>',
+    link: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg>',
+    copiar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>',
+    wa: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.4.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 2.9 2.9 0 0 0-.9 2.2 5 5 0 0 0 1 2.7 11.5 11.5 0 0 0 4.4 3.9c1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg>',
+    x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    vacioG: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7zM14 3v5h5"/></svg>',
+    vacioV: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 4.5a3.5 3.5 0 0 1 0 7M21 20c0-2.6-1.6-4.8-4-5.6"/></svg>',
+  };
+  let toastT = 0;
+  function aviso(txt, error) {
+    document.querySelector(".toast")?.remove();
+    const t = document.createElement("div");
+    t.className = "toast" + (error ? " err" : "");
+    t.setAttribute("role", "status");
+    t.textContent = txt;
+    document.body.appendChild(t);
+    clearTimeout(toastT); toastT = setTimeout(() => t.remove(), 4200);
+  }
+  // Menú del usuario
+  $("menuUsuarioBtn").addEventListener("click", (e) => { e.stopPropagation(); const m = $("menuUsuario"); m.classList.toggle("oculto"); $("menuUsuarioBtn").setAttribute("aria-expanded", String(!m.classList.contains("oculto"))); });
+  document.addEventListener("click", (e) => { if (!e.target.closest("#menuUsuario")) $("menuUsuario").classList.add("oculto"); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { $("menuUsuario").classList.add("oculto"); ["modalClave", "modalCancelar", "visor"].forEach((id) => $(id).classList.add("oculto")); } });
+  // Mostrar / ocultar la clave
+  document.querySelectorAll(".ver-clave").forEach((b) => b.addEventListener("click", () => { const i = $(b.dataset.ver); i.type = i.type === "password" ? "text" : "password"; b.setAttribute("aria-label", i.type === "password" ? "Mostrar la clave" : "Ocultar la clave"); }));
+  function textoWa(t) { document.querySelectorAll("[data-wa]").forEach((a) => { a.href = "https://wa.me/5493413782085?text=" + encodeURIComponent(t); }); }
+
   let pase = "";
   const codigoLink = (new URLSearchParams(location.search).get("i") || "").trim();
   let modoLink = false;
@@ -406,6 +751,7 @@
 
   function mostrarLogin() {
     $("pantallaLogin").classList.remove("oculto");
+    $("heroIntro").classList.add("oculto");
     $("pantallaPanel").classList.add("oculto");
     $("hUsuario").classList.add("oculto");
   }
@@ -434,15 +780,17 @@
       $("pantallaPanel").classList.remove("oculto");
       $("hUsuario").classList.remove("oculto");
       $("hNombre").textContent = d.nombre;
+      $("hNombreMenu").textContent = d.nombre;
+      $("hAvatar").textContent = (String(d.nombre || "A").replace(/^(administraci[oó]n|adm\.?)\s+/i, "").trim()[0] || "A").toUpperCase();
+      textoWa("Hola SAT, soy " + d.nombre + " (administración de consorcio) y necesito ayuda con el portal de llaves.");
       $("bannerClave").classList.toggle("oculto", !d.debe_cambiar_clave);
       edificios = d.edificios || [];
       $("sinEdificios").classList.toggle("oculto", edificios.length > 0);
       $("edificios").innerHTML = edificios.map((e) => {
         const r = e.resumen;
-        return `<button type="button" class="ed-chip" data-c="${esc(e.codigo)}"><b>${esc(e.nombre)}</b><span>${esc(e.direccion || "")}</span>${r ? `<div class="ed-stats">
-          <div><b>${r.personas}</b>vecinos registrados</div><div><b>${r.unidades}</b>unidades con registro</div><div class="${r.abiertos ? "alerta" : ""}"><b>${r.abiertos}</b>pedidos abiertos</div>
-          <div><b>${r.tags}</b>tags activos</div><div><b>${r.controles}</b>controles activos</div><div><b>${r.hechos_30}</b>resueltos (30 días)</div></div>` : ""}</button>`;
+        return `<button type="button" class="ed-chip" data-c="${esc(e.codigo)}"><span class="marca"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><b>${esc(e.nombre)}</b><span class="dir">${esc(e.direccion || "")}</span>${r ? `<span class="mini-stats"><span class="pill">${r.personas} ${r.personas === 1 ? "vecino" : "vecinos"}</span><span class="pill">${r.tags} tags · ${r.controles} ctrl.</span>${r.abiertos ? `<span class="pill alerta">${r.abiertos} ${r.abiertos === 1 ? "pedido abierto" : "pedidos abiertos"}</span>` : ""}</span>` : ""}</button>`;
       }).join("");
+      $("seccionEdificios").classList.toggle("oculto", edificios.length === 1);
       $("edificios").querySelectorAll(".ed-chip").forEach((b) => b.addEventListener("click", () => abrirEdificio(b.dataset.c)));
       const ultimo = (() => { try { return localStorage.getItem("consorcio_edificio"); } catch (e) { return ""; } })();
       const elegir = edificios.find((e) => e.codigo === ultimo) || (edificios.length === 1 ? edificios[0] : null);
@@ -456,6 +804,8 @@
     try { localStorage.setItem("consorcio_edificio", codigo); } catch (e) {}
     $("edificios").querySelectorAll(".ed-chip").forEach((b) => b.classList.toggle("activo", b.dataset.c === codigo));
     $("edificioCard").classList.remove("oculto");
+    $("edNombre").textContent = actual.nombre;
+    $("edDireccion").textContent = actual.direccion || "";
     const st = $("edificioStatus");
     st.className = "status"; st.textContent = "Cargando " + actual.nombre + "…";
     try {
@@ -478,9 +828,22 @@
     if (r.cochera) p.push("Cochera " + r.cochera);
     return p.join(" · ") || (r.tipo === "cochera" ? "Cochera" : "—");
   }
+  function renderKpis() {
+    const activas = datos.registros.flatMap((r) => (r.llaves || []).filter((l) => l.estado !== "dada_de_baja" && l.estado !== "baja"));
+    const unidades = new Set(datos.registros.map(unidadTxt)).size;
+    const abiertos = datos.gestiones.filter((g) => g.estado === "pendiente" || g.estado === "en_curso").length;
+    const k = [
+      [datos.registros.length, datos.registros.length === 1 ? "vecino registrado" : "vecinos registrados", ""],
+      [unidades, unidades === 1 ? "unidad con registro" : "unidades con registro", ""],
+      [activas.filter((l) => (l.tipo || "tag") === "tag").length + " / " + activas.filter((l) => l.tipo === "control").length, "tags / controles activos", ""],
+      [abiertos, abiertos === 1 ? "pedido abierto" : "pedidos abiertos", abiertos ? "alerta" : ""],
+    ];
+    $("edKpis").innerHTML = k.map(([n, t, c]) => `<div class="kpi ${c}"><b>${esc(n)}</b><span>${esc(t)}</span></div>`).join("");
+  }
   function renderTodo() {
     $("nVecinos").textContent = datos.registros.length;
     $("nGestiones").textContent = datos.gestiones.length;
+    renderKpis();
     renderVecinos(); renderGestiones(); armarElegir(); renderLinks();
   }
 
@@ -489,21 +852,22 @@
     const q = $("buscarVecino").value.trim().toLowerCase();
     const regs = datos.registros.filter((r) => !q || [r.nombre, r.piso, r.unidad, `${r.piso}${r.unidad}`, `${r.piso} ${r.unidad}`, r.cochera, r.telefono, ...(r.llaves || []).map((l) => l.tag + " " + l.usuario)].join(" ").toLowerCase().includes(q));
     const cont = $("listaVecinos");
-    if (!datos.registros.length) { cont.innerHTML = '<p class="vacio">Todavía no hay vecinos registrados en este edificio. Cuando escaneen el QR del hall, aparecen acá.</p>'; return; }
-    if (!regs.length) { cont.innerHTML = '<p class="vacio">No hay resultados.</p>'; return; }
+    if (!datos.registros.length) { cont.innerHTML = `<div class="vacio">${IC.vacioV}<b>Todavía no hay vecinos registrados</b>Cuando escaneen el QR del hall, aparecen acá.</div>`; return; }
+    if (!regs.length) { cont.innerHTML = `<div class="vacio"><b>Sin resultados</b>Probá con otro nombre, unidad o número de llave.</div>`; return; }
     const grupos = new Map();
     regs.forEach((r) => { const k = unidadTxt(r); if (!grupos.has(k)) grupos.set(k, []); grupos.get(k).push(r); });
     const num = (s) => { const m = String(s).match(/\d+/); return m ? Number(m[0]) : (/pb/i.test(s) ? 0 : 999); };
     const rel = { titular: "Titular", inquilino: "Inquilino", otro: "Otro" };
+    const chipLlave = (l) => { const e = EST_LLAVE[l.estado] || EST_LLAVE.pendiente; const ctl = l.tipo === "control"; return `<span class="llave"><span class="tico ${ctl ? "ctl" : ""}">${ctl ? IC.control : IC.tag}</span><b>${esc(l.tag || "s/n")}</b>${l.usuario ? `<span class="dat">usr ${esc(l.usuario)}</span>` : ""}<span class="est ${e[1]}">${e[0]}</span>${l.foto ? `<button type="button" class="ver-foto" data-foto="${esc(l.foto)}" aria-label="Ver foto">${IC.foto}</button>` : ""}</span>`; };
     cont.innerHTML = [...grupos.entries()].sort((a, b) => num(a[0]) - num(b[0]) || a[0].localeCompare(b[0], "es", { numeric: true })).map(([u, rs]) => `
       <div class="unidad">
-        <div class="unidad-tit"><b>${esc(u)}</b><span class="dat">${rs.length} ${rs.length === 1 ? "persona" : "personas"}</span></div>
-        ${rs.map((r) => `<div class="persona">
-          <div><b>${esc(r.nombre)}</b> <span class="dat">· ${esc(rel[r.relacion] || "")}${r.relacion_otro ? " (" + esc(r.relacion_otro) + ")" : ""}</span></div>
-          <div class="dat">${esc(r.telefono)}${r.email ? " · " + esc(r.email) : ""}</div>
-          <div class="llaves">${(r.llaves || []).map((l) => { const e = EST_LLAVE[l.estado] || EST_LLAVE.pendiente; return `<span class="llave">${l.tipo === "control" ? "📟" : "🔑"} <b>${esc(l.tag || "s/n")}</b>${l.usuario ? ` <span class="dat">usuario ${esc(l.usuario)}</span>` : ""} <span class="est ${e[1]}">${e[0]}</span>${l.foto ? ` <button type="button" class="ver-foto" data-foto="${esc(l.foto)}">📷</button>` : ""}</span>`; }).join("")}
-          ${(r.perdidas || []).map((l) => `<span class="llave">⚠ <b>${esc(l.tag || "s/n")}</b> <span class="est est-baja">Reportada perdida</span></span>`).join("")}</div>
-        </div>`).join("")}
+        <div class="unidad-tit"><b>${esc(u)}</b><span>${rs.length} ${rs.length === 1 ? "persona" : "personas"}</span></div>
+        <div class="personas">${rs.map((r) => `<div class="persona">
+          <div class="quien"><b>${esc(r.nombre)}</b>${rel[r.relacion] ? `<span class="rel">${esc(rel[r.relacion])}${r.relacion_otro ? " · " + esc(r.relacion_otro) : ""}</span>` : ""}
+            <div class="dat">${esc(r.telefono || "")}${r.email ? "<br>" + esc(r.email) : ""}</div></div>
+          <div class="llaves">${(r.llaves || []).map(chipLlave).join("") || '<span class="sin-llaves">Sin llaves cargadas</span>'}
+            ${(r.perdidas || []).map((l) => `<span class="llave"><span class="tico warn">${IC.alerta}</span><b>${esc(l.tag || "s/n")}</b><span class="est est-baja">Reportada perdida</span></span>`).join("")}</div>
+        </div>`).join("")}</div>
       </div>`).join("");
   }
   $("buscarVecino").addEventListener("input", renderVecinos);
@@ -523,41 +887,80 @@
   });
 
   // ---------- Gestiones ----------
+  let filtroG = "";
+  document.querySelectorAll("#filtroGestiones button").forEach((b) => b.addEventListener("click", () => {
+    filtroG = b.dataset.f;
+    document.querySelectorAll("#filtroGestiones button").forEach((x) => x.classList.toggle("activo", x === b));
+    renderGestiones();
+  }));
+  const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  function fechaCorta(x, conAnio) { const d = new Date(x); if (isNaN(d)) return ""; return `${d.getDate()} ${MESES[d.getMonth()]}${conAnio && d.getFullYear() !== new Date().getFullYear() ? " " + d.getFullYear() : ""}`; }
+  function progresoGestion(g) {
+    if (g.estado === "rechazada" || g.estado === "cancelada") return "";
+    const orden = ["pendiente", "en_curso", "hecha"];
+    const i = orden.indexOf(g.estado);
+    const nombres = ["Recibido", "En curso", g.entrega ? "Entregado" : "Hecho"];
+    return `<div class="progreso">${nombres.map((n, j) => `<div class="${j < i || (j === i && g.estado === "hecha") ? "ok" : j === i ? "actual" : ""}">${n}</div>`).join("")}</div>`;
+  }
   function renderGestiones() {
     const cont = $("listaGestiones");
-    if (!datos.gestiones.length) { cont.innerHTML = '<p class="vacio">Todavía no cargaste gestiones para este edificio.</p>'; return; }
-    cont.innerHTML = datos.gestiones.map((g) => {
+    if (!datos.gestiones.length) { cont.innerHTML = `<div class="vacio">${IC.vacioG}<b>Todavía no hay pedidos</b>Los pedidos que cargues vos o los vecinos con un link aparecen acá.</div>`; return; }
+    const abierto = (g) => g.estado === "pendiente" || g.estado === "en_curso";
+    const lista = datos.gestiones.filter((g) => !filtroG || (filtroG === "abiertos" ? abierto(g) : !abierto(g)));
+    if (!lista.length) { cont.innerHTML = `<div class="vacio"><b>${filtroG === "abiertos" ? "No hay pedidos abiertos" : "No hay pedidos cerrados"}</b>${filtroG === "abiertos" ? "Todo lo que pediste ya está resuelto." : ""}</div>`; return; }
+    cont.innerHTML = lista.map((g) => {
       const e = ESTADOS[g.estado] || ESTADOS.pendiente;
-      const det = [];
-      det.push(`Unidad: <b>${esc(unidadTxt(g))}</b>`);
-      det.push(`${g.tipo === "titularidad" ? "Titular actual" : "Titular"}: <b>${esc(g.titular)}</b>${g.telefono ? " · " + esc(g.telefono) : ""}`);
-      if (g.tipo === "titularidad") det.push(`Nuevo titular: <b>${esc(g.nuevo_titular)}</b> · ${esc(g.nuevo_telefono)} · ${g.llaves_titularidad === "transferir" ? "se queda con las llaves" : "nuevas llaves, bajar las anteriores"}`);
-      if (g.tipo === "nuevo") det.push(`${g.cantidad} × ${g.dispositivo === "control" ? "control de cochera" : "tag"}`);
-      if (g.tag || g.usuario) det.push(`${g.dispositivo === "control" ? "Control" : "Llave"} <span class="mono">${esc(g.tag || "")}</span>${g.usuario ? " · usuario " + esc(g.usuario) : ""}`);
-      if (g.motivo) det.push(`Motivo: ${esc((MOTIVOS[g.tipo] || {})[g.motivo] || g.motivo)}`);
-      if (g.observaciones) det.push(`“${esc(g.observaciones)}”`);
-      if (g.origen === "vecino") det.push(`<span style="color:#3A5BA8;">📨 La cargó el vecino con un link${g.cargada_por ? " (" + esc(g.cargada_por) + ")" : ""}</span>`);
-      return `<div class="gestion ${esc(g.estado)}">
-        <div class="gestion-tit"><b>${g.numero ? `<span style="color:var(--muted);font-weight:600;">N° ${esc(g.numero)} · </span>` : ""}${esc(TIPOS[g.tipo] || g.tipo)}</b><span><span class="est ${e[1]}">${e[0]}</span> <span class="dat" style="color:var(--muted);font-size:13px;">${new Date(g.fecha).toLocaleDateString("es-AR")}</span></span></div>
-        <div class="dat">${det.join("<br>")}</div>
-        ${(g.fotos || []).length ? `<div style="margin-top:6px;display:flex;gap:6px;">${g.fotos.map((f, i) => `<button type="button" class="ver-foto" data-foto="${esc(f)}">📷 Foto ${i + 1}</button>`).join("")}</div>` : ""}
-        ${g.nota_sat ? `<div class="nota-sat"><b>SAT:</b> ${esc(g.nota_sat)}</div>` : ""}
-        ${g.estado === "cancelada" && g.motivo_cancelacion ? `<div class="nota-sat">Cancelado: ${esc(g.motivo_cancelacion)}</div>` : ""}
-        ${g.estado === "pendiente" ? `<button type="button" class="ver-foto cancelar-g" data-id="${esc(g.id)}" style="margin-top:8px;color:var(--err);border-color:#E9B4AF;">Cancelar pedido</button>` : ""}
-      </div>`;
+      const d = [];
+      d.push(["Unidad", esc(unidadTxt(g))]);
+      d.push([g.tipo === "titularidad" ? "Titular actual" : "Titular", `${esc(g.titular)}${g.telefono ? `<br><span style="color:var(--muted);">${esc(g.telefono)}</span>` : ""}`]);
+      if (g.tipo === "titularidad") d.push(["Nuevo titular", `${esc(g.nuevo_titular)}${g.nuevo_telefono ? `<br><span style="color:var(--muted);">${esc(g.nuevo_telefono)}</span>` : ""}`], ["Llaves", g.llaves_titularidad === "transferir" ? "Se las queda el nuevo titular" : "Nuevas; se dan de baja las anteriores"]);
+      if (g.tipo === "nuevo") d.push(["Cantidad", `${esc(g.cantidad)} × ${g.dispositivo === "control" ? "control de cochera" : "tag"}`]);
+      if (g.tag || g.usuario) d.push([g.dispositivo === "control" ? "Control" : "Llave", `<span class="mono">${esc(g.tag || "")}</span>${g.usuario ? ` · usuario ${esc(g.usuario)}` : ""}`]);
+      if (g.motivo) d.push(["Motivo", esc((MOTIVOS[g.tipo] || {})[g.motivo] || g.motivo)]);
+      if (g.observaciones) d.push(["Observaciones", esc(g.observaciones)]);
+      const fecha = fechaCorta(g.fecha, true);
+      return `<article class="gestion">
+        <div class="gestion-cab"><span class="hx">${IC[g.tipo] || IC.nuevo}</span>
+          <div class="tit">${g.numero ? `<span class="num">N° ${esc(g.numero)}</span>` : ""}<b>${esc(TIPOS[g.tipo] || g.tipo)}</b><span class="fecha">Cargado el ${fecha}</span></div>
+          <span class="est ${e[1]}">${e[0]}</span></div>
+        ${progresoGestion(g)}
+        <dl class="datos">${d.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("")}</dl>
+        ${g.nota_sat ? `<div class="nota-sat">${IC.sat}<span><b>SAT:</b> ${esc(g.nota_sat)}</span></div>` : ""}
+        ${g.estado === "cancelada" && g.motivo_cancelacion ? `<div class="nota-sat">${IC.x}<span>Cancelado: ${esc(g.motivo_cancelacion)}</span></div>` : ""}
+        ${(g.fotos || []).length || g.origen === "vecino" || g.estado === "pendiente" ? `<div class="gestion-pie">
+          ${g.origen === "vecino" ? `<span class="origen">${IC.link}Lo cargó el vecino con un link${g.cargada_por ? " (" + esc(g.cargada_por) + ")" : ""}</span>` : ""}
+          ${(g.fotos || []).map((f, i) => `<button type="button" class="ver-foto" data-foto="${esc(f)}">${IC.foto}Foto ${i + 1}</button>`).join("")}
+          ${g.estado === "pendiente" ? `<button type="button" class="btn btn-sec btn-chico btn-peligro cancelar-g" data-id="${esc(g.id)}" style="margin-left:auto;">Cancelar pedido</button>` : ""}
+        </div>` : ""}
+      </article>`;
     }).join("");
-    cont.querySelectorAll(".cancelar-g").forEach((b) => b.addEventListener("click", async () => {
-      const motivo = prompt("¿Cancelar este pedido? Contanos el motivo (opcional):");
-      if (motivo === null) return;
-      b.disabled = true;
-      try {
-        await api("POST", "", { accion: "cancelar_gestion", edificio: actual.codigo, id: b.dataset.id, motivo });
-        const g = datos.gestiones.find((x) => x.id === b.dataset.id);
-        if (g) { g.estado = "cancelada"; g.motivo_cancelacion = motivo; }
-        renderTodo();
-      } catch (e) { alert(e.message); b.disabled = false; }
-    }));
+    cont.querySelectorAll(".cancelar-g").forEach((b) => b.addEventListener("click", () => abrirCancelar(b.dataset.id)));
   }
+  let cancelando = null;
+  function abrirCancelar(id) {
+    cancelando = datos.gestiones.find((x) => x.id === id);
+    if (!cancelando) return;
+    $("cancelarNum").textContent = cancelando.numero ? "N° " + cancelando.numero : "";
+    $("cancelarMotivo").value = ""; $("cancelarStatus").textContent = "";
+    $("modalCancelar").classList.remove("oculto");
+    $("cancelarMotivo").focus();
+  }
+  $("cancelarVolver").addEventListener("click", () => $("modalCancelar").classList.add("oculto"));
+  $("modalCancelar").addEventListener("click", (e) => { if (e.target.id === "modalCancelar") $("modalCancelar").classList.add("oculto"); });
+  $("cancelarForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!cancelando) return;
+    const motivo = $("cancelarMotivo").value.trim();
+    $("cancelarOk").disabled = true;
+    try {
+      await api("POST", "", { accion: "cancelar_gestion", edificio: actual.codigo, id: cancelando.id, motivo });
+      cancelando.estado = "cancelada"; cancelando.motivo_cancelacion = motivo;
+      $("modalCancelar").classList.add("oculto");
+      renderTodo();
+      aviso("Pedido cancelado.");
+    } catch (err) { $("cancelarStatus").className = "status err"; $("cancelarStatus").textContent = err.message; }
+    $("cancelarOk").disabled = false;
+  });
 
   // ---------- Nueva gestión ----------
   const form = $("gestionForm");
@@ -623,6 +1026,7 @@
         const d = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(d.error || "No se pudo enviar");
         $("pantallaPanel").classList.add("oculto");
+        $("heroIntro").classList.add("oculto");
         $("linkFinTxt").innerHTML = `Tu pedido <b>N° ${esc(d.numero)}</b> le llegó a SAT, que lo va a gestionar. Tu administración (${esc(d.administrador)}) también lo puede seguir.${d.copia ? " Te mandamos una copia por mail." : ""}`;
         $("pantallaLinkFin").classList.remove("oculto");
         window.scrollTo({ top: 0, behavior: "smooth" });
@@ -634,7 +1038,7 @@
       datos.gestiones.unshift(d.gestion);
       form.reset(); delete form.dataset.registro; fotosGestion = []; renderFotosGestion(); ajustarForm();
       $("camposGestion").classList.add("oculto");
-      st.className = "status ok"; st.textContent = `✓ Pedido N° ${d.numero} enviado a SAT. Podés seguirlo en la pestaña Gestiones.`;
+      st.className = "status ok"; st.textContent = `✓ Pedido N° ${d.numero} enviado a SAT. Lo podés seguir en «Pedidos».`;
       renderTodo();
     } catch (err) { st.className = "status err"; st.textContent = err.message; }
     $("gEnviarBtn").disabled = false;
@@ -689,7 +1093,7 @@
       const r = await fetch(API + "&foto=" + encodeURIComponent(id) + "&e=" + encodeURIComponent(actual.codigo), { headers: { "X-Consorcio": pase }, cache: "no-store" });
       if (!r.ok) throw new Error();
       $("visorImg").src = URL.createObjectURL(await r.blob());
-    } catch (e) { $("visor").classList.add("oculto"); alert("No se pudo abrir la foto"); }
+    } catch (e) { $("visor").classList.add("oculto"); aviso("No se pudo abrir la foto", true); }
   }
   $("visorCerrar").addEventListener("click", () => { $("visor").classList.add("oculto"); });
   $("visor").addEventListener("click", (e) => { if (e.target.id === "visor") $("visor").classList.add("oculto"); });
@@ -701,32 +1105,33 @@
     return `Hola${inv.destinatario ? " " + inv.destinatario : ""}! Para ${inv.tipo ? "el pedido de " + TIPOS[inv.tipo].toLowerCase() : "tu pedido de llave"} de ${actual.nombre}, completá tus datos en este link (sirve una sola vez):\n${urlLink(inv.codigo)}`;
   }
   function botonesCompartir(inv) {
-    return `<button type="button" class="btn btn-sec copiar-link" data-c="${esc(inv.codigo)}" style="padding:8px 12px;font-size:14px;">Copiar link</button>
-      <a class="btn btn-sec" style="padding:8px 12px;font-size:14px;text-decoration:none;" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(mensajeLink(inv))}">Mandar por WhatsApp</a>`;
+    return `<button type="button" class="btn btn-sec btn-chico copiar-link" data-c="${esc(inv.codigo)}">${IC.copiar}Copiar</button>
+      <a class="btn btn-sec btn-chico" style="color:#178A45;" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(mensajeLink(inv))}">${IC.wa}WhatsApp</a>`;
   }
   function renderLinks() {
     const lista = datos.invitaciones || [];
     const cont = $("listaLinks");
-    if (!lista.length) { cont.innerHTML = '<p class="vacio">Todavía no generaste links para este edificio.</p>'; return; }
+    if (!lista.length) { cont.innerHTML = `<div class="vacio">${IC.link.replace("<svg", '<svg style="width:34px;height:34px;"')}<b>Todavía no generaste links</b>Usá el formulario de arriba para pedirle los datos a un vecino.</div>`; return; }
     cont.innerHTML = lista.map((i) => {
       const vencido = Date.parse(i.vence) < Date.now();
       const est = i.usada ? ["Usado", "est-ok"] : i.cancelada ? ["Cancelado", "est-gris"] : vencido ? ["Vencido", "est-gris"] : ["Sin usar", "est-pend"];
       const abierto = !i.usada && !i.cancelada && !vencido;
-      return `<div class="gestion" style="border-left-color:${abierto ? "var(--amber)" : "#C9C6BC"};">
-        <div class="gestion-tit"><b>${esc(i.destinatario || "Vecino")}${i.piso || i.unidad ? " · " + esc(`${i.piso ? i.piso + "°" : ""} ${i.unidad}`.trim()) : ""}</b><span class="est ${est[1]}">${est[0]}</span></div>
-        <div class="dat">${esc(i.tipo ? TIPOS[i.tipo] : "Gestión a elección del vecino")} · creado ${new Date(i.creada).toLocaleDateString("es-AR")}${abierto ? " · vence " + new Date(i.vence).toLocaleDateString("es-AR") : ""}</div>
-        ${abierto ? `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">${botonesCompartir(i)}<button type="button" class="btn btn-sec cancelar-link" data-id="${esc(i.id)}" style="padding:8px 12px;font-size:14px;color:var(--err);border-color:var(--err);">Cancelar</button></div>` : ""}
+      const fecha = (x) => fechaCorta(x);
+      return `<div class="link-item ${abierto ? "" : "cerrado"}">
+        <div class="quien"><div class="quien-tit"><b>${esc(i.destinatario || "Vecino")}${i.piso || i.unidad ? " · " + esc(`${i.piso ? i.piso + "°" : ""} ${i.unidad}`.trim()) : ""}</b><span class="est ${est[1]}">${est[0]}</span></div>
+          <div class="dat">${esc(i.tipo ? TIPOS[i.tipo] : "Gestión a elección del vecino")} · creado ${fecha(i.creada)}${abierto ? " · vence " + fecha(i.vence) : ""}</div></div>
+        ${abierto ? `<div class="acc">${botonesCompartir(i)}<button type="button" class="btn btn-sec btn-chico btn-peligro cancelar-link" data-id="${esc(i.id)}" aria-label="Cancelar link" title="Cancelar link">${IC.x}<span class="txt-cancelar">Cancelar</span></button></div>` : ""}
       </div>`;
     }).join("");
   }
   document.addEventListener("click", async (e) => {
     const c = e.target.closest(".copiar-link");
-    if (c) { try { await navigator.clipboard.writeText(urlLink(c.dataset.c)); c.textContent = "✓ Copiado"; } catch (err) { prompt("Copiá el link:", urlLink(c.dataset.c)); } return; }
+    if (c) { try { await navigator.clipboard.writeText(urlLink(c.dataset.c)); aviso("Link copiado. Pegalo en un mensaje al vecino."); } catch (err) { prompt("Copiá el link:", urlLink(c.dataset.c)); } return; }
     const x = e.target.closest(".cancelar-link");
     if (x) {
       if (!confirm("¿Cancelar este link? El vecino ya no lo va a poder usar.")) return;
       try { await api("POST", "", { accion: "cancelar_invitacion", edificio: actual.codigo, id: x.dataset.id }); const i = datos.invitaciones.find((v) => v.id === x.dataset.id); if (i) i.cancelada = new Date().toISOString(); renderLinks(); }
-      catch (err) { alert(err.message); }
+      catch (err) { aviso(err.message, true); }
     }
   });
   $("linkForm").addEventListener("submit", async (e) => {
@@ -752,7 +1157,7 @@
       datos.invitaciones = [inv, ...(datos.invitaciones || [])];
       $("linkForm").reset();
       st.textContent = "";
-      $("linkNuevo").innerHTML = `<div class="banner" style="background:#E6F4EA;border-color:#B7DFC4;display:block;"><b>Link listo${inv.destinatario ? " para " + esc(inv.destinatario) : ""}:</b><div class="mono" style="word-break:break-all;margin:6px 0 10px;font-size:13.5px;">${esc(urlLink(inv.codigo))}</div><div style="display:flex;gap:8px;flex-wrap:wrap;">${botonesCompartir(inv)}</div></div>`;
+      $("linkNuevo").innerHTML = `<div class="listo-box"><b>✓ Link listo${inv.destinatario ? " para " + esc(inv.destinatario) : ""}</b> — mandáselo al vecino.<div class="url">${esc(urlLink(inv.codigo))}</div><div style="display:flex;gap:8px;flex-wrap:wrap;">${botonesCompartir(inv)}</div></div>`;
       $("linkNuevo").classList.remove("oculto");
       renderLinks();
     } catch (err) { st.className = "status err"; st.textContent = err.message; }
@@ -762,32 +1167,38 @@
   // ---------- Modo vecino: abrió el link que le mandó su administración ----------
   async function iniciarModoLink() {
     modoLink = true;
-    $("heroTitulo").innerHTML = "Pedido de <em>llave</em>";
+    document.body.classList.add("modo-link");
+    $("barraSeccion").textContent = "Pedido de llave";
     $("pantallaLogin").classList.add("oculto");
     try {
       const r = await fetch("/api/datos?publico=consorcio_link&i=" + encodeURIComponent(codigoLink), { cache: "no-store" });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || "Este link no es válido");
-      $("heroTexto").textContent = `${d.edificio}${d.direccion ? " · " + d.direccion : ""}. Tu administración (${d.administrador}) te pide que completes estos datos. Lleva un par de minutos.`;
+      $("heroIntro").classList.remove("oculto");
+      $("heroEdificio").textContent = d.edificio;
+      $("heroTexto").textContent = `${d.direccion ? d.direccion + ". " : ""}Tu administración (${d.administrador}) te pide que completes estos datos. Lleva un par de minutos y le llega directo a SAT.`;
+      document.title = "Pedido de llave — " + d.edificio;
       actual = { codigo: codigoLink.split(".")[0], nombre: d.edificio };
       $("pantallaPanel").classList.remove("oculto");
       $("bannerClave").classList.add("oculto");
-      $("pantallaPanel").querySelector("section.card").classList.add("oculto"); // "Tus edificios"
+      $("seccionEdificios").classList.add("oculto");
       $("edificioCard").classList.remove("oculto");
-      document.querySelector("#edificioCard .tabs").classList.add("oculto");
+      $("edCab").classList.add("oculto");
+      $("edKpis").classList.add("oculto");
+      $("tabs").classList.add("oculto");
       $("elegirBox").remove(); // el vecino no ve a nadie más del edificio
       if (d.tipo) {
         form.querySelectorAll('input[name="tipo"]').forEach((r) => { r.closest(".tipo").classList.toggle("oculto", r.value !== d.tipo); r.checked = r.value === d.tipo; });
-        document.querySelector(".lbl").textContent = "Tu pedido";
+        $("lblTipo").textContent = "Tu pedido";
       }
       if (d.piso) $("gPiso").value = d.piso;
       if (d.unidad) $("gUnidad").value = d.unidad;
       if (d.destinatario) $("gTitular").value = d.destinatario;
+      $("grupoTitularTit").textContent = "Tus datos";
       $("gEnviarBtn").textContent = "Enviar pedido";
-      $("barraEdificio").classList.add("oculto");
       $("gEmail").addEventListener("input", () => $("copiaWrap").classList.toggle("oculto", !$("gEmail").value.trim()));
-      $("ayudaWa").style.display = "";
-      $("ayudaWa").href = "https://wa.me/5493413782085?text=" + encodeURIComponent("Hola SAT, necesito ayuda con un pedido de llave de " + d.edificio + ".");
+      $("ayudaLink").classList.remove("oculto");
+      textoWa("Hola SAT, necesito ayuda con un pedido de llave de " + d.edificio + ".");
       ajustarForm();
     } catch (e) {
       $("linkErrorTxt").textContent = e.message;
@@ -848,12 +1259,12 @@
   $("lLista").addEventListener("input", () => { const n = leerLista().length; $("lListaCuenta").textContent = n ? `${n} ${n === 1 ? "link" : "links"} para generar${n >= 60 ? " (máximo 60 por vez)" : ""}` : ""; });
   function renderLote(invs) {
     const filasTxt = invs.map((i) => `${i.destinatario || "Vecino"}${i.piso || i.unidad ? " (" + `${i.piso ? i.piso + "°" : ""} ${i.unidad}`.trim() + ")" : ""}: ${urlLink(i.codigo)}`);
-    $("linkNuevo").innerHTML = `<div class="banner" style="background:#E6F4EA;border-color:#B7DFC4;display:block;">
-      <b>${invs.length} links listos.</b> Mandale a cada uno el suyo (cada link sirve una sola vez).
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px;"><button type="button" class="btn btn-sec" id="loteCopiar" style="padding:8px 12px;font-size:14px;">Copiar toda la lista</button><button type="button" class="btn btn-sec" id="loteCsv" style="padding:8px 12px;font-size:14px;">⬇ Descargar lista</button></div>
-      <table class="lote-tabla">${invs.map((i) => `<tr><td><b>${esc(i.destinatario || "Vecino")}</b>${i.piso || i.unidad ? `<br><span class="dat" style="color:var(--muted);">${esc(`${i.piso ? i.piso + "°" : ""} ${i.unidad}`.trim())}</span>` : ""}</td><td style="text-align:right;white-space:nowrap;">${botonesCompartir(i)}</td></tr>`).join("")}</table></div>`;
+    $("linkNuevo").innerHTML = `<div class="listo-box">
+      <b>✓ ${invs.length} links listos.</b> Mandale a cada uno el suyo (cada link sirve una sola vez).
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px;"><button type="button" class="btn btn-sec btn-chico" id="loteCopiar">${IC.copiar}Copiar toda la lista</button><button type="button" class="btn btn-sec btn-chico" id="loteCsv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Descargar lista</button></div>
+      <table class="lote-tabla">${invs.map((i) => `<tr><td><b>${esc(i.destinatario || "Vecino")}</b>${i.piso || i.unidad ? `<br><span style="color:var(--muted);font-size:13px;">${esc(`${i.piso ? i.piso + "°" : ""} ${i.unidad}`.trim())}</span>` : ""}</td><td style="text-align:right;"><div style="display:inline-flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">${botonesCompartir(i)}</div></td></tr>`).join("")}</table></div>`;
     $("linkNuevo").classList.remove("oculto");
-    $("loteCopiar").addEventListener("click", async (e) => { try { await navigator.clipboard.writeText(filasTxt.join("\n")); e.target.textContent = "✓ Copiada"; } catch (err) { prompt("Copiá la lista:", filasTxt.join(" | ")); } });
+    $("loteCopiar").addEventListener("click", async (e) => { try { await navigator.clipboard.writeText(filasTxt.join("\n")); aviso("Lista copiada."); } catch (err) { prompt("Copiá la lista:", filasTxt.join(" | ")); } });
     $("loteCsv").addEventListener("click", () => {
       const celda = (v) => '"' + String(v ?? "").replace(/"/g, '""') + '"';
       const csv = [["Vecino", "Piso", "Depto", "Link", "Vence"], ...invs.map((i) => [i.destinatario, i.piso, i.unidad, urlLink(i.codigo), new Date(i.vence).toLocaleDateString("es-AR")])].map((f) => f.map(celda).join(";")).join("\r\n");
@@ -880,7 +1291,7 @@
     const rel = { titular: "Titular", inquilino: "Inquilino", otro: "Otro" };
     const hoy = new Date().toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" });
     const w = window.open("", "_blank");
-    if (!w) { alert("El navegador bloqueó la ventana del reporte: permití las ventanas emergentes."); return; }
+    if (!w) { aviso("El navegador bloqueó la ventana del reporte: permití las ventanas emergentes.", true); return; }
     w.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Reporte de llaves — ${esc(actual.nombre)}</title>
 <link rel="stylesheet" href="${location.origin}/vendor/fonts.css">
 <style>
@@ -953,6 +1364,7 @@
   });
   $("salirBtn").addEventListener("click", salir);
 
+  textoWa("Hola SAT, necesito ayuda con el portal de administradores de llaves.");
   if (codigoReset) { $("pantallaReset").classList.remove("oculto"); }
   else if (codigoLink) iniciarModoLink();
   else if (pase) iniciarPanel(); else mostrarLogin();

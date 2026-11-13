@@ -5,263 +5,321 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Registro de llaves de acceso — SAT</title>
 <meta name="robots" content="noindex">
-<meta name="theme-color" content="#0E0F10">
+<meta name="theme-color" content="#0D0C0D">
 <link rel="icon" href="/icons/icon-192.png">
 <link rel="stylesheet" href="/vendor/fonts.css">
 <style>
   :root {
-    --ink: #0E0F10;
-    --ink-2: #1C1E21;
-    --paper: #F2F1EC;
-    --card: #FFFFFF;
-    --line: #DEDCD4;
-    --muted: #6E6C66;
-    --amber: #F6B828;
-    --amber-dark: #B9850A;
-    --ok: #1F7A44;
-    --err: #B3261E;
-    --radius: 14px;
+    --ink: #0D0C0D; --ink-2: #1B1B1D; --ink-3: #2A2A2D;
+    --paper: #F3F2ED; --card: #FFFFFF; --field: #FAFAF7;
+    --line: #E1DFD7; --line-2: #ECEAE3;
+    --text: #141416; --text-2: #4A4843; --muted: #75726B;
+    --amber: #F6B828; --amber-2: #FFC94A; --amber-dark: #A87708; --amber-soft: #FFF6DE;
+    --ok: #1F7A44; --ok-soft: #E7F4EC; --err: #B3261E; --err-soft: #FFF3F2; --blue: #3557A6; --blue-soft: #EEF3FD;
+    --r-sm: 10px; --r: 14px; --r-lg: 20px;
+    --sh-1: 0 1px 2px rgba(13,12,13,.05), 0 1px 1px rgba(13,12,13,.03);
+    --sh-2: 0 1px 2px rgba(13,12,13,.05), 0 10px 30px -12px rgba(13,12,13,.16);
+    --ring: 0 0 0 3px rgba(246,184,40,.45);
+    --cond: 'Barlow Semi Condensed', 'Barlow', sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, monospace;
   }
   * { box-sizing: border-box; }
-  html { -webkit-text-size-adjust: 100%; }
-  body {
-    margin: 0;
-    font-family: 'Barlow', -apple-system, 'Segoe UI', Roboto, sans-serif;
-    font-size: 16px;
-    background: var(--paper);
-    color: var(--ink);
-    min-height: 100vh;
-  }
+  html { -webkit-text-size-adjust: 100%; scroll-padding-top: 76px; }
+  body { margin: 0; font-family: 'Barlow', -apple-system, 'Segoe UI', Roboto, sans-serif; font-size: 16px; line-height: 1.45; background: var(--paper); color: var(--text); min-height: 100vh; -webkit-font-smoothing: antialiased; }
+  svg { flex: none; }
+  .oculto { display: none !important; }
+  .mono { font-family: var(--mono) !important; letter-spacing: .4px; }
+  .mono::placeholder { font-family: 'Barlow', sans-serif; letter-spacing: 0; }
+  button { font: inherit; color: inherit; }
+  a { color: inherit; }
+  :focus-visible { outline: none; box-shadow: var(--ring); }
 
-  /* ---------- Encabezado ---------- */
-  .hero {
-    background: var(--ink);
-    color: #fff;
-    padding: 22px 20px 64px;
-    position: relative;
-    overflow: hidden;
-  }
-  .hero::after {
-    /* Panal de hexágonos muy tenue, como el del logo */
-    content: "";
-    position: absolute; inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='48' viewBox='0 0 56 48'%3E%3Cpath d='M14 1h28l13 23-13 23H14L1 24z' fill='none' stroke='%23F6B828' stroke-opacity='.07' stroke-width='1.5'/%3E%3C/svg%3E");
-    background-size: 56px 48px;
-    mask-image: linear-gradient(120deg, transparent 30%, #000 100%);
-    -webkit-mask-image: linear-gradient(120deg, transparent 30%, #000 100%);
-    pointer-events: none;
-  }
-  .hero-inner { max-width: 520px; margin: 0 auto; position: relative; z-index: 1; }
-  .hero-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 26px; }
-  .hero-top img { height: 34px; width: auto; display: block; }
-  .hero-top .tag-seg {
-    font-family: 'Barlow Semi Condensed', sans-serif; font-weight: 600;
-    font-size: 12px; letter-spacing: 1.6px; text-transform: uppercase; color: #A9A69C;
-  }
-  .edificio-chip {
-    display: inline-flex; align-items: center; gap: 8px;
-    background: rgba(246,184,40,.12); color: var(--amber);
-    border: 1px solid rgba(246,184,40,.35);
-    padding: 5px 12px 5px 10px; border-radius: 999px;
-    font-family: 'Barlow Semi Condensed', sans-serif; font-weight: 700;
-    font-size: 13px; letter-spacing: 1.2px; text-transform: uppercase;
-  }
+  /* ---------- Barra superior ---------- */
+  .barra { background: var(--ink); color: #fff; }
+  .barra-in { max-width: 1120px; margin: 0 auto; padding: 14px 20px; display: flex; align-items: center; gap: 14px; }
+  .barra img { height: 30px; width: auto; display: block; }
+  .barra .sep { width: 1px; height: 22px; background: rgba(255,255,255,.16); }
+  .barra .seccion { font-family: var(--cond); font-weight: 600; font-size: 13px; letter-spacing: 1.4px; text-transform: uppercase; color: #A9A69C; }
+  .barra .seguro { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #A9A69C; }
+  .barra .seguro svg { width: 15px; height: 15px; color: var(--amber); }
+
+  /* ---------- Estructura ---------- */
+  .layout { max-width: 1120px; margin: 0 auto; }
+  .intro { background: var(--ink); color: #fff; padding: 6px 20px 26px; position: relative; overflow: hidden; }
+  .intro::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='48' viewBox='0 0 56 48'%3E%3Cpath d='M14 1h28l13 23-13 23H14L1 24z' fill='none' stroke='%23F6B828' stroke-opacity='.08' stroke-width='1.5'/%3E%3C/svg%3E");
+    background-size: 56px 48px; -webkit-mask-image: linear-gradient(115deg, transparent 35%, #000 100%); mask-image: linear-gradient(115deg, transparent 35%, #000 100%); }
+  .intro > * { position: relative; z-index: 1; }
+  .edificio-chip { display: inline-flex; align-items: center; gap: 8px; background: rgba(246,184,40,.12); color: var(--amber); border: 1px solid rgba(246,184,40,.32); padding: 5px 12px 5px 10px; border-radius: 999px; font-family: var(--cond); font-weight: 700; font-size: 13px; letter-spacing: 1.1px; text-transform: uppercase; }
   .edificio-chip svg { width: 15px; height: 15px; }
-  .hero h1 {
-    font-family: 'Barlow Semi Condensed', sans-serif; font-weight: 800; font-style: italic;
-    font-size: clamp(34px, 9vw, 44px); line-height: .98; letter-spacing: -.3px;
-    margin: 14px 0 12px; text-transform: uppercase;
-  }
-  .hero h1 em { font-style: italic; color: var(--amber); }
-  .hero p { margin: 0; color: #C9C6BC; font-size: 15.5px; line-height: 1.5; max-width: 440px; }
-  .hero .direccion { color: #8F8C83; font-size: 14px; margin-top: 6px; }
+  .direccion { display: block; color: #8F8C83; font-size: 13.5px; margin-top: 8px; }
+  .direccion:empty { display: none; }
+  .intro h1 { font-family: var(--cond); font-weight: 800; font-style: italic; text-transform: uppercase; font-size: clamp(30px, 8.4vw, 40px); line-height: .98; letter-spacing: -.2px; margin: 16px 0 10px; }
+  .intro h1 em { color: var(--amber); }
+  .intro .bajada { margin: 0; color: #C9C6BC; font-size: 15.5px; line-height: 1.5; max-width: 460px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 16px; font-size: 13.5px; color: #C9C6BC; }
+  .meta span { display: inline-flex; align-items: center; gap: 6px; }
+  .meta svg { width: 16px; height: 16px; color: var(--amber); }
 
-  /* ---------- Contenido ---------- */
-  main { max-width: 520px; margin: -40px auto 0; padding: 0 14px 40px; position: relative; z-index: 2; }
-  .card {
-    background: var(--card); border-radius: var(--radius);
-    box-shadow: 0 1px 2px rgba(14,15,16,.06), 0 8px 24px rgba(14,15,16,.07);
-    padding: 22px 18px 20px; margin-bottom: 14px;
-  }
-  .paso { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
-  .paso-num {
-    width: 32px; height: 28px; flex: none;
-    display: grid; place-items: center;
-    background: var(--ink); color: var(--amber);
-    clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
-    font-family: 'Barlow Semi Condensed', sans-serif; font-weight: 700; font-size: 15px;
-  }
-  .paso h2 {
-    margin: 0; font-family: 'Barlow Semi Condensed', sans-serif; font-weight: 700;
-    font-size: 21px; letter-spacing: .2px;
-  }
-  .paso-sub { margin: 0 0 6px 44px; color: var(--muted); font-size: 14px; line-height: 1.4; }
+  /* Pasos: barra fija en el celular, lista en la columna izquierda en la PC */
+  .pasos-nav { position: sticky; top: 0; z-index: 30; background: rgba(243,242,237,.92); -webkit-backdrop-filter: saturate(1.4) blur(10px); backdrop-filter: saturate(1.4) blur(10px); border-bottom: 1px solid var(--line); }
+  .pasos-nav ol { list-style: none; margin: 0 auto; padding: 10px 14px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 600px; }
+  .pasos-nav a { display: flex; flex-direction: column; gap: 6px; text-decoration: none; color: var(--muted); font-size: 12.5px; font-weight: 600; letter-spacing: .2px; }
+  .pasos-nav a::before { content: ""; height: 4px; border-radius: 4px; background: var(--line); transition: background .25s; }
+  .pasos-nav li.actual a { color: var(--text); }
+  .pasos-nav li.actual a::before { background: linear-gradient(90deg, var(--ink) 0 100%); }
+  .pasos-nav li.listo a { color: var(--ok); }
+  .pasos-nav li.listo a::before { background: var(--amber); }
+  .pasos-nav .ic-ok { display: none; }
+  .pasos-nav .num { display: none; }
+  body.fin .pasos-nav { display: none; }
 
-  .campo { margin-top: 16px; }
-  .campo > label, .grupo-label {
-    display: block; font-weight: 600; font-size: 14.5px; margin-bottom: 7px;
-  }
+  main { max-width: 600px; margin: 0 auto; padding: 16px 14px 24px; }
+
+  /* ---------- Tarjetas / pasos ---------- */
+  .card { background: var(--card); border-radius: var(--r-lg); box-shadow: var(--sh-2); border: 1px solid rgba(13,12,13,.04); padding: 22px 18px; margin-bottom: 14px; }
+  .paso { display: flex; align-items: center; gap: 12px; }
+  .paso-num { width: 32px; height: 28px; flex: none; display: grid; place-items: center; background: var(--ink); color: var(--amber); clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%); font-family: var(--cond); font-weight: 700; font-size: 15px; transition: background .2s; }
+  .card.listo .paso-num { background: var(--amber); color: var(--ink); }
+  .paso h2 { margin: 0; font-family: var(--cond); font-weight: 700; font-size: 22px; letter-spacing: .1px; line-height: 1.1; }
+  .paso-sub { margin: 6px 0 0 44px; color: var(--muted); font-size: 14.5px; line-height: 1.45; }
+
+  .campo { margin-top: 18px; }
+  .campo > label:not(.check), .grupo-label { display: block; font-weight: 600; font-size: 14.5px; margin-bottom: 8px; color: var(--text); }
   .opcional { font-weight: 500; color: var(--muted); font-size: 13px; }
   input[type=text], input[type=tel], input[type=email], textarea {
-    width: 100%; padding: 13px 14px; font: inherit; font-size: 16px; color: var(--ink);
-    background: #FAFAF7; border: 1.5px solid var(--line); border-radius: 11px;
-    transition: border-color .15s, box-shadow .15s, background .15s;
-    -webkit-appearance: none; appearance: none;
-  }
-  textarea { min-height: 76px; resize: vertical; }
-  input:focus, textarea:focus { outline: none; border-color: var(--ink); background: #fff; box-shadow: 0 0 0 3px rgba(246,184,40,.35); }
-  .invalido input, input.invalido { border-color: var(--err); background: #FFF6F5; }
-  .fila { display: flex; gap: 10px; }
-  .fila > * { flex: 1; min-width: 0; }
+    width: 100%; padding: 13px 14px; font: inherit; font-size: 16px; color: var(--text); background: var(--field); border: 1.5px solid var(--line); border-radius: 12px;
+    transition: border-color .15s, box-shadow .15s, background .15s; -webkit-appearance: none; appearance: none; }
+  input::placeholder, textarea::placeholder { color: #A6A398; }
+  textarea { min-height: 84px; resize: vertical; line-height: 1.45; }
+  input:hover, textarea:hover { border-color: #CFCCC2; }
+  input:focus, textarea:focus { outline: none; border-color: var(--ink); background: #fff; box-shadow: var(--ring); }
+  .invalido input[type=text], .invalido input[type=tel], .invalido input[type=email], input.invalido { border-color: var(--err); background: var(--err-soft); }
+  .fila { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .fila > .campo { margin-top: 18px; }
   .ayuda-campo { font-size: 13px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
-  .error-campo { font-size: 13px; color: var(--err); margin-top: 6px; display: none; }
-  .invalido .error-campo { display: block; }
+  .error-campo { font-size: 13px; color: var(--err); margin-top: 7px; display: none; align-items: flex-start; gap: 6px; line-height: 1.35; font-weight: 500; }
+  .error-campo::before { content: ""; width: 14px; height: 14px; flex: none; margin-top: 1px; background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-2h2zm0-4h-2V7h2z'/%3E%3C/svg%3E") center/contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-2h2zm0-4h-2V7h2z'/%3E%3C/svg%3E") center/contain no-repeat; }
+  .invalido .error-campo { display: flex; }
 
   /* Opciones tipo botón */
-  .opciones { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 8px; }
+  .opciones { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; }
   .opcion { position: relative; }
-  .opcion input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
-  .opcion span {
-    display: flex; align-items: center; justify-content: center; gap: 7px; text-align: center;
-    min-height: 50px; padding: 8px 10px; border-radius: 11px;
-    border: 1.5px solid var(--line); background: #FAFAF7;
-    font-weight: 600; font-size: 15px; transition: all .15s; user-select: none;
-  }
-  .opcion span svg { width: 19px; height: 19px; flex: none; }
+  .opcion input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; z-index: 1; }
+  .opcion span { display: flex; align-items: center; justify-content: center; gap: 8px; text-align: center; min-height: 52px; padding: 8px 10px; border-radius: 12px; border: 1.5px solid var(--line); background: var(--field); font-weight: 600; font-size: 15px; transition: background .15s, border-color .15s, color .15s; user-select: none; }
+  .opcion span svg { width: 19px; height: 19px; color: var(--muted); }
+  .opcion:hover span { border-color: #CFCCC2; }
   .opcion input:checked + span { background: var(--ink); color: #fff; border-color: var(--ink); }
   .opcion input:checked + span svg { color: var(--amber); }
-  .opcion input:focus-visible + span { box-shadow: 0 0 0 3px rgba(246,184,40,.5); }
-  .invalido .opcion span { border-color: #E9B4AF; }
+  .opcion input:focus-visible + span { box-shadow: var(--ring); }
+  .invalido .opcion span { border-color: #E9B4AF; background: var(--err-soft); }
 
-  /* Llaves */
-  .llave {
-    border: 1.5px solid var(--line); border-radius: 12px; padding: 14px 14px 12px;
-    margin-top: 12px; background: linear-gradient(#FFFDF6, #FFFFFF);
-    position: relative;
-  }
-  .llave-tit { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-  .llave-tit b { font-family: 'Barlow Semi Condensed', sans-serif; font-size: 16px; display: flex; align-items: center; gap: 8px; }
-  .llave-tit b svg { width: 20px; height: 20px; color: var(--amber-dark); }
-  .quitar {
-    border: none; background: none; color: var(--muted); font: inherit; font-size: 14px;
-    padding: 6px 4px; cursor: pointer; text-decoration: underline;
-  }
-  .llave .campo { margin-top: 10px; }
-  .llave .campo:first-of-type { margin-top: 0; }
-  .mono { font-family: 'IBM Plex Mono', ui-monospace, monospace !important; letter-spacing: .5px; }
-  .btn-agregar {
-    width: 100%; margin-top: 12px; padding: 13px; border-radius: 11px;
-    border: 1.5px dashed #C9C6BC; background: transparent; color: var(--ink);
-    font: inherit; font-weight: 600; font-size: 15px; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; gap: 8px;
-  }
-  .btn-agregar:hover { border-color: var(--ink); }
-  .llave.control { background: linear-gradient(#F5F8FF, #FFFFFF); }
-  .llave.control .llave-tit b svg { color: #3A5BA8; }
-  .foto-campo { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line); }
-  .foto-tit { display: block; font-weight: 600; font-size: 14.5px; margin-bottom: 7px; }
-  .foto-btns { display: flex; gap: 8px; }
-  .btn-foto { flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 46px; padding: 8px 10px; border-radius: 11px; border: 1.5px solid var(--line); background: #fff; font-weight: 600; font-size: 14.5px; cursor: pointer; text-align: center; }
+  /* Casillas */
+  .check { display: flex; align-items: flex-start; gap: 12px; cursor: pointer; }
+  .check input { -webkit-appearance: none; appearance: none; width: 22px; height: 22px; margin: 1px 0 0; flex: none; border: 1.5px solid #BDBAB0; border-radius: 7px; background: #fff; display: grid; place-content: center; cursor: pointer; transition: background .15s, border-color .15s; }
+  .check input::before { content: ""; width: 12px; height: 12px; clip-path: polygon(14% 52%, 0 66%, 40% 100%, 100% 22%, 86% 8%, 39% 70%); background: var(--amber); transform: scale(0); transition: transform .12s ease-out; }
+  .check input:checked { background: var(--ink); border-color: var(--ink); }
+  .check input:checked::before { transform: scale(1); }
+  .check span { font-size: 15px; line-height: 1.45; }
+  .check small { display: block; color: var(--muted); font-size: 13.5px; margin-top: 2px; }
+  .invalido .check input { border-color: var(--err); background: var(--err-soft); }
+
+  /* Llaves y controles */
+  .llave { border: 1.5px solid var(--line); border-radius: 16px; margin-top: 14px; background: #fff; overflow: hidden; }
+  .llave-tit { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 12px 12px 14px; background: linear-gradient(180deg, #FFFBF0, #FFF8E6); border-bottom: 1px solid #F3E6C2; }
+  .llave.control .llave-tit { background: linear-gradient(180deg, #F6F9FF, #EEF3FD); border-bottom-color: #DCE5F7; }
+  .llave-tit b { font-family: var(--cond); font-weight: 700; font-size: 16.5px; display: flex; align-items: center; gap: 10px; }
+  .llave-ic { width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center; background: var(--ink); color: var(--amber); }
+  .llave.control .llave-ic { background: var(--blue); color: #fff; }
+  .llave-ic svg { width: 18px; height: 18px; }
+  .llave-cuerpo { padding: 4px 14px 14px; }
+  .quitar { border: none; background: none; color: var(--muted); font-size: 13.5px; font-weight: 600; padding: 6px 8px; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; }
+  .quitar svg { width: 15px; height: 15px; }
+  .quitar:hover { color: var(--err); background: rgba(179,38,30,.06); }
+  .llave .campo { margin-top: 14px; }
+  .otro-formato { border: none; background: none; padding: 8px 0 0; font-size: 13.5px; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+  .otro-formato:hover { color: var(--text); }
+  .foto-campo { margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--line); }
+  .foto-tit { display: block; font-weight: 600; font-size: 14.5px; margin-bottom: 8px; }
+  .foto-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .btn-foto { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 8px 10px; border-radius: 12px; border: 1.5px solid var(--line); background: #fff; font-weight: 600; font-size: 14.5px; cursor: pointer; text-align: center; transition: border-color .15s, background .15s; }
+  .btn-foto svg { width: 18px; height: 18px; color: var(--muted); }
+  .btn-foto:hover { border-color: var(--ink); }
   .btn-foto:active { background: #F6F5F0; }
   .btn-foto input { display: none; }
-  .foto-prev { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
-  .foto-prev img { width: 92px; height: 70px; object-fit: cover; border-radius: 9px; border: 1.5px solid var(--line); }
-  .foto-prev span { font-size: 14px; color: var(--ok); font-weight: 600; flex: 1; }
-  .otro-formato { border: none; background: none; padding: 6px 0 0; font: inherit; font-size: 13.5px; color: var(--muted); text-decoration: underline; cursor: pointer; }
+  .foto-prev { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 12px; background: var(--ok-soft); }
+  .foto-prev img { width: 84px; height: 64px; object-fit: cover; border-radius: 8px; display: block; }
+  .foto-prev span { font-size: 14px; color: var(--ok); font-weight: 600; flex: 1; display: inline-flex; align-items: center; gap: 6px; }
+  .agregar { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-top: 12px; }
+  .btn-agregar { padding: 13px; border-radius: 12px; border: 1.5px dashed #C9C6BC; background: transparent; font-weight: 600; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: border-color .15s, background .15s; }
+  .btn-agregar svg { width: 18px; height: 18px; }
+  .btn-agregar:hover { border-color: var(--ink); background: #fff; }
 
-  .donde {
-    margin-top: 14px; border-radius: 12px; background: #F6F5F0; overflow: hidden;
-  }
-  .donde summary {
-    list-style: none; cursor: pointer; padding: 13px 14px; font-weight: 600; font-size: 14.5px;
-    display: flex; align-items: center; gap: 9px;
-  }
+  .donde { margin-top: 16px; border-radius: 14px; background: #F6F5F0; border: 1px solid var(--line-2); overflow: hidden; }
+  .donde summary { list-style: none; cursor: pointer; padding: 14px; font-weight: 600; font-size: 14.5px; display: flex; align-items: center; gap: 10px; }
   .donde summary::-webkit-details-marker { display: none; }
   .donde summary .flecha { margin-left: auto; transition: transform .2s; }
   .donde[open] summary .flecha { transform: rotate(180deg); }
-  .donde summary svg { width: 18px; height: 18px; flex: none; }
-  .donde-cuerpo { padding: 0 14px 16px; font-size: 14px; color: #3D3B37; line-height: 1.5; }
-  .donde-cuerpo svg.ilustracion { width: 100%; height: auto; display: block; margin: 4px 0 10px; }
+  .donde summary svg { width: 18px; height: 18px; color: var(--amber-dark); }
+  .donde summary .flecha { color: var(--muted); }
+  .donde-cuerpo { padding: 0 14px 16px; font-size: 14px; color: var(--text-2); line-height: 1.55; }
+  .donde-cuerpo svg.ilustracion { width: 100%; height: auto; display: block; margin: 0 0 12px; background: #fff; border-radius: 12px; }
+  .donde-cuerpo p { margin: 0 0 8px; }
 
-  .switch-linea { display: flex; align-items: flex-start; gap: 12px; cursor: pointer; margin-top: 4px; }
-  .switch-linea input { width: 22px; height: 22px; margin: 1px 0 0; accent-color: var(--ink); flex: none; }
-  .switch-linea span { font-size: 15px; line-height: 1.45; }
-  .switch-linea small { display: block; color: var(--muted); font-size: 13.5px; margin-top: 2px; }
-
-  .perdida-box { margin-top: 12px; display: none; }
+  .perdida { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line-2); }
+  .perdida-box { margin-top: 4px; display: none; padding: 2px 0 0 34px; }
   .perdida-box.visible { display: block; }
 
-  .legal { font-size: 13px; color: var(--muted); line-height: 1.45; margin: 14px 0 0; }
-
-  .enviar {
-    width: 100%; margin-top: 18px; padding: 17px; border: none; border-radius: 12px;
-    background: var(--amber); color: var(--ink);
-    font-family: 'Barlow Semi Condensed', sans-serif; font-weight: 700; font-size: 19px; letter-spacing: .4px;
-    cursor: pointer; box-shadow: 0 6px 18px rgba(246,184,40,.35);
-    display: flex; align-items: center; justify-content: center; gap: 10px;
-  }
+  .enviar { width: 100%; margin-top: 20px; padding: 17px; border: none; border-radius: 14px; background: var(--amber); color: var(--ink); font-family: var(--cond); font-weight: 700; font-size: 19px; letter-spacing: .3px; cursor: pointer; box-shadow: 0 10px 24px -10px rgba(246,184,40,.8), inset 0 -2px 0 rgba(0,0,0,.08); display: flex; align-items: center; justify-content: center; gap: 10px; transition: transform .1s, background .15s; }
+  .enviar:hover { background: var(--amber-2); }
   .enviar:active { transform: translateY(1px); }
-  .enviar:disabled { opacity: .6; cursor: default; }
-  .status { margin: 12px 0 0; font-size: 14.5px; text-align: center; min-height: 1em; }
-  .status.err { color: var(--err); }
+  .enviar:disabled { opacity: .65; cursor: default; }
+  .enviar svg { width: 20px; height: 20px; }
+  .status { margin: 12px 0 0; font-size: 14.5px; text-align: center; min-height: 1em; color: var(--text-2); }
+  .status:empty { display: none; }
+  .status.err { color: var(--err); background: var(--err-soft); border-radius: 10px; padding: 10px 12px; font-weight: 500; }
+  .legal { display: flex; gap: 10px; font-size: 13px; color: var(--muted); line-height: 1.45; margin: 16px 0 0; }
+  .legal svg { width: 16px; height: 16px; margin-top: 1px; color: var(--muted); }
 
-  .oculto { display: none !important; }
-  .ayuda-wa { position: fixed; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom)); z-index: 40; display: inline-flex; align-items: center; gap: 8px; background: #1FA855; color: #fff; text-decoration: none; font-weight: 700; font-size: 15px; padding: 11px 15px 11px 12px; border-radius: 999px; box-shadow: 0 6px 18px rgba(0,0,0,.25); font-family: 'Barlow', sans-serif; }
-  .ayuda-wa svg { width: 22px; height: 22px; }
-  .pie { text-align: center; color: var(--muted); font-size: 13px; padding: 4px 16px 30px; line-height: 1.6; }
-  .pie a { color: var(--ink); font-weight: 600; }
+  .ayuda-lado { display: none; }
+  .pie { text-align: center; color: var(--muted); font-size: 13px; padding: 8px 16px 40px; line-height: 1.6; }
+  .pie a { color: var(--text); font-weight: 600; text-decoration: none; }
+  .pie img { height: 22px; display: block; margin: 0 auto 8px; opacity: .9; }
 
-  /* Gracias / error de código */
-  .final { text-align: center; padding: 34px 22px 28px; }
-  .final .sello {
-    width: 74px; height: 64px; margin: 0 auto 16px; display: grid; place-items: center;
-    background: var(--ink); color: var(--amber);
-    clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
-  }
-  .final .sello svg { width: 32px; height: 32px; }
-  .final h2 { font-family: 'Barlow Semi Condensed', sans-serif; font-size: 26px; margin: 0 0 8px; }
-  .final p { color: #4A4843; line-height: 1.55; margin: 0 0 6px; }
-  .resumen { text-align: left; background: #F6F5F0; border-radius: 12px; padding: 12px 14px; margin: 16px 0 6px; font-size: 14.5px; }
-  .resumen div { display: flex; justify-content: space-between; gap: 10px; padding: 3px 0; }
+  /* Gracias / código inválido */
+  .final { text-align: center; padding: 34px 22px 26px; }
+  .sello { width: 76px; height: 66px; margin: 0 auto 18px; display: grid; place-items: center; background: var(--ink); color: var(--amber); clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%); }
+  .sello svg { width: 32px; height: 32px; }
+  .sello.ok { background: var(--amber); color: var(--ink); animation: pop .4s cubic-bezier(.2,1.4,.4,1); }
+  @keyframes pop { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+  .final h2 { font-family: var(--cond); font-size: 28px; font-weight: 700; margin: 0 0 8px; }
+  .final p { color: var(--text-2); line-height: 1.55; margin: 0 auto 6px; max-width: 420px; }
+  .resumen { text-align: left; border: 1px solid var(--line); border-radius: 14px; margin: 20px 0 6px; font-size: 14.5px; overflow: hidden; }
+  .resumen div { display: flex; justify-content: space-between; gap: 12px; padding: 10px 14px; border-top: 1px solid var(--line-2); }
+  .resumen div:first-child { border-top: 0; background: #FAFAF7; }
   .resumen div span:first-child { color: var(--muted); }
   .resumen div span:last-child { font-weight: 600; text-align: right; }
-  .btn-sec {
-    margin-top: 14px; padding: 12px 18px; border-radius: 11px; border: 1.5px solid var(--ink);
-    background: #fff; font: inherit; font-weight: 600; cursor: pointer;
+  .resumen .mono { font-weight: 600; }
+  .btn-sec { margin-top: 16px; padding: 13px 20px; border-radius: 12px; border: 1.5px solid var(--ink); background: #fff; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+  .btn-sec:hover { background: var(--ink); color: #fff; }
+  .btn-sec svg { width: 18px; height: 18px; }
+  .cargando { padding: 22px 18px; }
+  .esqueleto { height: 14px; border-radius: 7px; background: linear-gradient(90deg, #EEEDE7 0%, #F7F6F2 50%, #EEEDE7 100%); background-size: 200% 100%; animation: brillo 1.2s infinite linear; margin: 12px 0; }
+  @keyframes brillo { to { background-position: -200% 0; } }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+
+  .ayuda-top { margin-left: auto; display: none; align-items: center; gap: 6px; padding: 7px 12px 7px 10px; border-radius: 999px; border: 1px solid rgba(31,168,85,.55); color: #6FDB9C; text-decoration: none; font-size: 14px; font-weight: 600; }
+  .ayuda-top svg { width: 17px; height: 17px; }
+  .ayuda-inline { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 16px auto 0; font-size: 14.5px; font-weight: 600; color: #178A45; text-decoration: none; }
+  .ayuda-inline svg { width: 18px; height: 18px; }
+  .ayuda-inline:hover { text-decoration: underline; }
+  body.fin .intro h1, body.fin .intro .bajada, body.fin .intro .meta { display: none; }
+  body.fin .intro { padding-bottom: 20px; }
+
+  /* ---------- PC: guía a la izquierda, formulario a la derecha ---------- */
+  @media (min-width: 980px) {
+    body { background: var(--paper); }
+    .barra-in { padding: 16px 28px; }
+    .layout { display: grid; grid-template-columns: 380px minmax(0, 600px); gap: 40px; justify-content: center; padding: 28px 28px 0; align-items: start; }
+    .lado { position: sticky; top: 24px; }
+    .intro { border-radius: 22px; padding: 30px 28px 28px; box-shadow: var(--sh-2); }
+    .intro h1 { font-size: 40px; margin-top: 20px; }
+    .pasos-nav { position: static; background: none; backdrop-filter: none; -webkit-backdrop-filter: none; border: 0; margin-top: 18px; }
+    .pasos-nav ol { display: block; padding: 0; max-width: none; }
+    .pasos-nav li + li { margin-top: 4px; }
+    .pasos-nav a { flex-direction: row; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; font-size: 15px; color: var(--muted); }
+    .pasos-nav a::before { display: none; }
+    .pasos-nav a:hover { background: rgba(13,12,13,.04); }
+    .pasos-nav .num { display: grid; place-items: center; width: 28px; height: 24px; background: #E6E4DC; color: var(--text-2); clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%); font-family: var(--cond); font-weight: 700; font-size: 13.5px; }
+    .pasos-nav li.actual a { background: #fff; color: var(--text); box-shadow: var(--sh-1); }
+    .pasos-nav li.actual .num { background: var(--ink); color: var(--amber); }
+    .pasos-nav li.listo a { color: var(--text-2); }
+    .pasos-nav li.listo .num { background: var(--amber); color: var(--ink); }
+    .pasos-nav li.listo .ic-ok { display: block; margin-left: auto; width: 18px; height: 18px; color: var(--ok); }
+    main { padding: 0 0 80px; margin: 0; max-width: none; }
+    .card { padding: 28px 28px 26px; }
+    .barra-in { max-width: 1076px; }
+    .ayuda-lado { display: flex; gap: 12px; align-items: center; margin-top: 14px; padding: 14px; border-radius: 14px; border: 1px solid var(--line); background: #fff; text-decoration: none; transition: border-color .15s, box-shadow .15s; }
+    .ayuda-lado:hover { border-color: #1FA855; box-shadow: var(--sh-1); }
+    .ayuda-lado .ic { width: 38px; height: 38px; border-radius: 10px; background: #1FA855; color: #fff; display: grid; place-items: center; flex: none; }
+    .ayuda-lado .ic svg { width: 22px; height: 22px; }
+    .ayuda-lado b { display: block; font-size: 15px; }
+    .ayuda-lado small { display: block; color: var(--muted); font-size: 13.5px; line-height: 1.35; margin-top: 2px; }
+    #secEnvio .ayuda-inline { display: none; }
+    .pie { padding-bottom: 40px; }
   }
-  .cargando { text-align: center; padding: 40px 0; color: var(--muted); }
+  @media (max-width: 979px) {
+    .lado { display: contents; }
+    .ayuda-top { display: inline-flex; }
+    .pie { padding-bottom: 32px; }
+    .barra-in { padding: 14px 20px 8px; }
+    .barra .seguro { display: none; }
+  }
+  @media (max-width: 380px) {
+    .fila { grid-template-columns: 1fr; gap: 0; }
+  }
 </style>
 </head>
 <body>
-  <header class="hero">
-    <div class="hero-inner">
-      <div class="hero-top">
-        <img src="/icons/logo.png" alt="SAT">
-        <span class="tag-seg">Control de acceso</span>
-      </div>
-      <span class="edificio-chip" id="edificioChip">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 7h1M14 7h1M9 11h1M14 11h1M9 15h1M14 15h1M11 21v-3h2v3"/></svg>
-        <span id="edificioNombre">Edificio</span>
-      </span>
-      <h1>Registrá tu <em>llave</em> de acceso</h1>
-      <p>Estamos actualizando los datos de acceso del edificio. Completarlo te lleva 2 minutos y nos ayuda a mantener el ingreso seguro: las llaves que nadie registre podrán ser dadas de baja.</p>
-      <p class="direccion" id="edificioDireccion"></p>
+  <header class="barra">
+    <div class="barra-in">
+      <img src="/icons/logo.png" alt="SAT">
+      <span class="sep" aria-hidden="true"></span>
+      <span class="seccion">Control de acceso</span>
+      <a class="ayuda-top" data-wa href="https://wa.me/5493413782085" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.4.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 2.9 2.9 0 0 0-.9 2.2 5 5 0 0 0 1 2.7 11.5 11.5 0 0 0 4.4 3.9c1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg>Ayuda</a>
+      <span class="seguro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Conexión segura</span>
     </div>
   </header>
 
+  <div class="layout">
+    <div class="lado">
+      <section class="intro" id="intro">
+        <span class="edificio-chip" id="edificioChip">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 7h1M14 7h1M9 11h1M14 11h1M9 15h1M14 15h1M11 21v-3h2v3"/></svg>
+          <span id="edificioNombre">Edificio</span>
+        </span>
+        <span class="direccion" id="edificioDireccion"></span>
+        <h1>Registrá tu <em>llave</em> de acceso</h1>
+        <p class="bajada" id="introTxt">Estamos actualizando el registro de llaves del edificio. Las llaves que nadie registre podrán darse de baja.</p>
+        <div class="meta" id="introMeta">
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 3h6"/></svg>2 minutos</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Datos privados</span>
+          <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6z"/></svg>Lo administra SAT</span>
+        </div>
+      </section>
+      <nav class="pasos-nav" id="pasosNav" aria-label="Pasos del registro">
+        <ol>
+          <li data-paso="secDatos" class="actual"><a href="#secDatos"><span class="num">1</span>Tus datos<svg class="ic-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></a></li>
+          <li data-paso="secUnidad"><a href="#secUnidad"><span class="num">2</span>Tu unidad<svg class="ic-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></a></li>
+          <li data-paso="secLlaves"><a href="#secLlaves"><span class="num">3</span>Llaves y controles<svg class="ic-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></a></li>
+        </ol>
+      </nav>
+      <a class="ayuda-lado" data-wa href="https://wa.me/5493413782085" target="_blank" rel="noopener">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.4.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 2.9 2.9 0 0 0-.9 2.2 5 5 0 0 0 1 2.7 11.5 11.5 0 0 0 4.4 3.9c1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg></span>
+        <span><b>¿Necesitás ayuda?</b><small>Escribinos por WhatsApp y te ayudamos a completarlo.</small></span>
+      </a>
+    </div>
+
   <main>
-    <div class="card cargando" id="cargando">Cargando…</div>
+    <div class="card cargando" id="cargando" aria-busy="true" aria-label="Cargando">
+      <div class="esqueleto" style="width:40%;height:22px;"></div>
+      <div class="esqueleto" style="width:90%;"></div>
+      <div class="esqueleto" style="width:75%;"></div>
+      <div class="esqueleto" style="width:100%;height:46px;border-radius:12px;"></div>
+    </div>
 
     <!-- Código inválido -->
     <div class="card final oculto" id="pantallaInvalida">
       <div class="sello"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 8v5M12 16.5v.01"/><circle cx="12" cy="12" r="9"/></svg></div>
       <h2>Este código no está habilitado</h2>
-      <p>Escaneá de nuevo el QR que está en el hall de tu edificio. Si el problema sigue, comunicate con SAT.</p>
+      <p>Escaneá de nuevo el QR que está en el hall de tu edificio. Si el problema sigue, escribinos y te ayudamos.</p>
+      <a class="ayuda-inline" data-wa href="https://wa.me/5493413782085" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.4.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 2.9 2.9 0 0 0-.9 2.2 5 5 0 0 0 1 2.7 11.5 11.5 0 0 0 4.4 3.9c1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg>Escribir a SAT por WhatsApp</a>
     </div>
 
     <form id="formulario" class="oculto" novalidate autocomplete="on">
       <!-- 1. Datos -->
-      <section class="card">
+      <section class="card" id="secDatos">
         <div class="paso"><span class="paso-num">1</span><h2>Tus datos</h2></div>
         <p class="paso-sub">De la persona que usa la llave.</p>
 
@@ -279,7 +337,7 @@
           <label for="email">Mail <span class="opcional">(opcional)</span></label>
           <input type="email" id="email" autocomplete="email" inputmode="email" maxlength="80" placeholder="nombre@correo.com">
           <div class="error-campo">Revisá el mail, no parece válido.</div>
-          <label class="switch-linea oculto" id="copiaWrap" style="margin-top:10px;"><input type="checkbox" id="copia" checked><span>Mandarme una copia por mail con lo que cargué</span></label>
+          <label class="check oculto" id="copiaWrap" style="margin-top:12px;"><input type="checkbox" id="copia" checked><span>Mandarme una copia por mail con lo que cargué</span></label>
         </div>
         <div class="campo" data-campo="relacion">
           <span class="grupo-label">¿Sos titular o inquilino?</span>
@@ -288,20 +346,20 @@
             <label class="opcion"><input type="radio" name="relacion" value="inquilino"><span>Inquilino</span></label>
             <label class="opcion"><input type="radio" name="relacion" value="otro"><span>Otro</span></label>
           </div>
-          <input type="text" id="relacionOtro" class="oculto" style="margin-top:8px;" maxlength="40" placeholder="Ej. familiar, encargado, empleada…">
+          <input type="text" id="relacionOtro" class="oculto" style="margin-top:8px;" maxlength="40" placeholder="Ej. familiar, encargado, empleada…" aria-label="¿Qué relación tenés con la unidad?">
           <div class="error-campo">Elegí una opción.</div>
         </div>
       </section>
 
       <!-- 2. Unidad -->
-      <section class="card">
+      <section class="card" id="secUnidad">
         <div class="paso"><span class="paso-num">2</span><h2>Tu unidad</h2></div>
         <div class="campo" data-campo="tipo">
           <span class="grupo-label">¿La llave es para…?</span>
           <div class="opciones">
             <label class="opcion"><input type="radio" name="tipo" value="vivienda"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>Vivienda</span></label>
             <label class="opcion"><input type="radio" name="tipo" value="cochera"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17h14M6 17l1.5-5h9L18 17"/><circle cx="8.5" cy="17.5" r="1.5"/><circle cx="15.5" cy="17.5" r="1.5"/></svg>Cochera</span></label>
-            <label class="opcion"><input type="radio" name="tipo" value="ambas"><span>Ambas</span></label>
+            <label class="opcion"><input type="radio" name="tipo" value="ambas"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>Ambas</span></label>
           </div>
           <div class="error-campo">Elegí una opción.</div>
         </div>
@@ -324,7 +382,7 @@
           </div>
           <div class="campo">
             <span class="grupo-label">¿Tenés control remoto para la cochera?</span>
-            <p class="ayuda-campo" style="margin:-2px 0 8px;">Si decís que sí, lo cargás abajo junto con tus llaves.</p>
+            <p class="ayuda-campo" style="margin:-4px 0 10px;">Si decís que sí, lo cargás en el paso 3 junto con tus llaves.</p>
             <div class="opciones">
               <label class="opcion"><input type="radio" name="control_remoto" value="si"><span>Sí</span></label>
               <label class="opcion"><input type="radio" name="control_remoto" value="no"><span>No</span></label>
@@ -334,17 +392,17 @@
       </section>
 
       <!-- 3. Llaves -->
-      <section class="card">
+      <section class="card" id="secLlaves">
         <div class="paso"><span class="paso-num">3</span><h2>Tus llaves y controles</h2></div>
         <p class="paso-sub">Cargá todo lo que usás para entrar: la llave (tag) de la puerta y, si tenés, el control de la cochera.</p>
         <div id="llaves"></div>
-        <div class="fila" style="gap:8px;">
+        <div class="agregar">
           <button type="button" class="btn-agregar" id="agregarLlaveBtn">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
             Otra llave
           </button>
           <button type="button" class="btn-agregar oculto" id="agregarControlBtn">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
             Otro control
           </button>
         </div>
@@ -374,14 +432,14 @@
               <text x="206" y="98" font-family="Barlow, sans-serif" font-size="13" fill="#6E6C66">dos puntos (:)</text>
               <text x="206" y="114" font-family="Barlow, sans-serif" font-size="13" fill="#6E6C66">5 números</text>
             </svg>
-            Está <b>grabado en el llavero</b>: son <b>3 números, dos puntos y 5 números</b>, por ejemplo <span class="mono">069:02561</span>. Escribí solo los números: los dos puntos se ponen solos.<br><br>
-            Si tu llave tiene el número escrito de otra forma, tocá <i>"Mi llave tiene el número de otra forma"</i> y copialo tal cual se ve. Si no lo podés leer, <b>sacale una foto</b> del lado de los números: con eso alcanza.<br><br>
-            El <b>número de usuario</b> es el que te asignaron al darte la llave o el control; si no lo sabés, dejalo vacío.
+            <p>Está <b>grabado en el llavero</b>: son <b>3 números, dos puntos y 5 números</b>, por ejemplo <span class="mono">069:02561</span>. Escribí solo los números: los dos puntos se ponen solos.</p>
+            <p>Si tu llave tiene el número escrito de otra forma, tocá <i>«Mi llave tiene el número de otra forma»</i> y copialo tal cual se ve. Si no lo podés leer, <b>sacale una foto</b> del lado de los números: con eso alcanza.</p>
+            <p style="margin:0;">El <b>número de usuario</b> es el que te asignaron al darte la llave o el control; si no lo sabés, dejalo vacío.</p>
           </div>
         </details>
 
-        <div class="campo" style="margin-top:18px;">
-          <label class="switch-linea">
+        <div class="perdida">
+          <label class="check">
             <input type="checkbox" id="tienePerdida">
             <span>Perdí una llave o un control, o ya no lo uso
               <small>Así la damos de baja y nadie más puede entrar con ella.</small></span>
@@ -400,7 +458,7 @@
       </section>
 
       <!-- Envío -->
-      <section class="card">
+      <section class="card" id="secEnvio">
         <div class="campo" style="margin-top:0;">
           <label for="comentario">¿Algo más que quieras contarnos? <span class="opcional">(opcional)</span></label>
           <textarea id="comentario" maxlength="400" placeholder="Ej. la llave a veces no abre la puerta de la cochera"></textarea>
@@ -409,7 +467,7 @@
         <input type="text" id="sitioWeb" name="sitio_web" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px;width:1px;height:1px;" aria-hidden="true">
 
         <div class="campo" data-campo="acepta" style="margin-top:18px;">
-          <label class="switch-linea">
+          <label class="check">
             <input type="checkbox" id="acepta">
             <span>Acepto que SAT use estos datos solo para administrar el control de acceso del edificio.</span>
           </label>
@@ -418,31 +476,30 @@
 
         <button type="submit" class="enviar" id="enviarBtn">
           Enviar registro
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         </button>
         <p class="status" id="statusMsg" role="status"></p>
-        <p class="legal">Tus datos se guardan de forma privada y no se comparten con terceros. Podés pedir que los corrijamos o borremos cuando quieras (Ley 25.326).</p>
+        <a class="ayuda-inline" data-wa href="https://wa.me/5493413782085" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.4.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 2.9 2.9 0 0 0-.9 2.2 5 5 0 0 0 1 2.7 11.5 11.5 0 0 0 4.4 3.9c1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg>¿Tenés dudas? Escribinos por WhatsApp</a>
+        <p class="legal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span>Tus datos se guardan de forma privada y no se comparten con terceros. Podés pedir que los corrijamos o borremos cuando quieras (Ley 25.326).</span></p>
       </section>
     </form>
 
     <!-- Gracias -->
     <div class="card final oculto" id="pantallaGracias">
-      <div class="sello"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+      <div class="sello ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
       <h2>¡Listo, gracias!</h2>
       <p id="graciasTxt">Tu registro quedó guardado. Si hace falta algo más, te vamos a contactar.</p>
       <div class="resumen" id="resumen"></div>
-      <button type="button" class="btn-sec" id="otroBtn">Registrar a otra persona</button>
+      <button type="button" class="btn-sec" id="otroBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M18 8v6M15 11h6"/></svg>Registrar a otra persona</button>
+      <a class="ayuda-inline" data-wa href="https://wa.me/5493413782085" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.4.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 2.9 2.9 0 0 0-.9 2.2 5 5 0 0 0 1 2.7 11.5 11.5 0 0 0 4.4 3.9c1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg>¿Algo no quedó bien? Escribinos</a>
     </div>
   </main>
-
-  <a class="ayuda-wa" id="ayudaWa" href="https://wa.me/5493413782085" target="_blank" rel="noopener" aria-label="Pedir ayuda por WhatsApp">
-    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2c-1.5 0-3-.4-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.4.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 2.9 2.9 0 0 0-.9 2.2 5 5 0 0 0 1 2.7 11.5 11.5 0 0 0 4.4 3.9c1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></svg>
-    ¿Ayuda?
-  </a>
-  <div class="pie">
-    SAT · Seguridad electrónica<br>
-    <a href="https://www.sat365.com.ar" target="_blank" rel="noopener">www.sat365.com.ar</a>
   </div>
+
+
+  <footer class="pie">
+    SAT · Seguridad electrónica · <a href="https://www.sat365.com.ar" target="_blank" rel="noopener">sat365.com.ar</a>
+  </footer>
 
 <script>
 (function () {
@@ -455,7 +512,38 @@
 
   function mostrar(id) {
     ["cargando", "pantallaInvalida", "formulario", "pantallaGracias"].forEach((x) => $(x).classList.toggle("oculto", x !== id));
+    document.body.classList.toggle("fin", id !== "formulario" && id !== "cargando");
+    if (id === "formulario") setTimeout(actualizarPasos, 0);
   }
+
+  // ---------- Progreso: qué paso está completo y en cuál está ----------
+  const PASOS = ["secDatos", "secUnidad", "secLlaves"];
+  function pasoCompleto(id) {
+    if (id === "secDatos") return !!$("nombre").value.trim() && $("telefono").value.replace(/\D/g, "").length >= 6 && !!valorRadio("relacion");
+    if (id === "secUnidad") { const t = valorRadio("tipo"); return !!t && (t === "cochera" || (!!$("piso").value.trim() && !!$("unidad").value.trim())); }
+    if (id === "secLlaves") return [...llavesCont.querySelectorAll(".llave")].some((l) => l.querySelector(".in-tag").value.trim() || l._foto) || ($("tienePerdida").checked && !!($("perdidaTag").value.trim() || $("perdidaDetalle").value.trim()));
+    return false;
+  }
+  let pasoActual = "secDatos";
+  function actualizarPasos() {
+    PASOS.forEach((id) => {
+      const ok = pasoCompleto(id);
+      $(id).classList.toggle("listo", ok);
+      const li = document.querySelector(`#pasosNav li[data-paso="${id}"]`);
+      li.classList.toggle("listo", ok);
+      li.classList.toggle("actual", id === pasoActual);
+    });
+  }
+  function calcularPasoActual() {
+    // El paso cuya tarjeta cruza la franja superior de la pantalla.
+    const linea = Math.min(window.innerHeight * 0.35, 260);
+    let actualNuevo = PASOS[0];
+    PASOS.forEach((id) => { if ($(id).getBoundingClientRect().top < linea) actualNuevo = id; });
+    if ($("secEnvio").getBoundingClientRect().top < linea) actualNuevo = PASOS[PASOS.length - 1];
+    if (actualNuevo !== pasoActual) { pasoActual = actualNuevo; actualizarPasos(); }
+  }
+  let rafPaso = 0;
+  window.addEventListener("scroll", () => { if (!rafPaso) rafPaso = requestAnimationFrame(() => { rafPaso = 0; calcularPasoActual(); }); }, { passive: true });
 
   async function iniciar() {
     if (!/^[a-z0-9-]{3,40}$/.test(codigo)) { mostrar("pantallaInvalida"); $("edificioChip").classList.add("oculto"); return; }
@@ -467,7 +555,7 @@
       $("edificioNombre").textContent = d.nombre;
       $("edificioDireccion").textContent = d.direccion || "";
       document.title = "Registro de llaves — " + d.nombre;
-      $("ayudaWa").href = "https://wa.me/5493413782085?text=" + encodeURIComponent("Hola SAT, necesito ayuda con el registro de llaves de " + d.nombre + ".");
+      document.querySelectorAll("[data-wa]").forEach((a) => { a.href = "https://wa.me/5493413782085?text=" + encodeURIComponent("Hola SAT, necesito ayuda con el registro de llaves de " + d.nombre + "."); });
       agregarDispositivo("tag");
       mostrar("formulario");
     } catch (e) {
@@ -480,7 +568,21 @@
   const ICONO = {
     tag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2 2M14 9l2 2"/></svg>',
     control: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="3"/><circle cx="12" cy="8" r="1.6"/><path d="M10 13h4M10 16.5h4"/></svg>',
+    quitar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
+    camara: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+    galeria: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>',
+    ok: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
   };
+  const bloqueFoto = () => `
+        <div class="foto-campo">
+          <span class="foto-tit">Foto del lado de los números <span class="opcional">(opcional)</span></span>
+          <div class="foto-btns">
+            <label class="btn-foto">${ICONO.camara}Sacar foto<input type="file" accept="image/*" capture="environment" class="in-foto"></label>
+            <label class="btn-foto">${ICONO.galeria}De la galería<input type="file" accept="image/*" class="in-foto"></label>
+          </div>
+          <div class="foto-prev oculto"><img alt="Foto de la llave"><span>${ICONO.ok}Foto lista</span><button type="button" class="quitar quitar-foto">Quitar</button></div>
+          <div class="ayuda-campo foto-estado"></div>
+        </div>`;
   const FORMATO_TAG = /^\d{3}:\d{5}$/;
   // "06902561" -> "069:02561" mientras escribe (los dos puntos se ponen solos).
   function formatearTag(inp) {
@@ -497,52 +599,35 @@
     const div = document.createElement("div");
     div.className = "llave" + (tipo === "control" ? " control" : "");
     div.dataset.tipo = tipo;
-    div.innerHTML = tipo === "tag" ? `
+    const cabecera = `
       <div class="llave-tit">
-        <b>${ICONO.tag}<span class="llave-num"></span></b>
-        <button type="button" class="quitar">Quitar</button>
-      </div>
-      <div class="campo" data-campo="tag">
-        <label>Número grabado en la llave</label>
-        <input type="text" class="mono in-tag" maxlength="9" inputmode="numeric" placeholder="Ej. 069:02561" autocomplete="off" spellcheck="false">
-        <div class="error-campo">Tiene que tener 3 números, dos puntos y 5 números (ej. 069:02561). Si no lo podés leer, sacale una foto abajo.</div>
-        <button type="button" class="otro-formato">Mi llave tiene el número de otra forma</button>
-      </div>
-      <div class="campo">
-        <label>Número de usuario <span class="opcional">(si lo conocés)</span></label>
-        <input type="text" class="mono in-usuario" maxlength="15" inputmode="numeric" placeholder="Ej. 125" autocomplete="off">
-      </div>
-      <div class="foto-campo">
-        <span class="foto-tit">Foto del lado de los números <span class="opcional">(opcional)</span></span>
-        <div class="foto-btns">
-          <label class="btn-foto">📷 Sacar foto<input type="file" accept="image/*" capture="environment" class="in-foto"></label>
-          <label class="btn-foto">🖼 De la galería<input type="file" accept="image/*" class="in-foto"></label>
-        </div>
-        <div class="foto-prev oculto"><img alt="Foto de la llave"><span>✓ Foto lista</span><button type="button" class="quitar quitar-foto">Quitar</button></div>
-        <div class="ayuda-campo foto-estado"></div>
-      </div>` : `
-      <div class="llave-tit">
-        <b>${ICONO.control}<span class="llave-num"></span></b>
-        <button type="button" class="quitar">Quitar</button>
-      </div>
-      <div class="campo">
-        <label>Número o código del control <span class="opcional">(si figura)</span></label>
-        <input type="text" class="mono in-tag" maxlength="40" placeholder="El de la etiqueta, si tiene" autocomplete="off" spellcheck="false">
-      </div>
-      <div class="campo">
-        <label>Número de usuario <span class="opcional">(si lo conocés)</span></label>
-        <input type="text" class="mono in-usuario" maxlength="15" inputmode="numeric" placeholder="Ej. 125" autocomplete="off">
-      </div>
-      <div class="foto-campo">
-        <span class="foto-tit">Foto del lado de los números <span class="opcional">(opcional)</span></span>
-        <div class="foto-btns">
-          <label class="btn-foto">📷 Sacar foto<input type="file" accept="image/*" capture="environment" class="in-foto"></label>
-          <label class="btn-foto">🖼 De la galería<input type="file" accept="image/*" class="in-foto"></label>
-        </div>
-        <div class="foto-prev oculto"><img alt="Foto de la llave"><span>✓ Foto lista</span><button type="button" class="quitar quitar-foto">Quitar</button></div>
-        <div class="ayuda-campo foto-estado"></div>
+        <b><span class="llave-ic">${ICONO[tipo]}</span><span class="llave-num"></span></b>
+        <button type="button" class="quitar quitar-disp" aria-label="Quitar">${ICONO.quitar}Quitar</button>
       </div>`;
-    div.querySelector(".quitar").addEventListener("click", () => {
+    div.innerHTML = cabecera + (tipo === "tag" ? `
+      <div class="llave-cuerpo">
+        <div class="campo" data-campo="tag">
+          <label>Número grabado en la llave</label>
+          <input type="text" class="mono in-tag" maxlength="9" inputmode="numeric" placeholder="Ej. 069:02561" autocomplete="off" spellcheck="false">
+          <div class="error-campo">Tiene que tener 3 números, dos puntos y 5 números (ej. 069:02561). Si no lo podés leer, sacale una foto abajo.</div>
+          <button type="button" class="otro-formato">Mi llave tiene el número de otra forma</button>
+        </div>
+        <div class="campo">
+          <label>Número de usuario <span class="opcional">(si lo conocés)</span></label>
+          <input type="text" class="mono in-usuario" maxlength="15" inputmode="numeric" placeholder="Ej. 125" autocomplete="off">
+        </div>${bloqueFoto()}
+      </div>` : `
+      <div class="llave-cuerpo">
+        <div class="campo">
+          <label>Número o código del control <span class="opcional">(si figura)</span></label>
+          <input type="text" class="mono in-tag" maxlength="40" placeholder="Si tiene una etiqueta, copiala" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="campo">
+          <label>Número de usuario <span class="opcional">(si lo conocés)</span></label>
+          <input type="text" class="mono in-usuario" maxlength="15" inputmode="numeric" placeholder="Ej. 125" autocomplete="off">
+        </div>${bloqueFoto()}
+      </div>`);
+    div.querySelector(".quitar-disp").addEventListener("click", () => {
       div.remove();
       // Si saca el último control, la respuesta "¿tenés control?" pasa a "No".
       if (tipo === "control" && !llavesCont.querySelector('[data-tipo="control"]')) {
@@ -550,6 +635,7 @@
       }
       if (!llavesCont.children.length) agregarDispositivo("tag");
       renumerar();
+      actualizarPasos();
     });
     if (tipo === "tag") {
       const inp = div.querySelector(".in-tag");
@@ -603,23 +689,25 @@
         div.querySelector(".foto-btns").classList.add("oculto");
         estado.textContent = "";
         const c = div.querySelector('[data-campo="tag"]'); if (c) c.classList.remove("invalido");
+        actualizarPasos();
       } catch (e) { estado.textContent = e.message; }
     }));
     div.querySelector(".quitar-foto").addEventListener("click", () => {
       div._foto = null;
       prev.classList.add("oculto");
       div.querySelector(".foto-btns").classList.remove("oculto");
+      actualizarPasos();
     });
   }
 
   function renumerar() {
     ["tag", "control"].forEach((t) => {
       const items = [...llavesCont.querySelectorAll(`[data-tipo="${t}"]`)];
-      const base = t === "tag" ? "Llave (tag)" : "Control remoto de cochera";
+      const base = t === "tag" ? "Llave (tag)" : "Control de cochera";
       items.forEach((el, i) => { el.querySelector(".llave-num").textContent = items.length > 1 ? `${base} ${i + 1}` : base; });
     });
     const total = llavesCont.children.length;
-    llavesCont.querySelectorAll(".quitar:not(.quitar-foto)").forEach((b) => b.classList.toggle("oculto", total === 1));
+    llavesCont.querySelectorAll(".quitar-disp").forEach((b) => b.classList.toggle("oculto", total === 1));
     $("agregarLlaveBtn").classList.toggle("oculto", total >= MAX_LLAVES);
     const tipoUnidad = valorRadio("tipo");
     $("agregarControlBtn").classList.toggle("oculto", total >= MAX_LLAVES || !tipoUnidad || tipoUnidad === "vivienda");
@@ -663,6 +751,8 @@
   });
 
   // Al corregir un campo, se le saca la marca de error.
+  form.addEventListener("input", actualizarPasos);
+  form.addEventListener("change", actualizarPasos);
   form.addEventListener("input", (e) => { const c = e.target.closest(".campo"); if (c) c.classList.remove("invalido"); if (!form.querySelector(".invalido")) $("statusMsg").textContent = ""; });
   form.addEventListener("change", (e) => { const c = e.target.closest(".campo"); if (c) c.classList.remove("invalido"); if (!form.querySelector(".invalido")) $("statusMsg").textContent = ""; });
 
