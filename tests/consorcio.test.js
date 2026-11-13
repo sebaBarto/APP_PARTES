@@ -413,6 +413,13 @@ test("captcha: sin claves no se pide; con claves se verifica con Cloudflare y si
     respuesta = "caido";
     llaves._reiniciarTopes();
     assert.strictEqual((await llamar(llaves.manejarPublico, { method: "POST", body: { ...cuerpo, nombre: "Otro Vecino", piso: "5", captcha: "x" } }, gh)).status, 200, "Cloudflare caído: pasa");
+    // Clave secreta mal cargada en Vercel: no se traba a los vecinos.
+    respuesta = { success: false, "error-codes": ["invalid-input-secret"] };
+    llaves._reiniciarTopes();
+    assert.strictEqual((await llamar(llaves.manejarPublico, { method: "POST", body: { ...cuerpo, nombre: "Tercer Vecino", piso: "6", captcha: "x" } }, gh)).status, 200, "clave mal configurada: pasa");
+    respuesta = { success: false, "error-codes": ["invalid-input-response"] };
+    llaves._reiniciarTopes();
+    assert.strictEqual((await llamar(llaves.manejarPublico, { method: "POST", body: { ...cuerpo, nombre: "Cuarto Vecino", piso: "7", captcha: "x" } }, gh)).status, 400, "token inválido: no pasa");
   } finally {
     global.fetch = fetchOriginal;
     delete process.env.TURNSTILE_SITE_KEY; delete process.env.TURNSTILE_SECRET_KEY;

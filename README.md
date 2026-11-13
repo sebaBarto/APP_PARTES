@@ -3357,7 +3357,11 @@ IP y por mail. Datos en `registro-llaves/administradores.json` y
   dominio `pedido.sat365.com.ar`, modo *Managed*; es gratis).
 - El vecino normalmente no ve nada (aparece un recuadro solo si Cloudflare
   duda). El servidor verifica el token; si Cloudflare no responde, deja pasar
-  (siguen los topes por IP y por día) para no trabar a los vecinos.
+  (siguen los topes por IP y por día) para no trabar a los vecinos. Lo mismo
+  si Cloudflare dice que la clave secreta está mal (queda en el log de Vercel).
+- Configurado el 13/11/2026: widget «SAT pedido» (hostname
+  `pedido.sat365.com.ar`), variables solo en producción. También protege la
+  denuncia de llave robada.
 
 ### Denuncia de llave robada o perdida (acceso de emergencia, 24 h)
 
