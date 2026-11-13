@@ -11,6 +11,8 @@ export const config = {
   matcher: "/:path*",
 };
 
+const PUBLICAS = ["/solicitar-servicio.html", "/registro-llaves.html", "/robo-llave.html", "/consorcio.html"];
+
 export default function middleware(request) {
   const host = request.headers.get("host") || "";
   if (host !== "pedido.sat365.com.ar") return;
@@ -23,9 +25,15 @@ export default function middleware(request) {
   // CSS, el propio app.js/sw.js, y las llamadas a /api/...) tiene que
   // pasar sin tocarlo — si no, hasta el logo del formulario se
   // redirige a sí mismo en vez de cargar la imagen real.
+  // Dirección corta para denunciar una llave robada o perdida (está impresa en el cartel del hall).
+  if (path === "/robo" || path === "/robo/") {
+    url.pathname = "/robo-llave.html";
+    return Response.redirect(url, 302);
+  }
   const esPagina = path === "/" || path.endsWith(".html");
-  // El registro de llaves (QR del hall) y el portal de administradores de consorcio también son públicos.
-  if (!esPagina || path === "/solicitar-servicio.html" || path === "/registro-llaves.html" || path === "/consorcio.html") return;
+  // El registro de llaves (QR del hall), la denuncia de llave robada y el portal de
+  // administradores de consorcio también son públicos.
+  if (!esPagina || PUBLICAS.includes(path)) return;
 
   url.pathname = "/solicitar-servicio.html";
   return Response.redirect(url, 302);
