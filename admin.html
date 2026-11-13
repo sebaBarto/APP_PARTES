@@ -652,6 +652,43 @@ input.campo-falta { border-color: #C0392B !important; box-shadow: 0 0 0 3px rgba
 }
 @media (max-width: 640px) { .admin-header-der .admin-usuario { display: none; } }
 
+/* ---------- Conciliación de llaves: colores por resultado, legibles en día y en noche ---------- */
+.rll-conc td { background: var(--r-bg); vertical-align: top; }
+.rll-conc td:first-child { border-left: 4px solid var(--r-c); }
+.rll-conc .r-tit { color: var(--r-c); font-weight: 700; }
+.rll-conc .r-tono { color: var(--r-c); }
+.rll-conc .r-sub { color: #55595F; }
+.rll-conc .r-nota { color: #55595F; font-size: 11.5px; }
+.rll-conc .r-num { font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 14px; color: var(--ink); }
+.rll-conc .r-vacio { color: #8A8F94; }
+.rll-conc .r-baja { width: auto; padding: 5px 10px; font-size: 12px; background: #B3261E; color: #fff; }
+.rll-conc .r-baja:hover { background: #8C1D18; }
+.rll-conc tr.r-encontrada { --r-bg: #E6F4EA; --r-c: #1F6B34; }
+.rll-conc tr.r-no_registrada { --r-bg: #FDE2E0; --r-c: #B3261E; }
+.rll-conc tr.r-perdida { --r-bg: #F9C9C4; --r-c: #8C1D18; }
+.rll-conc tr.r-falta { --r-bg: #FFF1D6; --r-c: #8A5A00; }
+.rll-conc tr.r-otra_llave { --r-bg: #EEF3FD; --r-c: #3557A6; }
+.rll-conc tr.r-no_vecino { --r-bg: #EEF0F2; --r-c: #5F6A73; }
+html[data-tema="noche"] .rll-conc .r-sub, html[data-tema="noche"] .rll-conc .r-nota { color: #C9C4B8; }
+html[data-tema="noche"] .rll-conc .r-vacio { color: #8F897D; }
+html[data-tema="noche"] .rll-conc tr.r-encontrada { --r-bg: #15281B; --r-c: #7FD39A; }
+html[data-tema="noche"] .rll-conc tr.r-no_registrada { --r-bg: #351A17; --r-c: #FF9D8F; }
+html[data-tema="noche"] .rll-conc tr.r-perdida { --r-bg: #46201B; --r-c: #FFB4A8; }
+html[data-tema="noche"] .rll-conc tr.r-falta { --r-bg: #33290F; --r-c: #FFC960; }
+html[data-tema="noche"] .rll-conc tr.r-otra_llave { --r-bg: #18213A; --r-c: #9DBBF0; }
+html[data-tema="noche"] .rll-conc tr.r-no_vecino { --r-bg: #24252A; --r-c: #B9BEC6; }
+html[data-tema="noche"] .rll-conc .r-baja { background: #C6372C; color: #fff; }
+html[data-tema="noche"] [style*="color:#3557A6"] { color: #9DBBF0 !important; }
+html[data-tema="noche"] [style*="color:#5F6A73"] { color: #B9BEC6 !important; }
+html[data-tema="noche"] [style*="color:#55595F"] { color: #C9C4B8 !important; }
+html[data-tema="noche"] [style*="color:#8A5A00"] { color: #FFC960 !important; }
+html[data-tema="noche"] [style*="background:#ECEAE3"] { background: #3B3832 !important; }
+html[data-tema="noche"] [style*="background:#EEF0F2"] { background: #2E3034 !important; }
+html[data-tema="noche"] [style*="background:#E8EEFB"], html[data-tema="noche"] [style*="background:#EEF3FD"] { background: #1C2640 !important; }
+html[data-tema="noche"] [style*="color:#2C4E9A"] { color: #9DBBF0 !important; }
+html[data-tema="noche"] [style*="background:#E6F4EA"] { background: #15281B !important; }
+html[data-tema="noche"] [style*="background:#FDE2E0"] { background: #351A17 !important; }
+
 html[data-tema="noche"] { color-scheme: dark;
   --ink: #ECE9E2; --osc: #2B2924; --paper: #25231F; --border: #3B3832; --steel: #A9A397; --ink-2: #A9A397;
   --shadow-card: 0 1px 2px rgba(0,0,0,0.5), 0 10px 24px -12px rgba(0,0,0,0.7);
@@ -10350,22 +10387,30 @@ function renderRllConciliacion() {
   const tabla = document.getElementById("rllConcTabla");
   if (!vis.length) { tabla.innerHTML = '<p class="status">No hay filas con ese filtro.</p>'; return; }
   const disp = (l) => (rllEsControl(l) ? "📟 Control" : "🔑 Tag");
-  tabla.innerHTML = `<table class="ven-tabla"><thead><tr><th>Resultado</th><th>En la estación</th><th>Registrado por el vecino</th><th>Qué hacer</th></tr></thead><tbody>${vis.map((f) => {
+  tabla.innerHTML = `<table class="ven-tabla rll-conc"><thead><tr><th>Resultado</th><th>En la estación</th><th>Registrado por el vecino</th><th>Qué hacer</th></tr></thead><tbody>${vis.map((f) => {
     const R = RLL_CONC_RES[f.res];
     const e = f.est, d = f.d;
-    const enEst = e ? `<span style="font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:14px;">${rllEsc(e.tag ? (rllEsControlEstacion(e) ? e.tag : (rllClaveTag(e.tag).includes(":") ? rllClaveTag(e.tag) : e.tag)) : "—")}</span>${e.usuario ? ` · usuario <b>${rllEsc(e.usuario)}</b>` : ""}<br><span style="color:#55595F;">${rllEsc([[e.nombre, e.apellido].filter(Boolean).join(" "), [e.piso ? e.piso + "°" : "", e.depto].filter(Boolean).join(" "), e.tipo].filter(Boolean).join(" · "))}</span>` : '<span style="color:#8A5A00;">No está en la estación</span>';
-    const reg = d ? `${disp(d.l)} <span style="font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:14px;">${rllEsc(d.l.tag ? (rllEsControl(d.l) ? d.l.tag : (rllTagCalculado(d.l.tag) && !RLL_FORMATO_TAG.test(d.l.tag) ? rllTagCalculado(d.l.tag) : d.l.tag)) : "s/n")}</span>${d.l.usuario ? ` · usuario <b>${rllEsc(d.l.usuario)}</b>` : ""}<br><span style="color:#55595F;">${rllEsc(d.r.nombre)} · ${rllEsc(rllUnidad(d.r))} · ${rllEsc(d.r.telefono)}</span>${d.perdida ? `<br><span style="color:#8C1D18;">La reportó perdida${d.l.detalle ? ": “" + rllEsc(d.l.detalle) + "”" : ""}</span>` : ""}` : f.duena ? `<span style="color:#3557A6;">Es de <b>${rllEsc(f.duena.r.nombre)}</b> (${rllEsc(rllUnidad(f.duena.r))}), que está registrada pero no declaró esta llave.</span><br><span style="font-size:12px;color:#55595F;">Preguntale si la sigue usando antes de darla de baja.</span>` : f.res === "no_vecino" ? `<span style="color:#5F6A73;">No es un vecino${f.est && f.est.obs ? ": " + rllEsc(f.est.obs) : ""}</span>` : '<span style="color:#B3261E;">Nadie la registró</span>';
+    const numEst = e && e.tag ? (rllEsControlEstacion(e) ? e.tag : (rllClaveTag(e.tag).includes(":") ? rllClaveTag(e.tag) : e.tag)) : "";
+    const enEst = e
+      ? `${numEst ? `<span class="r-num">${rllEsc(numEst)}</span>` : '<span class="r-vacio">sin N° de llave</span>'}${e.usuario ? ` · usuario <b>${rllEsc(e.usuario)}</b>` : ""}<br><span class="r-sub">${rllEsc([[e.nombre, e.apellido].filter(Boolean).join(" "), [e.piso ? e.piso + "°" : "", e.depto].filter(Boolean).join(" "), e.tipo].filter(Boolean).join(" · "))}</span>`
+      : '<span class="r-tono">No está en la estación</span>';
+    const numReg = (l) => (l.tag ? (rllEsControl(l) ? l.tag : (rllTagCalculado(l.tag) && !RLL_FORMATO_TAG.test(l.tag) ? rllTagCalculado(l.tag) : l.tag)) : "");
+    const reg = d
+      ? `${disp(d.l)} ${numReg(d.l) ? `<span class="r-num">${rllEsc(numReg(d.l))}</span>` : '<span class="r-vacio">s/n</span>'}${d.l.usuario ? ` · usuario <b>${rllEsc(d.l.usuario)}</b>` : ""}<br><span class="r-sub">${rllEsc(d.r.nombre)} · ${rllEsc(rllUnidad(d.r))} · ${rllEsc(d.r.telefono)}</span>${d.perdida ? `<br><span class="r-tono">La reportó perdida${d.l.detalle ? ": “" + rllEsc(d.l.detalle) + "”" : ""}</span>` : ""}`
+      : f.duena ? `<span class="r-tono">Es de <b>${rllEsc(f.duena.r.nombre)}</b> (${rllEsc(rllUnidad(f.duena.r))}), que está registrada pero no declaró esta llave.</span><br><span class="r-nota">Preguntale si la sigue usando antes de darla de baja.</span>`
+      : f.res === "no_vecino" ? `<span class="r-tono">No es un vecino${e && e.obs ? ": " + rllEsc(e.obs) : ""}</span>`
+      : '<span class="r-tono">Nadie la registró</span>';
     let accion = "";
-    if (f.res === "encontrada") accion = `<span style="color:#1F6B34;">${d.l.estado === "conciliada" ? "✓ Conciliada" : "Coincide"}${f.por === "usuario" ? " (por N° de usuario)" : f.por === "nombre" ? " (por nombre)" : ""}</span>`;
-    else if (f.res === "falta") accion = '<span style="color:#8A5A00;">Cargarla en la estación (o revisar el número)</span>';
+    if (f.res === "encontrada") accion = `<span class="r-tono">${d.l.estado === "conciliada" ? "✓ Conciliada" : "Coincide"}${f.por === "usuario" ? " (por N° de usuario)" : f.por === "nombre" ? " (por nombre)" : ""}</span>`;
+    else if (f.res === "falta") accion = '<span class="r-tono">Cargarla en la estación (o revisar el número)</span>';
     else {
       const dec = rllConc.filas[f.i].decision;
       accion = dec
         ? `<span class="ven-estado ${dec === "mantener" ? "sin" : dec === "hecho" ? "ok" : "vencido"}">${RLL_DECISIONES[dec]}</span>${dec === "dar_de_baja" || dec === "borrar" ? ` <button type="button" class="btn-secondary-admin rll-dec" data-i="${f.i}" data-d="hecho" style="width:auto;padding:4px 10px;font-size:12px;">✓ Ya lo hice</button>` : ""} <button type="button" class="btn-secondary-admin rll-dec" data-i="${f.i}" data-d="" style="width:auto;padding:4px 8px;font-size:12px;border-color:transparent;text-decoration:underline;">cambiar</button>`
-        : `<button type="button" class="rll-dec" data-i="${f.i}" data-d="dar_de_baja" style="width:auto;padding:5px 10px;font-size:12px;background:#B3261E;">Dar de baja</button> <button type="button" class="btn-secondary-admin rll-dec" data-i="${f.i}" data-d="borrar" style="width:auto;padding:5px 10px;font-size:12px;color:#B3261E;border-color:#B3261E;">Borrar</button> <button type="button" class="btn-secondary-admin rll-dec" data-i="${f.i}" data-d="mantener" style="width:auto;padding:5px 10px;font-size:12px;">Mantener</button>`;
+        : `<button type="button" class="rll-dec r-baja" data-i="${f.i}" data-d="dar_de_baja">Dar de baja</button> <button type="button" class="btn-secondary-admin rll-dec" data-i="${f.i}" data-d="borrar" style="width:auto;padding:5px 10px;font-size:12px;">Borrar</button> <button type="button" class="btn-secondary-admin rll-dec" data-i="${f.i}" data-d="mantener" style="width:auto;padding:5px 10px;font-size:12px;">Mantener</button>`;
     }
-    return `<tr style="background:${R.fondo};">
-      <td style="border-left:4px solid ${R.color};"><b style="color:${R.color};">${R.txt}</b>${f.nota && f.res !== "otra_llave" && f.res !== "no_vecino" ? `<br><span style="font-size:11.5px;color:#55595F;">⚠ ${rllEsc(f.nota)}</span>` : ""}</td>
+    return `<tr class="r-${f.res}">
+      <td><span class="r-tit">${R.txt}</span>${f.nota && f.res !== "otra_llave" && f.res !== "no_vecino" ? `<br><span class="r-nota">⚠ ${rllEsc(f.nota)}</span>` : ""}</td>
       <td>${enEst}</td><td>${reg}</td><td style="white-space:nowrap;">${accion}</td></tr>`;
   }).join("")}</tbody></table>`;
   tabla.querySelectorAll(".rll-dec").forEach((b) => b.addEventListener("click", () => rllDecidir([Number(b.dataset.i)], b.dataset.d)));
