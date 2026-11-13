@@ -3394,3 +3394,32 @@ y la pantalla de gracias y el mail de constancia le dan el link para guardarlo.
   al vecino al terminar.
 - Topes por IP, captcha (si está Turnstile) y no duplica la misma denuncia
   dentro de 48 h.
+
+## Seguridad (revisión del 13/11/2026)
+
+- **Colecciones de la oficina**: escribir en una colección (POST/PUT/DELETE)
+  reemplaza o vacía la tabla entera. Con una sesión de técnico solo se puede en
+  las que usa la APP (`errores_app`, `servicios_vistos`, `datos_equipo`,
+  `push-subscripciones`, `servicios_emergencia`, `notas`); config, clientes,
+  credenciales, guardias, catálogos, vehículos y SIMs, solo la oficina.
+- **Mails**: con la sesión de una persona solo se mandan los del parte
+  (`oficina`, `cliente`); el resto (constancias, claves nuevas, avisos de llaves,
+  estación de monitoreo) los manda únicamente el servidor con su clave.
+- **Pase del panel**: dura 24 h (antes 30 días); el de la APP de técnicos, 30.
+- **Portal de administradores**: además del tope en memoria, bloqueo por mail
+  guardado en el backend nuevo (`cons:<mail>`, mismo servicio que el ingreso al
+  panel) y no acepta claves triviales al cambiarla.
+- **Denuncia de llave robada**: topes guardados por edificio (6 por hora, 3 "sin
+  verificar" por día) además de los topes por conexión.
+- **Pedir servicio** (`solicitar-servicio.html`): topes, campo trampa, largos
+  máximos y captcha (Turnstile).
+- **Encuesta del cliente**: solo acepta un N° de parte y un puntaje válidos, y
+  escapa lo que va al mail de la oficina.
+- **Cabeceras** (vercel.json): nosniff, Referrer-Policy, HSTS,
+  Permissions-Policy y CSP `frame-ancestors` (solo el propio sitio y
+  sat365.com.ar pueden mostrar las páginas en un marco).
+- Comparaciones de tiempo constante para la clave general y el `CRON_SECRET`.
+- Pendientes recomendados: regla de **tope por IP en el firewall de Vercel**
+  para `/api/datos?publico=…`, cargar **`ADMIN_PASSWORD_HASH`** en vez de
+  `ADMIN_PASSWORD`, y borrar las claves de técnicos en texto plano de
+  `tecnicos.json` cuando todos tengan su hash en el backend nuevo.

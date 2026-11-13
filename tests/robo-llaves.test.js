@@ -210,3 +210,35 @@ test("robo: ticket vencido o adulterado, búsqueda de edificio y edificio apagad
   llaves._reiniciarTopes();
   assert.strictEqual((await llamar(robo.manejarPublico, { method: "GET", query: { e: E } }, gh)).status, 404);
 });
+
+test("robo: topes por edificio guardados (no dependen de la memoria del servidor)", async () => {
+  const { gh } = await preparar();
+  // 6 denuncias distintas en la hora: la séptima se frena.
+  for (let i = 0; i < 6; i++) {
+    llaves._reiniciarTopes();
+    const id = await post(gh, { accion: "identificar", piso: String(10 + i), unidad: "A", nombre: "Vecino " + i, telefono: "341 300 00" + (10 + i) });
+    const r = await post(gh, { accion: "reportar", ticket: id.data.ticket, tag: "100:0000" + i, motivo: "extravio", dni: JPEG });
+    assert.strictEqual(r.status, 200, "denuncia " + i);
+  }
+  llaves._reiniciarTopes();
+  const id = await post(gh, { accion: "identificar", piso: "20", unidad: "A", nombre: "Otro", telefono: "341 300 0099" });
+  const r = await post(gh, { accion: "reportar", ticket: id.data.ticket, tag: "100:00099", motivo: "robo", dni: JPEG });
+  assert.strictEqual(r.status, 429);
+  assert.match(r.data.error, /muchas denuncias/);
+});
+
+test("robo: después de 3 sin verificar en el día, pide el DNI", async () => {
+  const { gh } = await preparar();
+  for (let i = 0; i < 3; i++) {
+    llaves._reiniciarTopes();
+    const id = await post(gh, { accion: "identificar", piso: String(30 + i), unidad: "B", nombre: "Sin Dni " + i, telefono: "341 400 00" + (10 + i) });
+    assert.strictEqual((await post(gh, { accion: "reportar", ticket: id.data.ticket, tag: "200:0000" + i, motivo: "robo", sin_dni: true })).status, 200);
+  }
+  llaves._reiniciarTopes();
+  const id = await post(gh, { accion: "identificar", piso: "40", unidad: "B", nombre: "Cuarto", telefono: "341 400 0099" });
+  const r = await post(gh, { accion: "reportar", ticket: id.data.ticket, tag: "200:00099", motivo: "robo", sin_dni: true });
+  assert.strictEqual(r.status, 400);
+  assert.ok(r.data.falta_dni);
+  // Con DNI sí pasa.
+  assert.strictEqual((await post(gh, { accion: "reportar", ticket: id.data.ticket, tag: "200:00099", motivo: "robo", dni: JPEG })).status, 200);
+});

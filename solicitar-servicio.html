@@ -138,6 +138,8 @@
       <label for="tarea">¿Qué necesitás?</label>
       <textarea id="tarea" placeholder="Contanos qué pasó o qué necesitás"></textarea>
 
+      <input type="text" id="sitioWeb" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;">
+      <div id="captchaBox" style="display:flex;justify-content:center;margin-top:12px;"></div>
       <button type="button" id="enviarBtn">Enviar solicitud</button>
       <p class="status" id="statusMsg"></p>
     </div>
@@ -156,6 +158,20 @@
 <script>
   const enviarBtn = document.getElementById("enviarBtn");
   const statusMsg = document.getElementById("statusMsg");
+
+  // Anti-robots (Cloudflare Turnstile): solo si el servidor lo pide.
+  let captchaToken = "", captchaWidget = null;
+  fetch("/api/datos?publico=solicitud_emergencia").then((r) => r.json()).then((d) => {
+    if (!d || !d.captcha) return;
+    window.alCargarTurnstile = () => {
+      captchaWidget = window.turnstile.render("#captchaBox", { sitekey: d.captcha, language: "es", appearance: "interaction-only", action: "pedir_servicio",
+        callback: (t) => { captchaToken = t; }, "expired-callback": () => { captchaToken = ""; }, "error-callback": () => { captchaToken = ""; } });
+    };
+    const sc = document.createElement("script");
+    sc.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=alCargarTurnstile";
+    sc.async = true; document.head.appendChild(sc);
+  }).catch(() => {});
+  const reiniciarCaptcha = () => { captchaToken = ""; if (window.turnstile && captchaWidget !== null) { try { window.turnstile.reset(captchaWidget); } catch (e) {} } };
 
   enviarBtn.addEventListener("click", async () => {
     const cliente = document.getElementById("cliente").value.trim();
@@ -177,16 +193,16 @@
       const res = await fetch("/api/datos?publico=solicitud_emergencia", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ cliente, telefono, direccion, tarea }),
+        body: JSON.stringify({ cliente, telefono, direccion, tarea, captcha: captchaToken, sitio_web: document.getElementById("sitioWeb").value }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "No se pudo enviar");
+      if (!res.ok) { reiniciarCaptcha(); const e = new Error(data.error || "No se pudo enviar"); e.servidor = true; throw e; }
 
       document.getElementById("formularioWrap").style.display = "none";
       document.getElementById("pantallaGracias").classList.add("visible");
     } catch (err) {
       statusMsg.className = "status err";
-      statusMsg.textContent = "No se pudo enviar — probá de nuevo en un momento.";
+      statusMsg.textContent = err.servidor ? err.message : "No se pudo enviar — probá de nuevo en un momento.";
       enviarBtn.disabled = false;
     }
   });

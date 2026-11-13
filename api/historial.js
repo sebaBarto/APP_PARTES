@@ -272,6 +272,7 @@ module.exports = require("../lib/auditoria").conAuditoria("historial", async (re
   // excepción de todo este archivo.
   if (req.method === "GET" && req.query && req.query.tipo === "encuesta") {
     const { parte, puntaje } = req.query;
+    const escHtml = (v) => String(v == null ? "" : v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
     const paginaHtml = (titulo, mensaje) => `<!DOCTYPE html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${titulo}</title>
@@ -281,9 +282,17 @@ module.exports = require("../lib/auditoria").conAuditoria("historial", async (re
 
     try {
       const { BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN } = process.env;
-      if (!parte || !puntaje || !BACKEND_NUEVO_URL || !BACKEND_NUEVO_TOKEN) {
+      // El link lo arma el mail al cliente: N° de parte SAT-AAAAMMDD-HHMMSS-NNN y puntaje 1 a 5.
+      // Cualquier otra cosa se rechaza (si no, se podía meter HTML en el aviso a la oficina).
+      if (!/^SAT-\d{8}-\d{6}-\d{3}$/.test(String(parte || "")) || !/^[1-5]$/.test(String(puntaje || "")) || !BACKEND_NUEVO_URL || !BACKEND_NUEVO_TOKEN) {
         res.setHeader("Content-Type", "text/html; charset=utf-8");
-        res.status(400).send(paginaHtml("No se pudo registrar", "Faltan datos en el link."));
+        res.status(400).send(paginaHtml("No se pudo registrar", "El link no es válido."));
+        return;
+      }
+      const RL = require("../lib/registro-llaves");
+      if (!RL.util.pasaTope("enc|" + RL.util.ipDe(req), { n: 10, ms: 10 * 60 * 1000 })) {
+        res.setHeader("Content-Type", "text/html; charset=utf-8");
+        res.status(429).send(paginaHtml("Demasiados intentos", "Probá de nuevo en unos minutos."));
         return;
       }
       // Se busca el parte para sacarle cliente/técnico/fecha (para
@@ -318,9 +327,9 @@ module.exports = require("../lib/auditoria").conAuditoria("historial", async (re
               <div style="font-family: Arial, Helvetica, sans-serif; color:#101820;">
                 <h2 style="margin-bottom:4px;">⚠️ Un cliente calificó mal un servicio</h2>
                 <p><b>Puntaje:</b> ${puntaje}/5</p>
-                <p><b>Cliente:</b> ${cliente || "sin identificar"}</p>
-                <p><b>Técnico:</b> ${tecnico || "sin identificar"}</p>
-                <p><b>Fecha del parte:</b> ${fechaParte || "sin identificar"}</p>
+                <p><b>Cliente:</b> ${escHtml(cliente) || "sin identificar"}</p>
+                <p><b>Técnico:</b> ${escHtml(tecnico) || "sin identificar"}</p>
+                <p><b>Fecha del parte:</b> ${escHtml(fechaParte) || "sin identificar"}</p>
                 <p><b>N° de parte:</b> ${parte}</p>
               </div>
             `,

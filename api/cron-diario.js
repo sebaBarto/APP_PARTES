@@ -745,7 +745,8 @@ async function chequearPropuestas3d(ghHeaders) {
 module.exports = async (req, res) => {
   const authHeader = req.headers["authorization"] || "";
   const esperado = `Bearer ${process.env.CRON_SECRET || ""}`;
-  if (!process.env.CRON_SECRET || authHeader !== esperado) {
+  const igual = (x, y) => { const bx = Buffer.from(String(x)), by = Buffer.from(String(y)); return bx.length === by.length && require("crypto").timingSafeEqual(bx, by); };
+  if (!process.env.CRON_SECRET || !igual(authHeader, esperado)) {
     res.status(401).json({ error: "No autorizado" });
     return;
   }

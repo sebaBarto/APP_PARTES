@@ -332,7 +332,8 @@ function getTransporter() {
 module.exports = async (req, res) => {
   const authHeader = req.headers["authorization"] || "";
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();
-  if (!require("../lib/sesion").autorizar(req)) {
+  const quien = require("../lib/sesion").autorizar(req);
+  if (!quien) {
     res.status(401).json({ error: "No autorizado" });
     return;
   }
@@ -340,6 +341,17 @@ module.exports = async (req, res) => {
     res.setHeader("Allow", "POST");
     res.status(405).json({ error: "Método no permitido" });
     return;
+  }
+  // Con la sesión de una persona (APP o panel) solo se mandan los mails del parte
+  // (a la oficina y al cliente); el diagnóstico, solo la oficina. Los demás (avisos de
+  // llaves, constancias, claves nuevas, estación de monitoreo) los manda el servidor
+  // con su propia clave: así una sesión robada no sirve para mandar mails a nombre de SAT.
+  if (quien.tipo === "sesion") {
+    let b0 = req.body;
+    if (typeof b0 === "string") { try { b0 = JSON.parse(b0); } catch (e) { b0 = {}; } }
+    const t0 = (b0 || {}).tipo;
+    const permitido = t0 === "oficina" || t0 === "cliente" || (t0 === "diagnostico-smtp" && quien.rol === "admin");
+    if (!permitido) { res.status(403).json({ error: "Este mail lo manda solo el servidor" }); return; }
   }
 
   // Diagnóstico SMTP — verifica la conexión sin mandar ningún mail real,

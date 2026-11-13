@@ -42,7 +42,9 @@ async function verificarPasswordAdmin(intento) {
   }
 
   // Respaldo temporal mientras no se configuró el hash todavía.
-  return !!process.env.ADMIN_PASSWORD && intento === process.env.ADMIN_PASSWORD;
+  if (!process.env.ADMIN_PASSWORD) return false;
+  const a = Buffer.from(intento), b = Buffer.from(process.env.ADMIN_PASSWORD);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
 // Lista de técnicos tal como está guardada (con claves y permisos). Solo
@@ -2255,13 +2257,33 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
     await require("../lib/registro-llaves").manejarPublico(req, res, { leer: leerArchivoDatos, escribir: escribirArchivoDatos });
     return;
   }
+  if (req.method === "GET" && req.query && req.query.publico === "solicitud_emergencia") {
+    // Lo único que necesita la página: si tiene que mostrar el captcha.
+    res.setHeader("Cache-Control", "public, max-age=0, s-maxage=300");
+    res.status(200).json({ captcha: process.env.TURNSTILE_SITE_KEY && process.env.TURNSTILE_SECRET_KEY ? process.env.TURNSTILE_SITE_KEY : "" });
+    return;
+  }
   if (req.method === "POST" && req.query && req.query.publico === "solicitud_emergencia") {
     let body = req.body;
     if (typeof body === "string") { try { body = JSON.parse(body); } catch (e) { body = {}; } }
-    const comoTexto = (v) => (typeof v === "string" ? v.trim() : "");
-    const cliente = comoTexto(body?.cliente);
-    const telefono = comoTexto(body?.telefono);
-    if (!cliente || !telefono) {
+    // Formulario público: cada pedido manda un aviso a todo el equipo, así que tiene
+    // topes (por conexión y en total), un campo trampa para robots y captcha.
+    const RL = require("../lib/registro-llaves");
+    const ipPedido = RL.util.ipDe(req);
+    if (!RL.util.pasaTope("se|" + ipPedido, { n: 3, ms: 15 * 60 * 1000 }) || !RL.util.pasaTope("se|total", { n: 40, ms: 60 * 60 * 1000 })) {
+      res.status(429).json({ error: "Se mandaron muchos pedidos seguidos. Esperá unos minutos o escribinos por WhatsApp" });
+      return;
+    }
+    if (body && typeof body.sitio_web === "string" && body.sitio_web.trim()) { res.status(200).json({ ok: true }); return; }
+    if (!(await RL.verificarCaptcha(body && body.captcha, ipPedido))) {
+      res.status(400).json({ error: "No pudimos verificar que no seas un robot. Esperá unos segundos y probá de nuevo", captcha: true });
+      return;
+    }
+    const comoTexto = (v, n = 200) => (typeof v === "string" ? v.replace(/[<>"`\\\u0000-\u001f]/g, "").replace(/\s+/g, " ").trim().slice(0, n) : "");
+    const cliente = comoTexto(body?.cliente, 80);
+    const telefono = comoTexto(body?.telefono, 30).replace(/[^0-9+()\-\s]/g, "");
+    body = { ...body, direccion: comoTexto(body?.direccion, 150), tarea: comoTexto(body?.tarea, 800) };
+    if (!cliente || telefono.replace(/\D/g, "").length < 6) {
       res.status(400).json({ error: "Faltan datos (nombre o teléfono)" });
       return;
     }
@@ -2724,6 +2746,16 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
   // probando cada una antes de seguir con la próxima. La app en el
   // celular no cambia en nada — sigue pidiendo lo mismo de siempre.
   const COLECCIONES_YA_CORTADAS = ["clientes", "materiales", "credenciales", "consultas-categorias", "config", "guardias", "push-subscripciones", "servicios_emergencia", "vehiculos", "herramientas", "sims", "sims_instaladas", "notas", "visitas_historicas"];
+  // Escribir (POST/PUT/DELETE) en una colección reemplaza o vacía la tabla entera: un
+  // técnico solo puede hacerlo en las que usa la APP. Configuración, clientes,
+  // credenciales, guardias, catálogos, vehículos y SIMs solo los cambia la oficina.
+  // (La lista de técnicos tiene su propia regla, más arriba.)
+  const ESCRIBE_TECNICO = ["errores_app", "servicios_vistos", "datos_equipo", "push-subscripciones", "servicios_emergencia", "notas"];
+  if (req.method !== "GET" && nombreColeccion !== "tecnicos" && (!autorizacion || autorizacion.rol !== "admin")
+    && (COLECCIONES[nombreColeccion] || COLECCIONES_YA_CORTADAS.includes(nombreColeccion)) && !ESCRIBE_TECNICO.includes(nombreColeccion)) {
+    res.status(403).json({ error: "Solo la oficina puede modificar esto" });
+    return;
+  }
   if (COLECCIONES_YA_CORTADAS.includes(nombreColeccion)) {
     const { BACKEND_NUEVO_URL, BACKEND_NUEVO_TOKEN } = process.env;
     if (!BACKEND_NUEVO_URL || !BACKEND_NUEVO_TOKEN) {
