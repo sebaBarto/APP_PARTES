@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.79.1";
+const APP_VERSION = "4.80.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -10994,10 +10994,196 @@ function planosPendientesSubir() {
 window.addEventListener("online", () => { if (planosPendientesLeer().length) planosPendientesSubir(); });
 setTimeout(() => { try { if (planosPendientesLeer().length && navigator.onLine !== false && SERVICIOS_API_TOKEN) planosPendientesSubir(); } catch (e) { /* nada */ } }, 4000);
 function esErrorDeRed(err) { return navigator.onLine === false || (err && (err.name === "TypeError" || /Failed to fetch|NetworkError|Load failed|network/i.test(err.message || ""))); }
+// ---------- Recortar y enderezar la foto de un plano en papel ----------
+// Se acomodan las 4 esquinas sobre las puntas del papel (con lupa para que quede justo) y la hoja
+// sale derecha, como escaneada. Devuelve un File JPEG, el mismo archivo («sin recortar») o null (canceló).
+const RP_FORMAS = { libre: 0, a4: 297 / 210, oficio: 356 / 216, carta: 279 / 216 };
+function rpEsFoto(archivo) {
+  const n = String(archivo.name || "").toLowerCase(), t = String(archivo.type || "").toLowerCase();
+  if (t === "application/pdf" || n.endsWith(".pdf") || t === "image/svg+xml" || n.endsWith(".svg")) return false;
+  return t.startsWith("image/") || /\.(png|jpe?g|webp|heic|heif|bmp|gif)$/.test(n);
+}
+async function rpCargarImagen(archivo, lado) {
+  const url = URL.createObjectURL(archivo);
+  try {
+    const img = await new Promise((ok, mal) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => mal(new Error("No se pudo abrir la foto")); i.src = url; });
+    const k = Math.min(1, lado / Math.max(img.naturalWidth, img.naturalHeight));
+    const cv = document.createElement("canvas");
+    cv.width = Math.max(1, Math.round(img.naturalWidth * k)); cv.height = Math.max(1, Math.round(img.naturalHeight * k));
+    cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+    return cv;
+  } finally { URL.revokeObjectURL(url); }
+}
+function rpGirar(cv) {
+  const g = document.createElement("canvas");
+  g.width = cv.height; g.height = cv.width;
+  const c = g.getContext("2d");
+  c.translate(g.width, 0); c.rotate(Math.PI / 2); c.drawImage(cv, 0, 0);
+  return g;
+}
+function rpDetectar(cv) {
+  const k = Math.min(1, 320 / Math.max(cv.width, cv.height));
+  const ch = document.createElement("canvas");
+  ch.width = Math.max(1, Math.round(cv.width * k)); ch.height = Math.max(1, Math.round(cv.height * k));
+  const c = ch.getContext("2d", { willReadFrequently: true });
+  c.drawImage(cv, 0, 0, ch.width, ch.height);
+  const q = croquisDetectarHoja(c.getImageData(0, 0, ch.width, ch.height));
+  if (!q) return null;
+  // Un poquito hacia adentro: la copia chica redondea el borde y no tiene que entrar la mesa.
+  const cx = q.reduce((a, p) => a + p[0], 0) / 4, cy = q.reduce((a, p) => a + p[1], 0) / 4, adentro = 0.006;
+  return q.map(([x, y]) => [Math.max(0, Math.min(cv.width, (x + (cx - x) * adentro) / k)), Math.max(0, Math.min(cv.height, (y + (cy - y) * adentro) / k))]);
+}
+const rpEntera = (cv) => [[0, 0], [cv.width, 0], [cv.width, cv.height], [0, cv.height]];
+function abrirRecortePlano(archivo) {
+  return new Promise(async (resolver) => {
+    let src;
+    try { src = await rpCargarImagen(archivo, 2400); } catch (e) { resolver(archivo); return; }
+    let q = rpDetectar(src), detectada = !!q;
+    if (!q) { const m = 0.06; q = [[src.width * m, src.height * m], [src.width * (1 - m), src.height * m], [src.width * (1 - m), src.height * (1 - m)], [src.width * m, src.height * (1 - m)]]; }
+    let forma = "libre", resultado = null, arrastra = -1;
+    const capa = document.createElement("div");
+    capa.className = "rp-capa";
+    capa.setAttribute("role", "dialog"); capa.setAttribute("aria-modal", "true"); capa.setAttribute("aria-label", "Recortar la foto del plano");
+    capa.innerHTML = `<div class="rp-cab"><b class="rp-tit">Recortá la hoja</b><span class="rp-ayuda"></span></div>
+      <div class="rp-escena"><canvas class="rp-lienzo"></canvas><canvas class="rp-lupa" width="240" height="240"></canvas></div>
+      <div class="rp-herr">
+        <button type="button" class="rp-btn" data-rp="girar">↻ Girar</button>
+        <button type="button" class="rp-btn" data-rp="detectar">Buscar la hoja</button>
+        <button type="button" class="rp-btn" data-rp="entera">Toda la foto</button>
+        <label class="rp-forma">Hoja <select data-rp="forma"><option value="libre">Como se ve</option><option value="a4">A4</option><option value="oficio">Oficio</option><option value="carta">Carta</option></select></label>
+      </div>
+      <div class="rp-pie">
+        <button type="button" class="rp-btn rp-sec" data-rp="cancelar">Cancelar</button>
+        <button type="button" class="rp-btn rp-sec" data-rp="sin">Sin recortar</button>
+        <button type="button" class="rp-btn rp-pri" data-rp="listo">Enderezar</button>
+      </div>`;
+    document.body.appendChild(capa);
+    const lienzo = capa.querySelector(".rp-lienzo"), lupa = capa.querySelector(".rp-lupa"), escena = capa.querySelector(".rp-escena");
+    const ayuda = capa.querySelector(".rp-ayuda"), btnListo = capa.querySelector('[data-rp="listo"]');
+    const ctx = lienzo.getContext("2d");
+    let esc = 1, ox = 0, oy = 0; // imagen -> pantalla (px CSS)
+    const pantalla = () => (resultado ? resultado.cv : src);
+    const ponerAyuda = () => {
+      ayuda.textContent = resultado ? "Así queda. Si algo quedó torcido, volvé a acomodar las esquinas." : detectada ? "Encontré la hoja: revisá que cada esquina quede justo en la punta del papel." : "Arrastrá cada esquina hasta la punta del papel.";
+    };
+    const dibujar = () => {
+      const r = escena.getBoundingClientRect(), dpr = window.devicePixelRatio || 1, img = pantalla();
+      lienzo.width = Math.round(r.width * dpr); lienzo.height = Math.round(r.height * dpr);
+      lienzo.style.width = r.width + "px"; lienzo.style.height = r.height + "px";
+      const m = resultado ? 12 : 26;
+      esc = Math.min((r.width - 2 * m) / img.width, (r.height - 2 * m) / img.height);
+      ox = (r.width - img.width * esc) / 2; oy = (r.height - img.height * esc) / 2;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, r.width, r.height);
+      ctx.drawImage(img, ox, oy, img.width * esc, img.height * esc);
+      if (resultado) return;
+      const P = q.map(([x, y]) => [ox + x * esc, oy + y * esc]);
+      // Afuera de la hoja, oscuro
+      ctx.save(); ctx.fillStyle = "rgba(0,0,0,.55)"; ctx.beginPath(); ctx.rect(0, 0, r.width, r.height);
+      ctx.moveTo(P[0][0], P[0][1]); P.slice(1).forEach((p) => ctx.lineTo(p[0], p[1])); ctx.closePath(); ctx.fill("evenodd"); ctx.restore();
+      ctx.strokeStyle = "#FFC033"; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(P[0][0], P[0][1]); P.slice(1).forEach((p) => ctx.lineTo(p[0], p[1])); ctx.closePath(); ctx.stroke();
+      P.forEach((p, k) => { ctx.beginPath(); ctx.arc(p[0], p[1], k === arrastra ? 16 : 13, 0, Math.PI * 2); ctx.fillStyle = "rgba(255,192,51,.35)"; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = "#fff"; ctx.stroke(); ctx.beginPath(); ctx.arc(p[0], p[1], 2.5, 0, Math.PI * 2); ctx.fillStyle = "#FFC033"; ctx.fill(); });
+    };
+    const dibujarLupa = (k, px, py) => {
+      const lc = lupa.getContext("2d"), Z = 3, R = 120;
+      const [x, y] = q[k];
+      lc.clearRect(0, 0, 240, 240);
+      lc.save(); lc.beginPath(); lc.arc(R, R, R - 3, 0, Math.PI * 2); lc.clip();
+      lc.fillStyle = "#222"; lc.fillRect(0, 0, 240, 240);
+      const tam = 240 / (Z * esc); // px de imagen que entran en la lupa
+      lc.drawImage(src, x - tam / 2, y - tam / 2, tam, tam, 0, 0, 240, 240);
+      lc.strokeStyle = "#FFC033"; lc.lineWidth = 1.5; lc.beginPath(); lc.moveTo(R, R - 26); lc.lineTo(R, R + 26); lc.moveTo(R - 26, R); lc.lineTo(R + 26, R); lc.stroke();
+      lc.restore();
+      lc.beginPath(); lc.arc(R, R, R - 3, 0, Math.PI * 2); lc.lineWidth = 4; lc.strokeStyle = "#fff"; lc.stroke();
+      // Lejos del dedo: arriba (o abajo si no entra)
+      const r = escena.getBoundingClientRect(), L = 120;
+      let lx = px - L / 2, ly = py - L - 46;
+      if (ly < 4) ly = py + 46;
+      lx = Math.max(4, Math.min(r.width - L - 4, lx));
+      lupa.style.left = lx + "px"; lupa.style.top = ly + "px"; lupa.style.display = "block";
+    };
+    const punto = (e) => { const r = lienzo.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+    let toque = [0, 0], base = [0, 0];
+    lienzo.addEventListener("pointerdown", (e) => {
+      if (resultado) return;
+      const [px, py] = punto(e);
+      let mejor = -1, dmin = 44;
+      q.forEach(([x, y], k) => { const d = Math.hypot(ox + x * esc - px, oy + y * esc - py); if (d < dmin) { dmin = d; mejor = k; } });
+      if (mejor < 0) return;
+      e.preventDefault();
+      arrastra = mejor; toque = [px, py]; base = [...q[mejor]];
+      lienzo.setPointerCapture(e.pointerId);
+      dibujar(); dibujarLupa(arrastra, px, py);
+    });
+    lienzo.addEventListener("pointermove", (e) => {
+      if (arrastra < 0) return;
+      const [px, py] = punto(e);
+      // Se mueve lo que se mueve el dedo (la esquina no salta debajo del dedo y se ve en la lupa)
+      q[arrastra] = [Math.max(0, Math.min(src.width, base[0] + (px - toque[0]) / esc)), Math.max(0, Math.min(src.height, base[1] + (py - toque[1]) / esc))];
+      detectada = false;
+      dibujar(); dibujarLupa(arrastra, px, py);
+    });
+    const soltar = () => { if (arrastra < 0) return; arrastra = -1; lupa.style.display = "none"; ponerAyuda(); dibujar(); };
+    lienzo.addEventListener("pointerup", soltar);
+    lienzo.addEventListener("pointercancel", soltar);
+    const terminar = (v) => { window.removeEventListener("resize", dibujar); capa.remove(); resolver(v); };
+    const modoAcomodar = () => {
+      resultado = null;
+      capa.querySelector(".rp-tit").textContent = "Recortá la hoja";
+      capa.querySelector(".rp-herr").classList.remove("hidden");
+      btnListo.textContent = "Enderezar";
+      capa.querySelector('[data-rp="sin"]').textContent = "Sin recortar";
+      ponerAyuda(); dibujar();
+    };
+    capa.addEventListener("click", async (e) => {
+      const b = e.target.closest("[data-rp]"); if (!b || b.tagName === "SELECT") return;
+      const que = b.dataset.rp;
+      if (que === "cancelar") return terminar(null);
+      if (que === "sin") { if (resultado) return modoAcomodar(); return terminar(archivo); }
+      if (que === "girar") { q = croquisGirarEsquinas(q, src.width, src.height); src = rpGirar(src); dibujar(); return; }
+      if (que === "detectar") { const d = rpDetectar(src); if (d) { q = d; detectada = true; ponerAyuda(); dibujar(); } else showToast("No encontré el borde de la hoja: acomodá las esquinas a mano (ayuda sacar la foto sobre una mesa oscura)."); return; }
+      if (que === "entera") { q = rpEntera(src); detectada = false; ponerAyuda(); dibujar(); return; }
+      if (que === "listo") {
+        if (resultado) {
+          btnListo.disabled = true;
+          resultado.cv.toBlob((blob) => terminar(blob ? new File([blob], "plano-recortado.jpg", { type: "image/jpeg" }) : archivo), "image/jpeg", 0.9);
+          return;
+        }
+        btnListo.disabled = true; btnListo.textContent = "Enderezando…";
+        await new Promise((r) => setTimeout(r, 30));
+        try {
+          const c = src.getContext("2d", { willReadFrequently: true });
+          const px = croquisEnderezarPixeles(c.getImageData(0, 0, src.width, src.height), q, 2400, RP_FORMAS[forma]);
+          const cv = document.createElement("canvas"); cv.width = px.width; cv.height = px.height;
+          cv.getContext("2d").putImageData(new ImageData(px.data, px.width, px.height), 0, 0);
+          resultado = { cv };
+          capa.querySelector(".rp-tit").textContent = "Hoja enderezada";
+          capa.querySelector(".rp-herr").classList.add("hidden");
+          capa.querySelector('[data-rp="sin"]').textContent = "← Acomodar de nuevo";
+          btnListo.textContent = "Usar así";
+          ponerAyuda(); dibujar();
+        } catch (err) { showToast(err.message || "No se pudo enderezar"); btnListo.textContent = "Enderezar"; }
+        btnListo.disabled = false;
+      }
+    });
+    capa.querySelector('[data-rp="forma"]').addEventListener("change", (e) => { forma = e.target.value; });
+    window.addEventListener("resize", dibujar);
+    capa.rpEstado = () => ({ q: q.map((p) => [...p]), pantalla: q.map(([x, y]) => [ox + x * esc, oy + y * esc]), ancho: src.width, alto: src.height });
+    ponerAyuda();
+    requestAnimationFrame(dibujar);
+  });
+}
+
 document.getElementById("instPlanoArchivoInput").addEventListener("change", async (e) => {
-  const archivo = e.target.files && e.target.files[0];
+  let archivo = e.target.files && e.target.files[0];
   e.target.value = "";
   if (!archivo || !instalacionActivaId) return;
+  // Foto del plano en papel: recortar la hoja y enderezarla antes de subirla.
+  if (rpEsFoto(archivo)) {
+    const recortado = await abrirRecortePlano(archivo);
+    if (!recortado) return;
+    archivo = recortado;
+  }
   const dat = instalacionActivaDatos || {};
   instPlanoEstado.textContent = "Preparando el plano...";
   let pendiente = null;

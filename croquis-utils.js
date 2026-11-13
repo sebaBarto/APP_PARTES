@@ -16,7 +16,7 @@
 //   simbolo { tipo, x, y, rot, esc, color?, esp? }  equipos y objetos de obra
 
 // Tiene que ser igual a APP_VERSION de app.js (si no, la app recarga).
-const CROQUIS_UTILS_VERSION = "4.79.1";
+const CROQUIS_UTILS_VERSION = "4.80.0";
 const CROQUIS_GRILLA = 20;
 
 // Cada símbolo se dibuja centrado en 0,0 con dib(color). "cat" separa los
@@ -2089,3 +2089,130 @@ function croquisSvgMedidas(elementos) {
 }
 
 croquisCargarLogo();
+
+// ============================================================
+// FOTO DE UN PLANO EN PAPEL: recortar la hoja y enderezarla
+// (corrección de perspectiva con las 4 esquinas del papel).
+// Funciones puras (sin DOM) para poder probarlas: la pantalla
+// está en app.js (abrirRecortePlano).
+// ============================================================
+// Homografía que lleva (0,0)-(W,0)-(W,H)-(0,H) a las 4 esquinas q = [[x,y] ×4] (sentido horario desde arriba a la izquierda).
+function croquisHomografia(W, H, q) {
+  const s = [[0, 0], [W, 0], [W, H], [0, H]];
+  const A = [], b = [];
+  for (let k = 0; k < 4; k++) {
+    const [x, y] = s[k], [u, v] = q[k];
+    A.push([x, y, 1, 0, 0, 0, -u * x, -u * y]); b.push(u);
+    A.push([0, 0, 0, x, y, 1, -v * x, -v * y]); b.push(v);
+  }
+  // Gauss con pivoteo parcial
+  const n = 8;
+  for (let c = 0; c < n; c++) {
+    let p = c;
+    for (let r = c + 1; r < n; r++) if (Math.abs(A[r][c]) > Math.abs(A[p][c])) p = r;
+    if (Math.abs(A[p][c]) < 1e-12) return null;
+    [A[c], A[p]] = [A[p], A[c]]; [b[c], b[p]] = [b[p], b[c]];
+    for (let r = 0; r < n; r++) {
+      if (r === c) continue;
+      const f = A[r][c] / A[c][c];
+      if (!f) continue;
+      for (let k = c; k < n; k++) A[r][k] -= f * A[c][k];
+      b[r] -= f * b[c];
+    }
+  }
+  const h = b.map((v, i) => v / A[i][i]);
+  return [h[0], h[1], h[2], h[3], h[4], h[5], h[6], h[7], 1];
+}
+function croquisAplicarHomografia(h, x, y) {
+  const d = h[6] * x + h[7] * y + h[8];
+  return [(h[0] * x + h[1] * y + h[2]) / d, (h[3] * x + h[4] * y + h[5]) / d];
+}
+// Tamaño de la hoja enderezada: el promedio de los lados opuestos, con tope en el lado más largo.
+// proporcion (lado largo / lado corto, ej. A4 = 1.414): la hoja queda con esa forma exacta (la foto
+// sola no la puede saber), parada o acostada según cómo se ve.
+function croquisTamanoEnderezado(q, tope, proporcion) {
+  const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  let W = (dist(q[0], q[1]) + dist(q[3], q[2])) / 2, H = (dist(q[0], q[3]) + dist(q[1], q[2])) / 2;
+  if (proporcion > 1) { const largo = Math.max(W, H); if (H >= W) { H = largo; W = largo / proporcion; } else { W = largo; H = largo / proporcion; } }
+  const k = Math.min(1, (tope || 2400) / Math.max(W, H, 1));
+  return { w: Math.max(1, Math.round(W * k)), h: Math.max(1, Math.round(H * k)) };
+}
+// Endereza: src = { data (RGBA), width, height }, q = esquinas en px de src. Devuelve { data, width, height }.
+function croquisEnderezarPixeles(src, q, tope, proporcion) {
+  const { w: W, h: H } = croquisTamanoEnderezado(q, tope, proporcion);
+  const h = croquisHomografia(W, H, q);
+  if (!h) throw new Error("Las esquinas no forman una hoja: acomodalas de nuevo.");
+  const out = new Uint8ClampedArray(W * H * 4), sd = src.data, sw = src.width, sh = src.height;
+  for (let y = 0; y < H; y++) {
+    // Recorrido incremental de la fila (misma cuenta que croquisAplicarHomografia, más rápido).
+    let nx = h[1] * (y + 0.5) + h[2] + h[0] * 0.5, ny = h[4] * (y + 0.5) + h[5] + h[3] * 0.5, dd = h[7] * (y + 0.5) + h[8] + h[6] * 0.5;
+    let o = y * W * 4;
+    for (let x = 0; x < W; x++, o += 4, nx += h[0], ny += h[3], dd += h[6]) {
+      let u = nx / dd - 0.5, v = ny / dd - 0.5;
+      if (u < 0) u = 0; else if (u > sw - 1) u = sw - 1;
+      if (v < 0) v = 0; else if (v > sh - 1) v = sh - 1;
+      const x0 = u | 0, y0 = v | 0, x1 = x0 + 1 < sw ? x0 + 1 : x0, y1 = y0 + 1 < sh ? y0 + 1 : y0, fx = u - x0, fy = v - y0;
+      const i00 = (y0 * sw + x0) * 4, i10 = (y0 * sw + x1) * 4, i01 = (y1 * sw + x0) * 4, i11 = (y1 * sw + x1) * 4;
+      for (let c = 0; c < 3; c++) {
+        const a = sd[i00 + c] + (sd[i10 + c] - sd[i00 + c]) * fx, b2 = sd[i01 + c] + (sd[i11 + c] - sd[i01 + c]) * fx;
+        out[o + c] = a + (b2 - a) * fy;
+      }
+      out[o + 3] = 255;
+    }
+  }
+  return { data: out, width: W, height: H };
+}
+// Busca la hoja en la foto (el papel es más claro que la mesa): umbral de Otsu sobre una copia chica,
+// la mancha clara más grande y sus 4 esquinas. Devuelve las esquinas en px de la imagen, o null.
+function croquisDetectarHoja(img) {
+  const { data, width: w, height: h } = img;
+  const gris = new Uint8Array(w * h), hist = new Array(256).fill(0);
+  for (let i = 0, p = 0; i < w * h; i++, p += 4) { const g = (data[p] * 299 + data[p + 1] * 587 + data[p + 2] * 114) / 1000 | 0; gris[i] = g; hist[g]++; }
+  // Otsu
+  let total = w * h, suma = 0; for (let t = 0; t < 256; t++) suma += t * hist[t];
+  let sB = 0, wB = 0, mejor = 0, umbral = 128;
+  for (let t = 0; t < 256; t++) {
+    wB += hist[t]; if (!wB) continue;
+    const wF = total - wB; if (!wF) break;
+    sB += t * hist[t];
+    const mB = sB / wB, mF = (suma - sB) / wF, entre = wB * wF * (mB - mF) * (mB - mF);
+    if (entre > mejor) { mejor = entre; umbral = t; }
+  }
+  // Mancha clara más grande (4-vecinos)
+  const marca = new Int32Array(w * h).fill(-1), cola = new Int32Array(w * h);
+  let mejorId = -1, mejorTam = 0, id = 0;
+  for (let i = 0; i < w * h; i++) {
+    if (gris[i] <= umbral || marca[i] !== -1) continue;
+    let ini = 0, fin = 0; cola[fin++] = i; marca[i] = id;
+    while (ini < fin) {
+      const p = cola[ini++], x = p % w, y = (p / w) | 0;
+      if (x > 0 && marca[p - 1] === -1 && gris[p - 1] > umbral) { marca[p - 1] = id; cola[fin++] = p - 1; }
+      if (x < w - 1 && marca[p + 1] === -1 && gris[p + 1] > umbral) { marca[p + 1] = id; cola[fin++] = p + 1; }
+      if (y > 0 && marca[p - w] === -1 && gris[p - w] > umbral) { marca[p - w] = id; cola[fin++] = p - w; }
+      if (y < h - 1 && marca[p + w] === -1 && gris[p + w] > umbral) { marca[p + w] = id; cola[fin++] = p + w; }
+    }
+    if (fin > mejorTam) { mejorTam = fin; mejorId = id; }
+    id++;
+  }
+  if (mejorId < 0 || mejorTam < w * h * 0.12) return null;
+  // Esquinas: los extremos de x+y y x−y
+  let tl = [0, 0], tr = [0, 0], br = [0, 0], bl = [0, 0], mTL = Infinity, mBR = -Infinity, mTR = -Infinity, mBL = Infinity;
+  for (let i = 0; i < w * h; i++) {
+    if (marca[i] !== mejorId) continue;
+    const x = i % w, y = (i / w) | 0, s = x + y, d = x - y;
+    if (s < mTL) { mTL = s; tl = [x, y]; }
+    if (s > mBR) { mBR = s; br = [x + 1, y + 1]; }
+    if (d > mTR) { mTR = d; tr = [x + 1, y]; }
+    if (d < mBL) { mBL = d; bl = [x, y + 1]; }
+  }
+  const q = [tl, tr, br, bl];
+  // Si ocupa toda la foto (no hay mesa alrededor), no sirve.
+  const area = Math.abs((q[0][0] * q[1][1] - q[1][0] * q[0][1]) + (q[1][0] * q[2][1] - q[2][0] * q[1][1]) + (q[2][0] * q[3][1] - q[3][0] * q[2][1]) + (q[3][0] * q[0][1] - q[0][0] * q[3][1])) / 2;
+  if (area > w * h * 0.97 || area < w * h * 0.12) return null;
+  return q;
+}
+// Gira 90° (sentido horario) una lista de esquinas de una imagen de w×h, para la imagen girada (h×w).
+function croquisGirarEsquinas(q, w, h) {
+  const g = q.map(([x, y]) => [h - y, x]);
+  return [g[3], g[0], g[1], g[2]];
+}

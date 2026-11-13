@@ -2351,3 +2351,49 @@ test("SIMs de instalaciones para revisar: el instalador deja el aviso (sin dupli
     assert.strictEqual((await get(admin)).length, 1);
   } finally { global.fetch = fetchViejo; }
 });
+
+test("Foto de un plano: detecta la hoja sobre la mesa, la endereza con las 4 esquinas (perspectiva) y gira las esquinas con la foto", () => {
+  const vm = require("vm");
+  const ctx = { window: {}, document: { createElement: () => ({ getContext: () => null }) }, console };
+  ctx.window = ctx;
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(raiz, "croquis-utils.js"), "utf8") + "\n;this.C={croquisHomografia,croquisAplicarHomografia,croquisEnderezarPixeles,croquisDetectarHoja,croquisGirarEsquinas,croquisTamanoEnderezado};", ctx);
+  const C = ctx.C;
+  // Hoja de 200×280 (proporción A4) fotografiada torcida sobre una mesa oscura de 400×400
+  const q = [[90, 60], [300, 85], [320, 350], [70, 330]];
+  const W = 400, Hh = 400, data = new Uint8ClampedArray(W * Hh * 4);
+  const hInv = C.croquisHomografia(200, 280, q);
+  // Para pintar: punto de la foto -> ¿cae en la hoja? (inversa numérica con la homografía de la foto a la hoja)
+  const hFotoAHoja = C.croquisHomografia(400, 400, [[0, 0], [400, 0], [400, 400], [0, 400]]); // identidad (control)
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(C.croquisAplicarHomografia(hFotoAHoja, 123, 45).map(Math.round))), [123, 45]);
+  // Pinto la mesa y la hoja recorriendo la hoja (denso) para no tener que invertir
+  for (let i = 0; i < W * Hh; i++) { data[i * 4] = 60; data[i * 4 + 1] = 50; data[i * 4 + 2] = 45; data[i * 4 + 3] = 255; }
+  for (let y = 0; y < 280; y += 0.5) for (let x = 0; x < 200; x += 0.5) {
+    const [u, v] = C.croquisAplicarHomografia(hInv, x, y), p = ((v | 0) * W + (u | 0)) * 4;
+    const marca = Math.hypot(x - 50, y - 70) < 6; // un punto negro en (50,70) de la hoja
+    data[p] = data[p + 1] = data[p + 2] = marca ? 10 : 235;
+  }
+  const det = C.croquisDetectarHoja({ data, width: W, height: Hh });
+  assert.ok(det, "encuentra la hoja");
+  det.forEach((p, k) => assert.ok(Math.hypot(p[0] - q[k][0], p[1] - q[k][1]) < 6, `esquina ${k}: ${p} vs ${q[k]}`));
+  // Enderezada: queda con la proporción de la hoja y el punto en su lugar
+  const libre = C.croquisEnderezarPixeles({ data, width: W, height: Hh }, q, 2400);
+  const t = C.croquisTamanoEnderezado(q, 2400);
+  assert.deepStrictEqual([libre.width, libre.height], [t.w, t.h], "sin proporción: el promedio de los lados");
+  // Con la proporción de la hoja (200×280 = 1.4) queda exacta
+  const out = C.croquisEnderezarPixeles({ data, width: W, height: Hh }, q, 2400, 1.4);
+  assert.ok(Math.abs(out.height / out.width - 1.4) < 0.01, `${out.width}×${out.height}`);
+  const px = (x, y) => out.data[((Math.round(y * out.height / 280)) * out.width + Math.round(x * out.width / 200)) * 4];
+  assert.ok(px(50, 70) < 60, "el punto negro queda donde estaba en el papel");
+  assert.ok(px(150, 200) > 200, "el resto es papel blanco");
+  assert.ok(px(2, 2) > 150 && px(198, 278) > 150, "las esquinas son papel, no mesa");
+  // Con el tope, se achica sin cambiar la proporción
+  const chico = C.croquisTamanoEnderezado(q, 100);
+  assert.strictEqual(Math.max(chico.w, chico.h), 100);
+  // Girar 90°: las esquinas siguen siendo arriba-izq, arriba-der, abajo-der, abajo-izq de la foto girada
+  const g = C.croquisGirarEsquinas([[0, 0], [10, 0], [10, 20], [0, 20]], 10, 20);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(g)), [[0, 0], [20, 0], [20, 10], [0, 10]]);
+  // Una foto sin mesa alrededor (todo papel): no inventa esquinas
+  const lisa = new Uint8ClampedArray(50 * 50 * 4).fill(240);
+  assert.strictEqual(C.croquisDetectarHoja({ data: lisa, width: 50, height: 50 }), null);
+});

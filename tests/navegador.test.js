@@ -3130,8 +3130,41 @@ test("Plano de la instalación: sobre el plano de la casa (copia), foto del plan
   await page.waitForFunction(() => screens.instalacion.dataset.active === "true");
 
   // Subir foto del plano: se guarda sola en la instalación
-  const foto = await page.evaluate(async () => { const cv = document.createElement("canvas"); cv.width = 1200; cv.height = 900; const c = cv.getContext("2d"); c.fillStyle = "#fff"; c.fillRect(0, 0, 1200, 900); c.strokeRect(50, 50, 1100, 800); return Array.from(new Uint8Array(await (await new Promise((ok) => cv.toBlob(ok, "image/png"))).arrayBuffer())); });
-  await page.setInputFiles("#instPlanoArchivoInput", { name: "plano.png", mimeType: "image/png", buffer: Buffer.from(foto) });
+  // Foto de una hoja A4 torcida sobre una mesa oscura
+  const foto = await page.evaluate(async () => {
+    const cv = document.createElement("canvas"); cv.width = 1200; cv.height = 900; const c = cv.getContext("2d");
+    c.fillStyle = "#3a3330"; c.fillRect(0, 0, 1200, 900);
+    c.fillStyle = "#f4f4f0"; c.beginPath(); c.moveTo(380, 90); c.lineTo(860, 140); c.lineTo(840, 830); c.lineTo(330, 790); c.closePath(); c.fill();
+    c.strokeStyle = "#111"; c.lineWidth = 4; c.strokeRect(470, 260, 280, 360);
+    return Array.from(new Uint8Array(await (await new Promise((ok) => cv.toBlob(ok, "image/jpeg", 0.92))).arrayBuffer()));
+  });
+  await page.setInputFiles("#instPlanoArchivoInput", { name: "plano.jpg", mimeType: "image/jpeg", buffer: Buffer.from(foto) });
+  // Se abre el recorte: encuentra la hoja sola
+  await page.waitForSelector(".rp-capa");
+  await page.waitForFunction(() => /Encontré la hoja/.test(document.querySelector(".rp-ayuda").textContent));
+  const est0 = await page.evaluate(() => document.querySelector(".rp-capa").rpEstado());
+  const esperadas = [[380, 90], [860, 140], [840, 830], [330, 790]];
+  est0.q.forEach((p, k) => assert.ok(Math.hypot(p[0] - esperadas[k][0], p[1] - esperadas[k][1]) < 14, `esquina ${k}: ${p}`));
+  // Una esquina se acomoda arrastrando, con lupa (se mueve lo que se mueve el dedo)
+  const lienzo = await page.locator(".rp-lienzo").boundingBox();
+  const [ex, ey] = est0.pantalla[0];
+  await page.mouse.move(lienzo.x + ex + 6, lienzo.y + ey + 4);
+  await page.mouse.down();
+  await page.mouse.move(lienzo.x + ex + 16, lienzo.y + ey + 14, { steps: 4 });
+  assert.strictEqual(await page.locator(".rp-lupa").isVisible(), true, "aparece la lupa");
+  const est1 = await page.evaluate(() => document.querySelector(".rp-capa").rpEstado());
+  assert.ok(Math.abs(est1.pantalla[0][0] - (ex + 10)) < 1.5 && Math.abs(est1.pantalla[0][1] - (ey + 10)) < 1.5, "no salta debajo del dedo");
+  await page.mouse.move(lienzo.x + ex + 6, lienzo.y + ey + 4, { steps: 4 });
+  await page.mouse.up();
+  assert.strictEqual(await page.locator(".rp-lupa").isVisible(), false);
+  await page.selectOption('.rp-capa [data-rp="forma"]', "a4");
+  if (process.env.FOTO_RECORTE) await page.screenshot({ path: process.env.FOTO_RECORTE });
+  await page.click('.rp-capa [data-rp="listo"]');
+  await page.waitForFunction(() => /Hoja enderezada/.test(document.querySelector(".rp-tit").textContent));
+  assert.match(await page.textContent('.rp-capa [data-rp="sin"]'), /Acomodar de nuevo/);
+  if (process.env.FOTO_RECORTE) await page.screenshot({ path: process.env.FOTO_RECORTE.replace(".png", "-listo.png") });
+  await page.click('.rp-capa [data-rp="listo"]');
+  await page.waitForSelector(".rp-capa", { state: "detached" });
   await page.waitForFunction(() => document.querySelectorAll("#instPlanoLista .cq-item").length >= 0 && !/Subiendo/.test(document.getElementById("instPlanoEstado").textContent));
   await page.waitForTimeout(300);
   const g2 = posts.filter((p) => p.accion === "guardar")[1];
@@ -3139,6 +3172,8 @@ test("Plano de la instalación: sobre el plano de la casa (copia), foto del plan
   assert.strictEqual(g2.instalacion, "7");
   assert.strictEqual(g2.dibujo.paginas[0].fondo.base, true);
   assert.strictEqual(g2.dibujo.paginas[0].elementos.length, 0, "se guarda aunque no tenga nada dibujado");
+  const fondoFoto = g2.dibujo.paginas[0].fondo;
+  assert.ok(Math.abs(fondoFoto.h / fondoFoto.w - 297 / 210) < 0.01, `hoja A4 parada: ${fondoFoto.w}×${fondoFoto.h}`);
 
   // Al cerrar la instalación: el PDF de cada plano va al mail, y los planos quedan como registro
   await page.waitForFunction(() => document.querySelectorAll("#instPlanoLista .cq-item").length === 2);
