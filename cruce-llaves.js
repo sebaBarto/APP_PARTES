@@ -193,5 +193,43 @@
     return { estacion: out, faltan };
   }
 
-  return { cruzar, claveTag, tagCalculado, claveUsuario, esControl, esControlEstacion, esNoVecino, enComun, mismaPersona, palabras, claveUnidad, tel7 };
+  // ---------- ¿De qué edificio es este Excel? ----------
+  // Lee el título del archivo (las filas antes de los encabezados, p. ej.
+  // «D018 - Edificio Muelle 11 (…)») y el nombre del archivo
+  // («Usuarios_D018_Muelle11.xlsx»), y busca el N° de abonado y el nombre de
+  // alguno de los edificios cargados.
+  const normAbonado = (v) => String(v == null ? "" : v).toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/^([A-Z]*)0+(?=\d)/, "$1");
+  const compacto = (v) => String(v || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  function identificarArchivo(texto, edificios) {
+    const t = String(texto || "").replace(/_/g, " ");
+    const abonados = [];
+    const re = /(?:^|[^A-Za-z0-9])([A-Za-z]\d{2,5})(?=[^A-Za-z0-9]|$)/g;
+    let m;
+    while ((m = re.exec(t))) { const a = m[1].toUpperCase(); if (!abonados.includes(a)) abonados.push(a); }
+    const reNum = /(?:abonado|cuenta|cliente)\s*(?:n[°º.]?|nro\.?|#)?\s*:?\s*([A-Za-z]?\d{2,6})/gi;
+    while ((m = reNum.exec(t))) { const a = m[1].toUpperCase(); if (!abonados.includes(a)) abonados.push(a); }
+    const plano = compacto(t);
+    const lista = Array.isArray(edificios) ? edificios : [];
+    const porAbonado = lista.filter((e) => e.abonado && abonados.some((a) => normAbonado(a) === normAbonado(e.abonado)));
+    const porNombre = lista.filter((e) => { const n = compacto(e.nombre); return n.length >= 4 && plano.includes(n); });
+    return { abonados, porAbonado, porNombre };
+  }
+  // Veredicto para el edificio abierto: "ok" (coincide), "otro" (es de otro edificio),
+  // "dudoso" (no se pudo confirmar) y, si el edificio no tiene abonado, cuál sugerir.
+  function verificarArchivo(texto, edificio, edificios) {
+    const id = identificarArchivo(texto, edificios);
+    const mio = (e) => e && edificio && e.codigo === edificio.codigo;
+    const otroAb = id.porAbonado.find((e) => !mio(e));
+    const otroNom = id.porNombre.find((e) => !mio(e));
+    const miAb = edificio && edificio.abonado ? normAbonado(edificio.abonado) : "";
+    const nombreOk = id.porNombre.some(mio);
+    if (miAb && id.abonados.some((a) => normAbonado(a) === miAb)) return { veredicto: "ok", abonado: edificio.abonado, por: "abonado", id };
+    if (otroAb) return { veredicto: "otro", otro: otroAb, abonado: id.abonados.find((a) => normAbonado(a) === normAbonado(otroAb.abonado)), id };
+    if (otroNom && !nombreOk) return { veredicto: "otro", otro: otroNom, abonado: id.abonados[0] || "", id };
+    if (miAb && id.abonados.length && !nombreOk) return { veredicto: "otro", otro: null, abonado: id.abonados[0], id };
+    if (nombreOk) return { veredicto: "ok", por: "nombre", abonado: id.abonados[0] || "", sugerir: !miAb && id.abonados.length === 1 ? id.abonados[0] : "", id };
+    return { veredicto: "dudoso", abonado: id.abonados[0] || "", id };
+  }
+
+  return { identificarArchivo, verificarArchivo, normAbonado, cruzar, claveTag, tagCalculado, claveUsuario, esControl, esControlEstacion, esNoVecino, enComun, mismaPersona, palabras, claveUnidad, tel7 };
 });

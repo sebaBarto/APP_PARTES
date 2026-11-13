@@ -1826,7 +1826,9 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
           <div class="field-row" style="flex-wrap:wrap;margin-top:10px;">
             <div style="flex:1 1 200px;"><label>Nombre</label><input type="text" class="field-input" id="rllEdNombre" placeholder="Ej. MUELLE 11"></div>
             <div style="flex:2 1 260px;"><label>Dirección (aparece en el formulario)</label><input type="text" class="field-input" id="rllEdDireccion" placeholder="Ej. Av. Ejemplo 1234"></div>
+            <div style="flex:0 1 190px;"><label>N° de abonado en la estación</label><input type="text" class="field-input" id="rllEdAbonado" placeholder="Ej. D018" maxlength="12" style="font-family:'IBM Plex Mono',monospace;text-transform:uppercase;"></div>
           </div>
+          <p style="margin:6px 0 0;font-size:12.5px;color:#6B7680;">Con el N° de abonado, la conciliación comprueba que el Excel que subís sea de este edificio y no de otro.</p>
           <div class="hidden" id="rllEdActivoWrap"><label style="display:flex;align-items:center;gap:8px;margin-top:8px;"><input type="checkbox" id="rllEdActivo" style="width:auto;margin:0;"> QR habilitado (si lo apagás, el QR deja de aceptar registros)</label></div>
           <div class="field-row" style="gap:8px;margin-top:10px;">
             <button type="button" id="rllEdGuardarBtn" style="width:auto;">Guardar edificio</button>
@@ -1929,7 +1931,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
 
       <div class="card hidden" id="rllCampanaCard">
         <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between;">
-          <h3 style="margin:0;">Campaña de registro <span id="rllCampanaEstado"></span></h3>
+          <h3 style="margin:0;">Campaña de registro de <span id="rllCampanaEdNombre"></span> <span id="rllCampanaEstado"></span></h3>
         </div>
         <p class="subtitle" style="margin:8px 0 0;">Una fecha límite para que los vecinos registren sus llaves. Al vencer, las llaves de la estación que nadie registró se le mandan al administrador del consorcio para que apruebe la baja (o pida conservar alguna). Lo aprobado queda marcado en la conciliación como «Dar de baja».</p>
         <div id="rllCampanaCuerpo" style="margin-top:12px;"></div>
@@ -1938,7 +1940,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
 
       <div class="card hidden" id="rllConcCard">
         <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px;justify-content:space-between;">
-          <h3 style="margin:0;">Conciliación con la estación de monitoreo</h3>
+          <h3 style="margin:0;">Conciliación de <span id="rllConcEdNombre"></span> con la estación <span id="rllConcEdAbonado"></span></h3>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <label class="btn-secondary-admin" style="width:auto;display:inline-flex;align-items:center;gap:6px;cursor:pointer;margin:0;padding:10px 14px;border-radius:var(--r-sm);font-weight:600;font-size:14px;">
               ⬆ Subir Excel de la estación<input type="file" id="rllConcArchivo" accept=".xlsx,.xls,.csv" style="display:none;">
@@ -1949,10 +1951,14 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
         <p class="subtitle" style="margin:8px 0 0;">Subí el listado de usuarios que tiene cargados la estación (Excel o CSV). Se compara llave por llave con lo que registraron los vecinos — por número de tag y, si no hay, por número de usuario.</p>
         <p class="status" id="rllConcStatus"></p>
         <div id="rllConcMapeo" class="hidden" style="margin-top:12px;padding:14px;border:1.5px dashed var(--border);border-radius:var(--r-md);">
+          <div id="rllConcVerif"></div>
           <b>¿Qué columna es cada dato?</b> <span style="color:#6B7680;">Lo detecté solo; corregilo si hace falta.</span>
           <div id="rllConcColumnas" class="field-row" style="flex-wrap:wrap;gap:10px;margin-top:10px;"></div>
           <div id="rllConcVista" style="overflow-x:auto;margin-top:8px;"></div>
-          <button type="button" id="rllConcCompararBtn" style="width:auto;margin-top:10px;">Comparar con los registros</button>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px;">
+            <button type="button" id="rllConcCompararBtn" style="width:auto;margin:0;">Comparar con el padrón</button>
+            <button type="button" class="btn-secondary-admin" id="rllConcDescartarBtn" style="width:auto;margin:0;">Cancelar</button>
+          </div>
         </div>
         <div id="rllConcResultado" class="hidden" style="margin-top:14px;">
           <p style="color:#6B7680;font-size:13px;margin:0 0 8px;" id="rllConcInfo"></p>
@@ -9687,12 +9693,20 @@ async function cargarRegistroLlavesAdmin() {
 function renderRllEdificios() {
   const cont = document.getElementById("rllEdificiosLista");
   if (!rllEdificios.length) { cont.innerHTML = ""; return; }
-  cont.innerHTML = `<table><thead><tr><th>Edificio</th><th>Registros</th><th>Por revisar</th><th>Último</th><th>QR</th><th></th></tr></thead><tbody>${rllEdificios.map((e) => `
+  const estacionTxt = (e) => {
+    const ab = e.abonado ? `<span style="font-family:'IBM Plex Mono',monospace;font-weight:600;">${rllEsc(e.abonado)}</span>` : '<span style="color:#6B7680;font-size:12px;">sin N° de abonado</span>';
+    const c = e.conciliacion;
+    if (!c) return `${ab}<br><span style="color:#6B7680;font-size:12px;">Sin Excel de la estación</span>`;
+    const p = c.estacion;
+    return `${ab}<br><span style="font-size:12px;">Excel del ${rllEsc(rllFecha(c.fecha).split(" ")[0])}${p ? ` · <b style="color:#1F6B34;">${p.con_dueno}</b> con dueño · <b style="color:#B3261E;">${p.sin_dueno}</b> sin dueño` : ""}${c.por_decidir ? ` · ${c.por_decidir} para dar de baja` : ""}</span>`;
+  };
+  cont.innerHTML = `<table><thead><tr><th>Edificio</th><th>Registros</th><th>Por revisar</th><th>Último</th><th>Estación</th><th>QR</th><th></th></tr></thead><tbody>${rllEdificios.map((e) => `
     <tr${rllEdificioActual && rllEdificioActual.codigo === e.codigo ? ' style="background:rgba(245,166,35,0.10);"' : ""}>
       <td><b>${rllEsc(e.nombre)}</b>${e.direccion ? `<br><span style="color:#6B7680;">${rllEsc(e.direccion)}</span>` : ""}<br><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#6B7680;">${rllEsc(e.codigo)}</span></td>
       <td>${e.registros == null ? "—" : e.registros}</td>
       <td>${e.pendientes ? `<b style="color:#B5772A;">${e.pendientes}</b>` : "0"}</td>
       <td>${e.ultimo ? rllFecha(e.ultimo) : "—"}</td>
+      <td>${estacionTxt(e)}</td>
       <td>${e.activo === false ? '<span class="ven-estado sin">Apagado</span>' : '<span class="ven-estado ok">Activo</span>'}</td>
       <td style="white-space:nowrap;text-align:right;">
         <button type="button" class="rll-ver" data-c="${e.codigo}" style="width:auto;padding:6px 10px;font-size:13px;margin:2px;">Ver registros</button>
@@ -9713,6 +9727,7 @@ function renderRllEdificios() {
     document.getElementById("rllEdCodigo").value = e.codigo;
     document.getElementById("rllEdNombre").value = e.nombre;
     document.getElementById("rllEdDireccion").value = e.direccion || "";
+    document.getElementById("rllEdAbonado").value = e.abonado || "";
     document.getElementById("rllEdActivo").checked = e.activo !== false;
     document.getElementById("rllEdActivoWrap").classList.remove("hidden");
     document.getElementById("rllEdCancelarBtn").classList.remove("hidden");
@@ -9722,7 +9737,7 @@ function renderRllEdificios() {
   }));
 }
 function rllLimpiarFormEdificio() {
-  ["rllEdCodigo", "rllEdNombre", "rllEdDireccion"].forEach((id) => { document.getElementById(id).value = ""; });
+  ["rllEdCodigo", "rllEdNombre", "rllEdDireccion", "rllEdAbonado"].forEach((id) => { document.getElementById(id).value = ""; });
   document.getElementById("rllEdActivoWrap").classList.add("hidden");
   document.getElementById("rllEdCancelarBtn").classList.add("hidden");
   document.getElementById("rllEdificioFormTit").textContent = "+ Agregar un edificio";
@@ -9737,7 +9752,7 @@ document.getElementById("rllEdGuardarBtn").addEventListener("click", async () =>
   try {
     const r = await fetch("/api/datos?coleccion=registro_llaves", {
       method: "POST", headers: rllHeaders(true),
-      body: JSON.stringify({ accion: "guardar_edificio", codigo: codigo || undefined, nombre, direccion: document.getElementById("rllEdDireccion").value.trim(), activo: codigo ? document.getElementById("rllEdActivo").checked : true }),
+      body: JSON.stringify({ accion: "guardar_edificio", codigo: codigo || undefined, nombre, direccion: document.getElementById("rllEdDireccion").value.trim(), abonado: document.getElementById("rllEdAbonado").value.trim(), activo: codigo ? document.getElementById("rllEdActivo").checked : true }),
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || "Error desconocido");
@@ -10226,8 +10241,28 @@ function rllPartirNombre(n) {
   return [p.slice(0, -1).join(" "), p[p.length - 1]];
 }
 
+function rllTitulosEdificio() {
+  const e = rllEdificioActual;
+  if (!e) return;
+  document.getElementById("rllConcEdNombre").textContent = e.nombre;
+  document.getElementById("rllCampanaEdNombre").textContent = e.nombre;
+  document.getElementById("rllConcEdAbonado").innerHTML = e.abonado ? `<span style="font-family:'IBM Plex Mono',monospace;font-size:13px;font-weight:600;padding:2px 8px;border-radius:6px;background:rgba(245,166,35,0.16);vertical-align:middle;">abonado ${rllEsc(e.abonado)}</span>` : "";
+}
+// Vuelve a pedir la lista de edificios (sin cerrar el que está abierto) para actualizar la columna Estación.
+async function rllRefrescarListaEdificios() {
+  try {
+    const r = await fetch("/api/datos?coleccion=registro_llaves", { headers: rllHeaders(), cache: "no-store" });
+    const d = await r.json();
+    if (!r.ok || !Array.isArray(d)) return;
+    rllEdificios = d;
+    if (rllEdificioActual) rllEdificioActual = rllEdificios.find((x) => x.codigo === rllEdificioActual.codigo) || rllEdificioActual;
+    renderRllEdificios();
+    rllTitulosEdificio();
+  } catch (e) { /* no es grave */ }
+}
 async function rllCargarConciliacion() {
   if (!rllEdificioActual) return;
+  rllTitulosEdificio();
   document.getElementById("rllConcCard").classList.remove("hidden");
   rllConcPendiente = null;
   document.getElementById("rllConcMapeo").classList.add("hidden");
@@ -10257,10 +10292,58 @@ document.getElementById("rllConcArchivo").addEventListener("change", async (ev) 
     if (iEnc < 0 || iEnc > 10) iEnc = 0;
     const encabezados = matriz[iEnc].map((c, i) => String(c).trim() || "Columna " + (i + 1));
     const filas = matriz.slice(iEnc + 1);
-    rllConcPendiente = { nombre: archivo.name, encabezados, filas };
+    // Para saber de qué edificio es: el título del archivo (filas antes de los encabezados) y su nombre.
+    const texto = matriz.slice(0, iEnc).map((f) => f.join(" ")).join("\n") + "\n" + archivo.name + "\n" + (libro.SheetNames[0] || "");
+    rllConcPendiente = { nombre: archivo.name, encabezados, filas, texto, edificio: rllEdificioActual.codigo };
     st.textContent = `${filas.length} filas leídas de ${archivo.name}.`;
     rllArmarMapeo();
+    rllVerificarArchivo();
   } catch (e) { st.className = "status err"; st.textContent = "No se pudo leer el archivo: " + e.message; }
+});
+
+// ¿El Excel es del edificio abierto? Si parece de otro, no se compara hasta confirmarlo.
+function rllVerificarArchivo() {
+  const p = rllConcPendiente, e = rllEdificioActual;
+  const v = CruceLlaves.verificarArchivo(p.texto, e, rllEdificios);
+  p.abonado = v.abonado || "";
+  p.forzar = false;
+  p.fijar = false;
+  const caja = document.getElementById("rllConcVerif");
+  const btn = document.getElementById("rllConcCompararBtn");
+  const estilo = (fondo, borde) => `margin:0 0 12px;padding:12px 14px;border-radius:10px;background:${fondo};border:1px solid ${borde};font-size:14px;`;
+  btn.textContent = `Comparar con el padrón de ${e.nombre}`;
+  btn.disabled = false;
+  if (v.veredicto === "ok") {
+    caja.innerHTML = `<div style="${estilo("#E6F4EA", "#B7DFC4")}">✓ El archivo es de <b>${rllEsc(e.nombre)}</b>${v.abonado ? ` (abonado <b>${rllEsc(v.abonado)}</b>)` : ""}.${v.sugerir ? `<label style="display:flex;align-items:center;gap:8px;margin:8px 0 0;font-weight:500;"><input type="checkbox" id="rllConcFijar" checked style="width:auto;margin:0;"> Guardar <b>${rllEsc(v.sugerir)}</b> como N° de abonado de ${rllEsc(e.nombre)} (así se controla en las próximas)</label>` : ""}</div>`;
+    const fj = document.getElementById("rllConcFijar");
+    if (fj) { p.fijar = true; fj.addEventListener("change", () => { p.fijar = fj.checked; }); }
+    return;
+  }
+  if (v.veredicto === "otro") {
+    const deQuien = v.otro ? `<b>${rllEsc(v.otro.nombre)}</b>${v.otro.abonado ? " (abonado " + rllEsc(v.otro.abonado) + ")" : ""}` : `el abonado <b>${rllEsc(v.abonado)}</b>`;
+    caja.innerHTML = `<div style="${estilo("#FDE2E0", "#F3B8B2")}color:#8C1D18;">⚠ <b>Este archivo parece ser de ${deQuien}</b>, pero tenés abierto <b>${rllEsc(e.nombre)}</b>${e.abonado ? " (abonado " + rllEsc(e.abonado) + ")" : ""}. Si lo comparás acá, casi todos van a salir como «no registrados».
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;">${v.otro ? `<button type="button" class="btn-secondary-admin" id="rllConcIrOtro" style="width:auto;margin:0;">Abrir ${rllEsc(v.otro.nombre)} y subirlo ahí</button>` : ""}
+      <label style="display:flex;align-items:center;gap:8px;margin:0;font-weight:500;color:inherit;"><input type="checkbox" id="rllConcForzar" style="width:auto;margin:0;"> Es de ${rllEsc(e.nombre)}, compararlo igual</label></div></div>`;
+    btn.disabled = true;
+    document.getElementById("rllConcForzar").addEventListener("change", (ev) => { p.forzar = ev.target.checked; btn.disabled = !ev.target.checked; });
+    const ir = document.getElementById("rllConcIrOtro");
+    if (ir) ir.addEventListener("click", async () => {
+      const guardado = rllConcPendiente;
+      await rllAbrirEdificio(v.otro.codigo);
+      // Se reabre el mismo archivo en el edificio correcto, sin volver a elegirlo.
+      rllConcPendiente = { ...guardado, edificio: v.otro.codigo };
+      rllArmarMapeo();
+      rllVerificarArchivo();
+      document.getElementById("rllConcCard").scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return;
+  }
+  caja.innerHTML = `<div style="${estilo("#FFF1D6", "#F1D99A")}color:#8A5A00;">No pude confirmar de qué edificio es este archivo (no dice el N° de abonado ni el nombre). Revisá que sea de <b>${rllEsc(e.nombre)}</b> antes de comparar.</div>`;
+}
+document.getElementById("rllConcDescartarBtn").addEventListener("click", () => {
+  rllConcPendiente = null;
+  document.getElementById("rllConcMapeo").classList.add("hidden");
+  document.getElementById("rllConcStatus").textContent = "";
 });
 
 function rllArmarMapeo() {
@@ -10296,16 +10379,18 @@ document.getElementById("rllConcCompararBtn").addEventListener("click", async ()
   }).filter((f) => f.tag || f.usuario || f.nombre);
   st.className = "status"; st.textContent = "Guardando y comparando...";
   try {
-    const r = await fetch("/api/datos?coleccion=registro_llaves", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "guardar_conciliacion", edificio: rllEdificioActual.codigo, archivo: rllConcPendiente.nombre, filas }) });
+    if (rllConcPendiente.edificio !== rllEdificioActual.codigo) throw new Error("cambiaste de edificio: volvé a subir el archivo");
+    const r = await fetch("/api/datos?coleccion=registro_llaves", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "guardar_conciliacion", edificio: rllEdificioActual.codigo, archivo: rllConcPendiente.nombre, filas, abonado_archivo: rllConcPendiente.abonado || "", forzar: !!rllConcPendiente.forzar, fijar_abonado: !!rllConcPendiente.fijar }) });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || "Error");
     rllConc = d;
     rllConcPendiente = null;
     rllConcFiltro = "";
     document.getElementById("rllConcMapeo").classList.add("hidden");
-    st.className = "status ok"; st.textContent = `Listo: ${d.filas.length} filas de la estación comparadas.`;
+    st.className = "status ok"; st.textContent = `Listo: ${d.filas.length} filas de la estación comparadas con el padrón de ${rllEdificioActual.nombre}.`;
     renderRllConciliacion();
     rllCargarCampana();
+    rllRefrescarListaEdificios();
   } catch (e) { st.className = "status err"; st.textContent = "No se pudo comparar: " + e.message; }
 });
 
@@ -10331,7 +10416,7 @@ function renderRllConciliacion() {
   if (!rllConc) { cont.classList.add("hidden"); return; }
   cont.classList.remove("hidden");
   const filas = rllCompararConciliacion();
-  document.getElementById("rllConcInfo").textContent = `Archivo: ${rllConc.archivo || "(sin nombre)"} · subido ${rllFecha(rllConc.fecha)}${rllConc.por ? " por " + rllConc.por : ""} · ${rllConc.filas.length} filas de la estación. Se vuelve a comparar con los registros cada vez que abrís esta pestaña.`;
+  document.getElementById("rllConcInfo").textContent = `${rllEdificioActual.nombre}${rllConc.abonado_archivo ? " · abonado " + rllConc.abonado_archivo : ""} · archivo: ${rllConc.archivo || "(sin nombre)"} · subido ${rllFecha(rllConc.fecha)}${rllConc.por ? " por " + rllConc.por : ""} · ${rllConc.filas.length} filas de la estación. Se vuelve a comparar con los registros cada vez que abrís esta pestaña.`;
   const n = (k) => filas.filter((f) => f.res === k).length;
   const pendBaja = filas.filter((f) => (f.res === "no_registrada" || f.res === "perdida") && !rllConc.filas[f.i].decision).length;
   const chips = [["", "Todas", filas.length], ["encontrada", "Encontradas", n("encontrada")], ["no_registrada", "No registradas → dar de baja", n("no_registrada")], ["perdida", "Reportadas perdidas", n("perdida")], ["falta", "Faltan en la estación", n("falta")], ["otra_llave", "De alguien registrado, no declarada", n("otra_llave")], ["no_vecino", "SAT / funciones / proveedores", n("no_vecino")]].filter((c) => c[0] === "" || c[2] || c[0] === rllConcFiltro);
