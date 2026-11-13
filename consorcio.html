@@ -127,6 +127,16 @@
 
   /* ---------- Ingreso ---------- */
   .acceso { display: grid; grid-template-columns: 1fr; gap: 0; max-width: 980px; margin: 0 auto; border-radius: 24px; overflow: hidden; box-shadow: var(--sh-2); background: #fff; }
+  .robo-acceso { grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; padding: 16px 22px; background: #FDECEA; border-top: 1px solid #F3C4BE; color: #8C1D18; text-decoration: none; }
+  .robo-acceso:hover { background: #FBDDD9; }
+  .robo-acceso .ic { width: 40px; height: 40px; flex: none; border-radius: 50%; background: #C0261C; color: #fff; display: grid; place-items: center; }
+  .robo-acceso .ic svg { width: 20px; height: 20px; }
+  .robo-acceso .tx { flex: 1; min-width: 0; }
+  .robo-acceso b { display: block; font-size: 15.5px; }
+  .robo-acceso small { display: block; font-size: 13.5px; color: #7A3530; margin-top: 2px; }
+  .robo-acceso .ir { display: inline-flex; align-items: center; gap: 6px; padding: 10px 14px; border-radius: 10px; background: #C0261C; color: #fff; font-weight: 700; font-size: 14.5px; white-space: nowrap; }
+  .robo-acceso .ir svg { width: 16px; height: 16px; }
+  @media (max-width: 560px) { .robo-acceso { flex-wrap: wrap; padding: 14px 16px; } .robo-acceso .ir { width: 100%; justify-content: center; } }
   .acceso-info { background: var(--ink); color: #fff; padding: 30px 26px; position: relative; overflow: hidden; }
   .acceso-info > * { position: relative; z-index: 1; }
   .acceso-info .eyebrow { font-family: var(--cond); font-weight: 600; font-size: 13px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--amber); }
@@ -467,6 +477,12 @@
           </form>
         </div>
       </section>
+      <!-- Para vecinos: denuncia de llave robada o perdida (acceso de emergencia, 24 h) -->
+      <a class="robo-acceso" href="/robo-llave.html">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l10 18H2z"/><path d="M12 10v4M12 17.5v.01"/></svg></span>
+        <span class="tx"><b>¿Sos vecino y te robaron o perdiste la llave?</b><small>Denunciala acá, a cualquier hora: avisamos a la central de monitoreo.</small></span>
+        <span class="ir">Denunciar<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
+      </a>
     </div>
 
     <!-- Crear clave nueva (link del mail) -->
