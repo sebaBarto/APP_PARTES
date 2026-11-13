@@ -2220,6 +2220,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
 <script src="stock-utils.js"></script>
 <script src="tablero-stock.js"></script>
 <script src="croquis-utils.js"></script>
+<script src="cruce-llaves.js"></script>
 <script>
 // ==== CONFIGURACIÓN ====
 // Pase de la sesión de oficina: lo entrega el servidor al entrar con la
@@ -10156,6 +10157,7 @@ const RLL_CONC_CAMPOS = [
   ["piso", "Piso", /(piso|floor)/i],
   ["depto", "Depto", /(depto|dpto|departamento|unidad|uf\b|dto)/i],
   ["telefono", "Teléfono", /(tel|cel|m[oó]vil|phone)/i],
+  ["obs", "Observaciones (SAT, proveedores…)", /(observ|nota|coment|v[ií]nculo|detalle)/i],
   ["tipo", "Tipo de dispositivo", /(tipo|dispositivo|device|medio)/i],
 ];
 const RLL_CONC_RES = {
@@ -10163,6 +10165,8 @@ const RLL_CONC_RES = {
   no_registrada: { txt: "No registrada → dar de baja", fondo: "#FDE2E0", color: "#B3261E", argb: "FFFAD4D0" },
   perdida: { txt: "Reportada perdida → dar de baja", fondo: "#F9C9C4", color: "#8C1D18", argb: "FFF5B7B1" },
   falta: { txt: "Falta cargar en la estación", fondo: "#FFF1D6", color: "#8A5A00", argb: "FFFFEBC2" },
+  otra_llave: { txt: "Es de alguien registrado, no la declaró", fondo: "#EEF3FD", color: "#3557A6", argb: "FFE2EAFB" },
+  no_vecino: { txt: "SAT, función o proveedor", fondo: "#EEF0F2", color: "#5F6A73", argb: "FFE9ECEF" },
 };
 const RLL_DECISIONES = { "": "", dar_de_baja: "Dar de baja", borrar: "Borrar", hecho: "Hecho en la estación", mantener: "Mantener" };
 
@@ -10254,7 +10258,7 @@ document.getElementById("rllConcCompararBtn").addEventListener("click", async ()
     const fac = v(f, "facility");
     let tag = v(f, "tag");
     if (fac && /^\d+$/.test(fac) && /^\d+$/.test(tag)) tag = fac + ":" + tag;
-    return { tag, usuario: v(f, "usuario"), nombre: v(f, "nombre"), apellido: v(f, "apellido"), piso: v(f, "piso"), depto: v(f, "depto"), telefono: v(f, "telefono"), tipo: v(f, "tipo") };
+    return { tag, usuario: v(f, "usuario"), nombre: v(f, "nombre"), apellido: v(f, "apellido"), piso: v(f, "piso"), depto: v(f, "depto"), telefono: v(f, "telefono"), tipo: v(f, "tipo"), obs: v(f, "obs") };
   }).filter((f) => f.tag || f.usuario || f.nombre);
   st.className = "status"; st.textContent = "Guardando y comparando...";
   try {
@@ -10274,36 +10278,16 @@ document.getElementById("rllConcCompararBtn").addEventListener("click", async ()
 function rllEsControlEstacion(f) { return /control|remoto|\brf\b|\btx\b|cochera|garage/i.test(f.tipo || ""); }
 
 // Compara el listado guardado de la estación contra los registros actuales.
+// El criterio (tag, usuario, nombre…) está en cruce-llaves.js: es el mismo que usa la campaña de registro.
 function rllCompararConciliacion() {
   const disp = rllFilas();
-  const porTag = {}, porUsuario = {}, perdidas = {};
-  disp.forEach((d) => {
-    const kt = d.l.tag ? (rllEsControl(d.l) ? "c" + rllClaveUsuario(d.l.tag) : rllClaveTag(d.l.tag)) : "";
-    if (d.perdida) { if (kt) (perdidas[kt] = perdidas[kt] || []).push(d); return; }
-    if (kt && kt !== "c") (porTag[kt] = porTag[kt] || []).push(d);
-    const ku = rllClaveUsuario(d.l.usuario);
-    if (ku) (porUsuario[ku] = porUsuario[ku] || []).push(d);
-  });
-  const usados = new Set();
-  const filas = rllConc.filas.map((est, i) => {
-    const control = rllEsControlEstacion(est);
-    const kt = est.tag ? (control ? "c" + rllClaveUsuario(est.tag) : rllClaveTag(est.tag)) : "";
-    const ku = rllClaveUsuario(est.usuario);
-    const fila = { origen: "estacion", i, est, d: null, res: "no_registrada", por: "", nota: "" };
-    if (kt && kt !== "c" && perdidas[kt]) { fila.res = "perdida"; fila.d = perdidas[kt][0]; fila.por = "tag"; return fila; }
-    const candTag = kt && kt !== "c" ? (porTag[kt] || []) : [];
-    const candUsu = ku ? (porUsuario[ku] || []).filter((d) => rllEsControl(d.l) === control || !est.tipo) : [];
-    const d = candTag.find((x) => !usados.has(x)) || candTag[0] || candUsu.find((x) => !usados.has(x)) || null;
-    if (d) {
-      fila.res = "encontrada"; fila.d = d; fila.por = candTag.includes(d) ? "tag" : "usuario";
-      usados.add(d);
-      const uReg = rllClaveUsuario(d.l.usuario);
-      if (ku && uReg && ku !== uReg) fila.nota = `N° de usuario distinto: estación ${est.usuario}, vecino ${d.l.usuario}`;
-      if (fila.por === "usuario" && kt && d.l.tag && rllClaveTag(d.l.tag) !== kt && !rllEsControl(d.l)) fila.nota = `Coincide el usuario pero no el tag (estación ${est.tag}, vecino ${d.l.tag})`;
-    }
-    return fila;
-  });
-  disp.filter((d) => !d.perdida && !usados.has(d)).forEach((d) => filas.push({ origen: "registro", i: -1, est: null, d, res: "falta", por: "", nota: "" }));
+  const { estacion, faltan } = CruceLlaves.cruzar(disp, rllConc.filas, rllRegistros);
+  const filas = estacion.map((x) => ({
+    origen: "estacion", i: x.i, est: rllConc.filas[x.i], res: x.res, por: x.por, nota: x.nota,
+    // "otra_llave": la persona está registrada, pero esta llave no es ninguna de las que declaró.
+    d: x.res === "otra_llave" ? null : x.d, duena: x.res === "otra_llave" ? x.d : null,
+  }));
+  faltan.forEach((d) => filas.push({ origen: "registro", i: -1, est: null, d, res: "falta", por: "", nota: "" }));
   return filas;
 }
 
@@ -10316,7 +10300,7 @@ function renderRllConciliacion() {
   document.getElementById("rllConcInfo").textContent = `Archivo: ${rllConc.archivo || "(sin nombre)"} · subido ${rllFecha(rllConc.fecha)}${rllConc.por ? " por " + rllConc.por : ""} · ${rllConc.filas.length} filas de la estación. Se vuelve a comparar con los registros cada vez que abrís esta pestaña.`;
   const n = (k) => filas.filter((f) => f.res === k).length;
   const pendBaja = filas.filter((f) => (f.res === "no_registrada" || f.res === "perdida") && !rllConc.filas[f.i].decision).length;
-  const chips = [["", "Todas", filas.length], ["encontrada", "Encontradas", n("encontrada")], ["no_registrada", "No registradas → dar de baja", n("no_registrada")], ["perdida", "Reportadas perdidas", n("perdida")], ["falta", "Faltan en la estación", n("falta")]];
+  const chips = [["", "Todas", filas.length], ["encontrada", "Encontradas", n("encontrada")], ["no_registrada", "No registradas → dar de baja", n("no_registrada")], ["perdida", "Reportadas perdidas", n("perdida")], ["falta", "Faltan en la estación", n("falta")], ["otra_llave", "De alguien registrado, no declarada", n("otra_llave")], ["no_vecino", "SAT / funciones / proveedores", n("no_vecino")]].filter((c) => c[0] === "" || c[2] || c[0] === rllConcFiltro);
   document.getElementById("rllConcResumen").innerHTML = chips.map(([k, t, c]) => {
     const r = RLL_CONC_RES[k];
     return `<button type="button" class="sims-chip ${rllConcFiltro === k ? "activo" : ""}" data-k="${k}" style="${r && rllConcFiltro !== k ? `background:${r.fondo};border-color:${r.fondo};color:${r.color};` : ""}"><b>${c}</b> ${t}</button>`;
@@ -10329,6 +10313,9 @@ function renderRllConciliacion() {
   const botones = [];
   if (encPend.length) botones.push(`<button type="button" class="btn-secondary-admin" id="rllConcConciliarBtn">✓ Marcar las ${encPend.length} encontradas como conciliadas</button>`);
   if (pendBaja) botones.push(`<button type="button" class="btn-secondary-admin" id="rllConcBajaTodasBtn">Marcar las ${pendBaja} sin decidir para dar de baja</button>`);
+  // Encontradas por nombre a las que les falta el N° de usuario en el padrón: se completa con el de la estación.
+  const sinUsuario = filas.filter((f) => f.res === "encontrada" && f.por === "nombre" && f.d && !rllClaveUsuario(f.d.l.usuario) && rllClaveUsuario(f.est.usuario));
+  if (sinUsuario.length) botones.push(`<button type="button" class="btn-secondary-admin" id="rllConcUsuarioBtn" title="Copia al padrón el N° de usuario de la estación, así la próxima vez coinciden por número">Completar el N° de usuario en ${sinUsuario.length} ${sinUsuario.length === 1 ? "llave encontrada" : "llaves encontradas"} por nombre</button>`);
   lote.innerHTML = botones.length ? `<b>Acciones rápidas</b>${botones.join("")}` : "";
   lote.classList.toggle("hidden", !botones.length);
   const bConc = document.getElementById("rllConcConciliarBtn");
@@ -10344,11 +10331,24 @@ function renderRllConciliacion() {
       renderRllConciliacion();
     } catch (e) { alert("No se pudo guardar: " + e.message); bConc.disabled = false; }
   });
+  const bUsu = document.getElementById("rllConcUsuarioBtn");
+  if (bUsu) bUsu.addEventListener("click", async () => {
+    bUsu.disabled = true;
+    try {
+      const cambios = sinUsuario.map((f) => ({ id: f.d.r.id, indice: f.d.i, perdida: false, usuario: f.est.usuario, estado: "conciliada" }));
+      const r = await fetch("/api/datos?coleccion=registro_llaves", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "estado_lote", edificio: rllEdificioActual.codigo, cambios }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Error");
+      sinUsuario.forEach((f) => { f.d.l.usuario = String(f.est.usuario).replace(/\D/g, ""); f.d.l.estado = "conciliada"; f.d.l.revisado_por = adminNombre || "vos"; });
+      renderRllRegistros();
+      renderRllConciliacion();
+    } catch (e) { alert("No se pudo guardar: " + e.message); bUsu.disabled = false; }
+  });
   const bBaja = document.getElementById("rllConcBajaTodasBtn");
   if (bBaja) bBaja.addEventListener("click", () => rllDecidir(filas.filter((f) => (f.res === "no_registrada" || f.res === "perdida") && !rllConc.filas[f.i].decision).map((f) => f.i), "dar_de_baja"));
 
   const vis = filas.filter((f) => !rllConcFiltro || f.res === rllConcFiltro);
-  const orden = { perdida: 0, no_registrada: 1, falta: 2, encontrada: 3 };
+  const orden = { perdida: 0, no_registrada: 1, falta: 2, otra_llave: 3, encontrada: 4, no_vecino: 5 };
   vis.sort((a, b) => orden[a.res] - orden[b.res]);
   const tabla = document.getElementById("rllConcTabla");
   if (!vis.length) { tabla.innerHTML = '<p class="status">No hay filas con ese filtro.</p>'; return; }
@@ -10357,9 +10357,9 @@ function renderRllConciliacion() {
     const R = RLL_CONC_RES[f.res];
     const e = f.est, d = f.d;
     const enEst = e ? `<span style="font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:14px;">${rllEsc(e.tag ? (rllEsControlEstacion(e) ? e.tag : (rllClaveTag(e.tag).includes(":") ? rllClaveTag(e.tag) : e.tag)) : "—")}</span>${e.usuario ? ` · usuario <b>${rllEsc(e.usuario)}</b>` : ""}<br><span style="color:#55595F;">${rllEsc([[e.nombre, e.apellido].filter(Boolean).join(" "), [e.piso ? e.piso + "°" : "", e.depto].filter(Boolean).join(" "), e.tipo].filter(Boolean).join(" · "))}</span>` : '<span style="color:#8A5A00;">No está en la estación</span>';
-    const reg = d ? `${disp(d.l)} <span style="font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:14px;">${rllEsc(d.l.tag ? (rllEsControl(d.l) ? d.l.tag : (rllTagCalculado(d.l.tag) && !RLL_FORMATO_TAG.test(d.l.tag) ? rllTagCalculado(d.l.tag) : d.l.tag)) : "s/n")}</span>${d.l.usuario ? ` · usuario <b>${rllEsc(d.l.usuario)}</b>` : ""}<br><span style="color:#55595F;">${rllEsc(d.r.nombre)} · ${rllEsc(rllUnidad(d.r))} · ${rllEsc(d.r.telefono)}</span>${d.perdida ? `<br><span style="color:#8C1D18;">La reportó perdida${d.l.detalle ? ": “" + rllEsc(d.l.detalle) + "”" : ""}</span>` : ""}` : '<span style="color:#B3261E;">Nadie la registró</span>';
+    const reg = d ? `${disp(d.l)} <span style="font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:14px;">${rllEsc(d.l.tag ? (rllEsControl(d.l) ? d.l.tag : (rllTagCalculado(d.l.tag) && !RLL_FORMATO_TAG.test(d.l.tag) ? rllTagCalculado(d.l.tag) : d.l.tag)) : "s/n")}</span>${d.l.usuario ? ` · usuario <b>${rllEsc(d.l.usuario)}</b>` : ""}<br><span style="color:#55595F;">${rllEsc(d.r.nombre)} · ${rllEsc(rllUnidad(d.r))} · ${rllEsc(d.r.telefono)}</span>${d.perdida ? `<br><span style="color:#8C1D18;">La reportó perdida${d.l.detalle ? ": “" + rllEsc(d.l.detalle) + "”" : ""}</span>` : ""}` : f.duena ? `<span style="color:#3557A6;">Es de <b>${rllEsc(f.duena.r.nombre)}</b> (${rllEsc(rllUnidad(f.duena.r))}), que está registrada pero no declaró esta llave.</span><br><span style="font-size:12px;color:#55595F;">Preguntale si la sigue usando antes de darla de baja.</span>` : f.res === "no_vecino" ? `<span style="color:#5F6A73;">No es un vecino${f.est && f.est.obs ? ": " + rllEsc(f.est.obs) : ""}</span>` : '<span style="color:#B3261E;">Nadie la registró</span>';
     let accion = "";
-    if (f.res === "encontrada") accion = `<span style="color:#1F6B34;">${d.l.estado === "conciliada" ? "✓ Conciliada" : "Coincide"}${f.por === "usuario" ? " (por N° de usuario)" : ""}</span>`;
+    if (f.res === "encontrada") accion = `<span style="color:#1F6B34;">${d.l.estado === "conciliada" ? "✓ Conciliada" : "Coincide"}${f.por === "usuario" ? " (por N° de usuario)" : f.por === "nombre" ? " (por nombre)" : ""}</span>`;
     else if (f.res === "falta") accion = '<span style="color:#8A5A00;">Cargarla en la estación (o revisar el número)</span>';
     else {
       const dec = rllConc.filas[f.i].decision;
@@ -10368,7 +10368,7 @@ function renderRllConciliacion() {
         : `<button type="button" class="rll-dec" data-i="${f.i}" data-d="dar_de_baja" style="width:auto;padding:5px 10px;font-size:12px;background:#B3261E;">Dar de baja</button> <button type="button" class="btn-secondary-admin rll-dec" data-i="${f.i}" data-d="borrar" style="width:auto;padding:5px 10px;font-size:12px;color:#B3261E;border-color:#B3261E;">Borrar</button> <button type="button" class="btn-secondary-admin rll-dec" data-i="${f.i}" data-d="mantener" style="width:auto;padding:5px 10px;font-size:12px;">Mantener</button>`;
     }
     return `<tr style="background:${R.fondo};">
-      <td style="border-left:4px solid ${R.color};"><b style="color:${R.color};">${R.txt}</b>${f.nota ? `<br><span style="font-size:11.5px;color:#55595F;">⚠ ${rllEsc(f.nota)}</span>` : ""}</td>
+      <td style="border-left:4px solid ${R.color};"><b style="color:${R.color};">${R.txt}</b>${f.nota && f.res !== "otra_llave" && f.res !== "no_vecino" ? `<br><span style="font-size:11.5px;color:#55595F;">⚠ ${rllEsc(f.nota)}</span>` : ""}</td>
       <td>${enEst}</td><td>${reg}</td><td style="white-space:nowrap;">${accion}</td></tr>`;
   }).join("")}</tbody></table>`;
   tabla.querySelectorAll(".rll-dec").forEach((b) => b.addEventListener("click", () => rllDecidir([Number(b.dataset.i)], b.dataset.d)));
@@ -10431,7 +10431,7 @@ document.getElementById("rllConcExcelBtn").addEventListener("click", async () =>
       { header: "Estación: nombre", key: "eNombre", width: 22 }, { header: "Estación: N° de llave", key: "eTag", width: 18 }, { header: "Estación: N° de usuario", key: "eUsuario", width: 12 },
       { header: "Observaciones", key: "obs", width: 40 },
     ];
-    const orden = { perdida: 0, no_registrada: 1, falta: 2, encontrada: 3 };
+    const orden = { perdida: 0, no_registrada: 1, falta: 2, otra_llave: 3, encontrada: 4, no_vecino: 5 };
     filas.slice().sort((a, b) => orden[a.res] - orden[b.res]).forEach((f) => {
       const R = RLL_CONC_RES[f.res], d = f.d, e = f.est;
       const dec = e && rllConc.filas[f.i] ? rllConc.filas[f.i].decision : "";
@@ -10440,7 +10440,7 @@ document.getElementById("rllConcExcelBtn").addEventListener("click", async () =>
       const reg = d && !d.perdida ? d.r : null;
       const [nom, ape] = reg ? rllPartirNombre(reg.nombre) : (e && e.apellido ? [e.nombre, e.apellido] : rllPartirNombre(e && e.nombre));
       const pr = reg ? resumenPersona(reg) : null;
-      const hacer = f.res === "encontrada" ? (d.l.estado === "conciliada" ? "OK — conciliada" : "OK") : f.res === "falta" ? "Cargar en la estación" : (RLL_DECISIONES[dec] || "Dar de baja o borrar");
+      const hacer = f.res === "encontrada" ? (d.l.estado === "conciliada" ? "OK — conciliada" : "OK") : f.res === "falta" ? "Cargar en la estación" : (RLL_DECISIONES[dec] || (f.res === "otra_llave" ? "Preguntarle al vecino" : f.res === "no_vecino" ? "Revisar (no es vecino)" : "Dar de baja o borrar"));
       const fila = h1.addRow({
         res: R.txt, hacer, nombre: nom, apellido: ape,
         tel: reg ? reg.telefono : (e && e.telefono) || "", mail: reg ? reg.email || "" : "",
