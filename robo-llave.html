@@ -501,7 +501,7 @@
     $("listoLista").innerHTML = items.map((t) => `<li>${ICONO.ok}<span>${t}</span></li>`).join("");
     $("listoSinEstacion").classList.toggle("oculto", !!j.estacion_avisada || !!j.ya_estaba);
     const tel = j.telefono_estacion || telEstacion;
-    if (tel) { $("listoTel").href = "tel:" + tel.replace(/[^\d+]/g, ""); $("listoTelTxt").textContent = "Si ves algo raro, llamá a la central: " + tel; $("listoTel").classList.remove("oculto"); }
+    if (tel) { const dig = tel.replace(/[^\d+]/g, ""); $("listoTel").href = "tel:" + (dig.startsWith("+") ? dig : dig.length === 10 ? "+54" + dig : dig); $("listoTelTxt").textContent = "Si ves algo raro, llamá a la central: " + tel; $("listoTel").classList.remove("oculto"); }
     mostrar("pListo");
   }
 
