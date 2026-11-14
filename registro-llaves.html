@@ -5,17 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Registro de llaves de acceso — SAT</title>
 <meta name="robots" content="noindex">
-<meta name="theme-color" content="#0D0C0D">
+<meta name="theme-color" content="#26252B">
 <link rel="icon" href="/icons/icon-192.png">
 <link rel="stylesheet" href="/vendor/fonts.css">
 <style>
   :root {
-    --ink: #0D0C0D; --ink-2: #1B1B1D; --ink-3: #2A2A2D;
-    --paper: #F3F2ED; --card: #FFFFFF; --field: #FAFAF7;
-    --line: #E1DFD7; --line-2: #ECEAE3;
-    --text: #141416; --text-2: #4A4843; --muted: #75726B;
-    --amber: #F6B828; --amber-2: #FFC94A; --amber-dark: #A87708; --amber-soft: #FFF6DE;
-    --ok: #1F7A44; --ok-soft: #E7F4EC; --err: #B3261E; --err-soft: #FFF3F2; --blue: #3557A6; --blue-soft: #EEF3FD;
+    --ink: #121114; --ink-2: #1D1C20; --ink-3: #2A292E; --head: #26252B;
+    --paper: #F5F3EE; --card: #FFFFFF; --field: #FAFAF7;
+    --line: #E4E0D6; --line-2: #ECEAE3;
+    --text: #16151A; --text-2: #4C4A44; --muted: #6B6860;
+    --amber: #F6B828; --amber-2: #FFC94A; --amber-dark: #7A5300; --amber-soft: #FFF3D1;
+    --ok: #0F6E63; --ok-soft: #E2F1EE; --tag: #2348C8; --err: #B3261E; --err-soft: #FFF3F2; --blue: #3557A6; --blue-soft: #EEF3FD;
     --r-sm: 10px; --r: 14px; --r-lg: 20px;
     --sh-1: 0 1px 2px rgba(13,12,13,.05), 0 1px 1px rgba(13,12,13,.03);
     --sh-2: 0 1px 2px rgba(13,12,13,.05), 0 10px 30px -12px rgba(13,12,13,.16);
@@ -35,9 +35,9 @@
   :focus-visible { outline: none; box-shadow: var(--ring); }
 
   /* ---------- Barra superior ---------- */
-  .barra { background: var(--ink); color: #fff; }
+  .barra { background: var(--head); color: #fff; }
   .barra-in { max-width: 1120px; margin: 0 auto; padding: 14px 20px; display: flex; align-items: center; gap: 14px; }
-  .barra img { height: 30px; width: auto; display: block; }
+  .barra img { height: 34px; width: auto; display: block; }
   .barra .sep { width: 1px; height: 22px; background: rgba(255,255,255,.16); }
   .barra .seccion { font-family: var(--cond); font-weight: 600; font-size: 13px; letter-spacing: 1.4px; text-transform: uppercase; color: #A9A69C; }
   .barra .seguro { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #A9A69C; }
@@ -45,7 +45,7 @@
 
   /* ---------- Estructura ---------- */
   .layout { max-width: 1120px; margin: 0 auto; }
-  .intro { background: var(--ink); color: #fff; padding: 6px 20px 26px; position: relative; overflow: hidden; }
+  .intro { background: var(--head); color: #fff; padding: 6px 20px 26px; position: relative; overflow: hidden; }
   .intro::after { content: ""; position: absolute; inset: 0; pointer-events: none;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='48' viewBox='0 0 56 48'%3E%3Cpath d='M14 1h28l13 23-13 23H14L1 24z' fill='none' stroke='%23F6B828' stroke-opacity='.08' stroke-width='1.5'/%3E%3C/svg%3E");
     background-size: 56px 48px; -webkit-mask-image: linear-gradient(115deg, transparent 35%, #000 100%); mask-image: linear-gradient(115deg, transparent 35%, #000 100%); }
@@ -69,11 +69,12 @@
   /* Pasos: barra fija en el celular, lista en la columna izquierda en la PC */
   .pasos-nav { position: sticky; top: 0; z-index: 30; background: rgba(243,242,237,.92); -webkit-backdrop-filter: saturate(1.4) blur(10px); backdrop-filter: saturate(1.4) blur(10px); border-bottom: 1px solid var(--line); }
   .pasos-nav ol { list-style: none; margin: 0 auto; padding: 10px 14px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 600px; }
+  .pasos-nav a.bloqueado { cursor: default; opacity: .7; }
   .pasos-nav a { display: flex; flex-direction: column; gap: 6px; text-decoration: none; color: var(--muted); font-size: 12.5px; font-weight: 600; letter-spacing: .2px; }
   .pasos-nav a::before { content: ""; height: 4px; border-radius: 4px; background: var(--line); transition: background .25s; }
   .pasos-nav li.actual a { color: var(--text); }
-  .pasos-nav li.actual a::before { background: linear-gradient(90deg, var(--ink) 0 100%); }
-  .pasos-nav li.listo a { color: var(--ok); }
+  .pasos-nav li.actual a::before { background: var(--ink); }
+  .pasos-nav li.listo a { color: var(--text-2); }
   .pasos-nav li.listo a::before { background: var(--amber); }
   .pasos-nav .ic-ok { display: none; }
   .pasos-nav .num { display: none; }
@@ -87,7 +88,7 @@
   .paso-num { width: 32px; height: 28px; flex: none; display: grid; place-items: center; background: var(--ink); color: var(--amber); clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%); font-family: var(--cond); font-weight: 700; font-size: 15px; transition: background .2s; }
   .card.listo .paso-num { background: var(--amber); color: var(--ink); }
   .paso h2 { margin: 0; font-family: var(--cond); font-weight: 700; font-size: 22px; letter-spacing: .1px; line-height: 1.1; }
-  .paso-sub { margin: 6px 0 0 44px; color: var(--muted); font-size: 14.5px; line-height: 1.45; }
+  .paso-sub { margin: 8px 0 0 44px; color: var(--muted); font-size: 14.5px; line-height: 1.45; }
 
   .campo { margin-top: 18px; }
   .campo > label:not(.check), .grupo-label { display: block; font-weight: 600; font-size: 14.5px; margin-bottom: 8px; color: var(--text); }
@@ -233,6 +234,55 @@
   body.fin .intro h1, body.fin .intro .bajada, body.fin .intro .meta { display: none; }
   body.fin .intro { padding-bottom: 20px; }
 
+  /* ---------- Rediseño 2026: un paso por pantalla ---------- */
+  .oculto-paso { display: none !important; }
+  .card.entra { animation: entra .35s cubic-bezier(.2,.8,.2,1); }
+  @keyframes entra { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  .paso-de { display: block; font-family: var(--cond); font-weight: 700; font-size: 12.5px; letter-spacing: 1.6px; text-transform: uppercase; color: var(--amber-dark); margin-bottom: 2px; }
+  .nav-paso { display: flex; gap: 10px; margin-top: 22px; }
+  .nav-paso .enviar { margin-top: 0; flex: 1; }
+  .btn-atras { flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 104px; padding: 0 16px; border-radius: 14px; border: 1.5px solid var(--line); background: #fff; font-weight: 700; font-size: 16px; cursor: pointer; }
+  .btn-atras:hover { border-color: var(--ink); }
+  .btn-atras svg { width: 18px; height: 18px; }
+  /* Ilustraciones animadas del tag y del control */
+  .ilus { display: flex; align-items: flex-end; justify-content: center; gap: 26px; margin: 16px 0 4px; padding: 14px 10px 10px; border-radius: 18px; background: #F1EEE6; }
+  .ilus figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .ilus figcaption { font-size: 13px; font-weight: 600; color: var(--text-2); }
+  .ilus .fig-control { display: none; }
+  .ilus.con-control .fig-control { display: flex; }
+  .a-balanceo { animation: balanceo 3.2s ease-in-out infinite; transform-origin: 60px 20px; }
+  .a-flota { animation: flota 5s ease-in-out infinite; }
+  .a-led { animation: led 3.2s linear infinite; }
+  .a-pulsa { animation: pulsa 3.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+  .a-titila { animation: titila 1.6s ease-in-out infinite; }
+  @keyframes balanceo { 0%, 100% { transform: rotate(-7deg); } 50% { transform: rotate(7deg); } }
+  @keyframes flota { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+  @keyframes led { 0%, 1% { opacity: 0; } 2%, 5% { opacity: 1; } 6%, 8% { opacity: 0; } 9%, 12% { opacity: 1; } 13%, 100% { opacity: 0; } }
+  @keyframes pulsa { 0%, 9%, 100% { transform: scale(1); } 3% { transform: scale(.88); } }
+  @keyframes titila { 0%, 60%, 100% { opacity: 1; } 30% { opacity: .2; } }
+  .llave-ic.mini { background: #EAF0FF; }
+  .llave.control .llave-ic.mini { background: #ECEBEF; }
+  .llave-ic.mini svg { width: 22px; height: 22px; }
+  /* Pantalla final */
+  .tilde { width: 112px; height: 112px; margin: 0 auto 12px; display: block; }
+  .tilde .trazo { stroke-dasharray: 60; stroke-dashoffset: 60; animation: trazo .8s .25s ease-out forwards; }
+  @keyframes trazo { to { stroke-dashoffset: 0; } }
+  .final { position: relative; overflow: hidden; }
+  .papelito { position: absolute; border-radius: 50%; animation: flota 4.5s ease-in-out infinite; opacity: .9; }
+  .emergencia.nuevo { position: relative; overflow: hidden; text-align: left; margin: 18px 0 4px; padding: 20px 18px 18px; border-radius: 20px; background: var(--ink); border: 0; color: #fff; }
+  .emergencia.nuevo .aro { position: absolute; right: -86px; top: -86px; width: 160px; height: 160px; pointer-events: none; }
+  .emergencia.nuevo .emerg-tit { display: inline-flex; align-items: center; gap: 8px; font-family: var(--cond); font-weight: 700; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase; color: var(--amber); }
+  .emergencia.nuevo .emerg-tit svg { width: 17px; height: 17px; }
+  .emergencia.nuevo b { display: block; margin-top: 8px; font-family: var(--cond); font-weight: 700; font-size: 21px; line-height: 1.15; color: #fff; }
+  .emergencia.nuevo p { color: #C9C5BC; font-size: 14.5px; margin: 8px 0 14px; max-width: none; }
+  .emergencia.nuevo .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .emergencia.nuevo button, .emergencia.nuevo a { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 46px; padding: 10px; border-radius: 13px; border: 0; font-weight: 700; font-size: 14.5px; text-decoration: none; cursor: pointer; }
+  .emergencia.nuevo button { background: var(--amber); color: var(--ink); }
+  .emergencia.nuevo a { background: #2A292E; color: #fff; }
+  .emergencia.nuevo svg.ic { width: 17px; height: 17px; }
+  .pie img { height: 26px; }
+  @media (prefers-reduced-motion: reduce) { .tilde .trazo { stroke-dashoffset: 0; } }
+
   /* ---------- PC: guía a la izquierda, formulario a la derecha ---------- */
   @media (min-width: 980px) {
     body { background: var(--paper); }
@@ -338,7 +388,7 @@
     <form id="formulario" class="oculto" novalidate autocomplete="on">
       <!-- 1. Datos -->
       <section class="card" id="secDatos">
-        <div class="paso"><span class="paso-num">1</span><h2>Tus datos</h2></div>
+        <div class="paso"><span class="paso-num">1</span><div><span class="paso-de">Paso 1 de 3</span><h2>Tus datos</h2></div></div>
         <p class="paso-sub">De la persona que usa la llave.</p>
 
         <div class="campo" data-campo="nombre">
@@ -367,11 +417,12 @@
           <input type="text" id="relacionOtro" class="oculto" style="margin-top:8px;" maxlength="40" placeholder="Ej. familiar, encargado, empleada…" aria-label="¿Qué relación tenés con la unidad?">
           <div class="error-campo">Elegí una opción.</div>
         </div>
+        <div class="nav-paso"><button type="button" class="enviar" data-ir="secUnidad">Siguiente <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>
       </section>
 
       <!-- 2. Unidad -->
       <section class="card" id="secUnidad">
-        <div class="paso"><span class="paso-num">2</span><h2>Tu unidad</h2></div>
+        <div class="paso"><span class="paso-num">2</span><div><span class="paso-de">Paso 2 de 3</span><h2>Tu unidad</h2></div></div>
         <div class="campo" data-campo="tipo">
           <span class="grupo-label">¿La llave es para…?</span>
           <div class="opciones">
@@ -407,12 +458,14 @@
             </div>
           </div>
         </div>
+        <div class="nav-paso"><button type="button" class="btn-atras" data-volver="secDatos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>Atrás</button><button type="button" class="enviar" data-ir="secLlaves">Siguiente <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>
       </section>
 
       <!-- 3. Llaves -->
       <section class="card" id="secLlaves">
-        <div class="paso"><span class="paso-num">3</span><h2>Tus llaves y controles</h2></div>
+        <div class="paso"><span class="paso-num">3</span><div><span class="paso-de">Paso 3 de 3</span><h2>Tus llaves y controles</h2></div></div>
         <p class="paso-sub">Cargá todo lo que usás para entrar: la llave (tag) de la puerta y, si tenés, el control de la cochera.</p>
+        <div class="ilus" id="ilusLlaves"><figure><svg width="70" height="122" viewBox="0 0 120 210" aria-hidden="true"><g class="a-balanceo"><circle cx="60" cy="36" r="17" fill="none" stroke="#B9BBC0" stroke-width="3.5"/><path fill-rule="evenodd" d="M60 34C82 50 102 86 102 134c0 42-18 70-44 72C34 206 18 180 18 138 18 94 40 54 60 34zM60 51.5a5 5 0 1 0 .01 0z" fill="#2348C8" fill-opacity=".9"/><path d="M60 34C82 50 102 86 102 134c0 42-18 70-44 72C34 206 18 180 18 138 18 94 40 54 60 34z" fill="none" stroke="#5B7FF0" stroke-opacity=".7" stroke-width="2"/><circle cx="60" cy="140" r="31" fill="#1A34A2" fill-opacity=".75"/><circle cx="60" cy="140" r="31" fill="none" stroke="#132A86" stroke-width="5" stroke-opacity=".7"/><path d="M26 108C46 96 78 96 98 112" fill="none" stroke="#fff" stroke-opacity=".28" stroke-width="6" stroke-linecap="round"/><text x="60" y="140" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="11.5" font-weight="500" fill="#D5DEFA">069:02561</text><text x="60" y="154" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="#D5DEFA" fill-opacity=".55">PTOC16</text><circle cx="60" cy="56" r="7.5" fill="none" stroke="#D4D6DA" stroke-width="4"/><circle cx="60" cy="56" r="9.5" fill="none" stroke="#8E9096" stroke-width="1"/></g></svg><figcaption>Llave (tag)</figcaption></figure><figure class="fig-control"><svg width="52" height="124" viewBox="0 0 110 260" aria-hidden="true"><g class="a-flota"><path d="M20 34c0-16 12-26 35-26s35 10 35 26v104c0 12-8 20-20 20H40c-12 0-20-8-20-20z" fill="#C9CBD0"/><path d="M24 34c0-13 11-22 31-22s31 9 31 22v103c0 10-7 17-17 17H41c-10 0-17-7-17-17z" fill="#0F0F11"/><path d="M30 36c0-10 9-17 25-17s25 7 25 17v98c0 8-5 13-13 13H43c-8 0-13-5-13-13z" fill="#1B1B1E"/><circle cx="55" cy="27" r="4.2" fill="#2E2E33"/><circle cx="55" cy="27" r="4.2" fill="#3DDC6E" class="a-led"/><circle cx="55" cy="27" r="9" fill="#3DDC6E" fill-opacity=".35" class="a-led"/><g class="a-pulsa"><rect x="35" y="41" width="40" height="17" rx="8.5" fill="#D4D4D8" stroke="#000" stroke-width="2"/><path d="M51.5 49.5v-1.6a3.5 3.5 0 0 1 7 0v1.6" fill="none" stroke="#D3262B" stroke-width="1.6"/><rect x="50" y="49.3" width="10" height="6" rx="1" fill="#D3262B"/></g><rect x="33" y="64" width="21" height="17" rx="8" fill="#D4D4D8" stroke="#000" stroke-width="2"/><circle cx="43.5" cy="72.5" r="1.8" fill="#fff" stroke="#9A9AA0" stroke-width=".6"/><rect x="56" y="64" width="21" height="17" rx="8" fill="#D4D4D8" stroke="#000" stroke-width="2"/><circle cx="63.5" cy="72.5" r="1.8" fill="#fff" stroke="#9A9AA0" stroke-width=".6"/><circle cx="69.5" cy="72.5" r="1.8" fill="#fff" stroke="#9A9AA0" stroke-width=".6"/><rect x="35" y="87" width="40" height="17" rx="8.5" fill="#D4D4D8" stroke="#000" stroke-width="2"/><path d="M51.5 95.5v-1.6a3.5 3.5 0 0 1 6.6-1.6" fill="none" stroke="#1E9A4A" stroke-width="1.6"/><rect x="50" y="95.3" width="10" height="6" rx="1" fill="#1E9A4A"/><circle cx="55" cy="123" r="10.5" fill="#D4D4D8" stroke="#000" stroke-width="2"/><text x="55" y="127.5" text-anchor="middle" font-family="Barlow, sans-serif" font-weight="700" font-size="13" fill="#2A2A2E">i</text><path d="M42 150h26v14H42z" fill="none" stroke="#B9BBC0" stroke-width="3"/><circle cx="55" cy="170" r="6" fill="none" stroke="#B9BBC0" stroke-width="2.5"/><rect x="51" y="176" width="8" height="18" rx="4" fill="none" stroke="#B9BBC0" stroke-width="2.5"/><circle cx="55" cy="222" r="26" fill="none" stroke="#B9BBC0" stroke-width="3.5"/></g></svg><figcaption>Control remoto</figcaption></figure></div>
         <div id="llaves"></div>
         <div class="agregar">
           <button type="button" class="btn-agregar" id="agregarLlaveBtn">
@@ -432,25 +485,23 @@
             <svg class="flecha" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
           </summary>
           <div class="donde-cuerpo">
-            <svg class="ilustracion" viewBox="0 0 330 160" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Llavero de acceso con el número grabado: tres números, dos puntos y cinco números">
-              <defs>
-                <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#43464B"/><stop offset="1" stop-color="#1A1C1F"/></linearGradient>
-              </defs>
-              <g transform="translate(26 8)">
-                <circle cx="68" cy="14" r="9" fill="none" stroke="#9A978E" stroke-width="3"/>
-                <path d="M68 24 C 106 24 134 54 134 88 C 134 122 106 144 68 144 C 30 144 2 122 2 88 C 2 54 30 24 68 24 Z" fill="url(#g1)"/>
-                <circle cx="68" cy="40" r="5.5" fill="#F2F1EC"/>
-                <text x="68" y="99" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="17" font-weight="600" fill="#C9C6BC" letter-spacing=".5">069:02561</text>
-                <rect x="14" y="80" width="108" height="28" rx="7" fill="none" stroke="#F6B828" stroke-width="3"/>
+            <svg class="ilustracion" viewBox="0 0 330 150" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Llave azul con el número grabado: tres números, dos puntos y cinco números. Debajo hay otro código que no va.">
+              <g transform="translate(6 24)">
+                <path fill-rule="evenodd" d="M8 56C20 24 80 8 140 22c26 6 44 18 54 30-12 14-36 30-66 38C76 104 18 92 8 56zM168 52a5 5 0 1 0 .01 0z" fill="#2348C8" fill-opacity=".92"/>
+                <circle cx="93" cy="54" r="34" fill="#1A34A2" fill-opacity=".7"/><circle cx="93" cy="54" r="34" fill="none" stroke="#132A86" stroke-width="5" stroke-opacity=".7"/>
+                <path d="M20 40C60 22 120 22 170 40" fill="none" stroke="#fff" stroke-opacity=".25" stroke-width="6" stroke-linecap="round"/>
+                <text x="93" y="49" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="13" font-weight="500" fill="#E2E8FC">069:02561</text>
+                <text x="93" y="66" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10.5" fill="#E2E8FC" fill-opacity=".55">PTOC16</text>
+                <rect x="50" y="35" width="86" height="19" rx="5" fill="none" stroke="#F6B828" stroke-width="2.5" class="a-titila"/>
+                <circle cx="168" cy="57" r="7.5" fill="none" stroke="#D4D6DA" stroke-width="4"/><circle cx="168" cy="57" r="9.5" fill="none" stroke="#8E9096" stroke-width="1"/>
               </g>
-              <path d="M152 100 C 172 100 180 84 196 78" fill="none" stroke="#B9850A" stroke-width="2.2" stroke-dasharray="4 4"/>
-              <path d="M190 72 l9 5 -8 7" fill="none" stroke="#B9850A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-              <text x="206" y="64" font-family="Barlow, sans-serif" font-size="14" font-weight="600" fill="#0E0F10">Este número</text>
-              <text x="206" y="82" font-family="Barlow, sans-serif" font-size="13" fill="#6E6C66">3 números</text>
-              <text x="206" y="98" font-family="Barlow, sans-serif" font-size="13" fill="#6E6C66">dos puntos (:)</text>
-              <text x="206" y="114" font-family="Barlow, sans-serif" font-size="13" fill="#6E6C66">5 números</text>
+              <path d="M146 62 C 170 56 186 46 208 44" fill="none" stroke="#B9850A" stroke-width="2.2" stroke-dasharray="4 4"/>
+              <text x="214" y="40" font-family="Barlow, sans-serif" font-size="14" font-weight="600" fill="#16151A">Este número</text>
+              <text x="214" y="58" font-family="Barlow, sans-serif" font-size="13" fill="#6B6860">3 números, dos</text>
+              <text x="214" y="74" font-family="Barlow, sans-serif" font-size="13" fill="#6B6860">puntos y 5 números</text>
+              <text x="214" y="104" font-family="Barlow, sans-serif" font-size="13" fill="#B42318">El de abajo no va</text>
             </svg>
-            <p>Está <b>grabado en el llavero</b>: son <b>3 números, dos puntos y 5 números</b>, por ejemplo <span class="mono">069:02561</span>. Escribí solo los números: los dos puntos se ponen solos.</p>
+            <p>Está <b>grabado en el llavero</b>: son <b>3 números, dos puntos y 5 números</b>, por ejemplo <span class="mono">069:02561</span>. Escribí solo los números: los dos puntos se ponen solos. El código de abajo (por ejemplo <span class="mono">PTOC16</span>) no va.</p>
             <p>Si tu llave tiene el número escrito de otra forma, tocá <i>«Mi llave tiene el número de otra forma»</i> y copialo tal cual se ve. Si no lo podés leer, <b>sacale una foto</b> del lado de los números: con eso alcanza.</p>
             <p style="margin:0;">El <b>número de usuario</b> es el que te asignaron al darte la llave o el control; si no lo sabés, dejalo vacío.</p>
           </div>
@@ -505,13 +556,16 @@
 
     <!-- Gracias -->
     <div class="card final oculto" id="pantallaGracias">
-      <div class="sello ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
-      <h2>¡Listo, gracias!</h2>
+      <span class="papelito" aria-hidden="true" style="left:9%;top:26px;width:10px;height:10px;background:#F6B828"></span><span class="papelito" aria-hidden="true" style="right:12%;top:44px;width:8px;height:8px;background:#0F6E63;border-radius:2px;animation-delay:.8s"></span><span class="papelito" aria-hidden="true" style="right:20%;top:130px;width:11px;height:11px;background:#F6B828;animation-delay:1.6s"></span><span class="papelito" aria-hidden="true" style="left:16%;top:150px;width:7px;height:7px;background:#2F55A4;border-radius:2px;animation-delay:2.2s"></span>
+      <svg class="tilde" viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="56" fill="#0F6E63" opacity=".12"/><circle cx="60" cy="60" r="44" fill="#0F6E63"/><path class="trazo" d="M40 61l14 14 27-29" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <h2 id="graciasTit">¡Listo, gracias!</h2>
       <p id="graciasTxt">Tu registro quedó guardado. Si hace falta algo más, te vamos a contactar.</p>
       <div class="resumen" id="resumen"></div>
-      <div class="emergencia oculto" id="emergenciaBox">
-        <b>Guardá tu link de emergencia</b>
-        <p>Si un día te roban o perdés la llave, con este link la denunciás a cualquier hora y le avisamos a la central de monitoreo. Es personal: no lo compartas.</p>
+      <div class="emergencia nuevo oculto" id="emergenciaBox">
+        <svg class="aro" viewBox="0 0 160 160" aria-hidden="true"><circle cx="80" cy="80" r="62" fill="none" stroke="#F6B828" stroke-opacity=".18" stroke-width="18"/></svg>
+        <span class="emerg-tit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></svg>Tu acceso de emergencia</span>
+        <b>Si algún día perdés la llave o te la roban, entrás desde acá y avisás en un minuto.</b>
+        <p>Le llega al instante a la central de monitoreo, a cualquier hora. Es personal: no lo compartas.</p>
         <div class="btns"><button type="button" id="emergenciaCopiar">Copiar link</button><a id="emergenciaWa" href="#" target="_blank" rel="noopener">Mandármelo por WhatsApp</a></div>
       </div>
       <button type="button" class="btn-sec" id="otroBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M18 8v6M15 11h6"/></svg>Registrar a otra persona</button>
@@ -522,7 +576,8 @@
 
 
   <footer class="pie">
-    SAT · Seguridad electrónica · <a href="https://www.sat365.com.ar" target="_blank" rel="noopener">sat365.com.ar</a>
+    <img src="/icons/logo.png" alt="SAT">
+    Seguridad electrónica · <a href="https://www.sat365.com.ar" target="_blank" rel="noopener">sat365.com.ar</a>
   </footer>
 
 <script>
@@ -537,7 +592,7 @@
   function mostrar(id) {
     ["cargando", "pantallaInvalida", "formulario", "pantallaGracias"].forEach((x) => $(x).classList.toggle("oculto", x !== id));
     document.body.classList.toggle("fin", id !== "formulario" && id !== "cargando");
-    if (id === "formulario") setTimeout(actualizarPasos, 0);
+    if (id === "formulario") setTimeout(() => mostrarPaso(pasoActual), 0);
   }
 
   // ---------- Progreso: qué paso está completo y en cuál está ----------
@@ -549,6 +604,38 @@
     return false;
   }
   let pasoActual = "secDatos";
+  // Un paso por pantalla: Siguiente valida solo ese paso; Atrás no pide nada.
+  function mostrarPaso(id, animar) {
+    pasoActual = id;
+    PASOS.forEach((x) => $(x).classList.toggle("oculto-paso", x !== id));
+    $("secEnvio").classList.toggle("oculto-paso", id !== "secLlaves");
+    if (animar) { $(id).classList.remove("entra"); void $(id).offsetWidth; $(id).classList.add("entra"); }
+    actualizarPasos();
+  }
+  function validarPaso(id) {
+    const malos = validar();
+    malos.forEach((c) => { if (!$(id).contains(c)) c.classList.remove("invalido"); });
+    return malos.filter((c) => $(id).contains(c));
+  }
+  function subirA(id) {
+    const y = $(id).getBoundingClientRect().top + window.scrollY - (window.innerWidth >= 980 ? 24 : 70);
+    if (y < window.scrollY) window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
+  }
+  function irAPaso(destino) {
+    const iDest = PASOS.indexOf(destino), iAct = PASOS.indexOf(pasoActual);
+    for (let i = iAct; i < iDest; i++) {
+      const malos = validarPaso(PASOS[i]);
+      if (malos.length) {
+        if (PASOS[i] !== pasoActual) mostrarPaso(PASOS[i], true);
+        malos[0].scrollIntoView({ behavior: "smooth", block: "center" });
+        const campo = malos[0].querySelector("input:not([type=radio]):not(.oculto)"); if (campo) campo.focus({ preventScroll: true });
+        return false;
+      }
+    }
+    mostrarPaso(destino, true);
+    subirA(destino);
+    return true;
+  }
   function actualizarPasos() {
     PASOS.forEach((id) => {
       const ok = pasoCompleto(id);
@@ -558,17 +645,6 @@
       li.classList.toggle("actual", id === pasoActual);
     });
   }
-  function calcularPasoActual() {
-    // El paso cuya tarjeta cruza la franja superior de la pantalla.
-    const linea = Math.min(window.innerHeight * 0.35, 260);
-    let actualNuevo = PASOS[0];
-    PASOS.forEach((id) => { if ($(id).getBoundingClientRect().top < linea) actualNuevo = id; });
-    if ($("secEnvio").getBoundingClientRect().top < linea) actualNuevo = PASOS[PASOS.length - 1];
-    if (actualNuevo !== pasoActual) { pasoActual = actualNuevo; actualizarPasos(); }
-  }
-  let rafPaso = 0;
-  window.addEventListener("scroll", () => { if (!rafPaso) rafPaso = requestAnimationFrame(() => { rafPaso = 0; calcularPasoActual(); }); }, { passive: true });
-
   async function iniciar() {
     if (!/^[a-z0-9-]{3,40}$/.test(codigo)) { mostrar("pantallaInvalida"); $("edificioChip").classList.add("oculto"); return; }
     try {
@@ -617,8 +693,8 @@
 
   // ---------- Dispositivos: llaves (tag) y controles de cochera ----------
   const ICONO = {
-    tag: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2 2M14 9l2 2"/></svg>',
-    control: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="3"/><circle cx="12" cy="8" r="1.6"/><path d="M10 13h4M10 16.5h4"/></svg>',
+    tag: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M2 13C4 7 12 4 18 6.5c2 .8 3.4 2 4 3-1 1.6-3.6 3.8-6.6 4.9C10 16.4 3.4 16.6 2 13zM19.3 10.6a1.2 1.2 0 1 0 .01 0z" fill="#2348C8"/><circle cx="11" cy="11.5" r="3.8" fill="#1A34A2"/></svg>',
+    control: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="1.5" width="10" height="21" rx="4.5" fill="#111113"/><circle cx="12" cy="4.6" r="1.1" fill="#3DDC6E"/><rect x="9.2" y="7.2" width="5.6" height="2.5" rx="1.25" fill="#D4D4D8"/><rect x="9.2" y="10.8" width="5.6" height="2.5" rx="1.25" fill="#D4D4D8"/><rect x="9.2" y="14.4" width="5.6" height="2.5" rx="1.25" fill="#D4D4D8"/><circle cx="12" cy="19" r="1.5" fill="#D4D4D8"/></svg>',
     quitar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
     camara: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>',
     galeria: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>',
@@ -652,7 +728,7 @@
     div.dataset.tipo = tipo;
     const cabecera = `
       <div class="llave-tit">
-        <b><span class="llave-ic">${ICONO[tipo]}</span><span class="llave-num"></span></b>
+        <b><span class="llave-ic mini">${ICONO[tipo]}</span><span class="llave-num"></span></b>
         <button type="button" class="quitar quitar-disp" aria-label="Quitar">${ICONO.quitar}Quitar</button>
       </div>`;
     div.innerHTML = cabecera + (tipo === "tag" ? `
@@ -761,6 +837,7 @@
     llavesCont.querySelectorAll(".quitar-disp").forEach((b) => b.classList.toggle("oculto", total === 1));
     $("agregarLlaveBtn").classList.toggle("oculto", total >= MAX_LLAVES);
     const tipoUnidad = valorRadio("tipo");
+    $("ilusLlaves").classList.toggle("con-control", !!tipoUnidad && tipoUnidad !== "vivienda");
     $("agregarControlBtn").classList.toggle("oculto", total >= MAX_LLAVES || !tipoUnidad || tipoUnidad === "vivienda");
   }
   $("agregarLlaveBtn").addEventListener("click", () => agregarDispositivo("tag", true));
@@ -807,6 +884,16 @@
   form.addEventListener("input", (e) => { const c = e.target.closest(".campo"); if (c) c.classList.remove("invalido"); if (!form.querySelector(".invalido")) $("statusMsg").textContent = ""; });
   form.addEventListener("change", (e) => { const c = e.target.closest(".campo"); if (c) c.classList.remove("invalido"); if (!form.querySelector(".invalido")) $("statusMsg").textContent = ""; });
 
+  document.querySelectorAll("[data-ir]").forEach((b) => b.addEventListener("click", () => irAPaso(b.dataset.ir)));
+  document.querySelectorAll("[data-volver]").forEach((b) => b.addEventListener("click", () => { $("statusMsg").textContent = ""; mostrarPaso(b.dataset.volver, true); subirA(b.dataset.volver); }));
+  document.querySelectorAll("#pasosNav a").forEach((a) => a.addEventListener("click", (e) => { e.preventDefault(); irAPaso(a.closest("li").dataset.paso); }));
+  // Enter en los pasos 1 y 2 avanza en vez de mandar el formulario.
+  form.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" || e.target.tagName === "TEXTAREA" || e.target.tagName === "BUTTON" || pasoActual === "secLlaves") return;
+    e.preventDefault();
+    irAPaso(PASOS[PASOS.indexOf(pasoActual) + 1]);
+  });
+
   $("email").addEventListener("input", () => $("copiaWrap").classList.toggle("oculto", !$("email").value.trim()));
 
   // ---------- Envío ----------
@@ -846,6 +933,8 @@
     if (malos.length) {
       st.className = "status err";
       st.textContent = malos.length === 1 ? "Revisá el campo marcado en rojo." : `Revisá los ${malos.length} campos marcados en rojo.`;
+      const sec = malos[0].closest("section.card");
+      if (sec && PASOS.includes(sec.id) && sec.id !== pasoActual) { st.textContent = ""; mostrarPaso(sec.id, true); validarPaso(sec.id); }
       malos[0].scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
@@ -894,6 +983,8 @@
       } else $("emergenciaBox").classList.add("oculto");
       $("graciasTxt").textContent = (d.actualizado ? "Ya estabas registrado: actualizamos tus datos con lo que cargaste ahora." : "Tu registro quedó guardado. Si hace falta algo más, te vamos a contactar.") + (d.copia ? " Te mandamos una copia por mail." : "");
       st.textContent = "";
+      const nombrePila = datos.nombre.split(/\s+/)[0];
+      $("graciasTit").textContent = nombrePila ? `¡Listo, ${nombrePila}!` : "¡Listo, gracias!";
       mostrar("pantallaGracias");
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
@@ -929,6 +1020,7 @@
     $("bloqueCochera").classList.add("oculto");
     $("filaDepto").classList.remove("oculto");
     $("perdidaBox").classList.remove("visible");
+    pasoActual = "secDatos";
     mostrar("formulario");
     window.scrollTo({ top: 0, behavior: "smooth" });
   });
