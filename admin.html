@@ -735,6 +735,35 @@ html[data-tema="noche"] .rll-conc .r-fuente.ok { background: rgba(120,220,150,0.
   .rll-ed-cab .c-adm .a { min-width: 0; flex: 1 1 100%; }
 }
 
+
+/* ---------- Rediseño 2026: tarjetas con % conciliado y bandeja vecino ↔ placa ---------- */
+.rll-ed-tarjeta .t-top { display: flex; gap: 14px; align-items: center; }
+.rll-ed-tarjeta .t-anillo { flex: none; width: 66px; height: 66px; position: relative; }
+.rll-ed-tarjeta .t-anillo svg { width: 66px; height: 66px; display: block; }
+.rll-ed-tarjeta .t-anillo b { position: absolute; inset: 0; display: grid; place-items: center; font-size: 16px; font-weight: 800; }
+.rll-ed-tarjeta .t-anillo .arco { stroke-dasharray: 163.4; animation: rllArco 1.1s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes rllArco { from { stroke-dashoffset: 163.4; } }
+.rll-ed-tarjeta .t-chip.den { background: #B42318; color: #fff; }
+.rll-bandeja { display: flex; flex-direction: column; gap: 10px; }
+.rll-bandeja .b-fila { display: grid; grid-template-columns: 180px minmax(0, 1fr) 46px minmax(0, 1fr) 240px; gap: 14px; align-items: center; background: var(--card, #fff); border: 1px solid var(--border); border-left: 5px solid var(--r-c); border-radius: 16px; padding: 14px 16px; }
+.rll-bandeja .b-ver { display: flex; flex-direction: column; gap: 4px; background: var(--r-bg); border-radius: 12px; padding: 8px 10px; align-self: stretch; justify-content: center; }
+.rll-bandeja .b-lado { min-width: 0; font-size: 13.5px; line-height: 1.45; }
+.rll-bandeja .b-et { display: block; font-size: 11px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--steel); margin-bottom: 3px; }
+.rll-bandeja .b-medio { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--r-bg); color: var(--r-c); justify-self: center; }
+.rll-bandeja .b-medio svg { width: 20px; height: 20px; }
+.rll-bandeja .b-acc { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; align-items: center; max-width: 300px; }
+.rll-bandeja mark { background: #F6B828; color: #121114; border-radius: 3px; padding: 0 1px; }
+@media (max-width: 900px) {
+  .rll-bandeja .b-fila { grid-template-columns: minmax(0, 1fr) 40px minmax(0, 1fr); }
+  .rll-bandeja .b-ver { grid-column: 1 / -1; flex-direction: row; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+  .rll-bandeja .b-acc { grid-column: 1 / -1; justify-content: flex-start; max-width: none; }
+}
+@media (max-width: 560px) {
+  .rll-bandeja .b-fila { grid-template-columns: 1fr; }
+  .rll-bandeja .b-medio { display: none; }
+}
+html[data-tema="noche"] .rll-bandeja .b-fila { background: #1B1A17; }
+html[data-tema="noche"] .rll-bandeja mark { background: #F6B828; color: #121114; }
 /* ---------- Conciliación de llaves: colores por resultado, legibles en día y en noche ---------- */
 .rll-conc td { background: var(--r-bg); vertical-align: top; }
 .rll-conc td:first-child { border-left: 4px solid var(--r-c); }
@@ -746,20 +775,20 @@ html[data-tema="noche"] .rll-conc .r-fuente.ok { background: rgba(120,220,150,0.
 .rll-conc .r-vacio { color: #8A8F94; }
 .rll-conc .r-baja { width: auto; padding: 5px 10px; font-size: 12px; background: #B3261E; color: #fff; }
 .rll-conc .r-baja:hover { background: #8C1D18; }
-.rll-conc tr.r-encontrada { --r-bg: #E6F4EA; --r-c: #1F6B34; }
-.rll-conc tr.r-no_registrada { --r-bg: #FDE2E0; --r-c: #B3261E; }
-.rll-conc tr.r-perdida { --r-bg: #F9C9C4; --r-c: #8C1D18; }
-.rll-conc tr.r-falta { --r-bg: #FFF1D6; --r-c: #8A5A00; }
-.rll-conc tr.r-otra_llave { --r-bg: #EEF3FD; --r-c: #3557A6; }
-.rll-conc tr.r-no_vecino { --r-bg: #EEF0F2; --r-c: #5F6A73; }
+.rll-conc .r-encontrada { --r-bg: #E6F4EA; --r-c: #1F6B34; }
+.rll-conc .r-no_registrada { --r-bg: #FDE2E0; --r-c: #B3261E; }
+.rll-conc .r-perdida { --r-bg: #F9C9C4; --r-c: #8C1D18; }
+.rll-conc .r-falta { --r-bg: #FFF1D6; --r-c: #8A5A00; }
+.rll-conc .r-otra_llave { --r-bg: #EEF3FD; --r-c: #3557A6; }
+.rll-conc .r-no_vecino { --r-bg: #EEF0F2; --r-c: #5F6A73; }
 html[data-tema="noche"] .rll-conc .r-sub, html[data-tema="noche"] .rll-conc .r-nota { color: #C9C4B8; }
 html[data-tema="noche"] .rll-conc .r-vacio { color: #8F897D; }
-html[data-tema="noche"] .rll-conc tr.r-encontrada { --r-bg: #15281B; --r-c: #7FD39A; }
-html[data-tema="noche"] .rll-conc tr.r-no_registrada { --r-bg: #351A17; --r-c: #FF9D8F; }
-html[data-tema="noche"] .rll-conc tr.r-perdida { --r-bg: #46201B; --r-c: #FFB4A8; }
-html[data-tema="noche"] .rll-conc tr.r-falta { --r-bg: #33290F; --r-c: #FFC960; }
-html[data-tema="noche"] .rll-conc tr.r-otra_llave { --r-bg: #18213A; --r-c: #9DBBF0; }
-html[data-tema="noche"] .rll-conc tr.r-no_vecino { --r-bg: #24252A; --r-c: #B9BEC6; }
+html[data-tema="noche"] .rll-conc .r-encontrada { --r-bg: #15281B; --r-c: #7FD39A; }
+html[data-tema="noche"] .rll-conc .r-no_registrada { --r-bg: #351A17; --r-c: #FF9D8F; }
+html[data-tema="noche"] .rll-conc .r-perdida { --r-bg: #46201B; --r-c: #FFB4A8; }
+html[data-tema="noche"] .rll-conc .r-falta { --r-bg: #33290F; --r-c: #FFC960; }
+html[data-tema="noche"] .rll-conc .r-otra_llave { --r-bg: #18213A; --r-c: #9DBBF0; }
+html[data-tema="noche"] .rll-conc .r-no_vecino { --r-bg: #24252A; --r-c: #B9BEC6; }
 html[data-tema="noche"] .rll-conc .r-baja { background: #C6372C; color: #fff; }
 html[data-tema="noche"] [style*="color:#3557A6"] { color: #9DBBF0 !important; }
 html[data-tema="noche"] [style*="color:#5F6A73"] { color: #B9BEC6 !important; }
@@ -9801,8 +9830,12 @@ function renderRllEdificios() {
     const abiertos = rllPedidosAbiertos(e.codigo);
     const c = e.conciliacion, p = c && c.estacion;
     const camp = e.campana && CAMP[e.campana.estado];
+    const total = p ? (p.total || (p.con_dueno || 0) + (p.sin_dueno || 0)) : 0;
+    const pct = p && total ? Math.round(((p.con_dueno || 0) * 100) / total) : null;
+    const den = (rllGestiones || []).filter((g) => g.edificio === e.codigo && g.origen === "emergencia" && (g.estado === "pendiente" || g.estado === "en_curso")).length;
+    const anillo = `<span class="t-anillo" title="${pct == null ? "Sin Excel de la estación todavía" : pct + "% de las llaves de la estación tienen dueño"}"><svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="26" fill="none" stroke="rgba(120,115,100,.18)" stroke-width="7"/>${pct == null ? "" : `<circle class="arco" cx="32" cy="32" r="26" fill="none" stroke="${pct >= 90 ? "#0F6E63" : pct >= 60 ? "#F6B828" : "#B42318"}" stroke-width="7" stroke-linecap="round" transform="rotate(-90 32 32)" style="stroke-dashoffset:${(163.4 * (1 - pct / 100)).toFixed(1)}"/>`}</svg><b>${pct == null ? "—" : pct + "%"}</b></span>`;
     return `<button type="button" class="rll-ed-tarjeta" data-c="${rllEsc(e.codigo)}">
-      <div class="t-cab"><div><div class="t-nombre">${rllEsc(e.nombre)}</div><div class="t-dir">${rllEsc(e.direccion || "Sin dirección")}</div></div>${e.abonado ? `<span class="t-ab">${rllEsc(e.abonado)}</span>` : ""}</div>
+      <div class="t-top">${anillo}<div class="t-cab" style="flex:1;min-width:0;"><div><div class="t-nombre">${rllEsc(e.nombre)}</div><div class="t-dir">${rllEsc(e.direccion || "Sin dirección")}</div></div>${e.abonado ? `<span class="t-ab">${rllEsc(e.abonado)}</span>` : ""}</div></div>
       <div class="t-adm"><span>Administra</span>${adms.length ? `<span>${adms.map((a) => rllEsc(a.nombre)).join(", ")}</span>` : '<span class="t-sin">Sin administrador asignado</span>'}</div>
       <div class="t-nums">
         <div><b>${e.registros == null ? "—" : e.registros}</b><span>vecinos</span></div>
@@ -9810,7 +9843,7 @@ function renderRllEdificios() {
         <div class="${abiertos ? "alerta" : ""}"><b>${abiertos}</b><span>pedidos abiertos</span></div>
       </div>
       <div class="t-est">${c ? `<span>Estación: <b>${p ? p.con_dueno : "?"}</b> con dueño · <b>${p ? p.sin_dueno : "?"}</b> sin dueño</span>` : "<span>Sin Excel de la estación</span>"}
-        ${camp ? `<span class="t-chip ${camp[1]}">${camp[0]}</span>` : ""}${e.activo === false ? '<span class="t-chip roj">QR apagado</span>' : ""}</div>
+        ${den ? `<span class="t-chip den">${den === 1 ? "1 denuncia de robo" : den + " denuncias de robo"}</span>` : ""}${camp ? `<span class="t-chip ${camp[1]}">${camp[0]}</span>` : ""}${e.activo === false ? '<span class="t-chip roj">QR apagado</span>' : ""}</div>
     </button>`;
   }).join("")}</div>`;
   cont.querySelectorAll(".rll-ed-tarjeta").forEach((b) => b.addEventListener("click", () => { rllAbrirEdificio(b.dataset.c); window.scrollTo({ top: 0, behavior: "smooth" }); }));
@@ -10802,18 +10835,36 @@ function renderRllConciliacion() {
   const tabla = document.getElementById("rllConcTabla");
   if (!vis.length) { tabla.innerHTML = '<p class="status">No hay filas con ese filtro.</p>'; return; }
   const disp = (l) => (rllEsControl(l) ? "📟 Control" : "🔑 Tag");
-  tabla.innerHTML = `<table class="ven-tabla rll-conc"><thead><tr><th>Resultado</th><th>${pl ? (nEst ? "En la estación y la placa" : "En la placa") : "En la estación"}</th><th>Registrado por el vecino</th><th>Qué hacer</th></tr></thead><tbody>${vis.map((f) => {
+  const ladoPlaca = pl ? (nEst ? "En la estación y la placa" : "En la placa") : "En la estación";
+  // Si el vecino y la estación tienen números distintos (y del mismo largo), se marcan los dígitos que no coinciden.
+  const dif = (a, b) => {
+    if (!a || !b || a === b || a.length !== b.length) return [rllEsc(a), rllEsc(b)];
+    const m = (x, y) => [...x].map((c, i) => (c !== y[i] ? `<mark>${rllEsc(c)}</mark>` : rllEsc(c))).join("");
+    return [m(a, b), m(b, a)];
+  };
+  const IC_B = {
+    igual: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+    distinto: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 9h14M5 15h14M16 5 8 19"/></svg>',
+    falta: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+    nadie: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+    alerta: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5 2.5 20h19z"/><path d="M12 10v4M12 17v.01"/></svg>',
+    pregunta: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .8-1 1.5v.7M12 17v.01"/></svg>',
+    otro: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 12h12"/></svg>',
+  };
+  tabla.innerHTML = `<div class="rll-conc rll-bandeja">${vis.map((f) => {
     const R = RLL_CONC_RES[f.res];
     const e = f.est, d = f.d;
     const numEst = e && e.tag ? (rllEsControlEstacion(e) ? e.tag : (rllClaveTag(e.tag).includes(":") ? rllClaveTag(e.tag) : e.tag)) : "";
+    const numReg = (l) => (l.tag ? (rllEsControl(l) ? l.tag : (rllTagCalculado(l.tag) && !RLL_FORMATO_TAG.test(l.tag) ? rllTagCalculado(l.tag) : l.tag)) : "");
+    const [numEstH, numRegH] = d && numEst && numReg(d.l) ? dif(numEst, numReg(d.l)) : [rllEsc(numEst), d ? rllEsc(numReg(d.l)) : ""];
+    const distintos = numEstH.includes("<mark>");
     const pc = rllPlacaClase(f), avP = pc === "dif" || pc === "placa" || pc === "estacion" ? CruceLlaves.avisoPlaca(e) : "";
     const etP = pc === "placa" ? '<span class="r-fuente">Solo en la placa</span>' : pc === "estacion" ? '<span class="r-fuente">No está en la placa</span>' : pc === "ok" ? '<span class="r-fuente ok" title="El usuario está en la placa con la misma tarjeta">✓ Placa</span>' : "";
     const enEst = e
-      ? `${etP}${numEst ? `<span class="r-num">${rllEsc(numEst)}</span>` : '<span class="r-vacio">sin N° de llave</span>'}${e.usuario ? ` · usuario <b>${rllEsc(e.usuario)}</b>` : ""}<br><span class="r-sub">${rllEsc([[e.nombre, e.apellido].filter(Boolean).join(" "), [e.piso ? e.piso + "°" : "", e.depto].filter(Boolean).join(" "), e.tipo].filter(Boolean).join(" · "))}</span>${avP && pc !== "placa" && pc !== "estacion" ? `<br><span class="r-nota">⚠ ${rllEsc(avP)}</span>` : ""}`
+      ? `${etP}${numEst ? `<span class="r-num">${numEstH}</span>` : '<span class="r-vacio">sin N° de llave</span>'}${e.usuario ? ` · usuario <b>${rllEsc(e.usuario)}</b>` : ""}<br><span class="r-sub">${rllEsc([[e.nombre, e.apellido].filter(Boolean).join(" "), [e.piso ? e.piso + "°" : "", e.depto].filter(Boolean).join(" "), e.tipo].filter(Boolean).join(" · "))}</span>${avP && pc !== "placa" && pc !== "estacion" ? `<br><span class="r-nota">⚠ ${rllEsc(avP)}</span>` : ""}`
       : '<span class="r-tono">No está en la estación</span>';
-    const numReg = (l) => (l.tag ? (rllEsControl(l) ? l.tag : (rllTagCalculado(l.tag) && !RLL_FORMATO_TAG.test(l.tag) ? rllTagCalculado(l.tag) : l.tag)) : "");
     const reg = d
-      ? `${disp(d.l)} ${numReg(d.l) ? `<span class="r-num">${rllEsc(numReg(d.l))}</span>` : '<span class="r-vacio">s/n</span>'}${d.l.usuario ? ` · usuario <b>${rllEsc(d.l.usuario)}</b>` : ""}<br><span class="r-sub">${rllEsc(d.r.nombre)} · ${rllEsc(rllUnidad(d.r))} · ${rllEsc(d.r.telefono)}</span>${d.perdida ? `<br><span class="r-tono">La reportó perdida${d.l.detalle ? ": “" + rllEsc(d.l.detalle) + "”" : ""}</span>` : ""}`
+      ? `${disp(d.l)} ${numReg(d.l) ? `<span class="r-num">${numRegH}</span>` : '<span class="r-vacio">s/n</span>'}${d.l.usuario ? ` · usuario <b>${rllEsc(d.l.usuario)}</b>` : ""}<br><span class="r-sub">${rllEsc(d.r.nombre)} · ${rllEsc(rllUnidad(d.r))} · ${rllEsc(d.r.telefono)}</span>${d.perdida ? `<br><span class="r-tono">La reportó perdida${d.l.detalle ? ": “" + rllEsc(d.l.detalle) + "”" : ""}</span>` : ""}`
       : f.duena ? `<span class="r-tono">Es de <b>${rllEsc(f.duena.r.nombre)}</b> (${rllEsc(rllUnidad(f.duena.r))}), que está registrada pero no declaró esta llave.</span><br><span class="r-nota">Preguntale si la sigue usando antes de darla de baja.</span>`
       : f.res === "no_vecino" ? `<span class="r-tono">No es un vecino${e && e.obs ? ": " + rllEsc(e.obs) : ""}</span>`
       : '<span class="r-tono">Nadie la registró</span>';
@@ -10826,10 +10877,14 @@ function renderRllConciliacion() {
         ? `<span class="ven-estado ${dec === "mantener" ? "sin" : dec === "hecho" ? "ok" : "vencido"}">${RLL_DECISIONES[dec]}</span>${dec === "dar_de_baja" || dec === "borrar" ? ` <button type="button" class="btn-secondary-admin rll-dec" data-i="${f.i}" data-d="hecho" style="width:auto;padding:4px 10px;font-size:12px;">✓ Ya lo hice</button>` : ""} <button type="button" class="btn-secondary-admin rll-dec" data-i="${f.i}" data-d="" style="width:auto;padding:4px 8px;font-size:12px;border-color:transparent;text-decoration:underline;">cambiar</button>`
         : `<button type="button" class="rll-dec r-baja" data-i="${f.i}" data-d="dar_de_baja">Dar de baja</button> <button type="button" class="btn-secondary-admin rll-dec" data-i="${f.i}" data-d="borrar" style="width:auto;padding:5px 10px;font-size:12px;">Borrar</button> <button type="button" class="btn-secondary-admin rll-dec" data-i="${f.i}" data-d="mantener" style="width:auto;padding:5px 10px;font-size:12px;">Mantener</button>`;
     }
-    return `<tr class="r-${f.res}">
-      <td><span class="r-tit">${R.txt}</span>${f.nota && f.res !== "otra_llave" && f.res !== "no_vecino" ? `<br><span class="r-nota">⚠ ${rllEsc(f.nota)}</span>` : ""}</td>
-      <td>${enEst}</td><td>${reg}</td><td style="white-space:nowrap;">${accion}</td></tr>`;
-  }).join("")}</tbody></table>`;
+    const icono = f.res === "encontrada" ? (distintos ? IC_B.distinto : IC_B.igual) : f.res === "falta" ? IC_B.falta : f.res === "no_registrada" ? IC_B.nadie : f.res === "perdida" ? IC_B.alerta : f.res === "otra_llave" ? IC_B.pregunta : IC_B.otro;
+    return `<div class="b-fila r-${f.res}">
+      <div class="b-ver"><span class="r-tit">${R.txt}</span>${distintos ? '<span class="r-nota">Los números no coinciden: revisá los dígitos marcados.</span>' : ""}${f.nota && f.res !== "otra_llave" && f.res !== "no_vecino" ? `<span class="r-nota">⚠ ${rllEsc(f.nota)}</span>` : ""}</div>
+      <div class="b-lado"><span class="b-et">Cargó el vecino</span>${reg}</div>
+      <div class="b-medio" aria-hidden="true">${icono}</div>
+      <div class="b-lado"><span class="b-et">${ladoPlaca}</span>${enEst}</div>
+      <div class="b-acc">${accion}</div></div>`;
+  }).join("")}</div>`;
   tabla.querySelectorAll(".rll-dec").forEach((b) => b.addEventListener("click", () => rllDecidir([Number(b.dataset.i)], b.dataset.d)));
 }
 
