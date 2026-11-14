@@ -3430,3 +3430,23 @@ y la pantalla de gracias y el mail de constancia le dan el link para guardarlo.
   `/api/datos?publico=…` (se carga a mano en el panel de Vercel).
 - **Clave general** (13/11/2026): ya se verifica con `ADMIN_PASSWORD_HASH`
   (scrypt); `ADMIN_PASSWORD` quedó con un valor al azar que no sirve para entrar.
+
+## Rediseño del portal de llaves (14/11/2026)
+
+- **Vecino** (`registro-llaves.html`): un paso por pantalla (Siguiente / Atrás, cada
+  paso valida solo lo suyo), dibujos animados del tag azul y del control de 5 botones
+  (LED verde), guía del número grabado («el código de abajo no va») y pantalla final
+  con saludo y el acceso de emergencia destacado.
+- **Aviso de robo** (`robo-llave.html`): encabezado claro con la central 24 h, cada
+  llave con su dibujo y, al terminar, una línea de tiempo de lo que pasa después.
+- **Portal de administradores** (`consorcio.html`): ingreso con un edificio animado,
+  «Para hoy» (denuncias, pedidos en curso, registro abierto), cada edificio dibujado
+  con sus ventanas según las unidades registradas y el **mapa del edificio**
+  (pisos × deptos, armado con lo que hay registrado) con la ficha de cada unidad y
+  accesos directos a pedir, reemplazar, dar de baja, cambiar titular o mandar el
+  link. El resumen de cada edificio suma `emergencias` (denuncias abiertas).
+- **Panel SAT** (`admin.html`, Llaves de edificios): anillo con el % de llaves de la
+  estación que tienen dueño y bandeja de conciliación (vecino ↔ estación/placa, con
+  los dígitos distintos resaltados).
+- Logo de SAT arriba y al pie en todas las pantallas; barras en gris carbón para que
+  se vea el hexágono.
