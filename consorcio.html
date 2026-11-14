@@ -5,17 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Portal de administradores — SAT</title>
 <meta name="robots" content="noindex">
-<meta name="theme-color" content="#0D0C0D">
+<meta name="theme-color" content="#26252B">
 <link rel="icon" href="/icons/icon-192.png">
 <link rel="stylesheet" href="/vendor/fonts.css">
 <style>
   :root {
-    --ink: #0D0C0D; --ink-2: #1B1B1D;
-    --paper: #F3F2ED; --card: #FFFFFF; --field: #FAFAF7; --soft: #F6F5F0;
-    --line: #E1DFD7; --line-2: #ECEAE3;
-    --text: #141416; --text-2: #4A4843; --muted: #75726B;
-    --amber: #F6B828; --amber-2: #FFC94A; --amber-dark: #A87708; --amber-soft: #FFF6DE;
-    --ok: #1F7A44; --ok-soft: #E7F4EC; --err: #B3261E; --err-soft: #FFF3F2; --blue: #3557A6; --blue-soft: #EEF3FD;
+    --ink: #121114; --ink-2: #1D1C20; --head: #26252B;
+    --paper: #F5F3EE; --card: #FFFFFF; --field: #FAF9F6; --soft: #F3F1EB;
+    --line: #E4E0D6; --line-2: #ECE9E1;
+    --text: #16151A; --text-2: #4C4A44; --muted: #6B6860;
+    --amber: #F6B828; --amber-2: #FFC94A; --amber-dark: #7A5300; --amber-soft: #FFF3D1;
+    --ok: #0F6E63; --ok-soft: #E2F1EE; --rojo: #B42318; --err: #B3261E; --err-soft: #FFF3F2; --blue: #3557A6; --blue-soft: #EEF3FD;
     --r-sm: 10px; --r: 14px; --r-lg: 20px;
     --sh-1: 0 1px 2px rgba(13,12,13,.05), 0 1px 1px rgba(13,12,13,.03);
     --sh-2: 0 1px 2px rgba(13,12,13,.05), 0 10px 30px -12px rgba(13,12,13,.16);
@@ -37,9 +37,9 @@
   .ic { width: 18px; height: 18px; }
 
   /* ---------- Barra superior ---------- */
-  .barra { background: var(--ink); color: #fff; position: relative; z-index: 20; }
+  .barra { background: var(--head); color: #fff; position: relative; z-index: 20; }
   .barra-in { max-width: 1120px; margin: 0 auto; padding: 12px 20px; display: flex; align-items: center; gap: 14px; min-height: 60px; }
-  .barra img { height: 28px; display: block; }
+  .barra img { height: 34px; display: block; }
   .barra .sep { width: 1px; height: 22px; background: rgba(255,255,255,.16); }
   .barra .seccion { font-family: var(--cond); font-weight: 600; font-size: 13px; letter-spacing: 1.4px; text-transform: uppercase; color: #A9A69C; }
   .barra-der { margin-left: auto; display: flex; align-items: center; gap: 10px; }
@@ -59,7 +59,7 @@
   .menu button svg { width: 18px; height: 18px; color: var(--muted); }
 
   /* ---------- Intro (link del vecino) ---------- */
-  .intro { background: var(--ink); color: #fff; position: relative; overflow: hidden; }
+  .intro { background: var(--head); color: #fff; position: relative; overflow: hidden; }
   .intro::after, .acceso-info::after { content: ""; position: absolute; inset: 0; pointer-events: none;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='48' viewBox='0 0 56 48'%3E%3Cpath d='M14 1h28l13 23-13 23H14L1 24z' fill='none' stroke='%23F6B828' stroke-opacity='.08' stroke-width='1.5'/%3E%3C/svg%3E");
     background-size: 56px 48px; -webkit-mask-image: linear-gradient(115deg, transparent 35%, #000 100%); mask-image: linear-gradient(115deg, transparent 35%, #000 100%); }
@@ -127,17 +127,20 @@
 
   /* ---------- Ingreso ---------- */
   .acceso { display: grid; grid-template-columns: 1fr; gap: 0; max-width: 980px; margin: 0 auto; border-radius: 24px; overflow: hidden; box-shadow: var(--sh-2); background: #fff; }
-  .robo-acceso { grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; padding: 16px 22px; background: #FDECEA; border-top: 1px solid #F3C4BE; color: #8C1D18; text-decoration: none; }
-  .robo-acceso:hover { background: #FBDDD9; }
-  .robo-acceso .ic { width: 40px; height: 40px; flex: none; border-radius: 50%; background: #C0261C; color: #fff; display: grid; place-items: center; }
-  .robo-acceso .ic svg { width: 20px; height: 20px; }
+  .robo-acceso { grid-column: 1 / -1; display: flex; align-items: center; gap: 16px; padding: 18px 24px; background: #fff; border-top: 1px solid #F3C9C4; color: var(--text); text-decoration: none; }
+  .robo-acceso:hover { background: #FFFAF9; }
+  .robo-acceso .ic { position: relative; width: 48px; height: 48px; flex: none; }
+  .robo-acceso .ic span { position: absolute; inset: 0; border-radius: 50%; background: var(--rojo); color: #fff; display: grid; place-items: center; }
+  .robo-acceso .ic span.onda { animation: onda 1.8s ease-out infinite; }
+  .robo-acceso .ic svg { width: 24px; height: 24px; }
   .robo-acceso .tx { flex: 1; min-width: 0; }
-  .robo-acceso b { display: block; font-size: 15.5px; }
-  .robo-acceso small { display: block; font-size: 13.5px; color: #7A3530; margin-top: 2px; }
-  .robo-acceso .ir { display: inline-flex; align-items: center; gap: 6px; padding: 10px 14px; border-radius: 10px; background: #C0261C; color: #fff; font-weight: 700; font-size: 14.5px; white-space: nowrap; }
+  .robo-acceso b { display: block; font-size: 16.5px; color: #7A1810; }
+  .robo-acceso small { display: block; font-size: 14px; color: var(--text-2); margin-top: 2px; }
+  .robo-acceso .ir { display: inline-flex; align-items: center; gap: 6px; padding: 12px 16px; border-radius: 12px; background: var(--rojo); color: #fff; font-weight: 700; font-size: 15px; white-space: nowrap; }
   .robo-acceso .ir svg { width: 16px; height: 16px; }
+  @keyframes onda { from { transform: scale(1); opacity: .55; } to { transform: scale(2.3); opacity: 0; } }
   @media (max-width: 560px) { .robo-acceso { flex-wrap: wrap; padding: 14px 16px; } .robo-acceso .ir { width: 100%; justify-content: center; } }
-  .acceso-info { background: var(--ink); color: #fff; padding: 30px 26px; position: relative; overflow: hidden; }
+  .acceso-info { background: var(--ink); color: #fff; padding: 30px 26px; position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 18px; }
   .acceso-info > * { position: relative; z-index: 1; }
   .acceso-info .eyebrow { font-family: var(--cond); font-weight: 600; font-size: 13px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--amber); }
   .acceso-info p { color: #C9C6BC; margin: 0; line-height: 1.5; }
@@ -355,6 +358,121 @@
   .ayuda-inline:hover { text-decoration: underline; }
   .pie { text-align: center; color: var(--muted); font-size: 13px; padding: 4px 16px 32px; }
   .pie a { color: var(--text); font-weight: 600; text-decoration: none; }
+
+  /* ---------- Rediseño 2026 ---------- */
+  .acceso-info h1 { font-style: normal; text-transform: none; letter-spacing: -.3px; margin-bottom: 0; }
+  .escena { position: relative; display: flex; justify-content: center; align-items: flex-end; min-height: 330px; margin: 4px 0 2px; }
+  .escena .halo { position: absolute; left: 50%; top: 50%; width: 380px; height: 380px; transform: translate(-50%, -50%); border-radius: 50%; background: radial-gradient(circle, rgba(246,184,40,.10) 0 46%, rgba(246,184,40,.05) 46% 70%, transparent 70%); pointer-events: none; }
+  .escena .edif-anim { position: relative; max-height: 330px; width: auto; }
+  .a-glow { animation: glow 7s infinite both; }
+  @keyframes glow { 0% { opacity: 0; } 8% { opacity: 1; } 62% { opacity: 1; } 72% { opacity: 0; } 100% { opacity: 0; } }
+  .escena .tag-flota { position: absolute; right: 6%; top: 18px; animation: flota 5s ease-in-out infinite; }
+  .escena .tag-flota g { animation: balanceo 3.2s ease-in-out infinite; transform-origin: 60px 20px; }
+  @keyframes flota { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+  @keyframes balanceo { 0%, 100% { transform: rotate(-7deg); } 50% { transform: rotate(7deg); } }
+  .burbuja { position: absolute; display: flex; gap: 10px; align-items: center; background: #fff; color: var(--text); border-radius: 14px; padding: 9px 13px; box-shadow: 0 18px 40px -14px rgba(0,0,0,.6); animation: burbuja 7s ease-in-out infinite both; }
+  .burbuja .bi { width: 28px; height: 28px; flex: none; border-radius: 50%; display: grid; place-items: center; }
+  .burbuja .bi svg { width: 16px; height: 16px; }
+  .burbuja b { display: block; font-size: 14px; line-height: 1.2; }
+  .burbuja small { display: block; font-size: 12px; color: var(--muted); }
+  .burbuja.b1 { left: 2%; top: 56px; }
+  .burbuja.b2 { left: 8%; bottom: 34px; animation-delay: 3.5s; }
+  @keyframes burbuja { 0%, 12% { opacity: 0; transform: translateY(8px); } 18%, 78% { opacity: 1; transform: none; } 86%, 100% { opacity: 0; transform: translateY(-6px); } }
+  .beneficios.fila3 { display: flex; flex-wrap: wrap; gap: 12px 18px; margin: 0; }
+  .beneficios.fila3 li { flex: 1 1 150px; align-items: center; font-size: 14px; color: #D9D6CF; }
+  .acceso-form .logo-form { height: 40px; width: auto; display: block; margin-bottom: 18px; }
+  /* Para hoy */
+  .hoy { margin: 0 0 22px; }
+  .hoy-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+  .hoy-item { display: flex; gap: 14px; align-items: flex-start; text-align: left; width: 100%; background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 16px; cursor: pointer; transition: transform .15s, box-shadow .15s; }
+  .hoy-item:hover { transform: translateY(-2px); box-shadow: var(--sh-2); }
+  .hoy-item.rojo { border-color: #F3C9C4; }
+  .hoy-ic { position: relative; width: 44px; height: 44px; flex: none; }
+  .hoy-ic span { position: absolute; inset: 0; border-radius: 14px; display: grid; place-items: center; }
+  .hoy-ic svg { width: 21px; height: 21px; }
+  .hoy-item.rojo .hoy-ic span { background: var(--rojo); color: #fff; }
+  .hoy-item.rojo .hoy-ic span.onda { animation: onda 1.8s ease-out infinite; }
+  .hoy-item.ambar .hoy-ic span { background: var(--amber-soft); color: var(--amber-dark); }
+  .hoy-item.verde .hoy-ic span { background: var(--ok-soft); color: var(--ok); }
+  .hoy-item b { display: block; font-size: 16px; line-height: 1.25; }
+  .hoy-item small { display: block; font-size: 14px; color: var(--text-2); margin-top: 3px; line-height: 1.4; }
+  .hoy-item .ir { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; font-weight: 700; font-size: 14px; }
+  .hoy-item .ir svg { width: 15px; height: 15px; }
+  /* Tarjetas de edificio con su dibujo */
+  .ed-chip { padding: 0 !important; overflow: hidden; }
+  .ed-chip .ed-dibujo { height: 150px; background: #F1EEE6; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 4px; }
+  .ed-chip .ed-dibujo svg { max-height: 142px; width: auto; }
+  .ed-chip .ed-txt { padding: 14px 16px 16px; display: block; }
+  .ed-chip .marca { top: 12px; right: 12px; background: #fff; }
+  .pill.rojo { background: var(--rojo); color: #fff; }
+  .a-late { animation: onda 1.8s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+  /* Mapa del edificio */
+  .mapa-wrap { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; margin: 18px 0 4px; }
+  .mapa { flex: 999 1 420px; min-width: 0; border: 1px solid var(--line); border-radius: 20px; padding: 18px; background: #fff; }
+  .mapa-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .mapa-cab h3 { margin: 0; font-family: var(--cond); font-weight: 700; font-size: 21px; }
+  .mapa-cab span { font-size: 14px; color: var(--muted); }
+  .mapa-grilla { overflow-x: auto; padding: 6px 6px 2px; margin: -6px -6px 0; }
+  .mapa-fila { display: grid; gap: 7px; align-items: center; margin-bottom: 7px; }
+  .mapa-fila .piso { font-family: var(--cond); font-weight: 700; font-size: 15px; color: var(--text-2); text-align: right; padding-right: 4px; }
+  .mapa-fila.cab span { font-size: 12px; font-weight: 700; letter-spacing: 1px; color: var(--muted); text-align: center; text-transform: uppercase; }
+  .celda { position: relative; height: 46px; min-width: 52px; border-radius: 12px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px; font-weight: 700; font-size: 15px; border: 1.5px solid; transition: transform .12s; }
+  .celda:hover { transform: scale(1.04); }
+  .celda svg { width: 14px; height: 14px; }
+  .celda.ok { background: var(--ok-soft); border-color: #8CC8BD; color: var(--ok); }
+  .celda.reg { background: var(--amber-soft); border-color: #EDC660; color: var(--amber-dark); }
+  .celda.none { background: #fff; border-color: #CFCABE; border-style: dashed; color: var(--muted); }
+  .celda.alerta { background: var(--rojo); border-color: var(--rojo); color: #fff; }
+  .celda.sel { outline: 3px solid var(--ink); outline-offset: 2px; transform: scale(1.04); }
+  .celda .punto { position: absolute; top: 5px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--blue); }
+  .celda .late { position: absolute; top: -5px; right: -5px; width: 14px; height: 14px; border-radius: 50%; background: var(--rojo); border: 2px solid #fff; animation: latido3 1.8s ease-out infinite; }
+  @keyframes latido3 { from { box-shadow: 0 0 0 0 rgba(180,35,24,.6); } to { box-shadow: 0 0 0 10px rgba(180,35,24,0); } }
+  .mapa-ley { display: flex; flex-wrap: wrap; gap: 8px 16px; border-top: 1px solid var(--line-2); padding-top: 12px; margin-top: 6px; font-size: 13.5px; color: var(--text-2); }
+  .mapa-ley span { display: inline-flex; align-items: center; gap: 7px; }
+  .mapa-ley i { width: 22px; height: 18px; border-radius: 6px; border: 1.5px solid; display: inline-block; }
+  .mapa-ley i.ok { background: var(--ok-soft); border-color: #8CC8BD; } .mapa-ley i.reg { background: var(--amber-soft); border-color: #EDC660; } .mapa-ley i.none { background: #fff; border-color: #CFCABE; border-style: dashed; } .mapa-ley i.alerta { background: var(--rojo); border-color: var(--rojo); }
+  .mapa-ley i.pto { width: 9px; height: 9px; border-radius: 50%; background: var(--blue); border: 0; }
+  .mapa-otros { margin-top: 10px; font-size: 13.5px; color: var(--muted); }
+  .mapa-otros:empty { display: none; }
+  .ficha { flex: 1 1 320px; min-width: 0; border: 1px solid var(--line); border-radius: 20px; padding: 18px; background: #fff; display: flex; flex-direction: column; gap: 14px; }
+  .ficha-cab { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .ficha-cab small { display: block; font-size: 12px; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; color: var(--muted); }
+  .ficha-cab b { display: block; font-family: var(--cond); font-weight: 800; font-size: 36px; line-height: 1; }
+  .chip-est { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 5px 12px; font-size: 13.5px; font-weight: 700; border: 1px solid; white-space: nowrap; }
+  .chip-est.ok { background: var(--ok-soft); color: var(--ok); border-color: #8CC8BD; } .chip-est.reg { background: var(--amber-soft); color: var(--amber-dark); border-color: #EDC660; } .chip-est.none { background: #fff; color: var(--muted); border-color: #CFCABE; } .chip-est.alerta { background: var(--rojo); color: #fff; border-color: var(--rojo); }
+  .ficha-alerta { background: #FDECEA; border: 1px solid #F3C9C4; border-radius: 14px; padding: 12px 14px; font-size: 14.5px; color: #5E2420; }
+  .ficha-alerta b { display: block; color: #7A1810; margin-bottom: 2px; }
+  .ficha-pedido { background: var(--blue-soft); border-radius: 12px; padding: 10px 12px; font-size: 14px; color: #1E3A75; }
+  .ficha-sec { font-weight: 700; font-size: 14px; color: var(--text-2); margin-bottom: -6px; }
+  .ficha-persona { display: flex; gap: 12px; align-items: center; }
+  .ficha-persona .ini { width: 36px; height: 36px; border-radius: 50%; background: var(--soft); display: grid; place-items: center; font-weight: 700; color: var(--text-2); flex: none; }
+  .ficha-persona b { display: block; font-size: 15px; }
+  .ficha-persona small { display: block; font-size: 13px; color: var(--muted); }
+  .ficha-llave { display: flex; gap: 10px; align-items: center; background: var(--field); border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; }
+  .ficha-llave .mi { width: 34px; height: 34px; border-radius: 10px; background: #EAF0FF; display: grid; place-items: center; flex: none; }
+  .ficha-llave .mi.ctl { background: #ECEBEF; }
+  .ficha-llave .mi svg { width: 24px; height: 24px; }
+  .ficha-llave .nro { flex: 1; min-width: 0; font-family: var(--mono); font-size: 14px; }
+  .ficha-acc { display: flex; flex-wrap: wrap; gap: 8px; border-top: 1px solid var(--line-2); padding-top: 14px; }
+  .ficha-vacia { border: 1.5px dashed #CFCABE; border-radius: 16px; padding: 18px; text-align: center; color: var(--text-2); font-size: 14.5px; }
+  .ficha-vacia b { display: block; color: var(--text); font-size: 16px; margin-bottom: 4px; }
+  /* Pedidos: pasos con puntos */
+  .progreso { display: flex !important; align-items: flex-start; gap: 0 !important; margin-top: 16px; }
+  .progreso div { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; position: relative; font-size: 12.5px !important; }
+  .progreso div::before { content: "" !important; width: 22px; height: 22px !important; border-radius: 50% !important; background: #fff !important; border: 2px solid #D6D1C5; margin: 0 !important; display: block; position: relative; z-index: 1; box-sizing: border-box; }
+  .progreso div::after { content: ""; position: absolute; top: 10px; left: calc(-50% + 11px); right: calc(50% + 11px); height: 3px; border-radius: 3px; background: #E1DCD0; }
+  .progreso div:first-child::after { display: none; }
+  .progreso div.ok::before { background-color: var(--ok) !important; border-color: var(--ok); background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 12.5l4 4 8-9'/%3E%3C/svg%3E") !important; background-size: 14px !important; background-position: center !important; background-repeat: no-repeat !important; }
+  .progreso div.ok::after, .progreso div.actual::after { background: var(--ok); }
+  .progreso div.actual::before { background: var(--amber) !important; border-color: #fff; box-shadow: 0 0 0 2px var(--amber); animation: latido2 1.8s ease-out infinite; }
+  @keyframes latido2 { from { box-shadow: 0 0 0 2px var(--amber), 0 0 0 2px rgba(246,184,40,.6); } to { box-shadow: 0 0 0 2px var(--amber), 0 0 0 12px rgba(246,184,40,0); } }
+  .kpis { grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)) !important; }
+  .kpi b { font-size: 32px; font-weight: 800; }
+  .kpi.rojo { background: var(--rojo); border-color: var(--rojo); } .kpi.rojo b, .kpi.rojo span { color: #fff; }
+  .pie img { height: 26px; display: block; margin: 0 auto 8px; }
+  .ed-cab-dibujo { display: block; width: 74px; flex: none; }
+  .ed-cab-dibujo svg { width: 74px; height: auto; display: block; }
+  @media (max-width: 520px) { .ed-cab-dibujo { display: none; } }
   @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 
   @media (min-width: 860px) {
@@ -368,6 +486,7 @@
     .card { padding: 20px 16px; border-radius: 18px; }
     .acceso { border-radius: 20px; }
     .beneficios { display: none; }
+    .escena { min-height: 250px; } .escena .edif-anim { max-height: 250px; } .burbuja.b2 { display: none; }
     .acceso-info { padding: 24px 20px 22px; }
     .acceso-form { padding: 24px 20px; }
     .tipos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -447,16 +566,23 @@
     <div class="acceso oculto" id="pantallaLogin">
       <div class="acceso-info">
         <span class="eyebrow">SAT · Control de acceso</span>
-        <h1>Portal de <em>administradores</em></h1>
-        <p>Gestioná las llaves de acceso de tus edificios desde un solo lugar.</p>
-        <ul class="beneficios">
-          <li><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>Pedí tags nuevos, reemplazos, bajas y cambios de titularidad.</li>
-          <li><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 4.5a3.5 3.5 0 0 1 0 7M21 20c0-2.6-1.6-4.8-4-5.6"/></svg></span>Consultá quién tiene llave en cada unidad.</li>
-          <li><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg></span>Mandá un link al vecino para que cargue su pedido.</li>
-          <li><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6"/></svg></span>Seguí cada pedido y descargá el reporte para la asamblea.</li>
+        <h1>Las llaves de tus edificios, <em>claras y al día</em></h1>
+        <p>Mirá quién tiene llave en cada unidad, pedí tags nuevos y seguí cada pedido sin llamadas ni planillas.</p>
+        <div class="escena" aria-hidden="true">
+          <span class="halo"></span>
+          <svg class="edif-anim" width="202" height="373" viewBox="0 0 202 373" role="img" aria-label="Edificio con ventanas que se encienden a medida que los vecinos registran sus llaves"><ellipse cx="100.9" cy="328.9" rx="112.8" ry="44.1" fill="rgba(0,0,0,.35)"/><polygon points="10.0,303.4 113.9,363.4 113.9,115.0 10.0,55.0" fill="#232227" stroke="#45444B" stroke-width="1"/><polygon points="191.9,318.4 113.9,363.4 113.9,115.0 191.9,70.0" fill="#2C2B31" stroke="#45444B" stroke-width="1"/><polygon points="87.9,10.0 191.9,70.0 113.9,115.0 10.0,55.0" fill="#3A3940" stroke="#45444B" stroke-width="1"/><polygon points="15.2,298.1 30.8,307.1 30.8,293.9 15.2,284.9" fill="#34333A"/><polygon points="15.2,298.1 30.8,307.1 30.8,293.9 15.2,284.9" fill="#F6B828" class="a-glow" style="animation-delay:1.06s"/><polygon points="41.2,313.1 56.8,322.1 56.8,308.9 41.2,299.9" fill="#34333A"/><polygon points="67.2,328.1 82.7,337.1 82.7,323.9 67.2,314.9" fill="#34333A"/><polygon points="67.2,328.1 82.7,337.1 82.7,323.9 67.2,314.9" fill="#F6B828" class="a-glow" style="animation-delay:3.75s"/><polygon points="93.1,343.1 108.7,352.1 108.7,338.9 93.1,329.9" fill="#34333A"/><polygon points="93.1,343.1 108.7,352.1 108.7,338.9 93.1,329.9" fill="#F6B828" class="a-glow" style="animation-delay:0.41s"/><polygon points="186.7,313.1 171.1,322.1 171.1,308.9 186.7,299.9" fill="#3B3A42"/><polygon points="160.7,328.1 145.1,337.1 145.1,323.9 160.7,314.9" fill="#3B3A42"/><polygon points="160.7,328.1 145.1,337.1 145.1,323.9 160.7,314.9" fill="#F6B828" class="a-glow" style="animation-delay:3.04s"/><polygon points="134.7,343.1 119.1,352.1 119.1,338.9 134.7,329.9" fill="#3B3A42"/><polygon points="134.7,343.1 119.1,352.1 119.1,338.9 134.7,329.9" fill="#F6B828" class="a-glow" style="animation-delay:0.63s"/><polygon points="15.2,270.5 30.8,279.5 30.8,266.3 15.2,257.3" fill="#34333A"/><polygon points="41.2,285.5 56.8,294.5 56.8,281.3 41.2,272.3" fill="#34333A"/><polygon points="67.2,300.5 82.7,309.5 82.7,296.3 67.2,287.3" fill="#34333A"/><polygon points="67.2,300.5 82.7,309.5 82.7,296.3 67.2,287.3" fill="#F6B828" class="a-glow" style="animation-delay:1.56s"/><polygon points="93.1,315.5 108.7,324.5 108.7,311.3 93.1,302.3" fill="#34333A"/><polygon points="186.7,285.5 171.1,294.5 171.1,281.3 186.7,272.3" fill="#3B3A42"/><polygon points="160.7,300.5 145.1,309.5 145.1,296.3 160.7,287.3" fill="#3B3A42"/><polygon points="134.7,315.5 119.1,324.5 119.1,311.3 134.7,302.3" fill="#3B3A42"/><polygon points="134.7,315.5 119.1,324.5 119.1,311.3 134.7,302.3" fill="#F6B828" class="a-glow" style="animation-delay:6.83s"/><polygon points="15.2,242.9 30.8,251.9 30.8,238.7 15.2,229.7" fill="#34333A"/><polygon points="15.2,242.9 30.8,251.9 30.8,238.7 15.2,229.7" fill="#F6B828" class="a-glow" style="animation-delay:6.01s"/><polygon points="41.2,257.9 56.8,266.9 56.8,253.7 41.2,244.7" fill="#34333A"/><polygon points="41.2,257.9 56.8,266.9 56.8,253.7 41.2,244.7" fill="#F6B828" class="a-glow" style="animation-delay:1.01s"/><polygon points="67.2,272.9 82.7,281.9 82.7,268.7 67.2,259.7" fill="#34333A"/><polygon points="67.2,272.9 82.7,281.9 82.7,268.7 67.2,259.7" fill="#F6B828" class="a-glow" style="animation-delay:2.16s"/><polygon points="93.1,287.9 108.7,296.9 108.7,283.7 93.1,274.7" fill="#34333A"/><polygon points="186.7,257.9 171.1,266.9 171.1,253.7 186.7,244.7" fill="#3B3A42"/><polygon points="186.7,257.9 171.1,266.9 171.1,253.7 186.7,244.7" fill="#F6B828" class="a-glow" style="animation-delay:4.07s"/><polygon points="160.7,272.9 145.1,281.9 145.1,268.7 160.7,259.7" fill="#3B3A42"/><polygon points="134.7,287.9 119.1,296.9 119.1,283.7 134.7,274.7" fill="#3B3A42"/><polygon points="134.7,287.9 119.1,296.9 119.1,283.7 134.7,274.7" fill="#F6B828" class="a-glow" style="animation-delay:3.83s"/><polygon points="15.2,215.3 30.8,224.3 30.8,211.1 15.2,202.1" fill="#34333A"/><polygon points="15.2,215.3 30.8,224.3 30.8,211.1 15.2,202.1" fill="#F6B828" class="a-glow" style="animation-delay:0.42s"/><polygon points="41.2,230.3 56.8,239.3 56.8,226.1 41.2,217.1" fill="#34333A"/><polygon points="41.2,230.3 56.8,239.3 56.8,226.1 41.2,217.1" fill="#F6B828" class="a-glow" style="animation-delay:4.76s"/><polygon points="67.2,245.3 82.7,254.3 82.7,241.1 67.2,232.1" fill="#34333A"/><polygon points="93.1,260.3 108.7,269.3 108.7,256.1 93.1,247.1" fill="#34333A"/><polygon points="93.1,260.3 108.7,269.3 108.7,256.1 93.1,247.1" fill="#F6B828" class="a-glow" style="animation-delay:4.10s"/><polygon points="186.7,230.3 171.1,239.3 171.1,226.1 186.7,217.1" fill="#3B3A42"/><polygon points="160.7,245.3 145.1,254.3 145.1,241.1 160.7,232.1" fill="#3B3A42"/><polygon points="160.7,245.3 145.1,254.3 145.1,241.1 160.7,232.1" fill="#F6B828" class="a-glow" style="animation-delay:5.56s"/><polygon points="134.7,260.3 119.1,269.3 119.1,256.1 134.7,247.1" fill="#3B3A42"/><polygon points="15.2,187.7 30.8,196.7 30.8,183.5 15.2,174.5" fill="#34333A"/><polygon points="15.2,187.7 30.8,196.7 30.8,183.5 15.2,174.5" fill="#F6B828" class="a-glow" style="animation-delay:4.02s"/><polygon points="41.2,202.7 56.8,211.7 56.8,198.5 41.2,189.5" fill="#34333A"/><polygon points="67.2,217.7 82.7,226.7 82.7,213.5 67.2,204.5" fill="#34333A"/><polygon points="93.1,232.7 108.7,241.7 108.7,228.5 93.1,219.5" fill="#34333A"/><polygon points="186.7,202.7 171.1,211.7 171.1,198.5 186.7,189.5" fill="#3B3A42"/><polygon points="186.7,202.7 171.1,211.7 171.1,198.5 186.7,189.5" fill="#F6B828" class="a-glow" style="animation-delay:6.86s"/><polygon points="160.7,217.7 145.1,226.7 145.1,213.5 160.7,204.5" fill="#3B3A42"/><polygon points="160.7,217.7 145.1,226.7 145.1,213.5 160.7,204.5" fill="#F6B828" class="a-glow" style="animation-delay:2.93s"/><polygon points="134.7,232.7 119.1,241.7 119.1,228.5 134.7,219.5" fill="#3B3A42"/><polygon points="15.2,160.1 30.8,169.1 30.8,155.9 15.2,146.9" fill="#34333A"/><polygon points="15.2,160.1 30.8,169.1 30.8,155.9 15.2,146.9" fill="#F6B828" class="a-glow" style="animation-delay:3.42s"/><polygon points="41.2,175.1 56.8,184.1 56.8,170.9 41.2,161.9" fill="#34333A"/><polygon points="41.2,175.1 56.8,184.1 56.8,170.9 41.2,161.9" fill="#F6B828" class="a-glow" style="animation-delay:4.68s"/><polygon points="67.2,190.1 82.7,199.1 82.7,185.9 67.2,176.9" fill="#34333A"/><polygon points="93.1,205.1 108.7,214.1 108.7,200.9 93.1,191.9" fill="#34333A"/><polygon points="186.7,175.1 171.1,184.1 171.1,170.9 186.7,161.9" fill="#3B3A42"/><polygon points="160.7,190.1 145.1,199.1 145.1,185.9 160.7,176.9" fill="#3B3A42"/><polygon points="160.7,190.1 145.1,199.1 145.1,185.9 160.7,176.9" fill="#F6B828" class="a-glow" style="animation-delay:4.87s"/><polygon points="134.7,205.1 119.1,214.1 119.1,200.9 134.7,191.9" fill="#3B3A42"/><polygon points="15.2,132.5 30.8,141.5 30.8,128.3 15.2,119.3" fill="#34333A"/><polygon points="41.2,147.5 56.8,156.5 56.8,143.3 41.2,134.3" fill="#34333A"/><polygon points="67.2,162.5 82.7,171.5 82.7,158.3 67.2,149.3" fill="#34333A"/><polygon points="93.1,177.5 108.7,186.5 108.7,173.3 93.1,164.3" fill="#34333A"/><polygon points="186.7,147.5 171.1,156.5 171.1,143.3 186.7,134.3" fill="#3B3A42"/><polygon points="160.7,162.5 145.1,171.5 145.1,158.3 160.7,149.3" fill="#3B3A42"/><polygon points="134.7,177.5 119.1,186.5 119.1,173.3 134.7,164.3" fill="#3B3A42"/><polygon points="134.7,177.5 119.1,186.5 119.1,173.3 134.7,164.3" fill="#F6B828" class="a-glow" style="animation-delay:4.91s"/><polygon points="15.2,104.9 30.8,113.9 30.8,100.7 15.2,91.7" fill="#34333A"/><polygon points="41.2,119.9 56.8,128.9 56.8,115.7 41.2,106.7" fill="#34333A"/><polygon points="67.2,134.9 82.7,143.9 82.7,130.7 67.2,121.7" fill="#34333A"/><polygon points="93.1,149.9 108.7,158.9 108.7,145.7 93.1,136.7" fill="#34333A"/><polygon points="93.1,149.9 108.7,158.9 108.7,145.7 93.1,136.7" fill="#F6B828" class="a-glow" style="animation-delay:2.70s"/><polygon points="186.7,119.9 171.1,128.9 171.1,115.7 186.7,106.7" fill="#3B3A42"/><polygon points="160.7,134.9 145.1,143.9 145.1,130.7 160.7,121.7" fill="#3B3A42"/><polygon points="160.7,134.9 145.1,143.9 145.1,130.7 160.7,121.7" fill="#F6B828" class="a-glow" style="animation-delay:3.23s"/><polygon points="134.7,149.9 119.1,158.9 119.1,145.7 134.7,136.7" fill="#3B3A42"/><polygon points="134.7,149.9 119.1,158.9 119.1,145.7 134.7,136.7" fill="#F6B828" class="a-glow" style="animation-delay:0.82s"/><polygon points="15.2,77.3 30.8,86.3 30.8,73.1 15.2,64.1" fill="#34333A"/><polygon points="15.2,77.3 30.8,86.3 30.8,73.1 15.2,64.1" fill="#F6B828" class="a-glow" style="animation-delay:5.38s"/><polygon points="41.2,92.3 56.8,101.3 56.8,88.1 41.2,79.1" fill="#34333A"/><polygon points="41.2,92.3 56.8,101.3 56.8,88.1 41.2,79.1" fill="#F6B828" class="a-glow" style="animation-delay:1.73s"/><polygon points="67.2,107.3 82.7,116.3 82.7,103.1 67.2,94.1" fill="#34333A"/><polygon points="67.2,107.3 82.7,116.3 82.7,103.1 67.2,94.1" fill="#F6B828" class="a-glow" style="animation-delay:6.10s"/><polygon points="93.1,122.3 108.7,131.3 108.7,118.1 93.1,109.1" fill="#34333A"/><polygon points="93.1,122.3 108.7,131.3 108.7,118.1 93.1,109.1" fill="#F6B828" class="a-glow" style="animation-delay:3.14s"/><polygon points="186.7,92.3 171.1,101.3 171.1,88.1 186.7,79.1" fill="#3B3A42"/><polygon points="160.7,107.3 145.1,116.3 145.1,103.1 160.7,94.1" fill="#3B3A42"/><polygon points="134.7,122.3 119.1,131.3 119.1,118.1 134.7,109.1" fill="#3B3A42"/><polygon points="51.6,327.4 72.4,339.4 72.4,324.2 51.6,312.2" fill="#F6B828"/></svg>
+          <svg class="tag-flota" width="78" height="136" viewBox="0 0 120 210" aria-hidden="true"><g><circle cx="60" cy="36" r="17" fill="none" stroke="#B9BBC0" stroke-width="3.5"/><path fill-rule="evenodd" d="M60 34C82 50 102 86 102 134c0 42-18 70-44 72C34 206 18 180 18 138 18 94 40 54 60 34zM60 51.5a5 5 0 1 0 .01 0z" fill="#2348C8" fill-opacity=".9"/><path d="M60 34C82 50 102 86 102 134c0 42-18 70-44 72C34 206 18 180 18 138 18 94 40 54 60 34z" fill="none" stroke="#5B7FF0" stroke-opacity=".7" stroke-width="2"/><circle cx="60" cy="140" r="31" fill="#1A34A2" fill-opacity=".75"/><path d="M26 108C46 96 78 96 98 112" fill="none" stroke="#fff" stroke-opacity=".28" stroke-width="6" stroke-linecap="round"/><circle cx="60" cy="56" r="7.5" fill="none" stroke="#D4D6DA" stroke-width="4"/></g></svg>
+          <div class="burbuja b1"><span class="bi" style="background:#E2F1EE;color:#0F6E63;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span><b>4° B registró su tag</b><small>Recién</small></span></div>
+          <div class="burbuja b2"><span class="bi" style="background:#FFF3D1;color:#7A5300;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/></svg></span><span><b>Tu pedido está en camino</b><small>2 tags nuevos</small></span></div>
+        </div>
+        <ul class="beneficios fila3">
+          <li><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 4.5a3.5 3.5 0 0 1 0 7M21 20c0-2.6-1.6-4.8-4-5.6"/></svg></span>Quién tiene llave, unidad por unidad</li>
+          <li><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>Pedidos en dos toques</li>
+          <li><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7zM14 3v5h5M10 13h6M10 17h6"/></svg></span>Reporte listo para la asamblea</li>
         </ul>
       </div>
       <section class="acceso-form">
+        <img class="logo-form" src="/icons/logo.png" alt="SAT">
         <h2>Ingresar</h2>
         <p class="sub">Con el mail y la clave que te dio SAT.</p>
         <form id="loginForm" autocomplete="on">
@@ -479,9 +605,9 @@
       </section>
       <!-- Para vecinos: denuncia de llave robada o perdida (acceso de emergencia, 24 h) -->
       <a class="robo-acceso" href="/robo-llave.html">
-        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l10 18H2z"/><path d="M12 10v4M12 17.5v.01"/></svg></span>
-        <span class="tx"><b>¿Sos vecino y te robaron o perdiste la llave?</b><small>Denunciala acá, a cualquier hora: avisamos a la central de monitoreo.</small></span>
-        <span class="ir">Denunciar<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
+        <span class="ic" aria-hidden="true"><span class="onda"></span><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M12 8v5M12 16.5v.01"/></svg></span></span>
+        <span class="tx"><b>¿Sos vecino y perdiste o te robaron la llave?</b><small>Avisá ahora, a cualquier hora. La central de monitoreo recibe el aviso al instante.</small></span>
+        <span class="ir">Avisar ahora<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
       </a>
     </div>
 
@@ -518,6 +644,7 @@
         <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Estás usando la clave que te dio SAT. Te recomendamos cambiarla por una tuya.</span>
         <button type="button" class="btn btn-sec btn-chico" id="bannerClaveBtn">Cambiar clave</button>
       </div>
+      <section class="hoy oculto" id="paraHoy" aria-labelledby="paraHoyTit"><h2 class="sec-tit" id="paraHoyTit">Para hoy</h2><div class="hoy-lista" id="paraHoyLista"></div></section>
       <section id="seccionEdificios">
         <h2 class="sec-tit">Tus edificios</h2>
         <div class="edificios" id="edificios"></div>
@@ -526,10 +653,13 @@
 
       <section class="card oculto" id="edificioCard">
         <div class="ed-cab" id="edCab">
-          <div>
+          <div style="display:flex;gap:16px;align-items:flex-end;min-width:0;">
+          <span class="ed-cab-dibujo" id="edDibujo" aria-hidden="true"></span>
+          <div style="min-width:0;">
             <span class="eyebrow">Edificio</span>
             <h2 id="edNombre"></h2>
             <div class="dir" id="edDireccion"></div>
+          </div>
           </div>
           <div class="reporte" id="barraEdificio">
             <select id="repPeriodo" aria-label="Período del reporte"><option value="30">Últimos 30 días</option><option value="90">Últimos 3 meses</option><option value="365" selected>Último año</option><option value="0">Todo</option></select>
@@ -538,6 +668,12 @@
         </div>
         <div class="kpis" id="edKpis"></div>
         <div id="edCampana"></div>
+        <div class="mapa-wrap oculto" id="mapaWrap">
+          <section class="mapa" aria-labelledby="mapaTit"><div class="mapa-cab"><h3 id="mapaTit">Mapa del edificio</h3><span>Tocá una unidad para ver quién tiene llave</span></div><div class="mapa-grilla" id="mapaGrilla"></div>
+            <div class="mapa-ley"><span><i class="ok"></i>Al día</span><span><i class="reg"></i>Registrada, SAT la revisa</span><span><i class="none"></i>Sin registro</span><span><i class="alerta"></i>Denuncia</span><span><i class="pto"></i>Pedido en curso</span></div>
+            <div class="mapa-otros" id="mapaOtros"></div></section>
+          <aside class="ficha" id="fichaUnidad" aria-live="polite"></aside>
+        </div>
         <div class="tabs" role="tablist" id="tabs">
           <button type="button" class="tab activo" data-tab="nueva" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span class="largo">Nueva gestión</span><span class="corto">Nueva</span></button>
           <button type="button" class="tab" data-tab="gestiones" role="tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5h10M9 12h10M9 19h10M4 5h.01M4 12h.01M4 19h.01"/></svg><span class="largo">Pedidos</span><span class="corto">Pedidos</span><span class="n" id="nGestiones">0</span></button>
@@ -738,7 +874,7 @@
 
   <div class="visor oculto" id="visor"><button type="button" class="btn btn-sec btn-chico" id="visorCerrar">Cerrar ✕</button><img id="visorImg" alt="Foto de la llave"></div>
 
-  <footer class="pie">SAT · Seguridad electrónica · <a href="https://www.sat365.com.ar" target="_blank" rel="noopener">sat365.com.ar</a></footer>
+  <footer class="pie"><img src="/icons/logo.png" alt="SAT">Seguridad electrónica · <a href="https://www.sat365.com.ar" target="_blank" rel="noopener">sat365.com.ar</a></footer>
 
 <script>
 (function () {
@@ -856,9 +992,11 @@
       $("sinEdificios").classList.toggle("oculto", edificios.length > 0);
       $("edificios").innerHTML = edificios.map((e) => {
         const r = e.resumen;
-        return `<button type="button" class="ed-chip" data-c="${esc(e.codigo)}"><span class="marca"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><b>${esc(e.nombre)}</b><span class="dir">${esc(e.direccion || "")}</span>${r ? `<span class="mini-stats"><span class="pill">${r.personas} ${r.personas === 1 ? "vecino" : "vecinos"}</span><span class="pill">${r.tags} tags · ${r.controles} ctrl.</span>${r.abiertos ? `<span class="pill alerta">${r.abiertos} ${r.abiertos === 1 ? "pedido abierto" : "pedidos abiertos"}</span>` : ""}${e.campana && e.campana.estado === "en_revision" ? '<span class="pill alerta">⚠ Revisar bajas</span>' : e.campana && e.campana.estado === "activa" ? `<span class="pill">Registro hasta ${esc(fechaCorta(e.campana.limite + "T12:00:00-03:00"))}</span>` : ""}</span>` : ""}</button>`;
+        const nEm = r && r.emergencias ? r.emergencias.length : 0;
+        return `<button type="button" class="ed-chip" data-c="${esc(e.codigo)}"><span class="ed-dibujo">${dibujoEdificio(e.codigo, r ? r.unidades || r.personas : 0, r ? Math.max(0, r.abiertos - nEm) : 0, nEm > 0)}</span><span class="marca"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="ed-txt"><b>${esc(e.nombre)}</b><span class="dir">${esc(e.direccion || "")}</span>${r ? `<span class="mini-stats">${nEm ? `<span class="pill rojo">${nEm === 1 ? "1 denuncia" : nEm + " denuncias"}</span>` : ""}<span class="pill">${r.personas} ${r.personas === 1 ? "vecino" : "vecinos"}</span><span class="pill">${r.tags} tags · ${r.controles} ctrl.</span>${r.abiertos ? `<span class="pill alerta">${r.abiertos} ${r.abiertos === 1 ? "pedido abierto" : "pedidos abiertos"}</span>` : ""}${e.campana && e.campana.estado === "en_revision" ? '<span class="pill alerta">⚠ Revisar bajas</span>' : e.campana && e.campana.estado === "activa" ? `<span class="pill">Registro hasta ${esc(fechaCorta(e.campana.limite + "T12:00:00-03:00"))}</span>` : ""}</span>` : ""}</span></button>`;
       }).join("");
       $("seccionEdificios").classList.toggle("oculto", edificios.length === 1);
+      renderParaHoy();
       $("edificios").querySelectorAll(".ed-chip").forEach((b) => b.addEventListener("click", () => abrirEdificio(b.dataset.c)));
       const ultimo = (() => { try { return localStorage.getItem("consorcio_edificio"); } catch (e) { return ""; } })();
       const elegir = edificios.find((e) => e.codigo === ultimo) || (edificios.length === 1 ? edificios[0] : null);
@@ -873,6 +1011,8 @@
     $("edificios").querySelectorAll(".ed-chip").forEach((b) => b.classList.toggle("activo", b.dataset.c === codigo));
     $("edificioCard").classList.remove("oculto");
     $("edNombre").textContent = actual.nombre;
+    { const r = actual.resumen || {}, nEm = (r.emergencias || []).length; $("edDibujo").innerHTML = dibujoEdificio(actual.codigo, r.unidades || r.personas || 0, Math.max(0, (r.abiertos || 0) - nEm), nEm > 0, 14); }
+    unidadSel = "";
     $("edDireccion").textContent = actual.direccion || "";
     const st = $("edificioStatus");
     st.className = "status"; st.textContent = "Cargando " + actual.nombre + "…";
@@ -881,6 +1021,166 @@
       st.textContent = "";
       renderTodo();
     } catch (e) { st.className = "status err"; st.textContent = e.message; }
+  }
+
+
+  // ---------- Dibujos de edificio (isométricos, hechos con los datos) ----------
+  function semilla(t) { let h = 2166136261; for (const c of String(t)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 10000) / 10000; }; }
+  // encendidas: cuántas ventanas en verde (unidades con llave); ambar: en ámbar; alerta: una ventana roja que late.
+  function dibujoEdificio(clave, encendidas, ambar, alerta, k) {
+    const W = 4, D = 3, H = 7; k = k || 18;
+    const C = 0.866, kz = k * 0.92;
+    const pt = (x, y, z) => [(x - y) * C * k, (x + y) * 0.5 * k - z * kz];
+    const todos = []; [0, W].forEach((x) => [0, D].forEach((y) => [0, H].forEach((z) => todos.push(pt(x, y, z)))));
+    const mx = Math.min(...todos.map((p) => p[0])) - 8, my = Math.min(...todos.map((p) => p[1])) - 8;
+    const ancho = Math.max(...todos.map((p) => p[0])) - mx + 8, alto = Math.max(...todos.map((p) => p[1])) - my + 8;
+    const pol = (ps, f, extra) => `<polygon points="${ps.map((p) => (p[0] - mx).toFixed(1) + "," + (p[1] - my).toFixed(1)).join(" ")}" fill="${f}"${extra || ""}/>`;
+    const ventanas = [];
+    for (let f = 0; f < H; f++) {
+      for (let i = 0; i < W; i++) ventanas.push({ ps: [pt(i + .2, D, f + .3), pt(i + .8, D, f + .3), pt(i + .8, D, f + .78), pt(i + .2, D, f + .78)], base: "#F7F5EF", c: [i + .5, D, f + .54] });
+      for (let j = 0; j < D; j++) ventanas.push({ ps: [pt(W, j + .2, f + .3), pt(W, j + .8, f + .3), pt(W, j + .8, f + .78), pt(W, j + .2, f + .78)], base: "#EFECE4", c: [W, j + .5, f + .54] });
+    }
+    const r = semilla(clave), orden = ventanas.map((v, i) => [r(), i]).sort((a, b) => a[0] - b[0]).map((x) => x[1]);
+    const color = {};
+    orden.slice(0, Math.min(encendidas, orden.length)).forEach((i) => { color[i] = "#3E9C8D"; });
+    orden.slice(encendidas, encendidas + Math.max(0, ambar)).forEach((i) => { color[i] = "#F6B828"; });
+    let rojo = "";
+    if (alerta) { const i = orden[orden.length - 1]; color[i] = "#B42318"; const c = pt(...ventanas[i].c); rojo = `<circle cx="${(c[0] - mx).toFixed(1)}" cy="${(c[1] - my).toFixed(1)}" r="6" fill="#B42318" class="a-late"/>`; }
+    const sx = pt(W / 2 + .6, D / 2 + .6, 0);
+    return `<svg viewBox="0 0 ${ancho.toFixed(0)} ${alto.toFixed(0)}" width="${ancho.toFixed(0)}" height="${alto.toFixed(0)}" aria-hidden="true">`
+      + `<ellipse cx="${(sx[0] - mx).toFixed(1)}" cy="${(sx[1] - my).toFixed(1)}" rx="${((W + D) * C * k * .62).toFixed(1)}" ry="${((W + D) * .5 * k * .42).toFixed(1)}" fill="rgba(18,17,20,.08)"/>`
+      + pol([pt(0, D, 0), pt(W, D, 0), pt(W, D, H), pt(0, D, H)], "#E8E4D9", ' stroke="#CFC9BB" stroke-width="1"')
+      + pol([pt(W, 0, 0), pt(W, D, 0), pt(W, D, H), pt(W, 0, H)], "#DCD7CA", ' stroke="#CFC9BB" stroke-width="1"')
+      + pol([pt(0, 0, H), pt(W, 0, H), pt(W, D, H), pt(0, D, H)], "#F3F0E8", ' stroke="#CFC9BB" stroke-width="1"')
+      + ventanas.map((v, i) => pol(v.ps, color[i] || v.base)).join("")
+      + pol([pt(W * .4, D, 0), pt(W * .6, D, 0), pt(W * .6, D, .55), pt(W * .4, D, .55)], "#BDB6A6") + rojo + "</svg>";
+  }
+  function haceCuanto(x) {
+    const m = Math.round((Date.now() - Date.parse(x)) / 60000);
+    if (!(m >= 0)) return "";
+    if (m < 2) return "recién"; if (m < 60) return `hace ${m} minutos`;
+    const h = Math.round(m / 60); if (h < 24) return h === 1 ? "hace 1 hora" : `hace ${h} horas`;
+    const d = Math.round(h / 24); return d === 1 ? "ayer" : `hace ${d} días`;
+  }
+  const ICH = {
+    escudo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M12 8v5M12 16.5v.01"/></svg>',
+    reloj: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    ok: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+    flecha: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+    tagMini: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M2 13C4 7 12 4 18 6.5c2 .8 3.4 2 4 3-1 1.6-3.6 3.8-6.6 4.9C10 16.4 3.4 16.6 2 13zM19.3 10.6a1.2 1.2 0 1 0 .01 0z" fill="#2348C8"/><circle cx="11" cy="11.5" r="3.8" fill="#1A34A2"/></svg>',
+    ctlMini: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="1.5" width="10" height="21" rx="4.5" fill="#111113"/><circle cx="12" cy="4.6" r="1.1" fill="#3DDC6E"/><rect x="9.2" y="7.2" width="5.6" height="2.5" rx="1.25" fill="#D4D4D8"/><rect x="9.2" y="10.8" width="5.6" height="2.5" rx="1.25" fill="#D4D4D8"/><rect x="9.2" y="14.4" width="5.6" height="2.5" rx="1.25" fill="#D4D4D8"/><circle cx="12" cy="19" r="1.5" fill="#D4D4D8"/></svg>',
+  };
+  const unidadCorta = (x) => [x.piso ? (/^pb$/i.test(String(x.piso).trim()) ? "PB" : x.piso + "°") : "", x.unidad || "", x.cochera ? "cochera " + x.cochera : ""].filter(Boolean).join(" ").trim();
+
+  // ---------- Para hoy ----------
+  function renderParaHoy() {
+    const items = [];
+    edificios.forEach((e) => {
+      const r = e.resumen || {};
+      (r.emergencias || []).slice().reverse().forEach((g) => items.push({ c: "rojo", ic: ICH.escudo, onda: true, t: "Denunciaron una llave como robada o perdida", s: `${e.nombre}${unidadCorta(g) ? " · " + unidadCorta(g) : ""}${g.fecha ? " · " + haceCuanto(g.fecha) : ""}. La central de monitoreo ya tiene el aviso.`, cta: "Ver la denuncia", ir: [e.codigo, "gestiones"] }));
+      if (e.campana && e.campana.estado === "en_revision") items.push({ c: "ambar", ic: IC.alerta, t: "Revisá las llaves que nadie registró", s: `${e.nombre}: terminó el registro y hay llaves para dar de baja o conservar.`, cta: "Revisar", ir: [e.codigo, ""] });
+      const abiertos = (r.abiertos || 0) - (r.emergencias || []).length;
+      if (abiertos > 0) items.push({ c: "ambar", ic: ICH.reloj, t: abiertos === 1 ? "1 pedido en curso" : `${abiertos} pedidos en curso`, s: `${e.nombre}: SAT los está resolviendo.`, cta: "Ver pedidos", ir: [e.codigo, "gestiones"] });
+      if (e.campana && e.campana.estado === "activa") items.push({ c: "verde", ic: IC.tag, t: "Registro de llaves abierto", s: `${e.nombre}: los vecinos se registran hasta el ${fechaCorta(e.campana.limite + "T12:00:00-03:00")}.`, cta: "Ver el avance", ir: [e.codigo, ""] });
+    });
+    if (!items.length) items.push({ c: "verde", ic: ICH.ok, t: "Todo al día", s: "No hay denuncias ni pedidos abiertos en tus edificios.", cta: "", ir: null });
+    $("paraHoy").classList.remove("oculto");
+    $("paraHoyLista").innerHTML = items.slice(0, 6).map((x, i) => `<button type="button" class="hoy-item ${x.c}" data-i="${i}"><span class="hoy-ic">${x.onda ? '<span class="onda"></span>' : ""}<span>${x.ic}</span></span><span><b>${esc(x.t)}</b><small>${esc(x.s)}</small>${x.cta ? `<span class="ir">${esc(x.cta)}${ICH.flecha}</span>` : ""}</span></button>`).join("");
+    $("paraHoyLista").querySelectorAll(".hoy-item").forEach((b) => b.addEventListener("click", async () => {
+      const x = items[Number(b.dataset.i)]; if (!x.ir) return;
+      await abrirEdificio(x.ir[0]);
+      if (x.ir[1]) irA(x.ir[1]);
+      $("edificioCard").scrollIntoView({ behavior: "smooth", block: "start" });
+    }));
+  }
+
+  // ---------- Mapa del edificio: pisos × deptos ----------
+  let unidadSel = "";
+  const normPiso = (p) => { const t = String(p || "").trim().toUpperCase().replace(/[°º]/g, "").replace(/^PISO\s*/, "").trim(); return /^(PB|P\.?\s?B\.?|0|PLANTA BAJA)$/.test(t) ? "PB" : t; };
+  const normDepto = (u) => String(u || "").trim().toUpperCase().replace(/^(DEPTO|DPTO|DTO)\.?\s*/, "").trim();
+  const valorPiso = (p) => (p === "PB" ? 0 : /^\d+$/.test(p) ? Number(p) : /^\d/.test(p) ? parseFloat(p) : -1);
+  const abiertoG = (g) => g.estado === "pendiente" || g.estado === "en_curso";
+  function armarUnidades() {
+    const u = new Map();
+    const de = (piso, unidad) => { const k = normPiso(piso) + "|" + normDepto(unidad); if (!u.has(k)) u.set(k, { k, piso: normPiso(piso), unidad: normDepto(unidad), pisoOrig: piso, unidadOrig: unidad, regs: [], pedidos: [], emergencias: [] }); return u.get(k); };
+    let soloCochera = 0;
+    datos.registros.forEach((r) => { if (r.piso && r.unidad) de(r.piso, r.unidad).regs.push(r); else soloCochera++; });
+    datos.gestiones.filter(abiertoG).forEach((g) => { if (!g.piso || !g.unidad) return; const x = de(g.piso, g.unidad); (g.origen === "emergencia" ? x.emergencias : x.pedidos).push(g); });
+    return { u, soloCochera };
+  }
+  function estadoUnidad(x) {
+    if (!x) return "none";
+    if (x.emergencias.length) return "alerta";
+    const llaves = x.regs.flatMap((r) => (r.llaves || []).filter((l) => l.estado !== "dada_de_baja" && l.estado !== "baja"));
+    if (!x.regs.length) return "none";
+    return llaves.length && llaves.every((l) => l.estado === "conciliada") ? "ok" : "reg";
+  }
+  const EST_UNIDAD = { ok: "Al día", reg: "Registrada", none: "Sin registro", alerta: "Denuncia" };
+  function renderMapa() {
+    const { u, soloCochera } = armarUnidades();
+    const lista = [...u.values()];
+    $("mapaWrap").classList.toggle("oculto", !lista.length);
+    if (!lista.length) return;
+    const pisos = [...new Set(lista.map((x) => x.piso))].sort((a, b) => valorPiso(b) - valorPiso(a) || a.localeCompare(b, "es", { numeric: true }));
+    const deptos = [...new Set(lista.map((x) => x.unidad))].sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
+    const cols = `grid-template-columns: 44px repeat(${deptos.length}, minmax(52px, 1fr));`;
+    if (!unidadSel || !u.has(unidadSel)) {
+      const pri = lista.find((x) => estadoUnidad(x) === "alerta") || lista.find((x) => x.pedidos.length) || lista[0];
+      unidadSel = pri.k;
+    }
+    const icono = { ok: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>', reg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>', alerta: IC.alerta, none: "" };
+    $("mapaGrilla").innerHTML = `<div class="mapa-fila cab" style="${cols}"><span></span>${deptos.map((d) => `<span>${esc(d)}</span>`).join("")}</div>`
+      + pisos.map((p) => `<div class="mapa-fila" style="${cols}"><span class="piso">${p === "PB" ? "PB" : esc(p) + "°"}</span>${deptos.map((d) => {
+        const k = p + "|" + d, x = u.get(k), e = estadoUnidad(x);
+        return `<button type="button" class="celda ${e}${k === unidadSel ? " sel" : ""}" data-k="${esc(k)}" aria-label="${p === "PB" ? "Planta baja" : "Piso " + esc(p)}, depto ${esc(d)}: ${EST_UNIDAD[e]}" aria-pressed="${k === unidadSel}">${esc(d)}${icono[e]}${x && x.pedidos.length ? '<span class="punto"></span>' : ""}${e === "alerta" ? '<span class="late"></span>' : ""}</button>`;
+      }).join("")}</div>`).join("");
+    $("mapaOtros").textContent = soloCochera ? `Además, ${soloCochera} ${soloCochera === 1 ? "registro es" : "registros son"} solo de cochera (están en Vecinos y llaves).` : "";
+    $("mapaGrilla").querySelectorAll(".celda").forEach((b) => b.addEventListener("click", () => { unidadSel = b.dataset.k; renderMapa(); }));
+    renderFicha(u.get(unidadSel) || { k: unidadSel, piso: unidadSel.split("|")[0], unidad: unidadSel.split("|")[1], pisoOrig: unidadSel.split("|")[0], unidadOrig: unidadSel.split("|")[1], regs: [], pedidos: [], emergencias: [] });
+  }
+  function renderFicha(x) {
+    const e = estadoUnidad(x.regs.length || x.emergencias.length ? x : null);
+    const titulo = (x.piso === "PB" ? "PB" : x.piso + "°") + " " + x.unidad;
+    const rel = { titular: "Titular", inquilino: "Inquilino", otro: "Otro" };
+    const llaves = x.regs.flatMap((r) => (r.llaves || []).filter((l) => l.estado !== "dada_de_baja"));
+    const em = x.emergencias[x.emergencias.length - 1];
+    let h = `<div class="ficha-cab"><div><small>Unidad</small><b>${esc(titulo)}</b></div><span class="chip-est ${e}">${EST_UNIDAD[e]}</span></div>`;
+    if (em) h += `<div class="ficha-alerta"><b>${em.motivo === "extravio" ? "Llave denunciada como perdida" : em.motivo === "robo" ? "Llave denunciada como robada" : "Llave denunciada como robada o perdida"}${em.tag ? " · " + esc(em.tag) : ""}</b>${em.fecha ? esc(haceCuanto(em.fecha)) + ". " : ""}La central de monitoreo ya tiene el aviso y SAT la da de baja.<div style="margin-top:8px;"><button type="button" class="btn btn-sec btn-chico" data-acc="ver">Ver la denuncia</button></div></div>`;
+    if (x.pedidos.length) h += `<div class="ficha-pedido">${x.pedidos.length === 1 ? "Hay un pedido en curso: " + esc(TIPOS[x.pedidos[0].tipo] || "pedido") : `Hay ${x.pedidos.length} pedidos en curso`}. <button type="button" class="enlace" data-acc="ver" style="color:#1E3A75;font-weight:700;">Ver</button></div>`;
+    if (!x.regs.length) {
+      h += `<div class="ficha-vacia"><b>Nadie registró llaves acá todavía</b>Mandale el link a la unidad o recordales el QR del hall.<div style="margin-top:12px;"><button type="button" class="btn btn-osc btn-chico" data-acc="link">${IC.link}Mandar link a la unidad</button></div></div>`;
+      h += `<div class="ficha-acc"><button type="button" class="btn btn-chico" data-acc="nuevo">+ Pedir llave nueva</button></div>`;
+    } else {
+      h += `<div class="ficha-sec">Personas</div>` + x.regs.map((r) => `<div class="ficha-persona"><span class="ini">${esc((r.nombre || "?").trim()[0] || "?")}</span><span><b>${esc(r.nombre)}</b><small>${esc([rel[r.relacion], r.telefono].filter(Boolean).join(" · "))}</small></span></div>`).join("");
+      h += `<div class="ficha-sec">Llaves</div>` + (llaves.length ? llaves.map((l) => { const s = EST_LLAVE[l.estado] || EST_LLAVE.pendiente; const ctl = l.tipo === "control"; return `<div class="ficha-llave"><span class="mi${ctl ? " ctl" : ""}">${ctl ? ICH.ctlMini : ICH.tagMini}</span><span class="nro">${esc(l.tag || "s/n")}${l.usuario ? `<br><span style="font-family:Barlow,sans-serif;font-size:12.5px;color:var(--muted);">usuario ${esc(l.usuario)}</span>` : ""}</span><span class="est ${s[1]}">${s[0]}</span></div>`; }).join("") : '<div class="sub" style="margin:0;">Sin llaves cargadas.</div>');
+      h += `<div class="ficha-acc"><button type="button" class="btn btn-chico" data-acc="nuevo">+ Pedir llave nueva</button><button type="button" class="btn btn-sec btn-chico" data-acc="reemplazo">Reemplazo</button><button type="button" class="btn btn-sec btn-chico" data-acc="baja">Dar de baja</button><button type="button" class="btn btn-sec btn-chico" data-acc="titularidad">Cambio de titular</button></div>`;
+    }
+    $("fichaUnidad").innerHTML = h;
+    $("fichaUnidad").querySelectorAll("[data-acc]").forEach((b) => b.addEventListener("click", () => accionUnidad(b.dataset.acc, x)));
+  }
+  function accionUnidad(acc, x) {
+    if (acc === "ver") { irA("gestiones"); $("tabs").scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+    if (acc === "link") {
+      irA("links");
+      const uno = document.querySelector('input[name="lModo"][value="uno"]'); if (uno && !uno.checked) { uno.checked = true; uno.dispatchEvent(new Event("change")); }
+      $("lPiso").value = x.pisoOrig || ""; $("lUnidad").value = x.unidadOrig || "";
+      $("tabs").scrollIntoView({ behavior: "smooth", block: "start" }); setTimeout(() => $("lDest").focus({ preventScroll: true }), 400);
+      return;
+    }
+    irA("nueva");
+    const radio = form.querySelector(`input[name="tipo"][value="${acc}"]`);
+    radio.checked = true; radio.dispatchEvent(new Event("change", { bubbles: true }));
+    const r0 = x.regs[0];
+    if (r0 && acc !== "nuevo") {
+      const i = datos.registros.indexOf(r0), ll = r0.llaves || [];
+      const j = ll.findIndex((l) => l.estado !== "dada_de_baja");
+      $("elegirLlave").value = `${i}|${ll.length ? Math.max(0, j) : ""}`;
+      $("elegirLlave").dispatchEvent(new Event("change"));
+    } else {
+      $("gPiso").value = x.pisoOrig || ""; $("gUnidad").value = x.unidadOrig || "";
+      if (r0) { $("gTitular").value = r0.nombre || ""; $("gTelefono").value = r0.telefono || ""; }
+    }
+    $("tabs").scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   // ---------- Pestañas ----------
@@ -906,6 +1206,8 @@
       [activas.filter((l) => (l.tipo || "tag") === "tag").length + " / " + activas.filter((l) => l.tipo === "control").length, "tags / controles activos", ""],
       [abiertos, abiertos === 1 ? "pedido abierto" : "pedidos abiertos", abiertos ? "alerta" : ""],
     ];
+    const denuncias = datos.gestiones.filter((g) => g.origen === "emergencia" && (g.estado === "pendiente" || g.estado === "en_curso")).length;
+    if (denuncias) k.push([denuncias, denuncias === 1 ? "denuncia de robo o pérdida" : "denuncias de robo o pérdida", "rojo"]);
     $("edKpis").innerHTML = k.map(([n, t, c]) => `<div class="kpi ${c}"><b>${esc(n)}</b><span>${esc(t)}</span></div>`).join("");
   }
   // ---------- Campaña de registro ----------
@@ -967,6 +1269,7 @@
     $("nGestiones").textContent = datos.gestiones.length;
     renderKpis();
     renderCampana();
+    renderMapa();
     renderVecinos(); renderGestiones(); armarElegir(); renderLinks();
   }
 

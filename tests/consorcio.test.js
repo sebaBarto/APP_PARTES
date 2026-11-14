@@ -234,7 +234,7 @@ test("consorcio: olvidé mi clave, cancelar pedido, links en lote y resumen al e
   assert.strictEqual(new Set(lote.data.invitaciones.map((i) => i.codigo)).size, 3);
   // Resumen al entrar.
   const inicio = (await llamar(consorcio.manejarPortal, { method: "GET", headers: h, query: {} }, gh)).data;
-  assert.deepStrictEqual(Object.keys(inicio.edificios[0].resumen).sort(), ["abiertos", "controles", "hechos_30", "personas", "tags", "unidades"]);
+  assert.deepStrictEqual(Object.keys(inicio.edificios[0].resumen).sort(), ["abiertos", "controles", "emergencias", "hechos_30", "personas", "tags", "unidades"]);
 });
 
 test("entrega de llaves: con firma, descuenta stock, anota en el padrón y no se entrega dos veces", async () => {
