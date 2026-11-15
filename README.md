@@ -3450,3 +3450,12 @@ y la pantalla de gracias y el mail de constancia le dan el link para guardarlo.
   los dígitos distintos resaltados).
 - Logo de SAT arriba y al pie en todas las pantallas; barras en gris carbón para que
   se vea el hexágono.
+
+### Escena animada del login de administradores (15/11/2026)
+
+El login de `consorcio.html` muestra una escena de 20 segundos en loop, hecha en SVG + JavaScript (sin video):
+toma general del edificio de noche → entrada a nivel de calle (el tag toca la lectora y se abre la puerta) →
+paneo a la cochera (el control remoto abre el portón y entra el auto) → vuelta a la toma general.
+Son dos SVG dentro de `.cine` (`#mundo`, isométrico, y `#calle`, de frente) y un script al final de la página
+que mueve la "cámara" cambiando el `viewBox`. Con "reducir movimiento" queda quieta en la primera toma, y se
+pausa sola cuando el login está oculto. Los datos de los avisos (4° B, 2° A, número de tag) son inventados.
