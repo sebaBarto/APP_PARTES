@@ -325,6 +325,27 @@
   @media (max-width: 380px) {
     .fila { grid-template-columns: 1fr; gap: 0; }
   }
+  /* Animación "cómo registrar tu llave" (la mueve el script del final) */
+  .guia { position: relative; height: 236px; margin: 18px 0 4px; border-radius: 18px; overflow: hidden; isolation: isolate; background: #141317; box-shadow: 0 0 0 1px rgba(255,255,255,.07), 0 18px 36px -20px rgba(0,0,0,.8); }
+  .guia svg.g { position: absolute; inset: 0; width: 100%; height: 100%; display: block; text-rendering: geometricPrecision; }
+  .guia .tit { animation: guiaTit 3.6s ease-in-out infinite; }
+  @keyframes guiaTit { 0%, 100% { opacity: .8; } 50% { opacity: .2; } }
+  .guia::after { content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: linear-gradient(rgba(18,17,20,0) 52%, rgba(18,17,20,.94) 86%), radial-gradient(120% 90% at 50% 40%, rgba(18,17,20,0) 55%, rgba(18,17,20,.5) 100%); }
+  .guia-pie { position: absolute; left: 14px; right: 14px; bottom: 12px; z-index: 2; }
+  .guia-pasos { position: relative; height: 30px; }
+  .guia-paso { position: absolute; left: 0; right: 0; bottom: 0; margin: 0; display: flex; align-items: center; gap: 9px; color: #fff; font-weight: 600; font-size: 15.5px; line-height: 1.2; opacity: 0; transform: translateY(6px); transition: opacity .35s, transform .35s; }
+  .guia-paso.on { opacity: 1; transform: none; }
+  .guia-paso span { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--amber, #F6B828); color: #121114; display: grid; place-items: center; font-family: var(--cond, inherit); font-weight: 800; font-size: 14px; }
+  .guia-rayas { display: flex; gap: 5px; margin-top: 9px; }
+  .guia-rayas i { flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,.2); overflow: hidden; }
+  .guia-rayas b { display: block; height: 100%; background: var(--amber, #F6B828); transform-origin: left; transform: scaleX(0); }
+  .guia-aviso { position: absolute; left: 12px; top: 12px; z-index: 2; display: flex; gap: 9px; align-items: center; background: rgba(255,255,255,.97); color: #121114; border-radius: 13px; padding: 8px 13px 8px 9px; box-shadow: 0 16px 34px -14px rgba(0,0,0,.7); opacity: 0; }
+  .guia-aviso .bi { width: 28px; height: 28px; border-radius: 50%; background: #E2F1EE; color: #0F6E63; display: grid; place-items: center; }
+  .guia-aviso .bi svg { width: 16px; height: 16px; }
+  .guia-aviso b { display: block; font-size: 13.5px; line-height: 1.2; } .guia-aviso small { display: block; font-size: 12px; color: #6B6860; }
+  body.fin .guia { display: none; }
+  @media (min-width: 900px) { .guia { height: 250px; } }
+  @media (prefers-reduced-motion: reduce) { .guia * { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
@@ -349,6 +370,78 @@
         <h1>Registrá tu <em>llave</em> de acceso</h1>
         <p class="bajada" id="introTxt">Estamos actualizando el registro de llaves del edificio. Las llaves que nadie registre podrán darse de baja.</p>
         <div class="limite oculto" id="introLimite"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span>Registrate antes del <b id="introLimiteTxt"></b></span></div>
+        <div class="guia" role="img" aria-label="Cómo se hace: buscá el número grabado en tu llave, cargalo acá con tu piso y depto, y la llave queda registrada a tu nombre.">
+          <svg class="g" id="gMesa" preserveAspectRatio="xMidYMid slice" viewBox="-2 40 640 384" aria-hidden="true"><defs>
+        <radialGradient id="mFondo" cx=".42" cy=".5" r=".75"><stop offset="0" stop-color="#34333B"/><stop offset=".6" stop-color="#211F26"/><stop offset="1" stop-color="#141317"/></radialGradient>
+        <radialGradient id="mHalo"><stop offset="0" stop-color="#F6B828" stop-opacity=".22"/><stop offset="1" stop-color="#F6B828" stop-opacity="0"/></radialGradient>
+        <linearGradient id="mTag" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6C93FF"/><stop offset=".4" stop-color="#2F55DA"/><stop offset="1" stop-color="#152A8C"/></linearGradient>
+        <linearGradient id="mKey" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#E3E5E8"/><stop offset=".5" stop-color="#A2A6AD"/><stop offset="1" stop-color="#CFD2D6"/></linearGradient>
+        <linearGradient id="mSteel" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#D9DBDF"/><stop offset=".45" stop-color="#9DA1A8"/><stop offset=".6" stop-color="#C5C8CD"/><stop offset="1" stop-color="#7C8087"/></linearGradient>
+        <linearGradient id="mTel" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3B3A42"/><stop offset="1" stop-color="#0E0D10"/></linearGradient>
+        <pattern id="mHex" width="52" height="90" patternUnits="userSpaceOnUse"><path d="M26 0l26 15v30l-26 15-26-15v-30zM0 60l26 15v30M52 60l-26 15" fill="none" stroke="#fff" stroke-opacity=".03" stroke-width="1"/></pattern>
+        <radialGradient id="mSombra"><stop offset="0" stop-color="#000" stop-opacity=".6"/><stop offset=".55" stop-color="#000" stop-opacity=".32"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+        <clipPath id="mPant"><rect x="716" y="24" width="208" height="412" rx="24"/></clipPath>
+        </defs><rect x="-600" y="-500" width="2400" height="1500" fill="url(#mFondo)"/><rect x="-600" y="-500" width="2400" height="1500" fill="url(#mHex)"/><ellipse cx="250" cy="230" rx="360" ry="250" fill="url(#mHalo)"/><ellipse cx="456" cy="256" rx="84" ry="176" fill="url(#mSombra)" transform="rotate(9 456 256)"/><g transform="translate(385 92) rotate(9 55 130) scale(1.12)"><g>
+        <path d="M20 34c0-16 12-26 35-26s35 10 35 26v104c0 12-8 20-20 20H40c-12 0-20-8-20-20z" fill="#C9CBD0"/>
+        <path d="M24 34c0-13 11-22 31-22s31 9 31 22v103c0 10-7 17-17 17H41c-10 0-17-7-17-17z" fill="#0F0F11"/>
+        <path d="M30 36c0-10 9-17 25-17s25 7 25 17v98c0 8-5 13-13 13H43c-8 0-13-5-13-13z" fill="#1B1B1E"/>
+        <circle cx="55" cy="27" r="4.2" fill="#2E2E33"/><circle cx="55" cy="27" r="4.2" fill="#3DDC6E" class="mLed"/><circle cx="55" cy="27" r="9" fill="#3DDC6E" fill-opacity=".35" class="mLed"/>
+        <g><rect x="35" y="41" width="40" height="17" rx="8.5" fill="#D4D4D8" stroke="#000" stroke-width="2"/><path d="M51.5 49.5v-1.6a3.5 3.5 0 0 1 7 0v1.6" fill="none" stroke="#D3262B" stroke-width="1.6"/><rect x="50" y="49.3" width="10" height="6" rx="1" fill="#D3262B"/></g>
+        <rect x="33" y="64" width="21" height="17" rx="8" fill="#D4D4D8" stroke="#000" stroke-width="2"/><circle cx="43.5" cy="72.5" r="1.8" fill="#FFFFFF" stroke="#9A9AA0" stroke-width=".6"/>
+        <rect x="56" y="64" width="21" height="17" rx="8" fill="#D4D4D8" stroke="#000" stroke-width="2"/><circle cx="63.5" cy="72.5" r="1.8" fill="#FFFFFF" stroke="#9A9AA0" stroke-width=".6"/><circle cx="69.5" cy="72.5" r="1.8" fill="#FFFFFF" stroke="#9A9AA0" stroke-width=".6"/>
+        <rect x="35" y="87" width="40" height="17" rx="8.5" fill="#D4D4D8" stroke="#000" stroke-width="2"/><path d="M51.5 95.5v-1.6a3.5 3.5 0 0 1 6.6-1.6" fill="none" stroke="#1E9A4A" stroke-width="1.6"/><rect x="50" y="95.3" width="10" height="6" rx="1" fill="#1E9A4A"/>
+        <circle cx="55" cy="123" r="10.5" fill="#D4D4D8" stroke="#000" stroke-width="2"/><text x="55" y="127.5" text-anchor="middle" font-family="Barlow, sans-serif" font-weight="700" font-size="13" fill="#2A2A2E">i</text>
+        <path d="M42 150h26v14H42z" fill="none" stroke="#B9BBC0" stroke-width="3"/>
+        <circle cx="55" cy="170" r="6" fill="none" stroke="#B9BBC0" stroke-width="2.5"/>
+        <rect x="51" y="176" width="8" height="18" rx="4" fill="none" stroke="#B9BBC0" stroke-width="2.5"/>
+        <circle cx="55" cy="222" r="26" fill="none" stroke="#B9BBC0" stroke-width="3.5"/>
+        </g></g><ellipse cx="200" cy="262" rx="132" ry="182" fill="url(#mSombra)" transform="rotate(-12 200 262)"/><g id="mTagG" transform="translate(190 236) rotate(-12) scale(1.9)"><g transform="rotate(26 0 -104)"><rect x="-17" y="-126" width="34" height="30" rx="10" fill="url(#mKey)"/><circle cx="0" cy="-113" r="6" fill="#16151A"/><path d="M-6 -97h12v70l-6 8-6-8zM6 -84h5v6h-5zM6 -68h7v7h-7zM6 -50h4v6h-4z" fill="url(#mKey)"/><path d="M-1 -92v60" stroke="#6F7279" stroke-width="1.6"/></g><path d="M0 -80C24 -62 50 -28 50 12C50 48 28 74 0 74C-28 74-50 48-50 12C-50 -28-24 -62 0 -80Z" fill="url(#mTag)"/><path d="M0 -80C24 -62 50 -28 50 12C50 48 28 74 0 74C-28 74-50 48-50 12C-50 -28-24 -62 0 -80Z" fill="none" stroke="#A9C1FF" stroke-opacity=".55" stroke-width="2" transform="scale(.93)"/><path d="M0 -80C24 -62 50 -28 50 12C50 48 28 74 0 74C-28 74-50 48-50 12C-50 -28-24 -62 0 -80Z" fill="none" stroke="#0E1F6E" stroke-width="2.4"/><circle cx="0" cy="22" r="33" fill="#12278A" opacity=".5"/><circle cx="0" cy="22" r="33" fill="none" stroke="#0E1F6E" stroke-opacity=".6" stroke-width="3"/><path d="M-36 -2C-28 -34-12 -54-2 -62" stroke="#fff" stroke-opacity=".35" stroke-width="8" fill="none" stroke-linecap="round"/><text x="0" y="29" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="34" font-weight="800" font-style="italic" fill="#F6B828">SAT</text><text x="0" y="46" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" font-weight="500" fill="#DCE5FF" opacity=".85">069:02561</text><circle cx="0" cy="-56" r="8" fill="#101014"/><circle cx="0" cy="-56" r="9.5" fill="none" stroke="url(#mSteel)" stroke-width="4"/><circle cx="0" cy="-82" r="24" fill="none" stroke="#8E9096" stroke-width="5.4"/><circle cx="0" cy="-82" r="24" fill="none" stroke="#E3E5E8" stroke-width="3"/></g><g id="mScan" opacity="0" transform="translate(207 315) rotate(-12)"><rect x="-58" y="-15" width="116" height="30" rx="8" fill="#F6B828" fill-opacity=".14" stroke="#F6B828" stroke-width="2.6"/><path id="mScanL" d="M-52 -11v22" stroke="#FFE3A3" stroke-width="2" opacity=".9"/></g><ellipse cx="826" cy="240" rx="170" ry="290" fill="url(#mSombra)"/><rect x="704" y="12" width="232" height="436" fill="url(#mTel)" rx="36"/><rect x="704.8" y="12.8" width="230.4" height="434.4" rx="35.2" fill="none" stroke="#6A6972" stroke-width="1.2"/><g clip-path="url(#mPant)"><rect x="716" y="24" width="208" height="412" fill="#F5F3EE"/><rect x="716" y="24" width="208" height="50" fill="#26252B"/><image href="/icons/logo.png" x="730" y="38" width="62" height="20.9" preserveAspectRatio="none"/><rect x="790" y="30" width="60" height="13" fill="#0B0B0D" rx="6.5"/><text x="734" y="104" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="19" font-weight="800" font-style="italic" fill="#121114">REGISTRÁ TU <tspan fill="#B07A00">LLAVE</tspan></text><text x="734" y="134" font-family="Barlow, sans-serif" font-size="12.5" font-weight="600" fill="#3B3A40">Piso y depto</text><rect id="mC1" x="732" y="141" width="176" height="38" rx="10" fill="#fff" stroke="#D9D5CA" stroke-width="1.4"/><text id="mT1" x="745" y="166" font-family="Barlow, sans-serif" font-size="17" font-weight="600" fill="#121114"></text><text x="734" y="204" font-family="Barlow, sans-serif" font-size="12.5" font-weight="600" fill="#3B3A40">Número de la llave</text><rect id="mC2" x="732" y="211" width="176" height="38" rx="10" fill="#fff" stroke="#D9D5CA" stroke-width="1.4"/><text id="mT2" x="745" y="236" font-family="IBM Plex Mono, monospace" font-size="16" font-weight="500" fill="#121114" opacity="0">069:02561</text><rect id="mCaret" x="746" y="150" width="1.6" height="20" fill="#121114" opacity="0"/><g id="mBtn"><rect x="732" y="268" width="176" height="42" rx="12" fill="#F6B828"/><text x="820" y="295" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="17" font-weight="700" fill="#121114">Registrar mi llave</text></g><text x="820" y="336" text-anchor="middle" font-family="Barlow, sans-serif" font-size="11" fill="#77746C">2 minutos · Datos privados</text><rect x="732" y="356" width="176" height="60" fill="#ECE9E1" rx="12"/><rect x="746" y="372" width="90" height="8" fill="#D9D5CA" rx="4"/><rect x="746" y="390" width="130" height="8" fill="#D9D5CA" rx="4"/><g id="mOk" opacity="0"><rect x="716" y="74" width="208" height="362" fill="#F5F3EE"/><circle id="mOkC" cx="820" cy="196" r="38" fill="#0F6E63"/><path id="mOkP" d="M803 197l12 12 23-25" fill="none" stroke="#fff" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="52" stroke-dashoffset="52"/><text x="820" y="268" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="24" font-weight="800" fill="#121114">¡Listo!</text><text x="820" y="290" text-anchor="middle" font-family="Barlow, sans-serif" font-size="13" fill="#3B3A40">Tu llave quedó registrada</text></g></g><path d="M716 60L800 24h60L716 150z" fill="#fff" opacity=".04" clip-path="url(#mPant)"/><circle id="mToque" cx="820" cy="289" r="10" fill="#121114" opacity="0"/><g id="mChip" opacity="0"><rect x="-58" y="-17" width="116" height="34" rx="9" fill="#F6B828"/><rect x="-58" y="-17" width="116" height="34" rx="9" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width="1.2"/><text x="0" y="6" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="16" font-weight="500" fill="#121114">069:02561</text></g></svg>
+          <svg class="g" id="gCalle" preserveAspectRatio="xMidYMid slice" viewBox="-160 -250 400 240" style="display:none" aria-hidden="true"><defs>
+        <linearGradient id="gWall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#17161B"/><stop offset="1" stop-color="#26252C"/></linearGradient>
+        <radialGradient id="gWarm"><stop offset="0" stop-color="#FFC966" stop-opacity=".30"/><stop offset=".6" stop-color="#F6B828" stop-opacity=".08"/><stop offset="1" stop-color="#F6B828" stop-opacity="0"/></radialGradient>
+        <radialGradient id="gWarm2"><stop offset="0" stop-color="#FFE3A3" stop-opacity=".55"/><stop offset="1" stop-color="#FFD27A" stop-opacity="0"/></radialGradient>
+        <linearGradient id="gCono" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFD98A" stop-opacity=".42"/><stop offset="1" stop-color="#FFD98A" stop-opacity="0"/></linearGradient>
+        <linearGradient id="gConoUp" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#FFD98A" stop-opacity=".16"/><stop offset="1" stop-color="#FFD98A" stop-opacity="0"/></linearGradient>
+        <linearGradient id="gMetal" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4A4950"/><stop offset="1" stop-color="#232228"/></linearGradient>
+        <linearGradient id="gPost" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#0D0D10"/><stop offset=".18" stop-color="#25252B"/><stop offset=".5" stop-color="#15151A"/><stop offset="1" stop-color="#0B0B0E"/></linearGradient>
+        <linearGradient id="gSteel" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#D9DBDF"/><stop offset=".45" stop-color="#9DA1A8"/><stop offset=".6" stop-color="#C5C8CD"/><stop offset="1" stop-color="#7C8087"/></linearGradient>
+        <linearGradient id="gSteelD" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#8C8F96"/><stop offset=".5" stop-color="#B9BCC2"/><stop offset="1" stop-color="#6F7279"/></linearGradient>
+        <linearGradient id="gGlass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#DCEBFA" stop-opacity=".20"/><stop offset=".5" stop-color="#DCEBFA" stop-opacity=".04"/><stop offset="1" stop-color="#DCEBFA" stop-opacity=".12"/></linearGradient>
+        <linearGradient id="gHallB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#B08A4E"/><stop offset="1" stop-color="#6E5633"/></linearGradient>
+        <linearGradient id="gHallL" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#4A3A25"/><stop offset="1" stop-color="#8A6B3E"/></linearGradient>
+        <linearGradient id="gHallR" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-color="#4A3A25"/><stop offset="1" stop-color="#8A6B3E"/></linearGradient>
+        <linearGradient id="gHallF" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C9B48C"/><stop offset="1" stop-color="#6B5A40"/></linearGradient>
+        <linearGradient id="gReader" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#3A3B43"/><stop offset=".22" stop-color="#1A1A1F"/><stop offset=".8" stop-color="#0C0C0F"/><stop offset="1" stop-color="#1D1D22"/></linearGradient>
+        <radialGradient id="gLedV"><stop offset="0" stop-color="#3DDC6E" stop-opacity=".9"/><stop offset="1" stop-color="#3DDC6E" stop-opacity="0"/></radialGradient>
+        <radialGradient id="gHalo"><stop offset="0" stop-color="#F6B828" stop-opacity=".55"/><stop offset=".55" stop-color="#F6B828" stop-opacity=".16"/><stop offset="1" stop-color="#F6B828" stop-opacity="0"/></radialGradient>
+        <linearGradient id="gSlat" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5A5961"/><stop offset=".25" stop-color="#4A4950"/><stop offset="1" stop-color="#2F2E35"/></linearGradient>
+        <linearGradient id="gGarB" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#55565E"/><stop offset="1" stop-color="#34353B"/></linearGradient>
+        <linearGradient id="gGarL" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#1E1E23"/><stop offset="1" stop-color="#3E3F46"/></linearGradient>
+        <linearGradient id="gGarR" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-color="#1E1E23"/><stop offset="1" stop-color="#3E3F46"/></linearGradient>
+        <linearGradient id="gGarF" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4A4B52"/><stop offset="1" stop-color="#232329"/></linearGradient>
+        <linearGradient id="gPiso" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2E2D34"/><stop offset=".5" stop-color="#1D1C21"/><stop offset="1" stop-color="#131216"/></linearGradient>
+        <linearGradient id="gSpill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E8EEFA" stop-opacity=".30"/><stop offset="1" stop-color="#E8EEFA" stop-opacity="0"/></linearGradient>
+        <linearGradient id="gMaceta" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4B4A51"/><stop offset="1" stop-color="#2A2930"/></linearGradient>
+        <linearGradient id="gCarBody" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#A9ADB7"/><stop offset=".35" stop-color="#7C808A"/><stop offset=".75" stop-color="#4A4D55"/><stop offset="1" stop-color="#2C2E34"/></linearGradient>
+        <linearGradient id="gCarRoof" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C3C7CF"/><stop offset=".2" stop-color="#8E929C"/><stop offset="1" stop-color="#6A6E78"/></linearGradient>
+        <linearGradient id="gCarGlass" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3A4A5E"/><stop offset=".5" stop-color="#141B26"/><stop offset="1" stop-color="#0B0F16"/></linearGradient>
+        <linearGradient id="gTail" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FF6A6E"/><stop offset="1" stop-color="#C2141C"/></linearGradient>
+        <radialGradient id="gRojo"><stop offset="0" stop-color="#FF3B42" stop-opacity=".85"/><stop offset="1" stop-color="#FF3B42" stop-opacity="0"/></radialGradient>
+        <radialGradient id="gFaros"><stop offset="0" stop-color="#FFF6DE" stop-opacity=".38"/><stop offset="1" stop-color="#FFF6DE" stop-opacity="0"/></radialGradient>
+        <linearGradient id="gTag" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6C93FF"/><stop offset=".4" stop-color="#2F55DA"/><stop offset="1" stop-color="#152A8C"/></linearGradient>
+        <linearGradient id="gKey" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#E3E5E8"/><stop offset=".5" stop-color="#A2A6AD"/><stop offset="1" stop-color="#CFD2D6"/></linearGradient>
+        <linearGradient id="gChapa" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFD84A"/><stop offset=".55" stop-color="#F6C21A"/><stop offset="1" stop-color="#DDA40E"/></linearGradient>
+        <pattern id="hazard" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="12" height="12" fill="#F6B828"/><rect width="6" height="12" fill="#17161A"/></pattern>
+        <filter id="blur3" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="3"/></filter>
+        <clipPath id="cHall"><rect x="-98" y="-238" width="196" height="238"/></clipPath>
+        <clipPath id="cGar"><rect x="330" y="-232" width="280" height="232"/></clipPath>
+        </defs><rect x="-500" y="-600" width="1100" height="600" fill="url(#gWall)"/><path d="M-500 -540H600M-480 -540v60M-360 -540v60M-240 -540v60M-120 -540v60M0 -540v60M120 -540v60M240 -540v60M360 -540v60M480 -540v60M-500 -480H600M-420 -480v60M-300 -480v60M-180 -480v60M-60 -480v60M60 -480v60M180 -480v60M300 -480v60M420 -480v60M540 -480v60M-500 -420H600M-480 -420v60M-360 -420v60M-240 -420v60M-120 -420v60M0 -420v60M120 -420v60M240 -420v60M360 -420v60M480 -420v60M-500 -360H600M-420 -360v60M-300 -360v60M-180 -360v60M-60 -360v60M60 -360v60M180 -360v60M300 -360v60M420 -360v60M540 -360v60M-500 -300H600M-480 -300v60M-360 -300v60M-240 -300v60M-120 -300v60M0 -300v60M120 -300v60M240 -300v60M360 -300v60M480 -300v60M-500 -240H600M-420 -240v60M-300 -240v60M-180 -240v60M-60 -240v60M60 -240v60M180 -240v60M300 -240v60M420 -240v60M540 -240v60M-500 -180H600M-480 -180v60M-360 -180v60M-240 -180v60M-120 -180v60M0 -180v60M120 -180v60M240 -180v60M360 -180v60M480 -180v60M-500 -120H600M-420 -120v60M-300 -120v60M-180 -120v60M-60 -120v60M60 -120v60M180 -120v60M300 -120v60M420 -120v60M540 -120v60M-500 -60H600M-480 -60v60M-360 -60v60M-240 -60v60M-120 -60v60M0 -60v60M120 -60v60M240 -60v60M360 -60v60M480 -60v60" stroke="#0A090C" stroke-opacity=".5" stroke-width=".8" fill="none"/><path d="M-500 -539H600M-500 -479H600M-500 -419H600M-500 -359H600M-500 -299H600M-500 -239H600M-500 -179H600M-500 -119H600M-500 -59H600" stroke="#fff" stroke-opacity=".035" stroke-width=".8" fill="none"/><rect x="-360" y="-600" width="130" height="200" fill="#F2B544" opacity=".55"/><rect x="-297" y="-600" width="4" height="200" fill="#3A2C12" opacity=".7"/><rect x="-130" y="-600" width="130" height="200" fill="#F2B544" opacity=".55"/><rect x="-67" y="-600" width="4" height="200" fill="#3A2C12" opacity=".7"/><rect x="100" y="-600" width="130" height="200" fill="#F2B544" opacity=".55"/><rect x="163" y="-600" width="4" height="200" fill="#3A2C12" opacity=".7"/><rect x="330" y="-600" width="130" height="200" fill="#F2B544" opacity=".55"/><rect x="393" y="-600" width="4" height="200" fill="#3A2C12" opacity=".7"/><rect x="560" y="-600" width="130" height="200" fill="#F2B544" opacity=".55"/><rect x="623" y="-600" width="4" height="200" fill="#3A2C12" opacity=".7"/><rect x="-900" y="-440" width="2500" height="95" fill="#AFC4D8" opacity=".07"/><rect x="-900" y="-442" width="2500" height="3" fill="#6B6A72"/><rect x="-900" y="-346" width="2500" height="16" fill="#3D3C44"/><rect x="-900" y="-330" width="2500" height="5" fill="#0C0B0E" opacity=".6"/><ellipse cx="0" cy="-170" rx="330" ry="240" fill="url(#gWarm)"/><polygon points="-156,-252 156,-252 225,0 -225,0" fill="url(#gCono)" opacity=".26"/><rect x="-166" y="-270" width="332" height="17" fill="url(#gMetal)" rx="2"/><rect x="-156" y="-254" width="312" height="2.6" fill="#FFE9B8"/><ellipse cx="0" cy="-252" rx="180" ry="20" fill="url(#gWarm2)" opacity=".7"/><rect x="-100" y="-240" width="200" height="240" fill="#0D0C10"/><g clip-path="url(#cHall)"><g id="hallIn"><polygon points="-130,-240 130,-240 58,-192 -58,-192" fill="#4E3E28"/><polygon points="-130,-240 -58,-192 -58,-50 -130,0" fill="url(#gHallL)"/><polygon points="130,-240 58,-192 58,-50 130,0" fill="url(#gHallR)"/><rect x="-58" y="-192" width="116" height="142" fill="url(#gHallB)"/><polygon points="-130,0 130,0 58,-50 -58,-50" fill="url(#gHallF)"/><path d="M-30 -50L-66 0M0 -50V0M30 -50L66 0M-90 -28H90M-72 -40H72" stroke="#5A4A32" stroke-opacity=".5" stroke-width=".7" fill="none"/><rect x="-50" y="-184" width="3" height="128" fill="#FFE3A3"/><ellipse cx="-48.5" cy="-120" rx="16" ry="74" fill="url(#gWarm2)" opacity=".7"/><rect x="-25" y="-152" width="50" height="102" fill="#3A3024" rx="1"/><rect x="-22" y="-149" width="21.3" height="99" fill="url(#gSteelD)"/><rect x="0.7" y="-149" width="21.3" height="99" fill="url(#gSteelD)"/><rect x="-22" y="-149" width="44" height="99" fill="#3A2E1C" opacity=".28"/><rect x="-7" y="-162" width="14" height="6" fill="#16120C" rx="1"/><path d="M-2.4 -157.4h4.8l-2.4-3.2z" fill="#F6B828"/><circle cx="32" cy="-104" r="1.7" fill="#F6B828"/><rect x="29.5" y="-109" width="5" height="10" rx="1" fill="none" stroke="#3A3024" stroke-width=".6"/><rect x="36" y="-68" width="13" height="18" fill="#E4DDCD" rx="2"/><ellipse cx="40" cy="-84" rx="5" ry="16" transform="rotate(-22 40 -68)" fill="#2F5A45"/><ellipse cx="45" cy="-86" rx="5" ry="17" transform="rotate(14 45 -69)" fill="#3C7358"/><ellipse cx="42.5" cy="-90" rx="4.5" ry="18" transform="rotate(-4 42.5 -72)" fill="#28503D"/><ellipse cx="48" cy="-80" rx="4" ry="13" transform="rotate(38 48 -67)" fill="#2F5A45"/><ellipse cx="37" cy="-79" rx="4" ry="12" transform="rotate(-48 37 -67)" fill="#3C7358"/><polygon points="-118,-178 -74,-160 -74,-92 -118,-84" fill="#C7D6E2" opacity=".22"/><ellipse cx="-26" cy="-208" rx="10" ry="3" fill="#FFF1CC"/><ellipse cx="-26" cy="-204" rx="34" ry="16" fill="url(#gWarm2)" opacity=".8"/><ellipse cx="26" cy="-208" rx="10" ry="3" fill="#FFF1CC"/><ellipse cx="26" cy="-204" rx="34" ry="16" fill="url(#gWarm2)" opacity=".8"/></g><rect id="hallLuz" x="-100" y="-240" width="200" height="240" fill="#FFD98A" opacity="0"/><rect x="-100" y="-240" width="200" height="240" fill="#0D0C10" id="hallSombra" opacity=".28"/></g><g clip-path="url(#cHall)"><g><rect x="-98" y="-236" width="97" height="236" fill="url(#gGlass)"/><polygon points="-76,-236 -56,-236 -86,0 -106,0" fill="#fff" opacity=".06"/><polygon points="-46,-236 -40,-236 -70,0 -76,0" fill="#fff" opacity=".05"/><rect x="-98" y="-236" width="97" height="236" fill="none" stroke="#08080A" stroke-width="5"/><rect x="-95.5" y="-233.5" width="92" height="231" fill="none" stroke="#fff" stroke-opacity=".08" stroke-width=".6"/><rect x="-14" y="-152" width="3.6" height="72" fill="url(#gSteelD)" rx="1.8"/><rect x="-13.4" y="-150" width="0.8" height="68" fill="#fff" opacity=".5"/></g><g id="hoja"><rect x="1" y="-236" width="97" height="236" fill="url(#gGlass)"/><polygon points="23,-236 43,-236 13,0 -7,0" fill="#fff" opacity=".06"/><polygon points="53,-236 59,-236 29,0 23,0" fill="#fff" opacity=".05"/><rect x="1" y="-236" width="97" height="236" fill="none" stroke="#08080A" stroke-width="5"/><rect x="3.5" y="-233.5" width="92" height="231" fill="none" stroke="#fff" stroke-opacity=".08" stroke-width=".6"/><rect x="10.4" y="-152" width="3.6" height="72" fill="url(#gSteelD)" rx="1.8"/><rect x="11.0" y="-150" width="0.8" height="68" fill="#fff" opacity=".5"/></g></g><rect x="-101" y="-241" width="202" height="241" fill="none" stroke="#060608" stroke-width="6"/><rect x="-106" y="-3" width="212" height="3" fill="#6A6972"/><rect x="-146" y="-244" width="44" height="244" fill="url(#gPost)"/><rect x="102" y="-244" width="44" height="244" fill="url(#gPost)"/><g transform="translate(-136 -156)"><rect x="0.8" y="1" width="24" height="46" fill="#000" rx="2" opacity='.5'/><rect x="0" y="0" width="24" height="46" fill="url(#gSteel)" rx="2"/><rect x=".4" y=".4" width="23.2" height="45.2" rx="1.8" fill="none" stroke="#fff" stroke-opacity=".5" stroke-width=".4"/><circle cx="12" cy="7.5" r="3.6" fill="#0C0C0F"/><circle cx="12" cy="7.5" r="2" fill="#1C2C4E"/><circle cx="11.2" cy="6.7" r=".6" fill="#9FC2FF"/><rect x="3.5" y="14" width="17" height="12" rx="1.2" fill="#08131F"/><rect x="4.3" y="14.8" width="15.4" height="10.4" rx=".8" fill="#12314F"/><circle cx="12" cy="18.6" r="1.7" fill="#7FB4EA" opacity=".8"/><path d="M8.6 25.2c.4-2.6 6.4-2.6 6.8 0z" fill="#7FB4EA" opacity=".8"/><path d="M6 30h12M6 32h12M6 34h12" stroke="#4B4E55" stroke-width=".7" stroke-linecap="round"/><circle cx="12" cy="40.2" r="2.9" fill="#E8E9EC" stroke="#F6B828" stroke-width=".8"/><circle cx="20.2" cy="3" r=".6" fill="#4DA3FF" class="tit"/></g><g transform="translate(105 -139)" font-family="Barlow Semi Condensed, Barlow, sans-serif" text-anchor="middle"><rect x=".5" y=".6" width="13.5" height="24" rx="1" fill="#000" opacity=".45"/><rect width="13.5" height="24" rx="1" fill="#F6C21A"/><text x="6.75" y="4.6" font-size="2.9" font-weight="800" fill="#121114">Acerque</text><text x="6.75" y="7.7" font-size="2.9" font-weight="800" fill="#121114">su llave</text><circle cx="6.75" cy="12.8" r="3" fill="#121114"/><path d="M5.6 12.8a1.2 1.2 0 0 1 0-.1M6.3 11.4a2 2 0 0 1 0 2.8M7.3 10.7a3 3 0 0 1 0 4.2" stroke="#F6C21A" stroke-width=".55" fill="none" stroke-linecap="round"/><circle cx="5.5" cy="12.8" r=".45" fill="#F6C21A"/><rect x="1.2" y="18" width="11.1" height="4.8" rx=".7" fill="#121114"/><text x="6.75" y="21.9" font-size="4" font-weight="800" font-style="italic" fill="#F6B828">SAT</text></g><g transform="translate(123.5 -140)"><rect x="1" y="1.4" width="10" height="27" rx="2.6" fill="#000" opacity=".55"/><rect width="10" height="27" rx="2.6" fill="url(#gReader)"/><rect x=".25" y=".25" width="9.5" height="26.5" rx="2.4" fill="none" stroke="#5A5B64" stroke-opacity=".7" stroke-width=".3"/><path d="M1.2 2.6C1.2 1.6 2 1 3 1h4c1 0 1.8.6 1.8 1.6V12H1.2z" fill="#fff" opacity=".045"/><rect x="1.4" y="1.6" width=".5" height="23" rx=".25" fill="#fff" opacity=".22"/><path d="M6.5 3.4c-3 .7-3.2 2.6-1.3 3.8 1.9 1.2 1.7 3.1-1.3 3.8" stroke="#6FD3FF" stroke-opacity=".3" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M6.5 3.4c-3 .7-3.2 2.6-1.3 3.8 1.9 1.2 1.7 3.1-1.3 3.8" stroke="#8FE0FF" stroke-width=".85" fill="none" stroke-linecap="round"/><circle id="ledGlow" cx="5" cy="18.6" r="5.5" fill="url(#gLedV)" opacity="0"/><circle id="led" cx="5" cy="18.6" r=".75" fill="#E5484D"/><rect x="3" y="23.6" width="4" height=".5" rx=".25" fill="#3A3B43"/></g><g id="ondas" transform="translate(128.5 -126.5)"><rect class="onda" x="-6" y="-14" width="12" height="28" rx="4" fill="none" stroke="#3DDC6E" stroke-width=".55" opacity="0"/><rect class="onda" x="-6" y="-14" width="12" height="28" rx="4" fill="none" stroke="#3DDC6E" stroke-width=".55" opacity="0"/><rect class="onda" x="-6" y="-14" width="12" height="28" rx="4" fill="none" stroke="#3DDC6E" stroke-width=".55" opacity="0"/></g><ellipse cx="218" cy="-222" rx="74" ry="40" fill="url(#gHalo)"/><rect x="189" y="-240" width="2" height="6" fill="#55545B"/><rect x="245" y="-240" width="2" height="6" fill="#55545B"/><image href="/icons/logo.png" x="176" y="-236" width="84" height="28.3" preserveAspectRatio="none"/><rect x="-900" y="0" width="2500" height="440" fill="url(#gPiso)"/><path d="M-480 0L-2900 440M-438 0L-2716 440M-396 0L-2532 440M-354 0L-2348 440M-312 0L-2163 440M-270 0L-1979 440M-228 0L-1795 440M-186 0L-1611 440M-144 0L-1427 440M-102 0L-1243 440M-60 0L-1058 440M-18 0L-874 440M24 0L-690 440M66 0L-506 440M108 0L-322 440M150 0L-138 440M192 0L46 440M234 0L231 440M276 0L415 440M318 0L599 440M360 0L783 440M402 0L967 440M444 0L1151 440M486 0L1336 440M528 0L1520 440M570 0L1704 440M612 0L1888 440M-500 10H600M-500 24H600M-500 43H600M-500 69H600M-500 104H600M-500 152H600M-500 218H600M-500 310H600" stroke="#08080A" stroke-opacity=".45" stroke-width=".9" fill="none"/><ellipse id="poolDoor" cx="0" cy="34" rx="230" ry="62" fill="url(#gWarm2)" opacity=".35"/><rect x="-900" y="-1.2" width="2500" height="2.4" fill="#0A090C" opacity=".7"/><ellipse cx="-255" cy="2" rx="66" ry="6" fill="#000" opacity=".4"/><rect x="-310" y="-44" width="110" height="44" fill="url(#gMaceta)" rx="2"/><rect x="-310" y="-44" width="110" height="3" fill="#66656D" rx="1"/><circle cx="-288" cy="-62" r="24" fill="#1F3A30"/><circle cx="-254" cy="-72" r="30" fill="#274A3B"/><circle cx="-222" cy="-60" r="23" fill="#1F3A30"/><circle cx="-270" cy="-80" r="18" fill="#2F5A47"/><circle cx="-238" cy="-86" r="15" fill="#356651"/><g id="tagSombra" opacity="0"><path d="M0 -80C24 -62 50 -28 50 12C50 48 28 74 0 74C-28 74-50 48-50 12C-50 -28-24 -62 0 -80Z" fill="#000" transform="scale(.1)"/></g><g id="tag" opacity="0"><g transform="scale(.1)"><g transform="rotate(26 0 -104)"><rect x="-17" y="-126" width="34" height="30" rx="10" fill="url(#gKey)"/><circle cx="0" cy="-113" r="6" fill="#16151A"/><path d="M-6 -97h12v70l-6 8-6-8zM6 -84h5v6h-5zM6 -68h7v7h-7zM6 -50h4v6h-4z" fill="url(#gKey)"/><path d="M-1 -92v60" stroke="#6F7279" stroke-width="1.6"/></g><path d="M0 -80C24 -62 50 -28 50 12C50 48 28 74 0 74C-28 74-50 48-50 12C-50 -28-24 -62 0 -80Z" fill="url(#gTag)"/><path d="M0 -80C24 -62 50 -28 50 12C50 48 28 74 0 74C-28 74-50 48-50 12C-50 -28-24 -62 0 -80Z" fill="none" stroke="#A9C1FF" stroke-opacity=".55" stroke-width="2" transform="scale(.93)"/><path d="M0 -80C24 -62 50 -28 50 12C50 48 28 74 0 74C-28 74-50 48-50 12C-50 -28-24 -62 0 -80Z" fill="none" stroke="#0E1F6E" stroke-width="2.4"/><circle cx="0" cy="22" r="33" fill="#12278A" opacity=".5"/><circle cx="0" cy="22" r="33" fill="none" stroke="#0E1F6E" stroke-opacity=".6" stroke-width="3"/><path d="M-36 -2C-28 -34-12 -54-2 -62" stroke="#fff" stroke-opacity=".35" stroke-width="8" fill="none" stroke-linecap="round"/><text x="0" y="29" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="34" font-weight="800" font-style="italic" fill="#F6B828">SAT</text><text x="0" y="46" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9.5" font-weight="500" fill="#DCE5FF" opacity=".85">069:02561</text><circle cx="0" cy="-56" r="8" fill="#101014"/><circle cx="0" cy="-56" r="9.5" fill="none" stroke="url(#gSteel)" stroke-width="4"/><circle cx="0" cy="-82" r="24" fill="none" stroke="#8E9096" stroke-width="5.4"/><circle cx="0" cy="-82" r="24" fill="none" stroke="#E3E5E8" stroke-width="3"/></g></g></svg>
+          <div class="guia-aviso" aria-hidden="true"><span class="bi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span><b>Llave registrada</b><small>4° B · a tu nombre</small></span></div>
+          <div class="guia-pie" aria-hidden="true">
+            <div class="guia-pasos"><p class="guia-paso on"><span>1</span>Buscá el número grabado en tu llave</p><p class="guia-paso"><span>2</span>Cargalo acá con tu piso y depto</p><p class="guia-paso"><span>3</span>Listo: la llave queda a tu nombre</p></div>
+            <div class="guia-rayas"><i><b></b></i><i><b></b></i><i><b></b></i></div>
+          </div>
+        </div>
         <div class="meta" id="introMeta">
           <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 3h6"/></svg>2 minutos</span>
           <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Datos privados</span>
@@ -1026,6 +1119,121 @@
   });
 
   iniciar();
+})();
+</script>
+<script>
+// Animación "cómo registrar tu llave": 13 s en loop, 3 pasos.
+// 1) el número grabado en el tag · 2) se carga en el formulario · 3) la llave abre la puerta, ya a tu nombre.
+(function () {
+  const caja = document.querySelector(".guia"); if (!caja) return;
+  const mesa = document.getElementById("gMesa"), calle = document.getElementById("gCalle");
+  const $ = (id) => document.getElementById(id), DUR = 13;
+  const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v)), lerp = (a, b, p) => a + (b - a) * p;
+  const eio = (p) => (p = clamp(p), p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2);
+  const eout = (p) => 1 - Math.pow(1 - clamp(p), 3);
+  const tramo = (t, a, b) => clamp((t - a) / (b - a));
+  const ventana = (t, a, b, f = 0.3) => (t < a || t > b ? 0 : Math.min(1, (t - a) / f, (b - t) / f));
+  const CURVA = { lin: clamp, eio, eout };
+  function camara(K, t) {
+    let i = 0; while (i < K.length - 2 && t >= K[i + 1][0]) i++;
+    const a = K[i], b = K[i + 1], p = CURVA[a[4]]((t - a[0]) / (b[0] - a[0]));
+    return [lerp(a[1], b[1], p), lerp(a[2], b[2], p), lerp(a[3], b[3], p)];
+  }
+  const CAM_MESA = [
+    [0, 318, 262, 660, "lin"], [1.0, 312, 262, 630, "eio"], [2.2, 208, 304, 300, "lin"], [3.3, 210, 306, 284, "eio"],
+    [4.5, 820, 222, 372, "lin"], [8.4, 820, 220, 356, "lin"], [13, 820, 220, 356, "lin"],
+  ];
+  const CAM_CALLE = [[8.2, 120, -124, 176, "lin"], [9.6, 119, -124, 160, "eio"], [11.4, 68, -132, 430, "lin"], [13, 69, -132, 420, "lin"]];
+  // el tercio de abajo lo ocupa el texto: el sujeto se encuadra un poco más arriba
+  const enc = (svg, cx, cy, w, asp) => svg.setAttribute("viewBox", `${(cx - w / 2).toFixed(3)} ${(cy - w * asp * 0.37).toFixed(3)} ${w.toFixed(3)} ${(w * asp).toFixed(3)}`);
+
+  const scan = $("mScan"), scanL = $("mScanL"), chip = $("mChip"), t1 = $("mT1"), t2 = $("mT2"), c1 = $("mC1"), c2 = $("mC2"), caret = $("mCaret");
+  const btn = $("mBtn"), toque = $("mToque"), ok = $("mOk"), okP = $("mOkP"), okC = $("mOkC"), leds = [...mesa.querySelectorAll(".mLed")];
+  const UNIDAD = "4° B";
+  function pintarMesa(t) {
+    leds.forEach((l) => l.setAttribute("opacity", t > 0.5 && t < 1.3 && Math.floor(t * 8) % 2 === 0 ? 1 : 0));
+    // 1 · resaltar el número grabado
+    const s = ventana(t, 1.7, 3.5, 0.3);
+    scan.setAttribute("opacity", s.toFixed(2));
+    scanL.setAttribute("transform", `translate(${(104 * (0.5 - 0.5 * Math.cos((t - 1.7) * 4))).toFixed(1)} 0)`);
+    // el número "viaja" al formulario
+    const v = tramo(t, 3.2, 4.5), p = eio(v);
+    chip.setAttribute("opacity", (t >= 3.1 && t < 4.75 ? Math.min(1, (t - 3.1) / 0.2, (4.75 - t) / 0.2) : 0).toFixed(2));
+    const x = lerp(207, 804, p), y = lerp(315, 230, p) - Math.sin(Math.PI * p) * 70;
+    chip.setAttribute("transform", `translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${lerp(-12, 0, p).toFixed(1)}) scale(${lerp(1, 0.94, p).toFixed(3)})`);
+    t2.setAttribute("opacity", tramo(t, 4.55, 4.75).toFixed(2));
+    c2.setAttribute("stroke", t >= 4.4 && t < 5.0 ? "#F6B828" : t >= 5.0 ? "#0F6E63" : "#D9D5CA");
+    // 2 · se escribe el piso y depto
+    const n = Math.floor(tramo(t, 5.1, 5.9) * UNIDAD.length + 0.001);
+    t1.textContent = t < 5.1 ? "" : UNIDAD.slice(0, n);
+    const escribe = t >= 4.95 && t < 6.2;
+    c1.setAttribute("stroke", escribe ? "#F6B828" : t >= 6.2 ? "#0F6E63" : "#D9D5CA");
+    caret.setAttribute("opacity", escribe && Math.floor(t * 3.2) % 2 === 0 ? 1 : 0);
+    caret.setAttribute("x", (746 + n * 9.6).toFixed(1));
+    // toque en el botón y pantalla de listo
+    const tq = tramo(t, 6.5, 6.95);
+    toque.setAttribute("opacity", tq > 0 && tq < 1 ? (0.28 * (1 - tq)).toFixed(2) : 0);
+    toque.setAttribute("r", (10 + tq * 30).toFixed(1));
+    btn.setAttribute("transform", t >= 6.5 && t < 6.7 ? "translate(820 289) scale(.96) translate(-820 -289)" : "");
+    const o = tramo(t, 6.8, 7.1);
+    ok.setAttribute("opacity", o.toFixed(2));
+    const e = eout(tramo(t, 6.9, 7.3));
+    okC.setAttribute("r", (38 * (0.6 + 0.4 * e)).toFixed(1));
+    okP.setAttribute("stroke-dashoffset", (52 * (1 - eio(tramo(t, 7.1, 7.5)))).toFixed(1));
+  }
+
+  const tag = $("tag"), tagS = $("tagSombra"), led = $("led"), ledG = $("ledGlow"), ondas = [...calle.querySelectorAll("#ondas .onda")];
+  const hoja = $("hoja"), hallLuz = $("hallLuz"), hallSombra = $("hallSombra"), pool = $("poolDoor"), hallIn = $("hallIn");
+  function pintarCalle(t, cx) {
+    hallIn.setAttribute("transform", `translate(${(cx * 0.07).toFixed(2)} 0)`);
+    const vis = ventana(t, 8.5, 10.6, 0.25);
+    tag.setAttribute("opacity", vis.toFixed(2)); tagS.setAttribute("opacity", (vis * 0.3).toFixed(2));
+    const X1 = 134, Y1 = -112.5, S1 = 1.12; let x, y, s, g;
+    if (t < 9.3) { const p = eout(tramo(t, 8.5, 9.3)); x = lerp(190, X1, p); y = lerp(-66, Y1, p); s = lerp(1.8, S1, p); g = lerp(62, 34, p) + Math.sin(t * 9) * 6 * (1 - p); }
+    else if (t < 10.0) { x = X1; y = Y1; s = S1; g = 34 + Math.sin((t - 9.3) * 6) * 1.6; }
+    else { const p = eio(tramo(t, 10.0, 10.6)); x = lerp(X1, 190, p); y = lerp(Y1, -70, p); s = lerp(S1, 1.6, p); g = lerp(34, 58, p); }
+    tag.setAttribute("transform", `translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${g.toFixed(1)} 0 ${(-8 * s).toFixed(1)}) scale(${s.toFixed(3)})`);
+    const d = 1.2 + (s - 1) * 14;
+    tagS.setAttribute("transform", `translate(${(x - d * 0.5).toFixed(2)} ${(y + d).toFixed(2)}) rotate(${g.toFixed(1)}) scale(${(s * 0.98).toFixed(3)})`);
+    const verde = t >= 9.4;
+    led.setAttribute("fill", verde ? "#3DDC6E" : "#E5484D");
+    ledG.setAttribute("opacity", verde ? (0.75 + 0.25 * Math.sin(t * 10)).toFixed(2) : 0);
+    ondas.forEach((o, i) => { const p = tramo(t, 9.4 + i * 0.26, 10.3 + i * 0.26), v = p > 0 && p < 1; o.setAttribute("opacity", v ? (1 - p).toFixed(2) : 0); o.setAttribute("transform", `scale(${(1 + p * 0.9).toFixed(3)})`); });
+    const ab = eio(tramo(t, 9.9, 11.2));
+    hoja.setAttribute("transform", `translate(${(-90 * ab).toFixed(1)} 0)`);
+    hallLuz.setAttribute("opacity", (0.16 * ab).toFixed(3)); hallSombra.setAttribute("opacity", (0.28 * (1 - ab)).toFixed(3)); pool.setAttribute("opacity", (0.35 + 0.45 * ab).toFixed(2));
+  }
+
+  const pasos = [...caja.querySelectorAll(".guia-paso")], rayas = [...caja.querySelectorAll(".guia-rayas i b")], aviso = caja.querySelector(".guia-aviso");
+  const CORTES = [0, 3.7, 8.3, DUR];
+  function pintarTextos(t) {
+    const i = t < CORTES[1] ? 0 : t < CORTES[2] ? 1 : 2;
+    pasos.forEach((el, k) => el.classList.toggle("on", k === i));
+    rayas.forEach((b, k) => (b.style.transform = `scaleX(${k < i ? 1 : k > i ? 0 : tramo(t, CORTES[k], CORTES[k + 1]).toFixed(3)})`));
+    const a = ventana(t, 11.1, 12.7, 0.4);
+    aviso.style.opacity = a.toFixed(2); aviso.style.transform = `translateY(${((1 - a) * 8).toFixed(1)}px)`;
+  }
+
+  const fijo = new URLSearchParams(location.search).get("t");
+  const quieto = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let visible = true;
+  if ("IntersectionObserver" in window) new IntersectionObserver((e) => { visible = e[0].isIntersecting; }).observe(caja);
+  const t0 = performance.now();
+  function cuadro(ahora) {
+    const r = caja.getBoundingClientRect();
+    if (!r.width || !visible || document.hidden) { setTimeout(() => requestAnimationFrame(cuadro), 500); return; }   // fuera de pantalla: en pausa
+    const t = fijo !== null ? +fijo : quieto ? 2.9 : ((ahora - t0) / 1000) % DUR, asp = r.height / r.width;
+    const oC = Math.min(tramo(t, 8.15, 8.6), 1 - tramo(t, 12.5, 12.95));
+    mesa.style.display = oC < 1 ? "" : "none";
+    calle.style.display = oC > 0 ? "" : "none"; calle.style.opacity = oC.toFixed(3);
+    // al volver al principio la mesa entra con su primer encuadre
+    const tm = t > 12.4 ? 0 : t;
+    if (oC < 1 && !(oC > 0 && t < 9)) { const [cx, cy, w] = camara(CAM_MESA, tm); enc(mesa, cx, cy, w, asp); pintarMesa(tm); }
+    if (oC > 0) { const [cx, cy, w] = camara(CAM_CALLE, t); enc(calle, cx, cy, w, asp); pintarCalle(t, cx); }
+    pintarTextos(t);
+    if (fijo === null && !quieto) requestAnimationFrame(cuadro);
+  }
+  requestAnimationFrame(cuadro);
 })();
 </script>
 </body>

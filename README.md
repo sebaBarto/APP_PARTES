@@ -3459,3 +3459,11 @@ paneo a la cochera (el control remoto abre el portón y entra el auto) → vuelt
 Son dos SVG dentro de `.cine` (`#mundo`, isométrico, y `#calle`, de frente) y un script al final de la página
 que mueve la "cámara" cambiando el `viewBox`. Con "reducir movimiento" queda quieta en la primera toma, y se
 pausa sola cuando el login está oculto. Los datos de los avisos (4° B, 2° A, número de tag) son inventados.
+
+### Animación "cómo registrar tu llave" (15/11/2026)
+
+`registro-llaves.html` muestra, dentro del bloque del título, una guía animada de 13 segundos en loop (`.guia`):
+1) el número grabado en el tag, 2) se carga con el piso y depto, 3) la llave abre la puerta, ya a nombre del vecino.
+Misma técnica que el login (dos SVG y un script que mueve el `viewBox`), sin filtros de desenfoque para que
+ande fluida en celulares. Se pausa cuando queda fuera de pantalla, se oculta en la pantalla final y respeta
+"reducir movimiento". Los datos que muestra son de ejemplo.
