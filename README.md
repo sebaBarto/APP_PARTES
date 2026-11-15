@@ -3470,3 +3470,8 @@ ande fluida en celulares. Se pausa cuando queda fuera de pantalla, se oculta en 
 
 `robo-llave.html` tiene una guía igual (reemplaza los tres recuadros de pasos): 1) el vecino manda el aviso,
 2) la central de monitoreo pone la llave en alerta, 3) si alguien la usa, sale un móvil y después SAT la da de baja.
+
+La ayuda «¿Dónde veo el número de la llave?» del paso 3 del registro también es animada (`.donde-anim`, 13 s):
+el número del llavero y el código que no va, cómo se escribe (los dos puntos se ponen solos) y que el control
+remoto no se abre: su número de serie solo viene en la caja; si no la tiene, el vecino completa el resto y SAT
+lo identifica. Arranca de cero al abrir la ayuda y se pausa al cerrarla.
