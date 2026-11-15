@@ -3467,3 +3467,6 @@ pausa sola cuando el login está oculto. Los datos de los avisos (4° B, 2° A, 
 Misma técnica que el login (dos SVG y un script que mueve el `viewBox`), sin filtros de desenfoque para que
 ande fluida en celulares. Se pausa cuando queda fuera de pantalla, se oculta en la pantalla final y respeta
 "reducir movimiento". Los datos que muestra son de ejemplo.
+
+`robo-llave.html` tiene una guía igual (reemplaza los tres recuadros de pasos): 1) el vecino manda el aviso,
+2) la central de monitoreo pone la llave en alerta, 3) si alguien la usa, sale un móvil y después SAT la da de baja.
