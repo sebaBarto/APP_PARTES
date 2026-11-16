@@ -13888,7 +13888,7 @@ document.getElementById("misatGuardarEstado").addEventListener("click", async (e
   if (!(await confirmarAdmin(misatTipoCuenta === "servicios" ? `¿Guardar la deuda de services y presupuestos? ${deben} clientes van a ver que deben; todos los demás, que no deben nada. Reemplaza al archivo anterior.` : `¿Guardar el estado del abono de ${filas.length} clientes? Reemplaza al archivo anterior.`))) return;
   ev.target.disabled = true;
   try {
-    const r = await fetch("/api/datos?coleccion=mi_sat", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "cargar_estado_cuenta", tipo: misatTipoCuenta, archivo: misatArchivoNombre, filas, no_figuran_al_dia: document.getElementById("misatNoFiguran").checked, mostrar_importe: document.getElementById("misatImporte").checked }) });
+    const r = await fetch("/api/datos?coleccion=mi_sat", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "cargar_estado_cuenta", version: 2, tipo: misatTipoCuenta, archivo: misatArchivoNombre, filas, no_figuran_al_dia: document.getElementById("misatNoFiguran").checked, mostrar_importe: document.getElementById("misatImporte").checked }) });
     const d = await r.json(); if (!r.ok) throw new Error(d.error || "Error");
     avisoAdmin(`Listo: se guardó el estado de cuenta de ${d.total} clientes.`);
     document.getElementById("misatMapeo").classList.add("hidden"); document.getElementById("misatArchivo").value = ""; misatHoja = null;
