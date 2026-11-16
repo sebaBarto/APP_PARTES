@@ -2402,7 +2402,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
     <div id="panelMiSat" class="hidden">
       <h1>Portal de clientes (Mi SAT)</h1>
       <p class="subtitle">Pedidos de acceso al portal <a href="https://pedido.sat365.com.ar/oficina" target="_blank" rel="noopener">pedido.sat365.com.ar/oficina</a>. Antes de aprobar, controlá que el DNI sea del titular y que el celular coincida con el de la cuenta. Al aprobar, avisale al cliente por WhatsApp.</p>
-      <div class="misat-filtros"><button type="button" class="misat-f on" data-f="pendiente">Pendientes</button><button type="button" class="misat-f" data-f="activa">Activas</button><button type="button" class="misat-f" data-f="otras">Rechazadas y bajas</button><span class="misat-sep"></span><button type="button" class="misat-f" data-f="estado">Estado de cuenta</button><button type="button" class="misat-f" data-f="fichas">Datos de clientes</button></div>
+      <div class="misat-filtros"><button type="button" class="misat-f on" data-f="pendiente">Pendientes</button><button type="button" class="misat-f" data-f="activa">Activas</button><button type="button" class="misat-f" data-f="otras">Rechazadas y bajas</button><span class="misat-sep"></span><button type="button" class="misat-f" data-f="estado">Estado de cuenta</button><button type="button" class="misat-f" data-f="fichas">Datos de clientes</button><span class="misat-sep"></span><button type="button" class="misat-f" data-f="consulta">🔎 Buscar clientes</button></div>
       <p id="misatStatus" class="subtitle"></p>
       <div id="misatLista"></div>
       <div id="misatEstado" class="hidden">
@@ -2429,6 +2429,22 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
             <div id="misatPrevia" style="overflow:auto;max-height:320px"></div>
             <div class="misat-acc"><button type="button" class="misat-aprobar" id="misatGuardarEstado">Guardar estado de cuenta</button></div>
           </div>
+        </div>
+      </div>
+      <div id="misatConsulta" class="hidden">
+        <div class="misat-card">
+          <h3>Buscar clientes</h3>
+          <p class="subtitle" style="margin:0">Todo lo cargado junto: acceso a Mi SAT, abono mensual, deuda de services y presupuestos, y datos del sistema.</p>
+          <div class="misat-cols">
+            <label>Buscar<input id="mcBuscar" placeholder="N° de cliente, abonado, nombre o dirección"></label>
+            <label>Acceso a Mi SAT<select id="mcAcceso"><option value="">Todos</option><option value="activa">Con acceso</option><option value="pendiente">Pedido pendiente</option><option value="sin">Sin acceso</option></select></label>
+            <label>Abono mensual<select id="mcAbono"><option value="">Todos</option><option value="pendiente">Debe</option><option value="al_dia">Al día</option><option value="sin">No figura en el archivo</option></select></label>
+            <label>Services y presupuestos<select id="mcServ"><option value="">Todos</option><option value="pendiente">Debe</option><option value="al_dia">No debe</option></select></label>
+            <label>Datos del sistema<select id="mcFicha"><option value="">Todos</option><option value="con">Cargados</option><option value="sin">Sin cargar</option><option value="paradox">Alarma Paradox</option><option value="dsc">Alarma DSC</option><option value="ajax">Alarma Ajax</option><option value="camaras">Con cámaras</option></select></label>
+            <label>Monitoreo<select id="mcMonit"><option value="">Todos</option><option value="si">Con N° de abonado</option><option value="no">Sin N° de abonado</option></select></label>
+          </div>
+          <div class="misat-acc" style="align-items:center"><span id="mcResumen" class="subtitle" style="margin:0;font-weight:600"></span><button type="button" class="btn-secondary-admin" style="width:auto;margin-left:auto" id="mcLimpiar">Limpiar filtros</button><button type="button" class="btn-secondary-admin" style="width:auto" id="mcExcel">Descargar Excel</button></div>
+          <div style="overflow:auto"><table class="misat-tabla" id="mcTabla"></table></div>
         </div>
       </div>
       <div id="misatFichas" class="hidden">
@@ -13654,12 +13670,83 @@ function misatPintar() {
 }
 document.querySelectorAll(".misat-f").forEach((b) => b.addEventListener("click", () => {
   misatFiltro = b.dataset.f; document.querySelectorAll(".misat-f").forEach((x) => x.classList.toggle("on", x === b));
-  const esEstado = misatFiltro === "estado", esFichas = misatFiltro === "fichas";
-  document.getElementById("misatLista").classList.toggle("hidden", esEstado || esFichas);
+  const esEstado = misatFiltro === "estado", esFichas = misatFiltro === "fichas", esConsulta = misatFiltro === "consulta";
+  document.getElementById("misatLista").classList.toggle("hidden", esEstado || esFichas || esConsulta);
   document.getElementById("misatEstado").classList.toggle("hidden", !esEstado);
   document.getElementById("misatFichas").classList.toggle("hidden", !esFichas);
-  if (esEstado) misatCargarEstado(); else if (esFichas) misatCargarFichas(); else misatPintar();
+  document.getElementById("misatConsulta").classList.toggle("hidden", !esConsulta);
+  if (esEstado) misatCargarEstado(); else if (esFichas) misatCargarFichas(); else if (esConsulta) misatCargarConsulta(); else misatPintar();
 }));
+
+// ----- Buscar clientes: todo lo del portal junto, con filtros -----
+let mcDatos = [];
+async function misatCargarConsulta() {
+  document.getElementById("mcResumen").textContent = "Cargando…";
+  try {
+    const leerJ = (u) => fetch(u, { headers: rllHeaders(), cache: "no-store" }).then(async (r) => { const d = await r.json(); if (!r.ok) throw new Error(d.error || "Error"); return d; });
+    const [cli, cuentas, fichas, abono, serv] = await Promise.all([
+      misatClientesBase.length ? misatClientesBase : leerJ("/api/datos?coleccion=clientes"),
+      leerJ("/api/datos?coleccion=mi_sat"), leerJ("/api/datos?coleccion=mi_sat&fichas=1"),
+      leerJ("/api/datos?coleccion=mi_sat&estado_cuenta=1&tipo=abono"), leerJ("/api/datos?coleccion=mi_sat&estado_cuenta=1&tipo=servicios"),
+    ]);
+    misatClientesBase = Array.isArray(cli) ? cli : []; misatLista = Array.isArray(cuentas) ? cuentas : []; misatFichasData = fichas || {};
+    const mapa = (o) => { const m = new Map(); Object.entries(o || {}).forEach(([k, v]) => m.set(misatSinCero(k), v)); return m; };
+    const mAb = mapa(abono && abono.clientes), mSv = mapa(serv && serv.clientes), mFi = mapa(misatFichasData);
+    const mAcc = new Map();
+    misatLista.forEach((c) => { const k = misatSinCero(c.numero_cliente), prev = mAcc.get(k); if (!prev || c.estado === "activa" || (c.estado === "pendiente" && prev.estado !== "activa")) mAcc.set(k, c); });
+    mcDatos = misatClientesBase.filter((c) => c && c.numero_cliente).map((c) => {
+      const k = misatSinCero(c.numero_cliente), ab = mAb.get(k), sv = mSv.get(k), fi = mFi.get(k), acc = mAcc.get(k);
+      return {
+        c, k, ficha: fi || null,
+        acceso: acc && ["activa", "pendiente"].includes(acc.estado) ? acc.estado : "sin", ultimo: acc && acc.ultimo_ingreso,
+        abono: !abono ? "" : ab ? ab.estado : (abono.no_figuran_al_dia ? "al_dia" : "sin"), abonoSaldo: ab && ab.saldo,
+        serv: !serv ? "" : sv ? sv.estado : "al_dia", servSaldo: sv && sv.saldo,
+        texto: misatNorm([c.numero_cliente, c.numero_abonado, c.nombre, c.direccion, c.localidad].join(" ")),
+      };
+    });
+    mcPintar();
+  } catch (e) { document.getElementById("mcResumen").textContent = "No se pudo cargar: " + e.message; }
+}
+function mcFiltrados() {
+  const q = misatNorm(document.getElementById("mcBuscar").value), v = (id) => document.getElementById(id).value;
+  const acc = v("mcAcceso"), ab = v("mcAbono"), sv = v("mcServ"), fi = v("mcFicha"), mo = v("mcMonit");
+  return mcDatos.filter((d) => (!q || q.split(/\s+/).every((p) => d.texto.includes(p)))
+    && (!acc || d.acceso === acc) && (!ab || d.abono === ab) && (!sv || d.serv === sv)
+    && (!fi || (fi === "con" ? !!d.ficha : fi === "sin" ? !d.ficha : fi === "camaras" ? !!(d.ficha && d.ficha.camaras) : !!(d.ficha && d.ficha.alarma_marca === fi)))
+    && (!mo || (mo === "si") === !!String(d.c.numero_abonado || "").trim()));
+}
+const mcPesos = (n) => n ? "$ " + Math.round(n).toLocaleString("es-AR") : "";
+function mcSistema(f) {
+  if (!f) return "";
+  return [f.alarma ? "Alarma" + (f.alarma_marca ? " " + ({ paradox: "Paradox", dsc: "DSC", ajax: "Ajax", otra: "" }[f.alarma_marca] || "") : "") + (f.alarma_modelo ? " " + f.alarma_modelo : "") : "", f.camaras ? `Cámaras${f.camaras_cantidad ? " (" + f.camaras_cantidad + ")" : ""}` : ""].filter(Boolean).join(" + ") || "Cargado";
+}
+function mcPintar() {
+  const lista = mcFiltrados(), MAX = 300;
+  const deben = (k) => lista.filter((d) => d[k] === "pendiente").length;
+  document.getElementById("mcResumen").textContent = `${lista.length} de ${mcDatos.length} clientes · ${lista.filter((d) => d.acceso === "activa").length} con acceso · ${deben("abono")} deben abono · ${deben("serv")} deben services`;
+  const est = (e, saldo, txtNo) => e === "pendiente" ? `<span class="misat-mal">Debe</span>${saldo ? " " + mcPesos(saldo) : ""}` : e === "al_dia" ? `<span class="misat-ok">${txtNo}</span>` : e === "sin" ? `<span style="color:#6B7680">No figura</span>` : "—";
+  const acc = { activa: '<span class="misat-ok">Activa</span>', pendiente: '<span style="color:#8A5A00;font-weight:700">Pendiente</span>', sin: '<span style="color:#6B7680">—</span>' };
+  document.getElementById("mcTabla").innerHTML = `<tr><th>N° cliente</th><th>Abonado</th><th>Cliente</th><th>Mi SAT</th><th>Abono</th><th>Services</th><th>Sistema</th><th></th></tr>`
+    + lista.slice(0, MAX).map((d) => `<tr><td><b>${misatEsc(d.c.numero_cliente)}</b></td><td>${misatEsc(d.c.numero_abonado || "")}</td><td>${misatEsc(d.c.nombre || "")}<br><small style="color:#6B7680">${misatEsc([d.c.direccion, d.c.localidad].filter(Boolean).join(", "))}</small></td><td>${acc[d.acceso]}${d.ultimo ? `<br><small style="color:#6B7680">Entró ${misatFecha(d.ultimo).split(",")[0]}</small>` : ""}</td><td>${est(d.abono, d.abonoSaldo, "Al día")}</td><td>${est(d.serv, d.servSaldo, "No debe")}</td><td>${misatEsc(mcSistema(d.ficha)) || '<span style="color:#6B7680">Sin cargar</span>'}</td><td><button type="button" class="btn-secondary-admin" style="width:auto;padding:4px 10px" data-mc-ficha="${misatEsc(d.c.numero_cliente)}">Editar datos</button></td></tr>`).join("")
+    + (lista.length > MAX ? `<tr><td colspan="8" class="subtitle">Mostrando ${MAX} de ${lista.length}: usá los filtros o descargá el Excel para ver todos.</td></tr>` : "");
+}
+["mcBuscar", "mcAcceso", "mcAbono", "mcServ", "mcFicha", "mcMonit"].forEach((id) => document.getElementById(id).addEventListener(id === "mcBuscar" ? "input" : "change", mcPintar));
+document.getElementById("mcLimpiar").addEventListener("click", () => { ["mcBuscar", "mcAcceso", "mcAbono", "mcServ", "mcFicha", "mcMonit"].forEach((id) => { document.getElementById(id).value = ""; }); mcPintar(); });
+document.getElementById("mcExcel").addEventListener("click", async () => {
+  if (typeof XLSX === "undefined") await new Promise((ok) => { const sc = document.createElement("script"); sc.src = "vendor/xlsx.full.min.js"; sc.onload = ok; document.head.appendChild(sc); });
+  const txt = { pendiente: "Debe", al_dia: "Al día", sin: "No figura", "": "" };
+  const filas = mcFiltrados().map((d) => ({ "N° cliente": d.c.numero_cliente, "N° abonado": d.c.numero_abonado || "", Cliente: d.c.nombre || "", "Dirección": [d.c.direccion, d.c.localidad].filter(Boolean).join(", "), "Teléfono": d.c.telefono || "",
+    "Mi SAT": { activa: "Activa", pendiente: "Pedido pendiente", sin: "" }[d.acceso], "Abono": txt[d.abono] || "", "Saldo abono": d.abonoSaldo || "", "Services": d.serv === "al_dia" ? "No debe" : txt[d.serv] || "", "Saldo services": d.servSaldo || "", "Sistema": mcSistema(d.ficha) }));
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filas), "Clientes");
+  XLSX.writeFile(wb, `clientes-mi-sat-${new Date().toISOString().slice(0, 10)}.xlsx`);
+});
+document.getElementById("mcTabla").addEventListener("click", (ev) => {
+  const b = ev.target.closest("[data-mc-ficha]"); if (!b) return;
+  const n = b.dataset.mcFicha;
+  document.querySelector('.misat-f[data-f="fichas"]').click();
+  document.getElementById("misatBuscar").value = n; document.getElementById("misatFichaFiltro").value = "todos";
+  setTimeout(() => { misatPintarFichas(); const e = [...document.querySelectorAll("#misatFichaLista [data-ficha]")].find((x) => x.dataset.ficha === n); if (e) e.click(); }, 400);
+});
 
 // ----- Estado de cuenta desde un Excel -----
 let misatHoja = null, misatArchivoNombre = "";
