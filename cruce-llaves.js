@@ -109,7 +109,9 @@
     if (/^(pb|plantabaja)$/.test(t)) t = "0";
     return t.replace(/^0+(?=\d)/, "");
   }
-  const claveUnidad = (piso, depto) => { const p = parteUnidad(piso), d = parteUnidad(depto); return p || d ? p + "|" + d : ""; };
+  // Depto con letra = número (A = 1, B = 2…), igual que el mapa del edificio.
+  const parteDepto = (v) => { const t = parteUnidad(v); return /^[a-z]$/.test(t) ? String(t.charCodeAt(0) - 96) : t; };
+  const claveUnidad = (piso, depto) => { const p = parteUnidad(piso), d = parteDepto(depto); return p || d ? p + "|" + d : ""; };
   const tel7 = (v) => { const d = String(v || "").replace(/\D/g, ""); return d.length >= 7 ? d.slice(-7) : ""; };
 
   // ---------- Cruce ----------

@@ -1171,8 +1171,21 @@
 
   // ---------- Mapa del edificio: pisos × deptos ----------
   let unidadSel = "";
-  const normPiso = (p) => { const t = String(p || "").trim().toUpperCase().replace(/[°º]/g, "").replace(/^PISO\s*/, "").trim(); return /^(PB|P\.?\s?B\.?|0|PLANTA BAJA)$/.test(t) ? "PB" : t; };
-  const normDepto = (u) => String(u || "").trim().toUpperCase().replace(/^(DEPTO|DPTO|DTO)\.?\s*/, "").trim();
+  // Un solo formato por piso y depto, escriba lo que escriba el vecino:
+  // piso "01", "1", "1er", "1°" → 1; "00", "0", "PB" → PB. Depto "A" → 1, "B" → 2…; "01" → 1.
+  const normPiso = (p) => {
+    const t = String(p || "").trim().toUpperCase().replace(/[°º.]/g, "").replace(/^PISO\s*/, "").replace(/\s+/g, " ").trim();
+    if (/^(PB|P B|PLANTA BAJA)$/.test(t)) return "PB";
+    const m = t.match(/^(\d+)\s*(ER|RO|DO|TO|MO|NO|VO|O)?$/);
+    if (m) return Number(m[1]) === 0 ? "PB" : String(Number(m[1]));
+    return t;
+  };
+  const normDepto = (u) => {
+    const t = String(u || "").trim().toUpperCase().replace(/^(DEPTO|DPTO|DTO|DEPARTAMENTO|UNIDAD)\.?\s*/, "").replace(/\s+/g, "").trim();
+    if (/^[A-Z]$/.test(t)) return String(t.charCodeAt(0) - 64);
+    if (/^\d+$/.test(t)) return String(Number(t));
+    return t;
+  };
   const valorPiso = (p) => (p === "PB" ? 0 : /^\d+$/.test(p) ? Number(p) : /^\d/.test(p) ? parseFloat(p) : -1);
   const abiertoG = (g) => g.estado === "pendiente" || g.estado === "en_curso";
   function armarUnidades() {
@@ -1267,7 +1280,7 @@
 
   function unidadTxt(r) {
     const p = [];
-    if (r.piso || r.unidad) p.push(`${r.piso ? r.piso + "°" : ""} ${r.unidad || ""}`.trim());
+    if (r.piso || r.unidad) { const np = r.piso ? normPiso(r.piso) : ""; p.push(`${np ? (np === "PB" ? "PB" : np + "°") : ""} ${r.unidad ? normDepto(r.unidad) : ""}`.trim()); }
     if (r.cochera) p.push("Cochera " + r.cochera);
     return p.join(" · ") || (r.tipo === "cochera" ? "Cochera" : "—");
   }
