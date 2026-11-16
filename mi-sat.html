@@ -277,6 +277,8 @@
   .cuenta b { display: block; font-size: 15px; } .cuenta small { display: block; font-size: 12.5px; opacity: .8; }
   .cuenta.ok { background: #E6F4EA; color: #1B5E2C; } .cuenta.ok .hx { background: #2E7D32; color: #fff; }
   .cuenta.debe { background: #FFF4DB; color: #6B4A00; } .cuenta.debe .hx { background: var(--amber); color: #16151A; }
+  .cuenta-lista { list-style: none; margin: 4px 0 2px; padding: 0; font-size: 13px; font-weight: 600; }
+  .cuenta-lista li::before { content: "✓ "; } .cuenta-lista li.d::before { content: "• "; }
   .cuenta .mini { text-decoration: none; white-space: nowrap; }
   a.tuya { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; text-decoration: none; color: inherit; background: var(--ink, #16151A); color: #fff; }
   a.tuya .hx { background: var(--amber); color: #16151A; width: 42px; height: 42px; }
@@ -545,10 +547,17 @@
     }
     const guiaOk = f && ["paradox", "dsc", "ajax"].includes(f.alarma_marca);
     $("#gTuya").innerHTML = guiaOk ? `<a class="tarjeta tuya" href="/guia-alarmas.html?marca=${f.alarma_marca}${f.teclado ? "&teclado=" + f.teclado : ""}"><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h4"/></svg></span><span><small>Tu alarma</small><b>${esc(f.alarma_marca_txt)}${f.teclado_txt ? " · " + esc(f.teclado_txt) : ""}</b><em>Ver la guía de tu teclado</em></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></a>` : "";
-    const c = d.cuenta;
-    $("#pCuenta").innerHTML = !c ? "" : c.al_dia
-      ? `<div class="cuenta ok"><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span><b>Tu cuenta está al día</b><small>Actualizado al ${fecha(c.actualizado)}</small></span></div>`
-      : `<div class="cuenta debe"><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h4"/></svg></span><span><b>Tenés pagos pendientes${c.importe ? ": " + pesos(c.importe) : ""}</b><small>Actualizado al ${fecha(c.actualizado)}. Si ya pagaste, no tengas en cuenta este aviso.</small></span><a class="mini" href="${WA}?text=${encodeURIComponent("Hola SAT, quiero consultar por mi cuenta (cliente N° " + d.numero_cliente + ").")}" target="_blank" rel="noopener">Consultar</a></div>`;
+    // Estado de cuenta: abono mensual y services/presupuestos (dos archivos que sube la oficina).
+    const c = d.cuenta, sv = d.servicios_deuda;
+    const items = [];
+    if (c) items.push({ debe: !c.al_dia, txt: c.al_dia ? "Abono mensual al día" : "Abono mensual pendiente" + (c.importe ? ": " + pesos(c.importe) : ""), act: c.actualizado });
+    if (sv) items.push({ debe: !sv.al_dia, txt: sv.al_dia ? "Sin deuda de services ni presupuestos" : "Services o presupuestos pendientes" + (sv.importe ? ": " + pesos(sv.importe) : ""), act: sv.actualizado });
+    const debe = items.some((i) => i.debe);
+    const actual = items.map((i) => i.act).filter(Boolean).sort().pop();
+    const lineas = items.length > 1 ? `<ul class="cuenta-lista">${items.map((i) => `<li class="${i.debe ? "d" : "o"}">${esc(i.txt)}</li>`).join("")}</ul>` : "";
+    $("#pCuenta").innerHTML = !items.length ? "" : !debe
+      ? `<div class="cuenta ok"><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span><b>Tu cuenta está al día</b>${lineas}<small>Actualizado al ${fecha(actual)}</small></span></div>`
+      : `<div class="cuenta debe"><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h4"/></svg></span><span><b>${items.length === 1 ? esc(items[0].txt) : "Tenés pagos pendientes"}</b>${lineas}<small>Actualizado al ${fecha(actual)}. Si ya pagaste, no tengas en cuenta este aviso.</small></span><a class="mini" href="${WA}?text=${encodeURIComponent("Hola SAT, quiero consultar por mi cuenta (cliente N° " + d.numero_cliente + ").")}" target="_blank" rel="noopener">Consultar</a></div>`;
     if (d.ultima_visita) sis.push(`<li><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-2.5z"/></svg></span><div><b>Última visita técnica</b><small>${fecha(d.ultima_visita)}</small></div></li>`);
     $("#lSistema").innerHTML = sis.join("");
     const vacio = `<li class="vacio">Todavía no hay services cargados desde que usamos el sistema nuevo (julio 2026).</li>`;

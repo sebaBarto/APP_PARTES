@@ -365,12 +365,17 @@
   .misat-ok { color: #1B7F3B; font-weight: 700; } .misat-mal { color: #B3261E; font-weight: 700; }
   .misat-acc { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
   .misat-acc button { width: auto; }
+  .misat-tipos { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
+  .misat-tipo { text-align: left; border: 1.5px solid rgba(16,24,32,.15); background: #fff; color: #101820; border-radius: 12px; padding: 10px 12px; font: inherit; cursor: pointer; display: grid; gap: 2px; }
+  .misat-tipo small { color: #6B7680; font-size: 12.5px; } .misat-tipo.on { border-color: #101820; box-shadow: 0 0 0 2px #F6B828; }
+  .misat-res { font-size: 12.5px; color: #1B7F3B; font-weight: 600; } .misat-res:empty { display: none; }
   .misat-sep { width: 1px; background: rgba(16,24,32,.15); margin: 0 4px; }
   .misat-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
   .misat-cols label, .misat-form label { display: grid; gap: 4px; font-size: 13px; color: #6B7680; }
   .misat-cols select, .misat-cols input, .misat-form select, .misat-form input, .misat-form textarea { font: inherit; font-size: 14px; padding: 7px 9px; border: 1px solid rgba(16,24,32,.2); border-radius: 8px; background: #fff; color: #101820; }
   .misat-chk, .misat-form label.misat-chk { display: flex; gap: 8px; align-items: center; font-size: 14px; color: #101820; }
   .misat-chk input { width: auto; }
+  .misat-chk[hidden] { display: none; }
   .misat-tabla { border-collapse: collapse; width: 100%; font-size: 13px; }
   .misat-tabla th, .misat-tabla td { border-bottom: 1px solid rgba(16,24,32,.08); padding: 5px 8px; text-align: left; }
   .misat-fila-cli { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 8px 2px; border-bottom: 1px solid rgba(16,24,32,.07); font-size: 14px; }
@@ -2403,8 +2408,12 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
       <div id="misatEstado" class="hidden">
         <div class="misat-card">
           <h3>Estado de cuenta de los clientes</h3>
-          <p class="subtitle" style="margin:0">Subí el Excel (o CSV) de la oficina con los clientes y si pagaron o deben. El portal le muestra a cada cliente «Tu cuenta está al día» o «Tenés pagos pendientes». Cada archivo nuevo reemplaza al anterior.</p>
-          <p id="misatEstadoActual" class="subtitle" style="margin:0"></p>
+          <p class="subtitle" style="margin:0">Hay dos archivos, y cada uno nuevo reemplaza al anterior del mismo tipo. El cliente ve en el portal si tiene algo pendiente de cada uno.</p>
+          <div class="misat-tipos">
+            <button type="button" class="misat-tipo on" data-tipo="abono"><b>1 · Abono mensual</b><small>Listado de cargos mensuales</small><span id="misatResAbono" class="misat-res"></span></button>
+            <button type="button" class="misat-tipo" data-tipo="servicios"><b>2 · Services y presupuestos</b><small>Deuda de services o presupuestos. Los que no figuran no deben nada.</small><span id="misatResServ" class="misat-res"></span></button>
+          </div>
+          <p id="misatEstadoActual" class="subtitle" style="margin:0;font-weight:600"></p>
           <input type="file" id="misatArchivo" accept=".xlsx,.xls,.csv">
           <div id="misatMapeo" class="hidden">
             <div class="misat-cols">
@@ -2413,8 +2422,8 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
               <label>Columna del estado (pagó / debe)<select id="misatColEst"></select></label>
               <label>Columna del saldo o importe adeudado<select id="misatColSaldo"></select></label>
             </div>
-            <p class="subtitle" style="margin:0">Cómo se calcula: si la columna de estado dice «pagado», «al día» u «ok», está al día; si dice «debe», «pendiente», «impago» o «vencido», debe. Si no hay estado (o no se entiende), se usa el saldo: mayor a cero, debe.</p>
-            <label class="misat-chk"><input type="checkbox" id="misatNoFiguran"> Los clientes que no están en el archivo están al día (marcalo si la lista trae solo a los que deben)</label>
+            <p class="subtitle" style="margin:0">Cómo se calcula: si la columna de estado dice «pagado», «al día» u «ok», está al día; si dice «debe», «pendiente», «impago» o «vencido», debe. Si no hay estado (o no se entiende), se usa el saldo: mayor a cero, debe. En el archivo de services y presupuestos, si no hay ni estado ni saldo, todos los que figuran deben.</p>
+            <label class="misat-chk" id="misatNoFiguranFila"><input type="checkbox" id="misatNoFiguran"> Los clientes que no están en el archivo están al día (marcalo si la lista trae solo a los que deben)</label>
             <label class="misat-chk"><input type="checkbox" id="misatImporte"> Mostrarle el importe adeudado al cliente</label>
             <p id="misatResumen" class="subtitle" style="margin:0;font-weight:600"></p>
             <div id="misatPrevia" style="overflow:auto;max-height:320px"></div>
@@ -13660,6 +13669,7 @@ function misatNumero(v) {
   let t = String(v == null ? "" : v).replace(/[^0-9,.\-]/g, "");
   if (!t) return null;
   if (t.includes(",") && t.lastIndexOf(",") > t.lastIndexOf(".")) t = t.replace(/\./g, "").replace(",", ".");
+  else if (/^-?\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, ""); // 15.000 = quince mil
   else t = t.replace(/,/g, "");
   const n = parseFloat(t); return Number.isFinite(n) ? n : null;
 }
@@ -13672,14 +13682,26 @@ function misatClasificar(estadoTxt, saldo) {
   if (saldo != null) return saldo > 0.009 ? "pendiente" : "al_dia";
   return "";
 }
+let misatTipoCuenta = "abono";
 async function misatCargarEstado() {
   const el = document.getElementById("misatEstadoActual"); el.textContent = "Cargando…";
+  const nom = { abono: "abono mensual", servicios: "services y presupuestos" };
   try {
-    const r = await fetch("/api/datos?coleccion=mi_sat&estado_cuenta=1", { headers: rllHeaders(), cache: "no-store" });
-    const d = await r.json(); if (!r.ok) throw new Error(d.error || "Error");
-    el.textContent = d ? `Último archivo: ${d.archivo || "—"} · cargado el ${misatFecha(d.actualizado_en)} por ${d.actualizado_por} · ${d.total} clientes (${d.pendientes} con pagos pendientes)${d.no_figuran_al_dia ? " · los que no figuran, al día" : ""}${d.mostrar_importe ? " · se muestra el importe" : ""}.` : "Todavía no se cargó ningún archivo: los clientes no ven nada sobre su cuenta.";
+    const [ra, rs] = await Promise.all(["abono", "servicios"].map((t) => fetch(`/api/datos?coleccion=mi_sat&estado_cuenta=1&tipo=${t}`, { headers: rllHeaders(), cache: "no-store" }).then((r) => r.json())));
+    const res = { abono: ra, servicios: rs };
+    document.getElementById("misatResAbono").textContent = ra ? `Cargado el ${misatFecha(ra.actualizado_en)} · ${ra.pendientes} deben` : "Sin cargar";
+    document.getElementById("misatResServ").textContent = rs ? `Cargado el ${misatFecha(rs.actualizado_en)} · ${rs.pendientes} deben` : "Sin cargar";
+    const d = res[misatTipoCuenta];
+    el.textContent = d ? `Último archivo de ${nom[misatTipoCuenta]}: ${d.archivo || "—"} · cargado el ${misatFecha(d.actualizado_en)} por ${d.actualizado_por} · ${d.total} clientes (${d.pendientes} con pagos pendientes)${misatTipoCuenta === "abono" && d.no_figuran_al_dia ? " · los que no figuran, al día" : ""}${d.mostrar_importe ? " · se muestra el importe" : ""}.` : `Todavía no se cargó ningún archivo de ${nom[misatTipoCuenta]}: los clientes no ven nada sobre eso.`;
   } catch (e) { el.textContent = "No se pudo leer: " + e.message; }
 }
+document.querySelectorAll(".misat-tipo").forEach((b) => b.addEventListener("click", () => {
+  misatTipoCuenta = b.dataset.tipo;
+  document.querySelectorAll(".misat-tipo").forEach((x) => x.classList.toggle("on", x === b));
+  document.getElementById("misatNoFiguranFila").hidden = misatTipoCuenta === "servicios";
+  document.getElementById("misatMapeo").classList.add("hidden"); document.getElementById("misatArchivo").value = ""; misatHoja = null;
+  misatCargarEstado();
+}));
 document.getElementById("misatArchivo").addEventListener("change", async (ev) => {
   const f = ev.target.files[0]; if (!f) return;
   misatArchivoNombre = f.name;
@@ -13745,7 +13767,7 @@ function misatFilasCalculadas() {
       if (!numero_cliente) problema = "Sin número";
     }
     const nombreArchivo = misatHoja.colNombre >= 0 ? String(r[misatHoja.colNombre] || "").trim() : "";
-    return { original: mostrado + (nombreArchivo ? " · " + nombreArchivo : ""), numero_cliente, nombre: cliente ? cliente.nombre : "", estado_txt: ce >= 0 ? String(r[ce]) : "", saldo, estado: misatClasificar(ce >= 0 ? r[ce] : "", saldo), problema };
+    return { original: mostrado + (nombreArchivo ? " · " + nombreArchivo : ""), numero_cliente, nombre: cliente ? cliente.nombre : "", estado_txt: ce >= 0 ? String(r[ce]) : "", saldo, estado: misatClasificar(ce >= 0 ? r[ce] : "", saldo) || (misatTipoCuenta === "servicios" && ce < 0 && cs < 0 ? "pendiente" : ""), problema };
   }).filter((f) => f.original);
   return filas;
 }
@@ -13775,10 +13797,11 @@ function misatPrevisualizar() {
 document.getElementById("misatGuardarEstado").addEventListener("click", async (ev) => {
   const filas = misatPorCliente(misatFilasCalculadas());
   if (!filas.length) { alert("No hay filas para guardar: revisá las columnas elegidas."); return; }
-  if (!(await confirmarAdmin(`¿Guardar el estado de cuenta de ${filas.length} clientes? Reemplaza al archivo anterior.`))) return;
+  const deben = filas.filter((f) => f.estado === "pendiente").length;
+  if (!(await confirmarAdmin(misatTipoCuenta === "servicios" ? `¿Guardar la deuda de services y presupuestos? ${deben} clientes van a ver que deben; todos los demás, que no deben nada. Reemplaza al archivo anterior.` : `¿Guardar el estado del abono de ${filas.length} clientes? Reemplaza al archivo anterior.`))) return;
   ev.target.disabled = true;
   try {
-    const r = await fetch("/api/datos?coleccion=mi_sat", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "cargar_estado_cuenta", archivo: misatArchivoNombre, filas, no_figuran_al_dia: document.getElementById("misatNoFiguran").checked, mostrar_importe: document.getElementById("misatImporte").checked }) });
+    const r = await fetch("/api/datos?coleccion=mi_sat", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "cargar_estado_cuenta", tipo: misatTipoCuenta, archivo: misatArchivoNombre, filas, no_figuran_al_dia: document.getElementById("misatNoFiguran").checked, mostrar_importe: document.getElementById("misatImporte").checked }) });
     const d = await r.json(); if (!r.ok) throw new Error(d.error || "Error");
     avisoAdmin(`Listo: se guardó el estado de cuenta de ${d.total} clientes.`);
     document.getElementById("misatMapeo").classList.add("hidden"); document.getElementById("misatArchivo").value = ""; misatHoja = null;
