@@ -11,7 +11,7 @@ export const config = {
   matcher: "/:path*",
 };
 
-const PUBLICAS = ["/solicitar-servicio.html", "/registro-llaves.html", "/robo-llave.html", "/consorcio.html"];
+const PUBLICAS = ["/solicitar-servicio.html", "/registro-llaves.html", "/robo-llave.html", "/consorcio.html", "/mi-sat.html", "/guia-alarmas.html"];
 
 export default function middleware(request) {
   const host = request.headers.get("host") || "";
@@ -26,6 +26,11 @@ export default function middleware(request) {
   // pasar sin tocarlo — si no, hasta el logo del formulario se
   // redirige a sí mismo en vez de cargar la imagen real.
   // Dirección corta para denunciar una llave robada o perdida (está impresa en el cartel del hall).
+  // Portal de clientes Mi SAT ("Ingreso clientes" de la web).
+  if (path === "/oficina" || path === "/oficina/") {
+    url.pathname = "/mi-sat.html";
+    return Response.redirect(url, 302);
+  }
   if (path === "/robo" || path === "/robo/") {
     url.pathname = "/robo-llave.html";
     return Response.redirect(url, 302);

@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guía rápida de tu alarma Paradox — SAT</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:ital,wght@0,600;0,700;0,800;1,800&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #121114; --head: #26252B; --paper: #F5F3EE; --card: #fff;
+    --text: #16151A; --text-2: #4A4842; --muted: #6B6860; --line: #E4E0D6; --line-2: #ECE9E1;
+    --amber: #F6B828; --amber-dark: #7A5300; --amber-soft: #FFF3D1;
+    --ok: #0F6E63; --ok-soft: #E2F1EE; --rojo: #B42318; --rojo-soft: #FDE7E4; --azul: #2348C8; --azul-soft: #E4ECFF;
+    --cond: 'Barlow Semi Condensed', 'Barlow', sans-serif; --mono: 'IBM Plex Mono', monospace;
+    --sh: 0 1px 2px rgba(18,17,20,.05), 0 12px 28px -18px rgba(18,17,20,.4);
+    --hex: polygon(25% 3%, 75% 3%, 100% 50%, 75% 97%, 25% 97%, 0 50%);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: 'Barlow', system-ui, sans-serif; background: var(--paper); color: var(--text); font-size: 16px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+  button { font: inherit; cursor: pointer; color: inherit; }
+  .barra { background: var(--head); color: #fff; }
+  .barra-in { max-width: 1100px; margin: 0 auto; padding: 12px 18px; display: flex; align-items: center; gap: 12px; }
+  .barra img { height: 28px; } .barra .sep { width: 1px; height: 20px; background: #4A4950; }
+  .barra .sec { font-family: var(--cond); font-weight: 600; letter-spacing: 1.4px; text-transform: uppercase; font-size: 12.5px; color: #B9B6AC; }
+  .hero { background: var(--head); color: #fff; padding: 8px 18px 70px; position: relative; overflow: hidden; }
+  .hero::after { content: ""; position: absolute; right: -80px; top: -80px; width: 320px; height: 320px; background: radial-gradient(circle, rgba(246,184,40,.2), rgba(246,184,40,0) 70%); }
+  .hero-in { max-width: 1100px; margin: 0 auto; position: relative; z-index: 1; }
+  .eyebrow { font-family: var(--cond); font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; font-size: 13px; color: var(--amber); }
+  .hero h1 { font-family: var(--cond); font-weight: 800; font-style: italic; text-transform: uppercase; font-size: clamp(32px, 7vw, 46px); line-height: .96; margin: 8px 0 10px; }
+  .hero h1 em { color: var(--amber); }
+  .hero p { margin: 0; color: #C9C6BC; max-width: 560px; }
+  .selector { display: inline-flex; margin-top: 18px; background: rgba(255,255,255,.08); border-radius: 999px; padding: 4px; gap: 4px; }
+  .selector button { border: 0; background: none; color: #D9D6CC; padding: 9px 16px; border-radius: 999px; font-weight: 700; font-size: 14.5px; }
+  .selector button.on { background: var(--amber); color: var(--ink); }
+  .selector.marca { margin: 0 0 14px; display: flex; width: max-content; }
+  .selector.marca button { font-family: var(--cond); font-size: 16px; letter-spacing: .6px; padding: 7px 20px; }
+  .selector.marca button.on { background: #fff; }
+  .rkz .tecla, .pk .tecla { transition: transform .08s; transform-box: fill-box; }
+  .rkz .tecla.apretada, .pk .tecla.apretada { transform: translateY(2.2px); }
+  .rkz .tecla.apretada .cara, .pk .tecla.apretada .cara { filter: brightness(.86); }
+  .rkz .tecla.sostener .aro, .pk .tecla.sostener .cara { stroke: #F6B828; stroke-width: 3; }
+  .rled.v { fill: #2BD15A; filter: drop-shadow(0 0 3px #2BD15A); } .rled.r { fill: #FF3B42; filter: drop-shadow(0 0 3px #FF3B42); } .rled.a { fill: #F6B828; filter: drop-shadow(0 0 3px #F6B828); }
+  .rled.tit, .pkst.tit, .pkw.tit { animation: parpadeo .6s steps(1) infinite; }
+  #pkOk.on { stroke: #2BD15A; } #pkLock.on { fill: #E53940; } #pkLock.on path { stroke: #E53940; } #pkTri.on { fill: #F0A81E; } #pkCA.on circle, #pkCA.on path { stroke: #2C9A3A; }
+  .pkw { opacity: .1; transition: opacity .2s; } .pkw.on { opacity: 1; }
+  .cmb .tecla.apretada .cara, .ts .tecla.apretada .cara { fill: #F6B828; fill-opacity: .28; }
+  .ts .tecla.apretada .cara[fill="#2BD15A"], .ts .tecla.apretada .cara[fill="#C72B33"], .ts .tecla.apretada .cara[fill="#F6B828"] { filter: brightness(1.25); }
+  .pk .tecla.apretada .cara { filter: brightness(.86); }
+  .cled { transition: fill .2s; } .cind.on .cled { fill: #2BD15A; filter: drop-shadow(0 0 3px #2BD15A); } #cmbFallo.on .cled { fill: #FF3B42; filter: drop-shadow(0 0 3px #FF3B42); }
+  #cmbMarco.alarma { stroke-width: 4; filter: drop-shadow(0 0 8px #FF3B42); animation: parpadeo .5s steps(1) infinite; }
+  #cmbLector.on { color: #2BB24C; }
+  .tsscr { display: none; } .tsscr.on { display: inline; }
+  #tsLogo { color: #8D939B; transition: color .2s; } #tsLogo.on { color: #E53940; filter: drop-shadow(0 0 5px rgba(229,57,64,.7)); }
+  .tsdot.on { fill: #1E2228; stroke: #1E2228; }
+  .seg { fill: #173F17; } .seg.off { fill: #173F17; opacity: .08; }
+
+  .cuerpo { max-width: 1100px; margin: -48px auto 0; padding: 0 14px 40px; display: grid; gap: 16px; position: relative; z-index: 2; }
+  @media (min-width: 900px) { .cuerpo { grid-template-columns: 420px 1fr; align-items: start; } .visor { position: sticky; top: 14px; } }
+
+  /* ---------- visor con el teclado ---------- */
+  .visor { background: #1C1B20; border-radius: 24px; padding: 18px 18px 16px; box-shadow: 0 30px 60px -28px rgba(0,0,0,.7); color: #fff; }
+  .visor-tit { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 12px; }
+  .visor-tit b { font-family: var(--cond); font-size: 20px; }
+  .visor-tit small { color: #9C998F; font-size: 12.5px; }
+  .teclado { width: 100%; max-width: 330px; margin: 0 auto; background: linear-gradient(180deg, #F2F1EE, #DEDCD6); border-radius: 22px; padding: 16px 16px 18px; box-shadow: inset 0 1px 0 #fff, 0 18px 30px -16px rgba(0,0,0,.7); position: relative; }
+  .tk-marca { text-align: center; font-family: var(--cond); font-weight: 700; letter-spacing: 3px; font-size: 11px; color: #77746C; margin-bottom: 10px; }
+  .lcd { background: #9DB58A; border-radius: 8px; height: 62px; padding: 8px 12px; font-family: var(--mono); font-size: 14px; line-height: 1.35; color: #1D2A17; box-shadow: inset 0 2px 6px rgba(0,0,0,.35); margin-bottom: 12px; white-space: pre; overflow: hidden; position: relative; }
+  .lcd.luz { background: #B9D69F; }
+  .leds { display: flex; justify-content: center; gap: 18px; margin-bottom: 14px; }
+  .led { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 700; color: #6B6860; letter-spacing: .4px; }
+  .led i { width: 12px; height: 12px; border-radius: 50%; background: #BDB9AF; box-shadow: inset 0 1px 2px rgba(0,0,0,.3); }
+  .led.verde.on i { background: #2BD15A; box-shadow: 0 0 10px #2BD15A; }
+  .led.rojo.on i { background: #FF3B42; box-shadow: 0 0 10px #FF3B42; }
+  .led.amb.on i { background: #F6B828; box-shadow: 0 0 10px #F6B828; }
+  .led.tit i { animation: titila .5s steps(1) infinite; }
+  @keyframes titila { 50% { background: #BDB9AF; box-shadow: none; } }
+  .teclas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) 8px repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .tecla[data-k=CLEAR], .tecla[data-k=ENTER] { font-size: 10.5px; letter-spacing: 0; }
+  .tecla { position: relative; height: 40px; border-radius: 10px; border: 0; background: linear-gradient(180deg, #FFFFFF, #E9E7E1); box-shadow: 0 3px 0 #B9B5AB, 0 4px 8px -2px rgba(0,0,0,.25); font-family: var(--cond); font-weight: 700; font-size: 17px; color: #26252B; display: grid; place-items: center; transition: transform .08s, box-shadow .08s; }
+  .tecla.fn { font-size: 11px; letter-spacing: .5px; background: linear-gradient(180deg, #3B3A42, #26252B); color: #fff; box-shadow: 0 3px 0 #0E0D10, 0 4px 8px -2px rgba(0,0,0,.35); }
+  .tecla .zled { position: absolute; top: 5px; right: 6px; width: 6px; height: 6px; border-radius: 50%; background: transparent; }
+  .k10 .tecla .zled { background: #D3CFC5; }
+  .teclado:not(.k10) .tecla:not(.fn) .zled { display: none; }
+  .tecla .zled.on { background: #FF3B42; box-shadow: 0 0 7px #FF3B42; }
+  .tecla .zled.flash { background: #FF3B42; box-shadow: 0 0 7px #FF3B42; animation: titila .45s steps(1) infinite; }
+  .tecla.fn .zled.on, .tecla.fn .zled.flash { background: #F6B828; box-shadow: 0 0 7px #F6B828; }
+  .tecla.apretada { transform: translateY(3px); box-shadow: 0 0 0 #B9B5AB, 0 0 0 transparent; }
+  .tecla.fn.apretada { box-shadow: 0 0 0 #0E0D10; }
+  .tecla.marca::after { content: ""; position: absolute; inset: -5px; border-radius: 13px; border: 3px solid var(--amber); animation: marca 1s ease-out infinite; }
+  @keyframes marca { 0% { opacity: 1; transform: scale(.94); } 100% { opacity: 0; transform: scale(1.12); } }
+  .tecla.sostener::after { content: ""; position: absolute; inset: -5px; border-radius: 13px; border: 3px solid var(--amber); }
+  .tecla .prog { width: 16px; height: 12px; border: 2px solid #fff; border-radius: 3px; position: relative; }
+  .tecla .prog::after { content: ""; position: absolute; left: 2px; right: 2px; top: 3px; height: 2px; background: #fff; box-shadow: 0 3px 0 #fff; }
+  .hueco { visibility: hidden; }
+  .tk-wrap { position: relative; max-width: 330px; margin: 0 auto; }
+  #tecLCD svg, #tecK10 svg, #tecRKZ svg, #tecPK svg, #tecTS svg, #tecCMB svg { width: 100%; height: auto; display: block; }
+  .k10h .tecla { transition: transform .08s; transform-box: fill-box; }
+  .k10h .tecla.apretada { transform: translateY(2.4px); }
+  .k10h .tecla.apretada .cara { fill: #CFD0CB; }
+  .k10h .tecla.sostener .cara { stroke: #F6B828; stroke-width: 2.6; }
+  .k10h .tecla.z-on .cara, .k10h .tecla.z-flash .cara { fill: url(#hRojo); stroke: #E0283C; }
+  .k10h .tecla.z-on .halo, .k10h .tecla.z-flash .halo { opacity: 1; }
+  .k10h .tecla.z-on .et, .k10h .tecla.z-flash .et { fill: #fff; }
+  .k10h .tecla.z-on .brillo, .k10h .tecla.z-flash .brillo { opacity: .25; }
+  .k10h .tecla.z-flash .cara, .k10h .tecla.z-flash .halo { animation: parpadeo .5s steps(1) infinite; }
+  .k10h .tecla.f-on .verde, .k10h .tecla.f-flash .verde { opacity: 1; }
+  .k10h .tecla.f-flash .verde { animation: parpadeo .5s steps(1) infinite; }
+  @keyframes parpadeo { 50% { opacity: .2; } }
+  .hled { transition: fill .2s; }
+  .hled.rojo { fill: #FF3B42; filter: drop-shadow(0 0 3px #FF3B42); }
+  .hled.verdeL { fill: #2BD15A; filter: drop-shadow(0 0 3px #2BD15A); }
+  .hled.tit { animation: parpadeo .6s steps(1) infinite; }
+  .k32 .tecla { transition: transform .08s; transform-box: fill-box; }
+  .k32 .tecla.apretada { transform: translateY(2.2px); }
+  .k32 .tecla.apretada .cara { fill: #ADA690; }
+  .k32 .tecla.sostener .cara { stroke: #F6B828; stroke-width: 2.4; }
+  .kled-ca { animation: none; }
+  .dedo { position: absolute; width: 34px; height: 34px; border-radius: 50%; background: rgba(246,184,40,.45); border: 2px solid var(--amber); pointer-events: none; opacity: 0; transition: left .35s cubic-bezier(.2,.8,.2,1), top .35s cubic-bezier(.2,.8,.2,1), opacity .2s; z-index: 3; }
+  .bip { position: absolute; right: -6px; top: -12px; background: var(--ok); color: #fff; font-weight: 700; font-size: 12.5px; border-radius: 999px; padding: 4px 10px; opacity: 0; transform: translateY(6px); transition: opacity .2s, transform .2s; }
+  .bip.on { opacity: 1; transform: none; } .bip.mal { background: var(--rojo); }
+  .subt { margin: 16px 0 0; min-height: 64px; background: rgba(255,255,255,.06); border-radius: 14px; padding: 12px 14px; display: flex; gap: 12px; align-items: center; }
+  .subt .n { width: 30px; height: 30px; clip-path: var(--hex); background: var(--amber); color: var(--ink); display: grid; place-items: center; font-family: var(--cond); font-weight: 800; flex: none; }
+  .subt p { margin: 0; font-size: 15px; }
+  .controles { display: flex; gap: 8px; margin-top: 12px; }
+  .controles button { flex: 1; border: 1px solid #3A3940; background: none; color: #D9D6CC; border-radius: 12px; padding: 9px; font-weight: 600; font-size: 14px; }
+  .controles button.prim { background: var(--amber); border-color: var(--amber); color: var(--ink); }
+
+  /* ---------- lista de funciones ---------- */
+  .grupo-tit { font-family: var(--cond); font-weight: 700; font-size: 13px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--muted); margin: 6px 4px 0; }
+  .funciones { display: grid; gap: 10px; }
+  .fun { background: var(--card); border-radius: 18px; box-shadow: var(--sh); border: 2px solid transparent; transition: border-color .2s; overflow: hidden; }
+  .fun.activa { border-color: var(--amber); }
+  .fun-cab { width: 100%; border: 0; background: none; text-align: left; padding: 14px 16px; display: flex; gap: 12px; align-items: center; }
+  .fun-cab .hx { width: 42px; height: 42px; clip-path: var(--hex); background: var(--ink); color: var(--amber); display: grid; place-items: center; flex: none; }
+  .fun-cab .hx svg { width: 21px; height: 21px; }
+  .fun-cab b { display: block; font-size: 16.5px; }
+  .fun-cab small { display: block; color: var(--muted); font-size: 13.5px; }
+  .fun-cab .play { margin-left: auto; flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--amber-soft); color: var(--amber-dark); display: grid; place-items: center; }
+  .fun-cab .play svg { width: 15px; height: 15px; }
+  .fun.activa .play { background: var(--amber); color: var(--ink); }
+  .pasos { display: none; list-style: none; margin: 0; padding: 0 16px 16px 70px; counter-reset: p; }
+  .fun.activa .pasos { display: block; }
+  .pasos li { position: relative; padding: 6px 0 6px 0; font-size: 15px; color: var(--text-2); counter-increment: p; transition: color .2s; }
+  .pasos li::before { content: counter(p); position: absolute; left: -30px; top: 6px; width: 22px; height: 22px; border-radius: 50%; background: var(--line-2); color: var(--muted); display: grid; place-items: center; font-size: 12px; font-weight: 700; transition: background .2s, color .2s; }
+  .pasos li.ahora { color: var(--text); font-weight: 600; } .pasos li.ahora::before { background: var(--amber); color: var(--ink); }
+  .pasos li.hecho::before { background: var(--ok); color: #fff; content: "✓"; }
+  .k { display: inline-block; font-family: var(--cond); font-weight: 700; font-size: 13px; letter-spacing: .4px; background: var(--ink); color: #fff; border-radius: 6px; padding: 1px 7px; margin: 0 1px; }
+  .k.num { background: #fff; color: var(--ink); border: 1px solid var(--line); }
+  .nota { margin: 0 16px 14px 70px; padding: 9px 12px; border-radius: 10px; background: var(--amber-soft); color: #5C4000; font-size: 13.5px; display: none; }
+  .fun.activa .nota { display: block; }
+  .problemas { display: none; margin: 0 16px 16px 70px; grid-template-columns: 1fr; gap: 6px; }
+  .fun.activa .problemas { display: grid; }
+  .problemas div { display: flex; gap: 10px; align-items: center; font-size: 14px; background: var(--paper); border-radius: 10px; padding: 6px 10px; }
+  .intro-fun { display: none; margin: 0 16px 10px 70px; padding: 10px 12px; border-radius: 12px; background: var(--paper); color: var(--text-2); font-size: 14.5px; line-height: 1.5; border-left: 3px solid var(--amber); }
+  .fun.activa .intro-fun { display: block; }
+  .problemas span small { display: block; color: var(--muted); font-size: 12.5px; }
+  .problemas b.larga { width: auto; clip-path: none; border-radius: 6px; padding: 0 6px; font-size: 11px; }
+  .problemas b { font-family: var(--cond); font-size: 15px; width: 26px; height: 26px; clip-path: var(--hex); background: var(--ink); color: var(--amber); display: grid; place-items: center; flex: none; }
+  .aviso { background: var(--card); border-radius: 18px; padding: 16px; box-shadow: var(--sh); display: flex; gap: 12px; align-items: flex-start; font-size: 14.5px; color: var(--text-2); }
+  .aviso svg { width: 22px; height: 22px; color: var(--amber-dark); flex: none; margin-top: 2px; }
+  .ayuda-sat { background: var(--ink); color: #fff; border-radius: 18px; padding: 16px; display: flex; gap: 14px; align-items: center; }
+  .ayuda-sat img { height: 26px; } .ayuda-sat b { display: block; } .ayuda-sat small { color: #B9B6AC; }
+  .ayuda-sat a { margin-left: auto; background: #1FA855; color: #fff; text-decoration: none; font-weight: 700; padding: 9px 14px; border-radius: 12px; font-size: 14px; white-space: nowrap; }
+  @media (prefers-reduced-motion: reduce) { *, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<header class="barra"><div class="barra-in"><img src="/icons/logo.png" alt="SAT"><span class="sep"></span><span class="sec">Guía de uso</span></div></header>
+<section class="hero"><div class="hero-in">
+  <div class="selector marca" role="tablist"><button class="on" data-marca="paradox" role="tab">Paradox</button><button data-marca="dsc" role="tab">DSC</button><button data-marca="ajax" role="tab">Ajax</button></div>
+  <span class="eyebrow" id="eyeMarca">Alarma Paradox</span>
+  <h1>Usá tu alarma <em>sin vueltas</em></h1>
+  <p>Elegí tu teclado y tocá una función: el teclado te muestra qué tocar, paso por paso.</p>
+  <div class="selector" id="selTec" role="tablist"></div>
+</div></section>
+
+<main class="cuerpo">
+  <section class="visor" aria-label="Animación del teclado">
+    <div class="visor-tit"><b id="vTit">Activar la alarma</b><small id="vTec">Teclado K32 LCD</small></div>
+    <div class="tk-wrap" id="tkWrap">
+    <div id="tecK10" hidden><svg class="k10h" viewBox="0 0 560 346" role="img" aria-label="Teclado Paradox K10H"><defs>
+<linearGradient id="hCuerpo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7F7F5"/><stop offset="1" stop-color="#E9E9E5"/></linearGradient>
+<linearGradient id="hTecla" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F1F2F0"/><stop offset="1" stop-color="#D9DAD6"/></linearGradient>
+<radialGradient id="hRojo" cx=".5" cy=".5" r=".6"><stop offset="0" stop-color="#FFF1F1"/><stop offset=".35" stop-color="#FF6B78"/><stop offset="1" stop-color="#E0283C"/></radialGradient>
+<radialGradient id="hRojoHalo"><stop offset="0" stop-color="#FF3550" stop-opacity=".55"/><stop offset="1" stop-color="#FF3550" stop-opacity="0"/></radialGradient>
+<filter id="hSom" x="-10%" y="-10%" width="120%" height="125%"><feDropShadow dx="0" dy="6" stdDeviation="7" flood-color="#000" flood-opacity=".3"/></filter>
+</defs><g filter="url(#hSom)"><rect x="8" y="8" width="544" height="330" rx="16" fill="url(#hCuerpo)"/></g><rect x="8.6" y="8.6" width="542.8" height="328.8" rx="15.4" fill="none" stroke="#fff" stroke-width="1.2"/><rect x="22" y="24" width="428" height="296" rx="10" fill="#FBFBFA" stroke="#E2E2DE" stroke-width="1"/><g class="tecla" data-k="prog"><ellipse class="halo" cx="62" cy="72" rx="42" ry="41" fill="url(#hRojoHalo)" opacity="0"/><rect x="37.0" y="57.6" width="50" height="34" rx="17.0" fill="#B9BAB5"/><rect class="cara" x="37.0" y="55.0" width="50" height="34" rx="17.0" fill="url(#hTecla)" stroke="#C9CAC5" stroke-width=".8"/><rect class="brillo" x="43.0" y="57.0" width="38" height="2.4" rx="1.2" fill="#fff" opacity=".8"/><rect class="verde" x="39.0" y="54.0" width="46" height="36" rx="17.0" fill="none" stroke="#7BE08A" stroke-width="2.2" opacity="0"/><g transform="translate(62 72)"><path d="M-5 -5.4 A7.4 7.4 0 1 0 5 -5.4" fill="none" stroke="#3B3A42" stroke-width="1.8" stroke-linecap="round"/><path d="M0 -9 v7.5" stroke="#3B3A42" stroke-width="1.8" stroke-linecap="round"/></g></g><g class="tecla" data-k="TBL"><ellipse class="halo" cx="62" cy="136" rx="42" ry="41" fill="url(#hRojoHalo)" opacity="0"/><rect x="37.0" y="121.6" width="50" height="34" rx="17.0" fill="#B9BAB5"/><rect class="cara" x="37.0" y="119.0" width="50" height="34" rx="17.0" fill="url(#hTecla)" stroke="#C9CAC5" stroke-width=".8"/><rect class="brillo" x="43.0" y="121.0" width="38" height="2.4" rx="1.2" fill="#fff" opacity=".8"/><rect class="verde" x="39.0" y="118.0" width="46" height="36" rx="17.0" fill="none" stroke="#7BE08A" stroke-width="2.2" opacity="0"/><text class="et" x="62" y="140.3" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="12" font-weight="700" fill="#3B3A42">FALLO</text></g><g class="tecla" data-k="MEM"><ellipse class="halo" cx="62" cy="200" rx="42" ry="41" fill="url(#hRojoHalo)" opacity="0"/><rect x="37.0" y="185.6" width="50" height="34" rx="17.0" fill="#B9BAB5"/><rect class="cara" x="37.0" y="183.0" width="50" height="34" rx="17.0" fill="url(#hTecla)" stroke="#C9CAC5" stroke-width=".8"/><rect class="brillo" x="43.0" y="185.0" width="38" height="2.4" rx="1.2" fill="#fff" opacity=".8"/><rect class="verde" x="39.0" y="182.0" width="46" height="36" rx="17.0" fill="none" stroke="#7BE08A" stroke-width="2.2" opacity="0"/><text class="et" x="62" y="204.3" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="12" font-weight="700" fill="#3B3A42">MEM</text></g><g class="tecla" data-k="BYP"><ellipse class="halo" cx="62" cy="264" rx="42" ry="41" fill="url(#hRojoHalo)" opacity="0"/><rect x="37.0" y="249.6" width="50" height="34" rx="17.0" fill="#B9BAB5"/><rect class="cara" x="37.0" y="247.0" width="50" height="34" rx="17.0" fill="url(#hTecla)" stroke="#C9CAC5" stroke-width=".8"/><rect class="brillo" x="43.0" y="249.0" width="38" height="2.4" rx="1.2" fill="#fff" opacity=".8"/><rect class="verde" x="39.0" y="246.0" width="46" height="36" rx="17.0" fill="none" stroke="#7BE08A" stroke-width="2.2" opacity="0"/><text class="et" x="62" y="268.3" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="12" font-weight="700" fill="#3B3A42">EXC</text></g><g class="tecla" data-k="1" data-zona="1"><ellipse class="halo" cx="150" cy="72" rx="60" ry="36" fill="url(#hRojoHalo)" opacity="0"/><rect x="115.0" y="59.6" width="70" height="30" rx="15.0" fill="#B9BAB5"/><rect class="cara" x="115.0" y="57.0" width="70" height="30" rx="15.0" fill="url(#hTecla)" stroke="#C9CAC5" stroke-width=".8"/><rect class="brillo" x="121.0" y="59.0" width="58" height="2.4" rx="1.2" fill="#fff" opacity=".8"/><rect class="verde" x="117.0" y="56.0" width="66" height="32" rx="15.0" fill="none" stroke="#7BE08A" stroke-width="2.2" opacity="0"/><text class="et" x="150" y="79.2" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="20" font-weight="700" fill="#3B3A42">1</text></g><g class="tecla" data-k="2" data-zona="2"><ellipse class="halo" cx="240" cy="72" rx="60" ry="36" fill="url(#hRojoHalo)" opacity="0"/><rect x="205.0" y="59.6" width="70" height="30" rx="15.0" fill="#B9BAB5"/><rect class="cara" x="205.0" y="57.0" width="70" height="30" rx="15.0" fill="url(#hTecla)" stroke="#C9CAC5" stroke-width=".8"/><rect class="brillo" x="211.0" y="59.0" width="58" height="2.4" rx="1.2" fill="#fff" opacity=".8"/><rect class="verde" x="207.0" y="56.0" width="66" height="32" rx="15.0" fill="none" stroke="#7BE08A" stroke-width="2.2" opacity="0"/><text class="et" x="240" y="79.2" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="20" font-weight="700" fill="#3B3A42">2</text></g><g class="tecla" data-k="3" data-zona="3"><ellipse class="halo" cx="330" cy="72" rx="60" ry="36" fill="url(#hRojoHalo)" opacity="0"/><rect x="295.0" y="59.6" width="70" height="30" rx="15.0" fill="#B9BAB5"/><rect class="cara" x="295.0" y="57.0" width="70" height="30" rx="15.0" fill="url(#hTecla)" stroke="#C9CAC5" stroke-width=".8"/><rect class="brillo" x="301.0" y="59.0" width="58" height="2.4" rx="1.2" fill="#fff" opacity=".8"/><rect class="verde" x="297.0" y="56.0" width="66" height="32" rx="15.0" fill="none" stroke="#7BE08A" stroke-width="2.2" opacity="0"/><text class="et" x="330" y="79.2" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="20" font-weight="700" fill="#3B3A42">3</text></g><g class="tecla" data-k="4" data-zona="4"><ellipse class="halo" cx="150" cy="136" rx="60" ry="36" fill="url(#hRojoHalo)" opacity="0"/><rect x="115.0" y="123.6" width="70" height="30" rx="15.0" fill="#B9BAB5"/><rect class="cara" x="115.0" y="121.0" width="70" height="30" rx="15.0" fill="url(#hTecla)" stroke="#C9CAC5" stroke-width=".8"/><rect class="brillo" x="121.0" y="123.0" width="58" height="2.4" rx="1.2" fill="#fff" opacity=".8"/><rect class="verde" x="117.0" y="120.0" width="66" height="32" rx="15.0" fill="none" stroke="#7BE08A" stroke-width="2.2" opacity="0"/><text class="et" x="150" y="143.2" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="20" font-weight="700" fill="#3B3A42">4</text></g><g class="tecla" data-k="5" data-zona="5"><ellipse class="halo" cx="240" cy="136" rx="60" ry="36" fill="url(#hRojoHalo)" opacity="0"/><rect x="205.0" y="123.6" width="70" height="30" rx="15.0" fill="#B9BAB5"/><rect class="cara" x="205.0" y="121.0" width="70" height="30" rx="15.0" fill="url(#hTecla)" stroke="#C9CAC5" stroke-width=".8"/><rect class="brillo" x="211.0" y="123.0" width="58" height="2.4" rx="1.2" fill="#fff" opacity=".8"/><rect class="verde" x="207.0" y="120.0" width="66" height="32" rx="15.0" fill="none" stroke="#7BE08A" stroke-width="2.2" opacity="0"/><text class="et" x="240" y="143.2" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="20" font-weight="700" fill="#3B3A42">5</text></g><g class="tecla" data-k="6" data-zona="6"><ellipse class="halo" cx="330" cy="136" rx="60" ry="36" fill="url(#hRojoHalo)" opacity="0"/><rect x="295.0" y="123.6" width="70" height="30" rx="15.0" fill="#B9BAB5"/><rect class="cara" x="295.0" y="121.0" width="70" height="30" rx="15.0" fill="url(#hTecla)" stroke="#C9CAC5" stroke-width=".8"/><rect class="brillo" x="301.0" y="123.0" width="58" height="2.4" rx="1.2" fill="#fff" opacity=".8"/><rect class="verde" x="297.0" y="120.0" width="66" height="32" rx="15.0" fill="none" stroke="#7BE08A" stroke-width="2.2" opacity="0"/><text class="et" x="330" y="143.2" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="20" font-weight="700" fill="#3B3A42">6</text></g><g class="tecla" data-k="7" data-zona="7"><ellipse class="halo" cx="150" cy="200" rx="60" ry="36" fill="url(#hRojoHalo)" opacity="0"/><rect x="115.0" y="187.6" width="70" height="30" rx="15.0" fill="#B9BAB5"/><rect class="cara" x="115.0" y="185.0" width="70" height="30" rx="15.0" fill="url(#hTecla)" stroke="#C9CAC5" stroke-width=".8"/><rect class="brillo" x="121.0" y="187.0" width="58" height="2.4" rx="1.2" fill="#fff" opacity=".8"/><rect class="verde" x="117.0" y="184.0" width="66" height="32" rx="15.0" fill="none" stroke="#7BE08A" stroke-width="2.2" opacity="0"/><text class="et" x="150" y="207.2" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="20" font-weight="700" fill="#3B3A42">7</text></g><g class="tecla" data-k="8" data-zona="8"><ellipse class="halo" cx="240" cy="200" rx="60" ry="36" fill="url(#hRojoHalo)" opacity="0"/><rect x="205.0" y="187.6" width="70" height="30" rx="15.0" fill="#B9BAB5"/><rect class="cara" x="205.0" y="185.0" width="70" height="30" rx="15.0" fill="url(#hTecla)" stroke="#C9CAC5" stroke-width=".8"/><rect class="brillo" x="211.0" y="187.0" width="58" height="2.4" rx="1.2" fill="#fff" opacity=".8"/><rect class="verde" x="207.0" y="184.0" width="66" height="32" rx="15.0" fill="none" stroke="#7BE08A" stroke-width="2.2" opacity="0"/><text class="et" x="240" y="207.2" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="20" font-weight="700" fill="#3B3A42">8</text></g><g class="tecla" data-k="9" data-zona="9"><ellipse class="halo" cx="330" cy="200" rx="60" ry="36" fill="url(#hRojoHalo)" opacity="0"/><rect x="295.0" y="187.6" width="70" height="30" rx="15.0" fill="#B9BAB5"/><rect class="cara" x="295.0" y="185.0" width="70" height="30" rx="15.0" fill="url(#hTecla)" stroke="#C9CAC5" stroke-width=".8"/><rect class="brillo" x="301.0" y="187.0" width="58" height="2.4" rx="1.2" fill="#fff" opacity=".8"/><rect class="verde" x="297.0" y="184.0" width="66" height="32" rx="15.0" fill="none" stroke="#7BE08A" stroke-width="2.2" opacity="0"/><text class="et" x="330" y="207.2" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="20" font-weight="700" fill="#3B3A42">9</text></g><g class="tecla" data-k="CLEAR"><ellipse class="halo" cx="150" cy="264" rx="60" ry="36" fill="url(#hRojoHalo)" opacity="0"/><rect x="115.0" y="251.6" width="70" height="30" rx="15.0" fill="#B9BAB5"/><rect class="cara" x="115.0" y="249.0" width="70" height="30" rx="15.0" fill="url(#hTecla)" stroke="#C9CAC5" stroke-width=".8"/><rect class="brillo" x="121.0" y="251.0" width="58" height="2.4" rx="1.2" fill="#fff" opacity=".8"/><rect class="verde" x="117.0" y="248.0" width="66" height="32" rx="15.0" fill="none" stroke="#7BE08A" stroke-width="2.2" opacity="0"/><text class="et" x="150" y="268.1" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="11.5" font-weight="700" fill="#3B3A42">BORRAR</text></g><g class="tecla" data-k="0" data-zona="10"><ellipse class="halo" cx="240" cy="264" rx="60" ry="36" fill="url(#hRojoHalo)" opacity="0"/><rect x="205.0" y="251.6" width="70" height="30" rx="15.0" fill="#B9BAB5"/><rect class="cara" x="205.0" y="249.0" width="70" height="30" rx="15.0" fill="url(#hTecla)" stroke="#C9CAC5" stroke-width=".8"/><rect class="brillo" x="211.0" y="251.0" width="58" height="2.4" rx="1.2" fill="#fff" opacity=".8"/><rect class="verde" x="207.0" y="248.0" width="66" height="32" rx="15.0" fill="none" stroke="#7BE08A" stroke-width="2.2" opacity="0"/><text class="et" x="234" y="271" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="20" font-weight="700" fill="#3B3A42">0</text><text class="et" x="252" y="269" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="9" font-weight="700" fill="#3B3A42">(10)</text></g><g class="tecla" data-k="ENTER"><ellipse class="halo" cx="330" cy="264" rx="60" ry="36" fill="url(#hRojoHalo)" opacity="0"/><rect x="295.0" y="251.6" width="70" height="30" rx="15.0" fill="#B9BAB5"/><rect class="cara" x="295.0" y="249.0" width="70" height="30" rx="15.0" fill="url(#hTecla)" stroke="#C9CAC5" stroke-width=".8"/><rect class="brillo" x="301.0" y="251.0" width="58" height="2.4" rx="1.2" fill="#fff" opacity=".8"/><rect class="verde" x="297.0" y="248.0" width="66" height="32" rx="15.0" fill="none" stroke="#7BE08A" stroke-width="2.2" opacity="0"/><text class="et" x="330" y="268.1" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="11.5" font-weight="700" fill="#3B3A42">ENTRAR</text></g><g class="tecla" data-k="ARM"><ellipse class="halo" cx="412" cy="72" rx="56" ry="36" fill="url(#hRojoHalo)" opacity="0"/><rect x="379.0" y="59.6" width="66" height="30" rx="15.0" fill="#B9BAB5"/><rect class="cara" x="379.0" y="57.0" width="66" height="30" rx="15.0" fill="url(#hTecla)" stroke="#C9CAC5" stroke-width=".8"/><rect class="brillo" x="385.0" y="59.0" width="54" height="2.4" rx="1.2" fill="#fff" opacity=".8"/><rect class="verde" x="381.0" y="56.0" width="62" height="32" rx="15.0" fill="none" stroke="#7BE08A" stroke-width="2.2" opacity="0"/><text class="et" x="412" y="76.3" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="12" font-weight="700" fill="#3B3A42">ARM</text></g><g class="tecla" data-k="SLEEP"><ellipse class="halo" cx="412" cy="136" rx="56" ry="36" fill="url(#hRojoHalo)" opacity="0"/><rect x="379.0" y="123.6" width="66" height="30" rx="15.0" fill="#B9BAB5"/><rect class="cara" x="379.0" y="121.0" width="66" height="30" rx="15.0" fill="url(#hTecla)" stroke="#C9CAC5" stroke-width=".8"/><rect class="brillo" x="385.0" y="123.0" width="54" height="2.4" rx="1.2" fill="#fff" opacity=".8"/><rect class="verde" x="381.0" y="120.0" width="62" height="32" rx="15.0" fill="none" stroke="#7BE08A" stroke-width="2.2" opacity="0"/><text class="et" x="412" y="140.3" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="12" font-weight="700" fill="#3B3A42">NOCHE</text></g><g class="tecla" data-k="STAY"><ellipse class="halo" cx="412" cy="200" rx="56" ry="36" fill="url(#hRojoHalo)" opacity="0"/><rect x="379.0" y="187.6" width="66" height="30" rx="15.0" fill="#B9BAB5"/><rect class="cara" x="379.0" y="185.0" width="66" height="30" rx="15.0" fill="url(#hTecla)" stroke="#C9CAC5" stroke-width=".8"/><rect class="brillo" x="385.0" y="187.0" width="54" height="2.4" rx="1.2" fill="#fff" opacity=".8"/><rect class="verde" x="381.0" y="184.0" width="62" height="32" rx="15.0" fill="none" stroke="#7BE08A" stroke-width="2.2" opacity="0"/><text class="et" x="412" y="204.3" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="12" font-weight="700" fill="#3B3A42">EN CASA</text></g><g class="tecla" data-k="OFF"><ellipse class="halo" cx="412" cy="264" rx="56" ry="36" fill="url(#hRojoHalo)" opacity="0"/><rect x="379.0" y="251.6" width="66" height="30" rx="15.0" fill="#B9BAB5"/><rect class="cara" x="379.0" y="249.0" width="66" height="30" rx="15.0" fill="url(#hTecla)" stroke="#C9CAC5" stroke-width=".8"/><rect class="brillo" x="385.0" y="251.0" width="54" height="2.4" rx="1.2" fill="#fff" opacity=".8"/><rect class="verde" x="381.0" y="248.0" width="62" height="32" rx="15.0" fill="none" stroke="#7BE08A" stroke-width="2.2" opacity="0"/><text class="et" x="412" y="268.3" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="12" font-weight="700" fill="#3B3A42">OFF</text></g><g transform="translate(114 304)"><rect x="-5" y="-5" width="10" height="10" rx="1.5" fill="#2E3C9E"/></g><text x="142" y="308" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="10" font-weight="700" fill="#4A4A4E">[1] + [3]</text><g transform="translate(206 304)"><path d="M0 -6 l6 10 h-12 z" fill="none" stroke="#8A8A86" stroke-width="1.2"/></g><text x="234" y="308" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="10" font-weight="700" fill="#4A4A4E">[4] + [6]</text><g transform="translate(296 304)"><path d="M0 -6 l6 10 h-12 z" fill="#E15A4E"/></g><text x="324" y="308" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="10" font-weight="700" fill="#4A4A4E">[7] + [9]</text><rect x="468" y="34" width="68" height="104" rx="8" fill="none" stroke="#D6D6D2" stroke-width="1.2"/><g transform="translate(502 32)"><path d="M-8 2 L0 -6 L8 2" fill="#F7F7F5" stroke="#9A9A96" stroke-width="1.2"/><text x="0" y="1" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="8" font-weight="700" fill="#6A6A66">1</text></g><text x="480" y="57" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="7.5" font-weight="700" fill="#9A9A96">ARM</text><ellipse class="hled" id="a1ARM" cx="522" cy="54" rx="5.5" ry="3.6" fill="#3B3A42"/><text x="480" y="79" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="7.5" font-weight="700" fill="#9A9A96">NOCHE</text><ellipse class="hled" id="a1NOCHE" cx="522" cy="76" rx="5.5" ry="3.6" fill="#3B3A42"/><text x="480" y="101" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="7.5" font-weight="700" fill="#9A9A96">EN CASA</text><ellipse class="hled" id="a1ENCASA" cx="522" cy="98" rx="5.5" ry="3.6" fill="#3B3A42"/><text x="480" y="123" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="7.5" font-weight="700" fill="#9A9A96">OFF</text><ellipse class="hled" id="a1OFF" cx="522" cy="120" rx="5.5" ry="3.6" fill="#3B3A42"/><rect x="474" y="152" width="22" height="9" rx="4.5" fill="none" stroke="#9A9A96" stroke-width="1.2"/><ellipse class="hled" id="aBat" cx="522" cy="156.5" rx="5.5" ry="3.6" fill="#3B3A42"/><rect x="468" y="182" width="68" height="104" rx="8" fill="none" stroke="#D6D6D2" stroke-width="1.2"/><g transform="translate(502 180)"><path d="M-8 2 L0 -6 L8 2" fill="#F7F7F5" stroke="#9A9A96" stroke-width="1.2"/><text x="0" y="1" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="8" font-weight="700" fill="#6A6A66">2</text></g><text x="480" y="205" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="7.5" font-weight="700" fill="#9A9A96">ARM</text><ellipse class="hled" id="a2ARM" cx="522" cy="202" rx="5.5" ry="3.6" fill="#3B3A42"/><text x="480" y="227" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="7.5" font-weight="700" fill="#9A9A96">NOCHE</text><ellipse class="hled" id="a2NOCHE" cx="522" cy="224" rx="5.5" ry="3.6" fill="#3B3A42"/><text x="480" y="249" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="7.5" font-weight="700" fill="#9A9A96">EN CASA</text><ellipse class="hled" id="a2ENCASA" cx="522" cy="246" rx="5.5" ry="3.6" fill="#3B3A42"/><text x="480" y="271" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="7.5" font-weight="700" fill="#9A9A96">OFF</text><ellipse class="hled" id="a2OFF" cx="522" cy="268" rx="5.5" ry="3.6" fill="#3B3A42"/><path d="M476 306 q4 -7 8 0 t8 0" fill="none" stroke="#9A9A96" stroke-width="1.4"/><ellipse class="hled" id="aCA" cx="522" cy="306" rx="5.5" ry="3.6" fill="#2BD15A"/></svg></div>
+    <div id="tecRKZ" hidden><svg class="rkz" viewBox="0 0 414 304" role="img" aria-label="Teclado DSC PC1555RKZ"><defs>
+<linearGradient id="rCuerpo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F1F0EC"/><stop offset="1" stop-color="#DEDDD7"/></linearGradient>
+<linearGradient id="rPanel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E4E4E0"/><stop offset="1" stop-color="#D4D4CF"/></linearGradient>
+<radialGradient id="rTec" cx=".45" cy=".4" r=".6"><stop offset="0" stop-color="#EEF3F8"/><stop offset="1" stop-color="#C6D2DE"/></radialGradient>
+<linearGradient id="rAro" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9FB0C2"/><stop offset="1" stop-color="#4E6278"/></linearGradient>
+<filter id="rSom" x="-10%" y="-10%" width="120%" height="125%"><feDropShadow dx="0" dy="6" stdDeviation="7" flood-color="#000" flood-opacity=".3"/></filter>
+</defs><g filter="url(#rSom)"><path d="M70 14 H396 Q406 14 406 24 V250 L372 286 H70 Z" fill="url(#rCuerpo)"/></g><path d="M10 22 L72 14 L72 286 L14 296 Q8 296 8 290 V30 Q8 23 10 22 Z" fill="#F4F3EF" stroke="#D6D5CF" stroke-width="1"/><rect x="66" y="40" width="5" height="18" rx="2" fill="#CFCEC8"/><rect x="66" y="240" width="5" height="18" rx="2" fill="#CFCEC8"/><rect x="94" y="30" width="182" height="234" rx="6" fill="#ECEBE6" stroke="#D6D5CF" stroke-width="1"/><rect x="112" y="196" width="150" height="60" rx="5" fill="#E2E1DB" stroke="#D0CFC9" stroke-width="1"/><g class="tecla" data-k="1"><circle cx="136.5" cy="56.5" r="17" fill="#8A97A6" opacity=".55"/><circle class="aro" cx="135" cy="54" r="17" fill="url(#rAro)"/><circle class="cara" cx="134" cy="53" r="13.4" fill="url(#rTec)"/><text x="134" y="59.8" text-anchor="middle" font-family="Barlow, sans-serif" font-size="17" font-weight="600" fill="#2E3440">1</text></g><g class="tecla" data-k="2"><circle cx="186.5" cy="56.5" r="17" fill="#8A97A6" opacity=".55"/><circle class="aro" cx="185" cy="54" r="17" fill="url(#rAro)"/><circle class="cara" cx="184" cy="53" r="13.4" fill="url(#rTec)"/><text x="184" y="59.8" text-anchor="middle" font-family="Barlow, sans-serif" font-size="17" font-weight="600" fill="#2E3440">2</text></g><g class="tecla" data-k="3"><circle cx="236.5" cy="56.5" r="17" fill="#8A97A6" opacity=".55"/><circle class="aro" cx="235" cy="54" r="17" fill="url(#rAro)"/><circle class="cara" cx="234" cy="53" r="13.4" fill="url(#rTec)"/><text x="234" y="59.8" text-anchor="middle" font-family="Barlow, sans-serif" font-size="17" font-weight="600" fill="#2E3440">3</text></g><g class="tecla" data-k="4"><circle cx="136.5" cy="94.5" r="17" fill="#8A97A6" opacity=".55"/><circle class="aro" cx="135" cy="92" r="17" fill="url(#rAro)"/><circle class="cara" cx="134" cy="91" r="13.4" fill="url(#rTec)"/><text x="134" y="97.8" text-anchor="middle" font-family="Barlow, sans-serif" font-size="17" font-weight="600" fill="#2E3440">4</text></g><g class="tecla" data-k="5"><circle cx="186.5" cy="94.5" r="17" fill="#8A97A6" opacity=".55"/><circle class="aro" cx="185" cy="92" r="17" fill="url(#rAro)"/><circle class="cara" cx="184" cy="91" r="13.4" fill="url(#rTec)"/><text x="184" y="97.8" text-anchor="middle" font-family="Barlow, sans-serif" font-size="17" font-weight="600" fill="#2E3440">5</text></g><g class="tecla" data-k="6"><circle cx="236.5" cy="94.5" r="17" fill="#8A97A6" opacity=".55"/><circle class="aro" cx="235" cy="92" r="17" fill="url(#rAro)"/><circle class="cara" cx="234" cy="91" r="13.4" fill="url(#rTec)"/><text x="234" y="97.8" text-anchor="middle" font-family="Barlow, sans-serif" font-size="17" font-weight="600" fill="#2E3440">6</text></g><g class="tecla" data-k="7"><circle cx="136.5" cy="132.5" r="17" fill="#8A97A6" opacity=".55"/><circle class="aro" cx="135" cy="130" r="17" fill="url(#rAro)"/><circle class="cara" cx="134" cy="129" r="13.4" fill="url(#rTec)"/><text x="134" y="135.8" text-anchor="middle" font-family="Barlow, sans-serif" font-size="17" font-weight="600" fill="#2E3440">7</text></g><g class="tecla" data-k="8"><circle cx="186.5" cy="132.5" r="17" fill="#8A97A6" opacity=".55"/><circle class="aro" cx="185" cy="130" r="17" fill="url(#rAro)"/><circle class="cara" cx="184" cy="129" r="13.4" fill="url(#rTec)"/><text x="184" y="135.8" text-anchor="middle" font-family="Barlow, sans-serif" font-size="17" font-weight="600" fill="#2E3440">8</text></g><g class="tecla" data-k="9"><circle cx="236.5" cy="132.5" r="17" fill="#8A97A6" opacity=".55"/><circle class="aro" cx="235" cy="130" r="17" fill="url(#rAro)"/><circle class="cara" cx="234" cy="129" r="13.4" fill="url(#rTec)"/><text x="234" y="135.8" text-anchor="middle" font-family="Barlow, sans-serif" font-size="17" font-weight="600" fill="#2E3440">9</text></g><g class="tecla" data-k="*"><circle cx="136.5" cy="170.5" r="17" fill="#8A97A6" opacity=".55"/><circle class="aro" cx="135" cy="168" r="17" fill="url(#rAro)"/><circle class="cara" cx="134" cy="167" r="13.4" fill="url(#rTec)"/><text x="134" y="173.1" text-anchor="middle" font-family="Barlow, sans-serif" font-size="15" font-weight="600" fill="#2E3440">✱</text></g><g class="tecla" data-k="0"><circle cx="186.5" cy="170.5" r="17" fill="#8A97A6" opacity=".55"/><circle class="aro" cx="185" cy="168" r="17" fill="url(#rAro)"/><circle class="cara" cx="184" cy="167" r="13.4" fill="url(#rTec)"/><text x="184" y="173.8" text-anchor="middle" font-family="Barlow, sans-serif" font-size="17" font-weight="600" fill="#2E3440">0</text></g><g class="tecla" data-k="#"><circle cx="236.5" cy="170.5" r="17" fill="#8A97A6" opacity=".55"/><circle class="aro" cx="235" cy="168" r="17" fill="url(#rAro)"/><circle class="cara" cx="234" cy="167" r="13.4" fill="url(#rTec)"/><text x="234" y="173.8" text-anchor="middle" font-family="Barlow, sans-serif" font-size="17" font-weight="600" fill="#2E3440">#</text></g><g class="tecla" data-k="F"><rect x="120.5" y="207.5" width="29" height="44" rx="14.5" fill="#8A97A6" opacity=".55"/><rect class="aro" x="119" y="203" width="29" height="44" rx="14.5" fill="url(#rAro)"/><rect class="cara" x="122" y="205" width="23" height="38" rx="11.5" fill="url(#rTec)"/><text x="133.5" y="230" text-anchor="middle" font-family="Barlow, sans-serif" font-size="13" font-weight="700" fill="#2E3440">F</text></g><g class="tecla" data-k="A"><rect x="170.5" y="207.5" width="29" height="44" rx="14.5" fill="#8A97A6" opacity=".55"/><rect class="aro" x="169" y="203" width="29" height="44" rx="14.5" fill="url(#rAro)"/><rect class="cara" x="172" y="205" width="23" height="38" rx="11.5" fill="url(#rTec)"/><text x="183.5" y="230" text-anchor="middle" font-family="Barlow, sans-serif" font-size="13" font-weight="700" fill="#2E3440">A</text></g><g class="tecla" data-k="P"><rect x="220.5" y="207.5" width="29" height="44" rx="14.5" fill="#8A97A6" opacity=".55"/><rect class="aro" x="219" y="203" width="29" height="44" rx="14.5" fill="url(#rAro)"/><rect class="cara" x="222" y="205" width="23" height="38" rx="11.5" fill="url(#rTec)"/><text x="233.5" y="230" text-anchor="middle" font-family="Barlow, sans-serif" font-size="13" font-weight="700" fill="#2E3440">P</text></g><path d="M296 26 H392 V236 L366 262 H296 Z" fill="url(#rPanel)" stroke="#CACAC4" stroke-width="1"/><circle class="rled" id="rListo" cx="310" cy="44" r="3.6" fill="#3A3A3E"/><text x="320" y="47.6" font-family="Barlow, sans-serif" font-size="10.5" fill="#6A6A66">Listo</text><circle class="rled" id="rArmado" cx="310" cy="60.5" r="3.6" fill="#3A3A3E"/><text x="320" y="64.1" font-family="Barlow, sans-serif" font-size="10.5" fill="#6A6A66">Armado</text><circle class="rled" id="rSistema" cx="310" cy="77.0" r="3.6" fill="#3A3A3E"/><text x="320" y="80.6" font-family="Barlow, sans-serif" font-size="10.5" fill="#6A6A66">Sistema</text><circle class="rled" id="rZ1" cx="310" cy="99.5" r="3.6" fill="#3A3A3E"/><text x="320" y="103.1" font-family="Barlow, sans-serif" font-size="10.5" fill="#6A6A66">Zona 1</text><circle class="rled" id="rZ2" cx="310" cy="116.0" r="3.6" fill="#3A3A3E"/><text x="320" y="119.6" font-family="Barlow, sans-serif" font-size="10.5" fill="#6A6A66">Zona 2</text><circle class="rled" id="rZ3" cx="310" cy="132.5" r="3.6" fill="#3A3A3E"/><text x="320" y="136.1" font-family="Barlow, sans-serif" font-size="10.5" fill="#6A6A66">Zona 3</text><circle class="rled" id="rZ4" cx="310" cy="149.0" r="3.6" fill="#3A3A3E"/><text x="320" y="152.6" font-family="Barlow, sans-serif" font-size="10.5" fill="#6A6A66">Zona 4</text><circle class="rled" id="rZ5" cx="310" cy="165.5" r="3.6" fill="#3A3A3E"/><text x="320" y="169.1" font-family="Barlow, sans-serif" font-size="10.5" fill="#6A6A66">Zona 5</text><circle class="rled" id="rZ6" cx="310" cy="182.0" r="3.6" fill="#3A3A3E"/><text x="320" y="185.6" font-family="Barlow, sans-serif" font-size="10.5" fill="#6A6A66">Zona 6</text><circle class="rled" id="rZ7" cx="310" cy="198.5" r="3.6" fill="#3A3A3E"/><text x="320" y="202.1" font-family="Barlow, sans-serif" font-size="10.5" fill="#6A6A66">Zona 7</text><circle class="rled" id="rZ8" cx="310" cy="215.0" r="3.6" fill="#3A3A3E"/><text x="320" y="218.6" font-family="Barlow, sans-serif" font-size="10.5" fill="#6A6A66">Zona 8</text><text x="314" y="245.5" font-family="Arial Black, Barlow, sans-serif" font-size="15" font-weight="900" fill="#8D8D88" letter-spacing="1">DSC</text><path d="M372 286 L406 250" stroke="#CFCEC8" stroke-width="1.4"/><path d="M380 286 L406 258" stroke="#E2E1DB" stroke-width="1"/></svg></div>
+    <div id="tecPK" hidden><svg class="pk" viewBox="0 0 540 612" role="img" aria-label="Teclado DSC PK5501"><defs>
+<linearGradient id="pCuerpo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F7F8F9"/><stop offset=".55" stop-color="#E9ECEF"/><stop offset="1" stop-color="#D9DDE2"/></linearGradient>
+<linearGradient id="pBisel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E6E9EC"/><stop offset=".6" stop-color="#CFD4DA"/><stop offset="1" stop-color="#B9C0C8"/></linearGradient>
+<linearGradient id="pPanel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#EEF0F3"/><stop offset="1" stop-color="#E2E6EA"/></linearGradient>
+<linearGradient id="pLcd" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8BEA6E"/><stop offset=".5" stop-color="#6FDB5A"/><stop offset="1" stop-color="#5BCB4C"/></linearGradient>
+<linearGradient id="pTec" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#EDF2F8"/><stop offset="1" stop-color="#C3D0DF"/></linearGradient>
+<linearGradient id="pTapa" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E4E7EA"/><stop offset=".12" stop-color="#F4F5F6"/><stop offset="1" stop-color="#ECEEF0"/></linearGradient>
+<filter id="pSom" x="-10%" y="-10%" width="120%" height="125%"><feDropShadow dx="0" dy="6" stdDeviation="7" flood-color="#000" flood-opacity=".28"/></filter>
+</defs><g filter="url(#pSom)"><path d="M28 392 H512 L516 584 Q516 604 496 604 H44 Q24 604 24 584 Z" fill="url(#pTapa)" stroke="#D0D4D9"/></g><path d="M78 432 H152 M168 432 H252 M272 432 H356" stroke="#8B9198" stroke-width="1"/><path d="M78 456 H152 M168 456 H252 M272 456 H356" stroke="#8B9198" stroke-width="1"/><path d="M78 480 H152 M168 480 H252 M272 480 H356" stroke="#8B9198" stroke-width="1"/><path d="M78 504 H152 M168 504 H252 M272 504 H356" stroke="#8B9198" stroke-width="1"/><path d="M78 528 H152 M168 528 H252 M272 528 H356" stroke="#8B9198" stroke-width="1"/><g fill="none" stroke="#8B9198" stroke-width="1.3"><path d="M60 428 l6 -5 l6 5 v6 h-12 z"/><path d="M60 452 l6 -5 l6 5 v6 h-12 z"/><path d="M61 482 q0 -7 5 -7 q5 0 5 7 l1 2 h-12 z"/><circle cx="66" cy="501" r="5"/><path d="M61 520 h10 v12 h-10 z M63 522 l6 8 M69 522 l-6 8"/></g><g font-family="Barlow, sans-serif" font-size="8" fill="#8B9198"><text x="392" y="440">Alarma en memoria</text><text x="392" y="462">Zonas abiertas</text><text x="392" y="484">Zonas anuladas</text><text x="392" y="506">Campanilla</text><text x="420" y="560" font-weight="700" font-size="11" text-anchor="middle" fill="#6F757C">TEST SYSTEM</text><text x="420" y="574" font-weight="700" font-size="11" text-anchor="middle" fill="#6F757C">WEEKLY</text></g><g fill="none" stroke="#8B9198" stroke-width="1.2"><circle cx="380" cy="437" r="4"/><path d="M375 462 h8 v-8 h-8 z"/><path d="M375 484 h8 v-8 h-8 z M375 476 l8 8"/><path d="M376 506 q0 -6 4 -6 q4 0 4 6 h-8"/></g><rect x="70" y="384" width="34" height="14" rx="3" fill="#D5D9DE"/><rect x="436" y="384" width="34" height="14" rx="3" fill="#D5D9DE"/><g filter="url(#pSom)"><path d="M14 160 C14 52 60 12 150 9 H390 C480 12 526 52 526 160 V368 Q526 392 502 392 H38 Q14 392 14 368 Z" fill="url(#pCuerpo)"/></g><path d="M14 160 C14 52 60 12 150 9 H390 C480 12 526 52 526 160" fill="none" stroke="#FFFFFF" stroke-width="2" opacity=".9"/><path d="M34 158 C34 66 74 30 156 28 H384 C466 30 506 66 506 158 V170 H34 Z" fill="url(#pBisel)"/><path d="M34 170 H506" stroke="#A9B1BA" stroke-width="1.5"/><path d="M30 176 H510" stroke="#FFFFFF" stroke-width="2"/><rect x="92" y="53" width="356" height="92" rx="12" fill="#3E5A3B"/><rect x="96" y="57" width="348" height="84" rx="10" fill="url(#pLcd)"/><rect x="100" y="60" width="340" height="18" rx="8" fill="#FFFFFF" opacity=".12"/><g id="pkDig" transform="translate(198 80) scale(1.15)"></g><g id="pkIco" font-family="Barlow, sans-serif" font-size="8.5" font-weight="700" fill="#173F17"></g><path id="pkOk" class="pkst" d="M462 70 l5 5 l9 -11" fill="none" stroke="#B7BDC3" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/><g id="pkLock" class="pkst" fill="#B7BDC3"><rect x="462" y="86" width="12" height="9" rx="1.6"/><path d="M464.5 86 v-2.6 a3.5 3.5 0 0 1 7 0 v2.6" fill="none" stroke="#B7BDC3" stroke-width="1.8"/></g><path id="pkTri" class="pkst" d="M468 101 l6.5 11 h-13 z" fill="#B7BDC3"/><g id="pkCA" class="pkst"><circle cx="468" cy="127" r="6" fill="none" stroke="#B7BDC3" stroke-width="1.6"/><path d="M464.5 127 q1.7 -2.6 3.5 0 t3.5 0" fill="none" stroke="#B7BDC3" stroke-width="1.4"/></g><rect x="30" y="180" width="480" height="200" rx="10" fill="url(#pPanel)"/><g class="tecla" data-k="<"><rect x="71.5" y="198.5" width="42" height="24" rx="12.0" fill="#5D7697"/><rect class="cara" x="68.0" y="196.0" width="41" height="24" rx="12.0" fill="url(#pTec)" stroke="#8EA4BD" stroke-width="1.1"/><path d="M80.0 199.0 H98.0" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity=".7"/><path d="M93 202 l-8 6 l8 6" fill="none" stroke="#2E3846" stroke-width="2"/></g><g class="tecla" data-k=">"><rect x="117.5" y="198.5" width="42" height="24" rx="12.0" fill="#5D7697"/><rect class="cara" x="114.0" y="196.0" width="41" height="24" rx="12.0" fill="url(#pTec)" stroke="#8EA4BD" stroke-width="1.1"/><path d="M126.0 199.0 H144.0" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity=".7"/><path d="M131 202 l8 6 l-8 6" fill="none" stroke="#2E3846" stroke-width="2"/></g><g class="tecla" data-k="F"><rect x="70.5" y="250.5" width="88" height="26" rx="13.0" fill="#5D7697"/><rect class="cara" x="67.0" y="248.0" width="87" height="26" rx="13.0" fill="url(#pTec)" stroke="#8EA4BD" stroke-width="1.1"/><path d="M80.0 251.0 H142.0" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity=".7"/><path d="M111 252 c4 4 6 6 6 9.5 a6 6 0 0 1 -12 0 c0 -2.4 1.2 -3.6 2.4 -4.8 c0 2.4 1.2 3.6 2.4 3.6 c-1.2 -3.6 0 -6 1.2 -8.3 z" fill="#2E3846"/></g><g class="tecla" data-k="A"><rect x="70.5" y="293.5" width="88" height="26" rx="13.0" fill="#5D7697"/><rect class="cara" x="67.0" y="291.0" width="87" height="26" rx="13.0" fill="url(#pTec)" stroke="#8EA4BD" stroke-width="1.1"/><path d="M80.0 294.0 H142.0" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity=".7"/><path d="M111 296 l7.5 13 h-15 z" fill="none" stroke="#2E3846" stroke-width="1.5"/><path d="M111 300.5 v4" stroke="#2E3846" stroke-width="1.5"/><circle cx="111" cy="306.5" r=".9" fill="#2E3846"/></g><g class="tecla" data-k="P"><rect x="70.5" y="335.5" width="88" height="26" rx="13.0" fill="#5D7697"/><rect class="cara" x="67.0" y="333.0" width="87" height="26" rx="13.0" fill="url(#pTec)" stroke="#8EA4BD" stroke-width="1.1"/><path d="M80.0 336.0 H142.0" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity=".7"/><path d="M105 339 h12 v6 c0 5 -3 7.6 -6 9 c-3 -1.4 -6 -4 -6 -9 z" fill="none" stroke="#2E3846" stroke-width="1.6"/><path d="M108 340 v13 M114 340 v13" stroke="#2E3846" stroke-width=".8"/></g><g class="tecla" data-k="1"><rect x="192.5" y="199.5" width="58" height="28" rx="14.0" fill="#5D7697"/><rect class="cara" x="189.0" y="197.0" width="57" height="28" rx="14.0" fill="url(#pTec)" stroke="#8EA4BD" stroke-width="1.1"/><path d="M203.0 200.0 H233.0" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity=".7"/><text x="218" y="218.6" text-anchor="middle" font-family="Barlow, sans-serif" font-size="21" font-weight="400" fill="#2E3846">1</text></g><g class="tecla" data-k="2"><rect x="258.5" y="199.5" width="58" height="28" rx="14.0" fill="#5D7697"/><rect class="cara" x="255.0" y="197.0" width="57" height="28" rx="14.0" fill="url(#pTec)" stroke="#8EA4BD" stroke-width="1.1"/><path d="M269.0 200.0 H299.0" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity=".7"/><text x="284" y="218.6" text-anchor="middle" font-family="Barlow, sans-serif" font-size="21" font-weight="400" fill="#2E3846">2</text></g><g class="tecla" data-k="3"><rect x="324.5" y="199.5" width="58" height="28" rx="14.0" fill="#5D7697"/><rect class="cara" x="321.0" y="197.0" width="57" height="28" rx="14.0" fill="url(#pTec)" stroke="#8EA4BD" stroke-width="1.1"/><path d="M335.0 200.0 H365.0" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity=".7"/><text x="350" y="218.6" text-anchor="middle" font-family="Barlow, sans-serif" font-size="21" font-weight="400" fill="#2E3846">3</text></g><g class="tecla" data-k="4"><rect x="192.5" y="244.5" width="58" height="28" rx="14.0" fill="#5D7697"/><rect class="cara" x="189.0" y="242.0" width="57" height="28" rx="14.0" fill="url(#pTec)" stroke="#8EA4BD" stroke-width="1.1"/><path d="M203.0 245.0 H233.0" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity=".7"/><text x="218" y="263.6" text-anchor="middle" font-family="Barlow, sans-serif" font-size="21" font-weight="400" fill="#2E3846">4</text></g><g class="tecla" data-k="5"><rect x="258.5" y="244.5" width="58" height="28" rx="14.0" fill="#5D7697"/><rect class="cara" x="255.0" y="242.0" width="57" height="28" rx="14.0" fill="url(#pTec)" stroke="#8EA4BD" stroke-width="1.1"/><path d="M269.0 245.0 H299.0" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity=".7"/><text x="284" y="263.6" text-anchor="middle" font-family="Barlow, sans-serif" font-size="21" font-weight="400" fill="#2E3846">5</text></g><g class="tecla" data-k="6"><rect x="324.5" y="244.5" width="58" height="28" rx="14.0" fill="#5D7697"/><rect class="cara" x="321.0" y="242.0" width="57" height="28" rx="14.0" fill="url(#pTec)" stroke="#8EA4BD" stroke-width="1.1"/><path d="M335.0 245.0 H365.0" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity=".7"/><text x="350" y="263.6" text-anchor="middle" font-family="Barlow, sans-serif" font-size="21" font-weight="400" fill="#2E3846">6</text></g><g class="tecla" data-k="7"><rect x="192.5" y="290.5" width="58" height="28" rx="14.0" fill="#5D7697"/><rect class="cara" x="189.0" y="288.0" width="57" height="28" rx="14.0" fill="url(#pTec)" stroke="#8EA4BD" stroke-width="1.1"/><path d="M203.0 291.0 H233.0" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity=".7"/><text x="218" y="309.6" text-anchor="middle" font-family="Barlow, sans-serif" font-size="21" font-weight="400" fill="#2E3846">7</text></g><g class="tecla" data-k="8"><rect x="258.5" y="290.5" width="58" height="28" rx="14.0" fill="#5D7697"/><rect class="cara" x="255.0" y="288.0" width="57" height="28" rx="14.0" fill="url(#pTec)" stroke="#8EA4BD" stroke-width="1.1"/><path d="M269.0 291.0 H299.0" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity=".7"/><text x="284" y="309.6" text-anchor="middle" font-family="Barlow, sans-serif" font-size="21" font-weight="400" fill="#2E3846">8</text></g><g class="tecla" data-k="9"><rect x="324.5" y="290.5" width="58" height="28" rx="14.0" fill="#5D7697"/><rect class="cara" x="321.0" y="288.0" width="57" height="28" rx="14.0" fill="url(#pTec)" stroke="#8EA4BD" stroke-width="1.1"/><path d="M335.0 291.0 H365.0" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity=".7"/><text x="350" y="309.6" text-anchor="middle" font-family="Barlow, sans-serif" font-size="21" font-weight="400" fill="#2E3846">9</text></g><g class="tecla" data-k="*"><rect x="192.5" y="335.5" width="58" height="28" rx="14.0" fill="#5D7697"/><rect class="cara" x="189.0" y="333.0" width="57" height="28" rx="14.0" fill="url(#pTec)" stroke="#8EA4BD" stroke-width="1.1"/><path d="M203.0 336.0 H233.0" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity=".7"/><path d="M218 340 v14 M212 343.5 l12 7 M212 350.5 l12 -7" stroke="#2E3846" stroke-width="2" stroke-linecap="round"/></g><g class="tecla" data-k="0"><rect x="258.5" y="335.5" width="58" height="28" rx="14.0" fill="#5D7697"/><rect class="cara" x="255.0" y="333.0" width="57" height="28" rx="14.0" fill="url(#pTec)" stroke="#8EA4BD" stroke-width="1.1"/><path d="M269.0 336.0 H299.0" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity=".7"/><text x="284" y="354.6" text-anchor="middle" font-family="Barlow, sans-serif" font-size="21" font-weight="400" fill="#2E3846">0</text></g><g class="tecla" data-k="#"><rect x="324.5" y="335.5" width="58" height="28" rx="14.0" fill="#5D7697"/><rect class="cara" x="321.0" y="333.0" width="57" height="28" rx="14.0" fill="url(#pTec)" stroke="#8EA4BD" stroke-width="1.1"/><path d="M335.0 336.0 H365.0" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity=".7"/><text x="350" y="353.5" text-anchor="middle" font-family="Barlow, sans-serif" font-size="18" font-weight="400" fill="#2E3846">#</text></g><g class="tecla" data-k="STAY"><rect x="416.5" y="198.0" width="58" height="25" rx="12.5" fill="#5D7697"/><rect class="cara" x="413.0" y="195.5" width="57" height="25" rx="12.5" fill="url(#pTec)" stroke="#8EA4BD" stroke-width="1.1"/><path d="M425.5 198.5 H458.5" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity=".7"/><path d="M435 208 L442 201 L449 208 V214 H435 Z" fill="none" stroke="#2E3846" stroke-width="1.6" stroke-linejoin="round"/><circle cx="442" cy="205.5" r="1.7" fill="#2E3846"/><path d="M442 207.5 v5 M439.5 209.5 h5" stroke="#2E3846" stroke-width="1.5"/></g><g class="tecla" data-k="AWAY"><rect x="416.5" y="235.0" width="58" height="25" rx="12.5" fill="#5D7697"/><rect class="cara" x="413.0" y="232.5" width="57" height="25" rx="12.5" fill="url(#pTec)" stroke="#8EA4BD" stroke-width="1.1"/><path d="M425.5 235.5 H458.5" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity=".7"/><path d="M435 245 L442 238 L449 245 V251 H435 Z" fill="none" stroke="#2E3846" stroke-width="1.6" stroke-linejoin="round"/></g><g class="tecla" data-k="CHIME"><rect x="416.5" y="270.0" width="58" height="25" rx="12.5" fill="#5D7697"/><rect class="cara" x="413.0" y="267.5" width="57" height="25" rx="12.5" fill="url(#pTec)" stroke="#8EA4BD" stroke-width="1.1"/><path d="M425.5 270.5 H458.5" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity=".7"/><path d="M436.5 284 q0 -10 5.5 -10 q5.5 0 5.5 10 l1.6 2 h-14.2 z" fill="none" stroke="#2E3846" stroke-width="1.6"/><circle cx="442" cy="288.5" r="1.4" fill="#2E3846"/></g><g class="tecla" data-k="RESET"><rect x="416.5" y="305.0" width="58" height="25" rx="12.5" fill="#5D7697"/><rect class="cara" x="413.0" y="302.5" width="57" height="25" rx="12.5" fill="url(#pTec)" stroke="#8EA4BD" stroke-width="1.1"/><path d="M425.5 305.5 H458.5" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity=".7"/><path d="M447.5 316 a5.8 5.8 0 1 1 -1.6 -4.6" fill="none" stroke="#2E3846" stroke-width="1.7"/><path d="M447 308 v4 h-4" fill="none" stroke="#2E3846" stroke-width="1.5"/></g><g class="tecla" data-k="EXIT"><rect x="416.5" y="340.0" width="58" height="25" rx="12.5" fill="#5D7697"/><rect class="cara" x="413.0" y="337.5" width="57" height="25" rx="12.5" fill="url(#pTec)" stroke="#8EA4BD" stroke-width="1.1"/><path d="M425.5 340.5 H458.5" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" opacity=".7"/><rect x="437" y="343" width="9" height="14" fill="none" stroke="#2E3846" stroke-width="1.6"/><path d="M446 343 l-4 2.5 v14 l4 -2.5 z" fill="#2E3846"/></g></svg></div>
+    <div id="tecTS" hidden><svg class="ts" viewBox="0 0 300 562" role="img" aria-label="Teclado Ajax KeyPad TouchScreen"><defs><linearGradient id="tCuerpo" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#E4E6E9"/></linearGradient>
+<linearGradient id="tVidrio" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16181B"/><stop offset="1" stop-color="#0B0C0E"/></linearGradient>
+<linearGradient id="tPant" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FAFAFB"/><stop offset="1" stop-color="#EEF0F2"/></linearGradient>
+<filter id="tSom" x="-15%" y="-10%" width="130%" height="125%"><feDropShadow dx="0" dy="7" stdDeviation="9" flood-color="#000" flood-opacity=".25"/></filter></defs><g filter="url(#tSom)"><rect x="18" y="8" width="264" height="544" rx="40" fill="url(#tCuerpo)"/></g><rect x="30" y="20" width="240" height="520" rx="30" fill="url(#tVidrio)"/><path d="M44 26 H256" stroke="#FFFFFF" stroke-opacity=".08" stroke-width="2"/><circle cx="150" cy="35" r="2.6" fill="#2E3238"/><rect x="42" y="48" width="216" height="336" rx="16" fill="url(#tPant)"/><g id="tsLogo"><text x="150" y="414" text-anchor="middle" font-family="Arial, Barlow, sans-serif" font-size="17" font-weight="400" letter-spacing="3.5" fill="currentColor">AJAX</text></g><g color="#8D939B"><path d="M134.36 486.07 A9.450000000000001 9.450000000000001 0 0 1 134.36 473.93" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M165.64 473.93 A9.450000000000001 9.450000000000001 0 0 1 165.64 486.07" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M128.73 490.80 A16.8 16.8 0 0 1 128.73 469.20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M171.27 469.20 A16.8 16.8 0 0 1 171.27 490.80" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M123.10 495.52 A24.150000000000002 24.150000000000002 0 0 1 123.10 464.48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M176.90 464.48 A24.150000000000002 24.150000000000002 0 0 1 176.90 495.52" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></g><g class="tsscr" data-scr="control"><text x="150" y="78" text-anchor="middle" font-family="Barlow, sans-serif" fill="#1E2228" font-size="17" font-weight="600">Control</text><path d="M232 78 q0 -10 6 -10 q6 0 6 10 l1.6 2 h-15.2 z" fill="none" stroke="#9AA0A8" stroke-width="1.3"/><g id="tsEnv" class="tecla" data-k="EVENTOS"><rect class="cara" x="52" y="62" width="30" height="24" rx="6" fill="#000" fill-opacity="0"/><rect x="58" y="67" width="18" height="13" rx="2" fill="none" stroke="#9AA0A8" stroke-width="1.3"/><path d="M58 68 l9 6.5 l9 -6.5" fill="none" stroke="#9AA0A8" stroke-width="1.3"/><circle id="tsBadge" cx="77" cy="67" r="4.5" fill="#E53940" opacity="0"/></g><circle cx="150" cy="150" r="46" fill="#FFFFFF" stroke="#E1E4E8"/><circle id="tsAro" cx="150" cy="150" r="46" fill="none" stroke="#2BB24C" stroke-width="3"/><g id="tsIcoDes"><path d="M136.89 140.82 A16 16 0 1 1 136.89 159.18" fill="none" stroke="#2BB24C" stroke-width="3" stroke-linecap="round"/></g><g id="tsIcoArm" opacity="0"><circle cx="150" cy="150" r="16" fill="none" stroke="#E53940" stroke-width="3"/></g><g id="tsIcoNoche" opacity="0"><circle cx="150" cy="150" r="16" fill="none" stroke="#3D6FE0" stroke-width="3"/><path d="M143.45 145.41 A8.0 8.0 0 1 1 143.45 154.59" fill="none" stroke="#3D6FE0" stroke-width="3" stroke-linecap="round"/></g><text id="tsEstado" x="150" y="218" text-anchor="middle" font-family="Barlow, sans-serif" fill="#1E2228" font-size="14" font-weight="600">Desarmado</text><g id="tsFallo" opacity="0"><rect x="58" y="226" width="184" height="20" rx="10" fill="#FFF3D6"/><path d="M70 241 l5.5 -9.5 l5.5 9.5 z" fill="#E09A10"/><text x="88" y="240" font-family="Barlow, sans-serif" font-size="10" font-weight="600" fill="#8A5A00">1 fallo · ver en la app Ajax</text></g><rect x="50" y="252" width="200" height="76" rx="14" fill="#FFFFFF" stroke="#E1E4E8"/><g class="tecla" data-k="ARMAR"><circle class="cara" cx="92" cy="278" r="21" fill="#FFFFFF" stroke="#E1E4E8"/><circle cx="92" cy="278" r="9" fill="none" stroke="#1E2228" stroke-width="1.8"/><text x="92" y="314" text-anchor="middle" font-family="Barlow, sans-serif" font-size="9.5" fill="#9AA0A8">Armar</text></g><g class="tecla" data-k="DESARMAR"><circle class="cara" cx="150" cy="278" r="21" fill="#FFFFFF" stroke="#E1E4E8"/><path d="M142.63 272.84 A9 9 0 1 1 142.63 283.16" fill="none" stroke="#1E2228" stroke-width="1.8" stroke-linecap="round"/><text x="150" y="314" text-anchor="middle" font-family="Barlow, sans-serif" font-size="9.5" fill="#9AA0A8">Desarmar</text></g><g class="tecla" data-k="NOCHE"><circle class="cara" cx="208" cy="278" r="21" fill="#FFFFFF" stroke="#E1E4E8"/><circle cx="208" cy="278" r="9" fill="none" stroke="#1E2228" stroke-width="1.8"/><path d="M204.31 275.42 A4.5 4.5 0 1 1 204.31 280.58" fill="none" stroke="#1E2228" stroke-width="1.8" stroke-linecap="round"/><text x="208" y="314" text-anchor="middle" font-family="Barlow, sans-serif" font-size="9.5" fill="#9AA0A8">Modo noche</text></g><path d="M42 334 H258" stroke="#E1E4E8"/><g class="tecla" data-k="TAB_PANICO"><rect class="cara" x="46" y="336" width="52" height="40" fill="#000" fill-opacity="0"/><circle cx="72" cy="349" r="6" fill="none" stroke="#9AA0A8" stroke-width="1.3"/><text x="72" y="369" text-anchor="middle" font-family="Barlow, sans-serif" font-size="8.5" font-weight="400" fill="#9AA0A8">Pánico</text></g><g class="tecla" data-k="TAB_CTRL"><rect class="cara" x="98" y="336" width="52" height="40" fill="#000" fill-opacity="0"/><circle cx="124" cy="349" r="6" fill="#1E2228"/><path d="M124 346 v3.5" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/><text x="124" y="369" text-anchor="middle" font-family="Barlow, sans-serif" font-size="8.5" font-weight="600" fill="#1E2228">Control</text></g><g class="tecla" data-k="TAB_ESC"><rect class="cara" x="150" y="336" width="52" height="40" fill="#000" fill-opacity="0"/><circle cx="176" cy="349" r="6" fill="none" stroke="#9AA0A8" stroke-width="1.3"/><text x="176" y="369" text-anchor="middle" font-family="Barlow, sans-serif" font-size="8.5" font-weight="400" fill="#9AA0A8">Escenarios</text></g><g class="tecla" data-k="TAB_LOGIN"><rect class="cara" x="202" y="336" width="52" height="40" fill="#000" fill-opacity="0"/><circle cx="228" cy="349" r="6" fill="none" stroke="#9AA0A8" stroke-width="1.3"/><text x="228" y="369" text-anchor="middle" font-family="Barlow, sans-serif" font-size="8.5" font-weight="400" fill="#9AA0A8">Ingresar</text></g></g><g class="tsscr" data-scr="code"><text x="150" y="78" text-anchor="middle" font-family="Barlow, sans-serif" fill="#1E2228" font-size="15" font-weight="600">Ingresá el código</text><text x="150" y="94" text-anchor="middle" font-family="Barlow, sans-serif" font-size="9.5" fill="#9AA0A8">o acercá tu tarjeta o llavero</text><circle class="tsdot" cx="120" cy="110" r="5" fill="none" stroke="#9AA0A8" stroke-width="1.4"/><circle class="tsdot" cx="140" cy="110" r="5" fill="none" stroke="#9AA0A8" stroke-width="1.4"/><circle class="tsdot" cx="160" cy="110" r="5" fill="none" stroke="#9AA0A8" stroke-width="1.4"/><circle class="tsdot" cx="180" cy="110" r="5" fill="none" stroke="#9AA0A8" stroke-width="1.4"/><g class="tecla" data-k="1"><rect class="cara" x="58" y="124" width="56" height="42" rx="12" fill="#FFFFFF" stroke="#E1E4E8" stroke-width="1"/><text x="86" y="152" text-anchor="middle" font-family="Barlow, sans-serif" fill="#1E2228" font-size="19" font-weight="500">1</text></g><g class="tecla" data-k="2"><rect class="cara" x="122" y="124" width="56" height="42" rx="12" fill="#FFFFFF" stroke="#E1E4E8" stroke-width="1"/><text x="150" y="152" text-anchor="middle" font-family="Barlow, sans-serif" fill="#1E2228" font-size="19" font-weight="500">2</text></g><g class="tecla" data-k="3"><rect class="cara" x="186" y="124" width="56" height="42" rx="12" fill="#FFFFFF" stroke="#E1E4E8" stroke-width="1"/><text x="214" y="152" text-anchor="middle" font-family="Barlow, sans-serif" fill="#1E2228" font-size="19" font-weight="500">3</text></g><g class="tecla" data-k="4"><rect class="cara" x="58" y="174" width="56" height="42" rx="12" fill="#FFFFFF" stroke="#E1E4E8" stroke-width="1"/><text x="86" y="202" text-anchor="middle" font-family="Barlow, sans-serif" fill="#1E2228" font-size="19" font-weight="500">4</text></g><g class="tecla" data-k="5"><rect class="cara" x="122" y="174" width="56" height="42" rx="12" fill="#FFFFFF" stroke="#E1E4E8" stroke-width="1"/><text x="150" y="202" text-anchor="middle" font-family="Barlow, sans-serif" fill="#1E2228" font-size="19" font-weight="500">5</text></g><g class="tecla" data-k="6"><rect class="cara" x="186" y="174" width="56" height="42" rx="12" fill="#FFFFFF" stroke="#E1E4E8" stroke-width="1"/><text x="214" y="202" text-anchor="middle" font-family="Barlow, sans-serif" fill="#1E2228" font-size="19" font-weight="500">6</text></g><g class="tecla" data-k="7"><rect class="cara" x="58" y="224" width="56" height="42" rx="12" fill="#FFFFFF" stroke="#E1E4E8" stroke-width="1"/><text x="86" y="252" text-anchor="middle" font-family="Barlow, sans-serif" fill="#1E2228" font-size="19" font-weight="500">7</text></g><g class="tecla" data-k="8"><rect class="cara" x="122" y="224" width="56" height="42" rx="12" fill="#FFFFFF" stroke="#E1E4E8" stroke-width="1"/><text x="150" y="252" text-anchor="middle" font-family="Barlow, sans-serif" fill="#1E2228" font-size="19" font-weight="500">8</text></g><g class="tecla" data-k="9"><rect class="cara" x="186" y="224" width="56" height="42" rx="12" fill="#FFFFFF" stroke="#E1E4E8" stroke-width="1"/><text x="214" y="252" text-anchor="middle" font-family="Barlow, sans-serif" fill="#1E2228" font-size="19" font-weight="500">9</text></g><g class="tecla" data-k="C"><rect class="cara" x="58" y="274" width="56" height="42" rx="12" fill="#FFFFFF" stroke="#E1E4E8" stroke-width="1"/><text x="86" y="302" text-anchor="middle" font-family="Barlow, sans-serif" fill="#1E2228" font-size="16" font-weight="500">⌫</text></g><g class="tecla" data-k="0"><rect class="cara" x="122" y="274" width="56" height="42" rx="12" fill="#FFFFFF" stroke="#E1E4E8" stroke-width="1"/><text x="150" y="302" text-anchor="middle" font-family="Barlow, sans-serif" fill="#1E2228" font-size="19" font-weight="500">0</text></g><g class="tecla" data-k="OK"><rect class="cara" x="186" y="274" width="56" height="42" rx="12" fill="#2BB24C" stroke="#E1E4E8" stroke-width="1"/><path d="M204 295 l6 6 l11 -12" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></g></g><g class="tsscr" data-scr="panic"><text x="150" y="78" text-anchor="middle" font-family="Barlow, sans-serif" fill="#1E2228" font-size="17" font-weight="600">Pánico</text><g class="tecla" data-k="PAN"><rect class="cara" x="56" y="96" width="188" height="80" rx="16" fill="#D6333B" stroke="#E1E4E8" stroke-width="1"/><text x="150" y="142" text-anchor="middle" font-family="Barlow, sans-serif" font-size="17" font-weight="700" fill="#fff">Pánico</text></g><g class="tecla" data-k="FIRE"><rect class="cara" x="56" y="186" width="91" height="70" rx="16" fill="#FFFFFF" stroke="#E1E4E8" stroke-width="1"/><text x="101" y="226" text-anchor="middle" font-family="Barlow, sans-serif" fill="#1E2228" font-size="12" font-weight="600">Incendio</text></g><g class="tecla" data-k="AUX"><rect class="cara" x="153" y="186" width="91" height="70" rx="16" fill="#FFFFFF" stroke="#E1E4E8" stroke-width="1"/><text x="198" y="226" text-anchor="middle" font-family="Barlow, sans-serif" fill="#1E2228" font-size="12" font-weight="600">Asistencia</text></g><path d="M42 334 H258" stroke="#E1E4E8"/><g class="tecla" data-k="TAB_PANICO"><rect class="cara" x="46" y="336" width="52" height="40" fill="#000" fill-opacity="0"/><circle cx="72" cy="349" r="6" fill="#1E2228"/><path d="M72 346 v3.5" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/><text x="72" y="369" text-anchor="middle" font-family="Barlow, sans-serif" font-size="8.5" font-weight="600" fill="#1E2228">Pánico</text></g><g class="tecla" data-k="TAB_CTRL"><rect class="cara" x="98" y="336" width="52" height="40" fill="#000" fill-opacity="0"/><circle cx="124" cy="349" r="6" fill="none" stroke="#9AA0A8" stroke-width="1.3"/><text x="124" y="369" text-anchor="middle" font-family="Barlow, sans-serif" font-size="8.5" font-weight="400" fill="#9AA0A8">Control</text></g><g class="tecla" data-k="TAB_ESC"><rect class="cara" x="150" y="336" width="52" height="40" fill="#000" fill-opacity="0"/><circle cx="176" cy="349" r="6" fill="none" stroke="#9AA0A8" stroke-width="1.3"/><text x="176" y="369" text-anchor="middle" font-family="Barlow, sans-serif" font-size="8.5" font-weight="400" fill="#9AA0A8">Escenarios</text></g><g class="tecla" data-k="TAB_LOGIN"><rect class="cara" x="202" y="336" width="52" height="40" fill="#000" fill-opacity="0"/><circle cx="228" cy="349" r="6" fill="none" stroke="#9AA0A8" stroke-width="1.3"/><text x="228" y="369" text-anchor="middle" font-family="Barlow, sans-serif" font-size="8.5" font-weight="400" fill="#9AA0A8">Ingresar</text></g></g><g class="tsscr" data-scr="send"><text x="150" y="150" text-anchor="middle" font-family="Barlow, sans-serif" fill="#1E2228" font-size="15" font-weight="600">¿Enviar la alarma?</text><g class="tecla" data-k="ENVIAR"><rect class="cara" x="56" y="176" width="188" height="54" rx="14" fill="#D6333B" stroke="#E1E4E8" stroke-width="1"/><text x="150" y="209" text-anchor="middle" font-family="Barlow, sans-serif" font-size="15" font-weight="700" fill="#fff">Enviar</text></g><g class="tecla" data-k="CANCELAR"><rect class="cara" x="56" y="240" width="188" height="44" rx="14" fill="#FFFFFF" stroke="#E1E4E8" stroke-width="1"/><text x="150" y="267" text-anchor="middle" font-family="Barlow, sans-serif" fill="#1E2228" font-size="13" font-weight="600">Cancelar</text></g></g><g class="tsscr" data-scr="events"><text x="150" y="78" text-anchor="middle" font-family="Barlow, sans-serif" fill="#1E2228" font-size="17" font-weight="600">Eventos</text><rect x="52" y="94" width="196" height="36" rx="10" fill="#FFFFFF" stroke="#E1E4E8"/><circle cx="66" cy="112" r="4" fill="#E53940"/><text x="78" y="116" font-family="Barlow, sans-serif" font-size="10.5" font-weight="600" fill="#1E2228">Alarma · Puerta de entrada</text><text x="238" y="116" text-anchor="end" font-family="Barlow, sans-serif" font-size="9.5" fill="#9AA0A8">21:12</text><rect x="52" y="138" width="196" height="36" rx="10" fill="#FFFFFF" stroke="#E1E4E8"/><circle cx="66" cy="156" r="4" fill="#9AA0A8"/><text x="78" y="160" font-family="Barlow, sans-serif" font-size="10.5" font-weight="600" fill="#1E2228">Armado · Teclado</text><text x="238" y="160" text-anchor="end" font-family="Barlow, sans-serif" font-size="9.5" fill="#9AA0A8">20:05</text><rect x="52" y="182" width="196" height="36" rx="10" fill="#FFFFFF" stroke="#E1E4E8"/><circle cx="66" cy="200" r="4" fill="#9AA0A8"/><text x="78" y="204" font-family="Barlow, sans-serif" font-size="10.5" font-weight="600" fill="#1E2228">Desarmado · Teclado</text><text x="238" y="204" text-anchor="end" font-family="Barlow, sans-serif" font-size="9.5" fill="#9AA0A8">18:40</text><g class="tecla" data-k="LEIDOS"><rect class="cara" x="52" y="232" width="196" height="36" rx="10" fill="#FFFFFF" stroke="#E1E4E8" stroke-width="1"/><text x="150" y="254" text-anchor="middle" font-family="Barlow, sans-serif" fill="#1E2228" font-size="11.5" font-weight="600">Marcar todo como leído</text></g><path d="M42 334 H258" stroke="#E1E4E8"/><g class="tecla" data-k="TAB_PANICO"><rect class="cara" x="46" y="336" width="52" height="40" fill="#000" fill-opacity="0"/><circle cx="72" cy="349" r="6" fill="none" stroke="#9AA0A8" stroke-width="1.3"/><text x="72" y="369" text-anchor="middle" font-family="Barlow, sans-serif" font-size="8.5" font-weight="400" fill="#9AA0A8">Pánico</text></g><g class="tecla" data-k="TAB_CTRL"><rect class="cara" x="98" y="336" width="52" height="40" fill="#000" fill-opacity="0"/><circle cx="124" cy="349" r="6" fill="#1E2228"/><path d="M124 346 v3.5" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/><text x="124" y="369" text-anchor="middle" font-family="Barlow, sans-serif" font-size="8.5" font-weight="600" fill="#1E2228">Control</text></g><g class="tecla" data-k="TAB_ESC"><rect class="cara" x="150" y="336" width="52" height="40" fill="#000" fill-opacity="0"/><circle cx="176" cy="349" r="6" fill="none" stroke="#9AA0A8" stroke-width="1.3"/><text x="176" y="369" text-anchor="middle" font-family="Barlow, sans-serif" font-size="8.5" font-weight="400" fill="#9AA0A8">Escenarios</text></g><g class="tecla" data-k="TAB_LOGIN"><rect class="cara" x="202" y="336" width="52" height="40" fill="#000" fill-opacity="0"/><circle cx="228" cy="349" r="6" fill="none" stroke="#9AA0A8" stroke-width="1.3"/><text x="228" y="369" text-anchor="middle" font-family="Barlow, sans-serif" font-size="8.5" font-weight="400" fill="#9AA0A8">Ingresar</text></g></g><g class="tsscr" data-scr="fire"><path d="M150 104 c11 11 17 17 17 27 a17 17 0 0 1 -34 0 c0 -7 3.5 -10 7 -13.5 c0 7 3.5 10 7 10 c-3.5 -10 0 -17 3 -23.5 z" fill="#FF6A3D"/><text x="150" y="182" text-anchor="middle" font-family="Barlow, sans-serif" fill="#1E2228" font-size="15" font-weight="700">Alarma de incendio</text><g class="tecla" data-k="SILENCIAR"><rect class="cara" x="56" y="206" width="188" height="54" rx="14" fill="#1E2228" stroke="#E1E4E8" stroke-width="1"/><text x="150" y="239" text-anchor="middle" font-family="Barlow, sans-serif" font-size="15" font-weight="700" fill="#fff">Silenciar</text></g></g><g class="tsscr" data-scr="sleep"><rect x="42" y="48" width="216" height="336" rx="16" fill="#0B0C0E"/></g></svg></div>
+    <div id="tecCMB" hidden><svg class="cmb" viewBox="0 0 518 356" role="img" aria-label="Teclado Ajax"><defs><linearGradient id="cCuerpo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset=".7" stop-color="#F6F7F8"/><stop offset="1" stop-color="#E8EAED"/></linearGradient>
+<radialGradient id="cSensor" cx=".4" cy=".35" r=".7"><stop offset="0" stop-color="#9A9EA4"/><stop offset="1" stop-color="#55595F"/></radialGradient>
+<filter id="cSom" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="7" stdDeviation="9" flood-color="#000" flood-opacity=".22"/></filter></defs><g filter="url(#cSom)"><path d="M58 40 C140 28 380 26 452 34 C486 38 500 52 500 92 V258 C500 296 484 318 444 324 C360 334 160 334 72 326 C34 322 18 302 18 262 V96 C18 58 30 44 58 40 Z" fill="url(#cCuerpo)"/></g><path id="cmbMarco" d="M58 40 C140 28 380 26 452 34 C486 38 500 52 500 92 V258 C500 296 484 318 444 324 C360 334 160 334 72 326 C34 322 18 302 18 262 V96 C18 58 30 44 58 40 Z" fill="none" stroke="#FF3B42" stroke-width="0"/><path d="M60 44 C140 32 380 30 450 38" fill="none" stroke="#FFFFFF" stroke-width="2"/><circle cx="72" cy="88" r="9" fill="url(#cSensor)"/><circle cx="72" cy="88" r="9" fill="none" stroke="#C9CCD0" stroke-width="1.5"/><g id="cmbLector" color="#8E949B"><path d="M137.11 137.79 A9 9 0 0 1 137.11 126.21" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M166.89 126.21 A9 9 0 0 1 166.89 137.79" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><path d="M131.74 142.28 A16 16 0 0 1 131.74 121.72" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M172.26 121.72 A16 16 0 0 1 172.26 142.28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M126.38 146.78 A23 23 0 0 1 126.38 117.22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M177.62 117.22 A23 23 0 0 1 177.62 146.78" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></g><g id="cmbArm" class="cind"><circle class="cled" cx="290" cy="72" r="2.4" fill="#7D838B"/><circle cx="290" cy="95" r="8" fill="none" stroke="#5A6069" stroke-width="1.4"/></g><g id="cmbDes" class="cind"><circle class="cled" cx="338" cy="72" r="2.4" fill="#7D838B"/><path d="M331.45 90.41 A8 8 0 1 1 331.45 99.59" fill="none" stroke="#5A6069" stroke-width="1.4" stroke-linecap="round"/></g><g id="cmbNoche" class="cind"><circle class="cled" cx="386" cy="72" r="2.4" fill="#7D838B"/><circle cx="386" cy="95" r="8" fill="none" stroke="#5A6069" stroke-width="1.4"/><path d="M382.72 92.71 A4.0 4.0 0 1 1 382.72 97.29" fill="none" stroke="#5A6069" stroke-width="1.4" stroke-linecap="round"/></g><g id="cmbFallo" class="cind"><circle class="cled" cx="434" cy="72" r="2.4" fill="#7D838B"/><circle cx="434" cy="95" r="8" fill="none" stroke="#5A6069" stroke-width="1.4"/><path d="M430.4 91.4 l7.2 7.2 M437.6 91.4 l-7.2 7.2" stroke="#5A6069" stroke-width="1.4" stroke-linecap="round"/></g><g class="tecla" data-k="1"><circle class="cara" cx="290" cy="138" r="19" fill="#000" fill-opacity="0"/><text x="290" y="144.5" text-anchor="middle" font-family="Barlow, sans-serif" font-size="18" font-weight="400" fill="#5A6069">1</text></g><g class="tecla" data-k="2"><circle class="cara" cx="362" cy="138" r="19" fill="#000" fill-opacity="0"/><text x="362" y="144.5" text-anchor="middle" font-family="Barlow, sans-serif" font-size="18" font-weight="400" fill="#5A6069">2</text></g><g class="tecla" data-k="3"><circle class="cara" cx="434" cy="138" r="19" fill="#000" fill-opacity="0"/><text x="434" y="144.5" text-anchor="middle" font-family="Barlow, sans-serif" font-size="18" font-weight="400" fill="#5A6069">3</text></g><g class="tecla" data-k="4"><circle class="cara" cx="290" cy="179" r="19" fill="#000" fill-opacity="0"/><text x="290" y="185.5" text-anchor="middle" font-family="Barlow, sans-serif" font-size="18" font-weight="400" fill="#5A6069">4</text></g><g class="tecla" data-k="5"><circle class="cara" cx="362" cy="179" r="19" fill="#000" fill-opacity="0"/><text x="362" y="185.5" text-anchor="middle" font-family="Barlow, sans-serif" font-size="18" font-weight="400" fill="#5A6069">5</text></g><g class="tecla" data-k="6"><circle class="cara" cx="434" cy="179" r="19" fill="#000" fill-opacity="0"/><text x="434" y="185.5" text-anchor="middle" font-family="Barlow, sans-serif" font-size="18" font-weight="400" fill="#5A6069">6</text></g><g class="tecla" data-k="7"><circle class="cara" cx="290" cy="220" r="19" fill="#000" fill-opacity="0"/><text x="290" y="226.5" text-anchor="middle" font-family="Barlow, sans-serif" font-size="18" font-weight="400" fill="#5A6069">7</text></g><g class="tecla" data-k="8"><circle class="cara" cx="362" cy="220" r="19" fill="#000" fill-opacity="0"/><text x="362" y="226.5" text-anchor="middle" font-family="Barlow, sans-serif" font-size="18" font-weight="400" fill="#5A6069">8</text></g><g class="tecla" data-k="9"><circle class="cara" cx="434" cy="220" r="19" fill="#000" fill-opacity="0"/><text x="434" y="226.5" text-anchor="middle" font-family="Barlow, sans-serif" font-size="18" font-weight="400" fill="#5A6069">9</text></g><g class="tecla" data-k="C"><circle class="cara" cx="290" cy="261" r="19" fill="#000" fill-opacity="0"/><text x="290" y="267.5" text-anchor="middle" font-family="Barlow, sans-serif" font-size="18" font-weight="400" fill="#5A6069">C</text></g><g class="tecla" data-k="0"><circle class="cara" cx="362" cy="261" r="19" fill="#000" fill-opacity="0"/><text x="362" y="267.5" text-anchor="middle" font-family="Barlow, sans-serif" font-size="18" font-weight="400" fill="#5A6069">0</text></g><g class="tecla" data-k="*"><circle class="cara" cx="434" cy="261" r="19" fill="#000" fill-opacity="0"/><path d="M434 254 v14 M428 257.5 l12 7 M428 264.5 l12 -7" stroke="#5A6069" stroke-width="1.4" stroke-linecap="round"/></g><g class="tecla" data-k="ARMAR"><circle class="cara" cx="290" cy="303" r="19" fill="#000" fill-opacity="0"/><circle cx="290" cy="303" r="8" fill="none" stroke="#5A6069" stroke-width="1.4"/></g><g class="tecla" data-k="DESARMAR"><circle class="cara" cx="362" cy="303" r="19" fill="#000" fill-opacity="0"/><path d="M355.45 298.41 A8 8 0 1 1 355.45 307.59" fill="none" stroke="#5A6069" stroke-width="1.4" stroke-linecap="round"/></g><g class="tecla" data-k="NOCHE"><circle class="cara" cx="434" cy="303" r="19" fill="#000" fill-opacity="0"/><circle cx="434" cy="303" r="8" fill="none" stroke="#5A6069" stroke-width="1.4"/><path d="M430.72 300.71 A4.0 4.0 0 1 1 430.72 305.29" fill="none" stroke="#5A6069" stroke-width="1.4" stroke-linecap="round"/></g></svg></div>
+    <div id="tecLCD" hidden><svg class="k32" viewBox="0 0 330 416" role="img" aria-label="Teclado Paradox K32 LCD"><defs>
+<linearGradient id="kPlata" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C9CBCE"/><stop offset=".55" stop-color="#ACAFB3"/><stop offset="1" stop-color="#9A9DA2"/></linearGradient>
+<linearGradient id="kCuerpo" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#E4DDC9"/><stop offset=".5" stop-color="#EFE9D8"/><stop offset="1" stop-color="#E2DBC6"/></linearGradient>
+<linearGradient id="kHueco" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E6E0CE"/><stop offset="1" stop-color="#EEE9DA"/></linearGradient>
+<linearGradient id="kLcd" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4E66F2"/><stop offset=".6" stop-color="#3550E0"/><stop offset="1" stop-color="#2C43C8"/></linearGradient>
+<linearGradient id="kTecla" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D3CDBC"/><stop offset="1" stop-color="#BDB6A3"/></linearGradient>
+<linearGradient id="kTapa" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ECE6D4"/><stop offset="1" stop-color="#E2DBC7"/></linearGradient>
+<radialGradient id="kLedAmb"><stop offset="0" stop-color="#FFF6C8"/><stop offset=".45" stop-color="#FFD84A"/><stop offset="1" stop-color="#FFD84A" stop-opacity="0"/></radialGradient>
+<filter id="kSom" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="6" stdDeviation="7" flood-color="#000" flood-opacity=".35"/></filter>
+</defs><g filter="url(#kSom)"><path d="M22 36 Q20 14 44 12 L286 12 Q310 14 308 36 L306 300 Q306 360 260 368 L70 368 Q24 360 24 300 Z" fill="url(#kCuerpo)"/><path d="M22 36 Q20 14 44 12 L286 12 Q310 14 308 36 L307 172 L232 172 Q226 172 222 178 L216 186 L114 186 L108 178 Q104 172 98 172 L23 172 Z" fill="url(#kPlata)"/></g><path d="M44 14 L286 14" stroke="#fff" stroke-opacity=".6" stroke-width="1.4"/><text x="165" y="40" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="13" font-weight="700" letter-spacing="9" fill="#3E3C7C">PARADOX</text><rect x="54" y="54" width="222" height="84" rx="5" fill="#8E9196"/><rect x="58" y="58" width="214" height="76" rx="3" fill="url(#kLcd)"/><rect x="58" y="58" width="214" height="76" rx="3" fill="#B9C8FF" opacity=".08"/><g font-family="IBM Plex Mono, monospace" font-size="17" fill="#DCE4FF" text-anchor="middle" style="filter: drop-shadow(0 0 3px rgba(200,215,255,.6))"><text id="kL1" x="165" y="90">Area 1</text><text id="kL2" x="165" y="116">Sistema Apagado</text></g><path d="M100 186 Q100 176 110 176 L220 176 Q230 176 230 186 L230 336 L100 336 Z" fill="url(#kHueco)" stroke="#D3CCB8" stroke-width="1"/><circle cx="52" cy="200" r="11" fill="url(#kLedAmb)" class="kled-ca"/><ellipse cx="52" cy="200" rx="5.5" ry="4" fill="#FFE884"/><path d="M46 214 q3 -5 6 0 t6 0" fill="none" stroke="#8A8577" stroke-width="1.4"/><ellipse id="kLed2" cx="52" cy="232" rx="5.5" ry="4" fill="#C98A3A"/><rect x="42" y="243" width="16" height="6" rx="3" fill="none" stroke="#8A8577" stroke-width="1.2"/><path d="M60 244.5 q2 1.5 0 3" fill="none" stroke="#8A8577" stroke-width="1.2"/><g class="tecla" data-k="UP"><ellipse class="cara" cx="270" cy="198" rx="17" ry="9" fill="url(#kTecla)"/><path d="M265 201 h10 l-5 -7 z" fill="#3B3A42"/></g><circle cx="270" cy="216" r="3.4" fill="none" stroke="#8A8577" stroke-width="1.1"/><g class="tecla" data-k="DOWN"><ellipse class="cara" cx="270" cy="234" rx="17" ry="9" fill="url(#kTecla)"/><path d="M265 231 h10 l-5 7 z" fill="#3B3A42"/></g><path d="M268 252 v-8 l5 -1.5" fill="none" stroke="#8A8577" stroke-width="1.1"/><circle cx="266.5" cy="252" r="2" fill="#8A8577"/><g class="tecla" data-k="prog"><rect x="106" y="192.5" width="27" height="17" rx="8.5" fill="#A59E8A"/><rect class="cara" x="106" y="190" width="27" height="17" rx="8.5" fill="url(#kTecla)"/><rect x="110" y="191.5" width="19" height="2" rx="1" fill="#fff" opacity=".35"/><g transform="translate(119.5 198.5)"><path d="M-3.4 -3.6 A5 5 0 1 0 3.4 -3.6" fill="none" stroke="#4A4842" stroke-width="1.5" stroke-linecap="round"/><path d="M0 -6 v5" stroke="#4A4842" stroke-width="1.5" stroke-linecap="round"/></g></g><g class="tecla" data-k="TBL"><rect x="137" y="192.5" width="27" height="17" rx="8.5" fill="#A59E8A"/><rect class="cara" x="137" y="190" width="27" height="17" rx="8.5" fill="url(#kTecla)"/><rect x="141" y="191.5" width="19" height="2" rx="1" fill="#fff" opacity=".35"/><text x="150.5" y="201.5" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="7" font-weight="700" fill="#4A4842">FALLO</text></g><g class="tecla" data-k="MEM"><rect x="168" y="192.5" width="27" height="17" rx="8.5" fill="#A59E8A"/><rect class="cara" x="168" y="190" width="27" height="17" rx="8.5" fill="url(#kTecla)"/><rect x="172" y="191.5" width="19" height="2" rx="1" fill="#fff" opacity=".35"/><text x="181.5" y="201.5" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="7" font-weight="700" fill="#4A4842">MEM</text></g><g class="tecla" data-k="BYP"><rect x="199" y="192.5" width="27" height="17" rx="8.5" fill="#A59E8A"/><rect class="cara" x="199" y="190" width="27" height="17" rx="8.5" fill="url(#kTecla)"/><rect x="203" y="191.5" width="19" height="2" rx="1" fill="#fff" opacity=".35"/><text x="212.5" y="201.5" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="7" font-weight="700" fill="#4A4842">EXC</text></g><g class="tecla" data-k="OFF"><rect x="106" y="216.5" width="27" height="17" rx="8.5" fill="#A59E8A"/><rect class="cara" x="106" y="214" width="27" height="17" rx="8.5" fill="url(#kTecla)"/><rect x="110" y="215.5" width="19" height="2" rx="1" fill="#fff" opacity=".35"/><text x="119.5" y="225.5" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="7" font-weight="700" fill="#4A4842">OFF</text></g><g class="tecla" data-k="STAY"><rect x="137" y="216.5" width="27" height="17" rx="8.5" fill="#A59E8A"/><rect class="cara" x="137" y="214" width="27" height="17" rx="8.5" fill="url(#kTecla)"/><rect x="141" y="215.5" width="19" height="2" rx="1" fill="#fff" opacity=".35"/><text x="150.5" y="225.5" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="7" font-weight="700" fill="#4A4842">EN CASA</text></g><g class="tecla" data-k="SLEEP"><rect x="168" y="216.5" width="27" height="17" rx="8.5" fill="#A59E8A"/><rect class="cara" x="168" y="214" width="27" height="17" rx="8.5" fill="url(#kTecla)"/><rect x="172" y="215.5" width="19" height="2" rx="1" fill="#fff" opacity=".35"/><text x="181.5" y="225.5" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="7" font-weight="700" fill="#4A4842">NOCHE</text></g><g class="tecla" data-k="ARM"><rect x="199" y="216.5" width="27" height="17" rx="8.5" fill="#A59E8A"/><rect class="cara" x="199" y="214" width="27" height="17" rx="8.5" fill="url(#kTecla)"/><rect x="203" y="215.5" width="19" height="2" rx="1" fill="#fff" opacity=".35"/><text x="212.5" y="225.5" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="7" font-weight="700" fill="#4A4842">ARM</text></g><g class="tecla" data-k="1"><rect x="108" y="244.5" width="36" height="19" rx="9.5" fill="#A59E8A"/><rect class="cara" x="108" y="242" width="36" height="19" rx="9.5" fill="url(#kTecla)"/><rect x="112" y="243.5" width="28" height="2" rx="1" fill="#fff" opacity=".35"/><text x="126.0" y="257.0" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="15" font-weight="700" fill="#4A4842">1</text></g><g class="tecla" data-k="2"><rect x="147" y="244.5" width="36" height="19" rx="9.5" fill="#A59E8A"/><rect class="cara" x="147" y="242" width="36" height="19" rx="9.5" fill="url(#kTecla)"/><rect x="151" y="243.5" width="28" height="2" rx="1" fill="#fff" opacity=".35"/><text x="165.0" y="257.0" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="15" font-weight="700" fill="#4A4842">2</text></g><g class="tecla" data-k="3"><rect x="186" y="244.5" width="36" height="19" rx="9.5" fill="#A59E8A"/><rect class="cara" x="186" y="242" width="36" height="19" rx="9.5" fill="url(#kTecla)"/><rect x="190" y="243.5" width="28" height="2" rx="1" fill="#fff" opacity=".35"/><text x="204.0" y="257.0" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="15" font-weight="700" fill="#4A4842">3</text></g><g class="tecla" data-k="4"><rect x="108" y="268.5" width="36" height="19" rx="9.5" fill="#A59E8A"/><rect class="cara" x="108" y="266" width="36" height="19" rx="9.5" fill="url(#kTecla)"/><rect x="112" y="267.5" width="28" height="2" rx="1" fill="#fff" opacity=".35"/><text x="126.0" y="281.0" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="15" font-weight="700" fill="#4A4842">4</text></g><g class="tecla" data-k="5"><rect x="147" y="268.5" width="36" height="19" rx="9.5" fill="#A59E8A"/><rect class="cara" x="147" y="266" width="36" height="19" rx="9.5" fill="url(#kTecla)"/><rect x="151" y="267.5" width="28" height="2" rx="1" fill="#fff" opacity=".35"/><text x="165.0" y="281.0" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="15" font-weight="700" fill="#4A4842">5</text></g><g class="tecla" data-k="6"><rect x="186" y="268.5" width="36" height="19" rx="9.5" fill="#A59E8A"/><rect class="cara" x="186" y="266" width="36" height="19" rx="9.5" fill="url(#kTecla)"/><rect x="190" y="267.5" width="28" height="2" rx="1" fill="#fff" opacity=".35"/><text x="204.0" y="281.0" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="15" font-weight="700" fill="#4A4842">6</text></g><g class="tecla" data-k="7"><rect x="108" y="292.5" width="36" height="19" rx="9.5" fill="#A59E8A"/><rect class="cara" x="108" y="290" width="36" height="19" rx="9.5" fill="url(#kTecla)"/><rect x="112" y="291.5" width="28" height="2" rx="1" fill="#fff" opacity=".35"/><text x="126.0" y="305.0" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="15" font-weight="700" fill="#4A4842">7</text></g><g class="tecla" data-k="8"><rect x="147" y="292.5" width="36" height="19" rx="9.5" fill="#A59E8A"/><rect class="cara" x="147" y="290" width="36" height="19" rx="9.5" fill="url(#kTecla)"/><rect x="151" y="291.5" width="28" height="2" rx="1" fill="#fff" opacity=".35"/><text x="165.0" y="305.0" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="15" font-weight="700" fill="#4A4842">8</text></g><g class="tecla" data-k="9"><rect x="186" y="292.5" width="36" height="19" rx="9.5" fill="#A59E8A"/><rect class="cara" x="186" y="290" width="36" height="19" rx="9.5" fill="url(#kTecla)"/><rect x="190" y="291.5" width="28" height="2" rx="1" fill="#fff" opacity=".35"/><text x="204.0" y="305.0" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="15" font-weight="700" fill="#4A4842">9</text></g><g class="tecla" data-k="CLEAR"><rect x="108" y="316.5" width="36" height="19" rx="9.5" fill="#A59E8A"/><rect class="cara" x="108" y="314" width="36" height="19" rx="9.5" fill="url(#kTecla)"/><rect x="112" y="315.5" width="28" height="2" rx="1" fill="#fff" opacity=".35"/><text x="126.0" y="326.5" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="7" font-weight="700" fill="#4A4842">BORRAR</text></g><g class="tecla" data-k="0"><rect x="147" y="316.5" width="36" height="19" rx="9.5" fill="#A59E8A"/><rect class="cara" x="147" y="314" width="36" height="19" rx="9.5" fill="url(#kTecla)"/><rect x="151" y="315.5" width="28" height="2" rx="1" fill="#fff" opacity=".35"/><text x="165.0" y="329.0" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="15" font-weight="700" fill="#4A4842">0</text></g><g class="tecla" data-k="ENTER"><rect x="186" y="316.5" width="36" height="19" rx="9.5" fill="#A59E8A"/><rect class="cara" x="186" y="314" width="36" height="19" rx="9.5" fill="url(#kTecla)"/><rect x="190" y="315.5" width="28" height="2" rx="1" fill="#fff" opacity=".35"/><text x="204.0" y="326.5" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="7" font-weight="700" fill="#4A4842">ENTRAR</text></g><path d="M100 340 L230 340 L234 352 L234 404 Q234 410 228 410 L102 410 Q96 410 96 404 L96 352 Z" fill="url(#kTapa)" stroke="#D3CCB8" stroke-width="1"/><rect x="96" y="336" width="138" height="20" rx="4" fill="#E9E3D1" stroke="#D3CCB8" stroke-width="1"/><circle cx="102" cy="346" r="4" fill="#DCD5C1"/><circle cx="228" cy="346" r="4" fill="#DCD5C1"/><g transform="translate(128 368)"><path d="M-4 -6 h8 v4 c0 3 -2 5 -4 6 c-2 -1 -4 -3 -4 -6 z" fill="#3E3C9C"/></g><text x="128" y="386" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="6.5" font-weight="700" fill="#4A4842">[1]+[3]</text><g transform="translate(165 368)"><path d="M0 -7 l6 10 h-12 z" fill="none" stroke="#6B6860" stroke-width="1.1"/><path d="M0 -3 v3" stroke="#6B6860" stroke-width="1.1"/></g><text x="165" y="386" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="6.5" font-weight="700" fill="#4A4842">[4]+[6]</text><g transform="translate(202 368)"><path d="M0 -7 c3 3 5 5 5 8 a5 5 0 0 1 -10 0 c0 -2 1 -3 2 -4 c0 2 1 3 2 3 c-1 -3 0 -5 1 -7 z" fill="#D8352C"/></g><text x="202" y="386" text-anchor="middle" font-family="Barlow Semi Condensed, Barlow, sans-serif" font-size="6.5" font-weight="700" fill="#4A4842">[7]+[9]</text></svg></div>
+      <span class="dedo" id="dedo"></span>
+      <span class="bip" id="bip">bip ✓</span>
+    </div>
+    <div class="subt"><span class="n" id="sNum">1</span><p id="sTxt">Tocá una función de la lista.</p></div>
+    <div class="controles"><button id="bAnt">◀ Paso</button><button class="prim" id="bPlay">Repetir</button><button id="bSig">Paso ▶</button></div>
+  </section>
+
+  <section>
+    <div class="funciones" id="funciones"></div>
+  </section>
+</main>
+
+<script>
+  // Teclas: id → etiqueta. "prog" es la tecla de programación (sin texto).
+  const DISTRIB = [["1","2","3","_","ARM","STAY"],["4","5","6","_","SLEEP","OFF"],["7","8","9","_","BYP","MEM"],["CLEAR","0","ENTER","_","TBL","prog"]];
+  const $ = (s, el = document) => el.querySelector(s), $$ = (s, el = document) => [...el.querySelectorAll(s)];
+  const ICO = {
+    escudo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg>',
+    casa: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-5h4v5"/></svg>',
+    luna: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>',
+    abierto: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/></svg>',
+    anular: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></svg>',
+    llave: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2 2M14 9l2 2"/></svg>',
+    borrar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="4"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6M16 11h6"/></svg>',
+    memoria: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    problema: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17v.01"/></svg>',
+    panico: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M12 8v5M12 16v.01"/></svg>',
+    play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
+  };
+  const K = (t) => `<span class="k${/^\d+$/.test(t) ? " num" : ""}">${t}</span>`;
+  const CODIGO = "1234";
+
+  // Cada paso: texto + acciones sobre el teclado. lcd = [línea 1, línea 2] (solo pantalla). zonas = {n: "on"|"flash"}.
+  const FUN_PARADOX = [
+    { grupo: "Uso diario" },
+    { id: "arm", ico: "escudo", tit: "Activar la alarma", sub: "Cuando te vas y no queda nadie",
+      pasos: [
+        { t: `Cerrá puertas y ventanas: no tiene que quedar ninguna zona prendida en rojo.`, leds: { listo: 1 }, lcd: ["Area 1", "Sistema Apagado"] },
+        { t: `Tocá ${K("ARM")}.`, tecla: "ARM", lcd: ["Ingrese", "su código"] },
+        { t: `Escribí tu código.`, codigo: true },
+        { t: `Bip: la alarma empieza a activarse. Tenés el tiempo de salida para irte.`, area: "ARM-tit", leds: { listo: 0, armado: "tit" }, bip: "ok", lcd: ["Area 1", "Salida en curso"] },
+      ] },
+    { id: "stay", ico: "casa", tit: "Activar estando en casa", sub: "Protege puertas y ventanas; podés moverte adentro",
+      pasos: [
+        { t: `Cerrá puertas y ventanas.`, leds: { listo: 1 }, lcd: ["Area 1", "Sistema Apagado"] },
+        { t: `Tocá ${K("EN CASA")}.`, tecla: "STAY", lcd: ["Ingrese", "su código"] },
+        { t: `Escribí tu código.`, codigo: true },
+        { t: `Bip: quedan activadas las aberturas y los sensores de adentro no suenan.`, area: "ENCASA", leds: { listo: 0, armado: 1 }, bip: "ok", lcd: ["Area 1", "Armado En Casa"] },
+      ], nota: "Qué sensores quedan apagados lo define la instalación. Si no estás seguro, preguntanos." },
+    { id: "sleep", ico: "luna", tit: "Activar modo noche", sub: "Para dormir: protege casi toda la casa",
+      pasos: [
+        { t: `Tocá ${K("NOCHE")}.`, tecla: "SLEEP", leds: { listo: 1 }, lcd: ["Ingrese", "su código"] },
+        { t: `Escribí tu código.`, codigo: true },
+        { t: `Bip: queda activada la casa salvo los sensores de los dormitorios.`, area: "NOCHE", leds: { listo: 0, armado: 1 }, bip: "ok", lcd: ["Area 1", "Armado Noche"] },
+      ], nota: "Funciona solo si tu instalación tiene configurado el modo noche." },
+    { id: "off", ico: "abierto", tit: "Desactivar la alarma", sub: "Al llegar, antes de que termine el tiempo de entrada",
+      pasos: [
+        { t: `Al entrar, el teclado suena: tenés el tiempo de entrada para desactivar.`, area: "ARM", leds: { armado: 1 }, lcd: ["Area 1", "Entrada en curso"] },
+        { t: `Tocá ${K("OFF")}.`, tecla: "OFF", lcd: ["Ingrese", "su código"] },
+        { t: `Escribí tu código.`, codigo: true },
+        { t: `Bip: la alarma está desactivada.`, area: "OFF", leds: { armado: 0, listo: 1 }, bip: "ok", lcd: ["Area 1", "Sistema Apagado"] },
+      ], nota: "Si te equivocás de código, tocá CLEAR y volvé a escribirlo." },
+    { id: "byp", ico: "anular", tit: "Anular una zona", sub: "Para activar con una ventana abierta o un sensor que falla",
+      intro: "Anular una zona es dejarla sin vigilar la próxima vez que actives la alarma. Sirve, por ejemplo, si querés dejar una ventana abierta o si un sensor está fallando. El resto de la casa queda protegido.",
+      pasos: [
+        { t: `Tocá ${K("EXC")}.`, tecla: "BYP", lcd: ["Exclusión de", "zonas"], fn: { BYP: "flash" } },
+        { t: `Escribí tu código. Si el teclado no te lo pide, seguí con el paso siguiente.`, codigo: true, lcd: ["Zona a excluir:", "__"] },
+        { t: `Escribí el número de la zona con dos cifras. Por ejemplo, zona 3: ${K("0")}${K("3")}. En el teclado sin pantalla, la zona anulada titila.`, teclas: ["0", "3"], zonas: { 3: "flash" }, lcd: ["Zona 03", "Excluida"] },
+        { t: `Si querés anular otra, escribí su número también. Si te equivocaste, escribí el mismo número otra vez y se desanula.`, teclas: ["0", "6"], zonas: { 6: "flash" }, lcd: ["Zona 06", "Excluida"] },
+        { t: `Tocá ${K("ENTRAR")} para guardar. Después activá la alarma como siempre.`, tecla: "ENTER", fn: { BYP: "on" }, zonas: { 3: 0, 6: 0 }, bip: "ok", lcd: ["Area 1", "Zonas excluidas"] },
+      ], nota: "Si tocás EXC y directamente ENTRAR, se anulan todas las zonas que estén abiertas. Las zonas anuladas vuelven a la normalidad cuando desactivás la alarma. Si un sensor falla seguido, pedí un service." },
+    { id: "byp2", ico: "anular", tit: "Repetir la última anulación", sub: "Para volver a anular las mismas zonas de la vez anterior",
+      pasos: [
+        { t: `Tocá ${K("EXC")}.`, tecla: "BYP", fn: { BYP: "flash" }, lcd: ["Exclusión de", "zonas"] },
+        { t: `Escribí tu código.`, codigo: true, lcd: ["Zona a excluir:", "__"] },
+        { t: `Tocá ${K("EXC")} otra vez: vuelven las mismas zonas que anulaste la última vez.`, tecla: "BYP", zonas: { 3: "flash", 6: "flash" }, lcd: ["Zonas 03 06", "Excluidas"] },
+        { t: `Tocá ${K("ENTRAR")} para guardar y activá como siempre.`, tecla: "ENTER", zonas: { 3: 0, 6: 0 }, fn: { BYP: "on" }, bip: "ok", lcd: ["Area 1", "Zonas excluidas"] },
+      ] },
+    { grupo: "Códigos (con el código maestro)" },
+    { id: "codigo", ico: "llave", tit: "Agregar o cambiar un código", sub: "Para darle un código a otra persona o cambiar el tuyo",
+      pasos: [
+        { t: `Tocá la tecla ${K("⏻")} (programación).`, tecla: "prog", fn: { prog: "flash" }, lcd: ["Ingrese código", "maestro"] },
+        { t: `Escribí el código maestro.`, codigo: true, lcd: ["Usuario:", "__"] },
+        { t: `Escribí el número de usuario con dos cifras, por ejemplo ${K("0")}${K("3")}.`, teclas: ["0", "3"], fn: { ARM: "flash" }, lcd: ["Usuario 03", "Código nuevo:"] },
+        { t: `Escribí el código nuevo de 4 cifras.`, codigo: "5678", fn: { ARM: 0, SLEEP: "flash" }, lcd: ["Repita el", "código:"] },
+        { t: `Escribilo otra vez para confirmar.`, codigo: "5678", fn: { SLEEP: 0, STAY: "flash" }, lcd: ["Código", "confirmado"] },
+        { t: `Tocá ${K("ENTRAR")} y después ${K("BORRAR")} para salir.`, teclas: ["ENTER", "CLEAR"], fn: { STAY: 0, prog: 0 }, bip: "ok", lcd: ["Listo", ""] },
+      ], nota: "Anotá en papel solo el nombre de cada usuario, nunca el código." },
+    { id: "borrar", ico: "borrar", tit: "Borrar un código", sub: "Cuando alguien ya no tiene que entrar",
+      pasos: [
+        { t: `Tocá la tecla ${K("⏻")} (programación).`, tecla: "prog", fn: { prog: "flash" }, lcd: ["Ingrese código", "maestro"] },
+        { t: `Escribí el código maestro.`, codigo: true, lcd: ["Usuario:", "__"] },
+        { t: `Escribí el número de usuario a borrar, por ejemplo ${K("0")}${K("3")}.`, teclas: ["0", "3"], lcd: ["Usuario 03", ""] },
+        { t: `Mantené apretada ${K("NOCHE")} hasta escuchar el bip.`, sostener: "SLEEP", fn: { prog: 0 }, bip: "ok", lcd: ["Usuario 03", "borrado"] },
+      ] },
+    { grupo: "Si algo pasa" },
+    { id: "mem", ico: "memoria", tit: "Alarma en memoria: qué es y cómo apagar MEM", sub: "Después de un disparo queda prendida la tecla MEM",
+      intro: "Cuando la alarma se dispara, el sistema guarda qué zonas sonaron: eso es la alarma en memoria. La tecla MEM queda prendida para avisarte que hubo un disparo, aunque ya hayas desactivado. Así podés saber, por ejemplo, si sonó por la puerta o por un sensor de adentro.",
+      pasos: [
+        { t: `Hubo un disparo: se prende ${K("MEM")} y, en el teclado sin pantalla, titila el número de la zona que sonó.`, area: "ARM", fn: { MEM: "on" }, zonas: { 5: "flash" }, lcd: ["Area 1", "Alarma en memoria"] },
+        { t: `Desactivá como siempre: ${K("OFF")} y tu código. La zona deja de titilar, pero ${K("MEM")} sigue prendida.`, tecla: "OFF", codigo: true, area: "OFF", zonas: { 5: 0 }, lcd: ["Area 1", "Sistema Apagado"] },
+        { t: `Para ver qué zona sonó, tocá ${K("MEM")}: se prende el número de la zona (en el teclado con pantalla, se lee ahí).`, tecla: "MEM", zonas: { 5: "on" }, lcd: ["Alarma en", "zona 05"] },
+        { t: `Tocá ${K("BORRAR")} para volver.`, tecla: "CLEAR", zonas: { 5: 0 }, lcd: ["Area 1", "Sistema Apagado"] },
+        { t: `Para apagar ${K("MEM")}: activá la alarma completa con ${K("ARM")} y tu código…`, tecla: "ARM", codigo: true, area: "ARM-tit", lcd: ["Area 1", "Salida en curso"] },
+        { t: `…y después desactivala con ${K("OFF")} y tu código. La memoria se borra y ${K("MEM")} se apaga.`, tecla: "OFF", codigo: true, area: "OFF", fn: { MEM: 0 }, bip: "ok", lcd: ["Area 1", "Sistema Apagado"] },
+      ], nota: "La memoria también se reemplaza sola si vuelve a haber un disparo. Activar en modo EN CASA o NOCHE no la borra: tiene que ser con ARM." },
+    { id: "tbl", ico: "problema", tit: "Revisar los fallos", sub: "Cuando se prende la tecla FALLO o el teclado pita",
+      intro: "Un fallo es un aviso de que algo del sistema no está funcionando bien: por ejemplo, un corte de luz o una pila baja. La alarma te avisa prendiendo la tecla FALLO.",
+      pasos: [
+        { t: `Si hay un fallo, se prende ${K("FALLO")} y el teclado puede pitar.`, fn: { TBL: "flash" }, lcd: ["Area 1", "Fallo en sistema"] },
+        { t: `Tocá ${K("FALLO")}: deja de pitar y se prende el número del fallo (en el teclado con pantalla, se lee el detalle).`, tecla: "TBL", fn: { TBL: "on" }, zonas: { 2: "on" }, lcd: ["Fallo:", "falta de 220V"] },
+        { t: `Buscá el número en la lista de abajo para saber qué pasa y qué hacer.`, lcd: ["Fallo:", "falta de 220V"] },
+        { t: `Tocá ${K("BORRAR")} para salir. ${K("FALLO")} sigue prendida hasta que se resuelva el problema.`, tecla: "CLEAR", zonas: { 2: 0 }, fn: { TBL: "on" }, lcd: ["Area 1", "Sistema Apagado"] },
+      ], problemas: [
+        ["1", "Pila baja en un sensor inalámbrico", "Pedinos el cambio de pila."],
+        ["2", "Problema de alimentación: corte de luz o batería baja", "Si volvió la luz y sigue prendido, avisanos."],
+        ["3", "Problema en la sirena (desconectada o en corto)", "Avisanos."],
+        ["4", "No pudo comunicarse con la central de monitoreo", "Avisanos: puede ser el comunicador o la línea."],
+        ["5", "Sabotaje o falla de cableado en una zona", "Avisanos."],
+        ["6", "Se abrió la tapa de un equipo (antisabotaje)", "Avisanos."],
+        ["7", "Falla en una zona de incendio", "Avisanos."],
+        ["8", "El reloj perdió la hora", "Hay que volver a cargarla: te ayudamos."],
+        ["9", "Un sensor inalámbrico dejó de comunicarse", "Avisanos."],
+        ["10", "Un módulo dejó de comunicarse con la central", "Avisanos."],
+        ["NOCHE", "Falla en un teclado", "Avisanos."]] },
+    { id: "panico", ico: "panico", tit: "Pedir ayuda (pánico)", sub: "Emergencia: avisa a la central de monitoreo",
+      pasos: [
+        { t: `Mantené apretadas ${K("1")} y ${K("3")} a la vez durante 3 segundos. Las combinaciones están dibujadas en la tapa del teclado.`, sostener: ["1", "3"] },
+        { t: `La central de monitoreo recibe el aviso. Con ${K("4")}+${K("6")} pedís asistencia y con ${K("7")}+${K("9")} avisás un incendio.`, bip: "ok" },
+      ], nota: "Solo funciona si está habilitado en tu instalación. Probalo con nosotros antes de necesitarlo." },
+  ];
+
+  // ---------- DSC (PC1555RKZ y PK5501) ----------
+  const FUN_DSC = [
+    { grupo: "Uso diario" },
+    { id: "arm", ico: "escudo", tit: "Activar la alarma", sub: "Cuando te vas y no queda nadie",
+      pasos: [
+        { t: `Cerrá puertas y ventanas: la luz ${K("Listo")} tiene que estar prendida (en la pantalla, el tilde verde).`, luces: { listo: 1 } },
+        { t: `Escribí tu código. En el teclado con pantalla también podés mantener apretada la tecla de la casa vacía (ausente) 2 segundos.`, codigo: true },
+        { t: `El teclado pita una vez por segundo: tenés el tiempo de salida para irte.`, luces: { listo: 0, armado: "tit" }, pk: { w: ["AWAY"] }, bip: "ok" },
+        { t: `Cuando termina el tiempo de salida deja de pitar y queda prendida ${K("Armado")} (en la pantalla, el candado).`, luces: { armado: 1 }, pk: { w: ["AWAY"] } },
+      ], nota: "Si te arrepentís durante el tiempo de salida, escribí tu código y se cancela." },
+    { id: "stay", ico: "casa", tit: "Activar estando en casa", sub: "Protege puertas y ventanas; podés moverte adentro",
+      pasos: [
+        { t: `Cerrá puertas y ventanas: ${K("Listo")} prendida.`, luces: { listo: 1 } },
+        { t: `Escribí tu código y no salgas. En el teclado con pantalla podés mantener apretada la tecla de la casa con la persona (presente) 2 segundos.`, codigo: true },
+        { t: `Como no salís por la puerta, los sensores de adentro quedan anulados solos y se activan las aberturas.`, luces: { listo: 0, armado: 1 }, pk: { w: ["STAY"] }, bip: "ok" },
+      ], nota: "Qué sensores quedan anulados lo define la instalación. Si la tecla de la pantalla no responde, usá el código." },
+    { id: "noent", ico: "luna", tit: "Activar sin tiempo de entrada", sub: "Para la noche: si alguien abre la puerta, suena enseguida",
+      pasos: [
+        { t: `Tocá ${K("✱")} y ${K("9")}.`, teclas: ["*", "9"], luces: { listo: 1 } },
+        { t: `Escribí tu código.`, codigo: true },
+        { t: `Bip: la alarma se activa y la puerta de entrada ya no tiene demora.`, luces: { listo: 0, armado: 1 }, pk: { w: ["STAY"] }, bip: "ok" },
+      ], nota: "Si entrás por la puerta con la alarma activada así, suena enseguida: usalo solo cuando ya estás adentro." },
+    { id: "off", ico: "abierto", tit: "Desactivar la alarma", sub: "Al llegar, antes de que termine el tiempo de entrada",
+      pasos: [
+        { t: `Al entrar, el teclado pita: tenés el tiempo de entrada para desactivar.`, luces: { listo: 0, armado: 1 }, pk: { w: ["AWAY"] } },
+        { t: `Escribí tu código.`, codigo: true },
+        { t: `Bip: se apaga ${K("Armado")} y la alarma queda desactivada.`, luces: { armado: 0, listo: 1 }, pk: { w: [] }, bip: "ok" },
+      ], nota: "Si te equivocás de código suena un tono de error: tocá # y escribilo de nuevo." },
+    { id: "byp", ico: "anular", tit: "Anular una zona", sub: "Para activar con una ventana abierta o un sensor que falla",
+      intro: "Anular una zona es dejarla sin vigilar la próxima vez que actives la alarma. Sirve, por ejemplo, si querés dejar una ventana abierta o si un sensor está fallando. El resto de la casa queda protegido.",
+      pasos: [
+        { t: `Con la alarma desactivada, tocá ${K("✱")} y ${K("1")}.`, teclas: ["*", "1"], pk: { w: ["BYPASS"] } },
+        { t: `Escribí tu código, si el teclado te lo pide.`, codigo: true },
+        { t: `Escribí el número de la zona con dos cifras, por ejemplo ${K("0")}${K("3")}: se prende la luz de esa zona (en la pantalla, el número).`, teclas: ["0", "3"], zonas: { 3: "on" }, pk: { d: "03", w: ["BYPASS"] } },
+        { t: `Si querés anular otra, escribí su número. Si te equivocaste, escribí el mismo número otra vez y se desanula.`, teclas: ["0", "6"], zonas: { 6: "on" }, pk: { d: "06", w: ["BYPASS"] } },
+        { t: `Tocá ${K("#")} para salir. Después activá como siempre.`, tecla: "#", zonas: { 3: 0, 6: 0 }, luces: { sistema: 1 }, pk: { d: "11:30", w: ["BYPASS"] }, bip: "ok" },
+      ], nota: "Las zonas anuladas vuelven a la normalidad cuando desactivás la alarma. Si un sensor falla seguido, pedí un service." },
+    { grupo: "Códigos (con el código maestro)" },
+    { id: "codigo", ico: "llave", tit: "Agregar o cambiar un código", sub: "Para darle un código a otra persona o cambiar el tuyo",
+      pasos: [
+        { t: `Con la alarma desactivada, tocá ${K("✱")} y ${K("5")}.`, teclas: ["*", "5"] },
+        { t: `Escribí el código maestro: titila ${K("Sistema")} (en la pantalla, PROGRAM).`, codigo: true, luces: { sistema: "tit", armado: 1 }, pk: { w: ["PROGRAM"] } },
+        { t: `Escribí el número de usuario con dos cifras, por ejemplo ${K("0")}${K("2")}.`, teclas: ["0", "2"], pk: { d: "02", w: ["PROGRAM"] } },
+        { t: `Escribí el código nuevo de 4 cifras.`, codigo: "5678", bip: "ok" },
+        { t: `Tocá ${K("#")} para salir.`, tecla: "#", luces: { sistema: 0, armado: 0 }, pk: { d: "11:30", w: [] } },
+      ], nota: "El usuario 40 es el código maestro. Anotá en papel solo el nombre de cada usuario, nunca el código." },
+    { id: "borrar", ico: "borrar", tit: "Borrar un código", sub: "Cuando alguien ya no tiene que entrar",
+      pasos: [
+        { t: `Tocá ${K("✱")} y ${K("5")}.`, teclas: ["*", "5"] },
+        { t: `Escribí el código maestro.`, codigo: true, luces: { sistema: "tit", armado: 1 }, pk: { w: ["PROGRAM"] } },
+        { t: `Escribí el número de usuario a borrar, por ejemplo ${K("0")}${K("2")}.`, teclas: ["0", "2"], pk: { d: "02", w: ["PROGRAM"] } },
+        { t: `Tocá ${K("✱")}: el código se borra en el momento.`, tecla: "*", bip: "ok" },
+        { t: `Tocá ${K("#")} para salir.`, tecla: "#", luces: { sistema: 0, armado: 0 }, pk: { d: "11:30", w: [] } },
+      ] },
+    { grupo: "Si algo pasa" },
+    { id: "mem", ico: "memoria", tit: "Alarma en memoria: qué es y cómo borrarla", sub: "Después de un disparo queda prendida la luz Sistema",
+      intro: "Cuando la alarma se dispara, el sistema guarda qué zonas sonaron: eso es la alarma en memoria. Queda prendida la luz Sistema (en la pantalla, MEMORY) para avisarte que hubo un disparo, aunque ya hayas desactivado.",
+      pasos: [
+        { t: `Hubo un disparo con la alarma activada: queda prendida ${K("Sistema")} (en la pantalla, MEMORY).`, luces: { listo: 0, armado: 1, sistema: 1 }, pk: { w: ["AWAY", "MEMORY"] } },
+        { t: `Desactivá con tu código: el teclado te muestra solo la memoria y titila la zona que sonó. Entrá con precaución.`, codigo: true, luces: { armado: 0, listo: 1 }, zonas: { 5: "flash" }, pk: { d: "05", w: ["MEMORY"] } },
+        { t: `Tocá ${K("#")} para salir. Para verla otra vez, tocá ${K("✱")} y ${K("3")}.`, tecla: "#", zonas: { 5: 0 }, pk: { d: "11:30", w: ["MEMORY"] } },
+        { t: `Para borrarla, activá la alarma con tu código…`, codigo: true, luces: { listo: 0, armado: 1 }, pk: { w: ["AWAY", "MEMORY"] } },
+        { t: `…y desactivala con tu código. La memoria se borra y ${K("Sistema")} se apaga.`, codigo: true, luces: { armado: 0, listo: 1, sistema: 0 }, pk: { w: [] }, bip: "ok" },
+      ] },
+    { id: "tbl", ico: "problema", tit: "Revisar los fallos", sub: "Cuando se prende Sistema (o el triángulo) y el teclado pita",
+      intro: "Un fallo es un aviso de que algo del sistema no está funcionando bien: por ejemplo, un corte de luz o una pila baja. El teclado pita cada 10 segundos y se prende la luz Sistema (en la pantalla, el triángulo).",
+      pasos: [
+        { t: `Si hay un fallo, se prende ${K("Sistema")} (en la pantalla, el triángulo) y el teclado pita.`, luces: { sistema: 1 }, pk: { tri: 1 } },
+        { t: `Tocá ${K("#")} para que deje de pitar.`, tecla: "#" },
+        { t: `Tocá ${K("✱")} y ${K("2")}: se prende el número del fallo (en el teclado de luces, en las luces de zona).`, teclas: ["*", "2"], zonas: { 2: "on" }, pk: { n: [2], tri: 1 } },
+        { t: `Buscá el número en la lista de abajo para saber qué pasa y qué hacer.` },
+        { t: `Tocá ${K("#")} para salir. La luz sigue prendida hasta que se resuelva el problema.`, tecla: "#", zonas: { 2: 0 }, pk: { n: [], tri: 1 } },
+      ], problemas: [
+        ["1", "Necesita service: batería, sirena u otra falla del equipo", "Avisanos."],
+        ["2", "Corte de luz (220 V): la alarma sigue andando con la batería unas horas", "Si volvió la luz y sigue prendido, avisanos."],
+        ["3", "Falla en la línea telefónica", "Avisanos."],
+        ["4", "No pudo comunicarse con la central de monitoreo", "Avisanos."],
+        ["5", "Falla en un sensor o zona", "Avisanos."],
+        ["6", "Sabotaje en un sensor o zona", "Avisanos."],
+        ["7", "Pila baja en un sensor inalámbrico", "Pedinos el cambio de pila."],
+        ["8", "Se perdió la fecha y la hora", "Hay que volver a cargarla: te ayudamos."]] },
+    { id: "panico", ico: "panico", tit: "Emergencias: pánico, asistencia e incendio", sub: "Avisan a la central de monitoreo",
+      pasos: [
+        { t: `Pánico (policía): mantené apretada ${K("P")} 2 segundos. En el teclado con pantalla es la tecla del escudo.`, sostener: "P" },
+        { t: `El teclado pita para confirmar y la central de monitoreo recibe el aviso.`, bip: "ok" },
+        { t: `Asistencia: ${K("A")} (en la pantalla, el triángulo). Incendio: ${K("F")} (la llama). Se usan igual: 2 segundos.`, sostener: "F", bip: "ok" },
+      ], nota: "Solo funcionan si están habilitadas en tu instalación. Probalas con nosotros antes de necesitarlas." },
+  ];
+
+  // ---------- Ajax (KeyPad TouchScreen y KeyPad Combi) ----------
+  // Los pasos cambian según el teclado: { ts: [...], combi: [...] }.
+  const DESPIERTA_C = { t: `Pasá la mano por el teclado para despertarlo: se prende la luz arriba del ícono del estado actual.`, cmb: { led: "des" } };
+  const DESPIERTA_T = { t: `Acercate: la pantalla se enciende sola y muestra el estado.`, ts: { scr: "control" } };
+  const modoTS = (k, nom, est, extra = {}) => [
+    DESPIERTA_T,
+    { t: `Tocá ${K(nom)}.`, tecla: k, ts: { scr: "code", dots: 0 } },
+    { t: `Escribí tu código (o acercá tu tarjeta o llavero al teclado).`, codigo: true },
+    { t: `Tocá el tilde verde para confirmar.`, tecla: "OK", ts: { scr: "control", est }, bip: "ok", ...extra },
+  ];
+  const modoC = (k, nom, led, final) => [
+    DESPIERTA_C,
+    { t: `Escribí tu código.`, codigo: true },
+    { t: `Tocá ${K(nom)}.`, tecla: k, cmb: { led, marco: 1 }, bip: "ok" },
+    { t: final, cmb: { led, marco: 0 } },
+  ];
+  const FUN_AJAX = [
+    { grupo: "Uso diario" },
+    { id: "arm", ico: "escudo", tit: "Activar la alarma", sub: "Cuando te vas y no queda nadie",
+      pasos: {
+        ts: modoTS("ARMAR", "Armar", "Armado", { tsLogo: 1 }),
+        combi: modoC("ARMAR", "Armar (círculo cerrado)", "arm", "Si tu instalación tiene tiempo de salida, el teclado pita mientras salís."),
+      }, nota: "Si te equivocás al escribir, tocá la tecla de borrar (C en el teclado con sirena, ⌫ en la pantalla) y empezá de nuevo." },
+    { id: "stay", ico: "luna", tit: "Activar en modo noche", sub: "Para dormir: protege lo que se haya configurado para la noche",
+      pasos: {
+        ts: modoTS("NOCHE", "Noche", "Modo noche"),
+        combi: modoC("NOCHE", "Noche (círculo doble)", "noche", "Queda prendida la luz arriba del ícono de noche mientras el teclado está despierto."),
+      }, nota: "Qué sensores quedan activos en modo noche lo define la instalación." },
+    { id: "off", ico: "abierto", tit: "Desactivar la alarma", sub: "Al llegar, antes de que termine el tiempo de entrada",
+      pasos: {
+        ts: modoTS("DESARMAR", "Desarmar", "Desarmado", { tsLogo: 0 }),
+        combi: modoC("DESARMAR", "Desarmar (círculo abierto)", "des", "Listo: la alarma quedó desactivada."),
+      }, nota: "Después de 3 códigos equivocados en un minuto, el teclado se bloquea un rato. Lo puede desbloquear el administrador desde la app Ajax." },
+    { id: "tag", ico: "llave", tit: "Usar la tarjeta o el llavero", sub: "Sin escribir el código",
+      pasos: {
+        ts: [DESPIERTA_T,
+          { t: `Acercá la tarjeta o el llavero al teclado (o usá tu celular con la app Ajax).`, ts: { scr: "control" }, bip: "ok" },
+          { t: `Tocá ${K("Armar")}, ${K("Desarmar")} o ${K("Noche")}.`, tecla: "ARMAR", ts: { est: "Armado", tsLogo: 1 }, bip: "ok" }],
+        combi: [DESPIERTA_C,
+          { t: `Acercá la tarjeta o el llavero al símbolo del lector, a la izquierda de los números.`, cmb: { lector: 1 }, bip: "ok" },
+          { t: `Tocá el botón del modo: armar, desarmar o noche (la fila de abajo).`, tecla: "ARMAR", cmb: { led: "arm", marco: 1, lector: 0 }, bip: "ok" }],
+      }, nota: "Según cómo esté configurado, el teclado puede pedirte además el código, o cambiar de modo solo con acercar la tarjeta." },
+    { grupo: "Si algo pasa" },
+    { id: "mem", ico: "memoria", tit: "Después de una alarma", sub: "Cómo apagarla y ver qué sensor la disparó",
+      intro: "Los teclados Ajax no tienen una tecla de memoria: lo que pasó queda registrado en los eventos. Los ves en la app Ajax y, en el teclado de pantalla, en el sobre de arriba a la derecha.",
+      pasos: {
+        ts: [{ t: `Si la alarma se disparó, se marca el sobre de eventos con un punto rojo.`, ts: { scr: "control", est: "Armado", tsLogo: 1, badge: 1 } },
+          { t: `Desactivá: tocá ${K("Desarmar")}…`, tecla: "DESARMAR", ts: { scr: "code", dots: 0 } },
+          { t: `…escribí tu código y confirmá con el tilde.`, codigo: true },
+          { t: `Se apaga la sirena.`, tecla: "OK", ts: { scr: "control", est: "Desarmado", tsLogo: 0 }, bip: "ok" },
+          { t: `Tocá el sobre para ver qué sensor disparó la alarma.`, tecla: "EVENTOS", ts: { scr: "events" } },
+          { t: `Tocá ${K("Marcar todo como leído")} para limpiar el aviso.`, tecla: "LEIDOS", ts: { scr: "control", badge: 0 } }],
+        combi: [{ t: `Cuando la alarma se dispara, suena la sirena que tiene el teclado adentro.`, cmb: { led: "arm", marco: "alarma" } },
+          { t: `Pasá la mano y escribí tu código.`, codigo: true },
+          { t: `Tocá ${K("Desarmar")}: se apaga la sirena.`, tecla: "DESARMAR", cmb: { led: "des", marco: 0 }, bip: "ok" },
+          { t: `Para saber qué sensor la disparó, abrí la app Ajax y mirá los eventos.` }],
+      }, nota: "Si la pantalla muestra que el sistema necesita restaurarse después de una alarma, avisanos: lo hacemos nosotros." },
+    { id: "tbl", ico: "problema", tit: "Revisar los fallos", sub: "Cuando aparece un aviso de fallo",
+      intro: "Un fallo es un aviso de que algo no anda bien: por ejemplo, una pila baja o un sensor que perdió la conexión.",
+      pasos: {
+        ts: [{ t: `Si hay un fallo, la pantalla lo avisa.`, ts: { scr: "control", fallo: 1 } },
+          { t: `Para ver el detalle, abrí la app Ajax: Dispositivos, elegí el equipo marcado y mirá su estado.` },
+          { t: `Buscá el fallo en la lista de abajo para saber qué hacer.` }],
+        combi: [{ t: `Al despertar el teclado, se prende la luz arriba del ícono de fallo (el círculo con la cruz).`, cmb: { led: "des", fallo: 1 } },
+          { t: `Para ver el detalle, abrí la app Ajax: Dispositivos, elegí el equipo marcado y mirá su estado.` },
+          { t: `Buscá el fallo en la lista de abajo para saber qué hacer.` }],
+      }, problemas: [
+        ["Tapa", "Un equipo tiene la tapa abierta o lo despegaron de la pared", "Si no lo tocó nadie, avisanos."],
+        ["Señal", "Un equipo perdió la conexión con la central", "Avisanos."],
+        ["Pila", "Pila o batería baja en un equipo", "Pedinos el cambio."],
+        ["Temp.", "La temperatura del equipo está fuera de lo normal", "Avisanos."]] },
+    { id: "panico", ico: "panico", tit: "Botón de pánico", sub: "Avisa a la central de monitoreo",
+      pasos: {
+        ts: [DESPIERTA_T,
+          { t: `Tocá la pestaña ${K("Pánico")} (no hace falta código).`, tecla: "TAB_PANICO", ts: { scr: "panic" } },
+          { t: `Tocá ${K("Pánico")}.`, tecla: "PAN", ts: { scr: "send" } },
+          { t: `Si te pide confirmar, tocá ${K("Enviar")}.`, tecla: "ENVIAR", ts: { scr: "control" }, bip: "ok" }],
+        combi: [DESPIERTA_C,
+          { t: `Tocá ${K("✱")}: si está configurada como pánico, avisa a la central.`, tecla: "*", bip: "ok" },
+          { t: `Si tiene protección contra toques sin querer, hay que tocarla dos veces.`, tecla: "*", bip: "ok" }],
+      }, nota: "Solo funciona si está habilitado en tu instalación. Probalo con nosotros antes de necesitarlo." },
+    { id: "fuego", ico: "panico", tit: "Silenciar una alarma de incendio", sub: "Cuando suenan los detectores de humo",
+      pasos: {
+        ts: [{ t: `Si suena una alarma de incendio, aparece la pantalla para silenciarla.`, ts: { scr: "fire" } },
+          { t: `Tocá ${K("Silenciar")}.`, tecla: "SILENCIAR", ts: { scr: "control" }, bip: "ok" }],
+        combi: [DESPIERTA_C,
+          { t: `Tocá ${K("✱")}: si está configurada para silenciar incendio, apaga las sirenas de los detectores.`, tecla: "*", bip: "ok" }],
+      }, nota: "Solo funciona si la instalación tiene esta opción. Antes de silenciar, fijate que no haya fuego." },
+    { grupo: "Desde la app Ajax" },
+    { id: "byp", ico: "anular", tit: "Dejar un sensor sin vigilar", sub: "Para activar con una ventana abierta o un sensor que falla",
+      intro: "En Ajax los sensores se anulan desde la app, no desde el teclado. El resto de la casa queda protegido.",
+      pasos: { ts: [
+          { t: `En la app Ajax, entrá a Dispositivos y elegí el sensor.` },
+          { t: `Entrá a su configuración (la tuerca) y buscá la opción para desactivarlo.` },
+          { t: `Elegí la desactivación temporal única: el sensor no vigila hasta que vuelvas a desactivar la alarma.` },
+          { t: `Activá la alarma como siempre desde el teclado.`, antes: { ts: { scr: "control" } }, tecla: "ARMAR", ts: { est: "Armado", tsLogo: 1 } }],
+        combi: [
+          { t: `En la app Ajax, entrá a Dispositivos y elegí el sensor.` },
+          { t: `Entrá a su configuración (la tuerca) y buscá la opción para desactivarlo.` },
+          { t: `Elegí la desactivación temporal única: el sensor no vigila hasta que vuelvas a desactivar la alarma.` },
+          { t: `Activá la alarma como siempre desde el teclado.`, tecla: "ARMAR", cmb: { led: "arm" } }] },
+      nota: "Según los permisos de tu usuario, puede que no veas esta opción: pedínoslo y lo hacemos nosotros." },
+    { id: "codigo", ico: "llave", tit: "Cambiar tu código", sub: "Se hace desde la app, no desde el teclado",
+      pasos: { ts: [
+          { t: `En la app Ajax, entrá a la configuración de la central.` },
+          { t: `Entrá a Usuarios y elegí tu usuario.` },
+          { t: `Buscá el código de acceso, escribí el nuevo (de 4 a 6 cifras) y guardá.` }],
+        combi: [
+          { t: `En la app Ajax, entrá a la configuración de la central.` },
+          { t: `Entrá a Usuarios y elegí tu usuario.` },
+          { t: `Buscá el código de acceso, escribí el nuevo (de 4 a 6 cifras) y guardá.` }] },
+      nota: "Si alguien te obliga a desactivar la alarma, hay un código de coacción: desactiva normal pero avisa en silencio a la central. Pedinos configurarlo." },
+  ];
+
+  const MARCAS = {
+    paradox: { nombre: "Paradox", fun: FUN_PARADOX, teclados: [["lcd", "Teclado con pantalla (K32 LCD)", "Teclado K32 LCD"], ["k10", "Teclado sin pantalla (K10H)", "Teclado K10H"]] },
+    dsc: { nombre: "DSC", fun: FUN_DSC, teclados: [["pk", "Teclado con pantalla (PK5501)", "Teclado PK5501"], ["rkz", "Teclado de luces (PC1555RKZ)", "Teclado PC1555RKZ"]] },
+    ajax: { nombre: "Ajax", fun: FUN_AJAX, teclados: [["ts", "Pantalla táctil (KeyPad TouchScreen)", "KeyPad TouchScreen"], ["combi", "Teclado con sirena (KeyPad Combi)", "KeyPad Combi"]] },
+  };
+  let marca = "paradox", FUNCIONES = FUN_PARADOX, tipo = "lcd";
+  const PASOS = (f) => (Array.isArray(f.pasos) ? f.pasos : f.pasos[tipo] || []);
+  // ---------- armado de la página ----------
+  const lista = $("#funciones");
+  function renderLista() {
+  lista.innerHTML = "";
+  FUNCIONES.forEach((f) => {
+    if (f.grupo) { lista.insertAdjacentHTML("beforeend", `<p class="grupo-tit">${f.grupo}</p>`); return; }
+    lista.insertAdjacentHTML("beforeend", `<article class="fun" data-id="${f.id}">
+      <button class="fun-cab"><span class="hx">${ICO[f.ico]}</span><span><b>${f.tit}</b><small>${f.sub}</small></span><span class="play">${ICO.play}</span></button>
+      ${f.intro ? `<p class="intro-fun">${f.intro}</p>` : ""}
+      <ol class="pasos">${PASOS(f).map((p) => `<li>${p.t}</li>`).join("")}</ol>
+      ${f.problemas ? `<div class="problemas">${f.problemas.map(([n, d, h]) => `<div><b${n.length > 2 ? ' class="larga"' : ""}>${n}</b><span>${d}${h ? `<small>${h}</small>` : ""}</span></div>`).join("")}</div>` : ""}
+      ${f.nota ? `<p class="nota">${f.nota}</p>` : ""}</article>`);
+  });
+  lista.insertAdjacentHTML("beforeend", `<div class="aviso"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16v.01"/></svg><span>Cada instalación puede estar configurada distinto (código de 4 o 6 cifras, modo noche, pánico). Si algo no responde como acá, consultanos antes de probar otras teclas.</span></div>
+    <div class="ayuda-sat"><img src="/icons/logo.png" alt="SAT"><span><b>¿Dudas con tu alarma?</b><small>Te ayudamos por WhatsApp</small></span><a href="https://wa.me/5493413782085?text=Hola%20SAT%2C%20tengo%20una%20consulta%20sobre%20mi%20alarma." target="_blank" rel="noopener">WhatsApp</a></div>`);
+  }
+
+  // ---------- motor de la animación ----------
+  let actual = null, paso = 0, timers = [], auto = true;
+  const espera = (ms) => new Promise((r) => timers.push(setTimeout(r, ms)));
+  const CONT = { lcd: "#tecLCD", k10: "#tecK10", rkz: "#tecRKZ", pk: "#tecPK", ts: "#tecTS", combi: "#tecCMB" };
+  const raiz = () => $(CONT[tipo]);
+  const tecla = (k) => raiz().querySelector(`.tecla[data-k="${k}"]`);
+  function limpiar() { timers.forEach(clearTimeout); timers = []; }
+  function estadoBase() {
+    $$(".k10h .tecla").forEach((t) => t.classList.remove("z-on", "z-flash", "f-on", "f-flash"));
+    area("OFF");
+    $$(".tecla").forEach((t) => t.classList.remove("marca", "sostener", "apretada"));
+    $("#bip").classList.remove("on", "mal");
+    lcd(["Area 1", "Sistema Apagado"]);
+    $$(".rled").forEach((l) => l.classList.remove("v", "r", "a", "tit"));
+    dscLuces({ listo: 1, armado: 0, sistema: 0 });
+    pkSet({ d: "11:30", w: [], n: [], tri: 0 }); $("#pkCA").classList.add("on");
+    cmbSet({ led: null, fallo: 0, marco: 0, lector: 0 });
+    tsSet({ scr: "sleep", est: "Desarmado", tsLogo: 0, fallo: 0, badge: 0, dots: 0 });
+  }
+  // Ajax KeyPad Combi: indicadores (armado, desarmado, noche, fallo), marco de luz de la sirena y lector.
+  function cmbSet(c) {
+    if ("led" in c) ["Arm", "Des", "Noche"].forEach((k) => $("#cmb" + k).classList.toggle("on", c.led === k.toLowerCase()));
+    if ("fallo" in c) $("#cmbFallo").classList.toggle("on", !!c.fallo);
+    if ("marco" in c) { const m = $("#cmbMarco"); m.classList.toggle("on", c.marco === 1); m.classList.toggle("alarma", c.marco === "alarma"); }
+    if ("lector" in c) $("#cmbLector").classList.toggle("on", !!c.lector);
+  }
+  // Ajax KeyPad TouchScreen: pantalla visible, estado, logo, aviso de fallo, sobre de eventos y puntos del código.
+  function tsSet(t) {
+    if (t.scr) $$("#tecTS .tsscr").forEach((g) => g.classList.toggle("on", g.dataset.scr === t.scr));
+    if (t.est) {
+      $("#tsEstado").textContent = t.est;
+      const col = { Armado: "#E53940", Desarmado: "#2BB24C", "Modo noche": "#3D6FE0" }[t.est];
+      $("#tsAro").setAttribute("stroke", col);
+      $("#tsIcoArm").setAttribute("opacity", t.est === "Armado" ? 1 : 0);
+      $("#tsIcoDes").setAttribute("opacity", t.est === "Desarmado" ? 1 : 0);
+      $("#tsIcoNoche").setAttribute("opacity", t.est === "Modo noche" ? 1 : 0);
+    }
+    if ("tsLogo" in t) $("#tsLogo").classList.toggle("on", !!t.tsLogo);
+    if ("fallo" in t) $("#tsFallo").setAttribute("opacity", t.fallo ? 1 : 0);
+    if ("badge" in t) $("#tsBadge").setAttribute("opacity", t.badge ? 1 : 0);
+    if ("dots" in t) $$("#tecTS .tsdot").forEach((d, i) => d.classList.toggle("on", i < t.dots));
+  }
+  // DSC: luces Listo (verde), Armado (rojo) y Sistema (ámbar). En la PK5501: tilde y candado.
+  function dscLuces(l) {
+    const set = (id, v, c) => { const e = $(id); e.classList.remove("v", "r", "a", "tit"); if (v) { e.classList.add(c); if (v === "tit") e.classList.add("tit"); } };
+    if ("listo" in l) { set("#rListo", l.listo, "v"); $("#pkOk").classList.toggle("on", !!l.listo); }
+    if ("armado" in l) { set("#rArmado", l.armado, "r"); $("#pkLock").classList.toggle("on", !!l.armado); $("#pkLock").classList.toggle("tit", l.armado === "tit"); }
+    if ("sistema" in l) set("#rSistema", l.sistema, "a");
+  }
+  // PK5501: dígitos de 7 segmentos, palabras (MEMORY, BYPASS…) y números de fallo 1 a 8.
+  const SEG = { "0": "abcdef", "1": "bc", "2": "abged", "3": "abgcd", "4": "fgbc", "5": "afgcd", "6": "afgedc", "7": "abc", "8": "abcdefg", "9": "abcdfg", " ": "", "-": "g" };
+  function digito(x, ch) {
+    const on = SEG[ch] || "", s = (k, d) => `<path class="seg${on.includes(k) ? "" : " off"}" d="${d}" transform="translate(${x} 0) skewX(-6)"/>`;
+    return s("a", "M3 0h14l-3 4h-8z") + s("b", "M18 1l3 3v12l-3 2l-3-2V4z") + s("c", "M18 20l3 2v12l-3 3l-3-3V22z") + s("d", "M3 38h14l-3-4h-8z") + s("e", "M2 20l3 2v12l-3 3l-3-3V22z").replace("translate(", "translate(") + s("f", "M2 1l3 3v12l-3 2l-3-2V4z") + s("g", "M4 19l2-2h8l2 2l-2 2h-8z");
+  }
+  function pkSet(p) {
+    if (p.d !== undefined) {
+      const txt = p.d.includes(":") ? p.d.replace(":", "") : p.d.padStart(4, " ");
+      let h = ""; [0, 1, 2, 3].forEach((i) => { h += digito(i * 28 + (i > 1 ? 12 : 0), txt[i] || " "); });
+      if (p.d.includes(":")) h += '<rect class="seg" x="58" y="10" width="4" height="4"/><rect class="seg" x="57" y="24" width="4" height="4"/>';
+      $("#pkDig").innerHTML = h;
+    }
+    if (p.w) $$("#pkIco .pkw[data-w]").forEach((e) => e.classList.toggle("on", p.w.includes(e.dataset.w)));
+    if (p.n) $$("#pkIco .pkw[data-n]").forEach((e) => e.classList.toggle("on", p.n.includes(+e.dataset.n)));
+    if (p.tri !== undefined) $("#pkTri").classList.toggle("on", !!p.tri);
+  }
+  // Luces del área 1 del K10H: ARM, NOCHE, EN CASA (rojas) u OFF (verde). "-tit" = titilando.
+  function area(v) {
+    const [nom, tit] = v.split("-");
+    ["ARM", "NOCHE", "ENCASA", "OFF"].forEach((k) => { const l = $("#a1" + k); l.classList.remove("rojo", "verdeL", "tit"); if (k === nom) { l.classList.add(k === "OFF" ? "verdeL" : "rojo"); if (tit) l.classList.add("tit"); } });
+  }
+  function lcd(l) { if (!l) return; $("#kL1").textContent = l[0] || ""; $("#kL2").textContent = l[1] || ""; }
+  function aplicarEstado(p) {
+    if (p.zonas) Object.entries(p.zonas).forEach(([n, v]) => { const t = $(`#tecK10 .tecla[data-zona="${n}"]`); if (t) { t.classList.toggle("z-on", v === "on"); t.classList.toggle("z-flash", v === "flash"); } });
+    if (p.fn) Object.entries(p.fn).forEach(([k, v]) => { const t = $(`#tecK10 .tecla[data-k="${k}"]`); if (t) { t.classList.toggle("f-on", v === "on"); t.classList.toggle("f-flash", v === "flash"); } });
+    if (p.area) area(p.area);
+    if (p.zonas) Object.entries(p.zonas).forEach(([n, v]) => { const e = $("#rZ" + n); if (e) { e.classList.remove("r", "tit"); if (v) { e.classList.add("r"); if (v === "flash") e.classList.add("tit"); } } });
+    if (p.luces) dscLuces(p.luces);
+    if (p.pk) pkSet(p.pk);
+    if (p.cmb) cmbSet(p.cmb);
+    if (p.ts) tsSet({ ...p.ts, ...("tsLogo" in p ? { tsLogo: p.tsLogo } : {}) });
+    else if ("tsLogo" in p) tsSet({ tsLogo: p.tsLogo });
+  }
+  async function apretar(k, ms = 260) {
+    const t = tecla(k); if (!t) return;
+    const d = $("#dedo"), r = t.getBoundingClientRect(), c = $("#tkWrap").getBoundingClientRect();
+    d.style.left = (r.left - c.left + r.width / 2 - 17) + "px"; d.style.top = (r.top - c.top + r.height / 2 - 17) + "px"; d.style.opacity = 1;
+    await espera(320); t.classList.add("apretada"); await espera(ms); t.classList.remove("apretada"); await espera(120);
+  }
+  async function correrPaso(f, i) {
+    const p = PASOS(f)[i];
+    $("#sNum").textContent = i + 1; $("#sTxt").innerHTML = p.t;
+    $$(`.fun[data-id="${f.id}"] .pasos li`).forEach((li, k) => { li.classList.toggle("ahora", k === i); li.classList.toggle("hecho", k < i); });
+    $("#bip").classList.remove("on");
+    if (p.antes) aplicarEstado(p.antes);
+    if (p.tecla) await apretar(p.tecla);
+    if (p.teclas) for (const k of p.teclas) await apretar(k, 200);
+    if (p.codigo) {
+      const cod = typeof p.codigo === "string" ? p.codigo : CODIGO; let txt = "";
+      for (const ch of cod) { await apretar(ch, 160); txt += "*"; lcd(["Código:", txt]); tsSet({ dots: txt.length }); }
+    }
+    if (p.sostener) {
+      const ks = [].concat(p.sostener);
+      await apretar(ks[0], 10);
+      ks.forEach((k) => { tecla(k).classList.add("apretada", "sostener"); });
+      await espera(1600);
+      ks.forEach((k) => tecla(k).classList.remove("apretada", "sostener"));
+    }
+    $("#dedo").style.opacity = 0;
+    aplicarEstado(p); lcd(p.lcd);
+    if (p.bip) { $("#bip").classList.add("on"); }
+  }
+  async function reproducir(desde = 0) {
+    limpiar(); const f = actual; if (!f) return;
+    estadoBase(); paso = desde;
+    // Si arrancamos a mitad, se aplican los estados de los pasos anteriores sin animar.
+    for (let i = 0; i < desde; i++) { aplicarEstado(PASOS(f)[i]); lcd(PASOS(f)[i].lcd); }
+    for (let i = desde; i < PASOS(f).length; i++) {
+      if (actual !== f) return;
+      paso = i; await correrPaso(f, i); await espera(1500);
+    }
+    $$(`.fun[data-id="${f.id}"] .pasos li`).forEach((li) => { li.classList.remove("ahora"); li.classList.add("hecho"); });
+    await espera(2200);
+    if (actual === f && auto) reproducir(0);
+  }
+  function elegir(id) {
+    actual = FUNCIONES.find((f) => f.id === id);
+    $$(".fun").forEach((el) => el.classList.toggle("activa", el.dataset.id === id));
+    $("#vTit").textContent = actual.tit;
+    reproducir(0);
+  }
+  function setTipo(t) {
+    tipo = t;
+    $$("#selTec button").forEach((b) => b.classList.toggle("on", b.dataset.teclado === t));
+    Object.entries(CONT).forEach(([k, sel]) => { $(sel).hidden = k !== t; });
+    $("#vTec").textContent = MARCAS[marca].teclados.find((x) => x[0] === t)[2];
+    if (actual) { renderLista(); $$(".fun").forEach((el) => el.classList.toggle("activa", el.dataset.id === actual.id)); reproducir(0); }
+  }
+  function setMarca(m, t, f) {
+    marca = m; FUNCIONES = MARCAS[m].fun;
+    $$("[data-marca]").forEach((b) => b.classList.toggle("on", b.dataset.marca === m));
+    $("#eyeMarca").textContent = "Alarma " + MARCAS[m].nombre;
+    $("#selTec").innerHTML = MARCAS[m].teclados.map(([k, n]) => `<button data-teclado="${k}" role="tab">${n}</button>`).join("");
+    const previo = actual && actual.id; actual = null;
+    tipo = t && MARCAS[m].teclados.some((x) => x[0] === t) ? t : MARCAS[m].teclados[0][0];
+    renderLista();
+    setTipo(tipo);
+    elegir(FUNCIONES.some((x) => x.id === (f || previo)) ? (f || previo) : "arm");
+  }
+  document.addEventListener("click", (e) => {
+    const m = e.target.closest("[data-marca]"); if (m) return setMarca(m.dataset.marca);
+    const s = e.target.closest("[data-teclado]"); if (s) return setTipo(s.dataset.teclado);
+    const f = e.target.closest(".fun-cab"); if (f) { const id = f.parentNode.dataset.id; if (actual && actual.id === id) reproducir(0); else elegir(id); if (innerWidth < 900) $(".visor").scrollIntoView({ behavior: "smooth", block: "start" }); }
+  });
+  $("#bPlay").onclick = () => reproducir(0);
+  $("#bSig").onclick = () => { if (actual) reproducir(Math.min(PASOS(actual).length - 1, paso + 1)); };
+  $("#bAnt").onclick = () => { if (actual) reproducir(Math.max(0, paso - 1)); };
+  const p = new URLSearchParams(location.search);
+  setMarca(MARCAS[p.get("marca")] ? p.get("marca") : "paradox", p.get("teclado"), p.get("f"));
+</script>
+</body>
+</html>

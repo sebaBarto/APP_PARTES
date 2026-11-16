@@ -2294,6 +2294,11 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
     await require("../lib/consorcio").manejarPortal(req, res, { leer: leerArchivoDatos, escribir: escribirArchivoDatos });
     return;
   }
+  // Portal de clientes Mi SAT (mi-sat.html): con su propio pase (ver lib/mi-sat.js).
+  if (req.query && req.query.publico === "mi_sat") {
+    await require("../lib/mi-sat").manejarPortal(req, res, { leer: leerArchivoDatos, escribir: escribirArchivoDatos });
+    return;
+  }
   if (req.query && req.query.publico === "robo_llave") {
     await require("../lib/robo-llaves").manejarPublico(req, res, { leer: leerArchivoDatos, escribir: escribirArchivoDatos });
     return;
@@ -2435,6 +2440,11 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
   if (req.query && req.query.coleccion === "consorcio") {
     if (!autorizacion) { res.status(401).json({ error: "No autorizado", sesion_vencida: true }); return; }
     await require("../lib/consorcio").manejarAdmin(req, res, autorizacion, { leer: leerArchivoDatos, escribir: escribirArchivoDatos });
+    return;
+  }
+  if (req.query && req.query.coleccion === "mi_sat") {
+    if (!autorizacion) { res.status(401).json({ error: "No autorizado", sesion_vencida: true }); return; }
+    await require("../lib/mi-sat").manejarAdmin(req, res, autorizacion, { leer: leerArchivoDatos, escribir: escribirArchivoDatos });
     return;
   }
   if (req.query && req.query.coleccion === "registro_llaves") {

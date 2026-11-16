@@ -69,6 +69,11 @@
   ],
   "redirects": [
     {
+      "source": "/oficina",
+      "destination": "/mi-sat.html",
+      "permanent": false
+    },
+    {
       "source": "/robo",
       "destination": "/robo-llave.html",
       "permanent": false
