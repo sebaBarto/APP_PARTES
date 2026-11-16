@@ -13616,6 +13616,22 @@ let emergenciasCacheAdmin = [];
 
 // ---------- Portal de clientes (Mi SAT): aprobación de accesos (ver lib/mi-sat.js) ----------
 let misatFiltro = "pendiente", misatLista = [];
+// Lee del servidor con hasta 2 reintentos (la base a veces tarda en responder) y, si falla,
+// muestra el detalle técnico para poder diagnosticarlo.
+async function misatLeerJson(url) {
+  let ultimo = null;
+  for (let i = 0; i < 3; i++) {
+    try {
+      const r = await fetch(url, { headers: rllHeaders(), cache: "no-store" });
+      const d = await r.json().catch(() => ({ error: "Respuesta inválida del servidor (" + r.status + ")" }));
+      if (r.ok) return d;
+      ultimo = new Error((d && d.error || "Error " + r.status) + (d && d.detalle ? " — " + d.detalle : ""));
+      if (r.status < 500) break;
+    } catch (e) { ultimo = e; }
+    await new Promise((ok) => setTimeout(ok, 1200 * (i + 1)));
+  }
+  throw ultimo;
+}
 const misatEsc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const misatFecha = (iso) => iso ? new Date(iso).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
 async function cargarMiSatAdmin() {
@@ -13683,7 +13699,7 @@ let mcDatos = [];
 async function misatCargarConsulta() {
   document.getElementById("mcResumen").textContent = "Cargando…";
   try {
-    const leerJ = (u) => fetch(u, { headers: rllHeaders(), cache: "no-store" }).then(async (r) => { const d = await r.json(); if (!r.ok) throw new Error(d.error || "Error"); return d; });
+    const leerJ = misatLeerJson;
     const [cli, cuentas, fichas, abono, serv] = await Promise.all([
       misatClientesBase.length ? misatClientesBase : leerJ("/api/datos?coleccion=clientes"),
       leerJ("/api/datos?coleccion=mi_sat"), leerJ("/api/datos?coleccion=mi_sat&fichas=1"),
@@ -13801,7 +13817,7 @@ document.getElementById("misatArchivo").addEventListener("change", async (ev) =>
     let iTit = -1;
     filas.slice(0, 30).forEach((r, i) => { if (textos(r) >= 2 && (iTit < 0 || textos(r) > textos(filas[iTit]))) iTit = i; });
     if (iTit < 0) throw new Error("No encontré la fila de títulos");
-    if (!misatClientesBase.length) { const rc = await fetch("/api/datos?coleccion=clientes", { headers: rllHeaders(), cache: "no-store" }); const c = await rc.json(); misatClientesBase = Array.isArray(c) ? c : []; }
+    if (!misatClientesBase.length) { const c = await misatLeerJson("/api/datos?coleccion=clientes"); misatClientesBase = Array.isArray(c) ? c : []; }
     const titulos = filas[iTit].map((t, i) => String(t).trim() || "Columna " + (i + 1));
     misatHoja = { titulos, colNombre: titulos.findIndex((t) => /(nombre|razon|titular|apellido)/.test(misatNorm(t))), datos: filas.slice(iTit + 1).filter((r) => r.some((c) => String(c).trim())) };
     const opciones = (sel, pista) => {
@@ -13906,10 +13922,10 @@ async function misatCargarFichas() {
   try {
     const [rf, rc] = await Promise.all([
       fetch("/api/datos?coleccion=mi_sat&fichas=1", { headers: rllHeaders(), cache: "no-store" }),
-      misatClientesBase.length ? null : fetch("/api/datos?coleccion=clientes", { headers: rllHeaders(), cache: "no-store" }),
+      misatClientesBase.length ? null : misatLeerJson("/api/datos?coleccion=clientes"),
     ]);
     misatFichasData = (await rf.json()) || {};
-    if (rc) { const c = await rc.json(); misatClientesBase = Array.isArray(c) ? c : []; }
+    if (rc) { const c = await rc; misatClientesBase = Array.isArray(c) ? c : []; }
     if (!misatLista.length) { const r = await fetch("/api/datos?coleccion=mi_sat", { headers: rllHeaders(), cache: "no-store" }); misatLista = (await r.json()) || []; }
     misatPintarFichas();
   } catch (e) { cont.innerHTML = `<p class="subtitle">No se pudo cargar: ${misatEsc(e.message)}</p>`; }

@@ -820,8 +820,10 @@ async function reemplazarColeccionSinClave(ruta, filasNuevas, backendUrl, header
 async function manejarColeccionCortada(nombreColeccion, metodo, body, backendUrl, headers) {
   if (nombreColeccion === "clientes") {
     if (metodo === "GET") {
-      const r = await fetch(`${backendUrl}/api/clientes`, { headers });
-      return { status: r.status, data: await r.json() };
+      const r = await fetch(`${backendUrl}/api/clientes`, { headers, signal: AbortSignal.timeout(25000) });
+      const texto = await r.text();
+      try { return { status: r.status, data: JSON.parse(texto) }; }
+      catch (e) { return { status: 502, data: { error: "La base no respondió bien", detalle: `HTTP ${r.status}: ${texto.slice(0, 160)}` } }; }
     }
     if (metodo === "POST") {
       // admin.html manda POST con lista vacía para "borrar todos"
