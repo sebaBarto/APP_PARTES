@@ -1607,6 +1607,10 @@ test("Vehículos sin señal: tomar con revisión queda en la cola, se ve en el i
   await page.click('[data-rev=nafta] [data-v="½"]');
   await page.click("[data-rev=cubiertas] [data-v=Problema]");
   await page.click("#vehiculoTomarBtn");
+  // ¿También llevás herramientas? -> No: sigue normal
+  await page.waitForSelector('.dlg-app .stk-opcion:has-text("No")');
+  assert.match(await page.textContent(".dlg-app"), /¿También llevás herramientas\?/);
+  await page.click('.dlg-app .stk-opcion:has-text("No")');
   await page.waitForTimeout(400);
   const cola = await page.evaluate(() => obtenerColaEnvios().map((i) => i.tipo + ":" + i.cuerpo.accion + ":" + (i.cuerpo.tipo_evento || "")));
   assert.deepStrictEqual(cola, ["vehiculo:tomar:", "vehiculo:evento:Revisión al tomar"]);
@@ -1631,6 +1635,66 @@ test("Vehículos sin señal: tomar con revisión queda en la cola, se ve en el i
   assert.match(posts[1].detalle, /Nafta ½ · Cubiertas: PROBLEMA/);
   assert.match(posts[1].detalle, /10 km más que el último registro/);
   assert.strictEqual(await page.evaluate(() => obtenerColaEnvios().length), 0);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Vehículos: al tomarlo pregunta si lleva herramientas; con Sí tiene que tomar al menos una antes de que se registre el vehículo", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const posts = [];
+  let herramientas = [
+    { nombre: "Escalera 6 m", tipo: "escalera", estado: "libre" },
+    { nombre: "Taladro", tipo: "electrica", estado: "libre" },
+    { nombre: "Notebook", tipo: "computadora", estado: "uso", tecnico_actual: "Luis" },
+    { nombre: "Tester", estado: "uso", tecnico_actual: "Juan Pérez" },
+  ];
+  let falla = "";
+  await page.route("**/api/**", (route) => {
+    const req = route.request(); const u = req.url();
+    const json = (o, st) => route.fulfill({ status: st || 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (req.method() === "POST") {
+      const b = JSON.parse(req.postData() || "{}");
+      if (b.recurso === "herramienta" && b.nombre === falla) return json({ error: "Ya la tomó otro" }, 409);
+      posts.push(b);
+      if (b.recurso === "herramienta" && b.accion === "tomar") herramientas = herramientas.map((h) => (h.nombre === b.nombre ? { ...h, estado: "uso", tecnico_actual: b.tecnico } : h));
+      return json({ ok: true, id: "f1" });
+    }
+    if (u.includes("coleccion=herramientas")) return json(herramientas);
+    if (u.includes("coleccion=vehiculos")) return json([{ nombre: "Kangoo", km_actual: 1000, umbrales: [] }]);
+    json([]);
+  });
+  await page.goto(base + "/");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { tecnicoLogueado = "Juan Pérez"; vehiculoSeleccionado = "Kangoo"; showScreen("vehiculoDetalle"); return renderVehiculoDetalle(); });
+  await page.click("#vehiculoTomarBtn");
+  await page.click('.dlg-app .stk-opcion:has-text("Sí")');
+  await page.waitForSelector(".veh-herr-lista");
+  const lista = await page.$$eval(".veh-herr-item", (l) => l.map((x) => x.innerText.replace(/\s+/g, " ").trim()));
+  assert.deepStrictEqual(lista, ["Escalera 6 m", "Taladro", "✓ Tester Ya la tenés", "Notebook En uso: Luis"]);
+  assert.strictEqual(await page.locator(".veh-herr-lista input").count(), 2, "solo se pueden marcar las libres");
+  // Sin marcar ninguna no sigue
+  await page.click(".veh-herr-caja .dlg-si");
+  assert.match(await page.textContent(".veh-herr-error"), /Marcá al menos una herramienta/);
+  assert.strictEqual(posts.length, 0, "todavía no se tomó nada");
+  // «Volver» pregunta de nuevo; Escape en la pregunta cancela sin tomar el vehículo
+  await page.click(".veh-herr-caja .dlg-no");
+  await page.waitForSelector('.dlg-app .stk-opcion:has-text("Sí")');
+  await page.click('.dlg-app .stk-opcion:has-text("Sí")');
+  // Una falla: la que sí se tomó queda, el vehículo espera
+  falla = "Taladro";
+  await page.check('.veh-herr-lista input[value="Escalera 6 m"]');
+  await page.check('.veh-herr-lista input[value="Taladro"]');
+  await page.click(".veh-herr-caja .dlg-si");
+  await page.waitForFunction(() => /No se pudo tomar: Taladro: Ya la tomó otro/.test(document.querySelector(".veh-herr-error").textContent));
+  assert.deepStrictEqual(posts.map((p) => [p.recurso || "vehiculo", p.accion, p.nombre || p.vehiculo]), [["herramienta", "tomar", "Escalera 6 m"]]);
+  assert.match(await page.textContent(".veh-herr-lista"), /✓ Escalera 6 m\s*Ya la tenés/);
+  // Se arregla y termina: primero la herramienta, después el vehículo
+  falla = "";
+  await page.click(".veh-herr-caja .dlg-si");
+  await page.waitForFunction(() => /Tomaste Kangoo y 2 herramientas/.test(document.getElementById("toast").textContent));
+  assert.deepStrictEqual(posts.map((p) => [p.recurso || "vehiculo", p.accion, p.nombre || p.vehiculo, p.tecnico]), [
+    ["herramienta", "tomar", "Escalera 6 m", "Juan Pérez"], ["herramienta", "tomar", "Taladro", "Juan Pérez"], ["vehiculo", "tomar", "Kangoo", "Juan Pérez"],
+  ]);
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });

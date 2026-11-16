@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.80.0";
+const APP_VERSION = "4.81.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -12222,6 +12222,79 @@ vehiculoRegistrarEventoBtn.addEventListener("click", async () => {
   renderVehiculosPicker();
 });
 
+// ---------- Al tomar un vehículo: ¿también llevás herramientas? ----------
+// Sí -> tiene que tomar al menos una (quedan a su nombre) antes de que se registre el vehículo.
+// No -> sigue como siempre. Devuelve los nombres tomados ([] = no lleva) o null (canceló).
+function vehElegirHerramientas(herramientas) {
+  return new Promise((resolver) => {
+    const mio = tecnicoLogueado || "";
+    const libres = herramientas.filter((h) => h.estado === "libre");
+    const mias = herramientas.filter((h) => h.estado === "uso" && h.tecnico_actual === mio);
+    const capa = document.createElement("div");
+    capa.className = "modal-overlay dlg-app";
+    capa.innerHTML = `<div class="modal-caja veh-herr-caja" role="dialog" aria-modal="true" aria-label="Herramientas que llevás">
+      <p class="dlg-texto"><b>¿Qué herramientas llevás?</b>\nMarcá las que te llevás: quedan a tu nombre.</p>
+      <div class="veh-herr-lista">
+        ${libres.map((h) => `<label class="veh-herr-item"><input type="checkbox" value="${escapeHtml(h.nombre)}"><span>${escapeHtml(h.nombre)}</span></label>`).join("")}
+        ${mias.map((h) => `<div class="veh-herr-item veh-herr-ya"><span>✓ ${escapeHtml(h.nombre)}</span><small>Ya la tenés</small></div>`).join("")}
+        ${herramientas.filter((h) => h.estado !== "libre" && !(h.estado === "uso" && h.tecnico_actual === mio)).map((h) => `<div class="veh-herr-item veh-herr-ocupada"><span>${escapeHtml(h.nombre)}</span><small>${escapeHtml(claseYTextoEstadoHerramienta(h).texto)}</small></div>`).join("")}
+      </div>
+      <p class="veh-herr-error hidden" role="alert"></p>
+      <div class="dlg-botones"><button type="button" class="dlg-no">Volver</button><button type="button" class="dlg-si">Tomar herramientas</button></div>
+    </div>`;
+    const error = capa.querySelector(".veh-herr-error"), si = capa.querySelector(".dlg-si");
+    const cerrar = (v) => { document.removeEventListener("keydown", tecla, true); capa.remove(); resolver(v); };
+    const tecla = (e) => { if (e.key === "Escape") { e.preventDefault(); cerrar(undefined); } };
+    capa.querySelector(".dlg-no").addEventListener("click", () => cerrar(undefined));
+    si.addEventListener("click", async () => {
+      const elegidas = [...capa.querySelectorAll(".veh-herr-lista input:checked")].map((i) => i.value);
+      if (!elegidas.length) { error.textContent = "Marcá al menos una herramienta. Si no llevás ninguna, tocá «Volver» y respondé No."; error.classList.remove("hidden"); return; }
+      si.disabled = true; si.textContent = "Tomando…"; error.classList.add("hidden");
+      const tomadas = [], fallas = [];
+      for (const nombre of elegidas) {
+        try { await llamarHerramientaUso("tomar", {}, nombre); tomadas.push(nombre); }
+        catch (err) { fallas.push(`${nombre}: ${err.message}`); }
+      }
+      if (fallas.length) {
+        // Las que sí se tomaron quedan tildadas como «Ya la tenés»; el vehículo todavía no se toma.
+        tomadas.forEach((n) => { const i = [...capa.querySelectorAll(".veh-herr-lista input")].find((x) => x.value === n); if (i) { const fila = i.closest(".veh-herr-item"); fila.className = "veh-herr-item veh-herr-ya"; fila.innerHTML = `<span>✓ ${escapeHtml(n)}</span><small>Ya la tenés</small>`; } });
+        error.textContent = `No se pudo tomar: ${fallas.join(" · ")}. Probá de nuevo o destildala.`; error.classList.remove("hidden");
+        si.disabled = false; si.textContent = "Tomar herramientas";
+        capa.tomadas = [...(capa.tomadas || []), ...tomadas];
+        if (!capa.querySelector(".veh-herr-lista input")) cerrar(capa.tomadas);
+        return;
+      }
+      cerrar([...(capa.tomadas || []), ...tomadas]);
+    });
+    document.addEventListener("keydown", tecla, true);
+    document.body.appendChild(capa);
+    const primero = capa.querySelector(".veh-herr-lista input"); if (primero) primero.focus(); else si.focus();
+  });
+}
+async function vehPreguntarHerramientas() {
+  for (;;) {
+    const lleva = await elegirOpcionApp("¿También llevás herramientas?", [
+      { v: "si", texto: "Sí", ayuda: "Las tomás ahora, antes de terminar de tomar el vehículo." },
+      { v: "no", texto: "No", ayuda: "Seguís tomando el vehículo." },
+    ]);
+    if (!lleva) return null;
+    if (lleva === "no") return [];
+    let herramientas;
+    try { herramientas = await fetchHerramientasConfig(); }
+    catch (e) {
+      const igual = await confirmarApp("No se pudo cargar la lista de herramientas (¿sin señal?). Tomalas después desde «Herramientas».\n\n¿Seguís tomando el vehículo?", { aceptar: "Sí, seguir", cancelar: "No" });
+      return igual ? [] : null;
+    }
+    if (!herramientas.some((h) => h.estado === "libre")) {
+      const tiene = herramientas.filter((h) => h.estado === "uso" && h.tecnico_actual === (tecnicoLogueado || "")).map((h) => h.nombre);
+      const igual = await confirmarApp(tiene.length ? `No hay herramientas libres. Ya tenés: ${tiene.join(", ")}.\n\n¿Seguís tomando el vehículo?` : "No hay herramientas libres para llevar.\n\n¿Seguís tomando el vehículo?", { aceptar: "Sí, seguir", cancelar: "No" });
+      return igual ? [] : null;
+    }
+    const tomadas = await vehElegirHerramientas(herramientas);
+    if (tomadas !== undefined) return tomadas; // «Volver»: se vuelve a preguntar
+  }
+}
+
 vehiculoTomarBtn.addEventListener("click", async () => {
   const kmToma = kmNumero(vehiculoKmToma.value);
   const revision = textoRevisionVehiculo();
@@ -12236,6 +12309,12 @@ vehiculoTomarBtn.addEventListener("click", async () => {
   const tecnico = tecnicoLogueado || "Oficina";
   const vehiculo = vehiculoSeleccionado;
   vehiculoTomarBtn.disabled = true;
+  // Antes de registrar el vehículo: ¿lleva herramientas? (si dice que sí, las toma primero)
+  let herramientasTomadas = [];
+  try {
+    herramientasTomadas = await vehPreguntarHerramientas();
+    if (herramientasTomadas === null) { vehiculoTomarBtn.disabled = false; return; }
+  } catch (err) { vehiculoTomarBtn.disabled = false; showToast("No se pudo: " + err.message); return; }
   try {
     const r = await enviarAccionVehiculo({
       accion: "tomar",
@@ -12262,7 +12341,8 @@ vehiculoTomarBtn.addEventListener("click", async () => {
         showToast("Lo tomaste, pero la revisión no se pudo guardar: " + err.message);
       }
     }
-    showToast(enCola ? `Sin señal: quedó guardado que tomaste ${vehiculo}. Se manda solo cuando vuelva la conexión.` : `Tomaste ${vehiculo}.`);
+    const conHerr = herramientasTomadas.length ? ` y ${herramientasTomadas.length === 1 ? `«${herramientasTomadas[0]}»` : `${herramientasTomadas.length} herramientas`}` : "";
+    showToast(enCola ? `Sin señal: quedó guardado que tomaste ${vehiculo}${conHerr}. Se manda solo cuando vuelva la conexión.` : `Tomaste ${vehiculo}${conHerr}.`);
     limpiarRevisionVehiculo();
     showScreen("vehiculos");
     renderVehiculosPicker();
@@ -13439,14 +13519,14 @@ async function renderHerramientaDetalle() {
   }
 }
 
-async function llamarHerramientaUso(accion, extra) {
+async function llamarHerramientaUso(accion, extra, nombre) {
   const res = await fetch("/api/recurso-uso", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN },
     body: JSON.stringify({
       recurso: "herramienta",
       accion,
-      nombre: herramientaSeleccionada,
+      nombre: nombre || herramientaSeleccionada,
       tecnico: tecnicoLogueado || "",
       hora: horaActualHHMM(),
       ...extra,

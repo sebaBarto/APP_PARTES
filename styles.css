@@ -4170,3 +4170,15 @@ html[data-inicio="nuevo"] .app #screen-deposito #depConsultarEscanearBtn { backg
 .rp-btn[disabled] { opacity: .6; }
 .rp-forma { display: flex; align-items: center; gap: 6px; font-size: 14px; color: rgba(255,255,255,.8); margin-left: auto; }
 .rp-forma select { min-height: 40px; border-radius: 10px; background: #1c1c20; color: #fff; border: 1px solid rgba(255,255,255,.22); padding: 0 8px; font: inherit; }
+
+/* Al tomar un vehículo: elegir las herramientas que lleva */
+.veh-herr-caja { max-width: 420px; }
+.veh-herr-lista { display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow-y: auto; margin: 0 0 12px; }
+.veh-herr-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 48px; padding: 8px 12px; border: 1px solid #D5DAE0; border-radius: 10px; font-size: 15px; }
+label.veh-herr-item { justify-content: flex-start; cursor: pointer; }
+label.veh-herr-item input { width: 22px; height: 22px; accent-color: #F5A623; flex: 0 0 auto; }
+label.veh-herr-item:has(input:checked) { border-color: #F5A623; background: #FFF6E3; font-weight: 600; }
+.veh-herr-ya { background: #EAF6EE; border-color: #9BD3AE; }
+.veh-herr-ocupada { opacity: .55; }
+.veh-herr-item small { font-size: 12px; color: #5B6B7B; text-align: right; }
+.veh-herr-error { color: #B42318; font-size: 13.5px; margin: 0 0 10px; }
