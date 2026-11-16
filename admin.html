@@ -3967,7 +3967,19 @@ clientesExcelFile.addEventListener("change", () => {
       });
       const existentes = await resExistente.json();
       const registro = new Map((Array.isArray(existentes) ? existentes : []).map((c) => [c.numero_cliente, c]));
-      nuevos.forEach((c) => registro.set(c.numero_cliente, c));
+      // Abonados del tipo «1E72» o «11E2»: Excel los convierte en números y en la planilla
+      // llegan como «1.00E+72» o «1100». Si la base ya tiene el abonado bien escrito y vale
+      // lo mismo, se conserva el de la base (corregido el 16/11/2026) en vez de pisarlo.
+      let abonadosConservados = 0;
+      const pareceNumero = (t) => /^-?\d+(\.\d+)?(e[+-]?\d+)?$/i.test(String(t || "").trim());
+      nuevos.forEach((c) => {
+        const viejo = registro.get(c.numero_cliente);
+        const va = viejo && String(viejo.numero_abonado || "").trim(), na = String(c.numero_abonado || "").trim();
+        if (va && na && va.toUpperCase() !== na.toUpperCase() && /E/i.test(va) && !/[.+]/.test(va) && pareceNumero(va) && pareceNumero(na) && Number(va) === Number(na)) {
+          c.numero_abonado = va; abonadosConservados++;
+        }
+        registro.set(c.numero_cliente, c);
+      });
       const listaFinal = [...registro.values()];
 
       const res = await fetch("/api/datos?coleccion=clientes", {
@@ -3983,6 +3995,7 @@ clientesExcelFile.addEventListener("change", () => {
       clientesImportStatus.textContent = descartadasSinNumero > 0
         ? `Listo — ${nuevos.length} filas cargadas, ${listaFinal.length} en total. Atención: ${descartadasSinNumero} fila(s) se descartaron por no tener "N° de Cliente" cargado.`
         : `Listo — ${nuevos.length} filas leídas de la planilla, ${listaFinal.length} en total.`;
+      if (abonadosConservados) clientesImportStatus.textContent += ` Se conservaron ${abonadosConservados} N° de abonado que Excel había convertido en números (ej. 1E72 → 1.00E+72).`;
       dibujarResultadosClientesAdmin();
     } catch (err) {
       clientesImportStatus.className = "status err";
