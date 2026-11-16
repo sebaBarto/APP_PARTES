@@ -2408,7 +2408,8 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
           <input type="file" id="misatArchivo" accept=".xlsx,.xls,.csv">
           <div id="misatMapeo" class="hidden">
             <div class="misat-cols">
-              <label>Columna del N° de cliente<select id="misatColNum"></select></label>
+              <label>Columna del número<select id="misatColNum"></select></label>
+              <label>Ese número es el…<select id="misatTipoNum"><option value="abonado">N° de abonado (como el listado de cargos mensuales)</option><option value="cliente">N° de cliente</option></select></label>
               <label>Columna del estado (pagó / debe)<select id="misatColEst"></select></label>
               <label>Columna del saldo o importe adeudado<select id="misatColSaldo"></select></label>
             </div>
@@ -13653,7 +13654,7 @@ function misatClasificar(estadoTxt, saldo) {
   const e = misatNorm(estadoTxt);
   if (e) {
     if (/(no pag|impag|debe|deud|adeud|pend|atras|venc|moros|falta)/.test(e)) return "pendiente";
-    if (/(pagad|pago|al dia|^ok$|^si$|cancelad|abonad|sin deuda)/.test(e)) return "al_dia";
+    if (/(cobrad|pagad|pago|al dia|^ok$|^si$|cancelad|abonad|sin deuda)/.test(e)) return "al_dia";
   }
   if (saldo != null) return saldo > 0.009 ? "pendiente" : "al_dia";
   return "";
@@ -13674,47 +13675,97 @@ document.getElementById("misatArchivo").addEventListener("change", async (ev) =>
     const wb = XLSX.read(await f.arrayBuffer(), { type: "array" });
     const filas = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: "", raw: true });
     // La fila de títulos es la primera que tiene al menos 2 celdas con texto.
-    const iTit = filas.findIndex((r) => r.filter((c) => String(c).trim() && isNaN(c)).length >= 2);
+    const textos = (r) => r.filter((c) => String(c).trim() && isNaN(c)).length;
+    let iTit = -1;
+    filas.slice(0, 30).forEach((r, i) => { if (textos(r) >= 2 && (iTit < 0 || textos(r) > textos(filas[iTit]))) iTit = i; });
     if (iTit < 0) throw new Error("No encontré la fila de títulos");
+    if (!misatClientesBase.length) { const rc = await fetch("/api/datos?coleccion=clientes", { headers: rllHeaders(), cache: "no-store" }); const c = await rc.json(); misatClientesBase = Array.isArray(c) ? c : []; }
     const titulos = filas[iTit].map((t, i) => String(t).trim() || "Columna " + (i + 1));
-    misatHoja = { titulos, datos: filas.slice(iTit + 1).filter((r) => r.some((c) => String(c).trim())) };
+    misatHoja = { titulos, colNombre: titulos.findIndex((t) => /(nombre|razon|titular|apellido)/.test(misatNorm(t))), datos: filas.slice(iTit + 1).filter((r) => r.some((c) => String(c).trim())) };
     const opciones = (sel, pista) => {
       const s = document.getElementById(sel);
       s.innerHTML = `<option value="-1">— ninguna —</option>` + titulos.map((t, i) => `<option value="${i}">${misatEsc(t)}</option>`).join("");
       const i = titulos.findIndex((t) => pista.test(misatNorm(t))); s.value = String(i);
     };
-    opciones("misatColNum", /(n.? ?de? ?cliente|nro|numero|cliente|codigo|cod|abonado|cuenta)/);
-    opciones("misatColEst", /(estado|situacion|pago|pagado|condicion)/);
-    opciones("misatColSaldo", /(saldo|deuda|importe|debe|monto|total)/);
+    opciones("misatColNum", /(abonado|n.? ?de? ?cliente|nro|numero|cliente|codigo|cod|cuenta)/);
+    document.getElementById("misatTipoNum").value = /abonado/.test(misatNorm(titulos[+document.getElementById("misatColNum").value] || "")) ? "abonado" : "cliente";
+    opciones("misatColEst", /(estado|situacion|condicion)/);
+    opciones("misatColSaldo", /(pendiente|saldo|deuda|adeud|debe)/);
+    if (document.getElementById("misatColSaldo").value === "-1") opciones("misatColSaldo", /(importe|monto|total)/);
     if (document.getElementById("misatColSaldo").value === document.getElementById("misatColEst").value) document.getElementById("misatColSaldo").value = "-1";
     document.getElementById("misatMapeo").classList.remove("hidden");
     misatPrevisualizar();
   } catch (e) { alert("No se pudo leer el archivo: " + e.message); }
 });
+// N° de abonado → clave para comparar. Excel convierte los abonados del tipo «1E72» en
+// números (1e+72) y en la base algunos quedaron como «1.00E+72»: los dos se comparan por
+// su valor. Los demás, en mayúsculas y sin espacios ni guiones («S3 1292» = «S3-1292»).
+function misatClaveAbonado(v) {
+  if (typeof v === "number") return Number.isFinite(v) ? "#" + v : "";
+  const t = String(v == null ? "" : v).trim();
+  if (/^-?\d+(\.\d+)?(e[+-]?\d+)?$/i.test(t)) return "#" + Number(t);
+  return t.toUpperCase().replace(/[\s\-]/g, "");
+}
+function misatIndiceAbonados() {
+  const idx = new Map();
+  misatClientesBase.forEach((c) => { const k = misatClaveAbonado(c.numero_abonado); if (!k || k === "#0") return; if (!idx.has(k)) idx.set(k, []); idx.get(k).push(c); });
+  return idx;
+}
 function misatFilasCalculadas() {
   if (!misatHoja) return [];
   const cn = +document.getElementById("misatColNum").value, ce = +document.getElementById("misatColEst").value, cs = +document.getElementById("misatColSaldo").value;
   if (cn < 0) return [];
-  return misatHoja.datos.map((r) => {
-    const numero_cliente = String(r[cn] == null ? "" : r[cn]).replace(/\.0+$/, "").replace(/[^0-9A-Za-z\-]/g, "");
+  const porAbonado = document.getElementById("misatTipoNum").value === "abonado";
+  const idx = porAbonado ? misatIndiceAbonados() : null;
+  const filas = misatHoja.datos.map((r) => {
+    const crudo = r[cn];
+    const mostrado = typeof crudo === "number" && Math.abs(crudo) >= 1e5 ? crudo.toExponential().toUpperCase() : String(crudo == null ? "" : crudo).trim();
     const saldo = cs >= 0 ? misatNumero(r[cs]) : null;
-    return { numero_cliente, estado_txt: ce >= 0 ? String(r[ce]) : "", saldo, estado: misatClasificar(ce >= 0 ? r[ce] : "", saldo) };
-  }).filter((f) => f.numero_cliente);
+    let numero_cliente = "", cliente = null, problema = "";
+    if (porAbonado) {
+      const k = misatClaveAbonado(crudo), m = k && k !== "#0" ? idx.get(k) || [] : [];
+      if (m.length === 1) { cliente = m[0]; numero_cliente = String(cliente.numero_cliente); }
+      else problema = m.length > 1 ? "Ese abonado está en más de un cliente" : "No está en la base";
+    } else {
+      numero_cliente = String(crudo == null ? "" : crudo).replace(/\.0+$/, "").replace(/[^0-9A-Za-z\-]/g, "");
+      cliente = misatClientesBase.find((c) => misatSinCero(c.numero_cliente) === misatSinCero(numero_cliente)) || null;
+      if (!numero_cliente) problema = "Sin número";
+    }
+    const nombreArchivo = misatHoja.colNombre >= 0 ? String(r[misatHoja.colNombre] || "").trim() : "";
+    return { original: mostrado + (nombreArchivo ? " · " + nombreArchivo : ""), numero_cliente, nombre: cliente ? cliente.nombre : "", estado_txt: ce >= 0 ? String(r[ce]) : "", saldo, estado: misatClasificar(ce >= 0 ? r[ce] : "", saldo), problema };
+  }).filter((f) => f.original);
+  return filas;
 }
+// Un cliente puede tener más de un cargo: queda «debe» si alguno está pendiente, y el saldo se suma.
+function misatPorCliente(filas) {
+  const m = new Map();
+  filas.filter((f) => f.numero_cliente && f.estado).forEach((f) => {
+    const k = misatSinCero(f.numero_cliente), x = m.get(k);
+    if (!x) m.set(k, { numero_cliente: f.numero_cliente, estado: f.estado, saldo: f.saldo });
+    else { if (f.estado === "pendiente") x.estado = "pendiente"; x.saldo = (x.saldo || 0) + (f.saldo || 0); }
+  });
+  return [...m.values()];
+}
+let misatVerProblemas = false;
 function misatPrevisualizar() {
-  const filas = misatFilasCalculadas(), ok = filas.filter((f) => f.estado);
-  const deben = ok.filter((f) => f.estado === "pendiente").length;
-  document.getElementById("misatResumen").textContent = filas.length ? `${filas.length} filas con N° de cliente: ${ok.length - deben} al día, ${deben} con pagos pendientes${filas.length - ok.length ? `, ${filas.length - ok.length} sin poder clasificar (no se guardan)` : ""}.` : "Elegí la columna del N° de cliente.";
-  document.getElementById("misatPrevia").innerHTML = filas.length ? `<table class="misat-tabla"><tr><th>N° cliente</th><th>Estado en el archivo</th><th>Saldo</th><th>Resultado</th></tr>${filas.slice(0, 12).map((f) => `<tr><td>${misatEsc(f.numero_cliente)}</td><td>${misatEsc(f.estado_txt)}</td><td>${f.saldo == null ? "" : "$ " + f.saldo.toLocaleString("es-AR")}</td><td>${f.estado === "al_dia" ? '<span class="misat-ok">Al día</span>' : f.estado === "pendiente" ? '<span class="misat-mal">Debe</span>' : "—"}</td></tr>`).join("")}</table>${filas.length > 12 ? `<p class="subtitle">… y ${filas.length - 12} filas más.</p>` : ""}` : "";
+  const filas = misatFilasCalculadas(), clientes = misatPorCliente(filas);
+  const deben = clientes.filter((f) => f.estado === "pendiente").length;
+  const sinCliente = filas.filter((f) => f.problema), sinEstado = filas.filter((f) => !f.problema && !f.estado);
+  document.getElementById("misatResumen").innerHTML = filas.length ? `${filas.length} filas → <span class="misat-ok">${clientes.length - deben} clientes al día</span> y <span class="misat-mal">${deben} con pagos pendientes</span>.`
+    + (sinCliente.length ? ` ${sinCliente.length} filas no se pudieron unir a un cliente de la base y no se guardan <button type="button" class="btn-secondary-admin" style="width:auto;padding:2px 10px" id="misatVerProb">${misatVerProblemas ? "Ver todas" : "Ver cuáles"}</button>` : "")
+    + (sinEstado.length ? ` ${sinEstado.length} sin poder clasificar.` : "") : "Elegí la columna del número.";
+  const lista = misatVerProblemas ? sinCliente : filas;
+  document.getElementById("misatPrevia").innerHTML = lista.length ? `<table class="misat-tabla"><tr><th>En el archivo</th><th>Cliente en la base</th><th>Estado</th><th>Saldo</th><th>Resultado</th></tr>${lista.slice(0, misatVerProblemas ? 300 : 12).map((f) => `<tr><td>${misatEsc(f.original)}</td><td>${f.problema ? `<span class="misat-mal">${misatEsc(f.problema)}</span>` : `N° ${misatEsc(f.numero_cliente)} · ${misatEsc(f.nombre)}`}</td><td>${misatEsc(f.estado_txt)}</td><td>${f.saldo == null ? "" : "$ " + f.saldo.toLocaleString("es-AR")}</td><td>${f.problema ? "—" : f.estado === "al_dia" ? '<span class="misat-ok">Al día</span>' : f.estado === "pendiente" ? '<span class="misat-mal">Debe</span>' : "—"}</td></tr>`).join("")}</table>${!misatVerProblemas && lista.length > 12 ? `<p class="subtitle">… y ${lista.length - 12} filas más.</p>` : ""}` : "";
+  const b = document.getElementById("misatVerProb"); if (b) b.addEventListener("click", () => { misatVerProblemas = !misatVerProblemas; misatPrevisualizar(); });
 }
-["misatColNum", "misatColEst", "misatColSaldo"].forEach((id) => document.getElementById(id).addEventListener("change", misatPrevisualizar));
+["misatColNum", "misatTipoNum", "misatColEst", "misatColSaldo"].forEach((id) => document.getElementById(id).addEventListener("change", misatPrevisualizar));
 document.getElementById("misatGuardarEstado").addEventListener("click", async (ev) => {
-  const filas = misatFilasCalculadas().filter((f) => f.estado);
+  const filas = misatPorCliente(misatFilasCalculadas());
   if (!filas.length) { alert("No hay filas para guardar: revisá las columnas elegidas."); return; }
   if (!(await confirmarAdmin(`¿Guardar el estado de cuenta de ${filas.length} clientes? Reemplaza al archivo anterior.`))) return;
   ev.target.disabled = true;
   try {
-    const r = await fetch("/api/datos?coleccion=mi_sat", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "cargar_estado_cuenta", archivo: misatArchivoNombre, filas: filas.map((f) => ({ numero_cliente: f.numero_cliente, estado: f.estado, saldo: f.saldo })), no_figuran_al_dia: document.getElementById("misatNoFiguran").checked, mostrar_importe: document.getElementById("misatImporte").checked }) });
+    const r = await fetch("/api/datos?coleccion=mi_sat", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "cargar_estado_cuenta", archivo: misatArchivoNombre, filas, no_figuran_al_dia: document.getElementById("misatNoFiguran").checked, mostrar_importe: document.getElementById("misatImporte").checked }) });
     const d = await r.json(); if (!r.ok) throw new Error(d.error || "Error");
     avisoAdmin(`Listo: se guardó el estado de cuenta de ${d.total} clientes.`);
     document.getElementById("misatMapeo").classList.add("hidden"); document.getElementById("misatArchivo").value = ""; misatHoja = null;
