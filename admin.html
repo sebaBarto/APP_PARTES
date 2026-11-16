@@ -369,6 +369,14 @@
   .misat-tipo { text-align: left; border: 1.5px solid rgba(16,24,32,.15); background: #fff; color: #101820; border-radius: 12px; padding: 10px 12px; font: inherit; cursor: pointer; display: grid; gap: 2px; }
   .misat-tipo small { color: #6B7680; font-size: 12.5px; } .misat-tipo.on { border-color: #101820; box-shadow: 0 0 0 2px #F6B828; }
   .misat-res { font-size: 12.5px; color: #1B7F3B; font-weight: 600; } .misat-res:empty { display: none; }
+  .msol-badge { display: inline-block; background: #C62828; color: #fff; border-radius: 999px; padding: 0 7px; font-size: 12px; line-height: 18px; margin-left: 4px; }
+  .msol-badge.hidden { display: none; }
+  .misat-sf { border: 1px solid rgba(16,24,32,.15); background: #fff; color: #101820; border-radius: 999px; padding: 5px 12px; font: inherit; font-size: 13px; cursor: pointer; }
+  .misat-sf.on { background: #F6B828; border-color: #F6B828; font-weight: 700; }
+  .msol-card.pendiente { border-left: 4px solid #F6B828; }
+  .msol-tipo { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; border-radius: 999px; padding: 3px 9px; background: #101820; color: #F6B828; }
+  .msol-cont { margin: 2px 0 0; padding-left: 22px; font-size: 14px; } .msol-cont li { margin: 2px 0; }
+  .msol-pal { font-family: "IBM Plex Mono", monospace; background: #F3F1EA; border-radius: 6px; padding: 1px 8px; }
   .misat-sep { width: 1px; background: rgba(16,24,32,.15); margin: 0 4px; }
   .misat-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
   .misat-cols label, .misat-form label { display: grid; gap: 4px; font-size: 13px; color: #6B7680; }
@@ -2402,7 +2410,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
     <div id="panelMiSat" class="hidden">
       <h1>Portal de clientes (Mi SAT)</h1>
       <p class="subtitle">Pedidos de acceso al portal <a href="https://pedido.sat365.com.ar/oficina" target="_blank" rel="noopener">pedido.sat365.com.ar/oficina</a>. Antes de aprobar, controlá que el DNI sea del titular y que el celular coincida con el de la cuenta. Al aprobar, avisale al cliente por WhatsApp.</p>
-      <div class="misat-filtros"><button type="button" class="misat-f on" data-f="pendiente">Pendientes</button><button type="button" class="misat-f" data-f="activa">Activas</button><button type="button" class="misat-f" data-f="otras">Rechazadas y bajas</button><span class="misat-sep"></span><button type="button" class="misat-f" data-f="estado">Estado de cuenta</button><button type="button" class="misat-f" data-f="fichas">Datos de clientes</button><span class="misat-sep"></span><button type="button" class="misat-f" data-f="consulta">🔎 Buscar clientes</button></div>
+      <div class="misat-filtros"><button type="button" class="misat-f" data-f="solicitudes">📞 Pedidos para monitoreo <b class="msol-badge hidden" id="misatSolBadge">0</b></button><span class="misat-sep"></span><button type="button" class="misat-f on" data-f="pendiente">Pendientes</button><button type="button" class="misat-f" data-f="activa">Activas</button><button type="button" class="misat-f" data-f="otras">Rechazadas y bajas</button><span class="misat-sep"></span><button type="button" class="misat-f" data-f="estado">Estado de cuenta</button><button type="button" class="misat-f" data-f="fichas">Datos de clientes</button><span class="misat-sep"></span><button type="button" class="misat-f" data-f="consulta">🔎 Buscar clientes</button></div>
       <p id="misatStatus" class="subtitle"></p>
       <div id="misatLista"></div>
       <div id="misatEstado" class="hidden">
@@ -2430,6 +2438,11 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
             <div class="misat-acc"><button type="button" class="misat-aprobar" id="misatGuardarEstado">Guardar estado de cuenta</button></div>
           </div>
         </div>
+      </div>
+      <div id="misatSolicitudes" class="hidden">
+        <p class="subtitle" style="margin:0 0 8px">Avisos de viaje, cambios del listado de llamadas y de palabra clave que mandan los clientes monitoreados desde Mi SAT. Pasalos a la estación de monitoreo y marcalos como enviados: el cliente ve el estado en su portal. La palabra clave se borra al marcar el pedido.</p>
+        <div class="misat-filtros" style="margin-top:0"><button type="button" class="misat-sf on" data-sf="pendiente">Pendientes</button><button type="button" class="misat-sf" data-sf="enviada">Enviadas a la estación</button><button type="button" class="misat-sf" data-sf="descartada">Descartadas</button><input id="msolBuscar" type="search" placeholder="Buscar cliente, abonado o nombre" style="flex:1;min-width:200px;height:34px;border-radius:999px;padding:0 14px;border:1px solid rgba(16,24,32,.15);font:inherit;font-size:13.5px"></div>
+        <div id="msolLista"></div>
       </div>
       <div id="misatConsulta" class="hidden">
         <div class="misat-card">
@@ -2852,7 +2865,7 @@ async function cargarInicioAdmin() {
   st.textContent = "Revisando...";
   const h = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
   const leer = (url) => fetch(url, { headers: h, cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-  const [emerg, rend, pend, sims, vehs, vehHist, errores, partes, clientes, instalaciones, presencias, historicas, simsInst, registroCopias, venPropios, venCreds, stockDatos, gestLlaves, simsAvisos, misatCuentas] = await Promise.all([
+  const [emerg, rend, pend, sims, vehs, vehHist, errores, partes, clientes, instalaciones, presencias, historicas, simsInst, registroCopias, venPropios, venCreds, stockDatos, gestLlaves, simsAvisos, misatCuentas, misatSols] = await Promise.all([
     leer("/api/datos?coleccion=servicios_emergencia"),
     leer("/api/recurso-uso?recurso=rendicion"),
     leer("/api/recurso-uso?recurso=sim&pendientes=1&todas=1"),
@@ -2873,6 +2886,7 @@ async function cargarInicioAdmin() {
     leer("/api/datos?coleccion=consorcio&gestiones=1"),
     leer("/api/datos?coleccion=sims_avisos"),
     leer("/api/datos?coleccion=mi_sat"),
+    leer("/api/datos?coleccion=mi_sat&solicitudes=1"),
   ]);
   const arr = (x) => (Array.isArray(x) ? x : []);
   const hoyISO = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
@@ -2889,6 +2903,9 @@ async function cargarInicioAdmin() {
   const emergSin = arr(emerg).filter((e) => !e.revisado);
   misatLista = arr(misatCuentas); misatActualizarBadge();
   const misatPend = misatLista.filter((c) => c.estado === "pendiente");
+  misatSolicitudes = arr(misatSols); misatActualizarBadge();
+  const solPend = misatSolicitudes.filter((x) => x.estado === "pendiente");
+  agregar(solPend.length, "Pedidos para la central de monitoreo", solPend.slice(0, 2).map((x) => `${x.tipo_txt} · N° ${x.numero_cliente}${x.abonado ? " (ab. " + x.abonado + ")" : ""}`).join(" · "), "tabMiSatBtn", solPend.some((x) => x.tipo === "viaje" && x.datos && x.datos.desde <= hoyISO) ? "urgente" : "atencion");
   agregar(misatPend.length, "Pedidos de acceso a Mi SAT", misatPend.slice(0, 2).map((c) => "N° " + c.numero_cliente).join(" · "), "tabMiSatBtn", "atencion");
   agregar(emergSin.length, "Emergencias sin revisar", emergSin.slice(0, 2).map((e) => e.cliente || "sin cliente").join(" · "), "tabEmergenciaBtn", "urgente", true);
   const rendPend = arr(rend).filter((r) => r.estado === "pendiente");
@@ -2958,6 +2975,7 @@ async function cargarInicioAdmin() {
     const x = tarjetas[Number(b.dataset.i)];
     if (x.pestana === "tabSemaforoBtn") { semaforoFiltro = "rojo"; semaforoAbonadoPedido = inicioSemaforoAbonado; }
     if (x.pestana === "tabStockBtn") stkVistaPedida = /pedir/.test(x.titulo) ? "pedidos" : "salud";
+    if (x.pestana === "tabMiSatBtn") misatFiltroPedido = /monitoreo/.test(x.titulo) ? "solicitudes" : "pendiente";
     if (x.pestana) irAPestana(x.pestana);
   }));
 }
@@ -13615,7 +13633,7 @@ const emergenciasBadge = document.getElementById("emergenciasBadge");
 let emergenciasCacheAdmin = [];
 
 // ---------- Portal de clientes (Mi SAT): aprobación de accesos (ver lib/mi-sat.js) ----------
-let misatFiltro = "pendiente", misatLista = [];
+let misatFiltro = "pendiente", misatLista = [], misatSolicitudes = [], misatFiltroPedido = "", msolFiltro = "pendiente";
 // Lee del servidor con hasta 2 reintentos (la base a veces tarda en responder) y, si falla,
 // muestra el detalle técnico para poder diagnosticarlo.
 async function misatLeerJson(url) {
@@ -13645,6 +13663,8 @@ async function cargarMiSatAdmin() {
     st.textContent = "";
     misatActualizarBadge();
     misatPintar();
+    misatCargarSolicitudes();
+    if (misatFiltroPedido) { const b = document.querySelector(`.misat-f[data-f="${misatFiltroPedido}"]`); misatFiltroPedido = ""; if (b) b.click(); }
   } catch (e) { st.textContent = "No se pudo cargar: " + e.message; }
 }
 // Celular argentino → formato de WhatsApp (549 + característica + número, sin 0 ni 15).
@@ -13661,7 +13681,78 @@ function misatWa(cel) {
 function misatActualizarBadge() {
   const n = misatLista.filter((c) => c.estado === "pendiente").length, b = document.getElementById("misatBadge");
   b.textContent = n; b.classList.toggle("hidden", !n);
+  // El badge de la pestaña suma los pedidos de acceso y los pedidos para la estación de monitoreo.
+  const ns = misatSolicitudes.filter((x) => x.estado === "pendiente").length, bs = document.getElementById("misatSolBadge");
+  bs.textContent = ns; bs.classList.toggle("hidden", !ns);
+  b.textContent = n + ns; b.classList.toggle("hidden", !(n + ns));
 }
+// ----- Pedidos para la central de monitoreo (aviso de viaje, listado de llamadas, palabra clave) -----
+async function misatCargarSolicitudes() {
+  try { misatSolicitudes = await misatLeerJson("/api/datos?coleccion=mi_sat&solicitudes=1"); if (!Array.isArray(misatSolicitudes)) misatSolicitudes = []; }
+  catch (e) { document.getElementById("msolLista").innerHTML = `<p class="subtitle">No se pudieron cargar los pedidos: ${misatEsc(e.message)}</p>`; return; }
+  misatActualizarBadge(); misatPintarSolicitudes();
+}
+const msolDia = (iso) => { const m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : ""; };
+// Texto listo para mandar a la estación de monitoreo (mail o WhatsApp).
+function msolTexto(x) {
+  const d = x.datos || {}, l = [];
+  l.push(`${x.tipo_txt.toUpperCase()} — Abonado ${x.abonado || "?"}`);
+  l.push(`Cliente SAT N° ${x.numero_cliente}: ${x.nombre}${x.direccion ? " · " + x.direccion : ""}`);
+  if (x.tipo === "viaje") l.push(`Ausentes desde el ${msolDia(d.desde)} hasta el ${msolDia(d.hasta)} inclusive.`);
+  else if (d.desde) l.push(`Cambio temporario: desde el ${msolDia(d.desde)} hasta el ${msolDia(d.hasta)} (después vuelve el listado habitual).`);
+  if (d.contactos && d.contactos.length) { l.push(x.tipo === "viaje" ? "Durante el viaje llamar a:" : "Listado de llamadas (en este orden):"); d.contactos.forEach((c, i) => l.push(`${i + 1}. ${c.nombre} - ${c.telefono}`)); }
+  if (x.tipo === "palabra_clave") { if (d.palabra_abonado) l.push(`Nueva palabra clave del abonado: ${d.palabra_abonado}`); if (d.palabra_operador) l.push(`Nueva palabra clave del operador: ${d.palabra_operador}`); }
+  if (d.observaciones) l.push(`Observaciones: ${d.observaciones}`);
+  return l.join("\n");
+}
+function misatPintarSolicitudes() {
+  const q = (document.getElementById("msolBuscar").value || "").trim().toLowerCase();
+  const lista = misatSolicitudes.filter((x) => x.estado === msolFiltro && (!q || [x.numero_cliente, x.abonado, x.nombre, x.direccion].join(" ").toLowerCase().includes(q)));
+  if (msolFiltro === "pendiente") lista.sort((a, b) => String(a.creado_en).localeCompare(String(b.creado_en)));
+  const cont = document.getElementById("msolLista");
+  if (!lista.length) { cont.innerHTML = `<p class="subtitle">${msolFiltro === "pendiente" ? "No hay pedidos pendientes para la estación." : "No hay pedidos en esta lista."}</p>`; return; }
+  const hoy = new Date().toLocaleDateString("sv-SE", { timeZone: "America/Argentina/Buenos_Aires" });
+  cont.innerHTML = lista.map((x) => { const d = x.datos || {}; const pal = (v) => v === "(borrada)" ? `<i style="color:#6B7680">borrada al gestionar</i>` : `<span class="msol-pal" data-pal="${misatEsc(v)}">••••••</span> <button type="button" class="btn-secondary-admin" style="width:auto;padding:2px 10px;font-size:12.5px" data-msol-ver>Ver</button>`;
+    return `<div class="misat-card msol-card ${x.estado}">
+    <h3><span class="msol-tipo">${misatEsc(x.tipo_txt)}</span> N° ${misatEsc(x.numero_cliente)} <span style="font-weight:500;color:#6B7680">${misatEsc(x.nombre)}</span>${x.tipo === "viaje" && x.estado === "pendiente" && d.desde <= hoy ? ' <span class="misat-mal">¡ya empezó!</span>' : ""}</h3>
+    <div class="fila"><span>Abonado</span><span><b>${misatEsc(x.abonado || "—")}</b></span></div>
+    ${x.direccion ? `<div class="fila"><span>Dirección</span><span>${misatEsc(x.direccion)}</span></div>` : ""}
+    ${d.desde ? `<div class="fila"><span>${x.tipo === "viaje" ? "Viaje" : "Vale"}</span><span><b>del ${msolDia(d.desde)} al ${msolDia(d.hasta)}</b></span></div>` : x.tipo === "llamadas" ? `<div class="fila"><span>Vale</span><span>Cambio definitivo</span></div>` : ""}
+    ${d.contactos && d.contactos.length ? `<div class="fila"><span>${x.tipo === "viaje" ? "Llamar durante el viaje" : "Orden de llamada"}</span><ol class="msol-cont">${d.contactos.map((c) => `<li>${misatEsc(c.nombre)} — <a href="tel:${misatEsc(String(c.telefono).replace(/[^\d+]/g, ""))}">${misatEsc(c.telefono)}</a></li>`).join("")}</ol></div>` : ""}
+    ${d.palabra_abonado ? `<div class="fila"><span>Palabra del abonado</span><span>${pal(d.palabra_abonado)}</span></div>` : ""}
+    ${d.palabra_operador ? `<div class="fila"><span>Palabra del operador</span><span>${pal(d.palabra_operador)}</span></div>` : ""}
+    ${d.observaciones ? `<div class="fila"><span>Observaciones</span><span>${misatEsc(d.observaciones)}</span></div>` : ""}
+    <div class="fila"><span>Pedido</span><span>${misatFecha(x.creado_en)}</span></div>
+    ${x.gestionado_en ? `<div class="fila"><span>${x.estado === "enviada" ? "Enviado a la estación" : "Descartado"}</span><span>${misatFecha(x.gestionado_en)} · ${misatEsc(x.gestionado_por)}${x.nota_oficina ? " · " + misatEsc(x.nota_oficina) : ""}</span></div>` : ""}
+    <div class="misat-acc">${x.estado === "pendiente" ? `<button type="button" class="btn-secondary-admin" data-msol="copiar" data-id="${x.id}">📋 Copiar para la estación</button><button type="button" class="misat-aprobar" data-msol="enviada" data-id="${x.id}">✓ Marcar enviado a la estación</button><button type="button" class="btn-secondary-admin" data-msol="descartada" data-id="${x.id}">Descartar</button>` : ""}</div>
+  </div>`; }).join("");
+}
+document.querySelectorAll(".misat-sf").forEach((b) => b.addEventListener("click", () => {
+  msolFiltro = b.dataset.sf; document.querySelectorAll(".misat-sf").forEach((x) => x.classList.toggle("on", x === b)); misatPintarSolicitudes();
+}));
+document.getElementById("msolBuscar").addEventListener("input", () => misatPintarSolicitudes());
+document.getElementById("msolLista").addEventListener("click", async (ev) => {
+  const ver = ev.target.closest("[data-msol-ver]");
+  if (ver) { const s = ver.previousElementSibling; const oculto = s.textContent === "••••••"; s.textContent = oculto ? s.dataset.pal : "••••••"; ver.textContent = oculto ? "Ocultar" : "Ver"; return; }
+  const b = ev.target.closest("[data-msol]"); if (!b) return;
+  const x = misatSolicitudes.find((y) => y.id === b.dataset.id); if (!x) return;
+  if (b.dataset.msol === "copiar") {
+    const t = msolTexto(x);
+    try { await navigator.clipboard.writeText(t); avisoAdmin("Copiado. Pegalo en el mail o WhatsApp a la estación de monitoreo.", "ok"); }
+    catch (e) { await pedirTextoAdmin("Copiá este texto para la estación:", t); }
+    return;
+  }
+  let nota = "";
+  if (b.dataset.msol === "enviada") { if (!(await confirmarAdmin(`¿Ya le pasaste a la estación el pedido del abonado ${x.abonado || x.numero_cliente}? El cliente lo va a ver como “Pasado a la central”.`))) return; }
+  else { nota = await pedirTextoAdmin("Motivo para descartarlo (opcional, sólo lo ve la oficina):", ""); if (nota === null) return; }
+  b.disabled = true;
+  try {
+    const r = await fetch("/api/datos?coleccion=mi_sat", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "gestionar_solicitud", id: x.id, estado: b.dataset.msol, nota }) });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || "Error");
+    await misatCargarSolicitudes();
+  } catch (e) { avisoAdmin("No se pudo: " + e.message, "error"); b.disabled = false; }
+});
 function misatPintar() {
   const cont = document.getElementById("misatLista");
   const lista = misatLista.filter((c) => misatFiltro === "otras" ? ["rechazada", "baja"].includes(c.estado) : c.estado === misatFiltro);
@@ -13686,12 +13777,13 @@ function misatPintar() {
 }
 document.querySelectorAll(".misat-f").forEach((b) => b.addEventListener("click", () => {
   misatFiltro = b.dataset.f; document.querySelectorAll(".misat-f").forEach((x) => x.classList.toggle("on", x === b));
-  const esEstado = misatFiltro === "estado", esFichas = misatFiltro === "fichas", esConsulta = misatFiltro === "consulta";
-  document.getElementById("misatLista").classList.toggle("hidden", esEstado || esFichas || esConsulta);
+  const esEstado = misatFiltro === "estado", esFichas = misatFiltro === "fichas", esConsulta = misatFiltro === "consulta", esSol = misatFiltro === "solicitudes";
+  document.getElementById("misatLista").classList.toggle("hidden", esEstado || esFichas || esConsulta || esSol);
+  document.getElementById("misatSolicitudes").classList.toggle("hidden", !esSol);
   document.getElementById("misatEstado").classList.toggle("hidden", !esEstado);
   document.getElementById("misatFichas").classList.toggle("hidden", !esFichas);
   document.getElementById("misatConsulta").classList.toggle("hidden", !esConsulta);
-  if (esEstado) misatCargarEstado(); else if (esFichas) misatCargarFichas(); else if (esConsulta) misatCargarConsulta(); else misatPintar();
+  if (esSol) misatCargarSolicitudes(); else if (esEstado) misatCargarEstado(); else if (esFichas) misatCargarFichas(); else if (esConsulta) misatCargarConsulta(); else misatPintar();
 }));
 
 // ----- Buscar clientes: todo lo del portal junto, con filtros -----

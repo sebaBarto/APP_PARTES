@@ -286,6 +286,50 @@
   a.tuya b { display: block; font-size: 16px; } a.tuya em { font-style: normal; font-size: 13px; opacity: .75; }
   a.tuya > svg { width: 18px; }
   .nav { grid-template-columns: repeat(3, 1fr) !important; }
+  .nav.con4 { grid-template-columns: repeat(4, 1fr) !important; }
+  /* ---- avisos a la central de monitoreo ---- */
+  button.aviso-acc { width: 100%; border: 0; text-align: left; font: inherit; display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; background: var(--amber-soft); color: var(--ink); cursor: pointer; }
+  button.aviso-acc[hidden] { display: none; }
+  .aviso-acc .hx { background: var(--amber); color: var(--ink); width: 42px; height: 42px; }
+  .aviso-acc small { display: block; color: var(--amber-dark); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; font-size: 11.5px; }
+  .aviso-acc b { display: block; font-size: 16px; } .aviso-acc em { font-style: normal; font-size: 13px; opacity: .75; }
+  .aviso-acc > svg { width: 18px; }
+  .av-intro p, .av-ayuda { font-size: 14px; color: #5C5A53; margin: 0 0 12px; line-height: 1.45; }
+  .av-intro a { color: var(--amber-dark); font-weight: 700; }
+  .av-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .av-tabs button { border: 1.5px solid #E2DED3; background: var(--field); border-radius: 14px; padding: 10px 6px; font: inherit; font-weight: 700; font-size: 13px; display: flex; flex-direction: column; align-items: center; gap: 5px; color: #4A4840; cursor: pointer; }
+  .av-tabs button svg { width: 22px; height: 22px; }
+  .av-tabs button.on { background: var(--ink); color: #fff; border-color: var(--ink); } .av-tabs button.on svg { color: var(--amber); }
+  .av-form { display: none; } .av-form.on { display: block; }
+  .av-form label { display: block; font-weight: 600; font-size: 13.5px; margin: 12px 0 5px; }
+  .av-form .opc { font-weight: 500; color: #8A877D; }
+  .av-form textarea { width: 100%; box-sizing: border-box; border-radius: 12px; border: 1.5px solid #D9D5CA; background: var(--field); padding: 10px 14px; font: inherit; font-size: 16px; resize: vertical; }
+  .av-form textarea:focus { outline: none; border-color: var(--amber); background: #fff; box-shadow: 0 0 0 4px rgba(246,184,40,.22); }
+  .av-fechas { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; } .av-fechas[hidden] { display: none; }
+  .av-fechas label { margin-top: 4px; }
+  .av-fechas > div { min-width: 0; } .av-fechas input { min-width: 0; padding: 0 10px; }
+  label.av-chk { display: flex; gap: 9px; align-items: flex-start; font-weight: 600; margin: 14px 0 4px; cursor: pointer; }
+  .av-chk input { width: 20px; height: 20px; flex: none; margin: 0; accent-color: #16151A; box-shadow: none; }
+  .av-cont[hidden] { display: none; }
+  .av-cont ol { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; }
+  .av-fila { display: grid; grid-template-columns: 30px 1fr auto; gap: 8px; align-items: center; background: var(--field); border: 1.5px solid #E7E3D9; border-radius: 14px; padding: 8px; }
+  .av-fila .n { width: 30px; height: 30px; border-radius: 50%; background: var(--ink); color: var(--amber); display: grid; place-items: center; font-family: var(--cond); font-weight: 800; font-size: 16px; }
+  .av-fila .campos { display: grid; gap: 6px; min-width: 0; }
+  .av-fila input { height: 42px; font-size: 15px; background: #fff; }
+  .av-fila .acc-f { display: grid; gap: 4px; }
+  .av-fila .acc-f button { width: 32px; height: 28px; border-radius: 8px; border: 1px solid #DDD9CE; background: #fff; display: grid; place-items: center; padding: 0; color: #4A4840; cursor: pointer; }
+  .av-fila .acc-f button svg { width: 16px; height: 16px; }
+  .av-fila .acc-f button[disabled] { opacity: .3; pointer-events: none; }
+  .av-agregar { margin-top: 8px; border: 1.5px dashed #CFCABD; background: none; border-radius: 12px; width: 100%; height: 42px; font: inherit; font-weight: 700; color: var(--amber-dark); cursor: pointer; }
+  .av-agregar[hidden] { display: none; }
+  .av-pedidos { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .av-pedidos li { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: center; border-bottom: 1px solid #EEEBE3; padding: 0 0 8px; font-size: 14px; }
+  .av-pedidos li:last-child { border: 0; padding: 0; }
+  .av-pedidos b { font-size: 14.5px; } .av-pedidos small { grid-column: 1; color: #7A776E; font-size: 12.5px; }
+  .av-pedidos .est { grid-row: 1 / 3; grid-column: 2; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 4px 10px; }
+  .est.pendiente { background: var(--amber-soft); color: var(--amber-dark); } .est.enviada { background: #E6F4EA; color: #1B5E2C; } .est.descartada { background: #EEE; color: #666; }
+  .av-pedidos .vacio { display: block; color: #7A776E; border: 0; }
+  .av-ok { background: #E6F4EA; color: #1B5E2C; border-radius: 14px; padding: 12px 14px; font-weight: 600; font-size: 14px; margin-top: 12px; }
   /* ---- PC: pantalla completa en vez del formato celular ---- */
   @media (min-width: 900px) {
     body { background: var(--paper); }
@@ -323,6 +367,11 @@
     #vServicios > .tarjeta { grid-column: 1 / -1; }
     #vServicios > .btn { grid-column: 1 / -1; max-width: 360px; justify-self: center; }
     #vGuias > #gTuya { grid-column: 1 / -1; }
+    #vInicio > #iAvisos { grid-column: 1 / -1; }
+    #vAvisos.on { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+    #vAvisos > .av-intro { grid-column: 1 / -1; }
+    #vAvisos > .av-intro .av-tabs { max-width: 640px; }
+    #vAvisos > .av-form { grid-column: 1; }
     #vGuias > #gTuya:empty { display: none; }
     .servicios.largo { columns: 2; column-gap: 36px; }
     .servicios.largo li { break-inside: avoid; }
@@ -479,6 +528,8 @@
             <button class="acc azu" type="button" data-vista="vServicios"><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg></span><b>Mis services</b><small>Fecha, técnico y costo</small></button>
           </div>
 
+          <button class="tarjeta aviso-acc" type="button" id="iAvisos" data-vista="vAvisos" hidden><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 13.5L3 11l1.5-1.5 8 .5 4-4.5a2.1 2.1 0 0 1 3 3l-4.5 4 .5 8L14 22l-2.5-7.5-3.5 3V20l-1.5 1-1-3.5L2 16.5 3 15h2.5z"/></svg></span><span><small>Central de monitoreo</small><b>¿Te vas de viaje o cambian tus contactos?</b><em>Aviso de viaje, listado de llamadas y palabra clave</em></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
+
           <div class="tarjeta">
             <h3>Tu sistema</h3>
             <ul class="equipos" id="lSistema"></ul>
@@ -519,11 +570,71 @@
             </form>
           </div>
         </div>
+        <div class="vista" id="vAvisos">
+          <div class="tarjeta av-intro">
+            <h3>Avisos a la central de monitoreo</h3>
+            <p>Lo que cargues acá le llega a la oficina de SAT y nosotros lo pasamos a la estación de monitoreo. Lo gestionamos en horario de oficina: si es urgente, <a data-wa href="#" target="_blank" rel="noopener">escribinos por WhatsApp</a>.</p>
+            <div class="av-tabs" role="tablist">
+              <button type="button" class="on" data-av="viaje"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 13.5L3 11l1.5-1.5 8 .5 4-4.5a2.1 2.1 0 0 1 3 3l-4.5 4 .5 8L14 22l-2.5-7.5-3.5 3V20l-1.5 1-1-3.5L2 16.5 3 15h2.5z"/></svg><span>Aviso de viaje</span></button>
+              <button type="button" data-av="llamadas"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"/></svg><span>Listado de llamadas</span></button>
+              <button type="button" data-av="palabra_clave"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4M12 15v2"/></svg><span>Palabra clave</span></button>
+            </div>
+          </div>
+
+          <form class="tarjeta av-form on" id="fViaje" data-tipo="viaje" novalidate>
+            <h3>Aviso de viaje</h3>
+            <p class="av-ayuda">Contanos cuándo se van y cuándo vuelven, así la central sabe que la casa queda sola.</p>
+            <div class="av-fechas">
+              <div><label for="vDesde">Me voy el</label><input type="date" id="vDesde" name="desde"></div>
+              <div><label for="vHasta">Vuelvo el</label><input type="date" id="vHasta" name="hasta"></div>
+            </div>
+            <label class="av-chk"><input type="checkbox" id="vConCont"> Durante el viaje, que la central llame a otras personas</label>
+            <div class="av-cont" id="vCont" hidden></div>
+            <label for="vObs">Algo más que tenga que saber la central <span class="opc">(opcional)</span></label>
+            <textarea id="vObs" name="observaciones" maxlength="400" rows="3" placeholder="Ej.: queda el perro en el patio; viene a regar la vecina los martes"></textarea>
+            <p class="error" role="alert"></p>
+            <button class="btn" type="submit">Enviar aviso de viaje <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+          </form>
+
+          <form class="tarjeta av-form" id="fLlamadas" data-tipo="llamadas" novalidate>
+            <h3>Listado de llamadas</h3>
+            <p class="av-ayuda">Ante un evento, la central llama en este orden. Cargá el listado completo como querés que quede.</p>
+            <div class="av-cont" id="lCont"></div>
+            <label class="av-chk"><input type="checkbox" id="lTemp"> Es un cambio por unos días (después vuelve el listado de siempre)</label>
+            <div class="av-fechas" id="lFechas" hidden>
+              <div><label for="lDesde">Desde el</label><input type="date" id="lDesde" name="desde"></div>
+              <div><label for="lHasta">Hasta el</label><input type="date" id="lHasta" name="hasta"></div>
+            </div>
+            <label for="lObs">Comentarios <span class="opc">(opcional)</span></label>
+            <textarea id="lObs" name="observaciones" maxlength="400" rows="2"></textarea>
+            <p class="error" role="alert"></p>
+            <button class="btn" type="submit">Enviar listado <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+          </form>
+
+          <form class="tarjeta av-form" id="fPalabra" data-tipo="palabra_clave" novalidate>
+            <h3>Cambio de palabra clave</h3>
+            <p class="av-ayuda">Completá sólo la que querés cambiar. Por seguridad te pedimos tu clave de Mi SAT, y la palabra se borra de nuestro sistema apenas la pasamos a la central.</p>
+            <label for="pAbo">Palabra clave del abonado</label>
+            <input id="pAbo" name="palabra_abonado" maxlength="30" autocomplete="off" placeholder="La que decís vos cuando te llama la central">
+            <label for="pOpe">Palabra clave del operador</label>
+            <input id="pOpe" name="palabra_operador" maxlength="30" autocomplete="off" placeholder="La que te dice el operador para identificarse">
+            <label for="pCla">Tu clave de Mi SAT</label>
+            <input id="pCla" type="password" name="clave_mi_sat" maxlength="200" autocomplete="current-password">
+            <p class="error" role="alert"></p>
+            <button class="btn" type="submit">Pedir el cambio <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+          </form>
+
+          <div class="tarjeta">
+            <h3>Tus pedidos</h3>
+            <ul class="av-pedidos" id="lPedidos"></ul>
+          </div>
+        </div>
       </div>
 
       <nav class="nav">
         <button class="on" type="button" data-vista="vInicio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-7 8 7v9H4z"/><path d="M10 20v-5h4v5"/></svg>Inicio</button>
         <button type="button" data-vista="vServicios"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-2.5z"/></svg>Services</button>
+        <button type="button" data-vista="vAvisos" id="nAvisos" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 13.5L3 11l1.5-1.5 8 .5 4-4.5a2.1 2.1 0 0 1 3 3l-4.5 4 .5 8L14 22l-2.5-7.5-3.5 3V20l-1.5 1-1-3.5L2 16.5 3 15h2.5z"/></svg>Avisos</button>
         <button type="button" data-vista="vGuias"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h4"/></svg>Guías</button>
       </nav>
     </section>
@@ -606,6 +717,10 @@
     $("#pCuenta").innerHTML = !items.length ? "" : !debe
       ? `<div class="cuenta ok"><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span><b>Tu cuenta está al día</b>${lineas}<small>Actualizado al ${fecha(actual)}</small></span></div>`
       : `<div class="cuenta debe"><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h4"/></svg></span><span><b>${items.length === 1 ? esc(items[0].txt) : "Tenés pagos pendientes"}</b>${lineas}<small>Actualizado al ${fecha(actual)}. Si ya pagaste, no tengas en cuenta este aviso.</small></span><a class="mini" href="${WA}?text=${encodeURIComponent("Hola SAT, quiero consultar por mi cuenta (cliente N° " + d.numero_cliente + ").")}" target="_blank" rel="noopener">Consultar</a></div>`;
+    // Avisos a la central: sólo para clientes monitoreados.
+    $("#iAvisos").hidden = $("#nAvisos").hidden = !d.monitoreo;
+    $(".nav").classList.toggle("con4", !!d.monitoreo);
+    pedidos(d.solicitudes || []);
     if (d.ultima_visita) sis.push(`<li><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-2.5z"/></svg></span><div><b>Última visita técnica</b><small>${fecha(d.ultima_visita)}</small></div></li>`);
     $("#lSistema").innerHTML = sis.join("");
     const vacio = `<li class="vacio">Todavía no hay services cargados desde que usamos el sistema nuevo (julio 2026).</li>`;
@@ -613,6 +728,90 @@
     $("#lServicios").innerHTML = (d.services.length ? d.services.map((s) => itemService(s, true)).join("") : vacio)
       + (d.visita_anterior ? `<li class="viejo"><span class="f">${fecha(d.visita_anterior)}</span><b>Última visita registrada antes de julio 2026</b><p>El detalle de visitas anteriores lo tiene la oficina.</p></li>` : "");
   }
+  // ---------- Avisos a la central de monitoreo ----------
+  const MAX_CONT = 10;
+  function editorContactos(caja, inicial) {
+    caja.innerHTML = `<ol></ol><button type="button" class="av-agregar">+ Agregar otro contacto</button>`;
+    const ol = $("ol", caja), mas = $(".av-agregar", caja);
+    const fila = (c = {}) => {
+      const li = document.createElement("li"); li.className = "av-fila";
+      li.innerHTML = `<span class="n"></span><div class="campos"><input class="nom" maxlength="60" placeholder="Nombre y apellido" autocomplete="off" aria-label="Nombre y apellido"><input class="telf" type="tel" inputmode="tel" maxlength="30" placeholder="Teléfono (ej. 341 555 1234)" autocomplete="off" aria-label="Teléfono"></div><div class="acc-f"><button type="button" data-m="-1" aria-label="Subir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg></button><button type="button" data-m="1" aria-label="Bajar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button><button type="button" data-m="x" aria-label="Quitar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>`;
+      $(".nom", li).value = c.nombre || ""; $(".telf", li).value = c.telefono || "";
+      ol.appendChild(li);
+    };
+    const renumerar = () => {
+      const fs = $$(".av-fila", ol);
+      fs.forEach((f, i) => { $(".n", f).textContent = i + 1; $('[data-m="-1"]', f).disabled = i === 0; $('[data-m="1"]', f).disabled = i === fs.length - 1; $('[data-m="x"]', f).disabled = fs.length === 1; });
+      mas.hidden = fs.length >= MAX_CONT;
+    };
+    ol.addEventListener("click", (ev) => {
+      const b = ev.target.closest("button[data-m]"); if (!b) return;
+      const f = b.closest(".av-fila");
+      if (b.dataset.m === "x") f.remove();
+      else if (b.dataset.m === "-1" && f.previousElementSibling) ol.insertBefore(f, f.previousElementSibling);
+      else if (b.dataset.m === "1" && f.nextElementSibling) ol.insertBefore(f.nextElementSibling, f);
+      renumerar();
+    });
+    mas.addEventListener("click", () => { fila(); renumerar(); $$(".nom", ol).pop().focus(); });
+    (inicial && inicial.length ? inicial : [{}, {}, {}]).forEach(fila); renumerar();
+    return () => $$(".av-fila", ol).map((f) => ({ nombre: $(".nom", f).value.trim(), telefono: $(".telf", f).value.trim() })).filter((c) => c.nombre || c.telefono);
+  }
+  const contViaje = editorContactos($("#vCont")), contLlam = editorContactos($("#lCont"));
+  $("#vConCont").addEventListener("change", (e) => { $("#vCont").hidden = !e.target.checked; });
+  $("#lTemp").addEventListener("change", (e) => { $("#lFechas").hidden = !e.target.checked; });
+  const hoyISO = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); };
+  ["#vDesde", "#vHasta", "#lDesde", "#lHasta"].forEach((s) => ($(s).min = hoyISO()));
+  $("#vDesde").addEventListener("change", () => { $("#vHasta").min = $("#vDesde").value || hoyISO(); });
+  $("#lDesde").addEventListener("change", () => { $("#lHasta").min = $("#lDesde").value || hoyISO(); });
+  document.addEventListener("click", (ev) => {
+    const t = ev.target.closest("[data-av]"); if (!t) return;
+    $$("[data-av]").forEach((b) => b.classList.toggle("on", b === t));
+    $$(".av-form").forEach((f) => f.classList.toggle("on", f.dataset.tipo === t.dataset.av));
+  });
+  function pedidos(lista) {
+    const est = { pendiente: "Recibido", enviada: "Pasado a la central", descartada: "Cerrado" };
+    $("#lPedidos").innerHTML = lista.length ? lista.map((x) => `<li><b>${esc(x.tipo_txt)}</b><span class="est ${esc(x.estado)}">${est[x.estado] || esc(x.estado)}</span><small>Pedido el ${fecha(x.creado_en)}${x.desde ? ` · del ${fecha(x.desde)} al ${fecha(x.hasta)}` : ""}</small></li>`).join("")
+      : `<li class="vacio">Todavía no mandaste ningún aviso.</li>`;
+    pedidos.lista = lista;
+  }
+  $$(".av-form").forEach((f) => f.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const err = $(".error", f), btn = $("button[type=submit]", f); err.textContent = "";
+    $$(".av-ok", f).forEach((x) => x.remove());
+    const tipo = f.dataset.tipo, cuerpo = { accion: "solicitud", tipo };
+    if (tipo === "viaje") {
+      cuerpo.desde = $("#vDesde").value; cuerpo.hasta = $("#vHasta").value; cuerpo.observaciones = $("#vObs").value;
+      if (!cuerpo.desde || !cuerpo.hasta) return (err.textContent = "Elegí la fecha en que se van y la de vuelta");
+      if (cuerpo.hasta < cuerpo.desde) return (err.textContent = "La fecha de vuelta tiene que ser después de la de ida");
+      cuerpo.contactos = $("#vConCont").checked ? contViaje() : [];
+    } else if (tipo === "llamadas") {
+      cuerpo.contactos = contLlam(); cuerpo.observaciones = $("#lObs").value;
+      if (!cuerpo.contactos.length) return (err.textContent = "Cargá al menos un contacto con nombre y teléfono");
+      if ($("#lTemp").checked) {
+        cuerpo.desde = $("#lDesde").value; cuerpo.hasta = $("#lHasta").value;
+        if (!cuerpo.desde || !cuerpo.hasta) return (err.textContent = "Elegí desde y hasta qué día vale el cambio");
+      }
+    } else {
+      cuerpo.palabra_abonado = $("#pAbo").value.trim(); cuerpo.palabra_operador = $("#pOpe").value.trim(); cuerpo.clave_mi_sat = $("#pCla").value;
+      if (!cuerpo.palabra_abonado && !cuerpo.palabra_operador) return (err.textContent = "Escribí la palabra clave nueva");
+      if (!cuerpo.clave_mi_sat) return (err.textContent = "Escribí tu clave de Mi SAT para confirmar");
+    }
+    if (tipo !== "palabra_clave") for (const [i, c] of (cuerpo.contactos || []).entries()) {
+      if (c.nombre.length < 3) return (err.textContent = `Escribí el nombre y apellido del contacto ${i + 1}`);
+      if (c.telefono.replace(/\D/g, "").length < 7) return (err.textContent = `Revisá el teléfono del contacto ${i + 1}`);
+    }
+    ocupado(btn, true);
+    try {
+      const d = await api(cuerpo);
+      f.reset(); $("#vCont").hidden = true; $("#lFechas").hidden = true;
+      pedidos([d.solicitud, ...(pedidos.lista || [])].slice(0, 10));
+      const ok = document.createElement("p"); ok.className = "av-ok"; ok.setAttribute("role", "status");
+      ok.textContent = "¡Listo! Recibimos tu pedido. Lo pasamos a la central de monitoreo y lo vas a ver como “Pasado a la central” en Tus pedidos.";
+      btn.after(ok);
+    } catch (e) { err.textContent = e.message; }
+    finally { ocupado(btn, false); }
+  }));
+
   async function cargarPanel() {
     ir("pPanel"); vista("vInicio");
     $("#pCargando").textContent = "Cargando tus datos…";
