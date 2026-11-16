@@ -286,6 +286,54 @@
   a.tuya b { display: block; font-size: 16px; } a.tuya em { font-style: normal; font-size: 13px; opacity: .75; }
   a.tuya > svg { width: 18px; }
   .nav { grid-template-columns: repeat(3, 1fr) !important; }
+  /* ---- PC: pantalla completa en vez del formato celular ---- */
+  @media (min-width: 900px) {
+    body { background: var(--paper); }
+    .marco { padding: 0; max-width: none; }
+    .tel { max-width: none; border-radius: 0; box-shadow: none; overflow: visible; min-height: 100vh; }
+    .pantalla { min-height: 100vh; }
+    /* ingreso: escena e intro a la izquierda, formulario a la derecha */
+    #pLogin.on { display: grid; grid-template-columns: minmax(0, 1fr) 440px; grid-template-rows: auto auto auto auto 1fr auto; column-gap: 56px; padding: 0 max(5vw, calc((100% - 1240px) / 2)); align-content: start; }
+    #pLogin .barra { grid-column: 1 / -1; padding: 18px 0; }
+    #pLogin .escena { grid-column: 1; grid-row: 2 / 4; height: 470px; margin-top: 0; }
+    #pLogin .escena .casa { width: 76%; }
+    #pLogin .intro { grid-column: 1; grid-row: 4 / 6; margin-top: -30px; padding: 0; }
+    #pLogin .intro h1 { font-size: 58px; max-width: 640px; }
+    #pLogin .form { grid-column: 2; grid-row: 2; margin: 24px 0 0; }
+    #pLogin .primera { grid-column: 2; grid-row: 3; margin: 14px 0 0; }
+    #pLogin .beneficios { grid-column: 2; grid-row: 4; margin: 20px 0 0; }
+    #pLogin .pie { grid-column: 1 / -1; }
+    .burbuja.b1, .burbuja.b3 { left: 6%; top: 90px; } .burbuja.b2 { right: 6%; top: 120px; }
+    /* primer ingreso: formulario centrado */
+    #pAct1 .form, #pAct2 .form, #pAct3 .form { width: 100%; max-width: 520px; margin: 40px auto; }
+    .pasos-act { width: 100%; max-width: 520px; margin: 0 auto; padding-top: 28px; }
+    /* panel */
+    #pPanel .barra { padding: 12px max(5vw, calc((100% - 1160px) / 2)); }
+    .cabecera { padding: 34px max(5vw, calc((100% - 1160px) / 2)) 78px; }
+    .cab-txt h1 { font-size: 42px; }
+    .cab-casa { width: 220px; }
+    .cuerpo { max-width: none; margin: -46px 0 0; padding: 0 max(5vw, calc((100% - 1160px) / 2)) 60px; }
+    .cab-casa { margin-right: 40px; }
+    #vInicio.on { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+    #vInicio > #pCuenta, #vInicio > .kpis, #vInicio > .accesos { grid-column: 1 / -1; }
+    #pCuenta .cuenta { margin-bottom: 0; }
+    .kpi { padding: 18px 20px; } .kpi b { font-size: 38px; height: 38px; } .kpi small { font-size: 13px; }
+    .accesos { grid-template-columns: repeat(4, 1fr); }
+    #vServicios.on, #vGuias.on { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+    #vServicios > .tarjeta { grid-column: 1 / -1; }
+    #vServicios > .btn { grid-column: 1 / -1; max-width: 360px; justify-self: center; }
+    #vGuias > #gTuya { grid-column: 1 / -1; }
+    #vGuias > #gTuya:empty { display: none; }
+    .servicios.largo { columns: 2; column-gap: 36px; }
+    .servicios.largo li { break-inside: avoid; }
+    /* menú: arriba, en la barra, en vez de flotar abajo */
+    .nav { position: fixed; top: 9px; bottom: auto; left: 50%; right: auto; transform: translateX(-50%); display: flex !important; gap: 4px; padding: 5px; border-radius: 14px; }
+    .nav button { flex-direction: row; gap: 7px; font-size: 14px; padding: 7px 16px; }
+    .nav svg { width: 18px; height: 18px; }
+    .nav button.on { background: rgba(255,255,255,.1); border-radius: 10px; }
+    .nav button.on::after { display: none; }
+    .cuerpo { padding-bottom: 60px; }
+  }
   .ok-txt { color: #2E7D32; font-weight: 700; font-size: 13.5px; margin: 10px 0 0; }
 </style>
 </head>
