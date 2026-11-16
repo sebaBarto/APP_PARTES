@@ -272,6 +272,17 @@
   .form-clave label { display: block; font-weight: 600; font-size: 13.5px; margin: 10px 0 4px; }
   .form-clave input { width: 100%; box-sizing: border-box; }
   .form-clave .btn { margin-top: 12px; }
+  .cuenta { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; border-radius: 18px; padding: 13px 14px; margin-bottom: 12px; position: relative; z-index: 1; }
+  .cuenta .hx { width: 38px; height: 38px; }
+  .cuenta b { display: block; font-size: 15px; } .cuenta small { display: block; font-size: 12.5px; opacity: .8; }
+  .cuenta.ok { background: #E6F4EA; color: #1B5E2C; } .cuenta.ok .hx { background: #2E7D32; color: #fff; }
+  .cuenta.debe { background: #FFF4DB; color: #6B4A00; } .cuenta.debe .hx { background: var(--amber); color: #16151A; }
+  .cuenta .mini { text-decoration: none; white-space: nowrap; }
+  a.tuya { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; text-decoration: none; color: inherit; background: var(--ink, #16151A); color: #fff; }
+  a.tuya .hx { background: var(--amber); color: #16151A; width: 42px; height: 42px; }
+  a.tuya small { display: block; color: var(--amber); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; font-size: 11.5px; }
+  a.tuya b { display: block; font-size: 16px; } a.tuya em { font-style: normal; font-size: 13px; opacity: .75; }
+  a.tuya > svg { width: 18px; }
   .nav { grid-template-columns: repeat(3, 1fr) !important; }
   .ok-txt { color: #2E7D32; font-weight: 700; font-size: 13.5px; margin: 10px 0 0; }
 </style>
@@ -404,6 +415,7 @@
         <p class="cargando" id="pCargando">Cargando tus datos…</p>
 
         <div class="vista on" id="vInicio">
+          <div id="pCuenta"></div>
           <div class="kpis">
             <div class="kpi"><b id="kDias">—</b><small id="kDiasTxt">días desde<br>tu última visita</small></div>
             <div class="kpi"><b id="kServ">0</b><small>services<br>registrados</small></div>
@@ -437,6 +449,7 @@
         </div>
 
         <div class="vista" id="vGuias">
+          <div id="gTuya"></div>
           <div class="tarjeta">
             <h3>Cómo usar tu alarma</h3>
             <p class="zonas-ayuda">Elegí la marca de tu alarma: te mostramos en el teclado qué tocar, paso a paso.</p>
@@ -523,6 +536,19 @@
     sis.push(d.monitoreo ? `<li><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg></span><div><b>Monitoreo 24 h</b><small>Tu alarma está conectada a la central de monitoreo</small></div></li>`
                           : `<li><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg></span><div><b>Monitoreo</b><small>No figura conectado. Si creés que es un error, escribinos</small></div></li>`);
     d.comunicadores.forEach((c) => sis.push(`<li><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0M12 19.5h0"/></svg></span><div><b>Comunicador celular</b><small>${esc(c.empresa || "Activo")}${c.desde ? " · activo desde " + fecha(c.desde) : ""}</small></div></li>`));
+    const f = d.ficha;
+    if (f) {
+      if (f.alarma || f.alarma_marca) sis.unshift(`<li><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h2M12 12h2M16 12h0M8 16h2M12 16h2"/></svg></span><div><b>Alarma${f.alarma_marca_txt && f.alarma_marca !== "otra" ? " " + esc(f.alarma_marca_txt) : ""}${f.alarma_modelo ? " " + esc(f.alarma_modelo) : ""}</b><small>${[f.teclado_txt ? "Teclado " + esc(f.teclado_txt) : "", f.zonas ? f.zonas + " zonas" : ""].filter(Boolean).join(" · ") || "Instalada por SAT"}</small></div></li>`);
+      if (f.camaras) sis.push(`<li><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="13" height="10" rx="2"/><path d="M16 11l5-3v8l-5-3"/></svg></span><div><b>Cámaras${f.camaras_marca ? " " + esc(f.camaras_marca) : ""}</b><small>${f.camaras_cantidad ? f.camaras_cantidad + (f.camaras_cantidad === 1 ? " cámara" : " cámaras") : "Instaladas por SAT"}</small></div><span class="cant">${f.camaras_cantidad || ""}</span></li>`);
+      if (f.otros) sis.push(`<li><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h12v6a6 6 0 0 1-12 0z"/><circle cx="12" cy="9" r="2"/></svg></span><div><b>Otros equipos</b><small>${esc(f.otros)}</small></div></li>`);
+      if (f.nota_cliente) sis.push(`<li><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h4"/></svg></span><div><b>Nota de SAT</b><small>${esc(f.nota_cliente)}</small></div></li>`);
+    }
+    const guiaOk = f && ["paradox", "dsc", "ajax"].includes(f.alarma_marca);
+    $("#gTuya").innerHTML = guiaOk ? `<a class="tarjeta tuya" href="/guia-alarmas.html?marca=${f.alarma_marca}${f.teclado ? "&teclado=" + f.teclado : ""}"><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h4"/></svg></span><span><small>Tu alarma</small><b>${esc(f.alarma_marca_txt)}${f.teclado_txt ? " · " + esc(f.teclado_txt) : ""}</b><em>Ver la guía de tu teclado</em></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></a>` : "";
+    const c = d.cuenta;
+    $("#pCuenta").innerHTML = !c ? "" : c.al_dia
+      ? `<div class="cuenta ok"><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span><b>Tu cuenta está al día</b><small>Actualizado al ${fecha(c.actualizado)}</small></span></div>`
+      : `<div class="cuenta debe"><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h4"/></svg></span><span><b>Tenés pagos pendientes${c.importe ? ": " + pesos(c.importe) : ""}</b><small>Actualizado al ${fecha(c.actualizado)}. Si ya pagaste, no tengas en cuenta este aviso.</small></span><a class="mini" href="${WA}?text=${encodeURIComponent("Hola SAT, quiero consultar por mi cuenta (cliente N° " + d.numero_cliente + ").")}" target="_blank" rel="noopener">Consultar</a></div>`;
     if (d.ultima_visita) sis.push(`<li><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-2.5z"/></svg></span><div><b>Última visita técnica</b><small>${fecha(d.ultima_visita)}</small></div></li>`);
     $("#lSistema").innerHTML = sis.join("");
     const vacio = `<li class="vacio">Todavía no hay services cargados desde que usamos el sistema nuevo (julio 2026).</li>`;
