@@ -65,6 +65,19 @@ async function nuevaPagina() {
   return { ctx, page, erroresPagina, posts };
 }
 
+// La simulación del 3D puede detectar al intruso en décimas de segundo: el primer cartel se
+// reemplaza enseguida. Se anotan todos los carteles para revisar lo que dijo, no lo último.
+async function anotarAvisos3d(page) {
+  await page.evaluate(() => {
+    const a = document.querySelector(".v3-aviso");
+    window.__avisos3d = [];
+    if (window.__obsAvisos3d) window.__obsAvisos3d.disconnect();
+    window.__obsAvisos3d = new MutationObserver(() => window.__avisos3d.push(a.textContent));
+    window.__obsAvisos3d.observe(a, { childList: true, characterData: true, subtree: true });
+  });
+}
+const avisos3d = (page) => page.evaluate(() => window.__avisos3d.join(" | "));
+
 test("la app abre sin errores de JavaScript", async () => {
   const { ctx, page, erroresPagina } = await nuevaPagina();
   await page.goto(base + "/");
@@ -4171,8 +4184,9 @@ test("Vista 3D del cliente: puntos débiles, simulación de intruso, cámara, do
     assert.ok(await page.$eval('.v3-hoja [data-h="debiles"]', (b) => b.classList.contains("on")));
     await page.click('.v3-hoja [data-h="cerrar"]');
     // Simulación: entra por la ventana sin sensor y lo detecta el infrarrojo de la zona 1
+    await anotarAvisos3d(page);
     await page.click('.v3-barra [data-a="simular"]');
-    assert.match(await page.textContent(".v3-aviso"), /entra por una ventana que no tiene sensor/);
+    assert.match(await avisos3d(page), /entra por una ventana que no tiene sensor/);
     await page.waitForSelector(".v3-hoja:not(.hidden)", { timeout: 30000 });
     const res = await page.textContent(".v3-hoja");
     assert.match(res, /Lo detectó el sensor de movimiento de la zona 1/);
@@ -4994,8 +5008,9 @@ test("Pulido: R gira y Shift+arrastrar elige varios; en 3D se elige por dónde e
     await page.click('.v3-barra [data-a="simular"]');
     const ops = await page.$$eval(".v3-hoja [data-ent]", (bs) => bs.map((b) => b.textContent));
     assert.ok(ops.includes("El peor caso") && ops.includes("El portón del frente") && ops.includes("Saltando el tapial"), ops.join(" | "));
+    await anotarAvisos3d(page);
     await page.click('.v3-hoja [data-ent="peor"]');
-    assert.match(await page.textContent(".v3-aviso"), /El peor caso/);
+    assert.match(await avisos3d(page), /El peor caso/);
     await page.waitForSelector(".v3-hoja:not(.hidden) [data-h=otra]", { timeout: 30000 });
     await page.click('.v3-hoja [data-h="cerrar"]');
     // Arreglar el aviso del arbusto: girarlo
