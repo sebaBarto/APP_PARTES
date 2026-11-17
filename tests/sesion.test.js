@@ -2397,3 +2397,74 @@ test("Foto de un plano: detecta la hoja sobre la mesa, la endereza con las 4 esq
   const lisa = new Uint8ClampedArray(50 * 50 * 4).fill(240);
   assert.strictEqual(C.croquisDetectarHoja({ data: lisa, width: 50, height: 50 }), null);
 });
+
+test("Equipo del cliente: batería (cambio hecho vs. pedido, 18/24 meses) y sistema de alarma (Paradox, Ajax, DSC, Caddx; cambios de sistema) desde los partes", () => {
+  const E = require(path.join(raiz, "equipo-utils.js"));
+  // Batería: lo hecho sí; lo pendiente, lo recomendado o «batería baja» no
+  for (const t of ["Cambio de batería", "Se cambió la batería de la central", "se coloca batería nueva 12v 7a", "Batería baja, se cambió por una nueva", "se reemplazo bateria"]) assert.ok(E.cambioDeBateriaEn(t), t);
+  for (const t of ["Hay que cambiar la batería", "No se cambió la batería", "Presupuesto cambio de batería", "Revisar batería", "batería agotada", "Bateria baja"]) assert.ok(!E.cambioDeBateriaEn(t), t);
+  assert.deepStrictEqual(E.bateriaDeParte({ fecha: "2025-01-05", materiales: "Batería 12V 7Ah x1, PIR x2" }), { fecha: "2025-01-05", fuente: "materiales" });
+  assert.strictEqual(E.bateriaDeParte({ fecha: "2025-01-05", tarea: "Cambio de batería" }).fuente, "pedido");
+  // Niveles: 18 meses atención, 24 cambiarla
+  const nivel = (f) => E.equipoDeCliente([{ fecha: f, materiales: "Batería 12V 7Ah x1" }], null, "2026-11-16").bateria;
+  assert.deepStrictEqual([nivel("2025-06-01").nivel, nivel("2025-05-16").nivel, nivel("2024-11-17").nivel, nivel("2024-11-16").nivel], ["ok", "atencion", "atencion", "cambiar"]);
+  assert.strictEqual(nivel("2025-01-05").antiguedad, "1 año y 10 meses");
+  assert.strictEqual(E.equipoDeCliente([], null, "2026-11-16").bateria.nivel, "sin_datos");
+  // Sistema: marca o modelo; una mención suelta es «probable»; un cambio firme reemplaza al anterior
+  const s = (t, m) => E.sistemaDeParte({ tarea: t, materiales: m || "" });
+  assert.deepStrictEqual([s("Teclado K32 no enciende").marca, s("Revisar teclado PK5501").marca, s("Revisar central caddx nx-8").marca, s("", "Hub 2 Ajax x1").marca], ["Paradox", "DSC", "Caddx", "Ajax"]);
+  assert.deepStrictEqual([s("Cambio de central DSC por Ajax Hub 2").marca, s("Cambio de central DSC por Ajax Hub 2").cambio], ["Ajax", true]);
+  assert.deepStrictEqual([s("Migración a Ajax").marca, s("Migración a Ajax").fuerza], ["Ajax", 3]);
+  assert.strictEqual(s("Cliente pregunta por Ajax").fuerza, 1);
+  assert.strictEqual(s("Cambio de batería, central DSC").cambio, false, "cambiar la batería no es cambiar el sistema");
+  const eq = E.equipoDeCliente([
+    { fecha: "2024-03-10", tarea: "Teclado K32 no enciende" },
+    { fecha: "2025-01-05", materiales: "Batería 12V 7Ah x1" },
+    { fecha: "2025-06-01", tarea: "Cliente pregunta por Ajax" },
+    { fecha: "2026-01-02", tarea: "Cambio de sistema Paradox a Ajax", observaciones: "se instala hub 2" },
+  ], null, "2026-11-16");
+  assert.deepStrictEqual([eq.sistema.marca, eq.sistema.estado, eq.sistema.anteriores.map((x) => x.marca)], ["Ajax", "confirmado", ["Paradox"]]);
+  const debil = E.equipoDeCliente([{ fecha: "2024-03-10", tarea: "Teclado K32 no enciende" }, { fecha: "2025-06-01", tarea: "Cliente pregunta por Ajax" }], null, "2026-11-16");
+  assert.deepStrictEqual([debil.sistema.marca, debil.sistema.estado], ["Paradox", "probable"], "una pregunta por otra marca no cambia el sistema");
+  // La oficina corrige; un cambio firme posterior en un parte manda
+  const conOficina = E.equipoDeCliente([{ fecha: "2024-03-10", tarea: "Teclado K32 no enciende" }], { sistema: "DSC", sistema_fecha: "2025-01-01", bateria_fecha: "2026-10-01" }, "2026-11-16");
+  assert.deepStrictEqual([conOficina.sistema.marca, conOficina.sistema.fuente, conOficina.bateria.fecha, conOficina.bateria.nivel], ["DSC", "oficina", "2026-10-01", "ok"]);
+  const despues = E.equipoDeCliente([{ fecha: "2026-02-01", tarea: "Migración a Ajax" }], { sistema: "DSC", sistema_fecha: "2025-01-01" }, "2026-11-16");
+  assert.strictEqual(despues.sistema.marca, "Ajax");
+  assert.strictEqual(E.claveCliente("00123", "Ana"), "n:123");
+  assert.strictEqual(E.claveCliente("", "José  Pérez"), "c:jose perez");
+});
+
+test("Equipo del cliente: la oficina corrige sistema y batería (solo admin, fechas válidas) y todos lo leen", async () => {
+  const fetchViejo = global.fetch;
+  const repo = {};
+  let version = 0;
+  global.fetch = async (url, op = {}) => {
+    const u = String(url), metodo = op.method || "GET";
+    const m = u.match(/contents\/([^?]+)/);
+    if (m) {
+      const ruta = decodeURIComponent(m[1]);
+      if (metodo === "PUT") { repo[ruta] = JSON.parse(Buffer.from(JSON.parse(op.body).content, "base64").toString()); version++; return new Response("{}", { status: 200 }); }
+      if (!(ruta in repo)) return new Response("{}", { status: 404 });
+      return new Response(JSON.stringify({ sha: `s${version}`, encoding: "base64", content: Buffer.from(JSON.stringify(repo[ruta])).toString("base64") }));
+    }
+    return new Response("[]");
+  };
+  try {
+    const juan = crearSesion({ nombre: "Juan", rol: "tecnico" }), admin = crearSesion({ nombre: "Paula", rol: "admin" });
+    const post = async (body, t) => { const r = resFalso(); await datos(pedido("POST", { coleccion: "equipos_clientes" }, body, t), r); return r; };
+    const get = async (t) => { const r = resFalso(); await datos(pedido("GET", { coleccion: "equipos_clientes" }, null, t), r); return r.cuerpo; };
+    assert.strictEqual((await post({ accion: "poner", numero_cliente: "123", sistema: "Ajax" }, juan)).statusCode, 403);
+    assert.strictEqual((await post({ accion: "poner", numero_cliente: "123", sistema: "Garnet" }, admin)).statusCode, 400);
+    assert.strictEqual((await post({ accion: "poner", numero_cliente: "123", bateria_fecha: "2999-01-01" }, admin)).statusCode, 400);
+    let r = await post({ accion: "poner", numero_cliente: "00123", nombre: "Ana", sistema: "Ajax", bateria_fecha: "2025-03-10" }, admin);
+    assert.ok(r.cuerpo.ok, JSON.stringify(r.cuerpo));
+    const e = repo["equipos-clientes.json"]["n:123"];
+    assert.deepStrictEqual([e.sistema, e.sistema_por, e.bateria_fecha, e.cliente], ["Ajax", "Paula", "2025-03-10", "Ana"]);
+    assert.strictEqual((await get(juan))["n:123"].sistema, "Ajax", "el técnico lo lee");
+    // Volver a automático y sin fecha: se borra
+    r = await post({ accion: "poner", numero_cliente: "123", nombre: "Ana", sistema: "", bateria_fecha: "" }, admin);
+    assert.strictEqual(r.cuerpo.equipo, null);
+    assert.deepStrictEqual(repo["equipos-clientes.json"], {});
+  } finally { global.fetch = fetchViejo; }
+});

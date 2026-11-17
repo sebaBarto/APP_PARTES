@@ -108,6 +108,8 @@ function mapearDesdeBackendNuevo(p) {
     localidad: p.localidad || "",
     tarea: p.tarea || "",
     observaciones: p.observaciones || "",
+    // Para saber de cuándo es la batería y qué sistema tiene (equipo-utils.js).
+    materiales: [p.materiales, p.materiales_otros].filter(Boolean).join(", ").slice(0, 600),
     tecnico: p.tecnico || "",
     tecnico2: p.tecnico_segundo || "",
     fecha: p.fecha || "",

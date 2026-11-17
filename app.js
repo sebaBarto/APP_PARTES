@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.81.0";
+const APP_VERSION = "4.82.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -2269,6 +2269,7 @@ function seleccionarServicio(item) {
   autocompletarTecnico();
   autocompletarFecha();
   mostrarVisitaAnterior();
+  setTimeout(() => avisoEquipoParte(true), 300); // llamado de atención si la batería es vieja
   cargarOpcionesSimInstalar();
   const restaurado = restaurarBorradorSiExiste(currentNumeroServicio);
   if (restaurado) {
@@ -2389,6 +2390,21 @@ async function abrirFichaCliente(c) {
   }));
   const fecha = (f) => (f ? f.split("-").reverse().join("/") : "");
   const bloques = [];
+  // Alarma: qué sistema tiene y de cuándo es la batería.
+  try { if (!equiposManualCache) await cargarEquiposManual(); } catch (e) { /* sin señal */ }
+  if (fichaClienteActual !== c) return;
+  if (typeof EquipoCliente !== "undefined") {
+    const eq = EquipoCliente.equipoDeCliente(visitas, equipoManualDe(c.numero_cliente, c.nombre), fechaLocalISO());
+    const s = eq.sistema, b = eq.bateria;
+    const anteriores = (s.anteriores || []).filter((x) => x.marca && x.marca !== s.marca);
+    bloques.push(`<div class="ficha-bloque ficha-equipo ficha-equipo-${b.nivel}"><p class="dash-subtitulo">Alarma</p>
+      <div class="ficha-equipo-fila"><span>Sistema</span><b>${s.marca ? escapeHtml(s.marca) : "Sin datos"}${s.estado === "probable" ? ' <small class="ficha-equipo-prob">probable</small>' : ""}</b></div>
+      ${s.marca ? `<p class="ficha-equipo-fuente">${s.fuente === "oficina" ? "Cargado por la oficina" : `Según los partes${s.desde ? ` (desde ${fechaCortaEquipo(s.desde)})` : ""}`}${anteriores.length ? ` · Antes: ${escapeHtml(anteriores.map((x) => x.marca).join(", "))}` : ""}</p>` : ""}
+      <div class="ficha-equipo-fila"><span>Batería</span><b class="ficha-equipo-bat">${b.fecha ? `${escapeHtml(b.antiguedad)}` : "Sin datos"}</b></div>
+      <p class="ficha-equipo-fuente">${b.fecha ? `${b.segura ? "Último cambio" : "Pedido de cambio"}: ${fechaCortaEquipo(b.fecha)} · ${escapeHtml(b.fuenteTexto)}` : "No hay registro de cambio de batería."}${b.nivel === "cambiar" ? ' · <span class="ficha-equipo-alerta">Más de 2 años: cambiala.</span>' : b.nivel === "atencion" ? ' · <span class="ficha-equipo-alerta">Más de 1 año y medio: prestale atención.</span>' : ""}</p>
+      ${eq.nota ? `<p class="ficha-equipo-fuente">${escapeHtml(eq.nota)}</p>` : ""}
+    </div>`);
+  }
   bloques.push(`<div class="ficha-bloque"><p class="dash-subtitulo">Pendientes</p>${pendientes.length ? pendientes.map((sv) => `<button type="button" class="ficha-pend" data-num="${escapeHtml(sv.numero_servicio || "")}"><b>N° ${escapeHtml(sv.numero_servicio || "")}</b> ${escapeHtml(sv.tarea || "")}</button>`).join("") : '<p class="list-status">No tiene servicios pendientes.</p>'}</div>`);
   bloques.push(`<div class="ficha-bloque"><p class="dash-subtitulo">Últimas visitas${visitas.length ? ` <span class="ficha-cuenta">(${visitas.length})</span>` : ""}</p>${visitas.length ? visitas.slice(0, 5).map((h) => `<div class="ficha-visita"><div class="ficha-visita-top"><b>${fecha(h.fecha)}</b> · ${escapeHtml(h.tecnico || "")}${h.es_instalacion ? ' · <span class="ficha-tag">Instalación</span>' : ""}</div>${h.tarea ? `<div class="ficha-visita-tarea">${escapeHtml(h.tarea)}</div>` : ""}${h.observaciones ? `<div class="ficha-visita-obs">${escapeHtml(h.observaciones)}</div>` : ""}${h.materiales ? `<div class="ficha-visita-obs">Materiales: ${escapeHtml(h.materiales)}</div>` : ""}</div>`).join("") : '<p class="list-status">Sin visitas registradas en la app.</p>'}</div>`);
   // Claves: las de los partes + las que cargó la oficina en la ficha (se traen aparte).
@@ -2927,6 +2943,7 @@ function seleccionarTareaCronograma(t) {
   autocompletarTecnico();
   autocompletarFecha();
   mostrarVisitaAnterior();
+  setTimeout(() => avisoEquipoParte(true), 300); // llamado de atención si la batería es vieja
   cargarOpcionesSimInstalar();
   showScreen("form");
 }
@@ -3084,7 +3101,67 @@ const visitaAnteriorModalOverlay = document.getElementById("visitaAnteriorModalO
 const visitaAnteriorModalContenido = document.getElementById("visitaAnteriorModalContenido");
 let ultimaVisitaEncontrada = null;
 
+// ---------- Equipo del cliente: sistema de alarma y antigüedad de la batería ----------
+// Se deduce de los partes (equipo-utils.js) + lo que corrigió la oficina en el panel.
+let equiposManualCache = null;
+async function cargarEquiposManual() {
+  try {
+    const r = await fetch("/api/datos?coleccion=equipos_clientes", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    equiposManualCache = await r.json();
+    try { localStorage.setItem("equipos_clientes_cache", JSON.stringify(equiposManualCache)); } catch (e) { /* sin espacio */ }
+  } catch (e) {
+    if (!equiposManualCache) { try { equiposManualCache = JSON.parse(localStorage.getItem("equipos_clientes_cache") || "{}"); } catch (e2) { equiposManualCache = {}; } }
+  }
+  return equiposManualCache;
+}
+function equipoManualDe(numero, nombre) {
+  const m = equiposManualCache || {};
+  return m[EquipoCliente.claveCliente(numero, "")] || m[EquipoCliente.claveCliente("", nombre)] || null;
+}
+function equipoDelCliente(numero, nombre) {
+  const num = String(numero || ""), nom = normalizeText(nombre || "");
+  let partes = num ? (historialCache || []).filter((h) => h.numero_cliente && h.numero_cliente === num) : [];
+  if (!partes.length && nom) partes = (historialCache || []).filter((h) => h.cliente && normalizeText(h.cliente) === nom);
+  return EquipoCliente.equipoDeCliente(partes, equipoManualDe(num, nombre), fechaLocalISO());
+}
+const fechaCortaEquipo = (f) => (f ? f.slice(0, 10).split("-").reverse().join("/") : "");
+// Texto para el técnico (banner del parte y ficha).
+function textoBateria(eq) {
+  const b = eq.bateria;
+  if (b.nivel === "sin_datos") return "Batería: no sabemos de cuándo es. Fijate la fecha y anotala en el parte.";
+  const cuando = `${b.antiguedad} (${b.segura ? "cambio" : "pedido de cambio"}: ${fechaCortaEquipo(b.fecha)})`;
+  if (b.nivel === "cambiar") return `Batería de ${cuando}: tiene más de 2 años, cambiala.`;
+  if (b.nivel === "atencion") return `Batería de ${cuando}: tiene más de 1 año y medio, prestale atención.`;
+  return `Batería de ${cuando}.`;
+}
+function textoSistema(eq) {
+  const s = eq.sistema;
+  if (!s.marca) return "Sistema: sin datos";
+  return `Sistema: ${s.marca}${s.estado === "probable" ? " (probable)" : ""}`;
+}
+async function avisoEquipoParte(llamar) {
+  const caja = document.getElementById("parteEquipoAviso");
+  if (!caja) return;
+  const nombre = document.getElementById("f_cliente").value.trim();
+  if (!nombre || typeof EquipoCliente === "undefined") { caja.classList.add("hidden"); return; }
+  if (!equiposManualCache) await cargarEquiposManual();
+  if (document.getElementById("f_cliente").value.trim() !== nombre) return;
+  const eq = equipoDelCliente(currentNumeroCliente, nombre);
+  const nivel = eq.bateria.nivel;
+  caja.className = `parte-equipo parte-equipo-${nivel}`;
+  caja.innerHTML = `<b>${escapeHtml(textoSistema(eq))}</b><span>${nivel === "cambiar" || nivel === "atencion" ? "⚠ " : ""}${escapeHtml(textoBateria(eq))}</span>${eq.nota ? `<small>${escapeHtml(eq.nota)}</small>` : ""}`;
+  // Llamado de atención al abrir el service (una vez por cliente y por día).
+  if (llamar && (nivel === "atencion" || nivel === "cambiar")) {
+    const clave = `aviso_bateria_${fechaLocalISO()}_${EquipoCliente.claveCliente(currentNumeroCliente, nombre)}`;
+    let visto = false;
+    try { visto = !!sessionStorage.getItem(clave); sessionStorage.setItem(clave, "1"); } catch (e) { /* sin almacenamiento */ }
+    if (!visto) await dialogoApp(`⚠ ${nombre}\n\n${textoBateria(eq)}\n${textoSistema(eq)}\n\nAunque vayas por otra cosa, revisá la batería.`, { aceptar: "Entendido", soloAceptar: true });
+  }
+}
+
 function mostrarVisitaAnterior() {
+  avisoEquipoParte(false);
   const nombreCliente = document.getElementById("f_cliente").value.trim();
   ultimaVisitaEncontrada = null;
   if (!nombreCliente || !Array.isArray(historialCache) || historialCache.length === 0) {
@@ -3140,6 +3217,7 @@ document.getElementById("f_cliente").addEventListener("change", () => {
     if (exacto) currentNumeroCliente = exacto.numero_cliente || "";
   }
   mostrarVisitaAnterior();
+  setTimeout(() => avisoEquipoParte(true), 300); // llamado de atención si la batería es vieja
 });
 
 // Sugerencias de cliente al escribir — busca por nombre O dirección a
@@ -3202,6 +3280,7 @@ fClienteInput.addEventListener("input", async () => {
       clienteSugerenciasWrap.classList.add("hidden");
       document.getElementById("clienteAmbiguoAviso").classList.add("hidden");
       mostrarVisitaAnterior();
+      setTimeout(() => avisoEquipoParte(true), 300); // llamado de atención si la batería es vieja
     });
   });
   clienteSugerenciasWrap.classList.remove("hidden");

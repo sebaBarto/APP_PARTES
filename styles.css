@@ -4182,3 +4182,21 @@ label.veh-herr-item:has(input:checked) { border-color: #F5A623; background: #FFF
 .veh-herr-ocupada { opacity: .55; }
 .veh-herr-item small { font-size: 12px; color: #5B6B7B; text-align: right; }
 .veh-herr-error { color: #B42318; font-size: 13.5px; margin: 0 0 10px; }
+
+/* Equipo del cliente: sistema de alarma y batería (parte y ficha). Sirve en tema claro y oscuro. */
+.parte-equipo { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; padding: 8px 12px; border-radius: 10px; font-size: 13.5px; line-height: 1.35; border: 1px solid rgba(127,127,127,.4); background: rgba(127,127,127,.12); color: inherit; }
+.parte-equipo b { font-size: 13px; }
+.parte-equipo small { opacity: .75; }
+.parte-equipo-atencion { background: rgba(245,166,35,.16); border-color: #F5A623; }
+.parte-equipo-atencion span { color: #E8961A; font-weight: 600; }
+.parte-equipo-cambiar { background: rgba(229,83,75,.16); border-color: #E5534B; }
+.parte-equipo-cambiar span { color: #E5534B; font-weight: 700; }
+.ficha-equipo-fila { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 4px 0; font-size: 15px; }
+.ficha-equipo-fila span { opacity: .7; }
+.ficha-equipo-prob { font-weight: 600; color: #8A5A00; background: #FFF1D6; border-radius: 6px; padding: 1px 6px; font-size: 11.5px; }
+.ficha-equipo-fuente { margin: 0 0 4px; font-size: 12.5px; opacity: .75; }
+.ficha-equipo-alerta { font-weight: 700; }
+.ficha-equipo-atencion { border-left: 4px solid #F5A623 !important; }
+.ficha-equipo-atencion .ficha-equipo-alerta, .ficha-equipo-atencion .ficha-equipo-bat { color: #E8961A; }
+.ficha-equipo-cambiar { border-left: 4px solid #E5534B !important; }
+.ficha-equipo-cambiar .ficha-equipo-alerta, .ficha-equipo-cambiar .ficha-equipo-bat { color: #E5534B; }

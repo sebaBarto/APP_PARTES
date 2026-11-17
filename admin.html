@@ -2493,6 +2493,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
 <script src="stock-utils.js"></script>
 <script src="tablero-stock.js"></script>
 <script src="croquis-utils.js"></script>
+<script src="equipo-utils.js"></script>
 <script src="cruce-llaves.js"></script>
 <script>
 // ==== CONFIGURACIÓN ====
@@ -2988,12 +2989,13 @@ async function datosParaFichaAdmin() {
   if (fichaDatosAdmin && Date.now() - fichaDatosAdmin.cuando < 5 * 60 * 1000) return fichaDatosAdmin;
   const h = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
   const leer = (url) => fetch(url, { headers: h, cache: "no-store" }).then((r) => (r.ok ? r.json() : [])).catch(() => []);
-  const [clientes, partes, inst, claves, comodatos, planos, emerg] = await Promise.all([
+  const [clientes, partes, inst, claves, comodatos, planos, emerg, equipos] = await Promise.all([
     leer("/api/datos?coleccion=clientes"), leer("/api/historial"), leer("/api/datos?coleccion=sims_instaladas"),
     leer("/api/historial?tipo=claves_cliente"), leer("/api/historial?tipo=comodatos"), leer("/api/planos"), leer("/api/datos?coleccion=servicios_emergencia"),
+    fetch("/api/datos?coleccion=equipos_clientes", { headers: h, cache: "no-store" }).then((r) => (r.ok ? r.json() : {})).catch(() => ({})),
   ]);
   const arr = (x) => (Array.isArray(x) ? x : []);
-  fichaDatosAdmin = { cuando: Date.now(), clientes: arr(clientes), partes: arr(partes), inst: arr(inst), claves: arr(claves), comodatos: arr(comodatos), planos: arr(planos), emerg: arr(emerg) };
+  fichaDatosAdmin = { cuando: Date.now(), clientes: arr(clientes), partes: arr(partes), inst: arr(inst), claves: arr(claves), comodatos: arr(comodatos), planos: arr(planos), emerg: arr(emerg), equipos: equipos && typeof equipos === "object" && !Array.isArray(equipos) ? equipos : {} };
   return fichaDatosAdmin;
 }
 let buscarClienteTimer = null;
@@ -3097,9 +3099,23 @@ function mostrarFichaClienteAdmin(c) {
   const sec = (titulo, items, vacio) => `<div class="fa-sec"><h4>${titulo} (${items.length})</h4>${items.length ? `<ul>${items.join("")}</ul>` : `<p class="fa-vacio">${vacio}</p>`}</div>`;
   const listaClaves = claves.flatMap((k) => k.claves || []);
   const totalClaves = listaClaves.length;
+  // Alarma: sistema y batería (deducido de los partes; la oficina lo corrige acá).
+  const manualEq = (d.equipos || {})[EquipoCliente.claveCliente(num, "")] || (d.equipos || {})[EquipoCliente.claveCliente("", c.nombre)] || null;
+  const eq = EquipoCliente.equipoDeCliente(partes, manualEq, new Date().toISOString().slice(0, 10));
+  const colorBat = { ok: "#1E7B34", atencion: "#B26A00", cambiar: "#B3261E", sin_datos: "#5B6B7B" }[eq.bateria.nivel];
+  const secAlarma = `<div class="fa-sec fa-sec-alarma"><h4>Alarma</h4>
+    <p style="margin:2px 0;"><b>Sistema:</b> ${eq.sistema.marca ? `${escapeHtmlAdmin(eq.sistema.marca)}${eq.sistema.estado === "probable" ? " <i>(probable: lo nombran los partes, sin un cambio de central registrado)</i>" : ""} <span class="stk-det">${eq.sistema.fuente === "oficina" ? `cargado por ${escapeHtmlAdmin(eq.sistema.por || "la oficina")}` : `según los partes, desde ${fechaAR(eq.sistema.desde)}`}${(eq.sistema.anteriores || []).length ? ` · antes: ${escapeHtmlAdmin(eq.sistema.anteriores.map((x) => x.marca).join(", "))}` : ""}</span>` : "sin datos"}</p>
+    <p style="margin:2px 0;color:${colorBat};"><b>Batería:</b> ${eq.bateria.fecha ? `${escapeHtmlAdmin(eq.bateria.antiguedad)} — ${eq.bateria.segura ? "cambio" : "pedido de cambio"} del ${fechaAR(eq.bateria.fecha)} <span class="stk-det">(${escapeHtmlAdmin(eq.bateria.fuenteTexto)})</span>${eq.bateria.nivel === "cambiar" ? " · <b>más de 2 años: cambiarla</b>" : eq.bateria.nivel === "atencion" ? " · <b>más de 1 año y medio</b>" : ""}` : "sin datos"}</p>
+    <div class="field-row fa-eq-editar" style="gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:6px;">
+      <label class="stk-det">Sistema<br><select class="field-input fa-eq-sistema" style="width:auto;"><option value="">Automático (según los partes)</option>${[...EquipoCliente.EQUIPO_MARCAS, "Otro"].map((m) => `<option ${manualEq && manualEq.sistema === m ? "selected" : ""}>${m}</option>`).join("")}</select></label>
+      <label class="stk-det">Último cambio de batería<br><input type="date" class="field-input fa-eq-bateria" style="width:auto;" max="${new Date().toISOString().slice(0, 10)}" value="${escapeHtmlAdmin((manualEq && manualEq.bateria_fecha) || "")}"></label>
+      <button type="button" class="btn-secondary-admin fa-eq-guardar" style="width:auto;">Guardar</button>
+    </div>
+  </div>`;
   document.getElementById("inicioFichaCliente").innerHTML = `<div class="ficha-adm">
     <h3>${escapeHtmlAdmin(c.nombre || "")}</h3>
     <div class="fa-sub">Cliente N° ${escapeHtmlAdmin(num || "?")}${c.numero_abonado ? ` · Abonado ${escapeHtmlAdmin(c.numero_abonado)}` : ""} · ${escapeHtmlAdmin([c.direccion, c.localidad].filter(Boolean).join(", "))}${c.telefono ? ` · Tel. ${escapeHtmlAdmin(c.telefono)}` : ""}</div>
+    ${secAlarma}
     ${sec("Últimas visitas", partes.slice(0, 8).map((p) => `<li><b>${fechaAR(p.fecha)}</b> — ${escapeHtmlAdmin(p.tecnico || "")}: ${escapeHtmlAdmin(String(p.tarea || p.observaciones || "").slice(0, 120))}${p.numero_servicio ? ` <span style="color:#6B7680;">(N° ${escapeHtmlAdmin(p.numero_servicio)})</span>` : ""}</li>`), "Sin partes registrados.")}
     ${sec("SIMs instaladas", sims.map((s) => `<li><button type="button" class="sim-num-link" data-ficha="${escapeHtmlAdmin(s.numero)}">${escapeHtmlAdmin(s.numero)}</button> · ${escapeHtmlAdmin(s.empresa || "")} · ${escapeHtmlAdmin(s.estado_linea || "Activo")}${s.fecha_activacion ? ` · desde ${fechaAR(s.fecha_activacion)}` : ""}</li>`), "No tiene SIMs instaladas.")}
     <div class="fa-sec fa-sec-claves"><h4>Claves (${totalClaves})</h4><div class="field-row" style="gap:8px;flex-wrap:wrap;">${totalClaves ? '<button type="button" class="btn-secondary-admin fa-ver-claves" style="width:auto; padding:6px 12px;">Mostrar claves</button>' : ""}<button type="button" class="btn-secondary-admin fa-clave-agregar" style="width:auto; padding:6px 12px;">+ Agregar clave</button></div>${totalClaves ? `<ul class="fa-claves">${htmlListaClaves(listaClaves)}</ul>` : '<p class="fa-vacio">No hay claves guardadas.</p>'}<div class="fa-clave-zona"></div></div>
@@ -3117,6 +3133,19 @@ function mostrarFichaClienteAdmin(c) {
     if (ul) ul.classList.add("visible"); if (b2) b2.textContent = "Ocultar claves";
   });
   cont.querySelectorAll("[data-ficha]").forEach((b) => b.addEventListener("click", () => abrirFichaLineaSim(b.dataset.ficha)));
+  const bEq = cont.querySelector(".fa-eq-guardar");
+  if (bEq) bEq.addEventListener("click", async () => {
+    bEq.disabled = true;
+    try {
+      const r = await fetch("/api/datos?coleccion=equipos_clientes", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ accion: "poner", numero_cliente: num, nombre: c.nombre || "", sistema: cont.querySelector(".fa-eq-sistema").value, bateria_fecha: cont.querySelector(".fa-eq-bateria").value }) });
+      const dd = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(dd.error || "HTTP " + r.status);
+      d.equipos = { ...(d.equipos || {}) };
+      if (dd.equipo) d.equipos[dd.clave] = dd.equipo; else delete d.equipos[dd.clave];
+      avisoAdmin("Alarma del cliente guardada.", "ok");
+      mostrarFichaClienteAdmin(c);
+    } catch (e) { bEq.disabled = false; cartelAdmin("No se pudo guardar: " + e.message); }
+  });
 }
 
 

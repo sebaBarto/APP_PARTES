@@ -1712,6 +1712,94 @@ test("Vehículos: al tomarlo pregunta si lleva herramientas; con Sí tiene que t
   await ctx.close();
 });
 
+test("Equipo del cliente: al abrir el service avisa si la batería es vieja (18/24 meses) y la ficha muestra el sistema de alarma", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const hoy = new Date(), hace = (meses) => { const d = new Date(hoy); d.setMonth(d.getMonth() - meses); return d.toISOString().slice(0, 10); };
+  const partes = [
+    { id_parte: "a", numero_servicio: "10", cliente: "Kiosco Pérez", numero_cliente: "900", fecha: hace(40), tarea: "Teclado K32 no enciende", observaciones: "", materiales: "", tecnico: "Luis" },
+    { id_parte: "b", numero_servicio: "11", cliente: "Kiosco Pérez", numero_cliente: "900", fecha: hace(26), tarea: "Revisión", observaciones: "Se cambió la batería", materiales: "Batería 12V 7Ah x1", tecnico: "Luis" },
+    { id_parte: "c", numero_servicio: "12", cliente: "Kiosco Pérez", numero_cliente: "900", fecha: hace(3), tarea: "Cliente pregunta por Ajax", observaciones: "", materiales: "", tecnico: "Luis" },
+    { id_parte: "d", numero_servicio: "13", cliente: "Lara Silvano", numero_cliente: "901", fecha: hace(20), tarea: "Migración a Ajax", observaciones: "Se instala Hub 2, batería nueva", materiales: "", tecnico: "Juan" },
+  ];
+  await page.route("**/api/**", (route) => {
+    const u = route.request().url();
+    const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (/\/api\/historial(\?|$)/.test(u) && !u.includes("tipo=")) return json(partes);
+    if (u.includes("coleccion=equipos_clientes")) return json({});
+    json([]);
+  });
+  await page.goto(base + "/");
+  await page.waitForTimeout(300);
+  await page.evaluate(async () => { tecnicoLogueado = "Juan Pérez"; await precargarHistorialParaVisitas(); });
+  // Batería de 2 años y 2 meses: llamado de atención al abrir el service, aunque vaya por otra cosa
+  await page.evaluate(() => seleccionarServicio({ numero_servicio: "500", cliente: "Kiosco Pérez", numero_cliente: "900", direccion: "Mitre 1", tarea: "Cambiar teclado" }));
+  await page.waitForSelector(".dlg-app .dlg-texto");
+  const dlg = await page.textContent(".dlg-app .dlg-texto");
+  assert.match(dlg, /Batería de 2 años y [12] mes(es)? \(cambio: \d\d\/\d\d\/\d{4}\): tiene más de 2 años, cambiala\./);
+  assert.match(dlg, /Sistema: Paradox \(probable\)/, "una pregunta por Ajax no cambia el sistema");
+  await page.click(".dlg-app .dlg-si");
+  const banner = await page.locator("#parteEquipoAviso");
+  assert.strictEqual(await banner.getAttribute("class"), "parte-equipo parte-equipo-cambiar");
+  assert.match(await banner.textContent(), /Sistema: Paradox \(probable\)⚠ Batería de 2 años y [12] mes/);
+  // El mismo día no vuelve a saltar
+  await page.evaluate(() => seleccionarServicio({ numero_servicio: "501", cliente: "Kiosco Pérez", numero_cliente: "900", direccion: "Mitre 1", tarea: "Otra" }));
+  await page.waitForTimeout(700);
+  assert.strictEqual(await page.locator(".dlg-app").count(), 0);
+  // 1 año y 8 meses: atención; migró a Ajax
+  await page.evaluate(() => seleccionarServicio({ numero_servicio: "502", cliente: "Lara Silvano", numero_cliente: "901", direccion: "Sarmiento 2", tarea: "Revisión" }));
+  await page.waitForSelector(".dlg-app .dlg-texto");
+  assert.match(await page.textContent(".dlg-app .dlg-texto"), /Batería de 1 año y [78] meses \(cambio: [\d/]+\): tiene más de 1 año y medio, prestale atención\.[\s\S]*Sistema: Ajax/);
+  await page.click(".dlg-app .dlg-si");
+  assert.strictEqual(await banner.getAttribute("class"), "parte-equipo parte-equipo-atencion");
+  // Ficha del cliente: bloque Alarma
+  await page.evaluate(() => abrirFichaCliente({ nombre: "Lara Silvano", numero_cliente: "901", direccion: "Sarmiento 2" }));
+  await page.waitForSelector(".ficha-equipo");
+  const ficha = (await page.textContent(".ficha-equipo")).replace(/\s+/g, " ");
+  assert.match(ficha, /SistemaAjax Según los partes \(desde [\d\/]+\)/);
+  assert.match(ficha, /Batería ?1 año y [78] meses Último cambio: [\d/]+ · lo que se hizo en el parte · Más de 1 año y medio: prestale atención\./);
+  if (process.env.FOTO) await page.screenshot({ path: process.env.FOTO });
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Admin, ficha del cliente: muestra la alarma (sistema y batería) y la oficina la corrige", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  let equipos = {};
+  const posts = [];
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("coleccion=equipos_clientes")) {
+      if (req.method() === "POST") { const b = JSON.parse(req.postData()); posts.push(b); equipos = { "n:900": { sistema: b.sistema, bateria_fecha: b.bateria_fecha, sistema_por: "Paula", sistema_fecha: "2026-11-16" } }; return json({ ok: true, clave: "n:900", equipo: equipos["n:900"] }); }
+      return json(equipos);
+    }
+    if (/\/api\/historial(\?|$)/.test(u) && !u.includes("tipo=")) return json([
+      { cliente: "Kiosco Pérez", numero_cliente: "900", fecha: "2023-05-02", tarea: "Revisar central DSC PC1616", observaciones: "", materiales: "" },
+      { cliente: "Kiosco Pérez", numero_cliente: "900", fecha: "2024-01-10", tarea: "Service", observaciones: "Se cambió la batería", materiales: "" },
+    ]);
+    if (u.includes("coleccion=clientes")) return json([{ nombre: "Kiosco Pérez", numero_cliente: "900", direccion: "Mitre 1" }]);
+    json([]);
+  });
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(async () => { document.getElementById("mainCard").classList.remove("hidden"); document.getElementById("panelInicio").classList.remove("hidden"); await datosParaFichaAdmin(); mostrarFichaClienteAdmin({ nombre: "Kiosco Pérez", numero_cliente: "900", direccion: "Mitre 1" }); });
+  let alarma = (await page.textContent(".fa-sec-alarma")).replace(/\s+/g, " ");
+  assert.match(alarma, /Sistema: DSC \(probable: lo nombran los partes, sin un cambio de central registrado\) según los partes, desde 02\/05\/2023/);
+  assert.match(alarma, /Batería: \d años y \d+ mes(es)? — cambio del 10\/01\/2024 \(lo que se hizo en el parte\) · más de 2 años: cambiarla/);
+  // La oficina sabe que tiene Ajax y que la batería se cambió hace poco
+  await page.selectOption(".fa-eq-sistema", "Ajax");
+  await page.fill(".fa-eq-bateria", "2026-10-01");
+  await page.click(".fa-eq-guardar");
+  await page.waitForFunction(() => /Sistema: Ajax cargado por Paula/.test(document.querySelector(".fa-sec-alarma").textContent.replace(/\s+/g, " ")));
+  assert.deepStrictEqual(posts[0], { accion: "poner", numero_cliente: "900", nombre: "Kiosco Pérez", sistema: "Ajax", bateria_fecha: "2026-10-01" });
+  alarma = (await page.textContent(".fa-sec-alarma")).replace(/\s+/g, " ");
+  assert.match(alarma, /antes: DSC/);
+  assert.match(alarma, /cargado por la oficina/);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
 test("El botón atrás de Android no cierra la app ni cambia de pantalla", async () => {
   const { ctx, page, erroresPagina } = await nuevaPagina();
   await page.route("**/api/**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));

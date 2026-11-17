@@ -1,6 +1,6 @@
 // Versión del caché: subir este número cada vez que se publican cambios
 // importantes fuerza a los celulares a descartar la copia vieja.
-const CACHE_NAME = "parte-tecnico-v257";
+const CACHE_NAME = "parte-tecnico-v258";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -12,6 +12,7 @@ const APP_SHELL = [
   "./stock-utils.js",
   "./tablero-stock.js",
   "./croquis-utils.js",
+  "./equipo-utils.js",
   "./croquis-3d.js",
   "./entregas-llaves.js",
 ];
