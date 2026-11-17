@@ -9987,6 +9987,7 @@ notasAdminBuscarInput.addEventListener("input", renderNotasAdmin);
 // llave por llave con lo que tiene la estación de monitoreo.
 // Escape completo (también comillas): lo que muestra esta sección lo escribió
 // cualquiera desde el formulario público, y va dentro de atributos HTML.
+const rllPisoGrado = (p) => { const t = String(p == null ? "" : p).trim(); return /^\d+$/.test(t) ? t + "°" : t; };
 function rllEsc(s) {
   return String(s ?? "").replace(/[&<>"'`]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;", "`": "&#96;" }[c]));
 }
@@ -10372,7 +10373,7 @@ function rllModal(titulo, cuerpoHtml) {
 }
 function rllUnidad(r) {
   const p = [];
-  if (r.piso || r.unidad) p.push(`${r.piso || "?"}° ${r.unidad || ""}`.trim());
+  if (r.piso || r.unidad) p.push(`${r.piso ? rllPisoGrado(r.piso) : "?°"} ${r.unidad || ""}`.trim());
   if (r.cochera) p.push("Cochera " + r.cochera);
   if (!p.length && r.tipo === "cochera") p.push("Cochera");
   return p.join(" · ") || "—";
@@ -11131,9 +11132,14 @@ function renderRllConciliacion() {
 
   // Acciones en lote
   const encPend = filas.filter((f) => f.res === "encontrada" && f.d && f.d.l.estado === "pendiente");
+  // N° de llave de la estación/placa, como se muestra (para completar el padrón cuando el vecino no lo cargó).
+  const numEstacion = (e) => (e && e.tag ? (rllEsControlEstacion(e) ? e.tag : (rllClaveTag(e.tag).includes(":") ? rllClaveTag(e.tag) : e.tag)) : "");
+  const tagFaltante = (f) => (f.d && !String(f.d.l.tag || "").trim() && numEstacion(f.est)) ? { tag: numEstacion(f.est) } : {};
+  const sinTag = filas.filter((f) => f.res === "encontrada" && f.d && tagFaltante(f).tag);
   const lote = document.getElementById("rllConcLote");
   const botones = [];
   if (encPend.length) botones.push(`<button type="button" class="btn-secondary-admin" id="rllConcConciliarBtn">✓ Marcar las ${encPend.length} encontradas como conciliadas</button>`);
+  if (sinTag.length) botones.push(`<button type="button" class="btn-secondary-admin" id="rllConcTagBtn" title="El vecino no cargó el número de la llave: se copia el de la estación o la placa">Completar el N° de llave en ${sinTag.length} ${sinTag.length === 1 ? "llave" : "llaves"} del padrón</button>`);
   if (pendBaja) botones.push(`<button type="button" class="btn-secondary-admin" id="rllConcBajaTodasBtn">Marcar las ${pendBaja} sin decidir para dar de baja</button>`);
   // Encontradas por nombre a las que les falta el N° de usuario en el padrón: se completa con el de la estación.
   const sinUsuario = filas.filter((f) => f.res === "encontrada" && f.por === "nombre" && f.d && !rllClaveUsuario(f.d.l.usuario) && rllClaveUsuario(f.est.usuario));
@@ -11144,11 +11150,11 @@ function renderRllConciliacion() {
   if (bConc) bConc.addEventListener("click", async () => {
     bConc.disabled = true;
     try {
-      const cambios = encPend.map((f) => ({ id: f.d.r.id, indice: f.d.i, perdida: false, estado: "conciliada" }));
+      const cambios = encPend.map((f) => ({ id: f.d.r.id, indice: f.d.i, perdida: false, estado: "conciliada", ...tagFaltante(f) }));
       const r = await fetch("/api/datos?coleccion=registro_llaves", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "estado_lote", edificio: rllEdificioActual.codigo, cambios }) });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Error");
-      encPend.forEach((f) => { f.d.l.estado = "conciliada"; f.d.l.revisado_por = adminNombre || "vos"; });
+      encPend.forEach((f) => { const t = tagFaltante(f).tag; if (t) f.d.l.tag = t; f.d.l.estado = "conciliada"; f.d.l.revisado_por = adminNombre || "vos"; });
       renderRllRegistros();
       renderRllConciliacion();
     } catch (e) { alert("No se pudo guardar: " + e.message); bConc.disabled = false; }
@@ -11157,7 +11163,7 @@ function renderRllConciliacion() {
   if (bUsu) bUsu.addEventListener("click", async () => {
     bUsu.disabled = true;
     try {
-      const cambios = sinUsuario.map((f) => ({ id: f.d.r.id, indice: f.d.i, perdida: false, usuario: f.est.usuario, estado: "conciliada" }));
+      const cambios = sinUsuario.map((f) => ({ id: f.d.r.id, indice: f.d.i, perdida: false, usuario: f.est.usuario, estado: "conciliada", ...tagFaltante(f) }));
       const r = await fetch("/api/datos?coleccion=registro_llaves", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "estado_lote", edificio: rllEdificioActual.codigo, cambios }) });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Error");
@@ -11165,6 +11171,19 @@ function renderRllConciliacion() {
       renderRllRegistros();
       renderRllConciliacion();
     } catch (e) { alert("No se pudo guardar: " + e.message); bUsu.disabled = false; }
+  });
+  const bTag = document.getElementById("rllConcTagBtn");
+  if (bTag) bTag.addEventListener("click", async () => {
+    bTag.disabled = true;
+    try {
+      const cambios = sinTag.map((f) => ({ id: f.d.r.id, indice: f.d.i, perdida: false, estado: f.d.l.estado, ...tagFaltante(f) }));
+      const r = await fetch("/api/datos?coleccion=registro_llaves", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "estado_lote", edificio: rllEdificioActual.codigo, cambios }) });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.error || "Error");
+      sinTag.forEach((f) => { f.d.l.tag = tagFaltante(f).tag; });
+      renderRllRegistros();
+      renderRllConciliacion();
+    } catch (e) { alert("No se pudo guardar: " + e.message); bTag.disabled = false; }
   });
   const bBaja = document.getElementById("rllConcBajaTodasBtn");
   if (bBaja) bBaja.addEventListener("click", () => rllDecidir(filas.filter((f) => (f.res === "no_registrada" || f.res === "perdida") && !rllConc.filas[f.i].decision).map((f) => f.i), "dar_de_baja"));
@@ -11400,7 +11419,7 @@ async function rllCargarGestiones() {
 }
 function rllGestUnidad(g) {
   const p = [];
-  if (g.piso || g.unidad) p.push(`${g.piso ? g.piso + "°" : ""} ${g.unidad || ""}`.trim());
+  if (g.piso || g.unidad) p.push(`${g.piso ? rllPisoGrado(g.piso) : ""} ${g.unidad || ""}`.trim());
   if (g.cochera) p.push("Cochera " + g.cochera);
   return p.join(" · ") || "—";
 }

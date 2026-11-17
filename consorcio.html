@@ -779,7 +779,7 @@
               <div class="grupo">
                 <h3 class="grupo-tit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>Unidad</h3>
                 <div class="fila tres">
-                  <div><label for="gPiso">Piso</label><input type="text" id="gPiso" maxlength="10" placeholder="Ej. 4"></div>
+                  <div><label for="gPiso">Piso</label><input type="text" id="gPiso" maxlength="20" placeholder="Ej. 4"></div>
                   <div><label for="gUnidad">Depto</label><input type="text" id="gUnidad" maxlength="10" placeholder="Ej. B"></div>
                   <div><label for="gCochera">Cochera <span class="opc">(si corresponde)</span></label><input type="text" id="gCochera" maxlength="15"></div>
                 </div>
@@ -1148,7 +1148,7 @@
     tagMini: '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill-rule="evenodd" d="M2 13C4 7 12 4 18 6.5c2 .8 3.4 2 4 3-1 1.6-3.6 3.8-6.6 4.9C10 16.4 3.4 16.6 2 13zM19.3 10.6a1.2 1.2 0 1 0 .01 0z" fill="#2348C8"/><circle cx="11" cy="11.5" r="3.8" fill="#1A34A2"/></svg>',
     ctlMini: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="1.5" width="10" height="21" rx="4.5" fill="#111113"/><circle cx="12" cy="4.6" r="1.1" fill="#3DDC6E"/><rect x="9.2" y="7.2" width="5.6" height="2.5" rx="1.25" fill="#D4D4D8"/><rect x="9.2" y="10.8" width="5.6" height="2.5" rx="1.25" fill="#D4D4D8"/><rect x="9.2" y="14.4" width="5.6" height="2.5" rx="1.25" fill="#D4D4D8"/><circle cx="12" cy="19" r="1.5" fill="#D4D4D8"/></svg>',
   };
-  const unidadCorta = (x) => [x.piso ? (/^pb$/i.test(String(x.piso).trim()) ? "PB" : x.piso + "°") : "", x.unidad || "", x.cochera ? "cochera " + x.cochera : ""].filter(Boolean).join(" ").trim();
+  const unidadCorta = (x) => [x.piso ? pisoGrado(/^pb$/i.test(String(x.piso).trim()) ? "PB" : x.piso) : "", x.unidad || "", x.cochera ? "cochera " + x.cochera : ""].filter(Boolean).join(" ").trim();
 
   // ---------- Para hoy ----------
   function renderParaHoy() {
@@ -1176,6 +1176,7 @@
   let unidadSel = "";
   // Un solo formato por piso y depto, escriba lo que escriba el vecino:
   // piso "01", "1", "1er", "1°" → 1; "00", "0", "PB" → PB. Depto "A" → 1, "B" → 2…; "01" → 1.
+  const pisoGrado = (p) => { const t = String(p == null ? "" : p).trim(); return /^\d+$/.test(t) ? t + "°" : t; };
   const normPiso = (p) => {
     const t = String(p || "").trim().toUpperCase().replace(/[°º.]/g, "").replace(/^PISO\s*/, "").replace(/\s+/g, " ").trim();
     if (/^(PB|P B|PLANTA BAJA)$/.test(t)) return "PB";
@@ -1221,7 +1222,7 @@
     }
     const icono = { ok: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>', reg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>', alerta: IC.alerta, none: "" };
     $("mapaGrilla").innerHTML = `<div class="mapa-fila cab" style="${cols}"><span></span>${deptos.map((d) => `<span>${esc(d)}</span>`).join("")}</div>`
-      + pisos.map((p) => `<div class="mapa-fila" style="${cols}"><span class="piso">${p === "PB" ? "PB" : esc(p) + "°"}</span>${deptos.map((d) => {
+      + pisos.map((p) => `<div class="mapa-fila" style="${cols}"><span class="piso">${esc(pisoGrado(p))}</span>${deptos.map((d) => {
         const k = p + "|" + d, x = u.get(k), e = estadoUnidad(x);
         return `<button type="button" class="celda ${e}${k === unidadSel ? " sel" : ""}" data-k="${esc(k)}" aria-label="${p === "PB" ? "Planta baja" : "Piso " + esc(p)}, depto ${esc(d)}: ${EST_UNIDAD[e]}" aria-pressed="${k === unidadSel}">${esc(d)}${icono[e]}${x && x.pedidos.length ? '<span class="punto"></span>' : ""}${e === "alerta" ? '<span class="late"></span>' : ""}</button>`;
       }).join("")}</div>`).join("");
@@ -1231,7 +1232,7 @@
   }
   function renderFicha(x) {
     const e = estadoUnidad(x.regs.length || x.emergencias.length ? x : null);
-    const titulo = (x.piso === "PB" ? "PB" : x.piso + "°") + " " + x.unidad;
+    const titulo = pisoGrado(x.piso) + " " + x.unidad;
     const rel = { titular: "Titular", inquilino: "Inquilino", otro: "Otro" };
     const llaves = x.regs.flatMap((r) => (r.llaves || []).filter((l) => l.estado !== "dada_de_baja"));
     const em = x.emergencias[x.emergencias.length - 1];
@@ -1283,7 +1284,7 @@
 
   function unidadTxt(r) {
     const p = [];
-    if (r.piso || r.unidad) { const np = r.piso ? normPiso(r.piso) : ""; p.push(`${np ? (np === "PB" ? "PB" : np + "°") : ""} ${r.unidad ? normDepto(r.unidad) : ""}`.trim()); }
+    if (r.piso || r.unidad) { const np = r.piso ? normPiso(r.piso) : ""; p.push(`${np ? pisoGrado(np) : ""} ${r.unidad ? normDepto(r.unidad) : ""}`.trim()); }
     if (r.cochera) p.push("Cochera " + r.cochera);
     return p.join(" · ") || (r.tipo === "cochera" ? "Cochera" : "—");
   }
@@ -1645,7 +1646,7 @@
       const abierto = !i.usada && !i.cancelada && !vencido;
       const fecha = (x) => fechaCorta(x);
       return `<div class="link-item ${abierto ? "" : "cerrado"}">
-        <div class="quien"><div class="quien-tit"><b>${esc(i.destinatario || "Vecino")}${i.piso || i.unidad ? " · " + esc(`${i.piso ? i.piso + "°" : ""} ${i.unidad}`.trim()) : ""}</b><span class="est ${est[1]}">${est[0]}</span></div>
+        <div class="quien"><div class="quien-tit"><b>${esc(i.destinatario || "Vecino")}${i.piso || i.unidad ? " · " + esc(`${i.piso ? pisoGrado(i.piso) : ""} ${i.unidad}`.trim()) : ""}</b><span class="est ${est[1]}">${est[0]}</span></div>
           <div class="dat">${esc(i.tipo ? TIPOS[i.tipo] : "Gestión a elección del vecino")} · creado ${fecha(i.creada)}${abierto ? " · vence " + fecha(i.vence) : ""}</div></div>
         ${abierto ? `<div class="acc">${botonesCompartir(i)}<button type="button" class="btn btn-sec btn-chico btn-peligro cancelar-link" data-id="${esc(i.id)}" aria-label="Cancelar link" title="Cancelar link">${IC.x}<span class="txt-cancelar">Cancelar</span></button></div>` : ""}
       </div>`;
@@ -1785,11 +1786,11 @@
   }
   $("lLista").addEventListener("input", () => { const n = leerLista().length; $("lListaCuenta").textContent = n ? `${n} ${n === 1 ? "link" : "links"} para generar${n >= 60 ? " (máximo 60 por vez)" : ""}` : ""; });
   function renderLote(invs) {
-    const filasTxt = invs.map((i) => `${i.destinatario || "Vecino"}${i.piso || i.unidad ? " (" + `${i.piso ? i.piso + "°" : ""} ${i.unidad}`.trim() + ")" : ""}: ${urlLink(i.codigo)}`);
+    const filasTxt = invs.map((i) => `${i.destinatario || "Vecino"}${i.piso || i.unidad ? " (" + `${i.piso ? pisoGrado(i.piso) : ""} ${i.unidad}`.trim() + ")" : ""}: ${urlLink(i.codigo)}`);
     $("linkNuevo").innerHTML = `<div class="listo-box">
       <b>✓ ${invs.length} links listos.</b> Mandale a cada uno el suyo (cada link sirve una sola vez).
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px;"><button type="button" class="btn btn-sec btn-chico" id="loteCopiar">${IC.copiar}Copiar toda la lista</button><button type="button" class="btn btn-sec btn-chico" id="loteCsv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Descargar lista</button></div>
-      <table class="lote-tabla">${invs.map((i) => `<tr><td><b>${esc(i.destinatario || "Vecino")}</b>${i.piso || i.unidad ? `<br><span style="color:var(--muted);font-size:13px;">${esc(`${i.piso ? i.piso + "°" : ""} ${i.unidad}`.trim())}</span>` : ""}</td><td style="text-align:right;"><div style="display:inline-flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">${botonesCompartir(i)}</div></td></tr>`).join("")}</table></div>`;
+      <table class="lote-tabla">${invs.map((i) => `<tr><td><b>${esc(i.destinatario || "Vecino")}</b>${i.piso || i.unidad ? `<br><span style="color:var(--muted);font-size:13px;">${esc(`${i.piso ? pisoGrado(i.piso) : ""} ${i.unidad}`.trim())}</span>` : ""}</td><td style="text-align:right;"><div style="display:inline-flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;">${botonesCompartir(i)}</div></td></tr>`).join("")}</table></div>`;
     $("linkNuevo").classList.remove("oculto");
     $("loteCopiar").addEventListener("click", async (e) => { try { await navigator.clipboard.writeText(filasTxt.join("\n")); aviso("Lista copiada."); } catch (err) { prompt("Copiá la lista:", filasTxt.join(" | ")); } });
     $("loteCsv").addEventListener("click", () => {
