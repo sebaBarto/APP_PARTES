@@ -1800,6 +1800,55 @@ test("Admin, ficha del cliente: muestra la alarma (sistema y batería) y la ofic
   await ctx.close();
 });
 
+test("Admin, Baterías: lista los clientes por antigüedad de la batería (2 años, 1 año y medio, sin datos), filtra por sistema y está en el Inicio", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const hace = (meses) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - meses); return d.toISOString().slice(0, 10); };
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  await page.route("**/api/**", (route) => {
+    const u = route.request().url();
+    const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (u.includes("coleccion=clientes")) return json([
+      { nombre: "Kiosco Pérez", numero_cliente: "900", direccion: "Mitre 1" },
+      { nombre: "Lara Silvano", numero_cliente: "901", direccion: "Sarmiento 2" },
+      { nombre: "Farmacia Sol", numero_cliente: "902", direccion: "Belgrano 3" },
+      { nombre: "Taller Ruiz", numero_cliente: "903", direccion: "Roca 4" },
+    ]);
+    if (u.includes("coleccion=equipos_clientes")) return json({ "n:903": { sistema: "Caddx", bateria_fecha: hace(2) } });
+    if (/\/api\/historial(\?|$)/.test(u) && !u.includes("tipo=")) return json([
+      { cliente: "Kiosco Pérez", numero_cliente: "900", fecha: hace(30), tarea: "Service", observaciones: "Se cambió la batería. Central DSC PC1616", materiales: "" },
+      { cliente: "Lara Silvano", numero_cliente: "901", fecha: hace(20), tarea: "Migración a Ajax", observaciones: "", materiales: "Batería 12V 7Ah x1" },
+      { cliente: "Farmacia Sol", numero_cliente: "902", fecha: hace(5), tarea: "Teclado K32 no enciende", observaciones: "", materiales: "" },
+    ]);
+    json([]);
+  });
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { document.getElementById("mainCard").classList.remove("hidden"); document.getElementById("tabBateriasBtn").click(); });
+  await page.waitForSelector(".bat-chip");
+  const chips = await page.$$eval(".bat-chip", (l) => l.map((b) => b.textContent.replace(/\s+/g, " ").trim()));
+  assert.deepStrictEqual(chips, ["🔴 Cambiarla (+2 años) 1", "🟠 Atención (+1 año y medio) 1", "🟢 Al día 1", "⚫ Sin datos 1", "Todos 4"]);
+  // Arranca en «Cambiarla»
+  let filas = await page.$$eval(".bat-fila", (l) => l.map((x) => x.textContent.replace(/\s+/g, " ").trim()));
+  assert.strictEqual(filas.length, 1);
+  assert.match(filas[0], /🔴 Kiosco Pérez ?2 años y [56] meses N° 900 · Mitre 1 Sistema: DSC \(probable\) · Batería cambiada el [\d/]+ \(lo que se hizo en el parte\)/);
+  await page.click('.bat-chip[data-nivel="todos"]');
+  filas = await page.$$eval(".bat-fila > div:first-child > b", (l) => l.map((x) => x.textContent.trim()));
+  assert.deepStrictEqual(filas, ["🔴 Kiosco Pérez", "🟠 Lara Silvano", "🟢 Taller Ruiz", "⚫ Farmacia Sol"], "las más viejas primero");
+  assert.match(await page.textContent(".bat-fila:nth-child(3)"), /Sistema: Caddx[\s\S]*cargado por la oficina/);
+  await page.selectOption("#batSistema", "Ajax");
+  assert.strictEqual(await page.locator(".bat-fila").count(), 1);
+  // Inicio: tarjeta de baterías para cambiar
+  await page.evaluate(() => document.getElementById("tabInicioBtn").click());
+  await page.waitForFunction(() => [...document.querySelectorAll(".inicio-tarjeta")].some((b) => /Baterías para cambiar/.test(b.textContent)));
+  const t = await page.$$eval(".inicio-tarjeta", (l) => l.map((b) => b.textContent.replace(/\s+/g, " ").trim()).find((x) => /Baterías para cambiar/.test(x)));
+  assert.match(t, /^1 ?Baterías para cambiar ?Kiosco Pérez \(2 años y [56] meses\)/);
+  await page.locator(".inicio-tarjeta", { hasText: "Baterías para cambiar" }).click();
+  await page.waitForSelector("#panelBaterias:not(.hidden) .bat-fila");
+  assert.strictEqual(await page.locator(".bat-fila").count(), 1, "llega filtrado en «Cambiarla»");
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
 test("El botón atrás de Android no cierra la app ni cambia de pantalla", async () => {
   const { ctx, page, erroresPagina } = await nuevaPagina();
   await page.route("**/api/**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));

@@ -313,6 +313,7 @@
   #tabRendicionesBtn:not(.active) .tab-icon { color: var(--acc-teal); }
   #tabCoordinacionBtn:not(.active) .tab-icon { color: var(--acc-amberdark); }
   #tabSemaforoBtn:not(.active) .tab-icon { color: var(--acc-sky); }
+  #tabBateriasBtn:not(.active) .tab-icon { color: #E8961A; }
   #tabClavesClienteBtn:not(.active) .tab-icon { color: var(--acc-goldenrod); }
 
   .tecnicos-filas { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
@@ -991,6 +992,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
       <button type="button" class="tab-btn" id="tabAuditoriaBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4h10a1 1 0 0 1 1 1v15H6a2 2 0 0 1-2-2V7"/><path d="M4 7a3 3 0 0 1 3-3h2v14"/><path d="M12 9h5M12 13h5M12 17h3"/></svg></span>Registro de cambios</button>
       <button type="button" class="tab-btn" id="tabRendicionesBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h12v19l-3-2-3 2-3-2-3 2V2z"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="11" x2="15" y2="11"/></svg></span>Rendiciones</button>
       <button type="button" class="tab-btn" id="tabCoordinacionBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>Coordinación</button>
+      <button type="button" class="tab-btn" id="tabBateriasBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="17" height="11" rx="2"/><path d="M22 11v3"/><path d="M6 11v3M10 11v3"/></svg></span>Baterías</button>
       <button type="button" class="tab-btn" id="tabSemaforoBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="20" rx="3"/><circle cx="12" cy="7" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="12" cy="17" r="1.2"/></svg></span>Semáforo visitas</button>
       <button type="button" class="tab-btn" id="tabClavesClienteBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>Claves por cliente</button>
       <button type="button" class="tab-btn" id="tabRegistroLlavesBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2 2M14 9l2 2"/></svg></span>Llaves de edificios<span class="tab-badge hidden" id="rllTabBadge">0</span></button>
@@ -2326,6 +2328,27 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
       </div>
     </div>
 
+    <div id="panelBaterias" class="hidden">
+      <h1>Baterías y sistemas</h1>
+      <p class="subtitle">
+        De cuándo es la batería de cada cliente y qué sistema de alarma tiene, según los partes (y lo que corrigió la oficina en la ficha).
+        🔴 más de 2 años: cambiarla · 🟠 más de 1 año y medio: prestar atención · 🟢 al día · ⚫ sin datos.
+      </p>
+      <div class="card" style="margin-bottom:16px;">
+        <div id="batChips" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;"></div>
+        <input type="text" class="field-input" id="batBuscar" placeholder="Buscar por cliente, número, dirección o localidad...">
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
+          <select class="field-input" id="batSistema" style="width:auto;"><option value="">Sistema: todos</option><option>Paradox</option><option>Ajax</option><option>DSC</option><option>Caddx</option><option value="Otro">Otro</option><option value="-">Sin dato</option></select>
+          <select class="field-input" id="batAbonado" style="width:auto;"><option value="activo">Solo clientes activos</option><option value="todos">Todos los clientes</option></select>
+          <button type="button" class="btn btn-secondary" id="batExcelBtn">⬇ Descargar Excel (lo filtrado)</button>
+        </div>
+      </div>
+      <div class="card">
+        <p class="status" id="batStatus"></p>
+        <div id="batLista"></div>
+      </div>
+    </div>
+
     <div id="panelSemaforo" class="hidden">
       <h1>Semáforo de visitas</h1>
       <p class="subtitle">
@@ -2802,6 +2825,7 @@ const TABS = [
   { btn: tabRendicionesBtn, panel: panelRendiciones, onShow: () => cargarRendicionesAdmin() },
   { btn: tabCoordinacionBtn, panel: panelCoordinacion, onShow: () => cargarCoordinacionAdmin() },
   { btn: tabSemaforoBtn, panel: panelSemaforo, onShow: () => cargarSemaforoVisitas() },
+  { btn: document.getElementById("tabBateriasBtn"), panel: document.getElementById("panelBaterias"), onShow: () => cargarBaterias() },
   { btn: tabClavesClienteBtn, panel: panelClavesCliente, onShow: () => cargarClavesClienteAdmin() },
   { btn: tabEmergenciaBtn, panel: panelEmergencia, onShow: () => cargarEmergenciasAdmin() },
   { btn: tabMiSatBtn, panel: panelMiSat, onShow: () => cargarMiSatAdmin() },
@@ -2820,7 +2844,7 @@ TABS.forEach(({ btn, panel, onShow }) => {
 // ---------- Menú agrupado ----------
 const GRUPOS_MENU = [
   ["", ["tabInicioBtn"]],
-  ["Día a día", ["tabServiciosBtn", "tabCronogramaBtn", "tabCoordinacionBtn", "tabEmergenciaBtn", "tabSeguimientosBtn", "tabSemaforoBtn", "tabNotasBtn"]],
+  ["Día a día", ["tabServiciosBtn", "tabCronogramaBtn", "tabCoordinacionBtn", "tabEmergenciaBtn", "tabSeguimientosBtn", "tabSemaforoBtn", "tabBateriasBtn", "tabNotasBtn"]],
   ["Administración", ["tabRendicionesBtn", "tabVencimientosBtn", "tabComodatosBtn", "tabInstalacionesBtn", "tabEncuestasBtn"]],
   ["SIMs", ["tabSimsBtn", "tabSimsInstaladasBtn", "tabSimsControlBtn"]],
   ["Flota y herramientas", ["tabStockBtn", "tabVehiculosBtn", "tabHerramientasBtn"]],
@@ -2866,7 +2890,7 @@ async function cargarInicioAdmin() {
   st.textContent = "Revisando...";
   const h = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
   const leer = (url) => fetch(url, { headers: h, cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-  const [emerg, rend, pend, sims, vehs, vehHist, errores, partes, clientes, instalaciones, presencias, historicas, simsInst, registroCopias, venPropios, venCreds, stockDatos, gestLlaves, simsAvisos, misatCuentas, misatSols] = await Promise.all([
+  const [emerg, rend, pend, sims, vehs, vehHist, errores, partes, clientes, instalaciones, presencias, historicas, simsInst, registroCopias, venPropios, venCreds, stockDatos, gestLlaves, simsAvisos, misatCuentas, misatSols, equiposClientes] = await Promise.all([
     leer("/api/datos?coleccion=servicios_emergencia"),
     leer("/api/recurso-uso?recurso=rendicion"),
     leer("/api/recurso-uso?recurso=sim&pendientes=1&todas=1"),
@@ -2888,6 +2912,7 @@ async function cargarInicioAdmin() {
     leer("/api/datos?coleccion=sims_avisos"),
     leer("/api/datos?coleccion=mi_sat"),
     leer("/api/datos?coleccion=mi_sat&solicitudes=1"),
+    leer("/api/datos?coleccion=equipos_clientes"),
   ]);
   const arr = (x) => (Array.isArray(x) ? x : []);
   const hoyISO = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
@@ -2955,6 +2980,14 @@ async function cargarInicioAdmin() {
       agregar(rojos.length, conEstado ? "Clientes activos en rojo" : "Clientes en rojo", det || `Más de ${SEMAFORO_DIAS_ROJO} días sin visita`, "tabSemaforoBtn", "atencion", true);
     } catch (e) { /* si falla, el resto del Inicio sigue */ }
   }
+  // Clientes (activos, si hay dato de estado) con la batería de más de 2 años.
+  if (arr(clientes).length) {
+    try {
+      const bat = armarFilasBaterias({ clientes, partes, instalaciones, presencias, historicas, sims: simsInst, equipos: equiposClientes });
+      const vencidas = bat.filas.filter((f) => !f.ignorado && f.nivel === "cambiar" && (!bat.conEstado || f.abonado === "activo"));
+      agregar(vencidas.length, "Baterías para cambiar", vencidas.slice(0, 2).map((f) => `${f.nombre} (${f.antiguedad})`).join(" · ") || "Más de 2 años", "tabBateriasBtn", "atencion");
+    } catch (e) { /* si falla, el resto del Inicio sigue */ }
+  }
   const sinPasar = arr(partes).filter((p) => !p.pasado_sistema_offline);
   agregar(sinPasar.length, "Partes sin pasar al sistema", "Se marcan desde Historial en la app", "", "atencion");
   const erroresSemana = arr(errores).filter((e) => String(e.fecha || "").slice(0, 10) >= hace7);
@@ -2975,6 +3008,7 @@ async function cargarInicioAdmin() {
   cont.querySelectorAll(".inicio-tarjeta").forEach((b) => b.addEventListener("click", () => {
     const x = tarjetas[Number(b.dataset.i)];
     if (x.pestana === "tabSemaforoBtn") { semaforoFiltro = "rojo"; semaforoAbonadoPedido = inicioSemaforoAbonado; }
+    if (x.pestana === "tabBateriasBtn") { batFiltro = "cambiar"; document.getElementById("batSistema").value = ""; document.getElementById("batBuscar").value = ""; }
     if (x.pestana === "tabStockBtn") stkVistaPedida = /pedir/.test(x.titulo) ? "pedidos" : "salud";
     if (x.pestana === "tabMiSatBtn") misatFiltroPedido = /monitoreo/.test(x.titulo) ? "solicitudes" : "pendiente";
     if (x.pestana) irAPestana(x.pestana);
@@ -12923,6 +12957,94 @@ function armarFilasSemaforo({ clientes, partes, instalaciones, presencias, histo
   });
   return { filas, hayHistorial, fuenteAbonado, desdeApp };
 }
+
+// ---------- Baterías y sistemas de todos los clientes ----------
+// La lista de clientes (y si están activos / ignorados) sale del semáforo; la batería y el
+// sistema, de equipo-utils.js con los partes de cada cliente + lo que corrigió la oficina.
+let batFiltro = "cambiar", batFilas = [], batConEstado = false;
+const BAT_ESTILO = { cambiar: { punto: "🔴", color: "#B3261E", texto: "Más de 2 años" }, atencion: { punto: "🟠", color: "#B26A00", texto: "Más de 1 año y medio" }, ok: { punto: "🟢", color: "#1E7B34", texto: "Al día" }, sin_datos: { punto: "⚫", color: "#5B6B7B", texto: "Sin datos" } };
+function armarFilasBaterias({ clientes, partes, instalaciones, presencias, historicas, sims, equipos }) {
+  const sem = armarFilasSemaforo({ clientes, partes, instalaciones, presencias, historicas, sims });
+  const porNum = new Map(), porNom = new Map();
+  (Array.isArray(partes) ? partes : []).forEach((p) => {
+    const n = EquipoCliente.claveCliente(p.numero_cliente, ""), c = EquipoCliente.claveCliente("", p.cliente);
+    if (n) { if (!porNum.has(n)) porNum.set(n, []); porNum.get(n).push(p); }
+    if (c) { if (!porNom.has(c)) porNom.set(c, []); porNom.get(c).push(p); }
+  });
+  const eqs = equipos && typeof equipos === "object" && !Array.isArray(equipos) ? equipos : {};
+  const hoy = hoyLocalISO();
+  const filas = sem.filas.map((f) => {
+    const kn = EquipoCliente.claveCliente(f.numero, ""), kc = EquipoCliente.claveCliente("", f.nombre);
+    const suyos = (kn && porNum.get(kn)) || (kc && porNom.get(kc)) || [];
+    const eq = EquipoCliente.equipoDeCliente(suyos, eqs[kn] || eqs[kc] || null, hoy);
+    return { ...f, sistema: eq.sistema.marca || "", sistemaEstado: eq.sistema.estado, nivel: eq.bateria.nivel, meses: eq.bateria.meses, antiguedad: eq.bateria.antiguedad, bateriaFecha: eq.bateria.fecha, bateriaFuente: eq.bateria.fuenteTexto, bateriaSegura: eq.bateria.segura };
+  });
+  return { filas, conEstado: sem.fuenteAbonado !== "ninguna" };
+}
+async function cargarBaterias() {
+  const st = document.getElementById("batStatus");
+  st.className = "status"; st.textContent = "Cargando clientes, partes y equipos...";
+  document.getElementById("batLista").innerHTML = "";
+  try {
+    const h = { Authorization: "Bearer " + SERVICIOS_API_TOKEN };
+    const pedir = (url, vacio) => fetch(url, { headers: h, cache: "no-store" }).then((r) => (r.ok ? r.json() : vacio)).catch(() => vacio);
+    const [clientes, partes, instalaciones, presencias, historicas, sims, equipos] = await Promise.all([
+      pedir("/api/datos?coleccion=clientes", []), pedir("/api/historial", []), pedir("/api/historial?tipo=instalaciones", []),
+      pedir("/api/recurso-uso?recurso=presencia&historial=1", []), pedir("/api/datos?coleccion=visitas_historicas", []), pedir("/api/datos?coleccion=sims_instaladas", []),
+      pedir("/api/datos?coleccion=equipos_clientes", {}),
+    ]);
+    if (!Array.isArray(clientes) || !clientes.length) { st.className = "status err"; st.textContent = "No se pudo cargar el listado de clientes (o está vacío)."; return; }
+    const r = armarFilasBaterias({ clientes, partes, instalaciones, presencias, historicas, sims, equipos });
+    batFilas = r.filas.filter((f) => !f.ignorado); batConEstado = r.conEstado;
+    const selAb = document.getElementById("batAbonado");
+    selAb.classList.toggle("hidden", !batConEstado);
+    renderBaterias();
+  } catch (err) { st.className = "status err"; st.textContent = "No se pudo cargar: " + err.message; }
+}
+function batBase() {
+  const soloActivos = batConEstado && document.getElementById("batAbonado").value === "activo";
+  const sis = document.getElementById("batSistema").value;
+  return batFilas.filter((f) => (!soloActivos || f.abonado === "activo") && (!sis || (sis === "-" ? !f.sistema : f.sistema === sis)));
+}
+function batFiltradas() {
+  const t = normalizeTextAdmin(document.getElementById("batBuscar").value || "").trim();
+  return batBase().filter((f) => (batFiltro === "todos" || f.nivel === batFiltro) && (!t || normalizeTextAdmin(`${f.nombre} ${f.numero} ${f.direccion} ${f.localidad}`).includes(t)))
+    .sort((a, b) => (b.meses ?? -1) - (a.meses ?? -1) || String(a.nombre).localeCompare(String(b.nombre)));
+}
+function renderBaterias() {
+  const base = batBase(), cuentas = { cambiar: 0, atencion: 0, ok: 0, sin_datos: 0 };
+  base.forEach((f) => { cuentas[f.nivel]++; });
+  const defs = [["cambiar", "🔴 Cambiarla (+2 años)"], ["atencion", "🟠 Atención (+1 año y medio)"], ["ok", "🟢 Al día"], ["sin_datos", "⚫ Sin datos"], ["todos", "Todos"]];
+  const chips = document.getElementById("batChips");
+  chips.innerHTML = defs.map(([k, et]) => `<button type="button" class="semaforo-chip bat-chip" data-nivel="${k}" style="padding:8px 14px; border-radius:999px; cursor:pointer; font-weight:600; font-size:13px; border:2px solid ${batFiltro === k ? "#101820" : "#D8DCD4"}; background:${batFiltro === k ? "#101820" : "#fff"}; color:${batFiltro === k ? "#fff" : "#101820"};">${et} <span style="opacity:.75;">${k === "todos" ? base.length : cuentas[k]}</span></button>`).join("");
+  chips.querySelectorAll(".bat-chip").forEach((b) => b.addEventListener("click", () => { batFiltro = b.dataset.nivel; renderBaterias(); }));
+  const filas = batFiltradas(), MAX = 300, mostradas = filas.slice(0, MAX);
+  const st = document.getElementById("batStatus");
+  st.className = "status";
+  st.textContent = `${filas.length} cliente(s) en esta vista${filas.length > MAX ? ` — se muestran los primeros ${MAX} (las baterías más viejas primero); usá el buscador o descargá el Excel` : ""}.`;
+  document.getElementById("batLista").innerHTML = mostradas.map((f) => {
+    const e = BAT_ESTILO[f.nivel];
+    return `<div class="bat-fila" style="padding:10px 0; border-bottom:1px solid #EEE;">
+      <div style="display:flex; justify-content:space-between; align-items:baseline; gap:10px;"><b>${e.punto} ${escapeHtmlAdmin(f.nombre)}</b><span style="color:${e.color}; font-weight:700; font-size:12px; white-space:nowrap;">${f.antiguedad ? escapeHtmlAdmin(f.antiguedad) : e.texto}</span></div>
+      <div style="font-size:13px; color:#6B7680; margin-top:2px;">${f.numero ? "N° " + escapeHtmlAdmin(f.numero) + " · " : ""}${escapeHtmlAdmin(f.direccion || "")}${f.localidad ? ", " + escapeHtmlAdmin(f.localidad) : ""}${f.telefono ? " · " + escapeHtmlAdmin(f.telefono) : ""}</div>
+      <div style="font-size:12px; color:#6B7680; margin-top:2px;">Sistema: <b>${f.sistema ? escapeHtmlAdmin(f.sistema) + (f.sistemaEstado === "probable" ? " (probable)" : "") : "sin dato"}</b> · ${f.bateriaFecha ? `${f.bateriaSegura ? "Batería cambiada" : "Cambio de batería pedido"} el ${fechaISOaLocal(f.bateriaFecha)} (${escapeHtmlAdmin(f.bateriaFuente)})` : "Sin registro de cambio de batería"}</div>
+    </div>`;
+  }).join("") || '<p class="fa-vacio">No hay clientes en esta vista.</p>';
+}
+document.getElementById("batBuscar").addEventListener("input", renderBaterias);
+document.getElementById("batSistema").addEventListener("change", renderBaterias);
+document.getElementById("batAbonado").addEventListener("change", renderBaterias);
+document.getElementById("batExcelBtn").addEventListener("click", () => {
+  const filas = batFiltradas();
+  if (!filas.length) { cartelAdmin("No hay clientes en esta vista para descargar."); return; }
+  const datos = filas.map((f) => ({
+    Estado: BAT_ESTILO[f.nivel].texto, "N° de cliente": f.numero, Cliente: f.nombre, Dirección: f.direccion, Localidad: f.localidad, Teléfono: f.telefono,
+    Sistema: f.sistema ? f.sistema + (f.sistemaEstado === "probable" ? " (probable)" : "") : "", "Último cambio de batería": fechaISOaLocal(f.bateriaFecha), "Antigüedad (meses)": f.meses ?? "", "Fuente del dato": f.bateriaFuente || "",
+  }));
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, XLSX.utils.json_to_sheet(datos), "Baterías");
+  XLSX.writeFile(libro, `baterias-${hoyLocalISO()}.xlsx`);
+});
 
 async function cargarSemaforoVisitas() {
   semaforoStatus.className = "status";
