@@ -11370,7 +11370,7 @@ document.getElementById("rllConcExcelBtn").addEventListener("click", async () =>
 
 // ---------- Portal de administradores de consorcio (lib/consorcio.js) ----------
 const RLL_PORTAL_URL = "https://pedido.sat365.com.ar/consorcio.html";
-const RLL_GEST_TIPOS = { nuevo: "Nuevo tag", reemplazo: "Reemplazo de tag", baja: "Baja de tag", titularidad: "Cambio de titularidad" };
+const RLL_GEST_TIPOS = { nuevo: "Nuevo tag", reemplazo: "Reemplazo de tag", baja: "Baja de tag", titularidad: "Cambio de titularidad", reactivacion: "Reactivar llave recuperada" };
 const RLL_GEST_MOTIVOS = { no_funciona: "No funciona", rotura: "Se rompió", desgaste: "Desgaste", extravio: "Extravío", robo: "Robo", ya_no_vive: "Ya no vive / no corresponde", otro: "Otro" };
 const RLL_GEST_ESTADOS = { pendiente: { txt: "Pendiente", color: "#8A5A00", bg: "#FFF1D6" }, en_curso: { txt: "En curso", color: "#2C4E9A", bg: "#E8EEFB" }, hecha: { txt: "Hecha", color: "#1F6B34", bg: "#E6F4EA" }, rechazada: { txt: "Rechazada", color: "#B3261E", bg: "#FDE2E0" }, cancelada: { txt: "Cancelada por el administrador", color: "#6B7680", bg: "#EEF0F2" } };
 let rllGestiones = [];
@@ -11490,7 +11490,7 @@ function rllMarcarHecha(g, alCancelar) {
     </div>`;
   const capa = rllModal(`Pedido N° ${rllEsc(g.numero || "")} · ${rllEsc(RLL_GEST_TIPOS[g.tipo] || g.tipo)} → Hecha`, `
     <p style="margin:0 0 6px;color:#55595F;">${rllEsc(g.edificio_nombre || "")} · ${rllEsc(rllGestUnidad(g))} · ${rllEsc(g.titular)}${g.tipo === "titularidad" ? " → " + rllEsc(g.nuevo_titular) : ""}</p>
-    ${g.tipo === "baja" ? "" : `<b>Llaves entregadas</b> <span style="color:#6B7680;font-size:13px;">(si todavía no tenés el número, dejalo vacío y lo completás después en el padrón)</span><div id="rllHechaFilas">${Array.from({ length: filasIniciales }, fila).join("")}</div><button type="button" class="btn-secondary-admin" id="rllHechaMas" style="width:auto;padding:4px 10px;font-size:12px;margin-top:6px;">+ Otra llave</button>`}
+    ${g.tipo === "baja" || g.tipo === "reactivacion" ? "" : `<b>Llaves entregadas</b> <span style="color:#6B7680;font-size:13px;">(si todavía no tenés el número, dejalo vacío y lo completás después en el padrón)</span><div id="rllHechaFilas">${Array.from({ length: filasIniciales }, fila).join("")}</div><button type="button" class="btn-secondary-admin" id="rllHechaMas" style="width:auto;padding:4px 10px;font-size:12px;margin-top:6px;">+ Otra llave</button>`}
     <div style="margin-top:14px;padding:10px 12px;border-radius:10px;background:#F4F5F0;"><b>Qué cambia en el padrón:</b><ul id="rllHechaPrev" style="margin:6px 0 0;padding-left:18px;line-height:1.55;"><li>Calculando…</li></ul></div>
     <label style="margin-top:12px;">Nota para el administrador <span style="color:#6B7680;font-weight:400;">(le llega por mail)</span></label>
     <input type="text" class="field-input" id="rllHechaNota" value="${rllEsc(g.nota_sat || "")}" placeholder="Ej. La llave está lista para retirar en portería">

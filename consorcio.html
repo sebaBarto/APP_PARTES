@@ -227,7 +227,7 @@
   .tab .corto, .reporte .corto { display: none; }
 
   /* Nueva gestión */
-  .tipos { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .tipos { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; }
   .tipo { position: relative; border: 1.5px solid var(--line); border-radius: 16px; padding: 14px; cursor: pointer; background: #fff; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; margin: 0; font-weight: 400; transition: border-color .15s, box-shadow .15s, transform .15s; }
   .tipo:hover { border-color: #C9C6BC; transform: translateY(-1px); }
   .tipo input { position: absolute; opacity: 0; }
@@ -244,6 +244,7 @@
   .elegir { background: var(--amber-soft); border: 1px solid #F1D99A; border-radius: 14px; padding: 12px 14px 14px; margin-top: 20px; }
   .elegir label { margin-top: 0; display: flex; align-items: center; gap: 8px; }
   .elegir label svg { width: 18px; height: 18px; color: var(--amber-dark); }
+  .aviso-robo.info { background: #FFF6DD; color: #6B4A00; border-color: #F0D58A; }
   .aviso-robo { display: flex; gap: 10px; align-items: flex-start; background: var(--err-soft); color: #8C1D18; border: 1px solid #F3C9C5; border-radius: 12px; padding: 10px 12px; font-size: 14px; margin-top: 12px; }
   .aviso-robo svg { width: 18px; height: 18px; margin-top: 1px; }
   .fotos-g { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
@@ -766,6 +767,7 @@
               <label class="tipo"><input type="radio" name="tipo" value="reemplazo"><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 14-5.3L20 9"/><path d="M20 4v5h-5"/><path d="M20 12a8 8 0 0 1-14 5.3L4 15"/><path d="M4 20v-5h5"/></svg></span><span><b>Reemplazo de tag</b><small>No funciona o se rompió</small></span></label>
               <label class="tipo"><input type="radio" name="tipo" value="baja"><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M8 12h8"/></svg></span><span><b>Baja de tag</b><small>Extravío, robo o ya no vive</small></span></label>
               <label class="tipo"><input type="radio" name="tipo" value="titularidad"><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="3"/><circle cx="16" cy="16" r="3"/><path d="M11 8h5a2 2 0 0 1 2 2v3"/><path d="M13 16H8a2 2 0 0 1-2-2v-3"/></svg></span><span><b>Cambio de titularidad</b><small>La unidad pasa a otra persona</small></span></label>
+              <label class="tipo"><input type="radio" name="tipo" value="reactivacion"><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span><span><b>Reactivar llave</b><small>La denunció y la recuperó</small></span></label>
             </div>
 
             <div id="camposGestion" class="oculto">
@@ -815,10 +817,11 @@
                 </div>
 
                 <div class="fila" id="bloqueTag">
-                  <div><label for="gTag">N° de la llave <span class="opc">(si lo sabés)</span></label><input type="text" id="gTag" class="mono" maxlength="40" placeholder="Ej. 069:02561"></div>
+                  <div><label for="gTag" id="gTagLbl">N° de la llave <span class="opc">(si lo sabés)</span></label><input type="text" id="gTag" class="mono" maxlength="40" placeholder="Ej. 069:02561"></div>
                   <div><label for="gUsuario">N° de usuario <span class="opc">(si lo sabés)</span></label><input type="text" id="gUsuario" class="mono" maxlength="15" inputmode="numeric"></div>
                 </div>
 
+                <div class="aviso-robo info oculto" id="avisoReactivar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg><span>Escribí el número de la llave que se recuperó. La central la tiene bloqueada: SAT la vuelve a habilitar después de confirmarlo con el titular.</span></div>
                 <div id="bloqueMotivo">
                   <span class="lbl">Motivo</span>
                   <div class="opciones" id="motivos"></div>
@@ -897,7 +900,7 @@
             </div>
             <div class="fila" id="lUnoA">
               <div><label for="lTipo">Gestión</label>
-                <select id="lTipo"><option value="">Que elija el vecino</option><option value="nuevo">Nuevo tag</option><option value="reemplazo">Reemplazo de tag</option><option value="baja">Baja de tag</option><option value="titularidad">Cambio de titularidad</option></select></div>
+                <select id="lTipo"><option value="">Que elija el vecino</option><option value="nuevo">Nuevo tag</option><option value="reemplazo">Reemplazo de tag</option><option value="baja">Baja de tag</option><option value="titularidad">Cambio de titularidad</option><option value="reactivacion">Reactivar llave recuperada</option></select></div>
               <div><label for="lDest">Nombre del vecino <span class="opc">(opcional)</span></label><input type="text" id="lDest" maxlength="80"></div>
             </div>
             <div class="fila" id="lUnoB">
@@ -956,7 +959,7 @@
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? "").replace(/[&<>"'`]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;", "`": "&#96;" }[c]));
   const API = "/api/datos?publico=consorcio";
-  const TIPOS = { nuevo: "Nuevo tag", reemplazo: "Reemplazo de tag", baja: "Baja de tag", titularidad: "Cambio de titularidad" };
+  const TIPOS = { nuevo: "Nuevo tag", reemplazo: "Reemplazo de tag", baja: "Baja de tag", titularidad: "Cambio de titularidad", reactivacion: "Reactivar llave recuperada" };
   const MOTIVOS = {
     reemplazo: { no_funciona: "No funciona", rotura: "Se rompió", desgaste: "Desgaste", otro: "Otro" },
     baja: { extravio: "Extravío", robo: "Robo", ya_no_vive: "Ya no vive / no corresponde", otro: "Otro" },
@@ -1233,7 +1236,7 @@
     const llaves = x.regs.flatMap((r) => (r.llaves || []).filter((l) => l.estado !== "dada_de_baja"));
     const em = x.emergencias[x.emergencias.length - 1];
     let h = `<div class="ficha-cab"><div><small>Unidad</small><b>${esc(titulo)}</b></div><span class="chip-est ${e}">${EST_UNIDAD[e]}</span></div>`;
-    if (em) h += `<div class="ficha-alerta"><b>${em.motivo === "extravio" ? "Llave denunciada como perdida" : em.motivo === "robo" ? "Llave denunciada como robada" : "Llave denunciada como robada o perdida"}${em.tag ? " · " + esc(em.tag) : ""}</b>${em.fecha ? esc(haceCuanto(em.fecha)) + ". " : ""}La central de monitoreo ya tiene el aviso y SAT la da de baja.<div style="margin-top:8px;"><button type="button" class="btn btn-sec btn-chico" data-acc="ver">Ver la denuncia</button></div></div>`;
+    if (em) h += `<div class="ficha-alerta"><b>${em.motivo === "extravio" ? "Llave denunciada como perdida" : em.motivo === "robo" ? "Llave denunciada como robada" : "Llave denunciada como robada o perdida"}${em.tag ? " · " + esc(em.tag) : ""}</b>${em.fecha ? esc(haceCuanto(em.fecha)) + ". " : ""}La central de monitoreo ya tiene el aviso y SAT la da de baja.<div style="margin-top:8px;"><button type="button" class="btn btn-sec btn-chico" data-acc="ver">Ver la denuncia</button> <button type="button" class="enlace" data-acc="reactivacion" style="font-weight:700;margin-left:10px;">¿La recuperó? Reactivarla</button></div></div>`;
     if (x.pedidos.length) h += `<div class="ficha-pedido">${x.pedidos.length === 1 ? "Hay un pedido en curso: " + esc(TIPOS[x.pedidos[0].tipo] || "pedido") : `Hay ${x.pedidos.length} pedidos en curso`}. <button type="button" class="enlace" data-acc="ver" style="color:#1E3A75;font-weight:700;">Ver</button></div>`;
     if (!x.regs.length) {
       h += `<div class="ficha-vacia"><b>Nadie registró llaves acá todavía</b>Mandale el link a la unidad o recordales el QR del hall.<div style="margin-top:12px;"><button type="button" class="btn btn-osc btn-chico" data-acc="link">${IC.link}Mandar link a la unidad</button></div></div>`;
@@ -1241,7 +1244,7 @@
     } else {
       h += `<div class="ficha-sec">Personas</div>` + x.regs.map((r) => `<div class="ficha-persona"><span class="ini">${esc((r.nombre || "?").trim()[0] || "?")}</span><span><b>${esc(r.nombre)}</b><small>${esc([rel[r.relacion], r.telefono].filter(Boolean).join(" · "))}</small></span></div>`).join("");
       h += `<div class="ficha-sec">Llaves</div>` + (llaves.length ? llaves.map((l) => { const s = EST_LLAVE[l.estado] || EST_LLAVE.pendiente; const ctl = l.tipo === "control"; return `<div class="ficha-llave"><span class="mi${ctl ? " ctl" : ""}">${ctl ? ICH.ctlMini : ICH.tagMini}</span><span class="nro">${esc(l.tag || "s/n")}${l.usuario ? `<br><span style="font-family:Barlow,sans-serif;font-size:12.5px;color:var(--muted);">usuario ${esc(l.usuario)}</span>` : ""}</span><span class="est ${s[1]}">${s[0]}</span></div>`; }).join("") : '<div class="sub" style="margin:0;">Sin llaves cargadas.</div>');
-      h += `<div class="ficha-acc"><button type="button" class="btn btn-chico" data-acc="nuevo">+ Pedir llave nueva</button><button type="button" class="btn btn-sec btn-chico" data-acc="reemplazo">Reemplazo</button><button type="button" class="btn btn-sec btn-chico" data-acc="baja">Dar de baja</button><button type="button" class="btn btn-sec btn-chico" data-acc="titularidad">Cambio de titular</button></div>`;
+      h += `<div class="ficha-acc"><button type="button" class="btn btn-chico" data-acc="nuevo">+ Pedir llave nueva</button><button type="button" class="btn btn-sec btn-chico" data-acc="reemplazo">Reemplazo</button><button type="button" class="btn btn-sec btn-chico" data-acc="baja">Dar de baja</button>${x.regs.some((r) => (r.llaves || []).some((l) => l.estado === "baja" || l.estado === "dada_de_baja")) ? '<button type="button" class="btn btn-sec btn-chico" data-acc="reactivacion">Reactivar llave</button>' : ""}<button type="button" class="btn btn-sec btn-chico" data-acc="titularidad">Cambio de titular</button></div>`;
     }
     $("fichaUnidad").innerHTML = h;
     $("fichaUnidad").querySelectorAll("[data-acc]").forEach((b) => b.addEventListener("click", () => accionUnidad(b.dataset.acc, x)));
@@ -1258,10 +1261,10 @@
     irA("nueva");
     const radio = form.querySelector(`input[name="tipo"][value="${acc}"]`);
     radio.checked = true; radio.dispatchEvent(new Event("change", { bubbles: true }));
-    const r0 = x.regs[0];
+    const r0 = (acc === "reactivacion" && x.regs.find((r) => (r.llaves || []).some((l) => l.estado === "baja" || l.estado === "dada_de_baja"))) || x.regs[0];
     if (r0 && acc !== "nuevo") {
       const i = datos.registros.indexOf(r0), ll = r0.llaves || [];
-      const j = ll.findIndex((l) => l.estado !== "dada_de_baja");
+      const j = acc === "reactivacion" ? ll.findIndex((l) => l.estado === "baja" || l.estado === "dada_de_baja") : ll.findIndex((l) => l.estado !== "dada_de_baja");
       $("elegirLlave").value = `${i}|${ll.length ? Math.max(0, j) : ""}`;
       $("elegirLlave").dispatchEvent(new Event("change"));
     } else {
@@ -1483,7 +1486,7 @@
   function armarElegir() {
     const ops = ['<option value="">— Elegir —</option>'];
     datos.registros.forEach((r, i) => {
-      (r.llaves || []).forEach((l, j) => ops.push(`<option value="${i}|${j}">${esc(unidadTxt(r))} — ${esc(r.nombre)} — ${l.tipo === "control" ? "control" : "tag"} ${esc(l.tag || "s/n")}</option>`));
+      (r.llaves || []).forEach((l, j) => ops.push(`<option value="${i}|${j}">${esc(unidadTxt(r))} — ${esc(r.nombre)} — ${l.tipo === "control" ? "control" : "tag"} ${esc(l.tag || "s/n")}${l.estado === "dada_de_baja" ? " (dada de baja)" : l.estado === "baja" ? " (para dar de baja)" : ""}</option>`));
       if (!(r.llaves || []).length) ops.push(`<option value="${i}|">${esc(unidadTxt(r))} — ${esc(r.nombre)}</option>`);
     });
     $("elegirLlave").innerHTML = ops.join("");
@@ -1512,12 +1515,14 @@
     $("bloqueCantidad").classList.toggle("oculto", t !== "nuevo");
     $("bloqueTag").classList.toggle("oculto", t === "nuevo");
     $("bloqueTitularidad").classList.toggle("oculto", t !== "titularidad");
-    $("filaMailRel").classList.toggle("oculto", t === "baja");
+    $("filaMailRel").classList.toggle("oculto", t === "baja" || t === "reactivacion");
+    $("avisoReactivar").classList.toggle("oculto", t !== "reactivacion");
     $("bloqueMotivo").classList.toggle("oculto", !MOTIVOS[t]);
     $("motivos").innerHTML = Object.entries(MOTIVOS[t] || {}).map(([k, v]) => `<label class="opcion"><input type="radio" name="motivo" value="${k}"><span>${v}</span></label>`).join("");
     $("motivos").querySelectorAll("input").forEach((i) => i.addEventListener("change", () => $("avisoRobo").classList.toggle("oculto", valor("motivo") !== "robo")));
     $("avisoRobo").classList.add("oculto");
     $("gTitularLbl").textContent = t === "titularidad" ? "Titular actual" : "Nombre y apellido del titular";
+    $("gTagLbl").innerHTML = t === "reactivacion" ? "N° de la llave recuperada" : 'N° de la llave <span class="opc">(si lo sabés)</span>';
     $("gTelefonoLbl").innerHTML = t === "nuevo" ? "Teléfono" : 'Teléfono <span class="opc">(opcional)</span>';
   }
   form.addEventListener("submit", async (e) => {
@@ -1527,8 +1532,8 @@
     const g = {
       accion: "gestion", edificio: actual.codigo, tipo: t,
       piso: $("gPiso").value.trim(), unidad: $("gUnidad").value.trim(), cochera: $("gCochera").value.trim(),
-      titular: $("gTitular").value.trim(), telefono: $("gTelefono").value.trim(), email: t === "baja" ? "" : $("gEmail").value.trim(),
-      relacion: t === "baja" ? "" : valor("relacion"), dispositivo: valor("dispositivo"), cantidad: Number($("gCantidad").value) || 1,
+      titular: $("gTitular").value.trim(), telefono: $("gTelefono").value.trim(), email: t === "baja" || t === "reactivacion" ? "" : $("gEmail").value.trim(),
+      relacion: t === "baja" || t === "reactivacion" ? "" : valor("relacion"), dispositivo: valor("dispositivo"), cantidad: Number($("gCantidad").value) || 1,
       tag: t === "nuevo" ? "" : $("gTag").value.trim(), usuario: t === "nuevo" ? "" : $("gUsuario").value.trim(), motivo: valor("motivo"),
       nuevo_titular: $("gNuevoTitular").value.trim(), nuevo_telefono: $("gNuevoTelefono").value.trim(), nuevo_email: $("gNuevoEmail").value.trim(),
       llaves_titularidad: valor("llaves_titularidad"), registro_id: form.dataset.registro || "", observaciones: $("gObs").value.trim(),
