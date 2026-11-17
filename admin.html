@@ -2061,6 +2061,8 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
           <h3 style="margin:0;" id="rllRegistrosTit">Padrón de llaves</h3>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <button type="button" class="btn-secondary-admin" id="rllAgregarPersonaBtn" style="width:auto;">+ Agregar persona</button>
+            <label class="btn-secondary-admin" style="width:auto;cursor:pointer;margin:0;" title="Cargar o corregir el padrón con un Excel">⬆ Subir padrón (Excel)<input type="file" id="rllImpArchivo" accept=".xlsx,.xls,.csv" style="display:none;"></label>
+            <button type="button" class="btn-secondary-admin" id="rllPlantillaBtn" style="width:auto;">⬇ Plantilla</button>
             <button type="button" class="btn-secondary-admin" id="rllRecargarBtn" style="width:auto;">↻ Actualizar</button>
             <button type="button" class="btn-secondary-admin" id="rllExcelBtn" style="width:auto;">⬇ Excel</button>
           </div>
@@ -2082,6 +2084,28 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
           </div>
           <div class="field-row" style="gap:8px;margin-top:10px;"><button type="button" id="rllApGuardarBtn" style="width:auto;">Agregar al padrón</button><button type="button" class="btn-secondary-admin" id="rllApCancelarBtn" style="width:auto;">Cancelar</button></div>
           <p class="status" id="rllApStatus"></p>
+        </div>
+        <div id="rllImp" class="hidden" style="margin-top:12px;padding:14px;border:1.5px dashed var(--border);border-radius:var(--r-md);">
+          <h4 style="margin:0 0 4px;">Cargar el padrón desde Excel <span id="rllImpArchivoNombre" style="font-weight:400;color:#6B7680;"></span></h4>
+          <p class="subtitle" style="margin:0 0 10px;">Sirve para dejarle al administrador una base con lo que ya sabemos del edificio, o para corregir el padrón. Usá la <b>Plantilla</b> o el <b>⬇ Excel</b> del padrón (descargalo, corregilo y volvé a subirlo). Una fila por llave; la persona se arma con piso, depto y nombre.</p>
+          <div id="rllImpLeido" style="font-size:13.5px;margin-bottom:10px;"></div>
+          <div class="field-row" style="flex-wrap:wrap;gap:10px 18px;align-items:flex-start;">
+            <div style="flex:1 1 300px;">
+              <label style="margin-bottom:6px;">Qué hacer con el padrón actual</label>
+              <label style="display:flex;gap:8px;align-items:flex-start;font-weight:400;margin:4px 0;"><input type="radio" name="rllImpModo" value="actualizar" checked style="width:auto;margin:3px 0 0;"> <span><b>Agregar y corregir</b><br><small style="color:#6B7680;">Suma lo nuevo y actualiza lo que coincide. No borra a nadie (lo que cargaron los vecinos queda).</small></span></label>
+              <label style="display:flex;gap:8px;align-items:flex-start;font-weight:400;margin:4px 0;"><input type="radio" name="rllImpModo" value="reemplazar" style="width:auto;margin:3px 0 0;"> <span><b>Reemplazar todo (definitivo)</b><br><small style="color:#6B7680;">El Excel pasa a ser el padrón: quien no figura en el archivo se quita.</small></span></label>
+            </div>
+            <div style="flex:0 1 260px;">
+              <label for="rllImpEstado">Llaves sin estado en el Excel</label>
+              <select id="rllImpEstado"><option value="conciliada">Conciliadas (al día con la estación)</option><option value="pendiente">Pendientes de revisar</option></select>
+            </div>
+          </div>
+          <div id="rllImpResumen" style="margin-top:10px;"></div>
+          <div class="field-row" style="gap:8px;margin-top:10px;">
+            <button type="button" id="rllImpConfirmarBtn" style="width:auto;" disabled>Cargar en el padrón</button>
+            <button type="button" class="btn-secondary-admin" id="rllImpCancelarBtn" style="width:auto;">Cancelar</button>
+          </div>
+          <p class="status" id="rllImpStatus"></p>
         </div>
         <div class="sims-resumen" id="rllResumen" style="margin-top:12px;"></div>
         <div class="sims-filtros" style="margin-bottom:6px;">
@@ -10535,6 +10559,134 @@ document.getElementById("rllExcelBtn").addEventListener("click", () => {
   const libro = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(libro, hoja, "Llaves");
   XLSX.writeFile(libro, `llaves_${rllEdificioActual.nombre.replace(/[^\w]+/g, "_")}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+});
+
+// ---------- Cargar el padrón desde un Excel ----------
+// Columnas: las del ⬇ Excel del padrón o las de la plantilla (los nombres se reconocen
+// con o sin acentos). Una fila por llave; las filas de la misma persona se juntan.
+const RLL_IMP_COLS = {
+  piso: ["piso"], unidad: ["depto", "dpto", "dto", "departamento", "unidad", "uf"], cochera: ["cochera"],
+  nombre: ["nombre", "nombreyapellido", "apellidoynombre", "titular", "nombreyapellidodeltitular"],
+  relacion: ["relacion", "es", "caracter"], telefono: ["telefono", "tel", "celular", "telefonocelular"], email: ["mail", "email", "correo", "correoelectronico"],
+  dispositivo: ["dispositivo", "tipodedispositivo"], tag: ["ndellave", "nrodellave", "numerodellave", "llave", "tag", "ndetag", "nrotag", "codigo"],
+  usuario: ["ndeusuario", "nrodeusuario", "usuario", "numerodeusuario"], estado: ["estado"], registro: ["tipoderegistro"],
+};
+const rllImpNorm = (h) => String(h || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[°º]/g, "").replace(/[^a-z0-9]/g, "");
+let rllImpFilas = null;
+async function rllImpXlsx() {
+  if (typeof XLSX === "undefined") await new Promise((ok, mal) => { const sc = document.createElement("script"); sc.src = "vendor/xlsx.full.min.js"; sc.onload = ok; sc.onerror = () => mal(new Error("no se pudo cargar el lector de Excel")); document.head.appendChild(sc); });
+}
+function rllImpLeer(libro) {
+  const hoja = libro.Sheets[libro.SheetNames.find((n) => !/formato|instruc/i.test(n)) || libro.SheetNames[0]];
+  const filas = XLSX.utils.sheet_to_json(hoja, { header: 1, raw: false, defval: "" });
+  // Fila de títulos: la que reconoce más columnas entre las primeras 15.
+  let mejor = -1, mapa = null;
+  for (let i = 0; i < Math.min(15, filas.length); i++) {
+    const m = {};
+    filas[i].forEach((h, c) => { const n = rllImpNorm(h); for (const [k, al] of Object.entries(RLL_IMP_COLS)) if (m[k] === undefined && al.includes(n)) m[k] = c; });
+    const n = Object.keys(m).length;
+    if (n > (mapa ? Object.keys(mapa).length : 1)) { mejor = i; mapa = m; }
+  }
+  if (!mapa || mapa.nombre === undefined && mapa.tag === undefined || mapa.piso === undefined && mapa.unidad === undefined && mapa.cochera === undefined)
+    throw new Error("No encontré las columnas. Tiene que haber Piso y/o Depto (o Cochera) y Nombre o N° de llave. Usá la Plantilla.");
+  const out = []; let perdidas = 0;
+  for (let i = mejor + 1; i < filas.length; i++) {
+    const f = filas[i]; const v = (k) => mapa[k] === undefined ? "" : String(f[mapa[k]] ?? "").trim();
+    if (!f.some((x) => String(x).trim())) continue;
+    if (/perdid/i.test(v("registro"))) { perdidas++; continue; }
+    out.push({ fila: i + 1, piso: v("piso"), unidad: v("unidad"), cochera: v("cochera"), nombre: v("nombre"), relacion: v("relacion"), telefono: v("telefono"), email: v("email"), dispositivo: v("dispositivo"), tag: v("tag"), usuario: v("usuario"), estado: v("estado") });
+  }
+  const reconocidas = Object.keys(mapa).filter((k) => k !== "registro");
+  return { filas: out, perdidas, reconocidas };
+}
+const RLL_IMP_NOMBRES = { piso: "Piso", unidad: "Depto", cochera: "Cochera", nombre: "Nombre", relacion: "Relación", telefono: "Teléfono", email: "Mail", dispositivo: "Dispositivo", tag: "N° de llave", usuario: "N° de usuario", estado: "Estado" };
+async function rllImpPedir(simular) {
+  const modo = document.querySelector('input[name="rllImpModo"]:checked').value;
+  const r = await fetch("/api/datos?coleccion=registro_llaves", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "importar_padron", edificio: rllEdificioActual.codigo, modo, estado_defecto: document.getElementById("rllImpEstado").value, filas: rllImpFilas, simular }) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || "Error " + r.status);
+  return d.resumen;
+}
+async function rllImpSimular() {
+  const caja = document.getElementById("rllImpResumen"), btn = document.getElementById("rllImpConfirmarBtn");
+  btn.disabled = true; caja.innerHTML = `<p class="status">Calculando qué cambia…</p>`;
+  try {
+    const z = await rllImpPedir(true);
+    const modo = document.querySelector('input[name="rllImpModo"]:checked').value;
+    const item = (n, txt, color) => `<div style="padding:8px 12px;border-radius:10px;background:${color};"><b style="font-size:20px;">${n}</b><br><small>${txt}</small></div>`;
+    caja.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:8px;">
+        ${item(z.nuevas, "personas nuevas", "#E6F4EA")}${item(z.actualizadas, "personas que ya estaban", "#EEF3FB")}${modo === "reemplazar" ? item(z.quitadas, "personas que se quitan", z.quitadas ? "#FDE2E0" : "#F3F1EA") : ""}
+        ${item(z.llaves_nuevas, "llaves nuevas", "#E6F4EA")}${item(z.llaves_cambiadas, "llaves que cambian", "#EEF3FB")}${modo === "reemplazar" ? item(z.llaves_quitadas, "llaves que se quitan", z.llaves_quitadas ? "#FDE2E0" : "#F3F1EA") : ""}
+      </div>
+      ${z.quitados && z.quitados.length ? `<details style="margin-top:8px;"><summary style="cursor:pointer;color:#B3261E;font-weight:600;">Se quitan del padrón (${z.quitadas})</summary><ul style="margin:6px 0 0;font-size:13px;">${z.quitados.map((x) => `<li>${rllEsc(x)}</li>`).join("")}</ul></details>` : ""}
+      ${z.avisos && z.avisos.length ? `<details open style="margin-top:8px;"><summary style="cursor:pointer;color:#8A5A00;font-weight:600;">Revisá antes de cargar (${z.avisos.length})</summary><ul style="margin:6px 0 0;font-size:13px;">${z.avisos.map((x) => `<li>${rllEsc(x)}</li>`).join("")}</ul></details>` : ""}`;
+    btn.disabled = false;
+    btn.textContent = modo === "reemplazar" ? "Reemplazar el padrón" : "Cargar en el padrón";
+  } catch (e) { caja.innerHTML = `<p class="status err">${rllEsc(e.message)}</p>`; }
+}
+document.getElementById("rllImpArchivo").addEventListener("change", async (ev) => {
+  const f = ev.target.files[0]; ev.target.value = "";
+  if (!f || !rllEdificioActual) return;
+  const panel = document.getElementById("rllImp"), st = document.getElementById("rllImpStatus");
+  panel.classList.remove("hidden"); st.className = "status"; st.textContent = "";
+  document.getElementById("rllImpArchivoNombre").textContent = "· " + f.name;
+  document.getElementById("rllImpResumen").innerHTML = "";
+  try {
+    await rllImpXlsx();
+    const libro = XLSX.read(await f.arrayBuffer(), { type: "array", raw: /\.csv$/i.test(f.name) });
+    const r = rllImpLeer(libro);
+    if (!r.filas.length) throw new Error("El archivo no tiene filas con datos.");
+    rllImpFilas = r.filas;
+    const faltan = Object.keys(RLL_IMP_NOMBRES).filter((k) => !r.reconocidas.includes(k));
+    document.getElementById("rllImpLeido").innerHTML = `Leí <b>${r.filas.length}</b> filas. Columnas reconocidas: ${r.reconocidas.map((k) => RLL_IMP_NOMBRES[k]).join(", ")}.`
+      + (faltan.length ? ` <span style="color:#6B7680;">No están: ${faltan.map((k) => RLL_IMP_NOMBRES[k]).join(", ")}.</span>` : "")
+      + (r.perdidas ? ` <span style="color:#6B7680;">Salteé ${r.perdidas} filas de llaves reportadas perdidas.</span>` : "");
+    panel.scrollIntoView({ behavior: "smooth", block: "center" });
+    rllImpSimular();
+  } catch (e) { rllImpFilas = null; document.getElementById("rllImpLeido").innerHTML = ""; st.className = "status err"; st.textContent = "No se pudo leer: " + e.message; document.getElementById("rllImpConfirmarBtn").disabled = true; }
+});
+document.querySelectorAll('input[name="rllImpModo"]').forEach((x) => x.addEventListener("change", () => rllImpFilas && rllImpSimular()));
+document.getElementById("rllImpEstado").addEventListener("change", () => rllImpFilas && rllImpSimular());
+document.getElementById("rllImpCancelarBtn").addEventListener("click", () => { rllImpFilas = null; document.getElementById("rllImp").classList.add("hidden"); });
+document.getElementById("rllImpConfirmarBtn").addEventListener("click", async () => {
+  if (!rllImpFilas) return;
+  const modo = document.querySelector('input[name="rllImpModo"]:checked').value;
+  const ed = rllEdificioActual;
+  if (modo === "reemplazar" && !(await confirmarAdmin(`¿Reemplazar el padrón de ${ed.nombre} por el Excel? Quien no figure en el archivo se quita del padrón (queda en el historial de versiones).`))) return;
+  const st = document.getElementById("rllImpStatus"), btn = document.getElementById("rllImpConfirmarBtn");
+  btn.disabled = true; st.className = "status"; st.textContent = "Cargando…";
+  try {
+    const z = await rllImpPedir(false);
+    rllImpFilas = null;
+    document.getElementById("rllImp").classList.add("hidden");
+    avisoAdmin(`Padrón de ${ed.nombre} cargado: ${z.nuevas} personas nuevas, ${z.actualizadas} actualizadas${modo === "reemplazar" ? `, ${z.quitadas} quitadas` : ""}; ${z.llaves_nuevas} llaves nuevas.`, "ok");
+    rllAbrirEdificio(ed.codigo);
+  } catch (e) { st.className = "status err"; st.textContent = "No se pudo: " + e.message; btn.disabled = false; }
+});
+document.getElementById("rllPlantillaBtn").addEventListener("click", async () => {
+  try { await rllImpXlsx(); } catch (e) { avisoAdmin(e.message, "error"); return; }
+  const cols = ["Piso", "Depto", "Cochera", "Nombre", "Relación", "Teléfono", "Mail", "Dispositivo", "N° de llave", "N° de usuario", "Estado"];
+  const ej = [
+    ["PB", "1", "", "Nombre Apellido", "Titular", "341 555 0000", "", "Tag", "069:02561", "12", "Conciliada"],
+    ["PB", "1", "", "Nombre Apellido", "Titular", "341 555 0000", "", "Tag", "069:02562", "13", "Conciliada"],
+    ["3", "2", "5", "Otra Persona", "Inquilino", "", "", "Control remoto cochera", "", "40", ""],
+  ];
+  const hoja = XLSX.utils.aoa_to_sheet([cols, ...ej]);
+  hoja["!cols"] = [6, 6, 8, 26, 11, 15, 24, 22, 13, 13, 14].map((w) => ({ wch: w }));
+  const fmt = XLSX.utils.aoa_to_sheet([
+    ["Columna", "Qué va"],
+    ["Piso", "PB, 1, 2… (01 y 1° se toman como 1; 00 como PB)"], ["Depto", "1, 2, 3… o A, B, C (A se toma como 1, B como 2)"],
+    ["Cochera", "Número de cochera, si tiene"], ["Nombre", "Nombre y apellido. Si una persona tiene 2 llaves, va en 2 filas con el mismo nombre"],
+    ["Relación", "Titular, Inquilino u Otro"], ["Teléfono / Mail", "Opcionales"], ["Dispositivo", "Tag o Control remoto cochera (vacío = Tag)"],
+    ["N° de llave", "El número grabado en el tag, por ejemplo 069:02561"], ["N° de usuario", "El número de usuario en la central, si lo sabés"],
+    ["Estado", "Conciliada, Pendiente, Dar de baja o Dada de baja. Vacío = lo que elijas al subirlo"],
+    ["", "Borrá las filas de ejemplo antes de subirlo."],
+  ]);
+  fmt["!cols"] = [{ wch: 16 }, { wch: 90 }];
+  const libro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(libro, hoja, "Padrón");
+  XLSX.utils.book_append_sheet(libro, fmt, "Formato");
+  XLSX.writeFile(libro, `plantilla_padron_${(rllEdificioActual ? rllEdificioActual.nombre : "edificio").replace(/[^\w]+/g, "_")}.xlsx`);
 });
 
 // Cartel A4 para pegar en el hall, con el QR del edificio.
