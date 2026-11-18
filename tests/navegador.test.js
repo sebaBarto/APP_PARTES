@@ -1849,6 +1849,51 @@ test("Admin, Baterías: lista los clientes por antigüedad de la batería (2 añ
   await ctx.close();
 });
 
+test("Llaves, pedido Hecha: si la persona tiene varias llaves, SAT elige cuáles pasan al nuevo titular (o cuál se reemplaza)", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const posts = [];
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    const json = (o) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+    if (req.method() === "POST" && u.includes("coleccion=consorcio")) {
+      const b = JSON.parse(req.postData()); posts.push(b);
+      if (b.accion === "previsualizar_gestion") {
+        const el = b.llaves_elegidas || [];
+        return json({ persona: "Ana Pérez", ya_aplicada: false, llaves_persona: [{ clave: "t:069:02561", tipo: "tag", tag: "069:02561", usuario: "125" }, { clave: "t:070:11111", tipo: "tag", tag: "070:11111", usuario: "" }],
+          acciones: el.map((k) => `La llave ${k.slice(2)} pasa de Ana Pérez a Pablo Gómez`) });
+      }
+      return json({ ok: true });
+    }
+    json([]);
+  });
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => { window.__g = { id: "g3", numero: "57", tipo: "titularidad", llaves_titularidad: "transferir", edificio: "M12", edificio_nombre: "MUELLE 12", piso: "4", unidad: "B", titular: "Ana Pérez", nuevo_titular: "Pablo Gómez", estado: "pendiente" }; rllMarcarHecha(window.__g, () => {}); });
+  await page.waitForSelector("#rllHechaElegir:not(.hidden) input");
+  assert.match(await page.textContent("#rllHechaElegir"), /¿Qué llaves de Ana Pérez pasan a Pablo Gómez\?[\s\S]*Las que no marques se quedan a nombre de Ana Pérez/);
+  assert.deepStrictEqual(await page.$$eval("#rllHechaElegir label", (l) => l.map((x) => x.textContent.trim())), ["🔑 069:02561 · usuario 125", "🔑 070:11111"]);
+  assert.deepStrictEqual(await page.$$eval("#rllHechaElegir input", (l) => l.map((x) => [x.type, x.checked])), [["checkbox", false], ["checkbox", false]], "no se elige solo");
+  // Sin marcar ninguna no la deja marcar hecha
+  await page.click("#rllHechaOk");
+  assert.match(await page.textContent("#rllHechaStatus"), /Marcá qué llaves pasan al nuevo titular/);
+  assert.ok(!posts.some((p) => p.accion === "estado_gestion"));
+  // Marca solo una: la vista previa y lo que se guarda llevan esa
+  await page.check('#rllHechaElegir input[value="t:070:11111"]');
+  await page.waitForFunction(() => /La llave 070:11111 pasa de Ana Pérez a Pablo Gómez/.test(document.getElementById("rllHechaPrev").textContent));
+  await page.click("#rllHechaOk");
+  await page.waitForFunction(() => !document.getElementById("rllHechaOk"));
+  const est = posts.find((p) => p.accion === "estado_gestion");
+  assert.deepStrictEqual([est.estado, est.aplicar, est.llaves_elegidas], ["hecha", true, ["t:070:11111"]]);
+  // Reemplazo sin número: se elige una sola (radio)
+  await page.evaluate(() => rllMarcarHecha({ id: "g2", numero: "56", tipo: "reemplazo", edificio: "M12", edificio_nombre: "MUELLE 12", piso: "4", unidad: "B", titular: "Ana Pérez", estado: "pendiente" }, () => {}));
+  await page.waitForSelector("#rllHechaElegir:not(.hidden) input");
+  assert.match(await page.textContent("#rllHechaElegir"), /Ana Pérez tiene 2 llaves: ¿cuál se reemplaza\?/);
+  assert.deepStrictEqual(await page.$$eval("#rllHechaElegir input", (l) => l.map((x) => x.type)), ["radio", "radio"]);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
 test("El botón atrás de Android no cierra la app ni cambia de pantalla", async () => {
   const { ctx, page, erroresPagina } = await nuevaPagina();
   await page.route("**/api/**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));

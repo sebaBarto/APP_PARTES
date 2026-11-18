@@ -11510,6 +11510,7 @@ function rllMarcarHecha(g, alCancelar) {
   const capa = rllModal(`Pedido N° ${rllEsc(g.numero || "")} · ${rllEsc(RLL_GEST_TIPOS[g.tipo] || g.tipo)} → Hecha`, `
     <p style="margin:0 0 6px;color:#55595F;">${rllEsc(g.edificio_nombre || "")} · ${rllEsc(rllGestUnidad(g))} · ${rllEsc(g.titular)}${g.tipo === "titularidad" ? " → " + rllEsc(g.nuevo_titular) : ""}</p>
     ${g.tipo === "baja" || g.tipo === "reactivacion" ? "" : `<b>Llaves entregadas</b> <span style="color:#6B7680;font-size:13px;">(si todavía no tenés el número, dejalo vacío y lo completás después en el padrón)</span><div id="rllHechaFilas">${Array.from({ length: filasIniciales }, fila).join("")}</div><button type="button" class="btn-secondary-admin" id="rllHechaMas" style="width:auto;padding:4px 10px;font-size:12px;margin-top:6px;">+ Otra llave</button>`}
+    <div id="rllHechaElegir" class="hidden" style="margin-top:14px;padding:10px 12px;border-radius:10px;border:1.5px solid #F5A623;background:#FFF8EA;"></div>
     <div style="margin-top:14px;padding:10px 12px;border-radius:10px;background:#F4F5F0;"><b>Qué cambia en el padrón:</b><ul id="rllHechaPrev" style="margin:6px 0 0;padding-left:18px;line-height:1.55;"><li>Calculando…</li></ul></div>
     <label style="margin-top:12px;">Nota para el administrador <span style="color:#6B7680;font-weight:400;">(le llega por mail)</span></label>
     <input type="text" class="field-input" id="rllHechaNota" value="${rllEsc(g.nota_sat || "")}" placeholder="Ej. La llave está lista para retirar en portería">
@@ -11519,28 +11520,56 @@ function rllMarcarHecha(g, alCancelar) {
     </div>
     <p class="status" id="rllHechaStatus"></p>`);
   const llaves = () => [...capa.querySelectorAll(".rll-hecha-fila")].map((f) => ({ tipo: f.querySelector(".rll-h-tipo").value, tag: f.querySelector(".rll-h-tag").value.trim(), usuario: f.querySelector(".rll-h-usuario").value.trim() })).filter((l) => l.tag || l.usuario);
+  // Qué llaves de la persona: en un cambio de titularidad, cuáles pasan al nuevo (o se dan de baja);
+  // en un reemplazo o una baja sin número, cuál es. Se elige por N° de llave o N° de usuario.
+  const cajaElegir = capa.querySelector("#rllHechaElegir");
+  let llavesPersona = null; // null = todavía no se armó la lista
+  const elegidas = () => (llavesPersona && llavesPersona.length ? [...cajaElegir.querySelectorAll("input:checked")].map((i) => i.value) : undefined);
+  const textoLlave = (l) => `${l.tipo === "control" ? "📟" : "🔑"} ${l.tag || "sin N°"}${l.usuario ? ` · usuario ${l.usuario}` : ""}`;
+  const armarElegir = (lista, persona) => {
+    llavesPersona = lista || [];
+    const tagPedido = g.tag ? String(g.tag).replace(/\D/g, "") : "";
+    const yaIdentificada = tagPedido && llavesPersona.some((l) => String(l.tag).replace(/\D/g, "") === tagPedido);
+    const varias = g.tipo === "titularidad" ? llavesPersona.length >= 1 : llavesPersona.length > 1 && !yaIdentificada;
+    if (!varias) { llavesPersona = []; return; }
+    const multi = g.tipo === "titularidad";
+    const titulo = g.tipo === "titularidad"
+      ? (g.llaves_titularidad === "transferir" ? `¿Qué llaves de ${rllEsc(persona || g.titular)} pasan a ${rllEsc(g.nuevo_titular)}?` : `¿Qué llaves de ${rllEsc(persona || g.titular)} se dan de baja?`)
+      : g.tipo === "reemplazo" ? `${rllEsc(persona || g.titular)} tiene ${llavesPersona.length} llaves: ¿cuál se reemplaza?` : `${rllEsc(persona || g.titular)} tiene ${llavesPersona.length} llaves: ¿cuál se da de baja?`;
+    const ayuda = multi ? (g.llaves_titularidad === "transferir" ? "Las que no marques se quedan a nombre de " + rllEsc(persona || g.titular) + "." : "Las que no marques siguen activas a su nombre (si no marcás ninguna, se queda con todas).") : "";
+    cajaElegir.innerHTML = `<b>${titulo}</b>${ayuda ? `<div style="font-size:12.5px;color:#55595F;margin:2px 0 6px;">${ayuda}</div>` : ""}
+      ${llavesPersona.map((l) => `<label class="rll-elegir-llave" style="display:flex;align-items:center;gap:8px;margin:6px 0;font-family:'IBM Plex Mono',monospace;font-size:14px;cursor:pointer;"><input type="${multi ? "checkbox" : "radio"}" name="rllElegirLlave" value="${rllEsc(l.clave)}"${llavesPersona.length === 1 ? " checked" : ""} style="width:18px;height:18px;margin:0;">${rllEsc(textoLlave(l))}</label>`).join("")}`;
+    cajaElegir.classList.remove("hidden");
+  };
   let t = null;
   const previsualizar = async () => {
     const ul = capa.querySelector("#rllHechaPrev");
     try {
-      const r = await fetch("/api/datos?coleccion=consorcio", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "previsualizar_gestion", edificio: g.edificio, id: g.id, llaves_nuevas: llaves() }) });
+      const r = await fetch("/api/datos?coleccion=consorcio", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "previsualizar_gestion", edificio: g.edificio, id: g.id, llaves_nuevas: llaves(), llaves_elegidas: elegidas() }) });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Error");
+      if (llavesPersona === null && !d.ya_aplicada) { armarElegir(d.llaves_persona, d.persona); if (llavesPersona.length) return previsualizar(); }
       ul.innerHTML = d.ya_aplicada ? "<li>Este pedido ya se aplicó al padrón antes: no se vuelve a aplicar.</li>" : (d.acciones.map((a) => `<li>${rllEsc(a)}</li>`).join("") || "<li>Nada</li>");
     } catch (e) { ul.innerHTML = `<li style="color:#B3261E;">No se pudo calcular: ${rllEsc(e.message)}</li>`; }
   };
   capa.addEventListener("input", () => { clearTimeout(t); t = setTimeout(previsualizar, 450); });
-  capa.addEventListener("change", (e) => { if (e.target.matches(".rll-h-tipo")) previsualizar(); });
+  capa.addEventListener("change", (e) => { if (e.target.matches(".rll-h-tipo") || e.target.name === "rllElegirLlave") previsualizar(); });
   const mas = capa.querySelector("#rllHechaMas");
   if (mas) mas.addEventListener("click", () => capa.querySelector("#rllHechaFilas").insertAdjacentHTML("beforeend", fila()));
   let guardado = false;
   const guardar = async (aplicar) => {
     const st = capa.querySelector("#rllHechaStatus");
+    if (aplicar && llavesPersona && llavesPersona.length && !elegidas().length && !(g.tipo === "titularidad" && g.llaves_titularidad !== "transferir")) {
+      st.className = "status err";
+      st.textContent = g.tipo === "titularidad" ? "Marcá qué llaves " + (g.llaves_titularidad === "transferir" ? "pasan al nuevo titular." : "se dan de baja.") : "Elegí cuál es la llave.";
+      cajaElegir.scrollIntoView({ block: "center", behavior: "smooth" });
+      return;
+    }
     st.className = "status"; st.textContent = "Guardando...";
     capa.querySelectorAll("button").forEach((b) => { b.disabled = true; });
     try {
       const nota = capa.querySelector("#rllHechaNota").value;
-      const r = await fetch("/api/datos?coleccion=consorcio", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "estado_gestion", edificio: g.edificio, id: g.id, estado: "hecha", nota_sat: nota, aplicar, llaves_nuevas: llaves() }) });
+      const r = await fetch("/api/datos?coleccion=consorcio", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "estado_gestion", edificio: g.edificio, id: g.id, estado: "hecha", nota_sat: nota, aplicar, llaves_nuevas: llaves(), llaves_elegidas: elegidas() }) });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Error");
       Object.assign(g, { estado: "hecha", nota_sat: nota, actualizado_por: adminNombre || "vos" }, d.aplicada ? { aplicada: d.aplicada } : {});

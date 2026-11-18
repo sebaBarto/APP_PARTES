@@ -201,6 +201,56 @@ test("padrón: al marcar Hecha, las gestiones actualizan solas la lista de llave
   assert.strictEqual((await padron()).length, 2);
 });
 
+test("padrón: con varias llaves a su nombre, SAT elige cuáles pasan al nuevo titular y cuál se reemplaza (el anterior se queda con las demás)", async () => {
+  const path = require("path");
+  process.env.SERVICIOS_API_TOKEN = process.env.SERVICIOS_API_TOKEN || "token-de-prueba";
+  require.cache[path.join(__dirname, "..", "api", "enviar-mail.js")] = { id: "x", loaded: true, exports: async (req, res) => { res.status(200).json({ ok: true }); } };
+  const { gh, m12, clave } = await preparar();
+  const { pase } = (await login(gh, "cp@admin.com", clave)).data;
+  const h = { "x-consorcio": pase };
+  const gestion = async (body) => { const r = await llamar(consorcio.manejarPortal, { method: "POST", headers: h, body: { accion: "gestion", edificio: m12, ...body } }, gh); assert.ok(r.data.gestion, JSON.stringify(r.data)); return r.data.gestion; };
+  const prev = async (g, extra) => (await llamar(consorcio.manejarAdmin, { method: "POST", body: { accion: "previsualizar_gestion", edificio: m12, id: g.id, ...extra } }, SAT, gh)).data;
+  const hecha = (g, extra) => llamar(consorcio.manejarAdmin, { method: "POST", body: { accion: "estado_gestion", edificio: m12, id: g.id, estado: "hecha", ...extra } }, SAT, gh);
+  const padron = async () => JSON.parse(gh.store[`registro-llaves/${m12}.json`].t);
+  // Ana (4° B) tiene dos llaves
+  const g1 = await gestion({ tipo: "nuevo", piso: "4", unidad: "B", titular: "Ana Pérez", telefono: "341 555 1234", cantidad: 2 });
+  await hecha(g1, { llaves_nuevas: [{ tag: "069:02561", usuario: "125" }, { tag: "069:02562", usuario: "126" }] });
+
+  // Reemplazo sin número: la vista previa ofrece sus dos llaves; SAT elige la del usuario 126
+  const g2 = await gestion({ tipo: "reemplazo", piso: "4", unidad: "B", titular: "Ana Pérez", motivo: "rotura" });
+  let v = await prev(g2, {});
+  assert.deepStrictEqual(v.llaves_persona.map((l) => [l.clave, l.tag, l.usuario]), [["t:069:02561", "069:02561", "125"], ["t:069:02562", "069:02562", "126"]]);
+  assert.ok(v.acciones.some((a) => /No se encontró en el padrón la llave a reemplazar/.test(a)), "sin elegir no adivina");
+  v = await prev(g2, { llaves_elegidas: ["t:069:02562"], llaves_nuevas: [{ tag: "070:11111" }] });
+  assert.ok(v.acciones.some((a) => /Dada de baja la llave 069:02562 de Ana Pérez/.test(a)), v.acciones.join(" | "));
+  await hecha(g2, { llaves_elegidas: ["t:069:02562"], llaves_nuevas: [{ tag: "070:11111" }] });
+  let p = await padron();
+  assert.deepStrictEqual(p[0].llaves.map((l) => [l.tag, l.estado]), [["069:02561", "conciliada"], ["069:02562", "dada_de_baja"], ["070:11111", "conciliada"]]);
+
+  // Cambio de titularidad «se queda con las llaves»: Ana le cede solo una a Pablo y se queda con la otra
+  const g3 = await gestion({ tipo: "titularidad", piso: "4", unidad: "B", titular: "Ana Pérez", nuevo_titular: "Pablo Gómez", nuevo_telefono: "341 111 2222", llaves_titularidad: "transferir" });
+  v = await prev(g3, {});
+  assert.deepStrictEqual(v.llaves_persona.map((l) => l.tag), ["069:02561", "070:11111"], "solo las activas");
+  v = await prev(g3, { llaves_elegidas: ["t:070:11111"] });
+  assert.deepStrictEqual(v.acciones, ["Nueva persona en el padrón: Pablo Gómez (4° 2)", "La llave 070:11111 pasa de Ana Pérez a Pablo Gómez", "Ana Pérez se queda con: llave 069:02561 (usuario 125)"]);
+  await hecha(g3, { llaves_elegidas: ["t:070:11111"] });
+  p = await padron();
+  assert.deepStrictEqual(p.map((r) => [r.nombre, r.llaves.filter((l) => l.estado !== "dada_de_baja").map((l) => l.tag)]), [["Ana Pérez", ["069:02561"]], ["Pablo Gómez", ["070:11111"]]]);
+  assert.match(p[1].llaves[0].nota, /Cedida por Ana Pérez/);
+  assert.ok(p[0].historial.some((x) => /Le cedió la llave 070:11111 a Pablo Gómez/.test(x.que)));
+
+  // Titularidad con llaves nuevas: se da de baja solo la elegida
+  const g4 = await gestion({ tipo: "titularidad", piso: "4", unidad: "B", titular: "Ana Pérez", nuevo_titular: "Luz Díaz", nuevo_telefono: "341 333 4444", llaves_titularidad: "reemplazar" });
+  await hecha(g4, { llaves_elegidas: [], llaves_nuevas: [{ tag: "080:22222" }] });
+  p = await padron();
+  assert.deepStrictEqual(p.find((r) => r.nombre === "Ana Pérez").llaves.filter((l) => l.estado !== "dada_de_baja").map((l) => l.tag), ["069:02561"], "sin marcar ninguna, Ana conserva la suya");
+  // Sin elegir nada (como antes): pasan todas
+  const g5 = await gestion({ tipo: "titularidad", piso: "4", unidad: "B", titular: "Pablo Gómez", nuevo_titular: "Marta Ruiz", nuevo_telefono: "341 555 6666", llaves_titularidad: "transferir" });
+  await hecha(g5);
+  p = await padron();
+  assert.ok(p.some((r) => r.nombre === "Marta Ruiz" && r.llaves.some((l) => l.tag === "070:11111")));
+});
+
 test("consorcio: olvidé mi clave, cancelar pedido, links en lote y resumen al entrar", async () => {
   const path = require("path");
   const enviados = [];
