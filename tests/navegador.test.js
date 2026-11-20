@@ -5903,6 +5903,90 @@ test("Parte: sin «Tarea realizada» no pasa a la firma (ya no se usa la tarea a
   await ctx.close();
 });
 
+test("Entregas de llaves (APP): se eligen varias y la persona firma una sola vez por todas", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  const pend = [
+    { id: "a1", numero: "101", edificio: "M12", edificio_nombre: "Muelle 12", unidad: "4° B", tipo: "nuevo", recibe: "Ana Pérez", llaves: [{ tipo: "tag", tag: "090:20001" }, { tipo: "tag", tag: "090:20002" }] },
+    { id: "b2", numero: "102", edificio: "M12", edificio_nombre: "Muelle 12", unidad: "4° B", tipo: "nuevo", recibe: "Ana Pérez", llaves: [{ tipo: "control", tag: "" }] },
+    { id: "c3", numero: "103", edificio: "M12", edificio_nombre: "Muelle 12", unidad: "7° A", tipo: "reemplazo", recibe: "Luis Gómez", llaves: [{ tipo: "tag", tag: "090:30001" }] },
+  ];
+  const posts = [];
+  await page.route("**/api/datos?coleccion=entregas_llaves**", (route) => {
+    const req = route.request();
+    if (req.method() === "POST") { const b = JSON.parse(req.postData()); posts.push(b); return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, entrega: { de: "dep", stock: { ok: true } }, entregas: b.pedidos.map((x) => ({ edificio: x.edificio, id: x.id, entrega: {} })), errores: [] }) }); }
+    route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(posts.length ? pend.slice(2) : pend) });
+  });
+  await page.goto(base + "/");
+  await page.evaluate(() => { SERVICIOS_API_TOKEN = "x"; document.getElementById("tileEntregasBtn").click(); });
+  await page.waitForSelector(".entrega-item");
+  assert.deepStrictEqual(await page.$$eval(".entregas-grupo span", (e) => e.map((x) => x.textContent)), ["Muelle 12 · 4° B", "Muelle 12 · 7° A"]);
+  assert.strictEqual(await page.isVisible("#entregasSeleccionBar"), false);
+  await page.click(".entregas-elegir-grupo");
+  assert.match(await page.textContent("#entregasSeleccionTxt"), /2 pedidos · 3 llaves\/controles/);
+  await page.click("#entregasSeleccionBtn");
+  assert.match(await page.textContent("#entregaResumen"), /Retira 2 pedidos · 3 llaves\/controles/);
+  assert.strictEqual(await page.inputValue("#entregaRecibio"), "Ana Pérez");
+  assert.strictEqual(await page.locator(".entrega-num").count(), 1, "solo el control sin número pide el N°");
+  await page.fill(".entrega-num", "C-77");
+  // Sin firma no deja
+  await page.click("#entregaConfirmarBtn");
+  assert.match(await page.textContent("#entregaFormStatus"), /Falta la firma/);
+  const caja = await page.locator("#entregaFirma").boundingBox();
+  await page.mouse.move(caja.x + 20, caja.y + 40); await page.mouse.down(); await page.mouse.move(caja.x + 120, caja.y + 90, { steps: 6 }); await page.mouse.up();
+  await page.click("#entregaConfirmarBtn");
+  await page.waitForFunction(() => !document.getElementById("entregaForm").classList.contains("hidden") === false);
+  assert.strictEqual(posts.length, 1, "un solo envío, una sola firma");
+  assert.deepStrictEqual(posts[0].pedidos.map((x) => x.id), ["a1", "b2"]);
+  assert.deepStrictEqual(posts[0].pedidos[1].llaves, [{ tag: "C-77" }]);
+  assert.strictEqual(posts[0].recibio, "Ana Pérez");
+  assert.match(posts[0].firma, /^data:image\/jpeg/);
+  await page.waitForFunction(() => document.querySelectorAll(".entrega-item").length === 1);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Entregas de llaves (panel): desde un pedido se tildan otros del mismo edificio y van con una sola firma", async () => {
+  const { ctx, page, erroresPagina } = await nuevaPagina();
+  await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
+  const posts = [];
+  await page.route("**/api/**", (route) => {
+    const req = route.request(), u = req.url();
+    if (u.includes("entregas_llaves") && req.method() === "POST") { const b = JSON.parse(req.postData()); posts.push(b); return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, entrega: { recibio: b.recibio, fecha: new Date().toISOString(), stock: { ok: true } }, entregas: b.pedidos.map((x) => ({ edificio: x.edificio, id: x.id, entrega: { recibio: b.recibio, fecha: new Date().toISOString(), stock: { ok: true } } })), errores: [] }) }); }
+    route.fulfill({ status: 200, contentType: "application/json", body: "[]" });
+  });
+  await page.goto(base + "/admin.html");
+  await page.waitForTimeout(300);
+  await page.evaluate(() => {
+    const hecha = (o) => ({ estado: "hecha", tipo: "nuevo", edificio: "M12", edificio_nombre: "Muelle 12", titular: "Ana Pérez", ...o });
+    rllGestiones = [
+      hecha({ id: "a1", numero: "101", piso: "4", unidad: "2", llaves_entregadas: [{ tipo: "tag", tag: "090:20001" }] }),
+      hecha({ id: "b2", numero: "102", piso: "4", unidad: "2", dispositivo: "control", cantidad: 1 }),
+      hecha({ id: "c3", numero: "103", piso: "7", unidad: "1", titular: "Luis", llaves_entregadas: [{ tipo: "tag", tag: "090:30001" }] }),
+      hecha({ id: "d4", numero: "104", edificio: "OTRO", piso: "1", unidad: "1", llaves_entregadas: [{ tipo: "tag", tag: "1:1" }] }),
+      hecha({ id: "e5", numero: "105", piso: "4", unidad: "2", entrega: { recibio: "x" } }),
+    ];
+    rllTecnicosCache = [];
+    rllRegistrarEntrega(rllGestiones[0]);
+  });
+  await page.waitForSelector(".rll-ent-otro");
+  const otros = await page.$$eval(".rll-ent-otro", (cs) => cs.map((c) => c.closest("label").textContent.replace(/\s+/g, " ").trim()));
+  assert.strictEqual(otros.length, 2, "solo los pendientes del mismo edificio");
+  assert.match(otros[0], /N° 102 .*mismo depto/);
+  assert.match(otros[1], /N° 103/);
+  await page.check('.rll-ent-otro[data-k="1"]');
+  assert.match(await page.textContent("#rllEntOk"), /Registrar las 2 entregas/);
+  await page.fill('.rll-ent-num[data-k="1"][data-i="0"]', "C-9");
+  const caja = await page.locator("#rllEntFirma").boundingBox();
+  await page.mouse.move(caja.x + 20, caja.y + 40); await page.mouse.down(); await page.mouse.move(caja.x + 150, caja.y + 100, { steps: 6 }); await page.mouse.up();
+  await page.click("#rllEntOk");
+  await page.waitForFunction(() => !document.getElementById("rllEntOk"));
+  assert.strictEqual(posts.length, 1);
+  assert.deepStrictEqual(posts[0].pedidos.map((x) => [x.id, x.llaves]), [["a1", [{ tag: "" }]], ["b2", [{ tag: "C-9" }]]]);
+  assert.deepStrictEqual(await page.evaluate(() => rllGestiones.filter((g) => g.entrega).map((g) => g.id)), ["a1", "b2", "e5"]);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
 test("Stock: catálogo desde el listado de Oficina, saldo inicial, mínimos, conciliación con todas las diferencias y pedido automático", async () => {
   const { ctx, page, erroresPagina } = await nuevaPagina();
   await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: route.request().url().includes("xlsx.full.min.js") ? require("fs").readFileSync(require("path").join(__dirname, "..", "vendor", "xlsx.full.min.js"), "utf8") : "" }));

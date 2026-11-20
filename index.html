@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#101820">
-<meta name="app-version" content="4.84.0">
+<meta name="app-version" content="4.85.0">
 <meta name="description" content="Digitalizador de partes técnicos de servicio">
 <title>Servicio Técnico SAT</title>
 <link rel="manifest" href="manifest.json">
@@ -2150,12 +2150,16 @@
   <section class="screen" id="screen-entregas">
     <div class="review-scroll">
       <p class="hint-eyebrow review-eyebrow">ENTREGAS DE LLAVES</p>
-      <p class="subtitle-consultas">Llaves de edificios ya programadas por la oficina, para entregar al vecino. Al entregar, el vecino firma y el tag se descuenta del stock.</p>
+      <p class="subtitle-consultas">Llaves de edificios ya programadas por la oficina, para entregar al vecino. Tocá las que retira la persona (pueden ser varias: firma una sola vez por todas) y después «Entregar».</p>
       <div class="list-toolbar">
         <button class="btn btn-ghost btn-small" id="entregasRecargarBtn" type="button">↻ Actualizar</button>
         <span class="list-sync-label" id="entregasStatus"></span>
       </div>
       <div id="entregasLista"></div>
+      <div id="entregasSeleccionBar" class="entregas-seleccion hidden">
+        <span id="entregasSeleccionTxt"></span>
+        <button class="btn btn-primary" id="entregasSeleccionBtn" type="button">Entregar</button>
+      </div>
 
       <div id="entregaForm" class="hidden">
         <div id="entregaResumen" class="entrega-resumen"></div>

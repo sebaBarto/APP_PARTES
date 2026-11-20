@@ -11624,14 +11624,30 @@ async function rllHabilitarEntrega(g) {
     } catch (e) { st.className = "status err"; st.textContent = e.message; }
   });
 }
+const rllLlavesDe = (g) => (g.llaves_entregadas && g.llaves_entregadas.length) ? g.llaves_entregadas : Array.from({ length: g.tipo === "nuevo" ? Math.max(1, Number(g.cantidad) || 1) : 1 }, () => ({ tipo: g.dispositivo === "control" ? "control" : "tag", tag: "" }));
+// Una persona puede retirar varios pedidos de una vez (sus llaves y controles): se tildan
+// los otros pendientes del mismo edificio y firma una sola vez por todo.
 async function rllRegistrarEntrega(g) {
   if (!g) return;
   await rllCargarTecnicos();
-  const llaves = (g.llaves_entregadas && g.llaves_entregadas.length) ? g.llaves_entregadas : Array.from({ length: g.tipo === "nuevo" ? Math.max(1, Number(g.cantidad) || 1) : 1 }, () => ({ tipo: g.dispositivo === "control" ? "control" : "tag", tag: "" }));
   const recibe = g.tipo === "titularidad" ? g.nuevo_titular : g.titular;
+  const mismaUnidad = (x) => rllGestUnidad(x) === rllGestUnidad(g);
+  const otros = rllGestiones.filter((x) => x !== g && x.edificio === g.edificio && rllPendienteEntrega(x))
+    .sort((x, y) => (mismaUnidad(y) - mismaUnidad(x)) || String(rllGestUnidad(x)).localeCompare(String(rllGestUnidad(y)), "es", { numeric: true }));
+  const todos = [g, ...otros];
+  const bloque = (x, k) => {
+    const ll = rllLlavesDe(x);
+    return `<div class="rll-ent-ped" data-k="${k}" style="${k ? "display:none;" : ""}margin-bottom:6px;">
+      ${otros.length ? `<div style="font-size:12px;color:#55595F;">Pedido N° ${rllEsc(x.numero || "")} · ${rllEsc(rllGestUnidad(x))}</div>` : ""}
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;">${ll.map((l, i) => l.tag ? `${l.tipo === "control" ? "📟" : "🔑"} ${rllEsc(l.tag)}` : `${l.tipo === "control" ? "📟" : "🔑"} <input type="text" class="field-input rll-ent-num" data-k="${k}" data-i="${i}" placeholder="000:00000 (si lo tenés)" style="display:inline-block;width:190px;margin:2px 0;font-family:inherit;">`).join("<br>")}</div></div>`;
+  };
   const capa = rllModal(`Entrega de llaves · pedido N° ${rllEsc(g.numero || "")}`, `
     <p style="margin:0 0 8px;color:#55595F;">${rllEsc(g.edificio_nombre || "")} · ${rllEsc(rllGestUnidad(g))} · ${rllEsc(RLL_GEST_TIPOS[g.tipo] || g.tipo)}</p>
-    <div style="font-family:'IBM Plex Mono',monospace;font-size:15px;margin-bottom:8px;">${llaves.map((l, i) => l.tag ? `${l.tipo === "control" ? "📟" : "🔑"} ${rllEsc(l.tag)}` : `${l.tipo === "control" ? "📟" : "🔑"} <input type="text" class="field-input rll-ent-num" data-i="${i}" placeholder="000:00000 (si lo tenés)" style="display:inline-block;width:190px;margin:2px 0;font-family:inherit;">`).join("<br>")}</div>
+    ${otros.length ? `<div style="background:#F4F5F0;border-radius:10px;padding:8px 10px;margin-bottom:10px;">
+      <div style="font-size:13px;font-weight:600;margin-bottom:4px;">¿Retira también otras llaves de este edificio? Tildalas: firma una sola vez por todas.</div>
+      ${otros.map((x, j) => `<label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;margin:4px 0;cursor:pointer;"><input type="checkbox" class="rll-ent-otro" data-k="${j + 1}" style="width:auto;margin-top:2px;"> <span>N° ${rllEsc(x.numero || "")} · <b>${rllEsc(rllGestUnidad(x))}</b>${mismaUnidad(x) ? ' <span style="color:#1F6B34;">(mismo depto)</span>' : ""} · ${rllEsc(RLL_GEST_TIPOS[x.tipo] || x.tipo)} · para ${rllEsc(x.tipo === "titularidad" ? x.nuevo_titular : x.titular)} · ${rllLlavesDe(x).map((l) => `${l.tipo === "control" ? "📟" : "🔑"} ${rllEsc(l.tag || "s/n")}`).join(" ")}</span></label>`).join("")}
+    </div>` : ""}
+    <div style="margin-bottom:8px;">${todos.map(bloque).join("")}</div>
     <div class="field-row" style="flex-wrap:wrap;">
       <div style="flex:2 1 200px;"><label>Quién recibe</label><input type="text" class="field-input" id="rllEntRecibio" value="${rllEsc(recibe || "")}"></div>
       <div style="flex:1 1 120px;"><label>DNI (opcional)</label><input type="text" class="field-input" id="rllEntDni"></div>
@@ -11644,6 +11660,12 @@ async function rllRegistrarEntrega(g) {
     <label style="margin-top:8px;">Observaciones (opcional)</label><input type="text" class="field-input" id="rllEntObs">
     <div style="display:flex;gap:8px;margin-top:12px;"><button type="button" id="rllEntOk" style="width:auto;">✓ Registrar entrega</button></div>
     <p class="status" id="rllEntStatus"></p>`);
+  const elegidosK = () => [0, ...[...capa.querySelectorAll(".rll-ent-otro:checked")].map((c) => Number(c.dataset.k))];
+  capa.querySelectorAll(".rll-ent-otro").forEach((c) => c.addEventListener("change", () => {
+    const ks = elegidosK();
+    capa.querySelectorAll(".rll-ent-ped").forEach((b) => { b.style.display = ks.includes(Number(b.dataset.k)) ? "" : "none"; });
+    capa.querySelector("#rllEntOk").textContent = ks.length > 1 ? `✓ Registrar las ${ks.length} entregas (una firma)` : "✓ Registrar entrega";
+  }));
   const lienzo = capa.querySelector("#rllEntFirma"), cx = lienzo.getContext("2d");
   let hay = false, dib = false, ult = null;
   setTimeout(() => {
@@ -11665,13 +11687,18 @@ async function rllRegistrarEntrega(g) {
     const g2 = c.getContext("2d"); g2.fillStyle = "#FFFFFF"; g2.fillRect(0, 0, c.width, c.height); g2.drawImage(lienzo, 0, 0, c.width, c.height);
     st.className = "status"; st.textContent = "Registrando...";
     try {
-      const r = await fetch("/api/datos?coleccion=entregas_llaves", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "entregar", edificio: g.edificio, id: g.id, recibio: capa.querySelector("#rllEntRecibio").value.trim(), dni: capa.querySelector("#rllEntDni").value.trim(), de: capa.querySelector("#rllEntDe").value, observaciones: capa.querySelector("#rllEntObs").value.trim(), llaves: llaves.map((l, i) => { const inp = capa.querySelector(`.rll-ent-num[data-i="${i}"]`); return { tag: inp ? inp.value.trim() : "" }; }), firma: c.toDataURL("image/jpeg", 0.85) }) });
+      const ks = elegidosK();
+      const pedidos = ks.map((k) => ({ edificio: todos[k].edificio, id: todos[k].id, llaves: rllLlavesDe(todos[k]).map((l, i) => { const inp = capa.querySelector(`.rll-ent-num[data-k="${k}"][data-i="${i}"]`); return { tag: inp ? inp.value.trim() : "" }; }) }));
+      const r = await fetch("/api/datos?coleccion=entregas_llaves", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "entregar", pedidos, recibio: capa.querySelector("#rllEntRecibio").value.trim(), dni: capa.querySelector("#rllEntDni").value.trim(), de: capa.querySelector("#rllEntDe").value, observaciones: capa.querySelector("#rllEntObs").value.trim(), firma: c.toDataURL("image/jpeg", 0.85) }) });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || "Error");
-      g.entrega = d.entrega;
+      (d.entregas && d.entregas.length ? d.entregas : [{ edificio: g.edificio, id: g.id, entrega: d.entrega }]).forEach((x) => { const y = rllGestiones.find((z) => z.id === x.id && z.edificio === x.edificio); if (y) y.entrega = x.entrega; });
       capa.remove();
       renderRllGestiones();
-      if (d.entrega.stock && !d.entrega.stock.ok) alert("La entrega quedó registrada, pero no se pudo descontar del stock: " + (d.entrega.stock.error || "") + ". Revisalo en Stock.");
+      const avisos = [];
+      if (d.entrega.stock && !d.entrega.stock.ok) avisos.push("no se pudo descontar del stock: " + (d.entrega.stock.error || "") + ". Revisalo en Stock");
+      if (d.errores && d.errores.length) avisos.push(`no se registraron: ${d.errores.map((x) => "N° " + (x.numero || "?") + " (" + x.error + ")").join(", ")}`);
+      if (avisos.length) alert("La entrega quedó registrada, pero " + avisos.join("; ") + ".");
     } catch (e) { st.className = "status err"; st.textContent = "No se pudo: " + e.message; }
   });
 }
@@ -11683,6 +11710,7 @@ async function rllConstancia(g) {
     <p style="margin:0 0 6px;"><b>${rllEsc(g.edificio_nombre || "")}</b> · ${rllEsc(rllGestUnidad(g))} · ${rllEsc(RLL_GEST_TIPOS[g.tipo] || g.tipo)}</p>
     <p style="margin:0 0 6px;">Entregado el <b>${rllFecha(e.fecha)}</b> por ${rllEsc(e.por)}</p>
     <p style="margin:0 0 6px;">Recibió: <b>${rllEsc(e.recibio)}</b>${e.dni ? " · DNI " + rllEsc(e.dni) : ""}</p>
+    ${e.grupo && e.grupo.pedidos && e.grupo.pedidos.length > 1 ? `<p style="margin:0 0 6px;">Retiró en la misma firma: ${e.grupo.pedidos.map((x) => `pedido N° ${rllEsc(x.numero || "")} (${rllEsc(x.unidad || "")}, ${x.llaves} ${x.llaves === 1 ? "llave" : "llaves"})`).join(" · ")}</p>` : ""}
     <p style="margin:0 0 6px;font-family:'IBM Plex Mono',monospace;">${(e.llaves || []).map((l) => `${l.tipo === "control" ? "📟" : "🔑"} ${rllEsc(l.tag || "s/n")}`).join(" &nbsp; ")}</p>
     <p style="margin:0 0 6px;color:#55595F;font-size:13px;">Stock: ${rllEsc(stockTxt)}</p>
     ${e.observaciones ? `<p style="margin:0 0 6px;">Obs.: ${rllEsc(e.observaciones)}</p>` : ""}

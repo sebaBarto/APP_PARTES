@@ -355,6 +355,66 @@ test("entrega de llaves: con firma, descuenta stock, anota en el padrón y no se
   assert.strictEqual(descuentos[1].de, "dep");
 });
 
+test("entrega de llaves: una persona retira varios pedidos con una sola firma (todo o nada)", async () => {
+  const entregas = require("../lib/entregas-llaves");
+  const { fotos } = llaves;
+  const subidas = [];
+  fotos.fotosGh.subir = async (...a) => { subidas.push(a); };
+  const path = require("path");
+  const enviados = [];
+  process.env.SERVICIOS_API_TOKEN = process.env.SERVICIOS_API_TOKEN || "token-de-prueba";
+  require.cache[path.join(__dirname, "..", "api", "enviar-mail.js")] = { id: "x", loaded: true, exports: async (req, res) => { enviados.push(req.body); res.status(200).json({ ok: true }); } };
+  const { gh, m12, clave } = await preparar();
+  const { pase } = (await login(gh, "cp@admin.com", clave)).data;
+  const pedir = async (body, llavesNuevas) => {
+    const g = (await llamar(consorcio.manejarPortal, { method: "POST", headers: { "x-consorcio": pase }, body: { accion: "gestion", edificio: m12, ...body } }, gh)).data.gestion;
+    if (llavesNuevas) await llamar(consorcio.manejarAdmin, { method: "POST", body: { accion: "estado_gestion", edificio: m12, id: g.id, estado: "hecha", llaves_nuevas: llavesNuevas } }, SAT, gh);
+    return g;
+  };
+  const gA = await pedir({ tipo: "nuevo", piso: "4", unidad: "B", titular: "Ana Pérez", telefono: "341 555 1234", cantidad: 2 }, [{ tag: "090:20001" }, { tag: "090:20002" }]);
+  const gB = await pedir({ tipo: "nuevo", piso: "4", unidad: "B", titular: "Ana Pérez", telefono: "341 555 1234", cantidad: 1, dispositivo: "control" }, [{ tag: "C-77", tipo: "control" }]);
+  const gC = await pedir({ tipo: "nuevo", piso: "5", unidad: "A", titular: "Luis Gómez", telefono: "341 555 9999", cantidad: 1 }); // sin marcar Hecha
+  const oficina = { nombre: "Brenda", rol: "tecnico" };
+  const descuentos = [];
+  const deps = {
+    gh,
+    descontarStock: async (x) => { descuentos.push(x); return { ok: true, descontados: x.items.map((i) => ({ c: i.c, cant: i.cant, de: x.de })), paraAprobar: 0 }; },
+    leerTecnicos: async () => [{ nombre: "Brenda", permisos: { entrega_llaves: true } }],
+  };
+  const llamarE = (req) => llamar((rq, rs) => entregas.manejar(rq, rs, oficina, deps), req);
+  await llamar((rq, rs) => entregas.manejar(rq, rs, SAT, deps), { method: "POST", body: { accion: "config", articulo_tag: "9001", articulo_control: "9002" } });
+  const firma = "data:image/jpeg;base64," + Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(3000, 9)]).toString("base64");
+  // Si uno de los elegidos no está listo, no se entrega ninguno.
+  const mal = await llamarE({ method: "POST", body: { accion: "entregar", pedidos: [{ edificio: m12, id: gA.id }, { edificio: m12, id: gC.id }], recibio: "Ana Pérez", firma } });
+  assert.strictEqual(mal.status, 409);
+  assert.strictEqual(descuentos.length, 0);
+  assert.strictEqual((await llamarE({ method: "GET", query: {} })).data.length, 2, "siguen pendientes las dos");
+  // Repetido o vacío: rechazado.
+  assert.strictEqual((await llamarE({ method: "POST", body: { accion: "entregar", pedidos: [{ edificio: m12, id: gA.id }, { edificio: m12, id: gA.id }], recibio: "Ana", firma } })).status, 400);
+  // Las dos juntas, una sola firma.
+  subidas.length = 0;
+  const ok = await llamarE({ method: "POST", body: { accion: "entregar", pedidos: [{ edificio: m12, id: gA.id }, { edificio: m12, id: gB.id }], recibio: "Ana Pérez", dni: "30111222", firma } });
+  assert.strictEqual(ok.status, 200);
+  assert.strictEqual(ok.data.entregas.length, 2);
+  assert.deepStrictEqual(ok.data.errores, []);
+  assert.strictEqual(subidas.length, 1, "la firma se guarda una sola vez");
+  const [eA, eB] = ok.data.entregas.map((x) => x.entrega);
+  assert.strictEqual(eA.firma, eB.firma);
+  assert.strictEqual(eA.grupo.id, eB.grupo.id);
+  assert.strictEqual(eA.grupo.pedidos.length, 2);
+  // Stock: un solo descuento para el depto, con un renglón de tags y uno de controles.
+  assert.strictEqual(descuentos.length, 1);
+  assert.deepStrictEqual(descuentos[0].items.map((i) => [i.c, i.cant]), [["9001", 2], ["9002", 1]]);
+  assert.strictEqual(descuentos[0].de, "dep");
+  assert.deepStrictEqual((await llamarE({ method: "GET", query: {} })).data, []);
+  const gest = JSON.parse(gh.store[`registro-llaves/${m12}.gestiones.json`].t);
+  assert.ok([gA.id, gB.id].every((id) => gest.find((g) => g.id === id).entrega.recibio === "Ana Pérez"));
+  // Al administrador le llega un aviso por cada pedido.
+  assert.strictEqual(enviados.filter((m) => m.tipo === "aviso_gestion" && /Entregada a Ana/.test(m.datos.estado_txt)).length, 2);
+  // Ya entregadas: no se repite.
+  assert.strictEqual((await llamarE({ method: "POST", body: { accion: "entregar", pedidos: [{ edificio: m12, id: gA.id }], recibio: "Ana", firma } })).status, 409);
+});
+
 test("campaña de registro: fecha límite, propuesta de llaves sin dueño, aprobación del administrador y conciliación marcada", async () => {
   const campana = require("../lib/campana-llaves");
   const path = require("path");
