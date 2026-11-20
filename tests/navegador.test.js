@@ -284,7 +284,8 @@ test("Parte: la tarea a realizar queda fija y 'Tarea realizada' arranca vacía, 
     assert.strictEqual(await page.locator("#tareaAsignadaTexto").isVisible(), true, estilo);
     assert.strictEqual((await page.locator("#tareaAsignadaTexto").textContent()).trim(), "Revisar sirena que no suena", estilo);
     assert.strictEqual(await page.inputValue("#f_tarea"), "", estilo);
-    assert.strictEqual(await page.evaluate(() => getFormData().tarea), "Revisar sirena que no suena", estilo + ": sin escribir, se guarda la asignada");
+    assert.strictEqual(await page.evaluate(() => getFormData().tarea), "", estilo + ": sin escribir, NO se usa la asignada como realizada");
+    assert.strictEqual(await page.evaluate(() => getFormData().tarea_pedida), "Revisar sirena que no suena", estilo);
     await page.fill("#f_tarea", "Cambié la sirena");
     assert.strictEqual(await page.evaluate(() => getFormData().tarea), "Cambié la sirena", estilo);
     await page.evaluate(() => resetForm());
@@ -5817,7 +5818,7 @@ test("Admin: un parte que llegó por mail y no quedó en el historial se carga p
   const fuente = fs.readFileSync(path.join(__dirname, "..", "api", "enviar-mail.js"), "utf8") + "\nmodule.exports.__html = (d) => renderTemplate(PLANTILLA_OFICINA, enriquecerDatos(d));";
   const mod = { exports: {} };
   vm.runInNewContext(fuente, { module: mod, require: (n) => (n === "nodemailer" ? {} : require(n)), process, console, Buffer, encodeURIComponent });
-  const html = mod.exports.__html({ id_parte: "45120", tipo_servicio: "Servicio técnico", cliente: "Genz Ricardo", direccion: "Mitre 100", localidad: "Rosario", cliente_email_usado: "genz@mail.com", tecnico: "Sebastián Purello", fecha: "2026-11-05", hora_entrada: "09:05", hora_salida: "10:20", tiempo_transcurrido: "1 h 15 min", tarea: "Cambio de batería de la central", materiales: "Batería 12V 7A x1", materiales_retirados: "Batería vieja", observaciones: "Cliente conforme", importe: "$ 35.000", descuento: "Sin descuento", costo_final: "$ 35.000", forma_pago: "Transferencia", firma_img: "", firma_aclaracion: "Ricardo Genz", claves: [] });
+  const html = mod.exports.__html({ id_parte: "45120", tipo_servicio: "Servicio técnico", cliente: "Genz Ricardo", direccion: "Mitre 100", localidad: "Rosario", cliente_email_usado: "genz@mail.com", tecnico: "Sebastián Purello", fecha: "2026-11-05", hora_entrada: "09:05", hora_salida: "10:20", tiempo_transcurrido: "1 h 15 min", tarea: "Cambio de batería de la central", tarea_pedida: "Revisar la alarma que suena sola", materiales: "Batería 12V 7A x1", materiales_retirados: "Batería vieja", observaciones: "Cliente conforme", importe: "$ 35.000", descuento: "Sin descuento", costo_final: "$ 35.000", forma_pago: "Transferencia", firma_img: "", firma_aclaracion: "Ricardo Genz", claves: [] });
   const { ctx, page, erroresPagina } = await nuevaPagina();
   await page.route(/^https?:\/\/(?!localhost)/, (route) => route.fulfill({ status: 200, contentType: "text/javascript", body: "" }));
   const guardados = [];
@@ -5851,6 +5852,53 @@ test("Admin: un parte que llegó por mail y no quedó en el historial se carga p
   await page.click("#recParteGuardarBtn");
   await page.waitForFunction(() => /ya está en el historial/.test(document.getElementById("recParteStatus").textContent));
   assert.strictEqual(guardados.length, 1);
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
+test("Mails del parte: se ocultan las secciones vacías, «Lo que se pidió» solo si es distinto y todo se escapa", () => {
+  const vm = require("vm"), fs = require("fs"), path = require("path");
+  const fuente = fs.readFileSync(path.join(__dirname, "..", "api", "enviar-mail.js"), "utf8") + "\nmodule.exports.__html = (t, d) => renderTemplate(t === 'o' ? PLANTILLA_OFICINA : PLANTILLA_CLIENTE, enriquecerDatos(d));";
+  const mod = { exports: {} };
+  vm.runInNewContext(fuente, { module: mod, require: (n) => (n === "nodemailer" ? {} : require(n)), process, console, Buffer, encodeURIComponent });
+  const base = { id_parte: "45121", tipo_servicio: "Servicio técnico", cliente: "Perez <b>Ana</b>", direccion: "Mitre 100", localidad: "Rosario", tecnico: "Seba", fecha: "2026-11-20", hora_entrada: "09:00", hora_salida: "10:00", tarea: "Cambié la batería", tarea_pedida: "Revisar alarma", materiales: "", materiales_retirados: "", observaciones: "", importe: "", descuento: "Sin descuento", costo_final: "", forma_pago: "", firma_img: "", firma_aclaracion: "Ana" };
+  for (const t of ["o", "c"]) {
+    const h = mod.exports.__html(t, base);
+    assert.doesNotMatch(h, /\{\{|\}\}/, "no quedan marcas de la plantilla");
+    assert.doesNotMatch(h, /Materiales utilizados|Materiales retirados|Observaciones|Costos|Descuento aplicado/);
+    assert.match(h, /Perez &lt;b&gt;Ana&lt;\/b&gt;/);
+    assert.match(h, /Viernes 20\/11\/2026/);
+    assert.match(h, /Cambié la batería/);
+  }
+  assert.match(mod.exports.__html("o", base), /Lo que se pidió[\s\S]*Revisar alarma/);
+  assert.doesNotMatch(mod.exports.__html("c", base), /Revisar alarma/, "al cliente no le llega lo que se pidió");
+  assert.doesNotMatch(mod.exports.__html("o", { ...base, tarea_pedida: "  cambie la BATERIA " }), /Lo que se pidió/, "si es lo mismo no se repite");
+  const conCostos = mod.exports.__html("c", { ...base, importe: "$ 10.000", descuento: "10%", costo_final: "$ 9.000", forma_pago: "PAGADO", materiales: "Batería 12V" });
+  assert.match(conCostos, /Descuento aplicado[\s\S]*10%[\s\S]*\$ 9\.000/);
+  assert.match(conCostos, /Materiales utilizados[\s\S]*Batería 12V/);
+});
+
+test("Parte: sin «Tarea realizada» no pasa a la firma (ya no se usa la tarea asignada en su lugar)", async () => {
+  const { ctx, page, erroresPagina } = await paginaConEstilo("nuevo");
+  await page.evaluate(() => {
+    seleccionarServicio({ numero_servicio: "124", cliente: "Perez Ana", direccion: "Mitre 100", localidad: "Rosario", tarea: "Revisar alarma que suena sola" });
+    showScreen("form");
+    document.getElementById("f_cliente").value = "Perez Ana";
+    tecnicoSelect.value = tecnicoSelect.options[1] ? tecnicoSelect.options[1].value : "";
+    if (!tecnicoSelect.value) { tecnicoSelect.value = "otro"; tecnicoOtro.value = "Seba"; }
+    document.getElementById("f_fecha").value = "2026-11-20";
+    document.getElementById("f_tarea").value = "";
+  });
+  const d = await page.evaluate(() => getFormData());
+  assert.strictEqual(d.tarea, "");
+  assert.strictEqual(d.tarea_pedida, "Revisar alarma que suena sola");
+  await page.evaluate(() => document.getElementById("toSignBtn").click());
+  await page.waitForTimeout(200);
+  assert.match(await page.evaluate(() => document.body.innerText), /Escribí qué hiciste en «Tarea realizada»/);
+  assert.ok(await page.evaluate(() => document.getElementById("screen-form").classList.contains("active") || !document.getElementById("screen-form").classList.contains("hidden")), "sigue en el parte");
+  assert.strictEqual(await page.evaluate(() => document.activeElement && document.activeElement.id), "f_tarea");
+  await page.evaluate(() => { document.getElementById("f_tarea").value = "Cambié la batería"; });
+  assert.strictEqual((await page.evaluate(() => getFormData())).tarea, "Cambié la batería");
   assert.deepStrictEqual(erroresPagina, []);
   await ctx.close();
 });

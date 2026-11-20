@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.83.1";
+const APP_VERSION = "4.84.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -1590,6 +1590,7 @@ function actualizarFaltantesParte() {
     if (!document.getElementById("f_cliente").value.trim()) faltan.push("Cliente");
     if (!getTecnicoValue()) faltan.push("Técnico");
     if (!document.getElementById("f_fecha").value) faltan.push("Fecha");
+    if (!document.getElementById("f_tarea").value.trim()) faltan.push("Tarea realizada");
     const importe = document.getElementById("f_importe").value.trim();
     el.classList.toggle("faltan", faltan.length > 0);
     if (faltan.length > 0) {
@@ -4394,8 +4395,10 @@ function getFormData() {
     direccion: document.getElementById("f_direccion").value.trim(),
     localidad: document.getElementById("f_localidad").value.trim(),
     cliente_email: document.getElementById("f_cliente_email").value.trim(),
-    // Si el técnico no escribió nada, se guarda la tarea asignada (como pasaba antes con el texto precargado).
-    tarea: document.getElementById("f_tarea").value.trim() || tareaAsignada,
+    // Lo que hizo el técnico. Ya no se completa sola con la tarea asignada: si no escribe nada,
+    // no se deja pasar a la firma (antes llegaba al mail y al historial lo que había que hacer).
+    tarea: document.getElementById("f_tarea").value.trim(),
+    tarea_pedida: (tareaAsignada || "").trim(),
     materiales: getMaterialesUtilizados(),
     sim_instalada_texto: getSimInstaladaTexto(),
     materiales_retirados: getMaterialesRetirados(),
@@ -4580,6 +4583,12 @@ toSignBtn.addEventListener("click", () => {
   }
   if (!data.fecha) {
     showToast("Falta completar la Fecha del servicio.");
+    return;
+  }
+  if (!data.tarea) {
+    showToast("Escribí qué hiciste en «Tarea realizada» antes de pasar a la firma.");
+    const t = document.getElementById("f_tarea");
+    try { t.scrollIntoView({ behavior: "smooth", block: "center" }); t.focus({ preventScroll: true }); } catch (e) { /* nada */ }
     return;
   }
   // Si eligió categoría y modelo pero nunca tocó "+ Agregar", esa
@@ -4773,6 +4782,7 @@ async function intentarEnviarParte(payload, interactivo) {
     direccion: data.direccion,
     localidad: data.localidad,
     tarea: data.tarea,
+    tarea_pedida: data.tarea_pedida,
     materiales: data.materiales,
     materiales_retirados: data.materiales_retirados,
     sim_instalada_texto: data.sim_instalada_texto,

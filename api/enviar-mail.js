@@ -34,198 +34,132 @@ function esEmailValido(email) {
 }
 
 function renderTemplate(html, datos) {
-  html = html.replace(/\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_, clave, contenido) =>
-    datos[clave] ? contenido : ""
-  );
+  // Se repite para resolver bloques adentro de otros bloques (ej.: el descuento adentro de los costos).
+  for (let i = 0, antes = null; i < 5 && antes !== html; i++) {
+    antes = html;
+    html = html.replace(/\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_, clave, contenido) =>
+      datos[clave] ? contenido : ""
+    );
+  }
   html = html.replace(/\{\{\{(\w+)\}\}\}/g, (_, clave) => (datos[clave] != null ? String(datos[clave]) : ""));
   html = html.replace(/\{\{(\w+)\}\}/g, (_, clave) => (datos[clave] != null ? escapeHtml(datos[clave]) : ""));
   return html;
 }
 
-// ---------- Plantilla: copia a la oficina ----------
-const PLANTILLA_OFICINA = `
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F4F5F0; padding:24px 0; font-family:Arial, Helvetica, sans-serif;">
+// ---------- Piezas comunes de las plantillas ----------
+// Hechas con tablas y estilos en línea (lo único que respetan Gmail, Outlook y
+// los clientes de mail del celular). La de oficina además se puede volver a
+// leer pegando su texto en el panel («Recuperar un parte desde el mail»): por
+// eso cada dato va en su propia fila «Etiqueta | valor» y los títulos de las
+// secciones no cambian de nombre.
+const LOGO_URL = "https://raw.githubusercontent.com/sebaBarto/APP_PARTES/main/icons/logo.png";
+const FUENTE = "Arial, Helvetica, sans-serif";
+const C = { tinta: "#101820", gris: "#6B7680", linea: "#E3E6DF", fondo: "#F4F5F0", acento: "#F5A623", acentoOsc: "#B5772A", blanco: "#FFFFFF" };
+
+const titulo = (emoji, texto, color) =>
+  `<div style="font-family:${FUENTE}; color:${color || C.acentoOsc}; font-size:11px; font-weight:bold; letter-spacing:1.2px; text-transform:uppercase; margin:0 0 8px;">${emoji} ${texto}</div>`;
+const fila = (etiqueta, valor, ultima) =>
+  `<tr><td style="padding:9px 14px; color:${C.gris}; font-size:13px; width:150px; vertical-align:top;${ultima ? "" : ` border-bottom:1px solid ${C.linea};`}">${etiqueta}</td><td style="padding:9px 14px; color:${C.tinta}; font-size:14px; vertical-align:top;${ultima ? "" : ` border-bottom:1px solid ${C.linea};`}">${valor}</td></tr>`;
+const tarjeta = (filas) =>
+  `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid ${C.linea}; border-radius:10px; border-collapse:separate; overflow:hidden;">${filas}</table>`;
+const caja = (contenido, extra) =>
+  `<div style="font-family:${FUENTE}; color:${C.tinta}; font-size:14px; line-height:1.6; background:${C.fondo}; border-radius:10px; padding:14px 16px; white-space:pre-line;${extra || ""}">${contenido}</div>`;
+const seccion = (contenido, pad) => `<tr><td style="padding:${pad || "18px 28px 0"};">${contenido}</td></tr>`;
+const cabecera = (tituloMail) => `
+        <tr>
+          <td style="background:${C.tinta}; padding:22px 28px 20px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="vertical-align:middle;"><img src="${LOGO_URL}" alt="SAT" height="30" style="display:block; height:30px; border:0;"></td>
+                <td align="right" style="vertical-align:middle; font-family:'Courier New', monospace; color:#9AA3A9; font-size:13px;">N° {{id_parte}}</td>
+              </tr>
+            </table>
+            <div style="font-family:${FUENTE}; color:${C.blanco}; font-size:22px; font-weight:bold; margin:18px 0 8px;">${tituloMail}</div>
+            <span style="display:inline-block; background:${C.acento}; color:${C.tinta}; font-family:${FUENTE}; font-size:11px; font-weight:bold; letter-spacing:0.6px; text-transform:uppercase; border-radius:20px; padding:4px 12px;">{{tipo_servicio}}</span>
+          </td>
+        </tr>
+        <tr><td style="background:${C.acento}; height:4px; line-height:4px; font-size:0;">&nbsp;</td></tr>`;
+const firma = (texto) => `
+          ${titulo("✍️", texto)}
+          <div style="border:1px solid ${C.linea}; border-radius:10px; padding:16px; text-align:center;">
+            <div style="display:inline-block;">{{{firma_img}}}</div>
+            <div style="border-top:1px solid #C7CCC3; width:220px; margin:6px auto 8px;"></div>
+            <div style="color:${C.tinta}; font-size:13px; font-weight:bold; font-family:${FUENTE};">{{firma_aclaracion}}</div>
+            {{#firma_cargo}}<div style="color:${C.gris}; font-size:12px; font-family:${FUENTE}; margin-top:2px;">{{firma_cargo}}</div>{{/firma_cargo}}
+          </div>`;
+const marco = (preheader, filas) => `
+<div style="display:none; max-height:0; overflow:hidden; mso-hide:all; font-size:1px; color:${C.fondo};">${preheader}</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.fondo}; padding:24px 10px; font-family:${FUENTE};">
   <tr>
     <td align="center">
-      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background:#FFFFFF; border-radius:10px; overflow:hidden; border:1px solid #D8DCD4; max-width:600px; width:100%;">
-        <tr>
-          <td style="background:#101820; padding:18px 28px;">
-            <img src="https://raw.githubusercontent.com/sebaBarto/APP_PARTES/main/icons/logo.png" alt="SAT" height="28" style="display:block; margin-bottom:10px;">
-            <span style="color:#9AA3A9; font-size:12px; font-family:'Courier New', monospace;">N° {{id_parte}}</span>
-            <div style="margin-top:6px;">
-              <span style="display:inline-block; background:#F5A623; color:#101820; font-size:11px; font-weight:bold; font-family:'Courier New', monospace; letter-spacing:0.5px; border-radius:4px; padding:3px 8px;">{{tipo_servicio}}</span>
-            </div>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:24px 28px 8px;">
-            <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:10px;">👤 Datos del cliente</div>
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-              <tr><td style="padding:4px 0; color:#6B7680; font-size:13px; width:140px;">Cliente</td><td style="padding:4px 0; color:#101820; font-size:14px;">{{cliente}}</td></tr>
-              <tr><td style="padding:4px 0; color:#6B7680; font-size:13px;">Dirección</td><td style="padding:4px 0; color:#101820; font-size:14px;"><a href="{{direccion_maps_link}}" style="color:#101820; text-decoration:underline;">{{direccion}}</a> 📍</td></tr>
-              <tr><td style="padding:4px 0; color:#6B7680; font-size:13px;">Localidad</td><td style="padding:4px 0; color:#101820; font-size:14px;">{{localidad}}</td></tr>
-              <tr><td style="padding:4px 0; color:#6B7680; font-size:13px;">Copia al cliente</td><td style="padding:4px 0; color:#101820; font-size:14px;">{{cliente_email_status}}</td></tr>
-            </table>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:16px 28px 8px;">
-            <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:10px;">🔧 Datos del servicio</div>
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-              <tr><td style="padding:4px 0; color:#6B7680; font-size:13px; width:140px;">Técnico</td><td style="padding:4px 0; color:#101820; font-size:14px;">{{tecnico}}</td></tr>
-              {{#tecnico2}}<tr><td style="padding:4px 0; color:#6B7680; font-size:13px;">2° Técnico</td><td style="padding:4px 0; color:#101820; font-size:14px;">{{tecnico2}}</td></tr>{{/tecnico2}}
-              <tr><td style="padding:4px 0; color:#6B7680; font-size:13px;">Fecha</td><td style="padding:4px 0; color:#101820; font-size:14px;">{{fecha}}</td></tr>
-              <tr><td style="padding:4px 0; color:#6B7680; font-size:13px;">Horario</td><td style="padding:4px 0; color:#101820; font-size:14px;">{{hora_entrada}} a {{hora_salida}} ({{tiempo_transcurrido}})</td></tr>
-            </table>
-          </td>
-        </tr>
-        <tr><td style="padding:16px 28px 8px;">
-          <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:6px;">📝 Tarea realizada</div>
-          <div style="color:#101820; font-size:14px; line-height:1.5; background:#F4F5F0; border-radius:8px; padding:12px 14px;">{{tarea}}</div>
-        </td></tr>
-        <tr><td style="padding:16px 28px 8px;">
-          <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:6px;">📦 Materiales utilizados</div>
-          <div style="color:#101820; font-size:14px; line-height:1.5; background:#F4F5F0; border-radius:8px; padding:12px 14px;">{{materiales}}</div>
-        </td></tr>
-        <tr><td style="padding:16px 28px 8px;">
-          <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:6px;">📤 Materiales retirados</div>
-          <div style="color:#101820; font-size:14px; line-height:1.5; background:#F4F5F0; border-radius:8px; padding:12px 14px;">{{materiales_retirados}}</div>
-        </td></tr>
-        {{#sim_instalada_texto}}<tr><td style="padding:0 28px 8px;">
-          <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:6px;">📶 SIM instalada</div>
-          <div style="color:#101820; font-size:14px; line-height:1.5; background:#F4F5F0; border-radius:8px; padding:12px 14px;">{{sim_instalada_texto}}</div>
-        </td></tr>{{/sim_instalada_texto}}
-        {{#tiene_claves}}<tr><td style="padding:0 28px 8px;">
-          <div style="color:#C0392B; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:6px;">🔑 Claves y códigos (uso interno — no se le envía al cliente)</div>
-          <div style="color:#101820; font-size:14px; line-height:1.5; background:#FCEEEC; border:1px solid #E4B8B2; border-radius:8px; padding:12px 14px;">
-            {{{claves_html}}}
-          </div>
-        </td></tr>{{/tiene_claves}}
-        <tr>
-          <td style="padding:16px 28px 8px;">
-            <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:10px;">💰 Costos</div>
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-              <tr><td style="padding:4px 0; color:#6B7680; font-size:13px; width:140px;">Importe del servicio</td><td style="padding:4px 0; color:#101820; font-size:14px; font-family:'Courier New', monospace;">{{importe}}</td></tr>
-              <tr><td style="padding:4px 0; color:#6B7680; font-size:13px;">Descuento aplicado</td><td style="padding:4px 0; color:#101820; font-size:14px;">{{descuento}}</td></tr>
-              <tr><td style="padding:8px 0 4px; color:#6B7680; font-size:13px; font-weight:bold;">Costo final al cliente</td><td style="padding:8px 0 4px; color:#101820; font-size:15px; font-weight:bold; font-family:'Courier New', monospace;">{{costo_final}}</td></tr>
-              <tr><td style="padding:4px 0; color:#6B7680; font-size:13px;">Forma de pago</td><td style="padding:4px 0;">{{{forma_pago_chip}}}</td></tr>
-            </table>
-          </td>
-        </tr>
-        <tr><td style="padding:16px 28px 8px;">
-          <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:6px;">🗒️ Observaciones</div>
-          <div style="color:#101820; font-size:14px; line-height:1.5; background:#F4F5F0; border-radius:8px; padding:12px 14px;">{{observaciones}}</div>
-        </td></tr>
-        {{#imprevisto}}<tr><td style="padding:0 28px 8px;">
-          <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:6px;">⚠️ Imprevisto</div>
-          <div style="color:#101820; font-size:14px; background:rgba(245,166,35,0.12); border-radius:8px; padding:12px 14px;">⚠ {{imprevisto}}</div>
-        </td></tr>{{/imprevisto}}
-        {{#foto_link}}<tr><td style="padding:0 28px 8px;">
-          <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:6px;">📷 Foto</div>
-          <a href="{{foto_link}}" style="display:block;">
-            <img src="{{foto_link}}" alt="Foto del servicio" width="200" style="display:block; width:200px; max-width:100%; height:auto; border-radius:8px; border:1px solid #D8DCD4;" />
-          </a>
-        </td></tr>{{/foto_link}}
-        <tr><td style="padding:16px 28px 24px;">
-          <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:8px;">✍️ Firma del cliente</div>
-          <div style="background:#F4F5F0; border-radius:8px; padding:14px; border:1px solid #D8DCD4;">
-            {{{firma_img}}}
-            <div style="border-top:1px solid #C7CCC3; width:220px; margin:6px auto 8px;"></div>
-            <div style="text-align:center; color:#101820; font-size:13px; font-weight:bold; font-family:Arial, Helvetica, sans-serif;">{{firma_aclaracion}}</div>
-            {{#firma_cargo}}<div style="text-align:center; color:#6B7680; font-size:12px; font-family:Arial, Helvetica, sans-serif; margin-top:2px;">{{firma_cargo}}</div>{{/firma_cargo}}
-          </div>
-        </td></tr>
-        <tr><td style="background:#101820; padding:14px 28px; color:#9AA3A9; font-size:11px; font-family:'Courier New', monospace; text-align:center;">
-          Generado automáticamente por la app de partes técnicos
-        </td></tr>
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background:${C.blanco}; border-radius:14px; overflow:hidden; border:1px solid #D8DCD4; max-width:600px; width:100%;">
+${filas}
       </table>
     </td>
   </tr>
-</table>
-`;
+</table>`;
+const filasCostos = (etiquetaTotal) => `
+              {{#importe}}${fila("Importe del servicio", `<span style="font-family:'Courier New', monospace;">{{importe}}</span>`)}{{/importe}}
+              {{#tiene_descuento}}${fila("Descuento aplicado", "{{descuento}}")}{{/tiene_descuento}}
+              {{#forma_pago}}${fila("Forma de pago", "{{{forma_pago_chip}}}")}{{/forma_pago}}
+              {{#costo_final}}<tr><td style="padding:12px 14px; background:${C.tinta}; color:#C9CFD3; font-size:13px; font-weight:bold; width:150px;">${etiquetaTotal}</td><td style="padding:12px 14px; background:${C.tinta}; color:${C.acento}; font-size:18px; font-weight:bold; font-family:'Courier New', monospace;">{{costo_final}}</td></tr>{{/costo_final}}`;
+
+// ---------- Plantilla: copia a la oficina ----------
+const PLANTILLA_OFICINA = marco("{{cliente}} · {{fecha_larga}} · {{tecnico}}", `
+${cabecera("Parte técnico")}
+${seccion(`${titulo("👤", "Datos del cliente")}${tarjeta(
+  fila("Cliente", "<b>{{cliente}}</b>") +
+  fila("Dirección", `<a href="{{direccion_maps_link}}" style="color:${C.tinta}; text-decoration:underline;">{{direccion}}</a> 📍`) +
+  fila("Localidad", "{{localidad}}") +
+  fila("Copia al cliente", "{{cliente_email_status}}", true))}`, "24px 28px 0")}
+${seccion(`${titulo("🔧", "Datos del servicio")}${tarjeta(
+  fila("Técnico", "{{tecnico}}") +
+  "{{#tecnico2}}" + fila("2° Técnico", "{{tecnico2}}") + "{{/tecnico2}}" +
+  fila("Fecha", "{{fecha_larga}}") +
+  fila("Horario", "{{hora_entrada}} a {{hora_salida}}{{#tiempo_transcurrido}} · {{tiempo_transcurrido}}{{/tiempo_transcurrido}}", true))}`)}
+${seccion(`${titulo("📝", "Tarea realizada")}${caja("{{tarea}}", ` border-left:4px solid ${C.acento};`)}`)}
+{{#mostrar_tarea_pedida}}${seccion(`${titulo("📋", "Lo que se pidió", C.gris)}${caja("{{tarea_pedida}}", ` color:${C.gris}; font-size:13px; background:${C.blanco}; border:1px dashed #C7CCC3;`)}`)}{{/mostrar_tarea_pedida}}
+{{#materiales}}${seccion(`${titulo("📦", "Materiales utilizados")}${caja("{{materiales}}")}`)}{{/materiales}}
+{{#materiales_retirados}}${seccion(`${titulo("📤", "Materiales retirados")}${caja("{{materiales_retirados}}")}`)}{{/materiales_retirados}}
+{{#sim_instalada_texto}}${seccion(`${titulo("📶", "SIM instalada")}${caja("{{sim_instalada_texto}}")}`)}{{/sim_instalada_texto}}
+{{#tiene_claves}}${seccion(`${titulo("🔑", "Claves y códigos (uso interno — no se le envía al cliente)", "#C0392B")}${caja("{{{claves_html}}}", " background:#FCEEEC; border:1px solid #E4B8B2; white-space:normal;")}`)}{{/tiene_claves}}
+{{#tiene_costos}}${seccion(`${titulo("💰", "Costos")}${tarjeta(filasCostos("Costo final al cliente"))}`)}{{/tiene_costos}}
+{{#observaciones}}${seccion(`${titulo("🗒️", "Observaciones")}${caja("{{observaciones}}")}`)}{{/observaciones}}
+{{#imprevisto}}${seccion(`${titulo("⚠️", "Imprevisto")}${caja("⚠ {{imprevisto}}", " background:#FDF3E1; border:1px solid #F2D29B;")}`)}{{/imprevisto}}
+{{#foto_link}}${seccion(`${titulo("📷", "Foto")}<a href="{{foto_link}}" style="display:block;"><img src="{{foto_link}}" alt="Foto del servicio" width="220" style="display:block; width:220px; max-width:100%; height:auto; border-radius:10px; border:1px solid #D8DCD4;" /></a>`)}{{/foto_link}}
+${seccion(firma("Firma del cliente"), "18px 28px 26px")}
+        <tr><td style="background:${C.tinta}; padding:14px 28px; color:#9AA3A9; font-size:11px; font-family:'Courier New', monospace; text-align:center;">
+          Generado automáticamente por la app de partes técnicos
+        </td></tr>`);
 
 // ---------- Plantilla: copia al cliente ----------
-const PLANTILLA_CLIENTE = `
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F4F5F0; padding:24px 0; font-family:Arial, Helvetica, sans-serif;">
-  <tr>
-    <td align="center">
-      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="background:#FFFFFF; border-radius:10px; overflow:hidden; border:1px solid #D8DCD4; max-width:600px; width:100%;">
-        <tr>
-          <td style="background:#101820; padding:18px 28px;">
-            <img src="https://raw.githubusercontent.com/sebaBarto/APP_PARTES/main/icons/logo.png" alt="SAT" height="28" style="display:block; margin-bottom:10px;">
-            <div style="color:#9AA3A9; font-size:12px; font-family:'Courier New', monospace;">N° {{id_parte}}</div>
-            <div style="margin-top:6px;">
-              <span style="display:inline-block; background:#F5A623; color:#101820; font-size:11px; font-weight:bold; font-family:'Courier New', monospace; letter-spacing:0.5px; border-radius:4px; padding:3px 8px;">{{tipo_servicio}}</span>
-            </div>
-          </td>
-        </tr>
-        <tr><td style="padding:24px 28px 8px;">
-          <div style="color:#101820; font-size:14px; line-height:1.5;">Hola {{cliente}}, te enviamos el resumen del servicio realizado en tu domicilio.</div>
-        </td></tr>
-        <tr>
-          <td style="padding:16px 28px 8px;">
-            <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:10px;">🔧 Datos del servicio</div>
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-              <tr><td style="padding:4px 0; color:#6B7680; font-size:13px; width:140px;">Dirección</td><td style="padding:4px 0; color:#101820; font-size:14px;"><a href="{{direccion_maps_link}}" style="color:#101820; text-decoration:underline;">{{direccion}}</a> 📍</td></tr>
-              <tr><td style="padding:4px 0; color:#6B7680; font-size:13px;">Localidad</td><td style="padding:4px 0; color:#101820; font-size:14px;">{{localidad}}</td></tr>
-              <tr><td style="padding:4px 0; color:#6B7680; font-size:13px;">Técnico</td><td style="padding:4px 0; color:#101820; font-size:14px;">{{tecnico}}</td></tr>
-              {{#tecnico2}}<tr><td style="padding:4px 0; color:#6B7680; font-size:13px;">2° Técnico</td><td style="padding:4px 0; color:#101820; font-size:14px;">{{tecnico2}}</td></tr>{{/tecnico2}}
-              <tr><td style="padding:4px 0; color:#6B7680; font-size:13px;">Fecha</td><td style="padding:4px 0; color:#101820; font-size:14px;">{{fecha}}</td></tr>
-              <tr><td style="padding:4px 0; color:#6B7680; font-size:13px;">Horario</td><td style="padding:4px 0; color:#101820; font-size:14px;">{{hora_entrada}} a {{hora_salida}}</td></tr>
-            </table>
-          </td>
-        </tr>
-        <tr><td style="padding:16px 28px 8px;">
-          <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:6px;">📝 Tarea realizada</div>
-          <div style="color:#101820; font-size:14px; line-height:1.5; background:#F4F5F0; border-radius:8px; padding:12px 14px;">{{tarea}}</div>
-        </td></tr>
-        <tr><td style="padding:16px 28px 8px;">
-          <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:6px;">📦 Materiales utilizados</div>
-          <div style="color:#101820; font-size:14px; line-height:1.5; background:#F4F5F0; border-radius:8px; padding:12px 14px;">{{materiales}}</div>
-        </td></tr>
-        <tr>
-          <td style="padding:16px 28px 8px;">
-            <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:10px;">💰 Costos</div>
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-              <tr><td style="padding:4px 0; color:#6B7680; font-size:13px; width:140px;">Importe del servicio</td><td style="padding:4px 0; color:#101820; font-size:14px; font-family:'Courier New', monospace;">{{importe}}</td></tr>
-              <tr><td style="padding:4px 0; color:#6B7680; font-size:13px;">Descuento aplicado</td><td style="padding:4px 0; color:#101820; font-size:14px;">{{descuento}}</td></tr>
-              <tr><td style="padding:8px 0 4px; color:#6B7680; font-size:13px; font-weight:bold;">Costo final</td><td style="padding:8px 0 4px; color:#101820; font-size:15px; font-weight:bold; font-family:'Courier New', monospace;">{{costo_final}}</td></tr>
-              <tr><td style="padding:4px 0; color:#6B7680; font-size:13px;">Forma de pago</td><td style="padding:4px 0;">{{{forma_pago_chip}}}</td></tr>
-            </table>
-          </td>
-        </tr>
-        <tr><td style="padding:16px 28px 8px;">
-          <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:6px;">🗒️ Observaciones</div>
-          <div style="color:#101820; font-size:14px; line-height:1.5; background:#F4F5F0; border-radius:8px; padding:12px 14px;">{{observaciones}}</div>
-        </td></tr>
-        <tr><td style="padding:16px 28px 24px;">
-          <div style="color:#B5772A; font-size:11px; font-family:'Courier New', monospace; letter-spacing:1px; text-transform:uppercase; margin-bottom:8px;">✍️ Tu firma de conformidad</div>
-          <div style="background:#F4F5F0; border-radius:8px; padding:14px; border:1px solid #D8DCD4;">
-            {{{firma_img}}}
-            <div style="border-top:1px solid #C7CCC3; width:220px; margin:6px auto 8px;"></div>
-            <div style="text-align:center; color:#101820; font-size:13px; font-weight:bold; font-family:Arial, Helvetica, sans-serif;">{{firma_aclaracion}}</div>
-            {{#firma_cargo}}<div style="text-align:center; color:#6B7680; font-size:12px; font-family:Arial, Helvetica, sans-serif; margin-top:2px;">{{firma_cargo}}</div>{{/firma_cargo}}
-          </div>
-        </td></tr>
-        <tr><td style="padding:0 28px 24px;">
-          <div style="background:#F4F5F0; border-radius:8px; padding:16px; text-align:center;">
-            <div style="color:#101820; font-size:13px; font-weight:bold; margin-bottom:10px;">¿Cómo te resultó nuestro servicio?</div>
-            <a href="{{encuesta_link_1}}" style="text-decoration:none; font-size:26px; margin:0 4px;">😞</a>
-            <a href="{{encuesta_link_2}}" style="text-decoration:none; font-size:26px; margin:0 4px;">🙁</a>
-            <a href="{{encuesta_link_3}}" style="text-decoration:none; font-size:26px; margin:0 4px;">😐</a>
-            <a href="{{encuesta_link_4}}" style="text-decoration:none; font-size:26px; margin:0 4px;">🙂</a>
-            <a href="{{encuesta_link_5}}" style="text-decoration:none; font-size:26px; margin:0 4px;">😄</a>
-          </div>
-        </td></tr>
-        <tr><td style="background:#101820; padding:18px 28px; color:#9AA3A9; font-size:11px; font-family:'Courier New', monospace; text-align:center; line-height:1.8;">
-          Gracias por confiar en nosotros<br>
-          <a href="https://www.sat365.com.ar" style="color:#F5A623; text-decoration:none;">www.sat365.com.ar</a>
-        </td></tr>
-      </table>
-    </td>
-  </tr>
-</table>
-`;
+const CARAS = [["😞", "Malo"], ["🙁", "Regular"], ["😐", "Bien"], ["🙂", "Muy bien"], ["😄", "Excelente"]];
+const PLANTILLA_CLIENTE = marco("Resumen del servicio técnico del {{fecha_larga}}", `
+${cabecera("Servicio realizado")}
+${seccion(`<div style="font-family:${FUENTE}; color:${C.tinta}; font-size:17px; font-weight:bold; margin-bottom:6px;">Hola {{cliente}}:</div>
+          <div style="font-family:${FUENTE}; color:#3A444C; font-size:14px; line-height:1.6;">Te enviamos el resumen del servicio que realizamos{{#fecha_larga}} el <b>{{fecha_larga}}</b>{{/fecha_larga}}. Guardalo como comprobante.</div>`, "26px 28px 4px")}
+${seccion(`${titulo("🔧", "Datos del servicio")}${tarjeta(
+  fila("Dirección", `<a href="{{direccion_maps_link}}" style="color:${C.tinta}; text-decoration:underline;">{{direccion}}</a>{{#localidad}}, {{localidad}}{{/localidad}}`) +
+  fila("Técnico", "{{tecnico}}{{#tecnico2}} y {{tecnico2}}{{/tecnico2}}") +
+  fila("Fecha", "{{fecha_larga}}") +
+  fila("Horario", "{{hora_entrada}} a {{hora_salida}}", true))}`)}
+${seccion(`${titulo("📝", "Qué hicimos")}${caja("{{tarea}}", ` border-left:4px solid ${C.acento};`)}`)}
+{{#materiales}}${seccion(`${titulo("📦", "Materiales utilizados")}${caja("{{materiales}}")}`)}{{/materiales}}
+{{#tiene_costos}}${seccion(`${titulo("💰", "Costos")}${tarjeta(filasCostos("Total"))}`)}{{/tiene_costos}}
+{{#observaciones}}${seccion(`${titulo("🗒️", "Observaciones")}${caja("{{observaciones}}")}`)}{{/observaciones}}
+${seccion(firma("Tu firma de conformidad"))}
+${seccion(`<div style="background:${C.fondo}; border-radius:12px; padding:18px 12px; text-align:center;">
+            <div style="font-family:${FUENTE}; color:${C.tinta}; font-size:15px; font-weight:bold;">¿Cómo te resultó nuestro servicio?</div>
+            <div style="font-family:${FUENTE}; color:${C.gris}; font-size:12px; margin:4px 0 12px;">Tocá una carita: nos ayuda a mejorar.</div>
+            <table role="presentation" cellpadding="0" cellspacing="0" align="center"><tr>
+              ${CARAS.map(([cara, txt], i) => `<td align="center" style="padding:0 4px;"><a href="{{encuesta_link_${i + 1}}}" style="display:block; text-decoration:none; background:${C.blanco}; border:1px solid ${C.linea}; border-radius:10px; padding:8px 6px; width:56px;"><span style="font-size:26px; line-height:30px;">${cara}</span><br><span style="font-family:${FUENTE}; font-size:10px; color:${C.gris};">${txt}</span></a></td>`).join("")}
+            </tr></table>
+          </div>`, "22px 28px 26px")}
+        <tr><td style="background:${C.tinta}; padding:20px 28px; text-align:center; font-family:${FUENTE};">
+          <div style="color:${C.blanco}; font-size:14px; font-weight:bold;">Gracias por confiar en nosotros</div>
+          <div style="color:#9AA3A9; font-size:12px; margin-top:6px; line-height:1.6;">Servicio Técnico SAT · Si tenés alguna consulta, respondé este mail.</div>
+          <a href="https://www.sat365.com.ar" style="display:inline-block; margin-top:8px; color:${C.acento}; font-size:12px; font-weight:bold; text-decoration:none;">www.sat365.com.ar</a>
+        </td></tr>`);
 
 // ---------- Ayudas para enriquecer los datos antes de renderizar ----------
 
@@ -273,6 +207,16 @@ function armarHtmlClaves(claves) {
   }).join("");
 }
 
+// "2026-11-20" -> "Jueves 20/11/2026" (sin pasar por la zona horaria del servidor).
+const DIAS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+function fechaLarga(iso) {
+  const m = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return String(iso || "");
+  const dia = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])).getUTCDay();
+  return `${DIAS[dia]} ${m[3]}/${m[2]}/${m[1]}`;
+}
+const normalizarTexto = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+
 function enriquecerDatos(datos) {
   const linkEncuesta = (puntaje) =>
     `https://app-partes-sat15.vercel.app/api/historial?tipo=encuesta&parte=${encodeURIComponent(datos.id_parte || "")}&puntaje=${puntaje}`;
@@ -283,6 +227,11 @@ function enriquecerDatos(datos) {
     cliente_email_status: datos.cliente_email_usado
       ? `Sí, a ${datos.cliente_email_usado}`
       : "No se cargó mail del cliente — no se le mandó copia",
+    fecha_larga: fechaLarga(datos.fecha),
+    tiene_descuento: !!datos.descuento && !/^sin descuento$/i.test(String(datos.descuento).trim()),
+    tiene_costos: !!(datos.importe || datos.costo_final || datos.forma_pago),
+    // La tarea que había asignado la oficina, solo si es distinta de lo que se hizo.
+    mostrar_tarea_pedida: !!datos.tarea_pedida && normalizarTexto(datos.tarea_pedida) !== normalizarTexto(datos.tarea),
     tiene_claves: Array.isArray(datos.claves) && datos.claves.length > 0,
     claves_html: armarHtmlClaves(datos.claves),
     encuesta_link_1: linkEncuesta(1),

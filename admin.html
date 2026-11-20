@@ -6965,7 +6965,7 @@ document.getElementById("simsConcEmpresa").addEventListener("change", (e) => { i
 function leerMailParte(texto) {
   const lineas = String(texto || "").replace(/\r/g, "").split("\n").map((l) => l.replace(/\u00a0/g, " ").trim()).filter(Boolean);
   const sinEmoji = (l) => l.replace(/^[^\p{L}\p{N}°]+/u, "").trim();
-  const SECC = [["tarea realizada", "tarea"], ["materiales utilizados", "materiales"], ["materiales retirados", "materiales_retirados"], ["sim instalada", "sim_instalada_texto"], ["claves y codigos", null], ["costos", null], ["observaciones", "observaciones"], ["imprevisto", "imprevisto"], ["foto", null], ["firma del cliente", "__firma"]];
+  const SECC = [["tarea realizada", "tarea"], ["lo que se pidio", "__pedida"], ["materiales utilizados", "materiales"], ["materiales retirados", "materiales_retirados"], ["sim instalada", "sim_instalada_texto"], ["claves y codigos", null], ["costos", null], ["observaciones", "observaciones"], ["imprevisto", "imprevisto"], ["foto", null], ["firma del cliente", "__firma"]];
   const CAMPOS = [["2° tecnico", "tecnico2"], ["copia al cliente", "__copia"], ["cliente", "cliente"], ["direccion", "direccion"], ["localidad", "localidad"], ["tecnico", "tecnico"], ["fecha", "fecha"], ["horario", "__horario"], ["importe del servicio", "importe"], ["descuento aplicado", "descuento"], ["costo final al cliente", "costo_final"], ["costo final", "costo_final"], ["forma de pago", "forma_pago"]];
   const r = { tipo_servicio: "Servicio técnico" }, partes = {};
   let seccion = null, firma = [];
@@ -6991,6 +6991,7 @@ function leerMailParte(texto) {
     if (seccion === "__firma") { firma.push(l); continue; }
     if (seccion) partes[seccion] = (partes[seccion] ? partes[seccion] + "\n" : "") + l.replace(/^⚠\s*/u, "");
   }
+  delete partes.__pedida; // la tarea que se había asignado (no es lo que se hizo)
   Object.assign(r, partes);
   const f = firma.filter((x) => !/^(firma|sin firma)$/i.test(x));
   if (f[0]) r.firma_aclaracion = f[0];
