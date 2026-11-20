@@ -888,6 +888,12 @@ html, body {
 .crono-tarea-hora { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #B5772A; }
 .crono-tarea-tecnico { font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: 14px; color: #101820; margin: 2px 0; }
 .crono-tarea-texto { font-size: 13px; color: #101820; white-space: pre-line; }
+.crono-hacer { margin-top: 6px; padding: 7px 10px; border-left: 3px solid #F5A623; background: rgba(245,166,35,.12); border-radius: 0 8px 8px 0; text-align: left; }
+.crono-hacer-tit { display: block; font-size: 11px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; opacity: .8; margin-bottom: 2px; }
+.crono-hacer-txt { display: block; font-size: 13.5px; line-height: 1.35; white-space: pre-line; overflow-wrap: anywhere; }
+.crono-hacer.recortada .crono-hacer-txt { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.crono-hacer-mas { display: inline-block; margin-top: 4px; padding: 2px 0; font-size: 12.5px; font-weight: 700; text-decoration: underline; cursor: pointer; }
+html[data-inicio="nuevo"] #screen-cronograma .crono-hacer { color: var(--t-fg); margin-top: 4px; }
 
 /* ---------- MAPA DEL SERVICIO ---------- */
 .mapa-leaflet { width: 100%; height: 280px; background: #E5E7E0; }

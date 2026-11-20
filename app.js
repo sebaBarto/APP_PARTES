@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.85.0";
+const APP_VERSION = "4.86.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -2780,6 +2780,10 @@ function renderCronogramaTareas() {
     const clienteN = parsed.cliente || lineas[0] || "Servicio";
     const dirN = [parsed.direccion, parsed.localidad].filter(Boolean).join(" · ");
     const detalleN = lineas.slice(2).join(" · ");
+    // La tarea a realizar del servicio vinculado, a la vista sin abrirlo.
+    const tareaHacer = !resuelto && info.servicio ? String(info.servicio.tarea || "").trim() : "";
+    const largaHacer = tareaHacer.length > 120 || tareaHacer.split("\n").length > 3;
+    const bloqueHacer = tareaHacer ? `<div class="crono-hacer${largaHacer ? " recortada" : ""}"><span class="crono-hacer-tit">🛠 Tarea a realizar${info.servicio.numero_servicio ? ` · N° ${escapeHtml(info.servicio.numero_servicio)}` : ""}</span><span class="crono-hacer-txt">${escapeHtml(tareaHacer)}</span>${largaHacer ? '<span class="crono-hacer-mas" role="button" tabindex="0">Ver todo</span>' : ""}</div>` : "";
     const card = document.createElement("button");
     card.type = "button";
     card.dataset.estado = estado;
@@ -2791,6 +2795,7 @@ function renderCronogramaTareas() {
         }</div>
         <div class="crono-tarea-tecnico">${escapeHtml(t.tecnico)}</div>
         <div class="crono-tarea-texto">${escapeHtml(t.tarea)}</div>
+        ${bloqueHacer}
       </div>
       <div class="crono-n">
         <div class="crono-n-hora"><b>${escapeHtml(t.hora_inicio || "--:--")}</b>${t.hora_fin ? `<span>${escapeHtml(t.hora_fin)}</span>` : ""}</div>
@@ -2798,10 +2803,21 @@ function renderCronogramaTareas() {
           <div class="crono-n-cliente">${escapeHtml(clienteN)}</div>
           ${dirN ? `<div class="crono-n-dir">${escapeHtml(dirN)}</div>` : ""}
           ${detalleN ? `<div class="crono-n-detalle">${escapeHtml(detalleN)}</div>` : ""}
+          ${bloqueHacer}
           <div class="crono-n-pie"><span class="crono-n-tec">${escapeHtml(t.tecnico)}</span><span class="crono-n-estado e-${estado}">${escapeHtml(etiquetaEstado)}</span></div>
         </div>
       </div>
     `;
+    // «Ver todo» despliega la tarea completa sin abrir el servicio.
+    card.querySelectorAll(".crono-hacer-mas").forEach((m) => {
+      const alternar = (e) => {
+        e.stopPropagation(); e.preventDefault();
+        card.querySelectorAll(".crono-hacer").forEach((b) => b.classList.toggle("recortada"));
+        card.querySelectorAll(".crono-hacer-mas").forEach((x) => { x.textContent = x.closest(".crono-hacer").classList.contains("recortada") ? "Ver todo" : "Ver menos"; });
+      };
+      m.addEventListener("click", alternar);
+      m.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") alternar(e); });
+    });
     card.addEventListener("click", () => seleccionarTareaCronograma(t));
     cronoTareasList.appendChild(card);
   });

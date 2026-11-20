@@ -440,6 +440,34 @@ test("Cronograma: una tarea ya hecha sigue 'Resuelta' aunque el servicio haya sa
   }
 });
 
+test("Cronograma: cada tarjeta muestra la tarea a realizar del servicio, sin abrirlo", async () => {
+  const larga = "Revisar la sirena exterior que no suena.\nCambiar batería de la central.\nProbar comunicador con el monitoreo.\nDejar al cliente las claves nuevas y explicar el uso del teclado.";
+  const tareas = [
+    { tecnico: "Juan Pérez", fecha: diaISO(0), dia_label: etiquetaDia(0), hora_inicio: "09:00", hora_fin: "10:00", tarea: "Servicio: Kiosco Norte\nBelgrano 55  -  Rosario" },
+    { tecnico: "Juan Pérez", fecha: diaISO(0), dia_label: etiquetaDia(0), hora_inicio: "11:00", hora_fin: "12:00", tarea: "Servicio: Panadería Sur\nMitre 100  -  Rosario" },
+    { tecnico: "Juan Pérez", fecha: diaISO(0), dia_label: etiquetaDia(0), hora_inicio: "13:00", hora_fin: "14:00", tarea: "Servicio: Farmacia Central\nCórdoba 1  -  Rosario" },
+  ];
+  const servicios = [
+    { numero_servicio: "901", cliente: "Kiosco Norte", direccion: "Belgrano 55", localidad: "Rosario", tarea: "Cambiar sensor <del> baño" },
+    { numero_servicio: "902", cliente: "Panadería Sur", direccion: "Mitre 100", localidad: "Rosario", tarea: larga },
+  ];
+  for (const estilo of ["clasico", "nuevo"]) {
+    const { ctx, page, erroresPagina } = await paginaCronograma(estilo, { tareas, servicios, historial: [] });
+    const bloques = page.locator("#cronoTareasList .crono-tarea-card .crono-hacer:visible");
+    assert.strictEqual(await bloques.count(), 2, estilo + ": la sin vincular no tiene tarea");
+    assert.match(await bloques.nth(0).textContent(), /Tarea a realizar · N° 901\s*Cambiar sensor <del> baño/, estilo);
+    assert.strictEqual(await page.locator(".crono-hacer:visible del").count(), 0, estilo + ": se escapa");
+    // La larga aparece recortada con «Ver todo»; tocarlo la despliega y NO abre el parte.
+    assert.match(await bloques.nth(1).getAttribute("class"), /recortada/, estilo);
+    await bloques.nth(1).locator(".crono-hacer-mas").click();
+    assert.doesNotMatch(await bloques.nth(1).getAttribute("class"), /recortada/, estilo);
+    assert.strictEqual(await bloques.nth(1).locator(".crono-hacer-mas").textContent(), "Ver menos");
+    assert.ok(await page.evaluate(() => document.getElementById("screen-cronograma").dataset.active === "true"), estilo + ": sigue en el cronograma");
+    assert.deepStrictEqual(erroresPagina, [], estilo);
+    await ctx.close();
+  }
+});
+
 test("Cronograma (skin nuevo): tarjetas con cliente destacado, días con cantidad y agenda propia primero; el clásico no cambia", async () => {
   const tareas = [
     { tecnico: "Juan Pérez", fecha: diaISO(0), dia_label: etiquetaDia(0), hora_inicio: "09:00", hora_fin: "10:00", tarea: "Servicio: Panadería Sur\nMitre 100  -  Rosario\nRevisar sirena" },
