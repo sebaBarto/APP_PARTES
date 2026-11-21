@@ -1522,7 +1522,7 @@
     $("motivos").innerHTML = Object.entries(MOTIVOS[t] || {}).map(([k, v]) => `<label class="opcion"><input type="radio" name="motivo" value="${k}"><span>${v}</span></label>`).join("");
     $("motivos").querySelectorAll("input").forEach((i) => i.addEventListener("change", () => $("avisoRobo").classList.toggle("oculto", valor("motivo") !== "robo")));
     $("avisoRobo").classList.add("oculto");
-    $("gTitularLbl").textContent = t === "titularidad" ? "Titular actual" : "Nombre y apellido del titular";
+    $("gTitularLbl").innerHTML = t === "titularidad" ? 'Titular actual <span class="opc">(si lo sabés)</span>' : "Nombre y apellido del titular";
     $("gTagLbl").innerHTML = t === "reactivacion" ? "N° de la llave recuperada" : 'N° de la llave <span class="opc">(si lo sabés)</span>';
     $("gTelefonoLbl").innerHTML = t === "nuevo" ? "Teléfono" : 'Teléfono <span class="opc">(opcional)</span>';
   }
