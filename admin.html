@@ -14153,6 +14153,7 @@ function misatPintarSolicitudes() {
   cont.innerHTML = lista.map((x) => { const d = x.datos || {}; const pal = (v) => v === "(borrada)" ? `<i style="color:#6B7680">borrada al gestionar</i>` : `<span class="msol-pal" data-pal="${misatEsc(v)}">••••••</span> <button type="button" class="btn-secondary-admin" style="width:auto;padding:2px 10px;font-size:12.5px" data-msol-ver>Ver</button>`;
     return `<div class="misat-card msol-card ${x.estado}">
     <h3><span class="msol-tipo">${misatEsc(x.tipo_txt)}</span> N° ${misatEsc(x.numero_cliente)} <span style="font-weight:500;color:#6B7680">${misatEsc(x.nombre)}</span>${x.tipo === "viaje" && x.estado === "pendiente" && d.desde <= hoy ? ' <span class="misat-mal">¡ya empezó!</span>' : ""}</h3>
+    ${x.tipo !== "viaje" && x.cuenta_aprobada_en && (Date.now() - Date.parse(x.cuenta_aprobada_en)) < 30 * 864e5 ? `<div class="fila"><span>⚠ Cuenta nueva</span><span class="misat-mal">Habilitada el ${misatFecha(x.cuenta_aprobada_en)}: antes de pasarlo a la estación, confirmá el cambio con el titular al teléfono de la base.</span></div>` : ""}
     <div class="fila"><span>Abonado</span><span><b>${misatEsc(x.abonado || "—")}</b></span></div>
     ${x.direccion ? `<div class="fila"><span>Dirección</span><span>${misatEsc(x.direccion)}</span></div>` : ""}
     ${d.desde ? `<div class="fila"><span>${x.tipo === "viaje" ? "Viaje" : "Vale"}</span><span><b>del ${msolDia(d.desde)} al ${msolDia(d.hasta)}</b></span></div>` : x.tipo === "llamadas" ? `<div class="fila"><span>Vale</span><span>Cambio definitivo</span></div>` : ""}
@@ -15538,7 +15539,7 @@ function exEditorPregunta(v, idx) {
 document.getElementById("misatLista").addEventListener("click", async (ev) => {
   if (!ev.target.closest("#misatLote")) return;
   const ids = misatLista.filter((c) => c.estado === "pendiente" && c.existe_cliente && c.celular_coincide).map((c) => c.id);
-  if (!(await confirmarAdmin(`¿Aprobar ${ids.length} ${ids.length === 1 ? "pedido" : "pedidos"} de acceso? Después mandales el WhatsApp desde «Activas».`))) return;
+  if (!(await confirmarAdmin(`¿Aprobar ${ids.length} ${ids.length === 1 ? "pedido" : "pedidos"} de acceso? El celular coincide con la base, pero el DNI no se puede comparar. Mandales el WhatsApp de bienvenida desde «Activas»: va al celular de la base, así que si alguien pidió el acceso por otro, el titular se entera.`))) return;
   ev.target.disabled = true;
   try {
     const r = await fetch("/api/datos?coleccion=mi_sat", { method: "POST", headers: rllHeaders(true), body: JSON.stringify({ accion: "aprobar_lote", ids }) });
@@ -15609,7 +15610,13 @@ function misatPintarBandeja() {
 document.getElementById("mbLista").addEventListener("click", async (ev) => {
   const b = ev.target.closest("[data-mb]"); if (!b) return;
   const cuerpo = b.dataset.mb === "recupero" ? { accion: "recupero", id: b.dataset.id, decision: b.dataset.decision } : { accion: b.dataset.mb, id: b.dataset.id, estado: b.dataset.estado };
-  if (cuerpo.decision === "aprobar" && !(await confirmarAdmin("¿Activar la clave nueva? La anterior deja de valer y se cierran sus sesiones abiertas."))) return;
+  if (cuerpo.decision === "aprobar") {
+    const rec = misatBandeja.recuperos.find((x) => x.id === cuerpo.id) || {};
+    if (!rec.celular_coincide && !rec.dni_coincide) {
+      if (!(await confirmarAdmin("⚠ Ni el celular ni el DNI coinciden con los de la cuenta. Puede ser alguien que intenta quedarse con el acceso de otro cliente. ¿Ya lo confirmaste llamando al titular al teléfono de la base?"))) return;
+      cuerpo.forzar = true;
+    } else if (!(await confirmarAdmin(`¿Activar la clave nueva?${!rec.celular_coincide || !rec.dni_coincide ? " Ojo: " + (!rec.celular_coincide ? "el celular" : "el DNI") + " no coincide." : ""} La anterior deja de valer y se cierran sus sesiones abiertas.`))) return;
+  }
   if (cuerpo.estado === "descartado") { const n = await pedirTextoAdmin("Motivo (opcional, solo lo ve la oficina):", ""); if (n === null) return; cuerpo.nota = n; }
   b.disabled = true;
   try {
