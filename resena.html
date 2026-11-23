@@ -27,6 +27,9 @@
   h1 { font-size: 28px; margin: 0 0 10px; }
   p { color: #C9CFD3; font-size: 16px; line-height: 1.5; margin: 0 0 24px; }
   a.boton { display: inline-block; background: #F5A623; color: #101820; font-weight: 700; font-size: 17px; text-decoration: none; border-radius: 999px; padding: 14px 26px; }
+  .espera { margin-top: 18px; font-size: 14px; color: #9AA3A9; }
+  .barra { height: 4px; border-radius: 4px; background: rgba(255,255,255,.12); overflow: hidden; margin: 10px auto 0; max-width: 220px; }
+  .barra i { display: block; height: 100%; width: 0; background: #F5A623; transition: width linear; }
 </style>
 </head>
 <body>
@@ -34,12 +37,25 @@
   <img class="logo" src="icons/logo.png" alt="SAT">
   <div class="estrellas" aria-hidden="true">★★★★★</div>
   <h1>¿Cómo te atendimos?</h1>
-  <p>Te estamos llevando a Google para que nos dejes tu opinión.<br>Te lleva menos de 30 segundos. ¡Gracias!</p>
+  <p>En un momento te llevamos a Google para que nos dejes tu opinión.<br>Te lleva menos de 30 segundos y nos ayuda muchísimo a seguir mejorando. ¡Gracias!</p>
   <a class="boton" id="ir" href="https://g.page/r/CVUi3V1N4LkPEBM/review">Dejar mi opinión en Google</a>
+  <div class="espera" id="espera">Te llevamos en <b id="seg">6</b> segundos…</div>
+  <div class="barra" aria-hidden="true"><i id="barra"></i></div>
 </main>
 <script>
-  // El que abre el link va directo a Google (WhatsApp, para la vista previa, no corre esto).
-  setTimeout(function () { location.replace(document.getElementById("ir").href); }, 400);
+  // Se deja leer la página unos segundos y después pasa sola a Google (con el
+  // botón puede ir antes). WhatsApp, para la vista previa, no corre esto.
+  (function () {
+    var SEG = 6, quedan = SEG, ir = document.getElementById("ir").href;
+    var barra = document.getElementById("barra");
+    barra.style.transitionDuration = SEG + "s";
+    requestAnimationFrame(function () { requestAnimationFrame(function () { barra.style.width = "100%"; }); });
+    var t = setInterval(function () {
+      quedan--;
+      document.getElementById("espera").innerHTML = quedan > 1 ? "Te llevamos en <b>" + quedan + "</b> segundos…" : quedan === 1 ? "Te llevamos en <b>1</b> segundo…" : "Abriendo Google…";
+      if (quedan <= 0) { clearInterval(t); location.replace(ir); }
+    }, 1000);
+  })();
 </script>
 </body>
 </html>
