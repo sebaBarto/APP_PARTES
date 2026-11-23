@@ -2470,6 +2470,12 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
     await require("../lib/equipos-clientes").manejar(req, res, autorizacion, { leer: leerArchivoDatos, escribir: escribirArchivoDatos }, cuerpoAccion);
     return;
   }
+  if (req.query && req.query.coleccion === "resenas") {
+    // A qué clientes ya se les pidió una reseña de Google por WhatsApp.
+    if (!autorizacion) { res.status(401).json({ error: "No autorizado", sesion_vencida: true }); return; }
+    await require("../lib/resenas").manejar(req, res, autorizacion, { leer: leerArchivoDatos, escribir: escribirArchivoDatos }, cuerpoAccion);
+    return;
+  }
   if (req.query && req.query.coleccion === "sims_avisos") {
     // SIMs instaladas que la oficina tiene que revisar (no estaban en el stock, cliente que no existe...).
     if (!autorizacion) { res.status(401).json({ error: "No autorizado", sesion_vencida: true }); return; }

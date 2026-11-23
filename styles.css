@@ -4217,3 +4217,13 @@ label.veh-herr-item:has(input:checked) { border-color: #F5A623; background: #FFF
 .ficha-equipo-atencion .ficha-equipo-alerta, .ficha-equipo-atencion .ficha-equipo-bat { color: #E8961A; }
 .ficha-equipo-cambiar { border-left: 4px solid #E5534B !important; }
 .ficha-equipo-cambiar .ficha-equipo-alerta, .ficha-equipo-cambiar .ficha-equipo-bat { color: #E5534B; }
+
+/* Pedir reseña en Google (ficha del historial) */
+.pd-resena { display: flex; align-items: center; gap: 12px; width: 100%; box-sizing: border-box; text-align: left; background: #F5A623; color: #101820; border: 0; border-radius: 14px; padding: 12px 14px; margin: 4px 0 6px; font: inherit; cursor: pointer; }
+.pd-resena b { display: block; font-size: 15px; }
+.pd-resena small { display: block; font-size: 12.5px; opacity: .8; margin-top: 1px; }
+.pd-resena-ic { font-size: 22px; line-height: 1; flex: none; }
+.pd-resena:active { filter: brightness(.94); }
+.pd-resena.hecha { background: transparent; color: inherit; border: 1.5px solid rgba(127,127,127,.4); cursor: default; }
+.pd-resena.hecha .pd-resena-ic { color: #2E9E4F; font-weight: 800; }
+.pd-resena-otra { background: none; border: 0; padding: 2px 2px 8px; color: inherit; opacity: .75; font: inherit; font-size: 13px; text-decoration: underline; cursor: pointer; }

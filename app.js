@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.86.0";
+const APP_VERSION = "4.87.0";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -7464,6 +7464,7 @@ async function abrirParteDetalleModal(idParte) {
           ${tecnicos ? `<div class="pd-meta">${escapeHtml(tecnicos)}</div>` : ""}
         </div>
         <div class="pd-acciones">${acciones}</div>
+        <div id="pdResenaWrap"></div>
         ${seccion("Trabajo", filaN("Horario", horarioTexto, { copiar: demora || horarioTexto }) + filaN("Tarea", p.tarea) + filaN("Observaciones", p.observaciones) + filaN("Imprevisto", p.imprevisto, { clase: "pd-alerta" }) + filaN("SIM instalada", p.sim_instalada_texto) + fotoMini)}
         ${seccion("Materiales", filaN("Instalados", p.materiales, { clase: "pd-mat-ok" }) + filaN("Retirados", p.materiales_otros, { clase: "pd-mat-ret" }))}
         ${seccion("Cobro", filaN("Importe", p.importe ? "$" + p.importe : "") + filaN("Descuento", p.descuento_tipo ? `${p.descuento_tipo}${p.descuento_pct ? " (" + p.descuento_pct + "%)" : ""}` : "") + filaN("N° de presupuesto", p.numero_presupuesto) + filaN("Costo final", costoFinalTexto, { copiar: (costoFinalTexto.match(/[\d.]+/) || [""])[0], clase: "pd-total" }) + filaN("Forma de pago", p.forma_pago))}
@@ -7513,6 +7514,7 @@ async function abrirParteDetalleModal(idParte) {
       parteDetalleModalContenido.querySelectorAll("[data-ampliar]").forEach((b) => b.addEventListener("click", () => ampliarImagenParte(b.dataset.ampliar)));
     } else {
     parteDetalleModalContenido.innerHTML = `
+      <div id="pdResenaWrap" style="margin-bottom:10px;"></div>
       ${fila("N° de servicio", p.numero_servicio || p.id)}
       ${fila("Tipo", p.tipo_servicio)}
       ${fila("Cliente", p.cliente)}
@@ -7551,6 +7553,7 @@ async function abrirParteDetalleModal(idParte) {
     `;
     }
 
+    montarBotonResena(p, parteDetalleModalContenido.querySelector("#pdResenaWrap"));
     parteDetalleModalContenido.querySelectorAll(".copiar-campo-btn").forEach((btn) => {
       btn.addEventListener("click", async () => {
         const valor = valoresParaCopiar[Number(btn.dataset.copiarIdx)];
@@ -7566,6 +7569,82 @@ async function abrirParteDetalleModal(idParte) {
     parteDetalleModalStatus.classList.remove("hidden");
     parteDetalleModalStatus.textContent = "No se pudo cargar: " + err.message;
   }
+}
+
+// ---------- Pedir reseña en Google por WhatsApp (desde la ficha del historial) ----------
+// El link va a /resena (página nuestra con la imagen que WhatsApp muestra en
+// el chat), que lleva directo a la ventana de reseñas de Google de SAT.
+const LINK_RESENA = "https://pedido.sat365.com.ar/resena";
+let resenasPedidasCache = null;
+async function cargarResenasPedidas(forzar) {
+  if (resenasPedidasCache && !forzar) return resenasPedidasCache;
+  try {
+    const r = await fetch("/api/datos?coleccion=resenas", { headers: { Authorization: "Bearer " + SERVICIOS_API_TOKEN }, cache: "no-store" });
+    const d = await r.json().catch(() => []);
+    if (r.ok && Array.isArray(d)) resenasPedidasCache = d;
+  } catch (e) { /* sin señal: se muestra igual el botón */ }
+  return resenasPedidasCache || [];
+}
+const telResena = (t) => String(t || "").replace(/\D/g, "").slice(-10);
+// La última vez que se le pidió a este cliente (por este parte, su N° de cliente o su teléfono).
+function resenaPreviaDe(p, lista) {
+  const tel = telResena(p.telefono);
+  return (lista || []).find((x) => (x.id_parte && x.id_parte === String(p.id || p.id_parte || ""))
+    || (p.numero_cliente && x.numero_cliente && String(x.numero_cliente) === String(p.numero_cliente))
+    || (tel.length >= 6 && x.telefono === tel)) || null;
+}
+function nombreParaResena(p) {
+  // La aclaración de la firma tiene el nombre de la persona; el cliente del
+  // historial suele estar con el apellido primero o ser un comercio.
+  const n = String(p.firma_aclaracion || "").trim().split(/\s+/)[0] || "";
+  if (!/^[a-záéíóúñü]{2,}$/i.test(n)) return "";
+  return n.charAt(0).toUpperCase() + n.slice(1).toLowerCase();
+}
+function cuandoFueServicio(fechaISO) {
+  if (!fechaISO) return "";
+  const hoy = fechaLocalISO();
+  const ayer = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; })();
+  if (fechaISO === hoy) return " de hoy";
+  if (fechaISO === ayer) return " de ayer";
+  const [, m, d] = fechaISO.split("-");
+  return ` del ${d}/${m}`;
+}
+function mensajeResena(p) {
+  const nombre = nombreParaResena(p);
+  return `¡Hola${nombre ? " " + nombre : ""}! 👋 Te escribimos de *SAT Servicio Técnico*. Gracias por confiar en nosotros para el servicio${cuandoFueServicio(p.fecha)}.\n\n`
+    + `¿Nos ayudás con una reseña en Google? ⭐⭐⭐⭐⭐\nSon *solo 30 segundos* y nos ayuda muchísimo a seguir mejorando.\n\n`
+    + `👉 ${LINK_RESENA}\n\n¡Muchas gracias! 🙌`;
+}
+function fechaHoraCorta(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return "";
+  const dia = fechaLocalISO(d) === fechaLocalISO() ? "hoy" : `el ${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+  return `${dia} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+function montarBotonResena(p, wrap) {
+  if (!wrap) return;
+  const numero = limpiarTelefonoWhatsapp(p.telefono);
+  if (!numero) { wrap.innerHTML = ""; return; }
+  const pintar = (previa) => {
+    const yaEste = previa && previa.id_parte === String(p.id || p.id_parte || "");
+    wrap.innerHTML = previa
+      ? `<div class="pd-resena hecha"><span class="pd-resena-ic">✓</span><div><b>Reseña pedida ${escapeHtml(fechaHoraCorta(previa.fecha))}${previa.por ? " por " + escapeHtml(previa.por) : ""}</b><small>${yaEste ? "En este servicio." : "A este cliente, en otro servicio."}</small></div></div>
+         <button type="button" class="pd-resena-otra" id="pdResenaBtn">Volver a mandarla por WhatsApp</button>`
+      : `<button type="button" class="pd-resena" id="pdResenaBtn"><span class="pd-resena-ic">⭐</span><div><b>Pedir reseña en Google</b><small>Le llega por WhatsApp al ${escapeHtml(p.telefono)}</small></div></button>`;
+    wrap.querySelector("#pdResenaBtn").addEventListener("click", async () => {
+      // Primero se abre WhatsApp (algunos celulares no dejan abrir ventanas después de esperar la red).
+      window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensajeResena(p))}`, "_blank", "noopener");
+      const reg = { id_parte: String(p.id || p.id_parte || ""), numero_cliente: p.numero_cliente || "", cliente: p.cliente || "", telefono: telResena(p.telefono), fecha: new Date().toISOString(), por: tecnicoLogueado || "" };
+      pintar(reg);
+      try {
+        const r = await fetch("/api/datos?coleccion=resenas", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ accion: "pedida", ...reg }) });
+        const d = await r.json().catch(() => ({}));
+        if (r.ok && d.registro) { (resenasPedidasCache = resenasPedidasCache || []).unshift(d.registro); pintar(d.registro); }
+      } catch (e) { /* queda marcada en pantalla; se puede volver a mandar */ }
+    });
+  };
+  pintar(resenaPreviaDe(p, resenasPedidasCache));
+  cargarResenasPedidas(true).then((lista) => { if (wrap.isConnected) pintar(resenaPreviaDe(p, lista)); });
 }
 
 parteDetalleModalCerrarBtn.addEventListener("click", () => parteDetalleModalOverlay.classList.add("hidden"));
