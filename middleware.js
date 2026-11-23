@@ -11,7 +11,7 @@ export const config = {
   matcher: "/:path*",
 };
 
-const PUBLICAS = ["/solicitar-servicio.html", "/registro-llaves.html", "/robo-llave.html", "/consorcio.html", "/mi-sat.html", "/guia-alarmas.html"];
+const PUBLICAS = ["/solicitar-servicio.html", "/registro-llaves.html", "/robo-llave.html", "/consorcio.html", "/mi-sat.html", "/guia-alarmas.html", "/examen.html"];
 
 export default function middleware(request) {
   const host = request.headers.get("host") || "";
@@ -29,6 +29,11 @@ export default function middleware(request) {
   // Portal de clientes Mi SAT ("Ingreso clientes" de la web).
   if (path === "/oficina" || path === "/oficina/") {
     url.pathname = "/mi-sat.html";
+    return Response.redirect(url, 302);
+  }
+  // Examen técnico: el link que manda la oficina (lleva ?t=…, se conserva).
+  if (path === "/examen" || path === "/examen/") {
+    url.pathname = "/examen.html";
     return Response.redirect(url, 302);
   }
   if (path === "/robo" || path === "/robo/") {

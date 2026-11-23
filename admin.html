@@ -357,6 +357,30 @@
   }
   .btn-secondary-admin:active { background: rgba(16,24,32,0.06); }
   .misat-filtros { display: flex; gap: 6px; margin: 4px 0 10px; flex-wrap: wrap; }
+  .ex-f { border: 1px solid rgba(16,24,32,.15); background: #fff; color: #101820; border-radius: 999px; padding: 6px 14px; font: inherit; font-size: 13.5px; cursor: pointer; }
+  .ex-f.on { background: #101820; color: #fff; border-color: #101820; }
+  .ex-card { background: #fff; border: 1px solid rgba(16,24,32,.1); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; display: grid; gap: 8px; color: #101820; }
+  .ex-card h3 { margin: 0; font-size: 16px; }
+  .ex-fila { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .ex-fila label { display: grid; gap: 4px; font-size: 12.5px; color: #5E5A52; min-width: 150px; flex: 1; }
+  .ex-fila input, .ex-fila select, .ex-card textarea { height: 38px; border: 1px solid rgba(16,24,32,.18); border-radius: 8px; padding: 0 10px; font: inherit; font-size: 14px; background: #fff; color: #101820; }
+  .ex-card textarea { height: auto; min-height: 70px; padding: 8px 10px; width: 100%; box-sizing: border-box; }
+  .ex-btn { border: 0; background: #101820; color: #fff; border-radius: 8px; padding: 9px 16px; font: inherit; font-size: 14px; cursor: pointer; }
+  .ex-btn.sec { background: #fff; color: #101820; border: 1px solid rgba(16,24,32,.2); }
+  .ex-btn.chico { padding: 5px 10px; font-size: 13px; }
+  .ex-tabla { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .ex-tabla th { text-align: left; font-weight: 600; color: #5E5A52; font-size: 12px; padding: 6px 8px; border-bottom: 1px solid rgba(16,24,32,.12); }
+  .ex-tabla td { padding: 8px; border-bottom: 1px solid rgba(16,24,32,.07); vertical-align: top; }
+  .ex-tabla tr.clic { cursor: pointer; } .ex-tabla tr.clic:hover td { background: #F7F6F2; }
+  .ex-cat { display: inline-block; border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 600; background: #EEF2F6; color: #24405C; white-space: nowrap; }
+  .ex-cat.c0 { background: #FCEBEA; color: #8C1D18; } .ex-cat.c1 { background: #FFF3D6; color: #7A5200; } .ex-cat.c2 { background: #E3F4E8; color: #1F6B34; }
+  .ex-est { font-size: 12px; color: #5E5A52; }
+  .ex-barra { height: 6px; border-radius: 3px; background: #ECEAE4; overflow: hidden; min-width: 80px; } .ex-barra i { display: block; height: 100%; background: #101820; }
+  .ex-preg { border-top: 1px solid rgba(16,24,32,.08); padding-top: 10px; display: grid; gap: 4px; font-size: 13.5px; }
+  .ex-preg .ok { color: #1F6B34; } .ex-preg .mal { color: #B3261E; } .ex-preg .sin { color: #8A8478; }
+  .ex-resp { background: #F7F6F2; border-radius: 8px; padding: 8px 10px; white-space: pre-wrap; }
+  .ex-link { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; background: #FFF8E6; border: 1px solid #F2D58A; border-radius: 10px; padding: 10px 12px; font-size: 13.5px; word-break: break-all; }
+  .ex-nivel { display: flex; gap: 6px; flex-wrap: wrap; } .ex-nivel button { border: 1px solid rgba(16,24,32,.18); background: #fff; color: #101820; border-radius: 8px; padding: 7px 12px; font: inherit; font-size: 13px; cursor: pointer; } .ex-nivel button.on { background: #101820; color: #fff; border-color: #101820; }
   .misat-f { border: 1px solid rgba(16,24,32,.15); background: #fff; color: #101820; border-radius: 999px; padding: 6px 14px; font: inherit; font-size: 13.5px; cursor: pointer; }
   .misat-f.on { background: #101820; color: #fff; border-color: #101820; }
   .misat-card { background: #fff; border: 1px solid rgba(16,24,32,.1); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; display: grid; gap: 6px; }
@@ -997,6 +1021,7 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
       <button type="button" class="tab-btn" id="tabClavesClienteBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>Claves por cliente</button>
       <button type="button" class="tab-btn" id="tabRegistroLlavesBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2 2M14 9l2 2"/></svg></span>Llaves de edificios<span class="tab-badge hidden" id="rllTabBadge">0</span></button>
       <button type="button" class="tab-btn" id="tabMiSatBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-7 8 7v9H4z"/><circle cx="12" cy="13" r="2"/><path d="M12 15v2"/></svg></span>Portal de clientes<span class="tab-badge hidden" id="misatBadge">0</span></button>
+      <button type="button" class="tab-btn" id="tabExamenBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 8l1.5 1.5L13 7"/><path d="M9 13h6M9 17h4"/></svg></span>Examen técnicos</button>
       <button type="button" class="tab-btn" id="tabEmergenciaBtn"><span class="tab-icon"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.29 3.86l-8.18 14.18A2 2 0 0 0 3.82 21h16.36a2 2 0 0 0 1.71-3l-8.18-14.14a2 2 0 0 0-3.42 0z"/></svg></span>Emergencias<span class="tab-badge hidden" id="emergenciasBadge">0</span></button>
     </div>
 
@@ -2454,6 +2479,13 @@ html[data-tema="noche"] :is([style*="background:#101820"], [style*="background: 
       </div>
     </div>
 
+    <div id="panelExamen" class="hidden">
+      <h1>Examen técnicos</h1>
+      <p class="subtitle">Generá un link para cada técnico y pasáselo por WhatsApp. Lo rinde desde el celular o la PC en <b>pedido.sat365.com.ar/examen</b> (no hace falta la APP). Cada link sirve para un solo examen. Si sale de la página o se termina el tiempo, el examen se corrige como está.</p>
+      <div class="misat-filtros"><button type="button" class="ex-f on" data-f="tecnicos">Resultados por técnico</button><button type="button" class="ex-f" data-f="nuevo">➕ Nuevo examen</button><button type="button" class="ex-f" data-f="intentos">Todos los exámenes</button><span class="misat-sep"></span><button type="button" class="ex-f" data-f="banco">Banco de preguntas</button><button type="button" class="ex-f" data-f="config">Configuración</button></div>
+      <p id="exStatus" class="subtitle"></p>
+      <div id="exVista"></div>
+    </div>
     <div id="panelMiSat" class="hidden">
       <h1>Portal de clientes (Mi SAT)</h1>
       <p class="subtitle">Pedidos de acceso al portal <a href="https://pedido.sat365.com.ar/oficina" target="_blank" rel="noopener">pedido.sat365.com.ar/oficina</a>. Antes de aprobar, controlá que el DNI sea del titular y que el celular coincida con el de la cuenta. Al aprobar, avisale al cliente por WhatsApp.</p>
@@ -2853,6 +2885,7 @@ const TABS = [
   { btn: tabClavesClienteBtn, panel: panelClavesCliente, onShow: () => cargarClavesClienteAdmin() },
   { btn: tabEmergenciaBtn, panel: panelEmergencia, onShow: () => cargarEmergenciasAdmin() },
   { btn: tabMiSatBtn, panel: panelMiSat, onShow: () => cargarMiSatAdmin() },
+  { btn: document.getElementById("tabExamenBtn"), panel: document.getElementById("panelExamen"), onShow: () => exCargar() },
   { btn: document.getElementById("tabRegistroLlavesBtn"), panel: document.getElementById("panelRegistroLlaves"), onShow: () => cargarRegistroLlavesAdmin() },
 ];
 
@@ -2873,7 +2906,7 @@ const GRUPOS_MENU = [
   ["SIMs", ["tabSimsBtn", "tabSimsInstaladasBtn", "tabSimsControlBtn"]],
   ["Flota y herramientas", ["tabStockBtn", "tabVehiculosBtn", "tabHerramientasBtn"]],
   ["Clientes", ["tabClientesBtn", "tabMiSatBtn", "tabClavesClienteBtn", "tabRegistroLlavesBtn", "tabPlanosBtn"]],
-  ["Equipo y configuración", ["tabTecnicosBtn", "tabCredencialesBtn", "tabGuardiasBtn", "tabMaterialesBtn", "tabConsultasBtn", "tabErroresBtn", "tabAuditoriaBtn", "tabBackupBtn"]],
+  ["Equipo y configuración", ["tabTecnicosBtn", "tabExamenBtn", "tabCredencialesBtn", "tabGuardiasBtn", "tabMaterialesBtn", "tabConsultasBtn", "tabErroresBtn", "tabAuditoriaBtn", "tabBackupBtn"]],
 ];
 (function armarMenuAgrupado() {
   const tabs = document.querySelector("#mainCard > .tabs");
@@ -15248,6 +15281,224 @@ document.getElementById("croquisBaseSubir").addEventListener("click", async () =
     est.textContent = "No se pudo: " + err.message;
   } finally { btn.disabled = false; }
 });
+
+// ============================================================
+// EXAMEN TÉCNICOS (lib/examen.js): links, resultados, banco y configuración
+// ============================================================
+let exVistaActual = "tecnicos", exDatos = null, exBanco = null, exTecnicos = [], exNuevo = { niveles: { alarmas: 2, camaras: 2, redes: 2 }, minutos: null };
+const exE = (s) => escapeHtmlAdmin(s == null ? "" : String(s));
+const EX_URL = "https://pedido.sat365.com.ar/examen?t=";
+const EX_MOTIVO = { completo: "Terminó", tiempo: "Se le acabó el tiempo", salio: "Salió de la página", cerrado_oficina: "Cerrado por la oficina" };
+const EX_ESTADO = { pendiente: "Sin empezar", en_curso: "Rindiendo ahora", terminado: "Terminado", anulado: "Anulado" };
+function exFecha(iso) { if (!iso) return ""; const d = new Date(iso); return d.toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "2-digit" }) + " " + d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }); }
+function exCatClase(nombre) { const cats = (exDatos && exDatos.config.categorias) || []; const i = cats.findIndex((c) => c.nombre === nombre); return "ex-cat c" + Math.max(0, Math.min(2, i)); }
+async function exPost(cuerpo) {
+  const r = await fetch("/api/datos?coleccion=examen", { method: "POST", headers: rllHeaders(true), body: JSON.stringify(cuerpo) });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || "Error " + r.status);
+  return d;
+}
+document.querySelectorAll(".ex-f").forEach((b) => b.addEventListener("click", () => { exVistaActual = b.dataset.f; exPintar(); }));
+async function exCargar() {
+  const st = document.getElementById("exStatus");
+  st.textContent = "Cargando…";
+  try {
+    const [d, tec] = await Promise.all([misatLeerJson("/api/datos?coleccion=examen"), exTecnicos.length ? Promise.resolve(null) : fetch("/api/datos?coleccion=tecnicos", { headers: rllHeaders(), cache: "no-store" }).then((r) => r.ok ? r.json() : []).catch(() => [])]);
+    exDatos = d;
+    if (Array.isArray(tec)) exTecnicos = tec.map((t) => t && t.nombre).filter(Boolean).sort((a, b) => a.localeCompare(b));
+    st.textContent = "";
+    exPintar();
+  } catch (e) { st.textContent = "No se pudo cargar: " + e.message; }
+}
+// Recarga la lista sin volver a pintar la vista (para no perder el link recién generado).
+async function exRefrescarDatos() { try { exDatos = await misatLeerJson("/api/datos?coleccion=examen"); } catch (e) { /* nada */ } }
+function exPintar() {
+  document.querySelectorAll(".ex-f").forEach((b) => b.classList.toggle("on", b.dataset.f === exVistaActual));
+  const v = document.getElementById("exVista");
+  if (!exDatos) { v.innerHTML = ""; return; }
+  if (exVistaActual === "nuevo") return exPintarNuevo(v);
+  if (exVistaActual === "intentos") return exPintarIntentos(v, exDatos.intentos);
+  if (exVistaActual === "banco") return exPintarBanco(v);
+  if (exVistaActual === "config") return exPintarConfig(v);
+  exPintarTecnicos(v);
+}
+function exPintarTecnicos(v) {
+  const por = {};
+  exDatos.intentos.filter((x) => x.estado !== "anulado").forEach((x) => { (por[x.tecnico] = por[x.tecnico] || []).push(x); });
+  const nombres = Object.keys(por).sort((a, b) => a.localeCompare(b));
+  if (!nombres.length) { v.innerHTML = `<div class="ex-card"><h3>Todavía nadie rindió</h3><p class="subtitle" style="margin:0">Tocá «Nuevo examen» para generar el primer link.</p><div><button type="button" class="ex-btn" id="exIrNuevo">➕ Nuevo examen</button></div></div>`; document.getElementById("exIrNuevo").onclick = () => { exVistaActual = "nuevo"; exPintar(); }; return; }
+  const filas = nombres.map((n) => {
+    const l = por[n], term = l.filter((x) => x.estado === "terminado");
+    const ult = term[0], mejor = term.slice().sort((a, b) => b.porcentaje - a.porcentaje)[0];
+    const pend = l.filter((x) => x.estado === "pendiente" || x.estado === "en_curso").length;
+    return `<tr class="clic" data-tec="${exE(n)}"><td><b>${exE(n)}</b>${pend ? `<div class="ex-est">${pend} link${pend > 1 ? "s" : ""} sin terminar</div>` : ""}</td><td>${term.length}</td>
+      <td>${ult ? `${ult.porcentaje}% <span class="ex-est">(${exFecha(ult.terminado_en).split(" ")[0]})</span>` : "—"}</td>
+      <td>${mejor ? mejor.porcentaje + "%" : "—"}</td><td>${ult ? `<span class="${exCatClase(ult.categoria)}">${exE(ult.categoria)}</span>` : ""}</td></tr>`;
+  }).join("");
+  v.innerHTML = `<div class="ex-card"><table class="ex-tabla"><thead><tr><th>Técnico</th><th>Veces que rindió</th><th>Último</th><th>Mejor</th><th>Categoría (último)</th></tr></thead><tbody>${filas}</tbody></table></div><div id="exDeTec"></div>`;
+  v.querySelectorAll("tr[data-tec]").forEach((tr) => tr.onclick = () => {
+    const l = por[tr.dataset.tec];
+    const caja = document.getElementById("exDeTec");
+    caja.innerHTML = `<h3 style="margin:14px 0 8px">${exE(tr.dataset.tec)}</h3>`;
+    const sub = document.createElement("div"); caja.appendChild(sub);
+    exPintarIntentos(sub, l, true);
+    caja.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+function exNivelesTxt(x) { const N = exDatos.niveles, T = exDatos.temarios; return Object.entries(x.niveles || {}).map(([t, n]) => `${T[t]} ${N[n]}`).join(" · "); }
+function exPintarIntentos(v, lista, sinTecnico) {
+  if (!lista.length) { v.innerHTML = `<p class="subtitle">No hay exámenes.</p>`; return; }
+  v.innerHTML = `<div class="ex-card"><table class="ex-tabla"><thead><tr>${sinTecnico ? "" : "<th>Técnico</th>"}<th>Fecha</th><th>Temarios y nivel</th><th>Estado</th><th>Puntaje</th><th></th></tr></thead><tbody>${lista.map((x) => `
+    <tr class="clic" data-id="${x.id}">${sinTecnico ? "" : `<td><b>${exE(x.tecnico)}</b></td>`}<td>${exFecha(x.terminado_en || x.iniciado_en || x.creado_en)}</td><td class="ex-est">${exE(exNivelesTxt(x))} · ${x.minutos} min</td>
+    <td>${exE(EX_ESTADO[x.estado] || x.estado)}${x.estado === "terminado" ? `<div class="ex-est">${exE(EX_MOTIVO[x.motivo_fin] || "")} · ${x.respondidas}/${x.total} respondidas</div>` : ""}</td>
+    <td>${x.estado === "terminado" ? `<b>${x.porcentaje}%</b> <span class="ex-est">${x.puntaje}/${x.maximo}</span><div class="ex-barra"><i style="width:${Math.min(100, x.porcentaje)}%"></i></div>` : ""}</td>
+    <td>${x.estado === "terminado" ? `<span class="${exCatClase(x.categoria)}">${exE(x.categoria)}</span>` : x.estado === "pendiente" ? `<button type="button" class="ex-btn chico sec" data-copiar="${x.id}">Copiar link</button>` : ""}</td></tr>`).join("")}</tbody></table></div>`;
+  v.querySelectorAll("[data-copiar]").forEach((b) => b.onclick = (e) => { e.stopPropagation(); const x = lista.find((y) => y.id === b.dataset.copiar); exCopiar(EX_URL + x.link_token); });
+  v.querySelectorAll("tr[data-id]").forEach((tr) => tr.onclick = () => exAbrirIntento(tr.dataset.id));
+}
+function exCopiar(texto) {
+  (navigator.clipboard ? navigator.clipboard.writeText(texto) : Promise.reject()).then(() => avisoAdmin("Link copiado. Pegalo en el WhatsApp del técnico.")).catch(() => pedirTextoAdmin("Copiá el link:", texto));
+}
+async function exAbrirIntento(id) {
+  let x;
+  try { x = await misatLeerJson("/api/datos?coleccion=examen&intento=" + encodeURIComponent(id)); } catch (e) { avisoAdmin(e.message, "err"); return; }
+  const T = exDatos.temarios, letra = (i) => String.fromCharCode(65 + i);
+  const capa = document.createElement("div");
+  capa.className = "cartel-admin-capa";
+  const preg = (x.preguntas || []).map((q, i) => {
+    const sin = q.respuesta == null || q.respuesta === "";
+    let cuerpo;
+    if (q.tipo === "mc") {
+      cuerpo = q.opciones.map((o, j) => `<div class="${j === q.correcta ? "ok" : j === q.respuesta ? "mal" : ""}">${letra(j)}) ${exE(o)}${j === q.correcta ? " ✔" : j === q.respuesta ? " ✘ (eligió esta)" : ""}</div>`).join("") + (sin ? `<div class="sin">Sin responder</div>` : "") + (q.explicacion ? `<div class="ex-est">${exE(q.explicacion)}</div>` : "");
+    } else {
+      cuerpo = `<div class="ex-resp">${sin ? "<span class='sin'>Sin responder</span>" : exE(q.respuesta)}</div>${q.guia ? `<div class="ex-est"><b>Respuesta esperada:</b> ${exE(q.guia)}</div>` : ""}
+        ${x.estado === "terminado" ? `<div class="ex-fila"><span class="ex-est">Corrección automática: ${q.puntos_auto ?? 0} de ${q.puntos_max}${q.ajustado_por ? " · ajustado por " + exE(q.ajustado_por) : ""}</span><input type="number" min="0" max="${q.puntos_max}" step="0.5" value="${q.puntos}" style="width:80px;height:32px" data-aj="${i}"><button type="button" class="ex-btn chico sec" data-ajb="${i}">Guardar puntaje</button></div>` : ""}`;
+    }
+    return `<div class="ex-preg"><div><b>${i + 1}.</b> <span class="ex-est">${exE(T[q.temario])} · nivel ${q.nivel}${q.marca ? " · " + exE(q.marca) : ""} · ${q.tipo === "mc" ? "opción múltiple" : "abierta"}</span> <b style="float:right">${q.puntos}/${q.puntos_max}</b></div><div>${exE(q.texto)}</div>${cuerpo}</div>`;
+  }).join("");
+  const temas = Object.entries(x.por_temario || {}).map(([t, p]) => `<div><b>${exE(T[t])}</b>: ${p.porcentaje}% <span class="ex-est">(${p.respondidas}/${p.total} respondidas)</span></div>`).join("");
+  capa.innerHTML = `<div class="cartel-admin" role="dialog" aria-modal="true" style="max-width:760px;width:calc(100vw - 32px);max-height:88vh;overflow:auto;text-align:left">
+    <div class="ex-fila" style="justify-content:space-between"><h3 style="margin:0">${exE(x.tecnico)}</h3><button type="button" class="ex-btn chico sec" data-cerrar>Cerrar</button></div>
+    <div class="ex-est">${exE(exNivelesTxt(x))} · ${x.minutos} min · ${exE(EX_ESTADO[x.estado])}${x.motivo_fin ? " (" + exE(EX_MOTIVO[x.motivo_fin] || x.motivo_fin) + ")" : ""}</div>
+    <div class="ex-est">Link creado ${exFecha(x.creado_en)} por ${exE(x.creado_por || "")}${x.iniciado_en ? " · empezó " + exFecha(x.iniciado_en) : ""}${x.terminado_en ? " · terminó " + exFecha(x.terminado_en) : ""}</div>
+    ${x.estado === "terminado" ? `<div style="font-size:22px;margin:8px 0"><b>${x.porcentaje}%</b> <span class="ex-est">${x.puntaje} de ${x.maximo} puntos</span> <span class="${exCatClase(x.categoria)}">${exE(x.categoria)}</span></div>${temas}` : ""}
+    ${x.link_token ? `<div class="ex-link"><span>${EX_URL}${x.link_token}</span><button type="button" class="ex-btn chico" data-copiarlink>Copiar link</button></div>` : ""}
+    <div class="ex-fila" style="margin:8px 0">${x.estado === "pendiente" ? `<button type="button" class="ex-btn chico sec" data-anular>Anular link</button>` : ""}${x.estado === "en_curso" ? `<button type="button" class="ex-btn chico sec" data-cerrarex>Cerrar y corregir ahora</button>` : ""}</div>
+    ${x.estado === "pendiente" ? "" : preg}</div>`;
+  const cerrar = () => capa.remove();
+  capa.addEventListener("click", (e) => { if (e.target === capa) cerrar(); });
+  capa.querySelector("[data-cerrar]").onclick = cerrar;
+  const cl = capa.querySelector("[data-copiarlink]"); if (cl) cl.onclick = () => exCopiar(EX_URL + x.link_token);
+  const accion = async (cuerpo, msj) => { try { await exPost(cuerpo); avisoAdmin(msj); cerrar(); await exCargar(); if (cuerpo.accion === "ajustar") exAbrirIntento(id); } catch (e) { avisoAdmin(e.message, "err"); } };
+  const an = capa.querySelector("[data-anular]"); if (an) an.onclick = async () => { if (await confirmarAdmin("¿Anular este link? El técnico ya no va a poder entrar.")) accion({ accion: "anular", id }, "Link anulado"); };
+  const ce = capa.querySelector("[data-cerrarex]"); if (ce) ce.onclick = async () => { if (await confirmarAdmin("¿Cerrar el examen ahora? Se corrige con lo que respondió hasta acá.")) accion({ accion: "cerrar", id }, "Examen cerrado y corregido"); };
+  capa.querySelectorAll("[data-ajb]").forEach((b) => b.onclick = () => accion({ accion: "ajustar", id, indice: Number(b.dataset.ajb), puntos: Number(capa.querySelector(`[data-aj="${b.dataset.ajb}"]`).value) }, "Puntaje ajustado"));
+  document.body.appendChild(capa);
+}
+function exPintarNuevo(v) {
+  const N = exDatos.niveles, T = exDatos.temarios, c = exDatos.config;
+  const maxN = () => Math.max(0, ...Object.values(exNuevo.niveles));
+  if (!exNuevo.minutos) exNuevo.minutos = c.minutos_por_nivel[maxN() || 1];
+  const cuantas = () => Object.entries(exNuevo.niveles).filter(([, n]) => n).reduce((s, [t]) => s + c.cantidades[t].mc + c.cantidades[t].abiertas, 0);
+  v.innerHTML = `<div class="ex-card"><h3>Nuevo examen</h3>
+    <div class="ex-fila"><label>Técnico<input id="exTec" list="exTecLista" placeholder="Elegí o escribí el nombre" autocomplete="off"></label><datalist id="exTecLista">${exTecnicos.map((n) => `<option value="${exE(n)}">`).join("")}</datalist></div>
+    ${Object.keys(T).map((t) => `<div><div class="ex-est" style="margin-bottom:4px">${exE(T[t])} <span>(${c.cantidades[t].mc} de opción múltiple + ${c.cantidades[t].abiertas} abierta${c.cantidades[t].abiertas === 1 ? "" : "s"})</span></div><div class="ex-nivel" data-t="${t}"><button type="button" data-n="0">No incluir</button>${[1, 2, 3].map((n) => `<button type="button" data-n="${n}">${n} · ${exE(N[n])}</button>`).join("")}</div></div>`).join("")}
+    <div><div class="ex-est" style="margin-bottom:4px">Tiempo total</div><div class="ex-nivel" id="exMin">${[30, 45].map((m) => `<button type="button" data-m="${m}">${m} minutos</button>`).join("")}<label style="display:flex;gap:6px;align-items:center;font-size:13px">Otro <input type="number" id="exMinOtro" min="5" max="180" style="width:70px;height:34px;border:1px solid rgba(16,24,32,.18);border-radius:8px;padding:0 8px"></label></div></div>
+    <p class="ex-est" id="exResumen" style="margin:0"></p>
+    <div><button type="button" class="ex-btn" id="exCrear">Generar link</button></div><div id="exLinkNuevo"></div></div>`;
+  const pintarSel = () => {
+    v.querySelectorAll(".ex-nivel[data-t]").forEach((g) => g.querySelectorAll("button").forEach((b) => b.classList.toggle("on", Number(b.dataset.n) === (exNuevo.niveles[g.dataset.t] || 0))));
+    v.querySelectorAll("#exMin button").forEach((b) => b.classList.toggle("on", Number(b.dataset.m) === exNuevo.minutos));
+    document.getElementById("exMinOtro").value = [30, 45].includes(exNuevo.minutos) ? "" : exNuevo.minutos;
+    document.getElementById("exResumen").textContent = `${cuantas()} preguntas en ${exNuevo.minutos} minutos. Se eligen al azar del banco, con el nivel de cada temario.`;
+  };
+  v.querySelectorAll(".ex-nivel[data-t] button").forEach((b) => b.onclick = () => { exNuevo.niveles[b.parentNode.dataset.t] = Number(b.dataset.n); exNuevo.minutos = c.minutos_por_nivel[maxN() || 1]; pintarSel(); });
+  v.querySelectorAll("#exMin button").forEach((b) => b.onclick = () => { exNuevo.minutos = Number(b.dataset.m); pintarSel(); });
+  document.getElementById("exMinOtro").oninput = (e) => { const m = parseInt(e.target.value, 10); if (m >= 5 && m <= 180) { exNuevo.minutos = m; v.querySelectorAll("#exMin button").forEach((b) => b.classList.toggle("on", Number(b.dataset.m) === m)); document.getElementById("exResumen").textContent = `${cuantas()} preguntas en ${m} minutos.`; } };
+  pintarSel();
+  document.getElementById("exCrear").onclick = async (ev) => {
+    const tecnico = document.getElementById("exTec").value.trim();
+    if (!tecnico) { avisoAdmin("Elegí o escribí el técnico", "aviso"); return; }
+    ev.target.disabled = true;
+    try {
+      const d = await exPost({ accion: "crear_link", tecnico, niveles: exNuevo.niveles, minutos: exNuevo.minutos });
+      const url = EX_URL + d.token;
+      document.getElementById("exLinkNuevo").innerHTML = `<div class="ex-link"><span>Link para <b>${exE(tecnico)}</b> (${d.total} preguntas, ${d.minutos} min): ${url}</span><button type="button" class="ex-btn chico" id="exCop">Copiar</button><a class="ex-btn chico sec" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent("Hola " + tecnico + ", este es tu examen técnico de SAT. Tenés " + d.minutos + " minutos y una vez que empezás no podés salir de la página: si salís, se corrige como esté. Entrá cuando tengas el tiempo libre: " + url)}">Mandar por WhatsApp</a></div>`;
+      document.getElementById("exCop").onclick = () => exCopiar(url);
+      document.getElementById("exTec").value = "";
+      exRefrescarDatos();
+    } catch (e) { avisoAdmin(e.message, "err"); }
+    ev.target.disabled = false;
+  };
+}
+function exPintarConfig(v) {
+  const c = JSON.parse(JSON.stringify(exDatos.config)), T = exDatos.temarios, N = exDatos.niveles;
+  v.innerHTML = `<div class="ex-card"><h3>Cantidad de preguntas por temario</h3>${Object.keys(T).map((t) => `<div class="ex-fila"><b style="min-width:150px">${exE(T[t])}</b><label>Opción múltiple<input type="number" min="0" max="30" data-c="${t}" data-k="mc" value="${c.cantidades[t].mc}"></label><label>Abiertas<input type="number" min="0" max="5" data-c="${t}" data-k="abiertas" value="${c.cantidades[t].abiertas}"></label></div>`).join("")}</div>
+    <div class="ex-card"><h3>Tiempo sugerido según la dificultad</h3><p class="ex-est" style="margin:0">Se toma el nivel más alto elegido. Al generar el link se puede cambiar.</p><div class="ex-fila">${[1, 2, 3].map((n) => `<label>${n} · ${exE(N[n])} (minutos)<input type="number" min="5" max="180" data-m="${n}" value="${c.minutos_por_nivel[n]}"></label>`).join("")}</div></div>
+    <div class="ex-card"><h3>Categorías según el puntaje</h3><p class="ex-est" style="margin:0">Desde qué porcentaje entra en cada categoría. La primera arranca en 0 %.</p>${c.categorias.map((k, i) => `<div class="ex-fila"><label>Nombre<input data-cn="${i}" value="${exE(k.nombre)}"></label><label>Desde (%)<input type="number" min="0" max="100" data-cd="${i}" value="${k.desde}" ${i === 0 ? "disabled" : ""}></label></div>`).join("")}</div>
+    <div><button type="button" class="ex-btn" id="exGuardarCfg">Guardar configuración</button></div>`;
+  document.getElementById("exGuardarCfg").onclick = async () => {
+    v.querySelectorAll("[data-c]").forEach((i) => { c.cantidades[i.dataset.c][i.dataset.k] = Number(i.value); });
+    v.querySelectorAll("[data-m]").forEach((i) => { c.minutos_por_nivel[i.dataset.m] = Number(i.value); });
+    v.querySelectorAll("[data-cn]").forEach((i) => { c.categorias[i.dataset.cn].nombre = i.value; });
+    v.querySelectorAll("[data-cd]").forEach((i) => { c.categorias[i.dataset.cd].desde = Number(i.value); });
+    try { const d = await exPost({ accion: "guardar_config", config: c }); exDatos.config = d.config; avisoAdmin("Configuración guardada"); exPintar(); } catch (e) { avisoAdmin(e.message, "err"); }
+  };
+}
+let exBancoFiltro = { temario: "alarmas", nivel: 0 };
+async function exPintarBanco(v) {
+  if (!exBanco) {
+    v.innerHTML = `<p class="subtitle">Cargando preguntas…</p>`;
+    try { exBanco = (await misatLeerJson("/api/datos?coleccion=examen&banco=1")).banco; } catch (e) { v.innerHTML = `<p class="subtitle">${exE(e.message)}</p>`; return; }
+  }
+  const T = exDatos.temarios, N = exDatos.niveles;
+  const lista = exBanco.map((p, i) => ({ p, i })).filter(({ p }) => p.temario === exBancoFiltro.temario && (!exBancoFiltro.nivel || p.nivel === exBancoFiltro.nivel));
+  const cuenta = (t, n, tipo) => exBanco.filter((p) => p.temario === t && p.nivel === n && p.tipo === tipo && p.activa !== false).length;
+  v.innerHTML = `<div class="ex-card"><div class="ex-fila"><div class="ex-nivel" id="exBT">${Object.keys(T).map((t) => `<button type="button" data-t="${t}" class="${t === exBancoFiltro.temario ? "on" : ""}">${exE(T[t])}</button>`).join("")}</div><div class="ex-nivel" id="exBN"><button type="button" data-n="0" class="${!exBancoFiltro.nivel ? "on" : ""}">Todos los niveles</button>${[1, 2, 3].map((n) => `<button type="button" data-n="${n}" class="${exBancoFiltro.nivel === n ? "on" : ""}">${exE(N[n])}</button>`).join("")}</div></div>
+    <p class="ex-est" style="margin:0">Activas en ${exE(T[exBancoFiltro.temario])}: ${[1, 2, 3].map((n) => `${N[n]} ${cuenta(exBancoFiltro.temario, n, "mc")} opción múltiple + ${cuenta(exBancoFiltro.temario, n, "abierta")} abiertas`).join(" · ")}. Si en un nivel faltan, se completa con preguntas del nivel de abajo.</p>
+    <div class="ex-fila"><button type="button" class="ex-btn chico" id="exBNueva">➕ Nueva pregunta</button><button type="button" class="ex-btn chico sec" id="exBGuardar">Guardar cambios del banco</button></div></div>
+    <div id="exBEditor"></div>
+    ${lista.map(({ p, i }) => `<div class="ex-card" style="${p.activa === false ? "opacity:.55" : ""}"><div class="ex-fila" style="justify-content:space-between"><span class="ex-est">Nivel ${p.nivel} · ${exE(p.marca || "")} · ${p.tipo === "mc" ? "opción múltiple" : "abierta"}${p.activa === false ? " · desactivada" : ""}</span><span><button type="button" class="ex-btn chico sec" data-ed="${i}">Editar</button> <button type="button" class="ex-btn chico sec" data-act="${i}">${p.activa === false ? "Activar" : "Desactivar"}</button></span></div><div>${exE(p.texto)}</div>${p.tipo === "mc" ? `<div class="ex-est">${p.opciones.map((o, j) => (j === p.correcta ? "✔ " : "· ") + exE(o)).join("<br>")}</div>` : `<div class="ex-est"><b>Esperada:</b> ${exE(p.guia || "")}</div>`}</div>`).join("")}`;
+  v.querySelectorAll("#exBT button").forEach((b) => b.onclick = () => { exBancoFiltro.temario = b.dataset.t; exPintarBanco(v); });
+  v.querySelectorAll("#exBN button").forEach((b) => b.onclick = () => { exBancoFiltro.nivel = Number(b.dataset.n); exPintarBanco(v); });
+  v.querySelectorAll("[data-act]").forEach((b) => b.onclick = () => { const p = exBanco[b.dataset.act]; p.activa = p.activa === false; exPintarBanco(v); avisoAdmin("Acordate de tocar «Guardar cambios del banco»", "aviso"); });
+  v.querySelectorAll("[data-ed]").forEach((b) => b.onclick = () => exEditorPregunta(v, Number(b.dataset.ed)));
+  document.getElementById("exBNueva").onclick = () => exEditorPregunta(v, -1);
+  document.getElementById("exBGuardar").onclick = async () => { try { const d = await exPost({ accion: "guardar_banco", banco: exBanco }); exBanco = null; avisoAdmin(`Banco guardado (${d.total} preguntas)`); exPintarBanco(v); } catch (e) { avisoAdmin(e.message, "err"); } };
+}
+function exEditorPregunta(v, idx) {
+  const p = idx >= 0 ? JSON.parse(JSON.stringify(exBanco[idx])) : { id: "", temario: exBancoFiltro.temario, nivel: exBancoFiltro.nivel || 1, marca: "", tipo: "mc", texto: "", opciones: ["", "", "", ""], correcta: 0, explicacion: "", claves: [], guia: "", activa: true };
+  const T = exDatos.temarios, N = exDatos.niveles, caja = document.getElementById("exBEditor");
+  const pintar = () => {
+    caja.innerHTML = `<div class="ex-card" style="border-color:#101820"><h3>${idx >= 0 ? "Editar pregunta" : "Nueva pregunta"}</h3>
+      <div class="ex-fila"><label>Temario<select id="exPT">${Object.keys(T).map((t) => `<option value="${t}" ${t === p.temario ? "selected" : ""}>${exE(T[t])}</option>`).join("")}</select></label><label>Nivel<select id="exPN">${[1, 2, 3].map((n) => `<option value="${n}" ${n === p.nivel ? "selected" : ""}>${n} · ${exE(N[n])}</option>`).join("")}</select></label><label>Marca / tema<input id="exPM" value="${exE(p.marca)}" placeholder="DSC, Paradox, Ajax, IP…"></label><label>Tipo<select id="exPTipo"><option value="mc" ${p.tipo === "mc" ? "selected" : ""}>Opción múltiple</option><option value="abierta" ${p.tipo === "abierta" ? "selected" : ""}>Abierta</option></select></label></div>
+      <label class="ex-est">Pregunta<textarea id="exPTx">${exE(p.texto)}</textarea></label>
+      ${p.tipo === "mc" ? `<div class="ex-est">Opciones (marcá la correcta)</div>${p.opciones.map((o, j) => `<div class="ex-fila"><input type="radio" name="exPC" value="${j}" ${j === p.correcta ? "checked" : ""} style="height:auto"><input data-op="${j}" value="${exE(o)}" style="flex:1"></div>`).join("")}<div><button type="button" class="ex-btn chico sec" id="exPMas">+ opción</button></div><label class="ex-est">Explicación (la ve la oficina al corregir)<textarea id="exPEx">${exE(p.explicacion || "")}</textarea></label>`
+        : `<label class="ex-est">Respuesta esperada (la ve la oficina al corregir)<textarea id="exPG">${exE(p.guia || "")}</textarea></label><label class="ex-est">Ideas que tiene que mencionar: una por renglón; si una idea se puede decir de varias formas, separalas con | (ej.: bateria|acumulador). Se buscan sin acentos y al principio de cada palabra.<textarea id="exPK" style="min-height:110px">${exE((p.claves || []).map((g) => g.join(" | ")).join("\n"))}</textarea></label>`}
+      <div class="ex-fila"><button type="button" class="ex-btn chico" id="exPOk">Listo</button><button type="button" class="ex-btn chico sec" id="exPNo">Cancelar</button></div></div>`;
+    const leer = () => {
+      p.temario = document.getElementById("exPT").value; p.nivel = Number(document.getElementById("exPN").value); p.marca = document.getElementById("exPM").value.trim(); p.texto = document.getElementById("exPTx").value.trim();
+      if (p.tipo === "mc") { p.opciones = [...caja.querySelectorAll("[data-op]")].map((i) => i.value.trim()); const r = caja.querySelector("input[name=exPC]:checked"); p.correcta = r ? Number(r.value) : 0; p.explicacion = document.getElementById("exPEx").value.trim(); }
+      else { p.guia = document.getElementById("exPG").value.trim(); p.claves = document.getElementById("exPK").value.split("\n").map((l) => l.split("|").map((a) => a.trim()).filter(Boolean)).filter((g) => g.length); }
+    };
+    document.getElementById("exPTipo").onchange = (e) => { leer(); p.tipo = e.target.value; if (p.tipo === "mc" && !p.opciones) { p.opciones = ["", "", "", ""]; p.correcta = 0; } pintar(); };
+    const mas = document.getElementById("exPMas"); if (mas) mas.onclick = () => { leer(); if (p.opciones.length < 6) p.opciones.push(""); pintar(); };
+    document.getElementById("exPNo").onclick = () => { caja.innerHTML = ""; };
+    document.getElementById("exPOk").onclick = () => {
+      leer();
+      if (!p.texto) { avisoAdmin("Escribí la pregunta", "aviso"); return; }
+      if (p.tipo === "mc") { const llenas = p.opciones.filter(Boolean); if (llenas.length < 2 || !p.opciones[p.correcta]) { avisoAdmin("Poné al menos dos opciones y marcá la correcta (que no esté vacía)", "aviso"); return; } const corr = p.opciones[p.correcta]; p.opciones = llenas; p.correcta = llenas.indexOf(corr); delete p.claves; delete p.guia; }
+      else { if (!p.claves.length) { avisoAdmin("Poné al menos una idea para corregir la abierta", "aviso"); return; } delete p.opciones; delete p.correcta; delete p.explicacion; }
+      if (!p.id) p.id = p.temario.slice(0, 2) + Date.now().toString(36);
+      if (idx >= 0) exBanco[idx] = p; else exBanco.push(p);
+      exBancoFiltro.temario = p.temario;
+      exPintarBanco(v);
+      avisoAdmin("Acordate de tocar «Guardar cambios del banco»", "aviso");
+    };
+  };
+  pintar();
+  caja.scrollIntoView({ behavior: "smooth", block: "center" });
+}
 </script>
 </body>
 </html>

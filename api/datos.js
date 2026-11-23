@@ -2301,6 +2301,11 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
     await require("../lib/mi-sat").manejarPortal(req, res, { leer: leerArchivoDatos, escribir: escribirArchivoDatos });
     return;
   }
+  // Examen técnico (examen.html): el técnico entra con un link de un solo uso (ver lib/examen.js).
+  if (req.query && req.query.publico === "examen") {
+    await require("../lib/examen").manejarPublico(req, res, { leer: leerArchivoDatos, escribir: escribirArchivoDatos });
+    return;
+  }
   if (req.query && req.query.publico === "robo_llave") {
     await require("../lib/robo-llaves").manejarPublico(req, res, { leer: leerArchivoDatos, escribir: escribirArchivoDatos });
     return;
@@ -2447,6 +2452,11 @@ module.exports = require("../lib/auditoria").conAuditoria("datos", async (req, r
   if (req.query && req.query.coleccion === "mi_sat") {
     if (!autorizacion) { res.status(401).json({ error: "No autorizado", sesion_vencida: true }); return; }
     await require("../lib/mi-sat").manejarAdmin(req, res, autorizacion, { leer: leerArchivoDatos, escribir: escribirArchivoDatos });
+    return;
+  }
+  if (req.query && req.query.coleccion === "examen") {
+    if (!autorizacion) { res.status(401).json({ error: "No autorizado", sesion_vencida: true }); return; }
+    await require("../lib/examen").manejarAdmin(req, res, autorizacion, { leer: leerArchivoDatos, escribir: escribirArchivoDatos });
     return;
   }
   if (req.query && req.query.coleccion === "registro_llaves") {
