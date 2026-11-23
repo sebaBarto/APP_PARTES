@@ -383,6 +383,45 @@
     .nav button.on::after { display: none; }
     .cuerpo { padding-bottom: 60px; }
   }
+
+  /* ---- pedidos en curso, mantenimiento, quiero sumar ---- */
+  .encurso { margin-bottom: 12px; position: relative; z-index: 1; }
+  .encurso h3 { margin-bottom: 4px; }
+  .curso-item { border-top: 1px solid #EFECE4; padding: 12px 0 4px; } .curso-item:first-of-type { border-top: 0; }
+  .curso-item b { display: block; font-size: 15.5px; } .curso-item p { margin: 3px 0 0; color: var(--muted); font-size: 14px; }
+  .pasos-s { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin: 10px 0 6px; }
+  .pasos-s span { text-align: center; font-size: 11.5px; font-weight: 600; color: #A9A59A; }
+  .pasos-s span::before { content: ""; display: block; height: 5px; border-radius: 3px; background: #E6E2D8; margin-bottom: 5px; }
+  .pasos-s span.ok { color: var(--text); } .pasos-s span.ok::before { background: var(--amber); }
+  .pasos-s span.ya { color: var(--ok); } .pasos-s span.ya::before { background: var(--ok); }
+  .curso-dato { display: flex; gap: 10px; align-items: center; background: var(--amber-soft); border-radius: 12px; padding: 10px 12px; margin-top: 8px; font-size: 14.5px; }
+  .curso-dato svg { width: 22px; height: 22px; flex: none; color: var(--amber-dark); }
+  .curso-dato.camino { background: #E6F4EA; } .curso-dato.camino svg { color: #1B5E2C; }
+  .curso-dato a { margin-left: auto; font-weight: 700; color: #1B5E2C; white-space: nowrap; }
+  .mant { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: center; margin-bottom: 12px; position: relative; z-index: 1; }
+  .mant .hx { color: var(--amber-dark); } .mant b { display: block; } .mant small { color: var(--muted); font-size: 13.5px; display: block; margin-top: 2px; }
+  .mant .acc-m { grid-column: 1 / -1; display: flex; gap: 8px; }
+  .mant .acc-m button { flex: 1; border: 0; border-radius: 12px; padding: 10px; font: inherit; font-weight: 700; cursor: pointer; background: var(--amber); color: #1A1400; }
+  .mant .acc-m button.sec { background: #F1EEE6; color: var(--muted); font-weight: 600; }
+  .productos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+  .productos button { text-align: left; border: 1.5px solid #ECE8DE; background: #FBFAF7; border-radius: 14px; padding: 11px 12px; font: inherit; cursor: pointer; color: inherit; }
+  .productos button b { display: block; font-size: 14px; } .productos button small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; line-height: 1.3; }
+  .productos button:hover { border-color: var(--amber); }
+  .chips-sel { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 2px; }
+  .chips-sel button { border: 1.5px solid #E2DED3; background: #fff; border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 13.5px; cursor: pointer; color: inherit; }
+  .chips-sel button.on { border-color: var(--amber); background: var(--amber-soft); }
+  .seg { display: flex; background: #F1EEE6; border-radius: 12px; padding: 4px; gap: 4px; }
+  .seg button { flex: 1; border: 0; background: transparent; border-radius: 9px; padding: 9px 6px; font: inherit; font-weight: 600; cursor: pointer; color: var(--muted); }
+  .seg button.on { background: #fff; color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .av-form .link { display: block; margin: 10px auto 0; }
+  .ok-box { background: #E6F4EA; color: #1B5E2C; border-radius: 12px; padding: 12px 14px; font-weight: 600; font-size: 14.5px; margin-top: 12px; }
+  .instalar { display: flex; gap: 10px; align-items: center; background: #26252B; color: #fff; border-radius: 16px; padding: 12px 14px; margin-top: 12px; font-size: 13.5px; }
+  .instalar b { display: block; font-size: 14.5px; } .instalar button { margin-left: auto; background: none; border: 0; color: #A9A69C; font-size: 20px; cursor: pointer; }
+  @media (min-width: 900px) {
+    #vInicio > #pCurso, #vInicio > #pMant, #vInicio > #pSumar { grid-column: 1 / -1; }
+    .productos { grid-template-columns: repeat(3, 1fr); }
+    #vPedir.on, #vSumar.on { display: block; max-width: 620px; margin: 0 auto; }
+  }
   .ok-txt { color: #2E7D32; font-weight: 700; font-size: 13.5px; margin: 10px 0 0; }
 </style>
 </head>
@@ -421,8 +460,7 @@
         <input id="lClave" type="password" autocomplete="current-password" placeholder="••••••••" maxlength="200">
         <p class="error" id="lErr" role="alert"></p>
         <button class="btn" type="submit" id="lBtn">Entrar <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
-        <button class="link" type="button" id="lOlvide">Olvidé mi clave</button>
-        <p class="ayuda olvide" id="lOlvideTxt" hidden>Escribinos por <a data-wa href="#" target="_blank" rel="noopener">WhatsApp</a>: la oficina reinicia tu acceso y volvés a pedirlo con una clave nueva.</p>
+        <button class="link" type="button" data-ir="pRecup">Olvidé mi clave</button>
       </form>
       <button class="primera" type="button" data-ir="pAct1">
         <span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-2.5z"/></svg></span>
@@ -435,6 +473,36 @@
         <li><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h4"/></svg></span>Cómo usar tu alarma</li>
       </ul>
       <div class="pie"><img src="/icons/logo.png" alt="SAT">Seguridad electrónica · Rosario</div>
+    </section>
+
+
+    <!-- ============ OLVIDÉ MI CLAVE ============ -->
+    <section class="pantalla" id="pRecup">
+      <header class="barra"><img src="/icons/logo.png" alt="SAT"><span class="sep"></span><span class="sec">Mi SAT</span></header>
+      <form class="form plano" id="fRecup" novalidate>
+        <h2>Clave nueva</h2>
+        <p class="sub">Confirmá tus datos y elegí una clave nueva. La oficina la controla y te avisamos por WhatsApp cuando esté activa. Mientras tanto sigue valiendo la anterior.</p>
+        <label for="rNum">Número de cliente</label>
+        <input id="rNum" class="mono" inputmode="numeric" placeholder="Ej. 1234" maxlength="20">
+        <label for="rTel">Tu celular</label>
+        <input id="rTel" inputmode="tel" autocomplete="tel" placeholder="Ej. 341 555 1234" maxlength="25">
+        <label for="rDni">DNI o CUIT del titular</label>
+        <input id="rDni" class="mono" inputmode="numeric" placeholder="Sin puntos" maxlength="13">
+        <label for="rCl1">Clave nueva</label>
+        <input id="rCl1" type="password" autocomplete="new-password" placeholder="Mínimo 8 caracteres" maxlength="72">
+        <label for="rCl2">Repetila</label>
+        <input id="rCl2" type="password" autocomplete="new-password" maxlength="72">
+        <input id="rWeb" class="trampa" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <p class="error" id="rErr" role="alert"></p>
+        <button class="btn" type="submit" id="rBtn">Pedir clave nueva <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+        <button class="link" type="button" data-ir="pLogin">Volver</button>
+      </form>
+      <div class="form plano listo" id="rListo" hidden>
+        <div class="check-anim"><svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="36"/><path d="M24 41l11 11 22-24"/></svg></div>
+        <h2>¡Pedido enviado!</h2>
+        <p class="sub">La oficina controla tus datos y te avisamos por WhatsApp cuando tu clave nueva esté activa.</p>
+        <button class="btn sec" type="button" data-ir="pLogin">Volver al inicio</button>
+      </div>
     </section>
 
     <!-- ============ PRIMER INGRESO ============ -->
@@ -515,6 +583,8 @@
 
         <div class="vista on" id="vInicio">
           <div id="pCuenta"></div>
+          <div id="pCurso"></div>
+          <div id="pMant"></div>
           <div class="kpis">
             <div class="kpi"><b id="kDias">—</b><small id="kDiasTxt">días desde<br>tu última visita</small></div>
             <div class="kpi"><b id="kServ">0</b><small>services<br>registrados</small></div>
@@ -522,7 +592,7 @@
           </div>
 
           <div class="accesos">
-            <a class="acc amb" href="/solicitar-servicio.html"><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-2.5z"/></svg></span><b>Pedir un service</b><small>Contanos qué pasa</small></a>
+            <button class="acc amb" type="button" data-pedir><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-2.5z"/></svg></span><b>Pedir un service</b><small>Contanos qué pasa</small></button>
             <a class="acc ver" data-wa href="#" target="_blank" rel="noopener"><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l1.3-3.9A8 8 0 1 1 8 19z"/><path d="M9 9.5c0 3 2.5 5.5 5.5 5.5l1-1.6-2-1-.8.8c-.9-.4-1.6-1.1-2-2l.8-.8-1-2z"/></svg></span><b>WhatsApp</b><small>Oficina y técnica</small></a>
             <button class="acc gri" type="button" data-vista="vGuias"><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h4"/></svg></span><b>Cómo usar tu alarma</b><small>Guías animadas</small></button>
             <button class="acc azu" type="button" data-vista="vServicios"><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg></span><b>Mis services</b><small>Fecha, técnico y costo</small></button>
@@ -535,6 +605,12 @@
             <ul class="equipos" id="lSistema"></ul>
           </div>
 
+          <div class="tarjeta sumar" id="pSumar" hidden>
+            <h3>Quiero sumar…</h3>
+            <p class="zonas-ayuda">Mejorá tu seguridad con SAT. Elegí qué te interesa y te contactamos sin compromiso.</p>
+            <div class="productos" id="lProductos"></div>
+          </div>
+
           <div class="tarjeta">
             <h3>Últimos services <button class="ver" type="button" data-vista="vServicios">Ver todos <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button></h3>
             <ul class="servicios" id="lUltimos"></ul>
@@ -542,11 +618,54 @@
         </div>
 
         <div class="vista" id="vServicios">
+          <div id="sCurso"></div>
           <div class="tarjeta">
             <h3>Tus services</h3>
             <ul class="servicios largo" id="lServicios"></ul>
           </div>
-          <a class="btn" href="/solicitar-servicio.html">Pedir un service <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+          <button class="btn" type="button" data-pedir>Pedir un service <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+        </div>
+
+
+        <div class="vista" id="vPedir">
+          <form class="tarjeta av-form on" id="fPedir" novalidate>
+            <h3>Pedir un service</h3>
+            <p class="av-ayuda">Contanos qué pasa. Le llega a la oficina, te llamamos para coordinar y acá vas a ver cuándo está agendado y cuándo el técnico va en camino.</p>
+            <div class="chips-sel" id="psChips">
+              <button type="button" data-t="La alarma no arma o marca un problema en el teclado">No arma / marca problema</button>
+              <button type="button" data-t="La alarma suena sola">Suena sola</button>
+              <button type="button" data-t="Una cámara no tiene imagen o no la veo en el celular">Cámaras</button>
+              <button type="button" data-t="Revisión o cambio de batería de la alarma">Batería</button>
+              <button type="button" data-t="No puedo ver o manejar la alarma desde la app">App</button>
+            </div>
+            <label for="psTarea">¿Qué pasa?</label>
+            <textarea id="psTarea" maxlength="800" rows="4" placeholder="Ej.: desde ayer el teclado pita y marca problema"></textarea>
+            <label>¿Cuándo te queda mejor?</label>
+            <div class="seg" id="psFranja"><button type="button" data-f="manana">Mañana</button><button type="button" data-f="tarde">Tarde</button><button type="button" class="on" data-f="cualquiera">Cualquiera</button></div>
+            <label for="psCuando">Días u horarios que NO podés <span class="opc">(opcional)</span></label>
+            <input id="psCuando" maxlength="120" placeholder="Ej.: los martes no estoy">
+            <label for="psTel">Teléfono para coordinar</label>
+            <input id="psTel" type="tel" inputmode="tel" maxlength="30">
+            <p class="error" role="alert"></p>
+            <button class="btn" type="submit">Enviar pedido <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+            <button class="link" type="button" data-vista="vInicio">Volver</button>
+          </form>
+        </div>
+
+        <div class="vista" id="vSumar">
+          <form class="tarjeta av-form on" id="fSumar" novalidate>
+            <h3 id="suTit">Quiero sumar</h3>
+            <p class="av-ayuda" id="suTxt"></p>
+            <label for="suCom">Contanos qué tenés en mente <span class="opc">(opcional)</span></label>
+            <textarea id="suCom" maxlength="400" rows="3" placeholder="Ej.: quiero ver el patio y la entrada desde el celular"></textarea>
+            <label for="suHor">¿Cuándo te llamamos? <span class="opc">(opcional)</span></label>
+            <input id="suHor" maxlength="80" placeholder="Ej.: de tarde, después de las 17">
+            <label for="suTel">Teléfono</label>
+            <input id="suTel" type="tel" inputmode="tel" maxlength="30">
+            <p class="error" role="alert"></p>
+            <button class="btn" type="submit">Que me contacten <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+            <button class="link" type="button" data-vista="vInicio">Volver</button>
+          </form>
         </div>
 
         <div class="vista" id="vGuias">
@@ -721,6 +840,10 @@
     $("#iAvisos").hidden = $("#nAvisos").hidden = !d.monitoreo;
     $(".nav").classList.toggle("con4", !!d.monitoreo);
     pedidos(d.solicitudes || []);
+    datosCliente = d;
+    pintarCurso(d.en_curso || []);
+    pintarMant(d.mantenimiento);
+    pintarProductos(d.productos);
     if (d.ultima_visita) sis.push(`<li><span class="eq-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.5-2.5z"/></svg></span><div><b>Última visita técnica</b><small>${fecha(d.ultima_visita)}</small></div></li>`);
     $("#lSistema").innerHTML = sis.join("");
     const vacio = `<li class="vacio">Todavía no hay services cargados desde que usamos el sistema nuevo (julio 2026).</li>`;
@@ -812,6 +935,102 @@
     finally { ocupado(btn, false); }
   }));
 
+
+  // ---------- Pedidos en curso ----------
+  const diaTxt = (iso) => { const d = new Date(iso + "T12:00:00"); const hoy = hoyISO(); const man = new Date(Date.now() + 864e5); const manISO = new Date(man - man.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
+    if (iso === hoy) return "hoy"; if (iso === manISO) return "mañana"; return d.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "numeric" }); };
+  function itemCurso(x) {
+    const paso = { recibido: 1, agendado: 2, en_camino: 3 }[x.estado] || 1;
+    const nombres = ["Recibido", "Agendado", "En camino", "Realizado"];
+    const pasos = `<div class="pasos-s">${nombres.map((n, i) => `<span class="${i < paso ? (i === paso - 1 ? "ok" : "ya") : ""}">${n}</span>`).join("")}</div>`;
+    let dato = "";
+    if (x.estado === "en_camino") dato = `<div class="curso-dato camino"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17h14v-5l-2-5H7l-2 5z"/><circle cx="8" cy="17" r="2"/><circle cx="16" cy="17" r="2"/></svg><span><b>${esc(x.tecnico || "El técnico")} va en camino</b></span>${x.seguimiento ? `<a href="${esc(x.seguimiento)}" target="_blank" rel="noopener">Ver en el mapa</a>` : ""}</div>`;
+    else if (x.estado === "agendado") dato = `<div class="curso-dato"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span>Agendado para <b style="display:inline">${esc(diaTxt(x.fecha))}</b>${x.desde ? `, entre las ${esc(x.desde)}${x.hasta ? " y las " + esc(x.hasta) : ""}` : ""}${x.tecnico ? ` · Técnico: ${esc(x.tecnico)}` : ""}</span></div>`;
+    else dato = `<div class="curso-dato"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>${x.tipo === "pedido" ? "La oficina lo está coordinando. Te llamamos para acordar el día." : "Ya está cargado. Te avisamos el día de la visita."}</span></div>`;
+    const tit = x.tipo === "servicio" ? `Service${x.numero ? ` <span class="mono" style="font-weight:500;opacity:.6">N° ${esc(x.numero)}</span>` : ""}` : "Tu pedido de service";
+    return `<div class="curso-item"><b>${tit}</b>${x.tarea ? `<p>${esc(x.tarea)}</p>` : ""}${x.creado_en ? `<p>Pedido el ${fecha(x.creado_en)}${x.preferencia ? " · " + esc(x.preferencia) : ""}</p>` : ""}${pasos}${dato}</div>`;
+  }
+  function pintarCurso(lista) {
+    const html = lista.length ? `<div class="tarjeta encurso"><h3>En curso</h3>${lista.map(itemCurso).join("")}</div>` : "";
+    $("#pCurso").innerHTML = html; $("#sCurso").innerHTML = html;
+    pintarCurso.lista = lista;
+  }
+  // ---------- Mantenimiento ----------
+  function pintarMant(m) {
+    let ocultoHasta = 0; try { ocultoHasta = Number(localStorage.getItem("misat_mant_oculto") || 0); } catch (e) {}
+    if (!m || Date.now() < ocultoHasta) { $("#pMant").innerHTML = ""; return; }
+    const txt = m.tipo === "bateria"
+      ? `<b>Te recomendamos revisar la batería</b><small>El último cambio que tenemos registrado es de ${esc(m.desde.slice(5, 7) + "/" + m.desde.slice(0, 4))}. Las baterías de respaldo duran entre 2 y 3 años: si se agota, la alarma deja de funcionar en un corte de luz.</small>`
+      : `<b>¿Hace cuánto no revisás la batería de la alarma?</b><small>Las baterías de respaldo duran entre 2 y 3 años. Si se agota, en un corte de luz la alarma deja de funcionar y de avisar a la central.</small>`;
+    $("#pMant").innerHTML = `<div class="tarjeta mant"><span class="hx"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="16" height="10" rx="2"/><path d="M21 11v2M7 10v4M11 10v4"/></svg></span><span>${txt}</span><div class="acc-m"><button type="button" class="sec" data-mant-ocultar>Ahora no</button><button type="button" data-pedir="Revisión o cambio de batería de la alarma">Pedir revisión</button></div></div>`;
+  }
+  document.addEventListener("click", (ev) => {
+    if (ev.target.closest("[data-mant-ocultar]")) { try { localStorage.setItem("misat_mant_oculto", String(Date.now() + 30 * 864e5)); } catch (e) {} $("#pMant").innerHTML = ""; }
+  });
+  // ---------- Pedir un service ----------
+  let datosCliente = null;
+  document.addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-pedir]"); if (!b) return;
+    const f = $("#fPedir"); $(".error", f).textContent = ""; $$(".ok-box", f).forEach((x) => x.remove());
+    $("button[type=submit]", f).style.display = "";
+    if (b.dataset.pedir) $("#psTarea").value = b.dataset.pedir;
+    if (!$("#psTel").value && datosCliente) $("#psTel").value = datosCliente.celular || "";
+    vista("vPedir");
+  });
+  $("#psChips").addEventListener("click", (ev) => {
+    const c = ev.target.closest("button[data-t]"); if (!c) return;
+    $$("#psChips button").forEach((x) => x.classList.toggle("on", x === c));
+    const ta = $("#psTarea"); ta.value = c.dataset.t + (ta.value && !$$("#psChips button").some((x) => x.dataset.t === ta.value) ? ". " + ta.value : ""); ta.focus();
+  });
+  $("#psFranja").addEventListener("click", (ev) => { const c = ev.target.closest("button[data-f]"); if (!c) return; $$("#psFranja button").forEach((x) => x.classList.toggle("on", x === c)); });
+  $("#fPedir").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const f = ev.target, err = $(".error", f), btn = $("button[type=submit]", f); err.textContent = "";
+    const tarea = $("#psTarea").value.trim();
+    if (tarea.length < 8) return (err.textContent = "Contanos un poco más qué pasa");
+    if ($("#psTel").value.replace(/\D/g, "").length < 7) return (err.textContent = "Dejanos un teléfono para coordinar la visita");
+    ocupado(btn, true);
+    try {
+      const d = await api({ accion: "pedir_service", tarea, franja: ($("#psFranja .on") || {}).dataset?.f || "", cuando: $("#psCuando").value, telefono: $("#psTel").value });
+      pintarCurso([d.pedido, ...(pintarCurso.lista || [])]);
+      $("#psTarea").value = ""; $("#psCuando").value = ""; $$("#psChips button").forEach((x) => x.classList.remove("on"));
+      btn.style.display = "none";
+      const ok = document.createElement("div"); ok.className = "ok-box"; ok.setAttribute("role", "status");
+      ok.innerHTML = `¡Listo! Recibimos tu pedido. Te llamamos para coordinar el día y lo vas a poder seguir en <b>En curso</b>, en el inicio.`;
+      btn.after(ok);
+    } catch (e) { err.textContent = e.message; }
+    finally { ocupado(btn, false); }
+  });
+  // ---------- Quiero sumar ----------
+  let productoSel = "";
+  function pintarProductos(lista) {
+    $("#pSumar").hidden = !lista || !lista.length;
+    $("#lProductos").innerHTML = (lista || []).map((p) => `<button type="button" data-prod="${esc(p.id)}"><b>${esc(p.titulo)}</b><small>${esc(p.txt)}</small></button>`).join("");
+    pintarProductos.lista = lista || [];
+  }
+  $("#lProductos").addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-prod]"); if (!b) return;
+    const p = pintarProductos.lista.find((x) => x.id === b.dataset.prod); productoSel = p.id;
+    $("#suTit").textContent = p.titulo; $("#suTxt").textContent = p.txt + ". Te llama alguien de ventas de SAT para contarte opciones y precios, sin compromiso.";
+    const f = $("#fSumar"); $(".error", f).textContent = ""; $$(".ok-box", f).forEach((x) => x.remove()); $("button[type=submit]", f).style.display = "";
+    if (!$("#suTel").value && datosCliente) $("#suTel").value = datosCliente.celular || "";
+    vista("vSumar");
+  });
+  $("#fSumar").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const f = ev.target, err = $(".error", f), btn = $("button[type=submit]", f); err.textContent = "";
+    if ($("#suTel").value.replace(/\D/g, "").length < 7) return (err.textContent = "Dejanos un teléfono para llamarte");
+    ocupado(btn, true);
+    try {
+      await api({ accion: "interes", producto: productoSel, comentario: $("#suCom").value, horario: $("#suHor").value, telefono: $("#suTel").value });
+      $("#suCom").value = ""; $("#suHor").value = ""; btn.style.display = "none";
+      const ok = document.createElement("div"); ok.className = "ok-box"; ok.setAttribute("role", "status");
+      ok.textContent = "¡Gracias! Le pasamos tu consulta al equipo de ventas y te contactamos a la brevedad.";
+      btn.after(ok);
+    } catch (e) { err.textContent = e.message; }
+    finally { ocupado(btn, false); }
+  });
+
   async function cargarPanel() {
     ir("pPanel"); vista("vInicio");
     $("#pCargando").textContent = "Cargando tus datos…";
@@ -829,7 +1048,26 @@
     catch (e) { $("#lErr").textContent = e.message; }
     finally { ocupado($("#lBtn"), false); }
   });
-  $("#lOlvide").addEventListener("click", () => { $("#lOlvideTxt").hidden = false; });
+  $("#fRecup").addEventListener("submit", async (ev) => {
+    ev.preventDefault(); const err = $("#rErr"); err.textContent = "";
+    const num = $("#rNum").value.trim(), tel = $("#rTel").value.replace(/\D/g, ""), dni = $("#rDni").value.replace(/\D/g, ""), c1 = $("#rCl1").value, c2 = $("#rCl2").value;
+    if (!num) return (err.textContent = "Escribí tu número de cliente");
+    if (tel.length < 8) return (err.textContent = "Escribí tu celular con la característica (ej. 341 555 1234)");
+    if (dni.length < 7) return (err.textContent = "Escribí el DNI o CUIT del titular, sin puntos");
+    if (c1.length < 8) return (err.textContent = "La clave nueva tiene que tener al menos 8 caracteres");
+    if (c1 !== c2) return (err.textContent = "Las dos claves no coinciden");
+    ocupado($("#rBtn"), true);
+    try {
+      await api({ accion: "recuperar_clave", numero_cliente: num, celular: $("#rTel").value, dni: $("#rDni").value, clave: c1, web: $("#rWeb").value });
+      ["#rCl1", "#rCl2", "#rDni"].forEach((s) => ($(s).value = ""));
+      $("#fRecup").hidden = true; $("#rListo").hidden = false;
+    } catch (e) { err.textContent = e.message; }
+    finally { ocupado($("#rBtn"), false); }
+  });
+  document.addEventListener("click", (ev) => { const b = ev.target.closest('[data-ir="pRecup"]'); if (b) { $("#fRecup").hidden = false; $("#rListo").hidden = true; if (!$("#rNum").value) $("#rNum").value = $("#lNum").value; } });
+  // Link de invitación de la oficina: pedido.sat365.com.ar/oficina?n=1234 (completa el número).
+  const nInv = (new URLSearchParams(location.search).get("n") || "").replace(/[^0-9A-Za-z-]/g, "").slice(0, 20);
+  if (nInv) { $("#lNum").value = $("#aNum").value = $("#rNum").value = nInv; if (!pase) ir("pAct1"); }
   $("#fAct1").addEventListener("submit", (ev) => {
     ev.preventDefault(); $("#a1Err").textContent = "";
     const num = $("#aNum").value.trim(), tel = $("#aTel").value.replace(/\D/g, ""), dni = $("#aDni").value.replace(/\D/g, "");

@@ -370,6 +370,20 @@ module.exports = async (req, res) => {
         ${datos.tarea ? `<p><b>Qué necesita:</b> ${escapeHtml(datos.tarea)}</p>` : ""}
         <p style="color:#6B7680; font-size:13px;">Ya quedó registrado en Agenda de emergencia — este mail es solo un aviso, no hace falta cargarlo de nuevo.</p>
       `);
+    } else if (tipo === "interes_mi_sat") {
+      // "Quiero sumar…" desde Mi SAT: un cliente pide que ventas lo contacte.
+      destinatario = "ventas@sat365.com.ar";
+      asunto = `🛒 Mi SAT: ${datos.producto || "consulta"} — ${datos.cliente || ""}`;
+      html = envolverDocumento(`
+        <h2 style="margin-top:0;">Un cliente quiere que lo contacten</h2>
+        <p><b>Le interesa:</b> ${escapeHtml(datos.producto || "")}</p>
+        <p><b>Cliente:</b> ${escapeHtml(datos.cliente || "")}</p>
+        ${datos.telefono ? `<p><b>Teléfono:</b> ${escapeHtml(datos.telefono)}</p>` : ""}
+        ${datos.direccion ? `<p><b>Dirección:</b> ${escapeHtml(datos.direccion)}</p>` : ""}
+        ${datos.horario ? `<p><b>Cuándo llamarlo:</b> ${escapeHtml(datos.horario)}</p>` : ""}
+        ${datos.comentario ? `<p><b>Comentario:</b> ${escapeHtml(datos.comentario)}</p>` : ""}
+        <p style="color:#6B7680; font-size:13px;">También figura en admin → Portal de clientes → Interesados.</p>
+      `);
     } else if (tipo === "gestion_llaves") {
       // Aviso de una gestión nueva del portal de administradores de consorcio
       // (lib/consorcio.js). Va fijo a administración y edificios (mismo criterio
