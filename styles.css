@@ -4227,3 +4227,14 @@ label.veh-herr-item:has(input:checked) { border-color: #F5A623; background: #FFF
 .pd-resena.hecha { background: transparent; color: inherit; border: 1.5px solid rgba(127,127,127,.4); cursor: default; }
 .pd-resena.hecha .pd-resena-ic { color: #2E9E4F; font-weight: 800; }
 .pd-resena-otra { background: none; border: 0; padding: 2px 2px 8px; color: inherit; opacity: .75; font: inherit; font-size: 13px; text-decoration: underline; cursor: pointer; }
+.pd-resena-elegir { border: 1.5px solid rgba(245,166,35,.55); border-radius: 14px; padding: 12px; margin: 4px 0 8px; }
+.pd-resena-lbl { display: block; font-size: 12px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; opacity: .8; margin-bottom: 6px; }
+.pd-resena-elegir .field-input { width: 100%; box-sizing: border-box; font-size: 17px; margin-bottom: 8px; }
+.pd-resena-sugs { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.pd-resena-sug { display: block; text-align: left; width: 100%; background: transparent; color: inherit; font: inherit; border: 1px solid rgba(127,127,127,.35); border-radius: 10px; padding: 7px 10px; cursor: pointer; }
+.pd-resena-sug b { display: block; font-size: 14.5px; }
+.pd-resena-sug small { display: block; font-size: 12px; opacity: .7; }
+.pd-resena-sug.elegido { border-color: #F5A623; background: rgba(245,166,35,.14); }
+.pd-resena-nada { font-size: 13px; opacity: .8; margin-bottom: 10px; }
+.pd-resena:disabled { opacity: .5; cursor: not-allowed; }
+.pd-resena-pie { display: flex; justify-content: space-between; gap: 10px; }
