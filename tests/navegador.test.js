@@ -2036,12 +2036,14 @@ test("Historial: «Pedir reseña en Google» abre WhatsApp al cliente con el men
     const partes = {
       p1: { id: "p1", numero_servicio: "4100", cliente: "Sur Panadería", numero_cliente: "1203", telefono: "341 555-1111", fecha: hoy, firma_aclaracion: "MARTA Gómez" },
       p2: { id: "p2", numero_servicio: "4101", cliente: "Sin Teléfono", fecha: hoy },
-      p3: { id: "p3", numero_servicio: "4102", cliente: "Otro servicio del mismo", numero_cliente: "1203", telefono: "3415551111", fecha: "2026-10-02", firma_aclaracion: "" },
+      p3: { id: "p3", numero_servicio: "4102", cliente: "Otro servicio del mismo", numero_cliente: "1203", fecha: "2026-10-02", firma_aclaracion: "" },
+      p4: { id: "p4", numero_servicio: "4103", cliente: "Kiosco Norte", numero_cliente: "555", fecha: hoy },
     };
     const posts = [];
     let resenas = [];
     await page.route("**/api/**", (route) => {
       const req = route.request(), u = req.url();
+      if (u.includes("coleccion=clientes")) return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify([{ numero_cliente: "1203", nombre: "Sur Panadería", telefono: "341 555-1111" }, { numero_cliente: "555", nombre: "Kiosco Norte", telefono: "341 600-2020" }]) });
       if (u.includes("coleccion=resenas")) {
         if (req.method() === "POST") { const b = JSON.parse(req.postData()); posts.push(b); const reg = { ...b, fecha: new Date().toISOString(), por: "Juan Pérez" }; delete reg.accion; resenas = [reg, ...resenas]; return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ ok: true, registro: reg }) }); }
         return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(resenas) });
@@ -2054,7 +2056,14 @@ test("Historial: «Pedir reseña en Google» abre WhatsApp al cliente con el men
     await page.reload();
     await page.waitForTimeout(300);
     await page.evaluate(() => { tecnicoLogueado = "Juan Pérez"; window.__abiertos = []; window.open = (u) => { window.__abiertos.push(u); return null; }; return abrirParteDetalleModal("p2"); });
-    assert.strictEqual(await page.locator("#pdResenaBtn").count(), 0, estilo + ": sin teléfono no hay botón");
+    await page.waitForSelector("#pdResenaBtn");
+    assert.match(await page.textContent("#pdResenaBtn"), /elegís el contacto en WhatsApp/, estilo + ": sin teléfono en ningún lado, se elige el contacto");
+    await page.click("#pdResenaBtn");
+    assert.match((await page.evaluate(() => window.__abiertos))[0], /^https:\/\/wa\.me\/\?text=/, estilo);
+    // El parte no trae teléfono, pero el cliente sí lo tiene en la base de clientes.
+    await page.evaluate(() => abrirParteDetalleModal("p4"));
+    await page.waitForFunction(() => /341 600-2020/.test(document.getElementById("pdResenaWrap").textContent));
+    await page.evaluate(() => { window.__abiertos = []; });
     await page.evaluate(() => abrirParteDetalleModal("p1"));
     await page.waitForSelector("#pdResenaBtn");
     assert.match(await page.textContent("#pdResenaBtn"), /Pedir reseña en Google[\s\S]*341 555-1111/, estilo);
@@ -2065,8 +2074,8 @@ test("Historial: «Pedir reseña en Google» abre WhatsApp al cliente con el men
     assert.match(texto, /^¡Hola Marta! 👋 Te escribimos de \*SAT Servicio Técnico\*\. Gracias por confiar en nosotros para el servicio de hoy\./, estilo);
     assert.match(texto, /solo 30 segundos[\s\S]*https:\/\/pedido\.sat365\.com\.ar\/resena/, estilo);
     await page.waitForFunction(() => /Reseña pedida hoy/.test(document.getElementById("pdResenaWrap").textContent));
-    assert.strictEqual(posts.length, 1);
-    assert.deepStrictEqual([posts[0].id_parte, posts[0].numero_cliente, posts[0].telefono], ["p1", "1203", "3415551111"]);
+    assert.strictEqual(posts.length, 2);
+    assert.deepStrictEqual([posts[1].id_parte, posts[1].numero_cliente, posts[1].telefono], ["p1", "1203", "3415551111"]);
     // Otro parte del mismo cliente: avisa que ya se le pidió; igual se puede volver a mandar (sin nombre y con la fecha).
     await page.evaluate(() => abrirParteDetalleModal("p3"));
     await page.waitForFunction(() => /otro servicio/.test(document.getElementById("pdResenaWrap").textContent));

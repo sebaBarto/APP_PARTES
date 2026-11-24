@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.87.0";
+const APP_VERSION = "4.87.1";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -7434,7 +7434,7 @@ async function abrirParteDetalleModal(idParte) {
       };
       const seccion = (titulo, cuerpo) => (cuerpo.trim() ? `<section class="pd-sec"><h3 class="pd-sec-tit">${titulo}</h3>${cuerpo}</section>` : "");
       const direccionCompleta = [p.direccion, p.localidad].filter(Boolean).join(", ");
-      const telefonoNum = String(p.telefono || "").replace(/[^\d+]/g, "");
+      const telefonoNum = String(telefonoParaResena(p) || "").replace(/[^\d+]/g, "");
       const tecnicos = [p.tecnico, p.tecnico_segundo].filter(Boolean).join(" y ");
       const ico = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
       const acciones = [
@@ -7588,7 +7588,7 @@ async function cargarResenasPedidas(forzar) {
 const telResena = (t) => String(t || "").replace(/\D/g, "").slice(-10);
 // La última vez que se le pidió a este cliente (por este parte, su N° de cliente o su teléfono).
 function resenaPreviaDe(p, lista) {
-  const tel = telResena(p.telefono);
+  const tel = telResena(telefonoParaResena(p));
   return (lista || []).find((x) => (x.id_parte && x.id_parte === String(p.id || p.id_parte || ""))
     || (p.numero_cliente && x.numero_cliente && String(x.numero_cliente) === String(p.numero_cliente))
     || (tel.length >= 6 && x.telefono === tel)) || null;
@@ -7621,20 +7621,36 @@ function fechaHoraCorta(iso) {
   const dia = fechaLocalISO(d) === fechaLocalISO() ? "hoy" : `el ${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
   return `${dia} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
+// El parte casi nunca trae el teléfono: se busca en la base de clientes o en los servicios pendientes.
+function telefonoParaResena(p) {
+  if (String(p.telefono || "").replace(/\D/g, "").length >= 6) return String(p.telefono);
+  const coincide = (c) => c && ((p.numero_cliente && c.numero_cliente && String(c.numero_cliente) === String(p.numero_cliente))
+    || (!p.numero_cliente && p.cliente && normalizeText(c.nombre || c.cliente || "") === normalizeText(p.cliente)));
+  const conTel = (c) => coincide(c) && String(c.telefono || "").replace(/\D/g, "").length >= 6;
+  const enBase = (Array.isArray(clientesGeneralCache) ? clientesGeneralCache : []).find(conTel);
+  if (enBase) return String(enBase.telefono);
+  const enServ = (Array.isArray(serviciosCache) ? serviciosCache : []).find(conTel);
+  return enServ ? String(enServ.telefono) : "";
+}
 function montarBotonResena(p, wrap) {
   if (!wrap) return;
-  const numero = limpiarTelefonoWhatsapp(p.telefono);
-  if (!numero) { wrap.innerHTML = ""; return; }
+  let telefono = telefonoParaResena(p);
+  let numero = limpiarTelefonoWhatsapp(telefono);
+  // Si todavía no se cargó la base de clientes, se busca ahí y se vuelve a armar el botón.
+  if (!numero && clientesGeneralCache === null && typeof cargarClientesGeneral === "function") {
+    cargarClientesGeneral().then(() => { if (wrap.isConnected && telefonoParaResena(p)) montarBotonResena(p, wrap); }).catch(() => {});
+  }
   const pintar = (previa) => {
     const yaEste = previa && previa.id_parte === String(p.id || p.id_parte || "");
     wrap.innerHTML = previa
       ? `<div class="pd-resena hecha"><span class="pd-resena-ic">✓</span><div><b>Reseña pedida ${escapeHtml(fechaHoraCorta(previa.fecha))}${previa.por ? " por " + escapeHtml(previa.por) : ""}</b><small>${yaEste ? "En este servicio." : "A este cliente, en otro servicio."}</small></div></div>
          <button type="button" class="pd-resena-otra" id="pdResenaBtn">Volver a mandarla por WhatsApp</button>`
-      : `<button type="button" class="pd-resena" id="pdResenaBtn"><span class="pd-resena-ic">⭐</span><div><b>Pedir reseña en Google</b><small>Le llega por WhatsApp al ${escapeHtml(p.telefono)}</small></div></button>`;
+      : `<button type="button" class="pd-resena" id="pdResenaBtn"><span class="pd-resena-ic">⭐</span><div><b>Pedir reseña en Google</b><small>${numero ? "Le llega por WhatsApp al " + escapeHtml(telefono) : "No tengo su teléfono: elegís el contacto en WhatsApp"}</small></div></button>`;
     wrap.querySelector("#pdResenaBtn").addEventListener("click", async () => {
       // Primero se abre WhatsApp (algunos celulares no dejan abrir ventanas después de esperar la red).
-      window.open(`https://wa.me/${numero}?text=${encodeURIComponent(mensajeResena(p))}`, "_blank", "noopener");
-      const reg = { id_parte: String(p.id || p.id_parte || ""), numero_cliente: p.numero_cliente || "", cliente: p.cliente || "", telefono: telResena(p.telefono), fecha: new Date().toISOString(), por: tecnicoLogueado || "" };
+      // Sin teléfono, WhatsApp abre con el mensaje escrito y se elige a quién mandarlo.
+      window.open(`https://wa.me/${numero || ""}?text=${encodeURIComponent(mensajeResena(p))}`, "_blank", "noopener");
+      const reg = { id_parte: String(p.id || p.id_parte || ""), numero_cliente: p.numero_cliente || "", cliente: p.cliente || "", telefono: telResena(telefono), fecha: new Date().toISOString(), por: tecnicoLogueado || "" };
       pintar(reg);
       try {
         const r = await fetch("/api/datos?coleccion=resenas", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + SERVICIOS_API_TOKEN }, body: JSON.stringify({ accion: "pedida", ...reg }) });

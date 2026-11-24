@@ -421,14 +421,15 @@ test("reseñas pedidas: se anota quién, a qué parte y teléfono (sin 54/9), y 
   const gh = { leer: async (r, d) => ({ data: store[r] ? JSON.parse(store[r]) : d, sha: store[r] ? "x" : null }), escribir: async (r, data) => { store[r] = JSON.stringify(data); return { ok: true }; } };
   const tec = { nombre: "Juan Pérez", rol: "tecnico" };
   const llamarR = (req) => llamar((rq, rs) => resenas.manejar(rq, rs, tec, gh, rq.body), req);
-  assert.strictEqual((await llamarR({ method: "POST", body: { accion: "pedida", id_parte: "p1" } })).status, 400, "sin teléfono");
+  assert.strictEqual((await llamarR({ method: "POST", body: { accion: "pedida", id_parte: "p1" } })).status, 400, "sin ningún dato del cliente");
+  assert.strictEqual((await llamarR({ method: "POST", body: { accion: "pedida", id_parte: "p0", numero_cliente: "77" } })).status, 200, "sin teléfono, con N° de cliente");
   assert.strictEqual((await llamarR({ method: "POST", body: { accion: "otra" } })).status, 400);
   const ok = await llamarR({ method: "POST", body: { accion: "pedida", id_parte: "p1", numero_cliente: "1203", cliente: "Panadería", telefono: "+54 9 341 555-1111", por: "otro" } });
   assert.strictEqual(ok.status, 200);
   assert.strictEqual(ok.data.registro.telefono, "3415551111");
   assert.strictEqual(ok.data.registro.por, "Juan Pérez", "el nombre sale de la sesión, no del pedido");
   const lista = (await llamarR({ method: "GET", query: {} })).data;
-  assert.strictEqual(lista.length, 1);
+  assert.strictEqual(lista.length, 2);
 });
 
 test("campaña de registro: fecha límite, propuesta de llaves sin dueño, aprobación del administrador y conciliación marcada", async () => {
