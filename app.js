@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.87.2";
+const APP_VERSION = "4.87.3";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -2133,17 +2133,41 @@ function actualizarBotonLlamar(telefono) {
 // ---------- Aviso "estoy en camino" por WhatsApp (link wa.me) ----------
 const whatsappClienteBtn = document.getElementById("whatsappClienteBtn");
 
+// Número para WhatsApp (wa.me): 54 + 9 + característica + número, sin el 0
+// ni el 15. SAT está en Rosario, así que si falta la característica se
+// agrega la 341. Ejemplos:
+//   "15 555-1234"          -> 5493415551234
+//   "0341 15 555-1234"     -> 5493415551234
+//   "341 555-1234"         -> 5493415551234
+//   "+54 9 11 2345-6789"   -> 5491123456789
+const CARACTERISTICA_LOCAL = "341";
 function limpiarTelefonoWhatsapp(numero) {
-  let limpio = (numero || "").toString().replace(/\D/g, "");
-  if (!limpio) return "";
-  // Si no viene con código de país, se asume Argentina (54) + el 9 que
-  // llevan los celulares en WhatsApp. Puede necesitar ajuste según el
-  // formato real de los teléfonos que carga el ERP — probar con un
-  // número real y corregir acá si hace falta.
-  if (!limpio.startsWith("54")) {
-    limpio = "549" + limpio.replace(/^0/, "");
+  let d = (numero || "").toString().replace(/\D/g, "");
+  if (!d) return "";
+  // Con código de país: se le saca el 54 (y el 9 si ya lo traía) y se normaliza el resto.
+  if (/^54/.test(d) && d.length >= 12) d = d.slice(2).replace(/^9(?=\d{10,12}$)/, "");
+  d = d.replace(/^0+/, "");
+  // Celular sin característica: 15 + 6 a 8 dígitos (ej.: 15 555-1234).
+  if (/^15\d{6,8}$/.test(d)) d = CARACTERISTICA_LOCAL + d.slice(2);
+  // Fijo o celular sin característica ni 15: 6 a 8 dígitos.
+  else if (d.length >= 6 && d.length <= 8) d = CARACTERISTICA_LOCAL + d;
+  // Característica + 15 + número (ej.: 341 15 555-1234): se saca el 15.
+  if (d.length > 10) {
+    for (const k of [3, 4, 2]) {
+      if (d.slice(k, k + 2) === "15" && d.length - 2 === 10) { d = d.slice(0, k) + d.slice(k + 2); break; }
+    }
   }
-  return limpio;
+  return "549" + d;
+}
+// Para mostrar a qué número va: +54 9 341 555-1234
+function telefonoWhatsappLegible(numero) {
+  const w = limpiarTelefonoWhatsapp(numero);
+  if (!/^549\d{10}$/.test(w)) return w ? "+" + w : "";
+  const r = w.slice(3);
+  const area = r.startsWith("11") ? 2 : r.startsWith(CARACTERISTICA_LOCAL) ? 3 : 0;
+  if (!area) return "+54 9 " + r; // otras características: no se sabe dónde cortar
+  const loc = r.slice(area);
+  return `+54 9 ${r.slice(0, area)} ${loc.slice(0, loc.length - 4)}-${loc.slice(-4)}`;
 }
 
 function actualizarBotonWhatsapp(telefono) {
@@ -7585,7 +7609,8 @@ async function cargarResenasPedidas(forzar) {
   } catch (e) { /* sin señal: se muestra igual el botón */ }
   return resenasPedidasCache || [];
 }
-const telResena = (t) => String(t || "").replace(/\D/g, "").slice(-10);
+// Los 10 dígitos (característica + número, sin 0 ni 15) para comparar números escritos distinto.
+const telResena = (t) => { const w = limpiarTelefonoWhatsapp(t); return w ? w.slice(-10) : ""; };
 // La última vez que se le pidió a este cliente (por este parte, su N° de cliente o su teléfono).
 function resenaPreviaDe(p, lista) {
   const tel = telResena(telefonoParaResena(p));
@@ -7641,7 +7666,8 @@ function sugerenciasTelefono(p) {
   if (!res.length) (Array.isArray(serviciosCache) ? serviciosCache : []).filter((c) => porNumero(c) || porNombre(c)).forEach((c) => sumar(c.telefono, "Del servicio pendiente"));
   return res;
 }
-const numeroValidoResena = (t) => String(t || "").replace(/\D/g, "").length >= 8 && !!limpiarTelefonoWhatsapp(t);
+// Válido para WhatsApp: después de normalizar queda 549 + 10 dígitos.
+const numeroValidoResena = (t) => /^549\d{10}$/.test(limpiarTelefonoWhatsapp(t));
 function telefonoParaResena(p) { const s = sugerenciasTelefono(p); return s.length ? s[0].tel : ""; }
 function montarBotonResena(p, wrap) {
   if (!wrap) return;
@@ -7680,7 +7706,7 @@ function montarBotonResena(p, wrap) {
     const actualizar = () => {
       escrito = inp.value;
       const ok = numeroValidoResena(inp.value);
-      wrap.querySelector("#pdResenaA").textContent = ok ? "Al " + inp.value.trim() : "Escribí un número válido (con característica)";
+      wrap.querySelector("#pdResenaA").textContent = ok ? "Al " + telefonoWhatsappLegible(inp.value) : "Escribí un número válido";
       wrap.querySelector("#pdResenaEnviar").disabled = !ok;
       wrap.querySelectorAll(".pd-resena-sug").forEach((b) => b.classList.toggle("elegido", telResena(sug[Number(b.dataset.i)].tel) === telResena(inp.value)));
     };

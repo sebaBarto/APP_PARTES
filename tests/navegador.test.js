@@ -2029,6 +2029,18 @@ test("Seguridad: la app manda el pase personal que le dio el login y, si el serv
   await ctx.close();
 });
 
+test("WhatsApp: el número se arma con 54 9, sin 0 ni 15, y con la 341 si no tiene característica", async () => {
+  const { ctx, page } = await nuevaPagina();
+  await page.goto(base + "/");
+  const casos = {
+    "15 555-1234": "5493415551234", "0341 15 555-1234": "5493415551234", "341 15 5551234": "5493415551234",
+    "341 555-1234": "5493415551234", "+54 9 341 555-1234": "5493415551234", "54 341 15 555-1234": "5493415551234",
+    "011 15 2345-6789": "5491123456789", "+54 9 11 2345-6789": "5491123456789", "4551234": "5493414551234", "03402 15 412345": "5493402412345",
+  };
+  for (const [entra, sale] of Object.entries(casos)) assert.strictEqual(await page.evaluate((t) => limpiarTelefonoWhatsapp(t), entra), sale, entra);
+  await ctx.close();
+});
+
 test("Historial: «Pedir reseña en Google» sugiere el número del listado de clientes, abre WhatsApp y queda anotada", async () => {
   for (const estilo of ["nuevo", "clasico"]) {
     const { ctx, page, erroresPagina } = await nuevaPagina();
@@ -2073,7 +2085,9 @@ test("Historial: «Pedir reseña en Google» sugiere el número del listado de c
     assert.strictEqual(await page.inputValue("#pdResenaTel"), "341 600-2020", estilo);
     await page.fill("#pdResenaTel", "12");
     assert.ok(await page.locator("#pdResenaEnviar").isDisabled(), estilo + ": número inválido");
-    await page.fill("#pdResenaTel", "341 600-2020");
+    // Celular con 15 y sin característica: se le saca el 15 y se le agrega la 341.
+    await page.fill("#pdResenaTel", "15 600-2020");
+    assert.match(await page.textContent("#pdResenaA"), /Al \+54 9 341 600-2020/, estilo);
     await page.click("#pdResenaEnviar");
     const url = (await page.evaluate(() => window.__abiertos))[0];
     assert.match(url, /^https:\/\/wa\.me\/5493416002020\?text=/, estilo);
