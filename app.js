@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.87.4";
+const APP_VERSION = "4.87.5";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -946,10 +946,8 @@ function restaurarBorradorSiExiste(numeroServicio) {
   tecnicoSelect2.value = b.tecnico2 || "";
   tecnicoSelect2.dispatchEvent(new Event("change", { bubbles: true }));
   tecnicoOtro2.value = b.tecnico2_otro || "";
-  document.getElementById("f_fecha").value = b.fecha || "";
-  fechaConfirmadaParte = "";
-  document.getElementById("f_entrada").value = b.hora_entrada || "";
-  document.getElementById("f_salida").value = b.hora_salida || "";
+  // La fecha y la hora NO se restauran del borrador: se toman del momento en
+  // que se abre el servicio (ver ponerFechaHoraDeAhora).
   imprevistoCheck.checked = !!b.imprevisto;
   imprevistoCheck.dispatchEvent(new Event("change", { bubbles: true }));
   document.getElementById("f_imprevisto_detalle").value = b.imprevisto_detalle || "";
@@ -2300,8 +2298,9 @@ function seleccionarServicio(item) {
   setTimeout(() => avisoEquipoParte(true), 300); // llamado de atención si la batería es vieja
   cargarOpcionesSimInstalar();
   const restaurado = restaurarBorradorSiExiste(currentNumeroServicio);
+  ponerFechaHoraDeAhora();
   if (restaurado) {
-    showToast("Se restauró lo que ya tenías cargado en este servicio.");
+    showToast("Se restauró lo que ya tenías cargado en este servicio (la fecha y la hora de entrada son las de ahora).");
   }
   showScreen("form");
 }
@@ -2316,7 +2315,7 @@ manualReportBtn.addEventListener("click", () => {
   actualizarBotonVerPlano(null);
   actualizarCobradorInfo(null);
   autocompletarTecnico();
-  autocompletarFecha();
+  ponerFechaHoraDeAhora();
   mostrarVisitaAnterior();
   cargarOpcionesSimInstalar();
   showScreen("form");
@@ -2985,7 +2984,7 @@ function seleccionarTareaCronograma(t) {
   actualizarBotonLlamar(null);
   actualizarBotonWhatsapp(null);
   autocompletarTecnico();
-  autocompletarFecha();
+  ponerFechaHoraDeAhora();
   mostrarVisitaAnterior();
   setTimeout(() => avisoEquipoParte(true), 300); // llamado de atención si la batería es vieja
   cargarOpcionesSimInstalar();
@@ -3118,6 +3117,18 @@ function autocompletarTecnico() {
     tecnicoSelect.value = tecnicoLogueado;
     tecnicoOtro.style.display = "none";
   }
+}
+
+// Al abrir un servicio (o un parte manual): fecha de hoy y hora de entrada
+// = ahora, siempre, aunque haya un borrador de otro día. La salida se
+// completa sola al pasar a la firma. Se pueden cambiar a mano.
+function ponerFechaHoraDeAhora() {
+  const ahora = new Date();
+  document.getElementById("f_fecha").value = fechaLocalISO(ahora);
+  document.getElementById("f_entrada").value = `${String(ahora.getHours()).padStart(2, "0")}:${String(ahora.getMinutes()).padStart(2, "0")}`;
+  document.getElementById("f_salida").value = "";
+  fechaConfirmadaParte = "";
+  try { verificarHorarioCruzaDia(); } catch (e) { /* nada */ }
 }
 
 // Autocompleta la fecha de hoy si el campo está vacío (se puede

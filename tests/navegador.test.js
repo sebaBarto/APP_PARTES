@@ -5985,6 +5985,22 @@ test("Mails del parte: se ocultan las secciones vacías, «Lo que se pidió» so
   assert.match(conCostos, /Materiales utilizados[\s\S]*Batería 12V/);
 });
 
+test("Parte: al abrir un servicio la fecha y la hora de entrada son las de ese momento (aunque haya un borrador de ayer)", async () => {
+  const { ctx, page, erroresPagina } = await paginaConEstilo("nuevo");
+  const ayer = await page.evaluate(() => { const d = new Date(); d.setDate(d.getDate() - 1); return fechaLocalISO(d); });
+  await page.evaluate((f) => localStorage.setItem(claveBorrador("37964"), JSON.stringify({ cliente: "Lardone Flavia", tarea: "Revisé la Z7", fecha: f, hora_entrada: "08:00", hora_salida: "08:30", materiales_agregados: [], claves: [] })), ayer);
+  const antes = await page.evaluate(() => Date.now());
+  await page.evaluate(() => seleccionarServicio({ numero_servicio: "37964", cliente: "Lardone Flavia", direccion: "Mitre 100", tarea: "Revisar alarma" }));
+  assert.strictEqual(await page.inputValue("#f_tarea"), "Revisé la Z7", "el resto del borrador se restaura");
+  assert.strictEqual(await page.inputValue("#f_fecha"), await page.evaluate(() => fechaLocalISO()));
+  const entrada = await page.inputValue("#f_entrada");
+  const ahora = await page.evaluate((t) => { const d = new Date(t); return [d, new Date()].map((x) => `${String(x.getHours()).padStart(2, "0")}:${String(x.getMinutes()).padStart(2, "0")}`); }, antes);
+  assert.ok(ahora.includes(entrada), `entrada ${entrada} = la hora de ahora`);
+  assert.strictEqual(await page.inputValue("#f_salida"), "", "la salida se completa al pasar a la firma");
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
 test("Parte: si la fecha no es hoy (borrador de ayer o APP abierta desde ayer), pregunta antes de la firma", async () => {
   const { ctx, page, erroresPagina } = await paginaConEstilo("nuevo");
   const ayer = await page.evaluate(() => { const d = new Date(); d.setDate(d.getDate() - 1); return fechaLocalISO(d); });
