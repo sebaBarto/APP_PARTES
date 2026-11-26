@@ -11914,7 +11914,7 @@ function rllMostrarClave(a, clave) {
     <p style="margin:6px 0 10px;font-size:13px;color:#6B7680;">Anotala o mandala ahora: por seguridad no se vuelve a mostrar (si se pierde, generás otra).</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
       <button type="button" class="btn-secondary-admin" id="rllAdmCopiarBtn" style="width:auto;">Copiar mensaje con el acceso</button>
-      <a class="btn-secondary-admin" style="width:auto;display:inline-flex;align-items:center;padding:10px 14px;border-radius:var(--r-sm);text-decoration:none;font-weight:600;" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(msg)}">Mandar por WhatsApp</a>
+      <a class="btn-secondary-admin" style="width:auto;display:inline-flex;align-items:center;padding:10px 14px;border-radius:var(--r-sm);text-decoration:none;font-weight:600;" target="_blank" rel="noopener" href="https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}">Mandar por WhatsApp</a>
       <button type="button" class="btn-secondary-admin" id="rllAdmCerrarClaveBtn" style="width:auto;border-color:transparent;text-decoration:underline;">Listo, cerrar</button>
     </div>`;
   box.classList.remove("hidden");
@@ -14191,7 +14191,7 @@ document.getElementById("msolLista").addEventListener("click", async (ev) => {
     if (!r.ok) throw new Error(d.error || "Error");
     await misatCargarSolicitudes();
     if (b.dataset.msol === "enviada" && x.celular && (await confirmarAdmin("¿Le avisamos al cliente por WhatsApp que ya está pasado a la central? (también lo ve en Mi SAT)"))) {
-      window.open(`https://wa.me/${misatWa(x.celular)}?text=${encodeURIComponent(msolTextoCliente(x))}`, "_blank", "noopener");
+      window.open(`https://api.whatsapp.com/send?phone=${misatWa(x.celular)}&text=${encodeURIComponent(msolTextoCliente(x))}`, "_blank", "noopener");
     }
   } catch (e) { avisoAdmin("No se pudo: " + e.message, "error"); b.disabled = false; }
 });
@@ -14215,7 +14215,7 @@ function misatPintar() {
       ${c.estado === "activa" ? `<button type="button" class="btn-secondary-admin" data-misat="dar_baja" data-id="${c.id}" style="color:#B3261E">Dar de baja (olvidó la clave / ya no es cliente)</button>` : ""}
       ${c.estado === "baja" ? `<button type="button" class="btn-secondary-admin" data-misat="reactivar" data-id="${c.id}">Reactivar</button>` : ""}
       ${c.estado !== "activa" ? `<button type="button" class="btn-secondary-admin" data-misat="borrar" data-id="${c.id}">Borrar</button>` : ""}
-      ${c.celular ? `<a class="btn-secondary-admin" style="width:auto;text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${misatWa(c.celular)}?text=${encodeURIComponent("Hola, te escribimos de SAT: tu acceso a Mi SAT ya está habilitado. Entrás en pedido.sat365.com.ar/oficina con tu número de cliente y la clave que elegiste.")}">WhatsApp</a>` : ""}</div>
+      ${c.celular ? `<a class="btn-secondary-admin" style="width:auto;text-decoration:none" target="_blank" rel="noopener" href="https://api.whatsapp.com/send?phone=${misatWa(c.celular)}&text=${encodeURIComponent("Hola, te escribimos de SAT: tu acceso a Mi SAT ya está habilitado. Entrás en pedido.sat365.com.ar/oficina con tu número de cliente y la clave que elegiste.")}">WhatsApp</a>` : ""}</div>
   </div>`).join("");
 }
 document.querySelectorAll(".misat-f").forEach((b) => b.addEventListener("click", () => {
@@ -15458,7 +15458,7 @@ function exPintarNuevo(v) {
     try {
       const d = await exPost({ accion: "crear_link", tecnico, niveles: exNuevo.niveles, minutos: exNuevo.minutos });
       const url = EX_URL + d.token;
-      document.getElementById("exLinkNuevo").innerHTML = `<div class="ex-link"><span>Link para <b>${exE(tecnico)}</b> (${d.total} preguntas, ${d.minutos} min): ${url}</span><button type="button" class="ex-btn chico" id="exCop">Copiar</button><a class="ex-btn chico sec" style="text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent("Hola " + tecnico + ", este es tu examen técnico de SAT. Tenés " + d.minutos + " minutos y una vez que empezás no podés salir de la página: si salís, se corrige como esté. Entrá cuando tengas el tiempo libre: " + url)}">Mandar por WhatsApp</a></div>`;
+      document.getElementById("exLinkNuevo").innerHTML = `<div class="ex-link"><span>Link para <b>${exE(tecnico)}</b> (${d.total} preguntas, ${d.minutos} min): ${url}</span><button type="button" class="ex-btn chico" id="exCop">Copiar</button><a class="ex-btn chico sec" style="text-decoration:none" target="_blank" rel="noopener" href="https://api.whatsapp.com/send?text=${encodeURIComponent("Hola " + tecnico + ", este es tu examen técnico de SAT. Tenés " + d.minutos + " minutos y una vez que empezás no podés salir de la página: si salís, se corrige como esté. Entrá cuando tengas el tiempo libre: " + url)}">Mandar por WhatsApp</a></div>`;
       document.getElementById("exCop").onclick = () => exCopiar(url);
       document.getElementById("exTec").value = "";
       exRefrescarDatos();
@@ -15564,7 +15564,7 @@ function misatBandejaBadge() {
 }
 document.querySelectorAll(".misat-bf").forEach((b) => b.addEventListener("click", () => { mbFiltro = b.dataset.bf; document.querySelectorAll(".misat-bf").forEach((x) => x.classList.toggle("on", x === b)); misatPintarBandeja(); }));
 document.getElementById("mbTodos").addEventListener("change", () => misatPintarBandeja());
-const mbWa = (tel, txt) => tel ? `<a class="btn-secondary-admin" style="width:auto;text-decoration:none" target="_blank" rel="noopener" href="https://wa.me/${misatWa(tel)}?text=${encodeURIComponent(txt)}">WhatsApp</a>` : "";
+const mbWa = (tel, txt) => tel ? `<a class="btn-secondary-admin" style="width:auto;text-decoration:none" target="_blank" rel="noopener" href="https://api.whatsapp.com/send?phone=${misatWa(tel)}&text=${encodeURIComponent(txt)}">WhatsApp</a>` : "";
 function misatPintarBandeja() {
   const todos = document.getElementById("mbTodos").checked, cont = document.getElementById("mbLista");
   let html = "";
@@ -15648,7 +15648,7 @@ function misatPintarInvitar() {
   const q = misatNorm(document.getElementById("miBuscar").value || ""), mon = document.getElementById("miMonit").checked, cel = document.getElementById("miCel").checked, noInv = document.getElementById("miNoInv").checked;
   const l = misatInv.lista.map((c) => ({ ...c, cel: misatCelularDe(c.telefono) })).filter((c) => (!mon || c.monitoreo) && (!cel || c.cel) && (!noInv || !c.invitado) && (!q || misatNorm([c.numero_cliente, c.nombre, c.localidad].join(" ")).includes(q)));
   document.getElementById("miResumen").textContent = `${misatInv.con_acceso} de ${misatInv.total_clientes} clientes ya tienen acceso o lo pidieron. En esta lista: ${l.length}.`;
-  document.getElementById("miLista").innerHTML = `<div class="misat-card" style="padding:0;overflow:auto"><table class="misat-tabla" style="width:100%;border-collapse:collapse;font-size:13.5px"><thead><tr><th style="text-align:left;padding:8px">N°</th><th style="text-align:left;padding:8px">Cliente</th><th style="text-align:left;padding:8px">Celular</th><th style="text-align:left;padding:8px">Invitado</th><th></th></tr></thead><tbody>${l.slice(0, 300).map((c) => `<tr style="border-top:1px solid rgba(16,24,32,.07)"><td style="padding:8px">${misatEsc(c.numero_cliente)}</td><td style="padding:8px"><b>${misatEsc(c.nombre)}</b><div style="color:#6B7680;font-size:12px">${misatEsc(c.localidad)}${c.monitoreo ? " · monitoreado" : ""}</div></td><td style="padding:8px">${misatEsc(c.cel || c.telefono || "—")}</td><td style="padding:8px;color:#6B7680">${c.invitado ? misatFecha(c.invitado.en) : ""}</td><td style="padding:8px;text-align:right">${c.cel ? `<a class="btn-secondary-admin" style="width:auto;text-decoration:none;white-space:nowrap" target="_blank" rel="noopener" data-inv="${misatEsc(c.numero_cliente)}" href="https://wa.me/${misatWa(c.cel)}?text=${encodeURIComponent(misatTextoInvitacion(c))}">WhatsApp</a>` : ""}</td></tr>`).join("")}</tbody></table>${l.length > 300 ? `<p class="subtitle" style="padding:8px">Se muestran los primeros 300. Usá el buscador para encontrar otros.</p>` : ""}</div>`;
+  document.getElementById("miLista").innerHTML = `<div class="misat-card" style="padding:0;overflow:auto"><table class="misat-tabla" style="width:100%;border-collapse:collapse;font-size:13.5px"><thead><tr><th style="text-align:left;padding:8px">N°</th><th style="text-align:left;padding:8px">Cliente</th><th style="text-align:left;padding:8px">Celular</th><th style="text-align:left;padding:8px">Invitado</th><th></th></tr></thead><tbody>${l.slice(0, 300).map((c) => `<tr style="border-top:1px solid rgba(16,24,32,.07)"><td style="padding:8px">${misatEsc(c.numero_cliente)}</td><td style="padding:8px"><b>${misatEsc(c.nombre)}</b><div style="color:#6B7680;font-size:12px">${misatEsc(c.localidad)}${c.monitoreo ? " · monitoreado" : ""}</div></td><td style="padding:8px">${misatEsc(c.cel || c.telefono || "—")}</td><td style="padding:8px;color:#6B7680">${c.invitado ? misatFecha(c.invitado.en) : ""}</td><td style="padding:8px;text-align:right">${c.cel ? `<a class="btn-secondary-admin" style="width:auto;text-decoration:none;white-space:nowrap" target="_blank" rel="noopener" data-inv="${misatEsc(c.numero_cliente)}" href="https://api.whatsapp.com/send?phone=${misatWa(c.cel)}&text=${encodeURIComponent(misatTextoInvitacion(c))}">WhatsApp</a>` : ""}</td></tr>`).join("")}</tbody></table>${l.length > 300 ? `<p class="subtitle" style="padding:8px">Se muestran los primeros 300. Usá el buscador para encontrar otros.</p>` : ""}</div>`;
 }
 function misatTextoInvitacion(c) {
   const pila = String(c.nombre || "").includes(",") ? String(c.nombre).split(",")[1].trim().split(/\s+/)[0] : String(c.nombre || "").split(/\s+/)[0];

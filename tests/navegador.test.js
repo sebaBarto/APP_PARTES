@@ -210,7 +210,7 @@ test("Próximo service: muestra la próxima tarea pendiente del técnico, saltea
   assert.strictEqual(await page.locator("#proximoServiceCliente").textContent(), "Panadería Sur");
   assert.match(await page.locator("#proximoServiceCuando").textContent(), /Mañana · 11:30/);
   assert.strictEqual(await page.locator("#proximoLlamarBtn").getAttribute("href"), "tel:3415551234");
-  assert.match(await page.locator("#proximoCaminoBtn").getAttribute("href"), /^https:\/\/wa\.me\/549341555123/);
+  assert.match(await page.locator("#proximoCaminoBtn").getAttribute("href"), /^https:\/\/api\.whatsapp\.com\/send\?phone=549341555123/);
   assert.match(await page.locator("#proximoComoLlegarBtn").getAttribute("href"), /google\.com\/maps\/dir.*Mitre%2055/);
   // resumen del día: 1 servicio pendiente con parte hecho hoy no cuenta como pendiente (123 está resuelto)
   assert.match(await page.locator("#tileServiciosResumen").textContent(), /1 pendiente/);
@@ -2072,7 +2072,7 @@ test("Historial: «Pedir reseña en Google» sugiere el número del listado de c
     assert.match(await page.textContent(".pd-resena-elegir"), /No hay un teléfono guardado/, estilo);
     assert.ok(await page.locator("#pdResenaEnviar").isDisabled(), estilo);
     await page.click("#pdResenaContacto");
-    assert.match((await page.evaluate(() => window.__abiertos))[0], /^https:\/\/wa\.me\/\?text=/, estilo);
+    assert.match((await page.evaluate(() => window.__abiertos))[0], /^https:\/\/api\.whatsapp\.com\/send\?text=/, estilo);
     // El parte no trae teléfono: sugiere los del listado de clientes (el campo trae dos).
     await page.evaluate(() => { window.__abiertos = []; return abrirParteDetalleModal("p1"); });
     await page.waitForFunction(() => /sugerido: 341 555-1111/.test(document.getElementById("pdResenaWrap").textContent));
@@ -2090,7 +2090,7 @@ test("Historial: «Pedir reseña en Google» sugiere el número del listado de c
     assert.match(await page.textContent("#pdResenaA"), /Al \+54 9 341 600-2020/, estilo);
     await page.click("#pdResenaEnviar");
     const url = (await page.evaluate(() => window.__abiertos))[0];
-    assert.match(url, /^https:\/\/wa\.me\/5493416002020\?text=/, estilo);
+    assert.match(url, /^https:\/\/api\.whatsapp\.com\/send\?phone=5493416002020&text=/, estilo);
     const texto = decodeURIComponent(url.split("text=")[1]);
     assert.match(texto, /^¡Hola Marta! 👋 Te escribimos de \*SAT Servicio Técnico\*\. Gracias por confiar en nosotros para el servicio de hoy\./, estilo);
     assert.match(texto, /solo 30 segundos[\s\S]*https:\/\/pedido\.sat365\.com\.ar\/resena/, estilo);
@@ -2522,7 +2522,7 @@ test("Presupuesto express: cliente del listado, artículos (en pesos y en dólar
   await page.click("#peWhatsappClienteBtn");
   await page.waitForFunction(() => window.__wa);
   const wa = decodeURIComponent(await page.evaluate(() => window.__wa));
-  assert.match(wa, /^https:\/\/wa\.me\/5493414519509\?text=Hola Tell Cecilia! Te enviamos el presupuesto E-0001[\s\S]*\$190\.000[\s\S]*Abono mensual de monitoreo: \$38\.500 por mes[\s\S]*api\/foto\?id=pdf1&tipo=pdf/);
+  assert.match(wa, /^https:\/\/api\.whatsapp\.com\/send\?phone=5493414519509&text=Hola Tell Cecilia! Te enviamos el presupuesto E-0001[\s\S]*\$190\.000[\s\S]*Abono mensual de monitoreo: \$38\.500 por mes[\s\S]*api\/foto\?id=pdf1&tipo=pdf/);
   // Corregir: sale como revisión del mismo número
   await page.evaluate(() => { window.dialogoApp = async (m, op = {}) => (op.conTexto ? null : true); window.__compartido = null; });
   await page.click("[data-corregir]");
@@ -4301,7 +4301,7 @@ test("Vista 3D: desde el croquis se ve en 3D y se le manda al cliente por link (
     assert.ok(!JSON.stringify(pedido).includes("Falsa"), "no manda la dirección");
     assert.strictEqual(pedido.paginas[0].elementos.length, CASA_3D.length);
     const abierto = await page.evaluate(() => window.__abierto);
-    assert.match(decodeURIComponent(abierto), /^https:\/\/wa\.me\/\?text=Hola Juan! .*\/vista-3d\.html\?id=0123456789abcdef/s);
+    assert.match(decodeURIComponent(abierto), /^https:\/\/api\.whatsapp\.com\/send\?text=Hola Juan! .*\/vista-3d\.html\?id=0123456789abcdef/s);
     // Archivo HTML
     await page.click('.v3-barra [data-extra="0"]');
     await page.click('[data-m="html"]');
@@ -5095,7 +5095,7 @@ test("Tarjeta de contacto del asesor: se elige y edita al mandar la vista 3D, y 
     await p2.click(".v3-asesor");
     await p2.waitForSelector(".v3-tarjeta");
     const links = await p2.$$eval(".v3-tarjeta a", (as) => as.map((a) => a.getAttribute("href")));
-    assert.ok(links.some((h) => h.startsWith("https://wa.me/5491155551234?text=")), "WhatsApp con el número bien armado: " + links.join(" "));
+    assert.ok(links.some((h) => h.startsWith("https://api.whatsapp.com/send?phone=5491155551234&text=")), "WhatsApp con el número bien armado: " + links.join(" "));
     assert.ok(links.includes("tel:0111555551234"));
     assert.ok(links.includes("https://instagram.com/satalarmas"));
     assert.ok(!links.some((h) => /javascript/.test(h)), "nada de links peligrosos");

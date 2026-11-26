@@ -1479,7 +1479,7 @@ function actualizarAccionesProximo(serv, direccion, localidad) {
     const numWa = limpiarTelefonoWhatsapp(tel);
     const nombre = tecnicoLogueado || "un técnico";
     const msg = `Hola! Soy ${nombre}, técnico de SAT (seguridad electrónica). Le escribo para avisarle que estoy en camino a su domicilio para el servicio técnico. ¡Nos vemos pronto!`;
-    camino.href = `https://wa.me/${numWa}?text=${encodeURIComponent(msg)}`;
+    camino.href = `https://api.whatsapp.com/send?phone=${numWa}&text=${encodeURIComponent(msg)}`;
     camino.classList.toggle("hidden", !numWa);
   } else {
     llamar.classList.add("hidden");
@@ -2190,7 +2190,7 @@ whatsappClienteBtn.addEventListener("click", (e) => {
   }
   const tecnico = getTecnicoValue() || "un técnico";
   const mensaje = `Hola! Soy ${tecnico}, técnico de SAT (seguridad electrónica). Le escribo para avisarle que estoy en camino a su domicilio para el servicio técnico. ¡Nos vemos pronto!`;
-  whatsappClienteBtn.href = `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
+  whatsappClienteBtn.href = `https://api.whatsapp.com/send?phone=${numero}&text=${encodeURIComponent(mensaje)}`;
 });
 
 // ---------- Acceso directo al plano del cliente, si el servicio trae número de cliente ----------
@@ -6741,7 +6741,7 @@ async function cargarYRenderGuardias() {
       guardiaLlamarBtn.href = "tel:" + (actual.telefono || "").replace(/[^\d+]/g, "");
       const numeroWa = limpiarTelefonoWhatsapp(actual.telefono);
       const mensaje = `Hola ${actual.nombre}, te contacto por un tema de guardia técnica.`;
-      guardiaWhatsappBtn.href = numeroWa ? `https://wa.me/${numeroWa}?text=${encodeURIComponent(mensaje)}` : "#";
+      guardiaWhatsappBtn.href = numeroWa ? `https://api.whatsapp.com/send?phone=${numeroWa}&text=${encodeURIComponent(mensaje)}` : "#";
       guardiaActualWrap.classList.remove("hidden");
     }
 
@@ -7565,7 +7565,7 @@ async function abrirParteDetalleModal(idParte) {
         try {
           if (navigator.share) { await navigator.share({ text: texto }); return; }
         } catch (e) { if (e && e.name === "AbortError") return; }
-        window.open("https://wa.me/?text=" + encodeURIComponent(texto), "_blank", "noopener");
+        window.open("https://api.whatsapp.com/send?text=" + encodeURIComponent(texto), "_blank", "noopener");
       });
       parteDetalleModalContenido.querySelectorAll("[data-ampliar]").forEach((b) => b.addEventListener("click", () => ampliarImagenParte(b.dataset.ampliar)));
     } else {
@@ -7712,7 +7712,7 @@ function montarBotonResena(p, wrap) {
     const numero = limpiarTelefonoWhatsapp(telefono);
     // Primero se abre WhatsApp (algunos celulares no dejan abrir ventanas después de esperar la red).
     // Sin número, WhatsApp abre con el mensaje escrito y se elige a quién mandarlo.
-    window.open(`https://wa.me/${numero || ""}?text=${encodeURIComponent(mensajeResena(p))}`, "_blank", "noopener");
+    window.open(`https://api.whatsapp.com/send?${numero ? "phone=" + numero + "&" : ""}text=${encodeURIComponent(mensajeResena(p))}`, "_blank", "noopener");
     const reg = { id_parte: String(p.id || p.id_parte || ""), numero_cliente: p.numero_cliente || "", cliente: p.cliente || "", telefono: numero ? telResena(telefono) : "", fecha: new Date().toISOString(), por: tecnicoLogueado || "" };
     abierto = false;
     pintar(reg);
@@ -9972,7 +9972,7 @@ seguimientoWhatsappBtn.addEventListener("click", () => {
   const telefono = seguimientoDoneWrap.dataset.telefono || localStorage.getItem("seguimiento_activo_telefono") || "";
   const numeroWa = limpiarTelefonoWhatsapp(telefono);
   const mensaje = `Hola! Soy de Servicio Técnico SAT, voy en camino. Podés seguir mi recorrido acá: ${link}`;
-  const url = numeroWa ? `https://wa.me/${numeroWa}?text=${encodeURIComponent(mensaje)}` : `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
+  const url = numeroWa ? `https://api.whatsapp.com/send?phone=${numeroWa}&text=${encodeURIComponent(mensaje)}` : `https://api.whatsapp.com/send?text=${encodeURIComponent(mensaje)}`;
   window.open(url, "_blank");
 });
 
@@ -16419,7 +16419,7 @@ async function peEnviarWhatsappCliente() {
   if (!peUltimoPdf.link && peUltimoPdf.copia) { btn.textContent = "Preparando el link..."; try { await peUltimoPdf.copia; } catch (e) { /* nada */ } btn.textContent = "Enviar al WhatsApp del cliente"; }
   const nombre = String(peUltimoPdf.cliente || "").split(/[-,]/)[0].trim();
   const texto = `Hola${nombre ? " " + nombre : ""}! Te enviamos el presupuesto ${peUltimoPdf.numero} de SAT${peUltimoPdf.titulo ? ` (${peUltimoPdf.titulo})` : ""}.\nTotal: ${pePesos(peUltimoPdf.total)} ${peUltimoPdf.mo_iva ? "(la mano de obra es + IVA)" : "(precio final, IVA incluido)"}.${peUltimoPdf.abono > 0 && PE_TIPOS[peUltimoPdf.tipo] ? `\n${PE_TIPOS[peUltimoPdf.tipo].abono}: ${pePesos(peUltimoPdf.abono)}${peUltimoPdf.abono_iva ? " + IVA" : ""} por mes.` : ""} Válido hasta el ${peUltimoPdf.vence}.` + (peUltimoPdf.link ? `\nPodés verlo acá: ${peUltimoPdf.link}` : "\nTe paso el PDF a continuación.") + "\nCualquier consulta, a disposición.";
-  window.open(`https://wa.me/${numero}?text=${encodeURIComponent(texto)}`, "_blank", "noopener");
+  window.open(`https://api.whatsapp.com/send?phone=${numero}&text=${encodeURIComponent(texto)}`, "_blank", "noopener");
   if (!peUltimoPdf.link) showToast("No se pudo subir el PDF: mandalo con «Compartir el PDF».");
 }
 
@@ -18419,7 +18419,7 @@ async function cqMandar3DLink(paquete) {
   if (navigator.share) {
     try { await navigator.share({ title: "Tu casa en 3D", text: texto }); return; } catch (e) { if (e && e.name === "AbortError") return; }
   }
-  window.open("https://wa.me/?text=" + encodeURIComponent(texto), "_blank", "noopener");
+  window.open("https://api.whatsapp.com/send?text=" + encodeURIComponent(texto), "_blank", "noopener");
 }
 async function cqMandar3DArchivo(paquete) {
   const espera = cqCapaCargando("Armando el archivo…");
@@ -18712,7 +18712,7 @@ async function cqAbrirPropuestas() {
     if (b.dataset.acc === "wa") {
       const nombre = String(v.cliente || "").trim().split(/\s+/)[0];
       const texto = `Hola${nombre ? " " + nombre : ""}! ¿Pudiste ver cómo quedaría tu sistema de seguridad? Te lo dejo de nuevo: ${url(v)}\nCualquier duda te llamo y lo charlamos.`;
-      window.open("https://wa.me/?text=" + encodeURIComponent(texto), "_blank", "noopener");
+      window.open("https://api.whatsapp.com/send?text=" + encodeURIComponent(texto), "_blank", "noopener");
     }
     if (b.dataset.acc === "ver") window.open(url(v) + "&yo=1", "_blank", "noopener");
     if (b.dataset.acc === "llamado") guardar(v, { llamada_atendida: true });
