@@ -5985,6 +5985,42 @@ test("Mails del parte: se ocultan las secciones vacías, «Lo que se pidió» so
   assert.match(conCostos, /Materiales utilizados[\s\S]*Batería 12V/);
 });
 
+test("Parte: si la fecha no es hoy (borrador de ayer o APP abierta desde ayer), pregunta antes de la firma", async () => {
+  const { ctx, page, erroresPagina } = await paginaConEstilo("nuevo");
+  const ayer = await page.evaluate(() => { const d = new Date(); d.setDate(d.getDate() - 1); return fechaLocalISO(d); });
+  const hoy = await page.evaluate(() => fechaLocalISO());
+  const preparar = async () => page.evaluate((f) => {
+    seleccionarServicio({ numero_servicio: "37964", cliente: "Lardone Flavia", direccion: "Mitre 100", localidad: "Rosario", tarea: "Revisar alarma" });
+    showScreen("form");
+    tecnicoSelect.value = tecnicoSelect.options[1] ? tecnicoSelect.options[1].value : "";
+    if (!tecnicoSelect.value) { tecnicoSelect.value = "otro"; tecnicoOtro.value = "Seba"; }
+    document.getElementById("f_fecha").value = f;
+    document.getElementById("f_entrada").value = "10:00";
+    document.getElementById("f_salida").value = "11:10";
+    document.getElementById("f_tarea").value = "Se reprogramó la anulación de zonas";
+  }, ayer);
+  await preparar();
+  await page.evaluate(() => document.getElementById("toSignBtn").click());
+  await page.waitForSelector(".dlg-app");
+  assert.match(await page.textContent(".dlg-texto"), /La fecha del parte es el \d\d\/\d\d \(ayer\), no hoy/);
+  await page.click(".dlg-si");
+  assert.strictEqual(await page.inputValue("#f_fecha"), hoy, "«Sí, poner hoy» cambia la fecha");
+  await page.waitForFunction(() => document.getElementById("screen-sign").dataset.active === "true");
+  // Si de verdad fue ayer, se deja y no vuelve a preguntar.
+  await page.evaluate(() => showScreen("form"));
+  await preparar();
+  await page.evaluate(() => document.getElementById("toSignBtn").click());
+  await page.waitForSelector(".dlg-app");
+  await page.click(".dlg-no");
+  assert.strictEqual(await page.inputValue("#f_fecha"), ayer);
+  await page.waitForFunction(() => document.getElementById("screen-sign").dataset.active === "true");
+  await page.evaluate(() => { showScreen("form"); document.getElementById("toSignBtn").click(); });
+  await page.waitForTimeout(200);
+  assert.strictEqual(await page.locator(".dlg-app").count(), 0, "no pregunta dos veces");
+  assert.deepStrictEqual(erroresPagina, []);
+  await ctx.close();
+});
+
 test("Parte: sin «Tarea realizada» no pasa a la firma (ya no se usa la tarea asignada en su lugar)", async () => {
   const { ctx, page, erroresPagina } = await paginaConEstilo("nuevo");
   await page.evaluate(() => {

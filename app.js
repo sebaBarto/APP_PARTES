@@ -3,7 +3,7 @@
 // Versión de la app — sube con cada actualización (3.0.0 -> 3.0.1 ->
 // ... -> 3.0.9 -> 3.1.0 -> ...), para poder verificar a simple vista
 // que un celular tiene la última versión.
-const APP_VERSION = "4.87.3";
+const APP_VERSION = "4.87.4";
 
 // Si el celular quedó con un index.html viejo (de antes de los Ajustes) y
 // un app.js nuevo, faltan elementos y la app se rompe a mitad de carga.
@@ -872,6 +872,8 @@ function armarBorrador() {
   };
 }
 
+// Fecha que el técnico ya confirmó para este parte (no se le vuelve a preguntar).
+let fechaConfirmadaParte = "";
 function hayAlgoCargadoEnElForm() {
   const b = armarBorrador();
   return !!(
@@ -945,6 +947,7 @@ function restaurarBorradorSiExiste(numeroServicio) {
   tecnicoSelect2.dispatchEvent(new Event("change", { bubbles: true }));
   tecnicoOtro2.value = b.tecnico2_otro || "";
   document.getElementById("f_fecha").value = b.fecha || "";
+  fechaConfirmadaParte = "";
   document.getElementById("f_entrada").value = b.hora_entrada || "";
   document.getElementById("f_salida").value = b.hora_salida || "";
   imprevistoCheck.checked = !!b.imprevisto;
@@ -4487,6 +4490,7 @@ function resetForm() {
   tecnicoOtro2.value = "";
   tecnicoOtro2.style.display = "none";
   document.getElementById("f_fecha").value = "";
+  fechaConfirmadaParte = "";
   document.getElementById("f_entrada").value = "";
   document.getElementById("f_salida").value = "";
   horarioCruzaDiaAviso.classList.add("hidden");
@@ -4605,7 +4609,7 @@ agregarClaveBtn.addEventListener("click", () => {
 abrirClavesBtn.addEventListener("click", () => showScreen("claves"));
 guardarClavesBtn.addEventListener("click", () => showScreen("form"));
 
-toSignBtn.addEventListener("click", () => {
+toSignBtn.addEventListener("click", async () => {
   // Se completa sola con la hora actual del celular, si todavía no
   // se había puesto nada — así el técnico no tiene que acordarse de
   // tocarla a mano. Si ya tenía algo cargado (por ejemplo, restauró
@@ -4629,6 +4633,23 @@ toSignBtn.addEventListener("click", () => {
     showToast("Escribí qué hiciste en «Tarea realizada» antes de pasar a la firma.");
     const t = document.getElementById("f_tarea");
     try { t.scrollIntoView({ behavior: "smooth", block: "center" }); t.focus({ preventScroll: true }); } catch (e) { /* nada */ }
+    return;
+  }
+  // La fecha queda de otro día si el parte se empezó antes (borrador guardado
+  // al abrir el servicio) o si la APP quedó abierta desde ayer: se pregunta.
+  const hoyISO = fechaLocalISO();
+  if (data.fecha !== hoyISO && fechaConfirmadaParte !== data.fecha) {
+    const [, mm, dd] = data.fecha.split("-");
+    const ayer = new Date(); ayer.setDate(ayer.getDate() - 1);
+    const cuando = data.fecha === fechaLocalISO(ayer) ? " (ayer)" : data.fecha > hoyISO ? " (un día que todavía no llegó)" : "";
+    const [, hm, hd] = hoyISO.split("-");
+    const usarHoy = await confirmarApp(`La fecha del parte es el ${dd}/${mm}${cuando}, no hoy ${hd}/${hm}. ¿El servicio se hizo hoy?`, { aceptar: `Sí, poner hoy ${hd}/${hm}`, cancelar: `No, fue el ${dd}/${mm}` });
+    if (usarHoy) {
+      document.getElementById("f_fecha").value = hoyISO;
+      guardarBorradorActual();
+    }
+    fechaConfirmadaParte = document.getElementById("f_fecha").value;
+    toSignBtn.click();
     return;
   }
   // Si eligió categoría y modelo pero nunca tocó "+ Agregar", esa
